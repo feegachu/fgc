@@ -10,6 +10,8 @@ import basic from './assets/pico-basic.png'
 import guide from './assets/pico-guide.png'
 import detective from './assets/pico-detective.png'
 import './pico-assistant.css'
+import { PaymentGuideOverlay } from './PaymentGuide'
+import { useGuideRuntime } from './guide-runtime'
 
 const labels: Record<PaymentScenario, string> = {
   'PAY-01': '이번 달 수수료는 얼마야?',
@@ -134,10 +136,24 @@ export function AssistantDemoMount({
 }) {
   if (!enabled || loggingOut || !['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'].includes(user.roleCode))
     return null
-  return <PicoAssistant key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} />
+  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} />
+}
+function AssistantWithGuide({ canProcess }: { canProcess: boolean }) {
+  useEffect(() => () => useGuideRuntime.getState().reset(), [])
+  return (
+    <>
+      <PicoAssistant canProcess={canProcess} />
+      <PaymentGuideOverlay />
+    </>
+  )
 }
 export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   const [open, setOpen] = useState(false)
+  const runtimeSession = useGuideRuntime((state) => state.session)
+  const observed = useGuideRuntime((state) => state.observation)
+  const guideActive =
+    runtimeSession != null && !['PAUSED', 'COMPLETED', 'CANCELLED', 'ERROR'].includes(runtimeSession.status)
+  const visible = open && !guideActive
   const [tab, setTab] = useState<'chat' | 'plan'>('chat')
   const [input, setInput] = useState('')
   const [pickedScenario, setPickedScenario] = useState<PaymentScenario>('PAY-02')
@@ -148,7 +164,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   const panelId = useId(),
     titleId = useId()
   useEffect(() => {
-    if (!open) return
+    if (!visible) return
     textarea.current?.focus()
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) {
@@ -161,7 +177,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       document.removeEventListener('keydown', close)
       document.getElementById(`${panelId}-launcher`)?.focus()
     }
-  }, [open, panelId])
+  }, [visible, panelId])
   useEffect(() => {
     if (open && tab === 'chat')
       stream.current?.scrollTo?.({
@@ -232,7 +248,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   }
   return (
     <div className="pico-assistant-root">
-      {!open && (
+      {!visible && (
         <div className="pico-launcher">
           <span className="pico-launcher-hint">업무가 막히면 피코를 불러요</span>
           <button
@@ -241,13 +257,16 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
             aria-label="피코 업무 비서 열기"
             aria-expanded="false"
             aria-controls={panelId}
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              if (guideActive) useGuideRuntime.getState().pause()
+              setOpen(true)
+            }}
           >
             <img src={basic} alt="피코" />
           </button>
         </div>
       )}
-      {open && (
+      {visible && (
         <aside id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className="pico-panel">
           <header className="pico-panel-header">
             <div className="pico-avatar">
@@ -434,17 +453,35 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                     : '대화에서 시연 질문을 선택하면 안내 순서를 볼 수 있어요.'}
                 </p>
                 {plan && (
-                  <ol>
-                    {plan.steps.map((step) => (
-                      <li key={step.stepId}>
-                        <b>{step.title}</b>
-                        <p>{step.instruction}</p>
-                      </li>
-                    ))}
-                  </ol>
+                  <>
+                    <ol>
+                      {plan.steps.map((step) => (
+                        <li key={step.stepId}>
+                          <b>{step.title}</b>
+                          <p>{step.instruction}</p>
+                        </li>
+                      ))}
+                    </ol>
+                    {observed?.ready && plan && (
+                      <button
+                        type="button"
+                        className="pico-plan-button"
+                        onClick={() => {
+                          if (useGuideRuntime.getState().start(plan.workflowId)) setOpen(false)
+                        }}
+                      >
+                        현재 지급 화면의 고정 도움말 시작
+                      </button>
+                    )}
+                    {!observed && (
+                      <p>
+                        실제 안내는 지급 건 작성 화면에서 시작할 수 있어요. 입력 보호를 위해 자동 이동하지 않습니다.
+                      </p>
+                    )}
+                  </>
                 )}
                 <p className="pico-plan-boundary">
-                  화면 이동·강조와 실제 처리 결과 연결은 다음 단계에서 제공됩니다. 이 화면에서 저장·확정하지 않습니다.
+                  시연 순서와 별개로 현재 지급 화면의 고정 도움말을 시작할 수 있어요. 저장·확정은 직접 실행합니다.
                 </p>
               </div>
             )}

@@ -9,6 +9,7 @@ import type { RequestOptions } from '../../lib/api/client'
 import { useToastStore } from '../../stores/toasts'
 import TransactionFormPage from './TransactionFormPage'
 import { draftQuery } from './form-api'
+import { useGuideRuntime } from '../assistant/guide-runtime'
 import type { Payment, Precheck } from './form-api'
 
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'TRAN-TEST' })
@@ -74,6 +75,8 @@ beforeEach(() => {
   }) as typeof apiClient.request)
 })
 afterEach(() => {
+  vi.unstubAllEnvs()
+  useGuideRuntime.setState({ session: null, observation: null })
   vi.restoreAllMocks()
   clients.splice(0).forEach((client) => client.clear())
 })
@@ -665,5 +668,43 @@ describe('CAP rejection recovery and resolved transport failures (#410)', () => 
     expect(button('btn-save')).toBeEnabled()
     expect(button('btn-precheck')).toBeEnabled()
     expect(button('btn-confirm')).toBeDisabled()
+  })
+})
+
+describe('read-only guide projection on the real payment form', () => {
+  it('observes the fetched draft and invalidates saved proof after a real form edit without writing', async () => {
+    vi.stubEnv('VITE_ASSISTANT_DEMO', 'true')
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(useGuideRuntime.getState().observation?.saved).toBe(true))
+    await user.click(screen.getByRole('button', { name: '초안 작성 도움말' }))
+    expect(useGuideRuntime.getState().session?.workflowId).toBe('payment.draft')
+    useGuideRuntime.getState().targetReady()
+    useGuideRuntime.getState().next()
+    await user.clear(screen.getByLabelText(/금액 \(원\)/))
+    await user.type(screen.getByLabelText(/금액 \(원\)/), '123000')
+    await waitFor(() => expect(useGuideRuntime.getState().observation?.saved).toBe(false))
+    expect(useGuideRuntime.getState().session?.index).toBe(0)
+    expect(writes()).toHaveLength(0)
+    const before = useGuideRuntime.getState().observation?.revision
+    mutation = () => {
+      throw new ApiError({ code: 'FGC-COMMON-500', message: 'failed' }, 'QA', 500)
+    }
+    await user.click(button('btn-save'))
+    await waitFor(() => expect(screen.getAllByText(/요청을 처리하지 못했습니다/).length).toBeGreaterThan(0))
+    expect(useGuideRuntime.getState().observation?.saved).toBe(false)
+    expect(useGuideRuntime.getState().observation?.revision).toBe(before)
+    mutation = () => ({ ...saved, amount: 123000 })
+    await user.click(button('btn-save'))
+    await waitFor(() => expect(useGuideRuntime.getState().observation?.saved).toBe(true))
+    expect(writes()).toHaveLength(2) // only the user's two explicit save clicks
+  })
+  it('exposes read help only for lookup capability and no observation when flag is off', async () => {
+    vi.stubEnv('VITE_ASSISTANT_DEMO', 'true')
+    mount('/app/transactions/new?id=77&month=2026-07', false)
+    await waitFor(() => expect(useGuideRuntime.getState().observation?.ready).toBe(true))
+    expect(screen.queryByRole('button', { name: '초안 작성 도움말' })).not.toBeInTheDocument()
+    expect(useGuideRuntime.getState().start('payment.confirm')).toBe(false)
+    expect(useGuideRuntime.getState().start('payment.amount.review')).toBe(true)
+    expect(writes()).toHaveLength(0)
   })
 })

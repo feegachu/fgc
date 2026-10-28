@@ -13,7 +13,11 @@ import type { FormValues } from './form-model'
 
 export function GatePanel({ result }: { result: Precheck | null }) {
   return (
-    <section className="surface transaction-gate-panel" aria-labelledby="transaction-gate-title">
+    <section
+      data-guide-target="payment.precheck.result"
+      className="surface transaction-gate-panel"
+      aria-labelledby="transaction-gate-title"
+    >
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-gate-title">
           ③ 확정 게이트 6단계
@@ -238,7 +242,7 @@ export function ConfirmationModal({
         </>
       }
     >
-      <div className="transaction-confirm-body">
+      <div data-guide-target="payment.confirm.dialog" className="transaction-confirm-body">
         <div className="guidance guidance-warning">
           <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
             warning
