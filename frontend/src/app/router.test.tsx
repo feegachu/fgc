@@ -51,10 +51,10 @@ function renderAt(path: string, roleCode = 'SETTLEMENT') {
   return router
 }
 describe('AppShell·라우트', () => {
-  it('AGENT의 관리자 홈 직접 접근은 관리자 API 호출 없이 본인 계약 목록으로 이동한다', async () => {
+  it('AGENT의 관리자 홈 직접 접근은 관리자 API 호출 없이 포트폴리오로 이동한다', async () => {
     const router = renderAt('/', 'AGENT')
-    await screen.findByRole('heading', { name: '보험계약 목록' })
-    expect(router.state.location.pathname).toBe('/contracts')
+    await screen.findByRole('heading', { name: '포트폴리오' })
+    expect(router.state.location.pathname).toBe('/agent-home')
     const paths = vi.mocked(apiClient.request).mock.calls.map(([path]) => path)
     expect(paths.some((path) => /dashboard|home\/summary|base\/agents|base\/organizations/.test(path))).toBe(false)
     expect(screen.queryByRole('link', { name: '업무 대시보드' })).not.toBeInTheDocument()
@@ -69,13 +69,13 @@ describe('AppShell·라우트', () => {
     await screen.findByRole('heading', { name: '보험계약 목록' })
     await router.navigate('/?month=2026-08')
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/contracts')
+      expect(router.state.location.pathname).toBe('/agent-home')
       expect(router.state.location.search).toContain('month=2026-08')
       expect(useWorkspaceStore.getState().month).toBe('2026-08')
     })
     await router.navigate('/?month=2026-99')
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/contracts')
+      expect(router.state.location.pathname).toBe('/agent-home')
       expect(router.state.location.search).toContain('month=2026-08')
     })
   })

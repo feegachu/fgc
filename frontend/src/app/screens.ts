@@ -13,6 +13,7 @@ export interface ScreenDefinition {
 }
 export const screens: ScreenDefinition[] = [
   { id: 'DASH-W01', path: '/', title: '업무 대시보드', menu: '/', icon: 'dashboard' },
+  { id: 'AGNT-W01', path: '/agent-home', title: '포트폴리오', menu: '/agent-home', icon: 'home' },
   {
     id: 'BASE-W01',
     path: '/base',
@@ -163,6 +164,8 @@ export const canOpen = (
   screen: ScreenDefinition,
   user: Partial<Record<Permission, boolean>> & { isAgent?: boolean; roleCode?: string },
 ) => {
-  if ((user.isAgent || user.roleCode === 'AGENT') && !['CONT-W01', 'CONT-W02', 'TRAN-W01'].includes(screen.id)) return false
+  const agent = user.isAgent || user.roleCode === 'AGENT'
+  if (screen.id === 'AGNT-W01') return agent
+  if (agent && !['CONT-W01', 'CONT-W02', 'TRAN-W01'].includes(screen.id)) return false
   return !screen.permission || user[screen.permission] === true
 }

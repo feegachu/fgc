@@ -48,3 +48,35 @@ export function useDrawn(): boolean {
   }, [animate])
   return drawn
 }
+
+/**
+ * 숫자 배열을 이전 값에서 목표값까지 부드럽게 옮긴다(필터를 바꿀 때 차트가 모양을 바꾸는 효과).
+ * 길이가 달라지면 새로 생기는 칸은 0에서 시작한다. fromZero 이면 처음 그릴 때도 0에서 올라온다.
+ * 모션을 쓰지 않으면 목표값을 그대로 돌려준다.
+ */
+export function useTween(target: number[], durationMs = 500, fromZero = false): number[] {
+  const [animate] = useState(canAnimate)
+  const key = target.join(',')
+  const [value, setValue] = useState<number[]>(animate && fromZero ? target.map(() => 0) : target)
+  const currentRef = useRef<number[]>(value)
+
+  useEffect(() => {
+    if (!animate) return
+    const to = key === '' ? [] : key.split(',').map(Number)
+    const from = to.map((_, i) => currentRef.current[i] ?? 0)
+    if (from.every((v, i) => v === to[i]) && from.length === currentRef.current.length) return
+    const start = performance.now()
+    let frame = 0
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / durationMs)
+      const next = t >= 1 ? to : to.map((v, i) => from[i] + (v - from[i]) * easeOutCubic(t))
+      currentRef.current = next
+      setValue(next)
+      if (t < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [animate, key, durationMs])
+
+  return animate ? value : target
+}

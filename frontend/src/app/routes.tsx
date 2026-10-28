@@ -17,6 +17,7 @@ import { RequirePermission } from './RequirePermission'
 // 직접 import한 화면은 초기 번들에 들어간다.
 const pages: Record<string, ComponentType> = {
   '/': HomePage,
+  '/agent-home': lazy(() => import('../features/agent-home/AgentHomePage').then((m) => ({ default: m.AgentHomePage }))),
   '/base': BasePage,
   '/policies': PoliciesPage,
   '/arbitrage-checks': lazy(() => import('../features/arbitrage/ArbitragePage')),
