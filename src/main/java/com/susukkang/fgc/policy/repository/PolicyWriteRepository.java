@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.policy.dto.PolicyApprovalActionResponse;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
+import com.susukkang.fgc.policy.dto.PolicyFeeLimit;
 import com.susukkang.fgc.policy.dto.PolicyWriteResult;
 import com.susukkang.fgc.policy.entity.PolicyVersion;
 import jakarta.persistence.EntityManager;
@@ -151,6 +152,20 @@ public class PolicyWriteRepository {
             }
         }
         touchPolicy(policy);
+    }
+
+    public Map<Long, Set<PolicyFeeLimit>> readFeeLimits(Long policyId) {
+        Map<Long, Set<PolicyFeeLimit>> limits = new LinkedHashMap<>();
+        org.springframework.jdbc.core.RowCallbackHandler collect = rs -> limits
+                .computeIfAbsent(rs.getLong(1), ignored -> new HashSet<>())
+                .add(new PolicyFeeLimit(rs.getString(2), rs.getBigDecimal(3), rs.getBoolean(4)));
+        jdbc.query("""
+                SELECT l.fee_regime_ruleset_id, l.limit_code, l.limit_pct, l.includes_indirect_expense_yn
+                FROM fgc.fee_regime_ruleset_limit l
+                JOIN fgc.fee_regime_ruleset r ON r.fee_regime_ruleset_id = l.fee_regime_ruleset_id
+                WHERE r.policy_version_id = ?
+                """, collect, policyId);
+        return limits;
     }
 
     private Map<Long, OffsetDateTime> creationTimes(boolean feeRegime, Long policyId) {

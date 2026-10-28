@@ -6,13 +6,16 @@ import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.CommissionRuleDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.FeeRegimeRuleDraft;
+import com.susukkang.fgc.policy.dto.PolicyFeeLimit;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.LongStream;
 
@@ -35,6 +38,33 @@ public class PolicySuccessionValidator {
                 throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 룰셋의 판매일·기초서류 적용 범위가 빠져 있습니다.");
             }
         }
+    }
+
+    /** 초안 DTO에 없는 부속 한도도 양방향으로 보존해야 기존 계약의 판정이 바뀌지 않는다. */
+    public void validateFeeLimits(PolicyDraft previous, PolicyDraft replacement,
+                                 Map<Long, Set<PolicyFeeLimit>> previousLimits,
+                                 Map<Long, Set<PolicyFeeLimit>> replacementLimits) {
+        for (FeeRegimeRuleDraft old : previous.feeRegimeRules()) {
+            List<FeeRegimeRuleDraft> sameLimits = replacement.feeRegimeRules().stream()
+                    .filter(rule -> sameFeeTerms(old, rule)
+                            && limitsFor(old, previousLimits).equals(limitsFor(rule, replacementLimits))).toList();
+            if (!coversFeeRule(old, sameLimits)) throw incompleteFeeLimits();
+        }
+        for (FeeRegimeRuleDraft rule : replacement.feeRegimeRules()) {
+            if (previous.feeRegimeRules().stream().noneMatch(old -> feeScopesOverlap(rule, old))) continue;
+            List<FeeRegimeRuleDraft> sameLimits = previous.feeRegimeRules().stream()
+                    .filter(old -> sameFeeTerms(old, rule)
+                            && limitsFor(old, previousLimits).equals(limitsFor(rule, replacementLimits))).toList();
+            if (!coversFeeRule(rule, sameLimits)) throw incompleteFeeLimits();
+        }
+    }
+
+    private static Set<PolicyFeeLimit> limitsFor(FeeRegimeRuleDraft rule, Map<Long, Set<PolicyFeeLimit>> limits) {
+        return rule.feeRegimeRulesetId() == null ? Set.of() : limits.getOrDefault(rule.feeRegimeRulesetId(), Set.of());
+    }
+
+    private static FgcBusinessException incompleteFeeLimits() {
+        return incomplete("feeRegimeRules", "승계본은 기존 분급 한도를 유지해야 합니다. 한도가 복제된 기존 행을 보존하세요.");
     }
 
     /** REG-22: 이미 적용하던 계약 범위에는 새 금액 조건이나 우선순위를 끼워 넣지 않는다. */
@@ -119,8 +149,8 @@ public class PolicySuccessionValidator {
         if (!coversScope(replacement.basicDocumentVersion(), previous.basicDocumentVersion())) {
             throw incomplete("basicDocumentVersion", "승계본은 기존 ACTIVE의 기초서류 범위를 모두 포함해야 합니다.");
         }
-        if (start(replacement.effectiveFrom()) > start(previous.effectiveFrom())) {
-            throw incomplete("effectiveFrom", "승계본의 시작일은 기존 ACTIVE의 시작일보다 늦을 수 없습니다.");
+        if (!Objects.equals(replacement.effectiveFrom(), previous.effectiveFrom())) {
+            throw incomplete("effectiveFrom", "승계본의 시작일은 기존 ACTIVE와 같아야 합니다. 과거 적용 범위를 확장하거나 누락할 수 없습니다.");
         }
         if (end(replacement.effectiveTo()) < end(previous.effectiveTo())) {
             throw incomplete("effectiveTo", "승계본은 기존 ACTIVE의 종료일(무기한 포함)을 모두 포함해야 합니다.");

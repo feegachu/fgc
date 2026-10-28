@@ -5,7 +5,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
+import com.susukkang.fgc.policy.dto.PolicyFeeLimit;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -46,6 +51,7 @@ class PolicySuccessionValidatorTest {
     @Test
     void rejectsLosingPastDatesOpenEndedCoverageOrHeaderWildcard() throws Exception {
         ObjectNode previous = document();
+        assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2025-12-31"), "effectiveFrom");
         assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-01"), "effectiveFrom");
         assertInvalid(previous, previous.deepCopy().put("effectiveTo", "2099-12-31"), "effectiveTo");
         assertInvalid(previous, previous.deepCopy().put("basicDocumentVersion", "NARROW"), "basicDocumentVersion");
@@ -135,6 +141,27 @@ class PolicySuccessionValidatorTest {
         ObjectNode replacement = previous.deepCopy();
         replacement.withArray("feeRegimeRules").remove(1);
         assertInvalid(previous, replacement, "feeRegimeRules");
+    }
+
+    @Test
+    void preservesHiddenRegimeLimitsAcrossNewIdsAndRejectsMissingOrChangedLimits() throws Exception {
+        ObjectNode previous = document().put("policyType", "FOUR_YEAR_COMMISSION").put("feeRegimeCode", "FOUR_YEAR_2027");
+        previous.withArray("feeRegimeRules").addObject().put("feeRegimeRulesetId", 1)
+                .put("feeRegimeCode", "FOUR_YEAR_2027").put("salesStartDateFrom", "2027-01-01").put("maxInstallments", 48);
+        ObjectNode replacement = previous.deepCopy();
+        ((ObjectNode) replacement.path("feeRegimeRules").get(0)).put("feeRegimeRulesetId", 2);
+        var originalLimits = Map.of(1L, Set.of(new PolicyFeeLimit("UPFRONT_TOTAL", new BigDecimal("100.0"), true)));
+        var copiedLimits = Map.of(2L, Set.of(new PolicyFeeLimit("UPFRONT_TOTAL", new BigDecimal("100.0000"), true)));
+        assertThatCode(() -> validator.validateFeeLimits(draft(previous), draft(replacement), originalLimits, copiedLimits))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> validator.validateFeeLimits(draft(previous), draft(replacement), originalLimits, Map.of()))
+                .isInstanceOf(FgcBusinessException.class);
+        var changedLimit = Map.of(2L, Set.of(new PolicyFeeLimit("UPFRONT_TOTAL", new BigDecimal("90"), true)));
+        assertThatThrownBy(() -> validator.validateFeeLimits(draft(previous), draft(replacement), originalLimits, changedLimit))
+                .isInstanceOf(FgcBusinessException.class);
+        var changedIndirect = Map.of(2L, Set.of(new PolicyFeeLimit("UPFRONT_TOTAL", new BigDecimal("100"), false)));
+        assertThatThrownBy(() -> validator.validateFeeLimits(draft(previous), draft(replacement), originalLimits, changedIndirect))
+                .isInstanceOf(FgcBusinessException.class);
     }
 
     private void assertValid(ObjectNode previous, ObjectNode replacement) {

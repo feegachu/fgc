@@ -456,6 +456,32 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void rejectsReaddedRegimeRowsThatLoseInheritedLimits() throws Exception {
+        Long sourceId = jdbc.queryForObject("""
+                SELECT policy_version_id FROM fgc.policy_version
+                WHERE policy_code = 'REG-FOUR-YEAR-2027-V1' AND version_no = 1
+                """, Long.class);
+        JsonNode original = detail(sourceId, writer).path("editDocument");
+        JsonNode copy = write(HttpMethod.POST, "/api/v1/policies/" + sourceId + "/versions",
+                cloneRequest(original.path("effectiveFrom").asText()), writer, key(), 201);
+        long copyId = copy.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(copyId, writer).path("editDocument").deepCopy();
+        long inheritedFeeId = edit.path("feeRegimeRules").get(0).path("feeRegimeRulesetId").asLong();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = ?",
+                Integer.class, inheritedFeeId)).isPositive();
+        ((ObjectNode) edit.path("feeRegimeRules").get(0)).remove("feeRegimeRulesetId");
+        ObjectNode commission = (ObjectNode) draft().path("commissionRules").get(0).deepCopy();
+        commission.put("feeComponentType", "UPFRONT");
+        edit.withArray("commissionRules").add(commission);
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + copyId, edit, writer, key(), 200);
+        JsonNode error = actionError(copyId, "SUBMIT", updated, writer, 400);
+        assertThat(error.path("field").asText()).isEqualTo("feeRegimeRules");
+        assertThat(error.path("detail").asText()).contains("한도");
+        assertThat(detail(copyId, writer).path("header").path("status").asText()).isEqualTo("DRAFT");
+        assertThat(detail(sourceId, writer).path("editDocument")).isEqualTo(original);
+    }
+
+    @Test
     void rejectsApprovalOverlappingExistingWildcardPolicyEvenForANewInsurer() throws Exception {
         ObjectNode draft = draft().put("effectiveFrom", "2090-01-01").put("effectiveTo", "2090-12-31");
         JsonNode created = create(draft, writer);

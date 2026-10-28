@@ -53,6 +53,11 @@ class PolicySuccessionIntegrationTest {
         JsonNode error = action(narrowId, "SUBMIT", narrow, writer, 400);
         assertThat(error.path("field").asText()).isEqualTo("effectiveFrom");
 
+        String earlierDate = java.time.LocalDate.parse(original.path("header").path("effectiveFrom").asText()).minusDays(1).toString();
+        JsonNode earlier = clone(originalId, earlierDate, writer);
+        assertThat(action(earlier.path("policyVersionId").asLong(), "SUBMIT", earlier, writer, 400)
+                .path("field").asText()).isEqualTo("effectiveFrom");
+
         JsonNode changed = clone(originalId, original.path("header").path("effectiveFrom").asText(), writer);
         long changedId = changed.path("policyVersionId").asLong();
         ObjectNode changedDocument = (ObjectNode) detail(changedId, writer).path("editDocument").deepCopy();

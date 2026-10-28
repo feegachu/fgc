@@ -166,7 +166,11 @@ public class PolicyWriteService {
             if (previous.getVersionNo() >= policy.getVersionNo()) {
                 throw stateConflict("현재 ACTIVE보다 높은 버전만 승계할 수 있습니다.");
             }
-            successionValidator.validate(writeRepository.readDraft(previous), replacement);
+            PolicyDraft original = writeRepository.readDraft(previous);
+            successionValidator.validate(original, replacement);
+            successionValidator.validateFeeLimits(original, replacement,
+                    writeRepository.readFeeLimits(previous.getPolicyVersionId()),
+                    writeRepository.readFeeLimits(policy.getPolicyVersionId()));
         }
         if (next == PolicyStatus.REVIEW) return; // 작성자가 불완전/소급 변경 초안을 바로 보완할 수 있도록 제출 때도 검사한다.
         if (next == PolicyStatus.ACTIVE) {
