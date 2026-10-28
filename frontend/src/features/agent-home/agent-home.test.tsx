@@ -85,7 +85,15 @@ describe('AGNT-W01 포트폴리오', () => {
         contract({ contractId: 2, contractNo: 'C-0002', contractDate: '2026-07-20', monthlyEquivalentFirstPremium: 80000 }),
         contract({ contractId: 3, contractNo: 'C-0003', contractDate: '2026-06-02', monthlyEquivalentFirstPremium: 100000 }),
       ])
-    payments = async () => page([{ amount: 300000, status: 'CONFIRMED' }, { amount: 200000, status: 'DRAFT' }, { amount: 900000, status: 'CANCELLED' }])
+    const fc = { paymentStage: 'GA_TO_FC', cashflowType: 'PAYMENT' }
+    payments = async () =>
+      page([
+        { ...fc, amount: 300000, status: 'CONFIRMED' },
+        { ...fc, amount: 200000, status: 'DRAFT' },
+        { ...fc, amount: 900000, status: 'CANCELLED' },
+        { ...fc, amount: 50000, status: 'CONFIRMED', cashflowType: 'DEDUCTION' },
+        { ...fc, amount: 700000, status: 'CONFIRMED', paymentStage: 'INSURER_TO_GA' },
+      ])
     renderHome()
     expect(await kpi('신규 계약 건수')).toHaveTextContent('2건')
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
@@ -107,6 +115,7 @@ describe('AGNT-W01 포트폴리오', () => {
     const dialog = screen.getByRole('dialog', { name: '확인 필요 계약 2건' })
     expect(within(dialog).getByText(/C-0002/)).toBeInTheDocument()
     expect(within(dialog).getByText(/C-0003/)).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: /C-0002/ })).toHaveAttribute('href', '/app/contracts/2')
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })

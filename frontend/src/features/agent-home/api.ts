@@ -17,9 +17,10 @@ async function allPages<T>(path: string, signal?: AbortSignal) {
     )
     if (!data || !Array.isArray(data.content)) throw new Error('응답 데이터를 확인할 수 없습니다.')
     rows.push(...data.content)
-    if (page >= (data.totalPages ?? 1)) break
+    if (page >= (data.totalPages ?? 1)) return rows
   }
-  return rows
+  // 상한까지 읽고도 더 있으면 일부만 합산한 값을 정상으로 보여 주지 않도록 오류로 알린다.
+  throw new Error(`조회 건수가 너무 많아 일부만 읽었어요(최대 ${PAGE * MAX_PAGES}건).`)
 }
 
 export const agentContractsQuery = () =>
@@ -58,7 +59,7 @@ export const agentProductsQuery = (insurerIds: number[], asOf: string) =>
     meta: { errorToast: false },
   })
 
-/** 해당 월 본인 수수료 지급 건 합계(취소 제외). */
+/** 해당 월 본인 수수료 지급 합계. 설계사 지급(GA_TO_FC)의 지급(PAYMENT) 건만 더하고 취소·공제(환수)는 제외한다. */
 export const agentCommissionQuery = (month: string) =>
   queryOptions({
     queryKey: ['agent-home', 'commission', month],
@@ -67,7 +68,9 @@ export const agentCommissionQuery = (month: string) =>
         `/api/v1/transactions?settlementMonth=${encodeURIComponent(month)}`,
         signal,
       )
-      return rows.filter((row) => row.status !== 'CANCELLED').reduce((sum, row) => sum + (row.amount ?? 0), 0)
+      return rows
+        .filter((row) => row.status !== 'CANCELLED' && row.paymentStage === 'GA_TO_FC' && row.cashflowType === 'PAYMENT')
+        .reduce((sum, row) => sum + (row.amount ?? 0), 0)
     },
     meta: { errorToast: false },
   })

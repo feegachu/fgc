@@ -109,8 +109,11 @@ export function monthStats(rows: Row[], month: string): MonthStats {
   }
 }
 
-/** 전월 대비 증감률(%). 전월 값이 0이면 비교할 수 없어 0으로 둔다. */
-export const deltaPercent = (now: number, before: number) => (before ? Math.round(((now - before) / before) * 100) : 0)
+/** 비율을 소수점 한 자리로 맞춘다(화면 표시 기준). */
+const oneDecimal = (value: number) => Math.round(value * 10) / 10
+
+/** 전월 대비 증감률(%, 소수점 한 자리). 전월 값이 0이면 비교할 수 없어 0으로 둔다. */
+export const deltaPercent = (now: number, before: number) => (before ? oneDecimal(((now - before) / before) * 100) : 0)
 
 export interface Aggregate {
   base: Row[]
@@ -150,7 +153,7 @@ export function categoryCounts(focus: Row[]) {
   const total = focus.length || 1
   return CATEGORIES.map((name, i) => {
     const count = focus.filter((r) => r.category === name).length
-    return { name, count, pct: Math.round((count / total) * 100), color: CATEGORY_COLORS[i] }
+    return { name, count, pct: oneDecimal((count / total) * 100), color: CATEGORY_COLORS[i] }
   })
 }
 
@@ -158,7 +161,7 @@ export function statusCounts(focus: Row[]) {
   const total = focus.length || 1
   return STATUS_DEFS.map((def) => {
     const count = focus.filter((r) => r.status === def.key).length
-    return { ...def, count, pct: Math.round((count / total) * 100) }
+    return { ...def, count, pct: oneDecimal((count / total) * 100) }
   })
 }
 

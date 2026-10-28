@@ -4,7 +4,7 @@ import { int, won } from '../../lib/format'
 import { useDrawn } from '../../lib/motion'
 import type { Slice } from './model'
 
-/** 마우스를 올리면 따라다니는 설명 상자. 차트 본체는 aria-label과 아래 범례·표가 대신 읽어 준다. */
+/** 마우스를 올리면 따라다니는 설명 상자. 차트 값은 범례·목록·숨은 표가 스크린 리더에 대신 읽어 준다. */
 function useTip() {
   const [tip, setTip] = useState<{ x: number; y: number; body: ReactNode } | null>(null)
   const show = (event: React.MouseEvent<HTMLElement | SVGElement>, body: ReactNode) => {
@@ -119,7 +119,7 @@ export function Donut({
                   {s.name}
                   <b>{s.value}</b>
                 </span>
-                <em>{total ? Math.round((s.value / total) * 100) : 0}%</em>
+                <em>{total ? ((s.value / total) * 100).toFixed(1) : '0.0'}%</em>
               </button>
             </li>
           )
@@ -205,6 +205,25 @@ export function Trend({ points }: { points: { month: string; count: number; prem
           </g>
         )}
       </svg>
+      <table className="visually-hidden">
+        <caption>월별 신규 계약 건수와 월 환산 보험료</caption>
+        <thead>
+          <tr>
+            <th scope="col">월</th>
+            <th scope="col">신규 계약</th>
+            <th scope="col">월 환산 보험료</th>
+          </tr>
+        </thead>
+        <tbody>
+          {points.map((p) => (
+            <tr key={p.month}>
+              <th scope="row">{p.month}</th>
+              <td>{p.count}건</td>
+              <td>{won(p.premium)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <Tip tip={tip} />
     </div>
   )
@@ -214,7 +233,7 @@ export function ProductBars({ items }: { items: { name: string; count: number; p
   const drawn = useDrawn()
   const max = Math.max(1, ...items.map((i) => i.count)) * 1.18
   return (
-    <ul className="ah-product" role="img" aria-label="보장 유형별 계약 비중 가로 막대 차트">
+    <ul className="ah-product" aria-label="보장 유형별 계약 비중 가로 막대 차트">
       {items.map((item) => (
         <li key={item.name}>
           <span className="ah-pd-name">{item.name}</span>
@@ -222,7 +241,7 @@ export function ProductBars({ items }: { items: { name: string; count: number; p
             <span className="ah-pd-fill" style={{ width: drawn ? `${(item.count / max) * 100}%` : 0, background: item.color }} />
           </span>
           <b>
-            {item.count}건 · {item.pct}%
+            {item.count}건 · {item.pct.toFixed(1)}%
           </b>
         </li>
       ))}
@@ -245,7 +264,7 @@ export function StatusBar({ items }: { items: { key: string; label: string; colo
           <li key={i.key}>
             <span className="ah-sg-dot" style={{ background: i.color }} />
             {i.label} <b>{i.count}</b>
-            <em>{i.pct}%</em>
+            <em>{i.pct.toFixed(1)}%</em>
           </li>
         ))}
       </ul>

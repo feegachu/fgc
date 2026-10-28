@@ -166,7 +166,7 @@
   & .ah-lg-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 2px; }
   & .ah-lg-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--body); }
   & .ah-lg-name b { margin-left: 3px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
-  & .ah-donut-legend em { flex: 0 0 26px; text-align: right; font-style: normal; font-size: 9.5px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+  & .ah-donut-legend em { flex: 0 0 36px; text-align: right; font-style: normal; font-size: 9.5px; color: #94a3b8; font-variant-numeric: tabular-nums; }
 
   & .ah-trend { height: 246px; }
   & .ah-trend svg { width: 100%; height: 100%; display: block; }
@@ -200,6 +200,8 @@
   & .ah-modal-body { padding: 6px 22px; }
   & .ah-empty { padding: 28px 0; text-align: center; font-size: 12.5px; color: var(--muted); }
   & .ah-need-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid #f1f5f9; }
+  & a.ah-need-row { color: inherit; text-decoration: none; }
+  & a.ah-need-row:hover, & a.ah-need-row:focus-visible { background: var(--brand-50); }
   & .ah-need-row:last-child { border-bottom: 0; }
   & .ah-nr-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
   & .ah-nr-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 400; color: var(--muted); }
@@ -235,6 +237,9 @@
   .ah .ah-kpis { grid-column: 1; grid-row: auto; grid-template-columns: 1fr; padding: 0 14px; }
   .ah .ah-kpi { min-height: 122px; padding: 14px 0; border-right: 0; border-bottom: 1px solid var(--border); }
   .ah .ah-kpi:last-child { border-bottom: 0; }
+  .ah .ah-donut-flex { flex-direction: column; align-items: stretch; }
+  .ah .ah-donut-canvas { align-self: center; }
+  .ah .ah-donut-legend { flex: none; width: 100%; }
   .ah .ah-frame-layer { inset: 0 0 60px 0; }
   .ah .ah-launcher { width: 104px; height: 104px; right: 16px; bottom: 78px; }
   .ah .ah-launcher img { width: 100px; height: 100px; }
