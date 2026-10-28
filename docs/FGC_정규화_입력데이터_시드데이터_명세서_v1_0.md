@@ -302,13 +302,13 @@ auth_refresh_token
 | `gaadmin` | GA_ADMIN | 정책·조직 조회 |
 | `settle01` | SETTLEMENT | 정산 실행·예외처리 |
 | `audit01` | COMPLIANCE | 조회 전용 |
-| `agent01` | AGENT | (2차, V64) `app_user.agent_id` = `A-FC-001`. 초기 DISABLED, 개별 비밀번호 설정 후 활성화 |
+| `agent01` | AGENT | (2차, V64) `app_user.agent_id` = `A-FC-001`. 초기 DISABLED, 개별 비밀번호 설정 후 활성화(시연 서버·로컬은 V66, prd 제외) |
 
 
-**V66 갱신**: 시연 편의를 위해 `db/demo/V66__activate_agent_demo_account.sql`이 `password_hash='!'`인 `agent01`만 팀 합의 시연 비밀번호의 BCrypt 해시로 `ACTIVE` 처리한다(평문은 저장소에 없다). 해시가 저장소에 있으므로 이 계정은 공유 시연 자격 증명이며, 위 신한 prd 배포 전 보호·검증 대상에 `agent01`이 활성 계정으로 포함된다.
+**V66 예외(시연 서버·로컬 한정)**: 시연 편의를 위해 `db/demo-agent/V66__activate_agent_demo_account.sql`이 `password_hash='!'`인 `agent01`만 BCrypt 해시로 `ACTIVE` 처리한다. 위치를 `db/demo`와 분리했으므로 신한 prd는 Flyway locations에 `db/demo-agent`를 넣지 않는 한 이 계정을 활성화하지 않는다(`infra/shinhan/compose.yaml`은 그대로). 이 비밀번호는 V3의 공통 시연 비밀번호와 같은 값이라 공유 시연 자격 증명이며, 아래 prd 보호 규칙은 그대로 적용된다.
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
 
-`agent01`은 공통 시연 자격 증명을 복제하지 않는다. V64 신규 행의 `password_hash='!'`는 로그인 불가능한 미지정 표식이고 `account_status='DISABLED'`다. 시연 관리자가 별도 Secret으로 전달한 비밀번호를 애플리케이션의 BCryptPasswordEncoder로 해시한 뒤, 보호된 관리 연결에서 해당 행에 해시와 `ACTIVE` 상태를 함께 설정해야 실제 로그인할 수 있다. SQL·PR·로그에 비밀번호나 해시를 붙이지 않는다. 통합 테스트는 트랜잭션 안에서 일회성 UUID 비밀번호를 설정·활성화한 뒤 롤백한다. 이미 존재하는 동일 연결의 agent01은 V64가 덮어쓰지 않으므로 배포 전 별도 보호 검증이 필요하다.
+`agent01`은 신한 prd에서 공통 시연 자격 증명을 복제하지 않는다(시연 서버·로컬의 V66 예외 제외). V64 신규 행의 `password_hash='!'`는 로그인 불가능한 미지정 표식이고 `account_status='DISABLED'`다. 시연 관리자가 별도 Secret으로 전달한 비밀번호를 애플리케이션의 BCryptPasswordEncoder로 해시한 뒤, 보호된 관리 연결에서 해당 행에 해시와 `ACTIVE` 상태를 함께 설정해야 실제 로그인할 수 있다. SQL·PR·로그에 비밀번호나 해시를 붙이지 않는다. 통합 테스트는 트랜잭션 안에서 일회성 UUID 비밀번호를 설정·활성화한 뒤 롤백한다. 이미 존재하는 동일 연결의 agent01은 V64가 덮어쓰지 않으므로 배포 전 별도 보호 검증이 필요하다.
 
 - **AGENT 역할·`agent01`(2차)**: `db/demo/V64__seed_agent_role_and_account.sql`로 추가한다(#634). 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정이며 #634의 V64에서 기본 연결로 적용한다. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
 - **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01`·`agent01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 다섯 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
