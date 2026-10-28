@@ -28,6 +28,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 /**
  * 설명 : 로컬 가짜 OpenAI 서버로 게이트웨이의 요청 계약(store=false·설정 모델·지시/데이터 분리·Files API 미사용)과
@@ -190,19 +191,20 @@ class LlmGatewayIntegrationTest {
 
     /** 차단은 cooldown 이 지나면 풀린다 — 재기동 없이 다음 요청부터 다시 외부로 보낸다. */
     @Test
-    void aiIsReenabledAfterCooldown() throws InterruptedException {
+    void aiIsReenabledAfterCooldown() {
         status = 429;
         responseBody = "{\"error\":{\"message\":\"You exceeded your current quota\",\"type\":\"insufficient_quota\",\"code\":\"insufficient_quota\"}}";
         // 2026-10-28 yslee - 300ms 는 첫 실패 기록(ai_call_log INSERT)이 느린 실행 환경에서 두 번째 호출 전에 끝나 버렸다.
-        // 차단 구간을 2초로 넓혀 두 번째 호출이 반드시 그 안에 들어가게 하고, 그 뒤 2.5초를 기다려 해제를 본다.
+        // 차단 구간을 2초로 넓혀 두 번째 호출이 반드시 그 안에 들어가게 하고, 2.5초 뒤 첫 확인으로 해제를 본다.
         LlmGateway gateway = gateway("test-key", Duration.ofSeconds(2));
 
         assertAi001(() -> gateway.call(request("문서"), DocKind.class));
         assertAi001(() -> gateway.call(request("문서"), DocKind.class));
         status = 200;
         responseBody = OK_BODY;
-        Thread.sleep(2_500);
-        assertThat(gateway.call(request("문서"), DocKind.class).rowCount).isEqualTo(3);
+        // 아직 차단 중이면 call 이 AI_001 예외를 던져 재시도 없이 바로 실패한다(재시도하면 FALLBACK 행이 늘어 아래 단언이 흐려진다).
+        await().pollDelay(Duration.ofMillis(2_500)).atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> assertThat(gateway.call(request("문서"), DocKind.class).rowCount).isEqualTo(3));
 
         assertThat(paths).hasSize(2);
         assertThat(statusAndError()).containsExactly(
