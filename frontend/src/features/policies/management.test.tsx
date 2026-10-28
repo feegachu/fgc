@@ -36,6 +36,24 @@ describe('policy UI boundaries', () => {
     expect(validateDraft(draft)['feeRegimeRules.0.maxInstallments']).toBeTruthy()
     expect(validateDraft(draft)['sourceDetails.0.url']).toBeTruthy()
   })
+  it.each([
+    ['FOUR_YEAR_COMMISSION', 48],
+    ['SEVEN_YEAR_COMMISSION', 84],
+  ] as const)('%s requires an integer installment limit within 1~%s', (policyType, max) => {
+    const draft = regimeDraft(policyType)
+    const rule = draft.feeRegimeRules[0]
+    const errorPath = 'feeRegimeRules.0.maxInstallments'
+    for (const value of [12.5, 0, max + 1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      rule.maxInstallments = value
+      expect(validateDraft(draft)[errorPath]).toBe(`1~${max}회차 사이의 정수로 입력하세요.`)
+    }
+    for (const value of [1, max]) {
+      rule.maxInstallments = value
+      expect(validateDraft(draft)[errorPath]).toBeUndefined()
+    }
+    rule.maxInstallments = ''
+    expect(validateDraft(draft)[errorPath]).toBe('필수 항목을 입력하세요.')
+  })
   it('production editor never claims to save or calls write APIs', () => {
     render(
       <QueryClientProvider client={new QueryClient()}>

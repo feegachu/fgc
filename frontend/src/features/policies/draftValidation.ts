@@ -40,8 +40,11 @@ export function validateDraft(draft: DraftDocument): DraftErrors {
     required(prefix + 'salesStartDateFrom', rule.salesStartDateFrom)
     required(prefix + 'maxInstallments', rule.maxInstallments)
     const max = rule.feeRegimeCode === 'FOUR_YEAR_2027' ? 48 : 84
-    if (rule.maxInstallments !== '' && (rule.maxInstallments < 1 || rule.maxInstallments > max))
-      errors[prefix + 'maxInstallments'] = `1~${max}회차 사이로 입력하세요.`
+    if (
+      rule.maxInstallments !== '' &&
+      (!Number.isInteger(rule.maxInstallments) || rule.maxInstallments < 1 || rule.maxInstallments > max)
+    )
+      errors[prefix + 'maxInstallments'] = `1~${max}회차 사이의 정수로 입력하세요.`
     range(prefix, 'salesStartDateFrom', 'salesStartDateTo', rule.salesStartDateFrom, rule.salesStartDateTo)
     range(prefix, 'basicDocumentDateFrom', 'basicDocumentDateTo', rule.basicDocumentDateFrom, rule.basicDocumentDateTo)
     const from = rule.longTermMaintenanceFrom,
