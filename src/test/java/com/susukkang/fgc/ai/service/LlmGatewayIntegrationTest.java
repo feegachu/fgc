@@ -193,13 +193,15 @@ class LlmGatewayIntegrationTest {
     void aiIsReenabledAfterCooldown() throws InterruptedException {
         status = 429;
         responseBody = "{\"error\":{\"message\":\"You exceeded your current quota\",\"type\":\"insufficient_quota\",\"code\":\"insufficient_quota\"}}";
-        LlmGateway gateway = gateway("test-key", Duration.ofMillis(300));
+        // 2026-10-28 yslee - 300ms 는 첫 실패 기록(ai_call_log INSERT)이 느린 실행 환경에서 두 번째 호출 전에 끝나 버렸다.
+        // 차단 구간을 2초로 넓혀 두 번째 호출이 반드시 그 안에 들어가게 하고, 그 뒤 2.5초를 기다려 해제를 본다.
+        LlmGateway gateway = gateway("test-key", Duration.ofSeconds(2));
 
         assertAi001(() -> gateway.call(request("문서"), DocKind.class));
         assertAi001(() -> gateway.call(request("문서"), DocKind.class));
         status = 200;
         responseBody = OK_BODY;
-        Thread.sleep(500);
+        Thread.sleep(2_500);
         assertThat(gateway.call(request("문서"), DocKind.class).rowCount).isEqualTo(3);
 
         assertThat(paths).hasSize(2);
