@@ -742,6 +742,24 @@ describe('FUN-087 real form observer', () => {
     expect(screen.queryByText('1,200% 사전검증을 수행하지 못했습니다.')).not.toBeInTheDocument()
   })
 
+  it.each([0, 503, 422])('shows confirmation failure after a guide revision change: %s', async (status) => {
+    const { user } = mount()
+    const dialog = await saveAndPrecheck(user)
+    const observer = getPaymentGuideObserver()!
+    mutation = () => {
+      observer.invalidateInput()
+      throw new ApiError({ code: 'FGC-TRAN-TEST', message: '확정 응답 오류' }, 'CONFIRM', status)
+    }
+    await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+    expect(
+      await within(dialog).findByText(status >= 500 ? /요청을 처리하지 못했습니다/ : /확정 응답 오류/),
+    ).toBeVisible()
+    if (status < 500 && status !== 0) expect(button('btn-confirm')).toBeDisabled()
+    else expect(button('btn-precheck')).toBeDisabled()
+    expect(screen.queryByRole('heading', { name: '지급 목록 결과' })).not.toBeInTheDocument()
+    expect(writes().filter(([path]) => path.endsWith('/confirm'))).toHaveLength(1)
+  })
+
   it.each(['read failure', 'rejected evidence', 'changed revision'])(
     'keeps confirmed success with %s',
     async (failure) => {

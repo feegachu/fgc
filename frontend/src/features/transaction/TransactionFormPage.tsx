@@ -397,7 +397,7 @@ function TransactionForm({
         }
       }
     } catch (error) {
-      if (!observer.isCurrent(operation)) return
+      if (!observer.isSamePayment(operation)) return
       observer.fail(operation)
       setConfirmError(showError(error, '수수료 지급 건을 확정하지 못했습니다.'))
       setConfirmFailure(error instanceof ApiError ? error : null)
