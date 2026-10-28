@@ -125,7 +125,7 @@ function TransactionForm({
             contractId: entry.contractId,
           },
         ]
-      : draftRows(draft, draft?.settlementMonth?.slice(0, 7) ?? month),
+      : draftRows(draft),
   )
   const sequence = useRef(rawRows.length)
   const [paymentId, setPaymentId] = useState(initialId)
@@ -264,7 +264,7 @@ function TransactionForm({
       if (!saved.commissionTransactionId) throw new Error('저장된 지급 건 번호를 확인할 수 없습니다.')
       setPaymentId(String(saved.commissionTransactionId))
       setForm(initialForm(month, saved))
-      setRows(draftRows(saved, saved.settlementMonth?.slice(0, 7) ?? month))
+      setRows(draftRows(saved))
       setLocked(true)
       setDirty(false)
       setResult(null)
@@ -583,11 +583,7 @@ function TransactionForm({
               setRows([
                 ...rows,
                 normalizeRow(
-                  newRow(
-                    ++sequence.current,
-                    form.settlementMonth ? `${form.settlementMonth}-01` : '',
-                    rows.length ? '0' : String(Number(form.amount) || 0),
-                  ),
+                  newRow(++sequence.current, '', rows.length ? '0' : String(Number(form.amount) || 0)),
                   insurer,
                   newcomer,
                 ),

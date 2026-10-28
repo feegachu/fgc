@@ -310,6 +310,13 @@ test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경�
   ).toHaveLength(0)
   await info.attach('귀속일 필수 입력', { body: await page.screenshot(), contentType: 'image/png' })
   await attributionDate.fill('2027-07-10')
+  await page.getByRole('button', { name: '귀속행 추가', exact: true }).click()
+  await selectEntity(page, page.getByLabel('2번 귀속행 계약번호', { exact: true }), '1')
+  const secondDate = page.getByLabel('2번 귀속행 귀속일', { exact: true })
+  await expect(secondDate).toHaveValue('')
+  await page.locator('#btn-save').click()
+  await expect(secondDate).toHaveAttribute('aria-invalid', 'true')
+  await page.getByRole('button', { name: '2번 귀속행 삭제', exact: true }).click()
   await page.locator('#btn-save').click()
   await expect(page.locator('#btn-precheck')).toBeEnabled()
   expect(fixture.payment()).toMatchObject({

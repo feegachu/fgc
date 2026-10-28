@@ -120,6 +120,7 @@ async function fillNew(user: ReturnType<typeof userEvent.setup>) {
   await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
   await user.click(button('btn-add-attr'))
   await selectOption(user, screen.getByLabelText('1번 귀속행 계약번호'), '3')
+  await user.type(screen.getByLabelText('1번 귀속행 귀속일'), '2026-07-18')
 }
 async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
   await fillNew(user)
@@ -132,6 +133,20 @@ async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('TRAN-W02 React form workflow', () => {
+  it('수동 신규 첫 행과 추가 행 모두 실제 귀속일 입력 전에는 저장하지 않는다', async () => {
+    const { user } = mount()
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    expect(screen.getByLabelText('1번 귀속행 귀속일')).toHaveValue('')
+    await selectOption(user, screen.getByLabelText(/수령 설계사/), '1')
+    await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
+    await user.click(button('btn-add-attr'))
+    await selectOption(user, screen.getByLabelText('1번 귀속행 계약번호'), '3')
+    const date = screen.getByLabelText('1번 귀속행 귀속일')
+    expect(date).toHaveValue('')
+    await user.click(button('btn-save'))
+    expect(date).toHaveAttribute('aria-invalid', 'true')
+    expect(writes()).toHaveLength(0)
+  })
   it('회차 없는 계약 맥락은 귀속일을 비워 두고 입력 전 저장을 차단한다', async () => {
     const { user } = mount(
       '/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1',
