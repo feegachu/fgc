@@ -1,0 +1,193 @@
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { apiClient, ApiError } from '../../../lib/api/client'
+import type { CompareExplain, CompareItem, CompareRanking } from './api'
+import { ChatbotModal } from './ChatbotModal'
+
+// 선별 단계를 일부러 천천히 보여 주므로(체크 4개 × 1초) 테스트 제한 시간을 넉넉히 둔다.
+vi.setConfig({ testTimeout: 15_000 })
+
+const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'chatbot' })
+const item = (rank: number, patch: Partial<CompareItem> = {}): CompareItem => ({
+  rank,
+  offeringId: rank,
+  insurer: `${rank}번보험`,
+  product: `상품${rank}`,
+  expectedReceipt: 900_000,
+  cappedReceipt: 900_000 - rank * 10_000,
+  carryover: 0,
+  clawbackExposure: 200_000 + rank * 10_000,
+  conservativeNet: 700_000 - rank * 50_000,
+  clawbackRatePct: 34.8,
+  capImpactPct: 67.1,
+  associationGrade: null,
+  evidence: [
+    { label: '수령 예상액', rule: '현행수수료 1~1회차 · 기준 보험료 × 650%', value: 650_000, source: '수수료 규칙', policyVersion: 'GA-CUR-2026-V1 v1', asOf: '2026-07-31' },
+    { label: '환수 노출액', rule: '지급액 × 해약환급률 34.8% (환수 규칙 구현 전 임시 기준)', value: 226_200, source: '해약환급률표', policyVersion: 'INS-REFUND-2026-V1 v1', asOf: '2026-07-31' },
+  ],
+  ...patch,
+})
+const ranking = (patch: Partial<CompareRanking> = {}): CompareRanking => ({
+  rankResultId: 'r-1',
+  categoryCode: 'HEALTH_PROTECTION',
+  categoryLabel: '건강보험',
+  asOf: '2026-07-31',
+  policyVersion: 'GA-CUR-2026-V1 v1',
+  basePremium: 100_000,
+  clawbackMonth: 12,
+  warnings: [],
+  capSummary: { usagePct: null, status: null, contractCount: 0 },
+  items: [1, 2, 3, 4, 5].map((n) => item(n)),
+  ...patch,
+})
+const explain = (patch: Partial<CompareExplain> = {}): CompareExplain => ({ rankResultId: 'r-1', summary: '건강보험 5개 보험사를 정렬했어요.', summarySource: 'RULE', summaryError: null, ...patch })
+
+let onRank: () => Promise<unknown>
+let onExplain: () => Promise<unknown>
+const clients: QueryClient[] = []
+
+beforeEach(() => {
+  onRank = async () => envelope(ranking())
+  onExplain = async () => envelope(explain())
+  vi.spyOn(apiClient, 'request').mockImplementation((async (path: string) => {
+    if (path.endsWith('/categories')) {
+      return envelope([
+        { code: 'HEALTH_PROTECTION', label: '건강보험', insurerCount: 4 },
+        { code: 'SAVINGS', label: '연금저축보험', insurerCount: 0 },
+      ])
+    }
+    if (path.endsWith('/rank')) return onRank()
+    if (path.endsWith('/explain')) return onExplain()
+    throw new Error(`unexpected ${path}`)
+  }) as typeof apiClient.request)
+})
+afterEach(() => {
+  vi.restoreAllMocks()
+  for (const client of clients.splice(0)) client.clear()
+})
+
+function renderModal(onClose = vi.fn()) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ChatbotModal onClose={onClose} need={{ near: 3, review: 5 }} />
+    </QueryClientProvider>,
+  )
+  return onClose
+}
+const pickHealth = async () => {
+  await userEvent.click(await screen.findByRole('button', { name: /건강보험/ }))
+}
+const result = async () => screen.findByRole('region', { name: '참고 순위 1위' }, { timeout: 9000 })
+
+describe('FUN-079 상품 추천 AI 챗봇', () => {
+  it('정상: 선별 → 1위 카드·순위 표·요약이 나온다', async () => {
+    renderModal()
+    await pickHealth()
+    expect(await screen.findByText('내 조건에 맞는 상품을 선별하고 있어요')).toBeInTheDocument()
+    const hero = await result()
+    expect(within(hero).getByText('상품1')).toBeInTheDocument()
+    expect(within(hero).getByText('650,000원')).toBeInTheDocument()
+    expect(screen.getAllByRole('row')).toHaveLength(6)
+    expect(await screen.findByText('건강보험 5개 보험사를 정렬했어요.')).toBeInTheDocument()
+    expect(screen.getAllByText('자료 없음').length).toBeGreaterThan(0)
+  })
+
+  it('판매 중인 상품이 없는 카테고리는 선택할 수 없다', async () => {
+    renderModal()
+    expect(await screen.findByRole('button', { name: /연금저축보험/ })).toBeDisabled()
+  })
+
+  it('근거 보기를 누르면 서버 근거와 정책 버전·기준일이 서랍에 나온다', async () => {
+    renderModal()
+    await pickHealth()
+    await result()
+    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 근거 보기' }))
+    const drawer = screen.getByRole('complementary', { name: '산출 근거' })
+    expect(within(drawer).getByText('현행수수료 1~1회차 · 기준 보험료 × 650%')).toBeInTheDocument()
+    expect(within(drawer).getByText(/GA-CUR-2026-V1 v1 · 기준일 2026-07-31/)).toBeInTheDocument()
+    // 보수적 순수령액(650,000원)과 수령 예상 근거 줄(650,000원)에 같은 금액이 함께 나온다
+    expect(within(drawer).getAllByText('650,000원')).toHaveLength(2)
+  })
+
+  it('한도를 넘어 이월되는 상품은 서랍에 이월 예정액을 보여 준다', async () => {
+    onRank = async () => envelope(ranking({ items: [item(1, { carryover: 130_000, capImpactPct: 110.8 })] }))
+    renderModal()
+    await pickHealth()
+    await result()
+    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 근거 보기' }))
+    const drawer = screen.getByRole('complementary', { name: '산출 근거' })
+    expect(within(drawer).getByText('한도 초과로 이월되는 예정액')).toBeInTheDocument()
+    expect(within(drawer).getByText('130,000원')).toBeInTheDocument()
+    expect(within(drawer).getByText('110.8% 초과·이월')).toBeInTheDocument()
+  })
+
+  it('Esc는 서랍을 먼저 닫고 그다음에 모달을 닫는다', async () => {
+    const onClose = renderModal()
+    await pickHealth()
+    await result()
+    await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 근거 보기' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('complementary', { name: '산출 근거' })).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('다른 카테고리 보기로 1단계에 돌아간다', async () => {
+    renderModal()
+    await pickHealth()
+    await result()
+    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
+    expect(await screen.findByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
+  })
+
+  it('후보 상품이 없으면 답변을 찾지 못했어요를 보여 준다', async () => {
+    onRank = async () => envelope(ranking({ items: [], warnings: ['NO_CANDIDATE'], rankResultId: null }))
+    renderModal()
+    await pickHealth()
+    expect(await screen.findByText('답변을 찾지 못했어요', undefined, { timeout: 9000 })).toBeInTheDocument()
+  })
+
+  it('보험사가 3곳 미만이면 경고를 표시한다', async () => {
+    onRank = async () => envelope(ranking({ warnings: ['OTHER_INSURER_LT_3'], items: [item(1), item(2)] }))
+    renderModal()
+    await pickHealth()
+    await result()
+    expect(screen.getByRole('alert')).toHaveTextContent('다른 보험사 상품이 2개뿐이에요')
+  })
+
+  it('요약이 실패해도 카드와 표는 그대로 두고 요약 말풍선만 실패를 알린다', async () => {
+    onExplain = async () => {
+      throw new ApiError(null, 'req-ai', 503)
+    }
+    renderModal()
+    await pickHealth()
+    await result()
+    expect(await screen.findByText(/요약을 불러오지 못했어요\(FGC-AI-001\)/)).toBeInTheDocument()
+    expect(screen.getAllByRole('row')).toHaveLength(6)
+  })
+
+  it('순위 조회가 실패하면 오류와 다시 시도를 보여 준다', async () => {
+    onRank = async () => {
+      throw new ApiError(null, 'req-rank', 500)
+    }
+    renderModal()
+    await pickHealth()
+    expect(await screen.findByText('순위를 불러오지 못했어요.')).toBeInTheDocument()
+    onRank = async () => envelope(ranking())
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+    await result()
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6))
+  })
+
+  it('자주 묻는 질문은 고정 문구를 보여 주고 서버를 호출하지 않는다', async () => {
+    renderModal()
+    await userEvent.click(await screen.findByRole('button', { name: '개인정보 안내' }))
+    expect(screen.getByText(/고객 이름·주민번호·연락처는 입력받지 않아요/)).toBeInTheDocument()
+    expect(vi.mocked(apiClient.request).mock.calls.some(([path]) => String(path).endsWith('/rank'))).toBe(false)
+  })
+})

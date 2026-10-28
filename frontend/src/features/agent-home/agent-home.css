@@ -214,12 +214,9 @@
   & .ah-launcher { position: fixed; right: 28px; bottom: 26px; z-index: 85; display: grid; place-items: center; width: 132px; height: 132px; }
   & .ah-launcher img { display: block; width: 128px; height: 128px; filter: drop-shadow(0 6px 10px rgb(15 23 42 / 22%)); animation: ah-float 3.2s ease-in-out infinite; will-change: transform; }
   & .ah-launcher:hover img, & .ah-launcher:focus-visible img { animation-play-state: paused; }
-  & .ah-launcher-label { position: absolute; right: 136px; bottom: 46px; padding: 7px 11px; border: 1.5px solid transparent; border-radius: 16px; background: linear-gradient(#fff, #fff) padding-box, conic-gradient(from var(--ah-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box; animation: ah-border-spin 3.4s linear infinite; box-shadow: 0 1px 2px rgb(15 23 42 / 6%); font-size: 12px; font-weight: 600; color: var(--brand-900); white-space: nowrap; }
-  & .ah-frame-layer { position: fixed; z-index: 200; inset: 0 0 0 var(--ah-frame-left, 256px); }
-  & .ah-frame-layer iframe { width: 100%; height: 100%; border: 0; background: transparent; }
+  & .ah-launcher-label { position: absolute; right: 138px; bottom: 44px; padding: 10px 17px; border: 2.5px solid transparent; border-radius: 20px; background: linear-gradient(#fff, #fff) padding-box, conic-gradient(from var(--ah-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box; animation: ah-border-spin 3.4s linear infinite; box-shadow: 0 1px 2px rgb(15 23 42 / 6%); font-size: 15px; font-weight: 600; color: var(--brand-900); white-space: nowrap; }
 }
 @keyframes ah-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
-.app-shell.is-sidebar-collapsed .ah .ah-frame-layer { --ah-frame-left: 72px; }
 
 @media (max-width: 1180px) {
   .ah .ah-snapshot { grid-template-columns: 195px minmax(0, 1fr); }
@@ -235,10 +232,9 @@
   .ah .ah-kpis { grid-column: 1; grid-row: auto; grid-template-columns: 1fr; padding: 0 14px; }
   .ah .ah-kpi { min-height: 122px; padding: 14px 0; border-right: 0; border-bottom: 1px solid var(--border); }
   .ah .ah-kpi:last-child { border-bottom: 0; }
-  .ah .ah-frame-layer { inset: 0 0 60px 0; }
   .ah .ah-launcher { width: 104px; height: 104px; right: 16px; bottom: 78px; }
   .ah .ah-launcher img { width: 100px; height: 100px; }
-  .ah .ah-launcher-label { right: 108px; bottom: 34px; font-size: 11px; }
+  .ah .ah-launcher-label { right: 108px; bottom: 32px; padding: 8px 13px; border-width: 2px; font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ah .ah-launcher img { animation: none; }

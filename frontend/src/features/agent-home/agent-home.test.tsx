@@ -54,6 +54,7 @@ beforeEach(() => {
     if (path.startsWith('/api/v1/transactions')) return payments()
     if (path.startsWith('/api/v1/base/insurers')) return page(insurers)
     if (path.startsWith('/api/v1/base/products')) return page(products)
+    if (path.startsWith('/api/v1/ai/compare-chat/categories')) return envelope([{ code: 'HEALTH_PROTECTION', label: '건강보험', insurerCount: 2 }])
     return envelope(user)
   }) as typeof apiClient.request)
 })
@@ -160,12 +161,15 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
-  it('런처를 누르면 상품 추천 AI 화면이 열리고 닫기 요청으로 닫힌다', async () => {
+  it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
     renderHome()
-    await userEvent.click(await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ }))
-    expect(screen.getByTitle('상품 추천 AI')).toHaveAttribute('src', expect.stringContaining('chatbot/fun079-modal.html?embed=1'))
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'fgc-chatbot-close' } }))
-    await waitFor(() => expect(screen.queryByTitle('상품 추천 AI')).not.toBeInTheDocument())
+    const launcher = await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ })
+    await userEvent.click(launcher)
+    const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
+    expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '상품 추천 AI' })).not.toBeInTheDocument())
+    expect(launcher).toHaveFocus()
   })
 
   it('관리자 역할은 포트폴리오에 접근할 수 없다', async () => {

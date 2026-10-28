@@ -21,6 +21,7 @@ import {
   trendSeries,
 } from './model'
 import type { InsurerKind, Period, Row } from './model'
+import { ChatbotModal } from './chatbot/ChatbotModal'
 import './agent-home.css'
 
 const PERIODS: { value: Period; label: string }[] = [
@@ -143,7 +144,12 @@ function AgentHomeContent({ month }: { month: string }) {
           {needOpen && <NeedModal month={month} rows={rows} onClose={() => setNeedOpen(false)} />}
         </>
       )}
-      <ChatbotLauncher open={chatOpen} onOpen={() => setChatOpen(true)} onClose={() => setChatOpen(false)} />
+      <ChatbotLauncher
+        open={chatOpen}
+        need={rows ? { near: rows.filter((r) => r.month === month && r.near).length, review: rows.filter((r) => r.month === month && r.review).length } : null}
+        onOpen={() => setChatOpen(true)}
+        onClose={() => setChatOpen(false)}
+      />
     </div>
   )
 }
@@ -384,22 +390,14 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
   )
 }
 
-/** 상품 추천 AI. 확정 모달 화면을 iframe으로 띄운다(모달은 닫기 요청을 postMessage로 보낸다). */
-function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
+/** 상품 추천 AI(FUN-079). 런처를 누르면 채팅형 모달이 열리고, 닫으면 포커스가 런처로 돌아온다. */
+function ChatbotLauncher({ open, need, onOpen, onClose }: { open: boolean; need: { near: number; review: number } | null; onOpen: () => void; onClose: () => void }) {
   const launcher = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!open) return
     const trigger = launcher.current
-    const onMessage = (event: MessageEvent) => event.data?.type === 'fgc-chatbot-close' && onClose()
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
-    window.addEventListener('message', onMessage)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('message', onMessage)
-      document.removeEventListener('keydown', onKey)
-      trigger?.focus({ preventScroll: true })
-    }
-  }, [open, onClose])
+    return () => trigger?.focus({ preventScroll: true })
+  }, [open])
   const base = import.meta.env.BASE_URL
   return (
     <>
@@ -407,11 +405,7 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
         <img src={`${base}images/brand/agent-mascot.png`} alt="" width={128} height={128} style={{ '--i': 0 } as CSSProperties} />
         <span className="ah-launcher-label">상품 추천 AI</span>
       </button>
-      {open && (
-        <div className="ah-frame-layer">
-          <iframe title="상품 추천 AI" src={`${base}chatbot/fun079-modal.html?embed=1`} />
-        </div>
-      )}
+      {open && <ChatbotModal need={need} onClose={onClose} />}
     </>
   )
 }

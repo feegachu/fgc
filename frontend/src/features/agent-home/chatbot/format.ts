@@ -1,0 +1,35 @@
+import type { CompareItem } from './api'
+
+export const won = (n: number) => `${n.toLocaleString('ko-KR')}원`
+
+/** 한도 영향 배지: 90% 미만 여유, 90~99% 근접, 100% 이상 초과·이월(기획서 §4-3, 임계값은 [가정]). */
+export function capBadge(pct: number | null): { tone: 'ok' | 'warn' | 'bad' | 'none'; text: string } {
+  if (pct == null) return { tone: 'none', text: '자료 없음' }
+  if (pct >= 100) return { tone: 'bad', text: `${pct.toFixed(1)}% 초과·이월` }
+  if (pct >= 90) return { tone: 'warn', text: `${pct.toFixed(1)}% 근접` }
+  return { tone: 'ok', text: `${pct.toFixed(1)}% 여유` }
+}
+
+const GRADES: Record<string, string> = { VERY_HIGH: '매우 높음', HIGH: '높음', NORMAL: '보통', LOW: '낮음', VERY_LOW: '매우 낮음' }
+/** 협회 등급은 협회 자료 값을 표시만 한다. 자료가 없으면 "자료 없음". */
+export const gradeLabel = (grade: string | null) => (grade ? (GRADES[grade] ?? grade) : '자료 없음')
+
+export const FAQ = [
+  { key: 'about', label: '피코 AI 소개', body: '고른 카테고리의 보험사별 상품을 내 계약 기준으로 비교해 참고 순위를 알려 드려요. 추천을 확정하지 않으며, 모든 숫자는 근거 보기에서 확인할 수 있어요.' },
+  { key: 'rank', label: '순위 기준', body: '보수적 순수령액(한도 반영 수령 예상액 − 환수 노출액)이 큰 순서예요. 같으면 환수 노출이 작은 쪽, 그다음 보험사명 순서예요. 협회 등급은 표시만 해요.' },
+  { key: 'limit', label: '1,200% 한도 영향', body: '상품의 첫해 수령 예상액이 한도(기준 보험료의 12배)에 얼마나 가까운지 보여 줘요. 100%를 넘는 부분은 이월 예정액으로 따로 계산해요.' },
+  { key: 'grade', label: '협회 수수료 등급', body: '협회 공시 등급을 읽기 전용으로 보여 줘요. 순위 계산에는 쓰지 않고, 자료가 없으면 "자료 없음"으로 표시해요.' },
+  { key: 'privacy', label: '개인정보 안내', body: '고객 이름·주민번호·연락처는 입력받지 않아요. 상품 구조와 내 수수료·한도 정보만 사용해요.' },
+]
+
+/** 1위가 2위보다 얼마나 앞서는지를 서버가 준 값으로만 풀어 쓴다(새 수치를 만들지 않는다). */
+export function heroWhy(items: CompareItem[]) {
+  if (items.length < 2) return ''
+  const [top, second] = items
+  const gap = top.conservativeNet - second.conservativeNet
+  const claw =
+    top.clawbackExposure <= second.clawbackExposure
+      ? '환수 부담도 더 작아요.'
+      : `환수 부담은 ${won(top.clawbackExposure - second.clawbackExposure)} 더 크지만 수령 예상액이 더 높아요.`
+  return `2위보다 순수령액이 ${won(gap)} 많아요. ${claw}`
+}
