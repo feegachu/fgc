@@ -13,6 +13,7 @@ import com.susukkang.fgc.common.code.PremiumConversionRuleCode;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractCreateResponse;
@@ -85,6 +86,7 @@ public class ContractServiceImpl implements ContractService {
     private final ContractLockRepository contractLockRepository;
     private final ContractFinancialSnapshotRepository contractFinancialSnapshotRepository;
     private final ContractStatusEventRepository contractStatusEventRepository;
+    private final AgentDataScopeService agentScope;
 
     @Override
     public PageResponse<ContractView> selectByCondition(ContractSearchCondition condition, int page, int size) {
@@ -132,6 +134,7 @@ public class ContractServiceImpl implements ContractService {
     @Override
     @Transactional(readOnly = true)
     public List<ContractStatusEventResponse> selectStatusEventsByContractId(Long contractId) {
+        agentScope.requireContract(contractId);
         // 1. 계약 존재 확인
         validateContractExists(contractId);
 

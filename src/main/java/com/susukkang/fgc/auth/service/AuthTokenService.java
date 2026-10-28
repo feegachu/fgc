@@ -200,6 +200,10 @@ public class AuthTokenService {
                 // 화면 표시용. 권한 판정은 FgcJwtAuthenticationConverter 가 DB 에서 다시 읽은 역할로 한다.
                 .claim(FgcJwtAuthenticationConverter.CLAIM_ROLES, List.of(user.getRoleCode()))
                 .build();
+        if (user.getAgentId() != null) {
+            claims = JwtClaimsSet.from(claims)
+                    .claim(FgcJwtAuthenticationConverter.CLAIM_AGENT_ID, user.getAgentId()).build();
+        }
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
 

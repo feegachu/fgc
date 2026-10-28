@@ -1,4 +1,5 @@
 export const roleLabels: Record<string, string> = {
+  AGENT: '설계사',
   SETTLEMENT: '정산담당자',
   COMPLIANCE: '준법·감사',
   GA_ADMIN: 'GA관리자',

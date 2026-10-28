@@ -349,7 +349,7 @@
     badge.appendChild(badgeValue);
 
     var insurerStage = item.paymentStage === "INSURER_TO_GA";
-    var multiplier = snapshot.premiumMultiplier == null ? null : String(snapshot.premiumMultiplier);
+    var multiplier = snapshot.premiumMultiplier == null ? null : format.rate(snapshot.premiumMultiplier);
     var ruleSetLabel = item.capRuleSetId == null ? "—" : "룰셋 ID " + item.capRuleSetId;
     capTableRows("input-body", [
       ["월납환산 초회보험료", money(item.basePremiumAmount)],
@@ -570,7 +570,7 @@
   function money(input) { return format ? format.won(input) : value(input); }
   function date(input) { return format ? format.date(input) : value(input); }
   function month(input) { return format ? format.month(input) : value(input); }
-  /* 사용률은 소수 6자리 — 요율(4자리)과 자리수가 다르다 (인터페이스정의서 2-4). */
+  /* 사용률 표시는 공통 소수 첫째 자리 규칙을 따른다. */
   function percent(input) {
     if (input === null || input === undefined || input === "") return "—";
     return (format ? format.usageRate(input) : String(input)) + "%";
