@@ -1,4 +1,12 @@
 import { present, useReferenceDate } from '../reference/utils'
+import { useContext, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Button } from '../../components/Button'
+import { useAuth } from '../auth/useAuth'
+import { PolicyDraftEditor } from './PolicyDraftEditor'
+import { PolicyManagement } from './PolicyManagement'
+import { PolicyPreviewContext } from './management'
+import './policies.css'
 import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
@@ -11,6 +19,7 @@ import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
 const tabs = [
   { id: 'versions', label: '정책 버전' },
+  { id: 'management', label: '관리 상세' },
   { id: 'commission', label: '수수료 규칙' },
   { id: 'cap', label: '1,200% 룰셋' },
   { id: 'refund', label: '예상 해약환급률표' },
@@ -22,6 +31,11 @@ const sourceTones: Record<string, StatusTone> = {
   PROJECT_ASSUMPTION: 'warning',
 }
 export function PoliciesPage() {
+  const { user } = useAuth()
+  const preview = useContext(PolicyPreviewContext)
+  const cache = useQueryClient()
+  const [creating, setCreating] = useState(false)
+  const [message, setMessage] = useState('')
   const defaultDate = useReferenceDate()
   const [params, setParams] = useSearchParams()
   const asOf = params.get('asOf') ?? defaultDate
@@ -45,16 +59,48 @@ export function PoliciesPage() {
       return next
     })
   }
+  function saved(nextId: number) {
+    setCreating(false)
+    setMessage('미리보기에 변경사항을 반영했습니다. 실제 정책은 저장되지 않습니다.')
+    void cache.invalidateQueries({ queryKey: ['policies'] })
+    patch({ tab: 'management', policyVersionId: String(nextId) })
+  }
   return (
     <div className="policy-page">
       <header className="page-header policy-page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">정책 · 룰셋 조회</h1>
+          <p className="policy-eyebrow">POL-W01 · POLICY MANAGEMENT</p>
+          <h1 className="page-title">정책 · 룰셋 관리</h1>
+          <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
-        <Field className="policy-date-field" label="적용 기준일">
-          <input type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
-        </Field>
+        <div className="policy-header-actions">
+          <Field className="policy-date-field" label="적용 기준일">
+            <input type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
+          </Field>
+          <Button variant="secondary" onClick={() => patch({ asOf: defaultDate, policyVersionId: null })}>
+            초기화
+          </Button>
+          {['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
+            <Button onClick={() => setCreating(true)}>
+              <span aria-hidden="true">＋</span> 정책 등록
+            </Button>
+          )}
+        </div>
       </header>
+      {preview && (
+        <div className="policy-preview-banner">
+          <StatusBadge tone="info">UI 미리보기</StatusBadge>
+          <span>예시 데이터입니다. 등록·수정·승인 결과는 현재 화면에서만 유지되며 새로고침하면 초기화됩니다.</span>
+        </div>
+      )}
+      {message && (
+        <p className="policy-notice" role="status">
+          {message}
+          <Button variant="ghost" aria-label="안내 닫기" onClick={() => setMessage('')}>
+            닫기
+          </Button>
+        </p>
+      )}
       <div className="policy-tabs">
         <ReferenceTabs
           panelClassName="surface policy-tab-panel"
@@ -67,14 +113,24 @@ export function PoliciesPage() {
             <h2 className="surface-title">{tabs.find((tab) => tab.id === active)?.label}</h2>
             <p className="policy-panel-caption">
               {active === 'versions'
-                ? `기준일 ${asOf} · ${int(policies.data?.length ?? 0)}건 · 행을 선택하면 나머지 탭에서 상세를 확인할 수 있습니다`
+                ? `기준일 ${asOf}${policies.isSuccess ? ` · ${int(policies.data?.length ?? 0)}건` : ''} · 행을 선택하면 나머지 탭에서 상세를 확인할 수 있습니다`
                 : selected
                   ? `선택 정책: ${selected.policyCode} v${selected.versionNo}`
                   : ''}
             </p>
           </header>
           <QueryState loading={policies.isLoading} error={policies.error} />
-          <div hidden={active !== 'versions'}>
+          {policies.error && (
+            <Button variant="secondary" onClick={() => void policies.refetch()}>
+              다시 조회
+            </Button>
+          )}
+          {policies.isFetching && !policies.isLoading && (
+            <p className="policy-note" role="status">
+              목록을 갱신하고 있습니다.
+            </p>
+          )}
+          <div hidden={active !== 'versions' || !policies.isSuccess}>
             <DataTable
               className="policy-version-table"
               viewportClassName="policy-version-table-viewport"
@@ -143,7 +199,17 @@ export function PoliciesPage() {
                   align: 'center',
                   render: (r) => (
                     <StatusBadge
-                      tone={r.status === 'ACTIVE' ? 'success' : r.status === 'DRAFT' ? 'warning' : 'neutral'}
+                      tone={
+                        r.status === 'ACTIVE'
+                          ? 'success'
+                          : r.status === 'DRAFT'
+                            ? 'warning'
+                            : r.status === 'REVIEW'
+                              ? 'review'
+                              : r.status === 'APPROVED'
+                                ? 'info'
+                                : 'neutral'
+                      }
                     >
                       {present(r.statusLabel)}
                     </StatusBadge>
@@ -159,6 +225,19 @@ export function PoliciesPage() {
                       r.regulationRefs.map((ref) => (
                         <EvidenceLink key={ref} label={ref}>
                           {r.policyName} · {ref}
+                          <p>저장된 근거 설명과 링크는 관리 상세에서 확인하세요.</p>
+                          <Button
+                            variant="ghost"
+                            onClick={() =>
+                              patch({
+                                policyVersionId: String(r.policyVersionId),
+                                tab: 'management',
+                                section: 'sources',
+                              })
+                            }
+                          >
+                            근거 상세 보기
+                          </Button>
                         </EvidenceLink>
                       ))
                     ) : (
@@ -167,6 +246,19 @@ export function PoliciesPage() {
                 },
               ]}
             />
+            {selected && (
+              <div className="policy-selection-footer">
+                <span>
+                  선택한 정책{' '}
+                  <strong>
+                    {selected.policyCode} · v{selected.versionNo}
+                  </strong>
+                </span>
+                <Button variant="secondary" onClick={() => patch({ tab: 'management', policyVersionId: String(id) })}>
+                  선택 정책 관리 <span aria-hidden="true">→</span>
+                </Button>
+              </div>
+            )}
           </div>
           {active !== 'versions' && policies.isSuccess && (
             <>
@@ -177,8 +269,23 @@ export function PoliciesPage() {
               ) : (
                 <>
                   <QueryState loading={detail.isLoading} error={detail.error} />
+                  {detail.error && (
+                    <Button variant="secondary" onClick={() => void detail.refetch()}>
+                      상세 다시 조회
+                    </Button>
+                  )}
                   {detail.data && !detail.error && (
                     <>
+                      {active === 'management' && (
+                        <PolicyManagement
+                          key={`${id}-${params.get('section')}`}
+                          initialPanel={params.get('section') === 'sources' ? 'sources' : 'rules'}
+                          policy={detail.data.header ?? selected ?? {}}
+                          detail={detail.data}
+                          refreshing={detail.isFetching || policies.isFetching}
+                          onSaved={saved}
+                        />
+                      )}
                       {active === 'commission' && <CommissionRules rows={detail.data.commissionRules ?? []} />}
                       {active === 'cap' && <CapRuleSets rows={detail.data.capRuleSets ?? []} />}
                       {active === 'refund' && <RefundTables rows={detail.data.refundRateTables ?? []} />}
@@ -190,6 +297,7 @@ export function PoliciesPage() {
           )}
         </ReferenceTabs>
       </div>
+      {creating && <PolicyDraftEditor onClose={() => setCreating(false)} onSaved={saved} />}
     </div>
   )
 }

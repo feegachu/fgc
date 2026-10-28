@@ -1,0 +1,570 @@
+import { useContext, useRef, useState } from 'react'
+import { Button } from '../../components/Button'
+import { Modal } from '../../components/Modal'
+import { Field } from '../../components/Field'
+import { DataTable } from '../../components/DataTable'
+import { StatusBadge } from '../../components/StatusBadge'
+import type { StatusTone } from '../../components/StatusBadge'
+import { date, dateTime, rate, won } from '../../lib/format'
+import { ReferenceTabs } from '../reference/ReferenceUI'
+import { useAuth } from '../auth/useAuth'
+import type { Policy } from './api'
+import {
+  actionLabels,
+  permittedActions,
+  policyTypes,
+  PolicyPreviewContext,
+  ruleCount,
+  safeSourceUrl,
+  statusLabels,
+} from './management'
+import type { DraftDocument, ManagedPolicyDetail, PolicyAction, SourceDetail } from './management'
+import { PolicyDraftEditor } from './PolicyDraftEditor'
+
+const tones: Record<string, StatusTone> = {
+  DRAFT: 'warning',
+  REVIEW: 'review',
+  APPROVED: 'info',
+  ACTIVE: 'success',
+  RETIRED: 'neutral',
+}
+const steps = ['DRAFT', 'REVIEW', 'APPROVED', 'ACTIVE']
+const panels = [
+  { id: 'rules', label: '설정 규칙' },
+  { id: 'sources', label: '근거 자료' },
+  { id: 'history', label: '승인 이력' },
+] as const
+export function PolicyManagement({
+  policy,
+  detail,
+  refreshing,
+  onSaved,
+  initialPanel = 'rules',
+}: {
+  policy: Policy
+  detail: ManagedPolicyDetail
+  refreshing: boolean
+  onSaved: (id: number) => void
+  initialPanel?: (typeof panels)[number]['id']
+}) {
+  const { user } = useAuth()
+  const preview = useContext(PolicyPreviewContext)
+  const [editing, setEditing] = useState(false)
+  const [action, setAction] = useState<PolicyAction | null>(null)
+  const [panel, setPanel] = useState<(typeof panels)[number]['id']>(initialPanel)
+  const draft = detail.editDocument
+  const allowed = permittedActions(policy, detail, user?.roleCode)
+  const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
+  const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
+  const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
+  const refs = [
+    ...new Set([...(policy.regulationRefs ?? []), ...(detail.sourceRefs ?? []), ...(draft?.sourceRefs ?? [])]),
+  ]
+  return (
+    <div className="policy-management">
+      <header className="policy-detail-hero">
+        <div>
+          <p className="policy-eyebrow">
+            {policy.policyCode} <span>VERSION {policy.versionNo}</span>
+          </p>
+          <h2>{policy.policyName ?? '정책명 자료 없음'}</h2>
+          <p>
+            {policy.policyTypeLabel ?? '유형 자료 없음'} <span>·</span> {policy.sourceClassLabel ?? '출처 자료 없음'}
+          </p>
+        </div>
+        <StatusBadge tone={tones[policy.status ?? '']}>
+          {statusLabels[policy.status ?? ''] ?? policy.statusLabel ?? '상태 자료 없음'}
+        </StatusBadge>
+      </header>
+      <div className="policy-workflow" aria-label="정책 승인 단계">
+        {steps.map((step, i) => (
+          <div
+            key={step}
+            className={
+              policy.status === step ? 'is-current' : steps.indexOf(policy.status ?? '') > i ? 'is-complete' : ''
+            }
+            aria-current={policy.status === step ? 'step' : undefined}
+          >
+            <span>{String(i + 1).padStart(2, '0')}</span>
+            <strong>{statusLabels[step]}</strong>
+            {i < steps.length - 1 && <span className="policy-workflow-line" />}
+          </div>
+        ))}
+      </div>
+      <dl className="policy-metadata">
+        <div>
+          <dt>적용 기간</dt>
+          <dd>
+            {date(policy.effectiveFrom)} ~ {policy.effectiveTo ? date(policy.effectiveTo) : '계속'}
+          </dd>
+        </div>
+        <div>
+          <dt>작성자</dt>
+          <dd>{policy.createdBy ?? detail.createdBy ?? '자료 없음'}</dd>
+        </div>
+        <div>
+          <dt>승인자 · 승인 일시</dt>
+          <dd>
+            {policy.approvedBy ?? detail.approvedBy ?? '미승인'}
+            <small>
+              {policy.approvedAt || detail.approvedAt
+                ? dateTime(policy.approvedAt ?? detail.approvedAt)
+                : '승인 후 표시됩니다.'}
+            </small>
+          </dd>
+        </div>
+        <div>
+          <dt>기초서류 버전</dt>
+          <dd>{draft?.basicDocumentVersion || '자료 없음'}</dd>
+        </div>
+      </dl>
+      <div className="policy-action-bar">
+        <p>
+          {refreshing
+            ? '최신 정책을 불러오는 중입니다.'
+            : policy.status === 'DRAFT'
+              ? '초안을 수정한 후 검토를 요청할 수 있습니다.'
+              : policy.status === 'REVIEW'
+                ? '검토 중인 정책은 반려 후 수정할 수 있습니다.'
+                : '승인된 정책은 새 버전으로 변경사항을 작성하세요.'}
+        </p>
+        <div className="policy-actions">
+          {allowed.includes('EDIT') && supported && (
+            <Button variant="secondary" disabled={refreshing || !draft} onClick={() => setEditing(true)}>
+              초안 수정
+            </Button>
+          )}
+          {allowed
+            .filter((a) => a !== 'EDIT' && (a !== 'NEW_VERSION' || supported))
+            .map((a) => (
+              <Button
+                key={a}
+                variant={a === 'REJECT' || a === 'NEW_VERSION' ? 'secondary' : 'primary'}
+                disabled={refreshing || (a === 'APPROVE' && own)}
+                title={a === 'APPROVE' && own ? '작성자는 본인이 작성한 정책을 승인할 수 없습니다.' : undefined}
+                onClick={() => setAction(a as PolicyAction)}
+              >
+                {actionLabels[a as PolicyAction]}
+              </Button>
+            ))}
+        </div>
+      </div>
+      {own && policy.status === 'REVIEW' && ['GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
+        <p className="policy-notice policy-notice-warning">
+          작성자는 본인이 작성한 정책을 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.
+        </p>
+      )}
+      {!detail.allowedActions && <p className="policy-note">작업 권한 정보가 제공되지 않아 조회만 가능합니다.</p>}
+      {!preview && allowed.length > 0 && (
+        <p className="policy-note">UI 구현 단계입니다. 저장·제출·승인 동작은 API 연결 후 사용할 수 있습니다.</p>
+      )}
+      <ReferenceTabs
+        tabs={panels}
+        active={panel}
+        onChange={setPanel}
+        label="정책 관리 상세"
+        panelClassName="policy-management-panel"
+      >
+        {panel === 'rules' &&
+          (draft ? (
+            <DraftRuleSummary draft={draft} detail={detail} />
+          ) : (
+            <div className="policy-editor-empty">
+              <strong>상세 설정 자료가 제공되지 않았습니다.</strong>
+              <p>기존 수수료·한도·환급률 탭에서 조회된 규칙을 확인할 수 있습니다.</p>
+            </div>
+          ))}
+        {panel === 'sources' && <PolicySources sources={sources} refs={refs} />}
+        {panel === 'history' && (
+          <>
+            <div className="policy-section-heading">
+              <h3>승인 이력</h3>
+              <span>{detail.approvalActions?.length ?? 0}건</span>
+            </div>
+            {!detail.approvalActions?.length ? (
+              <div className="policy-editor-empty">
+                <strong>기록된 승인 이력이 없습니다.</strong>
+                <p>제출·승인·반려·활성화 이력이 시간순으로 표시됩니다.</p>
+              </div>
+            ) : (
+              <ol className="policy-timeline">
+                {detail.approvalActions.map((entry, index) => (
+                  <li key={index}>
+                    <span className="policy-timeline-dot" />
+                    <div>
+                      <header>
+                        <strong>
+                          {actionLabels[entry.actionType as PolicyAction] ??
+                            (entry.actionType === 'CREATE' ? '초안 등록' : entry.actionType)}
+                        </strong>
+                        <span>
+                          {entry.previousStatus ? statusLabels[entry.previousStatus] : '신규'} →{' '}
+                          {statusLabels[entry.status] ?? entry.status}
+                        </span>
+                        <time>{dateTime(entry.actedAt)}</time>
+                      </header>
+                      <p>{entry.reason}</p>
+                      <small>
+                        {entry.actor}
+                        {entry.evidenceRefs?.length ? ` · ${entry.evidenceRefs.join(', ')}` : ''}
+                      </small>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </>
+        )}
+      </ReferenceTabs>
+      {editing && draft && (
+        <PolicyDraftEditor
+          initial={draft}
+          policyId={policy.policyVersionId}
+          onClose={() => setEditing(false)}
+          onSaved={(id) => {
+            setEditing(false)
+            onSaved(id)
+          }}
+        />
+      )}
+      {action && (
+        <PolicyActionDialog
+          policy={policy}
+          detail={detail}
+          action={action}
+          onClose={() => setAction(null)}
+          onSaved={(id) => {
+            setAction(null)
+            onSaved(id)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs: string[] }) {
+  const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref))
+  return (
+    <div className="policy-sources">
+      <div className="policy-section-heading">
+        <h3>정책 근거 자료</h3>
+        <span>{sources.length + missing.length}건</span>
+      </div>
+      {!sources.length && !missing.length && (
+        <div className="policy-editor-empty">
+          <strong>연결된 근거 자료가 없습니다.</strong>
+          <p>정책에 연결한 근거의 제목·설명·링크를 확인할 수 있습니다.</p>
+        </div>
+      )}
+      {sources.map((source) => (
+        <article className="policy-source-card" key={source.ref}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            description
+          </span>
+          <div>
+            <StatusBadge tone={source.ref.startsWith('REG-') ? 'info' : 'neutral'}>{source.ref}</StatusBadge>
+            <h4>{source.title}</h4>
+            <p>{source.explanation || '설명 자료 없음'}</p>
+          </div>
+          {safeSourceUrl(source.url) && (
+            <a href={safeSourceUrl(source.url)!} target="_blank" rel="noopener noreferrer">
+              원문 보기 ↗
+            </a>
+          )}
+        </article>
+      ))}
+      {missing.map((ref) => (
+        <article className="policy-source-card" key={ref}>
+          <StatusBadge>{ref}</StatusBadge>
+          <p>제목·설명·링크 자료가 아직 제공되지 않았습니다.</p>
+        </article>
+      ))}
+    </div>
+  )
+}
+function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: ManagedPolicyDetail }) {
+  return (
+    <div className="policy-rule-summary">
+      <div className="policy-section-heading">
+        <h3>유형별 설정 규칙</h3>
+        <span>총 {ruleCount(draft)}개</span>
+      </div>
+      {!ruleCount(draft) && (
+        <div className="policy-editor-empty">
+          <strong>등록된 설정 규칙이 없습니다.</strong>
+          <p>초안 수정에서 정책 유형에 맞는 규칙을 작성하세요.</p>
+        </div>
+      )}
+      {draft.commissionRules.length > 0 && (
+        <DataTable
+          caption="설정된 수수료 규칙"
+          rows={draft.commissionRules.map((r, i) => ({ ...r, row: i + 1 }))}
+          rowKey={(r) => String(r.row)}
+          columns={[
+            { key: 'row', label: '행', render: (r) => r.row },
+            {
+              key: 'stage',
+              label: '지급단계',
+              render: (r) => (r.paymentStage === 'INSURER_TO_GA' ? '보험사 → GA' : 'GA → 설계사'),
+            },
+            {
+              key: 'product',
+              label: '상품 · 판매버전',
+              render: (r) =>
+                r.productOfferingId ? (
+                  <span>
+                    {detail.commissionRules?.[r.row - 1]?.productName ?? '상품명 자료 없음'}
+                    <small className="policy-cell-subtitle">판매버전 ID · {r.productOfferingId}</small>
+                  </span>
+                ) : (
+                  '전체'
+                ),
+            },
+            {
+              key: 'item',
+              label: '수수료 항목',
+              render: (r) =>
+                detail.commissionRules?.[r.row - 1]?.itemName ??
+                (r.commissionItemId ? `항목 ID · ${r.commissionItemId}` : '자료 없음'),
+            },
+            { key: 'range', label: '회차', render: (r) => `${r.installmentFrom} ~ ${r.installmentTo}` },
+            {
+              key: 'type',
+              label: '계산 방식',
+              render: (r) => <StatusBadge tone="info">{r.calculationType}</StatusBadge>,
+            },
+            {
+              key: 'value',
+              label: '요율 / 고정금액',
+              render: (r) => (r.calculationType === 'RATE' ? `${rate(r.ratePct)}%` : won(r.fixedAmount)),
+            },
+            { key: 'equal', label: '월 동일액', render: (r) => (r.equalMonthlyYn ? '예' : '아니오') },
+          ]}
+        />
+      )}
+      {draft.feeRegimeRules.map((rule, i) => (
+        <section key={i} className="policy-regime-summary">
+          <header>
+            <StatusBadge tone="info">{rule.feeRegimeCode === 'FOUR_YEAR_2027' ? '4년 분급' : '7년 분급'}</StatusBadge>
+            <h4>분급 룰셋 {i + 1}</h4>
+            {rule.reviewRequiredYn && <StatusBadge tone="warning">검토 필요</StatusBadge>}
+          </header>
+          <dl className="policy-metadata">
+            <div>
+              <dt>판매 시작일 범위</dt>
+              <dd>
+                {date(rule.salesStartDateFrom)} ~ {rule.salesStartDateTo ? date(rule.salesStartDateTo) : '계속'}
+              </dd>
+            </div>
+            <div>
+              <dt>최대 회차</dt>
+              <dd>{rule.maxInstallments === '' ? '설정 필요' : `${rule.maxInstallments}회차`}</dd>
+            </div>
+            <div>
+              <dt>장기유지 구간</dt>
+              <dd>
+                {rule.longTermMaintenanceFrom === ''
+                  ? rule.feeRegimeCode === 'FOUR_YEAR_2027'
+                    ? '해당 없음'
+                    : '설정 필요'
+                  : `${rule.longTermMaintenanceFrom} ~ ${rule.longTermMaintenanceTo}회차`}
+              </dd>
+            </div>
+            <div>
+              <dt>근거</dt>
+              <dd>{rule.sourceRefs.join(', ') || '자료 없음'}</dd>
+            </div>
+          </dl>
+        </section>
+      ))}
+      {draft.parameters.map((parameter) => (
+        <article className="policy-condition-card" key={parameter.key}>
+          <header>
+            <h4>{parameter.key}</h4>
+            <StatusBadge tone="info">지원 조건</StatusBadge>
+          </header>
+          <strong>{parameter.value || '설정 필요'}</strong>
+          <p>{parameter.description}</p>
+        </article>
+      ))}
+      {draft.clawbackRules.length > 0 && (
+        <DataTable
+          caption="환수 규칙"
+          rows={draft.clawbackRules.map((r, i) => ({ ...r, row: i + 1 }))}
+          rowKey={(r) => String(r.row)}
+          columns={[
+            { key: 'insurer', label: '보험사 ID', render: (r) => r.insurerId || '전체' },
+            { key: 'product', label: '상품 판매버전 ID', render: (r) => r.productOfferingId || '전체' },
+            { key: 'item', label: '항목 ID', render: (r) => r.commissionItemId || '전체' },
+            { key: 'range', label: '경과월', render: (r) => `${r.elapsedMonthFrom} ~ ${r.elapsedMonthTo}` },
+            {
+              key: 'basis',
+              label: '기준금액 코드',
+              render: (r) => r.clawbackBasisCode || <StatusBadge tone="warning">설정 필요</StatusBadge>,
+            },
+            {
+              key: 'rate',
+              label: '환수율',
+              render: (r) => (r.clawbackRatePct === '' ? '설정 필요' : `${rate(r.clawbackRatePct)}%`),
+            },
+          ]}
+        />
+      )}
+    </div>
+  )
+}
+function PolicyActionDialog({
+  policy,
+  detail,
+  action,
+  onClose,
+  onSaved,
+}: {
+  policy: Policy
+  detail: ManagedPolicyDetail
+  action: PolicyAction
+  onClose: () => void
+  onSaved: (id: number) => void
+}) {
+  const preview = useContext(PolicyPreviewContext)
+  const [reason, setReason] = useState('')
+  const [effectiveFrom, setFrom] = useState('')
+  const [effectiveTo, setTo] = useState('')
+  const [error, setError] = useState('')
+  const [dateError, setDateError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const saving = useRef(false)
+  const reasonRef = useRef<HTMLTextAreaElement>(null)
+  const dateRef = useRef<HTMLInputElement>(null)
+  const newVersion = action === 'NEW_VERSION'
+  const label = actionLabels[action]
+  async function submit() {
+    if (!preview || saving.current || !policy.policyVersionId) return
+    setError('')
+    setDateError('')
+    if (newVersion && (!effectiveFrom || (effectiveTo && effectiveTo < effectiveFrom))) {
+      setDateError('유효한 적용 기간을 입력하세요.')
+      dateRef.current?.focus()
+      return
+    }
+    if (!reason.trim()) {
+      setError(`${action === 'REJECT' ? '반려' : '작업'} 사유를 입력하세요.`)
+      reasonRef.current?.focus()
+      return
+    }
+    saving.current = true
+    setBusy(true)
+    try {
+      onSaved(
+        await preview.action(
+          policy.policyVersionId,
+          action,
+          reason.trim(),
+          newVersion ? { effectiveFrom, effectiveTo } : undefined,
+        ),
+      )
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
+    } finally {
+      saving.current = false
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      open
+      title={`정책 ${label}`}
+      className="policy-action-modal"
+      onClose={() => {
+        if (!saving.current) onClose()
+      }}
+      closeOnEscape={!busy}
+      initialFocusRef={newVersion ? dateRef : reasonRef}
+      footer={
+        <>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            취소
+          </Button>
+          <Button disabled={!preview} loading={busy} onClick={() => void submit()}>
+            {newVersion ? '새 초안 만들기' : `${label} 확인`}
+          </Button>
+        </>
+      }
+    >
+      <p className="policy-section-description">
+        {newVersion
+          ? '기존 정책의 규칙과 근거를 복사하여 새로운 초안을 작성합니다.'
+          : action === 'REJECT'
+            ? '반려하면 작성자가 초안을 다시 수정할 수 있습니다.'
+            : `아래 정책의 정보와 작업 사유를 확인한 후 ${label}하세요.`}
+      </p>
+      <dl className="policy-confirm-summary">
+        <div>
+          <dt>정책코드</dt>
+          <dd>{policy.policyCode}</dd>
+        </div>
+        <div>
+          <dt>정책명</dt>
+          <dd>{policy.policyName}</dd>
+        </div>
+        <div>
+          <dt>버전 · 상태</dt>
+          <dd>
+            v{policy.versionNo} · {statusLabels[policy.status ?? '']}
+          </dd>
+        </div>
+        <div>
+          <dt>적용 기간</dt>
+          <dd>
+            {date(policy.effectiveFrom)} ~ {policy.effectiveTo ? date(policy.effectiveTo) : '계속'}
+          </dd>
+        </div>
+        <div>
+          <dt>규칙 행 수</dt>
+          <dd>{detail.editDocument ? `${ruleCount(detail.editDocument)}개` : '자료 없음'}</dd>
+        </div>
+      </dl>
+      {newVersion && (
+        <div className="policy-form-grid policy-form-grid-two">
+          <Field label="새 버전 적용 시작일" required error={dateError}>
+            <input
+              ref={dateRef}
+              type="date"
+              value={effectiveFrom}
+              onChange={(e) => setFrom(e.target.value)}
+              disabled={busy}
+            />
+          </Field>
+          <Field label="새 버전 적용 종료일">
+            <input type="date" value={effectiveTo} onChange={(e) => setTo(e.target.value)} disabled={busy} />
+          </Field>
+        </div>
+      )}
+      <Field
+        label={action === 'REJECT' ? '반려 사유' : '작업 사유'}
+        required
+        error={error}
+        helper={`${reason.length.toLocaleString()} / 2,000자`}
+      >
+        <textarea
+          ref={reasonRef}
+          value={reason}
+          rows={4}
+          maxLength={2000}
+          disabled={busy}
+          onChange={(e) => {
+            setReason(e.target.value)
+            setError('')
+          }}
+          placeholder="변경 또는 검토 사유를 작성하세요."
+        />
+      </Field>
+      {action === 'ACTIVATE' && (
+        <p className="policy-notice policy-notice-warning">
+          적용 중인 다른 정책은 자동 종료되지 않습니다. 적용 기간의 겹침 여부를 확인하세요.
+        </p>
+      )}
+      {!preview && <p className="policy-notice">UI 구현 단계입니다. API 연결 후 실제 동작을 실행할 수 있습니다.</p>}
+    </Modal>
+  )
+}
