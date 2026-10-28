@@ -337,7 +337,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     expect(await screen.findByText('schedule_header #11')).toBeInTheDocument()
     expect(screen.getByText('한빛생명 · 종신보험')).toBeInTheDocument()
     const lines = screen.getByRole('table', { name: '회차별 예상 지급 금액' })
-    expect(within(lines).getByText('1,000.1234%')).toBeInTheDocument()
+    expect(within(lines).getByText('1,000.1%')).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '요율' })).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '정액' })).toBeInTheDocument()
     expect(within(lines).getAllByText('-100,000원')[0]).toHaveClass('is-negative-amount')

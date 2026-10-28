@@ -359,11 +359,11 @@ class PublishingTemplateStructureTest {
                 .contains("요청 ID: ")
                 .doesNotContain("toFixed(")
                 .doesNotContain("Math.round(")
-                // 요율 4자리 · 사용률 6자리 (인터페이스정의서 2-4:177). 한 함수로 합치면 CAP 화면이 어긋난다.
+                // 화면정의서 공통규칙 3 (#712): 요율·사용률은 한 자리 절사, 저장·판정 정밀도는 유지한다.
                 .contains("function rate(")
                 .contains("function usageRate(")
-                .contains("truncateDecimal(value, 4)")
-                .contains("truncateDecimal(value, 6)");
+                .contains("truncateDecimal(value, 1)")
+                .containsPattern("function usageRate\\(value\\)\\s*\\{\\s*return rate\\(value\\);");
     }
 
     // FGC-UI-TRAN-W01·W02: 지급 목록·등록 화면은 공통 컴포넌트와 TRAN 전용 자산만 사용한다.

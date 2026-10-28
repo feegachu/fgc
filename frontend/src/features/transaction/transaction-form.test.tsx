@@ -633,11 +633,17 @@ describe('CAP rejection recovery and resolved transport failures (#410)', () => 
   it('links the existing violation after a lost CAP-001 rejection is retried and returns CAP-003', async () => {
     precheckResult = {
       confirmable: false,
-      blockers: [{ code: 'FGC-CAP-001', contractId: 7, message: '한도 위반' }],
-      capPreview: [{ contractId: 7, contractNo: 'C-007' }],
+      blockers: [{ code: 'FGC-CAP-001', contractId: 7, message: '한도 위반 — 사용률 104.166667%' }],
+      capPreview: [{ contractId: 7, contractNo: 'C-007', usagePct: '104.166667', resultStatus: 'VIOLATION' }],
     }
     const { user } = mount()
     let dialog = await saveAndPrecheck(user)
+    expect(document.getElementById('gate-list')).toHaveTextContent('한도 위반 — 사용률 104.1%')
+    expect(within(dialog).getByText('FGC-CAP-001 · 한도 위반 — 사용률 104.1%')).toBeVisible()
+    const progress = document.querySelector('.transaction-cap-progress')
+    expect(progress).toHaveAttribute('aria-label', '한도 사용률 104.1%')
+    expect(progress).toHaveAttribute('value', '100')
+    expect(screen.queryByText(/104\.166667%/)).not.toBeInTheDocument()
     mutation = () => {
       throw new TypeError('Lost rejection response')
     }

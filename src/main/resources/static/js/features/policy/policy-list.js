@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  var format = typeof module !== "undefined" && module.exports
+    ? require("../../common/format.js") : window.FgcUi.format;
+
   function escapeHtml(value) {
     return String(value == null ? "" : value)
         .replace(/&/g, "&amp;")
@@ -64,22 +67,7 @@
   }
 
   function formatRate(value) {
-    if (value == null || value === "" || (typeof value === "string" && value.trim() === "")) return "-";
-
-    var normalized = String(value).trim();
-    if (!/^[+-]?\d+(?:\.\d+)?$/.test(normalized)) return "-";
-
-    var sign = "";
-    if (normalized.charAt(0) === "-" || normalized.charAt(0) === "+") {
-      sign = normalized.charAt(0) === "-" ? "-" : "";
-      normalized = normalized.slice(1);
-    }
-
-    var parts = normalized.split(".");
-    var integerPart = parts[0].replace(/^0+(?=\d)/, "");
-    var fractionPart = ((parts[1] || "") + "0000").slice(0, 4);
-    var groupedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return escapeHtml(sign + groupedInteger + "." + fractionPart);
+    return escapeHtml(format.rate(value));
   }
 
   function formatRange(from, to) {
@@ -182,9 +170,9 @@
           + "<td>" + escapeHtml(set.paymentStageLabel) + "</td>"
           + "<td class='tabular-nums'>" + escapeHtml(set.contractDateFrom) + " ~ " + (set.contractDateTo == null ? "계속" : escapeHtml(set.contractDateTo)) + "</td>"
           + "<td class='is-number'>" + escapeHtml(set.firstYearMonths) + "</td>"
-          + "<td class='is-number tabular-nums'>" + escapeHtml(set.premiumMultiplier) + "</td>"
-          + "<td class='is-number tabular-nums'>" + escapeHtml(set.complianceDeductionPct) + "</td>"
-          + "<td class='is-number tabular-nums'>" + escapeHtml(set.warningUsagePct) + "</td>"
+          + "<td class='is-number tabular-nums'>" + formatRate(set.premiumMultiplier) + "</td>"
+          + "<td class='is-number tabular-nums'>" + formatRate(set.complianceDeductionPct) + "</td>"
+          + "<td class='is-number tabular-nums'>" + formatRate(set.warningUsagePct) + "</td>"
           + "<td class='tabular-nums policy-disclosure-cell'>" + tableCellDisclosure(set.refundAdditionCondition, 28, false) + "</td>"
           + "</tr>";
     }).join("");
@@ -227,7 +215,7 @@
             ? "<span class='status-badge status-badge-warning'>1,200% 한도 가산에 쓰는 값</span>"
             : "";
         return "<tr><td class='is-number'>" + escapeHtml(line.contractMonthNo) + "차월</td>"
-            + "<td class='is-number tabular-nums'>" + escapeHtml(line.refundRatePct) + "%</td>"
+            + "<td class='is-number tabular-nums'>" + formatRate(line.refundRatePct) + "%</td>"
             + "<td>" + mark + "</td></tr>";
       }).join("");
 

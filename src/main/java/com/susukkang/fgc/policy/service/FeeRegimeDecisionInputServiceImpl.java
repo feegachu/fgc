@@ -27,7 +27,7 @@ public class FeeRegimeDecisionInputServiceImpl implements FeeRegimeDecisionInput
             throw new FgcBusinessException(
                     FgcErrorCode.COMMON_002,
                     "contractId",
-                    Map.of("field", "contractId"),
+                    Map.of("contractId", "null"),
                     "분급 체계 판정 입력 조회 조건이 올바르지 않습니다."
             );
         }

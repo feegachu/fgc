@@ -1,6 +1,7 @@
 import { selectEntity } from '../e2e/selectEntity'
 import type { Page } from '@playwright/test'
 import type { components } from '../src/lib/api/schema'
+import { rateText } from '../src/lib/format'
 import {
   test,
   expect,
@@ -146,8 +147,11 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
   const error = (await failure.json()).error
   expect(error.code).toBe('FGC-CAP-001')
   await expect(page.locator('#transaction-confirm-blockers')).toContainText(error.code)
-  expect(error.message).toBeTruthy()
-  await expect(page.locator('#transaction-confirm-blockers')).toContainText(error.message)
+  // API 오류는 원본 정밀도를 유지하고 화면 문구만 한 자리로 표시한다 (#712).
+  expect(error.message).toContain('사용률 104.166667%')
+  await expect(page.locator('#transaction-confirm-blockers')).toContainText(rateText(error.message))
+  await expect(page.locator('#transaction-confirm-blockers')).toContainText('사용률 104.1%')
+  await expect(page.locator('#transaction-confirm-blockers')).not.toContainText('104.166667%')
   expect((await api(page, `/transactions/${id}`)).status).toBe('DRAFT')
   // CAP-001 currently returns no IDs in error.params. Resolve the recorded exception by its
   // original transaction, then require that exact row and its CAP record throughout the UI.
