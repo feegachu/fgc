@@ -5,8 +5,6 @@ import {
   test,
   expect,
   login,
-  legacyLogin,
-  backend,
   api,
   completeMonthly,
   responseFor,
@@ -17,10 +15,7 @@ import {
 const month = '2026-07'
 
 test('계약 등록·수정 → 스케줄 재생성·확정', async ({ page }, info) => {
-  await legacyLogin(page)
-  await page.goto(`${backend}/contracts?month=${month}`)
-  await expect(page.locator('.contract-table tbody tr').first()).toBeVisible()
-  await info.attach('legacy-contracts', { body: await page.screenshot(), contentType: 'image/png' })
+  await login(page)
   const seed = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0001&page=1&size=20')
   const original = await api(page, `/contracts/${seed.content[0].contractId}`)
   await login(page, 'settle01', '/contracts/new?month=2026-07')

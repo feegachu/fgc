@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { usageRate, won } from '../src/lib/format'
 
 // #411 UI 회귀. 실제 서버 대조는 FGC_CAP_REAL_SERVER=1일 때 별도로 실행한다(#418 인계).
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'cap-ui-fixture' })
@@ -99,7 +98,7 @@ test('필터 URL·계산근거·Escape 닫기·딥링크를 확인한다', async
   const table = page.getByRole('table', { name: '계약별 판정 목록' })
   await expect(table.getByText('104.1%')).toBeVisible()
   await expect(table.getByText('-50,000원')).toHaveCSS('color', 'rgb(185, 28, 28)')
-  await expect(table.getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/app/contracts/3?tab=cap')
+  await expect(table.getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/contracts/3?tab=cap')
   await page.getByLabel('계약번호', { exact: true }).fill('C-2026-0001')
   await page.getByRole('button', { name: '조회', exact: true }).click()
   await expect(page).toHaveURL(/contractNo=C-2026-0001/)
@@ -107,7 +106,7 @@ test('필터 URL·계산근거·Escape 닫기·딥링크를 확인한다', async
   const dialog = page.getByRole('dialog', { name: '계산근거' })
   await expect(dialog.getByText('① 입력값')).toBeVisible()
   await expect(dialog.getByRole('table', { name: '항목별 산입 내역' })).toBeVisible()
-  await expect(dialog.getByRole('link', { name: '예외 목록 보기' })).toHaveAttribute('href', '/app/exceptions')
+  await expect(dialog.getByRole('link', { name: '예외 목록 보기' })).toHaveAttribute('href', '/exceptions')
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
   await expect(page).not.toHaveURL(/capCheckId/)
@@ -176,61 +175,4 @@ test('좁은 화면에서도 지급단계의 큰 합계 금액을 모두 표시�
       }
     }
   }
-})
-
-test('실서버 CAP-W01·W02 전후 비교 및 캡처', async ({ page, context }) => {
-  test.skip(process.env.FGC_CAP_REAL_SERVER !== '1', '격리 DB와 실서버를 준비한 뒤 실행한다')
-  const qaLoginId = process.env.FGC_CAP_QA_LOGIN_ID
-  const qaPassword = process.env.FGC_CAP_QA_PASSWORD
-  test.skip(!qaLoginId || !qaPassword, 'QA 계정 정보는 환경변수로 제공한다')
-  test.setTimeout(60000)
-  const month = process.env.FGC_CAP_QA_MONTH ?? '2026-07'
-  await page.setViewportSize({ width: 1440, height: 1000 })
-  // 이전 세션 폼 로그인: UI 밖으로 쿠키/토큰을 출력·저장하지 않는다.
-  await page.goto('http://localhost:8081/login')
-  await page.getByLabel('아이디', { exact: true }).fill(qaLoginId!)
-  await page.locator('input[name="password"]').fill(qaPassword!)
-  await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page).not.toHaveURL(/\/login/)
-  const legacyResponsePromise = page.waitForResponse(
-    (response) => response.url().includes('/api/v1/cap-checks?') && response.status() === 200,
-  )
-  await page.goto(`http://localhost:8081/cap-checks?month=${month}`)
-  const legacyResponse = await legacyResponsePromise
-  const legacy = (await legacyResponse.json()).data
-  expect(legacy.content.length).toBeGreaterThan(0)
-  await expect(page.locator('#cap-total-count')).toHaveText(String(legacy.totalElements))
-  const id = legacy.content[0].capCheckId
-  await page.locator(`[data-cap-detail-id="${id}"]`).click()
-  await expect(page.locator('#cap-detail-content')).toBeVisible()
-  const legacyDetail = await context.request.get(`http://localhost:8081/api/v1/cap-checks/${id}/details`)
-  const stored = (await legacyDetail.json()).data
-  // SPA는 별도 JWT로 인증. 이 로그인은 동일한 임시 QA DB의 계정이다.
-  await page.goto(`login?redirect=${encodeURIComponent(`/cap-checks?month=${month}`)}`)
-  await page.getByLabel(/^아이디/).fill(qaLoginId!)
-  await page.getByLabel(/^비밀번호\s*\*?$/).fill(qaPassword!)
-  const reactResponsePromise = page.waitForResponse(
-    (response) => response.url().includes('/api/v1/cap-checks?') && response.status() === 200,
-  )
-  await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page.getByRole('table', { name: '계약별 판정 목록' }).getByRole('link').first()).toBeVisible()
-  const tokenList = await reactResponsePromise
-  // 동일 GET 응답/건수는 화면과 HTTP 응답으로 대조한다. DB의 판정 변경은 수행하지 않는다.
-  expect((await tokenList.json()).data).toEqual(legacy)
-  await expect(page.getByText(`총 ${legacy.totalElements}건`)).toBeVisible()
-  const first = legacy.content[0]
-  const firstRow = page.getByRole('table', { name: '계약별 판정 목록' }).locator('tbody tr').first()
-  await expect(firstRow).toContainText(first.contractNo)
-  await expect(firstRow).toContainText(won(first.includedAmount))
-  await expect(firstRow).toContainText(won(first.remainingAmount))
-  await expect(firstRow).toContainText(`${usageRate(first.usagePct)}%`)
-  await expect(firstRow).toContainText(first.resultStatusLabel)
-  await page.goto(`cap-checks?month=${month}&capCheckId=${id}`)
-  const dialog = page.getByRole('dialog', { name: '계산근거' })
-  await expect(dialog.getByText('① 입력값')).toBeVisible()
-  await expect(dialog.getByText(stored.capCheck.contractNo, { exact: true })).toBeVisible()
-  await expect(dialog).toContainText(`${usageRate(stored.capCheck.usagePct)}%`)
-  await expect(dialog.getByRole('table', { name: '항목별 산입 내역' }).locator('tbody tr')).toHaveCount(
-    stored.details.length || 1,
-  )
 })

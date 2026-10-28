@@ -7,8 +7,6 @@ const apiTarget = process.env.FGC_API_TARGET ?? 'http://localhost:8081'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // 공존기: nginx 가 /app/ 에서 서빙한다. 웨이브 C(#419)에서 '/' 로 바꾼다.
-  base: '/app/',
   plugins: [react()],
   server: {
     proxy: {
