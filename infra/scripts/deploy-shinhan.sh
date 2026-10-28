@@ -81,9 +81,9 @@ check_login() {
         -d '{"loginId":"__shinhan_deploy_probe__","password":"x"}')
     [[ "$code" == 401 ]] || { echo "Token login route HTTP=$code (expected 401)"; return 1; }
 }
-check_http http://127.0.0.1/app/login 200
+check_http http://127.0.0.1/login 200
 check_login http://127.0.0.1
-check_http "$origin/app/login" 200
+check_http "$origin/login" 200
 check_login "$origin"
 cp "$release/release.json" "$state/current.json"
 cp "$release/promotion.json" "$state/current-promotion.json"
