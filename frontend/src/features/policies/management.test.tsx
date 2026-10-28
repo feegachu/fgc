@@ -154,7 +154,7 @@ describe('policy UI boundaries', () => {
     const user = userEvent.setup()
     await user.type(screen.getByLabelText(/정책명/), '보존할 정책명')
     await user.click(screen.getByRole('button', { name: '초안 저장' }))
-    expect(await screen.findByLabelText(/정책코드/)).toHaveFocus()
+    await waitFor(() => expect(screen.getByLabelText(/정책코드/)).toHaveFocus())
     expect(screen.getByLabelText(/정책명/)).toHaveValue('보존할 정책명')
     expect(save).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '취소' }))
