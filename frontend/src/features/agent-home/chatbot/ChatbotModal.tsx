@@ -13,8 +13,9 @@ import './chatbot.css'
 
 const STEPS = ['카테고리 선택', '상품 선별', '비교 결과·근거']
 const CHECKS = ['내 한도 확인', '정책 수수료율 확인', '환수 규칙 확인', '협회 등급 확인']
-/** 계산이 빨라도 화면이 깜빡이지 않도록 선별 단계를 최소 이만큼 보여 준다(체크 4개 × 1000ms). */
-const CHECK_MS = 1000
+/** 계산이 빨라도 화면이 깜빡이지 않도록 2단계는 캐릭터가 한 바퀴 도는 시간 동안 보여 준다. chatbot.css 의 cb-turn 주기(5.5s)와 같아야 한다. */
+const SPIN_MS = 5500
+const CHECK_MS = SPIN_MS / CHECKS.length
 const IMG = (name: string) => `${import.meta.env.BASE_URL}images/brand/chatbot-${name}.png`
 
 function Mascot({ name, size = 101 }: { name: 'base' | 'search' | 'sum' | 'sorry'; size?: number }) {
@@ -313,7 +314,7 @@ export function ChatbotModal({
             )}
             {view === 3 &&
               asked.map((qa) => (
-                <div key={qa.kind}>
+                <div key={qa.kind} className="cb-asked">
                   <User text={qa.question} />
                   <Bot avatar="sum">
                     <div className="cb-card" role="status">

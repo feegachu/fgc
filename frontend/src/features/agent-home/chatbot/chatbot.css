@@ -295,7 +295,7 @@
 /* 3단계 연관 질문 버튼(입력창 위, 대화 스크롤 밖에 고정) */
 .cb .cb-suggest { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px 22px 0; border-top: 1px solid var(--cb-line); background: #fff; }
 .cb .cb-suggest + .cb-composer { border-top: 0; }
-.cb .cb-suggest-btn { padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 14px; background: #fff; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--cb-t700); }
+.cb .cb-suggest-btn { padding: 10px 16px; border: 1.5px solid #cbd5e1; border-radius: 24px; background: #fff; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--cb-t700); }
 .cb .cb-suggest-btn:hover:not(:disabled) { border-color: var(--cb-brand-dark); color: var(--cb-brand-dark); }
 .cb .cb-suggest-btn.on { border-color: var(--cb-brand-dark); background: var(--cb-brand-100); color: var(--cb-brand-dark); }
 .cb .cb-suggest-btn:disabled { opacity: 0.5; cursor: default; }
@@ -303,3 +303,4 @@
 @media (max-width: 760px) {
   .cb .cb-suggest { grid-template-columns: 1fr; padding: 8px 14px 0; }
 }
+.cb .cb-asked { margin-top: 32px; }
