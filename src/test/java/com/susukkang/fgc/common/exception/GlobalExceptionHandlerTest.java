@@ -1,5 +1,7 @@
 package com.susukkang.fgc.common.exception;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.RequestIdContext;
 import org.junit.jupiter.api.AfterEach;
@@ -10,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 
 import java.util.Map;
 
@@ -151,5 +155,35 @@ class GlobalExceptionHandlerTest {
         String message = response.getBody().error().message();
         assertThat(message).doesNotContain("{id}");
         assertThat(message).contains("42");
+    }
+
+    @Test
+    void unreadableJsonIsAValidationErrorWithoutEchoingRequestContents() {
+        ResponseEntity<ApiResponse<Void>> response = handler().handleUnreadableBody(
+                new HttpMessageNotReadableException("private-request-content",
+                        new MockHttpInputMessage(new byte[0])));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().error().code()).isEqualTo("FGC-COMMON-002");
+        assertThat(response.getBody().error().field()).isNull();
+        assertThat(response.getBody().error().detail()).isNull();
+        assertThat(response.getBody().error().message()).doesNotContain("private-request-content");
+    }
+
+    @Test
+    void jsonMappingErrorReportsNestedFieldWithoutJavaClassNames() {
+        JsonMappingException mapping = JsonMappingException.from((JsonParser) null, "private-request-content");
+        mapping.prependPath(Map.class, "paymentStage");
+        mapping.prependPath(java.util.List.class, 2);
+        mapping.prependPath(Map.class, "commissionRules");
+
+        ResponseEntity<ApiResponse<Void>> response = handler().handleUnreadableBody(
+                new HttpMessageNotReadableException("invalid body", mapping,
+                        new MockHttpInputMessage(new byte[0])));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().error().field()).isEqualTo("commissionRules[2].paymentStage");
+        assertThat(response.getBody().error().params()).containsEntry("field", "commissionRules[2].paymentStage");
+        assertThat(response.getBody().error().detail()).isNull();
     }
 }

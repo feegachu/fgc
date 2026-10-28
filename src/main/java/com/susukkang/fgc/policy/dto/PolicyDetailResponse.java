@@ -20,6 +20,18 @@ public record PolicyDetailResponse(
         @Schema(description = "1,200% 룰셋 탭 — 지급단계·적용범위별 복수")
         List<CapRuleSetResponse> capRuleSets,
         @Schema(description = "예상 해약환급률표 탭 — 상품·납입기간·채널별 복수")
-        List<RefundRateTableResponse> refundRateTables
+        List<RefundRateTableResponse> refundRateTables,
+        @Schema(description = "정책 편집 문서. expectedUpdatedAt과 자식 ID를 수정 요청에 사용")
+        PolicyDraft editDocument,
+        @Schema(description = "불변 정책 승인 이력, actionSeq 순")
+        List<PolicyApprovalActionResponse> approvalActions,
+        @Schema(description = "현재 사용자 역할·정책 상태·작성자를 반영한 동작")
+        List<String> allowedActions
 ) {
+    public PolicyDetailResponse(PolicyVersionResponse header, List<String> sourceRefs,
+                                List<CommissionRuleResponse> commissionRules,
+                                List<CapRuleSetResponse> capRuleSets,
+                                List<RefundRateTableResponse> refundRateTables) {
+        this(header, sourceRefs, commissionRules, capRuleSets, refundRateTables, null, List.of(), List.of());
+    }
 }

@@ -16,6 +16,7 @@ import com.susukkang.fgc.policy.entity.PolicyVersion;
 import com.susukkang.fgc.policy.repository.CapRuleSetRepository;
 import com.susukkang.fgc.policy.repository.CommissionRuleRepository;
 import com.susukkang.fgc.policy.repository.PolicyVersionRepository;
+import com.susukkang.fgc.policy.repository.PolicyWriteRepository;
 import com.susukkang.fgc.policy.repository.RefundRateTableRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,7 +32,7 @@ import java.util.stream.Stream;
 /**
  * 설명 : POL-W01 정책·룰셋 조회 전용 서비스 (FGC-FUN-012·013, IF-API-09·10).
  * 계산 엔진(CommissionPolicyService)과 분리된 화면·API 조회 경로다.
- * 1차는 조회만 한다 — 정책 등록·승인은 2차(POL-W02).
+ * 정책 작성·승인은 PolicyWriteService에서 처리한다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -42,6 +43,7 @@ public class PolicyQueryService {
     private final CommissionRuleRepository commissionRuleRepository;
     private final CapRuleSetRepository capRuleSetRepository;
     private final RefundRateTableRepository refundRateTableRepository;
+    private final PolicyWriteRepository policyWriteRepository;
 
     /** IF-API-09 — 정책 버전 목록. 필터 3개는 전부 선택이며 0건은 빈 목록이다(404 아님). */
     public List<PolicyVersionResponse> findPolicyVersions(PolicyType type, LocalDate asOf, PolicyStatus status) {
@@ -75,7 +77,10 @@ public class PolicyQueryService {
                 header.getSourceRefs(),
                 commissionRules,
                 capRuleSets,
-                refundRateTables);
+                refundRateTables,
+                policyWriteRepository.readDraft(policy),
+                policyWriteRepository.findApprovalActions(policyVersionId),
+                PolicyWriteService.allowedActions(policy));
     }
 
     private Map<Long, String> findUserLogins(List<PolicyVersion> policies) {
