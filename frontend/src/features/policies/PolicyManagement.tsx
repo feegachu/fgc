@@ -16,10 +16,12 @@ import {
   PolicyPreviewContext,
   ruleCount,
   safeSourceUrl,
+  sourceReferenceNotice,
   statusLabels,
 } from './management'
 import type { DraftDocument, ManagedPolicyDetail, PolicyAction, SourceDetail } from './management'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
+import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
 
 const tones: Record<string, StatusTone> = {
   DRAFT: 'warning',
@@ -166,14 +168,7 @@ export function PolicyManagement({
         panelClassName="policy-management-panel"
       >
         {panel === 'rules' &&
-          (draft ? (
-            <DraftRuleSummary draft={draft} detail={detail} />
-          ) : (
-            <div className="policy-editor-empty">
-              <strong>상세 설정 자료가 제공되지 않았습니다.</strong>
-              <p>기존 수수료·한도·환급률 탭에서 조회된 규칙을 확인할 수 있습니다.</p>
-            </div>
-          ))}
+          (draft ? <DraftRuleSummary draft={draft} detail={detail} /> : <ReadOnlyRuleSummary detail={detail} />)}
         {panel === 'sources' && <PolicySources sources={sources} refs={refs} />}
         {panel === 'history' && (
           <>
@@ -250,6 +245,7 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
         <h3>정책 근거 자료</h3>
         <span>{sources.length + missing.length}건</span>
       </div>
+      <p className="policy-notice">{sourceReferenceNotice}</p>
       {!sources.length && !missing.length && (
         <div className="policy-editor-empty">
           <strong>연결된 근거 자료가 없습니다.</strong>
@@ -263,6 +259,7 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
           </span>
           <div>
             <StatusBadge tone={source.ref.startsWith('REG-') ? 'info' : 'neutral'}>{source.ref}</StatusBadge>
+            <SourceStatusTags tags={source.statusTags} />
             <h4>{source.title}</h4>
             <p>{source.explanation || '설명 자료 없음'}</p>
           </div>
@@ -275,10 +272,59 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
       ))}
       {missing.map((ref) => (
         <article className="policy-source-card" key={ref}>
-          <StatusBadge>{ref}</StatusBadge>
-          <p>제목·설명·링크 자료가 아직 제공되지 않았습니다.</p>
+          <div>
+            <StatusBadge>{ref}</StatusBadge>
+            <SourceStatusTags />
+            <p>제목·설명·링크 자료가 아직 제공되지 않았습니다.</p>
+          </div>
         </article>
       ))}
+    </div>
+  )
+}
+function SourceStatusTags({ tags }: { tags?: string[] }) {
+  const labels = [...new Set(tags?.map((tag) => tag.trim()).filter(Boolean))]
+  return (
+    <div className="policy-source-status" aria-label="근거 상태">
+      {labels.length ? (
+        labels.map((tag) => <StatusBadge key={tag}>{tag}</StatusBadge>)
+      ) : (
+        <StatusBadge>상태 자료 없음</StatusBadge>
+      )}
+    </div>
+  )
+}
+function ReadOnlyRuleSummary({ detail }: { detail: ManagedPolicyDetail }) {
+  const commission = detail.commissionRules ?? []
+  const caps = detail.capRuleSets ?? []
+  const refunds = detail.refundRateTables ?? []
+  if (!commission.length && !caps.length && !refunds.length)
+    return (
+      <div className="policy-editor-empty">
+        <strong>조회된 설정 규칙이 없습니다.</strong>
+        <p>이 정책에 수수료·한도·환급률 규칙 자료가 제공되지 않았습니다.</p>
+      </div>
+    )
+  return (
+    <div className="policy-rule-summary">
+      {commission.length > 0 && (
+        <section>
+          <h3 className="policy-detail-title">수수료 규칙</h3>
+          <CommissionRules rows={commission} />
+        </section>
+      )}
+      {caps.length > 0 && (
+        <section>
+          <h3 className="policy-detail-title">1,200% 룰셋</h3>
+          <CapRuleSets rows={caps} />
+        </section>
+      )}
+      {refunds.length > 0 && (
+        <section>
+          <h3 className="policy-detail-title">예상 해약환급률표</h3>
+          <RefundTables rows={refunds} />
+        </section>
+      )}
     </div>
   )
 }

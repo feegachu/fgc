@@ -18,9 +18,25 @@ test('policy list, detail, sources and timeline render without API network reque
   await page.screenshot({ path: 'test-results/policy-ui-722/02-detail.png', fullPage: true })
   await page.getByRole('tab', { name: '근거 자료', exact: true }).click()
   await expect(page.getByText('화면 검토용 예시 근거')).toBeVisible()
+  await expect(page.getByText(/법정 심의·의결을 대체하지 않습니다/)).toBeVisible()
+  await expect(page.getByLabel('근거 상태', { exact: true })).toHaveText('회사정책')
+  await page.screenshot({ path: 'test-results/policy-ui-722/07-sources.png', fullPage: true })
   await page.getByRole('tab', { name: '승인 이력', exact: true }).click()
   await expect(page.getByText('화면 검토용 예시 초안 작성')).toBeVisible()
   expect(requests).toEqual([])
+})
+
+test('source status tags can be edited and persist in the preview detail', async ({ page }) => {
+  await page.getByRole('button', { name: '선택 정책 관리' }).click()
+  await page.getByRole('button', { name: '초안 수정' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: /근거 자료/ }).click()
+  await dialog.getByRole('checkbox', { name: 'FAQ', exact: true }).check()
+  await page.screenshot({ path: 'test-results/policy-ui-722/08-source-editor.png', fullPage: true })
+  await dialog.getByRole('button', { name: '초안 저장' }).click()
+  await page.getByRole('tab', { name: '근거 자료', exact: true }).click()
+  await expect(page.getByLabel('근거 상태', { exact: true })).toContainText('FAQ')
+  await expect(page.getByLabel('근거 상태', { exact: true })).toContainText('회사정책')
 })
 
 test('draft creation, field focus and unsaved changes preserve the selected policy', async ({ page }) => {

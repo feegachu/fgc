@@ -5,7 +5,7 @@ import { Button } from '../../components/Button'
 import { useAuth } from '../auth/useAuth'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
-import { PolicyPreviewContext } from './management'
+import { PolicyPreviewContext, sourceReferenceNotice } from './management'
 import './policies.css'
 import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
@@ -226,6 +226,7 @@ export function PoliciesPage() {
                         <EvidenceLink key={ref} label={ref}>
                           {r.policyName} · {ref}
                           <p>저장된 근거 설명과 링크는 관리 상세에서 확인하세요.</p>
+                          <p>{sourceReferenceNotice}</p>
                           <Button
                             variant="ghost"
                             onClick={() =>

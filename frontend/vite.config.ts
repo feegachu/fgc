@@ -17,12 +17,16 @@ export default defineConfig({
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
           if (req.url?.split('?')[0] !== '/app/policy-preview') return next()
-          const html = await server.transformIndexHtml(
-            '/app/policy-preview',
-            '<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>정책 UI 미리보기 · FGC</title></head><body><div id="root"></div><script type="module" src="/src/previews/policyPreview.tsx"></script></body></html>',
-          )
-          res.setHeader('Content-Type', 'text/html; charset=utf-8')
-          res.end(html)
+          try {
+            const html = await server.transformIndexHtml(
+              '/app/policy-preview',
+              '<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>정책 UI 미리보기 · FGC</title></head><body><div id="root"></div><script type="module" src="/src/previews/policyPreview.tsx"></script></body></html>',
+            )
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.end(html)
+          } catch (error) {
+            next(error)
+          }
         })
       },
     },

@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
+import { PolicySources } from './PolicyManagement'
 import { emptyDraft, emptyRegime, permittedActions, PolicyPreviewContext, safeSourceUrl } from './management'
+import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
 
 describe('policy UI boundaries', () => {
@@ -43,6 +45,84 @@ describe('policy UI boundaries', () => {
     expect(screen.getByRole('button', { name: '초안 저장' })).toBeDisabled()
     expect(screen.getByText('UI 구현 단계 · 저장 API 연결 예정')).toBeInTheDocument()
   })
+  it.each([
+    [1, 48],
+    [1, ''],
+    ['', 48],
+  ] as const)('rejects four-year long-term values %s / %s', (from, to) => {
+    const draft = regimeDraft('FOUR_YEAR_COMMISSION')
+    draft.feeRegimeRules[0].longTermMaintenanceFrom = from
+    draft.feeRegimeRules[0].longTermMaintenanceTo = to
+    expect(validateDraft(draft)['feeRegimeRules.0.longTermMaintenance']).toBeTruthy()
+  })
+  it('keeps seven-year long-term ranges editable', () => {
+    const draft = regimeDraft('SEVEN_YEAR_COMMISSION')
+    draft.feeRegimeRules[0].longTermMaintenanceFrom = 61
+    draft.feeRegimeRules[0].longTermMaintenanceTo = 84
+    expect(validateDraft(draft)).toEqual({})
+  })
+  it('lets an existing invalid four-year draft clear disabled long-term values before saving', async () => {
+    const draft = regimeDraft('FOUR_YEAR_COMMISSION')
+    draft.feeRegimeRules[0].longTermMaintenanceFrom = 1
+    draft.feeRegimeRules[0].longTermMaintenanceTo = 48
+    const { user, save } = mountRegimeEditor(draft)
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    const reset = await screen.findByRole('button', { name: '장기유지 값 초기화' })
+    await waitFor(() => expect(reset).toHaveFocus())
+    expect(save).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('장기유지 시작 회차')).toBeDisabled()
+    expect(screen.getByLabelText('장기유지 시작 회차')).toHaveValue(1)
+    await user.click(reset)
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feeRegimeRules: [expect.objectContaining({ longTermMaintenanceFrom: '', longTermMaintenanceTo: '' })],
+      }),
+      1,
+    )
+  })
+  it('allows deleting a comma one character at a time and saves cleared references as an empty list', async () => {
+    const { user, save } = mountRegimeEditor(regimeDraft('SEVEN_YEAR_COMMISSION'))
+    await user.click(screen.getByRole('button', { name: /분급 룰셋/ }))
+    const input = screen.getByLabelText('근거 코드')
+    await user.type(input, 'SRC-A, B')
+    await user.keyboard('{Backspace}{Backspace}{Backspace}')
+    expect(input).toHaveValue('SRC-A')
+    await user.clear(input)
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feeRegimeRules: [expect.objectContaining({ sourceRefs: [] })],
+      }),
+      1,
+    )
+  })
+  it('trims, removes empty entries and deduplicates reference codes only when saving', async () => {
+    const { user, save } = mountRegimeEditor(regimeDraft('SEVEN_YEAR_COMMISSION'))
+    await user.click(screen.getByRole('button', { name: /분급 룰셋/ }))
+    const input = screen.getByLabelText('근거 코드')
+    await user.type(input, ' SRC-A, REG-B, ,SRC-A, ')
+    expect(input).toHaveValue(' SRC-A, REG-B, ,SRC-A, ')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feeRegimeRules: [expect.objectContaining({ sourceRefs: ['SRC-A', 'REG-B'] })],
+      }),
+      1,
+    )
+  })
+  it('shows the reference notice and provided status tags without inferring missing statuses from REG codes', () => {
+    render(
+      <PolicySources
+        sources={[{ ref: 'SRC-01', title: '근거', explanation: '', url: null, statusTags: ['현행규정', 'FAQ'] }]}
+        refs={['SRC-01', 'REG-02']}
+      />,
+    )
+    expect(screen.getByText(/법정 심의·의결을 대체하지 않습니다/)).toBeVisible()
+    expect(screen.getByText('현행규정')).toBeVisible()
+    expect(screen.getByText('FAQ')).toBeVisible()
+    expect(screen.getByText('상태 자료 없음')).toBeVisible()
+  })
   it('focuses an invalid field and preserves input, then asks before discarding an edited draft', async () => {
     const save = vi.fn(),
       close = vi.fn()
@@ -65,3 +145,32 @@ describe('policy UI boundaries', () => {
     expect(screen.getByLabelText(/정책명/)).toHaveValue('보존할 정책명')
   })
 })
+
+function regimeDraft(policyType: string): DraftDocument {
+  return {
+    ...emptyDraft(),
+    policyCode: 'UI-REGRESSION',
+    policyName: '분급 룰셋 검증',
+    policyType,
+    sourceClass: 'PROJECT_ASSUMPTION',
+    effectiveFrom: '2029-01-01',
+    feeRegimeRules: [
+      {
+        ...emptyRegime(policyType),
+        salesStartDateFrom: '2029-01-01',
+        maxInstallments: policyType === 'FOUR_YEAR_COMMISSION' ? 48 : 84,
+      },
+    ],
+  }
+}
+function mountRegimeEditor(initial: DraftDocument) {
+  const save = vi.fn().mockResolvedValue(1)
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <PolicyPreviewContext.Provider value={{ save, action: vi.fn() }}>
+        <PolicyDraftEditor initial={initial} policyId={1} onClose={vi.fn()} onSaved={vi.fn()} />
+      </PolicyPreviewContext.Provider>
+    </QueryClientProvider>,
+  )
+  return { user: userEvent.setup(), save }
+}

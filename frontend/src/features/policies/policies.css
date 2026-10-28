@@ -254,6 +254,24 @@
   color: var(--color-text-link);
   flex-shrink: 0;
 }
+.policy-source-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.policy-source-status-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.policy-source-status-options .policy-checkbox {
+  padding-top: 8px;
+}
 .policy-timeline {
   list-style: none;
   padding: 0 8px;

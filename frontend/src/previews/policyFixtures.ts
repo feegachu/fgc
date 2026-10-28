@@ -55,6 +55,7 @@ export function createPreviewPolicies(): ManagedPolicyDetail[] {
         explanation:
           '정책 작성과 근거 패널의 배치를 확인하기 위한 예시입니다. 실제 업무 근거 또는 지급 기준이 아닙니다.',
         url: null,
+        statusTags: ['회사정책'],
       },
     ]
     draft.sourceRefs = ['SRC-UI-EXAMPLE']

@@ -15,6 +15,7 @@ import {
   PolicyPreviewContext,
   regimeFor,
   sources,
+  sourceStatusTags,
 } from './management'
 import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
@@ -89,6 +90,10 @@ export function PolicyDraftEditor({
       const id = await preview.save(
         {
           ...draft,
+          feeRegimeRules: draft.feeRegimeRules.map((rule) => ({
+            ...rule,
+            sourceRefs: [...new Set(rule.sourceRefs.map((ref) => ref.trim()).filter(Boolean))],
+          })),
           regulationRefs: [
             ...new Set([
               ...draft.regulationRefs,
@@ -348,8 +353,8 @@ export function PolicyDraftEditor({
                     required={required}
                     type="number"
                     min="1"
-                    max={draft.policyType === 'FOUR_YEAR_COMMISSION' ? 48 : 84}
-                    disabled={key !== 'maxInstallments' && draft.policyType === 'FOUR_YEAR_COMMISSION'}
+                    max={rule.feeRegimeCode === 'FOUR_YEAR_2027' ? 48 : 84}
+                    disabled={key !== 'maxInstallments' && rule.feeRegimeCode === 'FOUR_YEAR_2027'}
                     errors={errors}
                     value={rule[key]}
                     onChange={(v) => update({ [key]: numberValue(v) })}
@@ -426,9 +431,9 @@ export function PolicyDraftEditor({
                         path={prefix + 'sourceRefs'}
                         label="근거 코드"
                         errors={errors}
-                        value={rule.sourceRefs.join(', ')}
+                        value={rule.sourceRefs.join(',')}
                         placeholder="REG/SRC 코드를 쉼표로 구분"
-                        onChange={(v) => update({ sourceRefs: v.split(',').map((s) => s.trim()) })}
+                        onChange={(v) => update({ sourceRefs: v.split(',') })}
                       />
                       <label className="policy-checkbox">
                         <input
@@ -439,6 +444,19 @@ export function PolicyDraftEditor({
                         검토 필요
                       </label>
                     </div>
+                    {rule.feeRegimeCode === 'FOUR_YEAR_2027' &&
+                      (rule.longTermMaintenanceFrom !== '' || rule.longTermMaintenanceTo !== '') && (
+                        <div className="policy-notice policy-notice-warning">
+                          <span>4년 분급에 남아 있는 장기유지 값을 초기화한 후 저장하세요.</span>
+                          <Button
+                            variant="secondary"
+                            id={`policy-${prefix}longTermMaintenance`}
+                            onClick={() => update({ longTermMaintenanceFrom: '', longTermMaintenanceTo: '' })}
+                          >
+                            장기유지 값 초기화
+                          </Button>
+                        </div>
+                      )}
                   </section>
                 )
               })}
@@ -643,6 +661,25 @@ export function PolicyDraftEditor({
                           onChange={(e) => update({ explanation: e.target.value })}
                         />
                       </Field>
+                      <fieldset className="policy-span-all policy-source-status-options">
+                        <legend>근거 상태 (복수 선택)</legend>
+                        {[...new Set([...sourceStatusTags, ...(source.statusTags ?? [])])].map((tag) => (
+                          <label key={tag} className="policy-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={source.statusTags?.includes(tag) ?? false}
+                              onChange={(e) =>
+                                update({
+                                  statusTags: e.target.checked
+                                    ? [...(source.statusTags ?? []), tag]
+                                    : source.statusTags?.filter((value) => value !== tag),
+                                })
+                              }
+                            />
+                            {tag}
+                          </label>
+                        ))}
+                      </fieldset>
                       <div className="policy-span-all">
                         <DraftInput
                           path={prefix + 'url'}

@@ -46,7 +46,9 @@ export function validateDraft(draft: DraftDocument): DraftErrors {
     range(prefix, 'basicDocumentDateFrom', 'basicDocumentDateTo', rule.basicDocumentDateFrom, rule.basicDocumentDateTo)
     const from = rule.longTermMaintenanceFrom,
       to = rule.longTermMaintenanceTo
-    if (from !== '' || to !== '') {
+    if (rule.feeRegimeCode === 'FOUR_YEAR_2027' && (from !== '' || to !== '')) {
+      errors[prefix + 'longTermMaintenance'] = '4년 분급에는 장기유지 구간을 설정할 수 없습니다. 값을 초기화하세요.'
+    } else if (from !== '' || to !== '') {
       required(prefix + 'longTermMaintenanceFrom', from)
       required(prefix + 'longTermMaintenanceTo', to)
       if (from !== '' && from < 1) errors[prefix + 'longTermMaintenanceFrom'] = '1회차 이상으로 입력하세요.'
