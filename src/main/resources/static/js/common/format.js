@@ -6,7 +6,7 @@
  * 좋게 묶고 정해진 자리에서 자를 뿐이다. Number 로 바꾸면 1,200% 판정에 쓰는 소수 6자리가
  * 흔들리므로 문자열 그대로 다룬다.
  *
- * 요율과 사용률은 자리수가 다르다 — rate() 4자리, usageRate() 6자리. 섞어 쓰면 안 된다.
+ * 요율·사용률·배수는 화면에서 소수 첫째 자리까지만 표시한다. 계산·판정은 원본 값을 쓴다.
  *
  * 시각은 Asia/Seoul 로 고정한다. new Date().getMonth() 처럼 브라우저 로컬 시각을 쓰면
  * 월말·월초에 정산월이 한 달 어긋난다.
@@ -71,25 +71,22 @@
     return sign + integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + fractionPart;
   }
 
-  /*
-   * 요율 — 소수 넷째 자리. 예: 650.0000%
-   * 인터페이스정의서 2-4 "요율 소수점 4자리".
-   */
+  /* 요율·배수 — 소수 첫째 자리, 반올림 없이 절사 (화면정의서 4장 규칙 3). */
   function rate(value) {
-    return truncateDecimal(value, 4);
+    return truncateDecimal(value, 1);
   }
 
-  /*
-   * 사용률 — 소수 여섯째 자리. 예: 104.166667%
-   *
-   * 요율과 자리수가 다르다. 1,200% 한도 판정이 소수 6자리까지 쓰기 때문에 4자리로 자르면
-   * 화면 숫자와 판정 근거가 어긋난다.
-   *   인터페이스정의서 2-4 (:177) — "요율 소수점 4자리, 사용률 6자리"
-   *   화면정의서 CAP-W01 (:934) — "사용률 | 게이지 막대 + 숫자 (소수점 6자리)"
-   *   화면정의서 CAP-W02 (:1005) — "사용률 74.166667%"
-   */
+  /* 사용률 — 표시만 소수 첫째 자리로 줄이고 저장 정밀도·서버 판정은 유지한다. */
   function usageRate(value) {
-    return truncateDecimal(value, 6);
+    return rate(value);
+  }
+
+  /* 서버 문구 안의 소수 백분율만 표시 형식으로 바꾼다. 1,200% 같은 규칙명은 유지한다. */
+  function rateText(value) {
+    return String(value == null ? "" : value).replace(/(^|[^\w.,+-])([+-]?\d[\d,]*\.\d+)(\s*%)/g,
+      function (_, prefix, decimal, suffix) {
+        return prefix + rate(decimal.replace(/,/g, "")) + suffix;
+      });
   }
 
   function seoulParts(value) {
@@ -178,7 +175,7 @@
    *   그래서 본문에 이미 들어 있으면 뒤에 다시 적지 않는다.
    */
   function errorText(error, fallbackMessage) {
-    var message = (error && error.message) || fallbackMessage || "요청을 처리하지 못했습니다.";
+    var message = rateText((error && error.message) || fallbackMessage || "요청을 처리하지 못했습니다.");
     var requestId = error && error.requestId;
     var trace = [];
 
@@ -196,6 +193,7 @@
     isNegative: isNegative,
     rate: rate,
     usageRate: usageRate,
+    rateText: rateText,
     date: date,
     dateTime: dateTime,
     month: month,

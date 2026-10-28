@@ -212,14 +212,14 @@
               <td class="tabular-nums" th:title="${c.contractNo()}" th:text="${c.contractNo()} ?: '-'">계약번호</td>
               <td class="exception-title-cell exception-disclosure-cell">
                 <div class="table-cell-disclosure">
-                  <span class="table-cell-preview" th:text="${c.title()} ?: '-'">예외 내용</span>
+                  <span class="table-cell-preview" data-rate-text th:text="${c.title()} ?: '-'">예외 내용</span>
                   <details class="table-cell-details" hidden>
                     <summary>
                       <span class="table-cell-more">전체 보기</span>
                       <span class="table-cell-less">접기</span>
                       <span class="material-symbols-rounded table-cell-chevron" aria-hidden="true">expand_more</span>
                     </summary>
-                    <p class="table-cell-full" th:text="${c.title()}">예외 내용</p>
+                    <p class="table-cell-full" data-rate-text th:text="${c.title()}">예외 내용</p>
                   </details>
                 </div>
               </td>
@@ -354,8 +354,8 @@
         <div><dt>검출 횟수</dt><dd class="tabular-nums" th:text="|${c.detectionCount()}회|">1회</dd></div>
         <div><dt>최초 검출</dt><dd class="tabular-nums" th:text="${#temporals.format(c.firstDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</dd></div>
         <div><dt>최근 검출</dt><dd class="tabular-nums" th:text="${#temporals.format(c.lastDetectedAt(), 'yyyy-MM-dd HH:mm')}">-</dd></div>
-        <div class="exception-detail-wide"><dt>제목</dt><dd th:text="${c.title()}">-</dd></div>
-        <div class="exception-detail-wide"><dt>설명</dt><dd th:text="${c.description()}">-</dd></div>
+        <div class="exception-detail-wide"><dt>제목</dt><dd data-rate-text th:text="${c.title()}">-</dd></div>
+        <div class="exception-detail-wide"><dt>설명</dt><dd data-rate-text th:text="${c.description()}">-</dd></div>
         <div class="exception-detail-wide"><dt>참조</dt><dd class="tabular-nums">
           <a class="button button-secondary" th:if="${c.sourceLink() != null}" th:href="@{${c.sourceLink()}}">
             <span class="material-symbols-rounded" aria-hidden="true">open_in_new</span>
@@ -540,7 +540,7 @@
             <ul class="exception-evidence-list">
               <li th:each="item : ${occurrence.evidenceItems()}">
                 <span class="text-secondary" th:text="${item.label()}">항목</span>
-                <span class="tabular-nums" th:text="${item.value()}">값</span>
+                <span class="tabular-nums" data-rate-text th:attr="data-usage-rate=${item.label() == '사용률'}" th:text="${item.value()}">값</span>
               </li>
             </ul>
           </details>
