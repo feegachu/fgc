@@ -8,11 +8,15 @@ import java.util.List;
  * 금액은 원 단위 long, 한도 사용률은 소수 한 자리다. 요약 문장은 별도 explain 응답으로 받는다.
  */
 public record CompareRankingResponse(
-        /** explain 호출에 쓰는 이번 계산 결과 ID(본인 세션에서만 유효, 단기 보관) */
+        /** explain 호출에 쓰는 이번 계산 결과 ID(본인 세션에서만 유효, 단기 보관). 순위가 없으면 null */
         String rankResultId,
+        /** READY | RULE_NOT_CONFIGURED(승인된 계산 기준 미설정, items=[]) | INSUFFICIENT_DATA(자료 부족으로 순위 없음) */
+        String status,
         String categoryCode,
         String categoryLabel,
         LocalDate asOf,
+        /** 순위 계산 기준 버전(fgc.compare.rule-version). 미설정이면 null */
+        String ruleVersion,
         /** 이번 계산에 쓴 수수료 정책 버전. 후보가 없으면 null */
         String policyVersion,
         /** 순위 계산에 쓴 설계사 본인 계약의 평균 월 환산 보험료. 계약이 없으면 null */
@@ -20,7 +24,16 @@ public record CompareRankingResponse(
         int clawbackMonth,
         List<String> warnings,
         CapSummary capSummary,
-        List<Item> items) {
+        List<Item> items,
+        /** 자료가 없어 순위에서 뺀 상품과 사유. 결측을 0이나 최하위로 바꾸지 않는다 */
+        List<Excluded> excludedItems) {
+
+    public static final String READY = "READY";
+    public static final String RULE_NOT_CONFIGURED = "RULE_NOT_CONFIGURED";
+    public static final String INSUFFICIENT_DATA = "INSUFFICIENT_DATA";
+
+    public record Excluded(long offeringId, String insurer, String product, List<String> reasonCodes) {
+    }
 
     public record CapSummary(Double usagePct, String status, int contractCount) {
     }

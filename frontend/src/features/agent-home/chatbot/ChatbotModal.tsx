@@ -421,10 +421,9 @@ function StepOne({
   )
 }
 
-const WARNING_TEXT: Record<string, (n: number) => string> = {
+const WARNING_TEXT: Record<string, (n: number, excluded: number) => string> = {
   OTHER_INSURER_LT_3: (n) => `다른 보험사 상품이 ${n}개뿐이에요(3개 이상 필요). 비교 근거로 쓰기엔 부족할 수 있어요.`,
-  REFUND_RATE_MISSING: () => '일부 상품은 해약환급률표 자료가 없어 환수 노출을 0원으로 계산했어요.',
-  CAP_RULE_MISSING: () => '일부 상품은 한도 규칙 자료가 없어 한도를 반영하지 못했어요.',
+  SOME_EXCLUDED: (_n, excluded) => `자료가 부족한 상품 ${excluded}개는 순위에서 제외했어요.`,
 }
 
 function Result({
@@ -440,11 +439,14 @@ function Result({
 }) {
   const items = ranking.items
   if (items.length === 0) {
-    const reason = ranking.warnings.includes('NO_BASE_PREMIUM')
-      ? '본인 계약이 없어 기준 보험료를 정할 수 없어요.'
-      : ranking.warnings.includes('NO_COMMISSION_RULE')
-        ? '적용할 수수료 규칙이 없어 순위를 만들 수 없어요.'
-        : `${category.label} 후보 상품을 찾지 못했어요.`
+    const reason =
+      ranking.status === 'RULE_NOT_CONFIGURED'
+        ? '상품 순위 계산 기준이 아직 확정되지 않아 순위를 보여 드릴 수 없어요.'
+        : ranking.warnings.includes('NO_BASE_PREMIUM')
+          ? '본인 계약이 없어 기준 보험료를 정할 수 없어요.'
+          : ranking.warnings.includes('ALL_EXCLUDED')
+            ? '비교에 필요한 자료가 부족해 순위를 만들 수 없어요.'
+            : `${category.label} 후보 상품을 찾지 못했어요.`
     return (
       <>
         <User text={category.label} />
@@ -480,7 +482,7 @@ function Result({
       </Bot>
       {warnings.map((w) => (
         <div key={w} className="cb-warn" role="alert">
-          {WARNING_TEXT[w](insurerCount)}
+          {WARNING_TEXT[w](insurerCount, ranking.excludedItems.length)}
         </div>
       ))}
       <section className="cb-hero" aria-label="참고 순위 1위">

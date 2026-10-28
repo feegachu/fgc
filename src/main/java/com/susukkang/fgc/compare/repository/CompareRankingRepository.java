@@ -1,12 +1,14 @@
 package com.susukkang.fgc.compare.repository;
 
 import com.susukkang.fgc.compare.service.CompareRankingCalculator.CapRule;
-import com.susukkang.fgc.compare.service.CompareRankingCalculator.Rule;
+import com.susukkang.fgc.compare.service.CommissionRuleResolver.RuleRow;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -64,12 +66,14 @@ public class CompareRankingRepository {
         return value == null ? Optional.empty() : Optional.of(((Number) value).longValue());
     }
 
-    /** 기준일에 유효한 GA→설계사 현행 수수료 규칙 중 이 상품·설계사에 적용되는 무조건 규칙. */
+    /** 기준일에 유효한 GA→설계사 현행 수수료 규칙 중 이 상품·설계사에 맞는 무조건 규칙 전부. 1건 선택은 CommissionRuleResolver 가 한다. */
     @SuppressWarnings("unchecked")
-    public List<Rule> findCommissionRules(Offering offering, AgentProfile agent, LocalDate asOf) {
+    public List<RuleRow> findCommissionRules(Offering offering, AgentProfile agent, LocalDate asOf) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT r.installment_from, r.installment_to, r.rate_pct, r.fixed_amount, ci.item_name,
-                       pv.policy_code || ' v' || pv.version_no
+                SELECT r.commission_rule_id, r.policy_version_id, r.commission_item_id, r.installment_from, r.installment_to,
+                       r.rate_pct, r.fixed_amount, ci.item_name, pv.policy_code || ' v' || pv.version_no,
+                       r.product_offering_id IS NOT NULL, r.insurer_id IS NOT NULL, r.agent_rank_code IS NOT NULL,
+                       r.organization_id IS NOT NULL, r.priority_no
                 FROM fgc.commission_rule r
                 JOIN fgc.policy_version pv ON pv.policy_version_id = r.policy_version_id
                 JOIN fgc.commission_item ci ON ci.commission_item_id = r.commission_item_id
@@ -82,13 +86,15 @@ public class CompareRankingRepository {
                   AND (r.product_offering_id IS NULL OR r.product_offering_id = :offeringId)
                   AND (r.organization_id IS NULL OR r.organization_id = :orgId)
                   AND (r.agent_rank_code IS NULL OR r.agent_rank_code = :rank)
-                ORDER BY r.installment_from, r.priority_no, r.commission_rule_id
+                ORDER BY r.commission_rule_id
                 """)
                 .setParameter("offeringId", offering.offeringId()).setParameter("insurerId", offering.insurerId())
                 .setParameter("asOf", asOf).setParameter("orgId", agent.organizationId())
                 .setParameter("rank", agent.rankCode()).getResultList();
-        return rows.stream().map(r -> new Rule(((Number) r[0]).intValue(), ((Number) r[1]).intValue(),
-                (BigDecimal) r[2], (BigDecimal) r[3], (String) r[4], (String) r[5])).toList();
+        return rows.stream().map(r -> new RuleRow(((Number) r[0]).longValue(), ((Number) r[1]).longValue(),
+                ((Number) r[2]).longValue(), ((Number) r[3]).intValue(), ((Number) r[4]).intValue(), (BigDecimal) r[5],
+                (BigDecimal) r[6], (String) r[7], (String) r[8], (Boolean) r[9], (Boolean) r[10], (Boolean) r[11],
+                (Boolean) r[12], ((Number) r[13]).intValue())).toList();
     }
 
     /**
@@ -114,7 +120,7 @@ public class CompareRankingRepository {
     @SuppressWarnings("unchecked")
     public Optional<CapRule> findCapRule(Offering offering, LocalDate asOf) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT s.premium_multiplier, pv.policy_code || ' v' || pv.version_no
+                SELECT s.premium_multiplier, pv.policy_code || ' v' || pv.version_no, s.cap_rule_set_id
                 FROM fgc.cap_rule_set s JOIN fgc.policy_version pv ON pv.policy_version_id = s.policy_version_id
                 WHERE pv.status = 'ACTIVE' AND s.payment_stage = 'GA_TO_FC'
                   AND s.contract_date_from <= :asOf AND (s.contract_date_to IS NULL OR s.contract_date_to >= :asOf)
@@ -124,7 +130,18 @@ public class CompareRankingRepository {
                 LIMIT 1
                 """).setParameter("asOf", asOf).setParameter("insurerId", offering.insurerId())
                 .setParameter("groupCode", offering.groupCode()).getResultList();
-        return rows.stream().findFirst().map(r -> new CapRule((BigDecimal) r[0], (String) r[1]));
+        return rows.stream().findFirst().map(r -> new CapRule((BigDecimal) r[0], (String) r[1], ((Number) r[2]).longValue()));
+    }
+
+    /** 한도 규칙 세트의 수수료 항목별 산입 구분(INCLUDED/EXCLUDED/REVIEW_REQUIRED). 목록에 없는 항목은 구분이 없는 것이다. */
+    @SuppressWarnings("unchecked")
+    public Map<Long, String> findCapItemInclusion(long capRuleSetId) {
+        List<Object[]> rows = em.createNativeQuery("""
+                SELECT commission_item_id, inclusion_status FROM fgc.cap_rule_item WHERE cap_rule_set_id = :id
+                """).setParameter("id", capRuleSetId).getResultList();
+        Map<Long, String> result = new HashMap<>();
+        rows.forEach(r -> result.put(((Number) r[0]).longValue(), (String) r[1]));
+        return result;
     }
 
     /** 협회 등급(표시 전용). 가장 최근 기준일 값을 쓰고 자료가 없으면 비어 있다. */

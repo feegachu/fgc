@@ -30,17 +30,27 @@ export interface CompareItem {
   associationGrade: string | null
   evidence: CompareEvidence[]
 }
+export interface CompareExcluded {
+  offeringId: number
+  insurer: string
+  product: string
+  reasonCodes: string[]
+}
 export interface CompareRanking {
   rankResultId: string | null
+  /** READY | RULE_NOT_CONFIGURED(승인된 계산 기준 미설정) | INSUFFICIENT_DATA(자료 부족) */
+  status: 'READY' | 'RULE_NOT_CONFIGURED' | 'INSUFFICIENT_DATA'
   categoryCode: string
   categoryLabel: string
   asOf: string
+  ruleVersion: string | null
   policyVersion: string | null
   basePremium: number | null
   clawbackMonth: number
   warnings: string[]
   capSummary: { usagePct: number | null; status: string | null; contractCount: number }
   items: CompareItem[]
+  excludedItems: CompareExcluded[]
 }
 export interface CompareExplain {
   rankResultId: string

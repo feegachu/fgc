@@ -25,11 +25,13 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 설명 : 설계사에게 상품 비교 순위를 계산해 돌려주는 서비스(FUN-079).
  * 순위·금액은 서버가 결정론으로 확정하고(LLM 없이 완성), 요약 문장은 explain 으로 따로 받는다.
+ * 승인된 계산 기준(fgc.compare.rule-version)이 없으면 순위를 만들지 않는다.
  * 설계사 ID는 세션에서만 얻는다(FUN-085).
  */
 @Service
@@ -54,6 +56,11 @@ public class CompareRankingService {
     private final CompareRankingRepository repository;
     private final AgentDataScopeService agentScope;
     private final CompareRankResultStore resultStore;
+    private final CompareSummaryService summaryService;
+
+    /** 순위 계산 기준 버전(D-01 승인본). 비어 있으면 순위를 만들지 않고 RULE_NOT_CONFIGURED 로 응답한다. */
+    @Value("${fgc.compare.rule-version:}")
+    private String ruleVersion;
 
     /** 환수 노출액을 가정하는 해지 차월. 지금은 이 차월의 해약환급률을 환수율로 임시 사용한다(CompareRankingCalculator 참고). */
     @Value("${fgc.compare.clawback-month:12}")
@@ -76,34 +83,41 @@ public class CompareRankingService {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "categoryCode", Map.of("field", "categoryCode"), null);
         }
         LocalDate asOf = today();
-        AgentProfile agent = repository.findAgent(agentId).orElseThrow(() -> new FgcBusinessException(FgcErrorCode.AUTH_005));
         CapSummary cap = capSummary(agentId);
+        // 순위 계산 기준(D-01)이 승인·설정되기 전에는 임의 점수·순위를 만들지 않는다(FUN-079, CT-A02).
+        if (ruleVersion == null || ruleVersion.isBlank()) {
+            return result(null, CompareRankingResponse.RULE_NOT_CONFIGURED, categoryCode, label, asOf, null, null,
+                    List.of("RULE_NOT_CONFIGURED"), cap, List.of(), List.of());
+        }
+        AgentProfile agent = repository.findAgent(agentId).orElseThrow(() -> new FgcBusinessException(FgcErrorCode.AUTH_005));
         List<Offering> offerings = repository.findSellableOfferings(asOf).stream()
                 .filter(o -> categoryCode.equals(o.groupCode())).toList();
-        List<String> warnings = new ArrayList<>();
         if (offerings.isEmpty()) {
-            warnings.add("NO_CANDIDATE");
-            return empty(categoryCode, label, asOf, null, warnings, cap);
+            return insufficient(categoryCode, label, asOf, null, "NO_CANDIDATE", cap, List.of());
         }
         Long base = repository.averageMonthlyEquivalentPremium(agentId).orElse(null);
         if (base == null || base <= 0) {
-            warnings.add("NO_BASE_PREMIUM");
-            return empty(categoryCode, label, asOf, null, warnings, cap);
+            return insufficient(categoryCode, label, asOf, null, "NO_BASE_PREMIUM", cap, List.of());
         }
-        List<Candidate> candidates = offerings.stream().map(o -> candidate(o, agent, asOf))
-                .filter(c -> !c.rules().isEmpty()).toList();
+        List<Candidate> candidates = new ArrayList<>();
+        List<CompareRankingResponse.Excluded> excluded = new ArrayList<>();
+        for (Offering offering : offerings) {
+            Built built = build(offering, agent, asOf);
+            if (built.candidate() != null) {
+                candidates.add(built.candidate());
+            } else {
+                excluded.add(built.excluded());
+            }
+        }
         if (candidates.isEmpty()) {
-            warnings.add("NO_COMMISSION_RULE");
-            return empty(categoryCode, label, asOf, base, warnings, cap);
+            return insufficient(categoryCode, label, asOf, base, "ALL_EXCLUDED", cap, excluded);
         }
-        if (candidates.stream().anyMatch(c -> c.clawbackRatePct() == null)) {
-            warnings.add("REFUND_RATE_MISSING");
-        }
-        if (candidates.stream().anyMatch(c -> c.cap() == null)) {
-            warnings.add("CAP_RULE_MISSING");
-        }
+        List<String> warnings = new ArrayList<>();
         if (candidates.stream().map(Candidate::insurer).distinct().count() < MIN_INSURERS) {
             warnings.add("OTHER_INSURER_LT_3");
+        }
+        if (!excluded.isEmpty()) {
+            warnings.add("SOME_EXCLUDED");
         }
         List<Result> ranked = CompareRankingCalculator.rank(candidates, base, asOf);
         List<CompareRankingResponse.Item> items = new ArrayList<>();
@@ -117,16 +131,28 @@ public class CompareRankingService {
         }
         String policyVersion = candidates.stream().flatMap(c -> c.rules().stream()).map(CompareRankingCalculator.Rule::policyVersion)
                 .findFirst().orElse(null);
-        CompareRankingResponse response = new CompareRankingResponse(null, categoryCode, label, asOf, policyVersion, base,
-                clawbackMonth, warnings, cap, items);
+        CompareRankingResponse response = result(null, CompareRankingResponse.READY, categoryCode, label, asOf, policyVersion,
+                base, warnings, cap, items, excluded);
         return withId(response, resultStore.save(agentId, response));
     }
 
-    /** 순위 결과를 풀어 쓴 요약. 지금은 규칙형 문장만 만든다(LLM 요약은 LlmGateway 연동 단계에서 추가). */
+    /** 순위 결과를 풀어 쓴 요약. LLM 요약이 되면 그것을, 안 되면(키 없음·장애·검증 실패) 규칙형 문장을 돌려준다. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public CompareExplainResponse explain(String rankResultId) {
         long agentId = requireAgent();
+        if (resultStore.ownedByOther(agentId, rankResultId)) {
+            throw new FgcBusinessException(FgcErrorCode.AUTH_003);
+        }
         CompareRankingResponse ranking = resultStore.find(agentId, rankResultId)
                 .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004));
+        String llm = resultStore.findSummary(agentId, rankResultId)
+                .or(() -> summaryService.summarize(ranking).map(text -> {
+                    resultStore.saveSummary(agentId, rankResultId, text);
+                    return text;
+                })).orElse(null);
+        if (llm != null) {
+            return new CompareExplainResponse(rankResultId, llm, "LLM", null);
+        }
         return new CompareExplainResponse(rankResultId, ruleSummary(ranking.categoryLabel(), ranking.items()), "RULE", null);
     }
 
@@ -138,21 +164,65 @@ public class CompareRankingService {
                 .formatted(label, insurers, items.size(), top.insurer(), top.product(), top.conservativeNet());
     }
 
-    private Candidate candidate(Offering o, AgentProfile agent, LocalDate asOf) {
-        RefundRate refund = repository.findRefundRate(o, clawbackMonth, asOf).orElse(null);
-        return new Candidate(o.offeringId(), o.insurer(), o.product(), repository.findCommissionRules(o, agent, asOf),
-                refund == null ? null : refund.ratePct(), refund == null ? null : refund.policyVersion(),
-                repository.findCapRule(o, asOf).orElse(null), repository.findAssociationGrade(o.offeringId(), asOf).orElse(null));
+    private record Built(Candidate candidate, CompareRankingResponse.Excluded excluded) {
     }
 
-    private CompareRankingResponse empty(String categoryCode, String label, LocalDate asOf, Long base, List<String> warnings,
-                                         CapSummary cap) {
-        return new CompareRankingResponse(null, categoryCode, label, asOf, null, base, clawbackMonth, warnings, cap, List.of());
+    /** 상품 하나의 계산 입력을 만든다. 자료가 없으면 0이나 최하위로 바꾸지 않고 사유 코드와 함께 제외한다. */
+    private Built build(Offering o, AgentProfile agent, LocalDate asOf) {
+        List<String> reasons = new ArrayList<>();
+        CommissionRuleResolver.Resolution resolution = CommissionRuleResolver.resolve(
+                repository.findCommissionRules(o, agent, asOf), CompareRankingCalculator.FIRST_YEAR_INSTALLMENTS);
+        if (resolution.excludeReason() != null) {
+            reasons.add(resolution.excludeReason());
+        }
+        RefundRate refund = repository.findRefundRate(o, clawbackMonth, asOf).orElse(null);
+        if (refund == null) {
+            reasons.add("CLAWBACK_RATE_MISSING");
+        }
+        CompareRankingCalculator.CapRule cap = repository.findCapRule(o, asOf).orElse(null);
+        if (cap == null) {
+            reasons.add("CAP_RULE_MISSING");
+        }
+        List<CompareRankingCalculator.Rule> rules = new ArrayList<>();
+        if (reasons.isEmpty()) {
+            Map<Long, String> inclusion = cap.capRuleSetId() == null ? Map.of() : repository.findCapItemInclusion(cap.capRuleSetId());
+            boolean review = false;
+            for (CommissionRuleResolver.Run run : resolution.runs()) {
+                // 한도 규칙에 구분이 없는 항목은 산입 여부를 추정하지 않고 확인 필요로 본다(REG-11).
+                String status = inclusion.getOrDefault(run.rule().itemId(), "REVIEW_REQUIRED");
+                review |= "REVIEW_REQUIRED".equals(status);
+                rules.add(new CompareRankingCalculator.Rule(run.from(), run.to(), run.rule().ratePct(), run.rule().fixedAmount(),
+                        run.rule().label(), run.rule().policyVersion(), "EXCLUDED".equals(status)));
+            }
+            if (review) {
+                reasons.add("CAP_ITEM_REVIEW_REQUIRED");
+            }
+        }
+        if (!reasons.isEmpty()) {
+            return new Built(null, new CompareRankingResponse.Excluded(o.offeringId(), o.insurer(), o.product(), List.copyOf(reasons)));
+        }
+        return new Built(new Candidate(o.offeringId(), o.insurer(), o.product(), rules, refund.ratePct(), refund.policyVersion(),
+                cap, repository.findAssociationGrade(o.offeringId(), asOf).orElse(null)), null);
+    }
+
+    private CompareRankingResponse insufficient(String categoryCode, String label, LocalDate asOf, Long base, String warning,
+                                                CapSummary cap, List<CompareRankingResponse.Excluded> excluded) {
+        return result(null, CompareRankingResponse.INSUFFICIENT_DATA, categoryCode, label, asOf, null, base, List.of(warning), cap,
+                List.of(), excluded);
+    }
+
+    private CompareRankingResponse result(String id, String status, String categoryCode, String label, LocalDate asOf,
+                                          String policyVersion, Long base, List<String> warnings, CapSummary cap,
+                                          List<CompareRankingResponse.Item> items, List<CompareRankingResponse.Excluded> excluded) {
+        String version = CompareRankingResponse.RULE_NOT_CONFIGURED.equals(status) || ruleVersion == null || ruleVersion.isBlank()
+                ? null : ruleVersion;
+        return new CompareRankingResponse(id, status, categoryCode, label, asOf, version, policyVersion, base, clawbackMonth,
+                warnings, cap, items, excluded);
     }
 
     private static CompareRankingResponse withId(CompareRankingResponse r, String id) {
-        return new CompareRankingResponse(id, r.categoryCode(), r.categoryLabel(), r.asOf(), r.policyVersion(), r.basePremium(),
-                r.clawbackMonth(), r.warnings(), r.capSummary(), r.items());
+        return new CompareRankingResponse(id, r.status(), r.categoryCode(), r.categoryLabel(), r.asOf(), r.ruleVersion(),
+                r.policyVersion(), r.basePremium(), r.clawbackMonth(), r.warnings(), r.capSummary(), r.items(), r.excludedItems());
     }
 
     private CapSummary capSummary(long agentId) {

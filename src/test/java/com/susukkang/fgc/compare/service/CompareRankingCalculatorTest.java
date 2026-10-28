@@ -123,15 +123,15 @@ class CompareRankingCalculatorTest {
     }
 
     @Test
-    @DisplayName("보수적 순수령액이 큰 순서로 정렬하고 동률이면 환수가 작은 쪽이 앞선다")
-    void ranksByNetThenClawbackThenInsurer() {
+    @DisplayName("보수적 순수령액이 큰 순서로 정렬하고 동률이면 환수가 작은 쪽, 그래도 같으면 상품 ID 순이다")
+    void ranksByNetThenClawbackThenOfferingId() {
         List<Result> ranked = CompareRankingCalculator.rank(List.of(
                 candidate(1, "가보험", "34.8", null, rate(1, 1, "900")),
-                candidate(2, "나보험", "24.0", null, rate(1, 1, "900")),
+                candidate(2, "라보험", "24.0", null, rate(1, 1, "900")),
                 candidate(3, "다보험", "10.0", null, rate(1, 1, "760")),
-                candidate(4, "라보험", "24.0", null, rate(1, 1, "900"))), 100_000, AS_OF);
+                candidate(4, "나보험", "24.0", null, rate(1, 1, "900"))), 100_000, AS_OF);
 
-        // 2·3·4 는 순수령액 684,000 동률 → 환수가 가장 작은 3, 다음 환수 동률인 2·4 는 보험사명 순, 마지막 1
+        // 2·3·4 는 순수령액 684,000 동률 → 환수가 가장 작은 3, 다음 환수 동률인 2·4 는 보험사명과 무관하게 상품 ID 순, 마지막 1
         assertThat(ranked).extracting(r -> r.candidate().offeringId()).containsExactly(3L, 2L, 4L, 1L);
     }
 
@@ -143,5 +143,22 @@ class CompareRankingCalculatorTest {
         Result result = calc(candidate(1, "A", null, null, fixed), 50_000);
 
         assertThat(result.grossReceipt()).isEqualTo(3_000);
+    }
+    @Test
+    @DisplayName("한도 산입 제외 항목은 전액 지급하되 한도를 소진하지 않는다")
+    void exemptItemDoesNotConsumeCap() {
+        // 산입 항목 1회차 1,000% + 제외 항목 2회차 500%, 한도 12배(기준 100,000원 → 1,200,000원)
+        Rule included = rate(1, 1, "1000");
+        Rule exempt = new Rule(2, 2, new BigDecimal("500"), null, "제외항목", "GA-CUR-2026-V1 v1", true);
+        Rule overflow = rate(3, 3, "300");
+
+        Result result = calc(candidate(1, "A", null, CAP_1200, included, exempt, overflow), 100_000);
+
+        // 한도 안에서 산입분은 1,000,000 + 200,000(3회차 일부), 제외분 500,000은 그대로 지급, 3회차 100,000은 이월
+        assertThat(result.grossReceipt()).isEqualTo(1_800_000);
+        assertThat(result.cappedReceipt()).isEqualTo(1_700_000);
+        assertThat(result.carryover()).isEqualTo(100_000);
+        // 한도 영향은 산입분만 본다: 1,300,000 / 1,200,000
+        assertThat(result.capImpactPct()).isEqualTo(108.3);
     }
 }

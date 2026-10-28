@@ -31,15 +31,18 @@ const item = (rank: number, patch: Partial<CompareItem> = {}): CompareItem => ({
 })
 const ranking = (patch: Partial<CompareRanking> = {}): CompareRanking => ({
   rankResultId: 'r-1',
+  status: 'READY',
   categoryCode: 'HEALTH_PROTECTION',
   categoryLabel: '건강보험',
   asOf: '2026-07-31',
+  ruleVersion: 'TEST-RULE',
   policyVersion: 'GA-CUR-2026-V1 v1',
   basePremium: 100_000,
   clawbackMonth: 12,
   warnings: [],
   capSummary: { usagePct: null, status: null, contractCount: 0 },
   items: [1, 2, 3, 4, 5].map((n) => item(n)),
+  excludedItems: [],
   ...patch,
 })
 const explain = (patch: Partial<CompareExplain> = {}): CompareExplain => ({ rankResultId: 'r-1', summary: '건강보험 5개 보험사를 정렬했어요.', summarySource: 'RULE', summaryError: null, ...patch })
@@ -150,6 +153,22 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     renderModal()
     await pickHealth()
     expect(await screen.findByText('답변을 찾지 못했어요', undefined, { timeout: 9000 })).toBeInTheDocument()
+  })
+
+  it('계산 기준이 확정되지 않았으면 순위 대신 안내를 보여 준다', async () => {
+    onRank = async () => envelope(ranking({ status: 'RULE_NOT_CONFIGURED', items: [], rankResultId: null, ruleVersion: null, warnings: ['RULE_NOT_CONFIGURED'] }))
+    renderModal()
+    await pickHealth()
+    expect(await screen.findByText(/계산 기준이 아직 확정되지 않아/, undefined, { timeout: 9000 })).toBeInTheDocument()
+  })
+
+  it('자료가 부족해 제외된 상품이 있으면 개수를 알린다', async () => {
+    onRank = async () =>
+      envelope(ranking({ warnings: ['SOME_EXCLUDED'], excludedItems: [{ offeringId: 9, insurer: 'Z', product: 'Z', reasonCodes: ['CLAWBACK_RATE_MISSING'] }] }))
+    renderModal()
+    await pickHealth()
+    await result()
+    expect(screen.getByRole('alert')).toHaveTextContent('자료가 부족한 상품 1개는 순위에서 제외했어요')
   })
 
   it('보험사가 3곳 미만이면 경고를 표시한다', async () => {
