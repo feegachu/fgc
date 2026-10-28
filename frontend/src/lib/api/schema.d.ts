@@ -1157,6 +1157,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/pico/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 승인된 지급 가이드의 읽기 전용 질문 답변
+         * @description 설명형 첫 연결: validatedGuide=null. 실제 상태/금액/실행 없음. 제한 업무 어휘와 승인 근거만 외부 전송.
+         */
+        post: operations["ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4002,6 +4022,49 @@ export interface components {
             version?: string;
             entityId?: string;
         };
+        PicoAskRequest: {
+            question: string;
+            screenId: string;
+            entityRefs: components["schemas"]["PicoEntityRef"][];
+            clientContextRevision: string;
+            guideVersion: string;
+            conversation?: components["schemas"]["PicoConversationTurn"][];
+        };
+        PicoConversationTurn: {
+            /** @enum {string} */
+            role: "USER" | "ASSISTANT";
+            text: string;
+        };
+        PicoEntityRef: {
+            /** @enum {string} */
+            type: "CONTRACT" | "PAYMENT" | "SCHEDULE" | "VALIDATION_RUN" | "RECONCILIATION_RUN" | "EXCEPTION";
+            /** Format: int64 */
+            id: number;
+        };
+        ApiResponsePicoAskResponse: {
+            data?: components["schemas"]["PicoAskResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        PicoAskResponse: {
+            /** @enum {string} */
+            decision?: "ANSWER_ONLY" | "ASK_CLARIFICATION" | "UNSUPPORTED";
+            message?: string;
+            guideVersion?: string;
+            contextRevision?: string;
+            evidenceRefs?: components["schemas"]["PicoEvidenceRef"][];
+            /** @description Always null for the first read-only guide-answer scope */
+            validatedGuide?: Record<string, never> | null;
+            /** @enum {string} */
+            source?: "AI" | "FIXED";
+            fallbackReason?: string;
+        };
+        PicoEvidenceRef: {
+            chunkId?: string;
+            workflowId?: string;
+            stepId?: string;
+            title?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -6267,6 +6330,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponsePaymentCalculationSnapshot"];
+                };
+            };
+        };
+    };
+    ask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PicoAskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePicoAskResponse"];
                 };
             };
         };

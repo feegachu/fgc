@@ -125,3 +125,18 @@ tasks.register('verifyPersistenceDependencies') {
 tasks.named('check') {
     dependsOn tasks.named('verifyPersistenceDependencies')
 }
+
+// #664: server and frontend consume one approved payment-guide source.
+tasks.named('processResources') {
+    from('frontend/src/features/assistant') {
+        include 'payment-guides.v1.json'
+        into 'ai/pico'
+    }
+}
+
+// Explicit local QA only: test-classpath fixture, never packaged into the application.
+tasks.register('picoGuidePreview', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.susukkang.fgc.assistant.PicoGuidePreviewServer'
+}

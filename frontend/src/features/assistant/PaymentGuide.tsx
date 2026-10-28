@@ -6,7 +6,7 @@ import mascot from './assets/pico-guide.png'
 import './payment-guide.css'
 
 export function PaymentGuideHelp({ canProcess }: { canProcess: boolean }) {
-  if (import.meta.env.VITE_ASSISTANT_DEMO !== 'true') return null
+  if (import.meta.env.VITE_ASSISTANT_DEMO !== 'true' && import.meta.env.VITE_ASSISTANT_AI !== 'true') return null
   return (
     <div className="payment-guide-help" aria-label="지급 화면 고정 도움말">
       <button

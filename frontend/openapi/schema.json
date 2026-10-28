@@ -6337,6 +6337,144 @@
             "type" : "string"
           }
         }
+      },
+      "PicoAskRequest" : {
+        "type" : "object",
+        "properties" : {
+          "question" : {
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
+          },
+          "screenId" : {
+            "type" : "string",
+            "maxLength" : 30,
+            "minLength" : 0
+          },
+          "entityRefs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PicoEntityRef"
+            },
+            "maxItems" : 6,
+            "minItems" : 0
+          },
+          "clientContextRevision" : {
+            "type" : "string",
+            "maxLength" : 80,
+            "minLength" : 0
+          },
+          "guideVersion" : {
+            "type" : "string",
+            "maxLength" : 40,
+            "minLength" : 0
+          },
+          "conversation" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PicoConversationTurn"
+            },
+            "maxItems" : 6,
+            "minItems" : 0
+          }
+        },
+        "required" : [ "clientContextRevision", "entityRefs", "guideVersion", "question", "screenId" ]
+      },
+      "PicoConversationTurn" : {
+        "type" : "object",
+        "properties" : {
+          "role" : {
+            "type" : "string",
+            "enum" : [ "USER", "ASSISTANT" ]
+          },
+          "text" : {
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "role", "text" ]
+      },
+      "PicoEntityRef" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : [ "CONTRACT", "PAYMENT", "SCHEDULE", "VALIDATION_RUN", "RECONCILIATION_RUN", "EXCEPTION" ]
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "exclusiveMinimum" : 0
+          }
+        },
+        "required" : [ "id", "type" ]
+      },
+      "ApiResponsePicoAskResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PicoAskResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PicoAskResponse" : {
+        "type" : "object",
+        "properties" : {
+          "decision" : {
+            "type" : "string",
+            "enum" : [ "ANSWER_ONLY", "ASK_CLARIFICATION", "UNSUPPORTED" ]
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "guideVersion" : {
+            "type" : "string"
+          },
+          "contextRevision" : {
+            "type" : "string"
+          },
+          "evidenceRefs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PicoEvidenceRef"
+            }
+          },
+          "validatedGuide" : {
+            "type" : [ "object", "null" ],
+            "description" : "Always null for the first read-only guide-answer scope"
+          },
+          "source" : {
+            "type" : "string",
+            "enum" : [ "AI", "FIXED" ]
+          },
+          "fallbackReason" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PicoEvidenceRef" : {
+        "type" : "object",
+        "properties" : {
+          "chunkId" : {
+            "type" : "string"
+          },
+          "workflowId" : {
+            "type" : "string"
+          },
+          "stepId" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        }
       }
     },
     "securitySchemes" : {
@@ -9534,6 +9672,36 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/pico/ask" : {
+      "post" : {
+        "tags" : [ "pico-ask-controller" ],
+        "summary" : "승인된 지급 가이드의 읽기 전용 질문 답변",
+        "description" : "설명형 첫 연결: validatedGuide=null. 실제 상태/금액/실행 없음. 제한 업무 어휘와 승인 근거만 외부 전송.",
+        "operationId" : "ask",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PicoAskRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePicoAskResponse"
                 }
               }
             }

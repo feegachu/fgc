@@ -6,7 +6,7 @@ export function usePaymentGuideObservation(value: Omit<PaymentObservation, 'owne
   const owner = useId()
   const encoded = JSON.stringify(value)
   useEffect(() => {
-    if (import.meta.env.VITE_ASSISTANT_DEMO !== 'true') return
+    if (import.meta.env.VITE_ASSISTANT_DEMO !== 'true' && import.meta.env.VITE_ASSISTANT_AI !== 'true') return
     useGuideRuntime.getState().publish({ ...JSON.parse(encoded), owner } as PaymentObservation)
   }, [encoded, owner])
   useEffect(() => () => useGuideRuntime.getState().detach(owner), [owner])
