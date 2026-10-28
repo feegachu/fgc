@@ -2,6 +2,7 @@
   "use strict";
 
   var apiClient = window.FgcUi && window.FgcUi.apiClient;
+  var format = window.FgcUi && window.FgcUi.format;
   var main = document.querySelector(".reco-page");
   if (!apiClient || !main) return;
 
@@ -369,7 +370,7 @@
       sourceRow("지급예정일", match.dueDate || "—") +
       sourceRow("수령자", agentLabel(data.expectedAgent)) +
       sourceRow("기준금액", won(match.basisAmount)) +
-      sourceRow("적용 요율", match.ratePct == null ? "—" : match.ratePct + "%") +
+      sourceRow("적용 요율", match.ratePct == null ? "—" : format.rate(match.ratePct) + "%") +
       sourceRow("예상 금액", won(match.matchedAmount)) +
       "</dl>" +
       '<p class="reco-compare-source-note">' + escapeHtml(sourceLabel) + " · 저장된 대사 원천</p></section>";

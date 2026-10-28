@@ -15,37 +15,46 @@ package com.susukkang.fgc.common.security;
      * 문서의 역할 계약과 함께 추가한다.
  */
 public final class Roles {
+    private static final String HAS_ANY_ROLE = "hasAnyRole('";
 
     public static final String SYSTEM_ADMIN = "SYSTEM_ADMIN";
     public static final String GA_ADMIN = "GA_ADMIN";
     public static final String SETTLEMENT = "SETTLEMENT";
     public static final String COMPLIANCE = "COMPLIANCE";
+    public static final String AGENT = "AGENT";
+
+    /** FUN-085: 내부 업무 조회와 설계사 본인 업무를 명시적으로 구분한다. */
+    public static final String IS_AGENT = "hasRole('" + AGENT + "')";
+    public static final String CAN_USE_AGENT_WORKSPACE =
+            HAS_ANY_ROLE + AGENT + "','" + SYSTEM_ADMIN + "')";
+    public static final String CAN_VIEW_PUBLIC_PRODUCTS = HAS_ANY_ROLE + SYSTEM_ADMIN + "','" + GA_ADMIN
+            + "','" + SETTLEMENT + "','" + COMPLIANCE + "','" + AGENT + "')";
 
     /** 계약·지급·스케줄·검증실행 생성 등 "처리" 화면 공통 역할. 화면정의서 v2.0 §4-1/각 화면 권한 줄. */
     public static final String CAN_PROCESS =
-            "hasAnyRole('" + SETTLEMENT + "','" + SYSTEM_ADMIN + "')";
+            HAS_ANY_ROLE + SETTLEMENT + "','" + SYSTEM_ADMIN + "')";
 
     /** AUDT-W01 감사로그 조회. 화면정의서 v2.0 :1503,:1530. */
     public static final String CAN_VIEW_AUDIT_LOG =
-            "hasAnyRole('" + COMPLIANCE + "','" + SYSTEM_ADMIN + "')";
+            HAS_ANY_ROLE + COMPLIANCE + "','" + SYSTEM_ADMIN + "')";
 
     /** IF-API-36 원장 역분개. SYSTEM_ADMIN의 전 기능 권한을 함께 반영한다. */
     public static final String CAN_REVERSE_JOURNAL =
-            "hasAnyRole('" + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+            HAS_ANY_ROLE + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
     /** IF-API-44·44A 예외 처리와 원장 정정 실행. 화면정의서 EXCP-W01 권한 계약. */
     public static final String CAN_HANDLE_EXCEPTION =
-            "hasAnyRole('" + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+            HAS_ANY_ROLE + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
     /** IF-API-51 검증 실행 확정. 정산 처리 권한과 다른 별도 관리자 조합이다. */
     public static final String CAN_FINALIZE_VALIDATION =
-            "hasAnyRole('" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+            HAS_ANY_ROLE + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
     /**
      * "전체 조회" API용(기준정보 등). 사실상 authenticated()와 같지만, 역할 4종을 명시해
      * 새 역할이 추가될 때 조회 범위를 다시 판단하도록 강제한다.
      */
-    public static final String ANY_ROLE = "hasAnyRole('" + SYSTEM_ADMIN + "','" + GA_ADMIN
+    public static final String ANY_ROLE = HAS_ANY_ROLE + SYSTEM_ADMIN + "','" + GA_ADMIN
             + "','" + SETTLEMENT + "','" + COMPLIANCE + "')";
 
     /**

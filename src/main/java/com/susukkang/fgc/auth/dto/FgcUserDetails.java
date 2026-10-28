@@ -21,6 +21,7 @@ public class FgcUserDetails extends User {
     private final Long userId;
     private final String userName;
     private final String roleCode;
+    private final Long agentId;
 
     public FgcUserDetails(AppUserView user, boolean enabled, boolean accountNonLocked) {
         super(
@@ -35,6 +36,7 @@ public class FgcUserDetails extends User {
         this.userId = user.getUserId();
         this.userName = user.getUserName();
         this.roleCode = user.getRoleCode();
+        this.agentId = user.getAgentId();
     }
 
     private static List<GrantedAuthority> authorities(String roleCode) {
@@ -51,5 +53,9 @@ public class FgcUserDetails extends User {
 
     public String getRoleCode() {
         return roleCode;
+    }
+
+    public Long getAgentId() {
+        return agentId;
     }
 }

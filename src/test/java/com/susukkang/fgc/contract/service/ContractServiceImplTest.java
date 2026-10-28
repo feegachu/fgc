@@ -79,6 +79,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @ExtendWith(MockitoExtension.class)
 class ContractServiceImplTest {
     @Mock
+    private com.susukkang.fgc.common.security.AgentDataScopeService agentScope;
+    @Mock
     private com.susukkang.fgc.contract.repository.ContractLockRepository contractLockRepository;
 
     @Mock

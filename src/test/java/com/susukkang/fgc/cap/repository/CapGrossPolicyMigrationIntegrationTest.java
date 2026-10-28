@@ -41,7 +41,9 @@ class CapGrossPolicyMigrationIntegrationTest {
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.policy_version",Long.class)).isEqualTo(before);
             } else {
                 flyway(url,null).migrate();
-                assertThat(activeRuleOrder(jdbc)).containsExactlyElementsOf(originalRuleOrder);
+                // #635 V63: 유산 REG-CAP-INS-2026-V1은 폐기(RETIRED)돼 현행 목록에서 빠진다. 나머지 순서·파라미터는 그대로다.
+                assertThat(activeRuleOrder(jdbc)).containsExactlyElementsOf(originalRuleOrder.stream()
+                        .filter(rule -> !rule.startsWith("REG-CAP-INS-2026-V1:")).toList());
                 assertInsurerPolicyWinner(jdbc, "2026-07-01", "REG-CAP-INS-2021-V2", "0");
                 assertInsurerPolicyWinner(jdbc, "2027-01-01", "REG-CAP-INS-2027-V1", "3");
                 assertThat(jdbc.queryForObject("""

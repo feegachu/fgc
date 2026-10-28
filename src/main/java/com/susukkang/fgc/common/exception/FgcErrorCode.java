@@ -226,10 +226,22 @@ public enum FgcErrorCode {
             HttpStatus.FORBIDDEN,
             "error.auth.forbidden"
     ),
+    AUTH_005(
+            "FGC-AUTH-005",
+            HttpStatus.FORBIDDEN,
+            "error.auth.agentScope"
+    ),
     AUTH_004(
             "FGC-AUTH-004",
             HttpStatus.UNAUTHORIZED,
             "error.auth.superseded"
+    ),
+
+    // IF-EXT-03 외부 LLM 장애·건너뜀 — AI 기능만 끄고 기본 업무는 계속한다(SER-013).
+    AI_001(
+            "FGC-AI-001",
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "error.ai.unavailable"
     ),
 
     COMMON_002(
