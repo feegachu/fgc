@@ -44,9 +44,8 @@ import java.util.Map;
  *   규칙 1 과 규칙 3 은 한 advice 로 동시에 만족할 수 없다. 범위를 안 걸면 MPA 도 JSON 을 받아
  *   규칙 3 이 깨지고, 걸면 "한 클래스"가 아니게 된다. 규칙 3 이 사용자가 보는 결과이므로 그쪽을 택했다.
  *
- *  MPA 목록 조회의 page=0 같은 업무 예외는 {@link MpaExceptionHandler}가 이 클래스의
- *  상태·코드·문구 매핑을 재사용해 HTML로 반환한다. MPA advice의 @Controller 범위에는
- *  @RestController도 포함되므로, API 요청은 이 advice가 먼저 처리하도록 순서를 명시한다.
+ *  2026-10-27 yslee - 웨이브 C(#419)에서 MPA @Controller·오류 템플릿·MpaExceptionHandler 를 지웠다.
+ *  남은 컨트롤러는 전부 @RestController 라 위 범위 제한은 동작에 영향이 없다. 오류 화면은 React 가 그린다.
  */
 @Slf4j
 @RestControllerAdvice(annotations = RestController.class)
@@ -261,7 +260,7 @@ public class GlobalExceptionHandler {
      * NoResourceFoundException 핸들러는 지웠다 (2026-08-11).
      *
      * 원래 목적은 "아직 만들지 않은 화면 경로를 클릭하면 500 이 나던 것"을 404 로 바꾸는 것이었는데,
-     * 이제 templates/error/404.html 이 그 자리를 대신한다. 그리고 이 advice 가
+     * 화면 경로는 이제 React 라우터(404 화면)가 받는다(#419). 그리고 이 advice 가
      * annotations = RestController.class 로 제한되면서 애초에 호출되지도 않는다 —
      * NoResourceFoundException 은 컨트롤러가 아니라 정적 리소스 핸들러가 던져서
      * 적용 대상 타입 자체가 없기 때문이다.

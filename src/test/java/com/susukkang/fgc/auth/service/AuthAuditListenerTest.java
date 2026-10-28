@@ -11,8 +11,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
-import org.springframework.security.authentication.event.InteractiveAuthenticationSuccessEvent;
-import org.springframework.security.authentication.event.LogoutSuccessEvent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -34,26 +32,23 @@ class AuthAuditListenerTest {
     private AuditLogRepository repository;
 
     /**
-     * 설명 : 감사 저장 예외가 로그인 성공·실패 및 로그아웃 이벤트 리스너 밖으로 전파되지 않는지 검증한다.
+     * 설명 : 감사 저장 예외가 로그인 실패 이벤트 리스너 밖으로 전파되지 않는지 검증한다.
+     * 로그인 성공·로그아웃은 토큰 API 가 recordTokenEvent 로 남긴다(#419에서 폼 로그인 리스너 제거).
      *
      * @author hjKang
-     * @version 1.0
+     * @version 1.1
      * @since 2026-09-26
      */
     @Test
-    void auditFailureDoesNotEscapeLoginOrLogoutListeners() {
+    void auditFailureDoesNotEscapeLoginFailureListener() {
         given(repository.saveAndFlush(any())).willThrow(new DataIntegrityViolationException("audit unavailable"));
         var listener = new AuthAuditListener(repository, org.mockito.Mockito.mock(
                 org.springframework.transaction.PlatformTransactionManager.class));
         var authentication = UsernamePasswordAuthenticationToken.unauthenticated("settle01", "unused");
 
-        assertThatCode(() -> {
-            listener.onLoginSuccess(new InteractiveAuthenticationSuccessEvent(authentication, getClass()));
-            listener.onLoginFailure(new AuthenticationFailureBadCredentialsEvent(
-                    authentication, new BadCredentialsException("bad credentials")));
-            listener.onLogoutSuccess(new LogoutSuccessEvent(authentication));
-        }).doesNotThrowAnyException();
-        verify(repository, times(3)).saveAndFlush(any());
+        assertThatCode(() -> listener.onLoginFailure(new AuthenticationFailureBadCredentialsEvent(
+                authentication, new BadCredentialsException("bad credentials")))).doesNotThrowAnyException();
+        verify(repository, times(1)).saveAndFlush(any());
     }
 
     /**

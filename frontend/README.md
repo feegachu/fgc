@@ -1,7 +1,7 @@
 # FGC frontend (React + TypeScript)
 
-2차 Thymeleaf → React 전환 화면. 공존기에는 nginx가 `/app/`에서 서빙하고, 기존 화면은 `/`에 그대로 있다.
-웨이브 C(#419)에서 base를 `/`로 바꾼다.
+2차 Thymeleaf → React 전환 화면. 웨이브 C(#419)에서 1차 Thymeleaf 화면을 지우고 nginx가 SPA를 `/`에서 서빙한다.
+공존기 주소 `/app/*`는 nginx가 같은 경로로 301 이동시킨다.
 
 스택: Vite · React 19 · TypeScript(strict) · React Router · TanStack Query · Zustand · Tailwind CSS v3 · ESLint · Vitest + Testing Library · Playwright
 
@@ -15,7 +15,7 @@
 | 할 일 | 명령 |
 |---|---|
 | 의존성 설치 | `npm ci` |
-| 개발 서버 | `npm run dev` → `http://localhost:5173/app/` (`/api`는 8081로 프록시) |
+| 개발 서버 | `npm run dev` → `http://localhost:5173/` (`/api`는 8081로 프록시). `8081`은 API 서버라 화면이 없다 |
 | 린트 | `npm run lint` |
 | 포맷 | `npx prettier --write <파일>` — 설정은 `.prettierrc.json`. 아직 CI 체크는 없고, #444 이전 파일은 일괄 포맷하지 않았다 |
 | 단위 테스트 | `npm test` (감시 모드) / `npm test -- --run` (CI와 동일) |
@@ -44,8 +44,8 @@ src/
 
 ## 컨테이너
 
-`Containerfile.web` 1단계가 `npm ci && npm run build`를 하고, 2단계 nginx 이미지의 `/usr/share/nginx/html/app/`에 `dist/`를 복사한다.
-라우팅은 `nginx/default.conf.template`의 `/app/` location이 담당한다(없는 경로는 `index.html`로 넘기고, `/app/assets/`는 해시 파일이라 1년 캐시).
+`Containerfile.web` 1단계가 `npm ci && npm run build`를 하고, 2단계 nginx 이미지의 `/usr/share/nginx/html/`에 `dist/`를 복사한다.
+라우팅은 `nginx/default.conf.template`이 담당한다(`/api/`·`/actuator/`·`/v3/api-docs`만 API로 프록시, 나머지 없는 경로는 `index.html`, `/assets/`는 해시 파일이라 1년 캐시).
 
 ## 공통 계층 (#402)
 
@@ -118,7 +118,7 @@ blob을 서버 `Content-Disposition` 파일명(UTF-8 포함)으로 저장한다.
 | month-selector.js 현재 월 | `month(today())` | 브라우저 시간대 → KST; #403 |
 
 화면 담당자는 위 표시 차이를 화면 PR에 기록한다. 기존 Thymeleaf JS와 구조 테스트는
-이 이슈에서 삭제하지 않는다. 실제 화면 전환과 제거는 각 화면 이슈 및 #419 범위다.
+#419(웨이브 C)에서 삭제했다.
 
 ### OpenAPI 타입 재생성
 
@@ -203,35 +203,23 @@ Noto Sans KR와 Material Symbols는 `public/fonts/`에서 제공한다. 브랜�
 
 ### 검증과 1차 구조 테스트 대응
 
-| 유지하는 1차 테스트 | React 동작 검증 |
+| 1차 테스트(#419에서 삭제) | React 동작 검증 |
 |---|---|
 | AppShellWorkspaceStructureTest | workspace.test.ts, router.test.tsx, e2e/app-shell.spec.ts(10개 제한·복원·월 동기화) |
 | SidebarSectionStateStructureTest | Sidebar.test.tsx, 역할 4종 Playwright(메뉴·접힘·섹션 복원) |
 | GlobalMonthSelectorStructureTest | components.test.tsx, workspace.test.ts, Playwright(초안·비활성 월·방향키·취소) |
-| StatusBadgeDesignTokenTest | tokens.test.ts(원본 CSS 및 status 24개 값 대조), components.test.tsx(문구·상태 클래스) |
+| StatusBadgeDesignTokenTest | tokens.test.ts(status 24개 값 대조), components.test.tsx(문구·상태 클래스) |
 | PublishingTemplateStructureTest | components.test.tsx(표·페이지·모달·알림·근거·필드), tokens.test.ts |
 
-기존 템플릿·JS·위 구조 테스트는 #419까지 유지한다. `npm run test:e2e`는 #403 UI API
+기존 템플릿·JS·위 구조 테스트는 #419에서 삭제했다. `npm run test:e2e`는 #403 UI API
 fixture 시나리오를 실행한다. 실제 JWT/refresh 검증은 #402의 별도 서버 통합 테스트다.
 설치된 Chrome을 쓰려면 `FGC_BROWSER_EXECUTABLE`에 실행 파일 경로를 전달한다.
 
-동일 1440×1000 viewport의 기존 Thymeleaf/React 캡처와 치수 비교는 개발 서버 실행 후:
-
-```bash
-FGC_VERIFY_SHELL=true FGC_NODE_BIN="$(command -v node)" \
-  ./gradlew test --tests '*AppShellScreenshotIntegrationTest'
-```
-
-이 테스트도 임시 PostgreSQL을 사용한다. 기존 화면은 실제 Thymeleaf 렌더러로 생성하고,
-조회 API에는 시각 검증용 빈 데이터, React 사용자/월 API에는 UI fixture를 제공한다.
-`build/screenshots/app-shell/`에 legacy.png, react.png, react-month.png를 저장한다.
-업무 본문은 아직 placeholder이므로 본문 픽셀 일치를 주장하지 않는다. 사이드바 256px,
-헤더 52px, 탭 220×40px 및 실제 화면을 비교한다.
+1차/React 셸 캡처 비교(AppShellScreenshotIntegrationTest·verify-shell.mjs)는 1차 화면과 함께 #419에서 삭제했다.
 
 ## #406 기준정보·정책/룰셋
 
-`/app/base`, `/app/policies`에 조회 화면을 연결했다. 기존 `/base`, `/policies`와 템플릿·JS·테스트는
-#419까지 유지한다. API/DB 계약 변경은 없다. #404 로그인/가드가 병합된 develop을 반영했으며 ProtectedRoute·RequirePermission 안에서
+`/base`, `/policies`에 조회 화면을 연결했다. 1차 템플릿·JS·테스트는 #419에서 삭제했다. API/DB 계약 변경은 없다. #404 로그인/가드가 병합된 develop을 반영했으며 ProtectedRoute·RequirePermission 안에서
 화면을 렌더링한다.
 
 ### 공용 기준정보 훅
@@ -283,22 +271,10 @@ POL 기준일은 제목 오른쪽에 두고, 표의 열 너비와 상세 제목�
 
 `src/features/reference/reference.test.tsx`는 탭별 조회·필터·페이지·URL·지연 상세·빈 결과·400/404/500을
 검증한다. `e2e/reference.spec.ts`는 역할 4종의 읽기 전용 조회·새로고침·근거 표시를 검증한다.
-기존 BaseViewControllerTest, BaseViewIntegrationTest, PolicyViewControllerTest,
-PublishingTemplateStructureTest와 policy-list.test.cjs는 유지한다.
+1차 BaseViewControllerTest, BaseViewIntegrationTest, PolicyViewControllerTest,
+PublishingTemplateStructureTest와 policy-list.test.cjs는 #419에서 삭제했다.
 
-개발 서버를 실행한 뒤 실제 HTTP/JWT와 임시 PostgreSQL로 검증하려면 프로젝트 루트에서:
-
-```bash
-FGC_VERIFY_REFERENCE=true FGC_NODE_BIN=node \
-  ./gradlew test --tests '*ReferenceScreensIntegrationTest' --rerun
-```
-
-설치된 Chrome 사용 시 `FGC_BROWSER_EXECUTABLE`도 지정한다. 테스트는 MockMvc로 실제 Thymeleaf
-HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 임시 서버에 전달한다. React 시작 세션은
-테스트 서버가 발급한 실제 JWT를 주입하고 `/auth/me`부터 실제 API를 사용한다. 운영·개발 DB를 쓰지 않는다.
-1440×1000에서 BASE 5탭·POL 4탭의 전후 PNG와 API 상태·행 비교 결과를
-`build/screenshots/reference/`에 저장한다. 두 화면의 동일 데이터·표 제목·필터/버튼 순서와 주요 영역의 위치·너비·높이(허용오차 2px)를
-비교한다. 전체 이미지의 픽셀 동일성을 주장하지 않는다. #403 공통 셸 변경은 비교 범위 밖이다. 캡처에는 시드 데이터만 들어간다.
+1차/React 전후 대조(ReferenceScreensIntegrationTest·verify-reference.mjs)는 1차 화면과 함께 #419에서 삭제했다.
 
 긴 기준정보·정책 텍스트는 기존과 같은 1~2줄 미리보기와 전체 보기/접기를 사용한다.
 실제 잘림이 발생하는 경우에만 펼침 버튼을 표시하며, 너비 변경 시 ResizeObserver로 다시 확인한다.
@@ -306,8 +282,8 @@ HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 �
 
 ## #409 예상 스케줄 목록·상세
 
-`/app/schedules`, `/app/schedules/:id`를 `features/schedule/`로 옮겼다. 두 화면은 lazy 청크라 초기 번들에 들어가지 않는다.
-기존 `/schedules`, `/schedules/{id}`와 템플릿·JS·구조 테스트는 #419까지 유지한다. API·DB 계약 변경은 없다.
+`/schedules`, `/schedules/:id`를 `features/schedule/`로 옮겼다. 두 화면은 lazy 청크라 초기 번들에 들어가지 않는다.
+1차 템플릿·JS·구조 테스트는 #419에서 삭제했다. API·DB 계약 변경은 없다.
 
 - URL: 목록 `contractNo·stage·regime·purpose·status·page`(1차와 같은 이름). 목록에 없는 코드값은 1차처럼 전체(용도는 운영)로 보정하고,
   범위를 넘은 `page`는 마지막 페이지로 바꿔(기록 대체) 다시 조회한다. 상세는 경로의 숫자 id만 받는다.
@@ -340,13 +316,43 @@ HTML을 렌더링하고, 기존/React 양쪽 브라우저의 업무 요청을 �
 업무 오류(1차 `error/business.html`)는 SPA에서 폼 안 오류·Toast로 대체되어 별도 라우트를 두지 않는다.
 
 검증은 `src/features/error/error.test.tsx`(이슈 시나리오 1~6과 업무 오류 1건). 1차 대응 테스트
-`MpaErrorPageIntegrationTest`, `FgcErrorAttributesTest`, `PublishingTemplateStructureTest` 오류 화면 부분은 #419까지 유지한다.
+`MpaErrorPageIntegrationTest`, `PublishingTemplateStructureTest` 오류 화면 부분은 #419에서 삭제했다. `FgcErrorAttributesTest`는 /error JSON 검증으로 남는다.
 
 
 ## #412 차익거래 화면
 
-`/app/arbitrage-checks`의 목록·요약·필터·페이지·상세·타임라인과 수동 재검증을 React로 전환했다.
+`/arbitrage-checks`의 목록·요약·필터·페이지·상세·타임라인과 수동 재검증을 React로 전환했다.
 #406 기준정보 옵션 훅과 공용 client/format/Field/FilterBar/DataTable/Pagination/Modal/Toast를 사용한다.
 목록 API의 `summary + items(PageResponse)` 봉투를 유지하고, 타임라인은 계약 ID·지급단계별 전체 이력으로 분리한다.
 재점검은 canProcess 역할 및 GA_TO_FC 행에서만 실행한다. 입력 검증·중복 제출 방지·성공 재조회·오류 입력 보존을 제공한다.
 API·업무 규칙·DB·기존 Thymeleaf는 변경하지 않았다. #481 관련 상세 설명의 의도적 차이는 해당 이슈·PR에 기록했다.
+
+## #722 정책·룰셋 관리 UI 미리보기
+
+기존 `/policies`의 정책 버전·수수료·1,200%·환급률 탭을 유지하고, 같은 POL-W01 안에
+관리 상세와 정책 등록/초안 편집, 근거 패널, 승인 이력, 작업 확인창을 추가했다.
+작성 범위는 현행 수수료·4년/7년 분급·상태별 지급조건·환수다. CAP/REFUND 등의 범용 작성기는 추가하지 않는다.
+
+이번 브랜치는 **UI만 구현**한다. 일반 화면은 기존 조회 API를 사용하며, IF75/79/80/81 쓰기 호출은 없다.
+`allowedActions`가 없는 상세는 조회만 가능하고, 실제 저장/상태 변경 확인 버튼은 API 연결 전까지 비활성화한다.
+`management.ts`의 편집 모델은 폼 상태용이며 서버 DTO 직렬화·낙관적 잠금·멱등 처리의 완료를 의미하지 않는다.
+근거 상태 태그(`statusTags`)도 UI 폼/미리보기용이다. 현행규정·개정고시·시행세칙·FAQ·회사정책을 복수 선택할 수 있으며,
+값이 없는 기존 응답은 `상태 자료 없음`으로 표시한다. REG/SRC 코드나 출처 분류로 상태를 추정하지 않는다.
+실제 저장 필드·허용값 및 조회 응답 매핑은 API 연결 시 확정해야 한다. 근거 패널과 목록 info에는 법정 심의를 대체하지 않는 참조정보임을 안내한다.
+실제 401/403/409/422 및 CT-P01/P02 통합 검증은 API 연결 단계에 남아 있다. 따라서 #722 전체를 완료 처리하지 않는다.
+
+백엔드 없이 검토하려면 `frontend`에서 `npm ci` 후 `npm run dev -- --port 5177`을 실행하고
+`http://localhost:5177/policy-preview`를 연다. 개발 서버에만 있는 별도 진입점이며 배포 번들에는 포함되지 않는다.
+예시 데이터는 메모리에만 유지되고 새로고침하면 초기화된다. 이 문서의 API 호출은 모두 메모리 응답으로 격리된다.
+
+- 첫 7년 정책: 초안 수정 → RATE/FIXED 전환, 판매버전 선택, 분급 최대 회차/장기유지 구간, 근거 입력.
+- 계약상태 정책: 승인 → 활성화 또는 새 버전 작성 → 새 DRAFT 선택. 자기 작성 초안은 제출 후 자기 승인 불가.
+- 환수 정책: 유형별 입력과 미확정 기준금액의 `설정 필요` 표시. 근거·요율·장기유지 시작 회차를 신규 폼에 자동 입력하지 않는다.
+- 저장 전 필드 오류와 첫 오류 포커스, 미저장 닫기 확인, 저장 중 중복 클릭 잠금, 모달 종료 후 선택 보존.
+
+검증: `npm run build`, `npm run lint`,
+`npm test -- --run src/features/policies/management.test.tsx src/features/reference/reference.test.tsx`,
+`npx playwright test e2e/policy-management.spec.ts`.
+브라우저 테스트는 개발 미리보기를 사용한다. `FGC_E2E_ORIGIN`으로 서버 주소,
+`FGC_BROWSER_EXECUTABLE`로 설치된 브라우저를 지정할 수 있다.
+목록/상세/등록/규칙편집/승인/좁은 화면 캡처는 `frontend/test-results/policy-ui-722/`에 생성된다.

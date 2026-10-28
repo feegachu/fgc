@@ -12,6 +12,7 @@ spring:
     locations:
       - classpath:db/migration
       - classpath:db/demo
+      - classpath:db/demo-agent
 
 fgc:
   # 개발자 PC 의 OPENAI_API_KEY 로 테스트가 예산(SRC-060)을 쓰지 않게 끈다. 게이트웨이 테스트는 가짜 서버로 직접 만든다.
