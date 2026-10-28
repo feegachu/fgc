@@ -425,7 +425,7 @@ function StepOne({
               </div>
             </div>
             <ul className="cb-limit-notes">
-              <li>한도는 기준 보험료의 12배(1,200%)예요.</li>
+              <li>적용되는 한도는 정책 기준으로 계산하며, 결과 근거에서 확인할 수 있어요.</li>
               <li>한도가 거의 찬 상품은 결과에서 경고로 알려 드려요.</li>
             </ul>
           </section>

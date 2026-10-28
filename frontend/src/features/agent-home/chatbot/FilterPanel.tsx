@@ -63,7 +63,7 @@ export function FilterPanel({
             checked={value.excludeCapOverflow}
             onChange={(event) => onChange({ ...value, excludeCapOverflow: event.target.checked })}
           />
-          <span>한도(1,200%)를 넘어 이월이 생기는 상품은 제외</span>
+          <span>한도를 넘어 이월이 생기는 상품은 제외</span>
         </label>
         {count > 0 && (
           <button type="button" className="cb-btn" onClick={() => onChange(EMPTY_FILTERS)}>
