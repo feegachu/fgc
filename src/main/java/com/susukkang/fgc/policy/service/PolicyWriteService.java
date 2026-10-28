@@ -134,6 +134,7 @@ public class PolicyWriteService {
                 || request.actionType() != PolicyActionRequest.ActionType.APPROVE)) {
             throw invalid("evidenceRef", "승인 근거는 APPROVE에서만 비어 있지 않은 문서 참조로 지정하세요.");
         }
+        String evidenceRef = request.evidenceRef() == null ? null : request.evidenceRef().strip();
         boolean submit = request.actionType() == PolicyActionRequest.ActionType.SUBMIT;
         FgcUserDetails actor = requireActor(userId, submit ? WRITERS : APPROVERS);
         return executeOnce(idempotencyKey, userId, "ACTION:" + id, request, () -> {
@@ -153,9 +154,9 @@ public class PolicyWriteService {
                     && writeRepository.hasActiveOverlap(policy)) {
                 throw new FgcBusinessException(FgcErrorCode.POL_002);
             }
-            policy.transition(next, next == PolicyStatus.APPROVED ? userId : null, request.evidenceRef());
+            policy.transition(next, next == PolicyStatus.APPROVED ? userId : null, evidenceRef);
             policyVersionRepository.saveAndFlush(policy);
-            writeRepository.appendAction(id, request.actionType().name(), userId, request.reason(), request.evidenceRef());
+            writeRepository.appendAction(id, request.actionType().name(), userId, request.reason(), evidenceRef);
             writeRepository.refresh(policy);
             return recordChange(request.actionType().name(), policy, actor, before, request.reason());
         });

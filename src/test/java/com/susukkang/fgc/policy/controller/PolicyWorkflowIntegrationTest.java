@@ -521,7 +521,7 @@ class PolicyWorkflowIntegrationTest {
         assertThat(writeError(HttpMethod.POST, "/api/v1/policies/" + id + "/actions", submit, writer, key(), 400)
                 .path("field").asText()).isEqualTo("evidenceRef");
         JsonNode review = action(id, "SUBMIT", created, writer, 200);
-        ObjectNode approval = actionRequest("APPROVE", review).put("evidenceRef", "의결서-001");
+        ObjectNode approval = actionRequest("APPROVE", review).put("evidenceRef", "\u2003 의결서-001 \u2003");
         JsonNode approved = write(HttpMethod.POST, "/api/v1/policies/" + id + "/actions", approval, approver, key(), 200);
         action(id, "ACTIVATE", approved, approver, 200);
         JsonNode active = detail(id, writer);

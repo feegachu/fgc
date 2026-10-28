@@ -31,6 +31,7 @@ public class PolicyDraftValidator {
     private static final String SEVEN_YEAR = "SEVEN_YEAR_2029";
     private static final String FIELD_FEE_REGIME = "feeRegimeCode";
     private static final String FEE_RULE_PREFIX = "feeRegimeRules[";
+    private static final String COMMISSION_RULE_PREFIX = "commissionRules[";
     private static final Set<String> HEADER_REGIMES = Set.of("CURRENT", FOUR_YEAR, SEVEN_YEAR);
     private static final Map<String, String> SCHEDULE_VALUES = Map.of(
             "STATUS_MONTH_RULE", "PAY_IF_ACTIVE_ON_DUE_DATE",
@@ -99,9 +100,9 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.commissionRules().size(); i++) {
             CommissionRuleDraft rule = draft.commissionRules().get(i);
             if (rule.commissionRuleId() != null && !commissionIds.add(rule.commissionRuleId())) {
-                throw invalid("commissionRules[" + i + "].commissionRuleId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
+                throw invalid(COMMISSION_RULE_PREFIX + i + "].commissionRuleId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
             }
-            validateCommission(rule, "commissionRules[" + i + "]");
+            validateCommission(rule, COMMISSION_RULE_PREFIX + i + "]");
         }
     }
 
@@ -159,7 +160,7 @@ public class PolicyDraftValidator {
                         && Objects.equals(left.priorityNo(), right.priorityNo())
                         && left.installmentFrom() <= right.installmentTo()
                         && right.installmentFrom() <= left.installmentTo()) {
-                    throw new FgcBusinessException(FgcErrorCode.POL_002, "commissionRules[" + j + "]",
+                    throw new FgcBusinessException(FgcErrorCode.POL_002, COMMISSION_RULE_PREFIX + j + "]",
                             Map.of("conflictingIndex", i), "같은 적용 범위·우선순위의 수수료 규칙 회차가 겹칩니다.");
                 }
             }
@@ -172,7 +173,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.commissionRules().size(); i++) {
             CommissionRuleDraft rule = draft.commissionRules().get(i);
             for (FeeRegimeRuleDraft regime : draft.feeRegimeRules()) {
-                validateCommissionRegimeBound(rule, regime, "commissionRules[" + i + "]");
+                validateCommissionRegimeBound(rule, regime, COMMISSION_RULE_PREFIX + i + "]");
             }
         }
     }

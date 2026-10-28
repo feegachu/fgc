@@ -112,8 +112,8 @@ public class PolicyWriteRepository {
      */
     public void updateDraft(PolicyVersion policy, PolicyDraft draft) {
         Long id = policy.getPolicyVersionId();
-        Map<Long, OffsetDateTime> detachedCommissionRows = creationTimes("commission_rule", "commission_rule_id", id);
-        Map<Long, OffsetDateTime> detachedFeeRows = creationTimes("fee_regime_ruleset", "fee_regime_ruleset_id", id);
+        Map<Long, OffsetDateTime> detachedCommissionRows = creationTimes(false, id);
+        Map<Long, OffsetDateTime> detachedFeeRows = creationTimes(true, id);
         List<FeeLimit> savedLimits = jdbc.query("""
                 SELECT l.fee_regime_ruleset_limit_id, l.fee_regime_ruleset_id, l.limit_code,
                        l.limit_pct, l.includes_indirect_expense_yn, l.created_at
@@ -145,12 +145,14 @@ public class PolicyWriteRepository {
         touchPolicy(policy);
     }
 
-    private Map<Long, OffsetDateTime> creationTimes(String table, String idColumn, Long policyId) {
+    private Map<Long, OffsetDateTime> creationTimes(boolean feeRegime, Long policyId) {
         Map<Long, OffsetDateTime> times = new LinkedHashMap<>();
-        // 테이블·열 이름은 위의 고정 호출 두 곳만 사용하며, 요청 값은 항상 바인딩한다.
-        jdbc.query("SELECT " + idColumn + ", created_at FROM fgc." + table + " WHERE policy_version_id = ?",
-                (org.springframework.jdbc.core.RowCallbackHandler) rs -> times.put(rs.getLong(1), rs.getObject(2, OffsetDateTime.class)),
-                policyId);
+        org.springframework.jdbc.core.RowCallbackHandler collect = rs -> times.put(rs.getLong(1), rs.getObject(2, OffsetDateTime.class));
+        if (feeRegime) {
+            jdbc.query("SELECT fee_regime_ruleset_id, created_at FROM fgc.fee_regime_ruleset WHERE policy_version_id = ?", collect, policyId);
+        } else {
+            jdbc.query("SELECT commission_rule_id, created_at FROM fgc.commission_rule WHERE policy_version_id = ?", collect, policyId);
+        }
         return times;
     }
 
@@ -228,15 +230,25 @@ public class PolicyWriteRepository {
                 values.add(rule.commissionRuleId());
                 values.add(createdAt);
             }
-            jdbc.update("""
+            if (restoreIdentity) {
+                jdbc.update("""
                     INSERT INTO fgc.commission_rule
                       (payment_stage, insurer_id, product_offering_id, organization_id, agent_rank_code,
                        commission_item_id, fee_component_type, installment_from, installment_to,
                        calculation_type, basis_code, rate_pct, fixed_amount, equal_monthly_yn,
-                       payment_condition_code, priority_no, policy_version_id%s)
-                    %s VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?%s)
-                    """.formatted(restoreIdentity ? ", commission_rule_id, created_at" : "",
-                    restoreIdentity ? "OVERRIDING SYSTEM VALUE" : "", restoreIdentity ? ", ?, ?" : ""), values.toArray());
+                       payment_condition_code, priority_no, policy_version_id, commission_rule_id, created_at)
+                    OVERRIDING SYSTEM VALUE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, values.toArray());
+            } else {
+                jdbc.update("""
+                    INSERT INTO fgc.commission_rule
+                      (payment_stage, insurer_id, product_offering_id, organization_id, agent_rank_code,
+                       commission_item_id, fee_component_type, installment_from, installment_to,
+                       calculation_type, basis_code, rate_pct, fixed_amount, equal_monthly_yn,
+                       payment_condition_code, priority_no, policy_version_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, values.toArray());
+            }
         } else {
             values.add(rule.commissionRuleId());
             values.add(policyId);
@@ -272,14 +284,24 @@ public class PolicyWriteRepository {
                 values.add(rule.feeRegimeRulesetId());
                 values.add(createdAt);
             }
-            jdbc.update("""
+            if (restoreIdentity) {
+                jdbc.update("""
                     INSERT INTO fgc.fee_regime_ruleset
                       (fee_regime_code, sales_start_date_from, sales_start_date_to, basic_document_version,
                        basic_document_date_from, basic_document_date_to, max_installments,
-                       long_term_maintenance_from, long_term_maintenance_to, review_required_yn, source_refs, policy_version_id%s)
-                    %s VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ARRAY(SELECT jsonb_array_elements_text(?::jsonb)), ?%s)
-                    """.formatted(restoreIdentity ? ", fee_regime_ruleset_id, created_at" : "",
-                    restoreIdentity ? "OVERRIDING SYSTEM VALUE" : "", restoreIdentity ? ", ?, ?" : ""), values.toArray());
+                       long_term_maintenance_from, long_term_maintenance_to, review_required_yn, source_refs, policy_version_id,
+                       fee_regime_ruleset_id, created_at)
+                    OVERRIDING SYSTEM VALUE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ARRAY(SELECT jsonb_array_elements_text(?::jsonb)), ?, ?, ?)
+                    """, values.toArray());
+            } else {
+                jdbc.update("""
+                    INSERT INTO fgc.fee_regime_ruleset
+                      (fee_regime_code, sales_start_date_from, sales_start_date_to, basic_document_version,
+                       basic_document_date_from, basic_document_date_to, max_installments,
+                       long_term_maintenance_from, long_term_maintenance_to, review_required_yn, source_refs, policy_version_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ARRAY(SELECT jsonb_array_elements_text(?::jsonb)), ?)
+                    """, values.toArray());
+            }
         } else {
             values.add(rule.feeRegimeRulesetId());
             values.add(policyId);
