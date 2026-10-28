@@ -225,6 +225,31 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('자료가 부족한 상품 1개는 순위에서 제외했어요')
   })
 
+  it('제외된 상품은 이름과 사유를 읽을 수 있게 보여 준다', async () => {
+    onRank = async () =>
+      envelope(ranking({ warnings: ['SOME_EXCLUDED'], excludedItems: [{ offeringId: 9, insurer: '다보험', product: '제외상품', reasonCodes: ['CLAWBACK_RATE_MISSING', 'CAP_RULE_MISSING'] }] }))
+    renderModal()
+    await pickHealth()
+    await result()
+    expect(screen.getByRole('list', { name: '비교에서 제외된 상품' })).toHaveTextContent('다보험 제외상품 — 환수율 자료 없음, 한도 규칙 없음')
+  })
+
+  it('모든 상품이 제외돼 순위가 비어도 제외 상품과 사유를 보여 준다', async () => {
+    onRank = async () =>
+      envelope(
+        ranking({
+          status: 'INSUFFICIENT_DATA',
+          items: [],
+          rankResultId: null,
+          warnings: ['ALL_EXCLUDED'],
+          excludedItems: [{ offeringId: 9, insurer: '다보험', product: '제외상품', reasonCodes: ['NO_COMMISSION_RULE'] }],
+        }),
+      )
+    renderModal()
+    await pickHealth()
+    expect(await screen.findByRole('list', { name: '비교에서 제외된 상품' }, { timeout: 9000 })).toHaveTextContent('다보험 제외상품 — 수수료 규칙 없음')
+  })
+
   it('보험사가 3곳 미만이면 경고를 표시한다', async () => {
     onRank = async () => envelope(ranking({ warnings: ['OTHER_INSURER_LT_3'], items: [item(1), item(2)] }))
     renderModal()

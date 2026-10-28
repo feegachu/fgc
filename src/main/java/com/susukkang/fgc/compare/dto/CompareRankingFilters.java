@@ -1,5 +1,6 @@
 package com.susukkang.fgc.compare.dto;
 
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 
@@ -9,7 +10,7 @@ import java.util.List;
  * insurerIds 는 비교할 보험사(비어 있으면 전체), excludeCapOverflow 가 true 이면 1,200% 한도를 넘겨 이월이 생기는 상품을 순위에서 뺀다.
  */
 public record CompareRankingFilters(
-        @Size(max = 30) List<Long> insurerIds,
+        @Size(max = 30) List<@NotNull Long> insurerIds,
         Boolean excludeCapOverflow) {
 
     public static final CompareRankingFilters NONE = new CompareRankingFilters(List.of(), false);

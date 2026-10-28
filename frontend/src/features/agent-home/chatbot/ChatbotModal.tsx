@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { compareCategoriesQuery, compareExplainQuery, rankCompare } from './api'
-import type { CompareCategory, CompareEvidence, CompareItem, CompareRanking } from './api'
+import type { CompareCategory, CompareEvidence, CompareExcluded, CompareItem, CompareRanking } from './api'
 import { FilterPanel } from './FilterPanel'
 import { EMPTY_FILTERS, toFilters } from './filters'
 import type { FilterDraft } from './filters'
@@ -125,7 +125,11 @@ export function ChatbotModal({
     setDraft(null)
     setAsked([])
     rank.reset()
-    rank.mutate({ categoryCode: next.code, filters: toFilters(filters) })
+    // 이전 카테고리에서 고른 보험사가 이 카테고리에 없으면 서버가 FILTER_NO_MATCH 를 주므로, 이 카테고리의 보험사만 남긴다.
+    const available = new Set(next.insurers.map((i) => i.id))
+    const scoped: FilterDraft = { ...filters, insurerIds: filters.insurerIds.filter((id) => available.has(id)) }
+    setFilters(scoped)
+    rank.mutate({ categoryCode: next.code, filters: toFilters(scoped) })
   }
   const send = () => {
     if (!draft) return
@@ -503,6 +507,29 @@ const WARNING_TEXT: Record<string, (n: number, excluded: number) => string> = {
   SOME_EXCLUDED: (_n, excluded) => `자료가 부족한 상품 ${excluded}개는 순위에서 제외했어요.`,
 }
 
+const EXCLUDE_REASON: Record<string, string> = {
+  NO_COMMISSION_RULE: '수수료 규칙 없음',
+  POLICY_VERSION_AMBIGUOUS: '적용할 정책 버전이 모호함',
+  RULE_DUPLICATE: '수수료 규칙이 중복됨',
+  CLAWBACK_RATE_MISSING: '환수율 자료 없음',
+  CAP_RULE_MISSING: '한도 규칙 없음',
+  CAP_ITEM_REVIEW_REQUIRED: '한도 포함 여부 검토 필요',
+}
+
+/** 비교하지 못한 상품과 사유. 설계사가 어떤 상품이 왜 빠졌는지 확인할 수 있게 한다. */
+function ExcludedList({ items }: { items: CompareExcluded[] }) {
+  if (items.length === 0) return null
+  return (
+    <ul className="cb-muted cb-excluded" aria-label="비교에서 제외된 상품">
+      {items.map((e) => (
+        <li key={e.offeringId}>
+          {e.insurer} {e.product} — {e.reasonCodes.map((code) => EXCLUDE_REASON[code] ?? code).join(', ')}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** 순위가 비었을 때 서버 상태·경고 코드에 맞는 안내 문구. */
 function emptyReason(ranking: CompareRanking, category: CompareCategory) {
   if (ranking.status === 'RULE_NOT_CONFIGURED') return '상품 순위 계산 기준이 아직 확정되지 않아 순위를 보여 드릴 수 없어요.'
@@ -543,6 +570,7 @@ function Result({
           <div className="cb-card" role="status">
             <b>답변을 찾지 못했어요</b>
             <p className="cb-muted">{reason} 다른 카테고리를 골라 보세요.</p>
+            <ExcludedList items={ranking.excludedItems} />
           </div>
         </Bot>
       </>
@@ -579,6 +607,7 @@ function Result({
           {WARNING_TEXT[w](insurerCount, ranking.excludedItems.length)}
         </div>
       ))}
+      <ExcludedList items={ranking.excludedItems} />
       <section className="cb-hero" aria-label="참고 순위 1위">
         <div className="cb-hero-main">
           <span className="cb-rank-pill">1위</span>

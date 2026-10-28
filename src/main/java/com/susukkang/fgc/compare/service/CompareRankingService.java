@@ -129,24 +129,27 @@ public class CompareRankingService {
 
     private static Outcome ranked(List<Candidate> candidates, List<CompareRankingResponse.Excluded> excluded, long base,
                                   Scope scope) {
-        List<String> warnings = new ArrayList<>();
-        if (candidates.stream().map(Candidate::insurer).distinct().count() < MIN_INSURERS) {
-            warnings.add("OTHER_INSURER_LT_3");
-        }
-        if (!excluded.isEmpty()) {
-            warnings.add("SOME_EXCLUDED");
-        }
+        // 경고·정책 버전은 한도 필터까지 거친 최종 표시 상품 기준으로 만든다.
         List<Result> results = CompareRankingCalculator.rank(candidates, base, scope.asOf()).stream()
                 .filter(r -> !scope.filters().capOverflowExcluded() || r.carryover() == 0).toList();
         if (results.isEmpty()) {
             return insufficient(base, "FILTER_NO_MATCH", excluded);
         }
+        List<String> warnings = new ArrayList<>();
+        if (results.stream().map(r -> r.candidate().insurer()).distinct().count() < MIN_INSURERS) {
+            warnings.add("OTHER_INSURER_LT_3");
+        }
+        if (!excluded.isEmpty()) {
+            warnings.add("SOME_EXCLUDED");
+        }
         List<CompareRankingResponse.Item> items = new ArrayList<>();
         for (int i = 0; i < results.size() && i < MAX_ITEMS; i++) {
             items.add(item(i + 1, results.get(i)));
         }
-        String policyVersion = candidates.stream().flatMap(c -> c.rules().stream()).map(CompareRankingCalculator.Rule::policyVersion)
-                .findFirst().orElse(null);
+        // 표시 상품의 정책 버전이 하나로 같을 때만 대표 버전으로 쓴다. 섞여 있으면 상품별 evidence 의 버전을 본다.
+        List<String> versions = results.stream().limit(MAX_ITEMS).flatMap(r -> r.candidate().rules().stream())
+                .map(CompareRankingCalculator.Rule::policyVersion).distinct().toList();
+        String policyVersion = versions.size() == 1 ? versions.get(0) : null;
         return new Outcome(CompareRankingResponse.READY, policyVersion, base, warnings, items, excluded);
     }
 
