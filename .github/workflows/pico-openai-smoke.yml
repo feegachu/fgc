@@ -1,0 +1,76 @@
+name: Pico OpenAI Secret Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_paid_call:
+        description: 'Authorize one small gpt-4o-mini API call with synthetic data'
+        type: boolean
+        required: true
+        default: false
+  push:
+    branches: [codex/664-openai-pico-connection]
+    paths:
+      - '.github/workflows/pico-openai-smoke.yml'
+      - 'src/test/java/com/susukkang/fgc/ai/service/PicoOpenAiLiveSmokeTest.java'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pico-openai-secret-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify-existing-key:
+    # The initial authorized branch push runs once; ordinary pushes/PRs do not spend API tokens.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true) ||
+      (github.event_name == 'push' && github.event.head_commit.message == 'test(ai): verify registered OpenAI secret once [pico-live-smoke]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c
+      - name: One synthetic request through existing LlmGateway
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          FGC_PICO_LIVE_SMOKE: 'true'
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo 'OPENAI_API_KEY repository secret is missing.' >&2
+            exit 1
+          fi
+          ./gradlew test --tests '*PicoOpenAiLiveSmokeTest' --no-daemon --console=plain --rerun-tasks
+      - name: Publish metrics only
+        if: ${{ always() }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          source = Path('build/pico-openai-smoke/result.json')
+          if not source.exists():
+              raise SystemExit('No API result was produced; inspect build status, never dump environment.')
+          raw = json.loads(source.read_text())
+          keys = ('model', 'status', 'errorCode', 'inputTokens', 'outputTokens', 'latencyMs')
+          safe = {key: raw.get(key) for key in keys}
+          destination = Path('build/pico-openai-smoke/published-metrics.json')
+          destination.write_text(json.dumps(safe, indent=2) + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Pico OpenAI smoke: synthetic data; existing gateway; database logging mocked.\n\n')
+              for key, value in safe.items():
+                  summary.write(f'- {key}: {value}\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: ${{ always() }}
+        with:
+          name: pico-openai-smoke-metrics
+          path: build/pico-openai-smoke/published-metrics.json
+          if-no-files-found: ignore
+          retention-days: 1
