@@ -19,6 +19,7 @@ import { RequirePermission } from './RequirePermission'
 // 여기 없는 경로는 기존 Thymeleaf 화면으로 안내하는 TransitionPage를 그린다.
 const pages: Record<string, ComponentType> = {
   '/': HomePage,
+  '/agent-home': lazy(() => import('../features/agent-home/AgentHomePage').then((m) => ({ default: m.AgentHomePage }))),
   '/base': BasePage,
   '/policies': PoliciesPage,
   '/arbitrage-checks': lazy(() => import('../features/arbitrage/ArbitragePage')),
