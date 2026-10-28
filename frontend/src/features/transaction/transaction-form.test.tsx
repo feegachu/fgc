@@ -8,6 +8,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import type { RequestOptions } from '../../lib/api/client'
 import { useToastStore } from '../../stores/toasts'
 import TransactionFormPage from './TransactionFormPage'
+import { getPaymentGuideObserver, paymentGuideConditions } from './payment-guide'
 import { draftQuery } from './form-api'
 import type { Payment, Precheck } from './form-api'
 
@@ -59,7 +60,12 @@ beforeEach(() => {
   mutation = (path) => (path.endsWith('/precheck') ? precheckResult : saved)
   useToastStore.setState({ messages: [] })
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, options: RequestOptions = {}) => {
-    if (options.method && options.method !== 'GET') return envelope(await mutation(path, options))
+    if (options.method && options.method !== 'GET') {
+      const result = await mutation(path, options)
+      if (path.endsWith('/precheck')) return envelope({ paymentId: 77, ...(result as Precheck) })
+      if ((result as Payment)?.commissionTransactionId) draftResponse = result as Payment
+      return envelope(result)
+    }
     if (referenceFailure) throw referenceFailure
     if (path.startsWith('/api/v1/base/agents')) return envelope({ content: agents })
     if (path.startsWith('/api/v1/base/commission-items')) return envelope(items)
@@ -84,7 +90,11 @@ function mount(path = '/app/transactions/new?month=2026-07', canProcess = true, 
   const router = createMemoryRouter(
     [
       {
-        element: <Outlet context={{ user: { canProcess }, month: '2026-07' }} />,
+        element: (
+          <Outlet
+            context={{ user: { canProcess, roleCode: canProcess ? 'SETTLEMENT' : 'COMPLIANCE' }, month: '2026-07' }}
+          />
+        ),
         children: [
           { path: '/transactions/new', element: <TransactionFormPage /> },
           { path: '/transactions', element: <h1>지급 목록 결과</h1> },
@@ -665,5 +675,161 @@ describe('CAP rejection recovery and resolved transport failures (#410)', () => 
     expect(button('btn-save')).toBeEnabled()
     expect(button('btn-precheck')).toBeEnabled()
     expect(button('btn-confirm')).toBeDisabled()
+  })
+})
+
+describe('FUN-087 real form observer', () => {
+  const read = async () => {
+    const observer = getPaymentGuideObserver()!
+    const context = observer.readContext()
+    return { context, state: await observer.readBusinessState(context, new AbortController().signal) }
+  }
+  it('reads the current draft without writes and invalidates precheck on edit', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    const initial = await read()
+    expect(initial.context.entityRefs).toEqual([
+      { type: 'PAYMENT', id: 77 },
+      { type: 'CONTRACT', id: 3 },
+    ])
+    expect(initial.state.saved).toBe(true)
+    expect(initial.state.prechecked).toBe(false)
+    expect(writes()).toHaveLength(0)
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    expect((await read()).state.prechecked).toBe(true)
+    await user.type(screen.getByLabelText('증빙', { selector: 'input', exact: true }), 'changed')
+    const changed = await read()
+    expect(changed.context.clientContextRevision).not.toBe(initial.context.clientContextRevision)
+    expect(changed.state.saved).toBe(false)
+    expect(changed.state.prechecked).toBe(false)
+    expect(button('btn-confirm')).toBeDisabled()
+  })
+  it('only accepts a real save, resets the new payment context, and cleans up on navigation', async () => {
+    const { user, router } = mount()
+    await fillNew(user)
+    expect((await read()).state.saved).toBe(false)
+    await user.click(button('btn-save'))
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    const { context, state } = await read()
+    expect(paymentGuideConditions.CURRENT_DRAFT_SAVED(context, state)).toBe('SATISFIED')
+    expect(context.entityRefs).toContainEqual({ type: 'PAYMENT', id: 77 })
+    const observer = getPaymentGuideObserver()!
+    await router.navigate('/transactions')
+    await waitFor(() => expect(getPaymentGuideObserver()).toBeNull())
+    expect(() => observer.readContext()).toThrow('SCREEN_UNAVAILABLE')
+  })
+  it('does not treat a successful HTTP response containing DRAFT as confirmation', async () => {
+    const { user } = mount()
+    const dialog = await saveAndPrecheck(user)
+    mutation = () => saved
+    await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+    expect(await within(dialog).findByText('지급 확정 결과를 확인하지 못했습니다.')).toBeVisible()
+    expect((await read()).state.confirmed).toBe(false)
+    expect(screen.queryByRole('heading', { name: '지급 목록 결과' })).not.toBeInTheDocument()
+  })
+  it('rejects a precheck for another payment even with confirmable true', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    precheckResult = { paymentId: 88, confirmable: true, blockers: [] }
+    await user.click(button('btn-precheck'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('검증 결과를 사용할 수 없습니다')
+    expect(button('btn-confirm')).toBeDisabled()
+    expect((await read()).state.prechecked).toBe(false)
+  })
+})
+
+describe('FUN-087 guide card and spotlight', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      },
+    )
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([
+      { width: 200, height: 40 },
+    ] as unknown as DOMRectList)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 40,
+      y: 80,
+      left: 40,
+      top: 80,
+      right: 240,
+      bottom: 120,
+      width: 200,
+      height: 40,
+      toJSON() {},
+    })
+  })
+  afterEach(() => vi.unstubAllGlobals())
+  const panel = () => screen.getByRole('region', { name: '지급 업무 가이드' })
+  const next = async (user: ReturnType<typeof userEvent.setup>, acknowledgement = false) => {
+    const control = within(panel()).getByRole('button', {
+      name: acknowledgement ? '확인하고 다음' : '다음',
+    })
+    await waitFor(() => expect(control).toBeEnabled())
+    await user.click(control)
+  }
+  it('registers every catalog target once, never saves on next, and completes after real save', async () => {
+    const { user } = mount()
+    await fillNew(user)
+    for (const id of ['scope', 'amount', 'attributions', 'evidence', 'save', 'precheck', 'precheck.result', 'confirm'])
+      expect(document.querySelectorAll(`[data-guide-target="payment.${id}"]`)).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    await user.click(within(panel()).getByRole('button', { name: '지급 초안 저장' }))
+    await next(user, true)
+    await next(user, true)
+    await next(user, true)
+    await next(user)
+    await waitFor(() => expect(within(panel()).getByRole('heading')).toHaveTextContent('초안을 저장하세요'))
+    expect(within(panel()).getByRole('button', { name: '다음' })).toBeDisabled()
+    expect(writes()).toHaveLength(0)
+    await user.click(button('btn-save'))
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(within(panel()).getByRole('button', { name: '현재 내용으로 다시 찾기' }))
+    await next(user)
+    expect(await within(panel()).findByRole('heading', { name: '안내 완료' })).toBeVisible()
+    expect(writes()).toHaveLength(1)
+  })
+  it('shows confirmation completion before navigation, and removes spotlight while the modal owns focus', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    await user.click(within(panel()).getByRole('button', { name: '지급 사전검증·확정' }))
+    await next(user, true)
+    await next(user)
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    await next(user)
+    await next(user, true)
+    await user.click(within(panel()).getByRole('button', { name: '접기' }))
+    await user.click(button('btn-confirm'))
+    const dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
+    expect(screen.queryByRole('region', { name: '지급 업무 가이드' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('payment-guide-spotlight')).not.toBeInTheDocument()
+    mutation = () => ({ ...saved, status: 'CONFIRMED' })
+    await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
+    expect(await screen.findByRole('heading', { name: '지급 확정 완료' })).toBeVisible()
+    await waitFor(() => expect(panel()).toHaveAttribute('data-guide-status', 'COMPLETED'))
+    expect(screen.queryByRole('heading', { name: '지급 목록 결과' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/금액 \(원\)/)).toBeDisabled()
+    expect(writes().filter(([path]) => path.endsWith('/confirm'))).toHaveLength(1)
+    await user.click(within(panel()).getByRole('button', { name: '목록으로 이동' }))
+    expect(await screen.findByRole('heading', { name: '지급 목록 결과' })).toBeVisible()
+  })
+  it('Esc restores help focus and preserves the form without business writes', async () => {
+    const { user } = mount()
+    await fillNew(user)
+    const help = screen.getByRole('button', { name: '도움말' })
+    await user.click(help)
+    await user.click(within(panel()).getByRole('button', { name: '지급 초안 저장' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('region', { name: '지급 업무 가이드' })).not.toBeInTheDocument()
+    expect(help).toHaveFocus()
+    expect(screen.getByLabelText(/금액 \(원\)/)).toHaveValue(250000)
+    expect(writes()).toHaveLength(0)
   })
 })
