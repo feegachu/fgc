@@ -97,7 +97,7 @@ test('필터 URL·계산근거·Escape 닫기·딥링크를 확인한다', async
   await fixture(page)
   await page.goto('cap-checks?month=2026-07')
   const table = page.getByRole('table', { name: '계약별 판정 목록' })
-  await expect(table.getByText('104.166667%')).toBeVisible()
+  await expect(table.getByText('104.1%')).toBeVisible()
   await expect(table.getByText('-50,000원')).toHaveCSS('color', 'rgb(185, 28, 28)')
   await expect(table.getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/app/contracts/3?tab=cap')
   await page.getByLabel('계약번호', { exact: true }).fill('C-2026-0001')

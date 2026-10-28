@@ -12,23 +12,32 @@ test("금액은 천 단위로 묶고 음수는 마이너스 기호를 붙인다 
   assert.equal(format.isNegative(null), false);
 });
 
-test("요율은 소수 넷째 자리까지 자르기만 하고 반올림하지 않는다 (규칙 3)", () => {
-  assert.equal(format.rate("650.000000"), "650.0000");
-  assert.equal(format.rate("1.234567"), "1.2345");
-  assert.equal(format.rate("104.166667"), "104.1666");
-  assert.equal(format.rate("1200"), "1,200.0000");
+test("요율은 소수 첫째 자리까지 자르기만 하고 반올림하지 않는다 (규칙 3)", () => {
+  assert.equal(format.rate("650.000000"), "650.0");
+  assert.equal(format.rate("1.234567"), "1.2");
+  assert.equal(format.rate("104.166667"), "104.1");
+  assert.equal(format.rate("1200"), "1,200.0");
 });
 
-test("사용률은 소수 여섯째 자리다 — 요율과 자리수가 다르다 (인터페이스정의서 2-4)", () => {
-  // 화면정의서 CAP-W02(:1005) 예시 그대로.
-  assert.equal(format.usageRate("74.166667"), "74.166667");
-  assert.equal(format.usageRate("104.166667"), "104.166667");
-  // 4자리로 자르면 판정 근거와 어긋난다 — 두 함수가 실제로 달라야 한다.
-  assert.notEqual(format.usageRate("104.166667"), format.rate("104.166667"));
+test("사용률도 소수 첫째 자리로 표시하며 원본 정밀도는 바꾸지 않는다", () => {
+  assert.equal(format.usageRate("74.166667"), "74.1");
+  assert.equal(format.usageRate("104.166667"), "104.1");
   // 모자란 자리는 0으로 채우고, 넘치는 자리는 반올림 없이 버린다.
-  assert.equal(format.usageRate("1200"), "1,200.000000");
-  assert.equal(format.usageRate("1.23456789"), "1.234567");
+  assert.equal(format.usageRate("1200"), "1,200.0");
+  assert.equal(format.usageRate("1.23456789"), "1.2");
+  assert.equal(format.usageRate("99.999999"), "99.9");
+  assert.equal(format.usageRate("100.000001"), "100.0");
+  assert.equal(format.usageRate("-1.999999"), "-1.9");
+  assert.equal(format.usageRate("9007199254740993.123456"), "9,007,199,254,740,993.1");
   assert.equal(format.usageRate("not-a-rate"), "-");
+});
+
+test("서버 문구는 소수 백분율만 절사하고 규칙명·식별자는 보존한다", () => {
+  assert.equal(format.rateText("1,200% 한도 초과 — 사용률 104.166667%"), "1,200% 한도 초과 — 사용률 104.1%");
+  assert.equal(format.rateText("비율 -1,234.567% / 74.166667 %"), "비율 -1,234.5% / 74.1 %");
+  assert.equal(format.rateText("ID v1.2345% · 계약 123.456 · 1.2.3%"), "ID v1.2345% · 계약 123.456 · 1.2.3%");
+  assert.equal(format.errorText({message: "사용률 104.166667%", code: "FGC-CAP-001", requestId: "id-1"}),
+    "사용률 104.1% (FGC-CAP-001 · 요청 ID: id-1)");
 });
 
 test("서버가 이미 YYYY-MM-DD 로 준 날짜는 그대로 통과시킨다", () => {

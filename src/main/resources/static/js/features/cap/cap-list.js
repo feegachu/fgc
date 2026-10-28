@@ -3,6 +3,7 @@
 
   var root = document.querySelector(".cap-page");
   if (!root) return;
+  var format = window.FgcUi.format;
 
   var form = document.getElementById("cap-search-form");
   var controls = {
@@ -78,7 +79,7 @@
   }
 
   function percent(value) {
-    return value == null || value === "" ? "—" : String(value) + "%";
+    return value == null || value === "" ? "—" : format.usageRate(value) + "%";
   }
 
   function tableCellDisclosure(value, singleLine, previewHtml) {
@@ -462,7 +463,7 @@
     document.getElementById("sum-badge").innerHTML = statusBadge(item);
 
     var insurerStage = item.paymentStage === "INSURER_TO_GA";
-    var multiplier = snapshot.premiumMultiplier == null ? null : String(snapshot.premiumMultiplier);
+    var multiplier = snapshot.premiumMultiplier == null ? null : format.rate(snapshot.premiumMultiplier);
     var ruleSetLabel = item.capRuleSetId == null ? "—" : "룰셋 ID " + item.capRuleSetId;
     document.getElementById("input-body").innerHTML =
       detailPair("월납환산 초회보험료", won(item.basePremiumAmount)) +

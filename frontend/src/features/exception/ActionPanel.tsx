@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { StatusBadge } from '../../components/StatusBadge'
-import { date, dateTime, errorText } from '../../lib/format'
+import { date, dateTime, errorText, rateText } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { usePermission } from '../auth/useAuth'
 import { Link } from 'react-router'
@@ -83,11 +83,11 @@ function Detail({ item }: { item: ExceptionCase }) {
       </div>
       <div className="exception-detail-wide">
         <dt>제목</dt>
-        <dd>{dash(item.title)}</dd>
+        <dd>{rateText(dash(item.title))}</dd>
       </div>
       <div className="exception-detail-wide">
         <dt>설명</dt>
-        <dd>{dash(item.description)}</dd>
+        <dd>{rateText(dash(item.description))}</dd>
       </div>
       <div className="exception-detail-wide">
         <dt>참조</dt>

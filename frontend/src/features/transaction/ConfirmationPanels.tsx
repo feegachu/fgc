@@ -4,7 +4,7 @@ import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { isNegative, usageRate, won } from '../../lib/format'
+import { isNegative, rateText, usageRate, won } from '../../lib/format'
 import { withMonth } from '../../stores/workspace'
 import type { ApiError } from '../../lib/api/client'
 import type { CapPreview, Precheck } from './form-api'
@@ -32,7 +32,7 @@ export function GatePanel({ result }: { result: Precheck | null }) {
               </div>
               <div className="transaction-gate-detail">
                 {gate.failures.length
-                  ? gate.failures.map((blocker) => blocker.message || blocker.code).join(' / ')
+                  ? gate.failures.map((blocker) => rateText(blocker.message || blocker.code)).join(' / ')
                   : gate.state === 'pass'
                     ? '서버 사전검증 결과 통과했습니다.'
                     : result
@@ -268,13 +268,13 @@ export function ConfirmationModal({
             {failureText ? (
               <p>
                 {failure?.code && failure.status < 500 ? `${failure.code} · ` : ''}
-                {failureText}
+                {rateText(failureText)}
               </p>
             ) : (
               result?.blockers?.map((blocker, index) => (
                 <p key={index}>
                   {blocker.code ? `${blocker.code} · ` : ''}
-                  {blocker.message || '확정 차단 사유를 확인하세요.'}
+                  {rateText(blocker.message || '확정 차단 사유를 확인하세요.')}
                 </p>
               ))
             )}

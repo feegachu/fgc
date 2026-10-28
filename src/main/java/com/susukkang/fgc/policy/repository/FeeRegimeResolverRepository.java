@@ -4,7 +4,6 @@ import com.susukkang.fgc.policy.entity.PolicyVersion;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
