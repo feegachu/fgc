@@ -53,27 +53,12 @@ if [[ "$HOST_ROLE" != was ]]; then
     # 로그인 시도 제한: http 문맥(conf.d)에 zone, server 문맥(fgc.d)에 location. 업스트림 주소는 site.env 값.
     cat > "$release_dir/nginx/fgc-http.conf" <<'NGINX'
 limit_req_zone $binary_remote_addr zone=fgc_login:10m rate=30r/m;
-# HTTP Basic 인증 헤더가 붙은 요청만 접속 IP별로 센다(키가 빈 문자열이면 세지 않는다). §2 운영 Basic 정리 전까지의 방어
-map $http_authorization $fgc_basic_key { "~*^Basic " $binary_remote_addr; default ""; }
-limit_req_zone $fgc_basic_key zone=fgc_basic:10m rate=30r/m;
 limit_req_status 429;
 NGINX
     cat > "$release_dir/nginx/fgc.d/10-guard.conf" <<NGINX
 # actuator는 밖으로 내보내지 않는다. health는 서버 안에서 API 포트로 직접 확인한다.
 location ^~ /actuator { return 404; }
-# server 단계 제한: 자체 limit_req가 없는 모든 location(API 프록시 포함)에 적용된다
-limit_req zone=fgc_basic burst=10 nodelay;
-location = /login {
-    limit_req zone=fgc_login burst=10 nodelay;
-    proxy_pass http://$API_UPSTREAM;
-    proxy_http_version 1.1;
-    proxy_set_header Host              \$http_host;
-    proxy_set_header X-Real-IP         \$remote_addr;
-    proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header X-Forwarded-Host  \$http_host;
-    proxy_set_header X-Forwarded-Port  \$fgc_forwarded_port;
-}
+# HTTP Basic 제한(fgc_basic)은 서버의 httpBasic 제거(#419)로 지웠다. 로그인 시도 제한은 아래 토큰 로그인 경로에 남는다.
 location = /api/v1/auth/login {
     limit_req zone=fgc_login burst=10 nodelay;
     proxy_pass http://$API_UPSTREAM;

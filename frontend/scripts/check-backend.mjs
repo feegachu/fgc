@@ -21,7 +21,7 @@ export async function waitForBackend(url, timeout = 180_000, alive = () => true)
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    await waitForBackend(process.argv[2] ?? 'http://127.0.0.1:18081/login', Number(process.argv[3] ?? 180000))
+    await waitForBackend(process.argv[2] ?? 'http://127.0.0.1:18081/actuator/health', Number(process.argv[3] ?? 180000))
   } catch (error) {
     console.error(error.message)
     process.exitCode = 1

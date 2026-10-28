@@ -57,7 +57,7 @@ test('eleventh tab is bounded and restored; month updates every tab and removes 
   await page.goto('contracts?month=2026-07&page=3&status=ACTIVE')
   await expect(page.locator('.workspace-tab.is-active .workspace-tab-link')).toHaveAttribute(
     'href',
-    /^\/app\/contracts\?/,
+    /^\/contracts\?/,
   )
   for (const path of [
     '/transactions',
@@ -72,12 +72,12 @@ test('eleventh tab is bounded and restored; month updates every tab and removes 
     '/policies',
   ]) {
     await page.evaluate((href) => {
-      window.history.pushState({}, '', `/app${href}?month=2026-07&page=3`)
+      window.history.pushState({}, '', `${href}?month=2026-07&page=3`)
       window.dispatchEvent(new PopStateEvent('popstate'))
     }, path)
     await expect(page.locator('.workspace-tab.is-active .workspace-tab-link')).toHaveAttribute(
       'href',
-      new RegExp('^/app' + path + '[?]'),
+      new RegExp('^' + path + '[?]'),
     )
     await expect(page.locator('.workspace-tab.is-active')).toHaveCount(1)
     await expect(page).toHaveURL(new RegExp(path + '[?]'))
