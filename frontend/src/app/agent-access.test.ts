@@ -6,7 +6,7 @@ describe('FUN-085 설계사 화면 범위', () => {
   it('포트폴리오·본인 계약 목록·상세와 지급 목록만 열고 내부 화면·수정 화면을 막는다', () => {
     const agent = { roleCode: 'AGENT', canProcess: false, canViewAuditLog: false }
     expect(screens.filter((screen) => canOpen(screen, agent)).map((screen) => screen.path)).toEqual([
-      '/agent-home', '/contracts/:id', '/contracts', '/transactions',
+      '/agent-home', '/contracts/:id', '/contracts', '/agent/statements',
     ])
     expect(canOpen(screens.find((screen) => screen.path === '/contracts/new')!, { ...agent, canProcess: true })).toBe(false)
   })
@@ -16,7 +16,7 @@ describe('FUN-085 설계사 화면 범위', () => {
     const values = new Map<string, string>([[key, JSON.stringify({
       owner: 'agent01', month: '2026-07', tabs: [
         { href: '/' }, { href: '/journals' }, { href: '/audit-logs' },
-        { href: '/contracts/42?tab=ledger' }, { href: '/transactions' },
+        { href: '/contracts/42?tab=ledger' }, { href: '/transactions' }, { href: '/agent/statements?month=2026-07' },
       ],
     })]])
     const store = createWorkspaceStore({
@@ -25,7 +25,7 @@ describe('FUN-085 설계사 화면 범위', () => {
       removeItem: (name) => { values.delete(name) },
     })
     store.getState().initialize('agent01', '2026-07', null, { isAgent: true, canProcess: false, canViewAuditLog: false })
-    expect(store.getState().tabs.map((tab) => tab.id)).toEqual(['AGNT-W01', 'CONT-W02', 'TRAN-W01'])
+    expect(store.getState().tabs.map((tab) => tab.id)).toEqual(['AGNT-W01', 'CONT-W02', 'RPT-W02'])
     expect(store.getState().closeTab('AGNT-W01', 'AGNT-W01')).toBeNull()
   })
 })

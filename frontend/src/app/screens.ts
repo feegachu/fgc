@@ -83,6 +83,15 @@ export const screens: ScreenDefinition[] = [
     icon: 'payments',
   },
   {
+    id: 'RPT-W02',
+    path: '/agent/statements',
+    title: '설계사 수수료 명세',
+    menuTitle: '수수료 명세',
+    menu: '/agent/statements',
+    section: 'contracts',
+    icon: 'payments',
+  },
+  {
     id: 'SCHE-W02',
     path: '/schedules/:id',
     title: '예상 스케줄 상세',
@@ -166,6 +175,6 @@ export const canOpen = (
 ) => {
   const agent = user.isAgent || user.roleCode === 'AGENT'
   if (screen.id === 'AGNT-W01') return agent
-  if (agent && !['CONT-W01', 'CONT-W02', 'TRAN-W01'].includes(screen.id)) return false
+  if (agent && !['CONT-W01', 'CONT-W02', 'RPT-W02'].includes(screen.id)) return false
   return !screen.permission || user[screen.permission] === true
 }

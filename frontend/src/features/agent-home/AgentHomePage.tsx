@@ -237,6 +237,9 @@ function Snapshot({
                   <span>-</span>
                 )}
                 <span>전월 대비</span>
+                <Link className="ah-retry" to={`/agent/statements?month=${month}`}>
+                  명세 보기
+                </Link>
               </div>
             </>
           )}
