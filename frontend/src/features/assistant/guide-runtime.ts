@@ -214,7 +214,7 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
     const edge = current.next.find((item) => item.conditionId === current.completionRuleId)
     const nextIndex = edge ? guide.steps.findIndex((item) => item.stepId === edge.stepId) : -1
     if (edge && nextIndex < 0) {
-      get().fail('등록된 다음 안내 단계가 없습니다.')
+      get().fail()
       return
     }
     const last = !edge
