@@ -214,6 +214,7 @@ function TransactionForm({
     /* Existing validator owns form errors; observation does not display a second error. */
   }
   usePaymentGuideObservation({
+    paymentId,
     scopeKey: JSON.stringify([
       form.settlementMonth,
       form.paymentStage,

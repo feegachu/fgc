@@ -15,6 +15,7 @@ export type RuntimeStatus =
   | 'ERROR'
 export interface PaymentObservation {
   owner: string
+  paymentId: string | null
   scopeKey: string
   revision: number
   canProcess: boolean
