@@ -47,17 +47,38 @@ public class ProductSearchImpl implements ProductSearch {
     @Override
     public Page<ProductRow> searchSorted(long insurerId, LocalDate asOf, boolean includeExpired,
                                          boolean includeHistorical, ListSort sort, Pageable pageable) {
+        return queryPage(insurerId, asOf, includeExpired, includeHistorical, null, null, sort, pageable);
+    }
+
+    @Override
+    public Page<ProductRow> searchSelectable(long insurerId, LocalDate asOf, boolean includeExpired,
+                                            boolean includeHistorical, String keyword, Long selectedId, ListSort sort, Pageable pageable) {
+        return queryPage(insurerId, asOf, includeExpired, includeHistorical, keyword, selectedId, sort, pageable);
+    }
+
+    @SuppressWarnings({"unchecked", "java:S2077"})
+    private Page<ProductRow> queryPage(long insurerId, LocalDate asOf, boolean includeExpired,
+                                      boolean includeHistorical, String keyword, Long selectedId, ListSort sort, Pageable pageable) {
+        String filter = """
+                AND (CAST(:selectedId AS bigint) IS NULL OR po.product_offering_id = :selectedId)
+                AND (:keyword = '' OR strpos(lower(p.product_name), lower(:keyword)) > 0
+                  OR strpos(lower(p.insurer_product_code), lower(:keyword)) > 0
+                  OR strpos(lower(p.standard_product_code), lower(:keyword)) > 0
+                  OR strpos(lower(po.offering_version), lower(:keyword)) > 0)
+                """;
         // 정렬 표현식은 SORTABLE 의 코드 상수만 쓴다. 값이 비면 방향과 관계없이 맨 뒤로, 동률은 기존 기본 정렬을 따른다.
         String orderBy = sort == null
                 ? ProductSearchSql.DEFAULT_ORDER
                 : SqlSort.orderBy(sort, SORTABLE, DEFAULT_TIE_BREAKER) + "\n";
-        Query query = entityManager.createNativeQuery(ProductSearchSql.BODY + orderBy, "ProductRowMapping");
+        Query query = entityManager.createNativeQuery(ProductSearchSql.BODY + filter + orderBy, "ProductRowMapping");
         bind(query, insurerId, asOf, includeExpired, includeHistorical);
+        query.setParameter("keyword", keyword == null ? "" : keyword.trim()).setParameter("selectedId", selectedId);
         query.setFirstResult((int) pageable.getOffset()).setMaxResults(pageable.getPageSize());
         List<ProductRow> content = query.getResultList();
 
-        Query count = entityManager.createNativeQuery(ProductSearchSql.COUNT);
+        Query count = entityManager.createNativeQuery(ProductSearchSql.COUNT + filter);
         bind(count, insurerId, asOf, includeExpired, includeHistorical);
+        count.setParameter("keyword", keyword == null ? "" : keyword.trim()).setParameter("selectedId", selectedId);
         long total = ((Number) count.getSingleResult()).longValue();
         return new PageImpl<>(content, pageable, total);
     }

@@ -53,7 +53,11 @@ public class AgentServiceImpl implements AgentService {
         ListSort sort = sortOf(criteria.sort());
         Pageable pageable = JpaListSort.pageable(page, size, sort, SORTABLE, Sort.by(Sort.Direction.ASC, "agentCode"));
 
-        Page<AgentResponse> result = (criteria.includeHistorical()
+        if (criteria.selectedId() != null && criteria.selectedId() < 1) throw validationException("selectedId");
+        Page<AgentResponse> result = (criteria.selectedId() != null
+                ? agentRepository.search(criteria.selectedId(), criteria.organizationId(), normalizedKeyword, criteria.asOf(),
+                    criteria.includeTerminated(), criteria.includeHistorical(), pageable)
+                : criteria.includeHistorical()
                 ? agentRepository.search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), true, pageable)
                 : agentRepository.search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), pageable))
                 .map(AgentResponse::from);

@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { returnLink, safeReturnTo } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { Field } from '../../components/Field'
@@ -9,7 +10,10 @@ import { Modal } from '../../components/Modal'
 import { ApiError } from '../../lib/api/client'
 import { int, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
-import { useAgentOptions, useInsurerOptions, useProductOptions } from '../base/api'
+import { useInsurerOptions } from '../base/api'
+import type { Agent, Product } from '../base/api'
+import { useEntityChoices } from '../base/selection'
+import { SearchSelect } from '../../components/SearchSelect'
 import { contractDetailQuery, createContract, updateContract } from './api'
 import type { ContractDetail } from './api'
 import { contractStatusLabels, paymentCycleLabels } from './labels'
@@ -21,6 +25,8 @@ import './form.css'
 
 export default function ContractFormPage() {
   const { id } = useParams()
+  const [params] = useSearchParams()
+  const returnTo = safeReturnTo(params.get('returnTo'), '/contracts')
   const [revision, setRevision] = useState(0)
   const detail = useQuery({
     ...contractDetailQuery(id ?? ''),
@@ -39,7 +45,7 @@ export default function ContractFormPage() {
     <div className="contract-form-page">
       <header className="page-header contract-form-page-header">
         <h1 className="page-title">보험계약 {id ? '수정' : '등록'}</h1>
-        <Link className="button button-secondary" to="/contracts">
+        <Link className="button button-secondary" to={returnTo}>
           <span className="material-symbols-rounded" aria-hidden="true">
             arrow_back
           </span>
@@ -77,6 +83,8 @@ function ContractEditor({
   onReload: () => Promise<void>
 }) {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const returnTo = safeReturnTo(params.get('returnTo'), '/contracts')
   const queryClient = useQueryClient()
   const currentDate = today()
   // Keep the original read token and values until the user explicitly reloads the editor.
@@ -91,8 +99,19 @@ function ContractEditor({
   const submitting = useRef(false)
   const mounted = useRef(true)
   const insurers = useInsurerOptions()
-  const products = useProductOptions(draft.contractDate, draft.insurerId)
-  const agents = useAgentOptions(draft.contractDate)
+  const products = useEntityChoices(
+    'products',
+    { asOf: draft.contractDate, insurerId: draft.insurerId },
+    [draft.productOfferingId],
+    Boolean(draft.contractDate && draft.insurerId),
+  )
+  const agents = useEntityChoices(
+    'agents',
+    { asOf: draft.contractDate },
+    [draft.agentId],
+    Boolean(draft.contractDate),
+    (agent) => agent.rankCode === 'FC' && agent.agentStatus === 'ACTIVE' && agent.activeYn === true,
+  )
   const availableAgents = (agents.data ?? []).filter(
     (agent) => agent.rankCode === 'FC' && agent.agentStatus === 'ACTIVE' && agent.activeYn === true,
   )
@@ -117,7 +136,7 @@ function ContractEditor({
     if (referenceError) toast(contractErrorText(referenceError, '기준정보를 불러오지 못했습니다.'), 'error')
   }, [referenceError])
 
-  function change(field: ContractField, value: string) {
+  function change(field: ContractField, value: string, selection?: Agent | Product) {
     setErrors((current) => ({ ...current, [field]: undefined }))
     setDraft((current) => {
       let next = { ...current, [field]: value } as ContractDraft
@@ -128,13 +147,14 @@ function ContractEditor({
         next.organizationName = ''
       }
       if (field === 'agentId') {
-        const agent = availableAgents.find((row) => String(row.agentId) === value)
+        const agent = (selection as Agent | undefined) ?? availableAgents.find((row) => String(row.agentId) === value)
         const historical = value === String(original?.agentId) && current.contractDate === original?.contractDate
         next.organizationId = String((historical ? original?.organizationId : agent?.organizationId) ?? '')
         next.organizationName = (historical ? original?.organizationName : agent?.organizationName) ?? ''
       }
       if (field === 'productOfferingId') {
-        const selected = products.data?.find((row) => String(row.productOfferingId) === value)
+        const selected =
+          (selection as Product | undefined) ?? products.data?.find((row) => String(row.productOfferingId) === value)
         if (!selected?.standardDeduction80Yn) next.standardSurrenderDeductionAmount = ''
         if (selected?.paymentTermMonths != null && selected.paymentTermMonths > 0) {
           next.paymentTermMonths = String(selected.paymentTermMonths)
@@ -184,7 +204,9 @@ function ContractEditor({
           6000,
         )
       // Keep the synchronous guard closed through navigation, including repeated submit events.
-      await navigate(`/contracts/${encodeURIComponent(savedId)}`, { state: { message } })
+      await navigate(returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId)), {
+        state: { message },
+      })
     } catch (error) {
       if (!mounted.current) return
       const message = contractErrorText(error instanceof Error ? error : new Error('보험계약을 저장하지 못했습니다.'))
@@ -323,33 +345,21 @@ function ContractEditor({
                     </EvidenceLink>
                   }
                 >
-                  <select
+                  <SearchSelect
                     name="productOfferingId"
-                    className="select-control"
                     value={draft.productOfferingId}
-                    disabled={!draft.insurerId || !draft.contractDate || products.isFetching || Boolean(products.error)}
-                    onChange={(event) => change('productOfferingId', event.target.value)}
-                  >
-                    <option value="">
-                      {!draft.insurerId || !draft.contractDate
-                        ? '보험회사와 계약일을 먼저 선택하세요'
-                        : products.isFetching
-                          ? '상품 판매버전을 불러오는 중...'
-                          : '상품 판매버전을 선택하세요'}
-                    </option>
-                    {(products.data ?? []).map((row) => (
-                      <option key={row.productOfferingId} value={row.productOfferingId}>
-                        {row.productName} · {row.offeringVersion}
-                      </option>
-                    ))}
-                    {draft.productOfferingId &&
-                      draft.productOfferingId === String(original?.productOfferingId) &&
-                      !product && (
-                        <option value={original?.productOfferingId}>
-                          {original?.productName} · {original?.offeringVersion}
-                        </option>
-                      )}
-                  </select>
+                    source={products.source}
+                    selected={
+                      product ??
+                      (draft.productOfferingId === String(original?.productOfferingId) ? original : undefined)
+                    }
+                    placeholder="상품명·코드·판매버전 검색"
+                    disabled={!draft.insurerId || !draft.contractDate}
+                    onSelect={(value, row) => {
+                      products.remember(row)
+                      change('productOfferingId', value, row)
+                    }}
+                  />
                 </Field>
               </div>
               <Field
@@ -418,27 +428,21 @@ function ContractEditor({
                     </EvidenceLink>
                   }
                 >
-                  <select
+                  <SearchSelect
                     name="agentId"
-                    className="select-control"
                     value={draft.agentId}
-                    disabled={!draft.contractDate || agents.isFetching || Boolean(agents.error)}
-                    onChange={(event) => change('agentId', event.target.value)}
-                  >
-                    <option value="">
-                      {agents.isFetching ? '설계사를 불러오는 중...' : '모집 설계사를 선택하세요'}
-                    </option>
-                    {availableAgents.map((row) => (
-                      <option key={row.agentId} value={row.agentId}>
-                        {row.agentName} ({row.agentCode})
-                      </option>
-                    ))}
-                    {draft.agentId &&
-                      draft.agentId === String(original?.agentId) &&
-                      !availableAgents.some((row) => String(row.agentId) === draft.agentId) && (
-                        <option value={original?.agentId}>{original?.agentName}</option>
-                      )}
-                  </select>
+                    source={agents.source}
+                    selected={
+                      availableAgents.find((row) => String(row.agentId) === draft.agentId) ??
+                      (draft.agentId === String(original?.agentId) ? original : undefined)
+                    }
+                    placeholder="설계사 이름·코드 검색"
+                    disabled={!draft.contractDate}
+                    onSelect={(value, row) => {
+                      agents.remember(row)
+                      change('agentId', value, row)
+                    }}
+                  />
                 </Field>
               </div>
               <Field
@@ -556,7 +560,7 @@ function ContractEditor({
                 최신 계약 다시 불러오기
               </Button>
             )}
-            <Link className="button button-secondary" to="/contracts">
+            <Link className="button button-secondary" to={returnTo}>
               취소
             </Link>
             <Button

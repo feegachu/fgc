@@ -705,6 +705,20 @@
         },
         "type" : "object"
       },
+      "ApiResponsePageResponseCommissionItemResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseCommissionItemResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponsePageResponseCommissionPaymentListResponse" : {
         "properties" : {
           "data" : {
@@ -4866,6 +4880,36 @@
         },
         "type" : "object"
       },
+      "PageResponseCommissionItemResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CommissionItemResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageResponseCommissionPaymentListResponse" : {
         "properties" : {
           "content" : {
@@ -6228,17 +6272,36 @@
       },
       "ScheduleLineResponse" : {
         "properties" : {
+          "attributionDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
           "basisAmount" : {
             "type" : "number"
           },
           "basisCode" : {
             "type" : "string"
           },
+          "beneficiaryAgentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "calculationType" : {
             "type" : "string"
           },
+          "cashflowType" : {
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "commissionItemName" : {
             "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "contractMonthNo" : {
             "format" : "int32",
@@ -6673,7 +6736,7 @@
     "/api/v1/audit-logs" : {
       "get" : {
         "description" : "누가 언제 무엇을 바꿨는지 검색합니다. userLoginId 가 null 인 행은 배치 발 감사행(화면 표기 BATCH)입니다.",
-        "operationId" : "search_9",
+        "operationId" : "search_10",
         "parameters" : [ {
           "description" : "대상 종류",
           "example" : "COMMISSION_PAYMENT",
@@ -6930,8 +6993,17 @@
     "/api/v1/base/agents" : {
       "get" : {
         "description" : "기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.",
-        "operationId" : "search_8",
+        "operationId" : "search_9",
         "parameters" : [ {
+          "description" : "기존 선택 설계사 ID 재조회. 위촉기간 조건은 유지",
+          "in" : "query",
+          "name" : "selectedId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
           "description" : "소속 조직 ID",
           "in" : "query",
           "name" : "organizationId",
@@ -7051,6 +7123,75 @@
           }
         },
         "summary" : "수수료 항목 기준정보 조회·선택",
+        "tags" : [ "기준정보" ]
+      }
+    },
+    "/api/v1/base/commission-items/search" : {
+      "get" : {
+        "description" : "기존 asOf 목록 응답은 유지하고 검색·페이지·선택 ID 재조회를 제공합니다.",
+        "operationId" : "search_8",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "asOf",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "keyword",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "cashflowType",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "selectedId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseCommissionItemResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "수수료 항목 검색형 선택",
         "tags" : [ "기준정보" ]
       }
     },
@@ -7196,6 +7337,23 @@
         "description" : "보험회사와 기준일자에 해당하는 활성 상품 판매버전을 조회합니다. includeExpired=true이면 판매 종료 버전을 포함하고, includeHistorical=true이면 판매기간·활성 조건을 해제해 계약 검색용 전체 버전을 반환합니다.",
         "operationId" : "search_5",
         "parameters" : [ {
+          "description" : "상품명·상품코드·판매버전 부분 검색",
+          "in" : "query",
+          "name" : "keyword",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "기존 선택 판매버전 ID 재조회. 기준일·보험회사 조건은 유지",
+          "in" : "query",
+          "name" : "selectedId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
           "description" : "보험회사 ID",
           "example" : 2,
           "in" : "query",
