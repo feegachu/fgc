@@ -68,12 +68,12 @@ class PicoGuideApiLiveSmokeTest {
     void securedGuideApiUsesOneRealAnswerAndApprovedEvidence() throws Exception {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         String question = "초안 저장 방법을 알려줘";
-        mvc.perform(post("/api/v1/ai/pico/ask").with(user("synthetic").roles("AGENT"))
-                .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(question)))
-                .andExpect(status().isForbidden());
-        mvc.perform(post("/api/v1/ai/pico/ask").with(user("synthetic").roles("SETTLEMENT"))
+        mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_AGENT")))
                 .contentType(MediaType.APPLICATION_JSON).content(body(question)))
                 .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/ai/pico/ask"))
+                .contentType(MediaType.APPLICATION_JSON).content(body(question)))
+                .andExpect(status().isUnauthorized());
         assertThat(ask("초안 확정").path("data").path("decision").asText()).isEqualTo("ASK_CLARIFICATION");
         assertThat(ask("오늘 날씨").path("data").path("decision").asText()).isEqualTo("UNSUPPORTED");
         verifyNoInteractions(logs);
@@ -126,7 +126,7 @@ class PicoGuideApiLiveSmokeTest {
 
     private com.fasterxml.jackson.databind.JsonNode ask(String question) throws Exception {
         return mapper.readTree(mvc.perform(post("/api/v1/ai/pico/ask")
-                .with(user("synthetic").roles("SETTLEMENT")).with(csrf())
+                .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT")))
                 .contentType(MediaType.APPLICATION_JSON).content(body(question)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
     }

@@ -80,7 +80,7 @@ try {
   })
   const port = reservation.address().port
   await new Promise((resolve, reject) => reservation.close((error) => error ? reject(error) : resolve()))
-  const url = `http://127.0.0.1:${port}/login`
+  const url = `http://127.0.0.1:${port}/actuator/health`
   const timeout = 1000
   const absent = run('backend-unavailable', [join(root, 'scripts/check-backend.mjs'), url, String(timeout)])
   assert.equal(absent.status, 1, 'Missing backend must exit 1')

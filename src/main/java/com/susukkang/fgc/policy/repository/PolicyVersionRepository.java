@@ -47,13 +47,12 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
                    pv.policy_type,
                    :#{#paymentStage.name()} AS payment_stage,
                    po.fee_regime_code AS schedule_regime
-            FROM fgc.policy_version pv
+            FROM fgc.policy_application_version pv
             JOIN fgc.insurance_contract c ON c.contract_id = :contractId
             JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
             WHERE pv.policy_type = 'CURRENT_COMMISSION'
-              AND pv.status = 'ACTIVE'
               AND pv.effective_from <= c.contract_date
-              AND (pv.effective_to IS NULL OR pv.effective_to >= c.contract_date)
+              AND (pv.application_to IS NULL OR pv.application_to >= c.contract_date)
               AND po.fee_regime_code = 'CURRENT'
               AND (pv.fee_regime_code IS NULL OR pv.fee_regime_code = 'CURRENT')
               AND (pv.basic_document_version IS NULL OR pv.basic_document_version = po.basic_document_version)
@@ -126,16 +125,16 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
                    pp.parameter_value #>> '{}' AS "effectiveContractDate",
                    months.parameter_value #>> '{}' AS "refundAdditionMonths",
                    boundary.parameter_value #>> '{}' AS "refundAdditionBoundaryInclusive"
-              FROM fgc.policy_version pv
+              FROM fgc.policy_application_version pv
               LEFT JOIN fgc.policy_parameter pp ON pp.policy_version_id = pv.policy_version_id
                AND pp.parameter_key = 'ARBITRAGE_EFFECTIVE_CONTRACT_DATE'
               LEFT JOIN fgc.policy_parameter months ON months.policy_version_id = pv.policy_version_id
                AND months.parameter_key = 'ARBITRAGE_REFUND_ADDITION_MONTHS'
               LEFT JOIN fgc.policy_parameter boundary ON boundary.policy_version_id = pv.policy_version_id
                AND boundary.parameter_key = 'ARBITRAGE_REFUND_ADDITION_BOUNDARY_INCLUSIVE'
-             WHERE pv.policy_type = 'ARBITRAGE' AND pv.status = 'ACTIVE'
+             WHERE pv.policy_type = 'ARBITRAGE'
                AND pv.effective_from <= :asOf
-               AND (pv.effective_to IS NULL OR pv.effective_to >= :asOf)
+               AND (pv.application_to IS NULL OR pv.application_to >= :asOf)
              ORDER BY pv.policy_version_id
             """, nativeQuery = true)
     List<ArbitrageApplicability> findArbitrageApplicability(@Param("asOf") LocalDate asOf);

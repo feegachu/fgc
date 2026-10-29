@@ -36,25 +36,25 @@ class PaymentCalculationControllerTest {
 """;
     @ParameterizedTest @ValueSource(strings={"COMPLIANCE","GA_ADMIN","SETTLEMENT","SYSTEM_ADMIN"})
     void internalReadRolesCanUseExactReadOnlyPost(String role) throws Exception {
-        mvc.perform(post("/api/v1/assistant/calculations").with(user("reader").roles(role)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
         verify(service).calculate(any());
     }
     @ParameterizedTest @ValueSource(strings={"AGENT","UNKNOWN"})
     void deniesOtherRoles(String role) throws Exception {
-        mvc.perform(post("/api/v1/assistant/calculations").with(user("other").roles(role)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden()); verifyNoInteractions(service);
+        mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden()); verifyNoInteractions(service);
     }
     @Test void rejectUnknownScopeWithoutReadingAnotherEntity() throws Exception {
-        mvc.perform(post("/api/v1/assistant/calculations").with(user("reader").roles("COMPLIANCE")).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body.replace("\"paymentId\":\"77\"", "\"paymentId\":\"77\",\"contractId\":\"88\""))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_COMPLIANCE"))).contentType(MediaType.APPLICATION_JSON).content(body.replace("\"paymentId\":\"77\"", "\"paymentId\":\"77\",\"contractId\":\"88\""))).andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
-    @Test void sessionCsrfStillRequiredAndBadIdsAreRejected() throws Exception {
-        mvc.perform(post("/api/v1/assistant/calculations").with(user("reader").roles("COMPLIANCE")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
-        mvc.perform(post("/api/v1/assistant/calculations").with(user("reader").roles("COMPLIANCE")).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body.replace("\"77\"","\"-1\""))).andExpect(status().isBadRequest()); verifyNoInteractions(service);
+    @Test void bearerAuthenticationRequiredAndBadIdsAreRejected() throws Exception {
+        mvc.perform(post("/api/v1/assistant/calculations").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_COMPLIANCE"))).contentType(MediaType.APPLICATION_JSON).content(body.replace("\"77\"","\"-1\""))).andExpect(status().isBadRequest()); verifyNoInteractions(service);
     }
     @Test
     @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="FGC_EXPORT_ASSISTANT_OPENAPI", matches="true")
     void exportGeneratedAssistantOpenApiFragment() throws Exception {
-        String json = mvc.perform(get("/v3/api-docs").with(user("export").roles("SYSTEM_ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String json = mvc.perform(get("/v3/api-docs").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN")))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         ObjectNode generated = (ObjectNode) mapper.readTree(json);
         org.assertj.core.api.Assertions.assertThat(generated.path("paths").has("/api/v1/assistant/calculations")).isTrue();
         var file = java.nio.file.Path.of("frontend/openapi/schema.json");
@@ -77,7 +77,7 @@ class PaymentCalculationControllerTest {
         var actual = new PaymentCalculationService(payments,mapper);
         when(service.calculate(any())).thenAnswer(invocation -> actual.calculate(invocation.getArgument(0)));
         for (String kind : java.util.List.of("ATTRIBUTION_BALANCE","PAYMENT_CANDIDATE")) {
-            String json = mvc.perform(post("/api/v1/assistant/calculations").with(user("processor").roles("SETTLEMENT")).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body.replace("ATTRIBUTION_BALANCE",kind)))
+            String json = mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(body.replace("ATTRIBUTION_BALANCE",kind)))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.synthetic").value(false)).andExpect(jsonPath("$.data.snapshotOnly").value(true)).andExpect(jsonPath("$.data.validity").isEmpty()).andReturn().getResponse().getContentAsString();
             if (kind.equals("ATTRIBUTION_BALANCE")) org.assertj.core.api.Assertions.assertThat(mapper.readTree(json).at("/data/amounts/differenceAmount").asText()).isEqualTo("10000");
             String exportDir = System.getenv("FGC_CALC_RESPONSE_EXPORT_DIR");

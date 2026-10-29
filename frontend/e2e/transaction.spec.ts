@@ -1,3 +1,4 @@
+import { selectEntity } from './selectEntity'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
@@ -61,11 +62,12 @@ async function installApi(
           },
         ],
       }
-    else if (path === '/api/v1/base/commission-items')
-      data = [
+    else if (path === '/api/v1/base/commission-items' || path === '/api/v1/base/commission-items/search') {
+      const items = [
         { commissionItemId: 1, itemCode: 'MANAGEMENT_COMMISSION', itemName: '관리자수수료', cashflowType: 'PAYMENT' },
       ]
-    else if (path === '/api/v1/base/insurers')
+      data = path.endsWith('/search') ? { content: items, totalPages: 1 } : items
+    } else if (path === '/api/v1/base/insurers')
       data = { content: [{ insurerId: 1, insurerName: '시연보험', insurerCode: 'DEMO' }] }
     else if (path === '/api/v1/contracts') data = { content: contracts }
     else if (path === '/api/v1/contracts/103') {
@@ -243,10 +245,90 @@ test('초안 삭제는 확인 후 실행하며 취소 시 목록을 유지한다
   expect(fixture.requests.filter((request) => request.method === 'DELETE')).toHaveLength(1)
 })
 
+test('600번째 설계사는 서버 검색 후 키보드로 선택하며 첫 페이지 제한에 걸리지 않는다', async ({ page }, info) => {
+  await installApi(page)
+  const searched: URL[] = []
+  const agents = Array.from({ length: 600 }, (_, index) => ({
+    agentId: index + 1,
+    agentCode: `FC-${index + 1}`,
+    agentName: `검색설계사${index + 1}`,
+    rankCode: 'FC',
+    agentStatus: 'ACTIVE',
+    activeYn: true,
+  }))
+  await page.route('**/api/v1/base/agents?**', async (route) => {
+    const url = new URL(route.request().url())
+    searched.push(url)
+    const keyword = url.searchParams.get('keyword') ?? ''
+    const selected = url.searchParams.get('selectedId')
+    const filtered = agents.filter(
+      (agent) =>
+        (!selected || String(agent.agentId) === selected) &&
+        (agent.agentCode.includes(keyword) || agent.agentName.includes(keyword)),
+    )
+    const size = Number(url.searchParams.get('size') ?? 20)
+    const pageNumber = Number(url.searchParams.get('page') ?? 1)
+    await route.fulfill({
+      json: envelope({
+        content: filtered.slice((pageNumber - 1) * size, pageNumber * size),
+        totalPages: Math.ceil(filtered.length / size),
+        totalElements: filtered.length,
+      }),
+    })
+  })
+  await page.goto('transactions/new?month=2026-07')
+  const recipient = page.getByRole('combobox', { name: /수령 설계사/ })
+  await expect(recipient).toBeEnabled()
+  await recipient.fill('600')
+  await expect(page.getByRole('option', { name: '검색설계사600 (FC-600)' })).toBeVisible()
+  await page.screenshot({ path: 'e2e-artifacts/633-search-select.png', fullPage: true })
+  await info.attach('검색형 선택', { path: 'e2e-artifacts/633-search-select.png', contentType: 'image/png' })
+  await recipient.press('ArrowDown')
+  await recipient.press('Enter')
+  await expect(recipient).toHaveValue('검색설계사600 (FC-600)')
+  expect(
+    searched.some((url) => url.searchParams.get('keyword') === '600' && url.searchParams.get('page') === '1'),
+  ).toBe(true)
+  expect(searched.every((url) => Number(url.searchParams.get('size')) <= 20)).toBe(true)
+})
+
+test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경계 날짜를 보존한다', async ({ page }, info) => {
+  const fixture = await installApi(page)
+  await page.route('**/api/v1/contracts/1', (route) =>
+    route.fulfill({ json: envelope({ ...contracts[0], agentId: 6, agentName: '한지사', contractStatus: 'ACTIVE' }) }),
+  )
+  await page.goto('contracts/1?month=2027-07')
+  await page.getByRole('link', { name: '지급 등록', exact: true }).click()
+  expect(new URL(page.url()).searchParams.has('attributionDate')).toBe(false)
+  await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), '1')
+  const attributionDate = page.getByLabel('1번 귀속행 귀속일', { exact: true })
+  await expect(attributionDate).toHaveValue('')
+  await page.locator('#btn-save').click()
+  await expect(attributionDate).toHaveAttribute('aria-invalid', 'true')
+  expect(
+    fixture.requests.filter((request) => request.method === 'POST' && request.path === '/api/v1/transactions'),
+  ).toHaveLength(0)
+  await info.attach('귀속일 필수 입력', { body: await page.screenshot(), contentType: 'image/png' })
+  await attributionDate.fill('2027-07-10')
+  await page.getByRole('button', { name: '귀속행 추가', exact: true }).click()
+  await selectEntity(page, page.getByLabel('2번 귀속행 계약번호', { exact: true }), '1')
+  const secondDate = page.getByLabel('2번 귀속행 귀속일', { exact: true })
+  await expect(secondDate).toHaveValue('')
+  await page.locator('#btn-save').click()
+  await expect(secondDate).toHaveAttribute('aria-invalid', 'true')
+  await page.getByRole('button', { name: '2번 귀속행 삭제', exact: true }).click()
+  await page.locator('#btn-save').click()
+  await expect(page.locator('#btn-precheck')).toBeEnabled()
+  expect(fixture.payment()).toMatchObject({
+    settlementMonth: '2027-07-01',
+    attributions: [expect.objectContaining({ contractId: 1, attributionDate: '2027-07-10' })],
+  })
+})
+
 async function enterDraft(page: Page, amount: number, count: number) {
   await page.goto('transactions/new?month=2026-07')
-  await page.getByLabel('수령 설계사', { exact: false }).selectOption('6')
-  await page.getByLabel('수수료 항목', { exact: false }).selectOption('1')
+  await selectEntity(page, page.getByLabel('수령 설계사', { exact: false }), '6')
+  await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), '1')
   await page.locator('#bizKey').fill('E2E-MULTI-CONTRACT')
   await page.locator('#amount').fill(String(amount))
   for (let index = 0; index < count; index++) {
@@ -255,7 +337,7 @@ async function enterDraft(page: Page, amount: number, count: number) {
       .locator('#attr-body tr')
       .filter({ has: page.locator('[data-contract-id]') })
       .last()
-    await row.locator('[data-contract-id]').selectOption(String(index + 1))
+    await selectEntity(page, row.locator('[data-contract-id]'), String(index + 1))
     await row.locator('[data-attr-date]').fill('2026-07-31')
     await row.locator('[data-attr-amount]').fill(String(amount / count))
   }
@@ -289,7 +371,7 @@ test('한도 초과는 확정 시도 후 DRAFT를 유지하고 예외함 링크�
   await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
   await expect(page.getByRole('link', { name: '예외함에서 처리하기' })).toHaveAttribute(
     'href',
-    /\/app\/exceptions\?type=CAP_VIOLATION&contractNo=DEMO-CONTRACT-1(?:&month=2026-07)?$/,
+    /\/exceptions\?type=CAP_VIOLATION&contractNo=DEMO-CONTRACT-1(?:&month=2026-07)?$/,
   )
   await expect(page.locator('#btn-confirm-submit')).toBeHidden()
   await expect(page.getByRole('dialog')).toContainText('1,200% 한도를 초과했습니다.')

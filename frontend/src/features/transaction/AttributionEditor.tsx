@@ -1,3 +1,5 @@
+import { SearchSelect } from '../../components/SearchSelect'
+import type { SearchSource } from '../../components/SearchSelect'
 import { Button } from '../../components/Button'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
@@ -10,6 +12,8 @@ import type { AttributionRow } from './form-model'
 export function AttributionEditor({
   rows,
   contracts,
+  contractSource,
+  onContractSelected,
   agentLabel,
   amount,
   insurer,
@@ -21,6 +25,8 @@ export function AttributionEditor({
 }: {
   rows: AttributionRow[]
   contracts: Contract[]
+  contractSource: SearchSource<Contract>
+  onContractSelected: (row?: Contract) => void
   agentLabel: string
   amount: string
   insurer: boolean
@@ -53,19 +59,18 @@ export function AttributionEditor({
         newcomer ? (
           <span className="transaction-panel-meta">-</span>
         ) : (
-          <select
+          <SearchSelect
             {...control(row, 'contractId', '계약번호')}
             data-contract-id
             value={row.contractId}
-            onChange={(event) => patch(row, selectContract(row, event.target.value, contracts))}
-          >
-            <option value="">계약을 선택하세요</option>
-            {contracts.map((contract) => (
-              <option key={contract.contractId} value={contract.contractId}>
-                {contract.contractNo} · {contract.productName}
-              </option>
-            ))}
-          </select>
+            source={contractSource}
+            selected={contracts.find((contract) => String(contract.contractId) === row.contractId)}
+            placeholder="계약번호 검색"
+            onSelect={(id, selected) => {
+              onContractSelected(selected)
+              patch(row, selectContract(row, id, selected ? [selected] : []))
+            }}
+          />
         ),
     },
     { key: 'agent', label: '설계사', width: '9rem', render: () => agentLabel },
