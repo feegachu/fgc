@@ -4220,6 +4220,10 @@ export interface components {
         Basis: {
             sourceRefs?: components["schemas"]["Source"][];
             rounding?: components["schemas"]["Rounding"];
+            asOfDate?: string;
+            policyVersionIds?: string[];
+            ruleIds?: string[];
+            lines?: components["schemas"]["AssistantAttributionLine"][];
         };
         PaymentCalculationSnapshot: {
             calculationId?: string;
@@ -4277,6 +4281,13 @@ export interface components {
             title?: string;
             version?: string;
             entityId?: string;
+        };
+        AssistantAttributionLine: {
+            attributionSequence?: string;
+            contractId?: string;
+            attributionDate?: string;
+            originalAmount?: string;
+            roundedAmount?: string;
         };
     };
     responses: never;

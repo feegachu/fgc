@@ -67,6 +67,7 @@ public class PaymentCalculationService {
     }
     private Map<String, Object> preview(TransactionPrecheckResponse.CapPreviewItem item) {
         Map<String, Object> result = mapper.convertValue(item, new TypeReference<LinkedHashMap<String, Object>>() {});
+        result.put("asOfDate", string(item.asOfDate()));
         // Convert from the typed long fields, never through an IEEE-754 number on the client.
         CAP_MONEY.forEach(key -> { if (result.get(key) != null) result.put(key, result.get(key).toString()); });
         CAP_IDS.forEach(key -> { if (result.get(key) != null) result.put(key, result.get(key).toString()); });
@@ -83,8 +84,27 @@ public class PaymentCalculationService {
             sources = List.of(new PaymentCalculationSnapshot.Source("payment:" + payment.paymentId(), "PAYMENT", "저장된 지급 및 귀속 자료", string(payment.updatedAt()), string(payment.paymentId())));
         }
         return new PaymentCalculationSnapshot(UUID.randomUUID().toString(), request.kind().name(), request.mode().name(), status, request.clientRevision(), false, true, "ACTUAL", "KRW", payment == null ? null : string(payment.status()), scope, amounts, previews, confirmable, blockers, missing,
-                new PaymentCalculationSnapshot.Basis(sources, new PaymentCalculationSnapshot.Rounding(0, "HALF_UP", "ROUND_EACH_LINE_THEN_SUM")),
+                basis(payment, previews, sources),
                 new PaymentCalculationSnapshot.Recommendation(false, null, null, message, List.of("SERVER_VALIDITY_PROOF_REQUIRED")), OffsetDateTime.now(), null);
+    }
+    private PaymentCalculationSnapshot.Basis basis(CommissionPaymentResponse payment,
+            List<Map<String, Object>> previews, List<PaymentCalculationSnapshot.Source> sources) {
+        var lines = payment == null || payment.attributions() == null
+                ? List.<PaymentCalculationSnapshot.AttributionLine>of()
+                : payment.attributions().stream().map(row -> new PaymentCalculationSnapshot.AttributionLine(
+                        string(row.attributionSequence()), string(row.contractId()), string(row.attributionDate()),
+                        row.amount() == null ? null : row.amount().toPlainString(),
+                        row.amount() == null ? null : MoneyUtil.roundWon(row.amount()).toPlainString())).toList();
+        var dates = previews.isEmpty()
+                ? lines.stream().map(PaymentCalculationSnapshot.AttributionLine::attributionDate).filter(Objects::nonNull).distinct().toList()
+                : previews.stream().map(row -> string(row.get("asOfDate"))).filter(Objects::nonNull).distinct().toList();
+        boolean completeDates = previews.isEmpty() ? !lines.isEmpty() && lines.stream().allMatch(row -> row.attributionDate() != null) : previews.stream().allMatch(row -> row.get("asOfDate") != null);
+        var policies = payment == null || payment.allocationPolicyVersion() == null
+                ? List.<String>of() : List.of(string(payment.allocationPolicyVersion()));
+        var rules = previews.stream().map(row -> string(row.get("capRuleSetId"))).filter(Objects::nonNull).distinct().toList();
+        return new PaymentCalculationSnapshot.Basis(sources,
+                new PaymentCalculationSnapshot.Rounding(0, "HALF_UP", "ROUND_EACH_LINE_THEN_SUM"),
+                completeDates && dates.size() == 1 ? dates.getFirst() : null, policies, rules, lines);
     }
     private void requireProcessing() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();

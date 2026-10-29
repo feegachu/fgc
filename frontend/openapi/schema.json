@@ -6743,6 +6743,27 @@
           },
           "rounding" : {
             "$ref" : "#/components/schemas/Rounding"
+          },
+          "asOfDate" : {
+            "type" : "string"
+          },
+          "policyVersionIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "ruleIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantAttributionLine"
+            }
           }
         }
       },
@@ -6901,6 +6922,26 @@
             "type" : "string"
           },
           "entityId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "AssistantAttributionLine" : {
+        "type" : "object",
+        "properties" : {
+          "attributionSequence" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "attributionDate" : {
+            "type" : "string"
+          },
+          "originalAmount" : {
+            "type" : "string"
+          },
+          "roundedAmount" : {
             "type" : "string"
           }
         }
