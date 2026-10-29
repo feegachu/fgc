@@ -150,7 +150,7 @@ class ReleaseTests(unittest.TestCase):
         actual = release.adapt_nginx(template)
         self.assertIn("X-Forwarded-Proto https;", actual)
         self.assertIn("X-Forwarded-Port 443;", actual)
-        self.assertIn("location ^~ /app/assets/", actual)
+        self.assertIn("location ^~ /assets/", actual)
         self.assertIn("proxy_set_header X-Forwarded-For", actual)
 
     def test_public_origin_normalization_and_invalid_values(self):
@@ -205,7 +205,7 @@ fi
 exit 0
 ''',
             "curl": r'''#!/usr/bin/env bash
-if [[ "$*" == *'https://example.com/app/login'* && "$PUBLIC_FAILURE" == 1 ]]; then printf 503
+if [[ "$*" == *'https://example.com/login'* && "$PUBLIC_FAILURE" == 1 ]]; then printf 503
 elif [[ "$*" == *'/actuator/health'* ]]; then
   [[ "$API_FAILURE" == 0 ]] || exit 7
   printf '{"status":"UP"}'

@@ -1,3 +1,4 @@
+import { selectEntity } from '../e2e/selectEntity'
 import type { Page } from '@playwright/test'
 import type { components } from '../src/lib/api/schema'
 import { rateText } from '../src/lib/format'
@@ -5,8 +6,6 @@ import {
   test,
   expect,
   login,
-  legacyLogin,
-  backend,
   api,
   completeMonthly,
   responseFor,
@@ -17,18 +16,15 @@ import {
 const month = '2026-07'
 
 test('계약 등록·수정 → 스케줄 재생성·확정', async ({ page }, info) => {
-  await legacyLogin(page)
-  await page.goto(`${backend}/contracts?month=${month}`)
-  await expect(page.locator('.contract-table tbody tr').first()).toBeVisible()
-  await info.attach('legacy-contracts', { body: await page.screenshot(), contentType: 'image/png' })
+  await login(page)
   const seed = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0001&page=1&size=20')
   const original = await api(page, `/contracts/${seed.content[0].contractId}`)
   await login(page, 'settle01', '/contracts/new?month=2026-07')
   await page.locator('input[name=contractDate]').fill(original.contractDate)
   await page.locator('select[name=insurerId]').selectOption(String(original.insurerId))
-  await page.locator('select[name=productOfferingId]').selectOption(String(original.productOfferingId))
+  await selectEntity(page, page.locator('input[name=productOfferingId]'), String(original.productOfferingId))
   await page.locator('input[name=contractNo]').fill('E2E-418-CONTRACT')
-  await page.locator('select[name=agentId]').selectOption(String(original.agentId))
+  await selectEntity(page, page.locator('input[name=agentId]'), String(original.agentId))
   for (const field of ['premiumPerCycleAmount', 'firstPremiumAmount', 'monthlyEquivalentFirstPremium'])
     await page.locator(`input[name=${field}]`).fill(String(original[field]))
   const term = page.locator('input[name=paymentTermMonths]')
@@ -86,8 +82,8 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
   const item = items.find((item: { itemCode: string }) => item.itemCode === 'BASE_COMMISSION')
   expect(item, 'Demo BASE_COMMISSION item must exist').toBeTruthy()
   await page.goto(`transactions/new?month=${month}`)
-  await page.getByLabel('수령 설계사', { exact: false }).selectOption(String(contracts[0].agentId))
-  await page.getByLabel('수수료 항목', { exact: false }).selectOption(String(item.commissionItemId))
+  await selectEntity(page, page.getByLabel('수령 설계사', { exact: false }), String(contracts[0].agentId))
+  await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), String(item.commissionItemId))
   await page.locator('#bizKey').fill(`E2E-418-PAYMENT-${amount}`)
   await page.locator('#amount').fill(String(amount))
   for (let index = 0; index < contracts.length; index++) {
@@ -96,7 +92,7 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
       .locator('#attr-body tr')
       .filter({ has: page.locator('[data-contract-id]') })
       .nth(index)
-    await row.locator('[data-contract-id]').selectOption(String(contracts[index].contractId))
+    await selectEntity(page, row.locator('[data-contract-id]'), String(contracts[index].contractId))
     await row.locator('[data-attr-date]').fill('2026-07-31')
     await row.locator('[data-attr-amount]').fill(String(amount / contracts.length))
   }

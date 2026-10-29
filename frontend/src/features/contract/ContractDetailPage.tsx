@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { paymentEntryHref, safeReturnTo, returnLink } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { date, int, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
@@ -100,6 +101,9 @@ function ContractDetailView({ id }: { id: string }) {
         <div className="page-header-copy">
           <h1 className="page-title">보험계약 상세</h1>
         </div>
+        <Link className="button button-secondary" to={safeReturnTo(params.get('returnTo'), '/contracts')}>
+          목록으로
+        </Link>
       </header>
       {!validId ? (
         <ContractLoadState message="계약 식별자를 확인할 수 없습니다." error />
@@ -126,11 +130,30 @@ function ContractDetailView({ id }: { id: string }) {
                 </div>
               </div>
               <div className="contract-summary-actions" aria-label="계약 작업">
+                {canProcess && (
+                  <Link
+                    className="button button-primary"
+                    to={paymentEntryHref(
+                      {
+                        contractId: id,
+                        agentId: contract.agentId == null ? undefined : String(contract.agentId),
+                      },
+                      location.pathname + location.search,
+                      params.get('month') ?? undefined,
+                    )}
+                  >
+                    지급 등록
+                  </Link>
+                )}
                 <Button
                   variant="secondary"
                   disabled={actionDisabled}
                   aria-describedby={!canProcess ? 'contract-action-note' : undefined}
-                  onClick={() => void navigate(`/contracts/${id}/edit`)}
+                  onClick={() =>
+                    void navigate(
+                      returnLink(`/contracts/${id}/edit`, safeReturnTo(params.get('returnTo'), '/contracts')),
+                    )
+                  }
                 >
                   <span className="material-symbols-rounded" aria-hidden="true">
                     edit

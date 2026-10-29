@@ -30,16 +30,16 @@ class PicoAskControllerTest {
 {"question":"초안 저장 방법","screenId":"TRAN-W02","entityRefs":[],"clientContextRevision":"r1","guideVersion":"1.0","conversation":[]}
 """;
     @ParameterizedTest @ValueSource(strings={"SETTLEMENT","SYSTEM_ADMIN","GA_ADMIN","COMPLIANCE"})
-    void allowsInternalKnowledgeQueryWithCsrf(String role) throws Exception { mvc.perform(post("/api/v1/ai/pico/ask").with(user("reader").roles(role)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk()); verify(service).ask(any()); }
+    void allowsInternalKnowledgeQueryWithBearer(String role) throws Exception { mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk()); verify(service).ask(any()); }
     @ParameterizedTest @ValueSource(strings={"AGENT","UNKNOWN"})
-    void deniesNonInternalRoles(String role) throws Exception { mvc.perform(post("/api/v1/ai/pico/ask").with(user("reader").roles(role)).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden()); verifyNoInteractions(service); }
-    @Test void requiresCsrfAndBoundedQuestion() throws Exception {
-        mvc.perform(post("/api/v1/ai/pico/ask").with(user("reader").roles("SETTLEMENT")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
-        mvc.perform(post("/api/v1/ai/pico/ask").with(user("reader").roles("SETTLEMENT")).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body.replace("초안 저장 방법","x".repeat(2001)))).andExpect(status().isBadRequest()); verifyNoInteractions(service);
+    void deniesNonInternalRoles(String role) throws Exception { mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden()); verifyNoInteractions(service); }
+    @Test void requiresBearerAndBoundedQuestion() throws Exception {
+        mvc.perform(post("/api/v1/ai/pico/ask").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(body.replace("초안 저장 방법","x".repeat(2001)))).andExpect(status().isBadRequest()); verifyNoInteractions(service);
     }
     @Test @EnabledIfEnvironmentVariable(named="FGC_EXPORT_PICO_OPENAPI",matches="true")
     void exportRealControllerSchemaWithoutDatabase() throws Exception {
-        var generated=(ObjectNode)mapper.readTree(mvc.perform(get("/v3/api-docs").with(user("schema").roles("SYSTEM_ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var generated=(ObjectNode)mapper.readTree(mvc.perform(get("/v3/api-docs").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN")))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String endpoint="/api/v1/ai/pico/ask"; org.assertj.core.api.Assertions.assertThat(generated.path("paths").has(endpoint)).isTrue();
         var file=java.nio.file.Path.of("frontend/openapi/schema.json"); var existing=(ObjectNode)mapper.readTree(java.nio.file.Files.readString(file));
         ((ObjectNode)existing.get("paths")).set(endpoint,generated.path("paths").get(endpoint)); var schemas=(ObjectNode)existing.path("components").path("schemas");

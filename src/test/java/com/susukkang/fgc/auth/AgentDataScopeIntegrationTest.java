@@ -347,40 +347,25 @@ class AgentDataScopeIntegrationTest {
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.AUTH_002));
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({
-            "/api/v1/base/agents?asOf=2026-07-01,false",
-            "/api/v1/transactions?size=5,false",
-            "/contracts,false",
-            "/contracts,true"})
-    void sessionMustReauthenticateWhenInternalRoleChangesToAgent(String path, boolean forgedBearer) throws Exception {
-        jdbc.update("UPDATE fgc.app_user SET password_hash = ? WHERE login_id = 'settle01'", passwords.encode(loginPassword));
-        var login = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/login")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
-                .param("username", "settle01").param("password", loginPassword)).andExpect(status().is3xxRedirection());
-        var session = (org.springframework.mock.web.MockHttpSession) login.andReturn().getRequest().getSession(false);
-        assertThat(session).isNotNull();
+    // 2026-10-27 yslee - 세션 대신 Bearer 로 검증한다(#419 STATELESS). 역할·계정 상태는 요청마다 DB 에서 다시 읽으므로
+    // 이미 받은 토큰도 다음 요청부터 바뀐 역할로만 동작하고, 잠기거나 비활성화된 계정의 토큰은 거절된다.
+    @Test
+    void bearerFollowsRoleChangeToAgentOnNextRequest() throws Exception {
+        String internal = tokens.login((FgcUserDetails) users.loadUserByUsername("settle01")).accessToken();
         jdbc.update("UPDATE fgc.app_user SET role_id = (SELECT role_id FROM fgc.app_role WHERE role_code = 'AGENT'),"
                 + " agent_id = ? WHERE login_id = 'settle01'", ownAgent);
-        var request = get(path).session(session);
-        if (forgedBearer) request.header(HttpHeaders.AUTHORIZATION, "Bearer forged");
-        mvc.perform(request)
-                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error.code").value("FGC-AUTH-002"));
-        assertThat(session.isInvalid()).isTrue();
+        mvc.perform(get("/api/v1/base/agents?asOf=2026-07-01").header(HttpHeaders.AUTHORIZATION, "Bearer " + internal))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + internal))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.roleCode").value("AGENT"));
     }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"LOCKED", "DISABLED"})
-    void sessionMustReauthenticateWhenAccountStateChanges(String state) throws Exception {
-        var login = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/login")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
-                .param("username", "agent01").param("password", loginPassword)).andExpect(status().is3xxRedirection());
-        var session = (org.springframework.mock.web.MockHttpSession) login.andReturn().getRequest().getSession(false);
-        assertThat(session).isNotNull();
+    void bearerIsRejectedWhenAccountStateChanges(String state) throws Exception {
         jdbc.update("UPDATE fgc.app_user SET account_status = ? WHERE login_id = 'agent01'", state);
-        mvc.perform(get("/api/v1/contracts").session(session))
+        mvc.perform(get("/api/v1/contracts").header(HttpHeaders.AUTHORIZATION, "Bearer " + access))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error.code").value("FGC-AUTH-002"));
-        assertThat(session.isInvalid()).isTrue();
     }
 
     private JsonNode data(ResultActions result) throws Exception {
