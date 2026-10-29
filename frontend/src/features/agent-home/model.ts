@@ -109,8 +109,8 @@ export function monthStats(rows: Row[], month: string): MonthStats {
   }
 }
 
-/** 비율을 소수점 한 자리로 맞춘다(화면 표시 기준). */
-const oneDecimal = (value: number) => Math.round(value * 10) / 10
+/** 비율을 소수점 첫째 자리까지 절사한다(화면정의서 공통규칙 3). 먼저 1e-6에서 맞춰 28.999… 같은 곱셈 오차를 없앤다. */
+export const oneDecimal = (value: number) => Math.trunc(Math.round(value * 1e6) / 1e5) / 10
 
 /** 전월 대비 증감률(%, 소수점 한 자리). 전월 값이 0이면 비교할 수 없어 0으로 둔다. */
 export const deltaPercent = (now: number, before: number) => (before ? oneDecimal(((now - before) / before) * 100) : 0)
