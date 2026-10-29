@@ -48,6 +48,23 @@ class CompareAskServiceTest {
     }
 
     @Test
+    @DisplayName("int 범위를 넘는 긴 순위 번호도 예외 없이 1위·2위 비교로 답한다")
+    void hugeRankNumberFallsBackToDefaultComparison() {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask("99999999999999위 이유 알려줘", twoItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강");
+    }
+
+    @Test
+    @DisplayName("항목 수를 넘는 순위 번호는 기본 순위로 대체한다")
+    void outOfRangeRankNumberUsesDefault() {
+        assertThat(CompareAskService.rankAnswer(twoItems().items(), "5순위 이유")).contains("2위는 나보험 튼튼건강");
+    }
+
+    @Test
     @DisplayName("LLM 호출이 실패해도 순위 질문에는 서버 값으로 답한다")
     void rankQuestionFallsBackWhenGatewayFails() {
         when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
