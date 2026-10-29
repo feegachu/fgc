@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router'
+import { useLocation } from 'react-router'
+import { ContextLink } from '../../components/ContextLink'
+import { useContextNavigation } from '../../hooks/useContextNavigation'
+import { returnLink } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
@@ -42,7 +45,8 @@ const FILTER_KEYS = {
   page: '',
   size: '',
 }
-const detailHref = (row: ContractSummary) => `/contracts/${encodeURIComponent(String(row.contractId))}`
+const detailHref = (row: ContractSummary, back: string) =>
+  returnLink(`/contracts/${encodeURIComponent(String(row.contractId))}`, back, String(row.contractId))
 const textCell = (value?: string) => <CellDisclosure singleLine preview={value || '-'} full={value || '-'} />
 const agentStatusLabels = { ACTIVE: '활동', INACTIVE: '비활동', TERMINATED: '해촉' }
 function agentOptionLabel(agent: Agent) {
@@ -50,7 +54,7 @@ function agentOptionLabel(agent: Agent) {
   const details = [status, agent.activeYn === false ? '기준정보 사용중지' : ''].filter(Boolean)
   return `${agent.agentCode} · ${agent.agentName}${details.length ? ` (${details.join(' · ')})` : ''}`
 }
-const columns: TableColumn<ContractSummary>[] = [
+const columns = (back: string): TableColumn<ContractSummary>[] => [
   {
     key: 'contractNo',
     label: '계약번호',
@@ -58,7 +62,11 @@ const columns: TableColumn<ContractSummary>[] = [
     width: '12rem',
     cellClassName: 'contract-number-cell',
     render: (row) =>
-      row.contractId ? <Link to={detailHref(row)}>{row.contractNo || '-'}</Link> : row.contractNo || '-',
+      row.contractId ? (
+        <ContextLink to={detailHref(row, back)}>{row.contractNo || '-'}</ContextLink>
+      ) : (
+        row.contractNo || '-'
+      ),
   },
   {
     key: 'insurerName',
@@ -127,7 +135,9 @@ export default function ContractListPage() {
   const criteria = criteriaFromParams(params)
   const list = useQuery(contractListQuery(criteria))
   const canProcess = usePermission('canProcess')
-  const navigate = useNavigate()
+  const navigate = useContextNavigation()
+  const location = useLocation()
+  const back = location.pathname + location.search
   const exporting = useMutation({
     mutationFn: () => exportCsv(listCsvPath(criteria), { filename: 'contracts.csv', notifyError: false }),
     meta: { errorToast: false },
@@ -152,12 +162,12 @@ export default function ContractListPage() {
             CSV 내보내기
           </Button>
           {canProcess && (
-            <Link className="button button-primary" to="/contracts/new">
+            <ContextLink className="button button-primary" to={returnLink('/contracts/new', back)}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 add
               </span>
               신규 등록
-            </Link>
+            </ContextLink>
           )}
         </div>
       </header>
@@ -190,12 +200,13 @@ export default function ContractListPage() {
               className="contract-table"
               viewportClassName="contract-table-viewport"
               caption="보험계약 검색 결과"
-              columns={columns}
+              columns={columns(back)}
+              selectedKeys={params.get('selectedId') ? [params.get('selectedId')!] : []}
               {...sortBinding(criteria.sort, CONTRACT_SORT_KEYS, (sort) => update({ sort }))}
               rows={list.data?.content ?? []}
               rowKey={(row) => String(row.contractId)}
               onRowActivate={(row) => {
-                if (row.contractId) void navigate(detailHref(row))
+                if (row.contractId) void navigate(detailHref(row, back))
               }}
             />
             <ListPagination

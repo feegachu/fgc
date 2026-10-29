@@ -46,7 +46,11 @@ public class ProductServiceImpl implements ProductService {
         // 정렬(#604): 허용 컬럼만 받고(아니면 COMMON_002), 정렬을 주지 않으면 기존 기본 정렬 조회를 그대로 쓴다.
         ListSort sort = ProductSearchImpl.sortOf(criteria.sort());
         Page<ProductRow> rows;
-        if (sort != null) {
+        if (criteria.keyword() != null || criteria.selectedId() != null) {
+            if (criteria.selectedId() != null && criteria.selectedId() < 1) throw validationException("selectedId");
+            rows = productRepository.searchSelectable(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(),
+                    criteria.includeHistorical(), criteria.keyword(), criteria.selectedId(), sort, PageRequest.of(page - 1, size));
+        } else if (sort != null) {
             rows = productRepository.searchSorted(criteria.insurerId(), criteria.asOf(), criteria.includeExpired(),
                     criteria.includeHistorical(), sort, PageRequest.of(page - 1, size));
         } else {

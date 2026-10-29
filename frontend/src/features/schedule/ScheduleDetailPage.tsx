@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useLocation } from 'react-router'
+import { paymentEntryHref, safeReturnTo } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { Modal } from '../../components/Modal'
@@ -71,6 +72,7 @@ function ScheduleDetailView({ id }: { id: string }) {
   const validId = /^\d+$/.test(id)
   const client = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
   const canProcess = usePermission('canProcess')
   const detail = useQuery({ ...scheduleDetailQuery(id), enabled: validId })
   // 1차처럼 헤더를 받은 뒤에 버전 이력을 부른다.
@@ -116,6 +118,12 @@ function ScheduleDetailView({ id }: { id: string }) {
           <h1 className="page-title">예상 스케줄 상세</h1>
         </div>
         <div className="page-header-actions">
+          <Link
+            className="button button-secondary"
+            to={safeReturnTo(new URLSearchParams(location.search).get('returnTo'), '/schedules')}
+          >
+            목록으로
+          </Link>
           <Button
             variant="secondary"
             loading={exporting.isPending}
@@ -229,6 +237,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 'expected',
                 'status',
                 'rule',
+                'action',
               ].map((name) => (
                 <col key={name} className={`schedule-line-col-${name}`} />
               ))}
@@ -267,11 +276,12 @@ function ScheduleDetailView({ id }: { id: string }) {
                 <th scope="col" className="is-left">
                   규칙 ID
                 </th>
+                <th scope="col">지급 등록</th>
               </tr>
             </thead>
             <tbody>
               {!header ? (
-                <StateRow columns={13}>
+                <StateRow columns={14}>
                   <InlineState
                     message={loadError ?? '예상 스케줄을 불러오는 중입니다.'}
                     error={Boolean(loadError)}
@@ -279,13 +289,36 @@ function ScheduleDetailView({ id }: { id: string }) {
                   />
                 </StateRow>
               ) : lines.length === 0 ? (
-                <StateRow columns={13}>
+                <StateRow columns={14}>
                   <p className="schedule-inline-state is-empty" role="status">
                     등록된 회차가 없습니다.
                   </p>
                 </StateRow>
               ) : (
-                lines.map((line, index) => <LineRow key={line.lineNo ?? index} line={line} />)
+                lines.map((line, index) => (
+                  <LineRow
+                    key={line.lineNo ?? index}
+                    line={line}
+                    paymentHref={
+                      canProcess && line.contractId && line.commissionItemId
+                        ? paymentEntryHref(
+                            {
+                              contractId: String(line.contractId),
+                              agentId: line.beneficiaryAgentId == null ? undefined : String(line.beneficiaryAgentId),
+                              commissionItemId: String(line.commissionItemId),
+                              attributionDate: line.attributionDate,
+                              paymentStage: header.paymentStage,
+                              cashflowType: line.cashflowType === 'DEDUCTION' ? 'DEDUCTION' : 'PAYMENT',
+                              amount:
+                                line.expectedAmount == null ? undefined : String(Math.abs(Number(line.expectedAmount))),
+                            },
+                            location.pathname + location.search,
+                            line.attributionDate?.slice(0, 7),
+                          )
+                        : undefined
+                    }
+                  />
+                ))
               )}
             </tbody>
             <tfoot>
@@ -297,7 +330,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 <td className="is-number tabular-nums">
                   <Money amount={header ? header.expectedTotal : 0} />
                 </td>
-                <td colSpan={2} />
+                <td colSpan={3} />
               </tr>
             </tfoot>
           </table>
@@ -475,7 +508,7 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
   )
 }
 
-function LineRow({ line }: { line: ScheduleLine }) {
+function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: string }) {
   return (
     <tr>
       <td className="is-left tabular-nums">{int(line.lineNo)}</td>
@@ -503,6 +536,13 @@ function LineRow({ line }: { line: ScheduleLine }) {
         <ScheduleStatusBadge code={line.lineStatus} label={responseLabel(null, LINE_STATUS, line.lineStatus)} />
       </td>
       <td className="is-left tabular-nums">{line.ruleRef == null ? EMPTY : int(line.ruleRef)}</td>
+      <td>
+        {paymentHref && (
+          <Link className="button button-ghost" to={paymentHref} aria-label={`${line.lineNo}번 회차 지급 등록`}>
+            지급 등록
+          </Link>
+        )}
+      </td>
     </tr>
   )
 }

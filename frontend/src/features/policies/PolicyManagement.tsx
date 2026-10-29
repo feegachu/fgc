@@ -5,7 +5,7 @@ import { Field } from '../../components/Field'
 import { DataTable } from '../../components/DataTable'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { date, dateTime, rate, won } from '../../lib/format'
+import { date, dateTime, rate, won, today } from '../../lib/format'
 import { ReferenceTabs } from '../reference/ReferenceUI'
 import { useAuth } from '../auth/useAuth'
 import type { Policy } from './api'
@@ -66,6 +66,8 @@ export function PolicyManagement({
   const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
   const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
   const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
+  const successorRef = detail.approvalActions?.find((entry) => entry.actionType === 'RETIRE')
+    ?.evidenceRefs?.find((ref) => /^policy:\d+$/.test(ref))
   const refs = [
     ...new Set([...(policy.regulationRefs ?? []), ...(detail.sourceRefs ?? []), ...(draft?.sourceRefs ?? [])]),
   ]
@@ -113,6 +115,15 @@ export function PolicyManagement({
             <dd>
               {date(detail.applicationPeriod.from)} ~ {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
               {detail.applicationPeriod.successorPolicyVersionId && <small>이후 계약은 후속 버전 적용</small>}
+            </dd>
+          </div>
+        )}
+        {!detail.applicationPeriod && policy.status === 'RETIRED' && (
+          <div>
+            <dt>계약일 적용 기간</dt>
+            <dd>
+              {successorRef ? '정정·승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
+              {successorRef && <small>후속 정책 {successorRef.replace('policy:', '#')}</small>}
             </dd>
           </div>
         )}
@@ -523,8 +534,9 @@ function PolicyActionDialog({
       dateRef.current?.focus()
       return
     }
-    if (newVersion && policy.effectiveFrom && effectiveFrom <= policy.effectiveFrom) {
-      setDateError('새 적용일은 기존 버전의 시작일보다 늦어야 합니다.')
+    // 복제 원본이 현재 ACTIVE일 필요는 없다. 승계 시작일 관계는 서버가 현재 ACTIVE와 비교한다.
+    if (newVersion && effectiveFrom <= today()) {
+      setDateError('새 적용일은 한국시간 기준 내일 이후로 지정하세요.')
       dateRef.current?.focus()
       return
     }
@@ -585,7 +597,7 @@ function PolicyActionDialog({
     >
       <p className="policy-section-description">
         {newVersion
-          ? '기존 정책의 규칙과 근거를 복사합니다. 새 적용일 당일부터 체결한 계약에 변경 요율을 적용합니다. 그 이전 계약은 재계산할 때도 기존 버전과 요율을 유지합니다.'
+          ? '기존 정책의 규칙과 근거를 복사합니다. 새 적용일 당일부터 체결한 계약에 변경 요율을 적용합니다. 그 이전 계약은 재계산할 때도 기존 버전과 요율을 유지합니다. 새 적용일은 내일 이후로 지정하며, 아직 적용 전인 미래 버전은 같은 적용일로 정정할 수 있습니다.'
           : action === 'REJECT'
             ? '반려하면 작성자가 초안을 다시 수정할 수 있습니다.'
             : `아래 정책의 정보와 작업 사유를 확인한 후 ${label}하세요.`}

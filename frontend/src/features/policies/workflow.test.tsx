@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
@@ -20,7 +20,8 @@ vi.mock('../base/api', () => ({
   useCommissionItems: () => ({ data: [{ commissionItemId: 3, itemName: '유지 수수료' }], isLoading: false }),
 }))
 
-afterEach(() => vi.restoreAllMocks())
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-29T00:00:00Z') }) })
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 const updatedAt = '2026-10-28T04:05:06.123456Z'
 const result: PolicyWriteResult = {
@@ -121,6 +122,18 @@ describe('production policy workflow', () => {
     expect(within(period).getByText('이후 계약은 후속 버전 적용')).toBeVisible()
   })
 
+  it('identifies a superseded future version with an empty application window', () => {
+    const wire = wireDetail('RETIRED', ['CLONE'])
+    wire.approvalActions = [{ policyApprovalActionId: 32, actionSeq: 2, actionType: 'RETIRE',
+      actionBy: 'reviewer', actionAt: updatedAt, reason: '적용 전 정정', evidenceRef: 'policy:18' }]
+    const detail = normalizePolicyDetail(wire)
+    render(<QueryClientProvider client={new QueryClient()}>
+      <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
+    </QueryClientProvider>)
+    expect(screen.getByText('정정·승계로 계산 적용에서 제외됨')).toBeVisible()
+    expect(screen.getByText('후속 정책 #18')).toBeVisible()
+  })
+
   it('creates a real draft from the production form and returns its server ID', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
     const { user, onSaved } = mountEditor()
@@ -219,6 +232,41 @@ describe('production policy workflow', () => {
       method: 'POST', idempotencyKey: expect.any(String),
       body: { effectiveFrom: '2028-01-01', effectiveTo: null, reason: '다음 연도 정책' },
     }))
+  })
+
+  it('allows correcting a future version with the same cutover and blocks backdated dates', async () => {
+    const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({ ...result, policyVersionId: 18, versionNo: 2 }))
+    const { user, onSaved } = mountManagement('ACTIVE', ['CLONE'])
+    await user.click(screen.getByRole('button', { name: '새 버전 작성' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText(/새 버전 적용 시작일/), { target: { value: '2026-10-29' } })
+    await user.type(within(dialog).getByLabelText(/작업 사유/), '적용 전 정정')
+    await user.click(within(dialog).getByRole('button', { name: '새 초안 만들기' }))
+    expect(request).not.toHaveBeenCalled()
+    fireEvent.change(within(dialog).getByLabelText(/새 버전 적용 시작일/), { target: { value: '2027-01-01' } })
+    await user.click(within(dialog).getByRole('button', { name: '새 초안 만들기' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(18))
+    expect(request).toHaveBeenCalledWith('/api/v1/policies/17/versions', expect.objectContaining({
+      body: { effectiveFrom: '2027-01-01', effectiveTo: null, reason: '적용 전 정정' },
+    }))
+  })
+
+  it('does not use an unpublished clone source date as the current active cutover', async () => {
+    const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({ ...result, policyVersionId: 18, versionNo: 2 }))
+    const detail = normalizePolicyDetail(wireDetail('APPROVED', ['CLONE']))
+    detail.header!.effectiveFrom = '2029-01-01'
+    render(<QueryClientProvider client={new QueryClient()}>
+      <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
+    </QueryClientProvider>)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '새 버전 작성' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText(/새 버전 적용 시작일/), { target: { value: '2028-01-01' } })
+    await user.type(within(dialog).getByLabelText(/작업 사유/), '현재 ACTIVE를 기준으로 서버에서 검증')
+    await user.click(within(dialog).getByRole('button', { name: '새 초안 만들기' }))
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/api/v1/policies/17/versions', expect.objectContaining({
+      body: expect.objectContaining({ effectiveFrom: '2028-01-01' }),
+    })))
   })
 
   it('focuses a bracket-indexed server field error and preserves unsaved form values', async () => {

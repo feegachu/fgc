@@ -92,8 +92,8 @@ public class PolicySuccessionValidator {
         if (!coversScope(replacement.basicDocumentVersion(), previous.basicDocumentVersion())) {
             throw incomplete("basicDocumentVersion", "승계본은 기존 ACTIVE의 기초서류 범위를 모두 포함해야 합니다.");
         }
-        if (!replacement.effectiveFrom().isAfter(previous.effectiveFrom())) {
-            throw incomplete("effectiveFrom", "새 적용일은 기존 ACTIVE의 시작일보다 늦어야 합니다. 같은 날 교체나 역승계는 허용하지 않습니다.");
+        if (replacement.effectiveFrom().isBefore(previous.effectiveFrom())) {
+            throw incomplete("effectiveFrom", "새 적용일은 기존 ACTIVE의 시작일보다 이를 수 없습니다. 적용 전 미래 버전은 같은 적용일로 정정할 수 있습니다.");
         }
         if (previous.effectiveTo() != null && replacement.effectiveFrom().minusDays(1).isAfter(previous.effectiveTo())) {
             throw incomplete("effectiveFrom", "새 적용일과 기존 정책의 종료일 사이에 적용 공백이 생길 수 없습니다.");

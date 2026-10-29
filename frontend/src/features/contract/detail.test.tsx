@@ -31,6 +31,7 @@ const contract: ContractDetail = {
   monthlyEquivalentFirstPremium: 100000,
   paymentTermMonths: 120,
   agentName: '김설계',
+  agentId: 600,
   organizationName: '서울지점',
 }
 type Handler = (url: string, options?: RequestOptions) => unknown
@@ -85,6 +86,20 @@ afterEach(() => {
 })
 
 describe('CONT-W02 계약 상세', () => {
+  it('지급 등록에 계약·수령인과 상세 화면의 목록 맥락을 전달한다', async () => {
+    const { actions, router } = renderAt('/contracts/1?month=2026-07&returnTo=%2Fcontracts%3Fpage%3D3')
+    const link = await screen.findByRole('link', { name: '지급 등록' })
+    const url = new URL(link.getAttribute('href')!, 'http://local')
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      contractId: '1',
+      agentId: '600',
+      month: '2026-07',
+    })
+    expect(url.searchParams.has('attributionDate')).toBe(false)
+    expect(url.searchParams.get('returnTo')).toBe('/contracts/1?month=2026-07&returnTo=%2Fcontracts%3Fpage%3D3')
+    await actions.click(screen.getByRole('link', { name: '목록으로' }))
+    expect(router.state.location.pathname + router.state.location.search).toBe('/contracts?page=3')
+  })
   it('기본정보는 서버 라벨과 효력 순 이력을 표시하고 다른 탭은 미리 요청하지 않는다', async () => {
     const events: ContractStatusEvent[] = [
       {

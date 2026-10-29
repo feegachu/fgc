@@ -21,6 +21,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -31,6 +33,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 요구사항 : FGC-FUN-044 검증 결과 확정·잠금 (#491 PR 리뷰 반영)
@@ -40,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * 타이밍(sleep)으로 "막혔다"를 추정하지 않는다. pg_locks 에서 승인되지 않은 advisory 잠금 대기를
  * 직접 확인한 뒤 잠금을 푼다. 여러 스레드가 각자 커밋해야 하므로 @Transactional 롤백을 쓰지 않고
- * 테스트 전용 검증월(2086년)의 실행 행을 직접 지운다. 확정에 성공한 행은 트리거상 지울 수 없으므로
+ * 이 테스트가 만든 실행 ID만 직접 지운다. 같은 검증월의 다른 테스트 데이터는 보존한다. 확정에 성공한 행은 트리거상 지울 수 없으므로
  * 이 테스트는 확정이 거부되는 경로와 생성 경로만 다룬다.
  *
  * 격리 수준 전제: 확정 트랜잭션이 READ COMMITTED(PostgreSQL 기본)라 월 잠금을 얻은 뒤의 체크리스트 조회가
@@ -69,12 +74,67 @@ class ValidationRunFinalizeMonthLockConcurrencyIntegrationTest {
     private PlatformTransactionManager transactionManager;
 
     private final ExecutorService executor = Executors.newFixedThreadPool(2);
+    private final Set<Long> ownedRunIds = ConcurrentHashMap.newKeySet();
 
     @AfterEach
-    void cleanUp() {
-        executor.shutdownNow();
-        jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_month IN (?, ?)",
-                FINALIZE_MONTH, CREATE_MONTH);
+    void cleanUp() throws InterruptedException {
+        cleanUp(executor);
+    }
+
+    private void cleanUp(ExecutorService workers) throws InterruptedException {
+        workers.shutdownNow();
+        boolean terminated;
+        try {
+            terminated = workers.awaitTermination(10, TimeUnit.SECONDS);
+        } finally {
+            // 종료 대기가 실패해도 이 테스트가 기록한 행의 삭제는 반드시 시도한다.
+            for (Long runId : ownedRunIds) {
+                jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", runId);
+            }
+        }
+        assertThat(terminated).isTrue();
+    }
+
+    @Test
+    void cleanupDeletesOwnedRunsBeforeReportingTerminationTimeout() throws Exception {
+        Long runId = insertRun(CREATE_MONTH, "MONTHLY");
+        ExecutorService workers = mock(ExecutorService.class);
+        when(workers.awaitTermination(10, TimeUnit.SECONDS)).thenReturn(false);
+
+        assertThatThrownBy(() -> cleanUp(workers)).isInstanceOf(AssertionError.class);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                Integer.class, runId)).isZero();
+    }
+
+    @Test
+    void cleanupDeletesOwnedRunsWhenTerminationWaitIsInterrupted() throws Exception {
+        Long runId = insertRun(CREATE_MONTH, "MONTHLY");
+        ExecutorService workers = mock(ExecutorService.class);
+        when(workers.awaitTermination(10, TimeUnit.SECONDS)).thenThrow(new InterruptedException("종료 대기 중단"));
+
+        assertThatThrownBy(() -> cleanUp(workers)).isInstanceOf(InterruptedException.class);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                Integer.class, runId)).isZero();
+    }
+
+    @Test
+    void cleanupPreservesAnotherFixturesRunInTheSameMonth() throws Exception {
+        Long otherRunId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
+                VALUES (?, ?, 'PRE_CONFIRM') RETURNING validation_run_id
+                """, Long.class, FINALIZE_MONTH, ThreadLocalRandom.current().nextInt(1, 1_000_000));
+        try {
+            Long ownedRunId = insertRun(FINALIZE_MONTH, "PRE_CONFIRM");
+            cleanUp();
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                    Integer.class, ownedRunId)).isZero();
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                    Integer.class, otherRunId)).isEqualTo(1);
+        } finally {
+            jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", otherRunId);
+        }
     }
 
     // 리뷰 시나리오: 같은 달 새 실행 생성이 진행 중(검증월 잠금 보유, 아직 미커밋)일 때 이전 실행을 확정하면,
@@ -127,8 +187,12 @@ class ValidationRunFinalizeMonthLockConcurrencyIntegrationTest {
         }));
         assertThat(monthLocked.await(10, TimeUnit.SECONDS)).isTrue();
 
-        Future<ValidationRunRow> creation = executor.submit(() -> createService.create(
-                new CreateValidationRunCommand(CREATE_MONTH, ValidationRunType.MONTHLY, null)));
+        Future<ValidationRunRow> creation = executor.submit(() -> {
+            ValidationRunRow run = createService.create(
+                    new CreateValidationRunCommand(CREATE_MONTH, ValidationRunType.MONTHLY, null));
+            ownedRunIds.add(run.getValidationRunId());
+            return run;
+        });
 
         awaitAdvisoryLockWaiter(CREATE_MONTH);
         assertThat(creation.isDone()).isFalse();
@@ -192,11 +256,13 @@ class ValidationRunFinalizeMonthLockConcurrencyIntegrationTest {
     }
 
     private Long insertRun(LocalDate month, String runType) {
-        return jdbcTemplate.queryForObject("""
+        Long runId = jdbcTemplate.queryForObject("""
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
                 VALUES (?, ?, ?)
                 RETURNING validation_run_id
                 """, Long.class, month, ThreadLocalRandom.current().nextInt(1, 1_000_000), runType);
+        ownedRunIds.add(runId);
+        return runId;
     }
 
     private Long createCompletedRun(LocalDate month) {

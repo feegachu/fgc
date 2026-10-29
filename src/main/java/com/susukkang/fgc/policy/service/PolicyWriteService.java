@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,6 +66,7 @@ public class PolicyWriteService {
     private final Validator validator;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
+    private final Clock policyClock;
 
     public PolicyWriteResult createDraft(PolicyDraft draft, Long userId, String idempotencyKey) {
         FgcUserDetails actor = requireActor(userId, WRITERS);
@@ -163,6 +166,10 @@ public class PolicyWriteService {
     private void prepareSuccession(PolicyVersion policy, PolicyStatus next, FgcUserDetails actor, String reason) {
         List<PolicyVersion> previousVersions = writeRepository.lockActiveVersions(policy.getPolicyCode());
         if (previousVersions.size() > 1) throw stateConflict("같은 코드의 ACTIVE가 여러 개이므로 승계 기준을 확정할 수 없습니다.");
+        OffsetDateTime activatedAt = OffsetDateTime.now(policyClock);
+        if (!previousVersions.isEmpty() && !policy.getEffectiveFrom().isAfter(activatedAt.toLocalDate())) {
+            throw invalid("effectiveFrom", "새 정책은 한국시간 기준 내일 이후 계약부터 적용해야 합니다. 과거·당일 소급 교체는 허용하지 않습니다.");
+        }
         PolicyDraft replacement = writeRepository.readDraft(policy);
         for (PolicyVersion previous : previousVersions) {
             if (previous.getVersionNo() >= policy.getVersionNo()) {
@@ -180,7 +187,7 @@ public class PolicyWriteService {
                 Map<String, Object> before = snapshot(previous, actor);
                 previous.transition(PolicyStatus.RETIRED, null);
                 policyVersionRepository.saveAndFlush(previous);
-                writeRepository.recordSuccession(previous, policy, actor.getUserId());
+                writeRepository.recordSuccession(previous, policy, actor.getUserId(), activatedAt);
                 writeRepository.appendAction(previous.getPolicyVersionId(), "RETIRE", actor.getUserId(), reason,
                         "policy:" + policy.getPolicyVersionId());
                 writeRepository.refresh(previous);
@@ -213,9 +220,15 @@ public class PolicyWriteService {
         return switch (policy.getStatus()) {
             case DRAFT -> List.of("EDIT", "SUBMIT");
             case REVIEW -> reviewActions(policy, actor);
-            case APPROVED -> APPROVERS.contains(actor.getRoleCode()) ? List.of(ACTION_CLONE, "ACTIVATE") : List.of(ACTION_CLONE);
+            case APPROVED -> APPROVERS.contains(actor.getRoleCode()) && canActivateByDate(policy)
+                    ? List.of(ACTION_CLONE, "ACTIVATE") : List.of(ACTION_CLONE);
             case ACTIVE, RETIRED -> List.of(ACTION_CLONE);
         };
+    }
+
+    private boolean canActivateByDate(PolicyVersion policy) {
+        return policy.getEffectiveFrom().isAfter(LocalDate.now(policyClock))
+                || !writeRepository.hasActiveVersion(policy.getPolicyCode());
     }
 
     private List<String> reviewActions(PolicyVersion policy, FgcUserDetails actor) {
