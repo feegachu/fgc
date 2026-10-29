@@ -124,6 +124,15 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(screen.getAllByText('자료 없음').length).toBeGreaterThan(0)
   })
 
+  it('결과 화면에 순위 기준이 승인 전 가정이고 환수율이 임시값이라는 안내를 규칙 버전과 함께 보여 준다', async () => {
+    renderModal()
+    await pickHealth()
+    await result()
+    const note = await screen.findByTestId('assumption-note')
+    expect(note).toHaveTextContent('승인 전 가정(PROJECT_ASSUMPTION, 규칙 TEST-RULE)')
+    expect(note).toHaveTextContent('해약환급률표 값을 임시로 써서 계산했어요')
+  })
+
   it('세부 조건을 고르면 그 조건이 순위 요청에 담기고 결과에 적용 조건이 표시된다', async () => {
     let sent: unknown
     onRank = async (body) => {

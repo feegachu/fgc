@@ -745,6 +745,10 @@ function Result({
         보수적 순수령액 = 한도 반영 수령 예상액 − 환수 노출액(해지 시나리오 가정). 협회 등급은 표시만 하며 순위에
         반영하지 않아요. 기준 보험료는 내 계약의 평균 월 환산 보험료({won(ranking.basePremium ?? 0)})예요. 가상 데이터.
       </p>
+      <p className="cb-note" data-testid="assumption-note">
+        이 순위 기준은 승인 전 가정(PROJECT_ASSUMPTION{ranking.ruleVersion ? `, 규칙 ${ranking.ruleVersion}` : ''})이에요. 환수
+        노출액은 환수 규칙이 연결되기 전까지 해약환급률표 값을 임시로 써서 계산했어요.
+      </p>
     </>
   )
 }
