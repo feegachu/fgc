@@ -254,6 +254,13 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.intake.duplicateFile"
     ),
+    POL_001("FGC-POL-001", HttpStatus.CONFLICT, "error.policy.selfApproval"),
+    POL_002("FGC-POL-002", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.overlap"),
+    POL_003("FGC-POL-003", HttpStatus.CONFLICT, "error.policy.stateChanged"),
+    IMPL_IDEMPOTENCY_CONFLICT("FGC-IMPL-IDEMPOTENCY_CONFLICT", HttpStatus.CONFLICT,
+            "error.common.idempotencyConflict"),
+    IMPL_REQUEST_IN_PROGRESS("FGC-IMPL-REQUEST_IN_PROGRESS", HttpStatus.CONFLICT,
+            "error.common.requestInProgress"),
 
     COMMON_002(
             "FGC-COMMON-002",

@@ -130,7 +130,11 @@ class FeeRegimeRulesetMigrationIntegrationTest {
             assertThatThrownBy(() -> jdbc.update(
                     "DELETE FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = ?", rulesetId))
                     .hasMessageContaining("immutable");
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.fee_regime_ruleset", Integer.class)).isEqualTo(6);
+            // 데모 시드(V65) 룰셋은 세지 않는다
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM fgc.fee_regime_ruleset r JOIN fgc.policy_version pv USING (policy_version_id)
+                     WHERE pv.policy_code NOT LIKE 'REG-%'
+                    """, Integer.class)).isEqualTo(6);
         }
     }
 

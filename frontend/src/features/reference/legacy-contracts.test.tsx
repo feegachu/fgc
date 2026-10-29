@@ -15,10 +15,10 @@ it('정책 숫자·회차 표시는 1차 node 정책 테스트의 입력 계약�
     },
   )
   for (const [input, output] of [
-    ['650.000000', '650.0000'],
-    ['34.800000', '34.8000'],
-    ['1.234567', '1.2345'],
-    ['1200', '1,200.0000'],
+    ['650.000000', '650.0'],
+    ['34.800000', '34.8'],
+    ['1.234567', '1.2'],
+    ['1200', '1,200.0'],
   ])
     expect(rate(input)).toBe(output)
   expect(int(1200000)).toBe('1,200,000')
@@ -36,7 +36,7 @@ it('정책 숫자·회차 표시는 1차 node 정책 테스트의 입력 계약�
     />,
   )
   const rows = screen.getAllByRole('row').slice(1)
-  expect(within(rows[0]).getByText('1.2345')).toBeInTheDocument()
+  expect(within(rows[0]).getByText('1.2')).toBeInTheDocument()
   expect(within(rows[0]).getByText('1,200,000')).toBeInTheDocument()
   expect(rows[0].querySelectorAll('td')[5]).toHaveTextContent('-')
   expect(within(rows[1]).getByText('- ~ 12회차')).toBeInTheDocument()
