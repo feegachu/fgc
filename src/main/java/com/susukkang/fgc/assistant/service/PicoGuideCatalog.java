@@ -30,8 +30,13 @@ public class PicoGuideCatalog {
             for(var step:guide.steps()) if (!ids.add(step.stepId()) || !step.stepId().equals(step.targetId()) || !Set.of("payment.scope","payment.amount","payment.attributions","payment.evidence","payment.save","payment.precheck","payment.precheck.result","payment.confirm").contains(step.targetId()) || !"TRAN-W02".equals(step.screenId())) throw new IllegalStateException("Invalid guide target");
             for (var step : guide.steps()) {
                 if (step.next() == null) throw new IllegalStateException("Missing guide transitions");
+                boolean conditionalSave = "payment.confirm".equals(guide.workflowId()) && "payment.scope".equals(step.stepId());
+                if (conditionalSave) {
+                    var expected = Set.of(new Next("CURRENT_DRAFT_ALREADY_SAVED", "payment.precheck"), new Next("DRAFT_SAVE_REQUIRED", "payment.save"));
+                    if (step.next().size() != 2 || !new HashSet<>(step.next()).equals(expected)) throw new IllegalStateException("Invalid draft save branches");
+                }
                 for (var edge : step.next()) {
-                    if (!Objects.equals(edge.conditionId(), step.completionRuleId()) || !ids.contains(edge.stepId())) throw new IllegalStateException("Invalid guide transition");
+                    if ((!conditionalSave && !Objects.equals(edge.conditionId(), step.completionRuleId())) || !ids.contains(edge.stepId())) throw new IllegalStateException("Invalid guide transition");
                 }
             }
         }

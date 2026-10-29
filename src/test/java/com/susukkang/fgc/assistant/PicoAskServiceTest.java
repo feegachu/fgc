@@ -79,4 +79,11 @@ class PicoAskServiceTest {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("실제 금액은 계산 조회로 확인하세요.","payment.draft:overview"));
         assertThat(service.ask(request("초안 저장")).source()).isEqualTo(Source.AI);
     }
+    @Test void sharedCatalogRegistersBothApprovedSavedDraftBranches() {
+        var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("payment.confirm")).findFirst().orElseThrow();
+        var scope = guide.steps().stream().filter(step -> step.stepId().equals("payment.scope")).findFirst().orElseThrow();
+        assertThat(scope.next()).containsExactly(
+                new PicoGuideCatalog.Next("CURRENT_DRAFT_ALREADY_SAVED", "payment.precheck"),
+                new PicoGuideCatalog.Next("DRAFT_SAVE_REQUIRED", "payment.save"));
+    }
 }
