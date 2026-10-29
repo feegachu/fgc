@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
 import { apiClient } from '../../../lib/api/client'
+import * as evidenceApi from './api'
+import type { Evidence } from './state'
 import { SettlementGuide } from './SettlementGuide'
 import { openSettlementGuide, closeSettlementGuide } from './entry'
 const user = {
@@ -67,7 +69,10 @@ function mount(role = 'SETTLEMENT') {
         <main id="main-content">
           <Outlet />
         </main>
-        <SettlementGuide user={{ ...user, roleCode: role, canProcess: role !== 'COMPLIANCE' }} month="2026-07" />
+        <SettlementGuide
+          user={{ ...user, roleCode: role, canProcess: ['SETTLEMENT', 'SYSTEM_ADMIN'].includes(role) }}
+          month="2026-07"
+        />
       </>
     )
   }
@@ -86,6 +91,7 @@ function mount(role = 'SETTLEMENT') {
         },
         { path: '/contracts/1', element: <section data-guide-target="contract.schedules">스케줄 없음</section> },
         { path: '/schedules/2', element: <section data-guide-target="schedule.lines">실제 스케줄</section> },
+        { path: '/exceptions', element: <section data-guide-target="exception.action">예외 처리</section> },
         { path: '/transactions/new', element: <section data-guide-target="payment.form">지급 입력</section> },
       ],
     },
@@ -139,5 +145,61 @@ describe('FUN-088 shell guide', () => {
       resolve?.()
     })
     expect(router.state.location.pathname).toBe('/')
+  })
+})
+
+describe('role handoff in later stages', () => {
+  it.each([
+    ['GA_ADMIN', 'validation.execute', true],
+    ['COMPLIANCE', 'validation.execute', true],
+    ['COMPLIANCE', 'exception.resolve', true],
+    ['GA_ADMIN', 'exception.resolve', false],
+  ] as const)('%s reaching %s has handoff=%s', async (role, step, handoff) => {
+    const cancelled = step === 'exception.resolve'
+    vi.mocked(apiClient.request).mockResolvedValue({
+      data: { commissionTransactionId: 3, attributions: [{ contractId: 1 }] },
+      error: null,
+      requestId: 'test',
+    } as never)
+    vi.spyOn(evidenceApi, 'readEvidence').mockResolvedValue({
+      contract: { contractId: 1, contractNo: 'C1' },
+      schedule: {
+        header: {
+          scheduleHeaderId: 2,
+          contractNo: 'C1',
+          paymentStage: 'GA_TO_FC',
+          activeYn: true,
+          scheduleRegime: 'CURRENT',
+          schedulePurpose: 'OPERATIONAL',
+        },
+        lines: [{ lineNo: 1 }],
+      },
+      payment: {
+        commissionTransactionId: 3,
+        status: cancelled ? 'CANCELLED' : 'CONFIRMED',
+        settlementMonth: '2026-07-01',
+        paymentStage: 'GA_TO_FC',
+        attributions: [{ contractId: 1 }],
+      },
+      scheduleAcknowledged: true,
+    } satisfies Evidence)
+    const { actor } = mount(role)
+    await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+    await actor.type(screen.getByLabelText(/기존 지급 번호/), '3')
+    await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    if (cancelled) {
+      await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
+      await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+    }
+    if (handoff) {
+      expect(await screen.findByRole('alert')).toHaveTextContent('인계')
+      expect(screen.queryByLabelText('정정 후 지급 번호')).not.toBeInTheDocument()
+    } else {
+      expect(await screen.findByLabelText('정정 후 지급 번호')).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    }
+    expect(
+      vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET'),
+    ).toBe(true)
   })
 })

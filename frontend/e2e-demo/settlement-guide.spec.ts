@@ -25,8 +25,12 @@ for (const startMode of ['existing', 'new'] as const) {
       const seed = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0001&page=1&size=20')
       const original = await api(page, `/contracts/${seed.content[0].contractId}`)
       await page.locator('input[name=contractDate]').fill(original.contractDate)
-      await selectEntity(page, page.locator('[role=combobox][name=insurerId]'), String(original.insurerId))
-      await selectEntity(page, page.locator('[role=combobox][name=productOfferingId]'), String(original.productOfferingId))
+      await page.locator('select[name=insurerId]').selectOption(String(original.insurerId))
+      await selectEntity(
+        page,
+        page.locator('[role=combobox][name=productOfferingId]'),
+        String(original.productOfferingId),
+      )
       await page.locator('input[name=contractNo]').fill(contractNo)
       await selectEntity(page, page.locator('[role=combobox][name=agentId]'), String(original.agentId))
       for (const field of ['premiumPerCycleAmount', 'firstPremiumAmount', 'monthlyEquivalentFirstPremium'])
@@ -80,7 +84,7 @@ for (const startMode of ['existing', 'new'] as const) {
     expect((await successful(confirming)).status).toBe('CONFIRMED')
     await expect(page).toHaveURL(/\/transactions\?/)
     await next.click()
-    await expect(guide).toContainText('6/9')
+    await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
     const creating = responseFor(page, '/validation-runs')
     await page.getByRole('button', { name: '실행 생성' }).click()
     const run = await successful(creating)
@@ -93,7 +97,7 @@ for (const startMode of ['existing', 'new'] as const) {
       })
       .toBe('COMPLETED')
     await next.click()
-    await expect(guide).toContainText('7/9')
+    await expect(page).toHaveURL(/\/reconciliations\?/)
     await expect(page).toHaveURL(/\/reconciliations/)
     const history = page.getByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' })
     const runs = await api(page, '/reconciliations?month=2026-07&stage=GA_TO_FC&page=1&size=100')

@@ -1,6 +1,6 @@
 import { destinations } from './catalog'
 import { describe, expect, it } from 'vitest'
-import { decide, STEPS } from './state'
+import { decide, STEPS, replacePayment, handoffFor } from './state'
 import type { Evidence, Selection } from './state'
 const selection: Selection = {
   month: '2026-07',
@@ -68,7 +68,8 @@ describe('FUN-088 server evidence decisions', () => {
   it('rechecks a selected replacement payment against the existing contract and month', () => {
     const state = evidence()
     state.payment!.commissionTransactionId = 30
-    expect(decide({ ...selection, paymentId: 30 }, state, 'GA_ADMIN').step).toBe('validation.finalize')
+    state.validation = undefined
+    expect(decide(replacePayment(selection, 30), state, 'GA_ADMIN').step).toBe('validation.execute')
     state.payment!.attributions = [{ contractId: 999 }]
     expect(() => decide({ ...selection, paymentId: 30 }, state, 'GA_ADMIN')).toThrow('현재 안내 대상')
   })
@@ -188,5 +189,38 @@ describe('reconciliation selection spotlight', () => {
     expect(destinations({ ...base, reconciliationRunId: 5 })['reconciliation.review'].target).toBe(
       'reconciliation.results',
     )
+  })
+})
+
+describe('correction and permission boundaries', () => {
+  it.each(['COMPLETED', 'FINALIZED'] as const)(
+    'rejects a pre-correction %s run even with matched reconciliation',
+    (status) => {
+      const next = replacePayment(selection, 30)
+      expect(next).toMatchObject({ paymentId: 30, invalidatedValidationRunIds: [4] })
+      expect(next.validationRunId).toBeUndefined()
+      expect(next.reconciliationRunId).toBeUndefined()
+      const state = evidence()
+      state.payment!.commissionTransactionId = 30
+      state.validation!.header!.status = status
+      expect(() => decide({ ...next, validationRunId: 4, reconciliationRunId: 5 }, state, 'GA_ADMIN')).toThrow(
+        '정정 전 검증',
+      )
+      state.validation = undefined
+      expect(decide(next, state, 'GA_ADMIN').step).toBe('validation.execute')
+      state.validation = {
+        header: { validationRunId: 6, validationMonth: '2026-07-01', runType: 'MONTHLY', status: 'COMPLETED' },
+        targets: [{ contractNo: 'C1', selectionStatus: 'SELECTED' }],
+      }
+      state.reconciliation = undefined
+      expect(decide({ ...next, validationRunId: 6 }, state, 'GA_ADMIN').step).toBe('reconciliation.review')
+    },
+  )
+  it.each(['GA_ADMIN', 'COMPLIANCE'])('hands monthly execution off for %s', (role) => {
+    expect(handoffFor('validation.execute', role, false)).toContain('SETTLEMENT 또는 SYSTEM_ADMIN')
+  })
+  it('permits exception handling by GA_ADMIN but hands it off for COMPLIANCE', () => {
+    expect(handoffFor('exception.resolve', 'GA_ADMIN', false)).toBeUndefined()
+    expect(handoffFor('exception.resolve', 'COMPLIANCE', false)).toContain('인계')
   })
 })

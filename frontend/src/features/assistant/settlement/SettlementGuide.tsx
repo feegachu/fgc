@@ -10,7 +10,7 @@ import { getPaymentGuideObserver } from '../../transaction/payment-guide'
 import type { ContractPage } from '../../contract/api'
 import { readPayment } from '../../transaction/form-api'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from './entry'
-import { decide, STEPS } from './state'
+import { decide, STEPS, handoffFor, replacePayment as replacementSelection } from './state'
 import type { Selection, Evidence, Decision } from './state'
 import { guideGet, readEvidence } from './api'
 import { destinations, settlementCatalog, titles, FLOW_VERSION } from './catalog'
@@ -177,15 +177,18 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
           '미저장 입력이 있습니다. 현재 화면에서 저장하거나 입력을 보존한 뒤 다시 확인하세요. 안내 이동은 취소했습니다.',
         )
       }
-      if (
-        !user.canProcess &&
-        ['contract.create', 'payment.draft', 'payment.precheck', 'payment.confirm'].includes(result.step)
-      )
-        throw new Error('현재 역할은 조회 안내만 가능합니다. 업무 처리는 정산 담당자에게 인계하세요.')
+      const handoff = handoffFor(result.step, user.roleCode ?? '', user.canProcess)
       setContractLabel(evidence.contract?.contractNo ?? '')
       setSelection(next)
       current.current.selection = next
       setDecision(result)
+      if (handoff) {
+        runtime.current?.dispose()
+        setSnapshot(null)
+        setDecision({ ...result, reason: handoff })
+        setError(handoff)
+        return
+      }
       const refs: EntityRef[] = []
       for (const [type, value] of [
         ['CONTRACT', next.contractId],
@@ -252,7 +255,11 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         clientContextRevision: String(token),
         serverStateVersion: null,
       })
-      if (result.step === 'reconciliation.review' && !next.reconciliationRunId) setCollapsed(true)
+      if (
+        (result.step === 'reconciliation.review' && !next.reconciliationRunId) ||
+        (result.step === 'validation.execute' && !next.validationRunId)
+      )
+        setCollapsed(true)
       if (result.complete) await runner.next()
     } catch (failure) {
       if (!controller.signal.aborted && token === epoch.current)
@@ -383,43 +390,44 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
               </button>
             </div>
           )}
-          {decision?.step === 'exception.resolve' && (
-            <div className="settlement-guide-actions">
-              <label>
-                정정 후 지급 번호
-                <input
-                  inputMode="numeric"
-                  value={replacementNo}
-                  onChange={(event) => setReplacementNo(event.target.value)}
-                />
-              </label>
-              <button
-                disabled={busy}
-                onClick={() => {
-                  const paymentId = id(replacementNo)
-                  if (!paymentId) {
-                    setError('정정 후 확정된 지급 번호를 입력하세요.')
-                    return
-                  }
-                  void show(
-                    { ...selection, paymentId, reconciliationRunId: undefined, exceptionId: undefined },
-                    false,
-                    false,
-                    true,
-                  )
-                }}
-              >
-                정정 지급으로 이어서 안내
-              </button>
-              <button onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>새 월 검증 선택·생성</button>
-              <button onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
-                월 검증 다시 확인
-              </button>
-              <button onClick={() => revisit(destinations(selection)['reconciliation.review'].path)}>
-                대사 결과 다시 선택
-              </button>
-            </div>
+          {decision?.step === 'validation.execute' && !user.canProcess && (
+            <button onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>월 검증 결과 선택</button>
           )}
+          {decision?.step === 'exception.resolve' &&
+            !handoffFor('exception.resolve', user.roleCode ?? '', user.canProcess) && (
+              <div className="settlement-guide-actions">
+                <label>
+                  정정 후 지급 번호
+                  <input
+                    inputMode="numeric"
+                    value={replacementNo}
+                    onChange={(event) => setReplacementNo(event.target.value)}
+                  />
+                </label>
+                <button
+                  disabled={busy}
+                  onClick={() => {
+                    const paymentId = id(replacementNo)
+                    if (!paymentId) {
+                      setError('정정 후 확정된 지급 번호를 입력하세요.')
+                      return
+                    }
+                    void show(replacementSelection(selection, paymentId), false, false, true)
+                  }}
+                >
+                  정정 지급으로 이어서 안내
+                </button>
+                <button onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
+                  새 월 검증 선택·생성
+                </button>
+                <button onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
+                  월 검증 다시 확인
+                </button>
+                <button onClick={() => revisit(destinations(selection)['reconciliation.review'].path)}>
+                  대사 결과 다시 선택
+                </button>
+              </div>
+            )}
           <details>
             <summary>전체 9단계 보기</summary>
             <ol>

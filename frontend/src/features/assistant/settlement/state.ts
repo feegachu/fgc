@@ -26,6 +26,32 @@ export interface Selection {
   validationRunId?: number
   reconciliationRunId?: number
   exceptionId?: number
+  invalidatedValidationRunIds?: number[]
+}
+/** A corrected payment needs a newly selected validation; never reuse the previous run. */
+export function replacePayment(selection: Selection, paymentId: number): Selection {
+  return {
+    ...selection,
+    paymentId,
+    invalidatedValidationRunIds: [
+      ...new Set([
+        ...(selection.invalidatedValidationRunIds ?? []),
+        ...(selection.validationRunId ? [selection.validationRunId] : []),
+      ]),
+    ],
+    validationRunId: undefined,
+    reconciliationRunId: undefined,
+    exceptionId: undefined,
+  }
+}
+export function handoffFor(step: SettlementStep, role: string, canProcess: boolean): string | undefined {
+  if (
+    !canProcess &&
+    ['contract.create', 'payment.draft', 'payment.precheck', 'payment.confirm', 'validation.execute'].includes(step)
+  )
+    return '현재 역할은 조회 안내만 가능합니다. 생성·실행은 SETTLEMENT 또는 SYSTEM_ADMIN에게 인계하세요.'
+  if (step === 'exception.resolve' && !['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(role))
+    return '예외 조치·원천 정정은 SETTLEMENT, GA_ADMIN 또는 SYSTEM_ADMIN에게 인계하세요. 현재 역할은 조회 안내만 가능합니다.'
 }
 export interface Evidence {
   contract?: ContractDetail
@@ -80,7 +106,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     if (payment.status === 'CANCELLED')
       return at(
         'exception.resolve',
-        '기존 지급이 취소되었습니다. 원천 정정 결과의 확정된 지급 번호를 선택한 뒤 새 대사 결과를 확인하세요.',
+        '기존 지급이 취소되었습니다. 원천 정정 결과의 확정된 지급 번호를 선택한 뒤 새 월 검증을 실행하고 재대사 결과를 확인하세요.',
       )
     if (payment.status !== 'DRAFT') throw new Error('현재 지급 상태는 이 흐름에서 처리할 수 없습니다.')
     if (evidence.paymentGuide && !evidence.paymentGuide.saved)
@@ -89,6 +115,8 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
       return at('payment.precheck', '현재 저장본의 사전검증을 직접 실행하세요. 이전 세션의 검증은 재사용하지 않습니다.')
     return at('payment.confirm', '실제 확정 버튼으로 지급을 확정하세요.')
   }
+  if (selection.validationRunId && selection.invalidatedValidationRunIds?.includes(selection.validationRunId))
+    throw new Error('정정 전 검증 실행은 재사용할 수 없습니다. 새 월 검증을 생성·실행한 뒤 선택하세요.')
   const run = evidence.validation?.header
   if (!run) return at('validation.execute', '기준월의 월 통합검증을 선택하거나 생성하고 실행하세요.')
   if (
