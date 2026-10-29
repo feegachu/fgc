@@ -2,6 +2,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [develop, main]
   push:
@@ -229,12 +230,20 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build both images
         if: needs.changes.outputs.run_checks == 'true'
+        env:
+          # Public feature flag only. No API keys are available to image builds.
+          PICO_ASSISTANT_AI: ${{ vars.FGC_ASSISTANT_AI_ENABLED || 'false' }}
         run: |
           set -euo pipefail
           # docker build는 .containerignore를 읽지 않는다 (위 주의 참고)
           cp .containerignore .dockerignore
+          case "$PICO_ASSISTANT_AI" in true|false) ;; *) echo 'FGC_ASSISTANT_AI_ENABLED must be true or false' >&2; exit 1 ;; esac
           for app in api web; do
-            docker build --pull \
+            web_build_args=()
+            if [[ "$app" == web ]]; then
+              web_build_args+=(--build-arg "VITE_ASSISTANT_AI=$PICO_ASSISTANT_AI")
+            fi
+            docker build --pull "${web_build_args[@]}" \
               --label org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}" \
               --label org.opencontainers.image.revision="$GITHUB_SHA" \
               -f "Containerfile.$app" -t "$REGISTRY/$app:sha-$GITHUB_SHA" .
