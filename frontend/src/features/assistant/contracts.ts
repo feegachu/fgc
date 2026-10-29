@@ -55,6 +55,7 @@ export interface AssistantContext {
   formDirty: boolean
   clientRevision: number
 }
+/** assistant.v1 local catalog, not the server GuideStep wire DTO in interface §14-2. */
 export interface GuideStep {
   stepId: TargetId
   screenId: 'TRAN-W02'
@@ -64,7 +65,9 @@ export interface GuideStep {
   entryRuleId: 'CONTEXT_AVAILABLE'
   completionRuleId: CompletionRuleId
   missingTargetBehavior: 'PAUSE'
+  next: readonly { conditionId: CompletionRuleId; stepId: TargetId }[]
 }
+/** Local catalog fields intentionally differ from the future server proof/GuideStart contract. */
 export interface GuideDefinition {
   workflowId: WorkflowId
   guideVersion: '1.0'
@@ -73,6 +76,7 @@ export interface GuideDefinition {
   utterances: readonly string[]
   requiredSlots: readonly (keyof AssistantContext)[]
   capability: 'READ' | 'PROCESS'
+  roles: readonly ('SYSTEM_ADMIN' | 'GA_ADMIN' | 'SETTLEMENT' | 'COMPLIANCE')[]
   availableCalculationKinds: readonly CalculationKind[]
   steps: readonly Readonly<GuideStep>[]
   enabled: boolean

@@ -5,7 +5,7 @@ const step = (
   title: string,
   instruction: string,
   completionRuleId: CompletionRuleId,
-): Readonly<GuideStep> =>
+): Readonly<Omit<GuideStep, 'next'>> =>
   Object.freeze({
     stepId: targetId,
     screenId: 'TRAN-W02',
@@ -35,7 +35,7 @@ const save = step(
   'CURRENT_DRAFT_SAVED',
 )
 
-export const GUIDE_CATALOG: readonly Readonly<GuideDefinition>[] = Object.freeze([
+const definitions = Object.freeze([
   Object.freeze({
     workflowId: 'payment.amount.review',
     guideVersion: '1.0',
@@ -105,6 +105,31 @@ export const GUIDE_CATALOG: readonly Readonly<GuideDefinition>[] = Object.freeze
     enabled: true,
   }),
 ])
+
+// Register roles and every next edge explicitly; model text cannot invent a branch.
+export const GUIDE_CATALOG: readonly Readonly<GuideDefinition>[] = Object.freeze(
+  definitions.map((guide) =>
+    Object.freeze({
+      ...guide,
+      roles:
+        guide.capability === 'READ'
+          ? Object.freeze(['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'] as const)
+          : Object.freeze(['SYSTEM_ADMIN', 'SETTLEMENT'] as const),
+      steps: Object.freeze(
+        guide.steps.map((current, index) =>
+          Object.freeze({
+            ...current,
+            next: Object.freeze(
+              index + 1 < guide.steps.length
+                ? [Object.freeze({ conditionId: current.completionRuleId, stepId: guide.steps[index + 1].stepId })]
+                : [],
+            ),
+          }),
+        ),
+      ),
+    }),
+  ),
+)
 
 /** Only registered IDs are resolved. Routes, selectors and executable conditions never come from model text. */
 export function findGuide(workflowId: string, guideVersion: string): Readonly<GuideDefinition> | null {
