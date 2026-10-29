@@ -37,7 +37,7 @@ public class PicoAskService {
         String normalized = Normalizer.normalize(message, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
         if (normalized.codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
         if (UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return OutputRejection.UNSAFE_TEXT;
-        if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "개월", "년").stream()
+        if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "회", "개월", "년").stream()
                 .anyMatch(unit -> koreanQuantity(normalized, unit))) return OutputRejection.GENERATED_AMOUNT;
         return null;
     }
@@ -50,7 +50,10 @@ public class PicoAskService {
                     || List.of("까지", "이하", "이상", "입니다", "로", "를", "의", "가", "는", "만").stream().anyMatch(suffix::startsWith);
             int previous = index - 1;
             while (previous >= 0 && Character.isWhitespace(text.charAt(previous))) previous--;
-            if (boundary && previous >= 0 && numeralEnding(text.substring(0, previous + 1))) return true;
+            // 조회 is a lookup word, but a preceding numeral (일조회/일조 회) remains a quantity.
+            boolean lookupWord = unit.equals("회") && index > 0 && text.charAt(index - 1) == '조'
+                    && (index == 1 || MONEY_PREFIXES.indexOf(text.charAt(index - 2)) < 0);
+            if (!lookupWord && boundary && previous >= 0 && numeralEnding(text.substring(0, previous + 1))) return true;
             index = text.indexOf(unit, index + unit.length());
         }
         return false;

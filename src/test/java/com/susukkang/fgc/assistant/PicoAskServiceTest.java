@@ -76,8 +76,10 @@ class PicoAskServiceTest {
         assertThat(service.ask(request("초안 저장 방법")).source()).isEqualTo(Source.AI);
     }
     @Test void acceptsCalculationLookupWordingWithoutMistakingItForQuantity() {
-        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("실제 금액은 계산 조회로 확인하세요.","payment.draft:overview"));
-        assertThat(service.ask(request("초안 저장")).source()).isEqualTo(Source.AI);
+        for (var message : List.of("실제 금액은 계산 조회로 확인하세요.", "계산 조회를 확인하세요.", "계산 조회는 별도로 진행하세요.", "계산 조회가 필요합니다.", "계산 조회만 진행하세요.", "계산 조회까지 진행하세요.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("초안 저장")).source()).as(message).isEqualTo(Source.AI);
+        }
     }
     @Test void sharedCatalogRegistersBothApprovedSavedDraftBranches() {
         var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("payment.confirm")).findFirst().orElseThrow();
@@ -85,5 +87,13 @@ class PicoAskServiceTest {
         assertThat(scope.next()).containsExactly(
                 new PicoGuideCatalog.Next("CURRENT_DRAFT_ALREADY_SAVED", "payment.precheck"),
                 new PicoGuideCatalog.Next("DRAFT_SAVE_REQUIRED", "payment.save"));
+    }
+    @Test void rejectsGeneratedInstallmentCountsWithoutDisablingLookupWording() {
+        for (var message : List.of("수수료는 스물네 회로 나누어 지급됩니다.", "칠 회까지 분할 지급됩니다.", "스물네회로 분할 지급됩니다.", "일조회로 지급됩니다.", "일조 회로 지급됩니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            var response = service.ask(request("초안 저장"));
+            assertThat(response.source()).as(message).isEqualTo(Source.FIXED);
+            assertThat(response.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
+        }
     }
 }
