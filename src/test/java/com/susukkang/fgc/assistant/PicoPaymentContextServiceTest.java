@@ -12,7 +12,7 @@ import static org.mockito.Mockito.*;
 
 class PicoPaymentContextServiceTest {
     CommissionPaymentService payments = mock(CommissionPaymentService.class);
-    PicoPaymentContextService service = new PicoPaymentContextService(payments);
+    PicoPaymentContextService service = new PicoPaymentContextService(payments, new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules());
     @Test void returnsOnlyTheStoredStateWithoutPrecheckOrWrites() {
         when(payments.get(77L)).thenReturn(PaymentCalculationServiceTest.payment(CommissionPaymentStatus.DRAFT,"100000","100000"));
         assertThat(service.read(77L).status()).isEqualTo(CommissionPaymentStatus.DRAFT);

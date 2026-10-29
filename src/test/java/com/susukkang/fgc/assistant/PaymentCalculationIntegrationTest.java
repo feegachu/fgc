@@ -32,6 +32,7 @@ class PaymentCalculationIntegrationTest {
     @Autowired PaymentCalculationService calculations;
     @Autowired com.susukkang.fgc.assistant.service.PicoPaymentContextService picoContext;
     @Autowired CommissionPaymentService payments;
+    @Autowired com.susukkang.fgc.assistant.service.PicoGuideStartService guideStarts;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
     @MockitoSpyBean CommissionPaymentQueryRepository queries;
@@ -178,6 +179,32 @@ class PaymentCalculationIntegrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> picoContext.read(missingId))
                 .isInstanceOfSatisfying(com.susukkang.fgc.common.exception.FgcBusinessException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_004));
+    }
+
+    @Test @Timeout(45) void guideStartIsReadOnlyAndRejectsASeparatelyCommittedPaymentEdit() throws Exception {
+        doAnswer(invocation -> {
+            assertThat(jdbc.queryForObject("SHOW transaction_read_only", String.class)).isEqualTo("on");
+            assertThat(jdbc.queryForObject("SHOW transaction_isolation", String.class)).isEqualTo("repeatable read");
+            return invocation.callRealMethod();
+        }).when(queries).findById(paymentId);
+        var before = counts(); var source = paymentRow(); var rows = attributionRows();
+        var request = new com.susukkang.fgc.assistant.dto.PicoGuideRequest("payment.draft","1.0",paymentId.toString(),"r1",null);
+        var prepared = guideStarts.prepare(request,"Bearer integration-session");
+        var started = guideStarts.start(new com.susukkang.fgc.assistant.dto.PicoGuideRequest(request.workflowId(),request.guideVersion(),request.paymentId(),"r1",prepared.prepareToken()),"Bearer integration-session");
+        assertThat(started.status()).isEqualTo("STARTED");
+        assertThat(counts()).isEqualTo(before);assertThat(paymentRow()).isEqualTo(source);assertThat(attributionRows()).isEqualTo(rows);
+        var outdated = guideStarts.prepare(request,"Bearer integration-session");
+        var writer = Executors.newSingleThreadExecutor();
+        try {
+            writer.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                assertThat(jdbc.update("UPDATE fgc.commission_transaction SET amount=900000 WHERE commission_transaction_id=?",paymentId)).isEqualTo(1);
+                assertThat(jdbc.update("UPDATE fgc.transaction_attribution SET attributed_amount=900000 WHERE commission_transaction_id=?",paymentId)).isEqualTo(1);
+            })).get(15,TimeUnit.SECONDS);
+            var committed = paymentRow();var committedRows=attributionRows();
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> guideStarts.start(new com.susukkang.fgc.assistant.dto.PicoGuideRequest(request.workflowId(),request.guideVersion(),request.paymentId(),"r1",outdated.prepareToken()),"Bearer integration-session"))
+                    .isInstanceOfSatisfying(com.susukkang.fgc.common.exception.FgcBusinessException.class,error -> assertThat(error.getErrorCode()).isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.IMPL_GUIDE_STATE_STALE));
+            assertThat(paymentRow()).isEqualTo(committed);assertThat(attributionRows()).isEqualTo(committedRows);assertThat(counts()).isEqualTo(before);
+        } finally {writer.shutdownNow();assertThat(writer.awaitTermination(5,TimeUnit.SECONDS)).isTrue();}
     }
 
     private PaymentCalculationRequest request(PaymentCalculationRequest.Kind kind) {

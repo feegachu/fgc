@@ -15,6 +15,7 @@ import { PaymentCalculationPanel } from './PaymentCalculationPanel'
 import { PaymentGuideOverlay } from './PaymentGuide'
 import { useGuideRuntime } from './guide-runtime'
 import { askPico } from './pico-api'
+import { PicoGuideStartButton } from './PicoGuideStartButton'
 import type { PicoReply } from './pico-api'
 
 const labels: Record<PaymentScenario, string> = {
@@ -509,6 +510,19 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                             {source.title} · v{entry.reply.guideVersion}
                           </div>
                         ))}
+                        {entry.reply.decision === 'ANSWER_ONLY' &&
+                          entry.reply.contextRevision === String(aiSequence.current) &&
+                          !aiBusy &&
+                          [...new Set(entry.reply.evidenceRefs?.map((source) => source.workflowId))]
+                            .filter((id): id is string => Boolean(id))
+                            .map((workflowId) => (
+                              <PicoGuideStartButton
+                                key={workflowId}
+                                workflowId={workflowId}
+                                contextRevision={entry.reply.contextRevision!}
+                                canProcess={canProcess}
+                              />
+                            ))}
                         <small>일반 업무 안내 · 현재 지급 처리 완료를 뜻하지 않습니다.</small>
                       </article>
                     ) : (

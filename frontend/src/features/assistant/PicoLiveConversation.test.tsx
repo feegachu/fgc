@@ -160,24 +160,22 @@ it('distinguishes stale guide conflicts from connection failures without executi
 function observePayment(
   overrides: Partial<NonNullable<ReturnType<typeof useGuideRuntime.getState>['observation']>> = {},
 ) {
-  useGuideRuntime
-    .getState()
-    .publish({
-      owner: 'payment-page',
-      paymentId: '77',
-      scopeKey: 'scope-77',
-      revision: 0,
-      canProcess: true,
-      ready: true,
-      amountValid: true,
-      attributionsValid: true,
-      formValid: true,
-      saved: true,
-      busy: false,
-      precheck: 'NONE',
-      modalOpen: false,
-      ...overrides,
-    })
+  useGuideRuntime.getState().publish({
+    owner: 'payment-page',
+    paymentId: '77',
+    scopeKey: 'scope-77',
+    revision: 0,
+    canProcess: true,
+    ready: true,
+    amountValid: true,
+    attributionsValid: true,
+    formValid: true,
+    saved: true,
+    busy: false,
+    precheck: 'NONE',
+    modalOpen: false,
+    ...overrides,
+  })
 }
 it('sends only the current saved payment reference without form values or local status claims', async () => {
   observePayment()
@@ -223,4 +221,42 @@ it('aborts and discards a state-aware reply when only the payment id changes', a
   await act(async () => finish(envelope({ ...reply, contextRevision: revision })))
   expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
   expect(useGuideRuntime.getState().session).toBeNull()
+})
+
+it('connects the latest answer evidence to an explicitly selected and server-revalidated current guide', async () => {
+  observePayment()
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (path, options) => {
+    const body = options!.body as Record<string, unknown>
+    if (path.endsWith('/ask')) return envelope({ ...reply, contextRevision: body.clientContextRevision })
+    return envelope({
+      status: path.endsWith('/prepare') ? 'PREPARED' : 'STARTED',
+      workflowId: body.workflowId,
+      stepId: 'payment.scope',
+      guideVersion: '1.0',
+      paymentId: body.paymentId,
+      clientContextRevision: body.clientContextRevision,
+      expiresAt: '2099-01-01T00:00:00Z',
+      prepareToken: path.endsWith('/prepare') ? 'x'.repeat(43) : null,
+    })
+  }) as typeof apiClient.request)
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  const button = await screen.findByRole('button', { name: /이 업무 안내 시작/ })
+  expect(request).toHaveBeenCalledTimes(1)
+  await userEvent.click(button)
+  await waitFor(() =>
+    expect(useGuideRuntime.getState().session).toMatchObject({
+      workflowId: 'payment.draft',
+      paymentId: '77',
+      index: 0,
+      status: 'PREPARING',
+    }),
+  )
+  expect(request.mock.calls.map(([path]) => path)).toEqual([
+    '/api/v1/ai/pico/ask',
+    '/api/v1/ai/pico/guides/prepare',
+    '/api/v1/ai/pico/guides/start',
+  ])
+  expect(screen.queryByRole('textbox', { name: '피코에게 질문' })).not.toBeInTheDocument()
 })
