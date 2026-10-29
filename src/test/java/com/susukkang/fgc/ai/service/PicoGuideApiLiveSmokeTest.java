@@ -71,7 +71,7 @@ class PicoGuideApiLiveSmokeTest {
         mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_AGENT")))
                 .contentType(MediaType.APPLICATION_JSON).content(body(question)))
                 .andExpect(status().isForbidden());
-        mvc.perform(post("/api/v1/ai/pico/ask"))
+        mvc.perform(post("/api/v1/ai/pico/ask")
                 .contentType(MediaType.APPLICATION_JSON).content(body(question)))
                 .andExpect(status().isUnauthorized());
         assertThat(ask("초안 확정").path("data").path("decision").asText()).isEqualTo("ASK_CLARIFICATION");
