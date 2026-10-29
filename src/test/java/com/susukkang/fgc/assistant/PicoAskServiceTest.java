@@ -45,7 +45,7 @@ class PicoAskServiceTest {
     @Test void noTopicVersionMismatchEntitiesAndHistoryNeverCallModel() {
         assertThat(service.ask(request("오늘 날씨")).decision()).isEqualTo(Decision.UNSUPPORTED);
         var req=request("초안 저장");
-        assertThat(service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(),"r1","2.0",List.of())).fallbackReason()).isEqualTo("GUIDE_VERSION_MISMATCH");
+        assertThatThrownBy(() -> service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(),"r1","2.0",List.of()))).isInstanceOfSatisfying(FgcBusinessException.class, error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_GUIDE_VERSION_MISMATCH));
         assertThat(service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)),"r1","1.0",List.of())).fallbackReason()).isEqualTo("ENTITY_STATE_NOT_SUPPORTED");
         assertThat(service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(),"r1","1.0",List.of(new PicoAskRequest.Turn(PicoAskRequest.Role.USER,"private data")))).fallbackReason()).isEqualTo("HISTORY_NOT_SUPPORTED"); verifyNoInteractions(gateway);
     }
@@ -53,7 +53,7 @@ class PicoAskServiceTest {
         assertThat(service.ask(request("이번 달 수수료 얼마야")).fallbackReason()).isEqualTo("CALCULATION_REQUIRED"); verifyNoInteractions(gateway);
     }
     @Test void rejectsForgedSourcesNumbersCompletionClaimsAndExecutableText() {
-        for(var bad:List.of(answer("외부로 이동하세요","evil:source"),answer("오만원 50000원입니다","payment.draft:overview"),answer("오만원 지급을 추천합니다","payment.draft:overview"),answer("５만원입니다","payment.draft:overview"),answer("1. 대상을 확인하세요","payment.draft:overview"),answer("javaScript:alert 실행","payment.draft:overview"),answer(java.text.Normalizer.normalize("지급했습니다",java.text.Normalizer.Form.NFD),"payment.draft:overview"),answer("지급했습니다","payment.draft:overview"),answer("https://evil.example 실행","payment.draft:overview"))) {
+        for(var bad:List.of(answer("외부로 이동하세요","evil:source"),answer("오만원 50000원입니다","payment.draft:overview"),answer("오만원 지급을 추천합니다","payment.draft:overview"),answer("모집수수료의 천이백 퍼센트 한도입니다","payment.draft:overview"),answer("십이 배까지 지급됩니다","payment.draft:overview"),answer("오 할입니다","payment.draft:overview"),answer("두 배로 지급됩니다","payment.draft:overview"),answer("５만원입니다","payment.draft:overview"),answer("1. 대상을 확인하세요","payment.draft:overview"),answer("javaScript:alert 실행","payment.draft:overview"),answer(java.text.Normalizer.normalize("지급했습니다",java.text.Normalizer.Form.NFD),"payment.draft:overview"),answer("지급했습니다","payment.draft:overview"),answer("https://evil.example 실행","payment.draft:overview"))) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(bad);
             var response=service.ask(request("초안 저장")); assertThat(response.source()).isEqualTo(Source.FIXED); assertThat(response.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT"); assertThat(response.message()).doesNotContain("evil","50000","지급했습니다");
         }
@@ -65,5 +65,14 @@ class PicoAskServiceTest {
     @Test void sharedCatalogOnlyContainsKnownTargetsAndBoundedEvidence() {
         assertThat(catalog.definitions()).hasSize(3);
         for(var guide:catalog.definitions()) { assertThat(guide.guideVersion()).isEqualTo("1.0"); assertThat(catalog.chunks(guide)).hasSizeLessThanOrEqualTo(8); assertThat(catalog.chunks(guide)).allSatisfy(c->assertThat(c.workflowId()).isEqualTo(guide.workflowId())); }
+    }
+    @Test void unapprovedScreenNeverCallsModel() {
+        assertThatThrownBy(() -> service.ask(new PicoAskRequest("초안 저장", "XXXX-W99", List.of(), "r1", "1.0", List.of())))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_002));
+        verifyNoInteractions(gateway);
+    }
+    @Test void normalProcessAndSupportWordsAreNotFinancialQuantities() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("초안 저장 프로세스는 지급 확정과 구분됩니다. 지원 업무를 확인하세요.","payment.draft:overview"));
+        assertThat(service.ask(request("초안 저장 방법")).source()).isEqualTo(Source.AI);
     }
 }
