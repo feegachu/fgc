@@ -160,10 +160,10 @@ test('COMPLIANCE 스케줄 확정 버튼 비활성·지급 등록 403', async ({
   await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
 })
 
-test('패키징 서버 Swagger가 JWT 인증 후 정상이고 재시작 추적 필드를 노출한다', async ({ request, baseURL }, testInfo) => {
+test('패키징 서버 Swagger가 JWT 인증 후 정상이고 재시작 추적 필드를 노출한다', async ({ request }, testInfo) => {
   const backend = 'http://127.0.0.1:18081'
   const auth = await request.post(`${backend}/api/v1/auth/login`, {
-    headers: { Origin: new URL(baseURL!).origin, 'X-FGC-Client': 'web' },
+    headers: { Origin: backend, 'X-FGC-Client': 'web' },
     data: { loginId: 'admin', password },
   })
   expect(auth.status()).toBe(200)
