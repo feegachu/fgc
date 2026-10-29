@@ -69,8 +69,8 @@ export function newRow(key: number, date: string, amount = '0'): AttributionRow 
     evidenceRef: '',
   }
 }
-export function draftRows(draft: Payment | undefined, month: string): AttributionRow[] {
-  if (!draft) return [newRow(1, `${month}-01`, '250000')]
+export function draftRows(draft: Payment | undefined): AttributionRow[] {
+  if (!draft) return [newRow(1, '', '250000')]
   return (draft.attributions ?? []).map((row, index) => ({
     key: index + 1,
     contractId: row.contractId == null ? '' : String(row.contractId),
@@ -134,7 +134,7 @@ export function selectContract(row: AttributionRow, contractId: string, contract
   return {
     ...row,
     contractId,
-    attributionDate: date && (!row.attributionDate || row.attributionDate < date) ? date : row.attributionDate,
+    attributionDate: date && row.attributionDate && row.attributionDate < date ? date : row.attributionDate,
   }
 }
 export class FormValidationError extends Error {
