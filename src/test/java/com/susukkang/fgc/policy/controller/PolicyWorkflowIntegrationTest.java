@@ -282,7 +282,7 @@ class PolicyWorkflowIntegrationTest {
         JsonNode active = action(id, "ACTIVATE", approved, approver, 200);
         JsonNode original = detail(id, writer);
         JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
-                cloneRequest("2000-01-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+                cloneRequest("2000-07-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
         long cloneId = clone.path("policyVersionId").asLong();
         JsonNode cloneReview = action(cloneId, "SUBMIT", clone, writer, 200);
         JsonNode cloneApproved = action(cloneId, "APPROVE", cloneReview, approver, 200);
@@ -300,6 +300,9 @@ class PolicyWorkflowIntegrationTest {
         assertThat(retired.path("approvalActions").get(3).path("evidenceRef").asText()).isEqualTo("policy:" + cloneId);
         assertThat(auditCount(id, "POLICY_RETIRE")).isEqualTo(1);
         assertThat(auditCount(cloneId, "POLICY_ACTIVATE")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_succession WHERE previous_policy_version_id = ?",
+                Integer.class, id)).isEqualTo(1);
+        assertThat(retired.path("applicationPeriod").path("to").asText()).isEqualTo("2000-06-30");
         assertThat(active.path("status").asText()).isEqualTo("ACTIVE");
     }
 
@@ -427,7 +430,7 @@ class PolicyWorkflowIntegrationTest {
         String legacyRef = "docs/FGC_가상_GA_운영정책서_v1_0.md#제46조";
         assertThat(values(original.path("sourceRefs"))).contains(legacyRef);
         JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + sourceId + "/versions",
-                cloneRequest(original.path("effectiveFrom").asText()), writer, key(), 201);
+                cloneRequest("2028-01-01"), writer, key(), 201);
         long cloneId = clone.path("policyVersionId").asLong();
         ObjectNode edit = (ObjectNode) detail(cloneId, writer).path("editDocument").deepCopy();
         JsonNode originalFeeRefs = edit.path("feeRegimeRules").get(0).path("sourceRefs").deepCopy();
@@ -463,7 +466,7 @@ class PolicyWorkflowIntegrationTest {
                 """, Long.class);
         JsonNode original = detail(sourceId, writer).path("editDocument");
         JsonNode copy = write(HttpMethod.POST, "/api/v1/policies/" + sourceId + "/versions",
-                cloneRequest(original.path("effectiveFrom").asText()), writer, key(), 201);
+                cloneRequest("2028-01-01"), writer, key(), 201);
         long copyId = copy.path("policyVersionId").asLong();
         ObjectNode edit = (ObjectNode) detail(copyId, writer).path("editDocument").deepCopy();
         long inheritedFeeId = edit.path("feeRegimeRules").get(0).path("feeRegimeRulesetId").asLong();
@@ -568,7 +571,7 @@ class PolicyWorkflowIntegrationTest {
         long firstId = first.path("policyVersionId").asLong();
         action(firstId, "ACTIVATE", action(firstId, "APPROVE", action(firstId, "SUBMIT", first, writer, 200), approver, 200), approver, 200);
         JsonNode copy = write(HttpMethod.POST, "/api/v1/policies/" + firstId + "/versions",
-                cloneRequest("1800-01-01").put("effectiveTo", "1800-12-31"), writer, key(), 201);
+                cloneRequest("1800-07-01").put("effectiveTo", "1800-12-31"), writer, key(), 201);
         long copyId = copy.path("policyVersionId").asLong();
         long otherInsurer = jdbc.queryForObject("""
                 INSERT INTO fgc.insurer(insurer_code, insurer_name, insurer_type) VALUES (?, '별도 보험사', 'LIFE') RETURNING insurer_id
@@ -594,6 +597,8 @@ class PolicyWorkflowIntegrationTest {
         assertThat(auditCount(firstId, "POLICY_RETIRE")).isZero();
         assertThat(count("policy_approval_action", firstId)).isEqualTo(3);
         assertThat(auditCount(copyId, "POLICY_ACTIVATE")).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_succession WHERE previous_policy_version_id = ?",
+                Integer.class, firstId)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_write_request WHERE idempotency_key = ?",
                 Integer.class, activationKey)).isZero();
     }
@@ -604,9 +609,9 @@ class PolicyWorkflowIntegrationTest {
         long id = created.path("policyVersionId").asLong();
         action(id, "ACTIVATE", action(id, "APPROVE", action(id, "SUBMIT", created, writer, 200), approver, 200), approver, 200);
         JsonNode second = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
-                cloneRequest("2000-01-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+                cloneRequest("2000-05-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
         JsonNode third = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
-                cloneRequest("2000-01-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+                cloneRequest("2000-09-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
         long secondId = second.path("policyVersionId").asLong(), thirdId = third.path("policyVersionId").asLong();
         JsonNode approved2 = action(secondId, "APPROVE", action(secondId, "SUBMIT", second, writer, 200), approver, 200);
         JsonNode approved3 = action(thirdId, "APPROVE", action(thirdId, "SUBMIT", third, writer, 200), approver, 200);

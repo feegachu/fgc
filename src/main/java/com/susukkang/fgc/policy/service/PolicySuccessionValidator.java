@@ -1,6 +1,5 @@
 package com.susukkang.fgc.policy.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
@@ -10,7 +9,6 @@ import com.susukkang.fgc.policy.dto.PolicyFeeLimit;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -19,22 +17,21 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.LongStream;
 
-/** FUN-017·제49조: ACTIVE 교체본은 이전 버전의 유효 기간과 상세 선택 범위를 모두 포함한다. */
+/** 계약일 승계: 적용일 이후 규칙은 변경할 수 있고 이전 계약은 이전 버전을 계속 선택한다. */
 @Component
 public class PolicySuccessionValidator {
     public void validate(PolicyDraft previous, PolicyDraft replacement) {
         validateHeader(previous, replacement);
-        validateFinancialTerms(previous, replacement);
         for (CommissionRuleDraft oldRule : previous.commissionRules()) {
             List<long[]> intervals = replacement.commissionRules().stream()
-                    .filter(rule -> sameCommissionTerms(rule, oldRule))
+                    .filter(rule -> coversCommissionScope(rule, oldRule))
                     .map(rule -> new long[]{rule.installmentFrom(), rule.installmentTo()}).toList();
             if (!coversRange(oldRule.installmentFrom(), oldRule.installmentTo(), intervals)) {
                 throw incomplete("commissionRules", "승계본에 기존 ACTIVE 수수료 규칙의 적용 범위·항목·회차가 빠져 있습니다.");
             }
         }
         for (FeeRegimeRuleDraft oldRule : previous.feeRegimeRules()) {
-            if (!coversFeeRule(oldRule, replacement.feeRegimeRules().stream().filter(rule -> sameFeeTerms(rule, oldRule)).toList())) {
+            if (!coversFeeRule(oldRule, replacement.feeRegimeRules())) {
                 throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 룰셋의 판매일·기초서류 적용 범위가 빠져 있습니다.");
             }
         }
@@ -46,14 +43,14 @@ public class PolicySuccessionValidator {
                                  Map<Long, Set<PolicyFeeLimit>> replacementLimits) {
         for (FeeRegimeRuleDraft old : previous.feeRegimeRules()) {
             List<FeeRegimeRuleDraft> sameLimits = replacement.feeRegimeRules().stream()
-                    .filter(rule -> sameFeeTerms(old, rule)
+                    .filter(rule -> sameFeeScope(old, rule)
                             && limitsFor(old, previousLimits).equals(limitsFor(rule, replacementLimits))).toList();
             if (!coversFeeRule(old, sameLimits)) throw incompleteFeeLimits();
         }
         for (FeeRegimeRuleDraft rule : replacement.feeRegimeRules()) {
             if (previous.feeRegimeRules().stream().noneMatch(old -> feeScopesOverlap(rule, old))) continue;
             List<FeeRegimeRuleDraft> sameLimits = previous.feeRegimeRules().stream()
-                    .filter(old -> sameFeeTerms(old, rule)
+                    .filter(old -> sameFeeScope(old, rule)
                             && limitsFor(old, previousLimits).equals(limitsFor(rule, replacementLimits))).toList();
             if (!coversFeeRule(rule, sameLimits)) throw incompleteFeeLimits();
         }
@@ -65,56 +62,6 @@ public class PolicySuccessionValidator {
 
     private static FgcBusinessException incompleteFeeLimits() {
         return incomplete("feeRegimeRules", "승계본은 기존 분급 한도를 유지해야 합니다. 한도가 복제된 기존 행을 보존하세요.");
-    }
-
-    /** REG-22: 이미 적용하던 계약 범위에는 새 금액 조건이나 우선순위를 끼워 넣지 않는다. */
-    private static void validateFinancialTerms(PolicyDraft previous, PolicyDraft replacement) {
-        for (CommissionRuleDraft rule : replacement.commissionRules()) {
-            if (previous.commissionRules().stream().noneMatch(old -> contractScopesOverlap(rule, old))) continue;
-            List<long[]> sameTerms = previous.commissionRules().stream()
-                    .filter(old -> sameCommissionTerms(rule, old))
-                    .map(old -> new long[]{old.installmentFrom(), old.installmentTo()}).toList();
-            if (!coversRange(rule.installmentFrom(), rule.installmentTo(), sameTerms)) {
-                throw incomplete("commissionRules", "승계로 기존 계약의 금액·지급조건을 변경할 수 없습니다. 기존 규칙을 유지하세요.");
-            }
-        }
-        for (FeeRegimeRuleDraft rule : replacement.feeRegimeRules()) {
-            if (previous.feeRegimeRules().stream().noneMatch(old -> feeScopesOverlap(rule, old))) continue;
-            List<FeeRegimeRuleDraft> sameTerms = previous.feeRegimeRules().stream()
-                    .filter(old -> sameFeeTerms(rule, old)).toList();
-            if (!coversFeeRule(rule, sameTerms)) {
-                throw incomplete("feeRegimeRules", "승계로 기존 적용 범위의 분급 조건을 변경할 수 없습니다.");
-            }
-        }
-        for (PolicyDraft.ParameterDraft old : previous.parameters()) {
-            if (replacement.parameters().stream().noneMatch(value -> old.key().equals(value.key()) && sameValue(old.value(), value.value()))) {
-                throw incomplete("parameters", "승계본은 기존 계약의 정책 파라미터 키와 값을 유지해야 합니다.");
-            }
-        }
-    }
-
-    private static boolean sameValue(JsonNode first, JsonNode second) {
-        return first.isNumber() && second.isNumber() ? first.decimalValue().compareTo(second.decimalValue()) == 0 : first.equals(second);
-    }
-
-    private static boolean contractScopesOverlap(CommissionRuleDraft first, CommissionRuleDraft second) {
-        return overlapsScope(first.insurerId(), second.insurerId())
-                && overlapsScope(first.productOfferingId(), second.productOfferingId())
-                && overlapsScope(first.organizationId(), second.organizationId());
-    }
-
-    private static boolean sameCommissionTerms(CommissionRuleDraft first, CommissionRuleDraft second) {
-        return coversCommissionScope(first, second) && coversCommissionScope(second, first)
-                && first.calculationType() == second.calculationType()
-                && Objects.equals(first.basisCode(), second.basisCode())
-                && sameDecimal(first.ratePct(), second.ratePct()) && sameDecimal(first.fixedAmount(), second.fixedAmount())
-                && first.equalMonthlyYn() == second.equalMonthlyYn()
-                && Objects.equals(first.paymentConditionCode(), second.paymentConditionCode())
-                && Objects.equals(first.priorityNo(), second.priorityNo());
-    }
-
-    private static boolean sameDecimal(BigDecimal first, BigDecimal second) {
-        return first == null ? second == null : second != null && first.compareTo(second) == 0;
     }
 
     private static boolean overlapsScope(Object first, Object second) {
@@ -130,13 +77,9 @@ public class PolicySuccessionValidator {
                 && start(second.basicDocumentDateFrom()) <= end(first.basicDocumentDateTo());
     }
 
-    private static boolean sameFeeTerms(FeeRegimeRuleDraft first, FeeRegimeRuleDraft second) {
+    private static boolean sameFeeScope(FeeRegimeRuleDraft first, FeeRegimeRuleDraft second) {
         return Objects.equals(first.feeRegimeCode(), second.feeRegimeCode())
-                && Objects.equals(first.basicDocumentVersion(), second.basicDocumentVersion())
-                && Objects.equals(first.maxInstallments(), second.maxInstallments())
-                && Objects.equals(first.longTermMaintenanceFrom(), second.longTermMaintenanceFrom())
-                && Objects.equals(first.longTermMaintenanceTo(), second.longTermMaintenanceTo())
-                && first.reviewRequiredYn() == second.reviewRequiredYn();
+                && Objects.equals(first.basicDocumentVersion(), second.basicDocumentVersion());
     }
 
     private static void validateHeader(PolicyDraft previous, PolicyDraft replacement) {
@@ -149,8 +92,11 @@ public class PolicySuccessionValidator {
         if (!coversScope(replacement.basicDocumentVersion(), previous.basicDocumentVersion())) {
             throw incomplete("basicDocumentVersion", "승계본은 기존 ACTIVE의 기초서류 범위를 모두 포함해야 합니다.");
         }
-        if (!Objects.equals(replacement.effectiveFrom(), previous.effectiveFrom())) {
-            throw incomplete("effectiveFrom", "승계본의 시작일은 기존 ACTIVE와 같아야 합니다. 과거 적용 범위를 확장하거나 누락할 수 없습니다.");
+        if (!replacement.effectiveFrom().isAfter(previous.effectiveFrom())) {
+            throw incomplete("effectiveFrom", "새 적용일은 기존 ACTIVE의 시작일보다 늦어야 합니다. 같은 날 교체나 역승계는 허용하지 않습니다.");
+        }
+        if (previous.effectiveTo() != null && replacement.effectiveFrom().minusDays(1).isAfter(previous.effectiveTo())) {
+            throw incomplete("effectiveFrom", "새 적용일과 기존 정책의 종료일 사이에 적용 공백이 생길 수 없습니다.");
         }
         if (end(replacement.effectiveTo()) < end(previous.effectiveTo())) {
             throw incomplete("effectiveTo", "승계본은 기존 ACTIVE의 종료일(무기한 포함)을 모두 포함해야 합니다.");

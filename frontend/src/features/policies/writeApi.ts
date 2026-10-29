@@ -105,8 +105,9 @@ type PolicyDraftResponse = Omit<
 }
 export interface PolicyDetailResponse extends Omit<
   PolicyDetail,
-  'editDocument' | 'approvalActions' | 'allowedActions'
+  'editDocument' | 'approvalActions' | 'allowedActions' | 'applicationPeriod'
 > {
+  applicationPeriod?: Schemas['PolicyApplicationPeriod'] | null
   editDocument?: PolicyDraftResponse | null
   allowedActions?: string[]
   approvalActions?: (Omit<Required<Schemas['PolicyApprovalActionResponse']>, 'evidenceRef'> & {
@@ -120,6 +121,7 @@ export function normalizePolicyDetail(detail: PolicyDetailResponse | ManagedPoli
     ...detail,
     allowedActions: detail.allowedActions?.map((action) => (action === 'CLONE' ? 'NEW_VERSION' : action)),
     updatedAt: draft?.expectedUpdatedAt ?? ('updatedAt' in detail ? detail.updatedAt : undefined),
+    applicationPeriod: detail.applicationPeriod ?? undefined,
     editDocument: draft
       ? {
           ...draft,

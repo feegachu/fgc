@@ -107,6 +107,15 @@ export function PolicyManagement({
             {date(policy.effectiveFrom)} ~ {policy.effectiveTo ? date(policy.effectiveTo) : '계속'}
           </dd>
         </div>
+        {detail.applicationPeriod && (
+          <div>
+            <dt>계약일 적용 기간</dt>
+            <dd>
+              {date(detail.applicationPeriod.from)} ~ {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
+              {detail.applicationPeriod.successorPolicyVersionId && <small>이후 계약은 후속 버전 적용</small>}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>작성자</dt>
           <dd>{policy.createdBy ?? detail.createdBy ?? '자료 없음'}</dd>
@@ -482,7 +491,7 @@ function PolicyActionDialog({
   const preview = useContext(PolicyPreviewContext)
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
-  const [effectiveFrom, setFrom] = useState(policy.effectiveFrom ?? '')
+  const [effectiveFrom, setFrom] = useState('')
   const [effectiveTo, setTo] = useState(policy.effectiveTo ?? '')
   const [error, setError] = useState('')
   const [dateError, setDateError] = useState('')
@@ -499,6 +508,11 @@ function PolicyActionDialog({
     setDateError('')
     if (newVersion && (!effectiveFrom || (effectiveTo && effectiveTo < effectiveFrom))) {
       setDateError('유효한 적용 기간을 입력하세요.')
+      dateRef.current?.focus()
+      return
+    }
+    if (newVersion && policy.effectiveFrom && effectiveFrom <= policy.effectiveFrom) {
+      setDateError('새 적용일은 기존 버전의 시작일보다 늦어야 합니다.')
       dateRef.current?.focus()
       return
     }
@@ -559,7 +573,7 @@ function PolicyActionDialog({
     >
       <p className="policy-section-description">
         {newVersion
-          ? '기존 정책의 규칙과 근거를 복사합니다. 활성 정책을 교체하려면 기존 적용 기간과 규칙 범위를 모두 포함한 대체본을 작성하세요. 기존 시작일과 계약의 금액·지급조건·분급 한도는 유지해야 합니다.'
+          ? '기존 정책의 규칙과 근거를 복사합니다. 새 적용일 당일부터 체결한 계약에 변경 요율을 적용합니다. 그 이전 계약은 재계산할 때도 기존 버전과 요율을 유지합니다.'
           : action === 'REJECT'
             ? '반려하면 작성자가 초안을 다시 수정할 수 있습니다.'
             : `아래 정책의 정보와 작업 사유를 확인한 후 ${label}하세요.`}
@@ -637,8 +651,8 @@ function PolicyActionDialog({
       )}
       {action === 'ACTIVATE' && (
         <p className="policy-notice policy-notice-warning">
-          같은 정책코드의 기존 적용 버전을 종료하고 이 버전을 활성화합니다. 다른 정책과 적용 범위가 겹치거나 승계에
-          실패하면 기존 버전을 유지합니다.
+          이 버전의 적용일 당일부터 체결한 계약에 새 기준을 적용합니다. 이전 계약은 기존 버전과 요율을 유지합니다.
+          승계에 실패하면 기존 버전을 유지합니다.
         </p>
       )}
     </Modal>

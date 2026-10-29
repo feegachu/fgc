@@ -22,55 +22,59 @@ class PolicySuccessionValidatorTest {
     private final PolicySuccessionValidator validator = new PolicySuccessionValidator();
 
     @Test
-    void rejectsChangedPricesAndPriorityInsideTheOriginalContractScope() throws Exception {
-        ObjectNode previous = document(), replacement = previous.deepCopy();
+    void permitsChangedPricesAndPriorityFromTheNewContractDate() throws Exception {
+        ObjectNode previous = document(), replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         assertValid(previous, replacement);
         ((ObjectNode) replacement.path("commissionRules").get(0)).put("ratePct", "25.000001");
-        assertInvalid(previous, replacement, "commissionRules");
-        replacement = previous.deepCopy();
+        assertValid(previous, replacement);
+        replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         ((ObjectNode) replacement.path("commissionRules").get(0)).put("priorityNo", 2);
-        assertInvalid(previous, replacement, "commissionRules");
-        replacement = previous.deepCopy();
+        assertValid(previous, replacement);
+        replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         replacement.withArray("commissionRules").add(replacement.path("commissionRules").get(0).deepCopy());
         ((ObjectNode) replacement.path("commissionRules").get(1)).put("commissionItemId", 99);
-        assertInvalid(previous, replacement, "commissionRules");
+        assertValid(previous, replacement);
     }
 
     @Test
-    void permitsNewPricesOnlyInAProvablyDisjointContractScope() throws Exception {
+    void permitsFuturePricesInBothNewAndExistingScopes() throws Exception {
         ObjectNode previous = document();
         ((ObjectNode) previous.path("commissionRules").get(0)).put("insurerId", 1);
-        ObjectNode replacement = previous.deepCopy();
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         replacement.withArray("commissionRules").add(previous.path("commissionRules").get(0).deepCopy());
         ((ObjectNode) replacement.path("commissionRules").get(1)).put("insurerId", 2).put("ratePct", "25.000001");
         assertValid(previous, replacement);
         ((ObjectNode) replacement.path("commissionRules").get(1)).putNull("insurerId");
-        assertInvalid(previous, replacement, "commissionRules");
+        assertValid(previous, replacement);
     }
 
     @Test
-    void rejectsLosingPastDatesOpenEndedCoverageOrHeaderWildcard() throws Exception {
+    void requiresLaterCutoverWithoutGapsOrNarrowerCoverage() throws Exception {
         ObjectNode previous = document();
         assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2025-12-31"), "effectiveFrom");
-        assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-01"), "effectiveFrom");
-        assertInvalid(previous, previous.deepCopy().put("effectiveTo", "2099-12-31"), "effectiveTo");
+        assertInvalid(previous, previous.deepCopy(), "effectiveFrom");
+        assertValid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-01"));
+        assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-01").put("effectiveTo", "2099-12-31"), "effectiveTo");
         assertInvalid(previous, previous.deepCopy().put("basicDocumentVersion", "NARROW"), "basicDocumentVersion");
         assertInvalid(previous, previous.deepCopy().put("policyType", "SCHEDULE_ELIGIBILITY"), "policyType");
+        previous.put("effectiveTo", "2026-12-31");
+        assertValid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-01").putNull("effectiveTo"));
+        assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-02").putNull("effectiveTo"), "effectiveFrom");
     }
 
     @Test
     void rejectsDroppingItemsOrNarrowingCommissionWildcards() throws Exception {
-        ObjectNode previous = document(), replacement = previous.deepCopy();
+        ObjectNode previous = document(), replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         ((ObjectNode) replacement.path("commissionRules").get(0)).put("insurerId", 7);
         assertInvalid(previous, replacement, "commissionRules");
         previous.withArray("commissionRules").add(previous.path("commissionRules").get(0).deepCopy());
         ((ObjectNode) previous.path("commissionRules").get(1)).put("commissionItemId", 2);
-        assertInvalid(previous, document(), "commissionRules");
+        assertInvalid(previous, document().put("effectiveFrom", "2027-01-01"), "commissionRules");
     }
 
     @Test
     void permitsSplitInstallmentsOnlyWhenTheUnionHasNoGap() throws Exception {
-        ObjectNode previous = document(), replacement = previous.deepCopy();
+        ObjectNode previous = document(), replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         ObjectNode first = (ObjectNode) replacement.path("commissionRules").get(0);
         first.put("installmentTo", 6);
         replacement.withArray("commissionRules").add(first.deepCopy().put("installmentFrom", 7).put("installmentTo", 12));
@@ -82,7 +86,7 @@ class PolicySuccessionValidatorTest {
     @Test
     void verifiesTheEntireSalesAndDocumentDateGrid() throws Exception {
         ObjectNode previous = document().put("policyType", "FOUR_YEAR_COMMISSION").put("feeRegimeCode", "FOUR_YEAR_2027");
-        ObjectNode replacement = previous.deepCopy();
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         ObjectNode oldFee = JSON.createObjectNode().put("feeRegimeCode", "FOUR_YEAR_2027")
                 .put("salesStartDateFrom", "2027-01-01").put("salesStartDateTo", "2028-12-31")
                 .put("basicDocumentDateFrom", "2027-01-01").put("basicDocumentDateTo", "2028-12-31")
@@ -98,49 +102,43 @@ class PolicySuccessionValidatorTest {
         }
         assertValid(previous, replacement);
         ((ObjectNode) replacement.path("feeRegimeRules").get(3)).put("maxInstallments", 36);
-        assertInvalid(previous, replacement, "feeRegimeRules");
+        assertValid(previous, replacement);
         ((ObjectNode) replacement.path("feeRegimeRules").get(3)).put("maxInstallments", 48);
         replacement.withArray("feeRegimeRules").remove(3);
         assertInvalid(previous, replacement, "feeRegimeRules");
     }
 
     @Test
-    void preservesParameterValuesIncludingOptionalKeysWithEquivalentNumericRepresentations() throws Exception {
-        ObjectNode previous = document().put("policyType", "RECONCILIATION_TOLERANCE");
+    void permitsParameterChangesInTheNewApplicationWindow() throws Exception {
+        ObjectNode previous = document().put("policyType", "ARBITRAGE");
         previous.putArray("commissionRules");
-        previous.withArray("parameters").addObject().put("key", "TOLERANCE_AMOUNT_KRW").put("value", 0);
-        previous.withArray("parameters").addObject().put("key", "TOLERANCE_DAYS").put("value", 0);
-        ObjectNode replacement = previous.deepCopy();
-        ((ObjectNode) replacement.path("parameters").get(0)).put("value", 0.0);
+        previous.withArray("parameters").addObject().put("key", "ARBITRAGE_REFUND_ADDITION_MONTHS").put("value", 12);
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
+        ((ObjectNode) replacement.path("parameters").get(0)).put("value", 24);
         assertValid(previous, replacement);
-        ((ObjectNode) replacement.path("parameters").get(0)).put("value", 1);
-        assertInvalid(previous, replacement, "parameters");
-        replacement = previous.deepCopy();
-        replacement.withArray("parameters").remove(1);
-        assertInvalid(previous, replacement, "parameters");
     }
 
     @Test
-    void cannotDropSpecificPricesAndFallBackToAnUnchangedWildcardRule() throws Exception {
+    void permitsReplacingSpecificPricesByWildcardForFutureContracts() throws Exception {
         ObjectNode previous = document();
         previous.withArray("commissionRules").add(((ObjectNode) previous.path("commissionRules").get(0)).deepCopy()
                 .put("insurerId", 7).put("ratePct", "20.000000"));
-        ObjectNode replacement = previous.deepCopy();
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         replacement.withArray("commissionRules").remove(1);
-        assertInvalid(previous, replacement, "commissionRules");
+        assertValid(previous, replacement);
     }
 
     @Test
-    void cannotDropSpecificRegimeConditionsAndFallBackToAWildcard() throws Exception {
+    void permitsChangingFutureRegimeConditionsWhilePreservingCoverage() throws Exception {
         ObjectNode previous = document().put("policyType", "FOUR_YEAR_COMMISSION").put("feeRegimeCode", "FOUR_YEAR_2027");
         ObjectNode wildcard = JSON.createObjectNode().put("feeRegimeCode", "FOUR_YEAR_2027")
                 .put("salesStartDateFrom", "2027-01-01").put("maxInstallments", 48);
         wildcard.putArray("sourceRefs");
         previous.withArray("feeRegimeRules").add(wildcard);
         previous.withArray("feeRegimeRules").add(wildcard.deepCopy().put("basicDocumentVersion", "DOC-1").put("maxInstallments", 36));
-        ObjectNode replacement = previous.deepCopy();
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         replacement.withArray("feeRegimeRules").remove(1);
-        assertInvalid(previous, replacement, "feeRegimeRules");
+        assertValid(previous, replacement);
     }
 
     @Test

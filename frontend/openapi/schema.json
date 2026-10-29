@@ -5125,6 +5125,23 @@
         "required" : [ "actionType", "expectedStatus", "expectedUpdatedAt", "reason" ],
         "type" : "object"
       },
+      "PolicyApplicationPeriod" : {
+        "properties" : {
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "successorPolicyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "to" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "PolicyApprovalActionResponse" : {
         "description" : "정책 승인 동작 이력",
         "properties" : {
@@ -5184,6 +5201,10 @@
               "type" : "string"
             },
             "type" : "array"
+          },
+          "applicationPeriod" : {
+            "$ref" : "#/components/schemas/PolicyApplicationPeriod",
+            "description" : "계산에 사용하는 계약일 적용 구간. 승계된 과거 버전은 후속 적용일 전날까지이며 원본 승인 기간은 보존"
           },
           "approvalActions" : {
             "description" : "불변 정책 승인 이력, actionSeq 순",
@@ -8536,7 +8557,7 @@
     },
     "/api/v1/policies/{policyVersionId}/actions" : {
       "post" : {
-        "description" : "SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. 작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. ACTIVATE는 기존 계약의 계산조건을 유지하며 같은 코드의 기존 ACTIVE를 RETIRED로 전환하는 전체 대체본 승계이며 다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.",
+        "description" : "SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. 작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. ACTIVATE는 같은 코드의 기존 ACTIVE를 RETIRED로 전환하고 계약일별 적용 경계를 기록합니다. 새 적용일 전 계약은 구버전, 당일부터 체결한 계약은 변경 요율의 신버전을 선택하며 승인본의 기간·규칙은 보존합니다. 다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.",
         "operationId" : "executePolicyAction",
         "parameters" : [ {
           "in" : "path",

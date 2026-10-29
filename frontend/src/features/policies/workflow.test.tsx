@@ -80,8 +80,8 @@ function mountEditor(initial?: DraftDocument, policyId?: number) {
   return { user: userEvent.setup(), onSaved }
 }
 
-function mountManagement(status: PolicyWriteResult['status'], actions: string[]) {
-  const detail = normalizePolicyDetail(wireDetail(status, actions))
+function mountManagement(status: PolicyWriteResult['status'], actions: string[], applicationPeriod?: PolicyDetailResponse['applicationPeriod']) {
+  const detail = normalizePolicyDetail({ ...wireDetail(status, actions), applicationPeriod })
   const onSaved = vi.fn()
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -92,6 +92,13 @@ function mountManagement(status: PolicyWriteResult['status'], actions: string[])
 }
 
 describe('production policy workflow', () => {
+  it('shows the historical contract-date window separately from the immutable approval period', () => {
+    mountManagement('RETIRED', ['CLONE'], { from: '2027-01-01', to: '2027-12-31', successorPolicyVersionId: 18 })
+    const period = screen.getByText('계약일 적용 기간').parentElement!
+    expect(period).toHaveTextContent('2027-12-31')
+    expect(within(period).getByText('이후 계약은 후속 버전 적용')).toBeVisible()
+  })
+
   it('creates a real draft from the production form and returns its server ID', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
     const { user, onSaved } = mountEditor()
@@ -179,9 +186,9 @@ describe('production policy workflow', () => {
     expect(screen.getByText(/author · policy:17/)).toBeVisible()
     await user.click(screen.getByRole('button', { name: '새 버전 작성' }))
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByLabelText(/새 버전 적용 시작일/)).toHaveValue('2027-01-01')
+    expect(within(dialog).getByLabelText(/새 버전 적용 시작일/)).toHaveValue('')
     expect(within(dialog).getByLabelText(/새 버전 적용 종료일/)).toHaveValue('')
-    expect(within(dialog).getByText(/기존 적용 기간과 규칙 범위를 모두 포함한 대체본/)).toBeVisible()
+    expect(within(dialog).getByText(/이전 계약은 재계산할 때도 기존 버전과 요율을 유지/)).toBeVisible()
     fireEvent.change(within(dialog).getByLabelText(/새 버전 적용 시작일/), { target: { value: '2028-01-01' } })
     await user.type(within(dialog).getByLabelText(/작업 사유/), '다음 연도 정책')
     await user.click(within(dialog).getByRole('button', { name: '새 초안 만들기' }))

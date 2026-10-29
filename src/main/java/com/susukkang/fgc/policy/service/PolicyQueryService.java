@@ -82,7 +82,8 @@ public class PolicyQueryService {
                 policyWriteRepository.readDraft(policy),
                 policyWriteRepository.findApprovalActions(policyVersionId),
                 policyWriteService.allowedActions(policy),
-                policy.getApprovalEvidenceRef());
+                policy.getApprovalEvidenceRef(),
+                policyWriteRepository.applicationPeriod(policyVersionId));
     }
 
     private Map<Long, String> findUserLogins(List<PolicyVersion> policies) {

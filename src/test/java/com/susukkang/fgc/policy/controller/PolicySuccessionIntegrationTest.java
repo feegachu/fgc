@@ -7,6 +7,7 @@ import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.policy.repository.PolicyVersionRepository;
+import com.susukkang.fgc.policy.repository.FeeRegimeResolverRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -32,25 +34,32 @@ class PolicySuccessionIntegrationTest {
     @Autowired private ObjectMapper mapper;
     @Autowired private PolicyVersionRepository policies;
     @Autowired private ScheduleService schedules;
+    @Autowired private FeeRegimeResolverRepository feeRules;
 
     @Test
-    void replacesOpenEndedSeedWithoutLosingPastContractEligibilityOrStoredMoneyReferences() throws Exception {
+    void appliesChangedRatesOnlyFromCutoverAndKeepsOlderContractsOnTheirOriginalVersion() throws Exception {
         FgcUserDetails writer = actor("settle01"), approver = actor("gaadmin");
         long originalId = jdbc.queryForObject("SELECT policy_version_id FROM fgc.policy_version WHERE policy_code='GA-CUR-2026-V1' AND status='ACTIVE'", Long.class);
         JsonNode original = detail(originalId, writer);
         var historicMoney = jdbc.queryForList("SELECT commission_transaction_id, policy_version_id, amount FROM fgc.commission_transaction WHERE policy_version_id=? ORDER BY commission_transaction_id", originalId);
         assertThat(historicMoney).isNotEmpty();
-        long contractId = jdbc.queryForList("SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id", Long.class).stream()
+        long sourceContractId = jdbc.queryForList("""
+                SELECT c.contract_id FROM fgc.insurance_contract c
+                JOIN fgc.product_offering p ON p.product_offering_id=c.product_offering_id
+                WHERE p.sales_end_date IS NULL OR p.sales_end_date >= c.contract_date + 5
+                ORDER BY c.contract_id
+                """, Long.class).stream()
                 .filter(id -> policies.findApplicableCurrentCommissionPolicies(id, PaymentStage.GA_TO_FC).stream()
                         .anyMatch(policy -> policy.getPolicyVersionId() == originalId)).findFirst().orElseThrow();
-        contractId = copyContract(contractId);
+        LocalDate beforeDate = jdbc.queryForObject("SELECT contract_date FROM fgc.insurance_contract WHERE contract_id=?", LocalDate.class, sourceContractId);
+        LocalDate cutover = beforeDate.plusDays(1);
+        long contractId = copyContract(sourceContractId, beforeDate);
         schedules.generateSchedulesByContractId(contractId);
         var originalAmounts = amounts(contractId);
         assertThat(originalAmounts).isNotEmpty();
 
-        JsonNode narrow = clone(originalId, "2027-01-01", writer);
-        long narrowId = narrow.path("policyVersionId").asLong();
-        JsonNode error = action(narrowId, "SUBMIT", narrow, writer, 400);
+        JsonNode sameStart = clone(originalId, original.path("header").path("effectiveFrom").asText(), writer);
+        JsonNode error = action(sameStart.path("policyVersionId").asLong(), "SUBMIT", sameStart, writer, 400);
         assertThat(error.path("field").asText()).isEqualTo("effectiveFrom");
 
         String earlierDate = java.time.LocalDate.parse(original.path("header").path("effectiveFrom").asText()).minusDays(1).toString();
@@ -58,44 +67,97 @@ class PolicySuccessionIntegrationTest {
         assertThat(action(earlier.path("policyVersionId").asLong(), "SUBMIT", earlier, writer, 400)
                 .path("field").asText()).isEqualTo("effectiveFrom");
 
-        JsonNode changed = clone(originalId, original.path("header").path("effectiveFrom").asText(), writer);
+        JsonNode changed = clone(originalId, cutover.toString(), writer);
         long changedId = changed.path("policyVersionId").asLong();
         ObjectNode changedDocument = (ObjectNode) detail(changedId, writer).path("editDocument").deepCopy();
-        ((ObjectNode) changedDocument.path("commissionRules").get(0)).put("ratePct", "23.456789");
+        for (JsonNode rule : changedDocument.path("commissionRules")) {
+            ((ObjectNode) rule).put("calculationType", "RATE").put("ratePct", "12.000000").putNull("fixedAmount");
+        }
         JsonNode edited = write("/api/v1/policies/" + changedId, changedDocument, writer, 200, true);
-        assertThat(action(changedId, "SUBMIT", edited, writer, 400).path("field").asText()).isEqualTo("commissionRules");
-        schedules.regenerateContractSchedules(contractId, "요율 변경 거절 후 재계산");
-        assertThat(amounts(contractId)).isEqualTo(originalAmounts);
-
-        JsonNode replacement = clone(originalId, original.path("header").path("effectiveFrom").asText(), writer);
-        long replacementId = replacement.path("policyVersionId").asLong();
-        JsonNode approved = action(replacementId, "APPROVE", action(replacementId, "SUBMIT", replacement, writer, 200), approver, 200);
+        long replacementId = changedId;
+        JsonNode approved = action(replacementId, "APPROVE", action(replacementId, "SUBMIT", edited, writer, 200), approver, 200);
         assertThat(detail(originalId, writer).path("header").path("status").asText()).isEqualTo("ACTIVE");
         action(replacementId, "ACTIVATE", approved, approver, 200);
-        schedules.regenerateContractSchedules(contractId, "전체 대체본 승계 후 재계산");
+        schedules.regenerateContractSchedules(contractId, "요율 변경 후 기존 계약 재계산");
         assertThat(amounts(contractId)).isEqualTo(originalAmounts);
         assertThat(jdbc.queryForObject("SELECT policy_version_id FROM fgc.schedule_header WHERE contract_id=? AND payment_stage='GA_TO_FC' AND active_yn",
-                Long.class, contractId)).isEqualTo(replacementId);
+                Long.class, contractId)).isEqualTo(originalId);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.schedule_line l JOIN fgc.schedule_header h USING(schedule_header_id)
+                WHERE h.contract_id=? AND h.payment_stage='GA_TO_FC' AND h.active_yn AND l.due_date >= ?
+                """, Integer.class, contractId, cutover)).isPositive();
+
+        for (LocalDate date : java.util.List.of(cutover, cutover.plusDays(1))) {
+            long fresh = copyContract(sourceContractId, date);
+            schedules.generateSchedulesByContractId(fresh);
+            assertSelected(fresh, replacementId);
+            assertThat(amounts(fresh)).isNotEmpty();
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM fgc.schedule_header h JOIN fgc.schedule_line l USING(schedule_header_id)
+                    WHERE h.contract_id=? AND h.payment_stage='GA_TO_FC' AND h.active_yn
+                      AND (l.rate_pct <> 12 OR l.expected_amount <> round(l.basis_amount * 12 / 100, 0))
+                    """, Integer.class, fresh)).isZero();
+        }
 
         JsonNode retired = detail(originalId, writer);
         assertThat(retired.path("header").path("status").asText()).isEqualTo("RETIRED");
         assertThat(retired.path("editDocument").path("effectiveTo").isNull()).isTrue();
+        assertThat(retired.path("applicationPeriod").path("to").asText()).isEqualTo(cutover.minusDays(1).toString());
+        assertThat(retired.path("applicationPeriod").path("successorPolicyVersionId").asLong()).isEqualTo(replacementId);
         assertThat(retired.path("editDocument").path("commissionRules")).isEqualTo(original.path("editDocument").path("commissionRules"));
         assertThat(jdbc.queryForList("SELECT commission_transaction_id, policy_version_id, amount FROM fgc.commission_transaction WHERE policy_version_id=? ORDER BY commission_transaction_id", originalId)).isEqualTo(historicMoney);
         assertThat(policies.findApplicableCurrentCommissionPolicies(contractId, PaymentStage.GA_TO_FC))
-                .extracting(policy -> policy.getPolicyVersionId()).containsExactly(replacementId);
+                .extracting(policy -> policy.getPolicyVersionId()).containsExactly(originalId);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE entity_type='POLICY_VERSION' AND entity_id=? AND action_code='POLICY_RETIRE'", Integer.class, Long.toString(originalId))).isEqualTo(1);
+
+        LocalDate nextCutover = cutover.plusDays(2);
+        JsonNode third = clone(replacementId, nextCutover.toString(), writer);
+        long thirdId = third.path("policyVersionId").asLong();
+        action(thirdId, "ACTIVATE", action(thirdId, "APPROVE", action(thirdId, "SUBMIT", third, writer, 200), approver, 200), approver, 200);
+        assertSelected(copyContract(sourceContractId, cutover), replacementId);
+        assertSelected(copyContract(sourceContractId, nextCutover), thirdId);
+        schedules.regenerateContractSchedules(contractId, "세 번째 판 발행 후 기존 계약 재계산");
+        assertSelected(contractId, originalId);
+        assertThat(amounts(contractId)).isEqualTo(originalAmounts);
     }
 
-    private long copyContract(long sourceId) {
+    @Test
+    void selectsHistoricalRegimeRulesAndTheirLimitsByContractDate() throws Exception {
+        FgcUserDetails writer = actor("settle01"), approver = actor("gaadmin");
+        long sourceId = jdbc.queryForObject("SELECT policy_version_id FROM fgc.policy_version WHERE policy_code='REG-FOUR-YEAR-2027-V1' AND status='ACTIVE'", Long.class);
+        long currentId = jdbc.queryForObject("SELECT MIN(policy_version_id) FROM fgc.policy_version WHERE policy_code='GA-CUR-2026-V1'", Long.class);
+        JsonNode draft = clone(sourceId, "2028-01-01", writer);
+        long id = draft.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument").deepCopy();
+        ObjectNode rule = (ObjectNode) detail(currentId, writer).path("editDocument").path("commissionRules").get(0).deepCopy();
+        rule.remove("commissionRuleId");
+        rule.put("feeComponentType", "UPFRONT").put("installmentFrom", 1).put("installmentTo", 1);
+        edit.withArray("commissionRules").add(rule);
+        JsonNode updated = write("/api/v1/policies/" + id, edit, writer, 200, true);
+        action(id, "ACTIVATE", action(id, "APPROVE", action(id, "SUBMIT", updated, writer, 200), approver, 200), approver, 200);
+        for (LocalDate contractDate : java.util.List.of(LocalDate.of(2027, 12, 31), LocalDate.of(2028, 1, 1))) {
+            var candidates = feeRules.findRulesetCandidates("FOUR_YEAR_COMMISSION", "FOUR_YEAR_2027", contractDate,
+                    LocalDate.of(2027, 1, 1), "BD-2027-01", LocalDate.of(2027, 1, 1));
+            assertThat(candidates).hasSize(1);
+            assertThat(candidates.getFirst().getPolicyVersionId()).isEqualTo(contractDate.getYear() == 2027 ? sourceId : id);
+            assertThat(feeRules.findRulesetLimits(candidates.getFirst().getRulesetId())).hasSize(3);
+        }
+    }
+
+    private void assertSelected(long contractId, long policyId) {
+        assertThat(policies.findApplicableCurrentCommissionPolicies(contractId, PaymentStage.GA_TO_FC))
+                .extracting(policy -> policy.getPolicyVersionId()).containsExactly(policyId);
+    }
+
+    private long copyContract(long sourceId, LocalDate contractDate) {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.insurance_contract
                 (insurer_id,product_offering_id,contract_no,contract_date,agent_id,organization_id,
                  premium_per_cycle_amount,first_premium_amount,monthly_equivalent_first_premium,payment_term_months)
-                SELECT insurer_id,product_offering_id,?,contract_date,agent_id,organization_id,
+                SELECT insurer_id,product_offering_id,?,?,agent_id,organization_id,
                  premium_per_cycle_amount,first_premium_amount,monthly_equivalent_first_premium,payment_term_months
                 FROM fgc.insurance_contract WHERE contract_id=? RETURNING contract_id
-                """, Long.class, "P647-" + UUID.randomUUID(), sourceId);
+                """, Long.class, "P647-" + UUID.randomUUID(), contractDate, sourceId);
     }
 
     private java.util.List<java.util.Map<String, Object>> amounts(long contractId) {

@@ -3,6 +3,7 @@ package com.susukkang.fgc.policy.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.policy.dto.PolicyApprovalActionResponse;
+import com.susukkang.fgc.policy.dto.PolicyApplicationPeriod;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
 import com.susukkang.fgc.policy.dto.PolicyFeeLimit;
 import com.susukkang.fgc.policy.dto.PolicyWriteResult;
@@ -497,6 +498,24 @@ public class PolicyWriteRepository {
                 """, id, actionType, actorId, reason, evidenceRef, id);
     }
 
+    public void recordSuccession(PolicyVersion previous, PolicyVersion successor, Long actorId) {
+        jdbc.update("""
+                INSERT INTO fgc.policy_succession
+                    (previous_policy_version_id, successor_policy_version_id, cutover_date, activated_by)
+                VALUES (?, ?, ?, ?)
+                """, previous.getPolicyVersionId(), successor.getPolicyVersionId(), successor.getEffectiveFrom(), actorId);
+    }
+
+    public PolicyApplicationPeriod applicationPeriod(Long id) {
+        return jdbc.query("""
+                SELECT p.effective_from, p.application_to, s.successor_policy_version_id
+                FROM fgc.policy_application_version p
+                LEFT JOIN fgc.policy_succession s ON s.previous_policy_version_id = p.policy_version_id
+                WHERE p.policy_version_id = ?
+                """, (rs, row) -> new PolicyApplicationPeriod(rs.getObject(1, java.time.LocalDate.class),
+                rs.getObject(2, java.time.LocalDate.class), rs.getObject(3, Long.class)), id).stream().findFirst().orElse(null);
+    }
+
     public List<PolicyApprovalActionResponse> findApprovalActions(Long id) {
         return jdbc.query("""
                 SELECT a.policy_approval_action_id, a.action_seq, a.action_type, u.login_id,
@@ -523,11 +542,11 @@ public class PolicyWriteRepository {
     public boolean hasActiveOverlap(PolicyVersion policy, boolean excludeSameCode) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
-                  SELECT 1 FROM fgc.policy_version active
+                  SELECT 1 FROM fgc.policy_application_version active
                   JOIN fgc.policy_version candidate ON candidate.policy_version_id = ?
-                  WHERE active.status = 'ACTIVE' AND active.policy_version_id <> candidate.policy_version_id
-                    AND (NOT ? OR active.policy_code <> candidate.policy_code)
-                    AND daterange(active.effective_from, active.effective_to, '[]')
+                  WHERE active.policy_version_id <> candidate.policy_version_id
+                    AND (NOT ? OR active.policy_code <> candidate.policy_code OR active.status = 'RETIRED')
+                    AND daterange(active.effective_from, active.application_to, '[]')
                         && daterange(candidate.effective_from, candidate.effective_to, '[]')
                     AND (
                       active.policy_code = candidate.policy_code

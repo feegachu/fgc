@@ -731,7 +731,7 @@ export interface paths {
         put?: never;
         /**
          * 정책 제출·승인·반려·활성화 (IF-API-75)
-         * @description SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. 작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. ACTIVATE는 기존 계약의 계산조건을 유지하며 같은 코드의 기존 ACTIVE를 RETIRED로 전환하는 전체 대체본 승계이며 다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.
+         * @description SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. 작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. ACTIVATE는 같은 코드의 기존 ACTIVE를 RETIRED로 전환하고 계약일별 적용 경계를 기록합니다. 새 적용일 전 계약은 구버전, 당일부터 체결한 계약은 변경 요율의 신버전을 선택하며 승인본의 기간·규칙은 보존합니다. 다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.
          */
         post: operations["executePolicyAction"];
         delete?: never;
@@ -3436,6 +3436,14 @@ export interface components {
             expectedUpdatedAt: string;
             reason: string;
         };
+        PolicyApplicationPeriod: {
+            /** Format: date */
+            from?: string;
+            /** Format: int64 */
+            successorPolicyVersionId?: number;
+            /** Format: date */
+            to?: string;
+        };
         /** @description 정책 승인 동작 이력 */
         PolicyApprovalActionResponse: {
             /** Format: date-time */
@@ -3461,6 +3469,8 @@ export interface components {
         PolicyDetailResponse: {
             /** @description 현재 사용자 역할·정책 상태·작성자를 반영한 동작 */
             allowedActions?: string[];
+            /** @description 계산에 사용하는 계약일 적용 구간. 승계된 과거 버전은 후속 적용일 전날까지이며 원본 승인 기간은 보존 */
+            applicationPeriod?: components["schemas"]["PolicyApplicationPeriod"];
             /** @description 불변 정책 승인 이력, actionSeq 순 */
             approvalActions?: components["schemas"]["PolicyApprovalActionResponse"][];
             /** @description 승인 근거 문서 참조. 기초서류 버전은 editDocument.basicDocumentVersion에서 조회 */

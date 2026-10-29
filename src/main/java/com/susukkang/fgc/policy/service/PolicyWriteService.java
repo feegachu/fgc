@@ -161,6 +161,7 @@ public class PolicyWriteService {
 
     private void prepareSuccession(PolicyVersion policy, PolicyStatus next, FgcUserDetails actor, String reason) {
         List<PolicyVersion> previousVersions = writeRepository.lockActiveVersions(policy.getPolicyCode());
+        if (previousVersions.size() > 1) throw stateConflict("같은 코드의 ACTIVE가 여러 개이므로 승계 기준을 확정할 수 없습니다.");
         PolicyDraft replacement = writeRepository.readDraft(policy);
         for (PolicyVersion previous : previousVersions) {
             if (previous.getVersionNo() >= policy.getVersionNo()) {
@@ -172,12 +173,13 @@ public class PolicyWriteService {
                     writeRepository.readFeeLimits(previous.getPolicyVersionId()),
                     writeRepository.readFeeLimits(policy.getPolicyVersionId()));
         }
-        if (next == PolicyStatus.REVIEW) return; // 작성자가 불완전/소급 변경 초안을 바로 보완할 수 있도록 제출 때도 검사한다.
+        if (next == PolicyStatus.REVIEW) return; // 작성자가 적용일·범위·한도 오류를 제출 때 보완할 수 있게 한다.
         if (next == PolicyStatus.ACTIVE) {
             for (PolicyVersion previous : previousVersions) {
                 Map<String, Object> before = snapshot(previous, actor);
                 previous.transition(PolicyStatus.RETIRED, null);
                 policyVersionRepository.saveAndFlush(previous);
+                writeRepository.recordSuccession(previous, policy, actor.getUserId());
                 writeRepository.appendAction(previous.getPolicyVersionId(), "RETIRE", actor.getUserId(), reason,
                         "policy:" + policy.getPolicyVersionId());
                 writeRepository.refresh(previous);
