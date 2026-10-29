@@ -338,6 +338,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clawbacks/candidates/{candidateId}/calculations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * IF-API-85 환수액 계산
+         * @description 선택한 정책버전과 서버가 잠근 원천으로 계산판을 만듭니다. 같은 원천·정책·산식은 같은 판을 반환하고, 같은 Idempotency-Key 재요청은 최초 결과를 반환합니다.
+         */
+        post: operations["calculateClawbackCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts": {
         parameters: {
             query?: never;
@@ -1369,6 +1389,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseCalculation: {
+            data?: components["schemas"]["Calculation"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseCapCheckBasisResponse: {
             data?: components["schemas"]["CapCheckBasisResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2209,6 +2234,17 @@ export interface components {
             violationCount?: number;
             /** Format: int64 */
             warningCount?: number;
+        };
+        ClawbackCalculationRequest: {
+            /** @description IF-API-84에서 받은 sourceVersion. 다르면 409 FGC-IMPL-STATE_CHANGED */
+            expectedSourceVersion: string;
+            /**
+             * Format: int64
+             * @description IF-API-84 policyCandidates 중 사용자가 확인한 정책버전
+             */
+            policyVersionId: number;
+            /** @description 계산 사유 1~500자 */
+            reason: string;
         };
         ClawbackCandidateDetailResponse: {
             candidate?: components["schemas"]["ClawbackCandidateResponse"];
@@ -5006,6 +5042,53 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseClawbackCandidateDetailResponse"];
+                };
+            };
+        };
+    };
+    calculateClawbackCandidate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 계산 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                candidateId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClawbackCalculationRequest"];
+            };
+        };
+        responses: {
+            /** @description 계산판 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCalculation"];
+                };
+            };
+            /** @description 원천 버전 변경 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCalculation"];
+                };
+            };
+            /** @description 적용 정책·계산 근거 부족 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCalculation"];
                 };
             };
         };
