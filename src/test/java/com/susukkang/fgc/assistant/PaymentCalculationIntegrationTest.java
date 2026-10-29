@@ -120,7 +120,7 @@ class PaymentCalculationIntegrationTest {
                 assertThat(firstRead.await(15, TimeUnit.SECONDS)).as("calculation established its snapshot").isTrue();
                 new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                     assertThat(jdbc.update("UPDATE fgc.commission_transaction SET amount=900000 WHERE commission_transaction_id=?", paymentId)).isEqualTo(1);
-                    assertThat(jdbc.update("UPDATE fgc.transaction_attribution SET amount=900000 WHERE commission_transaction_id=?", paymentId)).isEqualTo(1);
+                    assertThat(jdbc.update("UPDATE fgc.transaction_attribution SET attributed_amount=900000 WHERE commission_transaction_id=?", paymentId)).isEqualTo(1);
                 });
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt(); throw new AssertionError(error);
@@ -133,7 +133,7 @@ class PaymentCalculationIntegrationTest {
             assertThat(result.capPreview()).isNotEmpty();
             assertThat(result.capPreview().getFirst()).containsEntry("candidateAmount", "100000");
             assertThat(jdbc.queryForObject("SELECT amount FROM fgc.commission_transaction WHERE commission_transaction_id=?", BigDecimal.class, paymentId)).isEqualByComparingTo("900000");
-            assertThat(jdbc.queryForObject("SELECT amount FROM fgc.transaction_attribution WHERE commission_transaction_id=?", BigDecimal.class, paymentId)).isEqualByComparingTo("900000");
+            assertThat(jdbc.queryForObject("SELECT attributed_amount FROM fgc.transaction_attribution WHERE commission_transaction_id=?", BigDecimal.class, paymentId)).isEqualByComparingTo("900000");
         } finally {
             firstRead.countDown(); writerDone.countDown(); executor.shutdownNow();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
@@ -150,10 +150,11 @@ class PaymentCalculationIntegrationTest {
             result.put(table, jdbc.queryForObject("SELECT COUNT(*) FROM fgc." + table, Long.class));
         return result;
     }
-    private Map<String, Object> paymentRow() {
-        return jdbc.queryForMap("SELECT * FROM fgc.commission_transaction WHERE commission_transaction_id=?", paymentId);
+    private String paymentRow() {
+        // Canonical PostgreSQL JSON compares all values, including JDBC array columns by content.
+        return jdbc.queryForObject("SELECT to_jsonb(t)::text FROM fgc.commission_transaction t WHERE commission_transaction_id=?", String.class, paymentId);
     }
-    private List<Map<String, Object>> attributionRows() {
-        return jdbc.queryForList("SELECT * FROM fgc.transaction_attribution WHERE commission_transaction_id=? ORDER BY transaction_attribution_id", paymentId);
+    private String attributionRows() {
+        return jdbc.queryForObject("SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY transaction_attribution_id), '[]'::jsonb)::text FROM fgc.transaction_attribution t WHERE commission_transaction_id=?", String.class, paymentId);
     }
 }
