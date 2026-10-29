@@ -1,3 +1,4 @@
+import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { ShellUser } from '../../app/shell/Sidebar'
@@ -13,6 +14,8 @@ import './pico-assistant.css'
 import { PaymentCalculationPanel } from './PaymentCalculationPanel'
 import { PaymentGuideOverlay } from './PaymentGuide'
 import { useGuideRuntime } from './guide-runtime'
+import { askPico } from './pico-api'
+import type { PicoReply } from './pico-api'
 
 const labels: Record<PaymentScenario, string> = {
   'PAY-01': '이번 달 수수료는 얼마야?',
@@ -57,6 +60,7 @@ type Entry =
   | { id: number; role: 'user'; text: string }
   | { id: number; role: 'notice'; text: string }
   | { id: number; role: 'assistant'; result: MessageResult }
+  | { id: number; role: 'live'; reply: PicoReply }
 interface Conversation {
   entries: Entry[]
   revision: number
@@ -129,7 +133,7 @@ function CalculationCard({ result, current }: { result: CalculationResult; curre
 export function AssistantDemoMount({
   user,
   loggingOut = false,
-  enabled = import.meta.env.VITE_ASSISTANT_DEMO === 'true',
+  enabled = import.meta.env.VITE_ASSISTANT_DEMO === 'true' || import.meta.env.VITE_ASSISTANT_AI === 'true',
 }: {
   user: ShellUser
   loggingOut?: boolean
@@ -150,6 +154,12 @@ function AssistantWithGuide({ canProcess }: { canProcess: boolean }) {
 }
 export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   const [open, setOpen] = useState(false)
+  const aiEnabled = import.meta.env.VITE_ASSISTANT_AI === 'true'
+  const syntheticEnabled = import.meta.env.VITE_ASSISTANT_DEMO === 'true' || !aiEnabled
+  const [aiBusy, setAiBusy] = useState(false)
+  const aiRequest = useRef<AbortController | null>(null)
+  const aiSequence = useRef(0)
+  const aiLock = useRef(false)
   const [calculationEpoch, setCalculationEpoch] = useState(0)
   const runtimeSession = useGuideRuntime((state) => state.session)
   const observed = useGuideRuntime((state) => state.observation)
@@ -187,11 +197,74 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
         behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
       })
   }, [open, tab, conversation.entries])
+  useEffect(
+    () => () => {
+      aiRequest.current?.abort()
+      aiSequence.current++
+      aiLock.current = false
+      setAiBusy(false)
+    },
+    [visible, observed?.owner, observed?.scopeKey, observed?.revision, observed?.saved, observed?.busy, canProcess],
+  )
+  function cancelAi() {
+    aiRequest.current?.abort()
+    aiSequence.current++
+    aiLock.current = false
+    setAiBusy(false)
+  }
+  async function sendLive(text: string) {
+    if (aiLock.current || !text.trim()) return
+    const controller = new AbortController(),
+      sequence = ++aiSequence.current
+    aiRequest.current = controller
+    aiLock.current = true
+    setAiBusy(true)
+    setInput('')
+    setTab('chat')
+    setConversation((previous) => ({
+      ...previous,
+      entries: [...previous.entries, { id: previous.entries.length, role: 'user', text }],
+    }))
+    try {
+      const reply = await askPico(text, String(sequence), observed ? 'TRAN-W02' : 'CMN-C04', controller.signal)
+      if (controller.signal.aborted || sequence !== aiSequence.current) return
+      setConversation((previous) => ({
+        ...previous,
+        entries: [...previous.entries, { id: previous.entries.length, role: 'live', reply }],
+      }))
+    } catch (error) {
+      if (controller.signal.aborted || sequence !== aiSequence.current) return
+      setConversation((previous) => ({
+        ...previous,
+        entries: [
+          ...previous.entries,
+          {
+            id: previous.entries.length,
+            role: 'notice',
+            text:
+              error instanceof ApiError && error.code === 'FGC-IMPL-GUIDE_VERSION_MISMATCH'
+                ? '가이드 버전이 변경됐어요. 작성 중인 내용을 보존한 뒤 화면을 새로 열어주세요.'
+                : '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 지급 화면의 고정 도움말을 사용할 수 있어요.',
+          },
+        ],
+      }))
+    } finally {
+      if (sequence === aiSequence.current) {
+        aiLock.current = false
+        setAiBusy(false)
+      }
+    }
+  }
   const currentContext = demoContext(conversation.revision, conversation.scenario)
   const plan = conversation.plan?.workflowProposal
     ? findGuide(conversation.plan.workflowProposal.workflowId, conversation.plan.workflowProposal.guideVersion)
     : null
   function runScenario(scenario: PaymentScenario, now: number) {
+    if (!syntheticEnabled) {
+      void sendLive(labels[scenario])
+      return
+    }
+    cancelAi()
     setConversation((previous) => {
       const revision = previous.revision + 1,
         context = demoContext(revision, scenario)
@@ -222,7 +295,11 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   function send(event: FormEvent) {
     event.preventDefault()
     const text = input.trim()
-    if (!text) return
+    if (!text || aiLock.current) return
+    if (aiEnabled) {
+      void sendLive(text)
+      return
+    }
     setConversation((previous) => ({
       ...previous,
       entries: [
@@ -284,6 +361,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
               className="pico-icon-button"
               aria-label="새 대화"
               onClick={() => {
+                cancelAi()
                 setConversation(initial())
                 setCalculationEpoch((value) => value + 1)
                 setPickedScenario('PAY-02')
@@ -400,6 +478,22 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                       <p className="pico-notice" key={entry.id}>
                         {entry.text}
                       </p>
+                    ) : entry.role === 'live' ? (
+                      <article className="pico-answer" key={entry.id}>
+                        <div className="pico-answer-author">
+                          <img src={guide} alt="피코" />
+                          <b>피코</b>
+                          <span>{entry.reply.source === 'AI' ? 'AI 가이드 답변' : '고정 가이드'}</span>
+                        </div>
+                        <p>{entry.reply.message}</p>
+                        {entry.reply.evidenceRefs?.map((source) => (
+                          <div className="pico-source" key={source.chunkId}>
+                            <Symbol name="menu_book" />
+                            {source.title} · v{entry.reply.guideVersion}
+                          </div>
+                        ))}
+                        <small>일반 업무 안내 · 현재 지급 처리 완료를 뜻하지 않습니다.</small>
+                      </article>
                     ) : (
                       <article className="pico-answer" key={entry.id}>
                         <div className="pico-answer-author">
@@ -502,25 +596,32 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
             )}
           </div>
           <div className="pico-compose-region">
-            <details className="pico-demo-picker">
-              <summary>시연 질문 바꾸기</summary>
-              <label>
-                시연 상황
-                <select
-                  value={pickedScenario}
-                  onChange={(event) => setPickedScenario(event.target.value as PaymentScenario)}
-                >
-                  {PAYMENT_SCENARIOS.map((scenario) => (
-                    <option key={scenario} value={scenario}>
-                      {labels[scenario]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="pico-demo-run" onClick={() => runScenario(pickedScenario, Date.now())}>
-                선택한 질문 시연
-              </button>
-            </details>
+            {syntheticEnabled && (
+              <details className="pico-demo-picker">
+                <summary>시연 질문 바꾸기</summary>
+                <label>
+                  시연 상황
+                  <select
+                    value={pickedScenario}
+                    onChange={(event) => setPickedScenario(event.target.value as PaymentScenario)}
+                  >
+                    {PAYMENT_SCENARIOS.map((scenario) => (
+                      <option key={scenario} value={scenario}>
+                        {labels[scenario]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="pico-demo-run" onClick={() => runScenario(pickedScenario, Date.now())}>
+                  선택한 질문 시연
+                </button>
+              </details>
+            )}
+            {aiBusy && (
+              <p className="pico-notice" role="status">
+                승인된 가이드로 답변을 준비하고 있어요.
+              </p>
+            )}
             <form onSubmit={send} className="pico-composer">
               <textarea
                 ref={textarea}
@@ -536,14 +637,16 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                   }
                 }}
               />
-              <button aria-label="질문 보내기" type="submit" disabled={!input.trim()}>
+              <button aria-label="질문 보내기" type="submit" disabled={!input.trim() || aiBusy}>
                 <Symbol name="arrow_upward" />
               </button>
             </form>
             <small>
-              {observed
-                ? '시연 질문은 합성 자료 · 저장된 지급 계산은 별도 조회 · 실제 AI 미연결'
-                : '합성 데이터 시연 · 실제 AI/계약/지급과 연결되지 않습니다.'}
+              {aiEnabled
+                ? '승인된 지급 가이드 설명 · 실제 처리/금액 판단은 기존 화면에서 확인'
+                : observed
+                  ? '시연 질문은 합성 자료 · 저장된 지급 계산은 별도 조회 · 실제 AI 미연결'
+                  : '합성 데이터 시연 · 실제 AI/계약/지급과 연결되지 않습니다.'}
             </small>
           </div>
         </aside>

@@ -1,0 +1,281 @@
+[
+  {
+    "workflowId": "payment.amount.review",
+    "guideVersion": "1.0",
+    "title": "지급 금액 확인",
+    "description": "예상액과 원천 근거를 확인합니다. 저장·확정을 자동으로 이어서 실행하지 않습니다.",
+    "utterances": [
+      "이번 달 수수료 얼마야?",
+      "예상 지급액 확인"
+    ],
+    "requiredSlots": [
+      "contractId",
+      "settlementMonth",
+      "paymentStage"
+    ],
+    "capability": "READ",
+    "availableCalculationKinds": [
+      "EXPECTED_COMMISSION",
+      "CAP_STATUS"
+    ],
+    "steps": [
+      {
+        "stepId": "payment.scope",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.scope",
+        "title": "지급 대상을 확인하세요",
+        "instruction": "정산월·지급단계·계약·수취인이 처리할 대상과 같은지 확인하세요.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "SCOPE_ACKNOWLEDGED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "SCOPE_ACKNOWLEDGED",
+            "stepId": "payment.amount"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.amount",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.amount",
+        "title": "지급액과 계산 근거를 비교하세요",
+        "instruction": "예상액과 실제 명세를 구분해 확인하세요. 추천만으로 지급액을 변경하지 않습니다.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "AMOUNT_REVIEW_ACKNOWLEDGED",
+        "missingTargetBehavior": "PAUSE",
+        "next": []
+      }
+    ],
+    "enabled": true,
+    "keywords": [
+      "금액",
+      "예상",
+      "한도",
+      "차액",
+      "조회",
+      "수수료"
+    ],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ]
+  },
+  {
+    "workflowId": "payment.draft",
+    "guideVersion": "1.0",
+    "title": "지급 초안 저장",
+    "description": "입력과 귀속·근거를 확인한 뒤 직접 저장합니다. 초안 저장은 작성 중인 DRAFT 상태이며 사전검증·지급 확정과 구분합니다.",
+    "utterances": [
+      "확정하지 말고 초안만 저장",
+      "지급 초안 수정"
+    ],
+    "requiredSlots": [],
+    "capability": "PROCESS",
+    "availableCalculationKinds": [
+      "EXPECTED_COMMISSION",
+      "ATTRIBUTION_BALANCE"
+    ],
+    "steps": [
+      {
+        "stepId": "payment.scope",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.scope",
+        "title": "지급 대상을 확인하세요",
+        "instruction": "정산월·지급단계·계약·수취인이 처리할 대상과 같은지 확인하세요.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "SCOPE_ACKNOWLEDGED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "SCOPE_ACKNOWLEDGED",
+            "stepId": "payment.amount"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.amount",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.amount",
+        "title": "지급액과 계산 근거를 비교하세요",
+        "instruction": "예상액과 실제 명세를 구분해 확인하세요. 추천만으로 지급액을 변경하지 않습니다.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "AMOUNT_REVIEW_ACKNOWLEDGED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "AMOUNT_REVIEW_ACKNOWLEDGED",
+            "stepId": "payment.attributions"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.attributions",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.attributions",
+        "title": "계약별 귀속을 확인하세요",
+        "instruction": "귀속 합계와 배부 근거를 확인하세요.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "ATTRIBUTIONS_REVIEWED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "ATTRIBUTIONS_REVIEWED",
+            "stepId": "payment.evidence"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.evidence",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.evidence",
+        "title": "원천 근거를 입력하세요",
+        "instruction": "필수 근거와 입력값을 확인하세요.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "EVIDENCE_FIELDS_VALID",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "EVIDENCE_FIELDS_VALID",
+            "stepId": "payment.save"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.save",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.save",
+        "title": "초안을 저장하세요",
+        "instruction": "기존 저장 버튼을 직접 누르세요. API가 성공해야 저장 완료입니다.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "CURRENT_DRAFT_SAVED",
+        "missingTargetBehavior": "PAUSE",
+        "next": []
+      }
+    ],
+    "enabled": true,
+    "keywords": [
+      "초안",
+      "저장",
+      "귀속",
+      "증빙",
+      "작성",
+      "입력"
+    ],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "SETTLEMENT"
+    ]
+  },
+  {
+    "workflowId": "payment.confirm",
+    "guideVersion": "1.0",
+    "title": "지급 사전검증·확정",
+    "description": "저장 상태에 맞춰 사전검증과 직접 확정을 안내합니다.",
+    "utterances": [
+      "지급액 입력했는데 다음은?",
+      "지급 확정 방법"
+    ],
+    "requiredSlots": [
+      "paymentId"
+    ],
+    "capability": "PROCESS",
+    "availableCalculationKinds": [
+      "PAYMENT_CANDIDATE"
+    ],
+    "steps": [
+      {
+        "stepId": "payment.scope",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.scope",
+        "title": "지급 대상을 확인하세요",
+        "instruction": "정산월·지급단계·계약·수취인이 처리할 대상과 같은지 확인하세요.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "SCOPE_ACKNOWLEDGED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "CURRENT_DRAFT_ALREADY_SAVED",
+            "stepId": "payment.precheck"
+          },
+          {
+            "conditionId": "DRAFT_SAVE_REQUIRED",
+            "stepId": "payment.save"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.save",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.save",
+        "title": "초안을 저장하세요",
+        "instruction": "기존 저장 버튼을 직접 누르세요. API가 성공해야 저장 완료입니다.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "CURRENT_DRAFT_SAVED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "CURRENT_DRAFT_SAVED",
+            "stepId": "payment.precheck"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.precheck",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.precheck",
+        "title": "사전검증을 실행하세요",
+        "instruction": "기존 사전검증 버튼을 직접 누르세요. 200 응답만으로 통과한 것은 아닙니다.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "CURRENT_PRECHECK_PASSED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "CURRENT_PRECHECK_PASSED",
+            "stepId": "payment.precheck.result"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.precheck.result",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.precheck.result",
+        "title": "검증 결과를 확인하세요",
+        "instruction": "confirmable과 차단 사유를 확인하세요.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "PRECHECK_RESULT_ACKNOWLEDGED",
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "PRECHECK_RESULT_ACKNOWLEDGED",
+            "stepId": "payment.confirm"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.confirm",
+        "screenId": "TRAN-W02",
+        "targetId": "payment.confirm",
+        "title": "지급을 확정하세요",
+        "instruction": "확인 모달에서 직접 확정하세요. 서버의 CONFIRMED 응답이 필요합니다.",
+        "entryRuleId": "CONTEXT_AVAILABLE",
+        "completionRuleId": "PAYMENT_CONFIRMED",
+        "missingTargetBehavior": "PAUSE",
+        "next": []
+      }
+    ],
+    "enabled": true,
+    "keywords": [
+      "확정",
+      "검증",
+      "다음",
+      "결과"
+    ],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "SETTLEMENT"
+    ]
+  }
+]

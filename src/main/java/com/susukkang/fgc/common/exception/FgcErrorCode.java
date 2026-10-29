@@ -244,6 +244,9 @@ public enum FgcErrorCode {
             "error.ai.unavailable"
     ),
 
+    IMPL_GUIDE_VERSION_MISMATCH("FGC-IMPL-GUIDE_VERSION_MISMATCH", HttpStatus.CONFLICT,
+            "error.ai.guideVersionMismatch"),
+
     POL_001("FGC-POL-001", HttpStatus.CONFLICT, "error.policy.selfApproval"),
     POL_002("FGC-POL-002", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.overlap"),
     POL_003("FGC-POL-003", HttpStatus.CONFLICT, "error.policy.stateChanged"),
