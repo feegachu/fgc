@@ -33,6 +33,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 요구사항 : FGC-FUN-044 검증 결과 확정·잠금 (#491 PR 리뷰 반영)
@@ -75,11 +78,45 @@ class ValidationRunFinalizeMonthLockConcurrencyIntegrationTest {
 
     @AfterEach
     void cleanUp() throws InterruptedException {
-        executor.shutdownNow();
-        assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
-        for (Long runId : ownedRunIds) {
-            jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", runId);
+        cleanUp(executor);
+    }
+
+    private void cleanUp(ExecutorService workers) throws InterruptedException {
+        workers.shutdownNow();
+        boolean terminated;
+        try {
+            terminated = workers.awaitTermination(10, TimeUnit.SECONDS);
+        } finally {
+            // 종료 대기가 실패해도 이 테스트가 기록한 행의 삭제는 반드시 시도한다.
+            for (Long runId : ownedRunIds) {
+                jdbcTemplate.update("DELETE FROM fgc.validation_run WHERE validation_run_id = ?", runId);
+            }
         }
+        assertThat(terminated).isTrue();
+    }
+
+    @Test
+    void cleanupDeletesOwnedRunsBeforeReportingTerminationTimeout() throws Exception {
+        Long runId = insertRun(CREATE_MONTH, "MONTHLY");
+        ExecutorService workers = mock(ExecutorService.class);
+        when(workers.awaitTermination(10, TimeUnit.SECONDS)).thenReturn(false);
+
+        assertThatThrownBy(() -> cleanUp(workers)).isInstanceOf(AssertionError.class);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                Integer.class, runId)).isZero();
+    }
+
+    @Test
+    void cleanupDeletesOwnedRunsWhenTerminationWaitIsInterrupted() throws Exception {
+        Long runId = insertRun(CREATE_MONTH, "MONTHLY");
+        ExecutorService workers = mock(ExecutorService.class);
+        when(workers.awaitTermination(10, TimeUnit.SECONDS)).thenThrow(new InterruptedException("종료 대기 중단"));
+
+        assertThatThrownBy(() -> cleanUp(workers)).isInstanceOf(InterruptedException.class);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM fgc.validation_run WHERE validation_run_id = ?",
+                Integer.class, runId)).isZero();
     }
 
     @Test
