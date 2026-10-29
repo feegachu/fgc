@@ -20,6 +20,7 @@ import java.util.Objects;
 @Component
 @RequiredArgsConstructor
 public class PolicyOfferingScopeValidator {
+    private static final String PRODUCT_OFFERING_ID = ".productOfferingId";
     private final ProductOfferingRepository offeringRepository;
     private final ProductRepository productRepository;
 
@@ -33,16 +34,13 @@ public class PolicyOfferingScopeValidator {
             String field = "commissionRules[" + i + "]";
             ProductOffering offering = offerings.computeIfAbsent(rule.productOfferingId(), id ->
                     offeringRepository.findById(id).orElseThrow(() ->
-                            invalid(field + ".productOfferingId", "존재하지 않는 상품 판매버전입니다.")));
-            if (rule.insurerId() != null && !Objects.equals(rule.insurerId(),
-                    productRepository.findById(offering.getProductId()).orElseThrow().getInsurerId())) {
-                throw invalid(field + ".insurerId", "선택한 보험회사에 속한 상품 판매버전이어야 합니다.");
-            }
+                            invalid(field + PRODUCT_OFFERING_ID, "존재하지 않는 상품 판매버전입니다.")));
+            validateInsurer(rule, offering, field);
             if (!Objects.equals(draft.feeRegimeCode(), offering.getFeeRegimeCode())
                     || !matchesVersion(draft.basicDocumentVersion(), offering.getBasicDocumentVersion())
                     || !overlaps(draft.effectiveFrom(), draft.effectiveTo(),
                                  offering.getSalesStartDate(), offering.getSalesEndDate())) {
-                throw invalid(field + ".productOfferingId",
+                throw invalid(field + PRODUCT_OFFERING_ID,
                         "상품 판매버전의 수수료체계·기초서류·판매기간과 정책 적용 조건이 일치해야 합니다.");
             }
             List<PolicyDraft.FeeRegimeRuleDraft> matches = draft.feeRegimeRules().stream()
@@ -55,10 +53,17 @@ public class PolicyOfferingScopeValidator {
                 matches = matches.stream().filter(regime -> regime.basicDocumentVersion() != null).toList();
             }
             if (matches.size() != 1) {
-                throw invalid(field + ".productOfferingId",
+                throw invalid(field + PRODUCT_OFFERING_ID,
                         "이 판매버전의 판매개시일·기초서류에 적용되는 분급 룰셋이 정확히 하나여야 합니다.");
             }
             PolicyDraftValidator.validateCommissionRegimeBound(rule, matches.getFirst(), field);
+        }
+    }
+
+    private void validateInsurer(PolicyDraft.CommissionRuleDraft rule, ProductOffering offering, String field) {
+        if (rule.insurerId() != null && !Objects.equals(rule.insurerId(),
+                productRepository.findById(offering.getProductId()).orElseThrow().getInsurerId())) {
+            throw invalid(field + ".insurerId", "선택한 보험회사에 속한 상품 판매버전이어야 합니다.");
         }
     }
 

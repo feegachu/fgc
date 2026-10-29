@@ -63,8 +63,9 @@ public class ProductFeeRegimeResolver {
                 ? "FOUR_YEAR_COMMISSION" : "SEVEN_YEAR_COMMISSION";
         List<RulesetCandidate> candidates = resolverRepository.findRulesetCandidates(
                 policyType, input.declaredFeeRegimeCode(), input.contractDate(), input.salesStartDate(),
-                input.basicDocumentVersion(), input.basicDocumentDate(), contractId,
-                paymentStage == null ? null : paymentStage.name());
+                input.basicDocumentVersion(), input.basicDocumentDate(),
+                new FeeRegimeResolverRepository.CommissionScope(contractId,
+                        paymentStage == null ? null : paymentStage.name()));
 
         // 기초서류 버전이 지정된 룰셋이 있으면 모든 버전용(NULL) 룰셋보다 우선한다(#534 선택 키 규칙).
         // 이 우선 규칙은 같은 정책버전 안의 겹침에만 적용한다. 정책버전이 다르면 후보를 가리지 않으므로

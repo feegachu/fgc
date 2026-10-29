@@ -49,11 +49,16 @@ public interface FeeRegimeResolverRepository extends Repository<PolicyVersion, L
                AND (r.sales_start_date_to IS NULL OR r.sales_start_date_to >= :salesStartDate)
                AND (r.basic_document_date_from IS NULL OR r.basic_document_date_from <= :basicDocumentDate)
                AND (r.basic_document_date_to IS NULL OR r.basic_document_date_to >= :basicDocumentDate)
-               AND (CAST(:paymentStage AS text) IS NULL OR EXISTS (
+               AND ((CAST(:#{#scope.paymentStage} AS text) IS NULL AND (
+                   NOT EXISTS (SELECT 1 FROM fgc.commission_rule cr
+                               WHERE cr.policy_version_id = r.policy_version_id)
+                   OR EXISTS (SELECT 1 FROM fgc.fee_regime_ruleset_limit l
+                              WHERE l.fee_regime_ruleset_id = r.fee_regime_ruleset_id)))
+                   OR EXISTS (
                    SELECT 1 FROM fgc.commission_rule cr
-                   JOIN fgc.insurance_contract c ON c.contract_id = :contractId
+                   JOIN fgc.insurance_contract c ON c.contract_id = :#{#scope.contractId}
                    WHERE cr.policy_version_id = r.policy_version_id
-                     AND cr.payment_stage = :paymentStage
+                     AND cr.payment_stage = :#{#scope.paymentStage}
                      AND (cr.insurer_id IS NULL OR cr.insurer_id = c.insurer_id)
                      AND (cr.product_offering_id IS NULL OR cr.product_offering_id = c.product_offering_id)
                      AND (cr.organization_id IS NULL OR cr.organization_id = c.organization_id)))
@@ -66,16 +71,18 @@ public interface FeeRegimeResolverRepository extends Repository<PolicyVersion, L
             @Param("salesStartDate") LocalDate salesStartDate,
             @Param("basicDocumentVersion") String basicDocumentVersion,
             @Param("basicDocumentDate") LocalDate basicDocumentDate,
-            @Param("contractId") Long contractId,
-            @Param("paymentStage") String paymentStage
+            @Param("scope") CommissionScope scope
     );
 
     /** 기존 규제 룰셋 조회 계약. 예정 생성의 지급단계/규칙 필터는 별도 인자로 지정한다. */
     default List<RulesetCandidate> findRulesetCandidates(String policyType, String feeRegimeCode,
             LocalDate contractDate, LocalDate salesStartDate, String basicDocumentVersion, LocalDate basicDocumentDate) {
         return findRulesetCandidates(policyType, feeRegimeCode, contractDate, salesStartDate,
-                basicDocumentVersion, basicDocumentDate, null, null);
+                basicDocumentVersion, basicDocumentDate, new CommissionScope(null, null));
     }
+
+    /** 지급단계가 없으면 규제 한도 후보, 있으면 계약의 실제 지급 규칙 후보를 조회한다. */
+    record CommissionScope(Long contractId, String paymentStage) {}
 
     // #537: 선택된 룰셋 헤더. 승인된 정책 아래의 룰셋은 잠금 트리거로 바뀌지 않으므로 같은 ID로 다시 읽어도 같다.
     @Query(value = """

@@ -9,6 +9,7 @@ import com.susukkang.fgc.common.code.FeeComponentType;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.policy.code.FeeRegimeReasonCode;
 import com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService;
+import com.susukkang.fgc.policy.service.FeeRegimeRulesetService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,7 @@ class PolicyWorkflowIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @MockitoBean(name = "policyClock") private Clock policyClock;
     @Autowired private FeeRegimeSchedulePolicyService schedulePolicies;
+    @Autowired private FeeRegimeRulesetService limitPolicies;
 
     private FgcUserDetails writer;
     private FgcUserDetails systemWriter;
@@ -720,6 +722,62 @@ class PolicyWorkflowIntegrationTest {
             assertThat(schedulePolicies.resolve(contract, PaymentStage.INSURER_TO_GA).isSelected()).isFalse();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id = ?",
                     Integer.class, contract)).isZero(); // 조회는 생성·확정 부수효과가 없다.
+        }
+    }
+
+    @Test
+    void limitLookupSurvivesCoexistingOfferingSpecificPayoutPolicies() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long regulatoryId = jdbc.queryForObject("""
+                SELECT policy_version_id FROM fgc.policy_version
+                WHERE policy_code = 'REG-SEVEN-YEAR-2029-V1' AND status = 'ACTIVE'
+                """, Long.class);
+        long[] contracts = new long[2];
+        long[] policyIds = new long[2];
+        for (int i = 0; i < contracts.length; i++) {
+            long offering = insertOffering(true, "2029-01-01", document);
+            contracts[i] = insertContract(offering, "2029-03-02");
+            JsonNode created = create(installmentDraft(true, offering, "2029-01-01", document), writer);
+            policyIds[i] = created.path("policyVersionId").asLong();
+            JsonNode approved = action(policyIds[i], "APPROVE",
+                    action(policyIds[i], "SUBMIT", created, writer, 200), approver, 200);
+            action(policyIds[i], "ACTIVATE", approved, approver, 200);
+            // 규제 상한 + 지급 정책 하나, 이후 지급 정책 둘이 함께 활성화되어도 모두 조회된다.
+            for (int j = 0; j <= i; j++) {
+                var limit = limitPolicies.resolve(contracts[j]);
+                assertThat(limit.isSelected()).isTrue();
+                assertThat(limit.ruleset().policyVersionId()).isEqualTo(regulatoryId);
+                assertThat(limit.limit("MAINTENANCE_MONTHLY").orElseThrow().limitPct())
+                        .isEqualByComparingTo("0.8");
+                var payout = schedulePolicies.resolve(contracts[j], PaymentStage.GA_TO_FC);
+                assertThat(payout.isSelected()).isTrue();
+                assertThat(payout.commissionPolicy().getPolicyVersionId()).isEqualTo(policyIds[j]);
+            }
+        }
+    }
+
+    @Test
+    void rejectsOverlappingLimitRulesetsEvenWhenTheirPayoutOfferingsDiffer() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        for (int i = 0; i < 2; i++) {
+            long offering = insertOffering(false, "2027-01-01", document);
+            JsonNode created = create(installmentDraft(false, offering, "2027-01-01", document), writer);
+            long id = created.path("policyVersionId").asLong();
+            jdbc.update("""
+                    INSERT INTO fgc.fee_regime_ruleset_limit(fee_regime_ruleset_id, limit_code, limit_pct)
+                    SELECT fee_regime_ruleset_id, 'UPFRONT_TOTAL', 100
+                    FROM fgc.fee_regime_ruleset WHERE policy_version_id = ?
+                    """, id);
+            JsonNode review = action(id, "SUBMIT", created, writer, 200);
+            if (i == 0) {
+                action(id, "ACTIVATE", action(id, "APPROVE", review, approver, 200), approver, 200);
+                long contract = insertContract(offering, "2027-03-02");
+                assertThat(limitPolicies.resolve(contract).resolution().reasonCode())
+                        .isEqualTo(FeeRegimeReasonCode.RULESET_LIMIT_MISSING);
+            } else {
+                actionError(id, "APPROVE", review, approver, 422);
+                assertThat(statusOf(id)).isEqualTo("REVIEW");
+            }
         }
     }
 

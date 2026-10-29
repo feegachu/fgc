@@ -592,8 +592,10 @@ public class PolicyWriteRepository {
                           AND daterange(a.basic_document_date_from, a.basic_document_date_to, '[]')
                               && daterange(c.basic_document_date_from, c.basic_document_date_to, '[]')
                           AND (%s OR (
-                            NOT EXISTS (SELECT 1 FROM fgc.commission_rule WHERE policy_version_id = active.policy_version_id)
-                            AND NOT EXISTS (SELECT 1 FROM fgc.commission_rule WHERE policy_version_id = candidate.policy_version_id))))
+                            (NOT EXISTS (SELECT 1 FROM fgc.commission_rule WHERE policy_version_id = active.policy_version_id)
+                             OR EXISTS (SELECT 1 FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = a.fee_regime_ruleset_id))
+                            AND (NOT EXISTS (SELECT 1 FROM fgc.commission_rule WHERE policy_version_id = candidate.policy_version_id)
+                             OR EXISTS (SELECT 1 FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = c.fee_regime_ruleset_id)))))
                     )
                 )
                 """.formatted(COMMISSION_SCOPE_OVERLAP, COMMISSION_SCOPE_OVERLAP),
