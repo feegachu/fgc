@@ -157,7 +157,6 @@ function AgentHomeContent({ month }: { month: string }) {
       )}
       <ChatbotLauncher
         open={chatOpen}
-        need={rows ? { near: rows.filter((r) => r.month === month && r.near).length, review: rows.filter((r) => r.month === month && r.review).length } : null}
         onOpen={() => setChatOpen(true)}
         onClose={closeChat}
       />
@@ -427,7 +426,7 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
 }
 
 /** 상품 추천 AI(FUN-079). 런처를 누르면 채팅형 모달이 열리고, 닫으면 포커스가 런처로 돌아온다. */
-function ChatbotLauncher({ open, need, onOpen, onClose }: { open: boolean; need: { near: number; review: number } | null; onOpen: () => void; onClose: () => void }) {
+function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
   const launcher = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!open) return
@@ -455,7 +454,7 @@ function ChatbotLauncher({ open, need, onOpen, onClose }: { open: boolean; need:
         />
         <span className="ah-launcher-label">상품 추천 AI</span>
       </button>
-      {open && <ChatbotModal need={need} onClose={onClose} />}
+      {open && <ChatbotModal onClose={onClose} />}
     </>
   )
 }

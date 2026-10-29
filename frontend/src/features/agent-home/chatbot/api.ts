@@ -81,6 +81,22 @@ export const compareCategoriesQuery = () =>
     meta: { errorToast: false },
   })
 
+/** 보험 업계 최신 뉴스 헤드라인(제목·원문 링크만). 못 가져오면 서버가 빈 목록을 준다. */
+export interface NewsHeadline {
+  title: string
+  link: string
+  publishedAt: string
+}
+
+export const newsHeadlinesQuery = () =>
+  queryOptions({
+    queryKey: ['news', 'headlines'],
+    queryFn: async ({ signal }) => (await apiClient.request<NewsHeadline[]>('/api/v1/news/headlines', { signal })).data ?? [],
+    staleTime: 5 * 60_000,
+    retry: false,
+    meta: { errorToast: false },
+  })
+
 export async function rankCompare(request: { categoryCode: string; filters?: CompareFilters }) {
   const { data } = await apiClient.request<CompareRanking>(`${BASE}/rank`, { method: 'POST', body: request })
   if (!data) throw new Error('응답 데이터를 확인할 수 없습니다.')

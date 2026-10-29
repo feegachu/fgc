@@ -16,15 +16,15 @@ export const CATEGORY_LABEL: Record<string, string> = {
   SAVINGS: '연금·저축',
 }
 export const CATEGORIES = ['건강보장', '정기보장', '장기손해', '연금·저축'] as const
-export const CATEGORY_COLORS = ['#7f57ac', '#8467a5', '#64978A', '#C19562']
-export const INSURER_COLORS = ['#4f86b8', '#4e9a8c', '#d19a45', '#c9677f', '#7a9e4f', '#d4784f', '#5aa0b5', '#a8a04a']
+export const CATEGORY_COLORS = ['#9a82b5', '#a493b8', '#86a89c', '#c9ae8f']
+export const INSURER_COLORS = ['#7f9fba', '#84ada3', '#caae7e', '#c492a0', '#a0b388', '#c99d88', '#8bb0bc', '#bbb589']
 
 /** 목업의 상태 4종 순서와 색. 청약·부활 등은 가까운 상태로 묶는다. */
 export const STATUS_DEFS = [
-  { key: 'ACTIVE', label: '정상', color: '#15803d' },
-  { key: 'UNPAID', label: '미납', color: '#b45309' },
-  { key: 'LAPSED', label: '실효', color: '#b91c1c' },
-  { key: 'END', label: '해지·종료', color: '#94a3b8' },
+  { key: 'ACTIVE', label: '정상', color: '#78a98a' },
+  { key: 'UNPAID', label: '미납', color: '#d1ad74' },
+  { key: 'LAPSED', label: '실효', color: '#c98a8a' },
+  { key: 'END', label: '해지·종료', color: '#b8c0cc' },
 ] as const
 const STATUS_GROUP: Record<string, (typeof STATUS_DEFS)[number]['key']> = {
   APPLIED: 'ACTIVE',

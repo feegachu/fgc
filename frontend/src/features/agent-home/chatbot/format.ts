@@ -37,7 +37,7 @@ export function followUpAnswer(kind: FollowUpKind, items: CompareItem[]) {
     // 순수령액이 2위와 같으면 "가장 높다"가 아니라 서버가 실제로 순위를 가른 기준을 heroWhy 가 설명한다.
     const tied = items.length > 1 && items[1].conservativeNet === top.conservativeNet
     const lead = `1위는 ${top.insurer} ${top.product}예요. 한도를 반영한 수령 예상액 ${won(top.cappedReceipt)}에서 환수 노출액 ${won(top.clawbackExposure)}을 뺀 보수적 순수령액은 ${won(top.conservativeNet)}${tied ? '이에요.' : '으로 가장 높아요.'}`
-    return [lead, heroWhy(items), '최종 선택은 설계사님이 하세요.'].filter(Boolean).join(' ')
+    return [lead, heroWhy(items)].filter(Boolean).join(' ')
   }
   const cap = `1위 상품의 한도 영향은 ${capBadge(top.capImpactPct).text}예요.`
   const carry = top.carryover > 0 ? ` 한도를 넘는 ${won(top.carryover)}은 이월 예정액으로 따로 계산해요.` : ''

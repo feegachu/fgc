@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { rate } from '../../../lib/format'
-import { askCompare, compareCategoriesQuery, compareExplainQuery, rankCompare } from './api'
+import { askCompare, compareCategoriesQuery, compareExplainQuery, newsHeadlinesQuery, rankCompare } from './api'
 import type { CompareCategory, CompareEvidence, CompareExcluded, CompareItem, CompareRanking } from './api'
 import { FilterPanel } from './FilterPanel'
 import { EMPTY_FILTERS, toFilters } from './filters'
@@ -72,13 +72,7 @@ function User({ text }: { text: string }) {
 const FOCUSABLE = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
 
 /** 상품 비교·참고 순위 챗봇 모달(FUN-079). 입력은 카테고리 버튼뿐이고 순위·금액·근거는 서버 값을 그대로 보여 준다. */
-export function ChatbotModal({
-  onClose,
-  need,
-}: {
-  onClose: () => void
-  need: { near: number; review: number } | null
-}) {
+export function ChatbotModal({ onClose }: { onClose: () => void }) {
   const categories = useQuery(compareCategoriesQuery())
   const rank = useMutation({ mutationFn: rankCompare })
   const [category, setCategory] = useState<CompareCategory | null>(null)
@@ -90,7 +84,7 @@ export function ChatbotModal({
   const [draft, setDraft] = useState<{ kind: FollowUpKind | 'restart'; text: string } | null>(null)
   // 하단 입력창: 연관 질문 버튼을 누르면 문구가 들어가고, 직접 써서 보내면 서버가 자연어 질문에 답한다.
   const [input, setInput] = useState('')
-  const [asked, setAsked] = useState<{ id: number; kind: FollowUpKind | 'free'; question: string; answer: string | null; ai?: boolean }[]>([])
+  const [asked, setAsked] = useState<{ id: number; kind: FollowUpKind | 'free'; question: string; answer: string | null }[]>([])
   const nextId = useRef(0)
   const dialog = useRef<HTMLDivElement>(null)
   const thread = useRef<HTMLDivElement>(null)
@@ -140,11 +134,11 @@ export function ChatbotModal({
   const canSend = !pending && (draft !== null || input.trim().length > 0)
   const ask = (question: string) => {
     const id = nextId.current++
-    const settle = (answer: string, ai: boolean) => setAsked((list) => list.map((qa) => (qa.id === id ? { ...qa, answer, ai } : qa)))
+    const settle = (answer: string) => setAsked((list) => list.map((qa) => (qa.id === id ? { ...qa, answer } : qa)))
     setAsked((list) => [...list, { id, kind: 'free', question, answer: null }])
     askCompare({ rankResultId: ranking?.rankResultId ?? null, question })
-      .then((res) => settle(res.answer, res.source === 'LLM'))
-      .catch(() => settle('답변을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', false))
+      .then((res) => settle(res.answer))
+      .catch(() => settle('답변을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'))
   }
   const send = () => {
     if (!canSend) return
@@ -256,7 +250,6 @@ export function ChatbotModal({
                 onPick={pick}
                 faq={faq}
                 onFaq={setFaq}
-                need={need}
                 filters={filters}
                 onFilters={setFilters}
               />
@@ -347,9 +340,7 @@ export function ChatbotModal({
                       {qa.answer === null ? (
                         <span className="cb-muted">답변을 쓰고 있어요…</span>
                       ) : (
-                        <>
-                          {qa.ai && <span className="cb-pill">AI 답변</span>} <span>{qa.answer}</span>
-                        </>
+                        <span>{qa.answer}</span>
                       )}
                     </div>
                   </Bot>
@@ -439,7 +430,6 @@ function StepOne({
   onPick,
   faq,
   onFaq,
-  need,
   filters,
   onFilters,
 }: {
@@ -450,7 +440,6 @@ function StepOne({
   onPick: (category: CompareCategory) => void
   faq: string | null
   onFaq: (key: string | null) => void
-  need: { near: number; review: number } | null
   filters: FilterDraft
   onFilters: (next: FilterDraft) => void
 }) {
@@ -527,28 +516,40 @@ function StepOne({
           )}
         </div>
       )}
-      <div className="cb-info">
-        {need && (
-          <section className="cb-info-card cb-limit">
-            <h4>내 한도 현황</h4>
-            <div className="cb-limit-stats">
-              <div className="near">
-                <span>1,200% 한도 근접 계약</span>
-                <b>{need.near}건</b>
-              </div>
-              <div className="review">
-                <span>검토 필요 계약</span>
-                <b>{need.review}건</b>
-              </div>
-            </div>
-            <ul className="cb-limit-notes">
-              <li>적용되는 한도는 정책 기준으로 계산하며, 결과 근거에서 확인할 수 있어요.</li>
-              <li>한도가 거의 찬 상품은 결과에서 경고로 알려 드려요.</li>
-            </ul>
-          </section>
-        )}
-      </div>
+      <NewsSection />
     </>
+  )
+}
+
+/** 보험 업계 최신 뉴스 제목. 누르면 원문 기사를 새 탭으로 연다. 뉴스가 없거나 실패해도 챗봇 사용에는 영향이 없다. */
+function NewsSection() {
+  const news = useQuery(newsHeadlinesQuery())
+  const list = Array.isArray(news.data) ? news.data : []
+  return (
+    <div className="cb-info">
+      <section className="cb-info-card cb-news" aria-labelledby="cb-news-title">
+        <h4 id="cb-news-title">보험 업계 최신 뉴스</h4>
+        {news.isLoading ? (
+          <p className="cb-muted" aria-busy="true">
+            뉴스를 불러오는 중이에요.
+          </p>
+        ) : list.length === 0 ? (
+          <p className="cb-muted">지금은 불러올 수 있는 뉴스가 없어요.</p>
+        ) : (
+          <ul className="cb-news-list">
+            {list.map((n) => (
+              <li key={n.link}>
+                <a href={n.link} target="_blank" rel="noopener noreferrer">
+                  {n.title}
+                </a>
+                {n.publishedAt && <time>{n.publishedAt.slice(0, 10)}</time>}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="cb-news-source">출처: 보험저널. 제목을 누르면 원문 기사로 이동해요.</p>
+      </section>
+    </div>
   )
 }
 
@@ -640,10 +641,7 @@ function Result({
           ) : explain.pending ? (
             <span className="cb-muted">요약을 쓰고 있어요…</span>
           ) : (
-            <>
-              <span className="cb-pill">{explain.source === 'LLM' ? 'AI 요약' : '요약'}</span>{' '}
-              <span>{explain.text}</span>
-            </>
+            <span>{explain.text}</span>
           )}
         </div>
       </Bot>
@@ -693,8 +691,12 @@ function Result({
               <th scope="col" className="r">
                 환수 노출
               </th>
-              <th scope="col">한도 영향</th>
-              <th scope="col">협회 등급</th>
+              <th scope="col" className="c">
+                한도 영향
+              </th>
+              <th scope="col" className="c">
+                협회 등급
+              </th>
               <th scope="col">
                 <span className="visually-hidden">근거</span>
               </th>
@@ -715,10 +717,10 @@ function Result({
                   </td>
                   <td className="r">{won(item.cappedReceipt)}</td>
                   <td className="r neg">−{won(item.clawbackExposure)}</td>
-                  <td>
+                  <td className="c">
                     <span className={`cb-badge ${badge.tone}`}>{badge.text}</span>
                   </td>
-                  <td>
+                  <td className="c">
                     <span className={`cb-badge ${item.associationGrade ? 'grade' : 'none'}`}>
                       {gradeLabel(item.associationGrade)}
                     </span>

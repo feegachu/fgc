@@ -59,21 +59,14 @@
 .cb .cb-head p b { color: var(--cb-brand-dark); font-weight: 600; }
 .cb .cb-close { width: 34px; height: 34px; border: 1px solid var(--cb-line); border-radius: 9px; background: #fff; color: var(--cb-t500); font-size: 18px; line-height: 1; }
 .cb .cb-close:hover { background: #f1f5f9; color: var(--cb-t900); }
-.cb .cb-stepper { display: flex; align-items: center; padding: 10px 28px; border-bottom: 1px solid var(--cb-line); }
+.cb .cb-stepper { display: flex; align-items: center; justify-content: space-evenly; gap: 24px; padding: 10px 28px; border-bottom: 1px solid var(--cb-line); }
 .cb .cb-step { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
-.cb .cb-step:not(:last-child) { flex: 1 1 0; }
 .cb .cb-step-num {
   width: 28px; height: 28px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
   border: 2px solid var(--cb-line); border-radius: 50%; background: #fff; font-size: 13px; font-weight: 700; color: var(--cb-t400);
   transition: background 0.3s, border-color 0.3s, color 0.3s, box-shadow 0.3s;
 }
 .cb .cb-step-txt { font-size: 14.5px; font-weight: 500; color: var(--cb-t400); white-space: nowrap; transition: color 0.3s; }
-.cb .cb-step:not(:last-child)::after {
-  content: ''; flex: 1 1 auto; min-width: 24px; height: 3px; margin: 0 16px; border-radius: 4px;
-  background: linear-gradient(90deg, var(--cb-brand), var(--cb-brand)) no-repeat left center / 0% 100%, var(--cb-line);
-  transition: background-size 0.6s ease;
-}
-.cb .cb-step.done:not(:last-child)::after { background-size: 100% 100%, auto; }
 .cb .cb-step.active .cb-step-num { border-color: var(--cb-brand); background: var(--cb-brand); color: #fff; box-shadow: 0 0 0 5px rgb(127 87 172 / 18%); }
 .cb .cb-step.active .cb-step-txt { color: var(--cb-brand-dark); font-weight: 700; }
 .cb .cb-step.done .cb-step-num { border-color: var(--cb-brand); background: var(--cb-brand); }
@@ -85,8 +78,10 @@
 .cb .cb-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 28px 26px; background: #fff; }
 .cb .cb-bot { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 12px; animation: cb-in 0.22s ease-out; }
 .cb .cb-bot .cb-mascot { width: 101px; height: 101px; flex: 0 0 101px; transform-origin: 50% 90%; animation: cb-bob 2.8s ease-in-out infinite; }
-/* 2단계(상품 선별 중)에서는 캐릭터가 천천히 한 바퀴씩 돈다 */
-.cb .cb-bot .cb-mascot.cb-spin { transform-origin: 50% 50%; animation: cb-turn 5.5s linear infinite; }
+/* 2단계(상품 선별 중)에서는 캐릭터가 천천히 한 바퀴씩 돈다. 회전 중심은 배의 F 로고(이미지 가로 45%·세로 60% 지점)다 */
+.cb .cb-bot .cb-mascot.cb-spin { transform-origin: 45% 60%; animation: cb-turn 5.5s linear infinite; }
+/* 선별 중 말풍선은 길어서 캐릭터가 맨 아래로 처지므로, 이때만 말풍선 세로 가운데에 맞춘다 */
+.cb .cb-bot:has(.cb-spin) { align-items: center; }
 @keyframes cb-turn { to { transform: rotate(360deg); } }
 /* 3단계(답변)에서는 6초마다 막대를 탁탁 두드린다 */
 .cb .cb-bot .cb-mascot.cb-pointer { position: relative; display: block; animation: none; }
@@ -191,6 +186,8 @@
 .cb .cb-table td { padding: 13px 10px; border-bottom: 1px solid var(--cb-line-light); color: var(--cb-t700); white-space: nowrap; vertical-align: middle; font-variant-numeric: tabular-nums; }
 .cb .cb-table tr:last-child td { border-bottom: 0; }
 .cb .cb-table .r { text-align: right; }
+/* 한도 영향 열: 환수 노출(오른쪽 정렬)과 붙어 보이지 않게 좌우 간격을 두고 가운데 정렬한다 */
+.cb .cb-table .c { padding-left: 24px; padding-right: 24px; text-align: center; }
 .cb .cb-table .rank { font-size: 15px; font-weight: 800; color: var(--cb-t900); }
 .cb .cb-table .rank.top { color: var(--cb-brand-dark); }
 .cb .cb-table .name { max-width: 240px; overflow: hidden; font-weight: 600; color: var(--cb-t900); text-overflow: ellipsis; }
@@ -272,13 +269,16 @@
   .cb .cb-dots i { animation: none; }
 }
 
-/* 1단계 내 한도 현황 */
-.cb .cb-limit { width: fit-content; max-width: 100%; }
-.cb .cb-limit-stats { display: flex; flex-wrap: wrap; gap: 14px; }
-.cb .cb-limit-stats div { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border: 1px solid #ddd0ec; border-radius: 6px; background: var(--cb-brand-50); }
-.cb .cb-limit-stats b { padding: 3px 14px; border-radius: 6px; background: #fff; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; color: var(--cb-brand-dark); }
-.cb .cb-limit-stats span { font-size: 13px; font-weight: 600; color: var(--cb-t700); }
-.cb .cb-limit-notes { margin: 14px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.7; color: var(--cb-t700); }
+/* 1단계 보험 업계 최신 뉴스 */
+.cb .cb-news { width: 100%; max-width: 100%; }
+.cb .cb-news-list { margin: 0; padding: 0; list-style: none; }
+.cb .cb-news-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid #eef0f3; }
+.cb .cb-news-list li:last-child { border-bottom: 0; }
+.cb .cb-news h4 { font-size: 17px; }
+.cb .cb-news-list a { min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.5; color: var(--cb-t700); text-decoration: none; overflow-wrap: anywhere; }
+.cb .cb-news-list a:hover, .cb .cb-news-list a:focus-visible { color: var(--cb-brand-dark); text-decoration: underline; }
+.cb .cb-news-list time { flex: none; font-size: 12px; color: #8a94a3; }
+.cb .cb-news-source { margin: 10px 0 0; font-size: 12px; color: #8a94a3; }
 
 /* 흰 배경 위에서 말풍선·카드는 얇은 회색 테두리로 구분한다 */
 .cb .cb-card, .cb .cb-info-card, .cb .cb-faq-card, .cb .cb-skeleton, .cb .cb-table-wrap { border: 1px solid #dfe3e8; box-shadow: none; }

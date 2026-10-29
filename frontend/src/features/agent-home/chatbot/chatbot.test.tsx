@@ -51,12 +51,14 @@ const explain = (patch: Partial<CompareExplain> = {}): CompareExplain => ({ rank
 let onRank: (body?: unknown) => Promise<unknown>
 let onExplain: () => Promise<unknown>
 let onAsk: (body?: unknown) => Promise<unknown>
+let onNews: () => Promise<unknown>
 const clients: QueryClient[] = []
 
 beforeEach(() => {
   onRank = async () => envelope(ranking())
   onExplain = async () => envelope(explain())
   onAsk = async () => envelope({ answer: "답변", source: "RULE" })
+  onNews = async () => envelope([{ title: '금감원, 보험 판매 수수료 제도 개선안 발표', link: 'https://www.insjournal.co.kr/news/articleView.html?idxno=1', publishedAt: '2026-10-29 13:50:29' }])
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, init?: { body?: unknown }) => {
     if (path.endsWith('/categories')) {
       return envelope([
@@ -67,6 +69,7 @@ beforeEach(() => {
     if (path.endsWith('/rank')) return onRank(init?.body)
     if (path.endsWith('/explain')) return onExplain()
     if (path.endsWith('/ask')) return onAsk(init?.body)
+    if (path.endsWith('/news/headlines')) return onNews()
     throw new Error(`unexpected ${path}`)
   }) as typeof apiClient.request)
 })
@@ -80,7 +83,7 @@ function renderModal(onClose = vi.fn()) {
   clients.push(client)
   render(
     <QueryClientProvider client={client}>
-      <ChatbotModal onClose={onClose} need={{ near: 3, review: 5 }} />
+      <ChatbotModal onClose={onClose} />
     </QueryClientProvider>,
   )
   return onClose
@@ -91,6 +94,24 @@ const pickHealth = async () => {
 const result = async () => screen.findByRole('region', { name: '참고 순위 1위' }, { timeout: 9000 })
 
 describe('FUN-079 상품 추천 AI 챗봇', () => {
+  it('1단계에 최신 뉴스 제목이 나오고 누르면 원문 기사를 새 탭으로 연다', async () => {
+    renderModal()
+    const link = await screen.findByRole('link', { name: /보험 판매 수수료 제도 개선안/ })
+    expect(link).toHaveAttribute('href', 'https://www.insjournal.co.kr/news/articleView.html?idxno=1')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    expect(screen.queryByText('내 한도 현황')).not.toBeInTheDocument()
+  })
+
+  it('뉴스를 못 가져와도 카테고리 선택은 그대로 쓸 수 있다', async () => {
+    onNews = async () => {
+      throw new Error('down')
+    }
+    renderModal()
+    expect(await screen.findByText('지금은 불러올 수 있는 뉴스가 없어요.')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /건강보험/ })).toBeEnabled()
+  })
+
   it('정상: 선별 → 1위 카드·순위 표·요약이 나온다', async () => {
     renderModal()
     await pickHealth()
@@ -210,7 +231,8 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     await userEvent.click(screen.getByRole('button', { name: '보내기' }))
 
     expect(await screen.findByText(/한도를 넘어 다음으로 넘어가는 금액/)).toBeInTheDocument()
-    expect(screen.getByText('AI 답변')).toBeInTheDocument()
+    expect(screen.queryByText('AI 답변')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI 요약')).not.toBeInTheDocument()
     expect(sent).toEqual({ rankResultId: 'r-1', question: '이월이 뭐예요?' })
     expect(screen.getByLabelText('질문 입력')).toHaveValue('')
   })

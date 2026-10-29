@@ -110,7 +110,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
         </main>
-        <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
+        {location.pathname !== '/' && <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>}
       </div>
     </div>
   )
