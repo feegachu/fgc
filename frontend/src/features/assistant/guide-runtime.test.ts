@@ -228,3 +228,10 @@ it('does not bypass scope acknowledgement, invalid fields or an in-flight save',
   next()
   expect(runtime().session).toMatchObject({ index: 0, status: 'WAITING_RESULT' })
 })
+
+it('pauses a started guide if only the payment id changes', () => {
+  runtime().publish({ ...observation, saved: true })
+  runtime().start('payment.draft')
+  runtime().publish({ ...observation, saved: true, paymentId: '88' })
+  expect(runtime().session).toMatchObject({ status: 'PAUSED', restartRequired: true, acknowledgements: [] })
+})

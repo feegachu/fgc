@@ -137,7 +137,7 @@ public class SecurityConfig {
                         // 요청을 막는다. 세분화된 역할 구분(SETTLEMENT vs GA_ADMIN 등)은
                         // 여전히 컨트롤러 @PreAuthorize가 담당한다.
                         // Read-only assistant query; retain the JWT chain and AGENT guard above.
-                        .requestMatchers(HttpMethod.POST, "/api/v1/assistant/calculations", "/api/v1/ai/pico/ask").hasAnyRole("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/assistant/calculations", "/api/v1/ai/pico/ask", "/api/v1/ai/pico/guides/prepare", "/api/v1/ai/pico/guides/start").hasAnyRole("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE")
                         .requestMatchers(HttpMethod.POST, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
                         .requestMatchers(HttpMethod.PUT, "/**").hasAnyRole(Roles.NON_COMPLIANCE)
                         .requestMatchers(HttpMethod.DELETE, "/**").hasAnyRole(Roles.NON_COMPLIANCE)

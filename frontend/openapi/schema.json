@@ -7969,6 +7969,92 @@
             "type": "string"
           }
         }
+      },
+      "PicoGuideRequest": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 0
+          },
+          "guideVersion": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "paymentId": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "[1-9][0-9]{0,18}"
+          },
+          "clientContextRevision": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "prepareToken": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "clientContextRevision",
+          "guideVersion",
+          "paymentId",
+          "workflowId"
+        ]
+      },
+      "ApiResponsePicoGuideResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PicoGuideResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ApiError"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        }
+      },
+      "PicoGuideResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "workflowId": {
+            "type": "string"
+          },
+          "stepId": {
+            "type": "string"
+          },
+          "guideVersion": {
+            "type": "string"
+          },
+          "paymentId": {
+            "type": "string"
+          },
+          "clientContextRevision": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "prepareToken": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -11963,6 +12049,90 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponsePicoAskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/pico/guides/prepare": {
+      "post": {
+        "tags": [
+          "pico-guide-controller"
+        ],
+        "summary": "현재 저장 지급 가이드의 일회성 시작 준비",
+        "description": "첫 scope 강조 전용. 금융 승인/진도 저장/외부 모델 호출 없음.",
+        "operationId": "prepare",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PicoGuideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePicoGuideResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/pico/guides/start": {
+      "post": {
+        "tags": [
+          "pico-guide-controller"
+        ],
+        "summary": "사용자 선택 후 지급 저장본을 재검증해 가이드 시작",
+        "description": "동일 사용자·Bearer·역할·저장본·카탈로그·revision·5분 만료 및 일회성 검증.",
+        "operationId": "start",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PicoGuideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePicoGuideResponse"
                 }
               }
             }

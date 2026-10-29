@@ -18,7 +18,10 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class PicoPaymentContextService {
     private final CommissionPaymentService payments;
-    public record Snapshot(CommissionPaymentStatus status) {}
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
+    public record Snapshot(CommissionPaymentStatus status, String fingerprint) {
+        public Snapshot(CommissionPaymentStatus status) { this(status, null); }
+    }
 
     @PreAuthorize(Roles.ANY_ROLE)
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -29,7 +32,8 @@ public class PicoPaymentContextService {
             var payment = payments.get(paymentId);
             if (!Objects.equals(payment.paymentId(), paymentId) || payment.status() == null)
                 throw new IllegalStateException("Invalid payment context snapshot");
-            return new Snapshot(payment.status());
+            try { return new Snapshot(payment.status(), PicoFingerprint.of(mapper.writeValueAsBytes(payment))); }
+            catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("Payment cannot be fingerprinted", error); }
         } catch (FgcBusinessException error) {
             // Translate only the existing payment service's missing-row error; preserve other validation and authorization.
             if (error.getErrorCode() == FgcErrorCode.COMMON_002 && "paymentId".equals(error.getField()))

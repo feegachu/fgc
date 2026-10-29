@@ -30,6 +30,7 @@ export interface PaymentObservation {
 }
 export interface LocalGuide {
   workflowId: WorkflowId
+  paymentId: string | null
   index: number
   generation: number
   status: RuntimeStatus
@@ -116,6 +117,7 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
       if (!old || ['COMPLETED', 'CANCELLED'].includes(old.status)) return { observation: value }
       if (
         old.owner !== value.owner ||
+        old.paymentId !== value.paymentId ||
         old.scopeKey !== value.scopeKey ||
         (!value.canProcess && findGuide(old.workflowId, '1.0')?.capability === 'PROCESS')
       )
@@ -178,6 +180,7 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
     set({
       session: {
         workflowId,
+        paymentId: observation.paymentId,
         index: 0,
         generation: (get().session?.generation ?? 0) + 1,
         status: 'PREPARING',

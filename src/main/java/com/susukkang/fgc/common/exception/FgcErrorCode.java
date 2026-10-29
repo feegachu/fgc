@@ -244,6 +244,8 @@ public enum FgcErrorCode {
             "error.ai.unavailable"
     ),
 
+    IMPL_GUIDE_STATE_STALE("FGC-IMPL-GUIDE_STATE_STALE", HttpStatus.CONFLICT, "error.ai.guideStateStale"),
+
     IMPL_GUIDE_VERSION_MISMATCH("FGC-IMPL-GUIDE_VERSION_MISMATCH", HttpStatus.CONFLICT,
             "error.ai.guideVersionMismatch"),
 
