@@ -32,6 +32,7 @@ class PicoAskServiceTest {
         assertThat(response.evidenceRefs()).extracting(Evidence::workflowId).containsExactly("payment.draft");
         var captured=ArgumentCaptor.forClass(LlmGateway.LlmRequest.class); verify(gateway).call(captured.capture(),eq(PicoAskService.ModelAnswer.class));
         assertThat(captured.getValue().data()).contains("intentTerms","초안").doesNotContain("김철수","123456789","private@example.com","초안 저장하면 지급 끝?");
+        assertThat(captured.getValue().instructions()).contains("목록/순서 번호 없이", "evidenceChunkIds 배열에만");
         assertThat(captured.getValue().relatedEntityId()).isNull(); verifyNoMoreInteractions(gateway);
     }
     @Test void readonlyRoleCannotObtainProcessGuide() {
@@ -52,7 +53,7 @@ class PicoAskServiceTest {
         assertThat(service.ask(request("이번 달 수수료 얼마야")).fallbackReason()).isEqualTo("CALCULATION_REQUIRED"); verifyNoInteractions(gateway);
     }
     @Test void rejectsForgedSourcesNumbersCompletionClaimsAndExecutableText() {
-        for(var bad:List.of(answer("외부로 이동하세요","evil:source"),answer("오만원 50000원입니다","payment.draft:overview"),answer("오만원 지급을 추천합니다","payment.draft:overview"),answer("５만원입니다","payment.draft:overview"),answer("javaScript:alert 실행","payment.draft:overview"),answer(java.text.Normalizer.normalize("지급했습니다",java.text.Normalizer.Form.NFD),"payment.draft:overview"),answer("지급했습니다","payment.draft:overview"),answer("https://evil.example 실행","payment.draft:overview"))) {
+        for(var bad:List.of(answer("외부로 이동하세요","evil:source"),answer("오만원 50000원입니다","payment.draft:overview"),answer("오만원 지급을 추천합니다","payment.draft:overview"),answer("５만원입니다","payment.draft:overview"),answer("1. 대상을 확인하세요","payment.draft:overview"),answer("javaScript:alert 실행","payment.draft:overview"),answer(java.text.Normalizer.normalize("지급했습니다",java.text.Normalizer.Form.NFD),"payment.draft:overview"),answer("지급했습니다","payment.draft:overview"),answer("https://evil.example 실행","payment.draft:overview"))) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(bad);
             var response=service.ask(request("초안 저장")); assertThat(response.source()).isEqualTo(Source.FIXED); assertThat(response.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT"); assertThat(response.message()).doesNotContain("evil","50000","지급했습니다");
         }

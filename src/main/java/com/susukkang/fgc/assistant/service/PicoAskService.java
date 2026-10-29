@@ -8,6 +8,7 @@ import com.susukkang.fgc.common.code.AiCallPurpose;
 import com.susukkang.fgc.common.exception.*;
 import com.susukkang.fgc.common.security.Roles;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.text.Normalizer;
 import static com.susukkang.fgc.assistant.dto.PicoAskResponse.*;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PicoAskService {
     private final LlmGateway gateway;
@@ -29,18 +31,20 @@ public class PicoAskService {
             "처리했습니다", "완료되었습니다");
     private static final String MONEY_PREFIXES = "일이삼사오육칠팔구십백천만억조";
 
-    private static boolean unsafeOutput(String message) {
+    private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
+
+    private static OutputRejection unsafeOutput(String message) {
         String normalized = Normalizer.normalize(message, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
-        if (normalized.codePoints().anyMatch(Character::isDigit)
-                || UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return true;
+        if (normalized.codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
+        if (UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return OutputRejection.UNSAFE_TEXT;
         // Scan backwards from each currency unit once: no nested regex backtracking on model text.
         for (int index = 1; index < normalized.length(); index++) {
             if (normalized.charAt(index) != '원') continue;
             int previous = index - 1;
             while (previous >= 0 && Character.isWhitespace(normalized.charAt(previous))) previous--;
-            if (previous >= 0 && MONEY_PREFIXES.indexOf(normalized.charAt(previous)) >= 0) return true;
+            if (previous >= 0 && MONEY_PREFIXES.indexOf(normalized.charAt(previous)) >= 0) return OutputRejection.GENERATED_AMOUNT;
         }
-        return false;
+        return null;
     }
 
     @PreAuthorize(Roles.ANY_ROLE)
@@ -61,8 +65,13 @@ public class PicoAskService {
             // Never send raw question, history, entity IDs, amounts, names or current business state.
             String data=mapper.writeValueAsString(Map.of("intentTerms",terms,"approvedGuide",selected.title(),"evidence",chunks));
             ModelAnswer output=gateway.call(new LlmGateway.LlmRequest(AiCallPurpose.PICO_EXPLAIN,
-                    "승인된 지급 업무 가이드만 근거로 한국어 설명을 작성하세요. intentTerms는 질문에서 허용된 업무 단어만 추출한 자료입니다. 모호하면 ASK_CLARIFICATION, 범위 밖이면 UNSUPPORTED입니다. 현재 업무 상태/개인정보/금액은 제공되지 않았습니다. 숫자·금액·요율을 만들지 말고 저장/확정/처리를 완료했다고 말하지 마세요. URL/선택자/스크립트/실행 명령을 반환하지 마세요. ANSWER_ONLY에는 받은 evidence의 chunkId를 하나 이상 인용하세요. message는 간결한 절차 설명이며 직접 실행하지 않습니다.",data,null,null),ModelAnswer.class);
-            if (!valid(output,chunks)) return fallback(request,chunks,"INVALID_AI_OUTPUT");
+                    "승인된 지급 업무 가이드만 근거로 한국어 설명을 작성하세요. intentTerms는 질문에서 허용된 업무 단어만 추출한 자료입니다. 모호하면 ASK_CLARIFICATION, 범위 밖이면 UNSUPPORTED입니다. 현재 업무 상태/개인정보/금액은 제공되지 않았습니다. 숫자·금액·요율을 만들지 말고 저장/확정/처리를 완료했다고 말하지 마세요. URL/선택자/스크립트/실행 명령을 반환하지 마세요. ANSWER_ONLY에는 받은 evidence의 chunkId를 하나 이상 인용하세요. message는 목록/순서 번호 없이 두세 문장으로 작성하고 근거 ID·버전·숫자를 본문에 반복하지 마세요. 근거 ID는 evidenceChunkIds 배열에만 넣으세요. 초안 저장은 지급 확정이 아니라는 구분을 유지하고 직접 실행하지 않습니다.",data,null,null),ModelAnswer.class);
+            OutputRejection rejection = rejection(output, chunks);
+            if (rejection != null) {
+                // Bounded enum only: never log the model message, question, IDs or credentials.
+                log.warn("Pico answer rejected: {}", rejection);
+                return fallback(request,chunks,"INVALID_AI_OUTPUT");
+            }
             var references=chunks.stream().filter(c->output.evidenceChunkIds().contains(c.chunkId())).toList();
             return response(request,output.decision(),output.message(),references,Source.AI,null);
         } catch (FgcBusinessException error) {
@@ -93,10 +102,19 @@ public class PicoAskService {
         if((normalized.contains("말고") || normalized.contains("하지마") || normalized.contains("없이")) && !result.contains("금지")) result.add("금지");
         return List.copyOf(result);
     }
-    private boolean valid(ModelAnswer output,List<PicoGuideCatalog.Chunk> chunks) {
-        if(output==null || output.decision()==null || output.message()==null || output.message().isBlank() || output.message().length()>2000 || unsafeOutput(output.message()) || output.evidenceChunkIds()==null || output.evidenceChunkIds().size()>8) return false;
-        var allowed=chunks.stream().map(PicoGuideCatalog.Chunk::chunkId).toList();
-        return (output.decision()!=Decision.ANSWER_ONLY || !output.evidenceChunkIds().isEmpty()) && output.evidenceChunkIds().stream().allMatch(id->id!=null && allowed.contains(id));
+    private OutputRejection rejection(ModelAnswer output, List<PicoGuideCatalog.Chunk> chunks) {
+        if (output == null || output.decision() == null || output.message() == null
+                || output.message().isBlank() || output.message().length() > 2000
+                || output.evidenceChunkIds() == null || output.evidenceChunkIds().size() > 8)
+            return OutputRejection.INVALID_FIELDS;
+        OutputRejection unsafe = unsafeOutput(output.message());
+        if (unsafe != null) return unsafe;
+        var allowed = chunks.stream().map(PicoGuideCatalog.Chunk::chunkId).toList();
+        if (output.decision() == Decision.ANSWER_ONLY && output.evidenceChunkIds().isEmpty())
+            return OutputRejection.INVALID_EVIDENCE;
+        if (output.evidenceChunkIds().stream().anyMatch(id -> id == null || !allowed.contains(id)))
+            return OutputRejection.INVALID_EVIDENCE;
+        return null;
     }
     private PicoAskResponse fallback(PicoAskRequest request,List<PicoGuideCatalog.Chunk> chunks,String reason) {
         var used=chunks.subList(0,Math.min(2,chunks.size()));
