@@ -6,14 +6,12 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse;
 import com.susukkang.fgc.clawback.dto.ClawbackCandidateSearchCondition;
 import com.susukkang.fgc.common.web.ListSort;
-import com.susukkang.fgc.common.web.SqlSort;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import org.hibernate.query.NativeQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +35,7 @@ public class ClawbackCandidateQueryRepository {
 
     private static final String BASIS = """
             WITH evidence AS (
-              SELECT cc.candidate_id, cc.contract_id, cc.trigger_type, cc.source_id, cc.event_date,
+              SELECT cc.candidate_id, cc.contract_id, cc.trigger_type, cc.source_id, cc.event_date, cc.status_event_id,
                      c.contract_no, c.contract_date, c.insurer_id, i.insurer_name,
                      c.product_offering_id, p.product_name, c.agent_id, ag.agent_name,
                      to_jsonb(c) AS contract_source,
@@ -63,7 +61,7 @@ public class ClawbackCandidateQueryRepository {
                           ELSE schedules.unpaid_amount END AS unpaid_amount,
                      policies.rows AS policies, policies.policy_count,
                      CASE WHEN policies.policy_count = 1 THEN policies.policy_id ELSE NULL END AS policy_id,
-                     effects.rows AS effects
+                     effects.rows AS effects, arbitrage_sources.rows AS arbitrage_source_refs
                 FROM fgc.clawback_candidate cc
                 JOIN fgc.insurance_contract c ON c.contract_id = cc.contract_id
                 JOIN fgc.insurer i ON i.insurer_id = c.insurer_id
@@ -74,6 +72,16 @@ public class ClawbackCandidateQueryRepository {
                   AND e.contract_id = cc.contract_id
                 LEFT JOIN fgc.arbitrage_check a ON a.arbitrage_check_id = cc.arbitrage_check_id
                   AND a.contract_id = cc.contract_id AND a.payment_stage = 'GA_TO_FC'
+                CROSS JOIN LATERAL (
+                  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                           'triggerType', cc.trigger_type, 'sourceId', observed.arbitrage_check_id,
+                           'effectiveAt', NULL, 'asOfDate', observed.as_of_date,
+                           'status', observed.result_status, 'evidence', to_jsonb(observed))
+                           ORDER BY observed.arbitrage_check_id DESC), '[]'::jsonb) AS rows
+                    FROM fgc.arbitrage_check observed
+                   WHERE cc.status_event_id IS NULL AND observed.contract_id = cc.contract_id
+                     AND observed.as_of_date = cc.event_date AND observed.payment_stage = 'GA_TO_FC'
+                ) arbitrage_sources
                 CROSS JOIN LATERAL (
                   SELECT COALESCE(jsonb_agg(jsonb_build_object(
                            'transactionAttributionId', ta.transaction_attribution_id,
@@ -165,7 +173,7 @@ public class ClawbackCandidateQueryRepository {
             ), candidates AS (
               SELECT evidence.*,
                      'claw-v1-' || md5(jsonb_build_array(contract_source, source, payment_source, schedule_source,
-                         policies, effects, superseded)::text) AS source_version,
+                         policies, effects, superseded, arbitrage_source_refs)::text) AS source_version,
                      -- 승인되지 않은 D-02를 성공 계산/기본 0원으로 바꾸지 않는다.
                      'REVIEW_REQUIRED' AS calculation_status,
                      to_jsonb(array_remove(ARRAY[
@@ -197,7 +205,8 @@ public class ClawbackCandidateQueryRepository {
                 'calculationStatus', calculation_status, 'reviewReasons', review_reasons,
                 'paidAmount', paid_amount, 'unpaidAmount', unpaid_amount, 'policyVersionId', policy_id,
                 'clawbackCaseId', NULL, 'calculatedAmount', NULL, 'allowedActions', '[]'::jsonb),
-              'sourceRefs', jsonb_build_array(source_ref), 'paymentAttributions', payments,
+              'sourceRefs', CASE WHEN status_event_id IS NULL THEN arbitrage_source_refs
+                                ELSE jsonb_build_array(source_ref) END, 'paymentAttributions', payments,
               'scheduleLines', schedules, 'policyCandidates', policies, 'effects', effects,
               'elapsedMonths', NULL, 'latestCalculation', NULL) AS text)
               FROM candidates
@@ -205,52 +214,77 @@ public class ClawbackCandidateQueryRepository {
 
     public record SearchResult(List<ClawbackCandidateDetailResponse> items, long total) { }
 
+    // 값뿐 아니라 기간/정렬 선택도 바인딩한다. 사용자 입력을 SQL 조각으로 조합하지 않는다.
+    private static final String FILTERS = """
+             WHERE (CAST(:dateFrom AS date) IS NULL OR
+                    CASE WHEN :dateBasis = 'CONTRACT_DATE' THEN contract_date ELSE event_date END >= :dateFrom)
+               AND (CAST(:dateTo AS date) IS NULL OR
+                    CASE WHEN :dateBasis = 'CONTRACT_DATE' THEN contract_date ELSE event_date END <= :dateTo)
+               AND (CAST(:contractNo AS text) IS NULL OR contract_no ILIKE :contractNo ESCAPE '!')
+               AND (CAST(:insurerId AS bigint) IS NULL OR insurer_id = :insurerId)
+               AND (CAST(:productOfferingId AS bigint) IS NULL OR product_offering_id = :productOfferingId)
+               AND (CAST(:agentId AS bigint) IS NULL OR agent_id = :agentId)
+               AND (CAST(:triggerType AS text) IS NULL OR trigger_type = :triggerType)
+               AND (CAST(:calculationStatus AS text) IS NULL OR calculation_status = :calculationStatus)
+            """;
+
+    private static final String ORDER = """
+             ORDER BY
+               CASE WHEN :sortKey = 'candidateId' AND :ascending THEN candidate_id END ASC NULLS LAST,
+               CASE WHEN :sortKey = 'candidateId' AND NOT :ascending THEN candidate_id END DESC NULLS LAST,
+               CASE WHEN :sortKey = 'contractNo' AND :ascending THEN contract_no END ASC NULLS LAST,
+               CASE WHEN :sortKey = 'contractNo' AND NOT :ascending THEN contract_no END DESC NULLS LAST,
+               CASE WHEN :sortKey = 'eventDate' AND :ascending THEN event_date END ASC NULLS LAST,
+               CASE WHEN :sortKey = 'eventDate' AND NOT :ascending THEN event_date END DESC NULLS LAST,
+               CASE WHEN :sortKey = 'contractDate' AND :ascending THEN contract_date END ASC NULLS LAST,
+               CASE WHEN :sortKey = 'contractDate' AND NOT :ascending THEN contract_date END DESC NULLS LAST,
+               CASE WHEN :sortKey = 'paidAmount' AND :ascending THEN paid_amount END ASC NULLS LAST,
+               CASE WHEN :sortKey = 'paidAmount' AND NOT :ascending THEN paid_amount END DESC NULLS LAST,
+               CASE WHEN :sortKey = 'unpaidAmount' AND :ascending THEN unpaid_amount END ASC NULLS LAST,
+               CASE WHEN :sortKey = 'unpaidAmount' AND NOT :ascending THEN unpaid_amount END DESC NULLS LAST,
+               candidate_id DESC
+            """;
+
+    /** 고정 SQL에 조건/정렬을 바인딩해 목록과 동일 조건의 전체 건수를 조회한다. */
     public SearchResult search(ClawbackCandidateSearchCondition condition, ListSort sort, int page, int size) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        String where = filters(condition, params);
-        List<?> rows = bind(entityManager.createNativeQuery(BASIS + DETAIL + where + " "
-                        + SqlSort.orderBy(sort, SORTABLE, "candidate_id DESC")), params)
+        List<?> rows = bindFilters(entityManager.createNativeQuery(BASIS + DETAIL + FILTERS + ORDER), condition)
+                .setParameter("sortKey", sort.key(), String.class)
+                .setParameter("ascending", sort.ascending(), Boolean.class)
                 .setFirstResult(Math.toIntExact((long) (page - 1) * size)).setMaxResults(size).getResultList();
-        long count = ((Number) bind(entityManager.createNativeQuery(BASIS + "SELECT count(*) FROM candidates" + where), params)
+        long count = ((Number) bindFilters(entityManager.createNativeQuery(BASIS + "SELECT count(*) FROM candidates" + FILTERS), condition)
                 .getSingleResult()).longValue();
         return new SearchResult(rows.stream().map(row -> decode((String) row)).toList(), count);
     }
 
+    /** 후보를 생성하지 않고 원천 이력·지급/스케줄 근거를 같은 snapshot으로 조회한다. */
     public Optional<ClawbackCandidateDetailResponse> findById(long candidateId) {
         List<?> rows = entityManager.createNativeQuery(BASIS + DETAIL + " WHERE candidate_id = :id")
                 .setParameter("id", candidateId).getResultList();
         return rows.stream().findFirst().map(row -> decode((String) row));
     }
 
-    private static String filters(ClawbackCandidateSearchCondition condition, Map<String, Object> params) {
-        List<String> clauses = new ArrayList<>();
-        String date = condition.getDateBasis() == ClawbackCandidateSearchCondition.DateBasis.CONTRACT_DATE
-                ? "contract_date" : "event_date";
-        add(clauses, params, date + " >= :dateFrom", "dateFrom", condition.getDateFrom());
-        add(clauses, params, date + " <= :dateTo", "dateTo", condition.getDateTo());
+    /** null의 JDBC 타입을 지정하고 LIKE 메타문자를 문자로 검색하도록 이스케이프한다. */
+    private static NativeQuery<?> bindFilters(Query query, ClawbackCandidateSearchCondition condition) {
+        String contractPattern = null;
         if (condition.getContractNo() != null && !condition.getContractNo().isBlank()) {
             String escaped = condition.getContractNo().trim().replace("!", "!!").replace("%", "!%").replace("_", "!_");
-            add(clauses, params, "contract_no ILIKE :contractNo ESCAPE '!'", "contractNo", "%" + escaped + "%");
+            contractPattern = "%" + escaped + "%";
         }
-        add(clauses, params, "insurer_id = :insurerId", "insurerId", condition.getInsurerId());
-        add(clauses, params, "product_offering_id = :productOfferingId", "productOfferingId", condition.getProductOfferingId());
-        add(clauses, params, "agent_id = :agentId", "agentId", condition.getAgentId());
-        add(clauses, params, "trigger_type = :triggerType", "triggerType",
-                condition.getTriggerType() == null ? null : condition.getTriggerType().name());
-        add(clauses, params, "calculation_status = :calculationStatus", "calculationStatus",
-                condition.getCalculationStatus() == null ? null : condition.getCalculationStatus().name());
-        return clauses.isEmpty() ? "" : " WHERE " + String.join(" AND ", clauses);
+        NativeQuery<?> bound = query.unwrap(NativeQuery.class);
+        return bound.setParameter("dateFrom", condition.getDateFrom(), java.time.LocalDate.class)
+                .setParameter("dateTo", condition.getDateTo(), java.time.LocalDate.class)
+                .setParameter("dateBasis", condition.getDateBasis() == ClawbackCandidateSearchCondition.DateBasis.CONTRACT_DATE
+                        ? "CONTRACT_DATE" : "EVENT_DATE", String.class)
+                .setParameter("contractNo", contractPattern, String.class)
+                .setParameter("insurerId", condition.getInsurerId(), Long.class)
+                .setParameter("productOfferingId", condition.getProductOfferingId(), Long.class)
+                .setParameter("agentId", condition.getAgentId(), Long.class)
+                .setParameter("triggerType", condition.getTriggerType() == null ? null : condition.getTriggerType().name(), String.class)
+                .setParameter("calculationStatus", condition.getCalculationStatus() == null
+                        ? null : condition.getCalculationStatus().name(), String.class);
     }
 
-    private static void add(List<String> clauses, Map<String, Object> params, String sql, String key, Object value) {
-        if (value != null) { clauses.add(sql); params.put(key, value); }
-    }
-
-    private static Query bind(Query query, Map<String, Object> params) {
-        params.forEach(query::setParameter);
-        return query;
-    }
-
+    /** 원천 근거의 소수 금액도 부동소수점 손실 없이 DTO로 읽는다. */
     private ClawbackCandidateDetailResponse decode(String json) {
         try {
             return objectMapper.readerFor(ClawbackCandidateDetailResponse.class)

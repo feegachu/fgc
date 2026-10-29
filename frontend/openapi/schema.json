@@ -2143,8 +2143,11 @@
             "type" : [ "integer", "null" ]
           },
           "latestCalculation" : {
-            "$ref" : "#/components/schemas/Calculation",
-            "type" : "null"
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Calculation"
+            }, {
+              "type" : "null"
+            } ]
           },
           "paymentAttributions" : {
             "items" : {

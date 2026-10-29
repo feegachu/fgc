@@ -21,6 +21,7 @@ import java.util.Map;
 public class ClawbackCandidateQueryService {
     private final ClawbackCandidateQueryRepository repository;
 
+    /** 기간·양수 ID·페이지·정렬 허용값을 검증하고 같은 snapshot의 목록과 전체 건수를 반환한다. */
     public PageResponse<ClawbackCandidateResponse> search(ClawbackCandidateSearchCondition condition, int page, int size) {
         if (page < 1 || (long) (page - 1) * size > Integer.MAX_VALUE) throw invalid("page");
         if (size < 1 || size > 100) throw invalid("size");
@@ -37,6 +38,7 @@ public class ClawbackCandidateQueryService {
                 page, size, result.total(), sort.value());
     }
 
+    /** 내부 사용자가 지정한 후보의 실제 근거를 읽으며 잘못된 ID와 없는 ID를 구분한다. */
     public ClawbackCandidateDetailResponse detail(long candidateId) {
         if (candidateId < 1) throw invalid("candidateId");
         return repository.findById(candidateId).orElseThrow(() ->

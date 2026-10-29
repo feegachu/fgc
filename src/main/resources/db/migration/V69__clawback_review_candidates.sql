@@ -2,7 +2,7 @@
 CREATE TABLE fgc.clawback_candidate (
     candidate_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     contract_id bigint NOT NULL REFERENCES fgc.insurance_contract(contract_id),
-    trigger_type varchar(20) NOT NULL CHECK (trigger_type IN ('STATUS_EVENT', 'ARBITRAGE')),
+    trigger_type varchar(20) NOT NULL,
     status_event_id bigint REFERENCES fgc.contract_status_event(contract_status_event_id),
     arbitrage_check_id bigint REFERENCES fgc.arbitrage_check(arbitrage_check_id),
     source_id bigint GENERATED ALWAYS AS (COALESCE(status_event_id, arbitrage_check_id)) STORED,
@@ -11,13 +11,14 @@ CREATE TABLE fgc.clawback_candidate (
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     CONSTRAINT ck_clawback_candidate_source CHECK (
-        (trigger_type = 'STATUS_EVENT' AND status_event_id IS NOT NULL AND arbitrage_check_id IS NULL)
-        OR (trigger_type = 'ARBITRAGE' AND arbitrage_check_id IS NOT NULL AND status_event_id IS NULL)
+        num_nonnulls(status_event_id, arbitrage_check_id) = 1
+        AND trigger_type = CASE WHEN status_event_id IS NOT NULL THEN 'STATUS_EVENT' ELSE 'ARBITRAGE' END
     ),
-    CONSTRAINT uq_clawback_candidate_source UNIQUE (trigger_type, source_id, contract_id),
-    CONSTRAINT uq_clawback_candidate_event UNIQUE (status_event_id),
-    CONSTRAINT uq_clawback_candidate_arbitrage UNIQUE (arbitrage_check_id)
+    CONSTRAINT uq_clawback_candidate_event UNIQUE (status_event_id)
 );
+-- 유형별로 실제 충돌을 판정하는 인덱스를 하나만 두고 동일 인덱스를 UPSERT arbiter로 사용한다.
+CREATE UNIQUE INDEX uq_clawback_candidate_arbitrage ON fgc.clawback_candidate (contract_id, event_date)
+    WHERE status_event_id IS NULL;
 CREATE INDEX ix_clawback_candidate_event_date ON fgc.clawback_candidate (event_date DESC, candidate_id DESC);
 CREATE INDEX ix_clawback_candidate_contract ON fgc.clawback_candidate (contract_id, candidate_id);
 COMMENT ON TABLE fgc.clawback_candidate IS 'FUN-054 환수 검토 원천. 정책/계산이 없어도 보존하며 조회로 생성하지 않는다';
@@ -25,11 +26,11 @@ COMMENT ON COLUMN fgc.clawback_candidate.source_version IS '관측한 원천행�
 
 CREATE FUNCTION fgc.guard_clawback_candidate_source() RETURNS trigger LANGUAGE plpgsql SET search_path = fgc, pg_temp AS $$
 BEGIN
-    IF TG_OP = 'UPDATE' AND ROW(NEW.contract_id, NEW.trigger_type, NEW.status_event_id, NEW.arbitrage_check_id)
-        IS DISTINCT FROM ROW(OLD.contract_id, OLD.trigger_type, OLD.status_event_id, OLD.arbitrage_check_id) THEN
+    IF TG_OP = 'UPDATE' AND ROW(NEW.contract_id, NEW.trigger_type, NEW.status_event_id, NEW.event_date)
+        IS DISTINCT FROM ROW(OLD.contract_id, OLD.trigger_type, OLD.status_event_id, OLD.event_date) THEN
         RAISE EXCEPTION 'Clawback candidate identity is immutable';
     END IF;
-    IF NEW.trigger_type = 'STATUS_EVENT' THEN
+    IF NEW.status_event_id IS NOT NULL THEN
         IF NOT EXISTS (SELECT 1 FROM fgc.contract_status_event e
             WHERE e.contract_status_event_id = NEW.status_event_id AND e.contract_id = NEW.contract_id
               AND e.new_status IN ('TERMINATED', 'LAPSED', 'CANCELLED')
@@ -58,4 +59,10 @@ SELECT e.contract_id, 'STATUS_EVENT', e.contract_status_event_id, md5(to_jsonb(e
 FROM fgc.contract_status_event e WHERE e.new_status IN ('TERMINATED', 'LAPSED', 'CANCELLED');
 INSERT INTO fgc.clawback_candidate (contract_id, trigger_type, arbitrage_check_id, source_version, event_date)
 SELECT a.contract_id, 'ARBITRAGE', a.arbitrage_check_id, md5(to_jsonb(a)::text), a.as_of_date
-FROM fgc.arbitrage_check a WHERE a.payment_stage = 'GA_TO_FC' AND a.result_status = 'CANDIDATE';
+FROM (
+    SELECT DISTINCT ON (contract_id, as_of_date) * FROM fgc.arbitrage_check
+    WHERE payment_stage = 'GA_TO_FC' ORDER BY contract_id, as_of_date, arbitrage_check_id DESC
+) a
+WHERE EXISTS (SELECT 1 FROM fgc.arbitrage_check detected
+    WHERE detected.contract_id = a.contract_id AND detected.as_of_date = a.as_of_date
+      AND detected.payment_stage = a.payment_stage AND detected.result_status = 'CANDIDATE');

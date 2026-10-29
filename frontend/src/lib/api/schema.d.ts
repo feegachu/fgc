@@ -2215,7 +2215,7 @@ export interface components {
             effects?: components["schemas"]["ProcessingEffect"][];
             /** Format: int32 */
             elapsedMonths?: number | null;
-            latestCalculation?: components["schemas"]["Calculation"];
+            latestCalculation?: components["schemas"]["Calculation"] | null;
             paymentAttributions?: components["schemas"]["PaymentEvidence"][];
             policyCandidates?: components["schemas"]["PolicyCandidate"][];
             scheduleLines?: components["schemas"]["ScheduleEvidence"][];

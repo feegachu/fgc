@@ -118,7 +118,36 @@ class ClawbackCandidateIntegrationTest {
         assertThat(query.detail(id).candidate().sourceVersion()).isNotEqualTo(version);
         assertThat(query.detail(id).candidate().reviewReasons()).contains("ARBITRAGE_SOURCE_CHANGED");
         assertThat(capture.captureArbitrageResult(arbitrage("INSURER_TO_GA", "CANDIDATE"))).isZero();
-        assertThat(capture.captureArbitrageResult(arbitrage("GA_TO_FC", "REVIEW_REQUIRED"))).isZero();
+        long reviewSource = arbitrage("GA_TO_FC", "REVIEW_REQUIRED");
+        assertThat(capture.captureArbitrageResult(reviewSource)).isEqualTo(1);
+        assertThat(candidate(reviewSource, "ARBITRAGE")).isEqualTo(id);
+    }
+
+    @Test
+    void separateArbitrageRunsReuseCandidateAndPreserveAllSourceReferences() {
+        long first = arbitrage("GA_TO_FC", "CANDIDATE");
+        capture.captureArbitrageResult(first);
+        long id = candidate(first, "ARBITRAGE");
+        String version = query.detail(id).candidate().sourceVersion();
+        long second = arbitrage("GA_TO_FC", "CANDIDATE");
+        assertThat(capture.captureArbitrageResult(second)).isEqualTo(1);
+        assertThat(candidate(second, "ARBITRAGE")).isEqualTo(id);
+        assertThat(query.detail(id).candidate().sourceVersion()).isNotEqualTo(version);
+        assertThat(query.detail(id).sourceRefs()).extracting(row -> row.sourceId()).containsExactly(second, first);
+        long clear = arbitrage("GA_TO_FC", "CLEAR");
+        assertThat(capture.captureArbitrageResult(clear)).isEqualTo(1);
+        assertThat(candidate(clear, "ARBITRAGE")).isEqualTo(id);
+        assertThat(capture.captureArbitrageResult(first)).isZero();
+        assertThat(query.detail(id).candidate().sourceId()).isEqualTo(clear);
+        assertThat(query.detail(id).candidate().reviewReasons()).contains("ARBITRAGE_SOURCE_CHANGED");
+        assertThat(query.detail(id).sourceRefs()).extracting(row -> row.sourceId()).containsExactly(clear, second, first);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.clawback_candidate WHERE contract_id=? AND trigger_type='ARBITRAGE'",
+                Long.class, contractId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT result_status FROM fgc.arbitrage_check WHERE arbitrage_check_id=?", String.class, first))
+                .isEqualTo("CANDIDATE");
+        long anotherDate = arbitrage("GA_TO_FC", "CANDIDATE", LocalDate.of(2026, 4, 2));
+        capture.captureArbitrageResult(anotherDate);
+        assertThat(candidate(anotherDate, "ARBITRAGE")).isNotEqualTo(id);
     }
 
     @Test
@@ -249,6 +278,34 @@ class ClawbackCandidateIntegrationTest {
     }
 
     @Test
+    void boundSortKeysOrderTheWholeResultBeforePaginationAndKeepNullTiesStable() {
+        long otherContract = cloneContract(contractNo + "-B");
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-01-02' WHERE contract_id=?", otherContract);
+        payment(contractId, agentId, 1, "100.4", "PAYMENT", "CONFIRMED");
+        payment(otherContract, agentId, 1, "200.5", "PAYMENT", "CONFIRMED");
+        long firstEvent = event("LAPSED", "2026-05-02T00:00:00+09:00");
+        long secondEvent = eventForContract(otherContract, "LAPSED", "2026-05-01T00:00:00+09:00");
+        capture.captureStatusEvents(List.of(firstEvent, secondEvent));
+        long firstId = candidate(firstEvent, "STATUS_EVENT");
+        long secondId = candidate(secondEvent, "STATUS_EVENT");
+        for (String key : List.of("candidateId", "contractNo", "eventDate", "contractDate", "paidAmount", "unpaidAmount")) {
+            for (String direction : List.of("asc", "desc")) {
+                var condition = condition();
+                condition.setSort(key + "," + direction);
+                boolean ascending = direction.equals("asc");
+                boolean firstBeforeSecond = key.equals("eventDate") ? !ascending : ascending;
+                List<Long> expected = key.equals("unpaidAmount") || !firstBeforeSecond
+                        ? List.of(secondId, firstId) : List.of(firstId, secondId);
+                var page = query.search(condition, 1, 20);
+                assertThat(page.content()).extracting(row -> row.candidateId()).as(condition.getSort()).containsExactlyElementsOf(expected);
+                assertThat(page.totalElements()).isEqualTo(2);
+                assertThat(query.search(condition, 2, 1).content()).singleElement()
+                        .satisfies(row -> assertThat(row.candidateId()).isEqualTo(expected.get(1)));
+            }
+        }
+    }
+
+    @Test
     void apiPreservesNullsAndRejectsInvalidInputAndDirectUnknownIds() throws Exception {
         long source = event("LAPSED", "2026-04-01T00:00:00+09:00");
         capture.captureStatusEvents(List.of(source));
@@ -333,26 +390,82 @@ class ClawbackCandidateIntegrationTest {
         assertThat(count("clawback_line")).isEqualTo(linesBefore);
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"STATUS_EVENT", "ARBITRAGE"})
     @Timeout(30)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    void concurrentObservationCommitsOneCandidate() throws Exception {
-        long source = event("LAPSED", "2026-04-01T00:00:00+09:00");
-        var ready = new CountDownLatch(2);
+    void concurrentObservationCommitsOneCandidate(String type) throws Exception {
+        boolean statusEvent = type.equals("STATUS_EVENT");
+        long source = statusEvent ? event("LAPSED", "2026-04-01T00:00:00+09:00") : arbitrage("GA_TO_FC", "CANDIDATE");
+        var ready = new CountDownLatch(4);
         var start = new CountDownLatch(1);
-        try (var workers = Executors.newFixedThreadPool(2)) {
+        try (var workers = Executors.newFixedThreadPool(4)) {
             java.util.concurrent.Callable<Integer> task = () -> {
                 ready.countDown();
                 assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
-                return new TransactionTemplate(transactionManager).execute(tx -> capture.captureStatusEvents(List.of(source)));
+                return new TransactionTemplate(transactionManager).execute(tx -> statusEvent
+                        ? capture.captureStatusEvents(List.of(source)) : capture.captureArbitrageResult(source));
             };
             var first = workers.submit(task);
             var second = workers.submit(task);
+            var third = workers.submit(task);
+            var fourth = workers.submit(task);
             assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
             start.countDown();
-            assertThat(first.get(15, TimeUnit.SECONDS) + second.get(15, TimeUnit.SECONDS)).isEqualTo(1);
+            assertThat(first.get(15, TimeUnit.SECONDS) + second.get(15, TimeUnit.SECONDS)
+                    + third.get(15, TimeUnit.SECONDS) + fourth.get(15, TimeUnit.SECONDS)).isEqualTo(1);
         }
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.clawback_candidate WHERE status_event_id=?", Long.class, source)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.clawback_candidate WHERE source_id=? AND trigger_type=?",
+                Long.class, source, type)).isEqualTo(1);
+    }
+
+    @Test
+    @Timeout(30)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentClearWaitsForCandidateCommitAndBecomesTheCurrentSource() throws Exception {
+        long firstRun = run();
+        long secondRun = run();
+        var captured = new CountDownLatch(1);
+        var commit = new CountDownLatch(1);
+        var clearStarted = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var first = workers.submit(() -> new TransactionTemplate(transactionManager).execute(tx -> {
+                long source = insertArbitrage(firstRun, "GA_TO_FC", "CANDIDATE", LocalDate.of(2026, 4, 1));
+                capture.captureArbitrageResult(source);
+                captured.countDown();
+                try { assertThat(commit.await(15, TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                return source;
+            }));
+            try {
+                assertThat(captured.await(10, TimeUnit.SECONDS)).isTrue();
+                var second = workers.submit(() -> new TransactionTemplate(transactionManager).execute(tx -> {
+                    long source = insertArbitrage(secondRun, "GA_TO_FC", "CLEAR", LocalDate.of(2026, 4, 1));
+                    clearStarted.countDown();
+                    capture.captureArbitrageResult(source);
+                    return source;
+                }));
+                assertThat(clearStarted.await(10, TimeUnit.SECONDS)).isTrue();
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                boolean waiting = false;
+                while (!waiting && !second.isDone() && System.nanoTime() < deadline) {
+                    waiting = jdbc.queryForObject("""
+                            SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted
+                              AND database=(SELECT oid FROM pg_database WHERE datname=current_database()))
+                            """, Boolean.class);
+                    if (!waiting) Thread.sleep(10);
+                }
+                assertThat(waiting).as("새 판정 관측이 기존 후보 트랜잭션을 기다린다").isTrue();
+                commit.countDown();
+                long firstSource = first.get(15, TimeUnit.SECONDS);
+                long clearSource = second.get(15, TimeUnit.SECONDS);
+                var detail = query.detail(candidate(clearSource, "ARBITRAGE"));
+                assertThat(detail.sourceRefs()).extracting(row -> row.sourceId()).containsExactly(clearSource, firstSource);
+                assertThat(detail.candidate().reviewReasons()).contains("ARBITRAGE_SOURCE_CHANGED");
+            } finally {
+                commit.countDown();
+            }
+        }
     }
 
     private ClawbackCandidateSearchCondition condition() {
@@ -373,12 +486,16 @@ class ClawbackCandidateIntegrationTest {
     }
 
     private long event(String state, String instant) {
+        return eventForContract(contractId, state, instant);
+    }
+
+    private long eventForContract(long contract, String state, String instant) {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.contract_status_event(contract_id,event_seq,new_status,effective_at,received_at,
                     source_system,source_event_key,source_version)
                 SELECT ?,COALESCE(MAX(event_seq),0)+1,?,CAST(? AS timestamptz),now(),'TEST-668',?,'source-v1'
                   FROM fgc.contract_status_event WHERE contract_id=? RETURNING contract_status_event_id
-                """, Long.class, contractId, state, instant, UUID.randomUUID().toString(), contractId);
+                """, Long.class, contract, state, instant, UUID.randomUUID().toString(), contract);
     }
 
     private long candidate(long source, String type) {
@@ -390,16 +507,27 @@ class ClawbackCandidateIntegrationTest {
     }
 
     private long arbitrage(String stage, String result) {
-        long run = jdbc.queryForObject("""
+        return arbitrage(stage, result, LocalDate.of(2026, 4, 1));
+    }
+
+    private long arbitrage(String stage, String result, LocalDate date) {
+        return insertArbitrage(run(), stage, result, date);
+    }
+
+    private long run() {
+        return jdbc.queryForObject("""
                 INSERT INTO fgc.validation_run(validation_month,run_no,run_type,status)
                 SELECT DATE '2098-11-01', COALESCE(MAX(run_no),0)+1, 'PRE_CONFIRM', 'CREATED'
                   FROM fgc.validation_run WHERE validation_month=DATE '2098-11-01' RETURNING validation_run_id
                 """, Long.class);
+    }
+
+    private long insertArbitrage(long run, String stage, String result, LocalDate date) {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.arbitrage_check(validation_run_id,contract_id,payment_stage,as_of_date,
                     contract_month_no,cumulative_paid_premium,net_difference_amount,standard_deduction_80_yn,result_status)
-                VALUES (?,?,?,DATE '2026-04-01',4,100,10,false,?) RETURNING arbitrage_check_id
-                """, Long.class, run, contractId, stage, result);
+                VALUES (?,?,?,?,4,100,10,false,?) RETURNING arbitrage_check_id
+                """, Long.class, run, contractId, stage, date, result);
     }
 
     private long header(String stage, String purpose, boolean active, int version) {
