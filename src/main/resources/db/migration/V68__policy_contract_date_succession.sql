@@ -13,6 +13,8 @@ BEFORE UPDATE OR DELETE ON fgc.policy_succession
 FOR EACH ROW EXECUTE FUNCTION fgc.reject_update_delete();
 
 -- 종료·활성화·승계 기록을 모두 저장한 최종 상태를 커밋 시 검증한다.
+-- activated_at은 서버의 주입 Clock으로 기록한다. 직접 INSERT 권한은 신뢰한 운영 주체로 제한해야 하며,
+-- SQL 관리자가 과거 시각을 위조하는 경우까지 방어하는 권한 경계는 이 날짜 제약의 범위 밖이다.
 CREATE FUNCTION fgc.check_policy_succession()
 RETURNS trigger LANGUAGE plpgsql SET search_path = fgc, pg_temp AS $$
 DECLARE

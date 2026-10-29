@@ -77,6 +77,12 @@ public class PolicyWriteRepository {
                 """, Long.class, policyCode).stream().map(id -> lockPolicy(id).orElseThrow()).toList();
     }
 
+    public boolean hasActiveVersion(String code) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM fgc.policy_version WHERE policy_code = ? AND status = 'ACTIVE')",
+                Boolean.class, code));
+    }
+
     public int nextVersion(String code) {
         return jdbc.queryForObject("SELECT COALESCE(MAX(version_no), 0) + 1 FROM fgc.policy_version WHERE policy_code = ?",
                 Integer.class, code);

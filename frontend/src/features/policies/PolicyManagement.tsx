@@ -66,6 +66,8 @@ export function PolicyManagement({
   const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
   const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
   const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
+  const successorRef = detail.approvalActions?.find((entry) => entry.actionType === 'RETIRE')
+    ?.evidenceRefs?.find((ref) => /^policy:\d+$/.test(ref))
   const refs = [
     ...new Set([...(policy.regulationRefs ?? []), ...(detail.sourceRefs ?? []), ...(draft?.sourceRefs ?? [])]),
   ]
@@ -113,6 +115,15 @@ export function PolicyManagement({
             <dd>
               {date(detail.applicationPeriod.from)} ~ {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
               {detail.applicationPeriod.successorPolicyVersionId && <small>이후 계약은 후속 버전 적용</small>}
+            </dd>
+          </div>
+        )}
+        {!detail.applicationPeriod && policy.status === 'RETIRED' && (
+          <div>
+            <dt>계약일 적용 기간</dt>
+            <dd>
+              {successorRef ? '정정·승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
+              {successorRef && <small>후속 정책 {successorRef.replace('policy:', '#')}</small>}
             </dd>
           </div>
         )}

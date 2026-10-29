@@ -31,6 +31,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -218,9 +219,15 @@ public class PolicyWriteService {
         return switch (policy.getStatus()) {
             case DRAFT -> List.of("EDIT", "SUBMIT");
             case REVIEW -> reviewActions(policy, actor);
-            case APPROVED -> APPROVERS.contains(actor.getRoleCode()) ? List.of(ACTION_CLONE, "ACTIVATE") : List.of(ACTION_CLONE);
+            case APPROVED -> APPROVERS.contains(actor.getRoleCode()) && canActivateByDate(policy)
+                    ? List.of(ACTION_CLONE, "ACTIVATE") : List.of(ACTION_CLONE);
             case ACTIVE, RETIRED -> List.of(ACTION_CLONE);
         };
+    }
+
+    private boolean canActivateByDate(PolicyVersion policy) {
+        return policy.getEffectiveFrom().isAfter(LocalDate.now(policyClock))
+                || !writeRepository.hasActiveVersion(policy.getPolicyCode());
     }
 
     private List<String> reviewActions(PolicyVersion policy, FgcUserDetails actor) {

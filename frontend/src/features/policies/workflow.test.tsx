@@ -100,6 +100,18 @@ describe('production policy workflow', () => {
     expect(within(period).getByText('이후 계약은 후속 버전 적용')).toBeVisible()
   })
 
+  it('identifies a superseded future version with an empty application window', () => {
+    const wire = wireDetail('RETIRED', ['CLONE'])
+    wire.approvalActions = [{ policyApprovalActionId: 32, actionSeq: 2, actionType: 'RETIRE',
+      actionBy: 'reviewer', actionAt: updatedAt, reason: '적용 전 정정', evidenceRef: 'policy:18' }]
+    const detail = normalizePolicyDetail(wire)
+    render(<QueryClientProvider client={new QueryClient()}>
+      <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
+    </QueryClientProvider>)
+    expect(screen.getByText('정정·승계로 계산 적용에서 제외됨')).toBeVisible()
+    expect(screen.getByText('후속 정책 #18')).toBeVisible()
+  })
+
   it('creates a real draft from the production form and returns its server ID', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
     const { user, onSaved } = mountEditor()

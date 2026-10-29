@@ -655,6 +655,7 @@ class PolicyWorkflowIntegrationTest {
         assertThat(actionError(futureId, "ACTIVATE", approved, approver, 400).path("field").asText()).isEqualTo("effectiveFrom");
         assertThat(statusOf(firstId)).isEqualTo("ACTIVE");
         assertThat(statusOf(futureId)).isEqualTo("APPROVED");
+        assertThat(values(detail(futureId, approver).path("allowedActions"))).containsExactly("CLONE");
         assertThat(auditCount(firstId, "POLICY_RETIRE")).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_succession WHERE previous_policy_version_id=?",
                 Integer.class, firstId)).isZero();

@@ -10,6 +10,12 @@ import com.susukkang.fgc.policy.repository.PolicyVersionRepository;
 import com.susukkang.fgc.policy.repository.FeeRegimeResolverRepository;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import static org.mockito.Mockito.when;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +41,13 @@ class PolicySuccessionIntegrationTest {
     @Autowired private PolicyVersionRepository policies;
     @Autowired private ScheduleService schedules;
     @Autowired private FeeRegimeResolverRepository feeRules;
+    @MockitoBean(name = "policyClock") private Clock policyClock;
+
+    @BeforeEach
+    void fixBusinessClock() {
+        when(policyClock.instant()).thenReturn(Instant.parse("2026-10-29T00:00:00Z"));
+        when(policyClock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
+    }
 
     @Test
     void appliesChangedRatesOnlyFromCutoverAndKeepsOlderContractsOnTheirOriginalVersion() throws Exception {
@@ -43,7 +56,7 @@ class PolicySuccessionIntegrationTest {
         JsonNode original = detail(originalId, writer);
         var historicMoney = jdbc.queryForList("SELECT commission_transaction_id, policy_version_id, amount FROM fgc.commission_transaction WHERE policy_version_id=? ORDER BY commission_transaction_id", originalId);
         assertThat(historicMoney).isNotEmpty();
-        LocalDate cutover = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).plusMonths(1).withDayOfMonth(1);
+        LocalDate cutover = LocalDate.now(policyClock).plusMonths(1).withDayOfMonth(1);
         long sourceContractId = jdbc.queryForList("""
                 SELECT c.contract_id FROM fgc.insurance_contract c
                 JOIN fgc.product_offering p ON p.product_offering_id=c.product_offering_id
@@ -162,7 +175,7 @@ class PolicySuccessionIntegrationTest {
     void keepsArbitrageParametersOnTheVersionSelectedByValidationDate() throws Exception {
         FgcUserDetails writer = actor("settle01"), approver = actor("gaadmin");
         long sourceId = jdbc.queryForObject("SELECT policy_version_id FROM fgc.policy_version WHERE policy_type='ARBITRAGE' AND status='ACTIVE'", Long.class);
-        LocalDate cutover = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).plusMonths(1).withDayOfMonth(1);
+        LocalDate cutover = LocalDate.now(policyClock).plusMonths(1).withDayOfMonth(1);
         String originalMonths = policies.findArbitrageApplicability(cutover.minusDays(1)).getFirst().getRefundAdditionMonths();
         JsonNode copy = clone(sourceId, cutover.toString(), writer);
         long id = copy.path("policyVersionId").asLong();
