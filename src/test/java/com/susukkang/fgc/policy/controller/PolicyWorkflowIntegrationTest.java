@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.code.FeeComponentType;
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.policy.code.FeeRegimeReasonCode;
+import com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +49,7 @@ class PolicyWorkflowIntegrationTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private FeeRegimeSchedulePolicyService schedulePolicies;
 
     private FgcUserDetails writer;
     private FgcUserDetails systemWriter;
@@ -625,6 +630,276 @@ class PolicyWorkflowIntegrationTest {
         assertThat(statusOf(secondId)).isIn("APPROVED", "RETIRED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code = ? AND status = 'ACTIVE'",
                 Integer.class, created.path("policyCode").asText())).isEqualTo(1);
+    }
+
+    @Test
+    void registeredFourAndSevenYearPoliciesSupplyActualRulesWithoutCostLimitPrerequisite() throws Exception {
+        for (boolean seven : List.of(false, true)) {
+            String start = seven ? "2029-01-01" : "2027-01-01";
+            String contractDate = seven ? "2029-03-02" : "2027-03-02";
+            String document = "BD-" + UUID.randomUUID();
+            long offering = insertOffering(seven, start, document);
+            long contract = insertContract(offering, contractDate);
+            ObjectNode documentDraft = installmentDraft(seven, offering, start, document);
+            if (seven) {
+                ObjectNode regime = (ObjectNode) documentDraft.path("feeRegimeRules").get(0);
+                regime.put("longTermMaintenanceFrom", 67).put("longTermMaintenanceTo", 84);
+                ObjectNode longTerm = ((ObjectNode) documentDraft.path("commissionRules").get(0)).deepCopy();
+                longTerm.put("commissionItemId", insertItem()).put("feeComponentType", "LONG_TERM_MAINTENANCE")
+                        .put("installmentFrom", 67).put("calculationType", "FIXED")
+                        .putNull("ratePct").put("fixedAmount", "12000.00");
+                ((com.fasterxml.jackson.databind.node.ArrayNode) documentDraft.path("commissionRules")).add(longTerm);
+            }
+            JsonNode created = create(documentDraft, writer);
+            long id = created.path("policyVersionId").asLong();
+            assertThat(schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC).isSelected()).isFalse();
+            JsonNode review = action(id, "SUBMIT", created, writer, 200);
+            JsonNode approved = action(id, "APPROVE", review, approver, 200);
+            assertThat(schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC).isSelected()).isFalse();
+            action(id, "ACTIVATE", approved, approver, 200);
+
+            var selected = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+            assertThat(selected.isSelected()).isTrue();
+            assertThat(selected.versionNo()).isEqualTo(1);
+            assertThat(selected.sourceRefs()).contains("REG-03", "SRC-022");
+            assertThat(selected.selection().limits()).isEmpty();
+            assertThat(selected.selection().ruleset().maxInstallments()).isEqualTo(seven ? 84 : 48);
+            assertThat(selected.commissionPolicy().getPolicyVersionId()).isEqualTo(id);
+            var regular = selected.commissionPolicy().getRules().stream()
+                    .filter(r -> r.getFeeComponentType() == FeeComponentType.MAINTENANCE).toList();
+            assertThat(regular).hasSize(seven ? 84 : 48);
+            assertThat(regular).allSatisfy(r -> {
+                assertThat(r.isEqualMonthlyYn()).isTrue();
+                assertThat(r.getRatePct()).isEqualByComparingTo(seven ? "24" : "45");
+                assertThat(r.getBasisCode()).isEqualTo("MONTHLY_EQUIVALENT_FIRST_PREMIUM");
+            });
+            assertThat(regular.getLast().getInstallmentTo()).isEqualTo(seven ? 84 : 48);
+            var longTerm = selected.commissionPolicy().getRules().stream()
+                    .filter(r -> r.getFeeComponentType() == FeeComponentType.LONG_TERM_MAINTENANCE).toList();
+            if (seven) {
+                assertThat(longTerm).hasSize(18);
+                assertThat(longTerm.getFirst().getInstallmentFrom()).isEqualTo(67);
+                assertThat(longTerm).allSatisfy(r -> assertThat(r.getFixedAmount()).isEqualByComparingTo("12000"));
+            } else {
+                assertThat(longTerm).isEmpty();
+            }
+            assertThat(schedulePolicies.resolve(contract, PaymentStage.INSURER_TO_GA).isSelected()).isFalse();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id = ?",
+                    Integer.class, contract)).isZero(); // 조회는 생성·확정 부수효과가 없다.
+        }
+    }
+
+    @Test
+    void filtersPoliciesByActualOfferingEvenWhenDatesAndDocumentsAreIdentical() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        for (int i = 0; i < 2; i++) {
+            long offering = insertOffering(false, "2027-01-01", document);
+            long contract = insertContract(offering, "2027-03-02");
+            JsonNode created = create(installmentDraft(false, offering, "2027-01-01", document), writer);
+            long id = created.path("policyVersionId").asLong();
+            JsonNode approved = action(id, "APPROVE", action(id, "SUBMIT", created, writer, 200), approver, 200);
+            action(id, "ACTIVATE", approved, approver, 200);
+            var selected = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+            assertThat(selected.isSelected()).isTrue();
+            assertThat(selected.commissionPolicy().getPolicyVersionId()).isEqualTo(id);
+        }
+        // 두 번째 정책이 활성화된 후에도 첫 번째 판매버전 선택은 바뀌지 않는다.
+        var rows = jdbc.queryForList("""
+                SELECT c.contract_id, c.product_offering_id, cr.policy_version_id
+                FROM fgc.insurance_contract c
+                JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
+                JOIN fgc.commission_rule cr ON cr.product_offering_id = po.product_offering_id
+                WHERE po.basic_document_version = ?
+                """, document);
+        for (var row : rows) {
+            assertThat(schedulePolicies.resolve(((Number) row.get("contract_id")).longValue(), PaymentStage.GA_TO_FC)
+                    .commissionPolicy().getPolicyVersionId()).isEqualTo(((Number) row.get("policy_version_id")).longValue());
+        }
+        long sameOffering = ((Number) rows.getFirst().get("product_offering_id")).longValue();
+        JsonNode conflict = create(installmentDraft(false, sameOffering, "2027-01-01", document), writer);
+        long conflictingId = conflict.path("policyVersionId").asLong();
+        JsonNode conflictReview = action(conflictingId, "SUBMIT", conflict, writer, 200);
+        actionError(conflictingId, "APPROVE", conflictReview, approver, 422);
+        assertThat(statusOf(conflictingId)).isEqualTo("REVIEW");
+    }
+
+    @Test
+    void submissionChecksOfferingRegimeDocumentDatesPeriodAndInsurer() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-01-01", document);
+        ObjectNode base = installmentDraft(false, offering, "2027-01-01", document);
+        List<ObjectNode> invalid = new java.util.ArrayList<>();
+        invalid.add(base.deepCopy().put("feeRegimeCode", "SEVEN_YEAR_2029").put("policyType", "SEVEN_YEAR_COMMISSION"));
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("feeRegimeCode", "SEVEN_YEAR_2029");
+        invalid.add(base.deepCopy().put("basicDocumentVersion", document + "-wrong"));
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("basicDocumentVersion", document + "-wrong");
+        invalid.add(base.deepCopy());
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("salesStartDateFrom", "2027-01-02");
+        invalid.add(base.deepCopy());
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("basicDocumentDateTo", "2026-12-31");
+        invalid.add(base.deepCopy().put("effectiveFrom", "2026-01-01").put("effectiveTo", "2026-12-31"));
+        invalid.add(base.deepCopy());
+        ((ObjectNode) invalid.getLast().path("commissionRules").get(0)).put("insurerId",
+                jdbc.queryForObject("SELECT min(insurer_id) FROM fgc.insurer", Long.class));
+        for (ObjectNode bad : invalid) {
+            bad.put("policyCode", "P014-" + UUID.randomUUID());
+            JsonNode created = create(bad, writer);
+            long id = created.path("policyVersionId").asLong();
+            actionError(id, "SUBMIT", created, writer, 400);
+            assertThat(statusOf(id)).isEqualTo("DRAFT");
+            assertThat(count("policy_approval_action", id)).isZero();
+        }
+    }
+
+    @Test
+    void validatesInstallmentLimitAgainstOnlyTheRulesetForTheSelectedOffering() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-07-01", document);
+        ObjectNode draft = installmentDraft(false, offering, "2027-01-01", document);
+        var regimes = (com.fasterxml.jackson.databind.node.ArrayNode) draft.path("feeRegimeRules");
+        ObjectNode later = ((ObjectNode) regimes.get(0)).deepCopy().put("salesStartDateFrom", "2027-07-01");
+        ((ObjectNode) regimes.get(0)).put("salesStartDateTo", "2027-06-30").put("maxInstallments", 24);
+        regimes.add(later);
+        JsonNode created = create(draft, writer);
+        action(created.path("policyVersionId").asLong(), "SUBMIT", created, writer, 200);
+
+        long earlier = insertOffering(false, "2027-01-01", document);
+        ObjectNode bad = draft.deepCopy().put("policyCode", "P014-" + UUID.randomUUID());
+        ((ObjectNode) bad.path("commissionRules").get(0)).put("productOfferingId", earlier);
+        JsonNode badCreated = create(bad, writer);
+        actionError(badCreated.path("policyVersionId").asLong(), "SUBMIT", badCreated, writer, 400);
+    }
+
+    @Test
+    void preservesMissingLongTermSettingsAndRoutesFlaggedPoliciesToReview() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(true, "2029-01-01", document);
+        long contract = insertContract(offering, "2029-03-02");
+        ObjectNode draft = installmentDraft(true, offering, "2029-01-01", document);
+        JsonNode created = create(draft, writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode approved = action(id, "APPROVE", action(id, "SUBMIT", created, writer, 200), approver, 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+        var selected = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+        assertThat(selected.isSelected()).isTrue();
+        assertThat(selected.selection().ruleset().longTermMaintenanceFrom()).isNull();
+        assertThat(selected.commissionPolicy().getRules()).allSatisfy(r ->
+                assertThat(r.getFeeComponentType()).isEqualTo(FeeComponentType.MAINTENANCE));
+
+        String flaggedDoc = "BD-" + UUID.randomUUID();
+        long flaggedOffering = insertOffering(false, "2027-01-01", flaggedDoc);
+        long flaggedContract = insertContract(flaggedOffering, "2027-03-02");
+        ObjectNode flagged = installmentDraft(false, flaggedOffering, "2027-01-01", flaggedDoc);
+        ((ObjectNode) flagged.path("feeRegimeRules").get(0)).put("reviewRequiredYn", true);
+        JsonNode flaggedCreated = create(flagged, writer);
+        long flaggedId = flaggedCreated.path("policyVersionId").asLong();
+        JsonNode flaggedApproved = action(flaggedId, "APPROVE",
+                action(flaggedId, "SUBMIT", flaggedCreated, writer, 200), approver, 200);
+        action(flaggedId, "ACTIVATE", flaggedApproved, approver, 200);
+        var review = schedulePolicies.resolve(flaggedContract, PaymentStage.GA_TO_FC);
+        assertThat(review.isSelected()).isFalse();
+        assertThat(review.commissionPolicy()).isNull();
+        assertThat(review.selection().resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.RULESET_FLAGGED);
+    }
+
+    @Test
+    void installmentPolicySuccessionKeepsOldContractRulesAndSelectsNewRulesByContractDate() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-01-01", document);
+        long oldContract = insertContract(offering, "2027-03-02");
+        long newContract = insertContract(offering, "2027-10-02");
+        JsonNode created = create(installmentDraft(false, offering, "2027-01-01", document), writer);
+        long originalId = created.path("policyVersionId").asLong();
+        JsonNode approved = action(originalId, "APPROVE",
+                action(originalId, "SUBMIT", created, writer, 200), approver, 200);
+        action(originalId, "ACTIVATE", approved, approver, 200);
+        JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + originalId + "/versions",
+                cloneRequest("2027-07-01"), writer, key(), 201);
+        long nextId = clone.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(nextId, writer).path("editDocument").deepCopy();
+        ((ObjectNode) edit.path("commissionRules").get(0)).put("ratePct", "40.000000");
+        JsonNode changed = write(HttpMethod.PUT, "/api/v1/policies/" + nextId, edit, writer, key(), 200);
+        JsonNode nextApproved = action(nextId, "APPROVE",
+                action(nextId, "SUBMIT", changed, writer, 200), approver, 200);
+        action(nextId, "ACTIVATE", nextApproved, approver, 200);
+
+        var oldPolicy = schedulePolicies.resolve(oldContract, PaymentStage.GA_TO_FC);
+        var newPolicy = schedulePolicies.resolve(newContract, PaymentStage.GA_TO_FC);
+        assertThat(oldPolicy.commissionPolicy().getPolicyVersionId()).isEqualTo(originalId);
+        assertThat(oldPolicy.versionNo()).isEqualTo(1);
+        assertThat(oldPolicy.commissionPolicy().getRules()).allSatisfy(r ->
+                assertThat(r.getRatePct()).isEqualByComparingTo("45"));
+        assertThat(newPolicy.commissionPolicy().getPolicyVersionId()).isEqualTo(nextId);
+        assertThat(newPolicy.versionNo()).isEqualTo(2);
+        assertThat(newPolicy.commissionPolicy().getRules()).allSatisfy(r ->
+                assertThat(r.getRatePct()).isEqualByComparingTo("40"));
+    }
+
+    @Test
+    void legacyPolicyWithRulesBeyondItsLimitReturnsReviewInsteadOfUsableCalculationInput() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-01-01", document);
+        long contract = insertContract(offering, "2027-03-02");
+        ObjectNode draft = installmentDraft(false, offering, "2027-01-01", document);
+        ((ObjectNode) draft.path("feeRegimeRules").get(0)).put("maxInstallments", 24);
+        JsonNode created = create(draft, writer);
+        long id = created.path("policyVersionId").asLong();
+        actionError(id, "SUBMIT", created, writer, 400);
+        // 시드/과거 적재로 형식 제약만 충족한 정책이 존재해도 읽기 경로가 자동 계산으로 넘기지 않는다.
+        jdbc.update("UPDATE fgc.policy_version SET status='APPROVED', approved_by=?, approved_at=clock_timestamp() WHERE policy_version_id=?",
+                approver.getUserId(), id);
+        jdbc.update("UPDATE fgc.policy_version SET status='ACTIVE' WHERE policy_version_id=?", id);
+        var review = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+        assertThat(review.isSelected()).isFalse();
+        assertThat(review.commissionPolicy()).isNull();
+        assertThat(review.selection().resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.COMMISSION_RULE_INVALID);
+        assertThat(review.selection().resolution().candidateRulesetIds()).hasSize(1);
+    }
+
+    private ObjectNode installmentDraft(boolean seven, long offering, String from, String document) {
+        ObjectNode draft = draft().put("policyType", seven ? "SEVEN_YEAR_COMMISSION" : "FOUR_YEAR_COMMISSION")
+                .put("feeRegimeCode", seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027")
+                .put("effectiveFrom", from).putNull("effectiveTo").put("basicDocumentVersion", document);
+        ((ObjectNode) draft.path("commissionRules").get(0)).put("productOfferingId", offering)
+                .put("feeComponentType", "MAINTENANCE").put("installmentTo", seven ? 84 : 48)
+                .put("ratePct", seven ? "24.000000" : "45.000000").put("equalMonthlyYn", true);
+        ObjectNode regime = draft.putArray("feeRegimeRules").addObject()
+                .put("feeRegimeCode", seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027")
+                .put("salesStartDateFrom", from).put("basicDocumentVersion", document)
+                .put("maxInstallments", seven ? 84 : 48);
+        regime.putArray("sourceRefs").add("REG-03").add("SRC-022");
+        return draft;
+    }
+
+    private long insertOffering(boolean seven, String salesStart, String document) {
+        String code = UUID.randomUUID().toString();
+        long product = jdbc.queryForObject("""
+                INSERT INTO fgc.product(insurer_id, insurer_product_code, standard_product_code, product_name, product_group_code)
+                VALUES (?, ?, ?, '분급 정책 연결 검증 상품', 'LIFE') RETURNING product_id
+                """, Long.class, insurerId, code, code);
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.product_offering(product_id, offering_version, sales_start_date, basic_document_version,
+                                                basic_document_date, channel_code, fee_regime_code)
+                VALUES (?, 'P014', ?::date, ?, ?::date, 'FACE_TO_FACE', ?) RETURNING product_offering_id
+                """, Long.class, product, salesStart, document, salesStart, seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027");
+    }
+
+    private long insertContract(long offering, String contractDate) {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.insurance_contract(insurer_id, product_offering_id, contract_no, contract_date,
+                    agent_id, organization_id, premium_per_cycle_amount, first_premium_amount,
+                    monthly_equivalent_first_premium, payment_term_months)
+                SELECT ?, ?, ?, ?::date, agent_id, organization_id, 100000, 100000, 100000, 240
+                FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1 RETURNING contract_id
+                """, Long.class, insurerId, offering, "P014-" + UUID.randomUUID(), contractDate);
+    }
+
+    private long insertItem() {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.commission_item(item_code, item_name, cashflow_type, item_category, effective_from)
+                VALUES (?, '장기유지 예정 수수료', 'PAYMENT', 'SALES', DATE '2026-01-01')
+                RETURNING commission_item_id
+                """, Long.class, "P014-" + UUID.randomUUID());
     }
 
     private ObjectNode draft() {

@@ -112,9 +112,24 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
             );
         }
 
+        List<ResolvedCommissionRule> resolvedRules =
+                resolveCommissionRules(policy.getPolicyVersionId(), contractId, paymentStage);
+
+        return ResolvedCommissionPolicy.builder()
+                .policyVersionId(policy.getPolicyVersionId())
+                .policyType(policy.getPolicyType())
+                .paymentStage(paymentStage)
+                .scheduleRegime(policy.getScheduleRegime())
+                .rules(resolvedRules)
+                .build();
+    }
+
+    @Override
+    public List<ResolvedCommissionRule> resolveCommissionRules(Long policyVersionId, Long contractId, PaymentStage paymentStage) {
+        validateQueryCondition(contractId, paymentStage);
         List<ResolvedCommissionRule> rules =
                 commissionRuleRepository.findApplicableCommissionRules(
-                        policy.getPolicyVersionId(),
+                        policyVersionId,
                         contractId,
                         paymentStage
                 );
@@ -124,22 +139,14 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
                     Map.of(
-                            "policyVersionId", String.valueOf(policy.getPolicyVersionId()),
-                            "paymentStage", paymentStage.name()
+                            "policyVersionId", String.valueOf(policyVersionId),
+                            "paymentStage", paymentStage.name(),
+                            "reason", "RULE_MISSING"
                     ),
                     "정책에 적용 가능한 수수료 규칙이 없습니다."
             );
         }
-        List<ResolvedCommissionRule> resolvedRules =
-                resolveApplicableRules(rules, policy.getPolicyVersionId());
-
-        return ResolvedCommissionPolicy.builder()
-                .policyVersionId(policy.getPolicyVersionId())
-                .policyType(policy.getPolicyType())
-                .paymentStage(paymentStage)
-                .scheduleRegime(policy.getScheduleRegime())
-                .rules(resolvedRules)
-                .build();
+        return resolveApplicableRules(rules, policyVersionId);
     }
 
     @Override
