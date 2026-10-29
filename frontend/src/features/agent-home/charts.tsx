@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { int, won } from '../../lib/format'
 import { useDrawn, useTween } from '../../lib/motion'
+import { oneDecimal } from './model'
 import type { Slice } from './model'
 
 /** 마우스를 올리면 따라다니는 설명 상자. 차트 값은 범례·목록·숨은 표가 스크린 리더에 대신 읽어 준다. */
@@ -143,7 +144,7 @@ export function Donut({
                   {s.name}
                   <b>{s.value}</b>
                 </span>
-                <em>{total ? ((s.value / total) * 100).toFixed(1) : '0.0'}%</em>
+                <em>{total ? oneDecimal((s.value / total) * 100).toFixed(1) : '0.0'}%</em>
               </button>
             </li>
           )

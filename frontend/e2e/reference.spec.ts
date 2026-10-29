@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 for (const roleCode of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
-  test(`${roleCode}: reference screens are read-only and restore URL state`, async ({ page }) => {
+  test(`${roleCode}: reference queries preserve URL state and gate policy authoring`, async ({ page }) => {
     const requests: string[] = []
     const longPolicyCode = 'POLICY-' + 'LONG-CODE-'.repeat(12)
     await page.route('**/api/v1/**', (route) => {
@@ -75,6 +75,7 @@ for (const roleCode of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN'])
     await expect(page.getByRole('radio', { name: 'POL-1 v1 선택', exact: true })).toBeChecked()
     await page.getByRole('button', { name: 'REG-08' }).click()
     await expect(page.getByRole('tooltip')).toContainText('REG-08')
-    await expect(page.getByRole('button', { name: /등록|수정|저장|삭제/, exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '정책 등록', exact: false })).toHaveCount(roleCode === 'COMPLIANCE' ? 0 : 1)
+    await expect(page.getByRole('button', { name: /수정|저장|삭제/, exact: true })).toHaveCount(0)
   })
 }
