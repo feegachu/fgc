@@ -39,7 +39,20 @@ function Evidence<T>({
     </section>
   )
 }
-const sourceColumns: TableColumn<Detail['sourceRefs'][number]>[] = [
+type Candidate = NonNullable<CandidateDetail['candidate']>
+const query = (values: Record<string, string>) => new URLSearchParams(values).toString()
+/** 원천으로 이동. 상태 사건은 계약 상세의 사건 이력, 차익거래는 검증기준월의 차익거래 검증 화면. */
+function sourceLink(c: Candidate, r: Detail['sourceRefs'][number]) {
+  if (r.triggerType === 'ARBITRAGE' && r.asOfDate && c.contractNo)
+    return (
+      <ContextLink to={`/arbitrage-checks?${query({ month: r.asOfDate.slice(0, 7), contractNo: c.contractNo })}`}>
+        차익거래 검증
+      </ContextLink>
+    )
+  if (c.contractId != null) return <ContextLink to={`/contracts/${c.contractId}`}>계약 사건 이력</ContextLink>
+  return '—'
+}
+const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[] => [
   { key: 'type', label: '원천', render: (r) => triggerLabels[r.triggerType ?? ''] ?? present(r.triggerType) },
   { key: 'id', label: '사건·검증 ID', cellClassName: 'tabular-nums', render: (r) => present(r.sourceId) },
   {
@@ -50,10 +63,26 @@ const sourceColumns: TableColumn<Detail['sourceRefs'][number]>[] = [
     render: (r) => (r.effectiveAt ? `효력 ${dateTime(r.effectiveAt)}` : `검증기준 ${date(r.asOfDate)}`),
   },
   { key: 'status', label: '상태', render: (r) => present(r.status) },
+  { key: 'open', label: '원천 열기', render: (r) => sourceLink(c, r) },
 ]
-const paymentColumns: TableColumn<Detail['paymentAttributions'][number]>[] = [
+const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions'][number]>[] => [
   { key: 'id', label: '귀속 ID', cellClassName: 'tabular-nums', render: (r) => present(r.transactionAttributionId) },
-  { key: 'tx', label: '지급 ID', cellClassName: 'tabular-nums', render: (r) => present(r.commissionTransactionId) },
+  {
+    key: 'tx',
+    label: '지급 ID',
+    cellClassName: 'tabular-nums',
+    // 지급 목록을 이 계약으로 거르고 해당 지급 행을 선택한 상태로 연다.
+    render: (r) =>
+      r.commissionTransactionId != null && c.contractNo ? (
+        <ContextLink
+          to={`/transactions?${query({ contractNo: c.contractNo, selectedId: String(r.commissionTransactionId) })}`}
+        >
+          {r.commissionTransactionId}
+        </ContextLink>
+      ) : (
+        present(r.commissionTransactionId)
+      ),
+  },
   { key: 'item', label: '수수료 항목', cellClassName: 'tabular-nums', render: (r) => present(r.commissionItemId) },
   { key: 'no', label: '회차', align: 'left', render: (r) => int(r.installmentNo) },
   { key: 'paidOn', label: '지급일', cellClassName: 'tabular-nums', render: (r) => date(r.paidOn) },
@@ -123,11 +152,12 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         <Row label="경과월">
           {detail.elapsedMonths == null ? '자료 없음 (산정 기준 미확정)' : `${int(detail.elapsedMonths)}개월`}
         </Row>
-        <Row label="적용 정책">
+        {/* 서버의 policyVersionId는 후보가 하나일 때 채워 주는 값이지 적용 선택 결과가 아니다(인터페이스 §4-4-5). */}
+        <Row label="정책 후보">
           {c.policyVersionId != null
-            ? `정책버전 ${c.policyVersionId}`
+            ? `후보 1개 · 정책버전 ${c.policyVersionId} (적용 선택 전)`
             : detail.policyCandidates?.length
-              ? `후보 ${detail.policyCandidates.length}개 · 선택 필요`
+              ? `후보 ${detail.policyCandidates.length}개 · 적용 선택 필요`
               : '유효한 환수 정책 없음'}
         </Row>
         <Row label="검토 사유">
@@ -145,14 +175,14 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
       <Evidence
         title="원천 사건 · 검증 근거"
         rows={detail.sourceRefs}
-        columns={sourceColumns}
+        columns={sourceColumns(c)}
         rowKey={(r, i) => `${r.triggerType}-${r.sourceId}-${i}`}
         empty="연결된 원천 근거가 없습니다."
       />
       <Evidence
         title="연결 지급 · 귀속"
         rows={detail.paymentAttributions}
-        columns={paymentColumns}
+        columns={paymentColumns(c)}
         rowKey={(r, i) => `${r.transactionAttributionId ?? 'x'}-${i}`}
         empty="연결된 기지급 내역이 없습니다."
       />

@@ -62,7 +62,9 @@ export default function ClawbackPage() {
     setParams(() => {
       const next = new URLSearchParams()
       Object.entries({ ...criteria, ...values }).forEach(([key, value]) => {
-        if (value !== '' && !(key === 'page' && value === 1)) next.set(key, String(value))
+        // 기간은 비운 값도 남겨 '제한 없음'을 기본값(작업월)과 구분한다.
+        const keepEmpty = key === 'dateFrom' || key === 'dateTo'
+        if ((value !== '' || keepEmpty) && !(key === 'page' && value === 1)) next.set(key, String(value))
       })
       return next
     })
@@ -104,7 +106,12 @@ export default function ClawbackPage() {
             <option value="CONTRACT_DATE">계약일</option>
           </select>
         </Field>
-        <Field variant="filter" className="claw-filter-date" label="시작일">
+        <Field
+          variant="filter"
+          className="claw-filter-date"
+          label="시작일"
+          helper={!draft.dateFrom && !draft.dateTo ? '비우면 기간 제한 없음' : undefined}
+        >
           <input type="date" value={draft.dateFrom} onChange={(e) => set('dateFrom', e.target.value)} />
         </Field>
         <Field variant="filter" className="claw-filter-date" label="종료일" error={dateError || undefined}>

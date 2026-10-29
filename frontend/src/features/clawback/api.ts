@@ -54,6 +54,7 @@ export function defaultCriteria(month: string): Criteria {
 export function criteriaFromParams(params: URLSearchParams, month: string): Criteria {
   const base = defaultCriteria(month)
   const raw = Number(params.get('page') ?? 1)
+  // URL에 키가 없으면 기본값(작업월)이고, `dateFrom=`처럼 빈 값으로 있으면 사용자가 비운 것(제한 없음)이다.
   const text = (key: keyof Criteria) => params.get(key)?.trim() ?? (base[key] as string)
   return {
     dateBasis: params.get('dateBasis') === 'CONTRACT_DATE' ? 'CONTRACT_DATE' : 'EVENT_DATE',

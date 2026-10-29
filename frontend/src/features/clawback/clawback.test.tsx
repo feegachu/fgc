@@ -179,3 +179,49 @@ it('distinguishes an empty result from a failed search', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('req-9')
   expect(screen.queryByText('조건에 맞는 환수 검토 대상이 없습니다.')).not.toBeInTheDocument()
 })
+
+it('keeps cleared dates as no period limit instead of falling back to the work month', async () => {
+  const user = userEvent.setup()
+  const { request, router } = mount()
+  await screen.findByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
+  await user.clear(screen.getByLabelText('시작일'))
+  await user.clear(screen.getByLabelText('종료일'))
+  expect(screen.getByText('비우면 기간 제한 없음')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /조회/ }))
+  await waitFor(() => expect(router.state.location.search).toContain('dateFrom=&dateTo='))
+  await waitFor(() => expect(candidateCalls(request)).toHaveLength(2))
+  const last = candidateCalls(request).at(-1)!
+  expect(last.searchParams.has('dateFrom')).toBe(false)
+  expect(last.searchParams.has('dateTo')).toBe(false)
+  expect(screen.getByLabelText('시작일')).toHaveValue('')
+  expect(screen.getByLabelText('종료일')).toHaveValue('')
+})
+
+it('shows a single policy candidate as a candidate, not as the applied policy', async () => {
+  const single = { ...detail, candidate: { ...statusRow, policyVersionId: 15 } }
+  mount('/clawbacks', (p) => (p.includes('/candidates/42') ? envelope(single) : fixtures(p)))
+  expect(await screen.findByText('후보 1개 · 정책버전 15 (적용 선택 전)')).toBeInTheDocument()
+  expect(screen.getByText('정책 후보')).toBeInTheDocument()
+  expect(screen.queryByText('적용 정책')).not.toBeInTheDocument()
+})
+
+it('links evidence to the source contract, arbitrage check and payment', async () => {
+  const arbitrageDetail: CandidateDetail = {
+    ...detail,
+    candidate: { ...arbitrageRow, contractId: 11 },
+    sourceRefs: [{ triggerType: 'ARBITRAGE', sourceId: 5, asOfDate: '2026-07-31', status: 'CANDIDATE' }],
+  }
+  const user = userEvent.setup()
+  mount('/clawbacks', (p) => (p.includes('/candidates/41') ? envelope(arbitrageDetail) : fixtures(p)))
+  const payments = await screen.findByRole('region', { name: '연결 지급 · 귀속' })
+  expect(within(payments).getByRole('link', { name: '800' })).toHaveAttribute(
+    'href',
+    '/transactions?contractNo=CLW-001&selectedId=800',
+  )
+  const sources = screen.getByRole('region', { name: '원천 사건 · 검증 근거' })
+  expect(within(sources).getByRole('link', { name: '계약 사건 이력' })).toHaveAttribute('href', '/contracts/10')
+  const table = screen.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
+  await user.click(within(table).getByText('41'))
+  const arbitrage = await screen.findByRole('link', { name: '차익거래 검증' })
+  expect(arbitrage).toHaveAttribute('href', '/arbitrage-checks?month=2026-07&contractNo=CLW-002')
+})
