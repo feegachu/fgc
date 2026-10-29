@@ -5,7 +5,7 @@ import { Field } from '../../components/Field'
 import { DataTable } from '../../components/DataTable'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { date, dateTime, rate, won } from '../../lib/format'
+import { date, dateTime, rate, won, today } from '../../lib/format'
 import { ReferenceTabs } from '../reference/ReferenceUI'
 import { useAuth } from '../auth/useAuth'
 import type { Policy } from './api'
@@ -22,6 +22,8 @@ import {
 import type { DraftDocument, ManagedPolicyDetail, PolicyAction, SourceDetail } from './management'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
+import { performPolicyAction } from './writeApi'
+import { usePolicyRequest } from './usePolicyRequest'
 
 const tones: Record<string, StatusTone> = {
   DRAFT: 'warning',
@@ -31,6 +33,12 @@ const tones: Record<string, StatusTone> = {
   RETIRED: 'neutral',
 }
 const steps = ['DRAFT', 'REVIEW', 'APPROVED', 'ACTIVE']
+const historyLabels: Record<string, string> = {
+  ...actionLabels,
+  CREATE: '초안 등록',
+  UPDATE: '초안 수정',
+  RETIRE: '승계로 종료',
+}
 const panels = [
   { id: 'rules', label: '설정 규칙' },
   { id: 'sources', label: '근거 자료' },
@@ -50,7 +58,6 @@ export function PolicyManagement({
   initialPanel?: (typeof panels)[number]['id']
 }) {
   const { user } = useAuth()
-  const preview = useContext(PolicyPreviewContext)
   const [editing, setEditing] = useState(false)
   const [action, setAction] = useState<PolicyAction | null>(null)
   const [panel, setPanel] = useState<(typeof panels)[number]['id']>(initialPanel)
@@ -59,6 +66,8 @@ export function PolicyManagement({
   const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
   const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
   const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
+  const successorRef = detail.approvalActions?.find((entry) => entry.actionType === 'RETIRE')
+    ?.evidenceRefs?.find((ref) => /^policy:\d+$/.test(ref))
   const refs = [
     ...new Set([...(policy.regulationRefs ?? []), ...(detail.sourceRefs ?? []), ...(draft?.sourceRefs ?? [])]),
   ]
@@ -100,6 +109,24 @@ export function PolicyManagement({
             {date(policy.effectiveFrom)} ~ {policy.effectiveTo ? date(policy.effectiveTo) : '계속'}
           </dd>
         </div>
+        {detail.applicationPeriod && (
+          <div>
+            <dt>계약일 적용 기간</dt>
+            <dd>
+              {date(detail.applicationPeriod.from)} ~ {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
+              {detail.applicationPeriod.successorPolicyVersionId && <small>이후 계약은 후속 버전 적용</small>}
+            </dd>
+          </div>
+        )}
+        {!detail.applicationPeriod && policy.status === 'RETIRED' && (
+          <div>
+            <dt>계약일 적용 기간</dt>
+            <dd>
+              {successorRef ? '정정·승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
+              {successorRef && <small>후속 정책 {successorRef.replace('policy:', '#')}</small>}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>작성자</dt>
           <dd>{policy.createdBy ?? detail.createdBy ?? '자료 없음'}</dd>
@@ -118,6 +145,10 @@ export function PolicyManagement({
         <div>
           <dt>기초서류 버전</dt>
           <dd>{draft?.basicDocumentVersion || '자료 없음'}</dd>
+        </div>
+        <div>
+          <dt>승인 근거 문서</dt>
+          <dd>{detail.approvalEvidenceRef || '자료 없음'}</dd>
         </div>
       </dl>
       <div className="policy-action-bar">
@@ -157,9 +188,6 @@ export function PolicyManagement({
         </p>
       )}
       {!detail.allowedActions && <p className="policy-note">작업 권한 정보가 제공되지 않아 조회만 가능합니다.</p>}
-      {!preview && allowed.length > 0 && (
-        <p className="policy-note">UI 구현 단계입니다. 저장·제출·승인 동작은 API 연결 후 사용할 수 있습니다.</p>
-      )}
       <ReferenceTabs
         tabs={panels}
         active={panel}
@@ -188,14 +216,13 @@ export function PolicyManagement({
                     <span className="policy-timeline-dot" />
                     <div>
                       <header>
-                        <strong>
-                          {actionLabels[entry.actionType as PolicyAction] ??
-                            (entry.actionType === 'CREATE' ? '초안 등록' : entry.actionType)}
-                        </strong>
-                        <span>
-                          {entry.previousStatus ? statusLabels[entry.previousStatus] : '신규'} →{' '}
-                          {statusLabels[entry.status] ?? entry.status}
-                        </span>
+                        <strong>{historyLabels[entry.actionType] ?? entry.actionType}</strong>
+                        {entry.status && (
+                          <span>
+                            {entry.previousStatus ? statusLabels[entry.previousStatus] : '신규'} →{' '}
+                            {statusLabels[entry.status] ?? entry.status}
+                          </span>
+                        )}
                         <time>{dateTime(entry.actedAt)}</time>
                       </header>
                       <p>{entry.reason}</p>
@@ -429,7 +456,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             <h4>{parameter.key}</h4>
             <StatusBadge tone="info">지원 조건</StatusBadge>
           </header>
-          <strong>{parameter.value || '설정 필요'}</strong>
+          <strong>{parameter.value == null || parameter.value === '' ? '설정 필요' : String(parameter.value)}</strong>
           <p>{parameter.description}</p>
         </article>
       ))}
@@ -474,22 +501,30 @@ function PolicyActionDialog({
 }) {
   const preview = useContext(PolicyPreviewContext)
   const [reason, setReason] = useState('')
+  const [evidenceRef, setEvidenceRef] = useState('')
   const [effectiveFrom, setFrom] = useState('')
-  const [effectiveTo, setTo] = useState('')
+  const [effectiveTo, setTo] = useState(policy.effectiveTo ?? '')
   const [error, setError] = useState('')
   const [dateError, setDateError] = useState('')
   const [busy, setBusy] = useState(false)
   const saving = useRef(false)
+  const requestKey = usePolicyRequest()
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const dateRef = useRef<HTMLInputElement>(null)
   const newVersion = action === 'NEW_VERSION'
   const label = actionLabels[action]
   async function submit() {
-    if (!preview || saving.current || !policy.policyVersionId) return
+    if (saving.current || !policy.policyVersionId) return
     setError('')
     setDateError('')
     if (newVersion && (!effectiveFrom || (effectiveTo && effectiveTo < effectiveFrom))) {
       setDateError('유효한 적용 기간을 입력하세요.')
+      dateRef.current?.focus()
+      return
+    }
+    // 복제 원본이 현재 ACTIVE일 필요는 없다. 승계 시작일 관계는 서버가 현재 ACTIVE와 비교한다.
+    if (newVersion && effectiveFrom <= today()) {
+      setDateError('새 적용일은 한국시간 기준 내일 이후로 지정하세요.')
       dateRef.current?.focus()
       return
     }
@@ -501,14 +536,25 @@ function PolicyActionDialog({
     saving.current = true
     setBusy(true)
     try {
-      onSaved(
-        await preview.action(
-          policy.policyVersionId,
-          action,
-          reason.trim(),
-          newVersion ? { effectiveFrom, effectiveTo } : undefined,
-        ),
-      )
+      const dates = newVersion ? { effectiveFrom, effectiveTo } : undefined
+      const context = {
+        expectedStatus: policy.status,
+        expectedUpdatedAt: detail.editDocument?.expectedUpdatedAt ?? detail.updatedAt,
+        ...(action === 'APPROVE' && evidenceRef.trim() ? { evidenceRef: evidenceRef.trim() } : {}),
+        ...dates,
+      }
+      const id = preview
+        ? await preview.action(policy.policyVersionId, action, reason.trim(), dates)
+        : (
+            await performPolicyAction(
+              policy.policyVersionId,
+              action,
+              reason.trim(),
+              context,
+              requestKey({ id: policy.policyVersionId, action, reason: reason.trim(), context }),
+            )
+          ).policyVersionId
+      onSaved(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
     } finally {
@@ -531,7 +577,7 @@ function PolicyActionDialog({
           <Button variant="secondary" disabled={busy} onClick={onClose}>
             취소
           </Button>
-          <Button disabled={!preview} loading={busy} onClick={() => void submit()}>
+          <Button loading={busy} onClick={() => void submit()}>
             {newVersion ? '새 초안 만들기' : `${label} 확인`}
           </Button>
         </>
@@ -539,7 +585,7 @@ function PolicyActionDialog({
     >
       <p className="policy-section-description">
         {newVersion
-          ? '기존 정책의 규칙과 근거를 복사하여 새로운 초안을 작성합니다.'
+          ? '기존 정책의 규칙과 근거를 복사합니다. 새 적용일 당일부터 체결한 계약에 변경 요율을 적용합니다. 그 이전 계약은 재계산할 때도 기존 버전과 요율을 유지합니다. 새 적용일은 내일 이후로 지정하며, 아직 적용 전인 미래 버전은 같은 적용일로 정정할 수 있습니다.'
           : action === 'REJECT'
             ? '반려하면 작성자가 초안을 다시 수정할 수 있습니다.'
             : `아래 정책의 정보와 작업 사유를 확인한 후 ${label}하세요.`}
@@ -605,12 +651,22 @@ function PolicyActionDialog({
           placeholder="변경 또는 검토 사유를 작성하세요."
         />
       </Field>
+      {action === 'APPROVE' && !preview && (
+        <Field label="승인 근거 문서" helper="상품위원회 의결서 등 승인 근거가 있으면 문서 참조를 입력하세요.">
+          <input
+            value={evidenceRef}
+            onChange={(event) => setEvidenceRef(event.target.value)}
+            maxLength={500}
+            disabled={busy}
+          />
+        </Field>
+      )}
       {action === 'ACTIVATE' && (
         <p className="policy-notice policy-notice-warning">
-          적용 중인 다른 정책은 자동 종료되지 않습니다. 적용 기간의 겹침 여부를 확인하세요.
+          이 버전의 적용일 당일부터 체결한 계약에 새 기준을 적용합니다. 이전 계약은 기존 버전과 요율을 유지합니다.
+          승계에 실패하면 기존 버전을 유지합니다.
         </p>
       )}
-      {!preview && <p className="policy-notice">UI 구현 단계입니다. API 연결 후 실제 동작을 실행할 수 있습니다.</p>}
     </Modal>
   )
 }

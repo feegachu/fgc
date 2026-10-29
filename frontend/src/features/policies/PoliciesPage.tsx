@@ -61,7 +61,9 @@ export function PoliciesPage() {
   }
   function saved(nextId: number) {
     setCreating(false)
-    setMessage('미리보기에 변경사항을 반영했습니다. 실제 정책은 저장되지 않습니다.')
+    setMessage(
+      preview ? '미리보기에 변경사항을 반영했습니다. 실제 정책은 저장되지 않습니다.' : '정책 변경사항을 저장했습니다.',
+    )
     void cache.invalidateQueries({ queryKey: ['policies'] })
     patch({ tab: 'management', policyVersionId: String(nextId) })
   }

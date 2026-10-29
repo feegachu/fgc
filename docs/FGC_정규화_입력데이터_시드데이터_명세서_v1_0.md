@@ -1465,7 +1465,7 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 |---|---|
 | 보험회사·조직·설계사 | insurer, organization, agent, agent_insurer_code |
 | 상품·판매버전 | product, product_offering |
-| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule |
+| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule, fee_regime_ruleset, policy_approval_action, policy_source_detail, policy_write_request, policy_succession |
 | 1,200% 정책 | cap_rule_set, cap_rule_item |
 | 배부근거 | allocation_policy |
 | 환급률 | refund_rate_table, refund_rate_line |
@@ -1480,6 +1480,8 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 대사 | reconciliation_run, reconciliation_result, reconciliation_match |
 | 예외 | exception_case, exception_occurrence, exception_action |
 | 감사 | audit_log |
+
+`policy_succession`(V68)은 이전/후속 정책버전 ID·계약 적용일·실행자/시각의 불변 승계 기록이다. 계산용 파생 뷰 `policy_application_version`은 원본 승인 기간을 바꾸지 않고 구버전 적용 종료일을 후속 적용일 전날까지로 해석한다. 승계된 RETIRED만 과거 계약 선택에 사용하며, 같은 미래 적용일 정정으로 생긴 빈 구간은 제외한다(인터페이스 §4-4-1·운영정책서 제49조, 2026-10-29).
 
 `exception_occurrence`는 SRC-032(2026-08-18)가 신설한 월 통합검증 실행별 예외 검출 이력이다. `exception_case`는 검증월 기준 안정 업무키의 업무건으로, 같은 결정으로 `reason_code`, `validation_month`, `first/last_detected_run_id`, `first/last_detected_at`, `detection_count` 컬럼이 추가됐다.
 

@@ -1,5 +1,7 @@
 package com.susukkang.fgc.common.exception;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -165,6 +167,32 @@ public class GlobalExceptionHandler {
             MethodArgumentTypeMismatchException exception
     ) {
         return validationError(exception.getName());
+    }
+
+    /** JSON 구문·enum·날짜 변환 오류도 입력 오류다. 원문이나 Java 타입 정보는 응답하지 않는다. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        Throwable cause = exception.getCause();
+        while (cause != null) {
+            if (cause instanceof JsonMappingException mapping) {
+                return validationError(jsonFieldPath(mapping));
+            }
+            cause = cause.getCause();
+        }
+        return validationError(null);
+    }
+
+    private static String jsonFieldPath(JsonMappingException mapping) {
+        StringBuilder field = new StringBuilder();
+        for (JsonMappingException.Reference reference : mapping.getPath()) {
+            if (reference.getFieldName() != null) {
+                if (!field.isEmpty()) field.append('.');
+                field.append(reference.getFieldName());
+            } else if (reference.getIndex() >= 0) {
+                field.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+        return field.isEmpty() ? null : field.toString();
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

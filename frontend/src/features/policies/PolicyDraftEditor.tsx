@@ -3,6 +3,7 @@ import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
+import { ApiError } from '../../lib/api/client'
 import { ClawbackTargets, CommissionRow, DraftInput, DraftSelect } from './PolicyDraftFields'
 import {
   conditionOptions,
@@ -20,6 +21,8 @@ import {
 import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
 import type { DraftErrors } from './draftValidation'
+import { savePolicyDraft } from './writeApi'
+import { usePolicyRequest } from './usePolicyRequest'
 
 type Section = 'basic' | 'commissionRules' | 'feeRegimeRules' | 'parameters' | 'clawbackRules' | 'sourceDetails'
 export function PolicyDraftEditor({
@@ -42,9 +45,18 @@ export function PolicyDraftEditor({
   const [discard, setDiscard] = useState(false)
   const [dirty, setDirty] = useState(false)
   const saving = useRef(false)
+  const requestKey = usePolicyRequest()
   const titleFocus = useRef<HTMLInputElement>(null)
   const set = <K extends keyof DraftDocument>(key: K, value: DraftDocument[K]) => {
     const next = { ...draft, [key]: value }
+    if (key === 'sourceDetails') {
+      const retained = new Set((value as DraftDocument['sourceDetails']).map((source) => source.ref))
+      const removed = new Set(
+        draft.sourceDetails.filter((source) => !retained.has(source.ref)).map((source) => source.ref),
+      )
+      next.regulationRefs = draft.regulationRefs.filter((ref) => !removed.has(ref))
+      next.sourceRefs = draft.sourceRefs.filter((ref) => !removed.has(ref))
+    }
     setDraft(next)
     setErrors((current) => {
       const remaining = validateDraft(next)
@@ -73,45 +85,60 @@ export function PolicyDraftEditor({
     if (dirty) setDiscard(true)
     else onClose()
   }
+  function focusError(path: string) {
+    const group = ['regulationRefs', 'sourceRefs'].includes(path.split('.')[0])
+      ? 'sourceDetails'
+      : (path.split('.')[0] as Section)
+    setSection(sections.some((item) => item.id === group) ? group : 'basic')
+    const parameter = /^parameters\.(\d+)\./.exec(path)
+    const focusPath = parameter ? `parameters.${draft.parameters[Number(parameter[1])]?.key}` : path
+    requestAnimationFrame(() => document.getElementById(`policy-${focusPath}`)?.focus())
+  }
   async function save() {
-    if (saving.current || !preview) return
+    if (saving.current) return
     const nextErrors = validateDraft(draft)
     setErrors(nextErrors)
     const first = Object.keys(nextErrors)[0]
     if (first) {
-      setSection(first.includes('.') ? (first.split('.')[0] as Section) : 'basic')
-      requestAnimationFrame(() => document.getElementById(`policy-${first}`)?.focus())
+      focusError(first)
       return
     }
     saving.current = true
     setBusy(true)
     setFailure('')
     try {
-      const id = await preview.save(
-        {
-          ...draft,
-          feeRegimeRules: draft.feeRegimeRules.map((rule) => ({
-            ...rule,
-            sourceRefs: [...new Set(rule.sourceRefs.map((ref) => ref.trim()).filter(Boolean))],
-          })),
-          regulationRefs: [
-            ...new Set([
-              ...draft.regulationRefs,
-              ...draft.sourceDetails.filter((s) => s.ref.startsWith('REG-')).map((s) => s.ref),
-            ]),
-          ],
-          sourceRefs: [
-            ...new Set([
-              ...draft.sourceRefs,
-              ...draft.sourceDetails.filter((s) => s.ref.startsWith('SRC-')).map((s) => s.ref),
-            ]),
-          ],
-        },
-        policyId,
-      )
+      const document = {
+        ...draft,
+        feeRegimeRules: draft.feeRegimeRules.map((rule) => ({
+          ...rule,
+          sourceRefs: [...new Set(rule.sourceRefs.map((ref) => ref.trim()).filter(Boolean))],
+        })),
+        regulationRefs: [
+          ...new Set([
+            ...draft.regulationRefs,
+            ...draft.sourceDetails.map((s) => s.ref.trim()).filter((ref) => ref.startsWith('REG-')),
+          ]),
+        ],
+        sourceRefs: [
+          ...new Set([
+            ...draft.sourceRefs,
+            ...draft.sourceDetails.map((s) => s.ref.trim()).filter((ref) => ref.startsWith('SRC-')),
+          ]),
+        ],
+      }
+      const id = preview
+        ? await preview.save(document, policyId)
+        : (await savePolicyDraft(document, policyId, requestKey({ policyId, document }))).policyVersionId
       onSaved(id)
-    } catch {
-      setFailure('저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.')
+    } catch (cause) {
+      const message =
+        cause instanceof Error ? cause.message : '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'
+      setFailure(message)
+      if (cause instanceof ApiError && cause.field) {
+        const path = cause.field.replace(/\[(\d+)\]/g, '.$1')
+        setErrors({ [path]: message })
+        focusError(path)
+      }
     } finally {
       saving.current = false
       setBusy(false)
@@ -147,12 +174,14 @@ export function PolicyDraftEditor({
       footer={
         <>
           <span className="policy-editor-footer-note">
-            {preview ? '미리보기 · 변경 내용은 이 화면에서만 유지됩니다.' : 'UI 구현 단계 · 저장 API 연결 예정'}
+            {preview
+              ? '미리보기 · 변경 내용은 이 화면에서만 유지됩니다.'
+              : '초안으로 저장한 후 검토를 요청할 수 있습니다.'}
           </span>
           <Button variant="secondary" disabled={busy} onClick={close}>
             취소
           </Button>
-          <Button loading={busy} disabled={!preview || discard} onClick={() => void save()}>
+          <Button loading={busy} disabled={discard} onClick={() => void save()}>
             초안 저장
           </Button>
         </>
@@ -215,6 +244,11 @@ export function PolicyDraftEditor({
               <h2>{sections.find((item) => item.id === section)?.label}</h2>
             </div>
           </div>
+          {errors[section] && (
+            <p role="alert" className="policy-notice policy-notice-warning">
+              {errors[section]}
+            </p>
+          )}
           {section === 'basic' && (
             <>
               <p className="policy-section-description">
@@ -491,7 +525,7 @@ export function PolicyDraftEditor({
                     path={`parameters.${option.key}`}
                     label={option.label + ' 설정'}
                     errors={errors}
-                    value={draft.parameters.find((p) => p.key === option.key)?.value ?? ''}
+                    value={String(draft.parameters.find((p) => p.key === option.key)?.value ?? '')}
                     onChange={(v) =>
                       set('parameters', [
                         ...draft.parameters.filter((p) => p.key !== option.key),
@@ -507,8 +541,8 @@ export function PolicyDraftEditor({
           {section === 'clawbackRules' && (
             <>
               <div className="policy-notice policy-notice-warning">
-                환수 대상금액과 경과월 산정 기준은 확정이 필요합니다. 기준금액 코드는 설정 필요 상태로 두며 계산값을
-                자동으로 채우지 않습니다.
+                환수 대상금액과 경과월 산정 기준(D-02)이 미확정입니다. 기준이 확정될 때까지 환수 규칙을 등록할 수
+                없습니다.
               </div>
               {draft.clawbackRules.map((rule, index) => {
                 const prefix = `clawbackRules.${index}.`
@@ -582,10 +616,11 @@ export function PolicyDraftEditor({
                 )
               })}
               {!draft.clawbackRules.length && (
-                <EditorEmpty text="등록된 환수 규칙이 없습니다." description="업무 기준이 확정된 항목만 입력하세요." />
+                <EditorEmpty text="등록된 환수 규칙이 없습니다." description="업무 기준 확정 후 등록할 수 있습니다." />
               )}
               <Button
                 variant="secondary"
+                disabled
                 onClick={() =>
                   set('clawbackRules', [
                     ...draft.clawbackRules,
@@ -610,6 +645,24 @@ export function PolicyDraftEditor({
               <p className="policy-section-description">
                 정책에 사용한 REG/SRC 근거의 제목과 설명, 원문 링크를 연결하세요.
               </p>
+              <div className="policy-form-grid policy-form-grid-two">
+                <DraftInput
+                  path="regulationRefs"
+                  label="규정 근거 코드"
+                  errors={errors}
+                  value={draft.regulationRefs.join(',')}
+                  placeholder="REG 코드를 쉼표로 구분"
+                  onChange={(value) => set('regulationRefs', value.split(','))}
+                />
+                <DraftInput
+                  path="sourceRefs"
+                  label="출처 근거 코드"
+                  errors={errors}
+                  value={draft.sourceRefs.join(',')}
+                  placeholder="SRC 코드를 쉼표로 구분"
+                  onChange={(value) => set('sourceRefs', value.split(','))}
+                />
+              </div>
               {draft.sourceDetails.map((source, index) => {
                 const prefix = `sourceDetails.${index}.`
                 const update = (patch: Partial<typeof source>) =>
@@ -661,8 +714,9 @@ export function PolicyDraftEditor({
                           onChange={(e) => update({ explanation: e.target.value })}
                         />
                       </Field>
-                      <fieldset className="policy-span-all policy-source-status-options">
+                      <fieldset disabled={!preview} className="policy-span-all policy-source-status-options">
                         <legend>근거 상태 (복수 선택)</legend>
+                        {!preview && <p className="policy-note">근거 상태 분류는 아직 저장할 수 없습니다.</p>}
                         {[...new Set([...sourceStatusTags, ...(source.statusTags ?? [])])].map((tag) => (
                           <label key={tag} className="policy-checkbox">
                             <input
