@@ -12,7 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.util.*;
-import java.util.regex.Pattern;
+import java.text.Normalizer;
 import static com.susukkang.fgc.assistant.dto.PicoAskResponse.*;
 
 @Service
@@ -23,21 +23,39 @@ public class PicoAskService {
     private final ObjectMapper mapper;
     public record ModelAnswer(Decision decision,String message,List<String> evidenceChunkIds) {}
     private static final List<String> VOCABULARY=List.of("초안","저장","지급","확정","검증","금액","예상","한도","귀속","증빙","수정","취소","조회","입력","정정","차액","방법","다음","완료","차이","금지","수수료","작성");
-    private static final Pattern UNSAFE=Pattern.compile("[0-9]|[일이삼사오육칠팔구십백천만억조]+\\s*원|https?://|www\\.|<[^>]*>|data-guide-target|querySelector|javascript:|/api/|/app/|저장했습니다|확정했습니다|지급했습니다|처리했습니다|완료되었습니다",Pattern.CASE_INSENSITIVE);
+    private static final List<String> UNSAFE_TEXT = List.of(
+            "http://", "https://", "www.", "<", ">", "data-guide-target", "queryselector",
+            "javascript:", "/api/", "/app/", "저장했습니다", "확정했습니다", "지급했습니다",
+            "처리했습니다", "완료되었습니다");
+    private static final String MONEY_PREFIXES = "일이삼사오육칠팔구십백천만억조";
+
+    private static boolean unsafeOutput(String message) {
+        String normalized = Normalizer.normalize(message, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
+        if (normalized.codePoints().anyMatch(Character::isDigit)
+                || UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return true;
+        // Scan backwards from each currency unit once: no nested regex backtracking on model text.
+        for (int index = 1; index < normalized.length(); index++) {
+            if (normalized.charAt(index) != '원') continue;
+            int previous = index - 1;
+            while (previous >= 0 && Character.isWhitespace(normalized.charAt(previous))) previous--;
+            if (previous >= 0 && MONEY_PREFIXES.indexOf(normalized.charAt(previous)) >= 0) return true;
+        }
+        return false;
+    }
+
     @PreAuthorize(Roles.ANY_ROLE)
     public PicoAskResponse ask(PicoAskRequest request) {
-        if (!"1.0".equals(request.guideVersion())) return fixed(request,Decision.ASK_CLARIFICATION,"가이드 버전이 바뀌었습니다. 화면을 새로 열고 질문해주세요.",List.of(),"GUIDE_VERSION_MISMATCH");
-        if (!request.entityRefs().isEmpty()) return fixed(request,Decision.ANSWER_ONLY,"이 연결은 지급 업무의 일반 절차를 설명합니다. 실제 대상의 금액과 상태는 기존 계산 조회에서 확인해주세요.",List.of(),"ENTITY_STATE_NOT_SUPPORTED");
-        if (request.conversation()!=null && !request.conversation().isEmpty()) return fixed(request,Decision.ASK_CLARIFICATION,"이번 연결은 현재 질문을 기준으로 안내합니다. 원하는 지급 업무를 질문에 다시 적어주세요.",List.of(),"HISTORY_NOT_SUPPORTED");
-        var terms=terms(request.question());
-        if (terms.isEmpty()) return fixed(request,Decision.UNSUPPORTED,"지급 금액 확인·초안 작성·사전검증과 확정 절차를 안내할 수 있어요. 원하는 업무를 구체적으로 적어주세요.",List.of(),"NO_SUPPORTED_WORKFLOW");
-        if (terms.stream().anyMatch(Set.of("수정","정정","취소")::contains)) return fixed(request,Decision.ASK_CLARIFICATION,"작성 중인 초안을 수정하려는 건가요, 이미 확정된 지급을 정정하려는 건가요? 상태에 맞는 기존 업무 화면을 먼저 확인해주세요.",List.of(),"PAYMENT_STATE_REQUIRED");
-        boolean canProcess=canProcess();
-        if (!canProcess && terms.stream().anyMatch(Set.of("저장","확정","취소","정정","작성")::contains)) return fixed(request,Decision.UNSUPPORTED,"현재 계정은 조회 안내만 사용할 수 있어요. 지급 처리 업무는 정산 담당자에게 요청해주세요.",List.of(),"PERMISSION_DENIED");
+        PicoAskResponse contextError = contextError(request);
+        if (contextError != null) return contextError;
+        var terms = terms(request.question());
+        boolean canProcess = canProcess();
+        PicoAskResponse intentError = intentError(request, terms, canProcess);
+        if (intentError != null) return intentError;
         var candidates=catalog.search(terms,canProcess);
         if (candidates.isEmpty()) return fixed(request,Decision.ASK_CLARIFICATION,"금액 확인·초안 저장·사전검증 중 어떤 업무가 필요한가요?",List.of(),"WORKFLOW_REQUIRED");
         if (candidates.size()>1 && catalog.score(candidates.get(0),terms)==catalog.score(candidates.get(1),terms)) return fixed(request,Decision.ASK_CLARIFICATION,"관련된 업무가 여러 개예요. 금액 확인·초안 저장·사전검증 중 원하는 목적을 알려주세요.",List.of(),"AMBIGUOUS_WORKFLOW");
-        var selected=candidates.getFirst(); var chunks=catalog.chunks(selected);
+        var selected=candidates.getFirst();
+        var chunks=catalog.chunks(selected);
         if (terms.contains("금액") && (request.question().contains("얼마") || request.question().contains("계산"))) return fixed(request,Decision.ANSWER_ONLY,"실제 금액은 프로그램의 현재 지급 건 계산 조회에서 확인해주세요. 이 답변은 금액을 계산하거나 지급을 승인하지 않습니다.",chunks.subList(0,1),"CALCULATION_REQUIRED");
         try {
             // Never send raw question, history, entity IDs, amounts, names or current business state.
@@ -52,8 +70,21 @@ public class PicoAskService {
             return fallback(request,chunks,"AI_UNAVAILABLE");
         } catch (JsonProcessingException error) { return fallback(request,chunks,"INPUT_ENCODING_ERROR"); }
     }
+    private PicoAskResponse contextError(PicoAskRequest request) {
+        if (!"1.0".equals(request.guideVersion())) return fixed(request,Decision.ASK_CLARIFICATION,"가이드 버전이 바뀌었습니다. 화면을 새로 열고 질문해주세요.",List.of(),"GUIDE_VERSION_MISMATCH");
+        if (!request.entityRefs().isEmpty()) return fixed(request,Decision.ANSWER_ONLY,"이 연결은 지급 업무의 일반 절차를 설명합니다. 실제 대상의 금액과 상태는 기존 계산 조회에서 확인해주세요.",List.of(),"ENTITY_STATE_NOT_SUPPORTED");
+        if (request.conversation()!=null && !request.conversation().isEmpty()) return fixed(request,Decision.ASK_CLARIFICATION,"이번 연결은 현재 질문을 기준으로 안내합니다. 원하는 지급 업무를 질문에 다시 적어주세요.",List.of(),"HISTORY_NOT_SUPPORTED");
+        return null;
+    }
+    private PicoAskResponse intentError(PicoAskRequest request, List<String> terms, boolean canProcess) {
+        if (terms.isEmpty()) return fixed(request,Decision.UNSUPPORTED,"지급 금액 확인·초안 작성·사전검증과 확정 절차를 안내할 수 있어요. 원하는 업무를 구체적으로 적어주세요.",List.of(),"NO_SUPPORTED_WORKFLOW");
+        if (terms.stream().anyMatch(Set.of("수정","정정","취소")::contains)) return fixed(request,Decision.ASK_CLARIFICATION,"작성 중인 초안을 수정하려는 건가요, 이미 확정된 지급을 정정하려는 건가요? 상태에 맞는 기존 업무 화면을 먼저 확인해주세요.",List.of(),"PAYMENT_STATE_REQUIRED");
+        if (!canProcess && terms.stream().anyMatch(Set.of("저장","확정","취소","정정","작성")::contains)) return fixed(request,Decision.UNSUPPORTED,"현재 계정은 조회 안내만 사용할 수 있어요. 지급 처리 업무는 정산 담당자에게 요청해주세요.",List.of(),"PERMISSION_DENIED");
+        return null;
+    }
     public static List<String> terms(String question) {
-        String normalized=question.replaceAll("\\s+",""); var result=new ArrayList<String>();
+        String normalized=question.replaceAll("\\s+","");
+        var result=new ArrayList<String>();
         for(var term:VOCABULARY) if(normalized.contains(term)) result.add(term);
         if((normalized.contains("얼마") || normalized.contains("계산")) && !result.contains("금액")) result.add("금액");
         if(normalized.contains("잘못") && !result.contains("수정")) result.add("수정");
@@ -63,7 +94,7 @@ public class PicoAskService {
         return List.copyOf(result);
     }
     private boolean valid(ModelAnswer output,List<PicoGuideCatalog.Chunk> chunks) {
-        if(output==null || output.decision()==null || output.message()==null || output.message().isBlank() || output.message().length()>2000 || UNSAFE.matcher(output.message()).find() || output.evidenceChunkIds()==null || output.evidenceChunkIds().size()>8) return false;
+        if(output==null || output.decision()==null || output.message()==null || output.message().isBlank() || output.message().length()>2000 || unsafeOutput(output.message()) || output.evidenceChunkIds()==null || output.evidenceChunkIds().size()>8) return false;
         var allowed=chunks.stream().map(PicoGuideCatalog.Chunk::chunkId).toList();
         return (output.decision()!=Decision.ANSWER_ONLY || !output.evidenceChunkIds().isEmpty()) && output.evidenceChunkIds().stream().allMatch(id->id!=null && allowed.contains(id));
     }

@@ -52,7 +52,7 @@ class PicoAskServiceTest {
         assertThat(service.ask(request("이번 달 수수료 얼마야")).fallbackReason()).isEqualTo("CALCULATION_REQUIRED"); verifyNoInteractions(gateway);
     }
     @Test void rejectsForgedSourcesNumbersCompletionClaimsAndExecutableText() {
-        for(var bad:List.of(answer("외부로 이동하세요","evil:source"),answer("오만원 50000원입니다","payment.draft:overview"),answer("오만원 지급을 추천합니다","payment.draft:overview"),answer("지급했습니다","payment.draft:overview"),answer("https://evil.example 실행","payment.draft:overview"))) {
+        for(var bad:List.of(answer("외부로 이동하세요","evil:source"),answer("오만원 50000원입니다","payment.draft:overview"),answer("오만원 지급을 추천합니다","payment.draft:overview"),answer("５만원입니다","payment.draft:overview"),answer("javaScript:alert 실행","payment.draft:overview"),answer(java.text.Normalizer.normalize("지급했습니다",java.text.Normalizer.Form.NFD),"payment.draft:overview"),answer("지급했습니다","payment.draft:overview"),answer("https://evil.example 실행","payment.draft:overview"))) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(bad);
             var response=service.ask(request("초안 저장")); assertThat(response.source()).isEqualTo(Source.FIXED); assertThat(response.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT"); assertThat(response.message()).doesNotContain("evil","50000","지급했습니다");
         }
