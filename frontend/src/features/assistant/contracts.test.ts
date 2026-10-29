@@ -188,3 +188,24 @@ describe('calculation recommendation boundary', () => {
     })
   })
 })
+
+it('registers role/next metadata and rejects missing proposal slots and unscoped recommendations', () => {
+  for (const guide of GUIDE_CATALOG) {
+    expect(guide.roles.length).toBeGreaterThan(0)
+    for (const step of guide.steps) {
+      for (const edge of step.next) expect(guide.steps.some((candidate) => candidate.stepId === edge.stepId)).toBe(true)
+    }
+  }
+  const c = context()
+  const response = readPaymentFixture('PAY-02', c, now)
+  response.workflowProposal!.workflowId = 'payment.confirm'
+  response.workflowProposal!.resolvedContext.paymentId = null
+  expect(checkGuideProposal(response, { ...c, paymentId: null }, { now, mode: 'synthetic' })).toMatchObject({
+    reason: 'MISSING_REQUIRED_CONTEXT',
+  })
+  const calc = readPaymentFixture('PAY-01', c, now).calculations[0]
+  calc.resolvedScope = null
+  expect(checkCalculationRecommendation(calc, c, { now, mode: 'synthetic' })).toMatchObject({
+    reason: 'UNRESOLVED_SCOPE',
+  })
+})

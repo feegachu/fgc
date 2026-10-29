@@ -36,6 +36,12 @@ class PaymentCalculationServiceTest {
         when(payments.get(77L)).thenReturn(payment(CommissionPaymentStatus.DRAFT,"1.49","0.50","0.50"));
         var result = service.calculate(request(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE));
         assertThat(result.amounts()).containsEntry("amount","1").containsEntry("attributedTotal","2").containsEntry("differenceAmount","-1");
+        assertThat(result.basis().lines()).hasSize(2).allSatisfy(row -> {
+            assertThat(row.originalAmount()).isEqualTo("0.50");
+            assertThat(row.roundedAmount()).isEqualTo("1");
+            assertThat(row.contractId()).isEqualTo("3");
+        });
+        assertThat(result.basis().asOfDate()).isEqualTo("2026-10-01");
         assertThat(result.status()).isEqualTo("REVIEW_REQUIRED"); assertThat(result.validity()).isNull(); assertThat(result.recommendation().allowed()).isFalse(); assertThat(result.snapshotOnly()).isTrue(); assertThat(result.paymentStatus()).isEqualTo("DRAFT");
         verify(payments).get(77L); verifyNoMoreInteractions(payments);
     }

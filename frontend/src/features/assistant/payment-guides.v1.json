@@ -27,7 +27,13 @@
         "instruction": "정산월·지급단계·계약·수취인이 처리할 대상과 같은지 확인하세요.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "SCOPE_ACKNOWLEDGED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "SCOPE_ACKNOWLEDGED",
+            "stepId": "payment.amount"
+          }
+        ]
       },
       {
         "stepId": "payment.amount",
@@ -37,7 +43,8 @@
         "instruction": "예상액과 실제 명세를 구분해 확인하세요. 추천만으로 지급액을 변경하지 않습니다.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "AMOUNT_REVIEW_ACKNOWLEDGED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": []
       }
     ],
     "enabled": true,
@@ -48,6 +55,12 @@
       "차액",
       "조회",
       "수수료"
+    ],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
     ]
   },
   {
@@ -74,7 +87,13 @@
         "instruction": "정산월·지급단계·계약·수취인이 처리할 대상과 같은지 확인하세요.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "SCOPE_ACKNOWLEDGED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "SCOPE_ACKNOWLEDGED",
+            "stepId": "payment.amount"
+          }
+        ]
       },
       {
         "stepId": "payment.amount",
@@ -84,7 +103,13 @@
         "instruction": "예상액과 실제 명세를 구분해 확인하세요. 추천만으로 지급액을 변경하지 않습니다.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "AMOUNT_REVIEW_ACKNOWLEDGED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "AMOUNT_REVIEW_ACKNOWLEDGED",
+            "stepId": "payment.attributions"
+          }
+        ]
       },
       {
         "stepId": "payment.attributions",
@@ -94,7 +119,13 @@
         "instruction": "귀속 합계와 배부 근거를 확인하세요.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "ATTRIBUTIONS_REVIEWED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "ATTRIBUTIONS_REVIEWED",
+            "stepId": "payment.evidence"
+          }
+        ]
       },
       {
         "stepId": "payment.evidence",
@@ -104,7 +135,13 @@
         "instruction": "필수 근거와 입력값을 확인하세요.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "EVIDENCE_FIELDS_VALID",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "EVIDENCE_FIELDS_VALID",
+            "stepId": "payment.save"
+          }
+        ]
       },
       {
         "stepId": "payment.save",
@@ -114,7 +151,8 @@
         "instruction": "기존 저장 버튼을 직접 누르세요. API가 성공해야 저장 완료입니다.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "CURRENT_DRAFT_SAVED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": []
       }
     ],
     "enabled": true,
@@ -125,6 +163,10 @@
       "증빙",
       "작성",
       "입력"
+    ],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "SETTLEMENT"
     ]
   },
   {
@@ -152,7 +194,13 @@
         "instruction": "정산월·지급단계·계약·수취인이 처리할 대상과 같은지 확인하세요.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "SCOPE_ACKNOWLEDGED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "SCOPE_ACKNOWLEDGED",
+            "stepId": "payment.save"
+          }
+        ]
       },
       {
         "stepId": "payment.save",
@@ -162,7 +210,13 @@
         "instruction": "기존 저장 버튼을 직접 누르세요. API가 성공해야 저장 완료입니다.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "CURRENT_DRAFT_SAVED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "CURRENT_DRAFT_SAVED",
+            "stepId": "payment.precheck"
+          }
+        ]
       },
       {
         "stepId": "payment.precheck",
@@ -172,7 +226,13 @@
         "instruction": "기존 사전검증 버튼을 직접 누르세요. 200 응답만으로 통과한 것은 아닙니다.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "CURRENT_PRECHECK_PASSED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "CURRENT_PRECHECK_PASSED",
+            "stepId": "payment.precheck.result"
+          }
+        ]
       },
       {
         "stepId": "payment.precheck.result",
@@ -182,7 +242,13 @@
         "instruction": "confirmable과 차단 사유를 확인하세요.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "PRECHECK_RESULT_ACKNOWLEDGED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": [
+          {
+            "conditionId": "PRECHECK_RESULT_ACKNOWLEDGED",
+            "stepId": "payment.confirm"
+          }
+        ]
       },
       {
         "stepId": "payment.confirm",
@@ -192,7 +258,8 @@
         "instruction": "확인 모달에서 직접 확정하세요. 서버의 CONFIRMED 응답이 필요합니다.",
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "PAYMENT_CONFIRMED",
-        "missingTargetBehavior": "PAUSE"
+        "missingTargetBehavior": "PAUSE",
+        "next": []
       }
     ],
     "enabled": true,
@@ -201,6 +268,10 @@
       "검증",
       "다음",
       "결과"
+    ],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "SETTLEMENT"
     ]
   }
 ]
