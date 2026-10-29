@@ -140,6 +140,7 @@ export function Sidebar({
             </li>
           ))}
           {link('/exceptions')}
+          {link('/clawbacks')}
           {hasVisibleLinks(groups[3].paths) && <li className="sidebar-nav-section">
             <details className="sidebar-nav-details" open={openSections.includes('admin')}>
               <summary

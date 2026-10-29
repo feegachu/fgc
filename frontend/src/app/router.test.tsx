@@ -89,7 +89,7 @@ describe('AppShell·라우트', () => {
       const labels = [...screen.getByRole('navigation', { name: '주요 업무 메뉴' }).querySelectorAll('a')].map(
         (link) => link.querySelector('.sidebar-nav-label')?.textContent ?? link.textContent,
       )
-      expect(labels.slice(0, 12)).toEqual([
+      expect(labels.slice(0, 13)).toEqual([
         '업무 대시보드',
         '보험계약',
         '수수료 지급',
@@ -100,6 +100,7 @@ describe('AppShell·라우트', () => {
         '검증원장',
         '대사 실행·결과',
         '예외',
+        '환수',
         '기준정보',
         '정책·룰셋',
       ])
