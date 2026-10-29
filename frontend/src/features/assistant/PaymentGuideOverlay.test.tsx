@@ -7,22 +7,22 @@ afterEach(() => {
   useGuideRuntime.setState({ session: null, observation: null })
 })
 function startPaused() {
-  useGuideRuntime
-    .getState()
-    .publish({
-      owner: 'qa',
-      scopeKey: 'payment',
-      revision: 0,
-      canProcess: true,
-      ready: true,
-      amountValid: true,
-      attributionsValid: true,
-      formValid: true,
-      saved: false,
-      busy: false,
-      precheck: 'NONE',
-      modalOpen: false,
-    })
+  const observation = {
+    owner: 'qa',
+    scopeKey: 'payment',
+    revision: 0,
+    paymentId: null,
+    canProcess: true,
+    ready: true,
+    amountValid: true,
+    attributionsValid: true,
+    formValid: true,
+    saved: false,
+    busy: false,
+    precheck: 'NONE' as const,
+    modalOpen: false,
+  }
+  useGuideRuntime.getState().publish(observation)
   useGuideRuntime.getState().start('payment.draft')
   useGuideRuntime.getState().pause()
 }
