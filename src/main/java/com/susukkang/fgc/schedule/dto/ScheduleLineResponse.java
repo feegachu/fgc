@@ -20,6 +20,11 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleLineResponse {
+    private Long contractId;
+    private Long beneficiaryAgentId;
+    private Long commissionItemId;
+    private LocalDate attributionDate;
+    private String cashflowType;
     private Integer lineNo; // 줄 번호
     private Integer installmentNo; // 회차
     private Integer contractMonthNo; // 계약 차월

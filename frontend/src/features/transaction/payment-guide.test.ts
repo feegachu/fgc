@@ -38,7 +38,7 @@ beforeEach(() => {
     canProcess: true,
     paymentId: '77',
     form: initialForm('2026-07', draft),
-    rows: draftRows(draft, '2026-07'),
+    rows: draftRows(draft),
     dirty: false,
     ready: true,
     valid: true,
@@ -152,5 +152,37 @@ describe('payment guide server evidence', () => {
     expect(url).toBe('/api/v1/transactions/77')
     expect(options?.method).toBeUndefined()
     expect(options?.body).toBeUndefined()
+  })
+})
+
+describe('step-specific input guidance', () => {
+  it('allows scope review before amount and attribution inputs are completed', async () => {
+    observer.update({
+      ...input,
+      paymentId: null,
+      valid: false,
+      form: { ...input.form, commissionItemId: '', amount: '' },
+      rows: [],
+    })
+    observer.acknowledge('SCOPE_ACKNOWLEDGED')
+    const state = await read()
+    expect(paymentGuideConditions.SCOPE_ACKNOWLEDGED(observer.readContext(), state)).toBe('SATISFIED')
+    expect(paymentGuideConditions.EVIDENCE_FIELDS_VALID(observer.readContext(), state)).toBe('WAITING_INPUT')
+    expect(state.amountReady).toBe(false)
+    expect(state.attributionsReady).toBe(false)
+    expect(state.saved).toBe(false)
+  })
+  it('requires the recipient for GA payments and matching attribution totals', async () => {
+    observer.update({
+      ...input,
+      paymentId: null,
+      form: { ...input.form, agentId: '' },
+      rows: [{ ...input.rows[0], amount: '100' }],
+    })
+    expect((await read()).scopeReady).toBe(false)
+    expect((await read()).attributionsReady).toBe(false)
+    observer.update({ ...input, paymentId: null, form: { ...input.form, agentId: '', paymentStage: 'INSURER_TO_GA' } })
+    expect((await read()).scopeReady).toBe(true)
+    expect((await read()).attributionsReady).toBe(true)
   })
 })

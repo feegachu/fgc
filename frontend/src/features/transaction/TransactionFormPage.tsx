@@ -10,19 +10,13 @@ import { ApiError } from '../../lib/api/client'
 import { today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { withMonth } from '../../stores/workspace'
+import { SearchSelect } from '../../components/SearchSelect'
+import { readPaymentEntry, safeReturnTo } from './payment-entry'
+import type { PaymentEntry } from './payment-entry'
+import { useEntityChoices } from '../base/selection'
 import { AttributionEditor } from './AttributionEditor'
 import { CapPanel, ConfirmationModal, GatePanel } from './ConfirmationPanels'
-import {
-  agentsQuery,
-  confirmPayment,
-  contractQuery,
-  contractsQuery,
-  draftQuery,
-  formError,
-  itemsQuery,
-  precheckPayment,
-  saveDraft,
-} from './form-api'
+import { confirmPayment, contractQuery, draftQuery, formError, precheckPayment, saveDraft } from './form-api'
 import type { Payment, Precheck } from './form-api'
 import {
   availableItems,
@@ -85,7 +79,9 @@ export default function TransactionFormPage() {
     )
   return (
     <TransactionForm
-      key={`${id ?? 'new'}:${activeMonth}`}
+      key={`${id ?? 'new'}:${activeMonth}:${id ? '' : params.toString()}`}
+      entry={id ? {} : readPaymentEntry(params)}
+      returnTo={safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))}
       initialId={id}
       draft={draft.data}
       month={activeMonth}
@@ -96,12 +92,16 @@ export default function TransactionFormPage() {
 }
 
 function TransactionForm({
+  entry,
+  returnTo,
   initialId,
   draft,
   month,
   canProcess,
   role,
 }: {
+  entry: PaymentEntry
+  returnTo: string
   initialId: string | null
   draft?: Payment
   month: string
@@ -117,8 +117,28 @@ function TransactionForm({
     help.current?.focus()
   }
   const queryClient = useQueryClient()
-  const [form, setForm] = useState(() => initialForm(month, draft))
-  const [rawRows, setRows] = useState(() => draftRows(draft, draft?.settlementMonth?.slice(0, 7) ?? month))
+  const [form, setForm] = useState(() => ({
+    ...initialForm(month, draft),
+    ...(!draft
+      ? {
+          agentId: entry.agentId ?? '',
+          commissionItemId: entry.commissionItemId ?? '',
+          paymentStage: entry.paymentStage ?? 'GA_TO_FC',
+          amount: entry.amount ?? '250000',
+          cashflowType: entry.cashflowType ?? 'PAYMENT',
+        }
+      : {}),
+  }))
+  const [rawRows, setRows] = useState(() =>
+    !draft && entry.contractId
+      ? [
+          {
+            ...newRow(1, entry.attributionDate ?? '', entry.amount ?? '250000'),
+            contractId: entry.contractId,
+          },
+        ]
+      : draftRows(draft),
+  )
   const initialPayment = useRef(draft)
   const guide = useRef<PaymentGuideObserver | null>(null)
   const disconnectGuide = useRef<(() => void) | null>(null)
@@ -136,7 +156,6 @@ function TransactionForm({
   const [paymentId, setPaymentId] = useState(initialId)
   const [locked, setLocked] = useState(false)
   const [dirty, setDirty] = useState(!initialId)
-  const [filterAgent, setFilterAgent] = useState('')
   const [busy, setBusy] = useState<'save' | 'precheck' | 'confirm' | null>(null)
   const actionLock = useRef(false)
   const [fieldError, setFieldError] = useState<{ field: string; message: string }>()
@@ -147,9 +166,26 @@ function TransactionForm({
   const [confirmFailure, setConfirmFailure] = useState<ApiError | null>(null)
   const [confirmError, setConfirmError] = useState('')
   const [confirmed, setConfirmed] = useState(false)
-  const agentQuery = useQuery({ ...agentsQuery(form.settlementMonth), retry: false })
-  const itemQuery = useQuery({ ...itemsQuery(form.settlementMonth), retry: false })
-  const contractListQuery = useQuery({ ...contractsQuery(filterAgent), retry: false })
+  const agentQuery = useEntityChoices(
+    'agents',
+    { asOf: form.settlementMonth + '-01' },
+    [form.agentId],
+    Boolean(form.settlementMonth),
+    (agent) => agent.activeYn !== false && agent.agentStatus === 'ACTIVE',
+  )
+  const itemQuery = useEntityChoices(
+    'items',
+    { asOf: form.settlementMonth + '-01', cashflowType: form.cashflowType },
+    [form.commissionItemId],
+    Boolean(form.settlementMonth),
+    (item) => form.paymentStage !== 'INSURER_TO_GA' || item.itemCode !== 'NEWCOMER_SUPPORT',
+    form.paymentStage,
+  )
+  const contractListQuery = useEntityChoices(
+    'contracts',
+    { agentId: form.paymentStage === 'INSURER_TO_GA' ? '' : filterAgentId(form.agentId, agentQuery.data) },
+    rawRows.map((row) => row.contractId),
+  )
   const agents = agentQuery.data ?? []
   const items = itemQuery.data ?? []
   const contracts = contractListQuery.data ?? []
@@ -203,11 +239,12 @@ function TransactionForm({
     return buildPayload(validatedForm, validatedRows, newcomer)
   }
   let guideInputValid = false
+  let guideValidationMessage: string | undefined
   try {
     validatedPayload()
     guideInputValid = true
-  } catch {
-    /* Existing field validation remains owned by save. */
+  } catch (error) {
+    guideValidationMessage = error instanceof Error ? error.message : undefined
   }
   useLayoutEffect(() => {
     guide.current?.update({
@@ -219,6 +256,7 @@ function TransactionForm({
       dirty: needsSave,
       ready: !loading && !referenceError,
       valid: guideInputValid,
+      validationMessage: guideValidationMessage,
     })
     if (guide.current && !disconnectGuide.current) disconnectGuide.current = connectPaymentGuide(guide.current)
   })
@@ -240,22 +278,13 @@ function TransactionForm({
     if (patch.paymentStage && patch.paymentStage !== form.paymentStage) {
       next.agentId = ''
       next.commissionItemId = ''
-      setFilterAgent('')
       setRows([])
       toast('지급단계가 변경되어 수수료 항목과 귀속행을 초기화했습니다.', 'warning')
     } else if (patch.agentId !== undefined && patch.agentId !== form.agentId) {
       setRows([])
-      setFilterAgent(filterAgentId(patch.agentId, agents))
       if (rows.length) toast('수령 설계사가 변경되어 기존 귀속행을 비웠습니다. 계약을 다시 선택하세요.', 'warning')
     } else if (patch.settlementMonth !== undefined) {
       next.agentId = ''
-      setFilterAgent('')
-      setRows(
-        rows.map((row) => ({
-          ...row,
-          attributionDate: row.attributionDate || (patch.settlementMonth ? `${patch.settlementMonth}-01` : ''),
-        })),
-      )
     } else {
       setRows(rows.map((row) => normalizeRow(row, next.paymentStage === 'INSURER_TO_GA', isNewcomer(next, items))))
     }
@@ -290,7 +319,7 @@ function TransactionForm({
       if (!observer.acceptSaved(operation, saved)) throw new Error('저장된 지급 초안을 확인할 수 없습니다.')
       setPaymentId(String(saved.commissionTransactionId))
       setForm(initialForm(month, saved))
-      setRows(draftRows(saved, saved.settlementMonth?.slice(0, 7) ?? month))
+      setRows(draftRows(saved))
       setLocked(true)
       setDirty(false)
       setResult(null)
@@ -386,7 +415,7 @@ function TransactionForm({
       void queryClient.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' })
       toast('수수료 지급 건을 확정했습니다.', 'success')
       if (!helpOpen) {
-        void navigate(withMonth('/transactions', month))
+        void navigate(returnTo)
       } else {
         // A guide read must never turn a committed business success into a retryable failure.
         try {
@@ -428,7 +457,7 @@ function TransactionForm({
           >
             도움말
           </button>
-          <Link className="button button-secondary" to={withMonth('/transactions', month)}>
+          <Link className="button button-secondary" to={returnTo}>
             <span className="material-symbols-rounded" aria-hidden="true">
               arrow_back
             </span>{' '}
@@ -566,35 +595,33 @@ function TransactionForm({
                   helper="GA→설계사 단계에서는 반드시 있어야 합니다."
                   error={fieldMessage('recipient')}
                 >
-                  <select
+                  <SearchSelect
                     id="recipient"
                     value={form.agentId}
                     disabled={inputDisabled}
-                    onChange={(event) => changeForm({ agentId: event.target.value })}
-                  >
-                    <option value="">수령 설계사를 선택하세요</option>
-                    {agents.map((agent) => (
-                      <option key={agent.agentId} value={agent.agentId}>
-                        {agent.agentCode} {agent.agentName}
-                      </option>
-                    ))}
-                  </select>
+                    source={agentQuery.source}
+                    selected={selectedAgent}
+                    placeholder="설계사 이름·코드 검색"
+                    onSelect={(agentId, row) => {
+                      agentQuery.remember(row)
+                      changeForm({ agentId })
+                    }}
+                  />
                 </Field>
               )}
               <Field label="수수료 항목" required error={fieldMessage('item')}>
-                <select
+                <SearchSelect
                   id="item"
                   value={form.commissionItemId}
                   disabled={inputDisabled}
-                  onChange={(event) => changeForm({ commissionItemId: event.target.value })}
-                >
-                  <option value="">수수료 항목을 선택하세요</option>
-                  {availableItems(form, items).map((item) => (
-                    <option key={item.commissionItemId} value={item.commissionItemId}>
-                      {item.itemName}
-                    </option>
-                  ))}
-                </select>
+                  source={itemQuery.source}
+                  selected={items.find((row) => String(row.commissionItemId) === form.commissionItemId)}
+                  placeholder="수수료 항목 이름·코드 검색"
+                  onSelect={(commissionItemId, row) => {
+                    itemQuery.remember(row)
+                    changeForm({ commissionItemId })
+                  }}
+                />
               </Field>
               <Field
                 label="금액 (원)"
@@ -646,6 +673,8 @@ function TransactionForm({
             <AttributionEditor
               rows={rows}
               contracts={contracts}
+              contractSource={contractListQuery.source}
+              onContractSelected={contractListQuery.remember}
               agentLabel={agentLabel}
               amount={form.amount}
               insurer={insurer}
@@ -661,11 +690,7 @@ function TransactionForm({
                 setRows([
                   ...rows,
                   normalizeRow(
-                    newRow(
-                      ++sequence.current,
-                      form.settlementMonth ? `${form.settlementMonth}-01` : '',
-                      rows.length ? '0' : String(Number(form.amount) || 0),
-                    ),
+                    newRow(++sequence.current, '', rows.length ? '0' : String(Number(form.amount) || 0)),
                     insurer,
                     newcomer,
                   ),
@@ -759,7 +784,7 @@ function TransactionForm({
           modalOpen={modalOpen}
           confirmed={confirmed}
           onClose={closeHelp}
-          onList={() => void navigate(withMonth('/transactions', month))}
+          onList={() => void navigate(returnTo)}
         />
       )}
       <ConfirmationModal

@@ -100,6 +100,9 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 통합 테스트 컨텍스트가 누적되어 기본 512m 힙에서 CI가 OOM으로 중단됐다.
+    maxHeapSize = '1536m'
+    systemProperty 'spring.test.context.cache.maxSize', '12'
     // 통합 테스트가 개발자가 localhost:8081에서 쓰는 fgc DB를 공유하면 @AfterEach 정리가
     // 실제 실행 이력까지 훼손할 수 있다. 모든 테스트를 Docker 임시 PostgreSQL로 격리한다.
     systemProperty 'spring.profiles.active', 'test'

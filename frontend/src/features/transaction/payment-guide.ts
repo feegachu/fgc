@@ -14,6 +14,7 @@ export interface PaymentGuideInput {
   dirty: boolean
   ready: boolean
   valid: boolean
+  validationMessage?: string
 }
 export interface PaymentGuideState {
   available: boolean
@@ -21,6 +22,10 @@ export interface PaymentGuideState {
   saved: boolean
   prechecked: boolean
   confirmed: boolean
+  scopeReady: boolean
+  amountReady: boolean
+  attributionsReady: boolean
+  validationMessage?: string
   acknowledged: readonly string[]
 }
 const readers = ['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE']
@@ -37,7 +42,7 @@ const inputKey = (form: FormValues, rows: AttributionRow[]) =>
 const serverKey = (payment: Payment) => JSON.stringify(payment)
 const sameInput = (input: PaymentGuideInput, payment: Payment) =>
   inputKey(input.form, input.rows) ===
-  inputKey(initialForm(input.form.settlementMonth, payment), draftRows(payment, input.form.settlementMonth))
+  inputKey(initialForm(input.form.settlementMonth, payment), draftRows(payment))
 
 export interface PaymentOperation {
   readonly revision: number
@@ -238,6 +243,24 @@ export class PaymentGuideObserver {
     return {
       available: input.ready && readers.includes(input.role),
       valid: input.valid,
+      scopeReady: !!input.form.settlementMonth && (input.form.paymentStage === 'INSURER_TO_GA' || !!input.form.agentId),
+      amountReady:
+        !!input.form.commissionItemId &&
+        input.form.amount.trim() !== '' &&
+        Number.isFinite(Number(input.form.amount)) &&
+        Number(input.form.amount) >= 0,
+      attributionsReady:
+        input.rows.length > 0 &&
+        input.rows.every(
+          (row) =>
+            (row.attributionMethod === 'NEWCOMER_NON_CONTRACT' || !!row.contractId) &&
+            !!row.attributionDate &&
+            row.amount.trim() !== '' &&
+            Number.isFinite(Number(row.amount)) &&
+            Number(row.amount) >= 0,
+        ) &&
+        input.rows.reduce((total, row) => total + Number(row.amount), 0) === Number(input.form.amount),
+      validationMessage: input.validationMessage,
       saved: matches && !input.dirty && payment?.status === 'DRAFT',
       prechecked:
         matches &&
@@ -279,15 +302,18 @@ export class PaymentGuideObserver {
   }
 }
 const inputCondition =
-  (rule: string): GuideCondition<PaymentGuideState> =>
+  (
+    rule: string,
+    field: 'valid' | 'scopeReady' | 'amountReady' | 'attributionsReady' = 'valid',
+  ): GuideCondition<PaymentGuideState> =>
   (_context, state) =>
-    state.available && state.valid && state.acknowledged.includes(rule) ? 'SATISFIED' : 'WAITING_INPUT'
+    state.available && state[field] && state.acknowledged.includes(rule) ? 'SATISFIED' : 'WAITING_INPUT'
 export const paymentGuideConditions: Readonly<Record<string, GuideCondition<PaymentGuideState>>> = {
   ALWAYS: () => 'SATISFIED',
   CONTEXT_AVAILABLE: (_context, state) => (state.available ? 'SATISFIED' : 'WAITING_INPUT'),
-  SCOPE_ACKNOWLEDGED: inputCondition('SCOPE_ACKNOWLEDGED'),
-  AMOUNT_REVIEW_ACKNOWLEDGED: inputCondition('AMOUNT_REVIEW_ACKNOWLEDGED'),
-  ATTRIBUTIONS_REVIEWED: inputCondition('ATTRIBUTIONS_REVIEWED'),
+  SCOPE_ACKNOWLEDGED: inputCondition('SCOPE_ACKNOWLEDGED', 'scopeReady'),
+  AMOUNT_REVIEW_ACKNOWLEDGED: inputCondition('AMOUNT_REVIEW_ACKNOWLEDGED', 'amountReady'),
+  ATTRIBUTIONS_REVIEWED: inputCondition('ATTRIBUTIONS_REVIEWED', 'attributionsReady'),
   EVIDENCE_FIELDS_VALID: (_context, state) => (state.valid ? 'SATISFIED' : 'WAITING_INPUT'),
   CURRENT_DRAFT_SAVED: (_context, state) => (state.saved ? 'SATISFIED' : 'WAITING_RESULT'),
   CURRENT_PRECHECK_PASSED: (_context, state) => (state.prechecked ? 'SATISFIED' : 'WAITING_RESULT'),

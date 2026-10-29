@@ -43,45 +43,12 @@ export const draftQuery = (id: string | null) =>
     queryFn: ({ signal }) => data<Payment>(path(id!), { signal }),
     enabled: Boolean(id),
   })
-export const agentsQuery = (month: string) =>
-  queryOptions({
-    meta: { errorToast: false },
-    queryKey: ['transactions', 'agents', month],
-    queryFn: async ({ signal }) => {
-      const result = await data<Schemas['PageResponseAgentResponse']>(
-        `/api/v1/base/agents?asOf=${encodeURIComponent(month + '-01')}&page=1&size=100`,
-        { signal },
-      )
-      return (result.content ?? []).filter((agent) => agent.activeYn !== false && agent.agentStatus === 'ACTIVE')
-    },
-    enabled: Boolean(month),
-  })
-export const contractsQuery = (agentId = '') =>
-  queryOptions({
-    meta: { errorToast: false },
-    queryKey: ['transactions', 'contracts', agentId],
-    queryFn: async ({ signal }) => {
-      const result = await data<Schemas['PageResponseContractView']>(
-        `/api/v1/contracts?page=1&size=100${agentId ? `&agentId=${encodeURIComponent(agentId)}` : ''}`,
-        { signal },
-      )
-      return result.content ?? []
-    },
-  })
 export const contractQuery = (id: number | undefined) =>
   queryOptions({
     meta: { errorToast: false },
     queryKey: ['transactions', 'contract', id],
     queryFn: ({ signal }) => data<Schemas['ContractDetailResponse']>('/api/v1/contracts/' + id, { signal }),
     enabled: id != null && id > 0,
-  })
-export const itemsQuery = (month: string) =>
-  queryOptions({
-    meta: { errorToast: false },
-    queryKey: ['transactions', 'items', month],
-    queryFn: ({ signal }) =>
-      data<CommissionItem[]>(`/api/v1/base/commission-items?asOf=${encodeURIComponent(month + '-01')}`, { signal }),
-    enabled: Boolean(month),
   })
 export const saveDraft = (id: string | null, body: PaymentPayload) =>
   data<Payment>(id ? path(id) : '/api/v1/transactions', { method: id ? 'PUT' : 'POST', body })

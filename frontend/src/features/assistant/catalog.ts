@@ -19,7 +19,7 @@ const step = (
 const scope = step(
   'payment.scope',
   '지급 대상을 확인하세요',
-  '정산월·지급단계·계약·수취인이 처리할 대상과 같은지 확인하세요.',
+  '① 지급 건에서 정산월·지급단계·수취인을 확인하세요. 계약 선택은 귀속행 단계에서 안내합니다.',
   'SCOPE_ACKNOWLEDGED',
 )
 const amount = step(

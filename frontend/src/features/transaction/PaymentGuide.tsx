@@ -1,3 +1,4 @@
+import { useSpotlight } from '../assistant/guide/useSpotlight'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
 import { createPortal } from 'react-dom'
@@ -217,6 +218,14 @@ function GuideSession({
   } catch {
     /* Changed selection is handled by the runtime pause state. */
   }
+  const waitingInstruction =
+    step?.stepId === 'payment.scope'
+      ? '① 지급 건에서 정산월·지급단계와 수령 설계사를 선택하세요. 원수사→GA는 설계사 선택이 필요 없습니다. 계약은 3단계 귀속행에서 선택합니다.'
+      : step?.stepId === 'payment.amount'
+        ? '① 지급 건에서 수수료 항목과 0원 이상의 지급액을 입력하세요.'
+        : step?.stepId === 'payment.attributions'
+          ? '② 귀속행 추가 후 계약번호·귀속일·금액을 입력하세요. 귀속금액 합계를 지급액과 맞추세요.'
+          : (state?.validationMessage ?? '화면의 실제 업무 버튼을 눌러 처리 결과를 확인하세요.')
   const paused = snapshot.status === 'PAUSED' || snapshot.status === 'ERROR'
   const complete = snapshot.status === 'COMPLETED'
   const folded = collapsed && !confirmed && !complete
@@ -307,7 +316,8 @@ function GuideSession({
                       '안내가 중단되었습니다. 현재 화면을 확인하고 다시 찾으세요.')
                     : canNext
                       ? '조건을 확인했습니다. 다음 단계로 진행할 수 있습니다.'
-                      : '입력 또는 실제 처리 결과를 기다리고 있습니다.'}
+                      : waitingInstruction}
+                  {paused && !canNext && ` ${waitingInstruction}`}
                 </p>
               )}
               {message && <p role="alert">{message}</p>}
@@ -390,68 +400,4 @@ function GuideSession({
     </>,
     document.body,
   )
-}
-
-function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>) {
-  const [position, setPosition] = useState<{
-    box: { left: number; top: number; width: number; height: number } | null
-    card: { left?: number; top?: number; right?: number; bottom?: number }
-  }>({ box: null, card: { right: 16, bottom: 16 } })
-  useEffect(() => {
-    let frame = 0
-    const measure = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => {
-        const width = document.documentElement.clientWidth,
-          height = window.innerHeight
-        const rect = target?.isConnected ? target.getBoundingClientRect() : null
-        const box = rect
-          ? {
-              left: Math.max(0, rect.left - 10),
-              top: Math.max(0, rect.top - 10),
-              width: Math.max(0, Math.min(width, rect.right + 10) - Math.max(0, rect.left - 10)),
-              height: Math.max(0, Math.min(height, rect.bottom + 10) - Math.max(0, rect.top - 10)),
-            }
-          : null
-        const cw = card.current?.offsetWidth ?? 360,
-          ch = card.current?.offsetHeight ?? 300
-        const corners = [
-          { left: width - cw - 16, top: height - ch - 16, anchor: { right: 16, bottom: 16 } },
-          { left: 16, top: height - ch - 16, anchor: { left: 16, bottom: 16 } },
-          { left: width - cw - 16, top: 16, anchor: { right: 16, top: 16 } },
-          { left: 16, top: 16, anchor: { left: 16, top: 16 } },
-        ]
-        const free =
-          box &&
-          corners.find(
-            (point) =>
-              point.left >= 0 &&
-              point.top >= 0 &&
-              (point.left + cw + 12 < box.left ||
-                point.left > box.left + box.width + 12 ||
-                point.top + ch + 12 < box.top ||
-                point.top > box.top + box.height + 12),
-          )
-        setPosition({
-          box: box?.width && box.height ? box : null,
-          card: free ? free.anchor : { right: 16, bottom: 16 },
-        })
-      })
-    }
-    const resize = new ResizeObserver(measure)
-    if (target) resize.observe(target)
-    if (card.current) resize.observe(card.current)
-    window.addEventListener('scroll', measure, true)
-    window.addEventListener('resize', measure)
-    window.visualViewport?.addEventListener('resize', measure)
-    measure()
-    return () => {
-      cancelAnimationFrame(frame)
-      resize.disconnect()
-      window.removeEventListener('scroll', measure, true)
-      window.removeEventListener('resize', measure)
-      window.visualViewport?.removeEventListener('resize', measure)
-    }
-  }, [target, card])
-  return position
 }

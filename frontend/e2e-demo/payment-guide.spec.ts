@@ -1,3 +1,4 @@
+import { selectEntity } from '../e2e/selectEntity'
 import { test, expect, login, api, responseFor, successful, sql } from './fixtures'
 
 // Screenshots and HTTP/DB evidence are retained without requiring video encoding.
@@ -19,12 +20,12 @@ test('FUN-087 실제 서버: 초안 저장 → 사전검증 → 확정 → 가�
   const items = await api(page, '/base/commission-items?asOf=2026-07-01')
   const item = items.find((entry: { itemCode: string }) => entry.itemCode === 'BASE_COMMISSION')
   expect(item).toBeTruthy()
-  await page.locator('#recipient').selectOption(String(contract.agentId))
-  await page.locator('#item').selectOption(String(item.commissionItemId))
+  await selectEntity(page, page.locator('#recipient'), String(contract.agentId))
+  await selectEntity(page, page.locator('#item'), String(item.commissionItemId))
   await page.locator('#bizKey').fill('E2E-FUN087-GUIDE')
   await page.locator('#amount').fill('20')
-  await page.locator('#btn-add-attr').click()
-  await page.locator('[data-contract-id]').selectOption(String(contract.contractId))
+  if (!(await page.locator('[data-contract-id]').count())) await page.locator('#btn-add-attr').click()
+  await selectEntity(page, page.locator('[data-contract-id]'), String(contract.contractId))
   await page.locator('[data-attr-date]').fill('2026-07-31')
   await page.locator('[data-attr-amount]').fill('20')
   await page.getByRole('button', { name: '도움말', exact: true }).click()

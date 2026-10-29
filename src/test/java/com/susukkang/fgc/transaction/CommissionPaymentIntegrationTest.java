@@ -22,6 +22,7 @@ import com.susukkang.fgc.transaction.entity.TransactionAttribution;
 import com.susukkang.fgc.transaction.repository.CommissionTransactionRepository;
 import com.susukkang.fgc.transaction.repository.CommissionPaymentWriteRepository;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentCommand;
+import com.susukkang.fgc.schedule.repository.ScheduleQueryRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,62 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 // 이 통합 테스트에도 SecurityContext가 필요하다. 지급 확정은 SETTLEMENT가 소유하는 동작이다.
 @WithMockUser(roles = "SETTLEMENT")
 class CommissionPaymentIntegrationTest {
+
+    @Autowired
+    private ScheduleQueryRepository scheduleQueryRepository;
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "2026-07-10,12,2027-06-10,INCLUDED",
+            "2026-07-10,13,2027-07-10,OUTSIDE_FIRST_YEAR",
+            "2026-01-31,2,2026-02-28,NOT_APPLICABLE"
+    })
+    void scheduledPaymentContextPreservesFirstYearAndMonthEndBoundaries(
+            LocalDate contractDate, int contractMonth, LocalDate expectedDate, String classification) {
+        Long contractId = firstYearCandidateContract(contractDate);
+        Long headerId = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.schedule_header(contract_id,payment_stage,policy_version_id,schedule_version_no,
+                    schedule_regime,schedule_purpose,status,active_yn,generation_reason)
+                SELECT ?,'GA_TO_FC',policy_version_id,1,'CURRENT','OPERATIONAL','PLANNED',true,'IT-633'
+                FROM fgc.policy_version WHERE policy_type='CURRENT_COMMISSION' AND status='ACTIVE'
+                ORDER BY policy_version_id LIMIT 1 RETURNING schedule_header_id
+                """, Long.class, contractId);
+        // 지급예정일을 귀속일과 다르게 두어 잘못된 필드 전달도 검출한다.
+        LocalDate dueDate = expectedDate.plusMonths(1);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.schedule_line(schedule_header_id,line_no,installment_no,contract_month_no,due_date,
+                    commission_item_id,beneficiary_agent_id,basis_code,basis_amount,calculation_type,fixed_amount,
+                    rounding_scale,rounding_mode,expected_amount,line_status)
+                VALUES (?,1,?,?,?, ?,6,'MONTHLY_PREMIUM',100000,'FIXED',100000,0,'HALF_UP',100000,'PLANNED')
+                """, headerId, contractMonth, contractMonth, dueDate, commissionItemId());
+
+        var line = scheduleQueryRepository.selectScheduleDetailById(headerId).getLines().getFirst();
+        assertThat(line.getAttributionDate()).isEqualTo(expectedDate).isNotEqualTo(line.getDueDate());
+        assertThat(line.getContractId()).isEqualTo(contractId);
+        var payment = commissionPaymentService.create(candidateRequest(line.getContractId(), "100000",
+                List.of(candidateAttribution(line.getContractId(), line.getAttributionDate(), "100000"))));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT attribution_date FROM fgc.transaction_attribution WHERE commission_transaction_id=?
+                """, LocalDate.class, payment.paymentId())).isEqualTo(expectedDate);
+        var preview = commissionPaymentService.precheck(payment.paymentId());
+        assertThat(preview.confirmable()).isTrue();
+        if ("OUTSIDE_FIRST_YEAR".equals(classification)) {
+            assertThat(preview.capPreview()).isEmpty();
+            assertThat(preview.capExclusions()).singleElement().satisfies(exclusion -> {
+                assertThat(exclusion.reasonCode()).isEqualTo("OUTSIDE_FIRST_YEAR");
+                assertThat(exclusion.firstYearEndExclusive()).isEqualTo(LocalDate.of(2027, 7, 10));
+            });
+        } else if ("INCLUDED".equals(classification)) {
+            assertThat(preview.capExclusions()).isEmpty();
+            assertThat(preview.capPreview()).singleElement().satisfies(item ->
+                    assertThat(item.candidateAmount()).isEqualTo(100000L));
+        } else {
+            // 2026-01 계약은 시행 전 계약이므로 기간 경계와 별도로 적용대상 아님을 유지한다.
+            assertThat(preview.capExclusions()).isEmpty();
+            assertThat(preview.capPreview()).singleElement().satisfies(item ->
+                    assertThat(item.applicabilityReasonCode()).isEqualTo("CONTRACT_BEFORE_EFFECTIVE_DATE"));
+        }
+    }
 
     @org.junit.jupiter.api.BeforeEach
     void authenticateActualActor() {

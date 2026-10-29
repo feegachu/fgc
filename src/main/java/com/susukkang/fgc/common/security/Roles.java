@@ -34,6 +34,10 @@ public final class Roles {
     public static final String CAN_PROCESS =
             HAS_ANY_ROLE + SETTLEMENT + "','" + SYSTEM_ADMIN + "')";
 
+    /** IF-API-79·80·81 및 제출: 정책 초안 작성. GA 관리자도 정책 작성에 참여한다. */
+    public static final String CAN_WRITE_POLICY =
+            HAS_ANY_ROLE + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+
     /** AUDT-W01 감사로그 조회. 화면정의서 v2.0 :1503,:1530. */
     public static final String CAN_VIEW_AUDIT_LOG =
             HAS_ANY_ROLE + COMPLIANCE + "','" + SYSTEM_ADMIN + "')";
