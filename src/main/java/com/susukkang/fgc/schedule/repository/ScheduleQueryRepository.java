@@ -314,8 +314,10 @@ public class ScheduleQueryRepository {
         List<ScheduleLineResponse> lines = entityManager.createQuery("""
                 SELECT sl.lineNo, sl.installmentNo, sl.contractMonthNo, sl.dueDate, ci.itemName, a.agentName,
                        sl.basisCode, sl.basisAmount, sl.calculationType, sl.ratePct, sl.expectedAmount,
-                       sl.lineStatus, sl.sourceCommissionRuleId
+                       sl.lineStatus, sl.sourceCommissionRuleId, c.contractId, c.contractDate, sl.beneficiaryAgentId, sl.commissionItemId, ci.cashflowType
                   FROM ScheduleLine sl
+                  JOIN ScheduleHeader sh ON sh.scheduleHeaderId = sl.scheduleHeaderId
+                  JOIN InsuranceContract c ON c.contractId = sh.contractId
                   LEFT JOIN Agent a ON a.agentId = sl.beneficiaryAgentId
                   LEFT JOIN CommissionItem ci ON ci.commissionItemId = sl.commissionItemId
                  WHERE sl.scheduleHeaderId = :scheduleHeaderId
@@ -324,6 +326,11 @@ public class ScheduleQueryRepository {
                 .setParameter("scheduleHeaderId", header.getScheduleHeaderId())
                 .getResultList().stream()
                 .map(row -> ScheduleLineResponse.builder()
+                        .contractId((Long) row[13])
+                        .beneficiaryAgentId((Long) row[15])
+                        .commissionItemId((Long) row[16])
+                        .cashflowType((String) row[17])
+                        .attributionDate(((LocalDate) row[14]).plusMonths(((Integer) row[2]) - 1L))
                         .lineNo((Integer) row[0])
                         .installmentNo((Integer) row[1])
                         .contractMonthNo((Integer) row[2])

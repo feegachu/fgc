@@ -12,6 +12,8 @@ import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { AssistantDemoMount } from '../../features/assistant/PicoAssistant'
+import { AgentTopbar } from './AgentTopbar'
+import './agent-theme.css'
 export interface ShellContext {
   user: ShellUser
   month: string | null
@@ -34,7 +36,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       canViewAuditLog: user.canViewAuditLog,
       isAgent: user.roleCode === 'AGENT',
     })
-    // 설계사 홈 전환과 이 셸의 월 URL 정규화가 서로 덮어쓰지 않게 한다.
+    // 포트폴리오 전환과 이 셸의 월 URL 정규화가 서로 덮어쓰지 않게 한다.
     if (user.roleCode === 'AGENT' && location.pathname === '/') return
     if (validMonth(requestedMonth) && requestedMonth !== useWorkspaceStore.getState().month)
       workspace.applyMonth(requestedMonth)
@@ -71,7 +73,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           : '권한 없음 (FGC-UI-ERR-403) · FGC')
   }, [errorTitle, current, allowed])
   return (
-    <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''}`}>
+    <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}>
       <a className="skip-link" href="#main-content">
         본문으로 건너뛰기
       </a>
@@ -84,7 +86,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           loggingOut={loggingOut}
         />
         <header className="app-header app-header-rail">
-          <WorkspaceTabs activeId={current?.id} />
+          {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? <AgentTopbar /> : <WorkspaceTabs activeId={current?.id} />}
           <div className="app-header-actions">
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>

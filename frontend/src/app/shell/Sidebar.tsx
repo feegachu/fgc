@@ -114,6 +114,7 @@ export function Sidebar({
       <nav className="sidebar-nav" aria-label="주요 업무 메뉴">
         <ul className="sidebar-nav-list">
           {link('/')}
+          {link('/agent-home')}
           {groups.slice(0, 3).filter((group) => hasVisibleLinks(group.paths)).map((group) => (
             <li key={group.id}>
               <details className="sidebar-nav-details" open={openSections.includes(group.id)}>

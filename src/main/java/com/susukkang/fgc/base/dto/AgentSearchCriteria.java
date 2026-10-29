@@ -10,8 +10,13 @@ public record AgentSearchCriteria(
         LocalDate asOf,
         boolean includeTerminated,
         boolean includeHistorical,
-        String sort
+        String sort,
+        Long selectedId
 ) {
+    public AgentSearchCriteria(Long organizationId, String keyword, LocalDate asOf, boolean includeTerminated,
+                               boolean includeHistorical, String sort) {
+        this(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort, null);
+    }
     /** 기존 기준정보·등록 화면은 기준일에 위촉 기간이 유효한 설계사만 조회한다. */
     public AgentSearchCriteria(Long organizationId, String keyword, LocalDate asOf) {
         this(organizationId, keyword, asOf, false);

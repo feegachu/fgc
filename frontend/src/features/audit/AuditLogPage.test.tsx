@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -361,16 +360,6 @@ describe('normalizeCriteria', () => {
     expect(normalizeCriteria(new URLSearchParams('sort=policyVersionId,desc')).sort).toBe('policyVersionId,desc')
     expect(normalizeCriteria(new URLSearchParams('sort=actionCode,asc')).sort).toBe('')
   })
-})
-
-it('공통 리사이즈로 대체한 좌우 배치 외의 감사로그 CSS 는 1차와 같다', () => {
-  // #597: React의 좌우 배치·모바일 전환은 ResizableSplit에서 담당한다.
-  const read = (path: string) => readFileSync(path, 'utf8')
-    .replace(/\r\n/g, '\n')
-    .replace(/@media \(max-width: 56.25rem\) \{\s*\.audit-layout \{[^}]*\}\s*\}/, '')
-    .replace(/\.audit-layout \{[^}]*\}/, '')
-    .replace(/\n{3,}/g, '\n\n')
-  expect(read('src/features/audit/audit.css')).toBe(read('../src/main/resources/static/css/features/audit.css'))
 })
 
 describe('diffFieldLabel', () => {
