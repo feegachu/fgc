@@ -1,20 +1,26 @@
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import { findGuide, findStep } from './catalog'
+import { isEntityId } from './guards'
 export type PicoReply = components['schemas']['PicoAskResponse']
 export async function askPico(
   question: string,
   revision: string,
   screenId: string,
   signal: AbortSignal,
+  paymentId?: string | null,
 ): Promise<PicoReply> {
+  const paymentRef =
+    paymentId && isEntityId(paymentId) && BigInt(paymentId) <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? [{ type: 'PAYMENT' as const, id: Number(paymentId) }]
+      : []
   const response = await apiClient.request<PicoReply>('/api/v1/ai/pico/ask', {
     method: 'POST',
     signal,
     body: {
       question,
       screenId,
-      entityRefs: [],
+      entityRefs: paymentRef,
       clientContextRevision: revision,
       guideVersion: '1.0',
       conversation: [],

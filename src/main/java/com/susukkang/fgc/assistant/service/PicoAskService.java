@@ -23,8 +23,9 @@ public class PicoAskService {
     private final LlmGateway gateway;
     private final PicoGuideCatalog catalog;
     private final ObjectMapper mapper;
+    private final PicoPaymentContextService paymentContext;
     public record ModelAnswer(Decision decision,String message,List<String> evidenceChunkIds) {}
-    private static final List<String> VOCABULARY=List.of("초안","저장","지급","확정","검증","금액","예상","한도","귀속","증빙","수정","취소","조회","입력","정정","차액","방법","다음","완료","차이","금지","수수료","작성");
+    private static final List<String> VOCABULARY=List.of("초안","저장","지급","확정","검증","금액","예상","한도","귀속","증빙","수정","취소","조회","입력","정정","차액","방법","다음","완료","차이","금지","수수료","작성","상태");
     private static final List<String> UNSAFE_TEXT = List.of(
             "http://", "https://", "www.", "<", ">", "data-guide-target", "queryselector",
             "javascript:", "/api/", "/app/", "저장했습니다", "확정했습니다", "지급했습니다",
@@ -71,6 +72,8 @@ public class PicoAskService {
         boolean canProcess = canProcess();
         PicoAskResponse intentError = intentError(request, terms, canProcess);
         if (intentError != null) return intentError;
+        PicoAskResponse paymentError = paymentContextResponse(request, terms);
+        if (paymentError != null) return paymentError;
         var candidates=catalog.search(terms,canProcess);
         if (candidates.isEmpty()) return fixed(request,Decision.ASK_CLARIFICATION,"금액 확인·초안 저장·사전검증 중 어떤 업무가 필요한가요?",List.of(),"WORKFLOW_REQUIRED");
         if (candidates.size()>1 && catalog.score(candidates.get(0),terms)==catalog.score(candidates.get(1),terms)) return fixed(request,Decision.ASK_CLARIFICATION,"관련된 업무가 여러 개예요. 금액 확인·초안 저장·사전검증 중 원하는 목적을 알려주세요.",List.of(),"AMBIGUOUS_WORKFLOW");
@@ -100,15 +103,36 @@ public class PicoAskService {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "screenId", Map.of("field", "screenId"), "승인된 질문 화면이 아닙니다.");
         if (!"1.0".equals(request.guideVersion()))
             throw new FgcBusinessException(FgcErrorCode.IMPL_GUIDE_VERSION_MISMATCH);
-        if (!request.entityRefs().isEmpty()) return fixed(request,Decision.ANSWER_ONLY,"이 연결은 지급 업무의 일반 절차를 설명합니다. 실제 대상의 금액과 상태는 기존 계산 조회에서 확인해주세요.",List.of(),"ENTITY_STATE_NOT_SUPPORTED");
         if (request.conversation()!=null && !request.conversation().isEmpty()) return fixed(request,Decision.ASK_CLARIFICATION,"이번 연결은 현재 질문을 기준으로 안내합니다. 원하는 지급 업무를 질문에 다시 적어주세요.",List.of(),"HISTORY_NOT_SUPPORTED");
         return null;
     }
     private PicoAskResponse intentError(PicoAskRequest request, List<String> terms, boolean canProcess) {
         if (terms.isEmpty()) return fixed(request,Decision.UNSUPPORTED,"지급 금액 확인·초안 작성·사전검증과 확정 절차를 안내할 수 있어요. 원하는 업무를 구체적으로 적어주세요.",List.of(),"NO_SUPPORTED_WORKFLOW");
-        if (terms.stream().anyMatch(Set.of("수정","정정","취소")::contains)) return fixed(request,Decision.ASK_CLARIFICATION,"작성 중인 초안을 수정하려는 건가요, 이미 확정된 지급을 정정하려는 건가요? 상태에 맞는 기존 업무 화면을 먼저 확인해주세요.",List.of(),"PAYMENT_STATE_REQUIRED");
-        if (!canProcess && terms.stream().anyMatch(Set.of("저장","확정","취소","정정","작성")::contains)) return fixed(request,Decision.UNSUPPORTED,"현재 계정은 조회 안내만 사용할 수 있어요. 지급 처리 업무는 정산 담당자에게 요청해주세요.",List.of(),"PERMISSION_DENIED");
+        if (!canProcess && !(terms.contains("상태") && !request.entityRefs().isEmpty()) && terms.stream().anyMatch(Set.of("저장","확정","취소","정정","수정","작성")::contains)) return fixed(request,Decision.UNSUPPORTED,"현재 계정은 조회 안내만 사용할 수 있어요. 지급 처리 업무는 정산 담당자에게 요청해주세요.",List.of(),"PERMISSION_DENIED");
+        if (request.entityRefs().isEmpty() && terms.stream().anyMatch(Set.of("수정","정정","취소")::contains)) return fixed(request,Decision.ASK_CLARIFICATION,"작성 중인 초안을 수정하려는 건가요, 이미 확정된 지급을 정정하려는 건가요? 상태에 맞는 기존 업무 화면을 먼저 확인해주세요.",List.of(),"PAYMENT_STATE_REQUIRED");
         return null;
+    }
+    private PicoAskResponse paymentContextResponse(PicoAskRequest request, List<String> terms) {
+        if (request.entityRefs().isEmpty()) return null;
+        if (request.entityRefs().size() != 1)
+            return fixed(request, Decision.ASK_CLARIFICATION, "지급 건을 하나 선택한 뒤 질문해주세요.", List.of(), "SINGLE_PAYMENT_REQUIRED");
+        var entity = request.entityRefs().getFirst();
+        if (entity.type() != PicoAskRequest.EntityType.PAYMENT)
+            return fixed(request, Decision.UNSUPPORTED, "현재는 저장된 지급 건의 상태만 질문에 연결할 수 있어요.", List.of(), "ENTITY_STATE_NOT_SUPPORTED");
+        // This separate service closes its read transaction before any external model call.
+        var snapshot = paymentContext.read(entity.id());
+        return switch (snapshot.status()) {
+            case CONFIRMED -> fixed(request, Decision.ANSWER_ONLY,
+                    "서버에서 확인한 지급 건은 확정 상태입니다. 초안 저장·확정 안내를 이어가지 않습니다. 기존 지급 목록의 상태와 정정 절차를 확인해주세요.", List.of(), "PAYMENT_ALREADY_CONFIRMED");
+            case CANCELLED -> fixed(request, Decision.ANSWER_ONLY,
+                    "서버에서 확인한 지급 건은 취소 상태입니다. 이 지급 건의 저장·확정 안내를 이어가지 않습니다. 기존 지급 목록에서 상태와 처리 이력을 확인해주세요.", List.of(), "PAYMENT_CANCELLED");
+            case DRAFT -> terms.contains("상태")
+                    ? fixed(request, Decision.ANSWER_ONLY, "서버에서 확인한 지급 건은 작성 중인 초안입니다. 현재 입력과 저장본이 같은지는 화면에서 확인해주세요. 이 답변은 저장·검증·확정을 수행하지 않습니다.", List.of(), "PAYMENT_DRAFT_STATE")
+                    : terms.stream().anyMatch(Set.of("수정", "정정", "취소")::contains)
+                    ? fixed(request, Decision.ANSWER_ONLY,
+                        "서버에서 확인한 지급 건은 작성 중인 초안입니다. 현재 입력과 저장본을 비교한 뒤 기존 초안 수정·저장 절차를 확인해주세요. 이 답변은 값을 변경하거나 저장하지 않습니다.", List.of(), "DRAFT_CORRECTION_REVIEW")
+                    : null;
+        };
     }
     public static List<String> terms(String question) {
         String normalized=question.replaceAll("\\s+","");

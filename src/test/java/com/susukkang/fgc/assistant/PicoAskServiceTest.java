@@ -17,9 +17,9 @@ import static org.mockito.Mockito.*;
 import static com.susukkang.fgc.assistant.dto.PicoAskResponse.*;
 
 class PicoAskServiceTest {
-    LlmGateway gateway; PicoAskService service; PicoGuideCatalog catalog;
+    LlmGateway gateway; PicoAskService service; PicoGuideCatalog catalog; PicoPaymentContextService contexts;
     @BeforeEach void setup() throws Exception {
-        gateway=mock(LlmGateway.class); var mapper=new ObjectMapper(); catalog=new PicoGuideCatalog(mapper); service=new PicoAskService(gateway,catalog,mapper); role("SETTLEMENT");
+        gateway=mock(LlmGateway.class); var mapper=new ObjectMapper(); catalog=new PicoGuideCatalog(mapper); contexts=mock(PicoPaymentContextService.class); service=new PicoAskService(gateway,catalog,mapper,contexts); role("SETTLEMENT");
     }
     @AfterEach void cleanup() { SecurityContextHolder.clearContext(); }
     void role(String role) { SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("reader","unused",List.of(new SimpleGrantedAuthority("ROLE_"+role)))); }
@@ -46,7 +46,7 @@ class PicoAskServiceTest {
         assertThat(service.ask(request("오늘 날씨")).decision()).isEqualTo(Decision.UNSUPPORTED);
         var req=request("초안 저장");
         assertThatThrownBy(() -> service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(),"r1","2.0",List.of()))).isInstanceOfSatisfying(FgcBusinessException.class, error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_GUIDE_VERSION_MISMATCH));
-        assertThat(service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)),"r1","1.0",List.of())).fallbackReason()).isEqualTo("ENTITY_STATE_NOT_SUPPORTED");
+        assertThat(service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.CONTRACT,77L)),"r1","1.0",List.of())).fallbackReason()).isEqualTo("ENTITY_STATE_NOT_SUPPORTED");
         assertThat(service.ask(new PicoAskRequest(req.question(),req.screenId(),List.of(),"r1","1.0",List.of(new PicoAskRequest.Turn(PicoAskRequest.Role.USER,"private data")))).fallbackReason()).isEqualTo("HISTORY_NOT_SUPPORTED"); verifyNoInteractions(gateway);
     }
     @Test void financialQuestionUsesProgramCalculationInsteadOfModelArithmetic() {
@@ -103,5 +103,47 @@ class PicoAskServiceTest {
         }
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("입력한 원본을 원칙에 따라 확인하고 배정 근거를 조회하세요.","payment.draft:overview"));
         assertThat(service.ask(request("초안 저장")).source()).isEqualTo(Source.AI);
+    }
+    PicoAskRequest paymentRequest(String question, long id) {
+        return new PicoAskRequest(question, "TRAN-W02", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,id)), "r1", "1.0", List.of());
+    }
+    @Test void authorizesStoredDraftBeforeModelAndNeverSendsItsIdentifiersOrState() {
+        long id = 9876543210123L;
+        when(contexts.read(id)).thenReturn(new PicoPaymentContextService.Snapshot(com.susukkang.fgc.common.code.CommissionPaymentStatus.DRAFT));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("초안 저장은 지급 확정과 구분됩니다.","payment.draft:overview"));
+        var response = service.ask(paymentRequest("초안 저장 방법 고객 김철수 1234567.89원", id));
+        assertThat(response.source()).isEqualTo(Source.AI); assertThat(response.validatedGuide()).isNull();
+        var order = inOrder(contexts, gateway); order.verify(contexts).read(id); order.verify(gateway).call(any(),eq(PicoAskService.ModelAnswer.class));
+        var captured = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class); verify(gateway).call(captured.capture(),eq(PicoAskService.ModelAnswer.class));
+        assertThat(captured.getValue().data()).doesNotContain("9876543210123", "1234567.89", "김철수", "\"paymentStatus\"", "\"entityRefs\"");
+        assertThat(captured.getValue().relatedEntityId()).isNull();
+    }
+    @Test void confirmedAndCancelledPaymentsNeverRequestAProcessingExplanation() {
+        for (var status : List.of(com.susukkang.fgc.common.code.CommissionPaymentStatus.CONFIRMED, com.susukkang.fgc.common.code.CommissionPaymentStatus.CANCELLED)) {
+            when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(status));
+            var response = service.ask(paymentRequest("지급 확정 방법",77L));
+            assertThat(response.source()).isEqualTo(Source.FIXED); assertThat(response.validatedGuide()).isNull();
+            assertThat(response.fallbackReason()).isIn("PAYMENT_ALREADY_CONFIRMED","PAYMENT_CANCELLED");
+        }
+        verifyNoInteractions(gateway);
+    }
+    @Test void readOnlyRoleCanReadPaymentStateButCannotObtainProcessingInstructions() {
+        role("COMPLIANCE");
+        when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(com.susukkang.fgc.common.code.CommissionPaymentStatus.DRAFT));
+        assertThat(service.ask(paymentRequest("현재 지급 상태가 확정인가요?",77L)).fallbackReason()).isEqualTo("PAYMENT_DRAFT_STATE");
+        assertThat(service.ask(paymentRequest("초안 저장 방법",77L)).fallbackReason()).isEqualTo("PERMISSION_DENIED");
+        verify(contexts,times(1)).read(77L); verifyNoInteractions(gateway);
+    }
+    @Test void multipleEntitiesAndUnauthorizedTargetsNeverReachTheModel() {
+        var request = new PicoAskRequest("초안 저장", "TRAN-W02", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L),new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,88L)), "r1", "1.0", List.of());
+        assertThat(service.ask(request).fallbackReason()).isEqualTo("SINGLE_PAYMENT_REQUIRED"); verifyNoInteractions(contexts);
+        when(contexts.read(77L)).thenThrow(new org.springframework.security.access.AccessDeniedException("denied"));
+        assertThatThrownBy(() -> service.ask(paymentRequest("초안 저장",77L))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(gateway);
+    }
+    @Test void correctionUsesActualDraftStateWithoutCallingTheModel() {
+        when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(com.susukkang.fgc.common.code.CommissionPaymentStatus.DRAFT));
+        assertThat(service.ask(paymentRequest("지급액을 잘못 입력했어요",77L)).fallbackReason()).isEqualTo("DRAFT_CORRECTION_REVIEW");
+        verifyNoInteractions(gateway);
     }
 }

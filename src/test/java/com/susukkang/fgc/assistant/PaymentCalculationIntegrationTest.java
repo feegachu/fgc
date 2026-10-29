@@ -30,6 +30,7 @@ import static org.mockito.Mockito.doAnswer;
 @SpringBootTest(properties = "fgc.batch.daily-changed-contract.enabled=false")
 class PaymentCalculationIntegrationTest {
     @Autowired PaymentCalculationService calculations;
+    @Autowired com.susukkang.fgc.assistant.service.PicoPaymentContextService picoContext;
     @Autowired CommissionPaymentService payments;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
@@ -146,6 +147,24 @@ class PaymentCalculationIntegrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> calculations.calculate(request))
                 .isInstanceOfSatisfying(com.susukkang.fgc.common.exception.FgcBusinessException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_002));
+    }
+
+    @Test void picoContextReadsAnAuthorizedSnapshotWithoutWritesAndDeniesAgentBeforeQuery() {
+        doAnswer(invocation -> {
+            assertThat(jdbc.queryForObject("SHOW transaction_read_only", String.class)).isEqualTo("on");
+            assertThat(jdbc.queryForObject("SHOW transaction_isolation", String.class)).isEqualTo("repeatable read");
+            return invocation.callRealMethod();
+        }).when(queries).findById(paymentId);
+        var before = counts();
+        var source = paymentRow();
+        assertThat(picoContext.read(paymentId).status()).isEqualTo(CommissionPaymentStatus.DRAFT);
+        assertThat(counts()).isEqualTo(before); assertThat(paymentRow()).isEqualTo(source);
+        org.mockito.Mockito.clearInvocations(queries);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("agent", "unused",
+                List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_AGENT"))));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> picoContext.read(paymentId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(queries);
     }
 
     private PaymentCalculationRequest request(PaymentCalculationRequest.Kind kind) {

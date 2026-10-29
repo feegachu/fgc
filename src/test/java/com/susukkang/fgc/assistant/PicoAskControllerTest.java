@@ -52,4 +52,9 @@ class PicoAskControllerTest {
                 .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("FGC-IMPL-GUIDE_VERSION_MISMATCH"));
     }
+    @Test void missingReferencedPaymentUses404Envelope() throws Exception {
+        when(service.ask(any())).thenThrow(new FgcBusinessException(FgcErrorCode.COMMON_004,java.util.Map.of("id",77)));
+        mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(body.replace("\"entityRefs\":[]", "\"entityRefs\":[{\"type\":\"PAYMENT\",\"id\":77}]")))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.error.code").value("FGC-COMMON-004"));
+    }
 }

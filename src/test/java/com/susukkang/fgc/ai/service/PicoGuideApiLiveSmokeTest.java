@@ -50,6 +50,7 @@ class PicoGuideApiLiveSmokeTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @MockitoBean AiCallLogRepository logs;
+    @MockitoBean com.susukkang.fgc.assistant.service.PicoPaymentContextService paymentContext;
     @MockitoBean PlatformTransactionManager transactions;
     @MockitoBean FgcMessageResolver messages;
     @MockitoBean ConstraintErrorCodeResolver constraints;

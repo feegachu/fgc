@@ -204,7 +204,17 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       aiLock.current = false
       setAiBusy(false)
     },
-    [visible, observed?.owner, observed?.scopeKey, observed?.revision, observed?.saved, observed?.busy, canProcess],
+    [
+      visible,
+      observed?.owner,
+      observed?.scopeKey,
+      observed?.paymentId,
+      observed?.revision,
+      observed?.saved,
+      observed?.busy,
+      observed?.ready,
+      canProcess,
+    ],
   )
   function cancelAi() {
     aiRequest.current?.abort()
@@ -226,7 +236,14 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       entries: [...previous.entries, { id: previous.entries.length, role: 'user', text }],
     }))
     try {
-      const reply = await askPico(text, String(sequence), observed ? 'TRAN-W02' : 'CMN-C04', controller.signal)
+      const paymentId = observed?.ready && observed.saved && !observed.busy ? observed.paymentId : null
+      const reply = await askPico(
+        text,
+        String(sequence),
+        observed ? 'TRAN-W02' : 'CMN-C04',
+        controller.signal,
+        paymentId,
+      )
       if (controller.signal.aborted || sequence !== aiSequence.current) return
       setConversation((previous) => ({
         ...previous,
