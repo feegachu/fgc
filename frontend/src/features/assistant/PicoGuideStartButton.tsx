@@ -64,7 +64,7 @@ export function PicoGuideStartButton({
   }
   return (
     <div>
-      <button type="button" className="pico-plan-button" disabled={busy} onClick={() => void start()}>
+      <button type="button" className="pico-primary" disabled={busy} onClick={() => void start()}>
         {busy ? '현재 지급 확인 중…' : `이 업무 안내 시작 · ${definition.title}`}
       </button>
       {notice && (

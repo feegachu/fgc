@@ -83,11 +83,31 @@ class PicoGuideStartServiceTest {
         } finally {pool.shutdownNow();}
     }
     @Test void cacheIsBoundedAndExpiredEntriesAreReclaimed() {
-        for(int i=0;i<1000;i++)service.prepare(request(null),"Bearer session-one");
+        when(payments.read(anyLong())).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.DRAFT,"original"));
+        for(int i=0;i<1000;i++) {
+            role("user-"+(i/8),"SETTLEMENT");
+            service.prepare(new PicoGuideRequest("payment.draft","1.0",String.valueOf(77+i%8),"r1",null),"Bearer session-one");
+        }
+        role("overflow","SETTLEMENT");
         assertThatThrownBy(() -> service.prepare(request(null),"Bearer session-one"))
             .isInstanceOfSatisfying(FgcBusinessException.class,e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS));
         clock.now=clock.now.plusSeconds(300);
         assertThat(service.prepare(request(null),"Bearer session-one").status()).isEqualTo("PREPARED");
+    }
+    @Test void oneAccountCannotExhaustOtherUsersAndBearerRotationDoesNotResetItsQuota() {
+        when(payments.read(anyLong())).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.DRAFT,"original"));
+        for(int i=0;i<8;i++)service.prepare(new PicoGuideRequest("payment.draft","1.0",String.valueOf(77+i),"r1",null),"Bearer session-one");
+        assertThatThrownBy(() -> service.prepare(new PicoGuideRequest("payment.draft","1.0","99","r1",null),"Bearer new-login"))
+            .isInstanceOfSatisfying(FgcBusinessException.class,e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS));
+        role("different-user","SETTLEMENT");
+        var fresh = service.prepare(request(null),"Bearer another-session");
+        assertThat(service.start(request(fresh.prepareToken()),"Bearer another-session").status()).isEqualTo("STARTED");
+    }
+    @Test void freshPrepareReplacesTheSameAccountsOldTargetWorkflowGrant() {
+        var old=service.prepare(request(null),"Bearer old-login");
+        var fresh=service.prepare(request(null),"Bearer new-login");
+        assertStale(() -> service.start(request(old.prepareToken()),"Bearer old-login"));
+        assertThat(service.start(request(fresh.prepareToken()),"Bearer new-login").status()).isEqualTo("STARTED");
     }
     void assertStale(org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {
         assertThatThrownBy(action).isInstanceOfSatisfying(FgcBusinessException.class,e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_GUIDE_STATE_STALE));

@@ -24,7 +24,7 @@ public class PicoGuideStartService {
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Grant> grants = new HashMap<>();
-    private record Grant(String owner, PicoGuideRequest request, String paymentFingerprint,
+    private record Grant(String owner, String account, PicoGuideRequest request, String paymentFingerprint,
                          String catalogFingerprint, Instant expiresAt) {}
 
     @Autowired
@@ -36,6 +36,7 @@ public class PicoGuideStartService {
     }
     public PicoGuideResponse prepare(PicoGuideRequest request, String bearer) {
         String owner = owner(bearer);
+        String account = PicoFingerprint.of(SecurityContextHolder.getContext().getAuthentication().getName());
         definition(request);
         if (request.prepareToken() != null) throw invalid();
         var snapshot = snapshot(request);
@@ -44,8 +45,13 @@ public class PicoGuideStartService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         synchronized (grants) {
             purge();
-            if (grants.size() >= 1000) throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
-            grants.put(token, new Grant(owner, request, snapshot.fingerprint(), catalogFingerprint(), expiresAt));
+            // One fresh grant replaces this account's older preparation for the same target/workflow.
+            grants.values().removeIf(g -> g.account().equals(account)
+                    && g.request().paymentId().equals(request.paymentId())
+                    && g.request().workflowId().equals(request.workflowId()));
+            if (grants.size() >= 1000 || grants.values().stream().filter(g -> g.account().equals(account)).count() >= 8)
+                throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
+            grants.put(token, new Grant(owner, account, request, snapshot.fingerprint(), catalogFingerprint(), expiresAt));
         }
         return response("PREPARED", request, expiresAt, token);
     }
