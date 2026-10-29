@@ -54,14 +54,14 @@ describe('policy UI boundaries', () => {
     rule.maxInstallments = ''
     expect(validateDraft(draft)[errorPath]).toBe('필수 항목을 입력하세요.')
   })
-  it('production editor never claims to save or calls write APIs', () => {
+  it('production editor allows draft saving', () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <PolicyDraftEditor onClose={vi.fn()} onSaved={vi.fn()} />
       </QueryClientProvider>,
     )
-    expect(screen.getByRole('button', { name: '초안 저장' })).toBeDisabled()
-    expect(screen.getByText('UI 구현 단계 · 저장 API 연결 예정')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '초안 저장' })).toBeEnabled()
+    expect(screen.getByText('초안으로 저장한 후 검토를 요청할 수 있습니다.')).toBeInTheDocument()
   })
   it.each([
     [1, 48],
