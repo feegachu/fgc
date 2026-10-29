@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AssistantContext, WorkflowId } from './contracts'
-import { GUIDE_CATALOG, findGuide, findStep } from './catalog'
+import { GUIDE_CATALOG, findGuide, findStep, selectGuideTransition } from './catalog'
 import {
   checkCalculationRecommendation,
   checkGuideProposal,
@@ -208,4 +208,20 @@ it('registers role/next metadata and rejects missing proposal slots and unscoped
   expect(checkCalculationRecommendation(calc, c, { now, mode: 'synthetic' })).toMatchObject({
     reason: 'UNRESOLVED_SCOPE',
   })
+})
+
+it('routes a current saved draft to precheck and requires saving for missing or changed input', () => {
+  const step = findStep('payment.confirm', '1.0', 'payment.scope')!
+  expect(step.next).toEqual([
+    { conditionId: 'CURRENT_DRAFT_ALREADY_SAVED', stepId: 'payment.precheck' },
+    { conditionId: 'DRAFT_SAVE_REQUIRED', stepId: 'payment.save' },
+  ])
+  expect(selectGuideTransition(step, { paymentId: '77', saved: true, formValid: true })).toBe('payment.precheck')
+  for (const context of [
+    { paymentId: '77', saved: false, formValid: true },
+    { paymentId: null, saved: true, formValid: true },
+    { paymentId: '77', saved: true, formValid: false },
+  ]) expect(selectGuideTransition(step, context)).toBe('payment.save')
+  expect(() => selectGuideTransition({ ...step, next: [step.next[0], step.next[0]] }, { paymentId: '77', saved: true, formValid: true })).toThrow()
+  expect(() => selectGuideTransition({ ...step, next: [step.next[0]] }, { paymentId: null, saved: false, formValid: true })).toThrow()
 })
