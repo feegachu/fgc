@@ -53,6 +53,11 @@ describe('월 지표', () => {
     expect(deltaPercent(150000, 100000)).toBe(50)
     expect(deltaPercent(100, 0)).toBe(0)
   })
+  it('증감률은 반올림하지 않고 0 쪽으로 절사하며 나누어떨어지는 값은 그대로 둔다', () => {
+    expect(deltaPercent(129, 100)).toBe(29) // (29/100)*100은 28.999…라 단순 절사하면 28.9가 된다
+    expect(deltaPercent(100, 300)).toBe(-66.6)
+    expect(deltaPercent(200, 300)).toBe(-33.3)
+  })
   it('확인 필요 목록은 한도 근접이 먼저다', () => {
     expect(needRows(rows, '2026-07').map((r) => r.id)).toEqual(['C-2'])
   })
@@ -72,9 +77,9 @@ describe('차트 집계', () => {
     const { base } = aggregate(rows, '2026-07', 12, 'all', null)
     expect(insurerSlices(base, insurers, 'all').map((s) => [s.name, s.value])).toEqual([['A생명', 2], ['B손해', 1]])
   })
-  it('보장 유형·상태 비중은 건수 대비 반올림 비율이다', () => {
+  it('보장 유형·상태 비중은 건수 대비 비율을 첫째 자리에서 절사한다(공통규칙 3)', () => {
     const { focus } = aggregate(rows, '2026-07', 12, 'all', null)
-    expect(categoryCounts(focus).find((c) => c.name === '건강보장')).toMatchObject({ count: 2, pct: 66.7 })
+    expect(categoryCounts(focus).find((c) => c.name === '건강보장')).toMatchObject({ count: 2, pct: 66.6 })
     expect(statusCounts(focus).map((s) => [s.label, s.count])).toEqual([['정상', 2], ['미납', 1], ['실효', 0], ['해지·종료', 0]])
   })
 })
