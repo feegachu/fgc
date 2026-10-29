@@ -161,4 +161,19 @@ class CompareRankingCalculatorTest {
         // 한도 영향은 산입분만 본다: 1,300,000 / 1,200,000
         assertThat(result.capImpactPct()).isEqualTo(108.3);
     }
+
+    @Test
+    @DisplayName("보험사 수 경고는 화면에 나가는 상위 5개 기준이다 — 6위 이하의 다른 보험사는 세지 않는다")
+    void insurerWarningCountsOnlyTheShownTopFive() {
+        // 순위 1~5: A사 3개·B사 2개, 6~7위: C사 — 전체로는 3개사지만 표시 목록은 2개사다
+        List<Result> ranked = CompareRankingCalculator.rank(List.of(
+                candidate(1, "A", null, null, rate(1, 1, "70")), candidate(2, "A", null, null, rate(1, 1, "60")),
+                candidate(3, "A", null, null, rate(1, 1, "50")), candidate(4, "B", null, null, rate(1, 1, "40")),
+                candidate(5, "B", null, null, rate(1, 1, "30")), candidate(6, "C", null, null, rate(1, 1, "20")),
+                candidate(7, "C", null, null, rate(1, 1, "10"))), 100_000, AS_OF);
+
+        assertThat(CompareRankingService.fewInsurers(ranked)).isFalse();
+        assertThat(CompareRankingService.shownOf(ranked)).hasSize(5);
+        assertThat(CompareRankingService.fewInsurers(CompareRankingService.shownOf(ranked))).isTrue();
+    }
 }

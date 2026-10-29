@@ -4,6 +4,7 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.compare.dto.CompareAskResponse;
 import com.susukkang.fgc.compare.dto.CompareCategoryResponse;
 import com.susukkang.fgc.compare.dto.CompareExplainResponse;
 import com.susukkang.fgc.compare.dto.CompareRankingFilters;
@@ -59,6 +60,7 @@ public class CompareRankingService {
     private final AgentDataScopeService agentScope;
     private final CompareRankResultStore resultStore;
     private final CompareSummaryService summaryService;
+    private final CompareAskService askService;
 
     /** 순위 계산 기준 버전(D-01 승인본). 비어 있으면 순위를 만들지 않고 RULE_NOT_CONFIGURED 로 응답한다. */
     @Value("${fgc.compare.rule-version:}")
@@ -135,22 +137,34 @@ public class CompareRankingService {
         if (results.isEmpty()) {
             return insufficient(base, "FILTER_NO_MATCH", excluded);
         }
+        // 화면에 나가는 상위 MAX_ITEMS 개가 비교 집합이다 — 경고·items·정책 버전을 모두 이 목록에서 계산한다.
+        List<Result> shown = shownOf(results);
         List<String> warnings = new ArrayList<>();
-        if (results.stream().map(r -> r.candidate().insurer()).distinct().count() < MIN_INSURERS) {
+        if (fewInsurers(shown)) {
             warnings.add("OTHER_INSURER_LT_3");
         }
         if (!excluded.isEmpty()) {
             warnings.add("SOME_EXCLUDED");
         }
         List<CompareRankingResponse.Item> items = new ArrayList<>();
-        for (int i = 0; i < results.size() && i < MAX_ITEMS; i++) {
-            items.add(item(i + 1, results.get(i)));
+        for (int i = 0; i < shown.size(); i++) {
+            items.add(item(i + 1, shown.get(i)));
         }
         // 표시 상품의 정책 버전이 하나로 같을 때만 대표 버전으로 쓴다. 섞여 있으면 상품별 evidence 의 버전을 본다.
-        List<String> versions = results.stream().limit(MAX_ITEMS).flatMap(r -> r.candidate().rules().stream())
+        List<String> versions = shown.stream().flatMap(r -> r.candidate().rules().stream())
                 .map(CompareRankingCalculator.Rule::policyVersion).distinct().toList();
         String policyVersion = versions.size() == 1 ? versions.get(0) : null;
         return new Outcome(CompareRankingResponse.READY, policyVersion, base, warnings, items, excluded);
+    }
+
+    /** 화면에 나가는 상위 MAX_ITEMS 개. 보험사 수 경고·정책 버전·items 가 모두 이 목록 기준이다. */
+    static List<Result> shownOf(List<Result> results) {
+        return results.subList(0, Math.min(results.size(), MAX_ITEMS));
+    }
+
+    /** 표시 목록의 보험사가 MIN_INSURERS 곳 미만이면 true — 6위 이하의 다른 보험사는 세지 않는다. */
+    static boolean fewInsurers(List<Result> shown) {
+        return shown.stream().map(r -> r.candidate().insurer()).distinct().count() < MIN_INSURERS;
     }
 
     private static CompareRankingResponse.Item item(int rank, Result r) {
@@ -179,6 +193,20 @@ public class CompareRankingService {
             return new CompareExplainResponse(rankResultId, llm, "LLM", null);
         }
         return new CompareExplainResponse(rankResultId, ruleSummary(ranking.categoryLabel(), ranking.items()), "RULE", null);
+    }
+
+    /** 자연어 질문 답변. 순위 결과가 있으면 본인 것만 근거로 쓰고, 없으면 용어 설명만으로 답한다. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public CompareAskResponse ask(String rankResultId, String question) {
+        long agentId = requireAgent();
+        CompareRankingResponse ranking = null;
+        if (rankResultId != null && !rankResultId.isBlank()) {
+            if (resultStore.ownedByOther(agentId, rankResultId)) {
+                throw new FgcBusinessException(FgcErrorCode.AUTH_003);
+            }
+            ranking = resultStore.find(agentId, rankResultId).orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004));
+        }
+        return askService.ask(question, ranking);
     }
 
     /** 규칙형 요약: LLM 없이도 항상 만들 수 있고, 새 수치를 만들지 않고 계산된 값만 쓴다. */
