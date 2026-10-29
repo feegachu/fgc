@@ -193,7 +193,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const hint = view === 1 ? '🔒 위 선택지에서 골라 주세요' : view === 2 ? '⏳ 상품을 선별하는 중이에요' : ''
+  const hint = view === 1 ? '위 선택지에서 골라 주세요' : view === 2 ? '⏳ 상품을 선별하는 중이에요' : ''
   return createPortal(
     <div className="cb cb-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div
