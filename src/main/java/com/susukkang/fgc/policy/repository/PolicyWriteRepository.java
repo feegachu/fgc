@@ -498,12 +498,12 @@ public class PolicyWriteRepository {
                 """, id, actionType, actorId, reason, evidenceRef, id);
     }
 
-    public void recordSuccession(PolicyVersion previous, PolicyVersion successor, Long actorId) {
+    public void recordSuccession(PolicyVersion previous, PolicyVersion successor, Long actorId, OffsetDateTime activatedAt) {
         jdbc.update("""
                 INSERT INTO fgc.policy_succession
-                    (previous_policy_version_id, successor_policy_version_id, cutover_date, activated_by)
-                VALUES (?, ?, ?, ?)
-                """, previous.getPolicyVersionId(), successor.getPolicyVersionId(), successor.getEffectiveFrom(), actorId);
+                    (previous_policy_version_id, successor_policy_version_id, cutover_date, activated_by, activated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """, previous.getPolicyVersionId(), successor.getPolicyVersionId(), successor.getEffectiveFrom(), actorId, activatedAt);
     }
 
     public PolicyApplicationPeriod applicationPeriod(Long id) {

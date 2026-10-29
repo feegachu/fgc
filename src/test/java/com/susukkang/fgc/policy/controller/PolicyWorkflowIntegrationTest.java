@@ -14,6 +14,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import java.util.List;
 import java.time.Duration;
@@ -26,6 +30,7 @@ import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
+import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -45,6 +50,7 @@ class PolicyWorkflowIntegrationTest {
     @Autowired private MockMvc mvc;
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
+    @MockitoBean(name = "policyClock") private Clock policyClock;
 
     private FgcUserDetails writer;
     private FgcUserDetails systemWriter;
@@ -54,6 +60,8 @@ class PolicyWorkflowIntegrationTest {
 
     @BeforeEach
     void createIndependentActorsAndRuleScope() {
+        when(policyClock.instant()).thenReturn(Instant.parse("1999-12-31T00:00:00Z"));
+        when(policyClock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
         writer = insertUser("SETTLEMENT");
         systemWriter = insertUser("SYSTEM_ADMIN");
         approver = insertUser("GA_ADMIN");
@@ -567,6 +575,7 @@ class PolicyWorkflowIntegrationTest {
 
     @Test
     void rollsBackRetirementWhenAnotherCodeConflictsWithTheReplacement() throws Exception {
+        when(policyClock.instant()).thenReturn(Instant.parse("1799-12-31T00:00:00Z"));
         JsonNode first = create(draft().put("effectiveFrom", "1800-01-01").put("effectiveTo", "1800-12-31"), writer);
         long firstId = first.path("policyVersionId").asLong();
         action(firstId, "ACTIVATE", action(firstId, "APPROVE", action(firstId, "SUBMIT", first, writer, 200), approver, 200), approver, 200);
@@ -625,6 +634,30 @@ class PolicyWorkflowIntegrationTest {
         assertThat(statusOf(secondId)).isIn("APPROVED", "RETIRED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code = ? AND status = 'ACTIVE'",
                 Integer.class, created.path("policyCode").asText())).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsBackdatedCutoverAndRechecksTheBusinessDateAtActivation() throws Exception {
+        JsonNode first = create(draft(), writer);
+        long firstId = first.path("policyVersionId").asLong();
+        action(firstId, "ACTIVATE", action(firstId, "APPROVE", action(firstId, "SUBMIT", first, writer, 200), approver, 200), approver, 200);
+        when(policyClock.instant()).thenReturn(Instant.parse("2000-04-01T00:00:00Z"));
+        JsonNode backdated = write(HttpMethod.POST, "/api/v1/policies/" + firstId + "/versions",
+                cloneRequest("2000-02-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+        assertThat(actionError(backdated.path("policyVersionId").asLong(), "SUBMIT", backdated, writer, 400)
+                .path("field").asText()).isEqualTo("effectiveFrom");
+        JsonNode future = write(HttpMethod.POST, "/api/v1/policies/" + firstId + "/versions",
+                cloneRequest("2000-07-01").put("effectiveTo", "2000-12-31"), writer, key(), 201);
+        long futureId = future.path("policyVersionId").asLong();
+        JsonNode approved = action(futureId, "APPROVE", action(futureId, "SUBMIT", future, writer, 200), approver, 200);
+        // UTC로는 전날이어도 한국시간으로 적용일이면 이미 늦은 활성화다.
+        when(policyClock.instant()).thenReturn(Instant.parse("2000-06-30T15:00:00Z"));
+        assertThat(actionError(futureId, "ACTIVATE", approved, approver, 400).path("field").asText()).isEqualTo("effectiveFrom");
+        assertThat(statusOf(firstId)).isEqualTo("ACTIVE");
+        assertThat(statusOf(futureId)).isEqualTo("APPROVED");
+        assertThat(auditCount(firstId, "POLICY_RETIRE")).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_succession WHERE previous_policy_version_id=?",
+                Integer.class, firstId)).isZero();
     }
 
     private ObjectNode draft() {

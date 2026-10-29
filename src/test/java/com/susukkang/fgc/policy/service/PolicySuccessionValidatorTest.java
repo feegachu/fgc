@@ -49,10 +49,10 @@ class PolicySuccessionValidatorTest {
     }
 
     @Test
-    void requiresLaterCutoverWithoutGapsOrNarrowerCoverage() throws Exception {
+    void requiresNonDecreasingCutoverWithoutGapsOrNarrowerCoverage() throws Exception {
         ObjectNode previous = document();
         assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2025-12-31"), "effectiveFrom");
-        assertInvalid(previous, previous.deepCopy(), "effectiveFrom");
+        assertValid(previous, previous.deepCopy()); // 같은 적용일은 서비스의 미래 날짜 검사 후 정정에 사용한다.
         assertValid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-01"));
         assertInvalid(previous, previous.deepCopy().put("effectiveFrom", "2027-01-01").put("effectiveTo", "2099-12-31"), "effectiveTo");
         assertInvalid(previous, previous.deepCopy().put("basicDocumentVersion", "NARROW"), "basicDocumentVersion");

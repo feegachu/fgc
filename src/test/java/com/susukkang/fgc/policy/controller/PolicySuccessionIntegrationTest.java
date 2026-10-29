@@ -43,16 +43,16 @@ class PolicySuccessionIntegrationTest {
         JsonNode original = detail(originalId, writer);
         var historicMoney = jdbc.queryForList("SELECT commission_transaction_id, policy_version_id, amount FROM fgc.commission_transaction WHERE policy_version_id=? ORDER BY commission_transaction_id", originalId);
         assertThat(historicMoney).isNotEmpty();
+        LocalDate cutover = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).plusMonths(1).withDayOfMonth(1);
         long sourceContractId = jdbc.queryForList("""
                 SELECT c.contract_id FROM fgc.insurance_contract c
                 JOIN fgc.product_offering p ON p.product_offering_id=c.product_offering_id
-                WHERE p.sales_end_date IS NULL OR p.sales_end_date >= c.contract_date + 5
+                WHERE p.sales_end_date IS NULL OR p.sales_end_date >= ?
                 ORDER BY c.contract_id
-                """, Long.class).stream()
+                """, Long.class, cutover.plusDays(5)).stream()
                 .filter(id -> policies.findApplicableCurrentCommissionPolicies(id, PaymentStage.GA_TO_FC).stream()
                         .anyMatch(policy -> policy.getPolicyVersionId() == originalId)).findFirst().orElseThrow();
         LocalDate beforeDate = jdbc.queryForObject("SELECT contract_date FROM fgc.insurance_contract WHERE contract_id=?", LocalDate.class, sourceContractId);
-        LocalDate cutover = beforeDate.plusDays(1);
         long contractId = copyContract(sourceContractId, beforeDate);
         schedules.generateSchedulesByContractId(contractId);
         var originalAmounts = amounts(contractId);
@@ -87,11 +87,15 @@ class PolicySuccessionIntegrationTest {
                 WHERE h.contract_id=? AND h.payment_stage='GA_TO_FC' AND h.active_yn AND l.due_date >= ?
                 """, Integer.class, contractId, cutover)).isPositive();
 
-        for (LocalDate date : java.util.List.of(cutover, cutover.plusDays(1))) {
+        for (LocalDate date : java.util.List.of(cutover.minusDays(1), cutover, cutover.plusDays(1))) {
             long fresh = copyContract(sourceContractId, date);
             schedules.generateSchedulesByContractId(fresh);
-            assertSelected(fresh, replacementId);
+            assertSelected(fresh, date.isBefore(cutover) ? originalId : replacementId);
             assertThat(amounts(fresh)).isNotEmpty();
+            if (date.isBefore(cutover)) {
+                assertThat(amounts(fresh)).isEqualTo(originalAmounts);
+                continue;
+            }
             assertThat(jdbc.queryForObject("""
                     SELECT count(*) FROM fgc.schedule_header h JOIN fgc.schedule_line l USING(schedule_header_id)
                     WHERE h.contract_id=? AND h.payment_stage='GA_TO_FC' AND h.active_yn
@@ -110,11 +114,21 @@ class PolicySuccessionIntegrationTest {
                 .extracting(policy -> policy.getPolicyVersionId()).containsExactly(originalId);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE entity_type='POLICY_VERSION' AND entity_id=? AND action_code='POLICY_RETIRE'", Integer.class, Long.toString(originalId))).isEqualTo(1);
 
+        // 아직 적용 전인 발행본은 같은 적용일로 정정한다. 폐기된 미래 판의 빈 구간은 선택하지 않는다.
+        JsonNode correction = clone(replacementId, cutover.toString(), writer);
+        long correctionId = correction.path("policyVersionId").asLong();
+        ObjectNode correctedDocument = (ObjectNode) detail(correctionId, writer).path("editDocument").deepCopy();
+        for (JsonNode rule : correctedDocument.path("commissionRules")) ((ObjectNode) rule).put("ratePct", "18.000000");
+        JsonNode corrected = write("/api/v1/policies/" + correctionId, correctedDocument, writer, 200, true);
+        action(correctionId, "ACTIVATE", action(correctionId, "APPROVE", action(correctionId, "SUBMIT", corrected, writer, 200), approver, 200), approver, 200);
+        assertThat(detail(replacementId, writer).path("applicationPeriod").isNull()).isTrue();
+        assertSelected(copyContract(sourceContractId, cutover), correctionId);
+        assertSelected(contractId, originalId);
         LocalDate nextCutover = cutover.plusDays(2);
-        JsonNode third = clone(replacementId, nextCutover.toString(), writer);
+        JsonNode third = clone(correctionId, nextCutover.toString(), writer);
         long thirdId = third.path("policyVersionId").asLong();
         action(thirdId, "ACTIVATE", action(thirdId, "APPROVE", action(thirdId, "SUBMIT", third, writer, 200), approver, 200), approver, 200);
-        assertSelected(copyContract(sourceContractId, cutover), replacementId);
+        assertSelected(copyContract(sourceContractId, cutover), correctionId);
         assertSelected(copyContract(sourceContractId, nextCutover), thirdId);
         schedules.regenerateContractSchedules(contractId, "세 번째 판 발행 후 기존 계약 재계산");
         assertSelected(contractId, originalId);
@@ -142,6 +156,30 @@ class PolicySuccessionIntegrationTest {
             assertThat(candidates.getFirst().getPolicyVersionId()).isEqualTo(contractDate.getYear() == 2027 ? sourceId : id);
             assertThat(feeRules.findRulesetLimits(candidates.getFirst().getRulesetId())).hasSize(3);
         }
+    }
+
+    @Test
+    void keepsArbitrageParametersOnTheVersionSelectedByValidationDate() throws Exception {
+        FgcUserDetails writer = actor("settle01"), approver = actor("gaadmin");
+        long sourceId = jdbc.queryForObject("SELECT policy_version_id FROM fgc.policy_version WHERE policy_type='ARBITRAGE' AND status='ACTIVE'", Long.class);
+        LocalDate cutover = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).plusMonths(1).withDayOfMonth(1);
+        String originalMonths = policies.findArbitrageApplicability(cutover.minusDays(1)).getFirst().getRefundAdditionMonths();
+        JsonNode copy = clone(sourceId, cutover.toString(), writer);
+        long id = copy.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument").deepCopy();
+        for (JsonNode parameter : edit.path("parameters")) {
+            if (parameter.path("key").asText().equals("ARBITRAGE_REFUND_ADDITION_MONTHS")) ((ObjectNode) parameter).put("value", 24);
+        }
+        JsonNode updated = write("/api/v1/policies/" + id, edit, writer, 200, true);
+        action(id, "ACTIVATE", action(id, "APPROVE", action(id, "SUBMIT", updated, writer, 200), approver, 200), approver, 200);
+        var before = policies.findArbitrageApplicability(cutover.minusDays(1));
+        var after = policies.findArbitrageApplicability(cutover);
+        assertThat(before).hasSize(1);
+        assertThat(before.getFirst().getPolicyVersionId()).isEqualTo(sourceId);
+        assertThat(before.getFirst().getRefundAdditionMonths()).isEqualTo(originalMonths);
+        assertThat(after).hasSize(1);
+        assertThat(after.getFirst().getPolicyVersionId()).isEqualTo(id);
+        assertThat(after.getFirst().getRefundAdditionMonths()).isEqualTo("24");
     }
 
     private void assertSelected(long contractId, long policyId) {
