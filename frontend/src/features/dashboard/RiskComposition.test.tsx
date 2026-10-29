@@ -45,6 +45,19 @@ describe('RiskComposition', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(4)
   })
 
+  it('비중은 공통 규칙 3대로 첫째 자리에서 절사하고 반올림하지 않는다', () => {
+    renderChart(items.slice(0, 2).map((item) => ({ ...item, value: item.key === 'a' ? 29 : 71 })))
+    // (29/100)*100은 28.999…라 절사하면 28.9가 된다. 나누어떨어지는 비중은 정확히 29.0%여야 한다
+    expect(screen.getByRole('link', { name: '1,200% 위반 29건, 비중 29.0%' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '1,200% 주의 71건, 비중 71.0%' })).toBeInTheDocument()
+  })
+
+  it('나누어떨어지지 않는 비중은 올리지 않고 자른다', () => {
+    renderChart(items.slice(0, 2).map((item) => ({ ...item, value: item.key === 'a' ? 2 : 1 })))
+    expect(screen.getByRole('link', { name: '1,200% 위반 2건, 비중 66.6%' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '1,200% 주의 1건, 비중 33.3%' })).toBeInTheDocument()
+  })
+
   it('범례 줄에 올리면 해당 줄과 조각이 강조되고 나가면 해제된다', async () => {
     const actions = userEvent.setup()
     const { container } = renderChart()

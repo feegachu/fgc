@@ -686,14 +686,8 @@ contract/
 
 ### Controller 구분
 
-화면 Controller와 API Controller를 분리합니다.
-
-```java
-@Controller
-```
-
-* Thymeleaf 화면 반환
-* URL 화면 라우팅 담당
+서버에는 API Controller만 둡니다. 화면은 `frontend/`(React SPA)가 그리고, URL 화면 라우팅은 React Router가 담당합니다
+(웨이브 C #419에서 `@Controller`·Thymeleaf 제거).
 
 ```java
 @RestController

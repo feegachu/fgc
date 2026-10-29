@@ -30,7 +30,7 @@ public interface FeeRegimeResolverRepository extends Repository<PolicyVersion, L
             """, nativeQuery = true)
     List<Long> findOfferingIdsCoveringContractDate(@Param("contractId") Long contractId);
 
-    // 정책 유형이 체계와 맞는 ACTIVE 정책버전 아래, 선택 키에 입력값이 들어가는 룰셋 후보.
+    // 계약일에 적용되는 정책버전(승계된 과거 버전 포함) 아래 선택 키에 맞는 룰셋 후보.
     // 룰셋의 기초서류 버전이 NULL 이면 모든 버전에 맞는 것으로 본다(#534 선택 키).
     @Query(value = """
             SELECT r.fee_regime_ruleset_id AS "rulesetId",
@@ -38,11 +38,10 @@ public interface FeeRegimeResolverRepository extends Repository<PolicyVersion, L
                    r.review_required_yn AS "reviewRequired",
                    r.basic_document_version AS "basicDocumentVersion"
               FROM fgc.fee_regime_ruleset r
-              JOIN fgc.policy_version pv ON pv.policy_version_id = r.policy_version_id
+              JOIN fgc.policy_application_version pv ON pv.policy_version_id = r.policy_version_id
              WHERE pv.policy_type = :policyType
-               AND pv.status = 'ACTIVE'
                AND pv.effective_from <= :contractDate
-               AND (pv.effective_to IS NULL OR pv.effective_to >= :contractDate)
+               AND (pv.application_to IS NULL OR pv.application_to >= :contractDate)
                AND r.fee_regime_code = :feeRegimeCode
                AND (pv.basic_document_version IS NULL OR pv.basic_document_version = :basicDocumentVersion)
                AND (r.basic_document_version IS NULL OR r.basic_document_version = :basicDocumentVersion)
