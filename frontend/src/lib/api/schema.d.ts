@@ -1205,6 +1205,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/calculations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 저장된 지급의 읽기 전용 계산 스냅샷
+         * @description ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.
+         */
+        post: operations["calculate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4178,6 +4198,97 @@ export interface components {
             /** Format: int64 */
             validationTargetId?: number;
         };
+        PaymentCalculationRequest: {
+            contractVersion: string;
+            /** @enum {string} */
+            kind: "EXPECTED_COMMISSION" | "ATTRIBUTION_BALANCE" | "CAP_STATUS" | "PAYMENT_CANDIDATE" | "RECONCILIATION_DIFFERENCE" | "ARBITRAGE_EXCESS" | "JOURNAL_CORRECTION_REVIEW";
+            /** @enum {string} */
+            mode: "EXISTING" | "HYPOTHETICAL";
+            scope?: components["schemas"]["Scope"];
+            candidate?: components["schemas"]["JsonNode"];
+            /** Format: int64 */
+            clientRevision: number;
+        };
+        Scope: {
+            paymentId?: string;
+        };
+        ApiResponsePaymentCalculationSnapshot: {
+            data?: components["schemas"]["PaymentCalculationSnapshot"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        Basis: {
+            sourceRefs?: components["schemas"]["Source"][];
+            rounding?: components["schemas"]["Rounding"];
+            asOfDate?: string;
+            policyVersionIds?: string[];
+            ruleIds?: string[];
+            lines?: components["schemas"]["AssistantAttributionLine"][];
+        };
+        PaymentCalculationSnapshot: {
+            calculationId?: string;
+            kind?: string;
+            mode?: string;
+            status?: string;
+            /** Format: int64 */
+            clientRevision?: number;
+            synthetic?: boolean;
+            snapshotOnly?: boolean;
+            evidenceKind?: string;
+            currency?: string;
+            paymentStatus?: string;
+            resolvedScope?: {
+                [key: string]: string;
+            };
+            amounts?: {
+                [key: string]: string;
+            };
+            capPreview?: {
+                [key: string]: unknown;
+            }[];
+            confirmable?: boolean;
+            blockers?: components["schemas"]["Reason"][];
+            missingInputs?: string[];
+            basis?: components["schemas"]["Basis"];
+            recommendation?: components["schemas"]["Recommendation"];
+            /** Format: date-time */
+            calculatedAt?: string;
+            /** @description Always null in snapshot-only phase; not a server proof */
+            validity?: Record<string, never> | null;
+        };
+        Reason: {
+            code?: string;
+            message?: string;
+            contractId?: string;
+            transactionAttributionId?: string;
+        };
+        Recommendation: {
+            allowed?: boolean;
+            targetId?: string;
+            suggestedAmount?: string;
+            reason?: string;
+            requiredChecks?: string[];
+        };
+        Rounding: {
+            /** Format: int32 */
+            scale?: number;
+            mode?: string;
+            aggregation?: string;
+        };
+        Source: {
+            sourceId?: string;
+            sourceType?: string;
+            title?: string;
+            version?: string;
+            entityId?: string;
+        };
+        AssistantAttributionLine: {
+            attributionSequence?: string;
+            contractId?: string;
+            attributionDate?: string;
+            originalAmount?: string;
+            roundedAmount?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -6647,6 +6758,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
+                };
+            };
+        };
+    };
+    calculate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentCalculationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePaymentCalculationSnapshot"];
                 };
             };
         };

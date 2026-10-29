@@ -6677,6 +6677,274 @@
           }
         },
         "type" : "object"
+      },
+      "PaymentCalculationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "contractVersion" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "assistant\\.v1"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ]
+          },
+          "mode" : {
+            "type" : "string",
+            "enum" : [ "EXISTING", "HYPOTHETICAL" ]
+          },
+          "scope" : {
+            "$ref" : "#/components/schemas/Scope"
+          },
+          "candidate" : {
+            "$ref" : "#/components/schemas/JsonNode"
+          },
+          "clientRevision" : {
+            "type" : "integer",
+            "format" : "int64",
+            "maximum" : 9007199254740991,
+            "minimum" : 0
+          }
+        },
+        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ]
+      },
+      "Scope" : {
+        "type" : "object",
+        "properties" : {
+          "paymentId" : {
+            "type" : "string",
+            "pattern" : "[1-9][0-9]{0,18}"
+          }
+        }
+      },
+      "ApiResponsePaymentCalculationSnapshot" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PaymentCalculationSnapshot"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Basis" : {
+        "type" : "object",
+        "properties" : {
+          "sourceRefs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Source"
+            }
+          },
+          "rounding" : {
+            "$ref" : "#/components/schemas/Rounding"
+          },
+          "asOfDate" : {
+            "type" : "string"
+          },
+          "policyVersionIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "ruleIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantAttributionLine"
+            }
+          }
+        }
+      },
+      "PaymentCalculationSnapshot" : {
+        "type" : "object",
+        "properties" : {
+          "calculationId" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "clientRevision" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "synthetic" : {
+            "type" : "boolean"
+          },
+          "snapshotOnly" : {
+            "type" : "boolean"
+          },
+          "evidenceKind" : {
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "paymentStatus" : {
+            "type" : "string"
+          },
+          "resolvedScope" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "amounts" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "capPreview" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "confirmable" : {
+            "type" : "boolean"
+          },
+          "blockers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Reason"
+            }
+          },
+          "missingInputs" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "basis" : {
+            "$ref" : "#/components/schemas/Basis"
+          },
+          "recommendation" : {
+            "$ref" : "#/components/schemas/Recommendation"
+          },
+          "calculatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "validity" : {
+            "type" : [ "object", "null" ],
+            "description" : "Always null in snapshot-only phase; not a server proof"
+          }
+        }
+      },
+      "Reason" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "transactionAttributionId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Recommendation" : {
+        "type" : "object",
+        "properties" : {
+          "allowed" : {
+            "type" : "boolean"
+          },
+          "targetId" : {
+            "type" : "string"
+          },
+          "suggestedAmount" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "requiredChecks" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "Rounding" : {
+        "type" : "object",
+        "properties" : {
+          "scale" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "aggregation" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Source" : {
+        "type" : "object",
+        "properties" : {
+          "sourceId" : {
+            "type" : "string"
+          },
+          "sourceType" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          },
+          "entityId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "AssistantAttributionLine" : {
+        "type" : "object",
+        "properties" : {
+          "attributionSequence" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "attributionDate" : {
+            "type" : "string"
+          },
+          "originalAmount" : {
+            "type" : "string"
+          },
+          "roundedAmount" : {
+            "type" : "string"
+          }
+        }
       }
     },
     "securitySchemes" : {
@@ -10210,6 +10478,36 @@
         },
         "summary" : "검증 실행 진행률 조회 (IF-API-49)",
         "tags" : [ "검증 실행" ]
+      }
+    },
+    "/api/v1/assistant/calculations" : {
+      "post" : {
+        "tags" : [ "payment-calculation-controller" ],
+        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
+        "description" : "ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.",
+        "operationId" : "calculate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PaymentCalculationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
