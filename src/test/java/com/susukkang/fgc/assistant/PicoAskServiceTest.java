@@ -96,4 +96,12 @@ class PicoAskServiceTest {
             assertThat(response.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
         }
     }
+    @Test void rejectsFinancialQuantitiesWithKoreanParticlesAndKeepsOrdinaryGuideWords() {
+        for (var message : List.of("천만 원을 초년도에 지급합니다.", "백만 원씩 나누어 지급됩니다.", "스물네 회에 걸쳐 분할 지급됩니다.", "칠 년에 걸쳐 분급됩니다.", "오 할이 환수됩니다.", "삼 회차로 지급됩니다.", "팔만 원짜리 지급입니다.", "사 년간 분할됩니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("초안 저장")).source()).as(message).isEqualTo(Source.FIXED);
+        }
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("입력한 원본을 원칙에 따라 확인하고 배정 근거를 조회하세요.","payment.draft:overview"));
+        assertThat(service.ask(request("초안 저장")).source()).isEqualTo(Source.AI);
+    }
 }
