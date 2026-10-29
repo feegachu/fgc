@@ -47,7 +47,7 @@ public class PicoAskService {
         while (index >= 0) {
             String suffix = text.substring(index + unit.length());
             boolean boundary = suffix.isEmpty() || !Character.isLetter(suffix.charAt(0))
-                    || List.of("까지", "이하", "이상", "입니다", "로", "를", "의", "가", "는", "만").stream().anyMatch(suffix::startsWith);
+                    || List.of("까지", "이하", "이상", "입니다", "로", "를", "의", "가", "는", "만", "을", "이", "은", "과", "와", "으로", "에", "씩", "도", "차", "분", "간", "부터", "보다", "마다", "쯤", "정도", "가량", "짜리", "대", "내외", "미만", "초과", "뿐").stream().anyMatch(suffix::startsWith);
             int previous = index - 1;
             while (previous >= 0 && Character.isWhitespace(text.charAt(previous))) previous--;
             // 조회 is a lookup word, but a preceding numeral (일조회/일조 회) remains a quantity.
