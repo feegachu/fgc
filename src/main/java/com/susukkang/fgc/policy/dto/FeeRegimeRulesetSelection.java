@@ -10,7 +10,8 @@ import java.util.Optional;
 /**
  * 설명 : 분급 룰셋 조회·적용 서비스(#537)의 결과. 판정 결과(#536)와 선택된 룰셋 전체(헤더·한도 행)를 함께 담는다.
  * REVIEW_REQUIRED·NOT_APPLICABLE 은 예외로 바꾸지 않고 사유와 사용한 키 값을 그대로 담으며, 룰셋 값은 비어 있다.
- * 호출부는 {@link #isSelected()}가 아니면 확정 스케줄을 만들 재료가 없다.
+ * 호출부는 {@link #isSelected()}가 아니면 예정 스케줄을 만들 재료가 없다.
+ * SELECTED는 지급 확정·한도 검증 통과를 뜻하지 않는다. 예정 생성용 조회에서는 한도 행이 비어 있을 수 있다.
  *
  * @param resolution 판정 결과 (상태·사유 코드·사용한 키 값·근거 REG)
  * @param ruleset    선택된 룰셋 헤더 (SELECTED 일 때만, 아니면 null)
@@ -37,7 +38,8 @@ public record FeeRegimeRulesetSelection(
             LocalDate basicDocumentDateTo,
             Integer maxInstallments,         // 법정 최대 회차
             Integer longTermMaintenanceFrom, // 장기유지 구간 시작 회차, 없으면 null
-            Integer longTermMaintenanceTo
+            Integer longTermMaintenanceTo,
+            List<String> sourceRefs
     ) {
     }
 
