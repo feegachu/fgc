@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 export const test = base.extend<{ demo: void }>({
   demo: [
     async ({ baseURL }, runScenario, info) => {
-      expect(baseURL).toBe('http://127.0.0.1:15173/app/')
+      expect(baseURL).toBe('http://127.0.0.1:15173/')
       resetDatabase()
       try {
         await runScenario()
@@ -38,7 +38,6 @@ export const test = base.extend<{ demo: void }>({
   ],
 })
 export { expect, sql }
-export const backend = 'http://127.0.0.1:18081'
 export const password = process.env.FGC_E2E_PASSWORD ?? 'fgc1234!' // checked-in demo accounts only
 
 export async function login(page: Page, account = 'settle01', route = '/contracts?month=2026-07') {
@@ -46,13 +45,6 @@ export async function login(page: Page, account = 'settle01', route = '/contract
   await page.goto(`login?redirect=${encodeURIComponent(route)}`)
   await page.getByLabel(/^아이디/).fill(account)
   await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
-  await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page).not.toHaveURL(/\/login/)
-}
-export async function legacyLogin(page: Page, account = 'settle01') {
-  await page.goto(`${backend}/login`)
-  await page.locator('input[name=username]').fill(account)
-  await page.locator('input[name=password]').fill(password)
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page).not.toHaveURL(/\/login/)
 }

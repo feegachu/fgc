@@ -31,7 +31,7 @@ export interface paths {
          * 감사로그 조회
          * @description 누가 언제 무엇을 바꿨는지 검색합니다. userLoginId 가 null 인 행은 배치 발 감사행(화면 표기 BATCH)입니다.
          */
-        get: operations["search_9"];
+        get: operations["search_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -155,7 +155,7 @@ export interface paths {
          * 보험설계사 기준정보 조회·선택 (IF-API-07)
          * @description 기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. 계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다.
          */
-        get: operations["search_8"];
+        get: operations["search_9"];
         put?: never;
         post?: never;
         delete?: never;
@@ -176,6 +176,26 @@ export interface paths {
          * @description 기준일자에 사용 가능한 수수료 항목과 사용기간을 조회합니다. 1,200% 산입 여부는 룰셋별 cap_rule_item에서 결정합니다.
          */
         get: operations["findCommissionItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/base/commission-items/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 수수료 항목 검색형 선택
+         * @description 기존 asOf 목록 응답은 유지하고 검색·페이지·선택 ID 재조회를 제공합니다.
+         */
+        get: operations["search_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -685,7 +705,11 @@ export interface paths {
          */
         get: operations["findPolicyVersions"];
         put?: never;
-        post?: never;
+        /**
+         * 정책 초안 생성 (IF-API-79)
+         * @description 정책 헤더와 유형별 규칙을 한 트랜잭션에 저장합니다. 버전 번호·DRAFT 상태·작성자는 서버가 결정합니다. Idempotency-Key로 같은 요청을 다시 보내면 기존 생성 결과를 반환합니다.
+         */
+        post: operations["createPolicyDraft"];
         delete?: never;
         options?: never;
         head?: never;
@@ -704,8 +728,52 @@ export interface paths {
          * @description 정책 버전 1건의 상세를 POL-W01 탭 구성(수수료 규칙, 1,200% 룰셋·항목별 산입 판정, 예상 해약환급률표, 근거 참조)으로 조회합니다. 탭 클릭 시 Ajax 로 호출됩니다.
          */
         get: operations["findPolicyDetail"];
-        put?: never;
+        /**
+         * 정책 초안 수정 (IF-API-80)
+         * @description DRAFT 정책의 헤더와 규칙을 저장합니다. policyCode는 변경할 수 없으며 expectedUpdatedAt으로 동시 수정을 검사합니다.
+         */
+        put: operations["updatePolicyDraft"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/policies/{policyVersionId}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 정책 제출·승인·반려·활성화 (IF-API-75)
+         * @description SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. 작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. ACTIVATE는 같은 코드의 기존 ACTIVE를 RETIRED로 전환하고 계약일별 적용 경계를 기록합니다. 새 적용일 전 계약은 구버전, 당일부터 체결한 계약은 변경 요율의 신버전을 선택하며 승인본의 기간·규칙은 보존합니다. 승계 적용일은 한국시간 내일 이후여야 하며 적용 전 미래 버전은 같은 적용일로 정정할 수 있습니다. 다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.
+         */
+        post: operations["executePolicyAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/policies/{policyVersionId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 승인 정책의 새 초안 버전 생성 (IF-API-81)
+         * @description 기존 승인 정책의 규칙과 근거를 새 ID로 복사합니다. 새 버전은 요청자를 작성자로 하는 DRAFT이며 승인 정보는 초기화합니다.
+         */
+        post: operations["clonePolicyVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1458,6 +1526,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponsePageResponseCommissionItemResponse: {
+            data?: components["schemas"]["PageResponseCommissionItemResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponsePageResponseCommissionPaymentListResponse: {
             data?: components["schemas"]["PageResponseCommissionPaymentListResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1490,6 +1563,11 @@ export interface components {
         };
         ApiResponsePolicyDetailResponse: {
             data?: components["schemas"]["PolicyDetailResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePolicyWriteResult: {
+            data?: components["schemas"]["PolicyWriteResult"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2072,6 +2150,21 @@ export interface components {
             /** Format: int64 */
             warningCount?: number;
         };
+        ClawbackRuleDraft: {
+            clawbackBasisCode: string;
+            clawbackRatePct: number;
+            /** Format: int64 */
+            commissionItemId?: number;
+            conditionExpression?: components["schemas"]["JsonNode"];
+            /** Format: int32 */
+            elapsedMonthFrom: number;
+            /** Format: int32 */
+            elapsedMonthTo: number;
+            /** Format: int64 */
+            insurerId?: number;
+            /** Format: int64 */
+            productOfferingId?: number;
+        };
         /** @description 수수료 항목 기준정보 */
         CommissionItemResponse: {
             /**
@@ -2276,6 +2369,39 @@ export interface components {
             settlementMonth: string;
             sourceBusinessKey: string;
             sourceType: string;
+        };
+        CommissionRuleDraft: {
+            /** @enum {string} */
+            agentRankCode?: "FC" | "TEAM_LEADER" | "BRANCH_MANAGER" | "DIVISION_HEAD";
+            basisCode: string;
+            /** @enum {string} */
+            calculationType: "FIXED" | "RATE";
+            /** Format: int64 */
+            commissionItemId: number;
+            /** Format: int64 */
+            commissionRuleId?: number;
+            equalMonthlyYn?: boolean;
+            /** @enum {string} */
+            feeComponentType: "CURRENT" | "UPFRONT" | "MAINTENANCE" | "LONG_TERM_MAINTENANCE" | "INCENTIVE" | "SETTLEMENT_SUPPORT" | "NEWCOMER_SUPPORT" | "COMMON_COST" | "OTHER";
+            /** @description 고정금액(원), 소수 정밀도를 보존한 문자열 */
+            fixedAmount?: string;
+            /** Format: int32 */
+            installmentFrom: number;
+            /** Format: int32 */
+            installmentTo: number;
+            /** Format: int64 */
+            insurerId?: number;
+            /** Format: int64 */
+            organizationId?: number;
+            paymentConditionCode?: string;
+            /** @enum {string} */
+            paymentStage: "INSURER_TO_GA" | "GA_TO_FC";
+            /** Format: int32 */
+            priorityNo: number;
+            /** Format: int64 */
+            productOfferingId?: number;
+            /** @description 요율(%), 소수 정밀도를 보존한 문자열 */
+            ratePct?: string;
         };
         /** @description 수수료 규칙 */
         CommissionRuleResponse: {
@@ -2822,6 +2948,28 @@ export interface components {
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
             typeLabel?: string;
         };
+        FeeRegimeRuleDraft: {
+            /** Format: date */
+            basicDocumentDateFrom?: string;
+            /** Format: date */
+            basicDocumentDateTo?: string;
+            basicDocumentVersion?: string;
+            feeRegimeCode: string;
+            /** Format: int64 */
+            feeRegimeRulesetId?: number;
+            /** Format: int32 */
+            longTermMaintenanceFrom?: number;
+            /** Format: int32 */
+            longTermMaintenanceTo?: number;
+            /** Format: int32 */
+            maxInstallments: number;
+            reviewRequiredYn?: boolean;
+            /** Format: date */
+            salesStartDateFrom: string;
+            /** Format: date */
+            salesStartDateTo?: string;
+            sourceRefs: string[];
+        };
         FinalizeChecklistConditionResponse: {
             /** Format: int64 */
             count?: number;
@@ -3232,6 +3380,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseCommissionItemResponse: {
+            content?: components["schemas"]["CommissionItemResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseCommissionPaymentListResponse: {
             content?: components["schemas"]["CommissionPaymentListResponse"][];
             /** Format: int32 */
@@ -3316,18 +3476,103 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        ParameterDraft: {
+            description?: string;
+            key: string;
+            value: components["schemas"]["JsonNode"];
+        };
+        /** @description 정책 제출·승인·반려·활성화 요청 */
+        PolicyActionRequest: {
+            /** @enum {string} */
+            actionType: "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE";
+            /** @description APPROVE에서만 지정하는 승인 근거 문서 참조 */
+            evidenceRef?: string;
+            /** @enum {string} */
+            expectedStatus: "DRAFT" | "REVIEW" | "APPROVED" | "ACTIVE" | "RETIRED";
+            /** Format: date-time */
+            expectedUpdatedAt: string;
+            reason: string;
+        };
+        PolicyApplicationPeriod: {
+            /** Format: date */
+            from?: string;
+            /** Format: int64 */
+            successorPolicyVersionId?: number;
+            /** Format: date */
+            to?: string;
+        };
+        /** @description 정책 승인 동작 이력 */
+        PolicyApprovalActionResponse: {
+            /** Format: date-time */
+            actionAt?: string;
+            actionBy?: string;
+            /** Format: int32 */
+            actionSeq?: number;
+            actionType?: string;
+            evidenceRef?: string;
+            /** Format: int64 */
+            policyApprovalActionId?: number;
+            reason?: string;
+        };
+        /** @description 정책 새 판의 적용기간과 복제 사유 */
+        PolicyCloneRequest: {
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string;
+            reason: string;
+        };
         /** @description 정책 버전 상세 — POL-W01 탭별 데이터 */
         PolicyDetailResponse: {
+            /** @description 현재 사용자 역할·정책 상태·작성자를 반영한 동작 */
+            allowedActions?: string[];
+            /** @description 계산에 사용하는 계약일 적용 구간. 승계된 과거 버전은 후속 적용일 전날까지이며 원본 승인 기간은 보존 */
+            applicationPeriod?: components["schemas"]["PolicyApplicationPeriod"];
+            /** @description 불변 정책 승인 이력, actionSeq 순 */
+            approvalActions?: components["schemas"]["PolicyApprovalActionResponse"][];
+            /** @description 승인 근거 문서 참조. 기초서류 버전은 editDocument.basicDocumentVersion에서 조회 */
+            approvalEvidenceRef?: string;
             /** @description 1,200% 룰셋 탭 — 지급단계·적용범위별 복수 */
             capRuleSets?: components["schemas"]["CapRuleSetResponse"][];
             /** @description 수수료 규칙 탭 */
             commissionRules?: components["schemas"]["CommissionRuleResponse"][];
+            /** @description 정책 편집 문서. expectedUpdatedAt과 자식 ID를 수정 요청에 사용 */
+            editDocument?: components["schemas"]["PolicyDraft"];
             /** @description 정책 버전 헤더 */
             header?: components["schemas"]["PolicyVersionResponse"];
             /** @description 예상 해약환급률표 탭 — 상품·납입기간·채널별 복수 */
             refundRateTables?: components["schemas"]["RefundRateTableResponse"][];
             /** @description 내부 근거 참조 목록(SRC-xx) */
             sourceRefs?: string[];
+        };
+        /** @description 정책 초안. 빈 규칙 목록을 저장할 수 있으며 제출 검증은 별도 동작이다. */
+        PolicyDraft: {
+            basicDocumentVersion?: string;
+            /** @description 환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다. */
+            clawbackRules: components["schemas"]["ClawbackRuleDraft"][];
+            commissionRules: components["schemas"]["CommissionRuleDraft"][];
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo?: string;
+            /**
+             * Format: date-time
+             * @description 수정 요청의 조회 시점 updatedAt. 최초 생성에서는 지정하지 않는다.
+             */
+            expectedUpdatedAt?: string;
+            /** @enum {string} */
+            feeRegimeCode?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
+            feeRegimeRules: components["schemas"]["FeeRegimeRuleDraft"][];
+            parameters: components["schemas"]["ParameterDraft"][];
+            policyCode: string;
+            policyName: string;
+            /** @enum {string} */
+            policyType: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY" | "ARBITRAGE";
+            regulationRefs: string[];
+            /** @enum {string} */
+            sourceClass: "REGULATORY" | "INSURER_RULE" | "GA_POLICY" | "PROJECT_ASSUMPTION";
+            sourceDetails?: components["schemas"]["SourceDetailDraft"][];
+            sourceRefs: string[];
         };
         /** @description 정책 버전 */
         PolicyVersionResponse: {
@@ -3405,6 +3650,22 @@ export interface components {
              * @description 버전 번호
              * @example 1
              */
+            versionNo?: number;
+        };
+        /** @description 서버가 결정한 정책 판 번호·상태·승인 정보와 허용 동작 */
+        PolicyWriteResult: {
+            allowedActions?: string[];
+            /** Format: date-time */
+            approvedAt?: string;
+            approvedBy?: string;
+            policyCode?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
+            /** @enum {string} */
+            status?: "DRAFT" | "REVIEW" | "APPROVED" | "ACTIVE" | "RETIRED";
+            /** Format: date-time */
+            updatedAt?: string;
+            /** Format: int32 */
             versionNo?: number;
         };
         /** @description 보험상품 판매버전 기준정보 */
@@ -3778,10 +4039,19 @@ export interface components {
             statusLabel?: string;
         };
         ScheduleLineResponse: {
+            /** Format: date */
+            attributionDate?: string;
             basisAmount?: number;
             basisCode?: string;
+            /** Format: int64 */
+            beneficiaryAgentId?: number;
             calculationType?: string;
+            cashflowType?: string;
+            /** Format: int64 */
+            commissionItemId?: number;
             commissionItemName?: string;
+            /** Format: int64 */
+            contractId?: number;
             /** Format: int32 */
             contractMonthNo?: number;
             /** Format: date */
@@ -3817,6 +4087,12 @@ export interface components {
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
             status?: "PLANNED" | "CONFIRMED" | "MATCHED" | "ADJUSTED" | "HOLD" | "CANCELLED" | "RESTARTED";
+        };
+        SourceDetailDraft: {
+            explanation?: string;
+            ref: string;
+            title: string;
+            url?: string;
         };
         TargetSummary: {
             /** Format: int64 */
@@ -4035,7 +4311,7 @@ export interface operations {
             };
         };
     };
-    search_9: {
+    search_10: {
         parameters: {
             query?: {
                 /**
@@ -4232,9 +4508,11 @@ export interface operations {
             };
         };
     };
-    search_8: {
+    search_9: {
         parameters: {
             query: {
+                /** @description 기존 선택 설계사 ID 재조회. 위촉기간 조건은 유지 */
+                selectedId?: number;
                 /** @description 소속 조직 ID */
                 organizationId?: number;
                 /** @description 설계사 코드 또는 이름 검색어 */
@@ -4300,6 +4578,33 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListCommissionItemResponse"];
+                };
+            };
+        };
+    };
+    search_8: {
+        parameters: {
+            query: {
+                asOf: string;
+                keyword?: string;
+                cashflowType?: string;
+                selectedId?: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseCommissionItemResponse"];
                 };
             };
         };
@@ -4384,6 +4689,10 @@ export interface operations {
     search_5: {
         parameters: {
             query: {
+                /** @description 상품명·상품코드·판매버전 부분 검색 */
+                keyword?: string;
+                /** @description 기존 선택 판매버전 ID 재조회. 기준일·보험회사 조건은 유지 */
+                selectedId?: number;
                 /**
                  * @description 보험회사 ID
                  * @example 2
@@ -5188,6 +5497,69 @@ export interface operations {
             };
         };
     };
+    createPolicyDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 생성 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyDraft"];
+            };
+        };
+        responses: {
+            /** @description 초안 생성 성공 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 요청 형식 또는 입력값 오류 (FGC-COMMON-002) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 정책 작성 권한 없음 (FGC-AUTH-003) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 정책 코드 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 정책 규칙의 적용 구간 충돌 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+        };
+    };
     findPolicyDetail: {
         parameters: {
             query?: never;
@@ -5219,6 +5591,138 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponsePolicyDetailResponse"];
+                };
+            };
+        };
+    };
+    updatePolicyDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 수정 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                policyVersionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyDraft"];
+            };
+        };
+        responses: {
+            /** @description 초안 수정 성공 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 정책 상태·수정 시각 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+        };
+    };
+    executePolicyAction: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 동작 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                policyVersionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyActionRequest"];
+            };
+        };
+        responses: {
+            /** @description 동작 실행 성공 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 동작 수행 권한 없음 (FGC-AUTH-003) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 자기 승인·정책 상태·수정 시각 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 활성 정책의 적용기간 충돌 (FGC-POL-002) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+        };
+    };
+    clonePolicyVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 복제 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                policyVersionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyCloneRequest"];
+            };
+        };
+        responses: {
+            /** @description 새 초안 버전 생성 성공 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
+            /** @description 복제할 수 없는 정책 상태 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
                 };
             };
         };

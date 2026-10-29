@@ -95,7 +95,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 src/main/resources/db/migration/   V1 ~ V61 (V47·V53 결번). 스키마·제약·트리거 + 운영 기준정보 일부
   V2   batch_watermark 초기 2행 · STATUS-MONTH-RULE-2026 v1(유산, §4-1)
   V16  journal_account 8개 계정과목
-src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀스)
+src/main/resources/db/demo/        Flyway 버전 순서(db/migration·db/demo·db/demo-agent 세 폴더가 한 시퀀스)
   V3     기준정보·정책·계약 6·지급·귀속 (GOLDEN 축소본)
   V4     검증 시나리오 계약 14(R1~R8·A1~A3·G1~G3)
   V6_1   원수사→GA 룰셋 보정 REG-CAP-INS-2021-V2(0%)·2027-V1(3%)
@@ -111,6 +111,8 @@ src/main/resources/db/demo/        Flyway 버전 순서(두 폴더가 한 시퀀
   V65    4년·7년 분급 규제 상한 룰셋(REGULATORY, 한도 행 포함, #538
   V60    STD-LIFE-B 2026-CURRENT-B 판매기간 종료(#540)
   V64    AGENT 역할·agent01 → A-FC-001(초기 비밀번호 미지정·DISABLED, #634)
+src/main/resources/db/demo-agent/  시연 서버·로컬 한정(신한 prd·E2E 제외). 같은 버전 시퀀스
+  V66    agent01 활성화 — password_hash='!'인 행만 BCrypt 해시·ACTIVE (V64 이후)
 
 src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 등) — 아직 없음
 ```
@@ -122,17 +124,17 @@ src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 
 - `R__` 반복 마이그레이션을 쓰지 않는다.
 - 데모 시드(`db/demo`)는 별도 프로필이 아니라 **Flyway 위치**로 켠다(`demo` 프로필은 없다). 현재 `db/demo`를 적재하는 곳은 다음과 같다(develop `fe6d0e6c`).
 
-| 환경 | 설정 위치 | db/demo |
-|---|---|---|
-| 로컬 | `application-local.yml` (저장소 밖, `.gitignore:58`) | 팀 관례상 포함 — 각자 확인 |
-| 통합 테스트 | `src/test/resources/application-test.yml` | 포함 |
-| E2E | `frontend/scripts/e2e-server.mjs` | 포함 |
-| AWS 개발·검증계 | `podman/fgc-app-combined.yaml:19`, `podman/fgc-app-was.yaml:19` (`SPRING_FLYWAY_LOCATIONS`) | 포함 |
-| 신한 prd(발표 시연) | `infra/shinhan/compose.yaml:39` | 포함 — 이미 적용된 데모 이력 보존 목적(:37-38) |
-| 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 |
+| 환경 | 설정 위치 | db/demo | db/demo-agent |
+|---|---|---|---|
+| 로컬 | `application-local.yml` (저장소 밖, `.gitignore:58`) | 팀 관례상 포함 — 각자 확인 | 각자 `application-local.yml`에 추가 |
+| 통합 테스트 | `src/test/resources/application-test.yml` | 포함 | 포함 |
+| E2E | `frontend/scripts/e2e-server.mjs` | 포함 | 제외 |
+| AWS 개발·검증계 | `podman/fgc-app-combined.yaml:19`, `podman/fgc-app-was.yaml:19` (`SPRING_FLYWAY_LOCATIONS`) | 포함 | 포함 |
+| 신한 prd(발표 시연) | `infra/shinhan/compose.yaml:39` | 포함 — 이미 적용된 데모 이력 보존 목적(:37-38) | 제외 — prd 에서 agent01 이 활성화되지 않게 한다 |
+| 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 | 해당 없음 |
 
 - 따라서 **`db/demo`에 넣는 모든 행은 신한 prd에도 들어간다.** 시연 환경 밖으로 내보내면 안 되는 데이터나 대량 데이터(DAR-012)는 `db/demo`에 넣지 않는다(§50).
-- **Flyway 번호**: `db/migration`과 `db/demo`는 하나의 버전 시퀀스다. #634는 사용자 지정 **V64**를 사용한다. 이 브랜치의 다음 번호는 **V65**이며 병합 직전 다른 PR의 번호도 대조한다. 결번(V47·V53 등)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
+- **Flyway 번호**: `db/migration`·`db/demo`·`db/demo-agent`(시연 서버·로컬 한정, V66)는 하나의 버전 시퀀스다. 같은 번호를 세 폴더 중 어디에도 중복해서 쓰지 않는다 — prd·E2E 는 `db/demo-agent`를 읽지 않아 통과해도 시연 서버·통합 테스트에서 기동이 실패한다. #634는 사용자 지정 **V64**를 사용한다. 이 브랜치의 다음 번호는 **V65**이며 병합 직전 다른 PR의 번호도 대조한다. 결번(V47·V53 등)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
 
 ---
 
@@ -302,11 +304,13 @@ auth_refresh_token
 | `gaadmin` | GA_ADMIN | 정책·조직 조회 |
 | `settle01` | SETTLEMENT | 정산 실행·예외처리 |
 | `audit01` | COMPLIANCE | 조회 전용 |
-| `agent01` | AGENT | (2차, V64) `app_user.agent_id` = `A-FC-001`. 초기 DISABLED, 개별 비밀번호 설정 후 활성화 |
+| `agent01` | AGENT | (2차, V64) `app_user.agent_id` = `A-FC-001`. 초기 DISABLED, 개별 비밀번호 설정 후 활성화(시연 서버·로컬은 V66, prd 제외) |
 
+
+**V66 예외(시연 서버·로컬 한정)**: 시연 편의를 위해 `db/demo-agent/V66__activate_agent_demo_account.sql`이 `password_hash='!'`인 `agent01`만 BCrypt 해시로 `ACTIVE` 처리한다. 위치를 `db/demo`와 분리했으므로 신한 prd는 Flyway locations에 `db/demo-agent`를 넣지 않는 한 이 계정을 활성화하지 않는다(`infra/shinhan/compose.yaml`은 그대로). 이 비밀번호는 V3의 공통 시연 비밀번호와 같은 값이라 공유 시연 자격 증명이며, 아래 prd 보호 규칙은 그대로 적용된다.
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
 
-`agent01`은 공통 시연 자격 증명을 복제하지 않는다. V64 신규 행의 `password_hash='!'`는 로그인 불가능한 미지정 표식이고 `account_status='DISABLED'`다. 시연 관리자가 별도 Secret으로 전달한 비밀번호를 애플리케이션의 BCryptPasswordEncoder로 해시한 뒤, 보호된 관리 연결에서 해당 행에 해시와 `ACTIVE` 상태를 함께 설정해야 실제 로그인할 수 있다. SQL·PR·로그에 비밀번호나 해시를 붙이지 않는다. 통합 테스트는 트랜잭션 안에서 일회성 UUID 비밀번호를 설정·활성화한 뒤 롤백한다. 이미 존재하는 동일 연결의 agent01은 V64가 덮어쓰지 않으므로 배포 전 별도 보호 검증이 필요하다.
+`agent01`은 신한 prd에서 공통 시연 자격 증명을 복제하지 않는다(시연 서버·로컬의 V66 예외 제외). V64 신규 행의 `password_hash='!'`는 로그인 불가능한 미지정 표식이고 `account_status='DISABLED'`다. 시연 관리자가 별도 Secret으로 전달한 비밀번호를 애플리케이션의 BCryptPasswordEncoder로 해시한 뒤, 보호된 관리 연결에서 해당 행에 해시와 `ACTIVE` 상태를 함께 설정해야 실제 로그인할 수 있다. SQL·PR·로그에 비밀번호나 해시를 붙이지 않는다. 통합 테스트는 트랜잭션 안에서 일회성 UUID 비밀번호를 설정·활성화한 뒤 롤백한다. 이미 존재하는 동일 연결의 agent01은 V64가 덮어쓰지 않으므로 배포 전 별도 보호 검증이 필요하다.
 
 - **AGENT 역할·`agent01`(2차)**: `db/demo/V64__seed_agent_role_and_account.sql`로 추가한다(#634). 스키마는 준비돼 있다(`app_user.agent_id`, `app_role`에 CHECK 없음). test·E2E에서 쓰려면 GOLDEN 설계사에 연결해야 하므로 기본 연결은 `A-FC-001`(정상 C001, 실효 C005, 원수사코드 3사)로 한다 — 프로젝트 가정이며 #634의 V64에서 기본 연결로 적용한다. DAR-012 생성기는 대표 설계사(정상·실효·부활·금액 미확인·환수)를 데이터셋 안에 만들고 그 DB에서만 `agent01.agent_id`를 그 설계사로 바꾼다(대표 계정은 계속 1개). (FUN-085, DAR-012)
 - **신한 prd 배포 전 필수 — 기존 데모 계정 보호**: V3 주석에 알려진 공통 비밀번호가 남아 있고 적용된 V3는 고치지 않는다(SRC-027 D-04). 현재 신한 prd 구성도 `db/demo`를 읽으므로(§2), 외부 트래픽을 열기 전에 배포 단계에서 `admin`·`gaadmin`·`settle01`·`audit01`·`agent01` 각각의 비밀번호를 안전하게 변경하거나 계정을 잠그고 결과를 검증한다. 새 비밀번호는 Secret으로 전달해 BCrypt 해시만 저장하며, 기존 공통 자격 증명으로 다섯 계정 모두 로그인할 수 없음을 확인한다. 잠금은 계정 상태와 인증 거절을 함께 확인한다. 없는 계정의 401 응답만으로는 합격 처리하지 않는다(SRC-065).
@@ -1461,7 +1465,7 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 |---|---|
 | 보험회사·조직·설계사 | insurer, organization, agent, agent_insurer_code |
 | 상품·판매버전 | product, product_offering |
-| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule |
+| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule, fee_regime_ruleset, policy_approval_action, policy_source_detail, policy_write_request, policy_succession |
 | 1,200% 정책 | cap_rule_set, cap_rule_item |
 | 배부근거 | allocation_policy |
 | 환급률 | refund_rate_table, refund_rate_line |
@@ -1476,6 +1480,8 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 대사 | reconciliation_run, reconciliation_result, reconciliation_match |
 | 예외 | exception_case, exception_occurrence, exception_action |
 | 감사 | audit_log |
+
+`policy_succession`(V68)은 이전/후속 정책버전 ID·계약 적용일·실행자/시각의 불변 승계 기록이다. 계산용 파생 뷰 `policy_application_version`은 원본 승인 기간을 바꾸지 않고 구버전 적용 종료일을 후속 적용일 전날까지로 해석한다. 승계된 RETIRED만 과거 계약 선택에 사용하며, 같은 미래 적용일 정정으로 생긴 빈 구간은 제외한다(인터페이스 §4-4-1·운영정책서 제49조, 2026-10-29).
 
 `exception_occurrence`는 SRC-032(2026-08-18)가 신설한 월 통합검증 실행별 예외 검출 이력이다. `exception_case`는 검증월 기준 안정 업무키의 업무건으로, 같은 결정으로 `reason_code`, `validation_month`, `first/last_detected_run_id`, `first/last_detected_at`, `detection_count` 컬럼이 추가됐다.
 
