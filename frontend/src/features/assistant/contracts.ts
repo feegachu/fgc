@@ -26,6 +26,12 @@ export type CompletionRuleId =
   | 'CURRENT_PRECHECK_PASSED'
   | 'PRECHECK_RESULT_ACKNOWLEDGED'
   | 'PAYMENT_CONFIRMED'
+export type GuideTransitionConditionId = CompletionRuleId | 'CURRENT_DRAFT_ALREADY_SAVED' | 'DRAFT_SAVE_REQUIRED'
+export interface GuideBranchContext {
+  paymentId: EntityId | null
+  saved: boolean
+  formValid: boolean
+}
 export type CalculationKind =
   | 'EXPECTED_COMMISSION'
   | 'ATTRIBUTION_BALANCE'
@@ -65,7 +71,7 @@ export interface LocalGuideStep {
   entryRuleId: 'CONTEXT_AVAILABLE'
   completionRuleId: CompletionRuleId
   missingTargetBehavior: 'PAUSE'
-  next: readonly { conditionId: CompletionRuleId; stepId: TargetId }[]
+  next: readonly { conditionId: GuideTransitionConditionId; stepId: TargetId }[]
 }
 /** Local catalog fields intentionally differ from the future server proof/GuideStart contract. */
 export interface LocalGuideDefinition {
