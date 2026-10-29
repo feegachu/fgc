@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { apiClient } from '../../lib/api/client'
+import { apiClient, ApiError } from '../../lib/api/client'
 import { AssistantDemoMount, PicoAssistant } from './PicoAssistant'
 import { useGuideRuntime } from './guide-runtime'
 import type { ShellUser } from '../../app/shell/Sidebar'
@@ -44,14 +44,12 @@ async function send() {
   await userEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
 }
 function mockResponse(source = 'AI') {
-  return vi
-    .spyOn(apiClient, 'request')
-    .mockImplementation((async (_path, options) =>
-      envelope({
-        ...reply,
-        source,
-        contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
-      })) as typeof apiClient.request)
+  return vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) =>
+    envelope({
+      ...reply,
+      source,
+      contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+    })) as typeof apiClient.request)
 }
 it('mounts with AI opt-in, calls the server and renders AI evidence distinct from synthetic buttons', async () => {
   const request = mockResponse()
@@ -146,4 +144,15 @@ it('rejects stale response revisions even when transport ignores abort', async (
   await send()
   await waitFor(() => expect(screen.getByText(/답변 서버에 연결하지 못했어요/)).toBeInTheDocument())
   expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+})
+
+it('distinguishes stale guide conflicts from connection failures without executing a guide', async () => {
+  vi.spyOn(apiClient, 'request').mockRejectedValue(
+    new ApiError({ code: 'FGC-IMPL-GUIDE_VERSION_MISMATCH', message: 'stale' }, 'qa', 409),
+  )
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
+  expect(useGuideRuntime.getState().session).toBeNull()
 })

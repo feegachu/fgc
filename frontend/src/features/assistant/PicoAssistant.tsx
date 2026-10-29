@@ -1,3 +1,4 @@
+import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { ShellUser } from '../../app/shell/Sidebar'
@@ -231,7 +232,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
         ...previous,
         entries: [...previous.entries, { id: previous.entries.length, role: 'live', reply }],
       }))
-    } catch {
+    } catch (error) {
       if (controller.signal.aborted || sequence !== aiSequence.current) return
       setConversation((previous) => ({
         ...previous,
@@ -240,7 +241,10 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
           {
             id: previous.entries.length,
             role: 'notice',
-            text: '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 지급 화면의 고정 도움말을 사용할 수 있어요.',
+            text:
+              error instanceof ApiError && error.code === 'FGC-IMPL-GUIDE_VERSION_MISMATCH'
+                ? '가이드 버전이 변경됐어요. 작성 중인 내용을 보존한 뒤 화면을 새로 열어주세요.'
+                : '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 지급 화면의 고정 도움말을 사용할 수 있어요.',
           },
         ],
       }))

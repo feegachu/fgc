@@ -37,14 +37,27 @@ public class PicoAskService {
         String normalized = Normalizer.normalize(message, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
         if (normalized.codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
         if (UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return OutputRejection.UNSAFE_TEXT;
-        // Scan backwards from each currency unit once: no nested regex backtracking on model text.
-        for (int index = 1; index < normalized.length(); index++) {
-            if (normalized.charAt(index) != '원') continue;
-            int previous = index - 1;
-            while (previous >= 0 && Character.isWhitespace(normalized.charAt(previous))) previous--;
-            if (previous >= 0 && MONEY_PREFIXES.indexOf(normalized.charAt(previous)) >= 0) return OutputRejection.GENERATED_AMOUNT;
-        }
+        if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "회", "개월", "년").stream()
+                .anyMatch(unit -> koreanQuantity(normalized, unit))) return OutputRejection.GENERATED_AMOUNT;
         return null;
+    }
+
+    private static boolean koreanQuantity(String text, String unit) {
+        int index = text.indexOf(unit);
+        while (index >= 0) {
+            String suffix = text.substring(index + unit.length());
+            boolean boundary = suffix.isEmpty() || !Character.isLetter(suffix.charAt(0))
+                    || List.of("까지", "이하", "이상", "입니다", "로", "를", "의", "가", "는", "만").stream().anyMatch(suffix::startsWith);
+            int previous = index - 1;
+            while (previous >= 0 && Character.isWhitespace(text.charAt(previous))) previous--;
+            if (boundary && previous >= 0 && numeralEnding(text.substring(0, previous + 1))) return true;
+            index = text.indexOf(unit, index + unit.length());
+        }
+        return false;
+    }
+    private static boolean numeralEnding(String prefix) {
+        return MONEY_PREFIXES.indexOf(prefix.charAt(prefix.length() - 1)) >= 0
+                || List.of("한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열", "스물", "서른", "마흔", "쉰").stream().anyMatch(prefix::endsWith);
     }
 
     @PreAuthorize(Roles.ANY_ROLE)
@@ -80,7 +93,10 @@ public class PicoAskService {
         } catch (JsonProcessingException error) { return fallback(request,chunks,"INPUT_ENCODING_ERROR"); }
     }
     private PicoAskResponse contextError(PicoAskRequest request) {
-        if (!"1.0".equals(request.guideVersion())) return fixed(request,Decision.ASK_CLARIFICATION,"가이드 버전이 바뀌었습니다. 화면을 새로 열고 질문해주세요.",List.of(),"GUIDE_VERSION_MISMATCH");
+        if (!Set.of("TRAN-W02", "CMN-C04").contains(request.screenId()))
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, "screenId", Map.of("field", "screenId"), "승인된 질문 화면이 아닙니다.");
+        if (!"1.0".equals(request.guideVersion()))
+            throw new FgcBusinessException(FgcErrorCode.IMPL_GUIDE_VERSION_MISMATCH);
         if (!request.entityRefs().isEmpty()) return fixed(request,Decision.ANSWER_ONLY,"이 연결은 지급 업무의 일반 절차를 설명합니다. 실제 대상의 금액과 상태는 기존 계산 조회에서 확인해주세요.",List.of(),"ENTITY_STATE_NOT_SUPPORTED");
         if (request.conversation()!=null && !request.conversation().isEmpty()) return fixed(request,Decision.ASK_CLARIFICATION,"이번 연결은 현재 질문을 기준으로 안내합니다. 원하는 지급 업무를 질문에 다시 적어주세요.",List.of(),"HISTORY_NOT_SUPPORTED");
         return null;

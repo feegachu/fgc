@@ -46,4 +46,10 @@ class PicoAskControllerTest {
         generated.path("components").path("schemas").fields().forEachRemaining(e->{ if(!schemas.has(e.getKey()) || e.getKey().startsWith("Pico") || e.getKey().equals("ApiResponsePicoAskResponse")) schemas.set(e.getKey(),e.getValue()); else org.assertj.core.api.Assertions.assertThat(schemas.get(e.getKey())).isEqualTo(e.getValue()); });
         java.nio.file.Files.writeString(file,mapper.writerWithDefaultPrettyPrinter().writeValueAsString(existing)+"\n");
     }
+    @Test void staleGuideVersionUsesRegisteredConflictEnvelope() throws Exception {
+        when(service.ask(any())).thenThrow(new FgcBusinessException(FgcErrorCode.IMPL_GUIDE_VERSION_MISMATCH));
+        mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT")))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("FGC-IMPL-GUIDE_VERSION_MISMATCH"));
+    }
 }

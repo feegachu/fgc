@@ -128,12 +128,33 @@ export function PaymentCalculationPanel({
               </div>
             ))}
           </dl>
+          {!!result.basis?.lines?.length && (
+            <details>
+              <summary>귀속 행별 반올림 근거</summary>
+              {result.basis.lines.map((line, index) => (
+                <p key={index}>
+                  귀속 {line.attributionSequence ?? '미확인'} · 계약 #{line.contractId ?? '미확인'} · 기준일{' '}
+                  {line.attributionDate ?? '미확인'}
+                  <br />
+                  원천 {line.originalAmount ?? '미제공'}원 → 반올림 {won(line.roundedAmount)}
+                </p>
+              ))}
+            </details>
+          )}
+          <p>
+            기준일: {result.basis?.asOfDate ?? '행별 기준일 확인'} · 배부 정책 버전:{' '}
+            {result.basis?.policyVersionIds?.join(', ') || '미제공'} · 한도 규칙:{' '}
+            {result.basis?.ruleIds?.join(', ') || '미제공'}
+          </p>
           {result.capPreview?.map((row, index) => (
             <div className="payment-calculation-cap" key={index}>
               <strong>
                 계약 #{String(row.contractId ?? '미확인')} ·{' '}
                 {String(row.resultStatusLabel ?? row.resultStatus ?? '미확인')}
               </strong>
+              <p>
+                기준일 {String(row.asOfDate ?? '미제공')} · 한도 규칙 #{String(row.capRuleSetId ?? '미제공')}
+              </p>
               <dl>
                 {['limitAmount', 'candidateAmount', 'includedAmount', 'remainingAmount'].map((key) => (
                   <div key={key}>
