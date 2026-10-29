@@ -1,11 +1,11 @@
-import type { CompletionRuleId, GuideDefinition, GuideStep, TargetId } from './contracts'
+import type { CompletionRuleId, LocalGuideDefinition, LocalGuideStep, TargetId } from './contracts'
 
 const step = (
   targetId: TargetId,
   title: string,
   instruction: string,
   completionRuleId: CompletionRuleId,
-): Readonly<Omit<GuideStep, 'next'>> =>
+): Readonly<Omit<LocalGuideStep, 'next'>> =>
   Object.freeze({
     stepId: targetId,
     screenId: 'TRAN-W02',
@@ -107,7 +107,7 @@ const definitions = Object.freeze([
 ])
 
 // Register roles and every next edge explicitly; model text cannot invent a branch.
-export const GUIDE_CATALOG: readonly Readonly<GuideDefinition>[] = Object.freeze(
+export const GUIDE_CATALOG: readonly Readonly<LocalGuideDefinition>[] = Object.freeze(
   definitions.map((guide) =>
     Object.freeze({
       ...guide,
@@ -132,13 +132,13 @@ export const GUIDE_CATALOG: readonly Readonly<GuideDefinition>[] = Object.freeze
 )
 
 /** Only registered IDs are resolved. Routes, selectors and executable conditions never come from model text. */
-export function findGuide(workflowId: string, guideVersion: string): Readonly<GuideDefinition> | null {
+export function findGuide(workflowId: string, guideVersion: string): Readonly<LocalGuideDefinition> | null {
   return (
     GUIDE_CATALOG.find(
       (guide) => guide.enabled && guide.workflowId === workflowId && guide.guideVersion === guideVersion,
     ) ?? null
   )
 }
-export function findStep(workflowId: string, guideVersion: string, stepId: string): Readonly<GuideStep> | null {
+export function findStep(workflowId: string, guideVersion: string, stepId: string): Readonly<LocalGuideStep> | null {
   return findGuide(workflowId, guideVersion)?.steps.find((entry) => entry.stepId === stepId) ?? null
 }

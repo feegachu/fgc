@@ -56,7 +56,7 @@ export interface AssistantContext {
   clientRevision: number
 }
 /** assistant.v1 local catalog, not the server GuideStep wire DTO in interface §14-2. */
-export interface GuideStep {
+export interface LocalGuideStep {
   stepId: TargetId
   screenId: 'TRAN-W02'
   targetId: TargetId
@@ -68,7 +68,7 @@ export interface GuideStep {
   next: readonly { conditionId: CompletionRuleId; stepId: TargetId }[]
 }
 /** Local catalog fields intentionally differ from the future server proof/GuideStart contract. */
-export interface GuideDefinition {
+export interface LocalGuideDefinition {
   workflowId: WorkflowId
   guideVersion: '1.0'
   title: string
@@ -78,7 +78,7 @@ export interface GuideDefinition {
   capability: 'READ' | 'PROCESS'
   roles: readonly ('SYSTEM_ADMIN' | 'GA_ADMIN' | 'SETTLEMENT' | 'COMPLIANCE')[]
   availableCalculationKinds: readonly CalculationKind[]
-  steps: readonly Readonly<GuideStep>[]
+  steps: readonly Readonly<LocalGuideStep>[]
   enabled: boolean
 }
 export interface SourceRef {
@@ -258,7 +258,7 @@ export interface GuideSession {
   planVersion: number
   state: GuideState
   resolvedContext: AssistantContext
-  steps: GuideStep[]
+  steps: LocalGuideStep[]
   currentStepId: TargetId
   stepResult: {
     status: 'WAITING' | 'SATISFIED' | 'BLOCKED'
