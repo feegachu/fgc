@@ -1,4 +1,4 @@
-import type { CompletionRuleId, LocalGuideDefinition, LocalGuideStep, TargetId } from './contracts'
+import type { CompletionRuleId, GuideBranchContext, LocalGuideDefinition, LocalGuideStep, TargetId } from './contracts'
 
 const step = (
   targetId: TargetId,
@@ -120,9 +120,14 @@ export const GUIDE_CATALOG: readonly Readonly<LocalGuideDefinition>[] = Object.f
           Object.freeze({
             ...current,
             next: Object.freeze(
-              index + 1 < guide.steps.length
-                ? [Object.freeze({ conditionId: current.completionRuleId, stepId: guide.steps[index + 1].stepId })]
-                : [],
+              guide.workflowId === 'payment.confirm' && current.stepId === 'payment.scope'
+                ? [
+                    Object.freeze({ conditionId: 'CURRENT_DRAFT_ALREADY_SAVED' as const, stepId: 'payment.precheck' as const }),
+                    Object.freeze({ conditionId: 'DRAFT_SAVE_REQUIRED' as const, stepId: 'payment.save' as const }),
+                  ]
+                : index + 1 < guide.steps.length
+                  ? [Object.freeze({ conditionId: current.completionRuleId, stepId: guide.steps[index + 1].stepId })]
+                  : [],
             ),
           }),
         ),
@@ -141,4 +146,19 @@ export function findGuide(workflowId: string, guideVersion: string): Readonly<Lo
 }
 export function findStep(workflowId: string, guideVersion: string, stepId: string): Readonly<LocalGuideStep> | null {
   return findGuide(workflowId, guideVersion)?.steps.find((entry) => entry.stepId === stepId) ?? null
+}
+
+/** Select only a registered edge after the caller has checked this step's completion. */
+export function selectGuideTransition(step: Readonly<LocalGuideStep>, context: GuideBranchContext): TargetId | null {
+  if (step.next.length === 0) return null
+  const currentDraftSaved = Boolean(context.paymentId) && context.saved && context.formValid
+  const matches = step.next.filter(({ conditionId }) =>
+    conditionId === 'CURRENT_DRAFT_ALREADY_SAVED'
+      ? currentDraftSaved
+      : conditionId === 'DRAFT_SAVE_REQUIRED'
+        ? !currentDraftSaved
+        : conditionId === step.completionRuleId,
+  )
+  if (matches.length !== 1) throw new Error('Guide transition must resolve to exactly one registered step')
+  return matches[0].stepId
 }
