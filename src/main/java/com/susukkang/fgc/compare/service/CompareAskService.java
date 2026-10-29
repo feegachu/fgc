@@ -58,8 +58,8 @@ public class CompareAskService {
 
     private static final int MAX_LENGTH = 600;
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:,\\d{3})*(?:\\.\\d+)?");
-    private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)");
-    private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교");
+    private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)", Pattern.CANON_EQ);
+    private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
 
     private final LlmGateway llmGateway;
@@ -76,19 +76,19 @@ public class CompareAskService {
         String data = describe(ranking);
         Output output = call(q, data);
         if (output == null) {
-            return fallback(q, ranking);
+            return fallbackAnswer(q, ranking);
         }
         if (Boolean.FALSE.equals(output.inScope)) {
             // 순위 결과가 있는 상태의 순위·이유 질문은 범위 안이다. 모델이 거절해도 서버 값으로 풀어 답한다.
             return hasItems(ranking) && isRankQuestion(q)
-                    ? fallback(q, ranking)
+                    ? fallbackAnswer(q, ranking)
                     : new CompareAskResponse(OUT_OF_SCOPE, CompareAskResponse.OUT_OF_SCOPE);
         }
         String text = output.answer == null ? "" : output.answer.strip();
         // 허용 숫자는 서버 근거(data)에서만 만든다. 질문에 적힌 숫자를 근거로 인정하면 사용자가 정한 값이 서버 값처럼 나간다.
         if (!isValid(text, data)) {
             log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다.");
-            return fallback(q, ranking);
+            return fallbackAnswer(q, ranking);
         }
         return new CompareAskResponse(text, CompareAskResponse.LLM);
     }
@@ -108,7 +108,7 @@ public class CompareAskService {
     }
 
     /** 순위 질문이면 서버 값으로 풀어 쓴 해설을, 용어 질문이면 용어 설명을, 아니면 안내 문장을 준다. 새 수치를 만들지 않는다. */
-    static CompareAskResponse fallback(String question, CompareRankingResponse ranking) {
+    static CompareAskResponse fallbackAnswer(String question, CompareRankingResponse ranking) {
         if (hasItems(ranking) && isRankQuestion(question)) {
             return new CompareAskResponse(rankAnswer(ranking.items(), question), CompareAskResponse.RULE);
         }
@@ -174,7 +174,7 @@ public class CompareAskService {
                 sb.append("- %d위 %s %s".formatted(it.rank(), it.insurer(), it.product()));
                 sb.append(it == top ? ": 기준 상품" : ": " + comparison(top, it)).append('\n');
                 for (CompareRankingResponse.Evidence e : it.evidence()) {
-                    sb.append("    근거 %s | %s | %s\n".formatted(e.label(), e.rule(), e.value() == null ? "자료 없음" : "%,d원".formatted(e.value())));
+                    sb.append("    근거 %s | %s | %s%n".formatted(e.label(), e.rule(), e.value() == null ? "자료 없음" : "%,d원".formatted(e.value())));
                 }
             }
         }

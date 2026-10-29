@@ -49,7 +49,7 @@ public class NewsHeadlineService {
             @Value("${fgc.news.failure-backoff:2m}") Duration failureBackoff,
             @Value("${fgc.news.timeout:5s}") Duration timeout) {
         this.feedUrl = feedUrl;
-        this.maxItems = Math.max(1, Math.min(maxItems, 20));
+        this.maxItems = Math.clamp(maxItems, 1, 20);
         this.ttl = ttl;
         this.failureBackoff = failureBackoff;
         this.timeout = timeout;
@@ -67,6 +67,9 @@ public class NewsHeadlineService {
                 cached = fresh;
             }
             nextFetchAt = now.plus(ttl);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            nextFetchAt = now.plus(failureBackoff);
         } catch (Exception e) {
             // 뉴스는 보조 정보다. 실패하면 직전 결과를 유지하고 잠시 다시 부르지 않는다.
             log.warn("뉴스 헤드라인을 불러오지 못했습니다: {}", e.getClass().getSimpleName());
