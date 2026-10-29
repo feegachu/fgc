@@ -26,6 +26,7 @@ import type { FinalizeChecklist, ValidationRunDetail, ValidationTarget } from '.
 import { FinalizeDialogs } from './FinalizeDialogs'
 import { RunStatusBadge } from './RunStatusBadge'
 import { MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
+import { useRestartAttemptDeadline } from './useRestartAttemptDeadline'
 import './validation.css'
 
 /*
@@ -97,12 +98,17 @@ function DetailBody({
   const header = detail.header ?? {}
   const [executed, setExecuted] = useState(false)
   const [previousAttemptId, setPreviousAttemptId] = useState<number | null>(null)
-  const polling = executed || header.status === 'RUNNING'
-    || (header.status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT' && user?.canProcess === true)
-  const progress = useQuery(runProgressQuery(id, polling, previousAttemptId))
+  const [attemptWaitGeneration, setAttemptWaitGeneration] = useState(0)
+  const attemptWaitExpired = useRestartAttemptDeadline(executed && previousAttemptId !== null, attemptWaitGeneration)
+  const polling =
+    executed ||
+    header.status === 'RUNNING' ||
+    (header.status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT' && user?.canProcess === true)
+  const progress = useQuery(runProgressQuery(id, polling, previousAttemptId, attemptWaitExpired))
+  const startUnconfirmed = attemptWaitExpired && !hasNewAttempt(progress.data, previousAttemptId)
   // 확정(FINALIZED)은 폴링 응답보다 늦게 도착한 헤더가 정답이다 — 이전 폴링 값이 확정 상태를 덮지 않게 한다.
-  const live = header.status === 'FINALIZED'
-    || !hasNewAttempt(progress.data, previousAttemptId) ? undefined : progress.data
+  const live =
+    header.status === 'FINALIZED' || !hasNewAttempt(progress.data, previousAttemptId) ? undefined : progress.data
   const status = live?.status ?? header.status
   const currentStep = live?.currentStep ?? header.currentStep ?? 0
   const failureMessage = live?.failureMessage ?? header.failureMessage
@@ -111,7 +117,7 @@ function DetailBody({
   const canProcess = user?.canProcess === true
   const canFinalize = user?.canFinalizeValidation === true
   const canRestart = status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT'
-  const canExecute = status === 'CREATED' || canRestart
+  const canExecute = (status === 'CREATED' || canRestart) && !startUnconfirmed
 
   // 폴링이 종료 상태에 닿으면 헤더·결과 요약·확정 조건을 다시 불러온다(1차는 전체 리로드였다).
   const finished = (executed || header.status === 'RUNNING') && live && !isRunning(live.status)
@@ -152,6 +158,7 @@ function DetailBody({
       announced.current = false
       setPreviousAttemptId(before?.restarting ? before.attemptId : null)
       setExecuted(true)
+      setAttemptWaitGeneration((value) => value + 1)
       toast('검증 실행을 시작했습니다. 진행률을 2초 간격으로 갱신합니다.', 'info')
     },
     onError: (error) => toast(errorText(error as Error, '실행 요청에 실패했습니다.'), 'error'),
@@ -270,16 +277,18 @@ function DetailBody({
           <p
             className="vrun-action-note"
             id="execute-action-note"
-            role="status"
+            role={startUnconfirmed ? 'alert' : 'status'}
             hidden={canProcess && canExecute && (!executed || finished)}
           >
             {status === 'FINALIZED'
               ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.'
               : !canProcess
                 ? '실행 기동은 정산 담당자만 할 수 있습니다.'
-                : executed && !finished
-                  ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
-                  : '생성됨 또는 실패한 월 실행만 기동할 수 있습니다.'}
+                : startUnconfirmed
+                  ? '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.'
+                  : executed && !finished
+                    ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
+                    : '생성됨 또는 실패한 월 실행만 기동할 수 있습니다.'}
           </p>
           <p className="vrun-progress-line">
             <span>진행률</span>

@@ -29,7 +29,14 @@ export const RUN_TYPES = [
 ] as const
 
 /** 서버(ValidationRunSearchImpl.SORT_KEYS)와 같은 정렬 key. 실행 유형·상태·진행·실패 사유는 순서 기준이 없어 제외한다. */
-export const RUN_SORT_KEYS = ['validationMonth', 'runNo', 'triggeredBy', 'startedAt', 'completedAt', 'finalizedAt'] as const
+export const RUN_SORT_KEYS = [
+  'validationMonth',
+  'runNo',
+  'triggeredBy',
+  'startedAt',
+  'completedAt',
+  'finalizedAt',
+] as const
 
 export interface RunCriteria {
   status: string
@@ -92,16 +99,23 @@ export const isRunning = (status?: string) => status === 'RUNNING' || status ===
 export const hasNewAttempt = (data: ValidationProgress | undefined, previousAttemptId: number | null) =>
   previousAttemptId === null || (data?.attemptId ?? 0) > previousAttemptId
 
-export const runProgressQuery = (id: string, enabled: boolean, previousAttemptId: number | null = null) =>
+export const runProgressQuery = (
+  id: string,
+  enabled: boolean,
+  previousAttemptId: number | null = null,
+  attemptWaitExpired = false,
+) =>
   queryOptions({
     queryKey: ['validation-runs', 'progress', id, previousAttemptId],
     queryFn: ({ signal }) =>
       get<ValidationProgress>(`/api/v1/validation-runs/${encodeURIComponent(id)}/progress`, signal),
     enabled,
     // execute 직후엔 배치가 아직 안 떠서 CREATED 가 조회될 수 있다 — 종료 상태에서만 멈춘다.
-    refetchInterval: (query) =>
-      query.state.data && hasNewAttempt(query.state.data, previousAttemptId)
-        && !isRunning(query.state.data.status) ? false : POLL_INTERVAL,
+    refetchInterval: (query) => {
+      if (query.state.data && hasNewAttempt(query.state.data, previousAttemptId))
+        return isRunning(query.state.data.status) ? POLL_INTERVAL : false
+      return attemptWaitExpired ? false : POLL_INTERVAL
+    },
     // 폴링은 항상 최신값이어야 하므로 캐시를 재사용하지 않는다.
     gcTime: 0,
     meta: { errorToast: false },
@@ -137,7 +151,8 @@ export const createRun = (validationMonth: string, runType: string) =>
 /** IF-API-48 — 202 수락만 의미하고 진행은 폴링으로 본다. */
 export const executeRun = async (id: string) => {
   const response = await apiClient.request<Schemas['ValidationRunExecuteResponse']>(
-    `/api/v1/validation-runs/${encodeURIComponent(id)}/execute`, { method: 'POST' },
+    `/api/v1/validation-runs/${encodeURIComponent(id)}/execute`,
+    { method: 'POST' },
   )
   if (response.data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
   return { ...response.data, requestId: response.requestId }

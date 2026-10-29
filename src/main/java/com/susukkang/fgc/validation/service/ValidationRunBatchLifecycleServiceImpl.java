@@ -19,7 +19,7 @@ public class ValidationRunBatchLifecycleServiceImpl implements ValidationRunBatc
     @Override @Transactional
     public void restart(Long id, MonthlyValidationJobParameters parameters) {
         if (parameters.restartFromExecutionId() != null) {
-            validationRunRepository.lockAdvisoryKey("fgc.validation_run.restart:" + id);
+            validationRunRepository.lockValidationRunRestart(id);
             if (validationRunRepository.hasRestartClaim(id, parameters.restartFromExecutionId())) {
                 throw new FgcBusinessException(FgcErrorCode.VRUN_005);
             }

@@ -311,7 +311,13 @@ describe('VRUN-W02 상세·실행·확정', () => {
       polls += 1
       return polls <= 2
         ? { status: 'FAILED', currentStep: 5, failureMessage: '25번째 실패', requestId: 'old-request', attemptId: 10 }
-        : { status: 'FAILED', currentStep: 5, failureMessage: '다시 실패', requestId: 'other-tab-request', attemptId: 11 }
+        : {
+            status: 'FAILED',
+            currentStep: 5,
+            failureMessage: '다시 실패',
+            requestId: 'other-tab-request',
+            attemptId: 11,
+          }
     }
     const { actions } = renderAt('/app/validation-runs/7')
     const restart = await screen.findByRole('button', { name: /실패 지점부터 재시작/ })
@@ -415,4 +421,36 @@ describe('VRUN-W02 상세·실행·확정', () => {
     await screen.findByText('미충족 1건')
     expect(screen.queryByRole('link', { name: /바로가기/ })).toBeNull()
   })
+})
+
+it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수동 조회로 복귀하며 재전송하지 않는다', async () => {
+  const nativeTimeout = window.setTimeout.bind(window)
+  vi.spyOn(window, 'setTimeout').mockImplementation(((handler: TimerHandler, delay?: number, ...args: unknown[]) =>
+    nativeTimeout(handler, delay === 120_000 ? 20 : delay, ...args)) as typeof window.setTimeout)
+  detailHandlers(run({ status: 'FAILED', currentStep: 5 }))
+  let advanced = false
+  handlers['POST /api/v1/validation-runs/7/execute'] = () => ({ validationRunId: 7, status: 'RUNNING' })
+  handlers['GET /api/v1/validation-runs/7/progress'] = () => ({
+    status: 'FAILED',
+    currentStep: 5,
+    attemptId: advanced ? 11 : 10,
+  })
+  const { actions } = renderAt('/app/validation-runs/7')
+  const restart = await screen.findByRole('button', { name: /실패 지점부터 재시작/ })
+  await waitFor(() => expect(restart).toBeEnabled())
+  await actions.click(restart)
+  const message = await screen.findByText(
+    '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.',
+  )
+  expect(message).toHaveAttribute('role', 'alert')
+  expect(restart).toBeDisabled()
+  expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+  const pollsAfterDeadline = calls('GET /api/v1/validation-runs/7/progress').length
+  await new Promise((resolve) => nativeTimeout(resolve, 2100))
+  expect(calls('GET /api/v1/validation-runs/7/progress')).toHaveLength(pollsAfterDeadline)
+  advanced = true
+  await actions.click(screen.getByRole('button', { name: '새로고침' }))
+  await waitFor(() => expect(restart).toBeEnabled())
+  expect(message).not.toBeVisible()
+  expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
 })

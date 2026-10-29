@@ -94,7 +94,13 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
     /** {@link #lockValidationMonth} 키 접두사. 다른 기능의 advisory 키와 섞이지 않게 네임스페이스를 둔다. */
     String VALIDATION_MONTH_LOCK_PREFIX = "fgc.validation_run.month:";
 
-    /** 문자열 키의 트랜잭션 advisory lock. 직접 쓰지 말고 {@link #lockValidationMonth}를 쓴다. */
+    String VALIDATION_RESTART_LOCK_PREFIX = "fgc.validation_run.restart:";
+
+    default void lockValidationRunRestart(Long validationRunId) {
+        lockAdvisoryKey(VALIDATION_RESTART_LOCK_PREFIX + validationRunId);
+    }
+
+    /** 문자열 키의 트랜잭션 advisory lock. 월/재시작용 도메인 helper를 통해 사용한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     @NativeQuery("""
             SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:lockKey, 0))
