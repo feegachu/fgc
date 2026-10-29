@@ -27,6 +27,49 @@ class CompareAskServiceTest {
                 "GA-CUR-2026-V1 v1", 100_000L, 12, List.of(), null, List.of(top), List.of(), CompareRankingFilters.NONE);
     }
 
+    private static CompareRankingResponse twoItems() {
+        CompareRankingResponse base = ranking();
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 24.0, 80.0, null, List.of());
+        return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
+                base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
+                List.of(base.items().get(0), second), List.of(), CompareRankingFilters.NONE);
+    }
+
+    @Test
+    @DisplayName("모델이 순위 질문을 범위 밖으로 거절해도 서버 값으로 2순위 이유를 풀어 답한다")
+    void rankQuestionIsAnsweredEvenWhenModelRefuses() {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask("2순위인 이유 알려줘", twoItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강", "1위보다 보수적 순수령액이 50,000원 적어요",
+                "수령 예상액은 1위보다 84,000원 적고", "환수 노출액은 1위보다 34,000원 더 작아요");
+    }
+
+    @Test
+    @DisplayName("LLM 호출이 실패해도 순위 질문에는 서버 값으로 답한다")
+    void rankQuestionFallsBackWhenGatewayFails() {
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+
+        assertThat(service.ask("1위와 2위 차이가 뭐야?", twoItems()).answer()).contains("1위는 가보험 든든건강");
+    }
+
+    @Test
+    @DisplayName("LLM 근거에 순위별 비교 근거가 담긴다")
+    void describeIncludesRankComparison() {
+        assertThat(CompareAskService.describe(twoItems())).contains("[순위별 비교 근거]",
+                "2위 나보험 튼튼건강: 1위보다 보수적 순수령액이 50,000원 적어요");
+    }
+
+    @Test
+    @DisplayName("순위 결과가 없으면 순위 질문도 범위 밖으로 안내한다")
+    void rankQuestionWithoutRankingIsOutOfScope() {
+        llmReturns(false, "");
+
+        assertThat(service.ask("2순위인 이유 알려줘", null).source()).isEqualTo("OUT_OF_SCOPE");
+    }
+
     private void llmReturns(Boolean inScope, String answer) {
         CompareAskService.Output output = new CompareAskService.Output();
         output.inScope = inScope;
