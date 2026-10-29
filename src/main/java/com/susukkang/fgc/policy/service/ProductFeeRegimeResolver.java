@@ -1,6 +1,7 @@
 package com.susukkang.fgc.policy.service;
 
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.policy.code.FeeRegimeReasonCode;
 import com.susukkang.fgc.policy.code.FeeRegimeResolutionStatus;
 import com.susukkang.fgc.policy.dto.FeeRegimeDecisionInput;
@@ -32,6 +33,16 @@ public class ProductFeeRegimeResolver {
     private final FeeRegimeResolverRepository resolverRepository;
 
     public FeeRegimeResolution resolve(Long contractId) {
+        return resolve(contractId, null);
+    }
+
+    /** 예정 생성에는 실제 계약·지급단계에 맞는 수수료 규칙을 가진 정책만 후보로 사용한다. */
+    public FeeRegimeResolution resolveForSchedule(Long contractId, PaymentStage paymentStage) {
+        java.util.Objects.requireNonNull(paymentStage, "paymentStage");
+        return resolve(contractId, paymentStage);
+    }
+
+    private FeeRegimeResolution resolve(Long contractId, PaymentStage paymentStage) {
         FeeRegimeDecisionInput input = inputService.getByContractId(contractId);
         List<Long> coveringOfferingIds = resolverRepository.findOfferingIdsCoveringContractDate(contractId);
 
@@ -43,16 +54,18 @@ public class ProductFeeRegimeResolver {
                     null, null,
                     decision.reasonCode() == FeeRegimeReasonCode.OFFERING_NOT_UNIQUE ? coveringOfferingIds : List.of(),
                     List.of());
-            case LOOKUP_RULESET -> selectRuleset(input);
+            case LOOKUP_RULESET -> selectRuleset(input, contractId, paymentStage);
         };
     }
 
-    private FeeRegimeResolution selectRuleset(FeeRegimeDecisionInput input) {
+    private FeeRegimeResolution selectRuleset(FeeRegimeDecisionInput input, Long contractId, PaymentStage paymentStage) {
         String policyType = FeeRegimeDecisionTable.FOUR_YEAR_2027.equals(input.declaredFeeRegimeCode())
                 ? "FOUR_YEAR_COMMISSION" : "SEVEN_YEAR_COMMISSION";
         List<RulesetCandidate> candidates = resolverRepository.findRulesetCandidates(
                 policyType, input.declaredFeeRegimeCode(), input.contractDate(), input.salesStartDate(),
-                input.basicDocumentVersion(), input.basicDocumentDate());
+                input.basicDocumentVersion(), input.basicDocumentDate(),
+                new FeeRegimeResolverRepository.CommissionScope(contractId,
+                        paymentStage == null ? null : paymentStage.name()));
 
         // 기초서류 버전이 지정된 룰셋이 있으면 모든 버전용(NULL) 룰셋보다 우선한다(#534 선택 키 규칙).
         // 이 우선 규칙은 같은 정책버전 안의 겹침에만 적용한다. 정책버전이 다르면 후보를 가리지 않으므로

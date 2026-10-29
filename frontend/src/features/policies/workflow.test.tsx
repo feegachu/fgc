@@ -93,6 +93,28 @@ function mountManagement(status: PolicyWriteResult['status'], actions: string[],
 }
 
 describe('production policy workflow', () => {
+  it('shows the saved offering document conditions alongside the installment limit', () => {
+    const wire = wireDetail('ACTIVE', ['CLONE'])
+    Object.assign(wire.editDocument!.feeRegimeRules[0], {
+      basicDocumentVersion: 'BD-2027-01',
+      basicDocumentDateFrom: '2026-03-01',
+      basicDocumentDateTo: '2027-12-31',
+    })
+    const detail = normalizePolicyDetail(wire)
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    const summary = within(screen.getByText('분급 룰셋 1').closest('section')!)
+    const version = summary.getByText('기초서류 버전').parentElement!
+    expect(version).toHaveTextContent('BD-2027-01')
+    const period = summary.getByText('기초서류 일자 범위').parentElement!
+    expect(period).toHaveTextContent('2026-03-01')
+    expect(period).toHaveTextContent('2027-12-31')
+    expect(summary.getByText('최대 회차').parentElement).toHaveTextContent('48회차')
+  })
+
   it('shows the historical contract-date window separately from the immutable approval period', () => {
     mountManagement('RETIRED', ['CLONE'], { from: '2027-01-01', to: '2027-12-31', successorPolicyVersionId: 18 })
     const period = screen.getByText('계약일 적용 기간').parentElement!
