@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.susukkang.fgc.clawback.dto.ClawbackCandidateSearchCondition.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -446,16 +448,13 @@ class ClawbackCandidateIntegrationTest {
                     return source;
                 }));
                 assertThat(clearStarted.await(10, TimeUnit.SECONDS)).isTrue();
-                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-                boolean waiting = false;
-                while (!waiting && !second.isDone() && System.nanoTime() < deadline) {
-                    waiting = jdbc.queryForObject("""
-                            SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted
-                              AND database=(SELECT oid FROM pg_database WHERE datname=current_database()))
-                            """, Boolean.class);
-                    if (!waiting) Thread.sleep(10);
-                }
-                assertThat(waiting).as("새 판정 관측이 기존 후보 트랜잭션을 기다린다").isTrue();
+                await().alias("새 판정 관측이 기존 후보 트랜잭션을 기다린다")
+                        .pollInterval(Duration.ofMillis(10)).atMost(Duration.ofSeconds(10))
+                        .until(() -> Boolean.TRUE.equals(jdbc.queryForObject("""
+                                SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted
+                                  AND database=(SELECT oid FROM pg_database WHERE datname=current_database()))
+                                """, Boolean.class)));
+                assertThat(second.isDone()).isFalse();
                 commit.countDown();
                 long firstSource = first.get(15, TimeUnit.SECONDS);
                 long clearSource = second.get(15, TimeUnit.SECONDS);
