@@ -49,7 +49,7 @@ it('renders a selected fixture and read-only plan without a financial request', 
     const panel = screen.getByRole('tabpanel')
     expect(within(panel).getByRole('heading', { name: '지급 사전검증·확정' })).toBeInTheDocument()
     expect(within(panel).getAllByRole('listitem')).toHaveLength(5)
-    expect(within(panel).getByText(/화면 이동·강조와 실제 처리 결과 연결은 다음 단계/)).toBeInTheDocument()
+    expect(within(panel).getByText(/시연 순서와 별개로 현재 지급 화면의 고정 도움말/)).toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalled()
   } finally {
     fetch.mockRestore()

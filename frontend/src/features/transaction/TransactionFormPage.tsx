@@ -1,3 +1,6 @@
+import { PaymentGuideHelp } from '../assistant/PaymentGuide'
+import { isWonAmount } from '../assistant/guards'
+import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservation'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -131,6 +134,8 @@ function TransactionForm({
   const [paymentId, setPaymentId] = useState(initialId)
   const [locked, setLocked] = useState(false)
   const [dirty, setDirty] = useState(!initialId)
+  const [guideRevision, setGuideRevision] = useState(0)
+  const [guideSaved, setGuideSaved] = useState(draft?.status === 'DRAFT')
   const [busy, setBusy] = useState<'save' | 'precheck' | 'confirm' | null>(null)
   const actionLock = useRef(false)
   const [fieldError, setFieldError] = useState<{ field: string; message: string }>()
@@ -195,7 +200,51 @@ function TransactionForm({
     if (fieldError && busy == null) document.getElementById(fieldError.field)?.focus()
   }, [fieldError, busy])
 
+  // Read-only guide projection: no input text, amounts, API payloads or server proof is stored.
+  let guideFormValid = false
+  try {
+    buildPayload(form, rows, newcomer)
+    guideFormValid =
+      !loading &&
+      !referenceError &&
+      (insurer || agents.some((agent) => String(agent.agentId) === form.agentId)) &&
+      availableItems(form, items).some((item) => String(item.commissionItemId) === form.commissionItemId) &&
+      (newcomer || rows.every((row) => contracts.some((contract) => String(contract.contractId) === row.contractId)))
+  } catch {
+    /* Existing validator owns form errors; observation does not display a second error. */
+  }
+  usePaymentGuideObservation({
+    paymentId,
+    scopeKey: JSON.stringify([
+      form.settlementMonth,
+      form.paymentStage,
+      form.agentId,
+      rows.map((row) => row.contractId),
+    ]),
+    revision: guideRevision,
+    canProcess,
+    ready: !loading && !referenceError && !confirmed,
+    amountValid: isWonAmount(form.amount) && !form.amount.startsWith('-'),
+    attributionsValid:
+      rows.length > 0 &&
+      rows.every(
+        (row) =>
+          (newcomer || contracts.some((contract) => String(contract.contractId) === row.contractId)) &&
+          row.attributionDate.trim() !== '' &&
+          isWonAmount(row.amount) &&
+          !row.amount.startsWith('-') &&
+          (row.attributionMethod !== 'APPROVED_ALLOCATION' || row.allocationBasis.trim() !== ''),
+      ),
+    formValid: guideFormValid,
+    saved: guideSaved && Boolean(paymentId) && !needsSave,
+    busy: busy !== null,
+    precheck: !result ? 'NONE' : result.confirmable ? 'PASSED_WITHOUT_TOKEN' : 'REJECTED',
+    modalOpen,
+  })
+
   function invalidatePreview() {
+    setGuideRevision((value) => value + 1)
+    setGuideSaved(false)
     setDirty(true)
     setResult(null)
     setPrecheckError('')
@@ -262,6 +311,7 @@ function TransactionForm({
     try {
       const saved = await saveDraft(paymentId, payload)
       if (!saved.commissionTransactionId) throw new Error('저장된 지급 건 번호를 확인할 수 없습니다.')
+      setGuideSaved(saved.status === 'DRAFT' && (!paymentId || String(saved.commissionTransactionId) === paymentId))
       setPaymentId(String(saved.commissionTransactionId))
       setForm(initialForm(month, saved))
       setRows(draftRows(saved))
@@ -349,6 +399,8 @@ function TransactionForm({
   return (
     <div
       className="publishing-page transaction-page transaction-form-page"
+      data-guide-screen="TRAN-W02"
+      data-guide-version="1.0"
       data-transaction-form
       aria-busy={loading || busy !== null}
     >
@@ -365,6 +417,7 @@ function TransactionForm({
           </Link>
         </div>
       </header>
+      <PaymentGuideHelp canProcess={canProcess} />
       <aside
         className="guidance guidance-info transaction-boundary-guidance"
         aria-labelledby="transaction-boundary-title"
@@ -426,7 +479,11 @@ function TransactionForm({
         id="main-grid"
       >
         <div className="transaction-form-column">
-          <section className="surface transaction-form-panel" aria-labelledby="transaction-input-title">
+          <section
+            data-guide-target="payment.scope"
+            className="surface transaction-form-panel"
+            aria-labelledby="transaction-input-title"
+          >
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title" id="transaction-input-title">
                 ① 지급 건
@@ -526,6 +583,7 @@ function TransactionForm({
                 error={fieldMessage('amount')}
               >
                 <input
+                  data-guide-target="payment.amount"
                   id="amount"
                   className="transaction-number"
                   type="number"
@@ -553,6 +611,7 @@ function TransactionForm({
                 error={fieldMessage('evidence')}
               >
                 <input
+                  data-guide-target="payment.evidence"
                   id="evidence"
                   maxLength={200}
                   placeholder="문서번호 · 링크"
@@ -563,33 +622,35 @@ function TransactionForm({
               </Field>
             </div>
           </section>
-          <AttributionEditor
-            rows={rows}
-            contracts={contracts}
-            contractSource={contractListQuery.source}
-            onContractSelected={contractListQuery.remember}
-            agentLabel={agentLabel}
-            amount={form.amount}
-            insurer={insurer}
-            newcomer={newcomer}
-            disabled={inputDisabled}
-            error={fieldError}
-            onChange={(next) => {
-              invalidatePreview()
-              setRows(next)
-            }}
-            onAdd={() => {
-              invalidatePreview()
-              setRows([
-                ...rows,
-                normalizeRow(
-                  newRow(++sequence.current, '', rows.length ? '0' : String(Number(form.amount) || 0)),
-                  insurer,
-                  newcomer,
-                ),
-              ])
-            }}
-          />
+          <div data-guide-target="payment.attributions">
+            <AttributionEditor
+              rows={rows}
+              contracts={contracts}
+              contractSource={contractListQuery.source}
+              onContractSelected={contractListQuery.remember}
+              agentLabel={agentLabel}
+              amount={form.amount}
+              insurer={insurer}
+              newcomer={newcomer}
+              disabled={inputDisabled}
+              error={fieldError}
+              onChange={(next) => {
+                invalidatePreview()
+                setRows(next)
+              }}
+              onAdd={() => {
+                invalidatePreview()
+                setRows([
+                  ...rows,
+                  normalizeRow(
+                    newRow(++sequence.current, '', rows.length ? '0' : String(Number(form.amount) || 0)),
+                    insurer,
+                    newcomer,
+                  ),
+                ])
+              }}
+            />
+          </div>
         </div>
         <div className="transaction-form-column">
           <GatePanel result={result} />
@@ -600,6 +661,7 @@ function TransactionForm({
             </h2>
             <div className="surface-body transaction-action-list">
               <Button
+                data-guide-target="payment.save"
                 id="btn-save"
                 variant="secondary"
                 loading={busy === 'save'}
@@ -613,6 +675,7 @@ function TransactionForm({
                 {busy === 'save' ? '저장 중' : initialId && !locked ? '수정 저장' : '임시저장 (검증 없음)'}
               </Button>
               <Button
+                data-guide-target="payment.precheck"
                 id="btn-precheck"
                 variant="secondary"
                 loading={busy === 'precheck'}
@@ -626,6 +689,7 @@ function TransactionForm({
                 {busy === 'precheck' ? '검증 중' : '사전검증'}
               </Button>
               <Button
+                data-guide-target="payment.confirm"
                 id="btn-confirm"
                 disabled={!ready || !result || needsSave || confirmationRejected}
                 onClick={() => setModalOpen(true)}

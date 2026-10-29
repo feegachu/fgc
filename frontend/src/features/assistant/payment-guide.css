@@ -1,0 +1,122 @@
+.payment-guide-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.payment-guide-spotlight {
+  position: fixed;
+  z-index: 82;
+  pointer-events: none;
+  border: 2px solid var(--color-primary, #2563eb);
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgb(15 32 52 / 22%);
+  animation: payment-guide-pulse 1.9s ease-in-out infinite;
+  transition:
+    left 200ms ease,
+    top 200ms ease,
+    width 200ms ease,
+    height 200ms ease;
+}
+.payment-guide-card {
+  position: fixed;
+  z-index: 84;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  width: min(430px, calc(100vw - 32px));
+  max-height: 46dvh;
+  overflow: auto;
+  padding: 16px 18px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #18344b);
+  border: 1px solid #cadbea;
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgb(19 47 77 / 20%);
+  font: inherit;
+}
+.payment-guide-card header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.payment-guide-card header img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+.payment-guide-card header div {
+  flex: 1;
+}
+.payment-guide-card small {
+  display: block;
+  font-size: 11px;
+  color: #617c95;
+  line-height: 1.6;
+}
+.payment-guide-card h3 {
+  font-size: 16px;
+  margin: 12px 0 6px;
+}
+.payment-guide-card p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 6px 0;
+}
+.payment-guide-card nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 12px 0 8px;
+}
+.payment-guide-card button {
+  background: #f3f7fc;
+  border: 1px solid #d7e2ef;
+  border-radius: 8px;
+  color: inherit;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.payment-guide-card button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.payment-guide-card button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.payment-guide-card.is-in-modal {
+  position: static;
+  width: auto;
+  max-height: none;
+  transform: none;
+  margin-top: 16px;
+  box-shadow: none;
+}
+@keyframes payment-guide-pulse {
+  50% {
+    border-color: #78b7fa;
+  }
+}
+@media (max-width: 760px) {
+  .payment-guide-card {
+    bottom: 8px;
+    padding: 10px 14px;
+    max-height: 38dvh;
+  }
+  .payment-guide-card header img {
+    width: 32px;
+    height: 32px;
+  }
+  .payment-guide-card h3 {
+    margin-top: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .payment-guide-spotlight {
+    animation: none;
+    transition: none;
+  }
+}
