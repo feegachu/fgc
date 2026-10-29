@@ -221,7 +221,7 @@ function DetailBody({
         </div>
       </section>
 
-      <section className="surface" aria-labelledby="vrun-stepper-title">
+      <section data-guide-target="validation.progress" className="surface" aria-labelledby="vrun-stepper-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-stepper-title">
             진행 단계 (운영정책서 제43조)
@@ -662,7 +662,7 @@ function FinalizeSection({
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
   else if (!passed) reason = '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
   return (
-    <section className="surface" aria-labelledby="vrun-finalize-section-title">
+    <section data-guide-target="validation.finalize" className="surface" aria-labelledby="vrun-finalize-section-title">
       <div className="vrun-finalize-row">
         <div className="vrun-finalize-copy">
           <p className="vrun-finalize-title" id="vrun-finalize-section-title">

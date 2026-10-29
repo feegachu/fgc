@@ -174,6 +174,7 @@ export function ContractTabs({
           aria-labelledby={`contract-tab-${name}`}
           tabIndex={0}
           hidden={active !== name}
+          data-guide-target={name === 'schedules' ? 'contract.schedules' : undefined}
           className={`surface contract-detail-panel ${['basic', 'schedules', 'cap', 'payment'].includes(name) ? 'contract-basic-card' : ''}`}
         >
           {active === name &&

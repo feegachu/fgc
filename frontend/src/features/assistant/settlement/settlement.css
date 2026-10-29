@@ -1,0 +1,97 @@
+.settlement-guide {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 45;
+  width: min(360px, calc(100vw - 32px));
+  max-height: 65vh;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--color-primary, #3154ff);
+  border-radius: 16px;
+  background: var(--color-surface, #fff);
+  box-shadow: 0 8px 32px #10205020;
+  font-size: 14px;
+}
+.settlement-guide header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.settlement-guide label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.settlement-guide input,
+.settlement-guide select {
+  padding: 8px;
+  border: 1px solid #bfc9d7;
+  border-radius: 6px;
+  width: 100%;
+}
+.settlement-guide p {
+  margin: 12px 0;
+}
+.settlement-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.settlement-guide button {
+  cursor: pointer;
+}
+.settlement-guide button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.settlement-guide small {
+  display: block;
+  margin-top: 12px;
+  color: #526174;
+}
+.settlement-spotlight {
+  outline: 3px solid #3154ff !important;
+  outline-offset: 6px;
+  scroll-margin-block: 100px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .settlement-spotlight {
+    transition: outline-color 0.2s;
+  }
+}
+body:has([role='dialog']) .settlement-guide {
+  visibility: hidden;
+}
+
+body:has([role='dialog']) .settlement-spotlight {
+  outline: none !important;
+}
+
+.settlement-guide-mascot {
+  object-fit: contain;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .settlement-guide-mascot {
+    animation: settlement-float 3s ease-in-out infinite;
+  }
+  @keyframes settlement-float {
+    50% {
+      transform: translateY(-3px);
+    }
+  }
+}
+
+.settlement-guide button:not(.button) {
+  border: 1px solid #c9d4e3;
+  border-radius: 6px;
+  background: #f7f9fc;
+  color: #163256;
+  padding: 6px 9px;
+}
+.settlement-guide header {
+  gap: 8px;
+}
+.settlement-guide header strong {
+  flex: 1;
+}

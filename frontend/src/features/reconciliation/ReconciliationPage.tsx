@@ -313,6 +313,7 @@ export default function ReconciliationPage() {
       )}
       <div className="reco-react-grid">
         <section
+          data-guide-target="reconciliation.results"
           className="surface reco-react-results"
           aria-label="대사 결과"
           aria-busy={!!runId && results.isFetching}
@@ -397,7 +398,7 @@ export default function ReconciliationPage() {
             onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
           />
         </section>
-        <section className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching}>
+        <section className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching} data-guide-target="reconciliation.history">
           <header className="surface-header reco-react-panel-header">
             <h2 className="surface-title">실행 이력</h2>
           </header>
