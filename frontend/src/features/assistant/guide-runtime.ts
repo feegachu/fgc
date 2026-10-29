@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { findGuide } from './catalog'
+import { findGuide, selectGuideTransition } from './catalog'
 import type { TargetId, WorkflowId } from './contracts'
 
 export type RuntimeStatus =
@@ -36,6 +36,7 @@ export interface LocalGuide {
   owner: string
   scopeKey: string
   revision: number
+  visited: number[]
   acknowledgements: TargetId[]
   restartRequired: boolean
 }
@@ -142,6 +143,7 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
           session: {
             ...old,
             index: 0,
+            visited: [],
             revision: value.revision,
             status: old.status === 'PAUSED' ? 'PAUSED' : 'PREPARING',
             acknowledgements: [],
@@ -182,6 +184,7 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
         owner: observation.owner,
         scopeKey: observation.scopeKey,
         revision: observation.revision,
+        visited: [],
         acknowledgements: [],
         restartRequired: false,
       },
@@ -210,18 +213,25 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
       return
     }
     const current = guide.steps[session.index]
-    const edge = current.next.find((item) => item.conditionId === current.completionRuleId)
-    const nextIndex = edge ? guide.steps.findIndex((item) => item.stepId === edge.stepId) : -1
-    if (edge && nextIndex < 0) {
+    let nextStepId: TargetId | null
+    try {
+      nextStepId = selectGuideTransition(current, observation)
+    } catch {
       get().fail()
       return
     }
-    const last = !edge
+    const nextIndex = nextStepId ? guide.steps.findIndex((item) => item.stepId === nextStepId) : -1
+    if (nextStepId && nextIndex < 0) {
+      get().fail()
+      return
+    }
+    const last = nextStepId === null
     set({
       session: {
         ...session,
         index: last ? session.index : nextIndex,
         status: last ? 'COMPLETED' : 'PREPARING',
+        visited: last ? session.visited : [...session.visited, session.index],
         reason: last ? '등록된 도움말 단계를 확인했어요. 실제 지급 확정 완료를 뜻하지 않습니다.' : '',
         acknowledgements: [...new Set([...session.acknowledgements, guide.steps[session.index].targetId])],
       },
@@ -232,7 +242,13 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
       !state.session || ['COMPLETED', 'CANCELLED', 'PAUSED', 'ERROR'].includes(state.session.status)
         ? {}
         : {
-            session: { ...state.session, index: Math.max(0, state.session.index - 1), status: 'PREPARING', reason: '' },
+            session: {
+              ...state.session,
+              index: state.session.visited.at(-1) ?? 0,
+              visited: state.session.visited.slice(0, -1),
+              status: 'PREPARING',
+              reason: '',
+            },
           },
     ),
   pause: (reason = '안내를 잠시 멈췄어요. 입력 내용은 그대로 유지됩니다.', restartRequired = false) =>
