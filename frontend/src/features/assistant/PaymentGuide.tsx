@@ -246,8 +246,12 @@ export function PaymentGuideOverlay() {
   )
   return (
     <>
-      {running && box?.key === measurementKey && (
-        <div aria-hidden="true" className="payment-guide-spotlight" style={box.rect} />
+      {running && box && (
+        <div
+          aria-hidden="true"
+          className="payment-guide-spotlight"
+          style={{ ...box.rect, visibility: box.key === measurementKey ? 'visible' : 'hidden' }}
+        />
       )}
       {createPortal(card, modal ?? document.body)}
     </>
