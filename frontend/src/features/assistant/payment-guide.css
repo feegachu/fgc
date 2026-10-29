@@ -12,6 +12,11 @@
   border-radius: 10px;
   box-shadow: 0 0 0 9999px rgb(15 32 52 / 22%);
   animation: payment-guide-pulse 1.9s ease-in-out infinite;
+  transition:
+    left 200ms ease,
+    top 200ms ease,
+    width 200ms ease,
+    height 200ms ease;
 }
 .payment-guide-card {
   position: fixed;
@@ -112,5 +117,6 @@
 @media (prefers-reduced-motion: reduce) {
   .payment-guide-spotlight {
     animation: none;
+    transition: none;
   }
 }

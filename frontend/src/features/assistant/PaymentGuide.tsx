@@ -96,13 +96,13 @@ export function PaymentGuideOverlay() {
         found = true
         clearTimeout(timeout)
         const r = element.getBoundingClientRect()
-        const left = Math.max(4, r.left - 5),
-          top = Math.max(4, r.top - 5)
+        const left = Math.max(4, r.left - 10),
+          top = Math.max(4, r.top - 10)
         const next = {
           left,
           top,
-          width: Math.max(0, Math.min(innerWidth - 4, r.right + 5) - left),
-          height: Math.max(0, Math.min(innerHeight - 4, r.bottom + 5) - top),
+          width: Math.max(0, Math.min(innerWidth - 4, r.right + 10) - left),
+          height: Math.max(0, Math.min(innerHeight - 4, r.bottom + 10) - top),
         }
         setBox((old) =>
           old?.key === measurementKey &&
@@ -155,7 +155,8 @@ export function PaymentGuideOverlay() {
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) {
         event.preventDefault()
-        useGuideRuntime.getState().pause()
+        useGuideRuntime.getState().reset()
+        if (returnFocus.current?.isConnected) returnFocus.current.focus()
       }
     }
     document.addEventListener('keydown', handler)

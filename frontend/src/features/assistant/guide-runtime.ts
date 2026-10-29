@@ -209,11 +209,18 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
       })
       return
     }
-    const last = session.index === guide.steps.length - 1
+    const current = guide.steps[session.index]
+    const edge = current.next.find((item) => item.conditionId === current.completionRuleId)
+    const nextIndex = edge ? guide.steps.findIndex((item) => item.stepId === edge.stepId) : -1
+    if (edge && nextIndex < 0) {
+      get().fail('등록된 다음 안내 단계가 없습니다.')
+      return
+    }
+    const last = !edge
     set({
       session: {
         ...session,
-        index: last ? session.index : session.index + 1,
+        index: last ? session.index : nextIndex,
         status: last ? 'COMPLETED' : 'PREPARING',
         reason: last ? '등록된 도움말 단계를 확인했어요. 실제 지급 확정 완료를 뜻하지 않습니다.' : '',
         acknowledgements: [...new Set([...session.acknowledgements, guide.steps[session.index].targetId])],
