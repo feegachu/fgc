@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { useLocation } from 'react-router'
+import { ContextLink } from '../../components/ContextLink'
+import { returnLink } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
@@ -33,7 +35,8 @@ import './schedule.css'
 const FILTER_KEYS = { contractNo: '', stage: '', regime: '', purpose: '', status: '', sort: '', page: '' }
 const DEFAULT_FILTERS: ScheduleFilters = { contractNo: '', stage: '', regime: '', purpose: DEFAULT_PURPOSE, status: '' }
 
-const detailHref = (row: ScheduleHeader) => `/schedules/${encodeURIComponent(String(row.scheduleHeaderId))}`
+const detailHref = (row: ScheduleHeader, back: string) =>
+  returnLink(`/schedules/${encodeURIComponent(String(row.scheduleHeaderId))}`, back, String(row.scheduleHeaderId))
 const hasId = (row: ScheduleHeader) => row.scheduleHeaderId != null
 
 /** 같은 계약·지급단계에 사용 중인 운영 스케줄이 둘 이상이면 데이터 이상이다(1차 hasDuplicateActiveOperational). */
@@ -49,7 +52,7 @@ function hasDuplicateActiveOperational(rows: ScheduleHeader[]) {
 }
 
 // 열 너비는 1차 schedule.css 의 .schedule-col-* 와 같은 값이다.
-const columns: TableColumn<ScheduleHeader>[] = [
+const columns = (back: string): TableColumn<ScheduleHeader>[] => [
   {
     key: 'contractNo',
     label: '계약번호',
@@ -58,7 +61,11 @@ const columns: TableColumn<ScheduleHeader>[] = [
     cellClassName: 'tabular-nums',
     // 계약번호는 폭을 넓게 잡아 토글 없이 항상 전체를 보여준다(#326).
     render: (row) =>
-      hasId(row) ? <Link to={detailHref(row)}>{row.contractNo || EMPTY}</Link> : row.contractNo || EMPTY,
+      hasId(row) ? (
+        <ContextLink to={detailHref(row, back)}>{row.contractNo || EMPTY}</ContextLink>
+      ) : (
+        row.contractNo || EMPTY
+      ),
   },
   {
     key: 'stage',
@@ -111,7 +118,14 @@ const columns: TableColumn<ScheduleHeader>[] = [
     align: 'center',
     render: (row) => <ActiveBadge active={row.activeYn} />,
   },
-  { key: 'lines', label: '회차 수', sortable: true, width: '5.5rem', align: 'left', render: (row) => int(row.lineCount) },
+  {
+    key: 'lines',
+    label: '회차 수',
+    sortable: true,
+    width: '5.5rem',
+    align: 'left',
+    render: (row) => int(row.lineCount),
+  },
   {
     key: 'total',
     label: '예상 총액',
@@ -142,13 +156,13 @@ const columns: TableColumn<ScheduleHeader>[] = [
     align: 'left',
     render: (row) =>
       hasId(row) ? (
-        <Link
+        <ContextLink
           className="button button-secondary schedule-row-button"
-          to={detailHref(row)}
+          to={detailHref(row, back)}
           aria-label={`${row.contractNo || '선택한 계약'} 회차 보기`}
         >
           회차 보기
-        </Link>
+        </ContextLink>
       ) : (
         <span className="button button-secondary schedule-row-button is-disabled" aria-disabled="true">
           회차 보기
@@ -158,6 +172,7 @@ const columns: TableColumn<ScheduleHeader>[] = [
 ]
 
 export default function ScheduleListPage() {
+  const location = useLocation()
   const { params, update } = useSearchParamsState(FILTER_KEYS)
   const criteria = criteriaFromParams(params)
   const list = useQuery(scheduleListQuery(criteria))
@@ -236,7 +251,8 @@ export default function ScheduleListPage() {
             className="schedule-table"
             viewportClassName="schedule-table-viewport"
             caption="예상 지급 스케줄 검색 결과"
-            columns={columns}
+            columns={columns(location.pathname + location.search)}
+            selectedKeys={[params.get('selectedId') ?? '']}
             {...sortBinding(criteria.sort, SCHEDULE_SORT_KEYS, (sort) => update({ sort }))}
             rows={rows}
             rowKey={(row) =>

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useOutletContext, useSearchParams } from 'react-router'
+import { useOutletContext, useSearchParams, useLocation } from 'react-router'
+import { ContextLink } from '../../components/ContextLink'
+import { returnLink } from './payment-entry'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
@@ -35,6 +37,8 @@ const disclosure = (value: string | undefined) => <CellDisclosure singleLine pre
 
 export default function TransactionListPage() {
   const { month, user } = useOutletContext<ShellContext>()
+  const location = useLocation()
+  const returnTo = location.pathname + location.search
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params)
   const search = useQuery(transactionListQuery(filters))
@@ -86,7 +90,11 @@ export default function TransactionListPage() {
   const totalPages = Math.max(1, search.data?.totalPages ?? 1)
   const page = search.data?.page ?? filters.page
   const path = (id: number | undefined) =>
-    month ? withMonth(`/transactions/new?id=${id}`, month) : `/transactions/new?id=${id}`
+    returnLink(
+      month ? withMonth(`/transactions/new?id=${id}`, month) : `/transactions/new?id=${id}`,
+      returnTo,
+      String(id),
+    )
   function apply(next: PaymentFilters) {
     const query = filterParams(next)
     const unchanged = query.toString() === filterParams(filters).toString()
@@ -112,8 +120,20 @@ export default function TransactionListPage() {
       cellClassName: 'transaction-mono',
       render: (row) => <span title={row.sourceBusinessKey}>{row.sourceBusinessKey || '-'}</span>,
     },
-    { key: 'month', label: '정산월', sortable: true, width: '5.5rem', render: (row) => formatMonth(row.settlementMonth) },
-    { key: 'agent', label: '수령 설계사', sortable: true, width: '9rem', render: (row) => disclosure(row.recipientAgentName) },
+    {
+      key: 'month',
+      label: '정산월',
+      sortable: true,
+      width: '5.5rem',
+      render: (row) => formatMonth(row.settlementMonth),
+    },
+    {
+      key: 'agent',
+      label: '수령 설계사',
+      sortable: true,
+      width: '9rem',
+      render: (row) => disclosure(row.recipientAgentName),
+    },
     {
       key: 'item',
       label: '수수료 항목',
@@ -181,13 +201,13 @@ export default function TransactionListPage() {
           '-'
         ) : user.canProcess ? (
           <div className="transaction-row-actions">
-            <Link
+            <ContextLink
               className="button button-ghost"
               to={path(row.commissionTransactionId)}
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정`}
             >
               수정
-            </Link>
+            </ContextLink>
             <Button
               variant="ghost"
               className="transaction-delete"
@@ -265,15 +285,15 @@ export default function TransactionListPage() {
         </div>
         <div className="page-header-actions">
           {user.canProcess && (
-            <Link
+            <ContextLink
               className="button button-primary"
-              to={month ? withMonth('/transactions/new', month) : '/transactions/new'}
+              to={returnLink(month ? withMonth('/transactions/new', month) : '/transactions/new', returnTo)}
             >
               <span className="material-symbols-rounded" aria-hidden="true">
                 add
               </span>
               신규 등록
-            </Link>
+            </ContextLink>
           )}
         </div>
       </header>
@@ -316,6 +336,7 @@ export default function TransactionListPage() {
           {...sortBinding(filters.sort, TRANSACTION_SORT_KEYS, (sort) => apply({ ...filters, sort, page: 1 }))}
           rows={rows}
           rowKey={(row) => String(row.commissionTransactionId)}
+          selectedKeys={params.get('selectedId') ? [params.get('selectedId')!] : []}
           emptyMessage={
             <div
               className={`transaction-state transaction-state-${search.isError ? 'error' : search.isPending ? 'loading' : 'empty'}`}
