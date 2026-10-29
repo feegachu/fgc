@@ -50,11 +50,13 @@ const explain = (patch: Partial<CompareExplain> = {}): CompareExplain => ({ rank
 
 let onRank: (body?: unknown) => Promise<unknown>
 let onExplain: () => Promise<unknown>
+let onAsk: (body?: unknown) => Promise<unknown>
 const clients: QueryClient[] = []
 
 beforeEach(() => {
   onRank = async () => envelope(ranking())
   onExplain = async () => envelope(explain())
+  onAsk = async () => envelope({ answer: "답변", source: "RULE" })
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, init?: { body?: unknown }) => {
     if (path.endsWith('/categories')) {
       return envelope([
@@ -64,6 +66,7 @@ beforeEach(() => {
     }
     if (path.endsWith('/rank')) return onRank(init?.body)
     if (path.endsWith('/explain')) return onExplain()
+    if (path.endsWith('/ask')) return onAsk(init?.body)
     throw new Error(`unexpected ${path}`)
   }) as typeof apiClient.request)
 })
@@ -190,6 +193,40 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     // 이미 받은 질문 버튼은 다시 누를 수 없고 보내기는 다시 잠긴다
     expect(screen.getByRole('button', { name: /왜 1위가 1번보험 상품1인지/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled()
+  })
+
+  it('직접 쓴 질문은 서버 /ask 로 보내고 AI 답변을 대화에 붙인다', async () => {
+    let sent: unknown
+    onAsk = async (body) => {
+      sent = body
+      return envelope({ answer: '이월은 한도를 넘어 다음으로 넘어가는 금액이에요.', source: 'LLM' })
+    }
+    renderModal()
+    await pickHealth()
+    await result()
+    expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled()
+
+    await userEvent.type(screen.getByLabelText('질문 입력'), '이월이 뭐예요?')
+    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
+
+    expect(await screen.findByText(/한도를 넘어 다음으로 넘어가는 금액/)).toBeInTheDocument()
+    expect(screen.getByText('AI 답변')).toBeInTheDocument()
+    expect(sent).toEqual({ rankResultId: 'r-1', question: '이월이 뭐예요?' })
+    expect(screen.getByLabelText('질문 입력')).toHaveValue('')
+  })
+
+  it('질문 답변을 받지 못하면 실패 안내를 보여 주고 순위 화면은 그대로 둔다', async () => {
+    onAsk = async () => {
+      throw new Error('boom')
+    }
+    renderModal()
+    await pickHealth()
+    await result()
+    await userEvent.type(screen.getByLabelText('질문 입력'), '궁금해요')
+    await userEvent.click(screen.getByRole('button', { name: '보내기' }))
+
+    expect(await screen.findByText(/답변을 불러오지 못했어요/)).toBeInTheDocument()
+    expect(screen.getAllByRole('row').length).toBeGreaterThan(1)
   })
 
   it('한도·환수 질문은 서버가 준 값으로만 답한다', async () => {

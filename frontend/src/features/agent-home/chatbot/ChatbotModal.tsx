@@ -2,7 +2,8 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { compareCategoriesQuery, compareExplainQuery, rankCompare } from './api'
+import { rate } from '../../../lib/format'
+import { askCompare, compareCategoriesQuery, compareExplainQuery, rankCompare } from './api'
 import type { CompareCategory, CompareEvidence, CompareExcluded, CompareItem, CompareRanking } from './api'
 import { FilterPanel } from './FilterPanel'
 import { EMPTY_FILTERS, toFilters } from './filters'
@@ -87,7 +88,10 @@ export function ChatbotModal({
   const [filters, setFilters] = useState<FilterDraft>(EMPTY_FILTERS)
   // 3단계 하단 질문 버튼을 누르면 입력창에 들어가고, 보내기를 눌러야 답변을 받거나 1단계로 돌아간다.
   const [draft, setDraft] = useState<{ kind: FollowUpKind | 'restart'; text: string } | null>(null)
-  const [asked, setAsked] = useState<{ kind: FollowUpKind; question: string; answer: string }[]>([])
+  // 하단 입력창: 연관 질문 버튼을 누르면 문구가 들어가고, 직접 써서 보내면 서버가 자연어 질문에 답한다.
+  const [input, setInput] = useState('')
+  const [asked, setAsked] = useState<{ id: number; kind: FollowUpKind | 'free'; question: string; answer: string | null; ai?: boolean }[]>([])
+  const nextId = useRef(0)
   const dialog = useRef<HTMLDivElement>(null)
   const thread = useRef<HTMLDivElement>(null)
   const evidenceTrigger = useRef<HTMLElement | null>(null)
@@ -123,6 +127,7 @@ export function ChatbotModal({
     setProgress(0)
     setSelected(null)
     setDraft(null)
+    setInput('')
     setAsked([])
     rank.reset()
     // 이전 카테고리에서 고른 보험사가 이 카테고리에 없으면 서버가 FILTER_NO_MATCH 를 주므로, 이 카테고리의 보험사만 남긴다.
@@ -131,16 +136,32 @@ export function ChatbotModal({
     setFilters(scoped)
     rank.mutate({ categoryCode: next.code, filters: toFilters(scoped) })
   }
+  const pending = asked.some((qa) => qa.answer === null)
+  const canSend = !pending && (draft !== null || input.trim().length > 0)
+  const ask = (question: string) => {
+    const id = nextId.current++
+    const settle = (answer: string, ai: boolean) => setAsked((list) => list.map((qa) => (qa.id === id ? { ...qa, answer, ai } : qa)))
+    setAsked((list) => [...list, { id, kind: 'free', question, answer: null }])
+    askCompare({ rankResultId: ranking?.rankResultId ?? null, question })
+      .then((res) => settle(res.answer, res.source === 'LLM'))
+      .catch(() => settle('답변을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', false))
+  }
   const send = () => {
-    if (!draft) return
-    if (draft.kind === 'restart') {
+    if (!canSend) return
+    if (draft?.kind === 'restart') {
       restart()
       return
     }
-    if (ranking && ranking.items.length > 0) {
-      setAsked((list) => [...list, { kind: draft.kind as FollowUpKind, question: draft.text, answer: followUpAnswer(draft.kind as FollowUpKind, ranking.items) }])
+    if (draft) {
+      const kind = draft.kind as FollowUpKind
+      if (ranking && ranking.items.length > 0) {
+        setAsked((list) => [...list, { id: nextId.current++, kind, question: draft.text, answer: followUpAnswer(kind, ranking.items) }])
+      }
+    } else {
+      ask(input.trim())
     }
     setDraft(null)
+    setInput('')
   }
   const openEvidence = (item: CompareItem) => {
     evidenceTrigger.current = document.activeElement as HTMLElement | null
@@ -150,6 +171,7 @@ export function ChatbotModal({
     setCategory(null)
     setSelected(null)
     setDraft(null)
+    setInput('')
     setAsked([])
     setProgress(0)
     rank.reset()
@@ -318,11 +340,17 @@ export function ChatbotModal({
             )}
             {view === 3 &&
               asked.map((qa) => (
-                <div key={qa.kind} className="cb-asked">
+                <div key={qa.id} className="cb-asked">
                   <User text={qa.question} />
                   <Bot avatar="sum">
                     <div className="cb-card" role="status">
-                      <span>{qa.answer}</span>
+                      {qa.answer === null ? (
+                        <span className="cb-muted">답변을 쓰고 있어요…</span>
+                      ) : (
+                        <>
+                          {qa.ai && <span className="cb-pill">AI 답변</span>} <span>{qa.answer}</span>
+                        </>
+                      )}
                     </div>
                   </Bot>
                 </div>
@@ -342,7 +370,10 @@ export function ChatbotModal({
                         className={`cb-suggest-btn${draft?.kind === kind ? ' on' : ''}`}
                         aria-pressed={draft?.kind === kind}
                         disabled={asked.some((qa) => qa.kind === kind)}
-                        onClick={() => setDraft({ kind, text })}
+                        onClick={() => {
+                          setDraft({ kind, text })
+                          setInput(text)
+                        }}
                       >
                         {text}
                       </button>
@@ -352,14 +383,33 @@ export function ChatbotModal({
                   type="button"
                   className={`cb-suggest-btn${draft?.kind === 'restart' ? ' on' : ''}`}
                   aria-pressed={draft?.kind === 'restart'}
-                  onClick={() => setDraft({ kind: 'restart', text: '다른 카테고리도 추천 받기' })}
+                  onClick={() => {
+                    setDraft({ kind: 'restart', text: '다른 카테고리도 추천 받기' })
+                    setInput('다른 카테고리도 추천 받기')
+                  }}
                 >
                   다른 카테고리도 추천 받기
                 </button>
               </div>
               <div className="cb-composer">
-                <div className={`cb-composer-field${draft ? ' ready' : ''}`}>{draft ? draft.text : '궁금한 점을 골라 보내기를 눌러 보세요'}</div>
-                <button type="button" className={`cb-send${draft ? ' on' : ''}`} aria-label="보내기" disabled={!draft} onClick={send}>
+                <input
+                  className={`cb-composer-field${input ? ' ready' : ''}`}
+                  aria-label="질문 입력"
+                  placeholder="궁금한 점을 입력하거나 위 질문을 골라 보세요"
+                  maxLength={200}
+                  value={input}
+                  onChange={(event) => {
+                    setInput(event.target.value)
+                    setDraft((d) => (d && d.text === event.target.value ? d : null))
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                      event.preventDefault()
+                      send()
+                    }
+                  }}
+                />
+                <button type="button" className={`cb-send${canSend ? ' on' : ''}`} aria-label="보내기" disabled={!canSend} onClick={send}>
                   ➤
                 </button>
               </div>
@@ -619,7 +669,7 @@ function Result({
         <dl className="cb-stats">
           <Stat k="수령 예상" v={won(top.cappedReceipt)} />
           <Stat k="환수 노출" v={`−${won(top.clawbackExposure)}`} neg />
-          <Stat k="한도 영향" v={top.capImpactPct == null ? '자료 없음' : `${top.capImpactPct.toFixed(1)}%`} />
+          <Stat k="한도 영향" v={top.capImpactPct == null ? '자료 없음' : `${rate(top.capImpactPct)}%`} />
           <Stat k="협회 등급" v={gradeLabel(top.associationGrade)} />
         </dl>
         <button type="button" className="cb-btn primary" onClick={() => onEvidence(top)}>

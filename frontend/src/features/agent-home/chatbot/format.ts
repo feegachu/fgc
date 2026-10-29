@@ -1,13 +1,14 @@
 import type { CompareItem } from './api'
+import { rate } from '../../../lib/format'
 
 export const won = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
 /** 한도 영향 배지: 90% 미만 여유, 90~99% 근접, 100% 이상 초과·이월(기획서 §4-3, 임계값은 [가정]). */
 export function capBadge(pct: number | null): { tone: 'ok' | 'warn' | 'bad' | 'none'; text: string } {
   if (pct == null) return { tone: 'none', text: '자료 없음' }
-  if (pct >= 100) return { tone: 'bad', text: `${pct.toFixed(1)}% 초과·이월` }
-  if (pct >= 90) return { tone: 'warn', text: `${pct.toFixed(1)}% 근접` }
-  return { tone: 'ok', text: `${pct.toFixed(1)}% 여유` }
+  if (pct >= 100) return { tone: 'bad', text: `${rate(pct)}% 초과·이월` }
+  if (pct >= 90) return { tone: 'warn', text: `${rate(pct)}% 근접` }
+  return { tone: 'ok', text: `${rate(pct)}% 여유` }
 }
 
 const GRADES: Record<string, string> = { VERY_HIGH: '매우 높음', HIGH: '높음', NORMAL: '보통', LOW: '낮음', VERY_LOW: '매우 낮음' }
@@ -43,7 +44,7 @@ export function followUpAnswer(kind: FollowUpKind, items: CompareItem[]) {
   const claw =
     top.clawbackRatePct == null
       ? ''
-      : ` 환수 노출액 ${won(top.clawbackExposure)}은 지급액에 ${top.clawbackRatePct.toFixed(1)}%를 곱한 값이고, 이 환수율은 해약환급률을 임시로 쓴 값이에요.`
+      : ` 환수 노출액 ${won(top.clawbackExposure)}은 지급액에 ${rate(top.clawbackRatePct)}%를 곱한 값이고, 이 환수율은 해약환급률을 임시로 쓴 값이에요.`
   return `${cap}${carry}${claw} 자세한 계산은 근거 보기에서 확인할 수 있어요.`
 }
 
