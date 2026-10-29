@@ -65,7 +65,7 @@ reviews:
         2. 금액은 BigDecimal만 씁니다. double/float 사용은 지적해주세요.
         3. 한도·분급·환수 계산은 docs/07_규제조문표_v0.2.1.md의 REG-01~24와 대조해주세요.
         4. 요구사항 ID는 FGC-FUN-xxx 형식입니다. 구현이
-           docs/FGC_요구사항명세서_v2_2_2_정합성교정_FUN_기능_요구사항.CSV의
+           docs/FGC_요구사항명세서_v3_0_FUN_기능_요구사항.csv의
            `검증기준(인수조건)` 열을 만족하는지 확인해주세요.
         5. 지적할 때는 근거 문서 경로와 줄 번호를 함께 밝혀주세요.
            근거를 못 찾으면 추측하지 말고 "근거 없음 — 확인 필요"라고 써주세요.
@@ -78,7 +78,7 @@ reviews:
     - path: "src/main/resources/db/migration/**"
       instructions: |
         1. 이미 적용된 Flyway 마이그레이션 파일 수정은 금지입니다. 새 V 파일로만 변경합니다.
-        2. db/migration 과 db/demo 사이에 버전 번호가 겹치면 안 됩니다.
+        2. db/migration · db/demo · db/demo-agent 사이에 버전 번호가 겹치면 안 됩니다.
            PR #30에서 병합 후 V6·V7이 양쪽에 되살아난 사고가 있었습니다.
         3. 금액 컬럼의 CHECK 제약과 감사 테이블의 append-only 성질이 깨지지 않는지 봐주세요.
         4. 정책 행은 불변입니다. APPROVED·ACTIVE·RETIRED 정책을 수정·삭제하지 않고

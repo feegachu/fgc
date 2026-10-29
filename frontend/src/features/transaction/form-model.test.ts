@@ -30,7 +30,7 @@ describe('transaction draft and attribution contract', () => {
       'REVIEW_REQUIRED',
       'EXCLUDED:COMPLIANCE_3PCT',
     ])
-    expect(draftRows({ attributions: [{ inclusionDecisionStatus: 'EXCLUDED' }] }, '2026-07')[0].decision).toBe(
+    expect(draftRows({ attributions: [{ inclusionDecisionStatus: 'EXCLUDED' }] })[0].decision).toBe(
       'EXCLUDED:NEW_AGENT_SUPPORT',
     )
   })
@@ -99,6 +99,7 @@ describe('transaction draft and attribution contract', () => {
     expect(filterAgentId('1', agents)).toBe('1')
     expect(filterAgentId('2', agents)).toBe('')
     const contracts = [{ contractId: 3, contractDate: '2026-07-18' }]
+    expect(selectContract({ ...row, attributionDate: '' }, '3', contracts).attributionDate).toBe('')
     expect(selectContract(row, '3', contracts).attributionDate).toBe('2026-07-18')
     expect(selectContract({ ...row, attributionDate: '2026-08-02' }, '3', contracts).attributionDate).toBe('2026-08-02')
   })
@@ -161,8 +162,9 @@ describe('legacy defect model regressions (#410)', () => {
     ).toBeUndefined()
   })
   it('preserves zero saved rows but retains the default row for a new form', () => {
-    expect(draftRows({ attributions: [] }, '2026-07')).toEqual([])
-    expect(draftRows(undefined, '2026-07')).toHaveLength(1)
+    expect(draftRows({ attributions: [] })).toEqual([])
+    expect(draftRows(undefined)).toHaveLength(1)
+    expect(draftRows(undefined)[0].attributionDate).toBe('')
   })
 })
 

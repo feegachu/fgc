@@ -106,6 +106,20 @@ beforeEach(() => {
   useToastStore.setState({ messages: [] })
   useAuthStore.setState({ accessToken: 'fixture', loggingOut: false })
 })
+
+it('상세에서 브라우저 뒤로가기를 하면 필터·페이지·선택 행을 복원한다', async () => {
+  const { router, user } = mount('/contracts?contractNo=C-2026&page=2')
+  await user.click(await screen.findByRole('link', { name: row.contractNo }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/1'))
+  await act(async () => {
+    await router.navigate(-1)
+  })
+  const table = await screen.findByRole('table', { name: '보험계약 검색 결과' })
+  expect(new URLSearchParams(router.state.location.search).get('contractNo')).toBe('C-2026')
+  expect(new URLSearchParams(router.state.location.search).get('page')).toBe('2')
+  expect(new URLSearchParams(router.state.location.search).get('selectedId')).toBe('1')
+  expect(within(table).getByRole('row', { name: /C-2026-001/ })).toHaveAttribute('aria-selected', 'true')
+})
 afterEach(() => {
   vi.restoreAllMocks()
   vi.clearAllMocks()
@@ -144,10 +158,16 @@ it('#604 헤더를 누르면 오름차순·내림차순으로 바뀌고 첫 페�
   expect(params.get('sort')).toBe('premium,asc')
   expect(params.has('page')).toBe(false)
   expect(params.get('contractNo')).toBe('C-2026')
-  expect(within(table).getByRole('columnheader', { name: /월납환산 초회보험료/ })).toHaveAttribute('aria-sort', 'ascending')
+  expect(within(table).getByRole('columnheader', { name: /월납환산 초회보험료/ })).toHaveAttribute(
+    'aria-sort',
+    'ascending',
+  )
   await user.click(within(table).getByRole('button', { name: '월납환산 초회보험료' }))
   await waitFor(() => expect(router.state.location.search).toContain('sort=premium%2Cdesc'))
-  expect(within(table).getByRole('columnheader', { name: /월납환산 초회보험료/ })).toHaveAttribute('aria-sort', 'descending')
+  expect(within(table).getByRole('columnheader', { name: /월납환산 초회보험료/ })).toHaveAttribute(
+    'aria-sort',
+    'descending',
+  )
   // 도움말 버튼은 정렬 버튼과 분리되어 있어 눌러도 정렬이 바뀌지 않는다.
   await user.click(screen.getByRole('button', { name: '월납환산 초회보험료 설명 보기' }))
   expect(router.state.location.search).toContain('sort=premium%2Cdesc')

@@ -43,6 +43,11 @@ const detail = (overrides: Partial<ScheduleHeader> = {}): ScheduleDetail => ({
   lines: [
     {
       lineNo: 1,
+      contractId: 600,
+      beneficiaryAgentId: 601,
+      commissionItemId: 25,
+      attributionDate: '2026-07-10',
+      cashflowType: 'PAYMENT',
       installmentNo: 1,
       contractMonthNo: 1,
       dueDate: '2026-08-10',
@@ -199,7 +204,14 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
     expect(screen.getByLabelText('용도')).toHaveValue('OPERATIONAL')
 
     // 행 → 상세는 /schedules/{id} 딥링크다.
-    expect(within(table).getAllByRole('link', { name: 'C-2026-0001' })[0]).toHaveAttribute('href', '/schedules/11')
+    const detailUrl = new URL(
+      within(table).getAllByRole('link', { name: 'C-2026-0001' })[0].getAttribute('href')!,
+      'http://local',
+    )
+    expect(detailUrl.pathname).toBe('/schedules/11')
+    expect(detailUrl.searchParams.get('returnTo')).toBe(
+      '/schedules?month=2026-07&stage=GA_TO_FC&status=PLANNED&page=2&selectedId=11',
+    )
 
     await actions.click(screen.getByRole('button', { name: '3' }))
     await waitFor(() =>
@@ -304,12 +316,28 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
       return undefined
     }
 
+  it('회차의 귀속일·ID·항목을 지급 등록에 전달하고 지급예정일로 바꾸지 않는다', async () => {
+    renderAt('/schedules/11?month=2026-07', baseHandler())
+    const link = await screen.findByRole('link', { name: '1번 회차 지급 등록' })
+    const url = new URL(link.getAttribute('href')!, 'http://local')
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      contractId: '600',
+      agentId: '601',
+      commissionItemId: '25',
+      attributionDate: '2026-07-10',
+      month: '2026-07',
+      amount: '1600000',
+      cashflowType: 'PAYMENT',
+    })
+    expect(url.searchParams.get('returnTo')).toBe('/schedules/11?month=2026-07')
+  })
+
   it('헤더·회차·합계·버전 이력을 1차와 같은 표기로 보여 준다', async () => {
     renderAt('/schedules/11?month=2026-07', baseHandler())
     expect(await screen.findByText('schedule_header #11')).toBeInTheDocument()
     expect(screen.getByText('한빛생명 · 종신보험')).toBeInTheDocument()
     const lines = screen.getByRole('table', { name: '회차별 예상 지급 금액' })
-    expect(within(lines).getByText('1,000.1234%')).toBeInTheDocument()
+    expect(within(lines).getByText('1,000.1%')).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '요율' })).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '정액' })).toBeInTheDocument()
     expect(within(lines).getAllByText('-100,000원')[0]).toHaveClass('is-negative-amount')

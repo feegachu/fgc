@@ -9,23 +9,37 @@ test("금액은 천 단위로 묶고 음수는 마이너스 기호를 붙인다 
   assert.strictEqual(format.isNegative(null), false);
 });
 
-test("요율은 소수 넷째 자리까지 자르기만 하고 반올림하지 않는다 (규칙 3)", () => {
-  assert.strictEqual(format.rate("650.000000"), "650.0000");
-  assert.strictEqual(format.rate("1.234567"), "1.2345");
-  assert.strictEqual(format.rate("104.166667"), "104.1666");
-  assert.strictEqual(format.rate("1200"), "1,200.0000");
+test("요율·배수는 소수 첫째 자리까지 자르기만 하고 반올림하지 않는다 (규칙 3)", () => {
+  assert.strictEqual(format.rate("650.000000"), "650.0");
+  assert.strictEqual(format.rate("1.234567"), "1.2");
+  assert.strictEqual(format.rate("104.166667"), "104.1");
+  assert.strictEqual(format.rate("1200"), "1,200.0");
+  assert.strictEqual(format.rate("-1.299999"), "-1.2");
+  assert.strictEqual(format.rate("9007199254740993.1999"), "9,007,199,254,740,993.1");
 });
 
-test("사용률은 소수 여섯째 자리다 — 요율과 자리수가 다르다 (인터페이스정의서 2-4)", () => {
-  // 화면정의서 CAP-W02(:1005) 예시 그대로.
-  assert.strictEqual(format.usageRate("74.166667"), "74.166667");
-  assert.strictEqual(format.usageRate("104.166667"), "104.166667");
-  // 4자리로 자르면 판정 근거와 어긋난다 — 두 함수가 실제로 달라야 한다.
-  assert.notEqual(format.usageRate("104.166667"), format.rate("104.166667"));
+test("사용률도 소수 첫째 자리로 표시하고 원본은 바꾸지 않는다", () => {
+  const source = "100.000001";
+  assert.strictEqual(format.usageRate("74.166667"), "74.1");
+  assert.strictEqual(format.usageRate("104.166667"), "104.1");
+  assert.strictEqual(format.usageRate(source), "100.0");
+  assert.strictEqual(source, "100.000001");
+  assert.strictEqual(format.usageRate("99.999999"), "99.9");
   // 모자란 자리는 0으로 채우고, 넘치는 자리는 반올림 없이 버린다.
-  assert.strictEqual(format.usageRate("1200"), "1,200.000000");
-  assert.strictEqual(format.usageRate("1.23456789"), "1.234567");
-  assert.strictEqual(format.usageRate("not-a-rate"), "-");
+  assert.strictEqual(format.usageRate("1200"), "1,200.0");
+  assert.strictEqual(format.usageRate("1.23456789"), "1.2");
+  [null, undefined, "", " ", "not-a-rate"].forEach((value) => {
+    assert.strictEqual(format.rate(value), "-");
+    assert.strictEqual(format.usageRate(value), "-");
+  });
+});
+
+test("오류·예외 문구의 소수 백분율만 줄이고 정책 명칭과 식별자는 유지한다", () => {
+  const message = "1,200% 한도 초과(사용률 104.166667%). 2026-10-26 · CAP-1.2345 · -1.2999%";
+  assert.strictEqual(format.rateText(message), "1,200% 한도 초과(사용률 104.1%). 2026-10-26 · CAP-1.2345 · -1.2%");
+  assert.strictEqual(format.rateText("사용률 1,234.56789%"), "사용률 1,234.5%");
+  assert.strictEqual(format.errorText({ message, code: "FGC-CAP-001", requestId: "req-123" }),
+    "1,200% 한도 초과(사용률 104.1%). 2026-10-26 · CAP-1.2345 · -1.2% (FGC-CAP-001 · 요청 ID: req-123)");
 });
 
 test("서버가 이미 YYYY-MM-DD 로 준 날짜는 그대로 통과시킨다", () => {
