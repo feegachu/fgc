@@ -85,4 +85,10 @@ class PaymentCalculationControllerTest {
         }
         verify(payments,times(2)).get(77L); verify(payments).precheck(77L); verifyNoMoreInteractions(payments);
     }
+    @Test void missingSourcePaymentIs400WithTheExistingErrorEnvelope() throws Exception {
+        when(service.calculate(any())).thenThrow(new FgcBusinessException(FgcErrorCode.COMMON_002, "paymentId", java.util.Map.of("field", "paymentId"), "지급 건을 찾을 수 없습니다."));
+        mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("paymentId"));
+    }
 }

@@ -140,6 +140,14 @@ class PaymentCalculationIntegrationTest {
         }
     }
 
+    @Test void missingPaymentPreservesTheExistingPaymentServiceError() {
+        var request = new PaymentCalculationRequest("assistant.v1", PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE,
+                PaymentCalculationRequest.Mode.EXISTING, new PaymentCalculationRequest.Scope(Long.toString(Long.MAX_VALUE)), null, 0L);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> calculations.calculate(request))
+                .isInstanceOfSatisfying(com.susukkang.fgc.common.exception.FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_002));
+    }
+
     private PaymentCalculationRequest request(PaymentCalculationRequest.Kind kind) {
         return new PaymentCalculationRequest("assistant.v1", kind, PaymentCalculationRequest.Mode.EXISTING,
                 new PaymentCalculationRequest.Scope(paymentId.toString()), null, 0L);

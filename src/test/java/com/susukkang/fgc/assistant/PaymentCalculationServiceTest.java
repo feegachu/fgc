@@ -90,4 +90,11 @@ class PaymentCalculationServiceTest {
         var request = com.openai.models.responses.ResponseCreateParams.builder().model("local-test").input("not sent").text(CompatibilityOutput.class).build();
         assertThat(request).isNotNull();
     }
+    @Test void unsupportedCalculationKindIsReportedBeforeCandidateValidation() {
+        var request = new PaymentCalculationRequest("assistant.v1", PaymentCalculationRequest.Kind.CAP_STATUS,
+                PaymentCalculationRequest.Mode.EXISTING, new PaymentCalculationRequest.Scope("77"),
+                new ObjectMapper().createObjectNode().put("amount", "100000"), 0L);
+        assertThat(service.calculate(request).status()).isEqualTo("UNSUPPORTED");
+        verifyNoInteractions(payments);
+    }
 }
