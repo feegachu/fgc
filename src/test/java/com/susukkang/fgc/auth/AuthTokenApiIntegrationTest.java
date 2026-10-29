@@ -18,7 +18,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -46,7 +45,6 @@ import java.util.concurrent.Future;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -94,14 +92,6 @@ class AuthTokenApiIntegrationTest {
     }
 
     // ── 시나리오 1·2: CI smoke ─────────────────────────────────────────────
-
-    @Test
-    void smokeSessionLoginCanStillGetContracts() throws Exception {
-        MockHttpSession session = sessionLogin("settle01");
-
-        mockMvc.perform(get("/api/v1/contracts").session(session))
-                .andExpect(status().isOk());
-    }
 
     @Test
     void smokeBearerPostTransactionNeedsNoCsrfToken() throws Exception {
@@ -159,10 +149,10 @@ class AuthTokenApiIntegrationTest {
     }
 
     @Test
-    void meReturnsAuditFlagsForComplianceAndWorksWithSession() throws Exception {
-        MockHttpSession session = sessionLogin("audit01");
-        session.setAttribute("fgc.month", "2020-01");
-        mockMvc.perform(get("/api/v1/auth/me").param("month", "2040-12").session(session))
+    void meReturnsAuditFlagsForCompliance() throws Exception {
+        Tokens tokens = login("audit01");
+        mockMvc.perform(get("/api/v1/auth/me").param("month", "2040-12")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.access()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.roleCode").value("COMPLIANCE"))
                 .andExpect(jsonPath("$.data.demoMonth").value("2032-11"))
@@ -284,18 +274,15 @@ class AuthTokenApiIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── 시나리오 7: 세션 요청은 CSRF 유지 ─────────────────────────────────────
+    // ── 시나리오 7: CSRF 를 끈 뒤(#419 STATELESS)에도 토큰 없는·위조 토큰 쓰기는 거절 ──────────
 
     @Test
-    void sessionPostWithoutCsrfTokenIsStillForbidden() throws Exception {
-        MockHttpSession session = sessionLogin("settle01");
-
-        mockMvc.perform(post("/api/v1/transactions").session(session)
+    void writeWithoutValidBearerIsUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validPaymentJson()))
-                .andExpect(status().isForbidden());
-        // 가짜 Bearer 헤더를 붙여 CSRF 를 피하려 해도 세션으로 넘어가지 않고 토큰 인증에서 거절된다.
-        mockMvc.perform(post("/api/v1/transactions").session(session)
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/transactions")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer forged")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validPaymentJson()))
@@ -563,11 +550,6 @@ class AuthTokenApiIntegrationTest {
     private static Tokens tokensOf(MockHttpServletResponse response) throws Exception {
         String access = JsonPath.read(response.getContentAsString(), "$.data.accessToken");
         return new Tokens(access, response.getCookie("fgc_refresh").getValue());
-    }
-
-    private MockHttpSession sessionLogin(String loginId) throws Exception {
-        return (MockHttpSession) mockMvc.perform(formLogin().user(loginId).password(PASSWORD))
-                .andReturn().getRequest().getSession(false);
     }
 
     private static Cookie refreshCookie(String value) {

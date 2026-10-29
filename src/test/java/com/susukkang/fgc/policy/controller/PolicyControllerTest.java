@@ -1,9 +1,13 @@
 package com.susukkang.fgc.policy.controller;
 
+import com.susukkang.fgc.auth.dto.AppUserView;
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.PolicySourceClass;
 import com.susukkang.fgc.common.code.PolicyStatus;
 import com.susukkang.fgc.common.code.PolicyType;
+import com.susukkang.fgc.common.config.SecurityConfig;
+import com.susukkang.fgc.common.security.AuthenticatedSessions;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -14,9 +18,11 @@ import com.susukkang.fgc.policy.dto.CapRuleSetResponse;
 import com.susukkang.fgc.policy.dto.CommissionRuleResponse;
 import com.susukkang.fgc.policy.dto.PolicyDetailResponse;
 import com.susukkang.fgc.policy.dto.PolicyVersionResponse;
+import com.susukkang.fgc.policy.dto.PolicyWriteResult;
 import com.susukkang.fgc.policy.dto.RefundRateLineResponse;
 import com.susukkang.fgc.policy.dto.RefundRateTableResponse;
 import com.susukkang.fgc.policy.service.PolicyQueryService;
+import com.susukkang.fgc.policy.service.PolicyWriteService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,14 +33,23 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,7 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 잘못된 입력 400(FGC-COMMON-002), 없는 정책 버전 404(FGC-COMMON-004).
  */
 @WebMvcTest(PolicyController.class)
-@Import({PolicyController.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class PolicyControllerTest {
 
     @Autowired
@@ -53,10 +68,192 @@ class PolicyControllerTest {
     private PolicyQueryService policyQueryService;
 
     @MockitoBean
+    private PolicyWriteService policyWriteService;
+
+    @MockitoBean
     private FgcMessageResolver messageResolver;
 
     @MockitoBean
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
+
+    private static final String DRAFT_JSON = """
+            {
+              "policyCode": "CURRENT-API-TEST", "policyName": "작성 API 테스트",
+              "policyType": "CURRENT_COMMISSION", "sourceClass": "GA_POLICY",
+              "effectiveFrom": "2026-10-01", "effectiveTo": null,
+              "feeRegimeCode": null, "basicDocumentVersion": null,
+              "regulationRefs": [], "sourceRefs": [], "sourceDetails": [],
+              "commissionRules": [], "feeRegimeRules": [], "parameters": [], "clawbackRules": []
+            }
+            """;
+
+    private static final String ACTION_JSON = """
+            {
+              "actionType": "SUBMIT", "reason": "검토 요청",
+              "expectedStatus": "DRAFT", "expectedUpdatedAt": "2026-10-28T09:00:00+09:00"
+            }
+            """;
+
+    private static PolicyWriteResult sampleWriteResult() {
+        return new PolicyWriteResult(81L, "CURRENT-API-TEST", 1, PolicyStatus.DRAFT,
+                OffsetDateTime.parse("2026-10-28T09:00:00+09:00"), null, null, List.of("SUBMIT"));
+    }
+
+    private static FgcUserDetails principal(String role) {
+        AppUserView view = new AppUserView();
+        view.setUserId(17L);
+        view.setLoginId("policy-writer");
+        view.setPasswordHash("unused");
+        view.setUserName("정책 작성자");
+        view.setRoleCode(role);
+        return new FgcUserDetails(view, true, true);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SETTLEMENT", "GA_ADMIN", "SYSTEM_ADMIN"})
+    void createsDraftForEachWriterRoleUsingAuthenticatedUser(String role) throws Exception {
+        given(policyWriteService.createDraft(any(), eq(17L), eq("create-81")))
+                .willReturn(sampleWriteResult());
+
+        mockMvc.perform(post("/api/v1/policies").with(user(principal(role)))
+                        .header("Idempotency-Key", "create-81")
+                        .contentType(APPLICATION_JSON).content(DRAFT_JSON))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/policies/81"))
+                .andExpect(jsonPath("$.data.policyVersionId").value(81))
+                .andExpect(jsonPath("$.data.versionNo").value(1))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.approvedBy").isEmpty())
+                .andExpect(jsonPath("$.data.approvedAt").isEmpty())
+                .andExpect(jsonPath("$.data.allowedActions[0]").value("SUBMIT"));
+
+        verify(policyWriteService).createDraft(any(), eq(17L), eq("create-81"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COMPLIANCE", "AGENT"})
+    void rejectsAllPolicyWritesForReadOnlyRoles(String role) throws Exception {
+        var actor = principal(role);
+        mockMvc.perform(post("/api/v1/policies").with(user(actor)).with(csrf())
+                        .contentType(APPLICATION_JSON).content(DRAFT_JSON))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/policies/81").with(user(actor)).with(csrf())
+                        .contentType(APPLICATION_JSON).content(DRAFT_JSON))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/policies/81/versions").with(user(actor)).with(csrf())
+                        .contentType(APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/policies/81/actions").with(user(actor)).with(csrf())
+                        .contentType(APPLICATION_JSON).content(ACTION_JSON))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(policyWriteService);
+    }
+
+    @Test
+    void requiresAuthenticationAndRejectsSessionOnlyAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/policies")
+                        .contentType(APPLICATION_JSON).content(DRAFT_JSON))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/policies").session(AuthenticatedSessions.withRoles("SETTLEMENT"))
+                        .contentType(APPLICATION_JSON).content(DRAFT_JSON))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(policyWriteService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"status", "versionNo", "createdBy", "approvedBy", "unexpectedField"})
+    void rejectsServerOwnedAndUnknownDraftFields(String field) throws Exception {
+        String body = DRAFT_JSON.replaceFirst("\\{", "{\"" + field + "\": \"client-value\",");
+        mockMvc.perform(post("/api/v1/policies").with(user(principal("SETTLEMENT"))).with(csrf())
+                        .header("Idempotency-Key", "invalid-field")
+                        .contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+        verifyNoInteractions(policyWriteService);
+    }
+
+    @Test
+    void returnsValidationErrorForInvalidEnumAndMalformedJson() throws Exception {
+        mockMvc.perform(post("/api/v1/policies").with(user(principal("SETTLEMENT"))).with(csrf())
+                        .header("Idempotency-Key", "invalid-enum")
+                        .contentType(APPLICATION_JSON)
+                        .content(DRAFT_JSON.replace("CURRENT_COMMISSION", "NOT_A_POLICY_TYPE")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("policyType"))
+                .andExpect(jsonPath("$.error.detail").isEmpty());
+        mockMvc.perform(post("/api/v1/policies").with(user(principal("SETTLEMENT"))).with(csrf())
+                        .header("Idempotency-Key", "invalid-json")
+                        .contentType(APPLICATION_JSON).content("{invalid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+        verifyNoInteractions(policyWriteService);
+    }
+
+    @Test
+    void validatesRequiredDraftFieldsBeforeCallingService() throws Exception {
+        mockMvc.perform(post("/api/v1/policies").with(user(principal("SETTLEMENT"))).with(csrf())
+                        .header("Idempotency-Key", "invalid-required")
+                        .contentType(APPLICATION_JSON).content(DRAFT_JSON.replace("CURRENT-API-TEST", "")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("policyCode"));
+        verifyNoInteractions(policyWriteService);
+    }
+
+    @Test
+    void updatesDraftAndForwardsIdempotencyKey() throws Exception {
+        given(policyWriteService.updateDraft(eq(81L), any(), eq(17L), eq("update-81")))
+                .willReturn(sampleWriteResult());
+        String body = DRAFT_JSON.replaceFirst("\\{",
+                "{\"expectedUpdatedAt\": \"2026-10-28T09:00:00+09:00\",");
+
+        mockMvc.perform(put("/api/v1/policies/81").with(user(principal("SETTLEMENT"))).with(csrf())
+                        .header("Idempotency-Key", "update-81")
+                        .contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.policyVersionId").value(81));
+        verify(policyWriteService).updateDraft(eq(81L), any(), eq(17L), eq("update-81"));
+    }
+
+    @Test
+    void clonesPolicyWithLocationOfNewDraft() throws Exception {
+        given(policyWriteService.cloneVersion(eq(12L), any(), eq(17L), eq("clone-12")))
+                .willReturn(sampleWriteResult());
+
+        mockMvc.perform(post("/api/v1/policies/12/versions").with(user(principal("GA_ADMIN"))).with(csrf())
+                        .header("Idempotency-Key", "clone-12").contentType(APPLICATION_JSON)
+                        .content("""
+                                {"effectiveFrom":"2027-01-01","effectiveTo":null,"reason":"새 정책 작성"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/policies/81"))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"));
+        verify(policyWriteService).cloneVersion(eq(12L), any(), eq(17L), eq("clone-12"));
+    }
+
+    @Test
+    void submitsPolicyWithActorAndIdempotencyKey() throws Exception {
+        given(policyWriteService.executeAction(eq(81L), any(), eq(17L), eq("submit-81")))
+                .willReturn(sampleWriteResult());
+
+        mockMvc.perform(post("/api/v1/policies/81/actions").with(user(principal("SETTLEMENT"))).with(csrf())
+                        .header("Idempotency-Key", "submit-81")
+                        .contentType(APPLICATION_JSON).content(ACTION_JSON))
+                .andExpect(status().isOk());
+        verify(policyWriteService).executeAction(eq(81L), any(), eq(17L), eq("submit-81"));
+    }
+
+    @Test
+    void rejectsActionWithoutReasonBeforeCallingService() throws Exception {
+        mockMvc.perform(post("/api/v1/policies/81/actions").with(user(principal("SETTLEMENT"))).with(csrf())
+                        .header("Idempotency-Key", "invalid-action").contentType(APPLICATION_JSON)
+                        .content(ACTION_JSON.replace("검토 요청", "")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("reason"));
+        verifyNoInteractions(policyWriteService);
+    }
 
     private static PolicyVersionResponse samplePolicyVersion() {
         return new PolicyVersionResponse(
