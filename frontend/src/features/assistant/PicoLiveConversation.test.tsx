@@ -156,3 +156,71 @@ it('distinguishes stale guide conflicts from connection failures without executi
   expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
   expect(useGuideRuntime.getState().session).toBeNull()
 })
+
+function observePayment(
+  overrides: Partial<NonNullable<ReturnType<typeof useGuideRuntime.getState>['observation']>> = {},
+) {
+  useGuideRuntime
+    .getState()
+    .publish({
+      owner: 'payment-page',
+      paymentId: '77',
+      scopeKey: 'scope-77',
+      revision: 0,
+      canProcess: true,
+      ready: true,
+      amountValid: true,
+      attributionsValid: true,
+      formValid: true,
+      saved: true,
+      busy: false,
+      precheck: 'NONE',
+      modalOpen: false,
+      ...overrides,
+    })
+}
+it('sends only the current saved payment reference without form values or local status claims', async () => {
+  observePayment()
+  const request = mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText(reply.message)).toBeInTheDocument()
+  const body = request.mock.calls[0][1]!.body as Record<string, unknown>
+  expect(body).toMatchObject({ screenId: 'TRAN-W02', entityRefs: [{ type: 'PAYMENT', id: 77 }], conversation: [] })
+  expect(body).not.toHaveProperty('amount')
+  expect(body).not.toHaveProperty('paymentStatus')
+  expect(body).not.toHaveProperty('formDirty')
+  expect(screen.queryByText('현재 보고 있는 업무')).not.toBeInTheDocument()
+})
+it.each([{ saved: false }, { ready: false }, { busy: true }, { paymentId: '9007199254740993' }])(
+  'uses a general question instead of sending an unsafe or unsaved payment context %j',
+  async (overrides) => {
+    observePayment(overrides)
+    const request = mockResponse()
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    expect(await screen.findByText(reply.message)).toBeInTheDocument()
+    expect((request.mock.calls[0][1]!.body as { entityRefs: unknown[] }).entityRefs).toEqual([])
+  },
+)
+it('aborts and discards a state-aware reply when only the payment id changes', async () => {
+  observePayment()
+  let finish!: (value: ReturnType<typeof envelope>) => void
+  const request = vi.spyOn(apiClient, 'request').mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve
+    }),
+  )
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  const options = request.mock.calls[0][1]!
+  const revision = (options.body as { clientContextRevision: string }).clientContextRevision
+  act(() => observePayment({ paymentId: '88' }))
+  expect(options.signal?.aborted).toBe(true)
+  await act(async () => finish(envelope({ ...reply, contextRevision: revision })))
+  expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+  expect(useGuideRuntime.getState().session).toBeNull()
+})
