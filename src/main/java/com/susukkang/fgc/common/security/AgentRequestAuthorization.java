@@ -19,7 +19,7 @@ public final class AgentRequestAuthorization {
 
     private static final Set<String> PUBLIC_READS = Set.of("/api/v1/auth/me",
             "/api/v1/base/insurers", "/api/v1/base/products", "/api/v1/base/commission-items",
-            "/api/v1/ai/compare-chat/categories");
+            "/api/v1/ai/compare-chat/categories", "/api/v1/news/headlines");
 
     private static final Set<String> COMPARE_CHAT_POSTS = Set.of("/api/v1/ai/compare-chat/rank",
             "/api/v1/ai/compare-chat/explain", "/api/v1/ai/compare-chat/ask");
