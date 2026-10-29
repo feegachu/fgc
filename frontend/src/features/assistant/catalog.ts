@@ -1,5 +1,5 @@
 import definitions from './payment-guides.v1.json'
-import type { GuideBranchContext, LocalGuideDefinition, LocalGuideStep } from './contracts'
+import type { GuideBranchContext, LocalGuideDefinition, LocalGuideStep, TargetId } from './contracts'
 function freeze<T>(value: T): Readonly<T> {
   if (value && typeof value === 'object') {
     Object.values(value).forEach(freeze)
