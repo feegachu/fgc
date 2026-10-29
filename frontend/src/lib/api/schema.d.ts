@@ -349,7 +349,7 @@ export interface paths {
         put?: never;
         /**
          * IF-API-85 환수액 계산
-         * @description 선택한 정책버전과 서버가 잠근 원천으로 계산판을 만듭니다. 같은 원천·정책·산식은 같은 판을 반환하고, 같은 Idempotency-Key 재요청은 최초 결과를 반환합니다.
+         * @description 선택한 정책버전과 서버가 잠근 원천으로 계산판을 만듭니다. 최신 판과 원천·정책·산식이 같으면 그 판을 반환하고, 같은 Idempotency-Key 재요청은 최초 결과를 반환합니다.
          */
         post: operations["calculateClawbackCandidate"];
         delete?: never;

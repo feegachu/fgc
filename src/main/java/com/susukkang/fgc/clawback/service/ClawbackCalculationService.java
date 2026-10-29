@@ -81,11 +81,14 @@ public class ClawbackCalculationService {
         if (!policyOffered) throw missing("policyVersionId", List.of("POLICY_NOT_OFFERED"));
         if (!candidate.allowedActions().contains("CALCULATE")) throw missing("candidate", candidate.reviewReasons());
 
-        var existing = store.findByInput(candidateId, candidate.sourceVersion(), request.policyVersionId(),
-                CALC_RULE_VERSION);
-        if (existing.isPresent()) {
-            store.saveRequest(idempotencyKey, userId, candidateId, hash, existing.get().calculationId());
-            return existing.get().calculation();
+        // 최신 판과 입력이 같을 때만 그 판을 돌려준다. 다른 정책으로 계산한 판이 그 사이에 있으면(P1→P2→P1)
+        // 옛 판을 돌려주면 case·라인·화면의 최신 판과 응답이 어긋나므로 새 판으로 다시 쌓는다.
+        var latest = store.findLatest(candidateId);
+        if (latest.isPresent() && latest.get().sameInput(candidate.sourceVersion(), request.policyVersionId(),
+                CALC_RULE_VERSION)) {
+            var stored = latest.get().stored();
+            store.saveRequest(idempotencyKey, userId, candidateId, hash, stored.calculationId());
+            return stored.calculation();
         }
 
         List<PaymentEvidence> paid = detail.paymentAttributions().stream()

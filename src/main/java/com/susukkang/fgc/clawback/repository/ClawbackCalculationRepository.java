@@ -26,7 +26,7 @@ public class ClawbackCalculationRepository {
                 "SELECT pg_try_advisory_xact_lock(hashtextextended(?, 0))", Boolean.class, "clawback-calc-request:" + key));
     }
 
-    /** 같은 후보의 계산·원천 관측을 직렬화한다. 대기 뒤 다음 문장은 새 커밋 snapshot을 읽는다. */
+    /** 같은 후보의 계산 요청을 직렬화한다. 대기 뒤 다음 문장은 새 커밋 snapshot을 읽는다. */
     public void lockCandidate(long candidateId) {
         jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "clawback-candidate:" + candidateId);
     }
@@ -57,14 +57,20 @@ public class ClawbackCalculationRepository {
                 (rs, n) -> new StoredCalculation(rs.getLong(1), decode(rs.getString(2))), calculationId).stream().findFirst();
     }
 
-    /** 같은 후보·원천 버전·정책·산식 버전의 판. 있으면 새 판을 만들지 않고 그대로 돌려준다. */
-    public Optional<StoredCalculation> findByInput(long candidateId, String sourceVersion, long policyVersionId,
-                                                   String calcRuleVersion) {
+    public record LatestCalculation(StoredCalculation stored, String sourceVersion, long policyVersionId,
+                                    String calcRuleVersion) {
+        public boolean sameInput(String source, long policy, String ruleVersion) {
+            return sourceVersion.equals(source) && policyVersionId == policy && calcRuleVersion.equals(ruleVersion);
+        }
+    }
+
+    /** 후보의 최신 판. 화면·case·라인이 가리키는 판이며 같은 입력의 재요청은 이 판으로만 수렴한다. */
+    public Optional<LatestCalculation> findLatest(long candidateId) {
         return jdbc.query("""
-                SELECT clawback_calculation_id, result_snapshot::text FROM fgc.clawback_calculation
-                 WHERE candidate_id = ? AND source_version = ? AND policy_version_id = ? AND calc_rule_version = ?
-                """, (rs, n) -> new StoredCalculation(rs.getLong(1), decode(rs.getString(2))),
-                candidateId, sourceVersion, policyVersionId, calcRuleVersion).stream().findFirst();
+                SELECT clawback_calculation_id, result_snapshot::text, source_version, policy_version_id, calc_rule_version
+                  FROM fgc.clawback_calculation WHERE candidate_id = ? ORDER BY version_no DESC LIMIT 1
+                """, (rs, n) -> new LatestCalculation(new StoredCalculation(rs.getLong(1), decode(rs.getString(2))),
+                rs.getString(3), rs.getLong(4), rs.getString(5)), candidateId).stream().findFirst();
     }
 
     public record Rule(long ruleId, Long insurerId, Long productOfferingId, Long commissionItemId,

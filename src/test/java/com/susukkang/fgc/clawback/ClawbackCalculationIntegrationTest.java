@@ -230,6 +230,101 @@ class ClawbackCalculationIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("FGC-IMPL-POLICY_MISSING"));
     }
 
+    @Test
+    void switchingBackToAnEarlierPolicyAppendsANewPlateSoTheCaseFollowsTheResponse() {
+        long full = policy(new Object[]{baseItem, 0, 1199, "100"});
+        long half = policy(new Object[]{baseItem, 0, 1199, "50"});
+        payment(baseItem, "1000", "CONFIRMED");
+        long id = lapsedCandidate("2026-04-01T00:00:00+09:00");
+        String version = query.detail(id).candidate().sourceVersion();
+        assertThat(calculation.calculate(id, request(version, full), key(), settlementUser).calculationVersion()).isEqualTo(1);
+        assertThat(calculation.calculate(id, request(version, half), key(), settlementUser).calculationVersion()).isEqualTo(2);
+
+        var back = calculation.calculate(id, request(version, full), key(), settlementUser);
+
+        assertThat(back.calculationVersion()).isEqualTo(3);
+        assertThat(back.amount()).isEqualByComparingTo("1000");
+        assertThat(jdbc.queryForMap("SELECT policy_version_id, calculated_amount FROM fgc.clawback_case WHERE candidate_id=?", id))
+                .satisfies(row -> {
+                    assertThat(((Number) row.get("policy_version_id")).longValue()).isEqualTo(full);
+                    assertThat((BigDecimal) row.get("calculated_amount")).isEqualByComparingTo("1000");
+                });
+        assertThat(jdbc.queryForObject("SELECT sum(clawback_amount) FROM fgc.clawback_line WHERE clawback_case_id=?",
+                BigDecimal.class, back.clawbackCaseId())).isEqualByComparingTo("1000");
+        var detail = query.detail(id);
+        assertThat(detail.latestCalculation().calculationVersion()).isEqualTo(3);
+        assertThat(detail.candidate().calculatedAmount()).isEqualByComparingTo("1000");
+    }
+
+    @Test
+    void caseBeyondCalculatedRejectsRecalculationAndRollsBackThePlate() {
+        long policy = policy(new Object[]{baseItem, 0, 1199, "100"});
+        payment(baseItem, "1000", "CONFIRMED");
+        long id = lapsedCandidate("2026-04-01T00:00:00+09:00");
+        var first = calculation.calculate(id, request(query.detail(id).candidate().sourceVersion(), policy), key(), settlementUser);
+        jdbc.update("UPDATE fgc.clawback_case SET status='NOTIFIED' WHERE clawback_case_id=?", first.clawbackCaseId());
+        payment(baseItem, "500", "CONFIRMED");
+        String changed = query.detail(id).candidate().sourceVersion();
+        assertThatThrownBy(() -> calculation.calculate(id, request(changed, policy), key(), settlementUser))
+                .isInstanceOfSatisfying(FgcBusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_STATE_CHANGED);
+                    assertThat(e.getParams()).containsEntry("caseStatus", "NOTIFIED");
+                });
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.clawback_calculation WHERE candidate_id=?", Long.class, id))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT sum(clawback_amount) FROM fgc.clawback_line WHERE clawback_case_id=?",
+                BigDecimal.class, first.clawbackCaseId())).isEqualByComparingTo("1000");
+    }
+
+    @Test
+    void ambiguousRulesAndUnsupportedConditionsAreNotGuessed() {
+        payment(baseItem, "1000", "CONFIRMED");
+        long id = lapsedCandidate("2026-04-01T00:00:00+09:00");
+        // 항목을 비운 두 규칙이 경과 3개월에 함께 맞는다(같은 구체성).
+        // 정책 후보도 sourceVersion에 들어가므로 정책을 만든 뒤 버전을 읽는다.
+        long ambiguous = policy(new Object[]{null, 0, 11, "100"}, new Object[]{null, 0, 23, "50"});
+        String version = query.detail(id).candidate().sourceVersion();
+        assertReasons(() -> calculation.calculate(id, request(version, ambiguous), key(), settlementUser),
+                "CLAWBACK_RULE_AMBIGUOUS");
+        long conditioned = policy(new Object[]{baseItem, 0, 1199, "100"});
+        jdbc.update("UPDATE fgc.clawback_rule SET condition_expression='{\"fault\":\"AGENT\"}'::jsonb WHERE policy_version_id=?",
+                conditioned);
+        String withConditioned = query.detail(id).candidate().sourceVersion();
+        assertReasons(() -> calculation.calculate(id, request(withConditioned, conditioned), key(), settlementUser),
+                "CONDITION_UNSUPPORTED");
+    }
+
+    @Test
+    void elapsedMonthsCountCompletedMonthsFromTheContractAnniversaryDay() {
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-01-05' WHERE contract_id=?", contractId);
+        assertThat(query.detail(lapsedCandidate("2026-02-04T12:00:00+09:00")).elapsedMonths()).isZero();
+        assertThat(query.detail(lapsedCandidate("2026-02-05T00:00:00+09:00")).elapsedMonths()).isEqualTo(1);
+        // 서울 일자 기준: 2026-02-04T15:00Z는 서울 2/5 00:00이다.
+        assertThat(query.detail(lapsedCandidate("2026-02-04T15:00:00Z")).elapsedMonths()).isEqualTo(1);
+        jdbc.update("UPDATE fgc.insurance_contract SET contract_date=DATE '2026-01-31' WHERE contract_id=?", contractId);
+        assertThat(query.detail(lapsedCandidate("2026-02-28T00:00:00+09:00")).elapsedMonths()).isZero();
+        assertThat(query.detail(lapsedCandidate("2026-03-31T00:00:00+09:00")).elapsedMonths()).isEqualTo(2);
+    }
+
+    @Test
+    void gaAdminMayCalculateButComplianceOnlyReads() throws Exception {
+        long policy = policy(new Object[]{baseItem, 0, 1199, "100"});
+        payment(baseItem, "1000", "CONFIRMED");
+        long id = lapsedCandidate("2026-04-01T00:00:00+09:00");
+        String body = "{\"expectedSourceVersion\":\"" + query.detail(id).candidate().sourceVersion()
+                + "\",\"policyVersionId\":" + policy + ",\"reason\":\"정책 확인 후 계산\"}";
+        mvc.perform(post("/api/v1/clawbacks/candidates/{id}/calculations", id).with(user(insertUser("GA_ADMIN"))).with(csrf())
+                        .header("Idempotency-Key", key()).contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+    }
+
+    private void assertReasons(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String reason) {
+        assertThatThrownBy(call).isInstanceOfSatisfying(FgcBusinessException.class, e -> {
+            assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_POLICY_MISSING);
+            assertThat(e.getParams().get("reasons")).isEqualTo(List.of(reason));
+        });
+    }
+
     private void assertMissing(org.assertj.core.api.ThrowableAssert.ThrowingCallable call, String field) {
         assertThatThrownBy(call).isInstanceOfSatisfying(FgcBusinessException.class, e -> {
             assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_POLICY_MISSING);

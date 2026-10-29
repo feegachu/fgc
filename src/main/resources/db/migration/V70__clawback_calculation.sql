@@ -20,10 +20,11 @@ CREATE TABLE clawback_calculation (
     result_snapshot         jsonb         NOT NULL,
     calculated_by           bigint        NOT NULL REFERENCES app_user(user_id),
     calculated_at           timestamptz   NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT uq_clawback_calculation_version UNIQUE (clawback_case_id, version_no),
-    -- 같은 원천·정책·산식 판은 하나로 수렴한다(멱등키가 달라도 새 판을 만들지 않는다).
-    CONSTRAINT uq_clawback_calculation_input UNIQUE (candidate_id, source_version, policy_version_id, calc_rule_version)
+    CONSTRAINT uq_clawback_calculation_version UNIQUE (clawback_case_id, version_no)
 );
+-- 같은 원천·정책·산식이어도 그 사이 다른 판이 쌓였으면 새 판으로 다시 쌓는다(최신 판만 수렴 대상).
+-- 그래서 입력 조합에는 UNIQUE를 두지 않고, 후보 잠금 아래 최신 판과 비교한다.
+CREATE INDEX ix_clawback_calculation_latest ON clawback_calculation(candidate_id, version_no DESC);
 CREATE TRIGGER trg_clawback_calculation_append_only
 BEFORE UPDATE OR DELETE ON clawback_calculation
 FOR EACH ROW EXECUTE FUNCTION reject_update_delete();

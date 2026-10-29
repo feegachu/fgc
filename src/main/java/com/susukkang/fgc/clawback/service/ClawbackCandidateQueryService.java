@@ -56,7 +56,7 @@ public class ClawbackCandidateQueryService {
                 detail.elapsedMonths(), detail.latestCalculation());
     }
 
-    /** SQL은 근거로만 동작을 판정한다. 계산 권한(SETTLEMENT·SYSTEM_ADMIN)이 없으면 동작을 비운다. */
+    /** SQL은 근거로만 동작을 판정한다. 계산 권한(Roles.CAN_CALCULATE_CLAWBACK)이 없으면 동작을 비운다. */
     private static ClawbackCandidateResponse forRole(ClawbackCandidateResponse c, boolean canProcess) {
         if (canProcess || c.allowedActions().isEmpty()) return c;
         return new ClawbackCandidateResponse(c.candidateId(), c.contractId(), c.contractNo(), c.insurerId(),
@@ -73,7 +73,7 @@ public class ClawbackCandidateQueryService {
     }
 
     private static final Set<String> PROCESS_AUTHORITIES =
-            Set.of("ROLE_" + Roles.SETTLEMENT, "ROLE_" + Roles.SYSTEM_ADMIN);
+            Set.of("ROLE_" + Roles.SETTLEMENT, "ROLE_" + Roles.GA_ADMIN, "ROLE_" + Roles.SYSTEM_ADMIN);
 
     private static void positive(Long value, String field) {
         if (value != null && value < 1) throw invalid(field);
