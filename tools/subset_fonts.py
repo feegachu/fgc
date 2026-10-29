@@ -1,17 +1,17 @@
 """정적 폰트 경량화 (2026-09-15, 첫 화면 28MB → 1.6MB).
 
 원본:
-  - Material Symbols Rounded 가변 ttf 14.7MB  → 템플릿·JS 에서 쓰는 아이콘만 남긴 woff2 (~90KB)
+  - Material Symbols Rounded 가변 ttf 14.7MB  → 화면에서 쓰는 아이콘만 남긴 woff2 (~90KB)
   - Noto Sans KR 가변 ttf 10.2MB              → KS X 1001 한글 2,350자 + 라틴/구두점/기호 woff2 (~330KB)
 
-새 아이콘을 템플릿에 추가하면 이 스크립트를 다시 돌린다. 원본 ttf 는 Google Fonts 에서 받아
-아무 경로에 두고 인자로 준다 (저장소에는 원본을 넣지 않는다 — 크기 때문).
+화면에 새 아이콘을 쓰면 이 스크립트를 다시 돌린다. 원본 ttf 는 Google Fonts 에서 받아
+아무 경로에 두고 인자로 준다 (저장소에는 원본을 넣지 않는다 — 크기 때문). 결과는 frontend/public/fonts 에 쓴다.
 
     pip install fonttools brotli
     python tools/subset_fonts.py <material-symbols-rounded.ttf> <noto-sans-kr-variable.ttf>
 
-아이콘 목록은 templates/**/*.html 의 <span class="material-symbols-...">이름</span> 과
-static/js 의 textContent 에서 자동 수집하고, 아래 EXTRA 를 더한다.
+아이콘 목록은 frontend/src(테스트 제외)의 소문자 snake_case 문자열·JSX 글자에서 자동 수집하고, 아래 EXTRA 를 더한다.
+(2026-10-27 #419 — 1차 templates/·static/js 대신 React 소스를 읽는다.)
 """
 import os
 import re
@@ -22,10 +22,10 @@ from fontTools import subset
 from fontTools.ttLib import TTFont
 
 ROOT = Path(__file__).resolve().parents[1]
-RES = ROOT / "src/main/resources"
-OUT = RES / "static/fonts"
+SRC = ROOT / "frontend/src"
+OUT = ROOT / "frontend/public/fonts"
 
-# 템플릿에 없지만 JS 가 문자열로 만들 수 있는 아이콘. 넉넉히.
+# 소스에 아직 없지만 곧 쓸 만한 아이콘. 넉넉히.
 EXTRA = """check delete cancel done more_vert more_horiz filter_list upload print arrow_forward
 arrow_upward arrow_downward check_circle schedule calendar_month notifications home list table_chart
 sort content_copy link mail star unfold_more keyboard_arrow_down keyboard_arrow_up keyboard_arrow_left
@@ -34,13 +34,15 @@ history account_circle visibility_off arrow_drop_down expand_less remove group f
 
 
 def collect_icon_names() -> set[str]:
+    # React 는 아이콘 이름을 JSX 글자·데이터(icon: 'inbox')·삼항식 문자열로 넘겨 span 만 봐서는 다 못 찾는다.
+    # 소문자 snake_case 문자열을 전부 모으고, 아이콘인지는 subset_material 이 폰트 글리프와의 교집합으로 거른다.
     names = set(EXTRA)
-    pat = re.compile(r'material-symbols[^>]*>\s*([a-z_]+)\s*<')
-    for html in (RES / "templates").rglob("*.html"):
-        names.update(pat.findall(html.read_text(encoding="utf-8")))
-    pat_js = re.compile(r'''textContent\s*=\s*['"]([a-z_]+)['"]''')
-    for js in (RES / "static/js").rglob("*.js"):
-        names.update(pat_js.findall(js.read_text(encoding="utf-8")))
+    pat = re.compile(r"""['"`]([a-z][a-z0-9_]*)['"`]|>\s*([a-z][a-z0-9_]*)\s*<""")
+    for path in SRC.rglob("*.ts*"):
+        if ".test." in path.name or path.name.endswith(".d.ts"):
+            continue
+        for quoted, text in pat.findall(path.read_text(encoding="utf-8")):
+            names.add(quoted or text)
     return names
 
 
@@ -73,7 +75,7 @@ def subset_material(src: Path) -> None:
     s.subset(font)
     out = OUT / "material-symbols-rounded.woff2"
     subset.save_font(font, str(out), opts)
-    print(f"material: {len(keep)} glyphs -> {out.stat().st_size // 1024} KB; 원본에 없는 이름: {missing}")
+    print(f"material: {len(keep)} glyphs -> {out.stat().st_size // 1024} KB; 아이콘이 아닌 수집 단어 {len(missing)}개")
 
 
 def subset_noto(src: Path) -> None:

@@ -4,6 +4,7 @@ import com.susukkang.fgc.common.code.PolicySourceClass;
 import com.susukkang.fgc.common.code.PolicyStatus;
 import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
+import com.susukkang.fgc.policy.dto.PolicyDraft;
 import jakarta.persistence.Column;
 import jakarta.persistence.ColumnResult;
 import jakarta.persistence.ConstructorResult;
@@ -25,6 +26,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashSet;
 
 /**
  * 설명 : 정책 버전 및 적용기간·승인 정보
@@ -121,4 +123,60 @@ public class PolicyVersion {
 
     @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime updatedAt;
+
+    /** 초안의 상태·버전·작성자는 호출한 작성 서비스가 결정한다. */
+    public static PolicyVersion draft(PolicyDraft document, int versionNo, Long actorId) {
+        PolicyVersion policy = new PolicyVersion();
+        policy.policyCode = document.policyCode();
+        policy.versionNo = versionNo;
+        policy.createdBy = actorId;
+        policy.revise(document);
+        return policy;
+    }
+
+    public void revise(PolicyDraft document) {
+        if (status != PolicyStatus.DRAFT || !policyCode.equals(document.policyCode())) {
+            throw new IllegalStateException("Only the same policy code's draft can be edited");
+        }
+        policyName = document.policyName();
+        policyType = document.policyType();
+        sourceClass = document.sourceClass();
+        effectiveFrom = document.effectiveFrom();
+        effectiveTo = document.effectiveTo();
+        feeRegimeCode = document.feeRegimeCode();
+        basicDocumentVersion = document.basicDocumentVersion();
+        regulationRefs = new ArrayList<>(new LinkedHashSet<>(document.regulationRefs()));
+        sourceRefs = new ArrayList<>(new LinkedHashSet<>(document.sourceRefs()));
+    }
+
+    /** 전이 권한·기대 상태·동시성은 작성 서비스가 잠금 안에서 검사한다. */
+    public void transition(PolicyStatus nextStatus, Long approverId) {
+        transition(nextStatus, approverId, null);
+    }
+
+    public void transition(PolicyStatus nextStatus, Long approverId, String evidenceRef) {
+        status = nextStatus;
+        if (nextStatus == PolicyStatus.APPROVED) {
+            approvedBy = approverId;
+            approvedAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);
+            approvalEvidenceRef = evidenceRef;
+        }
+    }
+
+    public PolicyVersion cloneDraft(LocalDate from, LocalDate to, int nextVersionNo, Long actorId) {
+        PolicyVersion copy = new PolicyVersion();
+        copy.policyCode = policyCode;
+        copy.policyName = policyName;
+        copy.policyType = policyType;
+        copy.sourceClass = sourceClass;
+        copy.versionNo = nextVersionNo;
+        copy.effectiveFrom = from;
+        copy.effectiveTo = to;
+        copy.feeRegimeCode = feeRegimeCode;
+        copy.basicDocumentVersion = basicDocumentVersion;
+        copy.regulationRefs = new ArrayList<>(regulationRefs);
+        copy.sourceRefs = new ArrayList<>(sourceRefs);
+        copy.createdBy = actorId;
+        return copy;
+    }
 }

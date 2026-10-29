@@ -36,6 +36,7 @@ public class AgentController {
     @GetMapping
     @PreAuthorize(Roles.ANY_ROLE)
     public ApiResponse<PageResponse<AgentResponse>> search(
+            @Parameter(description = "기존 선택 설계사 ID 재조회. 위촉기간 조건은 유지") @RequestParam(required = false) Long selectedId,
             @Parameter(description = "소속 조직 ID")
             @RequestParam(required = false)
             Long organizationId,
@@ -62,7 +63,7 @@ public class AgentController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        AgentSearchCriteria criteria = new AgentSearchCriteria(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort, selectedId);
         return ApiResponse.success(agentService.search(criteria, page, size));
     }
 }

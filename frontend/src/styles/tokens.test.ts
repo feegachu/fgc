@@ -1,12 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 
-it('1차 CSS 토큰과 레이아웃·공통 스타일을 그대로 유지한다', () => {
-  for (const name of ['variables', 'reset', 'layout', 'components', 'utilities']) {
-    expect(readFileSync(`src/styles/${name}.css`, 'utf8').replace(/\r\n/g, '\n')).toBe(
-      readFileSync(`../src/main/resources/static/css/common/${name}.css`, 'utf8').replace(/\r\n/g, '\n'),
-    )
-  }
+it('디자인 토큰(상태 24·중립 12)을 모두 Tailwind 매핑에 노출한다', () => {
   const source = readFileSync('src/styles/variables.css', 'utf8')
   const mapping = readFileSync('src/styles/tokens.js', 'utf8')
   const names = [...source.matchAll(/--((?:color-|space-|radius-|z-)[\w-]+)\s*:/g)].map((match) => match[1])

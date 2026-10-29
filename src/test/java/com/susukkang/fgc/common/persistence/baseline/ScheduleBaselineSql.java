@@ -267,6 +267,11 @@ final class ScheduleBaselineSql {
                         COALESCE(SUM(sl.expected_amount) OVER (PARTITION BY sh.schedule_header_id),0) AS expected_total,
                         CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label,
                         -- 라인 컬럼
+                        ci.cashflow_type,
+                        c.contract_id,
+                        sl.beneficiary_agent_id,
+                        sl.commission_item_id,
+                        (c.contract_date + make_interval(months => sl.contract_month_no - 1))::date AS attribution_date,
                         sl.line_no,
                         sl.installment_no,
                         sl.contract_month_no,
@@ -680,6 +685,11 @@ final class ScheduleBaselineSql {
                                 ' v',
                                 pv.version_no
                         ) AS policy_version_label,
+                        ci.cashflow_type,
+                        c.contract_id,
+                        sl.beneficiary_agent_id,
+                        sl.commission_item_id,
+                        (c.contract_date + make_interval(months => sl.contract_month_no - 1))::date AS attribution_date,
                         sl.line_no,
                         sl.installment_no,
                         sl.contract_month_no,

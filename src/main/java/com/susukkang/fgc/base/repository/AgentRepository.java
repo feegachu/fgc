@@ -41,7 +41,8 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             )
             FROM Agent a
             JOIN Organization o ON o.organizationId = a.organizationId
-            WHERE (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
+            WHERE (CAST(:selectedId AS Long) IS NULL OR a.agentId = :selectedId)
+              AND (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
               AND (:includeHistorical = TRUE OR :includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
               AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId
                    OR (:includeHistorical = TRUE AND a.agentId IN (
@@ -57,7 +58,8 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             countQuery = """
             SELECT COUNT(a)
             FROM Agent a
-            WHERE (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
+            WHERE (CAST(:selectedId AS Long) IS NULL OR a.agentId = :selectedId)
+              AND (:includeHistorical = TRUE OR a.appointmentDate <= :asOf)
               AND (:includeHistorical = TRUE OR :includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
               AND (CAST(:organizationId AS Long) IS NULL OR a.organizationId = :organizationId
                    OR (:includeHistorical = TRUE AND a.agentId IN (
@@ -71,6 +73,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
               )
             """)
     Page<AgentRow> search(
+            @Param("selectedId") Long selectedId,
             @Param("organizationId") Long organizationId,
             @Param("keyword") String keyword,
             @Param("asOf") LocalDate asOf,
@@ -78,6 +81,11 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
             @Param("includeHistorical") boolean includeHistorical,
             Pageable pageable
     );
+
+    default Page<AgentRow> search(Long organizationId, String keyword, LocalDate asOf, boolean includeTerminated,
+                                 boolean includeHistorical, Pageable pageable) {
+        return search(null, organizationId, keyword, asOf, includeTerminated, includeHistorical, pageable);
+    }
 
     default Page<AgentRow> search(Long organizationId, String keyword, LocalDate asOf, boolean includeTerminated, Pageable pageable) {
         return search(organizationId, keyword, asOf, includeTerminated, false, pageable);

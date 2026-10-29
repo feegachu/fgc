@@ -224,10 +224,12 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     expect(document.getElementById('sum-amount')).toHaveTextContent('10,000원')
     expect(screen.getByLabelText('정산월')).toHaveValue('2026-08')
     expect(screen.getByLabelText('수령 설계사')).toHaveValue('3')
-    expect(screen.getByRole('link', { name: 'TRAN-410 수정' })).toHaveAttribute(
-      'href',
-      '/app/transactions/new?id=41&month=2026-07',
-    )
+    const editUrl = new URL(screen.getByRole('link', { name: 'TRAN-410 수정' }).getAttribute('href')!, 'http://local')
+    expect(editUrl.pathname).toBe('/app/transactions/new')
+    expect(editUrl.searchParams.get('id')).toBe('41')
+    expect(editUrl.searchParams.get('month')).toBe('2026-07')
+    expect(new URL(editUrl.searchParams.get('returnTo')!, 'http://local').searchParams.get('page')).toBe('2')
+    expect(new URL(editUrl.searchParams.get('returnTo')!, 'http://local').searchParams.get('selectedId')).toBe('41')
   })
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 다음 검색에 유지한다', async () => {
     const { router, actions } = renderAt('/app/transactions?month=2026-07&contractNo=POL-2&page=3')

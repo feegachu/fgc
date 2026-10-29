@@ -10,7 +10,8 @@ import org.springframework.web.context.request.WebRequest;
 import java.util.Map;
 
 /**
- * 오류 화면(error/403·404·500.html)이 요청번호와 오류코드를 보여줄 수 있도록 /error 모델을 넓힌다.
+ * /error 응답(GlobalExceptionHandler 를 거치지 않은 오류의 JSON)에 요청번호와 오류코드를 싣는다.
+ * 2026-10-27 yslee - 1차 오류 템플릿(error/403·404·500.html)은 웨이브 C(#419)에서 지웠다. 아래는 그때의 설명이다.
  *
  * 부록 A FGC-COMMON-500 이 "{requestId} 를 실제 값으로 치환"하도록 규정한다. 그런데
  * {@link RequestIdFilter} 는 요청 속성 fgc.requestId 와 MDC 에만 값을 넣고, Spring Boot 기본

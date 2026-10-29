@@ -16,7 +16,7 @@ spec:
         - {name: SPRING_PROFILES_ACTIVE, value: "__ENV_NAME__"}
         - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://fgc-db:5432/fgc"}
         - {name: SPRING_DATASOURCE_USERNAME, value: fgc}
-        - {name: SPRING_FLYWAY_LOCATIONS, value: "classpath:db/migration,classpath:db/demo"}
+        - {name: SPRING_FLYWAY_LOCATIONS, value: "classpath:db/migration,classpath:db/demo,classpath:db/demo-agent"}
         - {name: JAVA_TOOL_OPTIONS, value: "-Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m"}
         - name: SPRING_DATASOURCE_PASSWORD
           valueFrom: {secretKeyRef: {name: fgc-app, key: SPRING_DATASOURCE_PASSWORD}}
