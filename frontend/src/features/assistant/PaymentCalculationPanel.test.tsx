@@ -126,3 +126,32 @@ it('aborts on form identity/revision remount and discards late results', async (
   })
   await waitFor(() => expect(screen.queryByText('10,000원')).not.toBeInTheDocument())
 })
+
+it('shows server-provided row rounding, dates and policy evidence without recalculating', async () => {
+  vi.spyOn(apiClient, 'request').mockResolvedValue(
+    envelope({
+      ...snapshot,
+      basis: {
+        ...snapshot.basis,
+        asOfDate: '2026-10-01',
+        policyVersionIds: ['9'],
+        ruleIds: ['5'],
+        lines: [
+          {
+            attributionSequence: '1',
+            contractId: '3',
+            attributionDate: '2026-10-01',
+            originalAmount: '0.50',
+            roundedAmount: '1',
+          },
+        ],
+      },
+    }),
+  )
+  render(<PaymentCalculationPanel observation={observation} canProcess />)
+  await userEvent.click(screen.getByRole('button', { name: '귀속 차액 조회' }))
+  await screen.findByText('귀속 행별 반올림 근거')
+  await userEvent.click(screen.getByText('귀속 행별 반올림 근거'))
+  expect(screen.getByText(/원천 0.50원 → 반올림 1원/)).toBeInTheDocument()
+  expect(screen.getByText(/배부 정책 버전: 9/)).toBeInTheDocument()
+})
