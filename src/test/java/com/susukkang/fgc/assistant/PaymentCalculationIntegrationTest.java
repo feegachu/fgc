@@ -167,6 +167,19 @@ class PaymentCalculationIntegrationTest {
         org.mockito.Mockito.verifyNoInteractions(queries);
     }
 
+    @Test void picoMissingPaymentMapsRealServiceValidationTo404WithoutChangingExistingApi() {
+        long missingId = Long.MAX_VALUE;
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.commission_transaction WHERE commission_transaction_id=?", Long.class, missingId)).isZero();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> payments.get(missingId))
+                .isInstanceOfSatisfying(com.susukkang.fgc.common.exception.FgcBusinessException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_002);
+                    assertThat(error.getField()).isEqualTo("paymentId");
+                });
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> picoContext.read(missingId))
+                .isInstanceOfSatisfying(com.susukkang.fgc.common.exception.FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_004));
+    }
+
     private PaymentCalculationRequest request(PaymentCalculationRequest.Kind kind) {
         return new PaymentCalculationRequest("assistant.v1", kind, PaymentCalculationRequest.Mode.EXISTING,
                 new PaymentCalculationRequest.Scope(paymentId.toString()), null, 0L);

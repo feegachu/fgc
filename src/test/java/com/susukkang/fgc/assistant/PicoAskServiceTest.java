@@ -127,12 +127,19 @@ class PicoAskServiceTest {
         }
         verifyNoInteractions(gateway);
     }
-    @Test void readOnlyRoleCanReadPaymentStateButCannotObtainProcessingInstructions() {
-        role("COMPLIANCE");
-        when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(com.susukkang.fgc.common.code.CommissionPaymentStatus.DRAFT));
-        assertThat(service.ask(paymentRequest("현재 지급 상태가 확정인가요?",77L)).fallbackReason()).isEqualTo("PAYMENT_DRAFT_STATE");
-        assertThat(service.ask(paymentRequest("초안 저장 방법",77L)).fallbackReason()).isEqualTo("PERMISSION_DENIED");
-        verify(contexts,times(1)).read(77L); verifyNoInteractions(gateway);
+    @Test void readOnlyRolesOnlyReceiveStateForEveryStoredStatusEvenWithMixedProcessingTerms() {
+        for (String readRole : List.of("COMPLIANCE", "GA_ADMIN")) {
+            role(readRole);
+            for (var status : com.susukkang.fgc.common.code.CommissionPaymentStatus.values()) {
+                when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(status));
+                var response = service.ask(paymentRequest("현재 지급 상태가 확정인가요? 정정하려면?",77L));
+                assertThat(response.fallbackReason()).isEqualTo("PAYMENT_STATE_READ_ONLY");
+                assertThat(response.message()).contains("상태 조회 안내만").doesNotContain("정정 절차", "수정", "저장", "확인해주세요");
+                assertThat(response.validatedGuide()).isNull();
+            }
+            assertThat(service.ask(paymentRequest("초안 저장 방법",77L)).fallbackReason()).isEqualTo("PERMISSION_DENIED");
+        }
+        verify(contexts,times(6)).read(77L); verifyNoInteractions(gateway);
     }
     @Test void multipleEntitiesAndUnauthorizedTargetsNeverReachTheModel() {
         var request = new PicoAskRequest("초안 저장", "TRAN-W02", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L),new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,88L)), "r1", "1.0", List.of());

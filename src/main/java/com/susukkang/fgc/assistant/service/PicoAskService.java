@@ -72,7 +72,7 @@ public class PicoAskService {
         boolean canProcess = canProcess();
         PicoAskResponse intentError = intentError(request, terms, canProcess);
         if (intentError != null) return intentError;
-        PicoAskResponse paymentError = paymentContextResponse(request, terms);
+        PicoAskResponse paymentError = paymentContextResponse(request, terms, canProcess);
         if (paymentError != null) return paymentError;
         var candidates=catalog.search(terms,canProcess);
         if (candidates.isEmpty()) return fixed(request,Decision.ASK_CLARIFICATION,"금액 확인·초안 저장·사전검증 중 어떤 업무가 필요한가요?",List.of(),"WORKFLOW_REQUIRED");
@@ -112,7 +112,7 @@ public class PicoAskService {
         if (request.entityRefs().isEmpty() && terms.stream().anyMatch(Set.of("수정","정정","취소")::contains)) return fixed(request,Decision.ASK_CLARIFICATION,"작성 중인 초안을 수정하려는 건가요, 이미 확정된 지급을 정정하려는 건가요? 상태에 맞는 기존 업무 화면을 먼저 확인해주세요.",List.of(),"PAYMENT_STATE_REQUIRED");
         return null;
     }
-    private PicoAskResponse paymentContextResponse(PicoAskRequest request, List<String> terms) {
+    private PicoAskResponse paymentContextResponse(PicoAskRequest request, List<String> terms, boolean canProcess) {
         if (request.entityRefs().isEmpty()) return null;
         if (request.entityRefs().size() != 1)
             return fixed(request, Decision.ASK_CLARIFICATION, "지급 건을 하나 선택한 뒤 질문해주세요.", List.of(), "SINGLE_PAYMENT_REQUIRED");
@@ -121,6 +121,16 @@ public class PicoAskService {
             return fixed(request, Decision.UNSUPPORTED, "현재는 저장된 지급 건의 상태만 질문에 연결할 수 있어요.", List.of(), "ENTITY_STATE_NOT_SUPPORTED");
         // This separate service closes its read transaction before any external model call.
         var snapshot = paymentContext.read(entity.id());
+        if (!canProcess) {
+            String state = switch (snapshot.status()) {
+                case DRAFT -> "작성 중인 초안";
+                case CONFIRMED -> "확정 상태";
+                case CANCELLED -> "취소 상태";
+            };
+            return fixed(request, Decision.ANSWER_ONLY,
+                    "서버에서 확인한 지급 건은 " + state + "입니다. 현재 계정은 상태 조회 안내만 제공합니다.",
+                    List.of(), "PAYMENT_STATE_READ_ONLY");
+        }
         return switch (snapshot.status()) {
             case CONFIRMED -> fixed(request, Decision.ANSWER_ONLY,
                     "서버에서 확인한 지급 건은 확정 상태입니다. 초안 저장·확정 안내를 이어가지 않습니다. 기존 지급 목록의 상태와 정정 절차를 확인해주세요.", List.of(), "PAYMENT_ALREADY_CONFIRMED");
