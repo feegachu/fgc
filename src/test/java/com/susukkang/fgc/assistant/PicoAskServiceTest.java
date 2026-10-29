@@ -75,4 +75,8 @@ class PicoAskServiceTest {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("초안 저장 프로세스는 지급 확정과 구분됩니다. 지원 업무를 확인하세요.","payment.draft:overview"));
         assertThat(service.ask(request("초안 저장 방법")).source()).isEqualTo(Source.AI);
     }
+    @Test void acceptsCalculationLookupWordingWithoutMistakingItForQuantity() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("실제 금액은 계산 조회로 확인하세요.","payment.draft:overview"));
+        assertThat(service.ask(request("초안 저장")).source()).isEqualTo(Source.AI);
+    }
 }

@@ -37,7 +37,7 @@ public class PicoAskService {
         String normalized = Normalizer.normalize(message, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
         if (normalized.codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
         if (UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return OutputRejection.UNSAFE_TEXT;
-        if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "회", "개월", "년").stream()
+        if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "개월", "년").stream()
                 .anyMatch(unit -> koreanQuantity(normalized, unit))) return OutputRejection.GENERATED_AMOUNT;
         return null;
     }
