@@ -197,7 +197,11 @@
         "missingTargetBehavior": "PAUSE",
         "next": [
           {
-            "conditionId": "SCOPE_ACKNOWLEDGED",
+            "conditionId": "CURRENT_DRAFT_ALREADY_SAVED",
+            "stepId": "payment.precheck"
+          },
+          {
+            "conditionId": "DRAFT_SAVE_REQUIRED",
             "stepId": "payment.save"
           }
         ]
