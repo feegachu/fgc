@@ -11,6 +11,7 @@ import { WorkspaceTabs } from './WorkspaceTabs'
 import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
+import { AssistantDemoMount } from '../../features/assistant/PicoAssistant'
 import { AgentTopbar } from './AgentTopbar'
 import './agent-theme.css'
 export interface ShellContext {
@@ -109,6 +110,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         </main>
         <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
       </div>
+      <AssistantDemoMount user={user} loggingOut={loggingOut} />
     </div>
   )
 }
