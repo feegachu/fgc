@@ -1,6 +1,8 @@
 package com.susukkang.fgc.compare.controller;
 
 import com.susukkang.fgc.common.web.ApiResponse;
+import com.susukkang.fgc.compare.dto.CompareAskRequest;
+import com.susukkang.fgc.compare.dto.CompareAskResponse;
 import com.susukkang.fgc.compare.dto.CompareCategoryResponse;
 import com.susukkang.fgc.compare.dto.CompareExplainRequest;
 import com.susukkang.fgc.compare.dto.CompareExplainResponse;
@@ -49,5 +51,12 @@ public class CompareController {
     @PreAuthorize("hasRole('AGENT')")
     public ApiResponse<CompareExplainResponse> explain(@Valid @RequestBody CompareExplainRequest request) {
         return ApiResponse.success(compareRankingService.explain(request.rankResultId()));
+    }
+
+    @Operation(summary = "자연어 질문 답변", description = "순위 결과(rankResultId, 선택)와 기본 용어 설명만 근거로 질문에 답한다. 범위 밖·검증 실패는 고정 문장으로 대체한다.")
+    @PostMapping("/ask")
+    @PreAuthorize("hasRole('AGENT')")
+    public ApiResponse<CompareAskResponse> ask(@Valid @RequestBody CompareAskRequest request) {
+        return ApiResponse.success(compareRankingService.ask(request.rankResultId(), request.question()));
     }
 }

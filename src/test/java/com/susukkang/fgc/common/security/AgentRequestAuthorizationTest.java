@@ -43,6 +43,13 @@ class AgentRequestAuthorizationTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/ai/compare-chat/rank", "/api/v1/ai/compare-chat/explain", "/api/v1/ai/compare-chat/ask"})
+    void opensOnlyCompareChatPosts(String path) {
+        assertThat(AgentRequestAuthorization.SCOPED_READS.check(() -> null,
+                new RequestAuthorizationContext(new MockHttpServletRequest("POST", path))).isGranted()).isTrue();
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
     void neverOpensInternalWrites(String method) {
         assertThat(AgentRequestAuthorization.SCOPED_READS.check(() -> null,
