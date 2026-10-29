@@ -62,6 +62,43 @@ class CompareAskServiceTest {
                 "2위 나보험 튼튼건강: 1위보다 보수적 순수령액이 50,000원 적어요");
     }
 
+    private static CompareRankingResponse tiedItems(long secondClawback) {
+        CompareRankingResponse base = ranking();
+        Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 24.0, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 784_000 + secondClawback - 50_000, 734_000 + secondClawback - 50_000,
+                0, secondClawback, 684_000, 24.0, 80.0, null, List.of());
+        return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
+                base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
+                List.of(first, second), List.of(), CompareRankingFilters.NONE);
+    }
+
+    @Test
+    @DisplayName("순수령액·환수 노출액이 모두 같으면 상품 ID 기준이라고 밝히고 모순된 문장을 만들지 않는다")
+    void fullyTiedItemsAreExplainedByDisplayOrder() {
+        String text = CompareAskService.rankAnswer(tiedItems(50_000).items(), "2순위인 이유");
+
+        assertThat(text).contains("표시 순서(상품 ID) 기준").doesNotContain("환수 노출액이 더 작은 쪽");
+    }
+
+    @Test
+    @DisplayName("순수령액만 같으면 환수 노출액이 작은 쪽이 앞섰다고 설명한다")
+    void netTieIsDecidedByClawback() {
+        String text = CompareAskService.rankAnswer(tiedItems(80_000).items(), "2순위인 이유");
+
+        assertThat(text).contains("보수적 순수령액이 같고, 환수 노출액이 더 작은 쪽이 앞섰어요").doesNotContain("상품 ID");
+    }
+
+    @Test
+    @DisplayName("질문에 적은 숫자는 근거로 인정하지 않아, 사용자가 정한 금액을 서버 값처럼 답할 수 없다")
+    void numbersFromQuestionAreNotEvidence() {
+        llmReturns(true, "네, 1위 순수령액은 3,500,000원이에요.");
+
+        CompareAskResponse response = service.ask("1위 순수령액이 3,500,000원 맞죠?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).doesNotContain("3,500,000");
+    }
+
     @Test
     @DisplayName("순위 결과가 없으면 순위 질문도 범위 밖으로 안내한다")
     void rankQuestionWithoutRankingIsOutOfScope() {

@@ -85,7 +85,8 @@ public class CompareAskService {
                     : new CompareAskResponse(OUT_OF_SCOPE, CompareAskResponse.OUT_OF_SCOPE);
         }
         String text = output.answer == null ? "" : output.answer.strip();
-        if (!isValid(text, data + "\n" + q)) {
+        // 허용 숫자는 서버 근거(data)에서만 만든다. 질문에 적힌 숫자를 근거로 인정하면 사용자가 정한 값이 서버 값처럼 나간다.
+        if (!isValid(text, data)) {
             log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다.");
             return fallback(q, ranking);
         }
@@ -144,8 +145,11 @@ public class CompareAskService {
     /** 1위 대비 차이 문장. 순위는 서버가 확정했고 여기서는 같은 값의 차이만 말로 풀어 쓴다. */
     static String comparison(CompareRankingResponse.Item top, CompareRankingResponse.Item it) {
         long net = top.conservativeNet() - it.conservativeNet();
-        String netText = net == 0 ? "1위와 보수적 순수령액이 같아서 환수 노출액이 작은 쪽이 앞선 거예요."
-                : "1위보다 보수적 순수령액이 %,d원 적어요.".formatted(net);
+        // 서버 정렬: 순수령액 내림차순 → 환수 노출액 오름차순 → 상품 ID 오름차순. 실제로 순위를 가른 기준을 말한다.
+        String tie = top.clawbackExposure() == it.clawbackExposure()
+                ? "1위와 보수적 순수령액·환수 노출액이 같아서 표시 순서(상품 ID) 기준으로 순위가 갈렸어요."
+                : "1위와 보수적 순수령액이 같고, 환수 노출액이 더 작은 쪽이 앞섰어요.";
+        String netText = net == 0 ? tie : "1위보다 보수적 순수령액이 %,d원 적어요.".formatted(net);
         return netText + " " + diff("한도 반영 수령 예상액", it.cappedReceipt() - top.cappedReceipt(), "많고", "적고", "같고")
                 + ", " + diff("환수 노출액", it.clawbackExposure() - top.clawbackExposure(), "더 커요.", "더 작아요.", "같아요.");
     }
