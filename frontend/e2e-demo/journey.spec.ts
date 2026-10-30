@@ -39,7 +39,7 @@ test('계약 등록·수정 → 스케줄 재생성·확정', async ({ page }, i
   const edited = responseFor(page, `/contracts/${contract.contractId}`, 'PUT')
   await page.locator('button[type=submit]').click()
   await successful(edited)
-  await expect(page.getByRole('status').filter({ hasText: '보험계약을 수정했습니다.' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: '계약 수정이 저장되었습니다.' })).toBeVisible()
   await expect(page.getByRole('main')).toContainText('E2E-418-CONTRACT-EDIT')
   await page.getByRole('tab', { name: '예상 스케줄', exact: true }).click()
   await page.goto('schedules?month=2026-07&contractNo=E2E-418-CONTRACT-EDIT&stage=GA_TO_FC')

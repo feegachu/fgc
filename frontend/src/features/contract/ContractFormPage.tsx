@@ -156,11 +156,15 @@ function ContractEditor({
   const nextStatuses = original?.allowedNextStatuses ?? []
   const reasonCodes = original?.statusReasonCodes ?? []
   const statusChanged = Boolean(original) && draft.contractStatus !== original?.contractStatus
-  const validate = () => ({
-    ...validateDraft(form, currentDate),
-    ...(statusChanged ? validateStatusEvent(statusEvent, seoulNow(), reasonCodes) : {}),
-  })
+  const draftErrors = validateDraft(form, currentDate)
+  const eventErrors: ContractFieldErrors = statusChanged
+    ? validateStatusEvent(statusEvent, seoulNow(), reasonCodes)
+    : {}
+  const validate = () => ({ ...draftErrors, ...eventErrors })
   const valid = Object.keys(validate()).length === 0
+  // 무효면 저장 버튼이 잠겨 submit이 오류를 그리지 못하므로, 값을 넣은 사건 필드는 규칙 위반을 바로 보여 준다.
+  const eventError = (field: keyof StatusEventDraft) =>
+    errors[`statusEvent.${field}`] ?? (statusEvent[field] ? eventErrors[`statusEvent.${field}`] : undefined)
   const disabled = !valid || saving || loadingReferences || Boolean(referenceError) || conflict || missingToken
   const changes = [
     statusChanged && '상태 사건 기록·해당 미확정 대상 처리',
@@ -516,7 +520,7 @@ function ContractEditor({
                   <Field
                     label="효력일시"
                     required
-                    error={errors['statusEvent.effectiveAt']}
+                    error={eventError('effectiveAt')}
                     helper="실제 효력 시각(서울). 최신 사건의 효력일시 이후, 접수일시 이전이어야 합니다."
                   >
                     <input
@@ -530,7 +534,7 @@ function ContractEditor({
                   <Field
                     label="접수일시"
                     required
-                    error={errors['statusEvent.receivedAt']}
+                    error={eventError('receivedAt')}
                     helper="실제로 접수한 시각(서울). 서버 처리 시각과 따로 기록합니다."
                   >
                     <input
@@ -540,7 +544,7 @@ function ContractEditor({
                       onChange={(event) => changeEvent('receivedAt', event.target.value)}
                     />
                   </Field>
-                  <Field label="사유코드" required error={errors['statusEvent.reasonCode']}>
+                  <Field label="사유코드" required error={eventError('reasonCode')}>
                     <select
                       name="statusEvent.reasonCode"
                       className="select-control"
@@ -559,7 +563,7 @@ function ContractEditor({
                     className="contract-status-event-reason"
                     label="사유"
                     required
-                    error={errors['statusEvent.reason']}
+                    error={eventError('reason')}
                     helper="1~2,000자"
                   >
                     <textarea
@@ -737,7 +741,9 @@ function ContractEditor({
                       ? id
                         ? `저장할 준비가 되었습니다. 변경 요약: ${changeSummary}`
                         : '저장할 준비가 되었습니다.'
-                      : '필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.'}
+                      : !referenceError && !Object.keys(draftErrors).length
+                        ? '상태 변경 사유의 필수 항목(*)과 일시를 확인해 주세요.'
+                        : '필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.'}
           </p>
           <div className="contract-action-buttons">
             {(conflict || missingToken) && (

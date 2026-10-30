@@ -706,6 +706,28 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     expect(writes).toHaveLength(1)
   })
 
+  it('저장 버튼이 잠겨도 입력한 사건 일시의 순서·미래 접수 오류는 그 필드 옆에 바로 보인다', async () => {
+    const { user, writes } = renderAt(undefined, (url, options) =>
+      url === '/api/v1/contracts/21' && !options?.method ? statusContract : undefined,
+    )
+    await ready()
+    await selectOption(user, field('변경 상태'), 'TERMINATED')
+    // 아직 입력하지 않은 빈 필드는 오류로 덮지 않는다.
+    expect(field('효력일시')).not.toHaveAttribute('aria-invalid')
+    fireEvent.change(field('접수일시'), { target: { value: '2026-10-27T10:00' } })
+    fireEvent.change(field('효력일시'), { target: { value: '2026-10-28T00:00' } })
+    await selectOption(user, field('사유코드'), 'MANUAL_STATUS_CHANGE')
+    fireEvent.change(reason(), { target: { value: '보험회사 해지 접수 반영' } })
+    expect(save()).toBeDisabled()
+    expect(field('효력일시')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('효력일시는 접수일시보다 늦을 수 없습니다.')).toBeInTheDocument()
+    expect(screen.getByText('상태 변경 사유의 필수 항목(*)과 일시를 확인해 주세요.')).toBeInTheDocument()
+    fireEvent.change(field('접수일시'), { target: { value: '2999-01-01T00:00' } })
+    expect(field('접수일시')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('접수일시는 현재 시각보다 늦을 수 없습니다.')).toBeInTheDocument()
+    expect(writes).toHaveLength(0)
+  })
+
   it('끝 상태는 변경 상태를 잠그고, 일반 수정만 할 수 있다', async () => {
     renderAt(undefined, (url, options) =>
       url === '/api/v1/contracts/21' && !options?.method
