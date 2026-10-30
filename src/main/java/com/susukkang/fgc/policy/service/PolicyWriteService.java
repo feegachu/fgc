@@ -316,7 +316,8 @@ public class PolicyWriteService {
             }
             // 새로 입력한 링크만 http(s)를 요구한다. 이 검사 이전에 저장된 링크는 복제·제출에서 그대로 보존한다.
             String url = detail.url();
-            if (url != null && !url.isBlank() && !inheritedUrls.contains(url) && !PolicyDraftValidator.isWebUrl(url)) {
+            if (url != null && !url.isBlank() && !inheritedUrls.contains(linkKey(detail.ref(), url))
+                    && !PolicyDraftValidator.isWebUrl(url)) {
                 throw invalid("sourceDetails[" + i + "].url", "근거 링크는 http 또는 https 주소만 등록할 수 있습니다.");
             }
         }
@@ -330,12 +331,17 @@ public class PolicyWriteService {
     }
 
     /**
-     * URL 검사 이전에 저장된 근거 링크. 근거 코드 집합과 분리해, 같은 글자의 문서명 참조를 새 링크로 넣어도
+     * URL 검사 이전에 저장된 (근거, 링크) 쌍. 근거 코드 집합과 분리해, 같은 글자의 문서명 참조를 새 링크로 넣어도
      * http(s) 검사를 건너뛰지 못하게 한다.
      */
     private static Set<String> storedUrls(PolicyDraft draft) {
-        return draft.sourceDetails().stream().map(PolicyDraft.SourceDetailDraft::url).filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        return draft.sourceDetails().stream().filter(detail -> detail.url() != null)
+                .map(detail -> linkKey(detail.ref(), detail.url())).collect(Collectors.toSet());
+    }
+
+    /** 링크 보존은 같은 근거(ref)에 저장돼 있던 링크만 인정한다. 다른 근거로 옮긴 링크는 새 입력으로 검사한다. */
+    private static String linkKey(String ref, String url) {
+        return ref + "\n" + url;
     }
 
     /** 참조 원문에서 REG/SRC 코드를 읽는다. 형식이 아니면 null. */

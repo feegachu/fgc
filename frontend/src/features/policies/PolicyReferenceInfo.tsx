@@ -1,9 +1,7 @@
 import { StatusBadge } from '../../components/StatusBadge'
 import { QueryState } from '../reference/ReferenceUI'
 import { usePolicyDetail } from './api'
-
-/** 서버가 http(s)로 검증해 저장한 링크만 받지만, 화면에서도 다른 scheme은 링크로 만들지 않는다. */
-const isWebLink = (url: string) => /^https?:\/\//i.test(url)
+import { safeSourceUrl } from './management'
 
 /**
  * FUN-016 근거 info 패널 본문. 팝오버가 열릴 때만 렌더링되므로 그때 정책 상세를 조회한다.
@@ -40,8 +38,9 @@ export function PolicyReferenceInfo({ policyVersionId, refText }: { policyVersio
           ) : (
             <p className="policy-reference-empty">설명 자료 없음</p>
           )}
-          {reference.url && isWebLink(reference.url) ? (
-            <a href={reference.url} target="_blank" rel="noopener noreferrer">
+          {safeSourceUrl(reference.url) ? (
+            // 이전에 저장된 링크도 관리 상세와 같은 기준(http(s)·사용자 정보 없음)으로만 연다.
+            <a href={safeSourceUrl(reference.url)!} target="_blank" rel="noopener noreferrer">
               근거 원문 열기
             </a>
           ) : null}

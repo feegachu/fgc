@@ -648,6 +648,13 @@ class PolicyWorkflowIntegrationTest {
         // URL 검사가 생기기 전에 저장된 링크를 흉내 낸다(초안 상태라 DRAFT 전용 트리거가 허용한다).
         jdbc.update("UPDATE fgc.policy_source_detail SET url = 'ftp://legacy.example.com/a' WHERE policy_version_id = ?", id);
         ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument").deepCopy();
+        // 같은 링크를 다른 근거(REG-03)로 옮기면 물려받은 링크로 보지 않는다.
+        ObjectNode moved = edit.deepCopy();
+        ((ObjectNode) moved.withArray("sourceDetails").get(0)).putNull("url");
+        moved.withArray("sourceDetails").addObject().put("ref", "REG-03").put("title", "옮긴 링크")
+                .putNull("explanation").put("url", "ftp://legacy.example.com/a");
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, moved, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[1].url");
         JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 200);
         assertThat(action(id, "SUBMIT", updated, writer, 200).path("status").asText()).isEqualTo("REVIEW");
 

@@ -98,3 +98,31 @@ it('says the explanation is missing when only a title is stored', async () => {
   expect(await screen.findByText('제목만')).toBeInTheDocument()
   expect(screen.getByText('설명 자료 없음')).toBeInTheDocument()
 })
+
+it('does not link a stored URL that carries user credentials', async () => {
+  vi.spyOn(apiClient, 'request').mockResolvedValue({
+    data: {
+      references: [
+        {
+          ref: 'SRC-022',
+          code: 'SRC-022',
+          group: 'SOURCE',
+          registryTitle: null,
+          detailTitle: '자격 증명 링크',
+          explanation: '설명',
+          url: 'https://user:token@example.com/a',
+          statusTags: [],
+        },
+      ],
+    },
+    error: null,
+    requestId: 'r',
+  } as never)
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <PolicyReferenceInfo policyVersionId={9} refText="SRC-022" />
+    </QueryClientProvider>,
+  )
+  expect(await screen.findByText('자격 증명 링크')).toBeInTheDocument()
+  expect(screen.queryByRole('link')).not.toBeInTheDocument()
+})
