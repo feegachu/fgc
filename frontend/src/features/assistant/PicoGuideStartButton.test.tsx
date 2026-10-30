@@ -81,16 +81,18 @@ it('waits for consent and revalidation before starting only the first highlight 
   expect(useGuideRuntime.getState().observation?.precheck).toBe('NONE')
 })
 it.each([{ saved: false }, { ready: false }, { busy: true }, { paymentId: null }])(
-  'does not offer a start for invalid screen context %j',
+  'disables start and explains invalid screen context %j',
   (changed) => {
     useGuideRuntime.setState({ observation: { ...observation, ...changed } })
     mount()
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('button')).toBeDisabled()
+    expect(screen.getByRole('status')).toBeInTheDocument()
   },
 )
 it('does not offer processing to a read role but can offer a read guide', () => {
   const view = mount(false)
-  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByRole('button')).toBeDisabled()
+  expect(screen.getByRole('status')).toBeInTheDocument()
   view.rerender(<PicoGuideStartButton workflowId="payment.amount.review" contextRevision="r1" canProcess={false} />)
   expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeInTheDocument()
 })
