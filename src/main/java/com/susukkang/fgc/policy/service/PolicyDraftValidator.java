@@ -85,11 +85,19 @@ public class PolicyDraftValidator {
         return requiredRegime;
     }
 
+    /** FUN-016 근거 상태 태그(요구사항 FUN-016 처리규칙). DB CHECK(V71)와 같은 목록이다. */
+    static final Set<String> SOURCE_STATUS_TAGS = Set.of("현행규정", "개정고시", "시행세칙", "FAQ", "회사정책");
+
     private static void validateSourceDetails(PolicyDraft draft) {
         Set<String> detailRefs = new HashSet<>();
         for (int i = 0; i < draft.sourceDetails().size(); i++) {
             if (!detailRefs.add(draft.sourceDetails().get(i).ref())) {
                 throw invalid("sourceDetails[" + i + "].ref", "동일한 근거 상세를 중복 지정할 수 없습니다.");
+            }
+            for (String tag : draft.sourceDetails().get(i).statusTags()) {
+                if (!SOURCE_STATUS_TAGS.contains(tag)) {
+                    throw invalid("sourceDetails[" + i + "].statusTags", "근거 상태는 현행규정·개정고시·시행세칙·FAQ·회사정책 중에서 고르세요.");
+                }
             }
             String url = draft.sourceDetails().get(i).url();
             if (url != null && !url.isBlank() && !isWebUrl(url)) {

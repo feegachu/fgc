@@ -24,6 +24,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /** IF-API-79·80 초안 입력. 자식 ID는 수정 시에만 동일 정책 소유인지 확인한 뒤 사용한다. */
@@ -122,8 +123,14 @@ public record PolicyDraft(
             @NotBlank String ref,
             @NotBlank @Size(max = 200) String title,
             @Size(max = 2000) String explanation,
-            @Size(max = 500) String url
+            @Size(max = 500) String url,
+            @Schema(description = "근거 상태 태그. 현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수, 기본 []")
+            List<@NotBlank String> statusTags
     ) {
+        public SourceDetailDraft {
+            statusTags = statusTags == null ? List.of() : List.copyOf(new LinkedHashSet<>(statusTags));
+        }
+
         @JsonAnySetter
         public void rejectUnknownField(String name, Object value) {
             throw unknownField(name);

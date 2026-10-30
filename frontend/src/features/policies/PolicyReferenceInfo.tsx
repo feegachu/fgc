@@ -1,3 +1,4 @@
+import { StatusBadge } from '../../components/StatusBadge'
 import { QueryState } from '../reference/ReferenceUI'
 import { usePolicyDetail } from './api'
 
@@ -20,6 +21,15 @@ export function PolicyReferenceInfo({ policyVersionId, refText }: { policyVersio
       {reference.registryTitle ? (
         <p className="policy-reference-registry">
           규제조문표 · <strong>{reference.registryTitle}</strong>
+        </p>
+      ) : null}
+      {reference.statusTags?.length ? (
+        <p className="policy-reference-tags" aria-label="근거 상태">
+          {reference.statusTags.map((tag) => (
+            <StatusBadge key={tag} tone="info">
+              {tag}
+            </StatusBadge>
+          ))}
         </p>
       ) : null}
       {reference.detailTitle ? (

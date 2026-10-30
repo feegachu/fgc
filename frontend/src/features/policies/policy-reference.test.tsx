@@ -13,6 +13,7 @@ const references = [
     detailTitle: '유지관리 월 상한',
     explanation: '계약체결비용의 0.8% 이내',
     url: 'https://www.law.go.kr/a',
+    statusTags: ['현행규정', 'FAQ'],
   },
   {
     ref: 'REG-05',
@@ -50,6 +51,7 @@ it('shows the registry title and the detail stored on that policy version with a
   expect(await screen.findByText('유지관리수수료')).toBeInTheDocument()
   expect(screen.getByText('유지관리 월 상한')).toBeInTheDocument()
   expect(screen.getByText('계약체결비용의 0.8% 이내')).toBeInTheDocument()
+  expect(screen.getByLabelText('근거 상태')).toHaveTextContent('현행규정FAQ')
   const link = screen.getByRole('link', { name: '근거 원문 열기' })
   expect(link).toHaveAttribute('href', 'https://www.law.go.kr/a')
   expect(link).toHaveAttribute('target', '_blank')

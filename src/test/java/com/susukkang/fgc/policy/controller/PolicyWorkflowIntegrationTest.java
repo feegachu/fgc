@@ -612,6 +612,35 @@ class PolicyWorkflowIntegrationTest {
         assertThat(source.path("detailTitle").asText()).isEqualTo("승인된 근거 연결");
         assertThat(source.path("explanation").asText()).isEqualTo("정책 등록과 복제에서 근거를 보존한다.");
         assertThat(source.path("url").asText()).isEqualTo("https://example.com/policy-evidence");
+        assertThat(values(regulation.path("statusTags"))).isEmpty();
+    }
+
+    @Test
+    void storesSourceStatusTagsAndKeepsThemThroughEditAndNewVersion() throws Exception {
+        ObjectNode tagged = draft();
+        ((ObjectNode) tagged.withArray("sourceDetails").get(0)).putArray("statusTags").add("현행규정").add("FAQ").add("FAQ");
+        JsonNode created = create(tagged, writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode saved = detail(id, writer);
+        assertThat(values(saved.path("editDocument").path("sourceDetails").get(0).path("statusTags")))
+                .containsExactly("현행규정", "FAQ");
+        JsonNode source = StreamSupport.stream(saved.path("references").spliterator(), false)
+                .filter(row -> row.path("code").asText().equals("SRC-022")).findFirst().orElseThrow();
+        assertThat(values(source.path("statusTags"))).containsExactly("현행규정", "FAQ");
+
+        ObjectNode unknown = draft();
+        ((ObjectNode) unknown.withArray("sourceDetails").get(0)).putArray("statusTags").add("보도자료");
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", unknown, writer, key(), 400).path("field").asText())
+                .isEqualTo("sourceDetails[0].statusTags");
+
+        // 새 버전은 승인본에서만 만들 수 있다. 승인본의 태그는 DRAFT 전용 트리거로 바꿀 수 없고 복제본이 이어받는다.
+        JsonNode review = action(id, "SUBMIT", created, writer, 200);
+        action(id, "APPROVE", review, approver, 200);
+        JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2000-06-01"), writer, key(), 201);
+        assertThat(values(detail(clone.path("policyVersionId").asLong(), writer)
+                .path("editDocument").path("sourceDetails").get(0).path("statusTags")))
+                .containsExactly("현행규정", "FAQ");
     }
 
     @Test

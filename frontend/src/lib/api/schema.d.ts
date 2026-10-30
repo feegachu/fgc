@@ -3741,6 +3741,8 @@ export interface components {
             ref?: string;
             /** @description 근거 코드 레지스트리 항목명. 미등록·SRC는 null일 수 있음 */
             registryTitle?: string | null;
+            /** @description 이 정책버전에 저장된 근거 상태 태그. 상세가 없으면 [] */
+            statusTags?: string[];
             /** @description 검증된 http(s) 링크 */
             url?: string | null;
         };
@@ -4291,6 +4293,8 @@ export interface components {
         SourceDetailDraft: {
             explanation?: string;
             ref: string;
+            /** @description 근거 상태 태그. 현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수, 기본 [] */
+            statusTags?: string[];
             title: string;
             url?: string;
         };

@@ -113,7 +113,8 @@ public class PolicyQueryService {
         PolicyDraft.SourceDetailDraft detail = details.get(ref);
         return new PolicyReferenceResponse(ref, code, group, code == null ? null : titles.get(code),
                 detail == null ? null : detail.title(), detail == null ? null : detail.explanation(),
-                detail == null || detail.url() == null || detail.url().isBlank() ? null : detail.url());
+                detail == null || detail.url() == null || detail.url().isBlank() ? null : detail.url(),
+                detail == null ? List.of() : detail.statusTags());
     }
 
     private Map<Long, String> findUserLogins(List<PolicyVersion> policies) {

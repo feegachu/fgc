@@ -93,4 +93,11 @@ INSERT INTO policy_reference (ref_code, ref_kind, title) VALUES
     ('SRC-065', 'SRC', NULL),
     ('SRC-066', 'SRC', NULL);
 
+-- 정책버전별 근거 상태 태그(FUN-016 인수조건: REG/SRC 근거·상태 태그 조회).
+-- 허용 값은 요구사항의 현행규정·개정고시·시행세칙·FAQ·회사정책이다. 기존 DRAFT 전용 트리거가 승인본 변경을 막는다.
+ALTER TABLE policy_source_detail ADD COLUMN status_tags text[] NOT NULL DEFAULT '{}'
+    CONSTRAINT ck_policy_source_detail_status_tags
+    CHECK (status_tags <@ ARRAY['현행규정', '개정고시', '시행세칙', 'FAQ', '회사정책']::text[]);
+COMMENT ON COLUMN policy_source_detail.status_tags IS 'FUN-016 근거 상태 태그. 현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수 선택';
+
 COMMENT ON TABLE policy_reference IS 'FUN-016 정책 근거 코드 레지스트리. REG 항목명은 규제조문표 기준, SRC 제목은 저장소 밖 근거대장이 정본이라 비워 둠';

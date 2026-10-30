@@ -5778,6 +5778,13 @@
             "description" : "근거 코드 레지스트리 항목명. 미등록·SRC는 null일 수 있음",
             "type" : [ "string", "null" ]
           },
+          "statusTags" : {
+            "description" : "이 정책버전에 저장된 근거 상태 태그. 상세가 없으면 []",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
           "url" : {
             "description" : "검증된 http(s) 링크",
             "type" : [ "string", "null" ]
@@ -6860,6 +6867,14 @@
           "ref" : {
             "minLength" : 1,
             "type" : "string"
+          },
+          "statusTags" : {
+            "description" : "근거 상태 태그. 현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수, 기본 []",
+            "items" : {
+              "minLength" : 1,
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "title" : {
             "maxLength" : 200,

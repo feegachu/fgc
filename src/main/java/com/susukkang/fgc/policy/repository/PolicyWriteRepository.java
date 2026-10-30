@@ -230,9 +230,10 @@ public class PolicyWriteRepository {
         jdbc.update("DELETE FROM fgc.policy_source_detail WHERE policy_version_id = ?", id);
         for (PolicyDraft.SourceDetailDraft source : draft.sourceDetails()) {
             jdbc.update("""
-                    INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url)
-                    VALUES (?, ?, ?, ?, ?)
-                    """, id, source.ref(), source.title(), source.explanation(), source.url());
+                    INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url, status_tags)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, id, source.ref(), source.title(), source.explanation(), source.url(),
+                    source.statusTags().toArray(String[]::new));
         }
     }
 
@@ -367,7 +368,7 @@ public class PolicyWriteRepository {
         document.put("regulationRefs", policy.getRegulationRefs());
         document.put("sourceRefs", policy.getSourceRefs());
         document.put("expectedUpdatedAt", policy.getUpdatedAt());
-        document.put("sourceDetails", rows("SELECT ref, title, explanation, url FROM fgc.policy_source_detail WHERE policy_version_id = ? ORDER BY ref", id));
+        document.put("sourceDetails", rows("SELECT ref, title, explanation, url, status_tags FROM fgc.policy_source_detail WHERE policy_version_id = ? ORDER BY ref", id));
         document.put("commissionRules", rows("""
                 SELECT commission_rule_id, payment_stage, insurer_id, product_offering_id, organization_id,
                        agent_rank_code, commission_item_id, fee_component_type, installment_from, installment_to,
@@ -460,8 +461,8 @@ public class PolicyWriteRepository {
                 SELECT ?, parameter_key, parameter_value, description FROM fgc.policy_parameter WHERE policy_version_id = ?
                 """, targetId, sourceId);
         jdbc.update("""
-                INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url)
-                SELECT ?, ref, title, explanation, url FROM fgc.policy_source_detail WHERE policy_version_id = ?
+                INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url, status_tags)
+                SELECT ?, ref, title, explanation, url, status_tags FROM fgc.policy_source_detail WHERE policy_version_id = ?
                 """, targetId, sourceId);
         for (Long oldFeeId : jdbc.queryForList("SELECT fee_regime_ruleset_id FROM fgc.fee_regime_ruleset WHERE policy_version_id = ? ORDER BY fee_regime_ruleset_id", Long.class, sourceId)) {
             Long newFeeId = jdbc.queryForObject("""
