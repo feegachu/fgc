@@ -43,6 +43,7 @@ class ArbitragePersistenceComparisonTest {
     @Autowired com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     @Autowired com.susukkang.fgc.audit.service.AuditLogService auditLogService;
     @Autowired com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService applicabilityPolicyService;
+    @Autowired com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService candidateCaptureService;
     private ArbitrageJdbcBaseline baseline;
 
     @BeforeEach
@@ -171,7 +172,12 @@ class ArbitragePersistenceComparisonTest {
         var oldService = new com.susukkang.fgc.arbitrage.baseline.ArbitrageBaselineService(
                 baseline, createService, oldRunMapper, exceptionRepository, objectMapper, auditLogService, applicabilityPolicyService);
         Long batchRunId = insertRun();
-        Supplier<?> oldBatch = () -> oldService.checkInExistingRun(batchRunId, contractId, date);
+        // #668의 새 업무(후보 관측)를 양쪽에 동일하게 포함해 영속성 구현의 실행 수를 비교한다.
+        Supplier<?> oldBatch = () -> {
+            var result = oldService.checkInExistingRun(batchRunId, contractId, date);
+            candidateCaptureService.captureArbitrageResult(result.getArbitrageCheckId());
+            return result;
+        };
         Supplier<?> newBatch = () -> service.checkInExistingRun(batchRunId, contractId, date);
         int batchSql = measure(oldBatch).sqlCount();
         compare("contract-processing", oldBatch, newBatch, batchSql);
