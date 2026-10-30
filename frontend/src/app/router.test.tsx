@@ -89,11 +89,12 @@ describe('AppShell·라우트', () => {
       const labels = [...screen.getByRole('navigation', { name: '주요 업무 메뉴' }).querySelectorAll('a')].map(
         (link) => link.querySelector('.sidebar-nav-label')?.textContent ?? link.textContent,
       )
-      expect(labels.slice(0, 12)).toEqual([
+      expect(labels.slice(0, 13)).toEqual([
         '업무 대시보드',
         '보험계약',
         '수수료 지급',
         '예상 스케줄',
+        '환수 검토·계산',
         '1,200% 한도 검증',
         '차익거래 검증',
         '월 통합검증',
