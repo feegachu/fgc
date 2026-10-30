@@ -29,11 +29,12 @@ export function serializePolicyDraft(draft: DraftDocument) {
     basicDocumentVersion: nullable(draft.basicDocumentVersion),
     regulationRefs: cleanRefs(draft.regulationRefs),
     sourceRefs: cleanRefs(draft.sourceRefs),
-    sourceDetails: draft.sourceDetails.map(({ ref, title, explanation, url }) => ({
+    sourceDetails: draft.sourceDetails.map(({ ref, title, explanation, url, statusTags }) => ({
       ref: ref.trim(),
       title,
       explanation: nullable(explanation),
       url: nullable(url),
+      statusTags: [...new Set(statusTags ?? [])],
     })),
     commissionRules: draft.commissionRules.map((rule) => ({
       commissionRuleId: rule.commissionRuleId,
@@ -133,6 +134,7 @@ export function normalizePolicyDetail(detail: PolicyDetailResponse | ManagedPoli
             ...source,
             explanation: source.explanation ?? '',
             url: source.url ?? null,
+            statusTags: source.statusTags ?? [],
           })),
           commissionRules: draft.commissionRules.map((rule) => ({
             ...rule,

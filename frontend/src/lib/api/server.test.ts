@@ -133,7 +133,8 @@ describe.skipIf(!origin)('실제 JWT 서버 연동', () => {
       const detail = await read(created.policyVersionId)
       expect(detail.editDocument?.basicDocumentVersion).toBe('')
       expect(detail.editDocument?.sourceDetails[0]).toMatchObject({ ref: 'SRC-022', explanation: '', url: null })
-      expect(detail.editDocument?.sourceDetails[0]).not.toHaveProperty('statusTags')
+      // FUN-016(#718): 근거 상태 태그를 저장·조회한다(이전에는 버려졌다).
+      expect(detail.editDocument?.sourceDetails[0]).toMatchObject({ statusTags: ['회사정책'] })
       expect(detail.updatedAt).toBe(detail.editDocument?.expectedUpdatedAt)
       expect(detail.allowedActions).toContain('SUBMIT')
       const updated = await savePolicyDraft(

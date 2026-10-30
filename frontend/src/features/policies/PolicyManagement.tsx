@@ -24,6 +24,8 @@ import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
 import { performPolicyAction } from './writeApi'
 import { usePolicyRequest } from './usePolicyRequest'
+import type { components } from '../../lib/api/schema'
+type OfferingGovernance = components['schemas']['PolicyOfferingGovernanceResponse']
 
 const tones: Record<string, StatusTone> = {
   DRAFT: 'warning',
@@ -66,7 +68,8 @@ export function PolicyManagement({
   const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
   const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
   const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
-  const successorRef = detail.approvalActions?.find((entry) => entry.actionType === 'RETIRE')
+  const successorRef = detail.approvalActions
+    ?.find((entry) => entry.actionType === 'RETIRE')
     ?.evidenceRefs?.find((ref) => /^policy:\d+$/.test(ref))
   const refs = [
     ...new Set([...(policy.regulationRefs ?? []), ...(detail.sourceRefs ?? []), ...(draft?.sourceRefs ?? [])]),
@@ -113,7 +116,8 @@ export function PolicyManagement({
           <div>
             <dt>계약일 적용 기간</dt>
             <dd>
-              {date(detail.applicationPeriod.from)} ~ {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
+              {date(detail.applicationPeriod.from)} ~{' '}
+              {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
               {detail.applicationPeriod.successorPolicyVersionId && <small>이후 계약은 후속 버전 적용</small>}
             </dd>
           </div>
@@ -197,7 +201,9 @@ export function PolicyManagement({
       >
         {panel === 'rules' &&
           (draft ? <DraftRuleSummary draft={draft} detail={detail} /> : <ReadOnlyRuleSummary detail={detail} />)}
-        {panel === 'sources' && <PolicySources sources={sources} refs={refs} />}
+        {panel === 'sources' && (
+          <PolicySources sources={sources} refs={refs} offerings={detail.productOfferings ?? []} />
+        )}
         {panel === 'history' && (
           <>
             <div className="policy-section-heading">
@@ -264,7 +270,15 @@ export function PolicyManagement({
     </div>
   )
 }
-export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs: string[] }) {
+export function PolicySources({
+  sources,
+  refs,
+  offerings = [],
+}: {
+  sources: SourceDetail[]
+  refs: string[]
+  offerings?: OfferingGovernance[]
+}) {
   const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref))
   return (
     <div className="policy-sources">
@@ -306,8 +320,42 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
           </div>
         </article>
       ))}
+      {offerings.length > 0 && <OfferingGovernanceList offerings={offerings} />}
     </div>
   )
+}
+/** FUN-016 상품위원회 메타데이터. 판매버전에 저장된 참조정보이며 법정 심의·의결을 대체하지 않는다. */
+function OfferingGovernanceList({ offerings }: { offerings: OfferingGovernance[] }) {
+  return (
+    <section className="policy-offering-governance" aria-label="상품위원회 정보">
+      <div className="policy-section-heading">
+        <h3>상품위원회 정보</h3>
+        <span>{offerings.length}건</span>
+      </div>
+      <dl className="policy-offering-list">
+        {offerings.map((offering) => (
+          <div key={offering.productOfferingId} className="policy-offering-row">
+            <dt>
+              {offering.productName} · {offering.offeringVersion}
+            </dt>
+            <dd>
+              승인일 {offering.committeeApprovalDate ? date(offering.committeeApprovalDate) : '미등록'} · 승인문서{' '}
+              {offering.committeeDocumentRef || '미등록'} · 기초서류 {offering.basicDocumentVersion} · 판매개시{' '}
+              {date(offering.salesStartDate)}
+              {offering.salesEndDate ? ` ~ ${date(offering.salesEndDate)}` : ''} · 판매 상태{' '}
+              {governanceLabels[offering.governanceStatus ?? ''] ?? '미등록'}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+const governanceLabels: Record<string, string> = {
+  APPROVED: '판매',
+  REVISED: '개정',
+  SUSPENDED: '판매보류',
+  STOPPED: '판매중지',
 }
 function SourceStatusTags({ tags }: { tags?: string[] }) {
   const labels = [...new Set(tags?.map((tag) => tag.trim()).filter(Boolean))]
