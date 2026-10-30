@@ -325,7 +325,8 @@ export function PolicyDraftEditor({
             <>
               <p className="policy-section-description">
                 지급 대상과 회차별 계산 방식을 설정합니다. 요율은 100%를 초과해 입력할 수 있습니다.
-                {installment && ' 상품 판매버전을 지정하면 해당 버전의 판매개시일·기초서류에 맞는 분급 룰셋을 적용합니다.'}
+                {installment &&
+                  ' 상품 판매버전을 지정하면 해당 버전의 판매개시일·기초서류에 맞는 분급 룰셋을 적용합니다.'}
               </p>
               {draft.commissionRules.map((rule, index) => (
                 <CommissionRow
@@ -371,8 +372,8 @@ export function PolicyDraftEditor({
                   : '7년 분급은 최대 84회차입니다. 장기유지 구간은 확정된 근거에 따라 직접 입력하세요.'}
               </div>
               <p className="policy-section-description">
-                최대 회차는 체계의 상한입니다. 실제 지급 회차·월 요율·월 동일 금액은 수수료 규칙에서 설정합니다.
-                정책 설정과 승인은 예정 스케줄의 지급 확정을 뜻하지 않습니다.
+                최대 회차는 체계의 상한입니다. 실제 지급 회차·월 요율·월 동일 금액은 수수료 규칙에서 설정합니다. 정책
+                설정과 승인은 예정 스케줄의 지급 확정을 뜻하지 않습니다.
               </p>
               {draft.feeRegimeRules.map((rule, index) => {
                 const prefix = `feeRegimeRules.${index}.`
@@ -719,9 +720,8 @@ export function PolicyDraftEditor({
                           onChange={(e) => update({ explanation: e.target.value })}
                         />
                       </Field>
-                      <fieldset disabled={!preview} className="policy-span-all policy-source-status-options">
+                      <fieldset className="policy-span-all policy-source-status-options">
                         <legend>근거 상태 (복수 선택)</legend>
-                        {!preview && <p className="policy-note">근거 상태 분류는 아직 저장할 수 없습니다.</p>}
                         {[...new Set([...sourceStatusTags, ...(source.statusTags ?? [])])].map((tag) => (
                           <label key={tag} className="policy-checkbox">
                             <input
