@@ -251,6 +251,8 @@ public enum FgcErrorCode {
             "error.common.idempotencyConflict"),
     IMPL_REQUEST_IN_PROGRESS("FGC-IMPL-REQUEST_IN_PROGRESS", HttpStatus.CONFLICT,
             "error.common.requestInProgress"),
+    IMPL_STATE_CHANGED("FGC-IMPL-STATE_CHANGED", HttpStatus.CONFLICT, "error.common.stateChanged"),
+    IMPL_POLICY_MISSING("FGC-IMPL-POLICY_MISSING", HttpStatus.UNPROCESSABLE_ENTITY, "error.common.policyMissing"),
 
     COMMON_002(
             "FGC-COMMON-002",

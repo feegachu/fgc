@@ -150,7 +150,9 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
           <Amount value={c.paidAmount} /> · <Amount value={c.unpaidAmount} />
         </Row>
         <Row label="경과월">
-          {detail.elapsedMonths == null ? '자료 없음 (산정 기준 미확정)' : `${int(detail.elapsedMonths)}개월`}
+          {detail.elapsedMonths == null
+            ? '계산 불가 (사건 기준일이 계약일보다 앞섬)'
+            : `${int(detail.elapsedMonths)}개월`}
         </Row>
         {/* 서버의 policyVersionId는 후보가 하나일 때 채워 주는 값이지 적용 선택 결과가 아니다(인터페이스 §4-4-5). */}
         <Row label="정책 후보">
@@ -221,12 +223,14 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
             : '저장된 계산판이 없습니다.'}
         </p>
         <div className="claw-calculation-actions">
-          <Button disabled={!canCalculate}>환수액 계산</Button>
-          {!canCalculate ? (
-            <p className="field-helper">
-              환수 산정 기준(D-02)이 확정되고 계산 API가 연결된 뒤 서버가 허용한 후보만 계산할 수 있습니다.
-            </p>
-          ) : null}
+          {/* 계산 API(IF-API-85)는 있지만 정책 선택·사유 입력·결과표 화면은 #629 후속에서 연결한다.
+              그 전에는 서버가 CALCULATE를 허용해도 눌러도 아무 일이 없는 버튼을 켜지 않는다. */}
+          <Button disabled>환수액 계산</Button>
+          <p className="field-helper">
+            {canCalculate
+              ? '계산할 수 있는 후보입니다. 정책 선택·사유 입력 화면은 후속 작업에서 연결합니다.'
+              : '서버가 계산을 허용한 후보만 계산할 수 있습니다. 위 검토 사유를 확인하세요.'}
+          </p>
         </div>
       </section>
     </>
