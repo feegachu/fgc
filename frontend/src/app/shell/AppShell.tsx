@@ -12,6 +12,8 @@ import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { AssistantDemoMount } from '../../features/assistant/PicoAssistant'
+import { WorkspaceGuide } from '../../features/assistant/WorkspaceGuide'
+import { DraftNavigationGuard } from './DraftNavigationGuard'
 import { AgentTopbar } from './AgentTopbar'
 import './agent-theme.css'
 export interface ShellContext {
@@ -95,7 +97,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
                   value={month}
                   openTabCount={tabs.length}
                   onApply={(next) => {
-                    useWorkspaceStore.getState().applyMonth(next)
                     return navigate(withMonth(location.pathname + location.search + location.hash, next))
                   }}
                 />
@@ -103,7 +104,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             </div>
           </div>
         </header>
-        <main id="main-content" data-guide-page={current?.id} className="app-main" tabIndex={-1}>
+        <main id="main-content" data-guide-page={current?.id} data-guide-pathname={location.pathname} className="app-main" tabIndex={-1}>
           <div className="page-content">
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
@@ -111,6 +112,8 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
       </div>
       <AssistantDemoMount user={user} loggingOut={loggingOut} />
+      {!loggingOut && <WorkspaceGuide user={user} />}
+      <DraftNavigationGuard />
     </div>
   )
 }

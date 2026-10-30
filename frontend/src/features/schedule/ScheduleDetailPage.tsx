@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useLocation } from 'react-router'
@@ -430,8 +431,9 @@ function ScheduleDetailView({ id }: { id: string }) {
       <RegenerateModal
         open={regenerateOpen}
         onClose={() => setRegenerateOpen(false)}
-        onSubmit={async (reason) => {
+        onSubmit={async (reason, committed) => {
           const result = await regenerateSchedule(id, reason)
+          committed()
           void client.invalidateQueries({ queryKey: ['schedules'] })
           setRegenerateOpen(false)
           toast('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.', 'success', 3500)
@@ -658,13 +660,14 @@ function RegenerateModal({
 }: {
   open: boolean
   onClose: () => void
-  onSubmit: (reason: string) => Promise<void>
+  onSubmit: (reason: string, committed: () => void) => Promise<void>
 }) {
   const input = useRef<HTMLTextAreaElement>(null)
   const [reason, setReason] = useState('')
+  const clearUnsaved = useUnsavedWork(open && Boolean(reason), reason)
   const [error, setError] = useState('')
   const mutation = useMutation({
-    mutationFn: onSubmit,
+    mutationFn: (reason: string) => onSubmit(reason, clearUnsaved),
     meta: { errorToast: false },
     onError: (caught) => {
       // 서버 검증(@NotBlank·@Size)이 사유 필드를 지목하면 Toast 가 아니라 필드 옆에 둔다(가이드 §11).
