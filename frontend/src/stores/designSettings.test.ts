@@ -53,6 +53,7 @@ it('이전 설정을 유지하면서 새 항목은 기본값으로 채우고 잘
       badgeOpacity: '0.2',
       buttonColor: 'url(example)',
       tabStyle: 'unknown',
+      tableHeaderLineOpacity: 1.01,
     }),
   )
   expect(readDesignPreferences()).toEqual({ ...defaultDesignPreferences, kpiStyle: 'summary' })
@@ -65,6 +66,10 @@ it('이전 설정을 유지하면서 새 항목은 기본값으로 채우고 잘
     sidebarButtonColor: '#aabbcc',
     glassBlur: 24,
   })
+  for (const tableHeaderLineOpacity of [0, 0.37, 1]) {
+    useDesignSettings.getState().update({ tableHeaderLineOpacity })
+    expect(readDesignPreferences().tableHeaderLineOpacity).toBe(tableHeaderLineOpacity)
+  }
 })
 
 it('기존 역할별 색은 유지하고 사용자 배경색에 대비되는 글자색을 선택한다', () => {

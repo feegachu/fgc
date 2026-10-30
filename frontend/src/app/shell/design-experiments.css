@@ -252,12 +252,12 @@
 .app-shell[data-table-header-style='subtle'] .page-content .data-table th {
   color: #59616e;
   background: #f5f6f9;
-  border-bottom: 1px solid #e0e4eb;
+  --design-header-line-base: #e0e4eb;
 }
 .app-shell[data-table-header-style='plain'] .page-content .data-table th {
   color: #59616e;
   background: #fff;
-  border-bottom: 1px solid #e4e7ec;
+  --design-header-line-base: #e4e7ec;
 }
 .app-shell[data-table-header-style='accent'] .page-content .data-table th,
 .app-shell[data-custom-table-header='true'] .page-content .data-table th {
@@ -415,7 +415,7 @@
 .app-shell[data-table-design='glass'][data-table-header-style='current'] .page-content .data-table th {
   color: var(--design-header-text);
   background: color-mix(in srgb, var(--design-header-color) 35%, transparent);
-  border-bottom: 1px solid #ffffff99;
+  --design-header-line-base: #ffffff99;
   backdrop-filter: blur(var(--design-glass-blur)) saturate(145%);
 }
 .app-shell[data-page-header-style='glass'] .page-content .page-header {
@@ -559,4 +559,14 @@
 }
 .app-shell[data-summary-display='hidden'] .dashboard-main-grid {
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* Keep each header preset's line color and fade only its bottom border. */
+.app-shell[data-table-header-style] .page-content .data-table th {
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--design-header-line-base, var(--design-table-line, var(--color-border-default)))
+      var(--design-header-line-opacity),
+    transparent
+  );
 }

@@ -201,6 +201,15 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
             <ChoiceSetting label="상단 탭바" setting="tabStyle" />
             <ChoiceSetting label="표 컬럼 머리글" setting="tableHeaderStyle" />
             <ColorSetting label="컬럼 머리글 색상" setting="tableHeaderColor" fallback="#eef2ff" />
+            <RangeSetting
+              label="컬럼 밑줄 불투명도"
+              setting="tableHeaderLineOpacity"
+              min={0}
+              max={1}
+              step={0.01}
+              percent
+            />
+            <p>0%는 밑줄 숨김, 100%는 기존 구분선입니다.</p>
           </fieldset>
           <fieldset className="design-experiment-group">
             <legend>제목과 화면 배경</legend>
@@ -370,7 +379,7 @@ function RangeSetting({
   percent = false,
 }: {
   label: string
-  setting: 'glassOpacity' | 'glassBlur' | 'badgeOpacity'
+  setting: 'glassOpacity' | 'glassBlur' | 'badgeOpacity' | 'tableHeaderLineOpacity'
   min: number
   max: number
   step: number

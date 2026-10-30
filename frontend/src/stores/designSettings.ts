@@ -79,6 +79,7 @@ export interface DesignPreferences extends ExtraPreferences {
   buttonColor: string | null
   sidebarButtonColor: string | null
   tableHeaderColor: string | null
+  tableHeaderLineOpacity: number
   pageHeaderColor: string | null
   backgroundColor: string | null
   badgeColor: string | null
@@ -109,6 +110,7 @@ export const defaultDesignPreferences: DesignPreferences = {
   buttonColor: null,
   sidebarButtonColor: null,
   tableHeaderColor: null,
+  tableHeaderLineOpacity: 1,
   pageHeaderColor: null,
   backgroundColor: null,
   badgeColor: null,
@@ -142,7 +144,14 @@ export function readDesignPreferences(): DesignPreferences {
         accepted = candidate === null || (typeof candidate === 'string' && /^#[\da-f]{6}$/i.test(candidate))
       else if (typeof initial === 'boolean') accepted = typeof candidate === 'boolean'
       else if (typeof initial === 'number') {
-        const bounds = key === 'glassBlur' ? [0, 32] : key === 'badgeOpacity' ? [0.06, 0.4] : [0.35, 0.95]
+        const bounds =
+          key === 'glassBlur'
+            ? [0, 32]
+            : key === 'badgeOpacity'
+              ? [0.06, 0.4]
+              : key === 'tableHeaderLineOpacity'
+                ? [0, 1]
+                : [0.35, 0.95]
         accepted =
           typeof candidate === 'number' &&
           Number.isFinite(candidate) &&
@@ -240,6 +249,7 @@ export function designAppearance(preferences: DesignPreferences, isAgent: boolea
       preferences.sidebarButtonColor && sidebarUsesDarkText(preferences.sidebarButtonColor) ? '#000000' : '#ffffff',
     '--design-header-color': preferences.tableHeaderColor ?? '#eef2ff',
     '--design-header-text': sidebarUsesDarkText(preferences.tableHeaderColor ?? '#eef2ff') ? '#171717' : '#ffffff',
+    '--design-header-line-opacity': `${preferences.tableHeaderLineOpacity * 100}%`,
     '--design-title-color': preferences.pageHeaderColor ?? '#f1f5f9',
     '--design-title-text': sidebarUsesDarkText(preferences.pageHeaderColor ?? '#f1f5f9') ? '#171717' : '#ffffff',
     '--design-canvas': preferences.backgroundColor ?? undefined,

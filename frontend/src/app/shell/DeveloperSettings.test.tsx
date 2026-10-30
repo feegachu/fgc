@@ -67,12 +67,14 @@ it('독립적인 표시·색상 설정과 글래스 프리셋을 저장하고 �
   await user.selectOptions(screen.getByRole('combobox', { name: '검증 현황 요약 표시' }), 'bars')
   await user.selectOptions(screen.getByRole('combobox', { name: '상단 탭바' }), 'underline')
   await user.selectOptions(screen.getByRole('combobox', { name: '표 컬럼 머리글' }), 'plain')
+  fireEvent.change(screen.getByRole('slider', { name: '컬럼 밑줄 불투명도' }), { target: { value: '0.37' } })
   fireEvent.input(screen.getByLabelText('공통 버튼색'), { target: { value: '#112233' } })
   fireEvent.input(screen.getByLabelText('사이드바 메뉴 버튼색'), { target: { value: '#aabbcc' } })
   expect(readDesignPreferences()).toMatchObject({
     summaryDisplay: 'bars',
     tabStyle: 'underline',
     tableHeaderStyle: 'plain',
+    tableHeaderLineOpacity: 0.37,
     buttonColor: '#112233',
     sidebarButtonColor: '#aabbcc',
     sidebarColor: null,
