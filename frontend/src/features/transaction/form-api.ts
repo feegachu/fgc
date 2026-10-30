@@ -35,6 +35,7 @@ async function data<T>(path: string, options: Parameters<typeof apiClient.reques
   return response.data
 }
 const path = (id: string, suffix = '') => `/api/v1/transactions/${encodeURIComponent(id)}${suffix}`
+export const readPayment = (id: string, signal?: AbortSignal) => data<Payment>(path(id), { signal })
 export const draftQuery = (id: string | null) =>
   queryOptions({
     meta: { errorToast: false },
@@ -51,7 +52,6 @@ export const contractQuery = (id: number | undefined) =>
   })
 export const saveDraft = (id: string | null, body: PaymentPayload) =>
   data<Payment>(id ? path(id) : '/api/v1/transactions', { method: id ? 'PUT' : 'POST', body })
-export const readPayment = (id: string, signal?: AbortSignal) => data<Payment>(path(id), { signal })
 export const precheckPayment = (id: string) => data<Precheck>(path(id, '/precheck'), { method: 'POST' })
 export const confirmPayment = (id: string) =>
   data<Payment>(path(id, '/confirm'), { method: 'POST', idempotencyKey: `TRAN-CONFIRM-${id}` })
