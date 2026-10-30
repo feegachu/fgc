@@ -608,7 +608,7 @@ for (const viewport of [
     await expect(page.getByTestId('payment-guide-spotlight')).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('guide-scope.png') })
     await card.getByRole('button', { name: '확인하고 다음' }).click()
-    await card.getByRole('button', { name: '다음', exact: true }).click()
+    await expect(card.getByRole('heading', { name: '사전검증을 실행하세요' })).toBeVisible()
     expect(
       fixture.requests.filter((request) => request.method === 'POST' && request.path.includes('/transactions')),
     ).toHaveLength(0)
