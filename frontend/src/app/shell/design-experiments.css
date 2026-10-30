@@ -338,6 +338,28 @@
     inset 0 1px #ffffff80,
     0 10px 30px #31477912;
 }
+/* One frosted surface per panel: nested content must not add another white layer. */
+.app-shell[data-glass-cards='true']
+  .page-content
+  :is(.surface, .ah-panel, .ah-box, .ah-snapshot, .filter-bar)
+  :is(.surface, .kpi-card, .ah-panel, .ah-box, .ah-snapshot, .filter-bar) {
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.app-shell[data-glass-cards='true'] .page-content :is(.surface, .ah-panel, .ah-box, .ah-snapshot) .filter-bar {
+  border: 0;
+  border-radius: 0;
+}
+.app-shell[data-glass-cards='true'] .page-content .cap-react-stage {
+  border-color: #ffffff66;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.app-shell[data-glass-cards='true'] .page-content .cap-react-stage-note {
+  background: #ffffff24;
+}
 .app-shell[data-glass-cards='true'] .page-content .kpi-group {
   background: transparent;
 }
@@ -345,9 +367,17 @@
   background: #ffffff66;
   backdrop-filter: blur(var(--design-glass-blur));
 }
+.app-shell[data-glass-cards='true'][data-kpi-style='summary']
+  .page-content
+  :is(.surface, .ah-panel, .ah-box, .ah-snapshot)
+  .kpi-group {
+  background: transparent;
+  backdrop-filter: none;
+}
 .app-shell[data-glass-cards='true'][data-kpi-style='summary'] .page-content .kpi-card {
   border-radius: 0;
   background: transparent;
+  backdrop-filter: none;
   box-shadow: none;
 }
 .app-shell[data-glass-cards='true'] .app-footer {
@@ -434,6 +464,13 @@
   border-radius: 0.75rem;
   background-color: #ffffff80;
   backdrop-filter: blur(var(--design-glass-blur));
+}
+.app-shell[data-glass-cards='true'][data-field-design='glass']
+  .page-content
+  .filter-bar
+  :is(.field-control, .select-control, .textarea-control):not([aria-invalid='true']) {
+  background-color: #ffffff26;
+  backdrop-filter: none;
 }
 
 /* Badge labels and status meaning remain present across solid, soft, outline and glass styles. */

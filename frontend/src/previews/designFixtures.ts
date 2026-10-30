@@ -42,7 +42,36 @@ export function designPreviewData(url: URL): unknown {
     return {
       ...page,
       summary: { normal: 13, warning: 0, violation: 3, reviewRequired: 0 },
-      stageSummary: [],
+      stageSummary: [
+        {
+          paymentStage: 'INSURER_TO_GA',
+          paymentStageLabel: '원수사 → GA',
+          contractCount: 11,
+          limitAmountTotal: 12336000,
+          includedAmountTotal: 10868000,
+          complianceDeductionAmountTotal: 0,
+          usagePct: '88.0',
+          violationCount: 3,
+          warningCount: 0,
+          reviewRequiredCount: 0,
+          worstContractNo: 'PREVIEW-2026-001',
+          worstUsagePct: '108.3',
+        },
+        {
+          paymentStage: 'GA_TO_FC',
+          paymentStageLabel: 'GA → 설계사',
+          contractCount: 5,
+          limitAmountTotal: 6000000,
+          includedAmountTotal: 4475000,
+          complianceDeductionAmountTotal: 0,
+          usagePct: '74.5',
+          violationCount: 0,
+          warningCount: 0,
+          reviewRequiredCount: 0,
+          worstContractNo: 'PREVIEW-2026-002',
+          worstUsagePct: '74.5',
+        },
+      ],
       agentSummary: [],
     }
   if (path === '/api/v1/arbitrage-checks')
