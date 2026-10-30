@@ -58,7 +58,7 @@ public class JournalCorrectionServiceImpl implements JournalCorrectionService {
     private static final int EVIDENCE_MAX_LENGTH = 500;
     private static final int DESCRIPTION_MAX_LENGTH = 1000;
     private static final int LINE_DESCRIPTION_MAX_LENGTH = 500;
-    private static final int MAX_MONTHLY_SEQ = 9999;
+    private static final int MAX_MONTHLY_SEQ = 99_999;
     private static final BigDecimal MAX_JOURNAL_AMOUNT =
             new BigDecimal("9999999999999");
 
