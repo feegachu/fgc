@@ -17,17 +17,35 @@ public class PicoGuideCatalog {
     public record Next(String conditionId,String stepId) {}
     public record Chunk(String chunkId,String workflowId,String stepId,String title,String content) {}
     private final List<Definition> definitions;
+    private final Set<String> screenIds;
     public PicoGuideCatalog(ObjectMapper mapper) throws IOException {
-        try(var stream=new ClassPathResource("ai/pico/payment-guides.v1.json").getInputStream()) {
-            definitions=List.copyOf(mapper.readValue(stream,new TypeReference<List<Definition>>(){}));
+        try(var stream=new ClassPathResource("ai/pico/screens.generated.json").getInputStream()) {
+            List<Map<String,Object>> screens = mapper.readValue(stream,new TypeReference<>(){});
+            var ids = new HashSet<String>();
+            for (var screen : screens) ids.add((String) screen.get("id"));
+            ids.add("CMN-C04");
+            screenIds = Set.copyOf(ids);
         }
-        if (definitions.size()!=3 || definitions.stream().map(Definition::workflowId).distinct().count()!=3) throw new IllegalStateException("Invalid guide registry");
+        Set<String> featureIds;
+        try(var stream=new ClassPathResource("ai/pico/feature-targets.generated.json").getInputStream()) {
+            List<Map<String,Object>> features = mapper.readValue(stream,new TypeReference<>(){});
+            featureIds = features.stream().map(feature -> (String) feature.get("id")).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+        var loaded = new ArrayList<Definition>();
+        for (var file : List.of("payment-guides.v1.json", "workflow-guides.v1.json")) {
+            try(var stream=new ClassPathResource("ai/pico/" + file).getInputStream()) {
+                loaded.addAll(mapper.readValue(stream,new TypeReference<List<Definition>>(){}));
+            }
+        }
+        definitions = List.copyOf(loaded);
+        if (definitions.isEmpty() || definitions.stream().map(Definition::workflowId).distinct().count()!=definitions.size()) throw new IllegalStateException("Invalid guide registry");
         for (var guide:definitions) {
-            if (!Set.of("payment.amount.review","payment.draft","payment.confirm").contains(guide.workflowId()) || !"1.0".equals(guide.guideVersion()) || !guide.enabled() || !Set.of("READ","PROCESS").contains(guide.capability()) || guide.keywords()==null || guide.steps()==null || guide.steps().isEmpty()) throw new IllegalStateException("Invalid guide definition");
+            if (!guide.workflowId().matches("[a-z][a-z0-9.]+") || !"1.0".equals(guide.guideVersion()) || !guide.enabled() || !Set.of("READ","PROCESS").contains(guide.capability()) || guide.steps()==null || guide.steps().isEmpty()) throw new IllegalStateException("Invalid guide definition");
             var expectedRoles = "READ".equals(guide.capability()) ? Set.of("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE") : Set.of("SYSTEM_ADMIN", "SETTLEMENT");
-            if (guide.roles() == null || !new HashSet<>(guide.roles()).equals(expectedRoles)) throw new IllegalStateException("Invalid guide roles");
+            if (guide.roles() == null || guide.roles().isEmpty() || !Set.of("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE", "AGENT").containsAll(guide.roles()) || (guide.workflowId().startsWith("payment.") && Set.of("payment.amount.review", "payment.draft", "payment.confirm").contains(guide.workflowId()) && !new HashSet<>(guide.roles()).equals(expectedRoles))) throw new IllegalStateException("Invalid guide roles");
             var ids=new HashSet<String>();
-            for(var step:guide.steps()) if (!ids.add(step.stepId()) || !step.stepId().equals(step.targetId()) || !Set.of("payment.scope","payment.amount","payment.attributions","payment.evidence","payment.save","payment.precheck","payment.precheck.result","payment.confirm").contains(step.targetId()) || !"TRAN-W02".equals(step.screenId())) throw new IllegalStateException("Invalid guide target");
+            for(var step:guide.steps()) if (!ids.add(step.stepId()) || !screenIds.contains(step.screenId()) ||
+                    !(featureIds.contains(step.targetId()) || (step.stepId().equals(step.targetId()) && "TRAN-W02".equals(step.screenId()) && Set.of("payment.scope","payment.amount","payment.attributions","payment.evidence","payment.save","payment.precheck","payment.precheck.result","payment.confirm").contains(step.targetId())))) throw new IllegalStateException("Invalid guide target");
             for (var step : guide.steps()) {
                 if (step.next() == null) throw new IllegalStateException("Missing guide transitions");
                 boolean conditionalSave = "payment.confirm".equals(guide.workflowId()) && "payment.scope".equals(step.stepId());
@@ -42,15 +60,11 @@ public class PicoGuideCatalog {
         }
     }
     public List<Definition> definitions() { return definitions; }
-    public List<Definition> search(List<String> terms,boolean canProcess) {
-        return definitions.stream().filter(d->canProcess || "READ".equals(d.capability()))
-                .filter(d->score(d,terms)>0).sorted(Comparator.<Definition>comparingInt(d->score(d,terms)).reversed().thenComparing(Definition::workflowId)).limit(5).toList();
-    }
-    public int score(Definition guide,List<String> terms) { return (int)guide.keywords().stream().filter(terms::contains).count(); }
+    public boolean supportsScreen(String screenId) { return screenIds.contains(screenId); }
     public List<Chunk> chunks(Definition guide) {
         var chunks=new ArrayList<Chunk>();
         chunks.add(new Chunk(guide.workflowId()+":overview",guide.workflowId(),null,guide.title(),guide.description()));
         for(var step:guide.steps()) chunks.add(new Chunk(guide.workflowId()+":"+step.stepId(),guide.workflowId(),step.stepId(),step.title(),step.instruction()));
-        return List.copyOf(chunks.subList(0,Math.min(8,chunks.size())));
+        return List.copyOf(chunks);
     }
 }

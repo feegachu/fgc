@@ -5,6 +5,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import { AssistantDemoMount, PicoAssistant } from './PicoAssistant'
 import { useGuideRuntime } from './guide-runtime'
 import type { ShellUser } from '../../app/shell/Sidebar'
+import { useWorkflowGuide } from './workflow-state'
 const reply = {
   decision: 'ANSWER_ONLY',
   message: '초안 저장은 지급 확정과 구분됩니다.',
@@ -26,11 +27,13 @@ const user: ShellUser = {
   canViewAuditLog: false,
 }
 beforeEach(() => {
+  useWorkflowGuide.getState().clear()
   vi.stubEnv('VITE_ASSISTANT_AI', 'true')
   vi.stubEnv('VITE_ASSISTANT_DEMO', '')
   useGuideRuntime.setState({ session: null, observation: null })
 })
 afterEach(() => {
+  useWorkflowGuide.getState().clear()
   cleanup()
   useGuideRuntime.setState({ session: null, observation: null })
   vi.restoreAllMocks()
@@ -79,8 +82,25 @@ it('shows fixed source explicitly when model is unavailable', async () => {
   render(<PicoAssistant canProcess />)
   await open()
   await send()
-  expect(await screen.findByText('고정 가이드')).toBeInTheDocument()
+  expect(await screen.findByText('시스템 안내')).toBeInTheDocument()
   expect(screen.queryByText('AI 가이드 답변')).not.toBeInTheDocument()
+})
+it('sends the previous question and AI answer when a follow-up asks where to select', async () => {
+  const request = mockResponse()
+  render(<AssistantDemoMount user={user} />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '선택 어디서 해?')
+  await userEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+  await waitFor(() => expect(request).toHaveBeenCalledTimes(2))
+  expect(request.mock.calls[1][1]?.body).toMatchObject({
+    question: '선택 어디서 해?',
+    conversation: [
+      { role: 'USER', text: '초안 저장하면 지급 끝인가요?' },
+      { role: 'ASSISTANT', text: reply.message },
+    ],
+  })
 })
 it('locks duplicate sends and aborts/discards old response after reset', async () => {
   let finish!: (value: ReturnType<typeof envelope>) => void
@@ -316,14 +336,15 @@ it.each([
     expect(screen.getAllByRole('button', { name: /이 업무 안내 시작/ })[0]).toBeDisabled()
   },
 )
-it('explains a missing payment context instead of silently removing the guide action', async () => {
-  mockResponse()
+it('offers registered payment-screen guidance before a draft exists without requesting a financial action', async () => {
+  const request = mockResponse()
   render(<PicoAssistant canProcess />)
   await open()
   await send()
   await screen.findByText(reply.message)
-  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
-  expect(screen.getByRole('status')).toHaveTextContent('저장된 지급 초안')
+  await userEvent.click(screen.getByRole('button', { name: /지급 작성 화면에서 안내 시작/ }))
+  expect(useWorkflowGuide.getState().request?.id).toBe('payment.draft')
+  expect(request).toHaveBeenCalledTimes(1)
 })
 
 it.each([{ ready: false }, { busy: true }, { paymentId: '9007199254740993' }])(

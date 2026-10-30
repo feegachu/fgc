@@ -1,4 +1,5 @@
 import { useContext, useRef, useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { Modal } from '../../components/Modal'
@@ -44,6 +45,7 @@ export function PolicyDraftEditor({
   const [failure, setFailure] = useState('')
   const [discard, setDiscard] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const clearUnsaved = useUnsavedWork(dirty)
   const saving = useRef(false)
   const requestKey = usePolicyRequest()
   const titleFocus = useRef<HTMLInputElement>(null)
@@ -129,6 +131,8 @@ export function PolicyDraftEditor({
       const id = preview
         ? await preview.save(document, policyId)
         : (await savePolicyDraft(document, policyId, requestKey({ policyId, document }))).policyVersionId
+      setDirty(false)
+      clearUnsaved()
       onSaved(id)
     } catch (cause) {
       const message =

@@ -5,6 +5,16 @@
     "element": "a"
   },
   {
+    "id": "app.shell.draft-navigation-guard.discard",
+    "file": "app/shell/DraftNavigationGuard.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.draft-navigation-guard.keep",
+    "file": "app/shell/DraftNavigationGuard.tsx",
+    "element": "button"
+  },
+  {
     "id": "app.shell.sidebar.button",
     "file": "app/shell/Sidebar.tsx",
     "element": "button"
@@ -1870,6 +1880,61 @@
     "element": "section"
   },
   {
+    "id": "features.transaction.payment-guide.button",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-10",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-2",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-3",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-4",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-5",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-6",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-7",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-8",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-9",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.section",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "section"
+  },
+  {
     "id": "features.transaction.transaction-form-page.amount",
     "file": "features/transaction/TransactionFormPage.tsx",
     "element": "input"
@@ -1901,6 +1966,11 @@
   },
   {
     "id": "features.transaction.transaction-form-page.button-2",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.button-3",
     "file": "features/transaction/TransactionFormPage.tsx",
     "element": "Button"
   },

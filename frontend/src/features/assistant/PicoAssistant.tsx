@@ -17,6 +17,10 @@ import { useGuideRuntime } from './guide-runtime'
 import { askPico, picoPaymentReference } from './pico-api'
 import { PicoGuideStartButton } from './PicoGuideStartButton'
 import type { PicoReply } from './pico-api'
+import type { PicoTurn } from './pico-api'
+import { screenFor } from '../../app/screens'
+import { findWorkflowGuide, WORKFLOW_GUIDES } from './workflow-catalog'
+import { useWorkflowGuide } from './workflow-state'
 
 const labels: Record<PaymentScenario, string> = {
   'PAY-01': '이번 달 수수료는 얼마야?',
@@ -135,28 +139,34 @@ export function AssistantDemoMount({
   user,
   loggingOut = false,
   enabled = import.meta.env.VITE_ASSISTANT_DEMO === 'true' || import.meta.env.VITE_ASSISTANT_AI === 'true',
+  screenId,
+  screenContext,
 }: {
   user: ShellUser
   loggingOut?: boolean
   enabled?: boolean
+  screenId?: string
+  screenContext?: string
 }) {
   if (!enabled || loggingOut || !['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'].includes(user.roleCode))
     return null
-  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} />
+  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} screenId={screenId} screenContext={screenContext} />
 }
-function AssistantWithGuide({ canProcess }: { canProcess: boolean }) {
+function AssistantWithGuide({ canProcess, screenId, screenContext }: { canProcess: boolean; screenId?: string; screenContext?: string }) {
   useEffect(() => () => useGuideRuntime.getState().reset(), [])
   return (
     <>
-      <PicoAssistant canProcess={canProcess} />
+      <PicoAssistant canProcess={canProcess} screenId={screenId} screenContext={screenContext} />
       <PaymentGuideOverlay />
     </>
   )
 }
-export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
+export function PicoAssistant({ canProcess, screenId, screenContext }: { canProcess: boolean; screenId?: string; screenContext?: string }) {
   const [open, setOpen] = useState(false)
   const aiEnabled = import.meta.env.VITE_ASSISTANT_AI === 'true'
-  const syntheticEnabled = import.meta.env.VITE_ASSISTANT_DEMO === 'true' || !aiEnabled
+  const currentScreen = screenId ?? screenFor(window.location.pathname)?.id ?? 'CMN-C04'
+  const suggestions = WORKFLOW_GUIDES.filter((guide) => guide.steps.some((step) => step.screenId === currentScreen)).slice(0, 3)
+  const syntheticEnabled = !aiEnabled
   const [aiBusy, setAiBusy] = useState(false)
   const aiRequest = useRef<AbortController | null>(null)
   const aiSequence = useRef(0)
@@ -164,6 +174,9 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   const [calculationEpoch, setCalculationEpoch] = useState(0)
   const runtimeSession = useGuideRuntime((state) => state.session)
   const observed = useGuideRuntime((state) => state.observation)
+  const workflowActive = useWorkflowGuide((state) => state.active)
+  const paymentActive = useWorkflowGuide((state) => state.paymentActive)
+  const activeGuideContext = useWorkflowGuide((state) => state.guideContext)
   const guideContext = JSON.stringify([
     observed?.owner,
     observed?.paymentId,
@@ -173,6 +186,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
     observed?.precheck,
     observed?.modalOpen,
     canProcess,
+    screenContext,
   ])
   const [latestLiveQuestion, setLatestLiveQuestion] = useState<{ context: string; revision: string | null }>({
     context: guideContext,
@@ -182,7 +196,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   if (latestLiveQuestion.context !== guideContext) setLatestLiveQuestion({ context: guideContext, revision: null })
   const guideActive =
     runtimeSession != null && !['PAUSED', 'COMPLETED', 'CANCELLED', 'ERROR'].includes(runtimeSession.status)
-  const visible = open && !guideActive
+  const visible = open && !guideActive && !workflowActive && !paymentActive
   const [tab, setTab] = useState<'chat' | 'plan'>('chat')
   const [input, setInput] = useState('')
   const [pickedScenario, setPickedScenario] = useState<PaymentScenario>('PAY-02')
@@ -233,6 +247,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       observed?.precheck,
       observed?.modalOpen,
       canProcess,
+      screenContext,
     ],
   )
   function cancelAi() {
@@ -257,12 +272,25 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
     }))
     try {
       const paymentId = observed?.ready && observed.saved && !observed.busy ? observed.paymentId : null
+      const generalGuide = activeGuideContext ? findWorkflowGuide(activeGuideContext.workflowId, '1.0') : null
+      const paymentGuide = activeGuideContext ? findGuide(activeGuideContext.workflowId, '1.0') : null
+      const contextGuide = generalGuide ?? paymentGuide
+      const contextStep = contextGuide?.steps.find((step) => step.stepId === activeGuideContext?.stepId)
+      const history = conversation.entries.flatMap((entry): PicoTurn[] =>
+        entry.role === 'user'
+          ? [{ role: 'USER', text: entry.text }]
+          : entry.role === 'live' && entry.reply.source === 'AI'
+            ? [{ role: 'ASSISTANT', text: entry.reply.message! }]
+            : [],
+      ).slice(contextStep ? -5 : -6)
+      if (contextStep) history.push({ role: 'ASSISTANT', text: `화면 안내 맥락: ${contextGuide!.title} / ${contextStep.title}. ${contextStep.instruction}` })
       const reply = await askPico(
         text,
         String(sequence),
-        observed ? 'TRAN-W02' : 'CMN-C04',
+        observed ? 'TRAN-W02' : currentScreen,
         controller.signal,
         paymentId,
+        history,
       )
       if (controller.signal.aborted || sequence !== aiSequence.current) return
       setConversation((previous) => ({
@@ -487,7 +515,13 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                       지금 필요한 화면과 입력 위치를 안내할게요.
                     </p>
                     <div className="pico-suggestions">
-                      {(['PAY-02', 'PAY-01', 'PAY-07'] as const).map((scenario, index) => (
+                      {aiEnabled ? (suggestions.length ? suggestions : WORKFLOW_GUIDES.filter((guide) => guide.workflowId === 'settlement.journey')).map((guide) => (
+                        <button key={guide.workflowId} onClick={() => void sendLive(`${guide.title} 업무를 어떻게 진행하나요?`)}>
+                          <span className="pico-suggestion-icon"><Symbol name="menu_book" /></span>
+                          <span>{guide.title}<small>업무 절차와 입력 위치 안내</small></span>
+                          <Symbol name="chevron_right" />
+                        </button>
+                      )) : (['PAY-02', 'PAY-01', 'PAY-07'] as const).map((scenario, index) => (
                         <button key={scenario} onClick={() => runScenario(scenario, Date.now())}>
                           <span className="pico-suggestion-icon">
                             <Symbol name={['payments', 'description', 'edit'][index]} />
@@ -529,7 +563,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                         <div className="pico-answer-author">
                           <img src={guide} alt="피코" />
                           <b>피코</b>
-                          <span>{entry.reply.source === 'AI' ? 'AI 가이드 답변' : '고정 가이드'}</span>
+                          <span>{entry.reply.source === 'AI' ? 'AI 가이드 답변' : '시스템 안내'}</span>
                         </div>
                         <p>{entry.reply.message}</p>
                         {entry.reply.evidenceRefs?.map((source) => (
@@ -541,7 +575,17 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                         {entry.reply.decision === 'ANSWER_ONLY' &&
                           [...new Set(entry.reply.evidenceRefs?.map((source) => source.workflowId))]
                             .filter((id): id is string => Boolean(id))
-                            .map((workflowId) => (
+                            .map((workflowId) => findWorkflowGuide(workflowId, '1.0') ? (
+                              <button key={workflowId} type="button" className="button button-secondary"
+                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId); setOpen(false) }}>
+                                이 업무 안내 시작 · {findWorkflowGuide(workflowId, '1.0')?.title}
+                              </button>
+                            ) : !observed?.paymentId ? (
+                              <button key={workflowId} type="button" className="button button-secondary" disabled={!canProcess}
+                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId); setOpen(false) }}>
+                                지급 작성 화면에서 안내 시작 · {findGuide(workflowId, '1.0')?.title}
+                              </button>
+                            ) : (
                               <PicoGuideStartButton
                                 key={workflowId}
                                 workflowId={workflowId}
@@ -706,7 +750,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
             </form>
             <small>
               {aiEnabled
-                ? '승인된 지급 가이드 설명 · 실제 처리/금액 판단은 기존 화면에서 확인'
+                ? '승인된 업무 가이드 · 실제 계산과 처리는 업무 화면에서 확인'
                 : observed
                   ? '시연 질문은 합성 자료 · 저장된 지급 계산은 별도 조회 · 실제 AI 미연결'
                   : '합성 데이터 시연 · 실제 AI/계약/지급과 연결되지 않습니다.'}

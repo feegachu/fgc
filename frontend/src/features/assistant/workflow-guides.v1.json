@@ -1,0 +1,1456 @@
+[
+  {
+    "workflowId": "contract.find",
+    "guideVersion": "1.0",
+    "title": "보험계약 검색·선택",
+    "description": "보험계약 목록에서 조건을 입력하고 조회 결과에서 원하는 계약을 선택하여 상세 화면으로 이동합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/contracts",
+    "steps": [
+      {
+        "stepId": "contract.find.step.1",
+        "screenId": "CONT-W01",
+        "targetId": "features.contract.contract-list-page.input",
+        "title": "계약 검색",
+        "instruction": "보험계약 목록의 검색 조건에서 계약번호 등 찾으려는 조건을 입력합니다. 검색 조건을 바꾼 뒤 조회를 실행합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.find.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.find.step.2",
+        "screenId": "CONT-W01",
+        "targetId": "features.contract.contract-list-page.section",
+        "title": "조회 결과 확인",
+        "instruction": "검색 결과의 계약번호·설계사·계약 상태를 확인하고 원하는 계약의 상세 링크를 직접 선택합니다. 다른 계약을 임의로 선택하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "contract.register",
+    "guideVersion": "1.0",
+    "title": "보험계약 등록·수정",
+    "description": "계약의 보험회사·계약일·상품 버전·설계사·보험료·납입 조건을 입력하고 저장합니다. 기존 계약은 상세의 수정 기능을 통해 진입하며 계약 변경은 예상 스케줄에 영향을 줄 수 있습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "SETTLEMENT"
+    ],
+    "enabled": true,
+    "route": "/contracts/new",
+    "steps": [
+      {
+        "stepId": "contract.register.step.1",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.insurer-id",
+        "title": "보험회사 선택",
+        "instruction": "보험회사를 검색하여 선택합니다. 검색 입력과 목록의 실제 항목 선택은 구분됩니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.register.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.register.step.2",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.contract-date",
+        "title": "계약일 입력",
+        "instruction": "계약일을 입력합니다. 계약일에 판매 가능한 상품 버전이 조회되며 미래 계약일 등 기존 검증을 따릅니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.register.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.register.step.3",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.product-offering-id",
+        "title": "상품 버전 선택",
+        "instruction": "보험회사와 계약일에 맞는 상품 버전을 검색 결과에서 선택합니다. 판매기간과 분급 기준을 확인합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.register.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.register.step.4",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.agent-id",
+        "title": "설계사 선택",
+        "instruction": "해당 계약의 설계사를 검색한 뒤 목록의 항목을 직접 선택합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.register.step.5"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.register.step.5",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.section-2",
+        "title": "금액·납입 조건 확인",
+        "instruction": "보험료·납입 조건 등 계약 입력을 확인합니다. 계산과 필수값 판정은 기존 계약 화면이 수행합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.register.step.6"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.register.step.6",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.form",
+        "title": "저장 결과 확인",
+        "instruction": "입력을 검토하고 기존 저장 버튼을 직접 누릅니다. 서버가 오류를 반환하면 사유를 수정하며, 저장 성공 후 이동한 계약 상세에서 저장 내용을 확인합니다. 안내 확인은 저장 성공이 아닙니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "contract.detail",
+    "guideVersion": "1.0",
+    "title": "계약 상세와 관련 업무 이동",
+    "description": "계약 상세의 정보·상태와 관련 업무 탭을 확인하고 선택한 계약의 예상 스케줄 또는 지급 화면으로 이동합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/contracts/:id",
+    "steps": [
+      {
+        "stepId": "contract.detail.step.1",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-detail-page.section",
+        "title": "계약 상세 확인",
+        "instruction": "목록에서 직접 선택한 계약의 상세 내용을 확인합니다. 계약번호와 설계사 및 상태를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.detail.step.2"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.basic",
+        "title": "기본정보 탭 선택",
+        "instruction": "기본정보 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "stepId": "contract.detail.step.2",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.detail.step.3"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.basic",
+        "title": "기본정보 근거 확인",
+        "instruction": "선택한 계약의 기본정보 패널에서 조회된 대상·상태와 근거를 확인하세요. 다른 업무로 이동하려면 화면의 실제 관련 링크를 사용하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "stepId": "contract.detail.step.3",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.detail.step.4"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.schedules",
+        "title": "예상 스케줄 탭 선택",
+        "instruction": "예상 스케줄 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "stepId": "contract.detail.step.4",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.detail.step.5"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.schedules",
+        "title": "예상 스케줄 근거 확인",
+        "instruction": "선택한 계약의 예상 스케줄 패널에서 조회된 대상·상태와 근거를 확인하세요. 다른 업무로 이동하려면 화면의 실제 관련 링크를 사용하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "stepId": "contract.detail.step.5",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.detail.step.6"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.cap",
+        "title": "한도 검증 탭 선택",
+        "instruction": "한도 검증 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "stepId": "contract.detail.step.6",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.detail.step.7"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.cap",
+        "title": "한도 검증 근거 확인",
+        "instruction": "선택한 계약의 한도 검증 패널에서 조회된 대상·상태와 근거를 확인하세요. 다른 업무로 이동하려면 화면의 실제 관련 링크를 사용하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "stepId": "contract.detail.step.7",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.detail.step.8"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.arbitrage",
+        "title": "차익거래 탭 선택",
+        "instruction": "차익거래 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "stepId": "contract.detail.step.8",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.detail.step.9"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.arbitrage",
+        "title": "차익거래 근거 확인",
+        "instruction": "선택한 계약의 차익거래 패널에서 조회된 대상·상태와 근거를 확인하세요. 다른 업무로 이동하려면 화면의 실제 관련 링크를 사용하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "stepId": "contract.detail.step.9",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.detail.step.10"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.ledger",
+        "title": "원장 탭 선택",
+        "instruction": "원장 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "stepId": "contract.detail.step.10",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.detail.step.11"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.ledger",
+        "title": "원장 근거 확인",
+        "instruction": "선택한 계약의 원장 패널에서 조회된 대상·상태와 근거를 확인하세요. 다른 업무로 이동하려면 화면의 실제 관련 링크를 사용하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "stepId": "contract.detail.step.11",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.detail.step.12"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.payment",
+        "title": "지급·대사 탭 선택",
+        "instruction": "지급·대사 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "stepId": "contract.detail.step.12",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.detail.step.13"
+          }
+        ]
+      },
+      {
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.payment",
+        "title": "지급·대사 근거 확인",
+        "instruction": "선택한 계약의 지급·대사 패널에서 조회된 대상·상태와 근거를 확인하세요. 다른 업무로 이동하려면 화면의 실제 관련 링크를 사용하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "stepId": "contract.detail.step.13",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "schedule.find",
+    "guideVersion": "1.0",
+    "title": "예상 스케줄 조회",
+    "description": "예상 스케줄을 검색하고 상세에서 지급 예정 회차·금액·규칙 및 상태를 확인합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/schedules",
+    "steps": [
+      {
+        "stepId": "schedule.find.step.1",
+        "screenId": "SCHE-W01",
+        "targetId": "features.schedule.schedule-list-page.input",
+        "title": "스케줄 검색",
+        "instruction": "계약과 상태 등 필요한 검색 조건을 입력합니다. 기준월과 화면 필터를 함께 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "schedule.find.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "schedule.find.step.2",
+        "screenId": "SCHE-W01",
+        "targetId": "features.schedule.schedule-list-page.section",
+        "title": "스케줄 선택",
+        "instruction": "조회 결과의 계약과 스케줄을 확인한 뒤 원하는 행의 상세 링크를 선택합니다. 예정 금액은 실제 지급과 구분됩니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "schedule.detail",
+    "guideVersion": "1.0",
+    "title": "예상 스케줄 상세·재생성",
+    "description": "선택한 예상 스케줄의 적용 규칙과 회차별 계산 결과를 조회합니다. 재생성은 기존 화면의 권한·사유·서버 결과에 따릅니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/schedules/:id",
+    "steps": [
+      {
+        "stepId": "schedule.detail.step.1",
+        "screenId": "SCHE-W02",
+        "targetId": "features.schedule.schedule-detail-page.section",
+        "title": "적용 규칙 확인",
+        "instruction": "선택한 스케줄의 계약·정책·적용 기간과 지급 단계를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "schedule.detail.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "schedule.detail.step.2",
+        "screenId": "SCHE-W02",
+        "targetId": "features.schedule.schedule-detail-page.table",
+        "title": "회차와 예상액 확인",
+        "instruction": "회차별 예정일·항목·예상 금액과 상태를 확인합니다. 예상액은 프로그램이 계산한 결과이며 AI가 새 금액을 만들지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "schedule.detail.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "schedule.detail.step.3",
+        "screenId": "SCHE-W02",
+        "targetId": "features.schedule.schedule-detail-page.regenerate-reason",
+        "title": "재생성 사유 입력",
+        "instruction": "재생성이 필요한 경우 기존 재생성 기능을 열고 사유를 입력합니다. 권한이나 상태로 기능이 없으면 기존 오류/안내를 확인하고 이 단계는 중단합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "schedule.detail.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "schedule.detail.step.4",
+        "screenId": "SCHE-W02",
+        "targetId": "features.schedule.schedule-detail-page.section",
+        "title": "재생성 결과 재조회",
+        "instruction": "기존 확인 버튼을 직접 누른 뒤 서버 처리 결과를 확인합니다. 상세를 다시 조회하여 회차와 적용 규칙을 확인하며 안내 종료를 재생성 성공으로 취급하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "payment.find",
+    "guideVersion": "1.0",
+    "title": "수수료 지급 목록·정정 대상 찾기",
+    "description": "지급 목록에서 계약·월·수취인·단계와 지급 상태를 확인하고 초안 수정 또는 확정 건 정정 업무의 대상을 고릅니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/transactions",
+    "steps": [
+      {
+        "stepId": "payment.find.step.1",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction.transaction-list-page.f-month",
+        "title": "지급월 확인",
+        "instruction": "지급 목록의 정산월과 상태 등 검색 조건을 설정한 뒤 조회합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "payment.find.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.find.step.2",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction.transaction-list-page.f-contract-no",
+        "title": "계약번호 검색",
+        "instruction": "계약번호로 대상을 좁힙니다. 계약과 지급 단계·수취인·금액·상태가 처리하려는 대상과 맞는지 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "payment.find.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "payment.find.step.3",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction.transaction-list-page.section",
+        "title": "지급 상세 선택",
+        "instruction": "조회 결과에서 원하는 지급 건을 직접 선택합니다. 초안 수정과 확정 건의 취소·정정 절차를 구분합니다. 지급을 추가 등록해 차액을 보정하기 전에 중복 지급 여부를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "base.lookup",
+    "guideVersion": "1.0",
+    "title": "기준정보 조회",
+    "description": "기준정보의 종류·검색 조건과 적용일을 선택하여 등록된 기준정보를 조회합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/base",
+    "steps": [
+      {
+        "stepId": "base.lookup.step.1",
+        "screenId": "BASE-W01",
+        "targetId": "features.base.base-page.select",
+        "title": "기준정보 종류 선택",
+        "instruction": "보험회사·상품·설계사 등 확인하려는 기준정보 종류를 선택합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "base.lookup.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "base.lookup.step.2",
+        "screenId": "BASE-W01",
+        "targetId": "features.base.base-page.input",
+        "title": "조건 입력",
+        "instruction": "검색어와 적용일 등 화면에서 제공하는 조건을 입력하고 조회 결과를 확인합니다. 검색 결과와 적용 기간을 업무 입력의 기준으로 사용합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "policy.review",
+    "guideVersion": "1.0",
+    "title": "정책·룰셋 조회와 선택",
+    "description": "정책 버전 선택은 정책 목록의 행 선택 항목에서 수행합니다. 기준일과 적용 기간·상태를 확인한 뒤 선택 정책 관리 또는 세부 룰셋 탭으로 이동합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/policies",
+    "steps": [
+      {
+        "stepId": "policy.review.step.1",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policies-page.input",
+        "title": "정책 기준일 설정",
+        "instruction": "정책을 확인할 기준일을 선택합니다. 기준일에 해당하는 버전과 유효기간을 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "policy.review.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "policy.review.step.2",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policies-page.policy-version",
+        "title": "정책 버전 선택",
+        "instruction": "정책 버전 목록에서 원하는 행의 선택 항목을 직접 누릅니다. 선택한 버전의 상태와 적용 기간을 확인합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "policy.review.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "policy.review.step.3",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policies-page.button-6",
+        "title": "선택 정책 관리로 이동",
+        "instruction": "선택 정책 관리 버튼으로 상세 관리 영역을 엽니다. 수수료 규칙·한도 룰셋·환급률표와 분급 규칙을 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "policy.lifecycle",
+    "guideVersion": "1.0",
+    "title": "정책 초안·제출·승인 관리",
+    "description": "정책 상태에 따라 초안 작성·수정·제출·승인·반려·활성화 등 허용된 동작을 수행합니다. 화면에 보이지 않거나 비활성화된 동작은 실행할 수 없습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/policies",
+    "steps": [
+      {
+        "stepId": "policy.lifecycle.step.1",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-management.button",
+        "title": "초안 수정",
+        "instruction": "정책 목록에서 버전을 선택하고 선택 정책 관리로 이동합니다. 수정 가능한 초안일 때 초안 수정 버튼으로 기존 편집 화면을 엽니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "policy.lifecycle.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "policy.lifecycle.step.2",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-management.section",
+        "title": "수수료 규칙 검토",
+        "instruction": "수수료 규칙과 한도·환급률·분급 기준을 검토합니다. 정책 수치 변경과 계산은 기존 편집기와 검증에 따릅니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "policy.lifecycle.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "policy.lifecycle.step.3",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-management.button-2",
+        "title": "허용된 상태 동작 선택",
+        "instruction": "현재 상태와 권한에 따라 보이는 제출·승인·반려·활성화 등의 기존 버튼을 직접 선택합니다. 작성자 본인 승인 금지 등 기존 제약을 따릅니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "policy.lifecycle.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "policy.lifecycle.step.4",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-management.textarea",
+        "title": "사유와 근거 확인",
+        "instruction": "열린 확인 창에서 사유 및 요구된 근거를 입력하고 기존 확인 버튼을 직접 누릅니다. 서버 응답 후 정책 상태를 다시 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "cap.review",
+    "guideVersion": "1.0",
+    "title": "수수료 한도 검증 결과 조회",
+    "description": "한도 검증은 기존 계산 결과와 산입 근거로 확인합니다. 잔여 한도를 추가 지급 승인으로 해석하지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/cap-checks",
+    "steps": [
+      {
+        "stepId": "cap.review.step.1",
+        "screenId": "CAP-W01",
+        "targetId": "features.cap.cap-list-page.input",
+        "title": "조회 조건 설정",
+        "instruction": "검증 기준일·계약 등 필요한 조건을 확인하고 조회합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "cap.review.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "cap.review.step.2",
+        "screenId": "CAP-W01",
+        "targetId": "features.cap.cap-list-page.section",
+        "title": "한도 결과 선택",
+        "instruction": "계약별 한도 산입액·잔여액·초과 여부를 확인하고 원하는 결과를 선택합니다. 실제 계산 결과를 사용하며 AI는 금액을 계산하거나 지급 가능하다고 승인하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "cap.review.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "cap.review.step.3",
+        "screenId": "CAP-W01",
+        "targetId": "features.cap.cap-list-page.section-2",
+        "title": "근거 확인",
+        "instruction": "상세 결과의 적용 규칙과 산입 근거 및 관련 계약을 확인합니다. 이상이 있으면 원천 자료를 확인한 뒤 기존 업무 절차로 수정합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "arbitrage.review",
+    "guideVersion": "1.0",
+    "title": "차익거래 검증·재검토",
+    "description": "차익거래 검증 결과의 대상·기준일·현재 차액·예정 포함 지표와 상세 계산 근거를 구분하여 조회하고 재검토합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/arbitrage-checks",
+    "steps": [
+      {
+        "stepId": "arbitrage.review.step.1",
+        "screenId": "ARB-W01",
+        "targetId": "features.arbitrage.arbitrage-page.input",
+        "title": "검증 기준 설정",
+        "instruction": "대상 계약과 기준일 등 조회 조건을 설정합니다. 저장된 과거 결과와 새 실행 결과를 구분합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "arbitrage.review.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "arbitrage.review.step.2",
+        "screenId": "ARB-W01",
+        "targetId": "features.arbitrage.arbitrage-page.section",
+        "title": "검증 결과 확인",
+        "instruction": "결과의 현재 차액과 예정 포함 지표·원천 근거를 확인하고 대상 결과를 선택합니다. 프로그램의 계산 결과를 사용합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "arbitrage.review.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "arbitrage.review.step.3",
+        "screenId": "ARB-W01",
+        "targetId": "features.arbitrage.arbitrage-page.section-2",
+        "title": "관련 근거 검토",
+        "instruction": "상세 결과에서 적용 규칙과 계약·지급·예상 근거를 확인합니다. 재검토가 필요하면 기존 재검토 기능의 사유와 서버 결과를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "ledger.review",
+    "guideVersion": "1.0",
+    "title": "검증원장 조회·역분개",
+    "description": "검증원장의 지급 연결과 원전표·역분개 상태를 조회합니다. 역분개와 재기표는 기존 권한·사유·정정 절차를 따르며 지급 목록·대사·예외함 반영을 확인합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/journals",
+    "steps": [
+      {
+        "stepId": "ledger.review.step.1",
+        "screenId": "LEDG-W01",
+        "targetId": "features.ledger.ledger-page.input",
+        "title": "원장 검색",
+        "instruction": "기준월·계약·상태 등 검색 조건을 확인하고 조회합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "ledger.review.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "ledger.review.step.2",
+        "screenId": "LEDG-W01",
+        "targetId": "features.ledger.ledger-page.section",
+        "title": "원장 대사 근거 확인",
+        "instruction": "원장 목록에서 지급과 연결된 분개 및 상태를 확인합니다. 원전표와 역분개 전표를 구분합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "ledger.review.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "ledger.review.step.3",
+        "screenId": "LEDG-W01",
+        "targetId": "features.ledger.ledger-page.textarea",
+        "title": "역분개 사유 작성",
+        "instruction": "권한과 상태가 허용하는 원전표를 선택한 뒤 기존 역분개 기능에서 사유를 입력합니다. 역분개는 별도 전표이며 원장 삭제가 아닙니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "ledger.review.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "ledger.review.step.4",
+        "screenId": "LEDG-W01",
+        "targetId": "features.ledger.ledger-page.section",
+        "title": "실제 반영 확인",
+        "instruction": "기존 확인 동작의 성공 응답 후 원전표·역분개·지급 상태와 대사 결과를 다시 확인합니다. 재기표는 기존 정정 절차로 진행하고 중복 지급을 만들지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "reconciliation.run",
+    "guideVersion": "1.0",
+    "title": "원장 대사 실행·결과 비교",
+    "description": "원장 대사에서 정산월과 대상 범위를 맞춰 실행하고 예상과 실제 지급의 비교 근거와 결과 유형을 확인합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/reconciliations",
+    "steps": [
+      {
+        "stepId": "reconciliation.run.step.1",
+        "screenId": "RECO-W01",
+        "targetId": "features.reconciliation.reconciliation-page.input",
+        "title": "대사 대상 조건 설정",
+        "instruction": "정산월과 대상 조건을 확인합니다. 예상과 실제의 동일 지급 의무·계약·회차·수취인 기준을 맞춥니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "reconciliation.run.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "reconciliation.run.step.2",
+        "screenId": "RECO-W01",
+        "targetId": "features.reconciliation.reconciliation-page.section",
+        "title": "실행과 목록 확인",
+        "instruction": "기존 대사 실행 기능을 직접 수행하고 실제 실행 상태와 결과 목록을 확인합니다. 요청 접수와 작업 완료를 구분합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "reconciliation.run.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "reconciliation.run.step.3",
+        "screenId": "RECO-W01",
+        "targetId": "features.reconciliation.reconciliation-page.reco-result-type",
+        "title": "결과 유형 선택",
+        "instruction": "일치·차이·누락 등 결과 유형으로 필요한 건을 좁힙니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "reconciliation.run.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "reconciliation.run.step.4",
+        "screenId": "RECO-W01",
+        "targetId": "features.reconciliation.reconciliation-page.section-2",
+        "title": "비교 근거 확인",
+        "instruction": "원천 예상·실제 지급과 원장 연결을 비교합니다. 역분개·취소 건의 유효 상태를 확인하고 예외 처리 대상으로 이동합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "exception.resolve",
+    "guideVersion": "1.0",
+    "title": "예외함 원인 확인·처리",
+    "description": "예외함에서 대상 예외를 선택하고 실행 회차·계약·발생 원인과 원천 근거를 확인한 뒤 기존 처리 또는 원장 정정 업무로 연결합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/exceptions",
+    "steps": [
+      {
+        "stepId": "exception.resolve.step.1",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.exception-page.f-contract",
+        "title": "예외 대상 검색",
+        "instruction": "계약 등 검색 조건을 입력해 처리할 예외를 찾습니다. 월과 실행 회차·상태가 맞는지 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "exception.resolve.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "exception.resolve.step.2",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.exception-page.section",
+        "title": "예외 목록 선택",
+        "instruction": "조회 결과에서 원하는 예외를 직접 선택하여 상세와 원천 근거를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "exception.resolve.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "exception.resolve.step.3",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.exception-page.section-2",
+        "title": "원인과 연결 업무 확인",
+        "instruction": "금액 차이·누락·중복 등 원인을 확인하고 관련 계약·스케줄·지급·원장 링크를 통해 원천 자료를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "exception.resolve.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "exception.resolve.step.4",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.exception-page.section-3",
+        "title": "처리 결과 확인",
+        "instruction": "기존 처리 패널에서 허용된 상태 전환과 사유를 입력합니다. 원천 수정과 예외 상태 변경은 구분하고 재검증 결과를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "validation.create",
+    "guideVersion": "1.0",
+    "title": "월 통합검증 실행",
+    "description": "검증월과 실행 유형으로 월 통합검증을 요청하고 실제 실행 상태·단계별 실패·예외·대사 결과를 상세에서 확인합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/validation-runs",
+    "steps": [
+      {
+        "stepId": "validation.create.step.1",
+        "screenId": "VRUN-W01",
+        "targetId": "features.validation.validation-run-list-page.input",
+        "title": "검증월 선택",
+        "instruction": "새 실행 만들기 영역에서 검증월을 선택합니다. 지급과 스케줄의 기준월이 같은지 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "validation.create.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "validation.create.step.2",
+        "screenId": "VRUN-W01",
+        "targetId": "features.validation.validation-run-list-page.select",
+        "title": "실행 유형 선택",
+        "instruction": "월 통합검증 실행 유형을 선택합니다. 기존 실행과 새 실행을 구분합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "validation.create.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "validation.create.step.3",
+        "screenId": "VRUN-W01",
+        "targetId": "features.validation.validation-run-list-page.btn-create",
+        "title": "실행 요청",
+        "instruction": "기존 실행 만들기 버튼을 직접 누릅니다. 요청이 접수됐다고 검증이 통과된 것은 아니며 실행 목록의 상태를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "validation.create.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "validation.create.step.4",
+        "screenId": "VRUN-W01",
+        "targetId": "features.validation.validation-run-list-page.section",
+        "title": "실행 결과 열기",
+        "instruction": "생성된 실행을 목록에서 직접 선택합니다. 실패·완료·확정 상태와 실제 처리 내역을 상세에서 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "validation.detail",
+    "guideVersion": "1.0",
+    "title": "월 통합검증 상세·확정",
+    "description": "월 통합검증 상세에서 단계별 결과·예외·대사·재시작 가능 여부를 확인합니다. 확정은 별도 관리자 권한과 완료 조건이 필요하며 AI가 실행하지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/validation-runs/:id",
+    "steps": [
+      {
+        "stepId": "validation.detail.step.1",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-run-detail-page.section",
+        "title": "실행 상태 확인",
+        "instruction": "직접 선택한 실행의 검증월·회차·실행 상태를 확인합니다. 실패나 진행 중인 실행을 완료로 취급하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "validation.detail.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "validation.detail.step.2",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-run-detail-page.section-2",
+        "title": "단계별 결과 확인",
+        "instruction": "단계별 처리 결과와 실패 사유·예외를 확인합니다. 재시작이 필요하면 기존 재시작 기능과 허용 상태를 따릅니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "validation.detail.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "validation.detail.step.3",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-run-detail-page.btn-finalize",
+        "title": "확정 조건 확인",
+        "instruction": "실행 완료와 잔여 예외·대사 상태 및 확정 권한을 확인합니다. 확정은 기존 확인 창에서 사용자가 직접 수행하고 실제 서버 상태를 재조회합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "audit.review",
+    "guideVersion": "1.0",
+    "title": "감사로그 조회",
+    "description": "감사로그는 감사 조회 권한을 가진 사용자만 기간과 업무 동작 등 조건으로 조회합니다. 개인정보나 로그 원문을 AI에 전송하지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/audit-logs",
+    "steps": [
+      {
+        "stepId": "audit.review.step.1",
+        "screenId": "AUDT-W01",
+        "targetId": "features.audit.audit-log-page.input",
+        "title": "감사 조회 조건 설정",
+        "instruction": "허용된 감사 조회 권한으로 기간·사용자·업무 동작 등 조건을 입력합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "audit.review.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "audit.review.step.2",
+        "screenId": "AUDT-W01",
+        "targetId": "features.audit.audit-log-page.table",
+        "title": "감사 기록 확인",
+        "instruction": "조회한 기록에서 요청 시점·동작·대상·결과를 확인합니다. 감사 기록의 업무 식별자와 실제 업무 상태를 대조합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "dashboard.review",
+    "guideVersion": "1.0",
+    "title": "업무 대시보드와 다음 업무",
+    "description": "업무 대시보드에서 기준월과 집계 현황을 확인하고 관련 업무의 원천 목록으로 이동합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/",
+    "steps": [
+      {
+        "stepId": "dashboard.review.step.1",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.dashboard-page.section",
+        "title": "기준월과 현황 확인",
+        "instruction": "상단 기준 정산월과 집계 대상 기간을 확인하고 대시보드의 처리 현황을 읽습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "dashboard.review.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "dashboard.review.step.2",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.dashboard-page.link",
+        "title": "관련 업무로 이동",
+        "instruction": "현황의 관련 업무 링크를 직접 선택하여 계약·지급·검증·예외 등의 원천 목록으로 이동합니다. 집계 수치와 실제 처리 상태를 구분합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "agent.portfolio",
+    "guideVersion": "1.0",
+    "title": "설계사 포트폴리오 확인",
+    "description": "설계사 본인 계정에서 본인 범위의 포트폴리오와 계약·지급 현황을 조회합니다. 내부 계정으로 설계사 화면을 대신 열지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "AGENT"
+    ],
+    "enabled": true,
+    "route": "/agent-home",
+    "steps": [
+      {
+        "stepId": "agent.portfolio.step.1",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.agent-home-page.section",
+        "title": "본인 포트폴리오 확인",
+        "instruction": "설계사 계정에서 본인 포트폴리오와 기준월을 확인합니다. 다른 설계사의 데이터에 접근하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "agent.portfolio.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "agent.portfolio.step.2",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.agent-home-page.section-2",
+        "title": "계약과 지급 현황 확인",
+        "instruction": "본인 계약과 지급 현황 및 화면에 표시된 추천 근거를 확인합니다. 내부 정산 처리 권한과는 구분됩니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "settlement.journey",
+    "guideVersion": "1.0",
+    "title": "정산 업무 전체 흐름",
+    "description": "계약 확인부터 예상 스케줄, 지급, 한도 및 차익거래 검증, 검증원장, 원장 대사, 월 통합검증, 예외 처리까지 페이지를 이동하며 전체 업무의 위치와 다음 과정을 안내합니다. 개별 업무의 실제 완료를 대신하지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/contracts",
+    "steps": [
+      {
+        "stepId": "settlement.journey.step.1",
+        "screenId": "CONT-W01",
+        "targetId": "features.contract.contract-list-page.input",
+        "title": "보험계약 검색·선택",
+        "instruction": "보험계약 목록에서 조건을 입력하고 조회 결과에서 원하는 계약을 선택하여 상세 화면으로 이동합니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.2",
+        "screenId": "SCHE-W01",
+        "targetId": "features.schedule.schedule-list-page.input",
+        "title": "예상 스케줄 조회",
+        "instruction": "예상 스케줄을 검색하고 상세에서 지급 예정 회차·금액·규칙 및 상태를 확인합니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.3",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction.transaction-list-page.f-month",
+        "title": "수수료 지급 목록·정정 대상 찾기",
+        "instruction": "지급 목록에서 계약·월·수취인·단계와 지급 상태를 확인하고 초안 수정 또는 확정 건 정정 업무의 대상을 고릅니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.4",
+        "screenId": "CAP-W01",
+        "targetId": "features.cap.cap-list-page.input",
+        "title": "수수료 한도 검증 결과 조회",
+        "instruction": "한도 검증은 기존 계산 결과와 산입 근거로 확인합니다. 잔여 한도를 추가 지급 승인으로 해석하지 않습니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.5"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.5",
+        "screenId": "ARB-W01",
+        "targetId": "features.arbitrage.arbitrage-page.input",
+        "title": "차익거래 검증·재검토",
+        "instruction": "차익거래 검증 결과의 대상·기준일·현재 차액·예정 포함 지표와 상세 계산 근거를 구분하여 조회하고 재검토합니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.6"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.6",
+        "screenId": "LEDG-W01",
+        "targetId": "features.ledger.ledger-page.input",
+        "title": "검증원장 조회·역분개",
+        "instruction": "검증원장의 지급 연결과 원전표·역분개 상태를 조회합니다. 역분개와 재기표는 기존 권한·사유·정정 절차를 따르며 지급 목록·대사·예외함 반영을 확인합니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.7"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.7",
+        "screenId": "RECO-W01",
+        "targetId": "features.reconciliation.reconciliation-page.input",
+        "title": "원장 대사 실행·결과 비교",
+        "instruction": "원장 대사에서 정산월과 대상 범위를 맞춰 실행하고 예상과 실제 지급의 비교 근거와 결과 유형을 확인합니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.8"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.8",
+        "screenId": "VRUN-W01",
+        "targetId": "features.validation.validation-run-list-page.input",
+        "title": "월 통합검증 실행",
+        "instruction": "검증월과 실행 유형으로 월 통합검증을 요청하고 실제 실행 상태·단계별 실패·예외·대사 결과를 상세에서 확인합니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "settlement.journey.step.9"
+          }
+        ]
+      },
+      {
+        "stepId": "settlement.journey.step.9",
+        "screenId": "EXCP-W01",
+        "targetId": "features.exception.exception-page.f-contract",
+        "title": "예외함 원인 확인·처리",
+        "instruction": "예외함에서 대상 예외를 선택하고 실행 회차·계약·발생 원인과 원천 근거를 확인한 뒤 기존 처리 또는 원장 정정 업무로 연결합니다. 이 단계는 업무 흐름의 위치 안내입니다. 실제 처리 결과는 해당 업무 화면에서 확인하세요.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "contract.edit",
+    "guideVersion": "1.0",
+    "title": "기존 보험계약 수정",
+    "description": "보험계약 목록에서 실제 수정할 계약을 선택하고 상세의 수정 기능으로 진입합니다. 현재 선택한 계약의 입력과 서버 변경 토큰을 확인하여 수정 저장합니다. 새 계약 등록과 구분합니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "SETTLEMENT"
+    ],
+    "enabled": true,
+    "route": "/contracts/:id/edit",
+    "steps": [
+      {
+        "stepId": "contract.edit.step.1",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.insurer-id",
+        "title": "보험회사 선택",
+        "instruction": "보험회사를 검색하여 선택합니다. 검색 입력과 목록의 실제 항목 선택은 구분됩니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.edit.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.edit.step.2",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.contract-date",
+        "title": "계약일 입력",
+        "instruction": "계약일을 입력합니다. 계약일에 판매 가능한 상품 버전이 조회되며 미래 계약일 등 기존 검증을 따릅니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.edit.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.edit.step.3",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.product-offering-id",
+        "title": "상품 버전 선택",
+        "instruction": "보험회사와 계약일에 맞는 상품 버전을 검색 결과에서 선택합니다. 판매기간과 분급 기준을 확인합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.edit.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.edit.step.4",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.agent-id",
+        "title": "설계사 선택",
+        "instruction": "해당 계약의 설계사를 검색한 뒤 목록의 항목을 직접 선택합니다.",
+        "completionRuleId": "INPUT_VALID",
+        "next": [
+          {
+            "conditionId": "INPUT_VALID",
+            "stepId": "contract.edit.step.5"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.edit.step.5",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.section-2",
+        "title": "금액·납입 조건 확인",
+        "instruction": "보험료·납입 조건 등 계약 입력을 확인합니다. 계산과 필수값 판정은 기존 계약 화면이 수행합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "contract.edit.step.6"
+          }
+        ]
+      },
+      {
+        "stepId": "contract.edit.step.6",
+        "screenId": "CONT-W03",
+        "targetId": "features.contract.contract-form-page.form",
+        "title": "저장 결과 확인",
+        "instruction": "입력을 검토하고 기존 저장 버튼을 직접 누릅니다. 서버가 오류를 반환하면 사유를 수정하며, 저장 성공 후 이동한 계약 상세에서 저장 내용을 확인합니다. 안내 확인은 저장 성공이 아닙니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  }
+]

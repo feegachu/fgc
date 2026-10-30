@@ -58,10 +58,16 @@ beforeEach(() => {
   referenceFailure = null
   draftResponse = saved
   contractDetailFailure = false
-  mutation = (path) => (path.endsWith('/precheck') ? precheckResult : saved)
+  mutation = (path) => (path.endsWith('/precheck') ? precheckResult : path.endsWith('/confirm') ? { ...saved, status: 'CONFIRMED' } : saved)
   useToastStore.setState({ messages: [] })
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, options: RequestOptions = {}) => {
-    if (options.method && options.method !== 'GET') return envelope(await mutation(path, options))
+    if (options.method && options.method !== 'GET') {
+      const data = await mutation(path, options)
+      // The real precheck response includes its payment ID; retain explicit mismatches for negative tests.
+      return envelope(path.endsWith('/precheck') && data && typeof data === 'object'
+        ? { paymentId: Number(/\/transactions\/(\d+)\/precheck$/.exec(path)?.[1]), ...data }
+        : data)
+    }
     if (referenceFailure) throw referenceFailure
     if (path.startsWith('/api/v1/base/agents')) return envelope({ content: agents })
     if (path.startsWith('/api/v1/base/commission-items/search'))
@@ -96,7 +102,7 @@ function mount(path = '/app/transactions/new?month=2026-07', canProcess = true, 
   const router = createMemoryRouter(
     [
       {
-        element: <Outlet context={{ user: { canProcess }, month }} />,
+        element: <Outlet context={{ user: { canProcess, roleCode: canProcess ? 'SETTLEMENT' : 'COMPLIANCE' }, month }} />,
         children: [
           { path: '/transactions/new', element: <TransactionFormPage /> },
           { path: '/transactions', element: <h1>지급 목록 결과</h1> },
@@ -763,14 +769,12 @@ describe('read-only guide projection on the real payment form', () => {
     vi.stubEnv('VITE_ASSISTANT_DEMO', 'true')
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(useGuideRuntime.getState().observation?.saved).toBe(true))
-    await user.click(screen.getByRole('button', { name: '초안 작성 도움말' }))
-    expect(useGuideRuntime.getState().session?.workflowId).toBe('payment.draft')
-    useGuideRuntime.getState().targetReady()
-    useGuideRuntime.getState().next()
+    const initialRevision = useGuideRuntime.getState().observation!.revision
+    await waitFor(() => expect(screen.getByLabelText(/금액 \(원\)/)).toBeEnabled())
     await user.clear(screen.getByLabelText(/금액 \(원\)/))
     await user.type(screen.getByLabelText(/금액 \(원\)/), '123000')
     await waitFor(() => expect(useGuideRuntime.getState().observation?.saved).toBe(false))
-    expect(useGuideRuntime.getState().session?.index).toBe(0)
+    expect(useGuideRuntime.getState().observation!.revision).toBeGreaterThan(initialRevision)
     expect(writes()).toHaveLength(0)
     const before = useGuideRuntime.getState().observation?.revision
     mutation = () => {
