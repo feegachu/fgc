@@ -1435,11 +1435,6 @@
     "element": "Button"
   },
   {
-    "id": "features.policies.policy-draft-fields.input",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "input"
-  },
-  {
     "id": "features.policies.policy-draft-fields.input-2",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "input"
@@ -1448,11 +1443,6 @@
     "id": "features.policies.policy-draft-fields.section",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.policies.policy-draft-fields.select",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "select"
   },
   {
     "id": "features.policies.policy-management.a",
@@ -2283,6 +2273,241 @@
     "id": "navigation.menu.vrun-w02",
     "file": "app/shell/Sidebar.tsx",
     "element": "Link"
+  },
+  {
+    "id": "policy.draft-input.basicdocumentversion",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.clawbackrules.clawbackratepct",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.clawbackrules.elapsedmonthfrom",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.clawbackrules.elapsedmonthto",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.commissionrules.fixedamount",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.commissionrules.installmentfrom",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.commissionrules.installmentto",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.commissionrules.priorityno",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.commissionrules.ratepct",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.effectivefrom",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.effectiveto",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.basicdocumentdatefrom",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.basicdocumentdateto",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.basicdocumentversion",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.longtermmaintenancefrom",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.longtermmaintenanceto",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.maxinstallments",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.salesstartdatefrom",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.salesstartdateto",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.feeregimerules.sourcerefs",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.policycode",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.regulationrefs",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.sourcedetails.ref",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.sourcedetails.title",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.sourcedetails.url",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.sourcerefs",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-select.clawbackrules.commissionitemid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.clawbackrules.insurerid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.clawbackrules.productofferingid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.agentrankcode",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.basiscode",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.calculationtype",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.commissionitemid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.feecomponenttype",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.insurerid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.organizationid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.paymentconditioncode",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.paymentstage",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.commissionrules.productofferingid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.feeregimerules.commissionitemid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.feeregimerules.insurerid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.feeregimerules.productofferingid",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.parameters.proration_rule",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.parameters.revival_backfill_rule",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.parameters.status_month_rule",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.policytype",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.sourceclass",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
   },
   {
     "id": "previews.policy-preview.a",
