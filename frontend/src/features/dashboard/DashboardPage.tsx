@@ -190,6 +190,8 @@ function DashboardContent({ month }: { month: string }) {
                 to={kpi.to}
                 className="kpi-card-link"
                 data-kpi={kpi.id}
+                data-zero={(kpi.value ?? 0) === 0}
+                data-attention={kpi.tone === 'error' && (kpi.value ?? 0) > 0}
                 style={{ '--i': index } as CSSProperties}
                 aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}
               >

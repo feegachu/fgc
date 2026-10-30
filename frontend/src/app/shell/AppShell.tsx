@@ -12,6 +12,9 @@ import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { AgentTopbar } from './AgentTopbar'
+import { DeveloperSettings } from './DeveloperSettings'
+import { resolveComponentDesign, sidebarAppearance, useDesignSettings } from '../../stores/designSettings'
+import './component-designs.css'
 import './agent-theme.css'
 export interface ShellContext {
   user: ShellUser
@@ -25,6 +28,8 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
   const errorTitle = useErrorTitleStore((state) => state.title)
+  const preferences = useDesignSettings((state) => state.preferences)
+  const appearance = sidebarAppearance(preferences, user.roleCode === 'AGENT')
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)
   useEffect(() => {
@@ -72,7 +77,19 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           : '권한 없음 (FGC-UI-ERR-403) · FGC')
   }, [errorTitle, current, allowed])
   return (
-    <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}>
+    <div
+      className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
+      data-sidebar-design={import.meta.env.DEV ? preferences.sidebarDesign : undefined}
+      data-sidebar-dark-text={import.meta.env.DEV ? appearance.darkText : undefined}
+      data-sidebar-custom-color={import.meta.env.DEV ? preferences.sidebarColor !== null : undefined}
+      data-kpi-style={import.meta.env.DEV ? preferences.kpiStyle : undefined}
+      data-component-design={import.meta.env.DEV ? preferences.componentDesign : undefined}
+      data-button-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'buttonDesign') : undefined}
+      data-field-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'fieldDesign') : undefined}
+      data-table-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'tableDesign') : undefined}
+      data-badge-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'badgeDesign') : undefined}
+      style={import.meta.env.DEV ? appearance.style : undefined}
+    >
       <a className="skip-link" href="#main-content">
         본문으로 건너뛰기
       </a>
@@ -87,6 +104,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         <header className="app-header app-header-rail">
           {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? <AgentTopbar /> : <WorkspaceTabs activeId={current?.id} />}
           <div className="app-header-actions">
+            {import.meta.env.DEV && <DeveloperSettings sidebarColor={appearance.color} />}
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
               {month && (

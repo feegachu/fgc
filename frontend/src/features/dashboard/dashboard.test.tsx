@@ -8,6 +8,7 @@ import { routes } from '../../app/routes'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { defaultDesignPreferences, useDesignSettings } from '../../stores/designSettings'
 import type { DashboardSummary } from './api'
 
 const user = {
@@ -60,6 +61,8 @@ const clients: QueryClient[] = []
 let summaryResponse: () => Promise<unknown>
 
 beforeEach(() => {
+  localStorage.clear()
+  useDesignSettings.setState({ preferences: { ...defaultDesignPreferences } })
   useAuthStore.setState({ accessToken: null, loggingOut: false })
   useWorkspaceStore.getState().clear()
   sessionStorage.clear()
@@ -92,6 +95,22 @@ const summaryCalls = () =>
     .filter((path) => path.includes('/dashboard/summary'))
 
 describe('DASH-W01 업무 대시보드', () => {
+  it('기존 카드형을 기본으로 하며 버전과 컴포넌트를 바꿔도 KPI 값·링크와 조회는 유지한다', async () => {
+    const { actions } = renderDashboard()
+    const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
+    const links = within(kpis).getAllByRole('link').map((link) => link.getAttribute('href'))
+    expect(kpis.closest('.app-shell')).toHaveAttribute('data-kpi-style', 'cards')
+    await actions.click(screen.getByRole('button', { name: '개발자' }))
+    await actions.click(screen.getByRole('radio', { name: /2. 한 줄 요약형/ }))
+    await actions.selectOptions(screen.getByRole('combobox', { name: '전체 스타일' }), 'b')
+    await actions.selectOptions(screen.getByRole('combobox', { name: '버튼' }), 'c')
+    expect(kpis.closest('.app-shell')).toHaveAttribute('data-kpi-style', 'summary')
+    expect(kpis.closest('.app-shell')).toHaveAttribute('data-button-design', 'c')
+    expect(kpis.closest('.app-shell')).toHaveAttribute('data-field-design', 'b')
+    expect(within(kpis).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(links)
+    expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
+    expect(summaryCalls()).toHaveLength(1)
+  })
   it('KPI 6종과 최근 예외·실행을 형식 규칙에 맞게 보여 준다', async () => {
     renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })

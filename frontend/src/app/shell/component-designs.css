@@ -1,0 +1,221 @@
+/* PDF A/B/C experiments are enabled only by the development shell attributes. */
+.app-shell[data-button-design='a'] {
+  --design-button-accent: #0046ff;
+  --design-button-radius: 8px;
+  --design-button-height: 36px;
+}
+.app-shell[data-button-design='b'] {
+  --design-button-accent: #2070e8;
+  --design-button-radius: 14px;
+  --design-button-height: 40px;
+}
+.app-shell[data-button-design='c'] {
+  --design-button-accent: #171717;
+  --design-button-radius: 6px;
+  --design-button-height: 32px;
+}
+.app-shell[data-button-design]:not([data-button-design='current']) .button {
+  min-height: var(--design-button-height);
+  height: auto;
+  padding-block: 0.375rem;
+  border-radius: var(--design-button-radius);
+}
+.app-shell[data-button-design]:not([data-button-design='current']) .button-primary:not(:disabled):not(.is-disabled) {
+  background: var(--design-button-accent);
+}
+.app-shell[data-button-design]:not([data-button-design='current'])
+  .button-primary:hover:not(:disabled):not(.is-disabled) {
+  background: color-mix(in srgb, var(--design-button-accent), black 14%);
+}
+.app-shell[data-button-design]:not([data-button-design='current']) .button-ghost:not(:disabled):not(.is-disabled) {
+  color: var(--design-button-accent);
+}
+.app-shell[data-button-design='b'] .button-secondary:not(:disabled):not(.is-disabled) {
+  border-color: transparent;
+  background: #f2f4f6;
+}
+
+.app-shell[data-field-design='a'] {
+  --design-field-radius: 8px;
+  --design-field-height: 36px;
+  --design-field-focus: #0046ff;
+}
+.app-shell[data-field-design='b'] {
+  --design-field-radius: 14px;
+  --design-field-height: 40px;
+  --design-field-focus: #2070e8;
+}
+.app-shell[data-field-design='c'] {
+  --design-field-radius: 6px;
+  --design-field-height: 32px;
+  --design-field-focus: #171717;
+}
+.app-shell[data-field-design]:not([data-field-design='current'])
+  :is(.field-control, .select-control, .textarea-control) {
+  border-radius: var(--design-field-radius);
+  font-size: 13px;
+}
+.app-shell[data-field-design]:not([data-field-design='current'])
+  :is(input.field-control, select.field-control, .select-control) {
+  height: var(--design-field-height);
+}
+.app-shell[data-field-design]:not([data-field-design='current'])
+  :is(.field-control, .select-control, .textarea-control):focus:not([aria-invalid='true']) {
+  border-color: var(--design-field-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--design-field-focus), transparent 85%);
+}
+.app-shell[data-field-design='b']
+  :is(.field-control, .select-control, .textarea-control):not([aria-invalid='true']):not(:focus) {
+  border-color: #e5e8eb;
+  background-color: #f9fafb;
+}
+.app-shell[data-field-design]:not([data-field-design='current'])
+  :is(.field-control, .select-control, .textarea-control):disabled {
+  opacity: 0.6;
+}
+
+.app-shell[data-table-design='a'] {
+  --design-row-height: 44px;
+  --design-table-header: #f4f6fa;
+  --design-table-line: #e4e7ec;
+}
+.app-shell[data-table-design='b'] {
+  --design-row-height: 52px;
+  --design-table-header: #f9fafb;
+  --design-table-line: #f2f4f6;
+}
+.app-shell[data-table-design='c'] {
+  --design-row-height: 40px;
+  --design-table-header: #fafafa;
+  --design-table-line: #eaeaea;
+}
+.app-shell[data-table-design]:not([data-table-design='current']) .data-table :is(th, td) {
+  height: var(--design-row-height);
+  padding-block: 0.5rem;
+  border-bottom-color: var(--design-table-line);
+  font-size: 13px;
+}
+.app-shell[data-table-design]:not([data-table-design='current']) .data-table th {
+  color: #59616e;
+  background: var(--design-table-header);
+  font-size: 12px;
+  font-weight: 500;
+}
+.app-shell[data-table-design='b'] .data-table td {
+  font-size: 15px;
+}
+.app-shell[data-table-design='c'] .data-table td.tabular-nums {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+}
+
+.app-shell[data-badge-design]:not([data-badge-design='current']) .status-badge {
+  gap: 0.375rem;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #59616e;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+}
+.app-shell[data-badge-design]:not([data-badge-design='current']) :is(.status-badge-error, .status-badge-risk) {
+  color: #d8262f;
+}
+.app-shell[data-badge-design]:not([data-badge-design='current']) .status-badge-warning {
+  color: #a35200;
+}
+.app-shell:is([data-badge-design='a'], [data-badge-design='c']) .status-badge::before {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+.app-shell[data-badge-design='b'] .status-badge {
+  font-size: 13px;
+}
+
+.app-shell[data-component-design='a'] .surface {
+  border-radius: 12px;
+  box-shadow: none;
+}
+.app-shell[data-component-design='b'] {
+  background: #f2f4f6;
+}
+.app-shell[data-component-design='b'] .surface {
+  border-color: transparent;
+  border-radius: 20px;
+  box-shadow: none;
+}
+.app-shell[data-component-design='c'] .surface {
+  border-color: #eaeaea;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.design-component-options {
+  min-width: 0;
+  margin: 1.25rem 0 0;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--color-border-default);
+}
+.design-component-options legend {
+  padding-top: 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.design-component-options label {
+  display: grid;
+  min-width: 0;
+  gap: 0.375rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.design-component-options select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0.375rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.5rem;
+  color: var(--color-text-primary);
+  background: white;
+  font-size: 0.75rem;
+}
+.design-component-bulk {
+  margin-top: 0.75rem;
+}
+.design-component-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.design-component-samples {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+}
+.design-component-samples h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.design-sample-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+.design-sample-controls > .field {
+  width: min(100%, 15rem);
+}
+.design-sample-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
