@@ -86,6 +86,7 @@ public class ContractServiceImpl implements ContractService {
     private static final String AUDIT_CONTRACT_UPDATED = "CONTRACT_UPDATED";
     private static final String AUDIT_CAP_RECHECKED = "CONTRACT_CAP_RECHECKED";
     private static final String AUDIT_SCHEDULES_REGENERATED = "CONTRACT_SCHEDULES_REGENERATED";
+    private static final String AGENT_ID_FIELD = "agentId";
     // 상태 사건의 원천키(source_event_key)로 쓰므로 화면이 만드는 요청 UUID만 받는다.
     private static final Pattern IDEMPOTENCY_KEY =
             Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
@@ -254,12 +255,22 @@ public class ContractServiceImpl implements ContractService {
     @Transactional
     public ContractUpdateResponse updateContract(Long id, ContractUpdateRequest request) {
         // 멱등키가 없는 수정. 상태 변경은 멱등키를 사건 원천키로 쓰므로 거절되고 일반 수정만 통과한다.
-        return updateContract(id, request, null, null);
+        return update(id, request, null, null);
     }
 
     @Override
     @Transactional
     public ContractUpdateResponse updateContract(
+            Long id,
+            ContractUpdateRequest request,
+            String idempotencyKey,
+            Long userId
+    ) {
+        return update(id, request, idempotencyKey, userId);
+    }
+
+    // 두 공개 메서드의 공통 본문. 트랜잭션 경계는 호출한 공개 메서드가 연다(this로 @Transactional 메서드를 부르지 않는다).
+    private ContractUpdateResponse update(
             Long id,
             ContractUpdateRequest request,
             String idempotencyKey,
@@ -292,8 +303,7 @@ public class ContractServiceImpl implements ContractService {
         }
         // #653·#621: 최초 연결 설계사는 바꾸지 않는다. 담당 변경·승계 경로는 두지 않는다.
         if (!Objects.equals(currentContract.getAgentId(), request.getAgentId())) {
-            throw new FgcBusinessException(FgcErrorCode.IMPL_AGENT_FIXED, "agentId",
-                    Map.of("field", "agentId"), "최초 연결 설계사는 바꿀 수 없습니다.");
+            throw fieldError(FgcErrorCode.IMPL_AGENT_FIXED, AGENT_ID_FIELD, "최초 연결 설계사는 바꿀 수 없습니다.");
         }
         // #653·#625: 상태를 바꾸는 요청만 사건을 받고 허용 전이·사건 일자를 잠근 계약 기준으로 검사한다.
         ContractStatus previousStatus = currentContract.getCurrentStatus();
@@ -562,7 +572,7 @@ public class ContractServiceImpl implements ContractService {
                 request.getContractDate()
         )) {
             throw validationException(
-                    "agentId",
+                    AGENT_ID_FIELD,
                     "계약일 기준 활동 중인 FC 직급의 모집설계사만 선택할 수 있습니다."
             );
         }
@@ -640,12 +650,11 @@ public class ContractServiceImpl implements ContractService {
             String field,
             String detail
     ) {
-        return new FgcBusinessException(
-                FgcErrorCode.COMMON_002,
-                field,
-                Map.of("field", field),
-                detail
-        );
+        return fieldError(FgcErrorCode.COMMON_002, field, detail);
+    }
+
+    private FgcBusinessException fieldError(FgcErrorCode errorCode, String field, String detail) {
+        return new FgcBusinessException(errorCode, field, Map.of("field", field), detail);
     }
 
     /**
@@ -794,7 +803,7 @@ public class ContractServiceImpl implements ContractService {
     }
 
     private FgcBusinessException eventOrder(String field, String detail) {
-        return new FgcBusinessException(FgcErrorCode.IMPL_EVENT_ORDER, field, Map.of("field", field), detail);
+        return fieldError(FgcErrorCode.IMPL_EVENT_ORDER, field, detail);
     }
 
     /**
@@ -977,7 +986,7 @@ public class ContractServiceImpl implements ContractService {
         snapshot.put("productOfferingId", contract.getProductOfferingId());
         snapshot.put("contractNo", contract.getContractNo());
         snapshot.put("contractDate", contract.getContractDate());
-        snapshot.put("agentId", contract.getAgentId());
+        snapshot.put(AGENT_ID_FIELD, contract.getAgentId());
         snapshot.put("organizationId", contract.getOrganizationId());
         snapshot.put("premiumPerCycleAmount", contract.getPremiumPerCycleAmount());
         snapshot.put("firstPremiumAmount", contract.getFirstPremiumAmount());

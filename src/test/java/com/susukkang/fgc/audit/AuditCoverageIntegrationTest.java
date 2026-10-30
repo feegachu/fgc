@@ -111,7 +111,7 @@ class AuditCoverageIntegrationTest {
                 """, String.valueOf(created.contractId()));
         assertThat((String) updatedAudit.get("before_value")).contains("ACTIVE");
         assertThat((String) updatedAudit.get("after_value")).contains("UNPAID").contains("statusEventId");
-        assertThat(updatedAudit.get("reason")).isEqualTo("감사 기록 확인용 미납 등록");
+        assertThat(updatedAudit).containsEntry("reason", "감사 기록 확인용 미납 등록");
     }
 
     private int realtimeCapCheckCount(Long contractId) {

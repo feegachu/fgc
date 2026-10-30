@@ -37,6 +37,7 @@ import static com.susukkang.fgc.common.code.PaymentCycleCode.MONTHLY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -303,7 +304,7 @@ class ContractControllerTest {
                         .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.field").value("expectedUpdatedAt"));
-        org.mockito.Mockito.verify(contractService, org.mockito.Mockito.never()).updateContract(any(), any(), any(), any());
+        verify(contractService, never()).updateContract(any(), any(), any(), any());
     }
 
     @Test

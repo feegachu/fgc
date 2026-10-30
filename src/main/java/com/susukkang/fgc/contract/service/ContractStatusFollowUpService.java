@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -100,11 +99,10 @@ public class ContractStatusFollowUpService {
 
     private boolean runOne() {
         // 1. 잡으면서 시도 횟수·다음 재시도 시각을 먼저 커밋한다. 실패·중단 뒤에도 그 시각 전에는 다른 worker가 잡지 않는다.
-        Optional<JobKey> claimed = transaction.execute(status -> jobs.claimNext(MAX_ATTEMPTS));
-        if (claimed == null || claimed.isEmpty()) {
+        JobKey job = transaction.execute(status -> jobs.claimNext(MAX_ATTEMPTS).orElse(null));
+        if (job == null) {
             return false;
         }
-        JobKey job = claimed.get();
         // savepoint로 처리기만 되돌리지 않는 이유: JpaTransactionManager의 중첩 트랜잭션은 JPA 영속성 컨텍스트를 되돌리지 않는다.
         try {
             transaction.executeWithoutResult(status -> process(job));
