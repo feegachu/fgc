@@ -172,7 +172,7 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await page.reload()
   await expect(page.getByRole('table', { name: 'GA→설계사 예상 스케줄' })).toBeVisible()
   await page.getByRole('button', { name: '수정', exact: true }).click()
-  const save = page.getByRole('button', { name: '수정하고 스케줄 재생성' })
+  const save = page.getByRole('button', { name: '수정 저장' })
   await expect(save).toBeEnabled()
   await page.getByPlaceholder('계약번호 입력').fill('CONT-UI-EDIT')
   await save.click()
@@ -182,6 +182,66 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await expect(save).toBeDisabled()
   await page.getByRole('link', { name: '취소', exact: true }).click()
   await expect(page.getByRole('heading', { name: '보험계약 목록' })).toBeVisible()
+})
+
+test('CONT-W03 상태 변경은 허용 전이·사유 입력·확인창을 거쳐 사건과 멱등키를 함께 보낸다', async ({
+  page,
+}, testInfo) => {
+  await fixture(page)
+  let put: { body: unknown; key?: string } | undefined
+  // 나중에 등록한 route가 fixture보다 먼저 응답한다.
+  await page.route('**/api/v1/contracts/1', async (route) => {
+    const envelope = (data: unknown) => ({ data, error: null, requestId: 'contract-status' })
+    if (route.request().method() === 'PUT') {
+      put = { body: route.request().postDataJSON(), key: route.request().headers()['idempotency-key'] }
+      return route.fulfill({
+        json: envelope({
+          contractId: 1,
+          scheduleHeaderIds: [],
+          regeneratedScheduleIds: [],
+          statusEventId: 9,
+          followUp: { status: 'PENDING', eventId: 9 },
+        }),
+      })
+    }
+    return route.fulfill({
+      json: envelope({
+        ...contract,
+        allowedNextStatuses: ['UNPAID', 'TERMINATED', 'MATURED', 'CANCELLED'],
+        statusReasonCodes: ['MANUAL_STATUS_CHANGE'],
+      }),
+    })
+  })
+  await page.goto('contracts/1/edit')
+  const status = page.getByLabel('변경 상태')
+  await expect(status.locator('option')).toHaveText(['변경 안 함', '미납', '해지', '만기', '청약철회'])
+  await expect(page.getByRole('textbox', { name: '모집 설계사' })).toHaveAttribute('readonly', '')
+  await status.selectOption('TERMINATED')
+  await page.getByLabel('효력일시').fill('2026-10-20T00:00')
+  await page.getByLabel('접수일시').fill('2026-10-27T10:00')
+  await page.getByLabel('사유코드').selectOption('MANUAL_STATUS_CHANGE')
+  await page.getByLabel(/^사유\s*\*?$/).fill('보험회사 해지 접수 반영')
+  await expect(page.getByText(/변경 요약: 상태 사건 기록·해당 미확정 대상 처리/)).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('contract-status-event-input.png'), fullPage: true })
+  await page.getByRole('button', { name: '수정 저장' }).click()
+  const dialog = page.getByRole('dialog', { name: '상태 변경 저장 확인' })
+  await expect(dialog).toContainText('정상 → 해지')
+  await expect(dialog).toContainText('2026-10-20 00:00')
+  await page.screenshot({ path: testInfo.outputPath('contract-status-event-confirm.png') })
+  await dialog.getByRole('button', { name: '확인하고 저장' }).click()
+  await expect(page.getByRole('heading', { name: '보험계약 상세' })).toBeVisible()
+  await expect(page.getByText('후속 처리 상태를 확인하세요. (후속 처리: 대기 중)', { exact: false })).toBeVisible()
+  expect(put?.key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+  expect(put?.body).toMatchObject({
+    contractStatus: 'TERMINATED',
+    agentId: 3,
+    statusEvent: {
+      effectiveAt: '2026-10-20T00:00:00+09:00',
+      receivedAt: '2026-10-27T10:00:00+09:00',
+      reasonCode: 'MANUAL_STATUS_CHANGE',
+      reason: '보험회사 해지 접수 반영',
+    },
+  })
 })
 
 test('없는 계약의 기존 오류와 COMPLIANCE의 폼 직접 진입 권한을 검증한다', async ({ page }) => {

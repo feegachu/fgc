@@ -145,10 +145,10 @@ describe('contract requests', () => {
       paymentTermMonths: 120,
       expectedUpdatedAt: '2026-10-12T00:00:00.123456Z',
     }
-    await updateContract('21', body)
-    expect(request).toHaveBeenCalledWith('/api/v1/contracts/21', { method: 'PUT', body })
+    await updateContract('21', body, 'request-key')
+    expect(request).toHaveBeenCalledWith('/api/v1/contracts/21', { method: 'PUT', body, idempotencyKey: 'request-key' })
     request.mockResolvedValue(envelope({}))
-    await expect(updateContract('21', body)).rejects.toThrow('수정된 계약을 확인할 수 없습니다.')
+    await expect(updateContract('21', body, 'request-key')).rejects.toThrow('수정된 계약을 확인할 수 없습니다.')
   })
 
   it('sends schedule regeneration as a POST with an encoded reason and isolates stage caches', async () => {
