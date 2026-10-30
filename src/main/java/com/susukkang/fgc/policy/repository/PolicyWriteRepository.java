@@ -6,6 +6,7 @@ import com.susukkang.fgc.policy.dto.PolicyApprovalActionResponse;
 import com.susukkang.fgc.policy.dto.PolicyApplicationPeriod;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
 import com.susukkang.fgc.policy.dto.PolicyFeeLimit;
+import com.susukkang.fgc.policy.dto.PolicyOfferingGovernanceResponse;
 import com.susukkang.fgc.policy.dto.PolicyWriteResult;
 import com.susukkang.fgc.policy.entity.PolicyVersion;
 import jakarta.persistence.EntityManager;
@@ -16,8 +17,10 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -229,9 +232,10 @@ public class PolicyWriteRepository {
         jdbc.update("DELETE FROM fgc.policy_source_detail WHERE policy_version_id = ?", id);
         for (PolicyDraft.SourceDetailDraft source : draft.sourceDetails()) {
             jdbc.update("""
-                    INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url)
-                    VALUES (?, ?, ?, ?, ?)
-                    """, id, source.ref(), source.title(), source.explanation(), source.url());
+                    INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url, status_tags)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, id, source.ref(), source.title(), source.explanation(), source.url(),
+                    source.statusTags().toArray(String[]::new));
         }
     }
 
@@ -366,7 +370,7 @@ public class PolicyWriteRepository {
         document.put("regulationRefs", policy.getRegulationRefs());
         document.put("sourceRefs", policy.getSourceRefs());
         document.put("expectedUpdatedAt", policy.getUpdatedAt());
-        document.put("sourceDetails", rows("SELECT ref, title, explanation, url FROM fgc.policy_source_detail WHERE policy_version_id = ? ORDER BY ref", id));
+        document.put("sourceDetails", rows("SELECT ref, title, explanation, url, status_tags FROM fgc.policy_source_detail WHERE policy_version_id = ? ORDER BY ref", id));
         document.put("commissionRules", rows("""
                 SELECT commission_rule_id, payment_stage, insurer_id, product_offering_id, organization_id,
                        agent_rank_code, commission_item_id, fee_component_type, installment_from, installment_to,
@@ -459,8 +463,8 @@ public class PolicyWriteRepository {
                 SELECT ?, parameter_key, parameter_value, description FROM fgc.policy_parameter WHERE policy_version_id = ?
                 """, targetId, sourceId);
         jdbc.update("""
-                INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url)
-                SELECT ?, ref, title, explanation, url FROM fgc.policy_source_detail WHERE policy_version_id = ?
+                INSERT INTO fgc.policy_source_detail (policy_version_id, ref, title, explanation, url, status_tags)
+                SELECT ?, ref, title, explanation, url, status_tags FROM fgc.policy_source_detail WHERE policy_version_id = ?
                 """, targetId, sourceId);
         for (Long oldFeeId : jdbc.queryForList("SELECT fee_regime_ruleset_id FROM fgc.fee_regime_ruleset WHERE policy_version_id = ? ORDER BY fee_regime_ruleset_id", Long.class, sourceId)) {
             Long newFeeId = jdbc.queryForObject("""
@@ -532,9 +536,14 @@ public class PolicyWriteRepository {
                 rs.getString(4), rs.getObject(5, OffsetDateTime.class), rs.getString(6), rs.getString(7)), id);
     }
 
-    /** 승인자·승인시각이 있는 기존 승인본에서 실제 사용된 참조만 승인된 등록부로 사용한다. */
+    /**
+     * 승인된 근거 참조: 근거 코드 레지스트리(V71, 규제조문표 기준)와, 승인자·승인시각이 있는 기존 승인본에서 실제 사용된 참조.
+     * 승인본의 과거 형식(코드 뒤 설명이 붙은 참조)은 복제 시 보존하기 위해 함께 돌려준다.
+     */
     public Set<String> approvedReferences() {
         return new HashSet<>(jdbc.queryForList("""
+                SELECT ref_code FROM fgc.policy_reference
+                UNION
                 SELECT DISTINCT unnest(regulation_refs || source_refs)
                 FROM fgc.policy_version
                 WHERE status IN ('APPROVED','ACTIVE','RETIRED') AND approved_by IS NOT NULL AND approved_at IS NOT NULL
@@ -543,6 +552,32 @@ public class PolicyWriteRepository {
                 FROM fgc.fee_regime_ruleset r JOIN fgc.policy_version p ON p.policy_version_id = r.policy_version_id
                 WHERE p.status IN ('APPROVED','ACTIVE','RETIRED') AND p.approved_by IS NOT NULL AND p.approved_at IS NOT NULL
                 """, String.class));
+    }
+
+    /** FUN-016: 정책 수수료 규칙이 가리키는 판매버전의 상품위원회·기초서류·판매 상태. */
+    public List<PolicyOfferingGovernanceResponse> offeringGovernance(Long policyVersionId) {
+        return jdbc.query("""
+                SELECT po.product_offering_id, p.product_name, po.offering_version, po.basic_document_version,
+                       po.sales_start_date, po.sales_end_date, po.committee_approval_date, po.committee_document_ref,
+                       po.governance_status
+                  FROM fgc.product_offering po
+                  JOIN fgc.product p ON p.product_id = po.product_id
+                 WHERE po.product_offering_id IN (SELECT product_offering_id FROM fgc.commission_rule
+                                                   WHERE policy_version_id = ? AND product_offering_id IS NOT NULL)
+                 ORDER BY p.product_name, po.offering_version, po.product_offering_id
+                """, (rs, n) -> new PolicyOfferingGovernanceResponse(rs.getLong(1), rs.getString(2), rs.getString(3),
+                rs.getString(4), rs.getObject(5, LocalDate.class), rs.getObject(6, LocalDate.class),
+                rs.getObject(7, LocalDate.class), rs.getString(8), rs.getString(9)), policyVersionId);
+    }
+
+    /** 근거 코드 레지스트리 항목명. 제목이 비어 있는 코드(SRC 등)는 결과에 넣지 않는다. */
+    public Map<String, String> referenceTitles(Set<String> codes) {
+        if (codes.isEmpty()) return Map.of();
+        Map<String, String> titles = new HashMap<>();
+        jdbc.query("SELECT ref_code, title FROM fgc.policy_reference WHERE title IS NOT NULL AND ref_code = ANY (?)",
+                rs -> { titles.put(rs.getString(1), rs.getString(2)); },
+                (Object) codes.toArray(String[]::new));
+        return titles;
     }
 
     private static final String COMMISSION_SCOPE_OVERLAP = """

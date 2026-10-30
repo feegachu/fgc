@@ -1465,7 +1465,7 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 |---|---|
 | 보험회사·조직·설계사 | insurer, organization, agent, agent_insurer_code |
 | 상품·판매버전 | product, product_offering |
-| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule, fee_regime_ruleset, policy_approval_action, policy_source_detail, policy_write_request, policy_succession |
+| 항목·정책 | commission_item, policy_version, policy_parameter, commission_rule, fee_regime_ruleset, policy_approval_action, policy_source_detail, policy_write_request, policy_succession, policy_reference |
 | 1,200% 정책 | cap_rule_set, cap_rule_item |
 | 배부근거 | allocation_policy |
 | 환급률 | refund_rate_table, refund_rate_line |
@@ -1480,6 +1480,8 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 대사 | reconciliation_run, reconciliation_result, reconciliation_match |
 | 예외 | exception_case, exception_occurrence, exception_action |
 | 감사 | audit_log |
+
+`policy_reference`(V71, #718)는 정책 근거 코드 레지스트리다. REG는 규제조문표 v0.2.1의 REG-01~24·REG-06A~C와 항목명이고, SRC는 저장소 문서·시드에 인용된 코드이며 SRC 제목은 저장소 밖 근거대장이 정본이라 비워 둔다. 정책 작성 시 "승인된 REG/SRC" 검사에 쓰며, 코드 추가는 규제조문표 개정과 함께 새 마이그레이션으로 한다. 같은 마이그레이션에서 `policy_source_detail.status_tags`(현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수, 기본 빈 배열)를 추가했다.
 
 `policy_succession`(V68)은 이전/후속 정책버전 ID·계약 적용일·실행자/시각의 불변 승계 기록이다. 계산용 파생 뷰 `policy_application_version`은 원본 승인 기간을 바꾸지 않고 구버전 적용 종료일을 후속 적용일 전날까지로 해석한다. 승계된 RETIRED만 과거 계약 선택에 사용하며, 같은 미래 적용일 정정으로 생긴 빈 구간은 제외한다(인터페이스 §4-4-1·운영정책서 제49조, 2026-10-29).
 

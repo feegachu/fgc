@@ -40,6 +40,8 @@ public record PolicyVersionResponse(
         LocalDate effectiveTo,
         @Schema(description = "규제 근거 코드 목록(REG-xx). 비어 있으면 화면에서 '근거 미기재' 표기")
         List<String> regulationRefs,
+        @Schema(description = "근거자료 코드 목록(SRC-xx). REG와 함께 비어 있으면 '근거 미기재'")
+        List<String> sourceRefs,
         @Schema(description = "작성자 로그인 ID", nullable = true)
         String createdBy,
         @Schema(description = "승인자 로그인 ID", nullable = true)
@@ -56,6 +58,7 @@ public record PolicyVersionResponse(
                 type, type.label(), sourceClass, sourceClass.label(),
                 row.getVersionNo(), status, status.label(),
                 row.getEffectiveFrom(), row.getEffectiveTo(), row.getRegulationRefs(),
+                row.getSourceRefs() == null ? List.of() : row.getSourceRefs(),
                 row.getCreatedBy(), row.getApprovedBy(), row.getApprovedAt());
     }
 }

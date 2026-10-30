@@ -663,3 +663,47 @@
     display: none;
   }
 }
+
+/* FUN-016 근거 info 패널 */
+.policy-reference-info {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+.policy-reference-info p {
+  margin: 0;
+}
+.policy-reference-registry,
+.policy-reference-empty {
+  color: var(--color-text-secondary);
+}
+.policy-reference-title {
+  font-weight: 600;
+}
+.policy-reference-explanation {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.policy-reference-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.policy-offering-governance {
+  margin-top: var(--space-4);
+}
+.policy-offering-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+.policy-offering-row dt {
+  font-weight: 600;
+}
+.policy-offering-row dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
