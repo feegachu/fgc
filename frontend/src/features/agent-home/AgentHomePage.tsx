@@ -15,7 +15,6 @@ import {
   deltaPercent,
   insurerSlices,
   monthStats,
-  needRows,
   shiftMonth,
   statusCounts,
   trendSeries,
@@ -96,9 +95,7 @@ function AgentHomeContent({ month }: { month: string }) {
   const [period, setPeriod] = useState<Period>(12)
   const [kind, setKind] = useState<InsurerKind>('all')
   const [insurer, setInsurer] = useState<string | null>(null)
-  const [needOpen, setNeedOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
-  const closeNeed = useCallback(() => setNeedOpen(false), [])
   const closeChat = useCallback(() => setChatOpen(false), [])
 
   const rows = useMemo(
@@ -133,7 +130,6 @@ function AgentHomeContent({ month }: { month: string }) {
             name={user?.userName ?? ''}
             commission={commission}
             previousCommission={previousCommission.data}
-            onNeed={() => setNeedOpen(true)}
           />
           <Charts
             month={month}
@@ -152,7 +148,6 @@ function AgentHomeContent({ month }: { month: string }) {
             }}
             onInsurer={(name) => setInsurer((current) => (current === name ? null : name))}
           />
-          {needOpen && <NeedModal month={month} rows={rows} onClose={closeNeed} />}
         </>
       )}
       <ChatbotLauncher
@@ -170,14 +165,12 @@ function Snapshot({
   name,
   commission,
   previousCommission,
-  onNeed,
 }: {
   month: string
   rows: Row[]
   name: string
   commission: { data?: number; isError: boolean; refetch: () => unknown }
   previousCommission?: number
-  onNeed: () => void
 }) {
   const now = monthStats(rows, month)
   const before = monthStats(rows, shiftMonth(month, -1))
@@ -188,8 +181,8 @@ function Snapshot({
       <article className="ah-hero" aria-label="설계사 프로필">
         <span className="ah-avatar">{name.slice(0, 1) || '설'}</span>
         <div className="ah-profile">
-          <p className="ah-profile-role">설계사</p>
-          <p className="ah-profile-name">{name}</p>
+          <p className="ah-profile-role">안녕하세요</p>
+          <p className="ah-profile-name">{name ? `${name}님` : "설계사님"}</p>
         </div>
       </article>
       <h2 className="ah-heading">이번달 현황</h2>
@@ -218,41 +211,34 @@ function Snapshot({
             <span>전월 대비</span>
           </div>
         </article>
-        <article className="ah-kpi" aria-label="수령 예정 수수료">
-          <span className="ah-kpi-label">수령 예정 수수료</span>
-          {commission.isError ? (
-            <>
-              <div className="ah-kpi-num">확인 불가</div>
-              <div className="ah-kpi-foot">
-                <button type="button" className="ah-retry" onClick={() => void commission.refetch()}>
-                  다시 시도
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="ah-kpi-num">
-                {commission.data == null ? '…' : <AnimatedNumber value={commission.data} format={int} />}
-                <span className="ah-kpi-unit">원</span>
-              </div>
-              <div className="ah-kpi-foot">
-                {commission.data != null && previousCommission != null ? (
-                  <Delta value={deltaPercent(commission.data, previousCommission)} />
-                ) : (
-                  <span>-</span>
-                )}
-                <span>전월 대비</span>
-              </div>
-            </>
-          )}
-        </article>
-        <button
-          type="button"
-          className="ah-kpi ah-kpi-alert"
-          aria-haspopup="dialog"
-          aria-label="확인 필요 계약"
-          onClick={onNeed}
-        >
+        {commission.isError ? (
+          <article className="ah-kpi" aria-label="수령 예정 수수료">
+            <span className="ah-kpi-label">수령 예정 수수료</span>
+            <div className="ah-kpi-num">확인 불가</div>
+            <div className="ah-kpi-foot">
+              <button type="button" className="ah-retry" onClick={() => void commission.refetch()}>
+                다시 시도
+              </button>
+            </div>
+          </article>
+        ) : (
+          <Link className="ah-kpi ah-kpi-link" to="/transactions" aria-label="수령 예정 수수료">
+            <span className="ah-kpi-label">수령 예정 수수료</span>
+            <div className="ah-kpi-num">
+              {commission.data == null ? '…' : <AnimatedNumber value={commission.data} format={int} />}
+              <span className="ah-kpi-unit">원</span>
+            </div>
+            <div className="ah-kpi-foot">
+              {commission.data != null && previousCommission != null ? (
+                <Delta value={deltaPercent(commission.data, previousCommission)} />
+              ) : (
+                <span>-</span>
+              )}
+              <span>전월 대비</span>
+            </div>
+          </Link>
+        )}
+        <Link className="ah-kpi ah-kpi-link ah-kpi-alert" to="/contracts" aria-label="확인 필요 계약">
           <span className="ah-kpi-label">확인 필요 계약</span>
           <div className="ah-kpi-num">
             <AnimatedNumber value={need} />
@@ -266,8 +252,7 @@ function Snapshot({
               검토 필요 <b>{now.review}</b>
             </span>
           </div>
-          <span className="ah-kpi-more">내역 보기 </span>
-        </button>
+        </Link>
       </div>
     </section>
   )
@@ -358,70 +343,6 @@ function Charts({
         </div>
       </div>
     </section>
-  )
-}
-
-function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClose: () => void }) {
-  const list = needRows(rows, month)
-  const near = list.filter((r) => r.near).length
-  const closeRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    closeRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-  return (
-    <div className="ah-modal" onClick={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="ah-modal-card" role="dialog" aria-modal="true" aria-labelledby="ah-need-title">
-        <div className="ah-modal-head">
-          <div>
-            <h3 id="ah-need-title">{`확인 필요 계약 ${list.length}건`}</h3>
-            <p>{`${month} 기준 · 한도 근접 ${near}건 · 검토 필요 ${list.length - near}건`}</p>
-          </div>
-          <button ref={closeRef} type="button" className="ah-modal-close" aria-label="닫기" onClick={onClose}>
-            ✕
-          </button>
-        </div>
-        <div className="ah-modal-body">
-          {list.length === 0 && <p className="ah-empty">확인할 계약이 없습니다.</p>}
-          {list.map((r) => {
-            const content = (
-              <>
-                <div>
-                  <div className="ah-nr-title">
-                    {r.insurerName} <span>{r.product}</span>
-                  </div>
-                  <div className="ah-nr-meta">
-                    {r.id}
-                    <i />
-                    {r.date} 체결
-                  </div>
-                </div>
-                <span className={`ah-badge ${r.near ? 'warn' : 'danger'}`}>
-                  {r.capLabel || (r.near ? '한도 근접' : '검토 필요')}
-                </span>
-              </>
-            )
-            return r.contractId ? (
-              <Link className="ah-need-row" key={r.contractId} to={`/contracts/${r.contractId}`} onClick={onClose}>
-                {content}
-              </Link>
-            ) : (
-              <div className="ah-need-row" key={r.id}>
-                {content}
-              </div>
-            )
-          })}
-        </div>
-        <div className="ah-modal-foot">
-          <p>한도 근접은 계약의 1,200% 한도 검증이 주의·위반으로 나온 경우, 검토 필요는 검증 자료가 부족한 경우예요.</p>
-          <button type="button" className="ah-btn-ghost" onClick={onClose}>
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 

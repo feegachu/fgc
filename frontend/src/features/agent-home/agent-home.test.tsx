@@ -76,7 +76,7 @@ function renderHome(path = '/app/agent-home') {
   )
   return router
 }
-const kpi = (name: string) => screen.findByRole('article', { name })
+const kpi = (name: string) => screen.findByLabelText(name)
 
 describe('AGNT-W01 포트폴리오', () => {
   it('프로필·이번달 현황 지표를 본인 계약과 지급에서 만든다', async () => {
@@ -99,26 +99,27 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(await kpi('신규 계약 건수')).toHaveTextContent('2건')
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
     expect(screen.getByRole('article', { name: '월 환산 초회보험료' })).toHaveTextContent('200,000')
-    await waitFor(() => expect(screen.getByRole('article', { name: '수령 예정 수수료' })).toHaveTextContent('500,000'))
+    await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('500,000'))
     expect(screen.getByRole('article', { name: '설계사 프로필' })).toHaveTextContent('김설계')
   })
 
-  it('확인 필요 계약 카드를 열면 한도 근접·검토 필요 계약이 보이고 닫을 수 있다', async () => {
+  it('확인 필요 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
     contracts = async () =>
       page([
         contract({ contractId: 2, contractNo: 'C-0002', capResultStatus: 'WARNING', capResultStatusLabel: '주의' }),
         contract({ contractId: 3, contractNo: 'C-0003', capResultStatus: 'REVIEW_REQUIRED', capResultStatusLabel: '검토필요' }),
       ])
     renderHome()
-    const card = await screen.findByRole('button', { name: '확인 필요 계약' })
+    const card = await screen.findByRole('link', { name: '확인 필요 계약' })
     expect(card).toHaveTextContent('2건')
-    await userEvent.click(card)
-    const dialog = screen.getByRole('dialog', { name: '확인 필요 계약 2건' })
-    expect(within(dialog).getByText(/C-0002/)).toBeInTheDocument()
-    expect(within(dialog).getByText(/C-0003/)).toBeInTheDocument()
-    expect(within(dialog).getByRole('link', { name: /C-0002/ })).toHaveAttribute('href', '/app/contracts/2')
-    await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(card).toHaveAttribute('href', '/app/contracts')
+    expect(card).not.toHaveTextContent('내역 보기')
+  })
+
+  it('수령 예정 수수료 카드를 누르면 수수료 지급 화면으로 간다', async () => {
+    renderHome()
+    const card = await screen.findByRole('link', { name: '수령 예정 수수료' })
+    expect(card).toHaveAttribute('href', '/app/transactions')
   })
 
   it('판매 관리 필터로 기간과 보험사 구분을 바꾸고 도넛 범례로 보험사를 고른다', async () => {
@@ -146,7 +147,7 @@ describe('AGNT-W01 포트폴리오', () => {
   it('이번 달 계약이 없으면 지표가 0이어도 화면이 깨지지 않는다', async () => {
     renderHome()
     expect(await kpi('신규 계약 건수')).toHaveTextContent('0건')
-    expect(screen.getByRole('button', { name: '확인 필요 계약' })).toHaveTextContent('0건')
+    expect(screen.getByRole('link', { name: '확인 필요 계약' })).toHaveTextContent('0건')
     expect(screen.getByRole('region', { name: '설계사 판매 관리 그래프' })).toHaveTextContent('합계 0건')
   })
 
@@ -156,9 +157,9 @@ describe('AGNT-W01 포트폴리오', () => {
       throw new ApiError(null, 'req-1', 500)
     }
     renderHome()
-    await waitFor(() => expect(screen.getByRole('article', { name: '수령 예정 수수료' })).toHaveTextContent('확인 불가'))
+    await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('확인 불가'))
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('1건')
-    expect(within(screen.getByRole('article', { name: '수령 예정 수수료' })).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('수령 예정 수수료')).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
   it('계약 조회가 실패하면 오류와 다시 시도를 보여 준다', async () => {
