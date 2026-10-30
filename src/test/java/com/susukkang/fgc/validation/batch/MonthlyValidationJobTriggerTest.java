@@ -1,9 +1,12 @@
 package com.susukkang.fgc.validation.batch;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.validation.dto.ValidationRunRow;
 import com.susukkang.fgc.validation.entity.ValidationRun;
 import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.validation.repository.MonthlyJobExecutionLookup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,12 +17,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.JobInstance;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import static org.mockito.Mockito.times;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,9 +56,59 @@ class MonthlyValidationJobTriggerTest {
 
     @Mock
     private ValidationRunRepository validationRunRepository;
+    @Mock
+    private MonthlyJobExecutionLookup monthlyJobExecutionLookup;
+
+    @Test
+    void missingCheckpointIsRejectedBeforeAsyncAcceptance() throws Exception {
+        var failed = row("FAILED");
+        given(monthlyJobExecutionLookup.findFailedExecution(failed))
+                .willThrow(new IllegalStateException("메타데이터 없음"));
+        assertThatThrownBy(() -> trigger.launch(failed, "retry"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_005));
+        verify(jobLauncher, never()).run(any(), any());
+    }
 
     @InjectMocks
     private MonthlyValidationJobTrigger trigger;
+
+    @Test
+    void queuedDuplicateCannotRestartAgainWhenFirstRetryFails() throws Exception {
+        var failed = row("FAILED");
+        given(validationRunRepository.findById(100L)).willReturn(Optional.of(entity(ValidationRunStatus.FAILED)));
+        var params = new JobParametersBuilder().addString("validationMonth", "2026-07").addLong("runNo", 2L)
+                .addString("runType", "MONTHLY").addLong("triggeredBy", 7L).addString("requestId", "old").toJobParameters();
+        var old = new JobExecution(new JobInstance(50L, "MonthlyValidationJob"), params);
+        old.setId(60L);
+        old.setStatus(BatchStatus.FAILED);
+        old.getExecutionContext().putLong("validationRunId", 100L);
+        var latest = new AtomicReference<>(old);
+        given(monthlyJobExecutionLookup.findFailedExecution(failed)).willAnswer(ignored -> latest.get());
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        given(jobLauncher.run(eq(monthlyValidationJob), any())).willAnswer(invocation -> {
+            entered.countDown();
+            if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("테스트 대기 시간 초과");
+            var retry = new JobExecution(old.getJobInstance(), invocation.getArgument(1));
+            retry.setId(61L);
+            retry.setStatus(BatchStatus.FAILED);
+            retry.getExecutionContext().putLong("validationRunId", 100L);
+            latest.set(retry);
+            return retry;
+        });
+        var first = trigger.launch(failed, "first-request");
+        try {
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = trigger.launch(failed, "queued-request");
+            release.countDown();
+            assertThat(first.get(10, TimeUnit.SECONDS).getId()).isEqualTo(61L);
+            assertThatThrownBy(second::join).isInstanceOf(CompletionException.class);
+            verify(jobLauncher, times(1)).run(eq(monthlyValidationJob), any());
+        } finally {
+            release.countDown();
+        }
+    }
 
     @AfterEach
     void shutdownExecutor() {
@@ -94,6 +154,30 @@ class MonthlyValidationJobTriggerTest {
         assertThat(params.getString("runType")).isEqualTo("MONTHLY");
         assertThat(params.getLong("triggeredBy")).isEqualTo(7L);
         assertThat(params.getString("requestId")).isEqualTo("20260817-abc123");
+        assertThat(params.getParameters().get("requestId").isIdentifying()).isFalse();
+    }
+
+    @Test
+    void restartsLegacyInstanceWithoutChangingIdentifyingParameters() throws Exception {
+        var failed = row("FAILED");
+        given(validationRunRepository.findById(100L)).willReturn(Optional.of(entity(ValidationRunStatus.FAILED)));
+        var legacy = new JobParametersBuilder().addString("validationMonth", "2026-07")
+                .addLong("runNo", 2L).addString("runType", "MONTHLY").addLong("triggeredBy", 7L)
+                .addString("requestId", "legacy-request", true).toJobParameters();
+        var previous = new JobExecution(new JobInstance(50L, "MonthlyValidationJob"), legacy);
+        previous.setStatus(BatchStatus.FAILED);
+        previous.setId(60L);
+        previous.getExecutionContext().putLong("validationRunId", 100L);
+        given(monthlyJobExecutionLookup.findFailedExecution(failed)).willReturn(previous);
+        given(jobLauncher.run(eq(monthlyValidationJob), any())).willReturn(mock(JobExecution.class));
+
+        trigger.launch(failed, "new-retry-request").join();
+
+        var captor = ArgumentCaptor.forClass(JobParameters.class);
+        verify(jobLauncher).run(eq(monthlyValidationJob), captor.capture());
+        assertThat(captor.getValue().getIdentifyingParameters()).isEqualTo(legacy.getIdentifyingParameters());
+        assertThat(captor.getValue().getString("restartRequestId")).isEqualTo("new-retry-request");
+        assertThat(captor.getValue().getLong("restartValidationRunId")).isEqualTo(100L);
     }
 
     @Test

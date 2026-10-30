@@ -18,7 +18,8 @@
     "excp-w01",
     "vrun-w01",
     "vrun-w02",
-    "audt-w01"
+    "audt-w01",
+    "claw-w01"
   ],
   "navigation.group": [
     "contracts",
@@ -90,6 +91,18 @@
     "recon",
     "journal",
     "open"
+  ],
+  "clawback.evidence": [
+    "source",
+    "payment",
+    "schedule",
+    "effects"
+  ],
+  "agent.guide-menu": [
+    "agent.portfolio",
+    "agent.contract.find",
+    "agent.contract.detail",
+    "agent.payments"
   ],
   "policy.draft-input": [
     "basicdocumentversion",
