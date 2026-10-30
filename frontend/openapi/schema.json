@@ -200,6 +200,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseCalculation" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Calculation"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseCapCheckBasisResponse" : {
         "properties" : {
           "data" : {
@@ -2165,6 +2179,30 @@
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "ClawbackCalculationRequest" : {
+        "properties" : {
+          "expectedSourceVersion" : {
+            "description" : "IF-API-84에서 받은 sourceVersion. 다르면 409 FGC-IMPL-STATE_CHANGED",
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "description" : "IF-API-84 policyCandidates 중 사용자가 확인한 정책버전",
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "description" : "계산 사유 1~500자",
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedSourceVersion", "policyVersionId", "reason" ],
         "type" : "object"
       },
       "ClawbackCandidateDetailResponse" : {
@@ -8625,6 +8663,73 @@
           }
         },
         "summary" : "IF-API-84 환수 후보 원천·지급·보류 근거 조회",
+        "tags" : [ "clawback-candidate-controller" ]
+      }
+    },
+    "/api/v1/clawbacks/candidates/{candidateId}/calculations" : {
+      "post" : {
+        "description" : "선택한 정책버전과 서버가 잠근 원천으로 계산판을 만듭니다. 최신 판과 원천·정책·산식이 같으면 그 판을 반환하고, 같은 Idempotency-Key 재요청은 최초 결과를 반환합니다.",
+        "operationId" : "calculateClawbackCandidate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "candidateId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "계산 요청의 멱등키",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ClawbackCalculationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                }
+              }
+            },
+            "description" : "계산판"
+          },
+          "409" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                }
+              }
+            },
+            "description" : "원천 버전 변경 또는 멱등키 충돌"
+          },
+          "422" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                }
+              }
+            },
+            "description" : "적용 정책·계산 근거 부족"
+          }
+        },
+        "summary" : "IF-API-85 환수액 계산",
         "tags" : [ "clawback-candidate-controller" ]
       }
     },
