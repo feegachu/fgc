@@ -34,6 +34,49 @@ const detail = (header: ReturnType<typeof run>) => ({
   },
 })
 
+test('실패 월 재시작은 이전 시도를 기다리고 다른 탭의 빠른 재실패도 표시한다', async ({ page }, testInfo) => {
+  let accepted = false
+  let pollsAfterAccept = 0
+  let posts = 0
+  await page.route('**/api/v1/auth/refresh', (route) =>
+    route.fulfill({ json: envelope({ accessToken: 'restart-fixture' }) }))
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: envelope({
+    loginId: 'settle01', userName: '정산 담당자', roleCode: 'SETTLEMENT', canProcess: true,
+    canFinalizeValidation: false, demoMonth: '2026-07',
+  }) }))
+  const failed = () => run({ status: 'FAILED', statusLabel: '실패', currentStep: 6, failureMessage: '25번째 원장 저장 실패' })
+  await page.route('**/api/v1/validation-runs?**', (route) => route.fulfill({
+    json: envelope({ content: [failed()], page: 1, size: 20, totalElements: 1, totalPages: 1 }),
+  }))
+  await page.route('**/api/v1/validation-runs/7', (route) => route.fulfill({ json: envelope(detail(failed())) }))
+  await page.route('**/api/v1/validation-runs/7/progress', (route) => {
+    if (accepted) pollsAfterAccept += 1
+    const newAttempt = accepted && pollsAfterAccept > 1
+    return route.fulfill({ json: envelope({
+      status: 'FAILED', currentStep: 6, failedStep: 6, totalSteps: 10, progressPct: 60,
+      attemptId: newAttempt ? 11 : 10,
+      requestId: newAttempt ? 'other-tab-request' : 'old-request',
+      failureMessage: newAttempt ? '다른 탭이 재시작한 원장의 재실패' : '25번째 원장 저장 실패',
+    }) })
+  })
+  await page.route('**/api/v1/validation-runs/7/execute', (route) => {
+    accepted = true
+    posts += 1
+    return route.fulfill({ status: 202, json: envelope({ validationRunId: 7, status: 'RUNNING' }) })
+  })
+  await page.goto('validation-runs/7')
+  const restart = page.getByRole('button', { name: /실패 지점부터 재시작/ })
+  await expect(restart).toBeEnabled()
+  await testInfo.attach('재시작 전 - API fixture', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+  await restart.click()
+  await expect(restart).toBeDisabled()
+  await expect(page.getByText('실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.')).toBeVisible()
+  await expect(restart).toBeEnabled({ timeout: 10_000 })
+  await expect(page.getByText('다른 탭이 재시작한 원장의 재실패', { exact: false })).toBeVisible()
+  expect(posts).toBe(1)
+  await testInfo.attach('새 시도 재실패 - API fixture', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+})
+
 test('실행을 만들고 돌려 확정한다', async ({ page }) => {
   let status: 'CREATED' | 'RUNNING' | 'COMPLETED' | 'FINALIZED' = 'CREATED'
   let polls = 0
