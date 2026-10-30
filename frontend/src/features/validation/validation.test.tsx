@@ -302,6 +302,49 @@ describe('VRUN-W02 상세·실행·확정', () => {
     })
   }, 20000)
 
+  it('실패한 월 실행을 재시작하고 이전 FAILED 폴링 응답은 무시한다', async () => {
+    const failed = run({ status: 'FAILED', statusLabel: '실패', currentStep: 5, failureMessage: '25번째 실패' })
+    detailHandlers(failed)
+    let polls = 0
+    handlers['POST /api/v1/validation-runs/7/execute'] = () => ({ validationRunId: 7, status: 'RUNNING' })
+    handlers['GET /api/v1/validation-runs/7/progress'] = () => {
+      polls += 1
+      return polls <= 2
+        ? { status: 'FAILED', currentStep: 5, failureMessage: '25번째 실패', requestId: 'old-request', attemptId: 10 }
+        : {
+            status: 'FAILED',
+            currentStep: 5,
+            failureMessage: '다시 실패',
+            requestId: 'other-tab-request',
+            attemptId: 11,
+          }
+    }
+    const { actions } = renderAt('/app/validation-runs/7')
+    const restart = await screen.findByRole('button', { name: /실패 지점부터 재시작/ })
+    await waitFor(() => expect(restart).toBeEnabled())
+    await actions.click(restart)
+    await waitFor(() => expect(polls).toBe(2))
+    expect(screen.getByRole('button', { name: /실패 지점부터 재시작/ })).toBeDisabled()
+    await waitFor(() => expect(polls).toBeGreaterThan(2), { timeout: 5000 })
+    await waitFor(() => expect(screen.getByRole('button', { name: /실패 지점부터 재시작/ })).toBeEnabled())
+    expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+  }, 15000)
+
+  it('계약수동 실패는 월 재시작을 할 수 없다', async () => {
+    detailHandlers(run({ status: 'FAILED', runType: 'MANUAL_CONTRACT', currentStep: 3 }))
+    renderAt('/app/validation-runs/7')
+    expect(await screen.findByRole('button', { name: /실행$/ })).toBeDisabled()
+    expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(0)
+  })
+
+  it('실패한 월 실행도 조회 전용 사용자는 재시작할 수 없다', async () => {
+    currentUser = gaAdmin
+    detailHandlers(run({ status: 'FAILED', currentStep: 5 }))
+    renderAt('/app/validation-runs/7')
+    expect(await screen.findByRole('button', { name: /실패 지점부터 재시작/ })).toBeDisabled()
+    expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(0)
+  })
+
   it('GA_ADMIN 은 8개 조건 통과 후 확정하고 완료 모달을 본다 — 실패 후 재시도는 같은 멱등키를 쓴다', async () => {
     currentUser = gaAdmin
     detailHandlers()
@@ -378,4 +421,36 @@ describe('VRUN-W02 상세·실행·확정', () => {
     await screen.findByText('미충족 1건')
     expect(screen.queryByRole('link', { name: /바로가기/ })).toBeNull()
   })
+})
+
+it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수동 조회로 복귀하며 재전송하지 않는다', async () => {
+  const nativeTimeout = window.setTimeout.bind(window)
+  vi.spyOn(window, 'setTimeout').mockImplementation(((handler: TimerHandler, delay?: number, ...args: unknown[]) =>
+    nativeTimeout(handler, delay === 120_000 ? 20 : delay, ...args)) as typeof window.setTimeout)
+  detailHandlers(run({ status: 'FAILED', currentStep: 5 }))
+  let advanced = false
+  handlers['POST /api/v1/validation-runs/7/execute'] = () => ({ validationRunId: 7, status: 'RUNNING' })
+  handlers['GET /api/v1/validation-runs/7/progress'] = () => ({
+    status: 'FAILED',
+    currentStep: 5,
+    attemptId: advanced ? 11 : 10,
+  })
+  const { actions } = renderAt('/app/validation-runs/7')
+  const restart = await screen.findByRole('button', { name: /실패 지점부터 재시작/ })
+  await waitFor(() => expect(restart).toBeEnabled())
+  await actions.click(restart)
+  const message = await screen.findByText(
+    '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.',
+  )
+  expect(message).toHaveAttribute('role', 'alert')
+  expect(restart).toBeDisabled()
+  expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+  const pollsAfterDeadline = calls('GET /api/v1/validation-runs/7/progress').length
+  await new Promise((resolve) => nativeTimeout(resolve, 2100))
+  expect(calls('GET /api/v1/validation-runs/7/progress')).toHaveLength(pollsAfterDeadline)
+  advanced = true
+  await actions.click(screen.getByRole('button', { name: '새로고침' }))
+  await waitFor(() => expect(restart).toBeEnabled())
+  expect(message).not.toBeVisible()
+  expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
 })

@@ -545,6 +545,19 @@ public class PolicyWriteRepository {
                 """, String.class));
     }
 
+    private static final String COMMISSION_SCOPE_OVERLAP = """
+            EXISTS (
+              SELECT 1 FROM fgc.commission_rule a JOIN fgc.commission_rule c
+                ON c.policy_version_id = candidate.policy_version_id
+              WHERE a.policy_version_id = active.policy_version_id
+                AND a.payment_stage = c.payment_stage
+                AND (a.insurer_id IS NULL OR c.insurer_id IS NULL OR a.insurer_id = c.insurer_id)
+                AND (a.product_offering_id IS NULL OR c.product_offering_id IS NULL
+                     OR a.product_offering_id = c.product_offering_id)
+                AND (a.organization_id IS NULL OR c.organization_id IS NULL
+                     OR a.organization_id = c.organization_id))
+            """;
+
     public boolean hasActiveOverlap(PolicyVersion policy, boolean excludeSameCode) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
@@ -563,16 +576,7 @@ public class PolicyWriteRepository {
                         AND COALESCE(candidate.fee_regime_code, 'CURRENT') = 'CURRENT'
                         AND (active.basic_document_version IS NULL OR candidate.basic_document_version IS NULL
                              OR active.basic_document_version = candidate.basic_document_version)
-                        AND EXISTS (
-                          SELECT 1 FROM fgc.commission_rule a JOIN fgc.commission_rule c
-                            ON c.policy_version_id = candidate.policy_version_id
-                          WHERE a.policy_version_id = active.policy_version_id
-                            AND a.payment_stage = c.payment_stage
-                            AND (a.insurer_id IS NULL OR c.insurer_id IS NULL OR a.insurer_id = c.insurer_id)
-                            AND (a.product_offering_id IS NULL OR c.product_offering_id IS NULL
-                                 OR a.product_offering_id = c.product_offering_id)
-                            AND (a.organization_id IS NULL OR c.organization_id IS NULL
-                                 OR a.organization_id = c.organization_id)))
+                        AND %s)
                       OR EXISTS (
                         SELECT 1 FROM fgc.fee_regime_ruleset a JOIN fgc.fee_regime_ruleset c
                           ON c.policy_version_id = candidate.policy_version_id
@@ -586,10 +590,16 @@ public class PolicyWriteRepository {
                           AND daterange(a.sales_start_date_from, a.sales_start_date_to, '[]')
                               && daterange(c.sales_start_date_from, c.sales_start_date_to, '[]')
                           AND daterange(a.basic_document_date_from, a.basic_document_date_to, '[]')
-                              && daterange(c.basic_document_date_from, c.basic_document_date_to, '[]'))
+                              && daterange(c.basic_document_date_from, c.basic_document_date_to, '[]')
+                          AND (%s OR (
+                            (NOT EXISTS (SELECT 1 FROM fgc.commission_rule WHERE policy_version_id = active.policy_version_id)
+                             OR EXISTS (SELECT 1 FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = a.fee_regime_ruleset_id))
+                            AND (NOT EXISTS (SELECT 1 FROM fgc.commission_rule WHERE policy_version_id = candidate.policy_version_id)
+                             OR EXISTS (SELECT 1 FROM fgc.fee_regime_ruleset_limit WHERE fee_regime_ruleset_id = c.fee_regime_ruleset_id)))))
                     )
                 )
-                """, Boolean.class, policy.getPolicyVersionId(), excludeSameCode));
+                """.formatted(COMMISSION_SCOPE_OVERLAP, COMMISSION_SCOPE_OVERLAP),
+                Boolean.class, policy.getPolicyVersionId(), excludeSameCode));
     }
 
     private String json(Object value) {
