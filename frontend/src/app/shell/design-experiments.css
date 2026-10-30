@@ -210,7 +210,7 @@
   top: auto;
   bottom: 0;
   height: 3px;
-  background: var(--design-button-custom, #0046ff);
+  background: var(--design-accent, #0046ff);
 }
 .app-shell[data-tab-style='underline'] .workspace-tab-link {
   grid-template-columns: minmax(0, 1fr);
@@ -230,8 +230,8 @@
   background: #f1f5f9;
 }
 .app-shell[data-tab-style='pills'] .workspace-tab.is-active {
-  color: #1748b5;
-  background: #e5edff;
+  color: var(--design-accent);
+  background: color-mix(in srgb, var(--design-accent) 10%, white);
 }
 .app-shell:is([data-tab-style='pills'], [data-tab-style='compact']) .workspace-tab.is-active::before {
   display: none;
@@ -281,6 +281,57 @@
 }
 
 /* Independent primary and sidebar menu colors. */
+.app-shell[data-button-color-mode='theme'] {
+  --color-action-primary: var(--design-accent);
+  --color-action-primary-hover: color-mix(in srgb, var(--design-accent), black 12%);
+  --color-action-primary-down: color-mix(in srgb, var(--design-accent), black 20%);
+  --color-action-subtle: color-mix(in srgb, var(--design-accent) 8%, white);
+}
+.app-shell[data-button-color-mode='theme'] .page-content .button-primary:not(:disabled):not(.is-disabled) {
+  color: #fff;
+  background: var(--design-accent);
+}
+.app-shell[data-button-color-mode='theme'] .page-content .button-primary:hover:not(:disabled):not(.is-disabled) {
+  background: var(--color-action-primary-hover);
+}
+.app-shell[data-button-color-mode='theme'] .page-content .button-secondary:not(:disabled):not(.is-disabled) {
+  color: var(--design-accent);
+  border-color: color-mix(in srgb, var(--design-accent) 20%, transparent);
+  background: color-mix(in srgb, var(--design-accent) 5%, white);
+}
+.app-shell[data-button-color-mode='theme'] .page-content .button-secondary:hover:not(:disabled):not(.is-disabled) {
+  background: color-mix(in srgb, var(--design-accent) 10%, white);
+}
+.app-shell[data-button-color-mode='theme'] .page-content .button-ghost:not(:disabled):not(.is-disabled) {
+  color: var(--design-accent);
+}
+.app-shell[data-button-color-mode='theme'][data-sidebar-dark-text='true']
+  .app-sidebar
+  :is(.sidebar-nav-link, .sidebar-nav-summary, .sidebar-subnav-link):hover {
+  background: color-mix(in srgb, var(--design-accent) 7%, transparent);
+}
+.app-shell[data-button-color-mode='theme'][data-sidebar-dark-text='true']
+  .app-sidebar
+  :is(.sidebar-nav-link.is-active, .sidebar-nav-details[open] > .sidebar-nav-summary, .sidebar-subnav-link.is-active) {
+  color: color-mix(in srgb, var(--design-accent) 85%, #0f172a);
+  background: color-mix(in srgb, var(--design-accent) 12%, transparent);
+}
+.design-button-theme-preview {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.design-button-theme-preview > span {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  color: white;
+  background: var(--design-accent);
+  font-size: 0.75rem;
+}
+.design-button-theme-preview > span + span {
+  color: var(--design-accent);
+  background: color-mix(in srgb, var(--design-accent) 12%, transparent);
+}
 .app-shell[data-custom-button-color='true'] .button.button-primary:not(:disabled):not(.is-disabled) {
   color: var(--design-button-text);
   background: var(--design-button-custom);
@@ -317,8 +368,8 @@
 .app-shell[data-glass-sidebar='true']:not([data-custom-sidebar-button='true'])
   .app-sidebar
   :is(.sidebar-nav-link.is-active, .sidebar-nav-details[open] > .sidebar-nav-summary, .sidebar-subnav-link.is-active) {
-  color: #145d95;
-  background: #ffffff66;
+  color: color-mix(in srgb, var(--design-accent) 35%, #0f172a);
+  background: color-mix(in srgb, var(--design-accent) 10%, #ffffff66);
   box-shadow:
     inset 0 0 0 1px #ffffff80,
     0 3px 12px #27416e0a;
@@ -391,6 +442,9 @@
 .app-shell[data-glass-cards='true'] .page-content .data-table tbody tr:hover {
   background: #ffffff40;
 }
+.app-shell[data-glass-cards='true'] .page-content .data-table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--color-action-primary) 8%, transparent);
+}
 .design-preview-navigation {
   display: flex;
   flex-wrap: wrap;
@@ -407,7 +461,7 @@
 }
 .app-shell[data-glass-buttons='true'] .page-content .button:not(:disabled):not(.is-disabled) {
   border: 1px solid #ffffffb3;
-  color: #174f80;
+  color: color-mix(in srgb, var(--design-accent) 35%, #0f172a);
   background: #ffffff66;
   backdrop-filter: blur(var(--design-glass-blur)) saturate(150%);
   box-shadow:
@@ -415,8 +469,14 @@
     0 4px 12px #26496e0d;
 }
 .app-shell[data-glass-buttons='true'] .page-content .button-primary:not(:disabled):not(.is-disabled) {
-  color: #133e62;
-  background: color-mix(in srgb, var(--design-button-custom, #95cbf0) 28%, #ffffff99);
+  color: color-mix(in srgb, var(--design-accent) 35%, #0f172a);
+  background: color-mix(in srgb, var(--design-accent) 28%, #ffffff99);
+}
+.app-shell[data-glass-buttons='true'] .page-content .button:hover:not(:disabled):not(.is-disabled) {
+  background: #ffffff99;
+}
+.app-shell[data-glass-buttons='true'] .page-content .button-primary:hover:not(:disabled):not(.is-disabled) {
+  background: color-mix(in srgb, var(--design-accent) 38%, #ffffff99);
 }
 .app-shell[data-glass-tabs='true'] .app-header {
   background: #ffffff59;
@@ -434,7 +494,7 @@
   background: #ffffff33;
 }
 .app-shell[data-glass-tabs='true'] .workspace-tab.is-active {
-  color: #174f80;
+  color: color-mix(in srgb, var(--design-accent) 35%, #0f172a);
   background: #ffffff99;
   box-shadow: 0 3px 12px #26496e0a;
 }
@@ -598,12 +658,27 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Keep each header preset's line color and fade only its bottom border. */
-.app-shell[data-table-header-style] .page-content .data-table th {
+/* Fade header and data-row dividers while keeping each preset's line color. */
+.app-shell[data-table-header-style] .page-content .data-table :is(th, td) {
   border-bottom-color: color-mix(
     in srgb,
     var(--design-header-line-base, var(--design-table-line, var(--color-border-default)))
       var(--design-header-line-opacity),
     transparent
   );
+}
+
+/* Highlight the entire workspace tab, including its close-button area. */
+.app-shell[data-tab-style] .workspace-tab {
+  --design-tab-hover: color-mix(in srgb, var(--design-accent) 8%, white);
+  transition: background-color 140ms ease;
+}
+.app-shell:is([data-glass-tabs='true'], [data-glass-cards='true']) .workspace-tab {
+  --design-tab-hover: color-mix(in srgb, var(--design-accent) 10%, #ffffff66);
+}
+.app-shell[data-tab-style] .workspace-tab:is(:hover, :focus-within) {
+  background: var(--design-tab-hover);
+}
+.app-shell[data-tab-style] .workspace-tab-close:hover {
+  background: color-mix(in srgb, var(--design-accent) 16%, transparent);
 }

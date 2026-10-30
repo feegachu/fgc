@@ -4,6 +4,10 @@ import { create } from 'zustand'
 export const DESIGN_SETTINGS_KEY = 'fgc.design-settings.v1'
 export type SidebarDesign = 'current' | 'a' | 'b' | 'c' | 'glass'
 export const extraDesignOptions = {
+  buttonColorMode: [
+    ['theme', '전체 시안에 자동 맞춤 (기본)'],
+    ['custom', '색상 직접 지정'],
+  ],
   summaryDisplay: [
     ['donut', '도넛과 범례 (기존)'],
     ['bars', '가로 요약 막대'],
@@ -96,6 +100,7 @@ export const defaultDesignPreferences: DesignPreferences = {
   sidebarDesign: 'current',
   sidebarColor: null,
   componentDesign: 'current',
+  buttonColorMode: 'theme',
   buttonDesign: 'inherit',
   fieldDesign: 'inherit',
   tableDesign: 'inherit',
@@ -231,6 +236,21 @@ export function sidebarAppearance(preferences: DesignPreferences, isAgent: boole
 }
 
 export function designAppearance(preferences: DesignPreferences, isAgent: boolean): CSSProperties {
+  const buttonDesign = resolveComponentDesign(preferences, 'buttonDesign')
+  const themeAccent = {
+    current: '#1f54e5',
+    a: '#0046ff',
+    b: '#2070e8',
+    c: '#171717',
+    glass:
+      preferences.backgroundStyle === 'lavender'
+        ? '#6d4dc0'
+        : preferences.backgroundStyle === 'aurora'
+          ? '#465ab8'
+          : '#145d95',
+  }[buttonDesign]
+  const buttonColor = preferences.buttonColorMode === 'custom' ? preferences.buttonColor : null
+  const sidebarButtonColor = preferences.buttonColorMode === 'custom' ? preferences.sidebarButtonColor : null
   const palettes = {
     semantic: '#2563eb',
     blue: '#2563eb',
@@ -241,12 +261,12 @@ export function designAppearance(preferences: DesignPreferences, isAgent: boolea
   }
   return {
     ...sidebarAppearance(preferences, isAgent).style,
-    '--design-button-custom': preferences.buttonColor ?? undefined,
-    '--design-button-text':
-      preferences.buttonColor && sidebarUsesDarkText(preferences.buttonColor) ? '#000000' : '#ffffff',
-    '--design-sidebar-active': preferences.sidebarButtonColor ?? undefined,
+    '--design-accent': buttonColor ?? themeAccent,
+    '--design-button-custom': buttonColor ?? undefined,
+    '--design-button-text': buttonColor && sidebarUsesDarkText(buttonColor) ? '#000000' : '#ffffff',
+    '--design-sidebar-active': sidebarButtonColor ?? undefined,
     '--design-sidebar-active-text':
-      preferences.sidebarButtonColor && sidebarUsesDarkText(preferences.sidebarButtonColor) ? '#000000' : '#ffffff',
+      sidebarButtonColor && sidebarUsesDarkText(sidebarButtonColor) ? '#000000' : '#ffffff',
     '--design-header-color': preferences.tableHeaderColor ?? '#eef2ff',
     '--design-header-text': sidebarUsesDarkText(preferences.tableHeaderColor ?? '#eef2ff') ? '#171717' : '#ffffff',
     '--design-header-line-opacity': `${preferences.tableHeaderLineOpacity * 100}%`,

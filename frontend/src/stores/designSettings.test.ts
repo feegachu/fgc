@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import {
   defaultDesignPreferences,
+  designAppearance,
   DESIGN_SETTINGS_KEY,
   readDesignPreferences,
   sidebarAppearance,
@@ -85,5 +86,25 @@ it('기존 역할별 색은 유지하고 사용자 배경색에 대비되는 글
   expect(sidebarAppearance({ ...defaultDesignPreferences, sidebarColor: '#101010' }, false)).toMatchObject({
     darkText: false,
     style: { '--color-nav-text-default': '#ffffff' },
+  })
+})
+
+it('자동 맞춤에서는 이전에 지정한 버튼색이 시안 색상을 덮지 않고 직접 지정 모드에서만 적용된다', () => {
+  const preferences = {
+    ...defaultDesignPreferences,
+    componentDesign: 'c' as const,
+    buttonColor: '#c3cce4',
+    sidebarButtonColor: '#e8eeff',
+  }
+  expect(designAppearance(preferences, false)).toMatchObject({
+    '--design-accent': '#171717',
+    '--design-button-custom': undefined,
+    '--design-sidebar-active': undefined,
+  })
+  expect(designAppearance({ ...preferences, buttonColorMode: 'custom' }, false)).toMatchObject({
+    '--design-accent': '#c3cce4',
+    '--design-button-custom': '#c3cce4',
+    '--design-sidebar-active': '#e8eeff',
+    '--design-button-text': '#000000',
   })
 })

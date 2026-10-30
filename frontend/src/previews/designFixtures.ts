@@ -1,3 +1,5 @@
+import type { CandidateRow } from '../features/clawback/api'
+
 // Synthetic, read-only fixtures for comparing the actual screens in /design-preview.
 export const designPreviewUser = {
   loginId: 'design-preview',
@@ -11,6 +13,25 @@ export const designPreviewUser = {
   canFinalizeValidation: false,
 }
 const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
+const clawbackCandidates: CandidateRow[] = [12, 11, 10].map((candidateId, index) => ({
+  candidateId,
+  contractId: candidateId,
+  contractNo: `PREVIEW-2026-00${index + 1}`,
+  insurerName: '미리보기 생명',
+  productName: '예시 건강보험',
+  agentName: '예시 설계사',
+  triggerType: 'ARBITRAGE',
+  sourceId: candidateId,
+  eventDate: '2026-07-31',
+  dateBasisLabel: '검증기준일',
+  contractDate: `2026-05-0${index + 1}`,
+  calculationStatus: 'UNCALCULATED',
+  reviewReasons: [],
+  paidAmount: 100000,
+  unpaidAmount: 0,
+  calculatedAmount: null,
+  allowedActions: [],
+}))
 const run = {
   validationRunId: 1,
   validationMonth: '2026-07-01',
@@ -38,6 +59,17 @@ const reconciliation = {
 export function designPreviewData(url: URL): unknown {
   const path = url.pathname
   if (path === '/api/v1/auth/me') return designPreviewUser
+  if (path === '/api/v1/clawbacks/candidates')
+    return { ...page, content: clawbackCandidates, totalElements: clawbackCandidates.length, totalPages: 1 }
+  if (path.startsWith('/api/v1/clawbacks/candidates/'))
+    return {
+      candidate: clawbackCandidates.find((row) => row.candidateId === Number(path.split('/').at(-1))),
+      sourceRefs: [],
+      paymentAttributions: [],
+      scheduleLines: [],
+      effects: [],
+      policyCandidates: [],
+    }
   if (path === '/api/v1/cap-checks')
     return {
       ...page,

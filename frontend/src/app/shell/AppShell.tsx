@@ -13,7 +13,12 @@ import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { AgentTopbar } from './AgentTopbar'
 import { DeveloperSettings } from './DeveloperSettings'
-import { designAppearance, resolveComponentDesign, sidebarAppearance, useDesignSettings } from '../../stores/designSettings'
+import {
+  designAppearance,
+  resolveComponentDesign,
+  sidebarAppearance,
+  useDesignSettings,
+} from '../../stores/designSettings'
 import './component-designs.css'
 import './kpi-designs.css'
 import './design-experiments.css'
@@ -87,6 +92,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       data-kpi-style={import.meta.env.DEV ? preferences.kpiStyle : undefined}
       data-component-design={import.meta.env.DEV ? preferences.componentDesign : undefined}
       data-button-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'buttonDesign') : undefined}
+      data-button-color-mode={import.meta.env.DEV ? preferences.buttonColorMode : undefined}
       data-field-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'fieldDesign') : undefined}
       data-table-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'tableDesign') : undefined}
       data-badge-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'badgeDesign') : undefined}
@@ -97,8 +103,14 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       data-background-style={import.meta.env.DEV ? preferences.backgroundStyle : undefined}
       data-badge-style={import.meta.env.DEV ? preferences.badgeStyle : undefined}
       data-badge-palette={import.meta.env.DEV ? preferences.badgePalette : undefined}
-      data-custom-button-color={import.meta.env.DEV ? preferences.buttonColor !== null : undefined}
-      data-custom-sidebar-button={import.meta.env.DEV ? preferences.sidebarButtonColor !== null : undefined}
+      data-custom-button-color={
+        import.meta.env.DEV ? preferences.buttonColorMode === 'custom' && preferences.buttonColor !== null : undefined
+      }
+      data-custom-sidebar-button={
+        import.meta.env.DEV
+          ? preferences.buttonColorMode === 'custom' && preferences.sidebarButtonColor !== null
+          : undefined
+      }
       data-custom-table-header={import.meta.env.DEV ? preferences.tableHeaderColor !== null : undefined}
       data-custom-page-header={import.meta.env.DEV ? preferences.pageHeaderColor !== null : undefined}
       data-custom-background={import.meta.env.DEV ? preferences.backgroundColor !== null : undefined}
@@ -121,7 +133,11 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           loggingOut={loggingOut}
         />
         <header className="app-header app-header-rail">
-          {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? <AgentTopbar /> : <WorkspaceTabs activeId={current?.id} />}
+          {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? (
+            <AgentTopbar />
+          ) : (
+            <WorkspaceTabs activeId={current?.id} />
+          )}
           <div className="app-header-actions">
             {import.meta.env.DEV && <DeveloperSettings sidebarColor={appearance.color} />}
             <div className="app-header-field">

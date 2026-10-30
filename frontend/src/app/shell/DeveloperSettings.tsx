@@ -149,6 +149,7 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                 onChange={(event) =>
                   update({
                     componentDesign: event.target.value as SidebarDesign,
+                    buttonColorMode: 'theme',
                     glassButtons: event.target.value === 'glass',
                     glassCards: event.target.value === 'glass',
                     buttonDesign: 'inherit',
@@ -202,14 +203,14 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
             <ChoiceSetting label="표 컬럼 머리글" setting="tableHeaderStyle" />
             <ColorSetting label="컬럼 머리글 색상" setting="tableHeaderColor" fallback="#eef2ff" />
             <RangeSetting
-              label="컬럼 밑줄 불투명도"
+              label="표 구분선 불투명도"
               setting="tableHeaderLineOpacity"
               min={0}
               max={1}
               step={0.01}
               percent
             />
-            <p>0%는 밑줄 숨김, 100%는 기존 구분선입니다.</p>
+            <p>머리글과 데이터 행 사이의 가로 구분선에 적용됩니다. 0%는 숨김, 100%는 기존 농도입니다.</p>
           </fieldset>
           <fieldset className="design-experiment-group">
             <legend>제목과 화면 배경</legend>
@@ -220,9 +221,19 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
           </fieldset>
           <fieldset className="design-experiment-group">
             <legend>버튼 색상</legend>
-            <p>사이드바 배경과 메뉴 버튼, 공통 버튼 색상을 각각 선택합니다.</p>
-            <ColorSetting label="사이드바 메뉴 버튼색" setting="sidebarButtonColor" fallback="#e8eeff" />
-            <ColorSetting label="공통 버튼색" setting="buttonColor" fallback="#1f54e5" />
+            <p>전체 시안에 맞춰 버튼과 메뉴의 강조색, 호버색을 함께 조정합니다.</p>
+            <ChoiceSetting label="버튼 색상 적용" setting="buttonColorMode" />
+            {preferences.buttonColorMode === 'custom' ? (
+              <>
+                <ColorSetting label="사이드바 메뉴 버튼색" setting="sidebarButtonColor" fallback="#e8eeff" />
+                <ColorSetting label="공통 버튼색" setting="buttonColor" fallback="#1f54e5" />
+              </>
+            ) : (
+              <div className="design-button-theme-preview" aria-label="시안에 맞춘 버튼 색상">
+                <span>기본 버튼</span>
+                <span>메뉴 강조</span>
+              </div>
+            )}
           </fieldset>
           <fieldset className="design-experiment-group">
             <legend>계약 상태와 배지</legend>
@@ -247,6 +258,7 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                       sidebarDesign: 'glass',
                       sidebarColor: null,
                       componentDesign: 'glass',
+                      buttonColorMode: 'theme',
                       buttonDesign: 'inherit',
                       fieldDesign: 'inherit',
                       tableDesign: 'inherit',
@@ -264,7 +276,7 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                       badgePalette: preset === 'lavender' ? 'violet' : 'blue',
                       badgeColor: null,
                       sidebarButtonColor: null,
-                      buttonColor: preset === 'lavender' ? '#6d4dc0' : '#145d95',
+                      buttonColor: null,
                       glassOpacity: preset === 'aurora' ? 0.45 : preset === 'lavender' ? 0.58 : 0.62,
                       glassBlur: 22,
                     })

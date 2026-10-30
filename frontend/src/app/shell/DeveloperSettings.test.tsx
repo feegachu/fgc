@@ -40,8 +40,15 @@ it('컴포넌트 전체 스타일과 개별 디자인을 조합하고 일괄 선
   await user.selectOptions(screen.getByRole('combobox', { name: '전체 스타일' }), 'b')
   await user.selectOptions(screen.getByRole('combobox', { name: '버튼' }), 'c')
   expect(readDesignPreferences()).toMatchObject({ componentDesign: 'b', buttonDesign: 'c', fieldDesign: 'inherit' })
+  await user.selectOptions(screen.getByRole('combobox', { name: '버튼 색상 적용' }), 'custom')
+  fireEvent.input(screen.getByLabelText('공통 버튼색'), { target: { value: '#c3cce4' } })
   await user.selectOptions(screen.getByRole('combobox', { name: '전체 스타일' }), 'a')
-  expect(readDesignPreferences()).toMatchObject({ componentDesign: 'a', buttonDesign: 'inherit' })
+  expect(readDesignPreferences()).toMatchObject({
+    componentDesign: 'a',
+    buttonDesign: 'inherit',
+    buttonColorMode: 'theme',
+  })
+  expect(screen.queryByLabelText('공통 버튼색')).not.toBeInTheDocument()
 })
 
 it('시안을 선택하면 사용자 지정 색을 해제하고 바깥 클릭으로 접는다', async () => {
@@ -67,7 +74,8 @@ it('독립적인 표시·색상 설정과 글래스 프리셋을 저장하고 �
   await user.selectOptions(screen.getByRole('combobox', { name: '검증 현황 요약 표시' }), 'bars')
   await user.selectOptions(screen.getByRole('combobox', { name: '상단 탭바' }), 'underline')
   await user.selectOptions(screen.getByRole('combobox', { name: '표 컬럼 머리글' }), 'plain')
-  fireEvent.change(screen.getByRole('slider', { name: '컬럼 밑줄 불투명도' }), { target: { value: '0.37' } })
+  fireEvent.change(screen.getByRole('slider', { name: '표 구분선 불투명도' }), { target: { value: '0.37' } })
+  await user.selectOptions(screen.getByRole('combobox', { name: '버튼 색상 적용' }), 'custom')
   fireEvent.input(screen.getByLabelText('공통 버튼색'), { target: { value: '#112233' } })
   fireEvent.input(screen.getByLabelText('사이드바 메뉴 버튼색'), { target: { value: '#aabbcc' } })
   expect(readDesignPreferences()).toMatchObject({
@@ -87,8 +95,11 @@ it('독립적인 표시·색상 설정과 글래스 프리셋을 저장하고 �
     glassButtons: true,
     glassTabs: true,
     badgeStyle: 'glass',
+    buttonColorMode: 'theme',
+    buttonColor: null,
     glassBlur: 22,
   })
+  expect(screen.queryByLabelText('공통 버튼색')).not.toBeInTheDocument()
   await user.click(screen.getByRole('checkbox', { name: '사이드바 유리 효과' }))
   expect(readDesignPreferences().glassSidebar).toBe(false)
   await user.click(screen.getByRole('button', { name: '기본값 복원' }))

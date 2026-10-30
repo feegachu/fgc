@@ -13,6 +13,7 @@ import { ExceptionPage } from '../features/exception/ExceptionPage'
 import ReconciliationPage from '../features/reconciliation/ReconciliationPage'
 import ValidationRunDetailPage from '../features/validation/ValidationRunDetailPage'
 import { AgentHomePage } from '../features/agent-home/AgentHomePage'
+import ClawbackPage from '../features/clawback/ClawbackPage'
 import { designPreviewData } from './designFixtures'
 import { DesignPreviewShell, PreviewNavigation } from './DesignPreviewShell'
 import '../index.css'
@@ -154,6 +155,7 @@ const router = createMemoryRouter([
       ...[
         { path: '/cap-checks', element: <CapListPage /> },
         { path: '/arbitrage-checks', element: <ArbitragePage /> },
+        { path: '/clawbacks', element: <ClawbackPage /> },
         { path: '/exceptions', element: <ExceptionPage /> },
         { path: '/reconciliations', element: <ReconciliationPage /> },
         { path: '/validation-runs/:id', element: <ValidationRunDetailPage /> },

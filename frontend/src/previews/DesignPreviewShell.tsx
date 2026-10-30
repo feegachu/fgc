@@ -9,6 +9,7 @@ export function PreviewNavigation() {
         ['/', '대시보드'],
         ['/cap-checks', '한도 검증'],
         ['/arbitrage-checks', '차익거래'],
+        ['/clawbacks', '환수 검토'],
         ['/exceptions', '예외함'],
         ['/reconciliations?runId=41', '대사'],
         ['/validation-runs/1', '통합검증'],
