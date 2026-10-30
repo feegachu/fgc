@@ -188,3 +188,15 @@ describe('step-specific input guidance', () => {
     expect((await read()).attributionsReady).toBe(true)
   })
 })
+
+it('selects precheck only for a valid current saved payment and otherwise requires save', async () => {
+  const context = observer.readContext()
+  const state = await read()
+  expect(paymentGuideConditions.CURRENT_DRAFT_ALREADY_SAVED(context, state)).toBe('SATISFIED')
+  expect(paymentGuideConditions.DRAFT_SAVE_REQUIRED(context, state)).toBe('WAITING_INPUT')
+  for (const changed of [{ ...state, saved: false }, { ...state, valid: false }]) {
+    expect(paymentGuideConditions.CURRENT_DRAFT_ALREADY_SAVED(context, changed)).toBe('WAITING_INPUT')
+    expect(paymentGuideConditions.DRAFT_SAVE_REQUIRED(context, changed)).toBe('SATISFIED')
+  }
+  expect(paymentGuideConditions.CURRENT_DRAFT_ALREADY_SAVED({ ...context, entityRefs: [] }, state)).toBe('WAITING_INPUT')
+})
