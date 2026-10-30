@@ -240,7 +240,7 @@ function Snapshot({
             </div>
           </article>
         ) : (
-          <Link className="ah-kpi ah-kpi-link" to="/transactions" aria-label="수령 예정 수수료">
+          <Link className="ah-kpi ah-kpi-link" to={`/agent/statements?month=${month}`} aria-label="수령 예정 수수료">
             <span className="ah-kpi-label">수령 예정 수수료</span>
             <div className="ah-kpi-num">
               {commission.data == null ? '…' : <AnimatedNumber value={commission.data} format={int} />}

@@ -16,7 +16,7 @@ const groups = [
     id: 'contracts',
     title: '계약·지급',
     icon: 'payments',
-    paths: ['/contracts', '/transactions', '/schedules', '/clawbacks'],
+    paths: ['/contracts', '/transactions', '/agent/statements', '/schedules', '/clawbacks'],
   },
   {
     id: 'compliance',

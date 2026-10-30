@@ -1,0 +1,136 @@
+/* RPT-W02 설계사 수수료 명세 화면 전용 레이아웃. */
+.ast-page {
+  --ast-gray: #f3f0f7;
+  --ast-gray-line: #e2dce9;
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.ast-lede,
+.ast-count,
+.ast-card-note,
+.ast-muted {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.ast-filter { align-items: flex-end; }
+.ast-filter-fields { flex: 1 1 auto; }
+
+/* 조회 버튼은 사이드바 메뉴 색 계열로 맞춘다. */
+.ast-filter .button-primary { background: var(--color-nav-bg-default); }
+.ast-filter .button-primary:hover { background: var(--color-nav-bg-hover); }
+.ast-filter .button-primary:active { background: var(--color-nav-bg-active); }
+
+/* 유형별 요약: 표 위의 한 줄 막대. 흰 표면과 구분되도록 연한 회색 바탕을 쓴다. */
+.ast-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--ast-gray-line);
+  border-radius: var(--radius-md);
+  background: var(--ast-gray);
+  overflow: hidden;
+}
+
+.ast-card {
+  display: grid;
+  min-width: 0;
+  padding: var(--space-5, 1.25rem) var(--space-4);
+  gap: var(--space-1);
+}
+.ast-card + .ast-card { border-left: 1px solid var(--ast-gray-line); }
+
+.ast-card-label { display: flex; align-items: center; }
+
+.ast-card-amount {
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 2rem;
+}
+
+
+.ast-type {
+  --ast-tone: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 2px 10px 2px 8px;
+  border-radius: 999px;
+  color: var(--ast-tone);
+  background: color-mix(in srgb, var(--ast-tone) 12%, transparent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ast-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ast-tone); }
+.ast-type:has(.ast-dot-pay) { --ast-tone: #6f4a9c; }
+.ast-type:has(.ast-dot-held) { --ast-tone: #b7791f; }
+.ast-type:has(.ast-dot-adj) { --ast-tone: #1f7f93; }
+.ast-type:has(.ast-dot-claw) { --ast-tone: #c0392b; }
+
+.ast-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* 근거 보기: 목록 아래가 아니라 화면 오른쪽에 작게 열린다. */
+.ast-detail {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(23rem, 100vw);
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg-surface);
+  box-shadow: -8px 0 24px rgb(15 23 42 / 12%);
+}
+
+.ast-hero {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--ast-gray);
+}
+.ast-hero-amount { font-size: 1.5rem; line-height: 2rem; }
+
+.ast-group { margin-top: var(--space-4); }
+.ast-group-title {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ast-dl { display: grid; margin: 0; }
+
+.ast-dl-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.875rem;
+}
+.ast-dl-row:last-child { border-bottom: 0; }
+
+.ast-dl-row dt { color: var(--color-text-tertiary); font-size: 0.8125rem; }
+.ast-dl-row dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.ast-link { margin-top: var(--space-3); }
+
+@media (max-width: 56.25rem) {
+  .ast-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ast-card:nth-child(3) { border-left: 0; }
+  .ast-card:nth-child(n + 3) { border-top: 1px solid var(--ast-gray-line); }
+}
