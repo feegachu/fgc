@@ -12,7 +12,12 @@ export interface ShellUser {
 }
 import { roleLabels } from './labels'
 const groups = [
-  { id: 'contracts', title: '계약·지급', icon: 'payments', paths: ['/contracts', '/transactions', '/schedules'] },
+  {
+    id: 'contracts',
+    title: '계약·지급',
+    icon: 'payments',
+    paths: ['/contracts', '/transactions', '/schedules', '/clawbacks'],
+  },
   {
     id: 'compliance',
     title: '규제 검증',
@@ -140,7 +145,6 @@ export function Sidebar({
             </li>
           ))}
           {link('/exceptions')}
-          {link('/clawbacks')}
           {hasVisibleLinks(groups[3].paths) && <li className="sidebar-nav-section">
             <details className="sidebar-nav-details" open={openSections.includes('admin')}>
               <summary

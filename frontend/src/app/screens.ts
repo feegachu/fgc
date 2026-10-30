@@ -135,9 +135,9 @@ export const screens: ScreenDefinition[] = [
     id: 'CLAW-W01',
     path: '/clawbacks',
     title: '환수 검토·계산',
-    menuTitle: '환수',
     menu: '/clawbacks',
-    icon: 'undo',
+    section: 'contracts',
+    icon: 'payments',
   },
   {
     id: 'VRUN-W02',
