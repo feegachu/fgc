@@ -39,6 +39,8 @@ export interface ContractCriteria extends ContractFilters {
 }
 /** 서버(ContractQueryRepository.SORT_KEYS)와 같은 정렬 key */
 export const CONTRACT_SORT_KEYS = ['contractNo', 'insurerName', 'productName', 'contractDate', 'premium', 'agent'] as const
+/** 설계사 홈의 '확인 필요 계약' 카드와 같은 한도 판정 묶음 */
+export const NEED_CHECK_STATUSES = 'WARNING,VIOLATION,REVIEW_REQUIRED'
 export const FILTER_NAMES = [
   'contractNo',
   'insurerId',
@@ -65,6 +67,12 @@ const referenceId = (value: string | null) =>
 const allowedCode = (labels: Record<string, string>, value: string | null) =>
   value && Object.hasOwn(labels, value) ? value : ''
 
+/** 쉼표로 이어 쓴 코드 목록. 하나라도 모르는 코드면 검색 기본값으로 돌린다. */
+const allowedCodes = (labels: Record<string, string>, value: string | null) => {
+  const codes = value?.split(',') ?? []
+  return codes.length > 0 && codes.every((code) => Object.hasOwn(labels, code)) ? codes.join(',') : ''
+}
+
 /** 잘못된 URL 코드·날짜·ID는 검색 기본값으로 돌리고 현재 PC 날짜는 검색 조건에 넣지 않는다. */
 export function criteriaFromParams(params: URLSearchParams): ContractCriteria {
   const from = params.get('contractDateFrom')
@@ -76,7 +84,7 @@ export function criteriaFromParams(params: URLSearchParams): ContractCriteria {
     agentId: referenceId(params.get('agentId')),
     orgId: referenceId(params.get('orgId')),
     currentStatus: allowedCode(contractStatusLabels, params.get('currentStatus')),
-    capResultStatus: allowedCode(capStatusLabels, params.get('capResultStatus')),
+    capResultStatus: allowedCodes(capStatusLabels, params.get('capResultStatus')),
     contractDateFrom: validDate(from) ? from : '',
     contractDateTo: validDate(to) ? to : '',
     sort: formatSort(parseSort(params.get('sort'), CONTRACT_SORT_KEYS)),

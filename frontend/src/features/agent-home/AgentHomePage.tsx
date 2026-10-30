@@ -6,6 +6,7 @@ import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { errorText, int } from '../../lib/format'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { useAuth } from '../auth/useAuth'
+import { NEED_CHECK_STATUSES } from '../contract/api'
 import { agentCommissionQuery, agentContractsQuery, agentInsurersQuery, agentProductsQuery } from './api'
 import { Donut, ProductBars, StatusBar, Trend } from './charts'
 import {
@@ -82,6 +83,18 @@ function Delta({ value }: { value: number }) {
       className={`ah-delta ${value >= 0 ? 'up' : 'down'}`}
     >{`${value >= 0 ? '▲' : '▼'} ${Math.abs(value).toFixed(1)}%`}</span>
   )
+}
+
+/** 카드의 건수와 같은 조건(이번 달 계약·한도 주의/위반/검토필요)으로 계약 목록을 연다. */
+const needContractsHref = (month: string) => {
+  const [year, mon] = month.split('-').map(Number)
+  const last = String(new Date(year, mon, 0).getDate()).padStart(2, '0')
+  const query = new URLSearchParams({
+    capResultStatus: NEED_CHECK_STATUSES,
+    contractDateFrom: `${month}-01`,
+    contractDateTo: `${month}-${last}`,
+  })
+  return `/contracts?${query.toString()}`
 }
 
 function AgentHomeContent({ month }: { month: string }) {
@@ -238,7 +251,7 @@ function Snapshot({
             </div>
           </Link>
         )}
-        <Link className="ah-kpi ah-kpi-link ah-kpi-alert" to="/contracts" aria-label="확인 필요 계약">
+        <Link className="ah-kpi ah-kpi-link ah-kpi-alert" to={needContractsHref(month)} aria-label="확인 필요 계약">
           <span className="ah-kpi-label">확인 필요 계약</span>
           <div className="ah-kpi-num">
             <AnimatedNumber value={need} />

@@ -112,7 +112,10 @@ describe('AGNT-W01 포트폴리오', () => {
     renderHome()
     const card = await screen.findByRole('link', { name: '확인 필요 계약' })
     expect(card).toHaveTextContent('2건')
-    expect(card).toHaveAttribute('href', '/app/contracts')
+    expect(card).toHaveAttribute(
+      'href',
+      '/app/contracts?capResultStatus=WARNING%2CVIOLATION%2CREVIEW_REQUIRED&contractDateFrom=2026-07-01&contractDateTo=2026-07-31',
+    )
     expect(card).not.toHaveTextContent('내역 보기')
   })
 

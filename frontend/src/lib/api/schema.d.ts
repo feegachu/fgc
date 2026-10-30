@@ -2722,8 +2722,7 @@ export interface components {
         ContractSearchCondition: {
             /** Format: int64 */
             agentId?: number;
-            /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            capResultStatus?: ("NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE")[];
             /** Format: date */
             contractDateFrom?: string;
             /** Format: date */
