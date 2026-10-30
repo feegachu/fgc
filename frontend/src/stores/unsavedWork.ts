@@ -11,11 +11,11 @@ export const useUnsavedWorkStore = create<{ owners: Record<string, boolean>; mar
   }),
 }))
 
-export function useUnsavedWork(dirty: boolean) {
+export function useUnsavedWork(dirty: boolean, revision?: string) {
   const owner = useId()
   useEffect(() => {
     useUnsavedWorkStore.getState().mark(owner, dirty)
     return () => useUnsavedWorkStore.getState().mark(owner, false)
-  }, [owner, dirty])
+  }, [owner, dirty, revision])
   return () => useUnsavedWorkStore.getState().mark(owner, false)
 }

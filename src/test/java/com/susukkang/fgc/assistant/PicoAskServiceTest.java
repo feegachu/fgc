@@ -102,6 +102,12 @@ class PicoAskServiceTest {
         assertThatThrownBy(() -> service.ask(new PicoAskRequest("어디서?","CONT-W01",List.of(),"r1","2.0",List.of()))).isInstanceOf(FgcBusinessException.class);
         verifyNoInteractions(gateway);
     }
+    @Test void sourceLocationRetrievalUsesLabelsAndReturnsOnlyRegisteredHelp() {
+        var guide = catalog.definitions().stream().filter(item -> item.workflowId().equals("contract.register")).findFirst().orElseThrow();
+        assertThat(catalog.chunks(guide,"계약번호 입력은 어디서 하나요").stream().filter(chunk -> chunk.stepId() != null && chunk.stepId().startsWith("help.")))
+            .isNotEmpty().allSatisfy(chunk -> assertThat(chunk.chunkId()).startsWith("contract.register:help."));
+        assertThat(catalog.chunks(guide,"zzzzzz").stream().filter(chunk -> chunk.stepId() != null && chunk.stepId().startsWith("help."))).isEmpty();
+    }
     @Test void sharedCatalogIncludesAllRegisteredBusinessScreens() {
         assertThat(catalog.definitions()).hasSizeGreaterThan(3);
         assertThat(catalog.definitions().stream().flatMap(guide -> guide.steps().stream()).map(PicoGuideCatalog.Step::screenId).distinct())

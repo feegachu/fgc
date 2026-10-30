@@ -2,7 +2,7 @@ import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { ShellUser } from '../../app/shell/Sidebar'
-import { findGuide } from './catalog'
+import { findGuide, GUIDE_CATALOG } from './catalog'
 import type { AssistantContext, CalculationResult, MessageResult } from './contracts'
 import { checkGuideProposal, isCurrentResponse, isWonAmount } from './guards'
 import { PAYMENT_SCENARIOS, readPaymentFixture } from './fixtures'
@@ -19,7 +19,7 @@ import { PicoGuideStartButton } from './PicoGuideStartButton'
 import type { PicoReply } from './pico-api'
 import type { PicoTurn } from './pico-api'
 import { screenFor } from '../../app/screens'
-import { findWorkflowGuide, WORKFLOW_GUIDES } from './workflow-catalog'
+import { findWorkflowGuide, WORKFLOW_GUIDES, workflowSteps } from './workflow-catalog'
 import { useWorkflowGuide } from './workflow-state'
 
 const labels: Record<PaymentScenario, string> = {
@@ -150,22 +150,24 @@ export function AssistantDemoMount({
 }) {
   if (!enabled || loggingOut || !['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'].includes(user.roleCode))
     return null
-  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} screenId={screenId} screenContext={screenContext} />
+  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} roleCode={user.roleCode} screenId={screenId} screenContext={screenContext} />
 }
-function AssistantWithGuide({ canProcess, screenId, screenContext }: { canProcess: boolean; screenId?: string; screenContext?: string }) {
+function AssistantWithGuide({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
   useEffect(() => () => useGuideRuntime.getState().reset(), [])
   return (
     <>
-      <PicoAssistant canProcess={canProcess} screenId={screenId} screenContext={screenContext} />
+      <PicoAssistant canProcess={canProcess} roleCode={roleCode} screenId={screenId} screenContext={screenContext} />
       <PaymentGuideOverlay />
     </>
   )
 }
-export function PicoAssistant({ canProcess, screenId, screenContext }: { canProcess: boolean; screenId?: string; screenContext?: string }) {
+export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
   const [open, setOpen] = useState(false)
   const aiEnabled = import.meta.env.VITE_ASSISTANT_AI === 'true'
   const currentScreen = screenId ?? screenFor(window.location.pathname)?.id ?? 'CMN-C04'
-  const suggestions = WORKFLOW_GUIDES.filter((guide) => guide.steps.some((step) => step.screenId === currentScreen)).slice(0, 3)
+  const currentRole = roleCode ?? (canProcess ? 'SETTLEMENT' : 'GA_ADMIN')
+  const availableWorkflows = WORKFLOW_GUIDES.filter((guide) => guide.roles.includes(currentRole))
+  const suggestions = availableWorkflows.filter((guide) => guide.steps.some((step) => step.screenId === currentScreen)).slice(0, 3)
   const syntheticEnabled = !aiEnabled
   const [aiBusy, setAiBusy] = useState(false)
   const aiRequest = useRef<AbortController | null>(null)
@@ -275,7 +277,7 @@ export function PicoAssistant({ canProcess, screenId, screenContext }: { canProc
       const generalGuide = activeGuideContext ? findWorkflowGuide(activeGuideContext.workflowId, '1.0') : null
       const paymentGuide = activeGuideContext ? findGuide(activeGuideContext.workflowId, '1.0') : null
       const contextGuide = generalGuide ?? paymentGuide
-      const contextStep = contextGuide?.steps.find((step) => step.stepId === activeGuideContext?.stepId)
+      const contextStep = (generalGuide ? workflowSteps(generalGuide) : contextGuide?.steps)?.find((step) => step.stepId === activeGuideContext?.stepId)
       const history = conversation.entries.flatMap((entry): PicoTurn[] =>
         entry.role === 'user'
           ? [{ role: 'USER', text: entry.text }]
@@ -316,9 +318,10 @@ export function PicoAssistant({ canProcess, screenId, screenContext }: { canProc
             id: previous.entries.length,
             role: 'notice',
             text:
-              error instanceof ApiError && error.code === 'FGC-IMPL-GUIDE_VERSION_MISMATCH'
+              (error instanceof ApiError && error.code === 'FGC-IMPL-GUIDE_VERSION_MISMATCH') ||
+              (error instanceof Error && ['INVALID_PICO_REPLY', 'INVALID_PICO_EVIDENCE', 'MISSING_PICO_EVIDENCE'].includes(error.message))
                 ? '가이드 버전이 변경됐어요. 작성 중인 내용을 보존한 뒤 화면을 새로 열어주세요.'
-                : '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 지급 화면의 고정 도움말을 사용할 수 있어요.',
+                : '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 기존 업무 화면의 도움말을 사용할 수 있어요.',
           },
         ],
       }))
@@ -515,7 +518,7 @@ export function PicoAssistant({ canProcess, screenId, screenContext }: { canProc
                       지금 필요한 화면과 입력 위치를 안내할게요.
                     </p>
                     <div className="pico-suggestions">
-                      {aiEnabled ? (suggestions.length ? suggestions : WORKFLOW_GUIDES.filter((guide) => guide.workflowId === 'settlement.journey')).map((guide) => (
+                      {aiEnabled ? (suggestions.length ? suggestions : availableWorkflows.slice(0, 3)).map((guide) => (
                         <button key={guide.workflowId} onClick={() => void sendLive(`${guide.title} 업무를 어떻게 진행하나요?`)}>
                           <span className="pico-suggestion-icon"><Symbol name="menu_book" /></span>
                           <span>{guide.title}<small>업무 절차와 입력 위치 안내</small></span>
@@ -577,12 +580,12 @@ export function PicoAssistant({ canProcess, screenId, screenContext }: { canProc
                             .filter((id): id is string => Boolean(id))
                             .map((workflowId) => findWorkflowGuide(workflowId, '1.0') ? (
                               <button key={workflowId} type="button" className="button button-secondary"
-                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId); setOpen(false) }}>
+                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
                                 이 업무 안내 시작 · {findWorkflowGuide(workflowId, '1.0')?.title}
                               </button>
                             ) : !observed?.paymentId ? (
                               <button key={workflowId} type="button" className="button button-secondary" disabled={!canProcess}
-                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId); setOpen(false) }}>
+                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
                                 지급 작성 화면에서 안내 시작 · {findGuide(workflowId, '1.0')?.title}
                               </button>
                             ) : (
@@ -654,6 +657,26 @@ export function PicoAssistant({ canProcess, screenId, screenContext }: { canProc
                   )}
                 </div>
               </>
+            ) : aiEnabled ? (
+              <div className="pico-plan">
+                <h3>업무 안내</h3>
+                <p>원하는 업무를 선택하면 해당 화면과 입력 위치를 안내해요. 작성 중인 입력이 있으면 이동 전에 확인합니다.</p>
+                <div className="pico-suggestions">
+                  {[...availableWorkflows].sort((left, right) => Number(right.steps.some((step) => step.screenId === currentScreen)) - Number(left.steps.some((step) => step.screenId === currentScreen))).map((workflow) => (
+                    <button key={workflow.workflowId} type="button" className="pico-suggestion"
+                      onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflow.workflowId); setOpen(false) }}>
+                      <span><b>{workflow.title}</b><small>{workflow.description}</small></span><Symbol name="chevron_right" />
+                    </button>
+                  ))}
+                  {GUIDE_CATALOG.filter((workflow) => workflow.roles.some((role) => role === currentRole)).map((workflow) => (
+                    <button key={workflow.workflowId} type="button" className="pico-suggestion"
+                      onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflow.workflowId); setOpen(false) }}>
+                      <span><b>{workflow.title}</b><small>지급 화면의 실제 입력·저장·검증 상태를 확인하며 안내합니다.</small></span><Symbol name="chevron_right" />
+                    </button>
+                  ))}
+                </div>
+                <p className="pico-plan-boundary">화면 안내는 업무 처리 완료를 뜻하지 않아요. 저장·계산·확정은 기존 업무 화면에서 직접 진행하세요.</p>
+              </div>
             ) : (
               <div className="pico-plan">
                 <img src={guide} alt="업무를 안내하는 피코" />

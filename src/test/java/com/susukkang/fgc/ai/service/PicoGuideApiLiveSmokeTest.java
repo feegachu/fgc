@@ -107,6 +107,9 @@ class PicoGuideApiLiveSmokeTest {
             assertThat(followup.path("decision").asText()).isEqualTo("ANSWER_ONLY");
             assertThat(followup.path("message").asText()).containsAnyOf("수령", "설계사", "수취");
             assertThat(followup.path("evidenceRefs").size()).isBetween(1, 8);
+            for (var ref : followup.path("evidenceRefs")) {
+                assertThat(ref.path("workflowId").asText()).as("Follow-up must remain grounded in the payment workflow").startsWith("payment.");
+            }
             assertThat(followup.path("validatedGuide").isNull()).isTrue();
             safe.put("followupPassed", true);
             safe.put("checksPassed", true);

@@ -2,7 +2,7 @@ import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import { findGuide, findStep } from './catalog'
 import { isEntityId } from './guards'
-import { findWorkflowGuide } from './workflow-catalog'
+import { findWorkflowGuide, workflowHelpSteps } from './workflow-catalog'
 export type PicoReply = components['schemas']['PicoAskResponse']
 export type PicoTurn = { role: 'USER' | 'ASSISTANT'; text: string }
 export function picoPaymentReference(paymentId?: string | null) {
@@ -50,7 +50,7 @@ export async function askPico(
     if (
       !ref.workflowId ||
       (!findGuide(ref.workflowId, '1.0') && !workflow) ||
-      (ref.stepId != null && !findStep(ref.workflowId, '1.0', ref.stepId) && !workflow?.steps.some((step) => step.stepId === ref.stepId)) ||
+      (ref.stepId != null && !findStep(ref.workflowId, '1.0', ref.stepId) && !workflow?.steps.some((step) => step.stepId === ref.stepId) && !workflowHelpSteps(ref.workflowId).some((step) => step.stepId === ref.stepId)) ||
       ref.chunkId !== `${ref.workflowId}:${ref.stepId ?? 'overview'}`
     )
       throw new Error('INVALID_PICO_EVIDENCE')

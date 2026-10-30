@@ -8,7 +8,7 @@ import { GuideRuntime } from './guide/runtime'
 import { GuideFailure, GuideTargets } from './guide/targets'
 import { useSpotlight } from './guide/useSpotlight'
 import type { GuideContext, GuideDefinition } from './guide/types'
-import { WORKFLOW_GUIDES, findWorkflowGuide } from './workflow-catalog'
+import { WORKFLOW_GUIDES, findWorkflowGuide, workflowSteps } from './workflow-catalog'
 import { useWorkflowGuide } from './workflow-state'
 import mascot from './assets/pico-guide.png'
 import './payment-guide.css'
@@ -50,7 +50,8 @@ export function WorkspaceGuide({ user }: { user: ShellUser }) {
   return <WorkspaceGuideSession key={`${user.loginId}:${user.roleCode}:${user.canProcess}:${user.canViewAuditLog}`} user={user} />
 }
 
-function WorkspaceGuideSession({ user }: { user: ShellUser }) {
+function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
+  const [user] = useState(currentUser)
   const navigate = useNavigate()
   const location = useLocation()
   const request = useWorkflowGuide((state) => state.request)
@@ -61,7 +62,7 @@ function WorkspaceGuideSession({ user }: { user: ShellUser }) {
     const selected = new Map<string, HTMLElement>()
     const allowed = WORKFLOW_GUIDES.filter((guide) => guide.roles.includes(user.roleCode))
     const registered = new Set<string>()
-    for (const guide of allowed) for (const step of guide.steps) {
+    for (const guide of allowed) for (const step of workflowSteps(guide)) {
       const key = `${step.screenId}:${step.targetId}`
       if (registered.has(key)) continue
       registered.add(key)
@@ -74,7 +75,7 @@ function WorkspaceGuideSession({ user }: { user: ShellUser }) {
     const definitions: GuideDefinition[] = allowed.map((guide) => ({
       workflowId: guide.workflowId, guideVersion: guide.guideVersion, title: guide.title, roles: guide.roles,
       keywords: [], exampleQuestions: [], requiredEntities: [],
-      steps: guide.steps.map((step) => ({ ...step, entryConditionId: 'AVAILABLE', completionConditionId: step.completionRuleId })),
+      steps: workflowSteps(guide).map((step) => ({ ...step, entryConditionId: 'AVAILABLE', completionConditionId: step.completionRuleId })),
     }))
     const readContext = (): GuideContext => ({
       screenId: document.querySelector<HTMLElement>('[data-guide-page]')?.dataset.guidePage ?? 'CMN-C04',
@@ -96,7 +97,7 @@ function WorkspaceGuideSession({ user }: { user: ShellUser }) {
         const target = current.step ? targets.find(current.step.screenId, '1.0', current.step.targetId) : null
         const control = target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement ? target : null
         return {
-          available: target != null && !(control?.disabled) && !(target instanceof HTMLButtonElement && target.disabled),
+          available: target != null && (current.step?.stepId.startsWith('help.') === true || (!(control?.disabled) && !(target instanceof HTMLButtonElement && target.disabled))),
           inputValid: target?.getAttribute('role') === 'tab' ? target.getAttribute('aria-selected') === 'true' : control != null && !control.disabled && control.validity.valid && control.getAttribute('aria-invalid') !== 'true' &&
             control.getAttribute('aria-expanded') !== 'true' && (control instanceof HTMLInputElement && ['radio', 'checkbox'].includes(control.type) ? control.checked : control.value.trim() !== ''),
         }
@@ -138,7 +139,7 @@ function WorkspaceGuideSession({ user }: { user: ShellUser }) {
   const position = useSpotlight(snapshot.target, card)
   useEffect(() => {
     useWorkflowGuide.setState({ active: !['IDLE', 'PAUSED', 'COMPLETED', 'ERROR'].includes(snapshot.status),
-      guideContext: snapshot.workflowId && snapshot.step ? { workflowId: snapshot.workflowId, stepId: snapshot.step.stepId } : null })
+      ...(snapshot.workflowId && snapshot.step ? { guideContext: { workflowId: snapshot.workflowId, stepId: snapshot.step.stepId } } : {}) })
   }, [snapshot.status, snapshot.workflowId, snapshot.step])
   useEffect(() => {
     if (!request) { runtime.engine.stop(); return }
@@ -174,7 +175,7 @@ function WorkspaceGuideSession({ user }: { user: ShellUser }) {
     runtime.engine.stop()
     runtime.selected.clear()
     const context = runtime.readContext()
-    void runtime.engine.start({ workflowId: guide.workflowId, stepId: guide.steps[0].stepId, guideVersion: guide.guideVersion,
+    void runtime.engine.start({ workflowId: guide.workflowId, stepId: request.stepId && workflowSteps(guide).some((step) => step.stepId === request.stepId) ? request.stepId : guide.steps[0].stepId, guideVersion: guide.guideVersion,
       entityRefs: context.entityRefs, clientContextRevision: context.clientContextRevision, serverStateVersion: null })
   }, [request, runtime, user, navigate])
   useEffect(() => { runtime.engine.contextChanged() }, [location.pathname, location.search, runtime])
@@ -182,7 +183,7 @@ function WorkspaceGuideSession({ user }: { user: ShellUser }) {
     mounted.current = true
     const mutations = new MutationObserver(() => runtime.engine.contextChanged())
     mutations.observe(document.body, { childList: true, subtree: true, attributes: true,
-      attributeFilter: ['hidden', 'inert', 'aria-hidden', 'data-guide-page', 'data-guide-feature'] })
+      attributeFilter: ['hidden', 'inert', 'aria-hidden', 'class', 'style', 'data-guide-page', 'data-guide-feature'] })
     const choose = (event: MouseEvent) => {
       const element = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-guide-feature]') : null
       const step = runtime.engine.getSnapshot().step
@@ -214,7 +215,7 @@ function WorkspaceGuideSession({ user }: { user: ShellUser }) {
     {position.box && snapshot.status !== 'PAUSED' && <div className="payment-guide-spotlight" style={position.box} aria-hidden="true" />}
     <section ref={card} className="payment-guide-card" aria-label="업무 튜토리얼" style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}>
       <header><img src={mascot} alt="" /><div><strong>{guide?.title}</strong><small>화면과 입력 위치 안내</small></div><button onClick={stop} aria-label="업무 튜토리얼 종료">닫기</button></header>
-      <h3>{snapshot.status === 'COMPLETED' ? '안내를 마쳤어요' : guide?.steps.find((step) => step.stepId === snapshot.step?.stepId)?.title}</h3>
+      <h3>{snapshot.status === 'COMPLETED' ? '안내를 마쳤어요' : guide && workflowSteps(guide).find((step) => step.stepId === snapshot.step?.stepId)?.title}</h3>
       <p>{snapshot.status === 'COMPLETED' ? '안내 확인을 마쳤습니다. 실제 저장·검증·확정 결과는 기존 업무 화면에서 확인해주세요.' : snapshot.step?.instruction}</p>
       {snapshot.reasonCode && <p role="status">{messages[snapshot.reasonCode] ?? '화면의 조건을 확인하고 필요한 영역을 연 뒤 이어가세요.'}</p>}
       <nav aria-label="튜토리얼 단계 이동">

@@ -5,6 +5,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import { AssistantDemoMount, PicoAssistant } from './PicoAssistant'
 import { useGuideRuntime } from './guide-runtime'
 import type { ShellUser } from '../../app/shell/Sidebar'
+import { workflowHelpSteps } from './workflow-catalog'
 import { useWorkflowGuide } from './workflow-state'
 const reply = {
   decision: 'ANSWER_ONLY',
@@ -134,7 +135,7 @@ it('rejects executable guide and unknown evidence instead of rendering or naviga
   render(<PicoAssistant canProcess />)
   await open()
   await send()
-  expect(await screen.findByText(/답변 서버에 연결하지 못했어요/)).toBeInTheDocument()
+  expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
   expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
 })
 it('closes safely and clears account conversation without keeping late replies', async () => {
@@ -162,7 +163,7 @@ it('rejects stale response revisions even when transport ignores abort', async (
   render(<PicoAssistant canProcess />)
   await open()
   await send()
-  await waitFor(() => expect(screen.getByText(/답변 서버에 연결하지 못했어요/)).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument())
   expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
 })
 
@@ -387,3 +388,29 @@ it.each([{ precheck: 'PASSED_WITHOUT_TOKEN' as const }, { modalOpen: true }])(
     expect(useGuideRuntime.getState().session).toBeNull()
   },
 )
+
+it('validates a source citation and starts that location instead of a hardcoded question route', async () => {
+  const help = workflowHelpSteps('contract.register').find((step) => step.targetId === 'features.contract.contract-form-page.contract-no')!
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) => envelope({
+    ...reply, message: '계약 등록 화면의 계약번호 입력 항목에서 입력하세요.',
+    contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+    evidenceRefs: [{ workflowId: 'contract.register', stepId: help.stepId, chunkId: `contract.register:${help.stepId}`, title: help.title }],
+  })) as typeof apiClient.request)
+  render(<AssistantDemoMount user={user} />)
+  await open()
+  await send()
+  await screen.findByText('계약 등록 화면의 계약번호 입력 항목에서 입력하세요.')
+  await userEvent.click(screen.getByRole('button', { name: /이 업무 안내 시작/ }))
+  expect(useWorkflowGuide.getState().request).toMatchObject({ id: 'contract.register', stepId: help.stepId })
+  expect(request).toHaveBeenCalledTimes(1)
+})
+
+it('lists role-permitted registered tutorials in the guide tab without an API or canned scenario', async () => {
+  const request = vi.spyOn(apiClient, 'request')
+  render(<AssistantDemoMount user={user} />)
+  await open()
+  await userEvent.click(screen.getByRole('tab', { name: '업무 안내' }))
+  await userEvent.click(screen.getByRole('button', { name: /보험계약 등록/ }))
+  expect(useWorkflowGuide.getState().request?.id).toBe('contract.register')
+  expect(request).not.toHaveBeenCalled()
+})

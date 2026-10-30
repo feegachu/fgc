@@ -29,6 +29,11 @@ class PicoGuideStartServiceTest {
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
     void role(String name, String role) { SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(name,null,List.of(new SimpleGrantedAuthority("ROLE_"+role)))); }
     PicoGuideRequest request(String token) { return new PicoGuideRequest("payment.draft","1.0","77","r1",token); }
+    @Test void generalWorkflowCannotObtainPaymentStartGrant() {
+        assertThatThrownBy(() -> service.prepare(new PicoGuideRequest("contract.register","1.0","77","r1",null),"Bearer session-one"))
+            .isInstanceOf(FgcBusinessException.class);
+        verifyNoInteractions(payments);
+    }
     @Test void startsOnlyAfterConsentRechecksAndConsumesOnce() {
         var prepared = service.prepare(request(null),"Bearer session-one");
         assertThat(prepared.prepareToken()).matches("[A-Za-z0-9_-]{43}");

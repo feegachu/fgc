@@ -516,6 +516,9 @@ function PolicyActionDialog({
   const [evidenceRef, setEvidenceRef] = useState('')
   const [effectiveFrom, setFrom] = useState('')
   const [effectiveTo, setTo] = useState(policy.effectiveTo ?? '')
+  const draftKey = JSON.stringify([reason, evidenceRef, effectiveFrom, effectiveTo])
+  const [initialDraftKey] = useState(draftKey)
+  const clearUnsaved = useUnsavedWork(draftKey !== initialDraftKey, draftKey)
   const [error, setError] = useState('')
   const [dateError, setDateError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -566,6 +569,7 @@ function PolicyActionDialog({
               requestKey({ id: policy.policyVersionId, action, reason: reason.trim(), context }),
             )
           ).policyVersionId
+      clearUnsaved()
       onSaved(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
@@ -682,3 +686,4 @@ function PolicyActionDialog({
     </Modal>
   )
 }
+import { useUnsavedWork } from '../../stores/unsavedWork'

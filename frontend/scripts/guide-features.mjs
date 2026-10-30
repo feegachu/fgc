@@ -52,6 +52,7 @@ function walk(dir) {
 }
 walk(root)
 const ids = entries.map((entry) => entry.id)
+if (ids.some((id) => !/^[a-z][a-z0-9._-]{0,79}$/.test(id))) throw new Error("Invalid guide feature ID grammar")
 if (missing.length || new Set(ids).size !== ids.length) {
   throw new Error(`Guide feature coverage failed: missing=${missing.join(',')}; duplicate=${ids.filter((id, index) => ids.indexOf(id) !== index).join(',')}`)
 }

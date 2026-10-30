@@ -2,6 +2,7 @@ import { invalidateJournalCorrectionQueries } from '../ledger/correction-cache'
 import { accountDisplayName } from '../ledger/accountName'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
@@ -188,6 +189,9 @@ function CorrectionBody({
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
   const [result, setResult] = useState<JournalCorrectionResult | null>(null)
+  const draftKey = JSON.stringify([journalDate, description, lines, reason, evidenceRef])
+  const [initialDraftKey] = useState(draftKey)
+  const clearUnsaved = useUnsavedWork(editable && result === null && draftKey !== initialDraftKey, draftKey)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -206,6 +210,7 @@ function CorrectionBody({
       }),
     meta: { errorToast: false },
     onSuccess: (done) => {
+      clearUnsaved()
       applyActionToCache(client, item.exceptionCaseId!, toAction(item, done))
       void invalidateJournalCorrectionQueries(client)
       setResult(done)

@@ -88,7 +88,7 @@ export default function ClawbackPage() {
         }}
         onReset={() => apply(defaultCriteria(month ?? ''))}
         actions={
-          <Button variant="secondary" disabled={busy} onClick={() => void query.refetch()}>
+          <Button data-guide-feature="features.clawback.clawback-page.button" variant="secondary" disabled={busy} onClick={() => void query.refetch()}>
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
@@ -97,7 +97,7 @@ export default function ClawbackPage() {
         }
       >
         <Field variant="filter" className="claw-filter-basis" label="기간 기준">
-          <select
+          <select data-guide-feature="features.clawback.clawback-page.select"
             className="select-control"
             value={draft.dateBasis}
             onChange={(e) => set('dateBasis', e.target.value as Draft['dateBasis'])}
@@ -112,10 +112,10 @@ export default function ClawbackPage() {
           label="시작일"
           helper={!draft.dateFrom && !draft.dateTo ? '비우면 기간 제한 없음' : undefined}
         >
-          <input type="date" value={draft.dateFrom} onChange={(e) => set('dateFrom', e.target.value)} />
+          <input data-guide-feature="features.clawback.clawback-page.input" type="date" value={draft.dateFrom} onChange={(e) => set('dateFrom', e.target.value)} />
         </Field>
         <Field variant="filter" className="claw-filter-date" label="종료일" error={dateError || undefined}>
-          <input
+          <input data-guide-feature="features.clawback.clawback-page.input-2"
             type="date"
             value={draft.dateTo}
             aria-invalid={Boolean(dateError)}
@@ -123,7 +123,7 @@ export default function ClawbackPage() {
           />
         </Field>
         <Field variant="filter" className="claw-filter-contract" label="계약번호">
-          <input
+          <input data-guide-feature="features.clawback.clawback-page.input-3"
             type="search"
             placeholder="계약번호 일부"
             maxLength={80}
@@ -132,7 +132,7 @@ export default function ClawbackPage() {
           />
         </Field>
         <Field variant="filter" className="claw-filter-insurer" label="보험회사">
-          <select
+          <select data-guide-feature="features.clawback.clawback-page.select-2"
             className="select-control"
             value={draft.insurerId}
             disabled={insurers.isLoading || Boolean(insurers.error)}
@@ -147,7 +147,7 @@ export default function ClawbackPage() {
           </select>
         </Field>
         <Field variant="filter" className="claw-filter-product" label="상품(판매버전)">
-          <select
+          <select data-guide-feature="features.clawback.clawback-page.select-3"
             className="select-control"
             value={draft.productOfferingId}
             disabled={!draft.insurerId || products.isLoading || Boolean(products.error)}
@@ -164,7 +164,7 @@ export default function ClawbackPage() {
           </select>
         </Field>
         <Field variant="filter" className="claw-filter-agent" label="설계사">
-          <select
+          <select data-guide-feature="features.clawback.clawback-page.select-4"
             className="select-control"
             value={draft.agentId}
             disabled={Boolean(agents.error)}
@@ -183,7 +183,7 @@ export default function ClawbackPage() {
           </select>
         </Field>
         <Field variant="filter" className="claw-filter-trigger" label="발생 사유">
-          <select
+          <select data-guide-feature="features.clawback.clawback-page.select-5"
             className="select-control"
             value={draft.triggerType}
             onChange={(e) => set('triggerType', e.target.value)}
@@ -197,7 +197,7 @@ export default function ClawbackPage() {
           </select>
         </Field>
         <Field variant="filter" className="claw-filter-status" label="계산 여부">
-          <select
+          <select data-guide-feature="features.clawback.clawback-page.select-6"
             className="select-control"
             value={draft.calculationStatus}
             onChange={(e) => set('calculationStatus', e.target.value)}
@@ -218,7 +218,7 @@ export default function ClawbackPage() {
         label="환수 검토 후보 목록과 상세 너비"
         defaultRatio={58}
       >
-        <section className="surface claw-list-panel" aria-labelledby="claw-list-title">
+        <section data-guide-feature="features.clawback.clawback-page.section" className="surface claw-list-panel" aria-labelledby="claw-list-title">
           <header className="surface-header claw-panel-header">
             <h2 className="surface-title" id="claw-list-title">
               ② 환수 검토 후보
@@ -259,7 +259,7 @@ export default function ClawbackPage() {
             />
           )}
         </section>
-        <section className="surface claw-detail-panel" aria-labelledby="claw-detail-title">
+        <section data-guide-feature="features.clawback.clawback-page.section-2" className="surface claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
             <h2 className="surface-title" id="claw-detail-title">
               ③ 후보 근거 · ④ 계산
@@ -273,7 +273,7 @@ export default function ClawbackPage() {
               <div className="empty-state">
                 <QueryState loading={detail.isLoading} error={detail.error} />
                 {detail.error ? (
-                  <Button variant="secondary" onClick={() => void detail.refetch()}>
+                  <Button data-guide-feature="features.clawback.clawback-page.button-2" variant="secondary" onClick={() => void detail.refetch()}>
                     다시 조회
                   </Button>
                 ) : null}

@@ -461,3 +461,16 @@ describe('screen lifecycle binding', () => {
     cleanup()
   })
 })
+
+it('highlights a known location while entry waits but never bypasses entry on next', async () => {
+  const s = setup()
+  s.updateState({ saved: true })
+  await s.runtime.start({ ...s.request(), stepId: 'save' })
+  expect(s.runtime.getSnapshot()).toMatchObject({ status: 'WAITING_INPUT', target: s.save, reasonCode: 'ENTRY_NOT_READY' })
+  await s.runtime.next()
+  expect(s.runtime.getSnapshot().status).toBe('WAITING_INPUT')
+  expect(s.click).not.toHaveBeenCalled()
+  s.updateState({ valid: true, saved: true })
+  await s.runtime.next()
+  expect(s.runtime.getSnapshot().status).toBe('COMPLETED')
+})

@@ -75,6 +75,9 @@ function GuideSession({
   }, [snapshot.workflowId, snapshot.step])
   const revision = useSyncExternalStore(observer.subscribe, observer.getViewRevision)
   const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    useWorkflowGuide.setState({ paymentActive: !collapsed && !['PAUSED', 'ERROR'].includes(snapshot.status) })
+  }, [collapsed, snapshot.status])
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState(false)
   const [refresh, setRefresh] = useState(0)
@@ -90,13 +93,16 @@ function GuideSession({
     if (!initialWorkflowId) return
     const guide = PAYMENT_GUIDES.find((guide) => guide.workflowId === initialWorkflowId)
     if (!guide) return
-    try {
+    let cancelled = false
+    void Promise.resolve().then(async () => {
+      if (cancelled) return
       const context = observer.readContext()
-      void runtime.start({ workflowId: guide.workflowId, stepId: guide.steps[0].stepId, guideVersion: guide.guideVersion,
+      await runtime.start({ workflowId: guide.workflowId, stepId: guide.steps[0].stepId, guideVersion: guide.guideVersion,
         entityRefs: context.entityRefs, clientContextRevision: context.clientContextRevision, serverStateVersion: context.serverStateVersion })
-    } catch {
-      setMessage('현재 선택 대상과 권한을 확인한 뒤 안내를 다시 시작해주세요.')
-    }
+    }).catch(() => {
+      if (!cancelled) setMessage('현재 선택 대상과 권한을 확인한 뒤 안내를 다시 시작해주세요.')
+    })
+    return () => { cancelled = true }
   }, [initialWorkflowId, observer, runtime])
 
   useEffect(() => {
@@ -229,6 +235,7 @@ function GuideSession({
     canNext = !!(
       candidate &&
       step &&
+      paymentGuideConditions[step.entryConditionId](observer.readContext(), candidate) === 'SATISFIED' &&
       paymentGuideConditions[step.completionConditionId](observer.readContext(), candidate) === 'SATISFIED'
     )
   } catch {
@@ -267,7 +274,7 @@ function GuideSession({
       <section data-guide-feature="features.transaction.payment-guide.section"
         ref={card}
         className={`payment-guide-card${folded ? ' is-collapsed' : ''}`}
-        style={position.card}
+        style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}
         aria-label="지급 업무 가이드"
         data-guide-status={snapshot.status}
       >

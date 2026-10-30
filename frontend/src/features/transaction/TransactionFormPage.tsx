@@ -1,6 +1,7 @@
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { isWonAmount } from '../assistant/guards'
 import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservation'
+import { findGuide } from '../assistant/catalog'
 import { useWorkflowGuide } from '../assistant/workflow-state'
 import { connectPaymentGuideLaunch } from './payment-guide-launch'
 import { ResizableSplit } from '../../components/ResizableSplit'
@@ -319,7 +320,10 @@ function TransactionForm({
   }), [])
   useEffect(() => {
     useWorkflowGuide.setState({ paymentActive: helpOpen })
-    return () => { useWorkflowGuide.setState({ paymentActive: false }) }
+    return () => {
+      const context = useWorkflowGuide.getState().guideContext
+      useWorkflowGuide.setState({ paymentActive: false, ...(context && findGuide(context.workflowId, '1.0') ? { guideContext: null } : {}) })
+    }
   }, [helpOpen])
 
   function invalidatePreview() {
@@ -767,9 +771,7 @@ function TransactionForm({
         </div>
         <div className="transaction-form-column">
           <GatePanel result={result} />
-          <div data-guide-target="payment.precheck.result">
-            <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} />
-          </div>
+          <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} />
           <section data-guide-feature="features.transaction.transaction-form-page.section-2" className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
             <h2 className="visually-hidden" id="transaction-actions-title">
               지급 건 작업

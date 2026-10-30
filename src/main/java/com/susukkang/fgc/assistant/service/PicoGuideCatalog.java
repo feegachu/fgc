@@ -18,6 +18,9 @@ public class PicoGuideCatalog {
     public record Chunk(String chunkId,String workflowId,String stepId,String title,String content) {}
     private final List<Definition> definitions;
     private final Set<String> screenIds;
+    private final Set<String> paymentWorkflowIds;
+    private final Map<String, List<Step>> help;
+    public record HelpDefinition(String workflowId, List<Step> steps) {}
     public PicoGuideCatalog(ObjectMapper mapper) throws IOException {
         try(var stream=new ClassPathResource("ai/pico/screens.generated.json").getInputStream()) {
             List<Map<String,Object>> screens = mapper.readValue(stream,new TypeReference<>(){});
@@ -38,6 +41,21 @@ public class PicoGuideCatalog {
             }
         }
         definitions = List.copyOf(loaded);
+        try(var stream=new ClassPathResource("ai/pico/payment-guides.v1.json").getInputStream()) {
+            List<Definition> payments = mapper.readValue(stream,new TypeReference<>(){});
+            paymentWorkflowIds = payments.stream().map(Definition::workflowId).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+        try(var stream=new ClassPathResource("ai/pico/workflow-help.generated.json").getInputStream()) {
+            List<HelpDefinition> locations = mapper.readValue(stream,new TypeReference<>(){});
+            var map = new LinkedHashMap<String, List<Step>>();
+            for (var location : locations) {
+                if (definitions.stream().noneMatch(guide -> guide.workflowId().equals(location.workflowId())) || map.containsKey(location.workflowId()) || location.steps() == null) throw new IllegalStateException("Unknown help workflow");
+                var ids = new HashSet<String>();
+                for (var step : location.steps()) if (step.stepId() == null || !step.stepId().matches("help\\.[a-f0-9]{32}") || !ids.add(step.stepId()) || !featureIds.contains(step.targetId()) || !screenIds.contains(step.screenId()) || !"USER_REVIEWED".equals(step.completionRuleId()) || step.next() == null || !step.next().isEmpty()) throw new IllegalStateException("Invalid UI help");
+                map.put(location.workflowId(), List.copyOf(location.steps()));
+            }
+            help = Map.copyOf(map);
+        }
         if (definitions.isEmpty() || definitions.stream().map(Definition::workflowId).distinct().count()!=definitions.size()) throw new IllegalStateException("Invalid guide registry");
         for (var guide:definitions) {
             if (!guide.workflowId().matches("[a-z][a-z0-9.]+") || !"1.0".equals(guide.guideVersion()) || !guide.enabled() || !Set.of("READ","PROCESS").contains(guide.capability()) || guide.steps()==null || guide.steps().isEmpty()) throw new IllegalStateException("Invalid guide definition");
@@ -60,7 +78,29 @@ public class PicoGuideCatalog {
         }
     }
     public List<Definition> definitions() { return definitions; }
+    public List<Definition> paymentDefinitions() { return definitions.stream().filter(guide -> paymentWorkflowIds.contains(guide.workflowId())).toList(); }
     public boolean supportsScreen(String screenId) { return screenIds.contains(screenId); }
+    /** Corpus-derived n-grams rank source labels; no fixed vocabulary or question dispatch. */
+    private static Set<String> grams(String text) {
+        String normalized = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]", "");
+        var result = new HashSet<String>();
+        for (int size = 2; size <= 3; size++) for (int index = 0; index + size <= normalized.length(); index++) result.add(normalized.substring(index,index+size));
+        return result;
+    }
+    public List<Chunk> chunks(Definition guide, String query) {
+        var chunks = new ArrayList<>(chunks(guide));
+        var terms = grams(query);
+        var ranked = help.getOrDefault(guide.workflowId(),List.of()).stream()
+            .map(step -> Map.entry(step, grams(step.title()).stream().filter(terms::contains).count()))
+            .filter(entry -> entry.getValue() > 0)
+            .sorted(Comparator.<Map.Entry<Step,Long>>comparingLong(Map.Entry::getValue).reversed().thenComparing(entry -> entry.getKey().stepId()))
+            .limit(8).toList();
+        for (var entry : ranked) {
+            var step = entry.getKey();
+            chunks.add(new Chunk(guide.workflowId()+":"+step.stepId(),guide.workflowId(),step.stepId(),step.title(),step.instruction()));
+        }
+        return List.copyOf(chunks);
+    }
     public List<Chunk> chunks(Definition guide) {
         var chunks=new ArrayList<Chunk>();
         chunks.add(new Chunk(guide.workflowId()+":overview",guide.workflowId(),null,guide.title(),guide.description()));

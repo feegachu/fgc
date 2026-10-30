@@ -1,4 +1,6 @@
 import definitions from './workflow-guides.v1.json'
+import { GUIDE_CATALOG } from './catalog'
+import helpDefinitions from './workflow-help.generated.json'
 import features from './feature-targets.generated.json'
 import registeredScreens from './screens.generated.json'
 
@@ -34,4 +36,21 @@ for (const guide of WORKFLOW_GUIDES) {
 }
 export function findWorkflowGuide(id: string, version: string) {
   return WORKFLOW_GUIDES.find((guide) => guide.workflowId === id && guide.guideVersion === version) ?? null
+}
+
+/** Shared, build-time UI copy. No runtime values or model-created targets. */
+export function workflowHelpSteps(id: string): WorkflowStep[] {
+  return (helpDefinitions.find((entry) => entry.workflowId === id)?.steps ?? []) as WorkflowStep[]
+}
+export function workflowSteps(guide: WorkflowGuide): WorkflowStep[] {
+  return [...guide.steps, ...workflowHelpSteps(guide.workflowId)]
+}
+for (const entry of helpDefinitions) {
+  if (!WORKFLOW_GUIDES.some((guide) => guide.workflowId === entry.workflowId) && !GUIDE_CATALOG.some((guide) => guide.workflowId === entry.workflowId)) throw new Error('Unknown help workflow')
+  const ids = new Set<string>()
+  for (const step of entry.steps) {
+    if (!/^help\.[a-f0-9]{32}$/.test(step.stepId) || ids.has(step.stepId) || !targetIds.has(step.targetId) ||
+      !registeredScreens.some((screen) => screen.id === step.screenId) || step.next.length || step.completionRuleId !== 'USER_REVIEWED') throw new Error('Unregistered UI help')
+    ids.add(step.stepId)
+  }
 }

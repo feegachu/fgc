@@ -85,7 +85,7 @@ public class PicoAskService {
             paymentState = paymentContext.read(request.entityRefs().getFirst().id()).status().name();
         }
         try {
-            var history = request.conversation() == null ? List.of() : request.conversation().stream()
+            List<Map<String, String>> history = request.conversation() == null ? List.of() : request.conversation().stream()
                     .map(turn -> Map.of("role", turn.role().name(), "text", PicoTextSanitizer.redact(turn.text()).substring(0, Math.min(800, PicoTextSanitizer.redact(turn.text()).length()))))
                     .toList();
             var input = new LinkedHashMap<String, Object>();
@@ -108,8 +108,9 @@ public class PicoAskService {
                     || selection.workflowIds().stream().distinct().count() != selection.workflowIds().size()
                     || selection.workflowIds().stream().anyMatch(id -> id == null || !allowedIds.contains(id)))
                 return fallback(request, chunks, "INVALID_AI_SELECTION");
+            String helpQuery = PicoTextSanitizer.redact(request.question()) + " " + history.stream().map(turn -> turn.get("text")).collect(java.util.stream.Collectors.joining(" "));
             chunks = allowed.stream().filter(guide -> selection.workflowIds().contains(guide.workflowId()))
-                    .flatMap(guide -> catalog.chunks(guide).stream()).toList();
+                    .flatMap(guide -> catalog.chunks(guide, helpQuery).stream()).toList();
             input.remove("availableGuides");
             input.put("evidence", chunks);
             String data = mapper.writeValueAsString(input);

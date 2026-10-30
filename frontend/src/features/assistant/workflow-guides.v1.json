@@ -1452,5 +1452,216 @@
         "next": []
       }
     ]
+  },
+  {
+    "workflowId": "clawback.review",
+    "guideVersion": "1.0",
+    "title": "환수 후보·근거 검토",
+    "description": "환수 화면은 현재 후보 조회와 원천·지급·스케줄·정책 후보를 확인하는 기능입니다. 환수액 계산 버튼의 실행은 아직 연결되지 않았으므로 실제 계산을 수행하거나 계산 완료로 안내하지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT",
+      "COMPLIANCE"
+    ],
+    "enabled": true,
+    "route": "/clawbacks",
+    "steps": [
+      {
+        "stepId": "clawback.review.step.1",
+        "screenId": "CLAW-W01",
+        "targetId": "features.clawback.clawback-page.select",
+        "title": "기간 기준 선택",
+        "instruction": "발생기준일과 계약일 중 검색 기준을 선택합니다. 시작일·종료일과 계약번호 등 조건을 입력한 뒤 후보 조회를 누릅니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "clawback.review.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "clawback.review.step.2",
+        "screenId": "CLAW-W01",
+        "targetId": "features.clawback.clawback-page.section",
+        "title": "환수 후보 선택",
+        "instruction": "후보 목록에서 처리할 계약의 후보를 직접 선택합니다. 조회 직후 기본 표시된 후보를 실제 처리 대상으로 단정하지 말고 계약과 발생 사유를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "clawback.review.step.3"
+          }
+        ]
+      },
+      {
+        "stepId": "clawback.review.step.3",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.evidence.source",
+        "title": "원천 사건 확인",
+        "instruction": "선택한 후보의 원천 사건과 검증 근거를 확인합니다. 차익거래 검증이나 계약 사건 이력 링크로 원천 업무를 조회할 수 있습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "clawback.review.step.4"
+          }
+        ]
+      },
+      {
+        "stepId": "clawback.review.step.4",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.evidence.payment",
+        "title": "연결 지급·귀속 확인",
+        "instruction": "기지급액·미지급액과 실제 연결 지급 및 귀속을 확인합니다. 실제 금액은 프로그램의 표시 결과이며 AI가 계산하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "clawback.review.step.5"
+          }
+        ]
+      },
+      {
+        "stepId": "clawback.review.step.5",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.evidence.schedule",
+        "title": "스케줄과 정책 후보 확인",
+        "instruction": "관련 스케줄·정책 후보와 적용 기준을 확인합니다. 정책 후보가 하나인 것을 적용 선택 완료로 취급하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "clawback.review.step.6"
+          }
+        ]
+      },
+      {
+        "stepId": "clawback.review.step.6",
+        "screenId": "CLAW-W01",
+        "targetId": "features.clawback.clawback-detail.section-2",
+        "title": "계산 지원 범위 확인",
+        "instruction": "현재 계산 영역의 정책 후보와 저장된 계산판 존재 여부를 확인합니다. 환수액 계산 버튼의 실제 실행은 아직 연결되지 않았으므로 이 안내는 계산 완료나 환수 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "agent.contract.find",
+    "guideVersion": "1.0",
+    "title": "본인 계약 조회",
+    "description": "설계사 본인 범위의 계약 목록을 검색하고 계약 상세를 선택합니다. 내부 처리나 다른 설계사 조회 권한을 추가하지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "AGENT"
+    ],
+    "enabled": true,
+    "route": "/contracts",
+    "steps": [
+      {
+        "stepId": "agent.contract.find.step.1",
+        "screenId": "CONT-W01",
+        "targetId": "features.contract.contract-list-page.input",
+        "title": "본인 계약 검색",
+        "instruction": "계약 검색 조건을 입력한 뒤 조회하고 본인 계약 중 확인할 계약을 직접 선택합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "agent.contract.find.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "agent.contract.find.step.2",
+        "screenId": "CONT-W01",
+        "targetId": "features.contract.contract-list-page.section",
+        "title": "계약 상세 선택",
+        "instruction": "실제 목록에서 원하는 계약의 상세 링크를 선택합니다. 본인 데이터 경계를 유지합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "agent.contract.detail",
+    "guideVersion": "1.0",
+    "title": "본인 계약 상세 확인",
+    "description": "목록에서 선택한 본인 계약의 기본 정보와 상태를 확인합니다. 내부 검증·원장·수정 업무를 열지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "AGENT"
+    ],
+    "enabled": true,
+    "route": "/contracts/:id",
+    "steps": [
+      {
+        "stepId": "agent.contract.detail.step.1",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-detail-page.section",
+        "title": "본인 계약 확인",
+        "instruction": "선택한 계약번호와 기본 정보를 확인합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "agent.contract.detail.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "agent.contract.detail.step.2",
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.basic",
+        "title": "상태와 기준 확인",
+        "instruction": "본인 계약의 기본정보 영역에서 상태와 계약 조건을 확인합니다. 내부 처리나 다른 계정의 데이터는 접근하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
+  },
+  {
+    "workflowId": "agent.payments",
+    "guideVersion": "1.0",
+    "title": "본인 지급 내역 조회",
+    "description": "설계사 본인 지급 내역을 월과 계약 기준으로 조회합니다. 수정·확정·정정은 내부 담당자 업무이며 이 안내가 실행하지 않습니다.",
+    "capability": "READ",
+    "keywords": [],
+    "roles": [
+      "AGENT"
+    ],
+    "enabled": true,
+    "route": "/transactions",
+    "steps": [
+      {
+        "stepId": "agent.payments.step.1",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction.transaction-list-page.f-month",
+        "title": "조회월 선택",
+        "instruction": "지급 내역의 정산월을 선택하고 조회합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": [
+          {
+            "conditionId": "USER_REVIEWED",
+            "stepId": "agent.payments.step.2"
+          }
+        ]
+      },
+      {
+        "stepId": "agent.payments.step.2",
+        "screenId": "TRAN-W01",
+        "targetId": "features.transaction.transaction-list-page.section",
+        "title": "본인 지급 상태 확인",
+        "instruction": "계약·단계·금액·상태를 확인합니다. 차이가 있으면 해당 지급 정보를 바탕으로 내부 담당자에게 확인을 요청합니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      }
+    ]
   }
 ]

@@ -1,3 +1,4 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import type { InputHTMLAttributes } from 'react'
 import { Field } from '../../components/Field'
 import { Button } from '../../components/Button'
@@ -23,7 +24,7 @@ export function DraftInput({
 } & Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'>) {
   return (
     <Field label={label} required={props.required} error={errors[path]}>
-      <input data-guide-feature="features.policies.policy-draft-fields.input" {...props} id={`policy-${path}`} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input data-guide-feature={guideFeatureId('policy.draft-input', path.replace(/\.\d+(?=\.|$)/g, ''))} {...props} id={`policy-${path}`} value={value} onChange={(event) => onChange(event.target.value)} />
     </Field>
   )
 }
@@ -52,7 +53,7 @@ export function DraftSelect({
 }) {
   return (
     <Field label={label} required={required} error={errors[path]} helper={helper}>
-      <select data-guide-feature="features.policies.policy-draft-fields.select"
+      <select data-guide-feature={guideFeatureId('policy.draft-select', path.replace(/\.\d+(?=\.|$)/g, ''))}
         id={`policy-${path}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}

@@ -221,15 +221,16 @@ export class GuideRuntime<State> {
     const state = await this.environment.readBusinessState(structuredClone(context), signal)
     assertCurrent()
     this.assertContext(context, step.screenId)
-    const entry = this.environment.conditions[step.entryConditionId](this.capture(), state)
-    if (entry !== 'SATISFIED') {
-      this.set({ status: entry, target: null, reasonCode: 'ENTRY_NOT_READY' })
-      return
-    }
     if (this.targets.find(step.screenId, this.guide!.guideVersion, step.targetId) !== target)
       throw new GuideFailure('TARGET_CHANGED')
     const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
     target.scrollIntoView?.({ block: 'center', behavior: reduced ? 'instant' : 'smooth' })
+    const entry = this.environment.conditions[step.entryConditionId](this.capture(), state)
+    // A registered visible location remains useful while data loads. next() still rechecks entry and completion.
+    if (entry !== 'SATISFIED') {
+      this.set({ status: entry, target, reasonCode: 'ENTRY_NOT_READY' })
+      return
+    }
     this.set({ status: 'SHOWING', target, reasonCode: null })
     this.emit('STEP_CHANGED')
   }
