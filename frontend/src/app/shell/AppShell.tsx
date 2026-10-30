@@ -111,7 +111,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         </main>
         <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
       </div>
-      <AssistantDemoMount user={user} loggingOut={loggingOut} />
+      <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} />
       {!loggingOut && <WorkspaceGuide user={user} />}
       <DraftNavigationGuard />
     </div>
