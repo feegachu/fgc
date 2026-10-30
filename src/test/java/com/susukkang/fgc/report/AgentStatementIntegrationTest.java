@@ -209,22 +209,13 @@ class AgentStatementIntegrationTest {
         // 원장 정정으로 생긴 대체 지급: source_type 은 GA_MANUAL_PAYMENT 지만 ADJUSTMENT 로 분류돼야 한다.
         Long original = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 7000);
         Long replacement = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 7500);
-        String journalNo = "STMT-" + UUID.randomUUID().toString().substring(0, 8);
-        Long journal = id("""
-                INSERT INTO fgc.journal_header(journal_no, journal_date, journal_type, source_entity_type, source_entity_id)
-                VALUES (?, DATE '2099-01-01', 'ADJUSTMENT', 'STATEMENT_TEST', ?) RETURNING journal_header_id
-                """, journalNo, journalNo);
-        jdbc.update("INSERT INTO fgc.journal_line(journal_header_id, line_no, journal_account_id, debit_amount, credit_amount) SELECT ?, 1, min(journal_account_id), 100, 0 FROM fgc.journal_account", journal);
-        jdbc.update("INSERT INTO fgc.journal_line(journal_header_id, line_no, journal_account_id, debit_amount, credit_amount) SELECT ?, 2, min(journal_account_id), 0, 100 FROM fgc.journal_account", journal);
-        jdbc.update("UPDATE fgc.journal_header SET status = 'POSTED' WHERE journal_header_id = ?", journal);
-        String groupKey = "STMT-CORR-" + UUID.randomUUID().toString().substring(0, 8);
-        jdbc.update("INSERT INTO fgc.journal_correction_group(correction_group_key, original_journal_header_id, reason) VALUES (?, ?, 'statement test')",
-                groupKey, journal);
-        jdbc.update("UPDATE fgc.commission_transaction SET status = 'CANCELLED' WHERE commission_transaction_id = ?", original);
-        jdbc.update("INSERT INTO fgc.payment_journal_correction(correction_group_key, original_payment_id, replacement_payment_id) VALUES (?, ?, ?)",
-                groupKey, original, replacement);
+        linkCorrection(original, replacement);
         // 귀속 설계사가 다른 지급건은 수취인이 본인이어도 본인 명세에 나오면 안 된다.
         confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, otherAgent, scheduled, header, 3000);
+        // 대체 지급의 귀속행이 모두 다른 설계사 것이면, 귀속행이 없는 경우처럼 지급건 전액으로 대체하지 않고 제외한다.
+        Long foreignOriginal = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 4000);
+        Long foreignReplacement = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, otherAgent, scheduled, header, 4500);
+        linkCorrection(foreignOriginal, foreignReplacement);
 
         JsonNode adjustment = data(mine("month=" + MONTH + "&entryType=ADJUSTMENT"));
         assertThat(adjustment.path("summary").path("adjustment").path("count").asLong()).isEqualTo(1);
@@ -271,6 +262,13 @@ class AgentStatementIntegrationTest {
         clawbackCase(rule, attribution, "CALCULATED", "2026-07-31 15:30:00+00");
         clawbackCase(rule, attribution, "DETECTED", "2026-07-15 10:00:00+09");
         clawbackCase(rule, attribution, "CANCELLED", "2026-07-16 10:00:00+09");
+        // 수취인은 본인이지만 귀속 설계사가 다른 귀속행의 환수 라인은 제외한다.
+        Long header = scheduleHeader();
+        Long scheduled = scheduleLine(header, 1, 6, "PLANNED");
+        Long foreignPayment = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, otherAgent, scheduled, header, 3000);
+        Long foreignAttribution = id("SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id = ?",
+                foreignPayment);
+        clawbackCase(rule, foreignAttribution, "CALCULATED", "2026-07-15 10:00:00+09");
 
         assertThat(data(mine("month=2026-06&entryType=CLAWBACK")).path("summary").path("clawback").path("count").asLong()).isZero();
         assertThat(data(mine("month=2026-07&entryType=CLAWBACK")).path("summary").path("clawback").path("count").asLong()).isEqualTo(1);
@@ -342,6 +340,24 @@ class AgentStatementIntegrationTest {
                 .andExpect(jsonPath("$.data.items.content").isEmpty());
         mine("month=" + MONTH + "&contractNo=%25").andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items.totalElements").value(0));
+    }
+
+    /** 원장 정정 그룹과 대체 지급 연결을 만든다. 원본은 취소 처리하고, 정정그룹용 분개는 차대 균형을 맞춰 POSTED 로 만든다. */
+    private void linkCorrection(Long original, Long replacement) {
+        String journalNo = "STMT-" + UUID.randomUUID().toString().substring(0, 8);
+        Long journal = id("""
+                INSERT INTO fgc.journal_header(journal_no, journal_date, journal_type, source_entity_type, source_entity_id)
+                VALUES (?, DATE '2099-01-01', 'ADJUSTMENT', 'STATEMENT_TEST', ?) RETURNING journal_header_id
+                """, journalNo, journalNo);
+        jdbc.update("INSERT INTO fgc.journal_line(journal_header_id, line_no, journal_account_id, debit_amount, credit_amount) SELECT ?, 1, min(journal_account_id), 100, 0 FROM fgc.journal_account", journal);
+        jdbc.update("INSERT INTO fgc.journal_line(journal_header_id, line_no, journal_account_id, debit_amount, credit_amount) SELECT ?, 2, min(journal_account_id), 0, 100 FROM fgc.journal_account", journal);
+        jdbc.update("UPDATE fgc.journal_header SET status = 'POSTED' WHERE journal_header_id = ?", journal);
+        String groupKey = "STMT-CORR-" + UUID.randomUUID().toString().substring(0, 8);
+        jdbc.update("INSERT INTO fgc.journal_correction_group(correction_group_key, original_journal_header_id, reason) VALUES (?, ?, 'statement test')",
+                groupKey, journal);
+        jdbc.update("UPDATE fgc.commission_transaction SET status = 'CANCELLED' WHERE commission_transaction_id = ?", original);
+        jdbc.update("INSERT INTO fgc.payment_journal_correction(correction_group_key, original_payment_id, replacement_payment_id) VALUES (?, ?, ?)",
+                groupKey, original, replacement);
     }
 
     private Long scheduleHeader() {

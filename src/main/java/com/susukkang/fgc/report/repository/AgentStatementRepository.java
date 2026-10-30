@@ -101,6 +101,9 @@ public class AgentStatementRepository {
                  AND (ct.source_type = 'ADJUSTMENT'
                       OR EXISTS (SELECT 1 FROM fgc.payment_journal_correction pc
                                   WHERE pc.replacement_payment_id = ct.commission_transaction_id))
+                 AND (ta.transaction_attribution_id IS NOT NULL
+                      OR NOT EXISTS (SELECT 1 FROM fgc.transaction_attribution x
+                                      WHERE x.commission_transaction_id = ct.commission_transaction_id))
               UNION ALL
               SELECT 'HELD', sl.schedule_line_id, 0::bigint,
                      sh.contract_id, sl.commission_item_id, sl.installment_no,
@@ -131,7 +134,7 @@ public class AgentStatementRepository {
                 JOIN fgc.clawback_case cc ON cc.clawback_case_id = cl.clawback_case_id
                 JOIN fgc.transaction_attribution ta ON ta.transaction_attribution_id = cl.transaction_attribution_id
                 JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
-               WHERE ct.recipient_agent_id = :agentId
+               WHERE ct.recipient_agent_id = :agentId AND ta.agent_id = :agentId
                  AND cc.status IN ('CALCULATED', 'NOTIFIED', 'OBJECTED', 'CONFIRMED', 'RECOVERING', 'CLOSED')
             )
             """;
