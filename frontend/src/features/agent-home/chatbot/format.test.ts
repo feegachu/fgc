@@ -48,7 +48,9 @@ describe('1위 설명은 서버가 순위를 가른 기준과 일치한다', () 
 describe('capBadge', () => {
   it('비율은 소수 첫째 자리 절사라 99.96% 가 100.0% 로 보이지 않는다', () => {
     expect(capBadge(99.96).text).toBe('99.9% 근접')
-    expect(capBadge(100.04).text).toBe('100.0% 초과·이월')
+    expect(capBadge(100.04).text).toBe('100.0% 근접')
+    expect(capBadge(100.04, 1).text).toBe('100.0% 초과·이월')
+    expect(capBadge(99.96, 0).text).toBe('99.9% 근접')
     expect(capBadge(89.99).text).toBe('89.9% 여유')
   })
 })

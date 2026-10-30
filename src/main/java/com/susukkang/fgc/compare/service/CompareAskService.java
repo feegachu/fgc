@@ -57,7 +57,6 @@ public class CompareAskService {
     static final String FALLBACK = "지금은 질문에 맞는 답변을 만들지 못했어요. 아래 연관 질문 버튼이나 근거 보기를 이용해 주세요.";
 
     private static final int MAX_LENGTH = 600;
-    private static final Pattern NUMBER = Pattern.compile("\\d+(?:,\\d{3})*(?:\\.\\d+)?");
     private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)", Pattern.CANON_EQ);
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
@@ -186,15 +185,6 @@ public class CompareAskService {
         if (text.isBlank() || text.length() > MAX_LENGTH || FORBIDDEN.stream().anyMatch(text::contains)) {
             return false;
         }
-        return numbers(source).containsAll(numbers(text));
-    }
-
-    private static Set<String> numbers(String text) {
-        Set<String> found = new HashSet<>();
-        Matcher m = NUMBER.matcher(text);
-        while (m.find()) {
-            found.add(m.group().replace(",", ""));
-        }
-        return found;
+        return AnswerNumberGuard.allowed(text, source);
     }
 }

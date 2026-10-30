@@ -34,7 +34,6 @@ public class CompareSummaryService {
             """;
 
     private static final int MAX_LENGTH = 400;
-    private static final Pattern NUMBER = Pattern.compile("\\d+(?:,\\d{3})*(?:\\.\\d+)?");
     private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
 
     private final LlmGateway llmGateway;
@@ -111,17 +110,7 @@ public class CompareSummaryService {
         if (!text.contains(top.product()) && !text.contains(top.insurer())) {
             return false;
         }
-        Set<String> allowed = numbers(data);
-        return allowed.containsAll(numbers(text));
-    }
-
-    private static Set<String> numbers(String text) {
-        Set<String> found = new HashSet<>();
-        Matcher m = NUMBER.matcher(text);
-        while (m.find()) {
-            found.add(m.group().replace(",", ""));
-        }
-        return found;
+        return AnswerNumberGuard.allowed(text, data);
     }
 
 }

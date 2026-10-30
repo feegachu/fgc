@@ -704,7 +704,7 @@ function Result({
           </thead>
           <tbody>
             {items.map((item) => {
-              const badge = capBadge(item.capImpactPct)
+              const badge = capBadge(item.capImpactPct, item.carryover)
               return (
                 <tr key={item.offeringId}>
                   <td className={`rank${item.rank === 1 ? ' top' : ''}`}>{item.rank}</td>
@@ -780,7 +780,7 @@ function Drawer({
   }, [item])
   const groups = new Map<string, CompareEvidence[]>()
   for (const line of item.evidence) groups.set(line.label, [...(groups.get(line.label) ?? []), line])
-  const badge = capBadge(item.capImpactPct)
+  const badge = capBadge(item.capImpactPct, item.carryover)
   return (
     <aside className="cb-drawer" aria-label="산출 근거">
       <div className="cb-drawer-head">
