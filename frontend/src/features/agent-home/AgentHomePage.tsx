@@ -22,6 +22,9 @@ import {
 } from './model'
 import type { InsurerKind, Period, Row } from './model'
 import './agent-home.css'
+import { WORKFLOW_GUIDES } from '../assistant/workflow-catalog'
+import { useWorkflowGuide } from '../assistant/workflow-state'
+import { guideFeatureId } from '../assistant/feature-ids'
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: 6, label: '6개월' },
@@ -109,6 +112,21 @@ function AgentHomeContent({ month }: { month: string }) {
   return (
     <div className="ah">
       <h1 className="visually-hidden">포트폴리오</h1>
+      {import.meta.env.VITE_ASSISTANT_AI === 'true' && (
+        <details className="surface" style={{ padding: 12, marginBottom: 12 }}>
+          <summary data-guide-feature="agent.guide-menu.open" style={{ cursor: 'pointer' }}>업무 안내</summary>
+          <nav aria-label="본인 업무 튜토리얼" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+            {WORKFLOW_GUIDES.filter((guide) => guide.roles.includes('AGENT')).map((guide) => (
+              <button data-guide-feature={guideFeatureId('agent.guide-menu', guide.workflowId)} key={guide.workflowId} type="button" className="button button-secondary"
+                onClick={(event) => {
+                  const menu = event.currentTarget.closest('details')
+                  if (menu) menu.open = false
+                  useWorkflowGuide.getState().start(guide.workflowId)
+                }}>{guide.title}</button>
+            ))}
+          </nav>
+        </details>
+      )}
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error, '포트폴리오를 불러오지 못했습니다.')}</p>

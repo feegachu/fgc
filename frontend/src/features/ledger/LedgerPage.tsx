@@ -1,6 +1,7 @@
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { Button } from '../../components/Button'
@@ -411,6 +412,7 @@ function JournalActionModal({
 }) {
   const [reason, setReason] = useState('')
   const [evidence, setEvidence] = useState('')
+  const clearUnsaved = useUnsavedWork(Boolean(reason || evidence), JSON.stringify([reason, evidence]))
   const [reasonError, setReasonError] = useState(false)
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const client = useQueryClient()
@@ -428,6 +430,7 @@ function JournalActionModal({
     },
     meta: { errorToast: false },
     onSuccess: async (result) => {
+      clearUnsaved()
       if ('target' in result) {
         void client.invalidateQueries({ queryKey: ['exceptions'] })
         onClose()

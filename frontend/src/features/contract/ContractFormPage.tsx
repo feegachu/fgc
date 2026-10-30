@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
@@ -97,6 +98,9 @@ function ContractEditor({
   const [confirmReload, setConfirmReload] = useState(false)
   const [reloading, setReloading] = useState(false)
   const submitting = useRef(false)
+  const [savedSuccessfully, setSavedSuccessfully] = useState(false)
+  const [initialInput] = useState(() => JSON.stringify(initialDraft(currentDate, contract)))
+  const clearUnsaved = useUnsavedWork(!savedSuccessfully && JSON.stringify(draft) !== initialInput)
   const mounted = useRef(true)
   const insurers = useInsurerOptions()
   const products = useEntityChoices(
@@ -188,6 +192,8 @@ function ContractEditor({
         : await createContract(body)
       const savedId = saved.contractId ?? id
       if (!savedId) throw new Error('저장 결과의 계약 번호를 확인하지 못했습니다. 목록에서 저장 여부를 확인해 주세요.')
+      setSavedSuccessfully(true)
+      clearUnsaved()
       // Invalidate inactive projections too: an update can regenerate schedules and financial snapshots.
       await queryClient.invalidateQueries({ queryKey: ['contracts'], refetchType: 'none' })
       await queryClient.invalidateQueries({ queryKey: ['schedules'], refetchType: 'none' })

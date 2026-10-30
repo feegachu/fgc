@@ -1,8 +1,43 @@
 [
   {
+    "id": "agent.guide-menu.agent.contract.detail",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "agent.guide-menu.agent.contract.find",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "agent.guide-menu.agent.payments",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "agent.guide-menu.agent.portfolio",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "agent.guide-menu.open",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "summary"
+  },
+  {
     "id": "app.shell.app-shell.a",
     "file": "app/shell/AppShell.tsx",
     "element": "a"
+  },
+  {
+    "id": "app.shell.draft-navigation-guard.discard",
+    "file": "app/shell/DraftNavigationGuard.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.draft-navigation-guard.keep",
+    "file": "app/shell/DraftNavigationGuard.tsx",
+    "element": "button"
   },
   {
     "id": "app.shell.sidebar.button",

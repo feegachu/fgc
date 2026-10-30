@@ -1,3 +1,4 @@
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { isWonAmount } from '../assistant/guards'
 import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservation'
 import { findGuide } from '../assistant/catalog'
@@ -164,6 +165,7 @@ function TransactionForm({
   const [paymentId, setPaymentId] = useState(initialId)
   const [locked, setLocked] = useState(false)
   const [dirty, setDirty] = useState(!initialId)
+  const [inputEdited, setInputEdited] = useState(false)
   const [busy, setBusy] = useState<'save' | 'precheck' | 'confirm' | null>(null)
   const actionLock = useRef(false)
   const [fieldError, setFieldError] = useState<{ field: string; message: string }>()
@@ -204,6 +206,7 @@ function TransactionForm({
   const rows = rawRows.map((row) => normalizeRow(row, insurer, newcomer))
   const normalized = !loading && !referenceError && rows.some((row, index) => rowWasNormalized(rawRows[index], row))
   const needsSave = dirty || normalized
+  useUnsavedWork(inputEdited && needsSave && !confirmed)
   const confirmationNeedsRetry = Boolean(confirmError) && isRetryableConfirmation(confirmFailure)
   const confirmationRejected = confirmFailure != null && !isRetryableConfirmation(confirmFailure)
   const blockerId = result && confirmFailure ? blockedContractId(result, confirmFailure.code) : undefined
@@ -325,6 +328,7 @@ function TransactionForm({
   }, [helpOpen])
 
   function invalidatePreview() {
+    setInputEdited(true)
     setGuideRevision((value) => value + 1)
     setGuideSaved(false)
     guide.current?.invalidateInput()
@@ -388,6 +392,7 @@ function TransactionForm({
       setRows(draftRows(saved))
       setLocked(true)
       setDirty(false)
+      setInputEdited(false)
       setResult(null)
       void queryClient.invalidateQueries({ queryKey: ['transactions', 'list'] })
       queryClient.setQueryData(draftQuery(String(saved.commissionTransactionId)).queryKey, saved)

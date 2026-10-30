@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
@@ -128,10 +129,12 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
   const actions = availableActions(item.status, item.type)
+  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]))
   const mutation = useMutation({
     mutationFn: () => postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }),
     meta: { errorToast: false },
     onSuccess: (action) => {
+      clearUnsaved()
       applyActionToCache(client, item.exceptionCaseId!, action)
       setActionType('')
       setReason('')
