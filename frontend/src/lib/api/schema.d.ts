@@ -2392,7 +2392,10 @@ export interface components {
         };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
-            clawbackRatePct: number;
+            /** @description 환수율(%), 0~100·소수점 최대6자리의 정밀도를 보존한 문자열 */
+            clawbackRatePct: string;
+            /** Format: int64 */
+            clawbackRuleId?: number;
             /** Format: int64 */
             commissionItemId?: number;
             conditionExpression?: components["schemas"]["JsonNode"];
@@ -3874,7 +3877,7 @@ export interface components {
         /** @description 정책 초안. 빈 규칙 목록을 저장할 수 있으며 제출 검증은 별도 동작이다. */
         PolicyDraft: {
             basicDocumentVersion?: string;
-            /** @description 환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다. */
+            /** @description D-02 환수 규칙. CLAWBACK 유형만 허용하며 기준금액은 PAID_ATTRIBUTED_AMOUNT, 조건식은 null 또는 {}이다. */
             clawbackRules: components["schemas"]["ClawbackRuleDraft"][];
             commissionRules: components["schemas"]["CommissionRuleDraft"][];
             /** Format: date */

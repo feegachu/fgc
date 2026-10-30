@@ -40,6 +40,17 @@ class ConstraintErrorCodeResolverTest {
         assertThat(resolver.resolve(exception)).isEmpty();
     }
 
+    @Test
+    void resolvesClawbackRuleUniqueAndReferenceConstraintsAsPolicyAndInputErrors() {
+        assertThat(resolver.resolve(new RuntimeException("constraint uq_clawback_rule")))
+                .contains(FgcErrorCode.POL_002);
+        for (String constraint : List.of("clawback_rule_insurer_id_fkey", "clawback_rule_product_offering_id_fkey",
+                "clawback_rule_commission_item_id_fkey")) {
+            assertThat(resolver.resolve(new RuntimeException("constraint " + constraint)))
+                    .contains(FgcErrorCode.COMMON_002);
+        }
+    }
+
     // 2026-08-11 yslee - 서로 다른 지급 건의 확정 멱등키 충돌 응답 검증
     // 기존 코드: 지급 건 자연키 제약만 거래 중복 오류로 변환하는지 테스트
     // 문제: 새 멱등키 고유 제약이 매핑에서 빠져도 회귀 테스트가 감지하지 못함

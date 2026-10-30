@@ -35,6 +35,16 @@ public class PolicySuccessionValidator {
                 throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 룰셋의 판매일·기초서류 적용 범위가 빠져 있습니다.");
             }
         }
+        for (PolicyDraft.ClawbackRuleDraft oldRule : previous.clawbackRules()) {
+            List<long[]> intervals = replacement.clawbackRules().stream()
+                    .filter(rule -> coversScope(rule.insurerId(), oldRule.insurerId())
+                            && coversScope(rule.productOfferingId(), oldRule.productOfferingId())
+                            && coversScope(rule.commissionItemId(), oldRule.commissionItemId()))
+                    .map(rule -> new long[]{rule.elapsedMonthFrom(), rule.elapsedMonthTo()}).toList();
+            if (!coversRange(oldRule.elapsedMonthFrom(), oldRule.elapsedMonthTo(), intervals)) {
+                throw incomplete("clawbackRules", "승계본에 기존 ACTIVE 환수 규칙의 적용 범위·항목·경과월이 빠져 있습니다.");
+            }
+        }
     }
 
     /** 초안 DTO에 없는 부속 한도도 양방향으로 보존해야 기존 계약의 판정이 바뀌지 않는다. */

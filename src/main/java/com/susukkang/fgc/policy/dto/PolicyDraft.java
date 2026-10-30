@@ -47,7 +47,7 @@ public record PolicyDraft(
         @NotNull List<@NotNull @Valid CommissionRuleDraft> commissionRules,
         @NotNull List<@NotNull @Valid FeeRegimeRuleDraft> feeRegimeRules,
         @NotNull List<@NotNull @Valid ParameterDraft> parameters,
-        @Schema(description = "환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다.")
+        @Schema(description = "D-02 환수 규칙. CLAWBACK 유형만 허용하며 기준금액은 PAID_ATTRIBUTED_AMOUNT, 조건식은 null 또는 {}이다.")
         @NotNull List<@NotNull @Valid ClawbackRuleDraft> clawbackRules,
         @Schema(description = "수정 요청의 조회 시점 updatedAt. 최초 생성에서는 지정하지 않는다.")
         OffsetDateTime expectedUpdatedAt
@@ -142,6 +142,7 @@ public record PolicyDraft(
     }
 
     public record ClawbackRuleDraft(
+            @Positive Long clawbackRuleId,
             @Positive Long insurerId,
             @Positive Long productOfferingId,
             @Positive Long commissionItemId,
@@ -150,6 +151,7 @@ public record PolicyDraft(
             @NotBlank @Size(max = 40) String clawbackBasisCode,
             @NotNull @DecimalMin("0") @DecimalMax("100")
             @JsonFormat(shape = JsonFormat.Shape.STRING)
+            @Schema(type = "string", description = "환수율(%), 0~100·소수점 최대6자리의 정밀도를 보존한 문자열")
             @Digits(integer = 3, fraction = 6) BigDecimal clawbackRatePct,
             JsonNode conditionExpression
     ) {

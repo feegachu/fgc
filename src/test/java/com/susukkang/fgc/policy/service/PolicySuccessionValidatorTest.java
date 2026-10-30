@@ -162,6 +162,27 @@ class PolicySuccessionValidatorTest {
                 .isInstanceOf(FgcBusinessException.class);
     }
 
+    @Test
+    void clawbackSuccessionAllowsNewRatesAndSplitBandsButPreservesScopeAndMonthCoverage() throws Exception {
+        ObjectNode previous = document().put("policyType", "CLAWBACK");
+        previous.withArray("commissionRules").removeAll();
+        previous.withArray("clawbackRules").addObject().put("insurerId", 1).put("commissionItemId", 2)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 23)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "100");
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
+        ObjectNode rule = (ObjectNode) replacement.path("clawbackRules").get(0);
+        rule.put("elapsedMonthTo", 11).put("clawbackRatePct", "50");
+        replacement.withArray("clawbackRules").add(rule.deepCopy().put("elapsedMonthFrom", 12)
+                .put("elapsedMonthTo", 23).put("clawbackRatePct", "0"));
+        assertValid(previous, replacement);
+        rule.put("insurerId", 3);
+        assertInvalid(previous, replacement, "clawbackRules");
+        rule.putNull("insurerId");
+        assertValid(previous, replacement);
+        rule.put("elapsedMonthTo", 10);
+        assertInvalid(previous, replacement, "clawbackRules");
+    }
+
     private void assertValid(ObjectNode previous, ObjectNode replacement) {
         assertThatCode(() -> validator.validate(draft(previous), draft(replacement))).doesNotThrowAnyException();
     }
