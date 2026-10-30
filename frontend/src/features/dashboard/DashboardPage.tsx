@@ -1,3 +1,4 @@
+import { openSettlementGuide } from '../assistant/settlement/entry'
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
 import { Link, useOutletContext } from 'react-router'
@@ -171,6 +172,14 @@ function DashboardContent({ month }: { month: string }) {
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>
+        <button
+          type="button"
+          className="button button-secondary"
+          data-guide-target="dashboard.guide"
+          onClick={openSettlementGuide}
+        >
+          전체 업무 가이드
+        </button>
       </header>
       {error ? (
         <div role="alert" className="empty-state">
@@ -236,7 +245,11 @@ function DashboardContent({ month }: { month: string }) {
                 {data?.recentRuns?.length ? (
                   <div className="run-list-body">
                     {data.recentRuns.map((run) => (
-                      <RunRow key={run.validationRunId} run={run} to={href(`/validation-runs/${run.validationRunId}`)} />
+                      <RunRow
+                        key={run.validationRunId}
+                        run={run}
+                        to={href(`/validation-runs/${run.validationRunId}`)}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -252,7 +265,10 @@ function DashboardContent({ month }: { month: string }) {
                   </h2>
                 </header>
                 <RiskComposition items={compositionItems} />
-                <p className="risk-composition-note">미처리 예외는 일부가 위 항목과 겹치고 세는 단위(예외 건)가 달라 비중에서 제외했습니다. 비중은 항목별 건수의 단순 비율이며 세는 단위가 서로 다릅니다.</p>
+                <p className="risk-composition-note">
+                  미처리 예외는 일부가 위 항목과 겹치고 세는 단위(예외 건)가 달라 비중에서 제외했습니다. 비중은 항목별
+                  건수의 단순 비율이며 세는 단위가 서로 다릅니다.
+                </p>
               </section>
             </aside>
           </div>

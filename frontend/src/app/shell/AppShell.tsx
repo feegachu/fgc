@@ -1,3 +1,4 @@
+import { SettlementGuide } from '../../features/assistant/settlement/SettlementGuide'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
@@ -72,7 +73,9 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           : '권한 없음 (FGC-UI-ERR-403) · FGC')
   }, [errorTitle, current, allowed])
   return (
-    <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}>
+    <div
+      className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
+    >
       <a className="skip-link" href="#main-content">
         본문으로 건너뛰기
       </a>
@@ -85,7 +88,11 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           loggingOut={loggingOut}
         />
         <header className="app-header app-header-rail">
-          {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? <AgentTopbar /> : <WorkspaceTabs activeId={current?.id} />}
+          {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? (
+            <AgentTopbar />
+          ) : (
+            <WorkspaceTabs activeId={current?.id} />
+          )}
           <div className="app-header-actions">
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
@@ -107,6 +114,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
         </main>
+        <SettlementGuide user={user} month={month} />
         <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
       </div>
     </div>

@@ -35,6 +35,7 @@ async function data<T>(path: string, options: Parameters<typeof apiClient.reques
   return response.data
 }
 const path = (id: string, suffix = '') => `/api/v1/transactions/${encodeURIComponent(id)}${suffix}`
+export const readPayment = (id: string, signal?: AbortSignal) => data<Payment>(path(id), { signal })
 export const draftQuery = (id: string | null) =>
   queryOptions({
     meta: { errorToast: false },
