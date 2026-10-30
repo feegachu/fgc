@@ -22,7 +22,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 설명 : FUN-026 상태 사건 후속 작업의 등록과 처리.
@@ -37,7 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 public class ContractStatusFollowUpService {
 
-    // shortcut: 5회 실패하면 자동 재시도를 멈추고 같은 계약의 뒤 사건도 기다린다. 수동 재시도 화면이 생기면 그 경로로 푼다.
+    // shortcut: 5번 시도(처리 중 중단 포함)하면 자동 재시도를 멈추고 같은 계약의 뒤 사건도 기다린다. 수동 재시도 화면이 생기면 그 경로로 푼다.
     static final int MAX_ATTEMPTS = 5;
     private static final int MAX_JOBS_PER_RUN = 100;
     private static final int FAILURE_REASON_MAX_LENGTH = 2000;
@@ -100,32 +99,33 @@ public class ContractStatusFollowUpService {
     }
 
     private boolean runOne() {
-        AtomicReference<JobKey> claimed = new AtomicReference<>();
-        try {
-            return Boolean.TRUE.equals(transaction.execute(status -> {
-                Optional<JobKey> next = jobs.claimNext(MAX_ATTEMPTS);
-                next.ifPresent(job -> {
-                    claimed.set(job);
-                    process(job);
-                });
-                return next.isPresent();
-            }));
-        } catch (RuntimeException failure) {
-            JobKey job = claimed.get();
-            if (job == null) {
-                throw failure;
-            }
-            log.warn("상태 사건 후속 작업 실패: eventId={}, job={}", job.eventId(), job.job(), failure);
-            transaction.executeWithoutResult(status -> {
-                processingHistory.insertProcessing(job.eventId(), job.job(), "FAILED", null, failureReason(failure));
-                jobs.markFailed(job, errorCode(failure));
-            });
-            return true;
+        // 1. 잡으면서 시도 횟수·다음 재시도 시각을 먼저 커밋한다. 실패·중단 뒤에도 그 시각 전에는 다른 worker가 잡지 않는다.
+        Optional<JobKey> claimed = transaction.execute(status -> jobs.claimNext(MAX_ATTEMPTS));
+        if (claimed == null || claimed.isEmpty()) {
+            return false;
         }
+        JobKey job = claimed.get();
+        // savepoint로 처리기만 되돌리지 않는 이유: JpaTransactionManager의 중첩 트랜잭션은 JPA 영속성 컨텍스트를 되돌리지 않는다.
+        try {
+            transaction.executeWithoutResult(status -> process(job));
+        } catch (RuntimeException failure) {
+            log.warn("상태 사건 후속 작업 실패: eventId={}, job={}", job.eventId(), job.job(), failure);
+            // 2. 작업 행을 다시 잠가 아직 끝나지 않았을 때만 실패를 남긴다(다른 worker의 성공 뒤에 실패 이력이 붙지 않게).
+            transaction.executeWithoutResult(status -> {
+                if (jobs.lockForFailure(job)) {
+                    processingHistory.insertProcessing(job.eventId(), job.job(), "FAILED", null, failureReason(failure));
+                    jobs.markFailed(job, errorCode(failure));
+                }
+            });
+        }
+        return true;
     }
 
-    /** 처리기 결과·영향·성공 이력·작업 완료를 계약 잠금 아래 한 트랜잭션에 남긴다. */
+    /** 작업·계약 행을 잠그고 처리기 결과·영향·성공 이력·작업 완료를 한 트랜잭션에 남긴다. */
     private void process(JobKey job) {
+        if (!jobs.lockForProcessing(job)) {
+            return;
+        }
         ContractStatusEvent event = events.findById(job.eventId()).orElseThrow();
         contractLocks.lock(event.getContractId());
         ContractStatusFollowUpProcessor processor = processors.orderedStream()

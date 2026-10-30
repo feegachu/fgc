@@ -13,6 +13,7 @@ import com.susukkang.fgc.contract.dto.ContractStatusEventRequest;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.entity.ContractStatusEvent;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
+import com.susukkang.fgc.contract.repository.ContractEventJobRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,10 +27,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -40,9 +44,11 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,6 +62,8 @@ import static com.susukkang.fgc.common.code.ContractStatus.TERMINATED;
 import static com.susukkang.fgc.common.code.ContractStatus.UNPAID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -84,7 +92,9 @@ class ContractStatusEventIntegrationTest {
     @Autowired private FgcUserDetailsService users;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private DataSource dataSource;
+    @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private RecordingProcessor processor;
+    @MockitoSpyBean private ContractEventJobRepository jobRepository;
 
     private FgcUserDetails settle;
 
@@ -373,6 +383,72 @@ class ContractStatusEventIntegrationTest {
         assertThat(jobState(paid)).isEqualTo("SUCCEEDED");
         assertThat(history(unpaid, "FAILED")).isEqualTo(1);
         assertThat(history(unpaid, "SUCCEEDED")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("실패를 기록하는 사이에도 다른 worker는 같은 작업(재시도 시각 전)과 같은 계약의 뒤 사건(순서)을 잡지 않는다")
+    void concurrentWorkerWaitsWhileAFailureIsRecorded() throws Exception {
+        Long id = newContract();
+        processor.supported = EnumSet.allOf(ContractStatus.class);
+        processor.failuresLeft.set(1);
+        long unpaid = data(put(id, update(id, UNPAID, event(AUG_1)), UUID.randomUUID().toString())
+                .andExpect(status().isOk())).path("statusEventId").asLong();
+        long paid = data(put(id, update(id, ACTIVE, event(AUG_1.plusDays(3))), UUID.randomUUID().toString())
+                .andExpect(status().isOk())).path("statusEventId").asLong();
+        CountDownLatch recording = new CountDownLatch(1);
+        CountDownLatch resume = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            recording.countDown();
+            assertThat(resume.await(20, TimeUnit.SECONDS)).isTrue();
+            return invocation.callRealMethod();
+        }).when(jobRepository).lockForFailure(any());
+
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            Future<Integer> first = worker.submit(followUps::runDueJobs);
+            assertThat(recording.await(20, TimeUnit.SECONDS)).isTrue();
+            // 첫 worker는 처리에 실패해 롤백했고 아직 실패를 기록하지 않았다.
+            assertThat(followUps.runDueJobs()).isZero();
+            assertThat(processor.processed).containsExactly(unpaid);
+            resume.countDown();
+            assertThat(first.get(30, TimeUnit.SECONDS)).isEqualTo(1);
+        } finally {
+            resume.countDown();
+            worker.shutdownNow();
+        }
+
+        assertThat(followUps.runDueJobs()).isZero();
+        assertThat(jobState(unpaid)).isEqualTo("FAILED");
+        assertThat(jobState(paid)).isEqualTo("PENDING");
+        assertThat(count("SELECT attempt_count FROM fgc.contract_event_job WHERE contract_status_event_id = ?", unpaid))
+                .isEqualTo(1);
+        assertThat(history(unpaid, "FAILED")).isEqualTo(1);
+        assertThat(history(unpaid, "SUCCEEDED")).isZero();
+    }
+
+    @Test
+    @DisplayName("작업을 잡은 뒤 프로세스가 멈추면 선점한 재시도 시각 전에는 잡히지 않고, 그 뒤 다시 처리되며 시도 횟수에 들어간다")
+    void abandonedClaimIsRetriedAfterItsRetryTime() throws Exception {
+        Long id = newContract();
+        processor.supported = EnumSet.of(UNPAID);
+        long eventId = data(put(id, update(id, UNPAID, event(AUG_1)), UUID.randomUUID().toString())
+                .andExpect(status().isOk())).path("statusEventId").asLong();
+
+        // 잡기만 커밋하고 처리 전에 멈춘 worker
+        Optional<ContractEventJobRepository.JobKey> abandoned = new TransactionTemplate(transactionManager)
+                .execute(tx -> jobRepository.claimNext(ContractStatusFollowUpService.MAX_ATTEMPTS));
+        assertThat(abandoned).isPresent();
+        assertThat(followUps.runDueJobs()).isZero();
+        assertThat(processor.processed).isEmpty();
+
+        jdbc.update("UPDATE fgc.contract_event_job SET next_retry_at = clock_timestamp() WHERE contract_status_event_id = ?",
+                eventId);
+        followUps.runDueJobs();
+
+        assertThat(processor.processed).containsExactly(eventId);
+        assertThat(jobState(eventId)).isEqualTo("SUCCEEDED");
+        assertThat(count("SELECT attempt_count FROM fgc.contract_event_job WHERE contract_status_event_id = ?", eventId))
+                .isEqualTo(2);
     }
 
     @Test
