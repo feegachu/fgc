@@ -22,6 +22,8 @@ RUN apk upgrade --no-cache
 
 # templates/*.template 은 컨테이너 시작 시 ${VAR} 를 환경변수로 치환해 conf.d/ 로 복사된다
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+# 보안 헤더(#677). conf.d 가 아닌 곳에 둔다 — conf.d/*.conf 는 http 문맥에서 자동으로 읽힌다
+COPY nginx/security-headers.conf /etc/nginx/fgc-security-headers.conf
 COPY --from=frontend /src/frontend/dist/ /usr/share/nginx/html/
 
 ENV API_UPSTREAM=127.0.0.1:8080

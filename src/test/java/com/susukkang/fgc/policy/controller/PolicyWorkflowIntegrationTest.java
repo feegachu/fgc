@@ -561,6 +561,167 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void acceptsRegistryCodesNeverUsedByApprovedPoliciesButRejectsUnknownCodes() throws Exception {
+        // FUN-016: 규제조문표의 REG-17은 승인 정책에 쓰인 적이 없어도 레지스트리(V71)에 있으므로 처음 등록할 수 있다.
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.policy_version
+                WHERE status IN ('APPROVED','ACTIVE','RETIRED') AND 'REG-17' = ANY (regulation_refs)
+                """, Integer.class)).isZero();
+        ObjectNode registered = draft();
+        registered.withArray("regulationRefs").add("REG-17");
+        assertThat(create(registered, writer).path("status").asText()).isEqualTo("DRAFT");
+        ObjectNode unknown = draft();
+        unknown.withArray("regulationRefs").add("REG-99");
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", unknown, writer, key(), 400).path("field").asText())
+                .isEqualTo("regulationRefs");
+    }
+
+    @Test
+    void acceptsOnlyWebLinksAndTextOnlySourceDetails() throws Exception {
+        for (String unsafe : List.of("javascript:alert(1)", "ftp://example.com/a", "file:///etc/passwd",
+                "https://user:pw@example.com/a", " https://example.com/a", "/relative/path", "https://")) {
+            ObjectNode draft = draft();
+            ((ObjectNode) draft.withArray("sourceDetails").get(0)).put("url", unsafe);
+            assertThat(writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400).path("field").asText())
+                    .as(unsafe).isEqualTo("sourceDetails[0].url");
+        }
+        ObjectNode textOnly = draft();
+        ((ObjectNode) textOnly.withArray("sourceDetails").get(0)).putNull("url");
+        long id = create(textOnly, writer).path("policyVersionId").asLong();
+        JsonNode source = StreamSupport.stream(detail(id, writer).path("references").spliterator(), false)
+                .filter(row -> row.path("code").asText().equals("SRC-022")).findFirst().orElseThrow();
+        assertThat(source.path("detailTitle").asText()).isEqualTo("승인된 근거 연결");
+        assertThat(source.path("url").isNull()).isTrue();
+    }
+
+    @Test
+    void detailMergesRegistryTitlesWithTheDetailsStoredOnThatPolicyVersion() throws Exception {
+        long id = create(draft(), writer).path("policyVersionId").asLong();
+        JsonNode references = detail(id, writer).path("references");
+        JsonNode regulation = references.get(0);
+        assertThat(regulation.path("ref").asText()).isEqualTo("REG-03");
+        assertThat(regulation.path("group").asText()).isEqualTo("REGULATION");
+        assertThat(regulation.path("registryTitle").asText()).isEqualTo("유지관리수수료");
+        // 상세를 저장하지 않은 근거는 공통 샘플 설명으로 채우지 않는다.
+        assertThat(regulation.path("detailTitle").isNull()).isTrue();
+        assertThat(regulation.path("explanation").isNull()).isTrue();
+        JsonNode source = StreamSupport.stream(references.spliterator(), false)
+                .filter(row -> row.path("group").asText().equals("SOURCE")).findFirst().orElseThrow();
+        assertThat(source.path("code").asText()).isEqualTo("SRC-022");
+        assertThat(source.path("registryTitle").isNull()).isTrue();
+        assertThat(source.path("detailTitle").asText()).isEqualTo("승인된 근거 연결");
+        assertThat(source.path("explanation").asText()).isEqualTo("정책 등록과 복제에서 근거를 보존한다.");
+        assertThat(source.path("url").asText()).isEqualTo("https://example.com/policy-evidence");
+        assertThat(values(regulation.path("statusTags"))).isEmpty();
+    }
+
+    @Test
+    void rejectsNullStatusTagAsAFieldErrorInsteadOfFailingDeserialization() throws Exception {
+        ObjectNode draft = draft();
+        ((ObjectNode) draft.withArray("sourceDetails").get(0)).putArray("statusTags").addNull();
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400).path("field").asText())
+                .startsWith("sourceDetails[0].statusTags");
+    }
+
+    @Test
+    void aStoredLegacyReferenceTextIsNotAcceptedAsANewLink() throws Exception {
+        Long sourceId = jdbc.queryForObject("""
+                SELECT policy_version_id FROM fgc.policy_version
+                WHERE policy_code = 'REG-FOUR-YEAR-2027-V1' AND version_no = 1
+                """, Long.class);
+        String legacyRef = "docs/FGC_가상_GA_운영정책서_v1_0.md#제46조";
+        long cloneId = write(HttpMethod.POST, "/api/v1/policies/" + sourceId + "/versions",
+                cloneRequest("2028-01-01"), writer, key(), 201).path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(cloneId, writer).path("editDocument").deepCopy();
+        assertThat(values(edit.path("sourceRefs"))).contains(legacyRef);
+        // 근거 코드로 물려받은 문서명 참조와 글자가 같아도, 링크로는 새 입력이라 http(s) 검사를 받는다.
+        int index = edit.withArray("sourceDetails").size();
+        edit.withArray("sourceDetails").addObject().put("ref", legacyRef).put("title", "옛 근거")
+                .putNull("explanation").put("url", legacyRef);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + cloneId, edit, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[" + index + "].url");
+    }
+
+    @Test
+    void keepsAnAlreadyStoredNonWebLinkButRejectsANewOne() throws Exception {
+        long id = create(draft(), writer).path("policyVersionId").asLong();
+        // URL 검사가 생기기 전에 저장된 링크를 흉내 낸다(초안 상태라 DRAFT 전용 트리거가 허용한다).
+        jdbc.update("UPDATE fgc.policy_source_detail SET url = 'ftp://legacy.example.com/a' WHERE policy_version_id = ?", id);
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument").deepCopy();
+        // 같은 링크를 다른 근거(REG-03)로 옮기면 물려받은 링크로 보지 않는다.
+        ObjectNode moved = edit.deepCopy();
+        ((ObjectNode) moved.withArray("sourceDetails").get(0)).putNull("url");
+        moved.withArray("sourceDetails").addObject().put("ref", "REG-03").put("title", "옮긴 링크")
+                .putNull("explanation").put("url", "ftp://legacy.example.com/a");
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, moved, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[1].url");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 200);
+        assertThat(action(id, "SUBMIT", updated, writer, 200).path("status").asText()).isEqualTo("REVIEW");
+
+        long other = create(draft(), writer).path("policyVersionId").asLong();
+        ObjectNode changed = (ObjectNode) detail(other, writer).path("editDocument").deepCopy();
+        ((ObjectNode) changed.withArray("sourceDetails").get(0)).put("url", "ftp://new.example.com/a");
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + other, changed, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[0].url");
+    }
+
+    @Test
+    void detailShowsCommitteeMetadataOfTheOfferingsItsRulesTarget() throws Exception {
+        long product = jdbc.queryForObject("""
+                INSERT INTO fgc.product(insurer_id, insurer_product_code, standard_product_code, product_name, product_group_code)
+                VALUES (?, ?, ?, '상품위원회 검증 상품', 'TERM') RETURNING product_id
+                """, Long.class, insurerId, "P718-" + UUID.randomUUID().toString().substring(0, 12),
+                "S718-" + UUID.randomUUID().toString().substring(0, 12));
+        long offering = jdbc.queryForObject("""
+                INSERT INTO fgc.product_offering(product_id, offering_version, sales_start_date, basic_document_version,
+                    basic_document_date, channel_code, fee_regime_code, committee_approval_date, committee_document_ref,
+                    governance_status)
+                VALUES (?, 'V1', DATE '2000-01-01', 'BD-718', DATE '1999-12-01', 'FACE_TO_FACE', 'CURRENT',
+                        DATE '1999-12-15', '상품위원회 의결서 2026-07', 'APPROVED') RETURNING product_offering_id
+                """, Long.class, product);
+        ObjectNode draft = draft();
+        ((ObjectNode) draft.path("commissionRules").get(0)).put("productOfferingId", offering);
+        long id = create(draft, writer).path("policyVersionId").asLong();
+        JsonNode offerings = detail(id, writer).path("productOfferings");
+        assertThat(offerings).hasSize(1);
+        JsonNode row = offerings.get(0);
+        assertThat(row.path("productOfferingId").asLong()).isEqualTo(offering);
+        assertThat(row.path("committeeApprovalDate").asText()).isEqualTo("1999-12-15");
+        assertThat(row.path("committeeDocumentRef").asText()).isEqualTo("상품위원회 의결서 2026-07");
+        assertThat(row.path("basicDocumentVersion").asText()).isEqualTo("BD-718");
+        assertThat(row.path("salesStartDate").asText()).isEqualTo("2000-01-01");
+        assertThat(row.path("governanceStatus").asText()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void storesSourceStatusTagsAndKeepsThemThroughEditAndNewVersion() throws Exception {
+        ObjectNode tagged = draft();
+        ((ObjectNode) tagged.withArray("sourceDetails").get(0)).putArray("statusTags").add("현행규정").add("FAQ").add("FAQ");
+        JsonNode created = create(tagged, writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode saved = detail(id, writer);
+        assertThat(values(saved.path("editDocument").path("sourceDetails").get(0).path("statusTags")))
+                .containsExactly("현행규정", "FAQ");
+        JsonNode source = StreamSupport.stream(saved.path("references").spliterator(), false)
+                .filter(row -> row.path("code").asText().equals("SRC-022")).findFirst().orElseThrow();
+        assertThat(values(source.path("statusTags"))).containsExactly("현행규정", "FAQ");
+
+        ObjectNode unknown = draft();
+        ((ObjectNode) unknown.withArray("sourceDetails").get(0)).putArray("statusTags").add("보도자료");
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", unknown, writer, key(), 400).path("field").asText())
+                .isEqualTo("sourceDetails[0].statusTags");
+
+        // 새 버전은 승인본에서만 만들 수 있다. 승인본의 태그는 DRAFT 전용 트리거로 바꿀 수 없고 복제본이 이어받는다.
+        JsonNode review = action(id, "SUBMIT", created, writer, 200);
+        action(id, "APPROVE", review, approver, 200);
+        JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2000-06-01"), writer, key(), 201);
+        assertThat(values(detail(clone.path("policyVersionId").asLong(), writer)
+                .path("editDocument").path("sourceDetails").get(0).path("statusTags")))
+                .containsExactly("현행규정", "FAQ");
+    }
+
+    @Test
     void storesApprovalEvidenceWithItsDocumentVersionAndResetsItOnClone() throws Exception {
         JsonNode created = create(draft().put("basicDocumentVersion", "DOC-V1"), writer);
         long id = created.path("policyVersionId").asLong();

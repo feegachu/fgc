@@ -68,7 +68,10 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       (!current
         ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
         : allowed
-          ? `${current.title} (${current.id}) · FGC`
+          ? // 설계사 포트폴리오 화면은 사용자에게 보이는 탭 제목에 화면 ID 를 붙이지 않는다.
+            current.id === 'AGNT-W01'
+            ? `${current.title} · FGC`
+            : `${current.title} (${current.id}) · FGC`
           : '권한 없음 (FGC-UI-ERR-403) · FGC')
   }, [errorTitle, current, allowed])
   return (
@@ -107,7 +110,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
         </main>
-        <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
+        {!location.pathname.startsWith('/agent-home') && <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>}
       </div>
     </div>
   )

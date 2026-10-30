@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/api/v1/agent/me/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 본인 수수료 명세 목록
+         * @description 지급·보류·조정·환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.
+         */
+        get: operations["mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/me/statements/{entryKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 본인 수수료 명세 상세
+         * @description 원천 ID·정책·계산 근거를 돌려줍니다. 남의 명세는 조회되지 않습니다.
+         */
+        get: operations["mineDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arbitrage-checks": {
         parameters: {
             query?: never;
@@ -332,6 +372,26 @@ export interface paths {
         get: operations["getClawbackCandidate"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clawbacks/candidates/{candidateId}/calculations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * IF-API-85 환수액 계산
+         * @description 선택한 정책버전과 서버가 잠근 원천으로 계산판을 만듭니다. 최신 판과 원천·정책·산식이 같으면 그 판을 반환하고, 같은 Idempotency-Key 재요청은 최초 결과를 반환합니다.
+         */
+        post: operations["calculateClawbackCandidate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -883,6 +943,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/agents/{agentId}/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 설계사별 수수료 명세 목록(내부)
+         * @description AGENT 를 제외한 내부 조회 역할이 설계사를 지정해 조회합니다.
+         */
+        get: operations["forAgent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/agents/{agentId}/statements/{entryKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 설계사별 수수료 명세 상세(내부) */
+        get: operations["detailForAgent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/schedules": {
         parameters: {
             query?: never;
@@ -1369,6 +1466,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseCalculation: {
+            data?: components["schemas"]["Calculation"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseCapCheckBasisResponse: {
             data?: components["schemas"]["CapCheckBasisResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1635,6 +1737,16 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseStatementDetail: {
+            data?: components["schemas"]["StatementDetail"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseStatementListResponse: {
+            data?: components["schemas"]["StatementListResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseTokenResponse: {
             data?: components["schemas"]["TokenResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1846,6 +1958,11 @@ export interface components {
             message?: string;
             /** Format: int64 */
             transactionAttributionId?: number;
+        };
+        Bucket: {
+            amount?: number;
+            /** Format: int64 */
+            count?: number;
         };
         Calculation: {
             amount?: number;
@@ -2209,6 +2326,17 @@ export interface components {
             violationCount?: number;
             /** Format: int64 */
             warningCount?: number;
+        };
+        ClawbackCalculationRequest: {
+            /** @description IF-API-84에서 받은 sourceVersion. 다르면 409 FGC-IMPL-STATE_CHANGED */
+            expectedSourceVersion: string;
+            /**
+             * Format: int64
+             * @description IF-API-84 policyCandidates 중 사용자가 확인한 정책버전
+             */
+            policyVersionId: number;
+            /** @description 계산 사유 1~500자 */
+            reason: string;
         };
         ClawbackCandidateDetailResponse: {
             candidate?: components["schemas"]["ClawbackCandidateResponse"];
@@ -2722,8 +2850,7 @@ export interface components {
         ContractSearchCondition: {
             /** Format: int64 */
             agentId?: number;
-            /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            capResultStatus?: ("NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE")[];
             /** Format: date */
             contractDateFrom?: string;
             /** Format: date */
@@ -3596,6 +3723,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseStatementEntry: {
+            content?: components["schemas"]["StatementEntry"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         ParameterDraft: {
             description?: string;
             key: string;
@@ -3691,6 +3830,10 @@ export interface components {
             editDocument?: components["schemas"]["PolicyDraft"];
             /** @description 정책 버전 헤더 */
             header?: components["schemas"]["PolicyVersionResponse"];
+            /** @description FUN-016 상품위원회 메타데이터. 수수료 규칙이 가리키는 판매버전의 승인일·승인문서·기초서류·판매 상태(참조정보) */
+            productOfferings?: components["schemas"]["PolicyOfferingGovernanceResponse"][];
+            /** @description FUN-016 근거 info 패널. regulationRefs·sourceRefs 순서대로 레지스트리 항목명과 저장된 상세를 합친 목록 */
+            references?: components["schemas"]["PolicyReferenceResponse"][];
             /** @description 예상 해약환급률표 탭 — 상품·납입기간·채널별 복수 */
             refundRateTables?: components["schemas"]["RefundRateTableResponse"][];
             /** @description 내부 근거 참조 목록(SRC-xx) */
@@ -3724,6 +3867,53 @@ export interface components {
             sourceClass: "REGULATORY" | "INSURER_RULE" | "GA_POLICY" | "PROJECT_ASSUMPTION";
             sourceDetails?: components["schemas"]["SourceDetailDraft"][];
             sourceRefs: string[];
+        };
+        /** @description 정책이 적용되는 판매버전의 상품위원회·기초서류·판매 상태(참조정보) */
+        PolicyOfferingGovernanceResponse: {
+            /** @description 기초서류 버전 */
+            basicDocumentVersion?: string;
+            /**
+             * Format: date
+             * @description 상품위원회 승인일
+             */
+            committeeApprovalDate?: string | null;
+            /** @description 상품위원회 승인문서 참조 */
+            committeeDocumentRef?: string | null;
+            /** @description 판매 상태 APPROVED·REVISED·SUSPENDED·STOPPED. 미등록이면 null */
+            governanceStatus?: string | null;
+            offeringVersion?: string;
+            productName?: string;
+            /** Format: int64 */
+            productOfferingId?: number;
+            /**
+             * Format: date
+             * @description 판매종료일
+             */
+            salesEndDate?: string | null;
+            /**
+             * Format: date
+             * @description 판매개시일
+             */
+            salesStartDate?: string;
+        };
+        /** @description 정책 근거 참조와 저장된 상세 설명 */
+        PolicyReferenceResponse: {
+            /** @description 참조에서 읽은 REG/SRC 코드. 형식이 아니면 null */
+            code?: string | null;
+            /** @description 이 정책버전에 저장된 근거 제목 */
+            detailTitle?: string | null;
+            /** @description 이 정책버전에 저장된 근거 설명 */
+            explanation?: string | null;
+            /** @description REGULATION(regulationRefs) 또는 SOURCE(sourceRefs) */
+            group?: string;
+            /** @description 정책에 저장된 참조 원문(코드 뒤 설명이 붙은 과거 형식 포함) */
+            ref?: string;
+            /** @description 근거 코드 레지스트리 항목명. 미등록·SRC는 null일 수 있음 */
+            registryTitle?: string | null;
+            /** @description 이 정책버전에 저장된 근거 상태 태그. 상세가 없으면 [] */
+            statusTags?: string[];
+            /** @description 검증된 http(s) 링크 */
+            url?: string | null;
         };
         /** @description 정책 버전 */
         PolicyVersionResponse: {
@@ -3786,6 +3976,8 @@ export interface components {
              * @example 규제
              */
             sourceClassLabel?: string;
+            /** @description 근거자료 코드 목록(SRC-xx). REG와 함께 비어 있으면 '근거 미기재' */
+            sourceRefs?: string[];
             /**
              * @description 정책 상태
              * @enum {string}
@@ -3905,6 +4097,12 @@ export interface components {
              * @example STD-LIFE-B
              */
             standardProductCode?: string;
+        };
+        Range: {
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
         };
         ReArbitrageCheckRequest: {
             /** Format: date */
@@ -4269,9 +4467,16 @@ export interface components {
             /** @enum {string} */
             status?: "PLANNED" | "CONFIRMED" | "MATCHED" | "ADJUSTED" | "HOLD" | "CANCELLED" | "RESTARTED";
         };
+        Source: {
+            entityType?: string;
+            /** Format: int64 */
+            id?: number;
+        };
         SourceDetailDraft: {
             explanation?: string;
             ref: string;
+            /** @description 근거 상태 태그. 현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수, 기본 [] */
+            statusTags?: string[];
             title: string;
             url?: string;
         };
@@ -4287,6 +4492,52 @@ export interface components {
             sourceId?: number;
             status?: string;
             triggerType?: string;
+        };
+        StatementBasis: {
+            dateBasis?: {
+                [key: string]: string;
+            };
+            month?: string;
+            range?: components["schemas"]["Range"];
+            warnings?: string[];
+        };
+        StatementDetail: {
+            basis?: components["schemas"]["StatementBasis"];
+            entry?: components["schemas"]["StatementEntry"];
+            evidence?: {
+                [key: string]: unknown;
+            };
+        };
+        StatementEntry: {
+            amount?: number;
+            /** Format: date */
+            basisDate?: string;
+            commissionItemCode?: string;
+            commissionItemName?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            dataStatus?: string;
+            entryKey?: string;
+            entryType?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            /** Format: int64 */
+            policyVersionId?: number;
+            source?: components["schemas"]["Source"];
+            statusCode?: string;
+            statusLabel?: string;
+        };
+        StatementListResponse: {
+            basis?: components["schemas"]["StatementBasis"];
+            items?: components["schemas"]["PageResponseStatementEntry"];
+            summary?: components["schemas"]["StatementSummary"];
+        };
+        StatementSummary: {
+            adjustment?: components["schemas"]["Bucket"];
+            clawback?: components["schemas"]["Bucket"];
+            held?: components["schemas"]["Bucket"];
+            payment?: components["schemas"]["Bucket"];
         };
         TargetSummary: {
             /** Format: int64 */
@@ -4358,7 +4609,6 @@ export interface components {
         ValidationRunProgressResponse: {
             /** Format: int64 */
             attemptId?: number;
-            requestId?: string;
             /** Format: int32 */
             currentStep?: number;
             /** Format: int32 */
@@ -4366,6 +4616,7 @@ export interface components {
             failureMessage?: string;
             /** Format: int32 */
             progressPct?: number;
+            requestId?: string;
             status?: string;
             statusLabel?: string;
             /** Format: int32 */
@@ -4404,6 +4655,66 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    mine: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다
+                 * @example 2026-07
+                 */
+                month?: string;
+                /** @description 계약번호(부분 일치) */
+                contractNo?: string;
+                /** @description 수수료 항목 ID */
+                commissionItemId?: number;
+                /** @description 내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK */
+                entryType?: string;
+                /** @description 정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순 */
+                sort?: string;
+                /** @description 페이지(1-base) */
+                page?: number;
+                /** @description 페이지 크기(최대 100) */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementListResponse"];
+                };
+            };
+        };
+    };
+    mineDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementDetail"];
+                };
+            };
+        };
+    };
     getArbitrageChecks_1: {
         parameters: {
             query: {
@@ -5006,6 +5317,53 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseClawbackCandidateDetailResponse"];
+                };
+            };
+        };
+    };
+    calculateClawbackCandidate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 계산 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                candidateId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClawbackCalculationRequest"];
+            };
+        };
+        responses: {
+            /** @description 계산판 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCalculation"];
+                };
+            };
+            /** @description 원천 버전 변경 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCalculation"];
+                };
+            };
+            /** @description 적용 정책·계산 근거 부족 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCalculation"];
                 };
             };
         };
@@ -6017,6 +6375,69 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseReconciliationResultSearchResponse"];
+                };
+            };
+        };
+    };
+    forAgent: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다
+                 * @example 2026-07
+                 */
+                month?: string;
+                /** @description 계약번호(부분 일치) */
+                contractNo?: string;
+                /** @description 수수료 항목 ID */
+                commissionItemId?: number;
+                /** @description 내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK */
+                entryType?: string;
+                /** @description 정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순 */
+                sort?: string;
+                /** @description 페이지(1-base) */
+                page?: number;
+                /** @description 페이지 크기(최대 100) */
+                size?: number;
+            };
+            header?: never;
+            path: {
+                agentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementListResponse"];
+                };
+            };
+        };
+    };
+    detailForAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agentId: number;
+                entryKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementDetail"];
                 };
             };
         };

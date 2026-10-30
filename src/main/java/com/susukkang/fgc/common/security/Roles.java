@@ -38,6 +38,10 @@ public final class Roles {
     public static final String CAN_WRITE_POLICY =
             HAS_ANY_ROLE + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
 
+    /** IF-API-85 환수액 계산. 인터페이스정의서 IF-API 목록의 권한 열(SETTLEMENT·GA_ADMIN·SYSTEM_ADMIN). */
+    public static final String CAN_CALCULATE_CLAWBACK =
+            HAS_ANY_ROLE + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+
     /** AUDT-W01 감사로그 조회. 화면정의서 v2.0 :1503,:1530. */
     public static final String CAN_VIEW_AUDIT_LOG =
             HAS_ANY_ROLE + COMPLIANCE + "','" + SYSTEM_ADMIN + "')";

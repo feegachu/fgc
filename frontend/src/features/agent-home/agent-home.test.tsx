@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -54,6 +54,7 @@ beforeEach(() => {
     if (path.startsWith('/api/v1/transactions')) return payments()
     if (path.startsWith('/api/v1/base/insurers')) return page(insurers)
     if (path.startsWith('/api/v1/base/products')) return page(products)
+    if (path.startsWith('/api/v1/ai/compare-chat/categories')) return envelope([{ code: 'HEALTH_PROTECTION', label: '건강보험', insurerCount: 2 }])
     return envelope(user)
   }) as typeof apiClient.request)
 })
@@ -75,7 +76,7 @@ function renderHome(path = '/app/agent-home') {
   )
   return router
 }
-const kpi = (name: string) => screen.findByRole('article', { name })
+const kpi = (name: string) => screen.findByLabelText(name)
 
 describe('AGNT-W01 포트폴리오', () => {
   it('프로필·이번달 현황 지표를 본인 계약과 지급에서 만든다', async () => {
@@ -98,26 +99,30 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(await kpi('신규 계약 건수')).toHaveTextContent('2건')
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
     expect(screen.getByRole('article', { name: '월 환산 초회보험료' })).toHaveTextContent('200,000')
-    await waitFor(() => expect(screen.getByRole('article', { name: '수령 예정 수수료' })).toHaveTextContent('500,000'))
+    await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('500,000'))
     expect(screen.getByRole('article', { name: '설계사 프로필' })).toHaveTextContent('김설계')
   })
 
-  it('확인 필요 계약 카드를 열면 한도 근접·검토 필요 계약이 보이고 닫을 수 있다', async () => {
+  it('확인 필요 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
     contracts = async () =>
       page([
         contract({ contractId: 2, contractNo: 'C-0002', capResultStatus: 'WARNING', capResultStatusLabel: '주의' }),
         contract({ contractId: 3, contractNo: 'C-0003', capResultStatus: 'REVIEW_REQUIRED', capResultStatusLabel: '검토필요' }),
       ])
     renderHome()
-    const card = await screen.findByRole('button', { name: '확인 필요 계약' })
+    const card = await screen.findByRole('link', { name: '확인 필요 계약' })
     expect(card).toHaveTextContent('2건')
-    await userEvent.click(card)
-    const dialog = screen.getByRole('dialog', { name: '확인 필요 계약 2건' })
-    expect(within(dialog).getByText(/C-0002/)).toBeInTheDocument()
-    expect(within(dialog).getByText(/C-0003/)).toBeInTheDocument()
-    expect(within(dialog).getByRole('link', { name: /C-0002/ })).toHaveAttribute('href', '/app/contracts/2')
-    await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(card).toHaveAttribute(
+      'href',
+      '/app/contracts?capResultStatus=WARNING%2CVIOLATION%2CREVIEW_REQUIRED&contractDateFrom=2026-07-01&contractDateTo=2026-07-31',
+    )
+    expect(card).not.toHaveTextContent('내역 보기')
+  })
+
+  it('수령 예정 수수료 카드를 누르면 수수료 지급 화면으로 간다', async () => {
+    renderHome()
+    const card = await screen.findByRole('link', { name: '수령 예정 수수료' })
+    expect(card).toHaveAttribute('href', '/app/agent/statements?month=2026-07')
   })
 
   it('판매 관리 필터로 기간과 보험사 구분을 바꾸고 도넛 범례로 보험사를 고른다', async () => {
@@ -142,10 +147,28 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(within(panel).queryByText('B손해 필터 적용 중')).not.toBeInTheDocument()
   })
 
+  it('상품 기준정보를 받기 전에는 그래프를 그리지 않고, 받은 뒤 보장 유형을 맞춰 그린다', async () => {
+    contracts = async () => page([contract({})])
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const base = vi.mocked(apiClient.request).getMockImplementation()!
+    vi.mocked(apiClient.request).mockImplementation((async (path: string) => {
+      if (path.startsWith('/api/v1/base/products')) await held
+      return base(path)
+    }) as typeof apiClient.request)
+    renderHome()
+    await waitFor(() => expect(clients[0].getQueryData(['agent-home', 'contracts'])).toBeDefined())
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(screen.getByText('불러오는 중입니다.')).toBeInTheDocument()
+    release()
+    const bars = await screen.findByRole('list', { name: '보장 유형별 계약 비중 가로 막대 차트' })
+    expect(within(bars).getByText('건강보장').closest('li')).toHaveTextContent('1건')
+  })
+
   it('이번 달 계약이 없으면 지표가 0이어도 화면이 깨지지 않는다', async () => {
     renderHome()
     expect(await kpi('신규 계약 건수')).toHaveTextContent('0건')
-    expect(screen.getByRole('button', { name: '확인 필요 계약' })).toHaveTextContent('0건')
+    expect(screen.getByRole('link', { name: '확인 필요 계약' })).toHaveTextContent('0건')
     expect(screen.getByRole('region', { name: '설계사 판매 관리 그래프' })).toHaveTextContent('합계 0건')
   })
 
@@ -155,9 +178,9 @@ describe('AGNT-W01 포트폴리오', () => {
       throw new ApiError(null, 'req-1', 500)
     }
     renderHome()
-    await waitFor(() => expect(screen.getByRole('article', { name: '수령 예정 수수료' })).toHaveTextContent('확인 불가'))
+    await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('확인 불가'))
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('1건')
-    expect(within(screen.getByRole('article', { name: '수령 예정 수수료' })).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    expect(within(screen.getByLabelText('수령 예정 수수료')).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
   it('계약 조회가 실패하면 오류와 다시 시도를 보여 준다', async () => {
@@ -169,12 +192,15 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
-  it('런처를 누르면 상품 추천 AI 화면이 열리고 닫기 요청으로 닫힌다', async () => {
+  it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
     renderHome()
-    await userEvent.click(await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ }))
-    expect(screen.getByTitle('상품 추천 AI')).toHaveAttribute('src', expect.stringContaining('chatbot/fun079-modal.html?embed=1'))
-    window.dispatchEvent(new MessageEvent('message', { data: { type: 'fgc-chatbot-close' } }))
-    await waitFor(() => expect(screen.queryByTitle('상품 추천 AI')).not.toBeInTheDocument())
+    const launcher = await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ })
+    await userEvent.click(launcher)
+    const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
+    expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '상품 추천 AI' })).not.toBeInTheDocument())
+    expect(launcher).toHaveFocus()
   })
 
   it('관리자 역할은 포트폴리오에 접근할 수 없다', async () => {

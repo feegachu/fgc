@@ -13,6 +13,8 @@ import com.susukkang.fgc.policy.dto.PolicyDraft.ParameterDraft;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
@@ -83,12 +85,35 @@ public class PolicyDraftValidator {
         return requiredRegime;
     }
 
+    /** FUN-016 근거 상태 태그(요구사항 FUN-016 처리규칙). DB CHECK(V71)와 같은 목록이다. */
+    static final Set<String> SOURCE_STATUS_TAGS = Set.of("현행규정", "개정고시", "시행세칙", "FAQ", "회사정책");
+
     private static void validateSourceDetails(PolicyDraft draft) {
         Set<String> detailRefs = new HashSet<>();
         for (int i = 0; i < draft.sourceDetails().size(); i++) {
             if (!detailRefs.add(draft.sourceDetails().get(i).ref())) {
                 throw invalid("sourceDetails[" + i + "].ref", "동일한 근거 상세를 중복 지정할 수 없습니다.");
             }
+            for (String tag : draft.sourceDetails().get(i).statusTags()) {
+                if (!SOURCE_STATUS_TAGS.contains(tag)) {
+                    throw invalid("sourceDetails[" + i + "].statusTags", "근거 상태는 현행규정·개정고시·시행세칙·FAQ·회사정책 중에서 고르세요.");
+                }
+            }
+        }
+    }
+
+    /** info 패널이 새 창으로 여는 링크. 스크립트·파일 등 다른 scheme과 공백·제어문자, 사용자 정보가 든 주소는 받지 않는다. */
+    static boolean isWebUrl(String url) {
+        if (!url.equals(url.strip()) || url.chars().anyMatch(c -> Character.isWhitespace(c) || Character.isISOControl(c))) {
+            return false;
+        }
+        try {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            return scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))
+                    && uri.getHost() != null && !uri.getHost().isBlank() && uri.getRawUserInfo() == null;
+        } catch (URISyntaxException e) {
+            return false;
         }
     }
 

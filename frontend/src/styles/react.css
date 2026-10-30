@@ -27,6 +27,9 @@
   top: var(--evidence-y);
   z-index: var(--z-overlay);
   max-width: calc(100vw - var(--space-4));
+  /* 긴 근거 설명도 뷰포트 안에서 스크롤로 끝까지 읽고 링크·버튼에 닿게 한다. */
+  max-height: calc(100vh - var(--space-4));
+  overflow-y: auto;
 }
 .evidence-popover.react-evidence-popover:not([popover]) {
   display: block;

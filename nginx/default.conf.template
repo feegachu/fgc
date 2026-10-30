@@ -10,6 +10,12 @@ server {
     listen 80;
     server_name _;
 
+    # 보안 헤더 값 (#677). SPA 는 인라인 스크립트·eval·외부 연결이 없고 폰트도 자체 호스팅이라 'self' 만 허용한다.
+    # 아래 include(fgc.d)보다 먼저 둔다 — 운영 TLS 설정(00-tls.conf)이 $fgc_hsts 를 덮어쓴다.
+    set $fgc_csp "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
+    set $fgc_hsts "";
+    include /etc/nginx/fgc-security-headers.conf;
+
     # 환경별 추가 설정(로그인 제한·actuator 차단·운영 TLS). deploy-host.sh가 넣는다. 없으면 아무 일도 없다(와일드카드 include).
     include /etc/nginx/fgc.d/*.conf;
 
@@ -29,6 +35,7 @@ server {
     # vite 산출물은 파일명에 해시가 있어 오래 캐시해도 된다. 없는 파일은 index.html 로 넘기지 않고 404.
     location ^~ /assets/ {
         add_header Cache-Control "public, max-age=31536000, immutable";
+        include /etc/nginx/fgc-security-headers.conf;
         try_files $uri =404;
     }
     location = /favicon.ico {
@@ -52,6 +59,7 @@ server {
     # 나머지 전부 React SPA 클라이언트 라우트 → index.html. 배포 직후 옛 index.html 이 남지 않게 매번 재검증한다.
     location / {
         add_header Cache-Control "no-cache";
+        include /etc/nginx/fgc-security-headers.conf;
         try_files $uri /index.html;
     }
 }
