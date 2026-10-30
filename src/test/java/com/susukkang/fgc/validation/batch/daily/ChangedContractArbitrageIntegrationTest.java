@@ -1,5 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
+
 import com.susukkang.fgc.arbitrage.service.ArbitrageCheckBatchItemService;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
@@ -67,6 +69,8 @@ class ChangedContractArbitrageIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
+    private ClawbackCandidateCaptureService clawbackCandidateCaptureService;
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     private ChangedContractItemProcessor processor;
@@ -81,7 +85,8 @@ class ChangedContractArbitrageIntegrationTest {
         processor = new ChangedContractItemProcessor(
                 insuranceContractRepository, scheduleService, capCheckService,
                 contractStatusEventProcessingRepository, arbitrageCheckBatchItemService, contractStatusEventRepository);
-        writer = new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository);
+        writer = new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository,
+                clawbackCandidateCaptureService);
 
         // exception_occurrence가 append-only라 이 실행은 정리하지 못하고 남는다 — 다른 테스트의
         // 예외 키(검증월 포함)·uq_validation_run과 겹치지 않도록 먼 미래의 무작위 월을 쓴다.
