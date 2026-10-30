@@ -12,7 +12,12 @@ export interface ShellUser {
 }
 import { roleLabels } from './labels'
 const groups = [
-  { id: 'contracts', title: '계약·지급', icon: 'payments', paths: ['/contracts', '/transactions', '/agent/statements', '/schedules'] },
+  {
+    id: 'contracts',
+    title: '계약·지급',
+    icon: 'payments',
+    paths: ['/contracts', '/transactions', '/agent/statements', '/schedules', '/clawbacks'],
+  },
   {
     id: 'compliance',
     title: '규제 검증',

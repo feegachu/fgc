@@ -141,6 +141,14 @@ export const screens: ScreenDefinition[] = [
   },
   { id: 'EXCP-W01', path: '/exceptions', title: '예외', menu: '/exceptions', icon: 'inbox' },
   {
+    id: 'CLAW-W01',
+    path: '/clawbacks',
+    title: '환수 검토·계산',
+    menu: '/clawbacks',
+    section: 'contracts',
+    icon: 'payments',
+  },
+  {
     id: 'VRUN-W02',
     path: '/validation-runs/:id',
     title: '월 통합검증 상세',

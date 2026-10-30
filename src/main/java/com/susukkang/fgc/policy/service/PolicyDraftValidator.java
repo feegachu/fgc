@@ -172,6 +172,8 @@ public class PolicyDraftValidator {
                 && draft.policyType() != PolicyType.SEVEN_YEAR_COMMISSION) return;
         for (int i = 0; i < draft.commissionRules().size(); i++) {
             CommissionRuleDraft rule = draft.commissionRules().get(i);
+            // 판매버전을 지정한 규칙은 DB의 판매일·기초서류로 좁힌 룰셋과 비교한다.
+            if (rule.productOfferingId() != null) continue;
             for (FeeRegimeRuleDraft regime : draft.feeRegimeRules()) {
                 validateCommissionRegimeBound(rule, regime, COMMISSION_RULE_PREFIX + i + "]");
             }
@@ -179,7 +181,7 @@ public class PolicyDraftValidator {
     }
 
     // 수수료 규칙은 판매일별로 나뉘지 않으므로 해당 정책의 모든 분급 룰셋에서 유효해야 한다.
-    private static void validateCommissionRegimeBound(CommissionRuleDraft rule, FeeRegimeRuleDraft regime, String field) {
+    static void validateCommissionRegimeBound(CommissionRuleDraft rule, FeeRegimeRuleDraft regime, String field) {
         if (rule.installmentTo() > regime.maxInstallments()) {
             throw invalid(field + ".installmentTo", "수수료 규칙은 분급 룰셋의 최대 회차를 넘을 수 없습니다.");
         }

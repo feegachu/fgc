@@ -22,6 +22,7 @@ const pages: Record<string, ComponentType> = {
   '/policies': PoliciesPage,
   '/arbitrage-checks': lazy(() => import('../features/arbitrage/ArbitragePage')),
   '/exceptions': ExceptionPage,
+  '/clawbacks': lazy(() => import('../features/clawback/ClawbackPage')),
   '/cap-checks': lazy(() => import('../features/cap/CapListPage')),
   '/transactions': lazy(() => import('../features/transaction/TransactionListPage')),
   '/agent/statements': lazy(() => import('../features/agent-statement/AgentStatementPage')),
