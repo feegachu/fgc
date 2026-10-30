@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import type { AgentContract } from './model'
@@ -56,6 +56,8 @@ export const agentProductsQuery = (insurerIds: number[], asOf: string) =>
       ).flat(),
     enabled: insurerIds.length > 0,
     staleTime: 5 * 60_000,
+    // 월을 바꾸면 기준일이 바뀌어 새로 받는다. 받는 동안 이전 목록으로 그려 화면이 '불러오는 중'으로 깜빡이지 않게 한다.
+    placeholderData: keepPreviousData,
     meta: { errorToast: false },
   })
 

@@ -38,15 +38,6 @@ server {
         include /etc/nginx/fgc-security-headers.conf;
         try_files $uri =404;
     }
-
-    # 상품 추천 AI 모달(iframe, public/chatbot/fun079-modal.html)은 인라인 <style>·<script> 와 Google Fonts 를 쓴다.
-    # 이 경로만 CSP 를 넓힌다. PR #739 가 React 모달로 바꾸면 이 location 과 파일을 함께 지운다.
-    location ^~ /chatbot/ {
-        set $fgc_csp "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
-        add_header Cache-Control "no-cache";
-        include /etc/nginx/fgc-security-headers.conf;
-        try_files $uri =404;
-    }
     location = /favicon.ico {
         try_files $uri =404;
     }

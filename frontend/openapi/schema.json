@@ -3374,8 +3374,11 @@
             "type" : "integer"
           },
           "capResultStatus" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
-            "type" : "string"
+            "items" : {
+              "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "contractDateFrom" : {
             "format" : "date",

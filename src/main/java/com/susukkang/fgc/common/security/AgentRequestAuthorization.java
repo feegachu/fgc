@@ -18,12 +18,20 @@ public final class AgentRequestAuthorization {
     };
 
     private static final Set<String> PUBLIC_READS = Set.of("/api/v1/auth/me",
-            "/api/v1/base/insurers", "/api/v1/base/products", "/api/v1/base/commission-items");
+            "/api/v1/base/insurers", "/api/v1/base/products", "/api/v1/base/commission-items",
+            "/api/v1/ai/compare-chat/categories", "/api/v1/news/headlines");
+
+    private static final Set<String> COMPARE_CHAT_POSTS = Set.of("/api/v1/ai/compare-chat/rank",
+            "/api/v1/ai/compare-chat/explain", "/api/v1/ai/compare-chat/ask");
 
     /** 객체 검사된 기존 API만 개방한다. 후속 쓰기 API는 공통 범위 검증을 연결한 PR에서 연다. */
     public static final AuthorizationManager<RequestAuthorizationContext> SCOPED_READS = (authentication, context) -> {
         var request = context.getRequest();
         String path = request.getRequestURI().substring(request.getContextPath().length());
+        if (HttpMethod.POST.matches(request.getMethod())) {
+            // FUN-079: 설계사 ID를 세션에서만 얻고 서버가 보관한 본인 결과만 쓰는 조회성 계산·질문 답변만 POST를 연다.
+            return new AuthorizationDecision(COMPARE_CHAT_POSTS.contains(path));
+        }
         return new AuthorizationDecision(HttpMethod.GET.matches(request.getMethod()) && (
                 PUBLIC_READS.contains(path)
                 || path.matches("/api/v1/contracts(?:/export\\.csv|/[1-9]\\d*(?:/status-events)?)?")

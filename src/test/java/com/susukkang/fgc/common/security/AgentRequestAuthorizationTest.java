@@ -26,7 +26,7 @@ class AgentRequestAuthorizationTest {
     @ParameterizedTest
     @ValueSource(strings = {"/api/v1/contracts", "/api/v1/contracts/1", "/api/v1/contracts/1/status-events",
             "/api/v1/contracts/export.csv", "/api/v1/transactions", "/api/v1/transactions/1",
-            "/api/v1/auth/me", "/api/v1/base/products"})
+            "/api/v1/auth/me", "/api/v1/base/products", "/api/v1/news/headlines"})
     void permitsOnlyScopedReads(String path) {
         assertThat(AgentRequestAuthorization.SCOPED_READS.check(() -> null,
                 new RequestAuthorizationContext(new MockHttpServletRequest("GET", path))).isGranted()).isTrue();
@@ -40,6 +40,13 @@ class AgentRequestAuthorizationTest {
     void internalOrUnclassifiedReadsStayClosed(String path) {
         assertThat(AgentRequestAuthorization.SCOPED_READS.check(() -> null,
                 new RequestAuthorizationContext(new MockHttpServletRequest("GET", path))).isGranted()).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/ai/compare-chat/rank", "/api/v1/ai/compare-chat/explain", "/api/v1/ai/compare-chat/ask"})
+    void opensOnlyCompareChatPosts(String path) {
+        assertThat(AgentRequestAuthorization.SCOPED_READS.check(() -> null,
+                new RequestAuthorizationContext(new MockHttpServletRequest("POST", path))).isGranted()).isTrue();
     }
 
     @ParameterizedTest
