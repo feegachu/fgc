@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
+import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { Button } from '../../components/Button'
 import { ContextLink } from '../../components/ContextLink'
 import { DataTable } from '../../components/DataTable'
@@ -97,6 +98,7 @@ export default function AgentStatementPage() {
       label: '수수료 항목',
       sortable: true,
       width: '10rem',
+      align: 'center',
       render: (row) => <span title={row.commissionItemCode}>{row.commissionItemName || row.commissionItemCode}</span>,
     },
     {
@@ -104,24 +106,25 @@ export default function AgentStatementPage() {
       label: '회차',
       sortable: true,
       width: '4.5rem',
-      align: 'number',
+      align: 'center',
       render: (row) => (row.installmentNo == null ? '-' : `${row.installmentNo}회`),
     },
-    { key: 'basisDate', label: '기준일', sortable: true, width: '6.5rem', render: (row) => date(row.basisDate) },
+    { key: 'basisDate', label: '기준일', sortable: true, width: '6.5rem', align: 'center', render: (row) => date(row.basisDate) },
     {
       key: 'entryType',
       label: '내역 구분',
       sortable: true,
       width: '6rem',
+      align: 'center',
       render: (row) => <TypeLabel type={row.entryType} />,
     },
-    { key: 'statusCode', label: '상태', sortable: true, width: '8rem', render: (row) => row.statusLabel || row.statusCode },
+    { key: 'statusCode', label: '상태', sortable: true, width: '8rem', align: 'center', render: (row) => row.statusLabel || row.statusCode },
     {
       key: 'amount',
       label: '금액',
       sortable: true,
       width: '8rem',
-      align: 'number',
+      align: 'center',
       render: (row) =>
         row.amount == null || row.dataStatus === 'MISSING' ? <span className="ast-muted">자료 없음</span> : won(row.amount),
     },
@@ -163,7 +166,8 @@ export default function AgentStatementPage() {
         </p>
       ) : (
         <>
-          <SummaryCards summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />
+          <SummaryCards
+            summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />
           <section className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
             <header className="surface-header">
               <h2 className="surface-title" id="ast-list-title">
@@ -261,7 +265,7 @@ function SummaryCards({
               <TypeLabel type={type} />
             </span>
             <strong className="ast-card-amount tabular-nums">
-              {bucket ? won(bucket.amount) : failed ? '조회 실패' : loading ? '…' : '-'}
+              {bucket ? <AnimatedNumber value={bucket.amount} format={won} /> : failed ? '조회 실패' : loading ? '…' : '-'}
             </strong>
             <span className="ast-card-note" title={note}>
               {bucket ? `${int(bucket.count)}건` : ''}
@@ -270,7 +274,6 @@ function SummaryCards({
           </article>
         )
       })}
-      <p className="ast-sum-note">유형별 금액은 성격이 달라 합산 순수령액을 만들지 않습니다.</p>
     </section>
   )
 }
@@ -287,6 +290,11 @@ function DetailPanel({
   onClose: () => void
 }) {
   const entry = detail?.entry
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [onClose])
   const evidence = Object.entries(detail?.evidence ?? {}).filter(
     ([key, value]) => value != null && value !== '' && EVIDENCE_LABELS[key],
   )
@@ -310,21 +318,38 @@ function DetailPanel({
             불러오는 중입니다.
           </p>
         ) : (
-          <dl className="ast-dl">
-            <Row label="내역 구분" value={entryTypeLabel(entry.entryType)} />
-            <Row label="상태" value={entry.statusLabel} />
-            <Row label="계약번호" value={entry.contractNo ?? '연결 계약 없음'} />
-            <Row label="수수료 항목" value={`${entry.commissionItemName} (${entry.commissionItemCode})`} />
-            <Row label="회차" value={entry.installmentNo == null ? '-' : `${entry.installmentNo}회`} />
-            <Row label="기준일" value={date(entry.basisDate)} />
-            <Row label="기준 설명" value={detail?.basis.dateBasis[entry.entryType]} />
-            <Row label="금액" value={entry.amount == null ? '자료 없음' : won(entry.amount)} />
-            <Row label="정책 버전 ID" value={entry.policyVersionId == null ? '-' : String(entry.policyVersionId)} />
-            <Row label="원천" value={`${entry.source.entityType} #${entry.source.id}`} />
-            {evidence.map(([key, value]) => (
-              <Row key={key} label={EVIDENCE_LABELS[key]} value={evidenceValue(key, value as string | number)} />
-            ))}
-          </dl>
+          <>
+            <div className="ast-hero">
+              <TypeLabel type={entry.entryType} />
+              <strong className="ast-hero-amount tabular-nums">
+                {entry.amount == null ? '자료 없음' : won(entry.amount)}
+              </strong>
+              <span className="ast-muted">
+                {entry.statusLabel} · {date(entry.basisDate)}
+              </span>
+            </div>
+            <section className="ast-group" aria-label="기본 정보">
+              <h3 className="ast-group-title">기본 정보</h3>
+              <dl className="ast-dl">
+                <Row label="계약번호" value={entry.contractNo ?? '연결 계약 없음'} />
+                <Row label="수수료 항목" value={`${entry.commissionItemName} (${entry.commissionItemCode})`} />
+                <Row label="회차" value={entry.installmentNo == null ? '-' : `${entry.installmentNo}회`} />
+                <Row label="기준 설명" value={detail?.basis.dateBasis[entry.entryType]} />
+                <Row label="정책 버전 ID" value={entry.policyVersionId == null ? '-' : String(entry.policyVersionId)} />
+                <Row label="원천" value={`${entry.source.entityType} #${entry.source.id}`} />
+              </dl>
+            </section>
+            {evidence.length > 0 && (
+              <section className="ast-group" aria-label="계산 근거">
+                <h3 className="ast-group-title">계산 근거</h3>
+                <dl className="ast-dl">
+                  {evidence.map(([key, value]) => (
+                    <Row key={key} label={EVIDENCE_LABELS[key]} value={evidenceValue(key, value as string | number)} />
+                  ))}
+                </dl>
+              </section>
+            )}
+          </>
         )}
         {entry?.contractId != null && (
           <ContextLink className="button button-secondary ast-link" to={`/contracts/${entry.contractId}`}>

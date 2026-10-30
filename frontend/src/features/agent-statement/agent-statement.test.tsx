@@ -123,7 +123,6 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     ]) {
       expect(screen.getByRole('article', { name: label })).toHaveTextContent(amount)
     }
-    expect(screen.getByText(/순수령액을 만들지 않습니다/)).toBeInTheDocument()
   })
 
   it('근거 보기로 상세를 열고 닫아도 조회 조건이 유지된다', async () => {
