@@ -3448,12 +3448,13 @@
           },
           "reason" : {
             "maxLength" : 2000,
-            "minLength" : 0,
+            "minLength" : 1,
             "type" : "string"
           },
           "reasonCode" : {
+            "enum" : [ "MANUAL_STATUS_CHANGE" ],
             "maxLength" : 40,
-            "minLength" : 0,
+            "minLength" : 1,
             "type" : "string"
           },
           "receivedAt" : {
@@ -3499,17 +3500,21 @@
             "type" : "array"
           },
           "reason" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "reasonCode" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "receivedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
           "registeredBy" : {
-            "$ref" : "#/components/schemas/RegisteredBy"
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/RegisteredBy"
+            }, {
+              "type" : "null"
+            } ]
           },
           "sourceEventKey" : {
             "type" : "string"
@@ -3704,7 +3709,7 @@
           },
           "statusEventId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "updatedAt" : {
             "format" : "date-time",
@@ -4434,7 +4439,7 @@
         "properties" : {
           "eventId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "status" : {
             "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],

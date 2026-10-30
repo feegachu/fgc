@@ -2883,7 +2883,8 @@ export interface components {
             /** Format: date-time */
             effectiveAt: string;
             reason: string;
-            reasonCode: string;
+            /** @enum {string} */
+            reasonCode: "MANUAL_STATUS_CHANGE";
             /** Format: date-time */
             receivedAt: string;
         };
@@ -2901,11 +2902,11 @@ export interface components {
             previousStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             previousStatusLabel?: string;
             processings?: components["schemas"]["ContractStatusEventProcessingResponse"][];
-            reason?: string;
-            reasonCode?: string;
+            reason?: string | null;
+            reasonCode?: string | null;
             /** Format: date-time */
             receivedAt?: string;
-            registeredBy?: components["schemas"]["RegisteredBy"];
+            registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
         };
@@ -2974,7 +2975,7 @@ export interface components {
             regeneratedScheduleIds?: number[];
             scheduleHeaderIds?: number[];
             /** Format: int64 */
-            statusEventId?: number;
+            statusEventId?: number | null;
             /** Format: date-time */
             updatedAt?: string;
         };
@@ -3254,7 +3255,7 @@ export interface components {
         };
         FollowUp: {
             /** Format: int64 */
-            eventId?: number;
+            eventId?: number | null;
             /** @enum {string} */
             status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
         };

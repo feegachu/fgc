@@ -141,7 +141,7 @@ public class ContractStatusFollowUpService {
                 : failure.getClass().getSimpleName();
     }
 
-    private static String failureReason(RuntimeException failure) {
+    static String failureReason(RuntimeException failure) {
         String reason = errorCode(failure) + (failure.getMessage() == null ? "" : ": " + failure.getMessage());
         return reason.length() <= FAILURE_REASON_MAX_LENGTH ? reason : reason.substring(0, FAILURE_REASON_MAX_LENGTH);
     }

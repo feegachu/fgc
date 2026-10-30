@@ -10,6 +10,7 @@ import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepo
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -89,5 +90,18 @@ class ContractStatusFollowUpServiceTest {
         verifyNoInteractions(events, contractLocks, processors, processingHistory);
         verify(jobs, never()).markSucceeded(any());
         verify(jobs, never()).markFailed(any(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1999, 1999", "2000, 2000", "2001, 2000"})
+    // 실패 사유는 contract_status_event_processing.failure_reason(varchar 2000)에 들어간다 — 넘치면 실패 기록부터 깨진다.
+    void cutsTheFailureReasonToTheColumnLength(int fullLength, int storedLength) {
+        String prefix = "IllegalStateException: ";
+        String full = prefix + "가".repeat(fullLength - prefix.length());
+
+        String reason = ContractStatusFollowUpService.failureReason(
+                new IllegalStateException(full.substring(prefix.length())));
+
+        assertThat(reason).hasSize(storedLength).isEqualTo(full.substring(0, storedLength));
     }
 }
