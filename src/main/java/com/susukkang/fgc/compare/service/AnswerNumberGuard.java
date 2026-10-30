@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 final class AnswerNumberGuard {
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:,\\d{3})*(?:\\.\\d+)?");
     /** 구백만원·삼십퍼센트처럼 한글 숫자 뒤에 단위가 붙은 표기. */
-    private static final Pattern KOREAN_AMOUNT = Pattern.compile("[영일이삼사오육칠팔구십백천만억조]+\\s*(?:원|%|퍼센트|프로)");
+    private static final Pattern KOREAN_AMOUNT = Pattern.compile("[영일이삼사오육칠팔구십백천만억조]++\\s*+(?:원|%|퍼센트|프로)", Pattern.CANON_EQ);
     /** 근거의 칸: | 와 줄바꿈, 그리고 한 줄 안의 문장·절(마침표·쉼표 뒤 공백) 경계. 숫자 속 쉼표(1,000)는 나누지 않는다. */
     private static final Pattern SEGMENT_BREAK = Pattern.compile("[|\\n]|[.,]\\s");
     private static final Pattern CLAUSE_BREAK = Pattern.compile("[.!?\\n]");
