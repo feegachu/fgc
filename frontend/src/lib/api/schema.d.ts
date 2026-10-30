@@ -3795,6 +3795,8 @@ export interface components {
             editDocument?: components["schemas"]["PolicyDraft"];
             /** @description 정책 버전 헤더 */
             header?: components["schemas"]["PolicyVersionResponse"];
+            /** @description FUN-016 상품위원회 메타데이터. 수수료 규칙이 가리키는 판매버전의 승인일·승인문서·기초서류·판매 상태(참조정보) */
+            productOfferings?: components["schemas"]["PolicyOfferingGovernanceResponse"][];
             /** @description FUN-016 근거 info 패널. regulationRefs·sourceRefs 순서대로 레지스트리 항목명과 저장된 상세를 합친 목록 */
             references?: components["schemas"]["PolicyReferenceResponse"][];
             /** @description 예상 해약환급률표 탭 — 상품·납입기간·채널별 복수 */
@@ -3830,6 +3832,34 @@ export interface components {
             sourceClass: "REGULATORY" | "INSURER_RULE" | "GA_POLICY" | "PROJECT_ASSUMPTION";
             sourceDetails?: components["schemas"]["SourceDetailDraft"][];
             sourceRefs: string[];
+        };
+        /** @description 정책이 적용되는 판매버전의 상품위원회·기초서류·판매 상태(참조정보) */
+        PolicyOfferingGovernanceResponse: {
+            /** @description 기초서류 버전 */
+            basicDocumentVersion?: string;
+            /**
+             * Format: date
+             * @description 상품위원회 승인일
+             */
+            committeeApprovalDate?: string | null;
+            /** @description 상품위원회 승인문서 참조 */
+            committeeDocumentRef?: string | null;
+            /** @description 판매 상태 APPROVED·REVISED·SUSPENDED·STOPPED. 미등록이면 null */
+            governanceStatus?: string | null;
+            offeringVersion?: string;
+            productName?: string;
+            /** Format: int64 */
+            productOfferingId?: number;
+            /**
+             * Format: date
+             * @description 판매종료일
+             */
+            salesEndDate?: string | null;
+            /**
+             * Format: date
+             * @description 판매개시일
+             */
+            salesStartDate?: string;
         };
         /** @description 정책 근거 참조와 저장된 상세 설명 */
         PolicyReferenceResponse: {
@@ -3911,6 +3941,8 @@ export interface components {
              * @example 규제
              */
             sourceClassLabel?: string;
+            /** @description 근거자료 코드 목록(SRC-xx). REG와 함께 비어 있으면 '근거 미기재' */
+            sourceRefs?: string[];
             /**
              * @description 정책 상태
              * @enum {string}

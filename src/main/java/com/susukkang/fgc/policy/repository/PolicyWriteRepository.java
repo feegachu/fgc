@@ -6,6 +6,7 @@ import com.susukkang.fgc.policy.dto.PolicyApprovalActionResponse;
 import com.susukkang.fgc.policy.dto.PolicyApplicationPeriod;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
 import com.susukkang.fgc.policy.dto.PolicyFeeLimit;
+import com.susukkang.fgc.policy.dto.PolicyOfferingGovernanceResponse;
 import com.susukkang.fgc.policy.dto.PolicyWriteResult;
 import com.susukkang.fgc.policy.entity.PolicyVersion;
 import jakarta.persistence.EntityManager;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -550,6 +552,22 @@ public class PolicyWriteRepository {
                 FROM fgc.fee_regime_ruleset r JOIN fgc.policy_version p ON p.policy_version_id = r.policy_version_id
                 WHERE p.status IN ('APPROVED','ACTIVE','RETIRED') AND p.approved_by IS NOT NULL AND p.approved_at IS NOT NULL
                 """, String.class));
+    }
+
+    /** FUN-016: 정책 수수료 규칙이 가리키는 판매버전의 상품위원회·기초서류·판매 상태. */
+    public List<PolicyOfferingGovernanceResponse> offeringGovernance(Long policyVersionId) {
+        return jdbc.query("""
+                SELECT po.product_offering_id, p.product_name, po.offering_version, po.basic_document_version,
+                       po.sales_start_date, po.sales_end_date, po.committee_approval_date, po.committee_document_ref,
+                       po.governance_status
+                  FROM fgc.product_offering po
+                  JOIN fgc.product p ON p.product_id = po.product_id
+                 WHERE po.product_offering_id IN (SELECT product_offering_id FROM fgc.commission_rule
+                                                   WHERE policy_version_id = ? AND product_offering_id IS NOT NULL)
+                 ORDER BY p.product_name, po.offering_version, po.product_offering_id
+                """, (rs, n) -> new PolicyOfferingGovernanceResponse(rs.getLong(1), rs.getString(2), rs.getString(3),
+                rs.getString(4), rs.getObject(5, LocalDate.class), rs.getObject(6, LocalDate.class),
+                rs.getObject(7, LocalDate.class), rs.getString(8), rs.getString(9)), policyVersionId);
     }
 
     /** 근거 코드 레지스트리 항목명. 제목이 비어 있는 코드(SRC 등)는 결과에 넣지 않는다. */

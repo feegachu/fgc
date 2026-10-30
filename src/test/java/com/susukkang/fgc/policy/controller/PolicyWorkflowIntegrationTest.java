@@ -616,6 +616,58 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void rejectsNullStatusTagAsAFieldErrorInsteadOfFailingDeserialization() throws Exception {
+        ObjectNode draft = draft();
+        ((ObjectNode) draft.withArray("sourceDetails").get(0)).putArray("statusTags").addNull();
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400).path("field").asText())
+                .startsWith("sourceDetails[0].statusTags");
+    }
+
+    @Test
+    void keepsAnAlreadyStoredNonWebLinkButRejectsANewOne() throws Exception {
+        long id = create(draft(), writer).path("policyVersionId").asLong();
+        // URL 검사가 생기기 전에 저장된 링크를 흉내 낸다(초안 상태라 DRAFT 전용 트리거가 허용한다).
+        jdbc.update("UPDATE fgc.policy_source_detail SET url = 'ftp://legacy.example.com/a' WHERE policy_version_id = ?", id);
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument").deepCopy();
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 200);
+        assertThat(action(id, "SUBMIT", updated, writer, 200).path("status").asText()).isEqualTo("REVIEW");
+
+        long other = create(draft(), writer).path("policyVersionId").asLong();
+        ObjectNode changed = (ObjectNode) detail(other, writer).path("editDocument").deepCopy();
+        ((ObjectNode) changed.withArray("sourceDetails").get(0)).put("url", "ftp://new.example.com/a");
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + other, changed, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[0].url");
+    }
+
+    @Test
+    void detailShowsCommitteeMetadataOfTheOfferingsItsRulesTarget() throws Exception {
+        long product = jdbc.queryForObject("""
+                INSERT INTO fgc.product(insurer_id, insurer_product_code, standard_product_code, product_name, product_group_code)
+                VALUES (?, ?, ?, '상품위원회 검증 상품', 'TERM') RETURNING product_id
+                """, Long.class, insurerId, "P718-" + UUID.randomUUID().toString().substring(0, 12),
+                "S718-" + UUID.randomUUID().toString().substring(0, 12));
+        long offering = jdbc.queryForObject("""
+                INSERT INTO fgc.product_offering(product_id, offering_version, sales_start_date, basic_document_version,
+                    basic_document_date, channel_code, fee_regime_code, committee_approval_date, committee_document_ref,
+                    governance_status)
+                VALUES (?, 'V1', DATE '2000-01-01', 'BD-718', DATE '1999-12-01', 'FACE_TO_FACE', 'CURRENT',
+                        DATE '1999-12-15', '상품위원회 의결서 2026-07', 'APPROVED') RETURNING product_offering_id
+                """, Long.class, product);
+        ObjectNode draft = draft();
+        ((ObjectNode) draft.path("commissionRules").get(0)).put("productOfferingId", offering);
+        long id = create(draft, writer).path("policyVersionId").asLong();
+        JsonNode offerings = detail(id, writer).path("productOfferings");
+        assertThat(offerings).hasSize(1);
+        JsonNode row = offerings.get(0);
+        assertThat(row.path("productOfferingId").asLong()).isEqualTo(offering);
+        assertThat(row.path("committeeApprovalDate").asText()).isEqualTo("1999-12-15");
+        assertThat(row.path("committeeDocumentRef").asText()).isEqualTo("상품위원회 의결서 2026-07");
+        assertThat(row.path("basicDocumentVersion").asText()).isEqualTo("BD-718");
+        assertThat(row.path("salesStartDate").asText()).isEqualTo("2000-01-01");
+        assertThat(row.path("governanceStatus").asText()).isEqualTo("APPROVED");
+    }
+
+    @Test
     void storesSourceStatusTagsAndKeepsThemThroughEditAndNewVersion() throws Exception {
         ObjectNode tagged = draft();
         ((ObjectNode) tagged.withArray("sourceDetails").get(0)).putArray("statusTags").add("현행규정").add("FAQ").add("FAQ");

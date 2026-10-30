@@ -32,13 +32,15 @@ public record PolicyDetailResponse(
         @Schema(description = "계산에 사용하는 계약일 적용 구간. 승계된 과거 버전은 후속 적용일 전날까지이며 원본 승인 기간은 보존")
         PolicyApplicationPeriod applicationPeriod,
         @Schema(description = "FUN-016 근거 info 패널. regulationRefs·sourceRefs 순서대로 레지스트리 항목명과 저장된 상세를 합친 목록")
-        List<PolicyReferenceResponse> references
+        List<PolicyReferenceResponse> references,
+        @Schema(description = "FUN-016 상품위원회 메타데이터. 수수료 규칙이 가리키는 판매버전의 승인일·승인문서·기초서류·판매 상태(참조정보)")
+        List<PolicyOfferingGovernanceResponse> productOfferings
 ) {
     public PolicyDetailResponse(PolicyVersionResponse header, List<String> sourceRefs,
                                 List<CommissionRuleResponse> commissionRules,
                                 List<CapRuleSetResponse> capRuleSets,
                                 List<RefundRateTableResponse> refundRateTables) {
         this(header, sourceRefs, commissionRules, capRuleSets, refundRateTables, null, List.of(), List.of(), null, null,
-                List.of());
+                List.of(), List.of());
     }
 }

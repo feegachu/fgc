@@ -308,18 +308,27 @@ public class PolicyWriteService {
         }
         Set<String> linked = Stream.concat(draft.regulationRefs().stream(), draft.sourceRefs().stream())
                 .collect(Collectors.toSet());
-        for (PolicyDraft.SourceDetailDraft detail : draft.sourceDetails()) {
+        for (int i = 0; i < draft.sourceDetails().size(); i++) {
+            PolicyDraft.SourceDetailDraft detail = draft.sourceDetails().get(i);
             if (!linked.contains(detail.ref())) {
                 throw invalid("sourceDetails.ref", "상세 근거는 정책의 근거 목록에 연결되어야 합니다.");
+            }
+            // 새로 입력한 링크만 http(s)를 요구한다. 이 검사 이전에 저장된 링크는 복제·제출에서 그대로 보존한다.
+            String url = detail.url();
+            if (url != null && !url.isBlank() && !inherited.contains(url) && !PolicyDraftValidator.isWebUrl(url)) {
+                throw invalid("sourceDetails[" + i + "].url", "근거 링크는 http 또는 https 주소만 등록할 수 있습니다.");
             }
         }
     }
 
-    /** 과거 승인본의 문서명·경로 참조는 복제 후에도 보존하되 신규 입력으로 추가하지 않는다. */
+    /**
+     * 과거 승인본의 문서명·경로 참조와 이미 저장된 근거 링크는 복제 후에도 보존하되 신규 입력으로 추가하지 않는다.
+     */
     private static Set<String> storedReferences(PolicyDraft draft) {
-        return Stream.concat(Stream.concat(draft.regulationRefs().stream(), draft.sourceRefs().stream()),
-                draft.feeRegimeRules().stream().flatMap(rule -> rule.sourceRefs().stream()))
-                .collect(Collectors.toSet());
+        return Stream.of(draft.regulationRefs().stream(), draft.sourceRefs().stream(),
+                        draft.feeRegimeRules().stream().flatMap(rule -> rule.sourceRefs().stream()),
+                        draft.sourceDetails().stream().map(PolicyDraft.SourceDetailDraft::url).filter(Objects::nonNull))
+                .flatMap(s -> s).collect(Collectors.toSet());
     }
 
     /** 참조 원문에서 REG/SRC 코드를 읽는다. 형식이 아니면 null. */

@@ -70,3 +70,31 @@ it('never turns a non-web scheme into a link', async () => {
   expect(await screen.findByText('스크립트 링크')).toBeInTheDocument()
   expect(screen.queryByRole('link')).not.toBeInTheDocument()
 })
+
+it('says the explanation is missing when only a title is stored', async () => {
+  vi.spyOn(apiClient, 'request').mockResolvedValue({
+    data: {
+      references: [
+        {
+          ref: 'SRC-022',
+          code: 'SRC-022',
+          group: 'SOURCE',
+          registryTitle: null,
+          detailTitle: '제목만',
+          explanation: null,
+          url: null,
+          statusTags: [],
+        },
+      ],
+    },
+    error: null,
+    requestId: 'r',
+  } as never)
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <PolicyReferenceInfo policyVersionId={8} refText="SRC-022" />
+    </QueryClientProvider>,
+  )
+  expect(await screen.findByText('제목만')).toBeInTheDocument()
+  expect(screen.getByText('설명 자료 없음')).toBeInTheDocument()
+})

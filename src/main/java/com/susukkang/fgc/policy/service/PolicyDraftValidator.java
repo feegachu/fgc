@@ -99,10 +99,6 @@ public class PolicyDraftValidator {
                     throw invalid("sourceDetails[" + i + "].statusTags", "근거 상태는 현행규정·개정고시·시행세칙·FAQ·회사정책 중에서 고르세요.");
                 }
             }
-            String url = draft.sourceDetails().get(i).url();
-            if (url != null && !url.isBlank() && !isWebUrl(url)) {
-                throw invalid("sourceDetails[" + i + "].url", "근거 링크는 http 또는 https 주소만 등록할 수 있습니다.");
-            }
         }
     }
 

@@ -18,6 +18,9 @@ import { QueryState, ReferenceTabs, ReferenceText } from '../reference/Reference
 import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
 import { PolicyReferenceInfo } from './PolicyReferenceInfo'
+import type { Policy } from './api'
+/** 목록 근거 info 대상: 규제(REG)와 근거자료(SRC) 모두. 둘 다 없을 때만 '근거 미기재'다. */
+const policyRefs = (policy: Policy) => [...(policy.regulationRefs ?? []), ...(policy.sourceRefs ?? [])]
 const tabs = [
   { id: 'versions', label: '정책 버전' },
   { id: 'management', label: '관리 상세' },
@@ -142,7 +145,7 @@ export function PoliciesPage() {
               rows={policies.data ?? []}
               rowKey={(r) => String(r.policyVersionId)}
               selectedKeys={id === undefined ? [] : [String(id)]}
-              rowClassName={(r) => `policy-row ${r.regulationRefs?.length ? '' : 'policy-row-missing-reference'}`}
+              rowClassName={(r) => `policy-row ${policyRefs(r).length ? '' : 'policy-row-missing-reference'}`}
               onRowActivate={(r) => patch({ policyVersionId: String(r.policyVersionId) })}
               columns={[
                 {
@@ -224,8 +227,8 @@ export function PoliciesPage() {
                   width: '11.5rem',
                   cellClassName: 'policy-disclosure-cell',
                   render: (r) =>
-                    r.regulationRefs?.length ? (
-                      r.regulationRefs.map((ref) => (
+                    policyRefs(r).length ? (
+                      policyRefs(r).map((ref) => (
                         <EvidenceLink key={ref} label={ref}>
                           {r.policyName} · {ref}
                           {r.policyVersionId != null ? (

@@ -24,6 +24,8 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 
@@ -128,7 +130,9 @@ public record PolicyDraft(
             List<@NotBlank String> statusTags
     ) {
         public SourceDetailDraft {
-            statusTags = statusTags == null ? List.of() : List.copyOf(new LinkedHashSet<>(statusTags));
+            // null 원소는 남겨 List<@NotBlank String> 검증이 필드 오류(400)를 만들게 한다(List.copyOf는 null에서 NPE).
+            statusTags = statusTags == null ? List.of()
+                    : Collections.unmodifiableList(new ArrayList<>(new LinkedHashSet<>(statusTags)));
         }
 
         @JsonAnySetter

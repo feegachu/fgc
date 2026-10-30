@@ -262,7 +262,7 @@ class PolicyControllerTest {
                 PolicySourceClass.REGULATORY, PolicySourceClass.REGULATORY.label(),
                 1, PolicyStatus.ACTIVE, PolicyStatus.ACTIVE.label(),
                 LocalDate.of(2026, 7, 1), null,
-                List.of("REG-08", "REG-09"),
+                List.of("REG-08", "REG-09"), List.of("SRC-022"),
                 "admin01", "admin01", null);
     }
 
@@ -288,6 +288,7 @@ class PolicyControllerTest {
                 .andExpect(jsonPath("$.data[0].effectiveFrom").value("2026-07-01"))
                 .andExpect(jsonPath("$.data[0].effectiveTo").isEmpty())
                 .andExpect(jsonPath("$.data[0].regulationRefs[0]").value("REG-08"))
+                .andExpect(jsonPath("$.data[0].sourceRefs[0]").value("SRC-022"))
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.requestId", matchesPattern("^\\d{8}-[0-9a-f]{6}$")));
     }

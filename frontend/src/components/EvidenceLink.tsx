@@ -38,9 +38,13 @@ export function EvidenceLink({
     place()
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
+    // 내용(예: 열린 뒤 도착한 상세 설명)이 커지면 뷰포트 안으로 다시 맞춘다.
+    const resized = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place)
+    resized?.observe(popover.current!)
     return () => {
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
+      resized?.disconnect()
     }
   }, [open])
   useEffect(() => {

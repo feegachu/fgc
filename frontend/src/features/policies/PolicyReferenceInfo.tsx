@@ -35,7 +35,11 @@ export function PolicyReferenceInfo({ policyVersionId, refText }: { policyVersio
       {reference.detailTitle ? (
         <>
           <p className="policy-reference-title">{reference.detailTitle}</p>
-          {reference.explanation ? <p className="policy-reference-explanation">{reference.explanation}</p> : null}
+          {reference.explanation ? (
+            <p className="policy-reference-explanation">{reference.explanation}</p>
+          ) : (
+            <p className="policy-reference-empty">설명 자료 없음</p>
+          )}
           {reference.url && isWebLink(reference.url) ? (
             <a href={reference.url} target="_blank" rel="noopener noreferrer">
               근거 원문 열기

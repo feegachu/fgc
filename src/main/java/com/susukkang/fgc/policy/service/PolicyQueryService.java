@@ -90,7 +90,8 @@ public class PolicyQueryService {
                 policyWriteService.allowedActions(policy),
                 policy.getApprovalEvidenceRef(),
                 policyWriteRepository.applicationPeriod(policyVersionId),
-                references(draft));
+                references(draft),
+                policyWriteRepository.offeringGovernance(policyVersionId));
     }
 
     /** 근거 info 패널: 정책에 연결된 참조마다 레지스트리 항목명과 이 정책버전에 저장된 상세를 붙인다. */

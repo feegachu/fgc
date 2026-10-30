@@ -5703,6 +5703,13 @@
             "$ref" : "#/components/schemas/PolicyVersionResponse",
             "description" : "정책 버전 헤더"
           },
+          "productOfferings" : {
+            "description" : "FUN-016 상품위원회 메타데이터. 수수료 규칙이 가리키는 판매버전의 승인일·승인문서·기초서류·판매 상태(참조정보)",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyOfferingGovernanceResponse"
+            },
+            "type" : "array"
+          },
           "references" : {
             "description" : "FUN-016 근거 info 패널. regulationRefs·sourceRefs 순서대로 레지스트리 항목명과 저장된 상세를 합친 목록",
             "items" : {
@@ -5821,6 +5828,49 @@
         "required" : [ "clawbackRules", "commissionRules", "effectiveFrom", "feeRegimeRules", "parameters", "policyCode", "policyName", "policyType", "regulationRefs", "sourceClass", "sourceRefs" ],
         "type" : "object"
       },
+      "PolicyOfferingGovernanceResponse" : {
+        "description" : "정책이 적용되는 판매버전의 상품위원회·기초서류·판매 상태(참조정보)",
+        "properties" : {
+          "basicDocumentVersion" : {
+            "description" : "기초서류 버전",
+            "type" : "string"
+          },
+          "committeeApprovalDate" : {
+            "description" : "상품위원회 승인일",
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "committeeDocumentRef" : {
+            "description" : "상품위원회 승인문서 참조",
+            "type" : [ "string", "null" ]
+          },
+          "governanceStatus" : {
+            "description" : "판매 상태 APPROVED·REVISED·SUSPENDED·STOPPED. 미등록이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "offeringVersion" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "productOfferingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesEndDate" : {
+            "description" : "판매종료일",
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "salesStartDate" : {
+            "description" : "판매개시일",
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "PolicyReferenceResponse" : {
         "description" : "정책 근거 참조와 저장된 상세 설명",
         "properties" : {
@@ -5932,6 +5982,13 @@
             "description" : "출처분류 한글 라벨",
             "example" : "규제",
             "type" : "string"
+          },
+          "sourceRefs" : {
+            "description" : "근거자료 코드 목록(SRC-xx). REG와 함께 비어 있으면 '근거 미기재'",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "status" : {
             "description" : "정책 상태",
