@@ -19,7 +19,7 @@ public class PicoAskController {
     private final PicoAskService service;
     private final GlobalExceptionHandler errors;
     @PostMapping
-    @Operation(summary="승인된 지급 가이드의 읽기 전용 질문 답변",description="설명형 첫 연결: validatedGuide=null. 실제 상태/금액/실행 없음. 제한 업무 어휘와 승인 근거만 외부 전송.")
+    @Operation(summary="승인된 업무 가이드의 대화형 질문 답변",description="비식별 질문·최근 대화와 역할별 업무 자료로 의미 검색 후 근거를 인용합니다. validatedGuide=null. 금융 계산·업무 쓰기는 기존 프로그램에서 수행합니다.")
     public ApiResponse<PicoAskResponse> ask(@Valid @RequestBody PicoAskRequest request) { return ApiResponse.success(service.ask(request)); }
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
     public org.springframework.http.ResponseEntity<ApiResponse<Void>> malformed() {

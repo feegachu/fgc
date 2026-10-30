@@ -82,7 +82,7 @@ public class PicoGuideStartService {
     }
     private void definition(PicoGuideRequest request) {
         if (!"1.0".equals(request.guideVersion())) throw new FgcBusinessException(FgcErrorCode.IMPL_GUIDE_VERSION_MISMATCH);
-        var definition = catalog.definitions().stream().filter(d -> d.enabled() && d.workflowId().equals(request.workflowId())).findFirst().orElseThrow(PicoGuideStartService::invalid);
+        var definition = catalog.paymentDefinitions().stream().filter(d -> d.enabled() && d.workflowId().equals(request.workflowId())).findFirst().orElseThrow(PicoGuideStartService::invalid);
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication.getAuthorities().stream().noneMatch(a -> definition.roles().contains(a.getAuthority().replaceFirst("^ROLE_", "")))) throw new AccessDeniedException("Guide permission denied");
         if (!"payment.scope".equals(definition.steps().getFirst().stepId())) throw stale();

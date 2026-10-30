@@ -18,7 +18,9 @@
     "test:e2e:negative": "node scripts/e2e-negative.mjs",
     "check:e2e": "tsc -p tsconfig.e2e.json",
     "generate:api": "openapi-typescript openapi/schema.json -o src/lib/api/schema.d.ts",
-    "check:api": "node scripts/check-api.mjs"
+    "check:api": "node scripts/check-api.mjs",
+    "generate:guide-knowledge": "node scripts/workflow-knowledge.mjs --write",
+    "check:guide-knowledge": "node scripts/workflow-knowledge.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",
