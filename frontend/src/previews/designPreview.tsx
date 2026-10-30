@@ -124,7 +124,7 @@ const router = createMemoryRouter([
             <DashboardPage />
             <section className="surface design-component-samples" aria-label="공통 컴포넌트 미리보기">
               <h2>공통 컴포넌트 미리보기</h2>
-              <p className="page-description">개발자 설정에서 버튼, 입력, 테이블, 상태 표시를 각각 바꿔보세요.</p>
+              <p className="page-description">버튼·입력·테이블을 비교하고, 배지는 ‘계약 상태와 배지’에서 변경하세요.</p>
               <div className="design-sample-controls">
                 <Field label="미리보기 입력">
                   <input placeholder="내용을 입력하세요" />

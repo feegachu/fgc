@@ -153,35 +153,6 @@
   font-family: ui-monospace, 'Cascadia Code', monospace;
 }
 
-.app-shell[data-badge-design]:not([data-badge-design='current']) .status-badge {
-  gap: 0.375rem;
-  min-height: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  color: #59616e;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 500;
-}
-.app-shell[data-badge-design]:not([data-badge-design='current']) :is(.status-badge-error, .status-badge-risk) {
-  color: #d8262f;
-}
-.app-shell[data-badge-design]:not([data-badge-design='current']) .status-badge-warning {
-  color: #a35200;
-}
-.app-shell:is([data-badge-design='a'], [data-badge-design='c']) .status-badge::before {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 5px;
-  border-radius: 50%;
-  background: currentColor;
-  content: '';
-}
-.app-shell[data-badge-design='b'] .status-badge {
-  font-size: 13px;
-}
-
 .app-shell[data-component-design='a'] .surface {
   border-radius: 12px;
   box-shadow: none;

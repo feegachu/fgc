@@ -637,8 +637,7 @@
   background: currentColor;
   content: '';
 }
-.app-shell[data-badge-style='glass'] .status-badge,
-.app-shell[data-badge-design='glass'][data-badge-style='inherit'] .status-badge {
+.app-shell[data-badge-style='glass'] .status-badge {
   color: var(--badge-ink, #334b65);
   border: 1px solid #ffffffb3;
   border-radius: 999px;

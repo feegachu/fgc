@@ -95,7 +95,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       data-button-color-mode={import.meta.env.DEV ? preferences.buttonColorMode : undefined}
       data-field-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'fieldDesign') : undefined}
       data-table-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'tableDesign') : undefined}
-      data-badge-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'badgeDesign') : undefined}
       data-summary-display={import.meta.env.DEV ? preferences.summaryDisplay : undefined}
       data-tab-style={import.meta.env.DEV ? preferences.tabStyle : undefined}
       data-table-header-style={import.meta.env.DEV ? preferences.tableHeaderStyle : undefined}

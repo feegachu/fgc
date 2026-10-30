@@ -161,7 +161,6 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                     buttonDesign: 'inherit',
                     fieldDesign: 'inherit',
                     tableDesign: 'inherit',
-                    badgeDesign: 'inherit',
                   })
                 }
               >
@@ -296,7 +295,6 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                       buttonDesign: 'inherit',
                       fieldDesign: 'inherit',
                       tableDesign: 'inherit',
-                      badgeDesign: 'inherit',
                       glassSidebar: true,
                       glassButtons: true,
                       glassCards: true,

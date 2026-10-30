@@ -46,7 +46,7 @@ export const extraDesignOptions = {
     ['aurora', '컬러 웨이브'],
   ],
   badgeStyle: [
-    ['inherit', '컴포넌트 설정 따름'],
+    ['inherit', '기존 배지 (기본)'],
     ['solid', '채워진 배지'],
     ['soft', '토스형 반투명'],
     ['outline', '테두리 배지'],
@@ -67,7 +67,6 @@ export const componentKinds = [
   { key: 'buttonDesign', label: '버튼' },
   { key: 'fieldDesign', label: '입력 / 선택' },
   { key: 'tableDesign', label: '테이블' },
-  { key: 'badgeDesign', label: '상태 표시' },
 ] as const
 export type ComponentKind = (typeof componentKinds)[number]['key']
 type ComponentDesign = SidebarDesign | 'inherit'
@@ -79,7 +78,6 @@ export interface DesignPreferences extends ExtraPreferences {
   buttonDesign: ComponentDesign
   fieldDesign: ComponentDesign
   tableDesign: ComponentDesign
-  badgeDesign: ComponentDesign
   buttonColor: string | null
   sidebarButtonColor: string | null
   tableHeaderColor: string | null
@@ -104,7 +102,6 @@ export const defaultDesignPreferences: DesignPreferences = {
   buttonDesign: 'inherit',
   fieldDesign: 'inherit',
   tableDesign: 'inherit',
-  badgeDesign: 'inherit',
   summaryDisplay: 'donut',
   tabStyle: 'current',
   tableHeaderStyle: 'current',
