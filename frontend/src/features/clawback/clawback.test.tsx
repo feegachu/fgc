@@ -21,7 +21,7 @@ const statusRow: CandidateRow = {
   contractDate: '2025-01-10',
   sourceVersion: 'claw-v1-abc',
   calculationStatus: 'REVIEW_REQUIRED',
-  reviewReasons: ['POLICY_MISSING', 'CALCULATION_BASIS_UNCONFIRMED'],
+  reviewReasons: ['POLICY_MISSING', 'SCHEDULE_MISSING'],
   paidAmount: 1200000,
   unpaidAmount: null,
   policyVersionId: null,
@@ -162,7 +162,8 @@ it('shows source, payment and hold evidence with calculation locked by allowedAc
   expect(within(screen.getByRole('region', { name: '연결 지급 · 귀속' })).getByText('900')).toBeInTheDocument()
   expect(within(screen.getByRole('region', { name: '보류 · 후속 처리 근거' })).getByText('HOLD')).toBeInTheDocument()
   expect(screen.getByText('유효한 환수 정책 없음', { selector: 'li' })).toBeInTheDocument()
-  expect(screen.getByText('자료 없음 (산정 기준 미확정)')).toBeInTheDocument()
+  // D-02 이후 경과월 null은 사건 기준일이 계약일보다 앞설 때뿐이다.
+  expect(screen.getByText('계산 불가 (사건 기준일이 계약일보다 앞섬)')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
 })
 

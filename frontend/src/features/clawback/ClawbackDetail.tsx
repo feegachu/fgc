@@ -150,7 +150,9 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
           <Amount value={c.paidAmount} /> · <Amount value={c.unpaidAmount} />
         </Row>
         <Row label="경과월">
-          {detail.elapsedMonths == null ? '자료 없음 (산정 기준 미확정)' : `${int(detail.elapsedMonths)}개월`}
+          {detail.elapsedMonths == null
+            ? '계산 불가 (사건 기준일이 계약일보다 앞섬)'
+            : `${int(detail.elapsedMonths)}개월`}
         </Row>
         {/* 서버의 policyVersionId는 후보가 하나일 때 채워 주는 값이지 적용 선택 결과가 아니다(인터페이스 §4-4-5). */}
         <Row label="정책 후보">
