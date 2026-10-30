@@ -14,7 +14,7 @@ import './pico-assistant.css'
 import { PaymentCalculationPanel } from './PaymentCalculationPanel'
 import { PaymentGuideOverlay } from './PaymentGuide'
 import { useGuideRuntime } from './guide-runtime'
-import { askPico } from './pico-api'
+import { askPico, picoPaymentReference } from './pico-api'
 import { PicoGuideStartButton } from './PicoGuideStartButton'
 import type { PicoReply } from './pico-api'
 
@@ -61,7 +61,7 @@ type Entry =
   | { id: number; role: 'user'; text: string }
   | { id: number; role: 'notice'; text: string }
   | { id: number; role: 'assistant'; result: MessageResult }
-  | { id: number; role: 'live'; reply: PicoReply }
+  | { id: number; role: 'live'; reply: PicoReply; guideContext: string; hasPaymentContext: boolean }
 interface Conversation {
   entries: Entry[]
   revision: number
@@ -164,6 +164,22 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
   const [calculationEpoch, setCalculationEpoch] = useState(0)
   const runtimeSession = useGuideRuntime((state) => state.session)
   const observed = useGuideRuntime((state) => state.observation)
+  const guideContext = JSON.stringify([
+    observed?.owner,
+    observed?.paymentId,
+    observed?.scopeKey,
+    observed?.revision,
+    observed?.saved,
+    observed?.precheck,
+    observed?.modalOpen,
+    canProcess,
+  ])
+  const [latestLiveQuestion, setLatestLiveQuestion] = useState<{ context: string; revision: string | null }>({
+    context: guideContext,
+    revision: null,
+  })
+  // Actual target/input changes invalidate completed proposals; transient readiness only cancels transport.
+  if (latestLiveQuestion.context !== guideContext) setLatestLiveQuestion({ context: guideContext, revision: null })
   const guideActive =
     runtimeSession != null && !['PAUSED', 'COMPLETED', 'CANCELLED', 'ERROR'].includes(runtimeSession.status)
   const visible = open && !guideActive
@@ -214,6 +230,8 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       observed?.saved,
       observed?.busy,
       observed?.ready,
+      observed?.precheck,
+      observed?.modalOpen,
       canProcess,
     ],
   )
@@ -230,6 +248,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
     aiRequest.current = controller
     aiLock.current = true
     setAiBusy(true)
+    setLatestLiveQuestion({ context: guideContext, revision: String(sequence) })
     setInput('')
     setTab('chat')
     setConversation((previous) => ({
@@ -248,7 +267,16 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       if (controller.signal.aborted || sequence !== aiSequence.current) return
       setConversation((previous) => ({
         ...previous,
-        entries: [...previous.entries, { id: previous.entries.length, role: 'live', reply }],
+        entries: [
+          ...previous.entries,
+          {
+            id: previous.entries.length,
+            role: 'live',
+            reply,
+            guideContext,
+            hasPaymentContext: Boolean(picoPaymentReference(paymentId)),
+          },
+        ],
       }))
     } catch (error) {
       if (controller.signal.aborted || sequence !== aiSequence.current) return
@@ -511,8 +539,6 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                           </div>
                         ))}
                         {entry.reply.decision === 'ANSWER_ONLY' &&
-                          entry.reply.contextRevision === String(aiSequence.current) &&
-                          !aiBusy &&
                           [...new Set(entry.reply.evidenceRefs?.map((source) => source.workflowId))]
                             .filter((id): id is string => Boolean(id))
                             .map((workflowId) => (
@@ -521,6 +547,12 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                                 workflowId={workflowId}
                                 contextRevision={entry.reply.contextRevision!}
                                 canProcess={canProcess}
+                                sourceContextAvailable={entry.hasPaymentContext}
+                                contextValid={
+                                  !aiBusy &&
+                                  entry.guideContext === guideContext &&
+                                  entry.reply.contextRevision === latestLiveQuestion.revision
+                                }
                               />
                             ))}
                         <small>일반 업무 안내 · 현재 지급 처리 완료를 뜻하지 않습니다.</small>

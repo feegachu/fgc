@@ -260,3 +260,109 @@ it('connects the latest answer evidence to an explicitly selected and server-rev
   ])
   expect(screen.queryByRole('textbox', { name: '피코에게 질문' })).not.toBeInTheDocument()
 })
+
+it('keeps a completed answer actionable after a temporary ready refresh finishes', async () => {
+  observePayment()
+  mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeEnabled()
+  act(() => observePayment({ ready: false }))
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
+  expect(screen.getByRole('status')).toHaveTextContent('기준정보')
+  act(() => observePayment({ ready: true }))
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeEnabled()
+})
+
+it('keeps a completed guide offer after closing and reopening the assistant', async () => {
+  observePayment()
+  const request = mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
+  await open()
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeEnabled()
+  expect(request).toHaveBeenCalledTimes(1)
+})
+it.each([
+  { paymentId: '88' },
+  { revision: 1 },
+  { scopeKey: 'other-scope' },
+  { saved: false },
+  { precheck: 'PASSED_WITHOUT_TOKEN' as const },
+  { precheck: 'REJECTED' as const },
+  { modalOpen: true },
+])(
+  'invalidates completed guide offers after an actual context change, including return to the old context %j',
+  async (changed) => {
+    observePayment()
+    const request = mockResponse()
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    await screen.findByText(reply.message)
+    act(() => observePayment(changed))
+    expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toHaveAccessibleDescription(/다시 질문/)
+    act(() => observePayment())
+    expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
+    expect(request).toHaveBeenCalledTimes(1)
+    await send()
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /이 업무 안내 시작/ }).at(-1)).toBeEnabled())
+    expect(screen.getAllByRole('button', { name: /이 업무 안내 시작/ })[0]).toBeDisabled()
+  },
+)
+it('explains a missing payment context instead of silently removing the guide action', async () => {
+  mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
+  expect(screen.getByRole('status')).toHaveTextContent('저장된 지급 초안')
+})
+
+it.each([{ ready: false }, { busy: true }, { paymentId: '9007199254740993' }])(
+  'never upgrades an answer sent without a payment reference when the screen becomes ready %j',
+  async (initialState) => {
+    observePayment(initialState)
+    const request = mockResponse()
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    await screen.findByText(reply.message)
+    expect((request.mock.calls[0][1]!.body as { entityRefs: unknown[] }).entityRefs).toEqual([])
+    act(() => observePayment({ ...initialState, ready: true, busy: false }))
+    const button = screen.getByRole('button', { name: /이 업무 안내 시작/ })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAccessibleDescription(/질문 당시 저장된 지급 상태를 확인하지 못했습니다/)
+    expect(request).toHaveBeenCalledTimes(1)
+  },
+)
+
+it.each([{ precheck: 'PASSED_WITHOUT_TOKEN' as const }, { modalOpen: true }])(
+  'aborts an in-flight answer when validation or confirmation state changes %j',
+  async (changed) => {
+    observePayment()
+    let finish!: (value: ReturnType<typeof envelope>) => void
+    const request = vi.spyOn(apiClient, 'request').mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    const options = request.mock.calls[0][1]!
+    const revision = (options.body as { clientContextRevision: string }).clientContextRevision
+    act(() => observePayment(changed))
+    expect(options.signal?.aborted).toBe(true)
+    await act(async () => finish(envelope({ ...reply, contextRevision: revision })))
+    expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+    expect(useGuideRuntime.getState().session).toBeNull()
+  },
+)
