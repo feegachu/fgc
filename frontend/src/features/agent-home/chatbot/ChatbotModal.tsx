@@ -112,9 +112,11 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!selected) evidenceTrigger.current?.focus({ preventScroll: true })
   }, [selected])
+  // 단계가 바뀌면 누른 버튼이 사라져 포커스가 body 로 빠진다. 1단계는 첫 카테고리로, 그 밖에는 대화 상자로 옮겨 Esc·Tab 을 지킨다.
   useEffect(() => {
-    dialog.current?.querySelector<HTMLElement>('.cb-cat')?.focus({ preventScroll: true })
-  }, [categories.isSuccess])
+    const target = (view === 1 && dialog.current?.querySelector<HTMLElement>('.cb-cat:not(:disabled)')) || dialog.current
+    target?.focus({ preventScroll: true })
+  }, [view, categories.isSuccess])
 
   const pick = (next: CompareCategory) => {
     setCategory(next)
@@ -386,7 +388,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                 <input
                   className={`cb-composer-field${input ? ' ready' : ''}`}
                   aria-label="질문 입력"
-                  placeholder="궁금한 점을 입력하거나 위 질문을 골라 보세요"
+                  placeholder="궁금한 점을 입력하거나 위 질문을 골라 보세요(고객 개인정보는 입력하지 마세요)"
                   maxLength={200}
                   value={input}
                   onChange={(event) => {
@@ -562,7 +564,9 @@ const EXCLUDE_REASON: Record<string, string> = {
   NO_COMMISSION_RULE: '수수료 규칙 없음',
   POLICY_VERSION_AMBIGUOUS: '적용할 정책 버전이 모호함',
   RULE_DUPLICATE: '수수료 규칙이 중복됨',
-  CLAWBACK_RATE_MISSING: '환수율 자료 없음',
+  CLAWBACK_RATE_MISSING: '환수 규칙 없음',
+  CLAWBACK_RULE_AMBIGUOUS: '적용할 환수 규칙이 둘 이상임',
+  CLAWBACK_RULE_UNSUPPORTED: '계산할 수 없는 환수 규칙(기준·조건)',
   CAP_RULE_MISSING: '한도 규칙 없음',
   CAP_ITEM_REVIEW_REQUIRED: '한도 포함 여부 검토 필요',
 }
@@ -746,8 +750,9 @@ function Result({
         반영하지 않아요. 기준 보험료는 내 계약의 평균 월 환산 보험료({won(ranking.basePremium ?? 0)})예요. 가상 데이터.
       </p>
       <p className="cb-note" data-testid="assumption-note">
-        이 순위 기준은 승인 전 가정(PROJECT_ASSUMPTION{ranking.ruleVersion ? `, 규칙 ${ranking.ruleVersion}` : ''})이에요. 환수
-        노출액은 환수 규칙이 연결되기 전까지 해약환급률표 값을 임시로 써서 계산했어요.
+        이 순위 기준(보수적 순수령액·동점 기준·1,200% 한도 공통 배수 근사)은 D-01에서 정한 가정(PROJECT_ASSUMPTION
+        {ranking.ruleVersion ? `, 규칙 ${ranking.ruleVersion}` : ''})이에요. 환수 노출액은 {ranking.clawbackMonth}개월차에 해지된다고
+        보고 환수 규칙의 환수율로 계산했어요.
       </p>
     </>
   )

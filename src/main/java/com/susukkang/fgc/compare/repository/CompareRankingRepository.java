@@ -1,5 +1,6 @@
 package com.susukkang.fgc.compare.repository;
 
+import com.susukkang.fgc.compare.service.ClawbackRuleResolver;
 import com.susukkang.fgc.compare.service.CompareRankingCalculator.CapRule;
 import com.susukkang.fgc.compare.service.CommissionRuleResolver.RuleRow;
 import jakarta.persistence.EntityManager;
@@ -25,10 +26,6 @@ public class CompareRankingRepository {
     }
 
     public record CapRow(Double usagePct, String status, int contractCount) {
-    }
-
-    /** 환수 기준으로 쓰는 환급률(%)과 출처 정책 버전. */
-    public record RefundRate(BigDecimal ratePct, String policyVersion) {
     }
 
     @PersistenceContext
@@ -98,22 +95,28 @@ public class CompareRankingRepository {
     }
 
     /**
-     * 상품의 해약환급률표에서 지정 차월 환급률(%)을 읽는다. 표가 없으면 비어 있다.
-     * 환수 규칙(clawback_rule)이 구현되기 전까지 환수 노출액의 환수율로 임시 사용한다. 환수 규칙 구현 후 이 조회를 환수 규칙 조회로 바꾼다.
+     * 기준일을 계약일로 볼 때 적용되는 승인 환수 정책(CLAWBACK)의 규칙 중 이 상품의 보험사·판매버전에 맞는 것 전부.
+     * 정책 선택은 FUN-054 후보 조회와 같다(승인본 + 계약일 적용 구간). 항목·경과월 선택은 ClawbackRuleResolver 가 한다.
      */
     @SuppressWarnings("unchecked")
-    public Optional<RefundRate> findRefundRate(Offering offering, int contractMonth, LocalDate asOf) {
+    public List<ClawbackRuleResolver.RuleRow> findClawbackRules(Offering offering, LocalDate asOf) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT l.refund_rate_pct, pv.policy_code || ' v' || pv.version_no FROM fgc.refund_rate_table t
-                JOIN fgc.policy_version pv ON pv.policy_version_id = t.policy_version_id AND pv.status = 'ACTIVE'
-                JOIN fgc.refund_rate_line l ON l.refund_rate_table_id = t.refund_rate_table_id AND l.contract_month_no = :month
-                WHERE t.product_id = :productId AND (t.product_offering_id IS NULL OR t.product_offering_id = :offeringId)
-                  AND t.effective_from <= :asOf AND (t.effective_to IS NULL OR t.effective_to >= :asOf)
-                ORDER BY (t.product_offering_id IS NULL), t.effective_from DESC, t.refund_rate_table_id DESC
-                LIMIT 1
-                """).setParameter("productId", offering.productId()).setParameter("offeringId", offering.offeringId())
-                .setParameter("month", contractMonth).setParameter("asOf", asOf).getResultList();
-        return rows.stream().findFirst().map(r -> new RefundRate((BigDecimal) r[0], (String) r[1]));
+                SELECT r.policy_version_id, pv.policy_code || ' v' || pv.version_no, r.commission_item_id,
+                       r.insurer_id IS NOT NULL, r.product_offering_id IS NOT NULL, r.elapsed_month_from, r.elapsed_month_to,
+                       r.clawback_basis_code, r.clawback_rate_pct, r.condition_expression::text
+                FROM fgc.policy_version pv
+                JOIN fgc.policy_application_version app ON app.policy_version_id = pv.policy_version_id
+                JOIN fgc.clawback_rule r ON r.policy_version_id = pv.policy_version_id
+                WHERE pv.policy_type = 'CLAWBACK' AND pv.approved_at IS NOT NULL
+                  AND app.effective_from <= :asOf AND (app.application_to IS NULL OR app.application_to >= :asOf)
+                  AND (r.insurer_id IS NULL OR r.insurer_id = :insurerId)
+                  AND (r.product_offering_id IS NULL OR r.product_offering_id = :offeringId)
+                ORDER BY r.policy_version_id, r.clawback_rule_id
+                """).setParameter("asOf", asOf).setParameter("insurerId", offering.insurerId())
+                .setParameter("offeringId", offering.offeringId()).getResultList();
+        return rows.stream().map(r -> new ClawbackRuleResolver.RuleRow(((Number) r[0]).longValue(), (String) r[1],
+                r[2] == null ? null : ((Number) r[2]).longValue(), (Boolean) r[3], (Boolean) r[4], ((Number) r[5]).intValue(),
+                ((Number) r[6]).intValue(), (String) r[7], (BigDecimal) r[8], (String) r[9])).toList();
     }
 
     /** 기준일에 유효한 GA→설계사 한도 규칙의 한도 배수. 상품군·보험사 지정 규칙이 공통 규칙보다 우선한다. */

@@ -113,7 +113,7 @@ src/main/resources/db/demo/        Flyway 버전 순서(db/migration·db/demo·d
   V64    AGENT 역할·agent01 → A-FC-001(초기 비밀번호 미지정·DISABLED, #634)
 src/main/resources/db/demo-agent/  시연 서버·로컬 한정(신한 prd·E2E 제외). 같은 버전 시퀀스
   V66    agent01 활성화 — password_hash='!'인 행만 BCrypt 해시·ACTIVE (V64 이후)
-  V72    상품 추천 AI(FUN-079) 시연용 예시 — 가상 보험사 3곳·상품 12개·해약환급률표(새 정책버전 DRAFT→ACTIVE)와 협회 등급·비교 상품군
+  V72    상품 추천 AI(FUN-079) 시연용 예시 — 가상 보험사 3곳·상품 12개·해약환급률표(상품 자료, 새 정책버전 DRAFT→ACTIVE)와 협회 등급·비교 상품군, 가상 보험사 3곳의 보험사 전용 환수 정책(CLAWBACK, 가정). 다른 보험사 상품의 환수율은 #766 V70_1 D-02 가상 환수율표에서 읽는다
   V73    agent01 표시 이름을 '손설계'로 변경 — login_id·설계사 연결은 그대로 (V64 이후, 시연 서버·로컬 한정)
 
 src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 등) — 아직 없음

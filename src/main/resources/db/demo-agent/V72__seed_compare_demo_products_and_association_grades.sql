@@ -1,8 +1,9 @@
 -- 상품 추천 AI(FUN-079) 시연용 예시 데이터 (시연 서버·로컬 전용).
 --  1) 협회 등급(commission_grade)과 비교 상품군(compare_product_group) — 등급이 "자료없음"으로만 나오지 않게 한다.
---  2) 카테고리마다 3개 이상 보험사가 비교되도록 가상 보험사·상품·판매버전·해약환급률표를 추가한다.
---     환급률 곡선을 상품마다 다르게 해 환수 노출액이 갈리고(순위가 바뀐다), 곡선이 같은 상품은 동률이 되며,
---     환급률표가 없는 상품 1개는 "환수율 자료 없음"으로 제외되도록 값을 일부러 섞었다.
+--  2) 카테고리마다 3개 이상 보험사가 비교되도록 가상 보험사·상품·판매버전과 예상 해약환급률표(REG-23 상품 자료)를 추가한다.
+--     해약환급률표는 계약 등록·한도 검증이 쓰는 상품 자료이며 순위의 환수율이 아니다. 순위의 환수율은 환수 정책(CLAWBACK)의
+--     규칙에서 읽는다(D-01, 인터페이스정의서 §4-4-6). 환급률표가 없는 상품('가상 신상품 건강보험 H')도 하나 둔다.
+--  3) 가상 보험사 3곳의 보험사 전용 환수 정책(CLAWBACK) — 보험사마다 환수 조건이 달라 순수령액이 갈리는 시연용 가정.
 -- 수수료 규칙은 건드리지 않는다. 적용 중인 GA 수수료 정책(GA-CUR-2026-V1)은 잠겨 있고, 새 정책 버전을 더하면
 -- 유효 정책이 둘이 되어 모든 상품이 "정책 버전 모호"로 제외되기 때문이다. 새 상품도 공통 수수료율을 그대로 쓴다.
 -- 환급률표는 V42 와 같은 방식으로 새 정책 버전을 DRAFT 로 만들어 적재한 뒤 승격한다.
@@ -103,6 +104,44 @@ UPDATE policy_version
  WHERE status = 'DRAFT' AND policy_code = 'INS-REFUND-2026-DEMO-V1';
 
 UPDATE policy_version SET status = 'ACTIVE' WHERE status = 'APPROVED' AND policy_code = 'INS-REFUND-2026-DEMO-V1';
+
+-- ---------------------------------------------------------------- 보험사별 가상 환수율 (CLAWBACK, D-01 시연 가정)
+-- 실제 환수율은 보험사↔GA 위탁계약·GA↔설계사 위촉계약마다 다르다(REG-14, 법정 단일 환수율 없음). D-02(운영정책서 제48조의3 4항)는
+-- 보험사마다 환수율이 다르면 정책을 나눠 등록한다. 이 파일이 만든 가상 보험사 3곳에 그 구조대로 보험사 전용 정책을 둔다.
+-- 형식은 #766 V70_1(D-02 가상 환수율표)과 같고(기본·인센티브 수수료, 경과 0~11·12~23·24개월 이후) 첫해 환수율만 다르다.
+-- 업무 규칙 아님 — 가상 GA 정책으로 정함(PROJECT_ASSUMPTION). 세 보험사는 계약이 없어 FUN-054·055 환수 후보에는 영향이 없다.
+-- 상품 비교는 보험사 전용 정책을 전체 정책(V70_1)보다 먼저 쓴다(인터페이스정의서 §4-4-6).
+INSERT INTO policy_version(policy_code, policy_name, policy_type, source_class, version_no, effective_from, effective_to, status,
+                           regulation_refs, source_refs, created_by)
+SELECT v.code, v.name, 'CLAWBACK', 'PROJECT_ASSUMPTION', 1, DATE '2026-01-01', NULL, 'DRAFT',
+       ARRAY['REG-13', 'REG-14'], ARRAY['D-01 시연 가정', 'FGC 운영정책서 제48조의3'],
+       (SELECT user_id FROM app_user WHERE login_id = 'settle01')
+  FROM (VALUES ('CLAW-FGN03-DEMO-2026', '다온가상손해보험 환수율(시연 가정)'),
+               ('CLAW-FGL06-DEMO-2026', '푸른가상생명 환수율(시연 가정)'),
+               ('CLAW-FGL05-DEMO-2026', '하늘가상생명 환수율(시연 가정)')) AS v(code, name)
+ WHERE NOT EXISTS (SELECT 1 FROM policy_version pv WHERE pv.policy_code = v.code AND pv.version_no = 1);
+
+-- 첫해(경과 0~11개월) 환수율: 다온 40% · 푸른 60% · 하늘 80%, 둘째 해는 그 절반, 24개월 이후 0%(실제 0원).
+INSERT INTO clawback_rule(policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                          elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct)
+SELECT pv.policy_version_id, i.insurer_id, NULL, item.commission_item_id, band.month_from, band.month_to,
+       'PAID_ATTRIBUTED_AMOUNT', CASE band.year WHEN 1 THEN v.first_year WHEN 2 THEN v.first_year / 2 ELSE 0 END
+  FROM (VALUES ('CLAW-FGN03-DEMO-2026', 'FGN03', 40.000000),
+               ('CLAW-FGL06-DEMO-2026', 'FGL06', 60.000000),
+               ('CLAW-FGL05-DEMO-2026', 'FGL05', 80.000000)) AS v(code, insurer_code, first_year)
+  JOIN policy_version pv ON pv.policy_code = v.code AND pv.version_no = 1 AND pv.status = 'DRAFT'
+  JOIN insurer i ON i.insurer_code = v.insurer_code
+  JOIN commission_item item ON item.item_code IN ('BASE_COMMISSION', 'INCENTIVE')
+ CROSS JOIN (VALUES (1, 0, 11), (2, 12, 23), (3, 24, 1199)) AS band(year, month_from, month_to);
+
+UPDATE policy_version
+   SET status = 'APPROVED', approved_at = TIMESTAMPTZ '2026-06-30 09:00:00+09',
+       approved_by = (SELECT user_id FROM app_user WHERE login_id = 'gaadmin'),
+       approval_evidence_ref = '시드 승인 (상품 추천 AI 시연 — 보험사별 가상 환수율, PROJECT_ASSUMPTION)'
+ WHERE status = 'DRAFT' AND policy_code IN ('CLAW-FGN03-DEMO-2026', 'CLAW-FGL06-DEMO-2026', 'CLAW-FGL05-DEMO-2026');
+
+UPDATE policy_version SET status = 'ACTIVE'
+ WHERE status = 'APPROVED' AND policy_code IN ('CLAW-FGN03-DEMO-2026', 'CLAW-FGL06-DEMO-2026', 'CLAW-FGL05-DEMO-2026');
 
 -- ---------------------------------------------------------------- 협회 등급 (상품군 분류 + 상품별 등급·순위)
 INSERT INTO compare_product_group (group_code, insurance_sector, major_class, minor_class_name)

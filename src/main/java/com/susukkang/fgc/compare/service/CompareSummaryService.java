@@ -5,19 +5,16 @@ import com.susukkang.fgc.ai.service.LlmGateway.LlmRequest;
 import com.susukkang.fgc.common.code.AiCallPurpose;
 import com.susukkang.fgc.compare.dto.CompareRankingFilters;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
  * 설명 : 서버가 확정한 순위 결과를 LLM 으로 풀어 쓴 요약 문장을 만든다(FUN-079, SER-013).
- * LLM 은 문장만 쓰고 순위·금액은 바꾸지 못한다. 입력에 없는 숫자나 단정 표현이 나오면 버리고 호출자가 규칙형 문장으로 대체한다.
+ * LLM 은 숫자 없는 문장만 쓰고 순위·금액은 화면의 서버 값이 보여 준다. 숫자나 단정 표현이 나오면 버리고 호출자가 규칙형 문장으로 대체한다.
  * 호출 실패·키 없음·차단은 빈 값으로 돌려준다(게이트웨이가 ai_call_log 를 남긴다).
  */
 @Slf4j
@@ -27,10 +24,11 @@ public class CompareSummaryService {
 
     static final String INSTRUCTIONS = """
             너는 보험대리점 설계사에게 상품 비교 순위를 풀어 설명하는 도우미다.
-            input 의 순위·금액은 서버가 계산한 확정값이다. 그 값만 그대로 쓰고 새 숫자를 만들거나 계산하지 마라.
-            2~3문장, 존댓말(~요 체)로 쓴다. 1위 상품과 그 이유, 한도·환수 관련 유의점이 있으면 한 가지를 짚는다.
+            input 의 순위·금액은 서버가 계산한 확정값이다. 순서를 바꾸거나 새로 계산하지 마라.
+            숫자(금액·비율·순위 번호·날짜)는 쓰지 않는다. 숫자는 화면의 카드와 표가 서버 값으로 보여 준다. '1,200% 룰'이라는 용어 이름만 쓸 수 있다.
+            2~3문장, 존댓말(~요 체)로 쓴다. 가장 앞선 상품을 보험사·상품 이름으로 부르고, 무엇이 순위를 갈랐는지(보수적 순수령액·환수 노출·한도 이월)와
+            한도·환수 관련 유의점이 있으면 한 가지를 말로 풀어 쓴다.
             최종 선택은 설계사가 한다는 뜻을 담고 '반드시·무조건·보장' 같은 단정 표현은 쓰지 않는다.
-            금액은 입력에 적힌 표기(예: 1,234,000원) 그대로 쓴다.
             """;
 
     private static final int MAX_LENGTH = 400;
@@ -61,7 +59,7 @@ public class CompareSummaryService {
             return Optional.empty();
         }
         String text = output == null || output.summary == null ? "" : output.summary.strip();
-        if (!isValid(text, data, ranking.items().get(0))) {
+        if (!isValid(text, ranking)) {
             log.warn("LLM 요약이 검증을 통과하지 못해 규칙형 문장으로 대체합니다(categoryCode={}).", ranking.categoryCode());
             return Optional.empty();
         }
@@ -102,15 +100,21 @@ public class CompareSummaryService {
         }
     }
 
-    /** 입력에 없는 숫자·단정 표현·너무 긴 글은 걸러낸다. 1위 상품 이름이 빠진 글도 쓰지 않는다. */
-    static boolean isValid(String text, String data, CompareRankingResponse.Item top) {
+    /** 숫자·단정 표현·너무 긴 글은 걸러낸다. 1위 상품 이름이 빠진 글도 쓰지 않는다. */
+    static boolean isValid(String text, CompareRankingResponse ranking) {
+        CompareRankingResponse.Item top = ranking.items().get(0);
         if (text.isBlank() || text.length() > MAX_LENGTH || FORBIDDEN.stream().anyMatch(text::contains)) {
             return false;
         }
         if (!text.contains(top.product()) && !text.contains(top.insurer())) {
             return false;
         }
-        return AnswerNumberGuard.allowed(text, data);
+        return AnswerNumberGuard.allowed(text, names(ranking));
     }
 
+    /** 서버가 준 보험사·상품 이름. 이름 안의 숫자는 AI 가 만든 수치가 아니다. */
+    static List<String> names(CompareRankingResponse ranking) {
+        return ranking == null ? List.of()
+                : ranking.items().stream().flatMap(item -> Stream.of(item.insurer(), item.product())).toList();
+    }
 }

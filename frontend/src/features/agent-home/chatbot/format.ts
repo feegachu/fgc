@@ -5,7 +5,8 @@ export const won = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
 /**
  * 한도 영향 배지: 이월액이 있으면 초과·이월, 90% 이상 근접, 그 미만 여유(기획서 §4-3, 근접 임계값은 [가정]).
- * 초과 여부는 서버가 반올림해 준 비율이 아니라 실제 이월액으로 판정한다(99.96%가 100.0%로 보여도 이월은 아니다).
+ * 초과 여부는 비율이 아니라 실제 이월액으로 판정한다(한도와 정확히 같으면 100%여도 이월은 0원이다).
+ * 비율은 서버 원값을 소수 첫째 자리 절사로 보여 준다(화면정의서 공통규칙 3).
  */
 export function capBadge(pct: number | null, carryover = 0): { tone: 'ok' | 'warn' | 'bad' | 'none'; text: string } {
   if (pct == null) return { tone: 'none', text: '자료 없음' }
@@ -23,7 +24,7 @@ export const FAQ = [
   { key: 'rank', label: '순위 기준', body: '보수적 순수령액(한도 반영 수령 예상액 − 환수 노출액)이 큰 순서예요. 같으면 환수 노출이 작은 쪽, 그래도 같으면 상품 ID 기준 표시 순서예요. 협회 등급은 표시만 해요.' },
   { key: 'limit', label: '1,200% 한도 영향', body: '상품의 첫해 수령 예상액이 한도(정책에 따른 기준)에 얼마나 가까운지 보여 줘요. 100%를 넘는 부분은 이월 예정액으로 따로 계산해요.' },
   { key: 'grade', label: '협회 수수료 등급', body: '협회 공시 등급을 읽기 전용으로 보여 줘요. 순위 계산에는 쓰지 않고, 자료가 없으면 "자료 없음"으로 표시해요.' },
-  { key: 'privacy', label: '개인정보 안내', body: '고객 이름·주민번호·연락처는 입력받지 않아요. 상품 구조와 내 수수료·한도 정보만 사용해요.' },
+  { key: 'privacy', label: '개인정보 안내', body: '고객 이름·주민번호·연락처는 입력하지 마세요. 주민번호·연락처로 보이는 질문은 AI에 보내지 않아요. 상품 구조와 내 수수료·한도 정보만 사용해요.' },
 ]
 
 export type FollowUpKind = 'why' | 'limit'
@@ -44,10 +45,7 @@ export function followUpAnswer(kind: FollowUpKind, items: CompareItem[]) {
   }
   const cap = `1위 상품의 한도 영향은 ${capBadge(top.capImpactPct, top.carryover).text}예요.`
   const carry = top.carryover > 0 ? ` 한도를 넘는 ${won(top.carryover)}은 이월 예정액으로 따로 계산해요.` : ''
-  const claw =
-    top.clawbackRatePct == null
-      ? ''
-      : ` 환수 노출액 ${won(top.clawbackExposure)}은 지급액에 ${rate(top.clawbackRatePct)}%를 곱한 값이고, 이 환수율은 해약환급률을 임시로 쓴 값이에요.`
+  const claw = ` 환수 노출액 ${won(top.clawbackExposure)}은 해지를 가정한 시점에 환수 규칙의 항목별 환수율을 지급액에 곱한 값이에요.`
   return `${cap}${carry}${claw} 자세한 계산은 근거 보기에서 확인할 수 있어요.`
 }
 
