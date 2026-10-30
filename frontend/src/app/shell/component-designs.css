@@ -5,6 +5,7 @@
   --design-button-primary-text: #fff;
   --design-button-primary-border: transparent;
   --design-button-secondary-bg: color-mix(in srgb, var(--design-accent) 5%, white);
+  --design-button-secondary-hover: color-mix(in srgb, var(--design-accent) 10%, white);
   --design-button-secondary-text: var(--design-accent);
   --design-button-secondary-border: color-mix(in srgb, var(--design-accent) 20%, transparent);
 }
@@ -15,6 +16,7 @@
   --design-button-primary-text: #1d4ed8;
   --design-button-primary-border: #c6d7ff;
   --design-button-secondary-bg: #fff;
+  --design-button-secondary-hover: #edf3ff;
   --design-button-secondary-text: #1d4ed8;
   --design-button-secondary-border: #c6d7ff;
 }
@@ -25,6 +27,7 @@
   --design-button-primary-text: #315f92;
   --design-button-primary-border: transparent;
   --design-button-secondary-bg: #f6f9fc;
+  --design-button-secondary-hover: #e8f1fb;
   --design-button-secondary-text: #315f92;
   --design-button-secondary-border: #d5e3f0;
 }
@@ -35,6 +38,7 @@
   --design-button-primary-text: #344052;
   --design-button-primary-border: #d7dde5;
   --design-button-secondary-bg: #fff;
+  --design-button-secondary-hover: #f1f3f5;
   --design-button-secondary-text: #344052;
   --design-button-secondary-border: #d7dde5;
 }

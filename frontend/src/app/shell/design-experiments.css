@@ -301,7 +301,9 @@
   background: var(--design-button-secondary-bg);
 }
 .app-shell[data-button-color-mode='theme'] .page-content .button-secondary:hover:not(:disabled):not(.is-disabled) {
-  background: var(--design-button-primary-hover);
+  color: var(--design-button-secondary-text);
+  border-color: var(--design-button-secondary-border);
+  background: var(--design-button-secondary-hover);
 }
 .app-shell[data-button-color-mode='theme'] .page-content .button-ghost:not(:disabled):not(.is-disabled) {
   color: var(--design-accent);

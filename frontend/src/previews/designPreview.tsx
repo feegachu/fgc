@@ -139,7 +139,12 @@ const router = createMemoryRouter([
                   ＋ 신규 등록
                 </Link>
                 <Button>조회</Button>
-                <Button variant="secondary">보조 버튼</Button>
+                <Button variant="secondary">
+                  <span className="material-symbols-rounded" aria-hidden="true">
+                    restart_alt
+                  </span>
+                  초기화
+                </Button>
                 <Button disabled>비활성</Button>
               </div>
               <div className="design-sample-statuses">
