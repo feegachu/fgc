@@ -306,6 +306,8 @@ const inputCondition =
   ): GuideCondition<PaymentGuideState> =>
   (_context, state) =>
     state.available && state[field] && state.acknowledged.includes(rule) ? 'SATISFIED' : 'WAITING_INPUT'
+const savedDraft = (context: GuideContext, state: PaymentGuideState) =>
+  state.available && state.saved && state.valid && context.entityRefs.some((ref) => ref.type === 'PAYMENT')
 export const paymentGuideConditions: Readonly<Record<string, GuideCondition<PaymentGuideState>>> = {
   ALWAYS: () => 'SATISFIED',
   CONTEXT_AVAILABLE: (_context, state) => (state.available ? 'SATISFIED' : 'WAITING_INPUT'),
@@ -313,6 +315,8 @@ export const paymentGuideConditions: Readonly<Record<string, GuideCondition<Paym
   AMOUNT_REVIEW_ACKNOWLEDGED: inputCondition('AMOUNT_REVIEW_ACKNOWLEDGED', 'amountReady'),
   ATTRIBUTIONS_REVIEWED: inputCondition('ATTRIBUTIONS_REVIEWED', 'attributionsReady'),
   EVIDENCE_FIELDS_VALID: (_context, state) => (state.valid ? 'SATISFIED' : 'WAITING_INPUT'),
+  CURRENT_DRAFT_ALREADY_SAVED: (context, state) => savedDraft(context, state) ? 'SATISFIED' : 'WAITING_INPUT',
+  DRAFT_SAVE_REQUIRED: (context, state) => state.available && !savedDraft(context, state) ? 'SATISFIED' : 'WAITING_INPUT',
   CURRENT_DRAFT_SAVED: (_context, state) => (state.saved ? 'SATISFIED' : 'WAITING_RESULT'),
   CURRENT_PRECHECK_PASSED: (_context, state) => (state.prechecked ? 'SATISFIED' : 'WAITING_RESULT'),
   PRECHECK_RESULT_ACKNOWLEDGED: (context, state) =>
