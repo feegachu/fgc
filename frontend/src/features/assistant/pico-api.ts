@@ -32,10 +32,10 @@ export async function askPico(
     },
   })
   const data = response.data
+  if (!data || typeof data.contextRevision !== 'string' || typeof data.guideVersion !== 'string') throw new Error('INVALID_PICO_REPLY')
+  if (data.guideVersion !== '1.0') throw new Error('PICO_GUIDE_VERSION_MISMATCH')
+  if (data.contextRevision !== revision) throw new Error('STALE_PICO_CONTEXT')
   if (
-    !data ||
-    data.contextRevision !== revision ||
-    data.guideVersion !== '1.0' ||
     data.validatedGuide != null ||
     !['AI', 'FIXED'].includes(data.source ?? '') ||
     !['ANSWER_ONLY', 'ASK_CLARIFICATION', 'UNSUPPORTED'].includes(data.decision ?? '') ||

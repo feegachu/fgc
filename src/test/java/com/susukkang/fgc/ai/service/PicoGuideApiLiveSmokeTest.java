@@ -56,11 +56,14 @@ class PicoGuideApiLiveSmokeTest {
 
     @TestConfiguration(proxyBeanMethods = false)
     static class LiveGateway {
-        @Bean LlmGateway gateway(AiCallLogRepository logs, PlatformTransactionManager transactions) {
+        @Bean LlmProperties properties() {
             String key = System.getenv("OPENAI_API_KEY");
             assertThat(key != null && !key.isBlank()).as("Runner key must be configured; never printed").isTrue();
-            return new LlmGateway(new LlmProperties(key, "https://api.openai.com/v1", "gpt-4o-mini",
-                    Duration.ofSeconds(30), 20000, 1024, Duration.ofMinutes(10)), logs, transactions);
+            return new LlmProperties(key, "https://api.openai.com/v1", "gpt-4o-mini",
+                    Duration.ofSeconds(30), 20000, 1024, Duration.ofMinutes(10));
+        }
+        @Bean LlmGateway gateway(AiCallLogRepository logs, PlatformTransactionManager transactions, LlmProperties properties) {
+            return new LlmGateway(properties, logs, transactions);
         }
     }
 

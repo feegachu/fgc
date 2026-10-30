@@ -135,7 +135,7 @@ it('rejects executable guide and unknown evidence instead of rendering or naviga
   render(<PicoAssistant canProcess />)
   await open()
   await send()
-  expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
+  expect(await screen.findByText(/답변의 형식이나 근거를 확인하지 못했어요/)).toBeInTheDocument()
   expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
 })
 it('closes safely and clears account conversation without keeping late replies', async () => {
@@ -163,7 +163,7 @@ it('rejects stale response revisions even when transport ignores abort', async (
   render(<PicoAssistant canProcess />)
   await open()
   await send()
-  await waitFor(() => expect(screen.getByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByText(/질문 이후 화면이나 입력이 바뀌었어요/)).toBeInTheDocument())
   expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
 })
 
@@ -413,4 +413,43 @@ it('lists role-permitted registered tutorials in the guide tab without an API or
   await userEvent.click(screen.getByRole('button', { name: /보험계약 등록/ }))
   expect(useWorkflowGuide.getState().request?.id).toBe('contract.register')
   expect(request).not.toHaveBeenCalled()
+})
+
+it('keeps actual version mismatch separate from stale context and invalid evidence', async () => {
+  vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) => envelope({ ...reply,
+    guideVersion: '2.0', contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+  })) as typeof apiClient.request)
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
+  expect(screen.queryByText(/답변의 형식이나 근거/)).not.toBeInTheDocument()
+})
+it.each(['general', 'before-draft'] as const)('invalidates %s answer actions on navigation, return and a pending question', async (kind) => {
+  const help = workflowHelpSteps('contract.register').find((step) => step.targetId === 'features.contract.contract-form-page.contract-no')!
+  const response = kind === 'general' ? { ...reply, evidenceRefs: [{ workflowId: 'contract.register', stepId: help.stepId, chunkId: `contract.register:${help.stepId}`, title: help.title }] } : reply
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) => envelope({ ...response,
+    contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+  })) as typeof apiClient.request)
+  const initial = <PicoAssistant canProcess screenId="TRAN-W02" screenContext="/transactions/new?month=2026-07" />
+  const view = render(initial)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  const name = kind === 'general' ? /이 업무 안내 시작/ : /지급 작성 화면에서 안내 시작/
+  expect(screen.getByRole('button', { name })).toBeEnabled()
+  view.rerender(<PicoAssistant canProcess screenId="CONT-W01" screenContext="/contracts?month=2026-07" />)
+  expect(screen.getByRole('button', { name })).toBeDisabled()
+  view.rerender(initial)
+  expect(screen.getByRole('button', { name })).toBeDisabled()
+  await send()
+  await waitFor(() => expect(screen.getAllByRole('button', { name }).at(-1)).toBeEnabled())
+  let finish!: (value: ReturnType<typeof envelope>) => void
+  request.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+  await send()
+  expect(screen.getAllByRole('button', { name }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true)
+  const revision = (request.mock.calls.at(-1)![1]!.body as { clientContextRevision: string }).clientContextRevision
+  await act(async () => finish(envelope({ ...response, contextRevision: revision })))
+  await waitFor(() => expect(screen.getAllByRole('button', { name }).at(-1)).toBeEnabled())
+  expect(useWorkflowGuide.getState().request).toBeNull()
 })

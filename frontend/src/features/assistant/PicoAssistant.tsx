@@ -319,9 +319,13 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
             role: 'notice',
             text:
               (error instanceof ApiError && error.code === 'FGC-IMPL-GUIDE_VERSION_MISMATCH') ||
-              (error instanceof Error && ['INVALID_PICO_REPLY', 'INVALID_PICO_EVIDENCE', 'MISSING_PICO_EVIDENCE'].includes(error.message))
+              (error instanceof Error && error.message === 'PICO_GUIDE_VERSION_MISMATCH')
                 ? '가이드 버전이 변경됐어요. 작성 중인 내용을 보존한 뒤 화면을 새로 열어주세요.'
-                : '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 기존 업무 화면의 도움말을 사용할 수 있어요.',
+                : error instanceof Error && error.message === 'STALE_PICO_CONTEXT'
+                  ? '질문 이후 화면이나 입력이 바뀌었어요. 대화는 유지되니 현재 화면에서 다시 질문해주세요.'
+                  : error instanceof Error && ['INVALID_PICO_REPLY', 'INVALID_PICO_EVIDENCE', 'MISSING_PICO_EVIDENCE'].includes(error.message)
+                    ? '답변의 형식이나 근거를 확인하지 못했어요. 대화는 유지되니 다시 질문해주세요.'
+                    : '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 기존 업무 화면의 도움말을 사용할 수 있어요.',
           },
         ],
       }))
@@ -332,6 +336,8 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
       }
     }
   }
+  const isCurrentLiveReply = (entry: Extract<Entry, { role: 'live' }>) =>
+    !aiBusy && entry.guideContext === guideContext && entry.reply.contextRevision === latestLiveQuestion.revision
   const currentContext = demoContext(conversation.revision, conversation.scenario)
   const plan = conversation.plan?.workflowProposal
     ? findGuide(conversation.plan.workflowProposal.workflowId, conversation.plan.workflowProposal.guideVersion)
@@ -579,12 +585,12 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                           [...new Set(entry.reply.evidenceRefs?.map((source) => source.workflowId))]
                             .filter((id): id is string => Boolean(id))
                             .map((workflowId) => findWorkflowGuide(workflowId, '1.0') ? (
-                              <button key={workflowId} type="button" className="button button-secondary"
+                              <button key={workflowId} type="button" className="button button-secondary" disabled={!isCurrentLiveReply(entry)}
                                 onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
                                 이 업무 안내 시작 · {findWorkflowGuide(workflowId, '1.0')?.title}
                               </button>
                             ) : !observed?.paymentId ? (
-                              <button key={workflowId} type="button" className="button button-secondary" disabled={!canProcess}
+                              <button key={workflowId} type="button" className="button button-secondary" disabled={!canProcess || !isCurrentLiveReply(entry)}
                                 onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
                                 지급 작성 화면에서 안내 시작 · {findGuide(workflowId, '1.0')?.title}
                               </button>
@@ -595,11 +601,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                                 contextRevision={entry.reply.contextRevision!}
                                 canProcess={canProcess}
                                 sourceContextAvailable={entry.hasPaymentContext}
-                                contextValid={
-                                  !aiBusy &&
-                                  entry.guideContext === guideContext &&
-                                  entry.reply.contextRevision === latestLiveQuestion.revision
-                                }
+                                contextValid={isCurrentLiveReply(entry)}
                               />
                             ))}
                         <small>일반 업무 안내 · 현재 지급 처리 완료를 뜻하지 않습니다.</small>
