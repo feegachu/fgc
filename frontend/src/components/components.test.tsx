@@ -43,11 +43,14 @@ it('StatusBadge는 색상 의미와 서버 문구를 함께, KPI는 값·단위�
   render(
     <>
       <StatusBadge tone="warning">주의</StatusBadge>
-      <KpiCard label="후보 계약" value="1,234" unit="건" footer="이번 월" />
+      <KpiCard guideId="test.kpi.candidates" label="후보 계약" value="1,234" unit="건" footer="이번 월" />
+      <KpiCard guideId="test.kpi.matched" label="일치 계약" value="12" unit="건" />
     </>,
   )
   expect(screen.getByText('주의')).toHaveClass('status-badge-warning')
   expect(screen.getByRole('region', { name: '후보 계약' })).toHaveTextContent('1,234건')
+  expect(screen.getByRole('region', { name: '후보 계약' })).toHaveAttribute('data-guide-feature', 'test.kpi.candidates')
+  expect(screen.getByRole('region', { name: '일치 계약' })).toHaveAttribute('data-guide-feature', 'test.kpi.matched')
 })
 it('DataTable 정렬·행 선택·페이지 전체 선택을 제공하고 셀 펼치기 버튼은 표시하지 않는다', async () => {
   const user = userEvent.setup()

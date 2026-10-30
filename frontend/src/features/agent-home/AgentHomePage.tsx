@@ -367,7 +367,7 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="ah-modal" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div data-guide-feature="features.agent-home.agent-home-page.div" className="ah-modal" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="ah-modal-card" role="dialog" aria-modal="true" aria-labelledby="ah-need-title">
         <div className="ah-modal-head">
           <div>

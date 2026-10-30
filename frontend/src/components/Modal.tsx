@@ -92,7 +92,7 @@ export function Modal({
   })
   if (!open) return null
   return createPortal(
-    <div
+    <div data-guide-feature="components.modal.div"
       className="modal-backdrop"
       onClick={(event) => {
         if (closeOnBackdrop && event.target === event.currentTarget) onClose()

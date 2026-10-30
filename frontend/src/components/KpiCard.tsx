@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 import type { StatusTone } from './StatusBadge'
 export function KpiCard({
+  guideId,
   label,
   value,
   unit,
   footer,
   tone = 'neutral',
 }: {
+  guideId: string
   label: string
   value: ReactNode
   unit?: string
@@ -14,7 +16,7 @@ export function KpiCard({
   tone?: StatusTone
 }) {
   return (
-    <section data-guide-feature="components.kpi-card.section" className={`kpi-card kpi-card-${tone}`} aria-label={label}>
+    <section data-guide-feature={guideId} className={`kpi-card kpi-card-${tone}`} aria-label={label}>
       <div className="kpi-card-header">
         <h2 className="kpi-label">{label}</h2>
       </div>

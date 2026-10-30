@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { guideFeatureId } from '../assistant/feature-ids'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { UseQueryResult } from '@tanstack/react-query'
@@ -132,7 +133,7 @@ export function ContractTabs({
     <>
       <div className="tab-list contract-detail-tabs" role="tablist" aria-label="계약 상세 영역">
         {visibleTabs.map(([name, label], index) => (
-          <button data-guide-feature="features.contract.contract-tabs.button-2"
+          <button data-guide-feature={guideFeatureId('contract.tab', name)}
             key={name}
             ref={(element) => {
               tabButtons.current[index] = element
@@ -167,7 +168,7 @@ export function ContractTabs({
         ))}
       </div>
       {visibleTabs.map(([name]) => (
-        <section data-guide-feature="features.contract.contract-tabs.section"
+        <section data-guide-feature={guideFeatureId('contract.panel', name)}
           key={name}
           id={`contract-panel-${name}`}
           role="tabpanel"
@@ -361,7 +362,7 @@ function SchedulesTab({ id }: { id: string }) {
 function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA_TO_FC' }) {
   const query = useQuery(contractSchedulesQuery(id, stage))
   return (
-    <section data-guide-feature="features.contract.contract-tabs.section-4" aria-label={PAYMENT_STAGE[stage]} className="contract-tab-section">
+    <section data-guide-feature={guideFeatureId('contract.schedule-stage', stage)} aria-label={PAYMENT_STAGE[stage]} className="contract-tab-section">
       <QueryContent query={query}>
         {(data) => (
           <>

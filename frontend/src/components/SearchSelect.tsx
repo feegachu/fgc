@@ -147,7 +147,7 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
               aria-label={`${input['aria-label'] ?? input.placeholder ?? '선택'} 검색 결과`}
             >
               {options.map((option, index) => (
-                <div
+                <div data-guide-feature="components.search-select.div"
                   key={source.id(option)}
                   id={`${popupId}-${index}`}
                   role="option"

@@ -489,3 +489,16 @@ describe('CONT-W02 계약 상세', () => {
     expect(messages()).toEqual([])
   })
 })
+
+it('registers each fixed contract tab and panel as a distinct guide target', async () => {
+  renderAt('/contracts/1?month=2026-07')
+  await screen.findByRole('tab', { name: '기본정보' })
+  const tabs = screen.getAllByRole('tab')
+  const tabIds = tabs.map((tab) => tab.getAttribute('data-guide-feature'))
+  expect(tabIds).toContain('contract.tab.schedules')
+  expect(new Set(tabIds).size).toBe(tabs.length)
+  const panels = [...document.querySelectorAll('[role="tabpanel"]')]
+  const panelIds = panels.map((panel) => panel.getAttribute('data-guide-feature'))
+  expect(panelIds).toContain('contract.panel.schedules')
+  expect(new Set(panelIds).size).toBe(panels.length)
+})

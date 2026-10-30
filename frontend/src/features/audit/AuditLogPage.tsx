@@ -262,7 +262,7 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
       </p>
       {log.reason && reason !== log.reason && (
         <details className="audit-reason-original">
-          <summary>사유 원문 보기</summary>
+          <summary data-guide-feature="features.audit.audit-log-page.summary">사유 원문 보기</summary>
           <p>{log.reason}</p>
         </details>
       )}

@@ -270,7 +270,7 @@ function TableContents<T>({
         <tbody id={bodyId}>
           {rows.length ? (
             rows.map((row) => (
-              <tr
+              <tr data-guide-feature="components.data-table.tr"
                 key={rowKey(row)}
                 tabIndex={onRowActivate ? 0 : undefined}
                 aria-label={rowLabel?.(row)}

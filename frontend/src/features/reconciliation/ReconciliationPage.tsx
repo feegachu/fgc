@@ -591,18 +591,19 @@ function RunSummary({ summary }: { summary?: Summary }) {
     <section data-guide-feature="features.reconciliation.reconciliation-page.section-4" className="reco-react-summary" aria-label="실행 요약">
       <h2 className="surface-title">실행 요약</h2>
       <div className="reco-react-kpis">
-        <KpiCard label="대상" value={summary ? int(summary.resultCount) : EMPTY} unit="건" />
-        <KpiCard label="일치" value={summary ? int(summary.matchedCount) : EMPTY} unit="건" tone="success" />
-        <KpiCard label="불일치" value={summary ? int(summary.exceptionCount) : EMPTY} unit="건" tone="error" />
+        <KpiCard guideId="reconciliation.kpi.total" label="대상" value={summary ? int(summary.resultCount) : EMPTY} unit="건" />
+        <KpiCard guideId="reconciliation.kpi.matched" label="일치" value={summary ? int(summary.matchedCount) : EMPTY} unit="건" tone="success" />
+        <KpiCard guideId="reconciliation.kpi.exception" label="불일치" value={summary ? int(summary.exceptionCount) : EMPTY} unit="건" tone="error" />
         <div className="reco-react-rate">
           <KpiCard
+            guideId="reconciliation.kpi.match-rate"
             label="일치율"
             value={matchRate}
             unit="%"
             tone={summary && summary.resultCount === summary.matchedCount ? 'success' : 'warning'}
           />
           <details className="reco-react-rate-help">
-            <summary aria-label="일치율 계산 안내">
+            <summary data-guide-feature="features.reconciliation.reconciliation-page.summary" aria-label="일치율 계산 안내">
               <span className="material-symbols-rounded" aria-hidden="true">
                 info
               </span>
@@ -614,6 +615,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
           </details>
         </div>
         <KpiCard
+          guideId="reconciliation.kpi.difference"
           label="차액 합계"
           value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
           unit="원"

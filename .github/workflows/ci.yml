@@ -147,6 +147,7 @@ jobs:
       - run: npm ci --no-audit
         if: needs.changes.outputs.run_checks == 'true'
       - run: npm run check:api
+        if: needs.changes.outputs.run_checks == 'true'
       - run: npm run check:guide-features
         if: needs.changes.outputs.run_checks == 'true'
       - run: npm run check:e2e

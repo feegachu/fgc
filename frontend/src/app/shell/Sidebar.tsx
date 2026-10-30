@@ -60,7 +60,7 @@ export function Sidebar({
     if (!canOpen(definition, user)) return null
     return (
       <li key={path}>
-        <Link data-guide-feature="app.shell.sidebar.link"
+        <Link data-guide-feature={guideFeatureId('navigation.menu', definition.id)}
           className={`${sub ? 'sidebar-subnav-link' : 'sidebar-nav-link'} ${current?.menu === path ? 'is-active' : ''}`}
           to={hrefFor(path)}
           aria-current={current?.menu === path ? 'page' : undefined}
@@ -119,6 +119,7 @@ export function Sidebar({
             <li key={group.id}>
               <details className="sidebar-nav-details" open={openSections.includes(group.id)}>
                 <summary
+                  data-guide-feature={guideFeatureId('navigation.group', group.id)}
                   className="sidebar-nav-summary"
                   onClick={(event) => {
                     event.preventDefault()
@@ -143,6 +144,7 @@ export function Sidebar({
           {hasVisibleLinks(groups[3].paths) && <li className="sidebar-nav-section">
             <details className="sidebar-nav-details" open={openSections.includes('admin')}>
               <summary
+                data-guide-feature="navigation.group.admin"
                 className="sidebar-nav-summary"
                 onClick={(event) => {
                   event.preventDefault()
@@ -187,3 +189,4 @@ export function Sidebar({
     </aside>
   )
 }
+import { guideFeatureId } from '../../features/assistant/feature-ids'

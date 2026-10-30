@@ -352,7 +352,7 @@ function Occurrences({ item }: { item: ExceptionCase }) {
           </p>
           {!!occurrence.evidenceItems?.length && (
             <details className="exception-evidence">
-              <summary className="text-secondary">검출 증거</summary>
+              <summary data-guide-feature="features.exception.exception-page.summary" className="text-secondary">검출 증거</summary>
               <ul className="exception-evidence-list">
                 {occurrence.evidenceItems.map((evidence) => (
                   <li key={evidence.label}>

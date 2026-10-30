@@ -185,7 +185,7 @@ function DashboardContent({ month }: { month: string }) {
         <>
           <section data-guide-feature="features.dashboard.dashboard-page.section" className="kpi-grid" aria-label="주요 검증 지표">
             {kpis?.map((kpi, index) => (
-              <Link data-guide-feature="features.dashboard.dashboard-page.link-2"
+              <Link data-guide-feature={guideFeatureId('dashboard.kpi-link', kpi.id)}
                 key={kpi.label}
                 to={kpi.to}
                 className="kpi-card-link"
@@ -194,6 +194,7 @@ function DashboardContent({ month }: { month: string }) {
                 aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}
               >
                 <KpiCard
+                  guideId={guideFeatureId('dashboard.kpi', kpi.id)}
                   label={kpi.label}
                   value={<AnimatedNumber value={kpi.value ?? 0} />}
                   unit="건"
@@ -297,3 +298,4 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
     </Link>
   )
 }
+import { guideFeatureId } from '../assistant/feature-ids'

@@ -1,0 +1,11 @@
+{
+  "navigation.menu": ["dash-w01", "agnt-w01", "base-w01", "pol-w01", "cont-w01", "cont-w02", "cont-w03", "tran-w01", "tran-w02", "sche-w01", "sche-w02", "cap-w01", "arb-w01", "ledg-w01", "reco-w01", "excp-w01", "vrun-w01", "vrun-w02", "audt-w01"],
+  "navigation.group": ["contracts", "compliance", "ledger"],
+  "contract.tab": ["basic", "schedules", "cap", "arbitrage", "ledger", "payment"],
+  "contract.panel": ["basic", "schedules", "cap", "arbitrage", "ledger", "payment"],
+  "contract.schedule-stage": ["insurer_to_ga", "ga_to_fc"],
+  "reference.tab": ["organization", "insurer", "product", "agent", "commission-item", "versions", "management", "commission", "cap", "refund", "rules", "sources", "history"],
+  "reference.panel": ["organization", "insurer", "product", "agent", "commission-item", "versions", "management", "commission", "cap", "refund", "rules", "sources", "history"],
+  "dashboard.kpi": ["cap-violation", "cap-warning", "arbitrage", "recon", "journal", "open"],
+  "dashboard.kpi-link": ["cap-violation", "cap-warning", "arbitrage", "recon", "journal", "open"]
+}

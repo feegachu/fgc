@@ -104,7 +104,7 @@ export function Donut({
             return d ? (
               <path key={s.name} d={d} {...common} />
             ) : (
-              <circle
+              <circle data-guide-feature="features.agent-home.charts.circle"
                 key={s.name}
                 cx="50"
                 cy="50"

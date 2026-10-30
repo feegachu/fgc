@@ -25,11 +25,6 @@
     "element": "Link"
   },
   {
-    "id": "app.shell.sidebar.link",
-    "file": "app/shell/Sidebar.tsx",
-    "element": "Link"
-  },
-  {
     "id": "app.shell.workspace-tabs.button",
     "file": "app/shell/WorkspaceTabs.tsx",
     "element": "button"
@@ -80,6 +75,11 @@
     "element": "table"
   },
   {
+    "id": "components.data-table.tr",
+    "file": "components/DataTable.tsx",
+    "element": "tr"
+  },
+  {
     "id": "components.evidence-link.button",
     "file": "components/EvidenceLink.tsx",
     "element": "button"
@@ -100,14 +100,14 @@
     "element": "form"
   },
   {
-    "id": "components.kpi-card.section",
-    "file": "components/KpiCard.tsx",
-    "element": "section"
-  },
-  {
     "id": "components.modal.button",
     "file": "components/Modal.tsx",
     "element": "button"
+  },
+  {
+    "id": "components.modal.div",
+    "file": "components/Modal.tsx",
+    "element": "div"
   },
   {
     "id": "components.month-selector.button",
@@ -165,6 +165,11 @@
     "element": "Button"
   },
   {
+    "id": "components.resize-handle.div",
+    "file": "components/ResizeHandle.tsx",
+    "element": "div"
+  },
+  {
     "id": "components.search-select.button",
     "file": "components/SearchSelect.tsx",
     "element": "button"
@@ -180,6 +185,11 @@
     "element": "button"
   },
   {
+    "id": "components.search-select.div",
+    "file": "components/SearchSelect.tsx",
+    "element": "div"
+  },
+  {
     "id": "components.search-select.input",
     "file": "components/SearchSelect.tsx",
     "element": "input"
@@ -188,6 +198,136 @@
     "id": "components.toast.button",
     "file": "components/Toast.tsx",
     "element": "button"
+  },
+  {
+    "id": "contract.panel.arbitrage",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.panel.basic",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.panel.cap",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.panel.ledger",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.panel.payment",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.panel.schedules",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.schedule-stage.ga_to_fc",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.schedule-stage.insurer_to_ga",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "contract.tab.arbitrage",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "contract.tab.basic",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "contract.tab.cap",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "contract.tab.ledger",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "contract.tab.payment",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "contract.tab.schedules",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "dashboard.kpi-link.arbitrage",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "dashboard.kpi-link.cap-violation",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "dashboard.kpi-link.cap-warning",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "dashboard.kpi-link.journal",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "dashboard.kpi-link.open",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "dashboard.kpi-link.recon",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "dashboard.kpi.arbitrage",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "dashboard.kpi.cap-violation",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "dashboard.kpi.cap-warning",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "dashboard.kpi.journal",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "dashboard.kpi.open",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "dashboard.kpi.recon",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "KpiCard"
   },
   {
     "id": "features.agent-home.agent-home-page.button",
@@ -225,6 +365,11 @@
     "element": "button"
   },
   {
+    "id": "features.agent-home.agent-home-page.div",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "div"
+  },
+  {
     "id": "features.agent-home.agent-home-page.fgc-ai",
     "file": "features/agent-home/AgentHomePage.tsx",
     "element": "button"
@@ -248,6 +393,11 @@
     "id": "features.agent-home.charts.button",
     "file": "features/agent-home/charts.tsx",
     "element": "button"
+  },
+  {
+    "id": "features.agent-home.charts.circle",
+    "file": "features/agent-home/charts.tsx",
+    "element": "circle"
   },
   {
     "id": "features.agent-home.charts.table",
@@ -368,6 +518,11 @@
     "id": "features.audit.audit-log-page.select-3",
     "file": "features/audit/AuditLogPage.tsx",
     "element": "select"
+  },
+  {
+    "id": "features.audit.audit-log-page.summary",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "summary"
   },
   {
     "id": "features.audit.audit-log-page.table",
@@ -745,11 +900,6 @@
     "element": "Button"
   },
   {
-    "id": "features.contract.contract-tabs.button-2",
-    "file": "features/contract/ContractTabs.tsx",
-    "element": "button"
-  },
-  {
     "id": "features.contract.contract-tabs.button-3",
     "file": "features/contract/ContractTabs.tsx",
     "element": "Button"
@@ -765,22 +915,12 @@
     "element": "Button"
   },
   {
-    "id": "features.contract.contract-tabs.section",
-    "file": "features/contract/ContractTabs.tsx",
-    "element": "section"
-  },
-  {
     "id": "features.contract.contract-tabs.section-2",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
   },
   {
     "id": "features.contract.contract-tabs.section-3",
-    "file": "features/contract/ContractTabs.tsx",
-    "element": "section"
-  },
-  {
-    "id": "features.contract.contract-tabs.section-4",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
   },
@@ -796,11 +936,6 @@
   },
   {
     "id": "features.dashboard.dashboard-page.link",
-    "file": "features/dashboard/DashboardPage.tsx",
-    "element": "Link"
-  },
-  {
-    "id": "features.dashboard.dashboard-page.link-2",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
   },
@@ -953,6 +1088,11 @@
     "id": "features.exception.exception-page.select",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "select"
+  },
+  {
+    "id": "features.exception.exception-page.summary",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "summary"
   },
   {
     "id": "features.exception.journal-correction-modal.button",
@@ -1495,14 +1635,9 @@
     "element": "select"
   },
   {
-    "id": "features.reference.reference-ui.button",
-    "file": "features/reference/ReferenceUI.tsx",
-    "element": "button"
-  },
-  {
-    "id": "features.reference.reference-ui.section",
-    "file": "features/reference/ReferenceUI.tsx",
-    "element": "section"
+    "id": "features.reconciliation.reconciliation-page.summary",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "summary"
   },
   {
     "id": "features.schedule.schedule-detail-page.button",
@@ -2035,8 +2170,278 @@
     "element": "select"
   },
   {
+    "id": "navigation.group.admin",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "summary"
+  },
+  {
+    "id": "navigation.group.compliance",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "summary"
+  },
+  {
+    "id": "navigation.group.contracts",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "summary"
+  },
+  {
+    "id": "navigation.group.ledger",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "summary"
+  },
+  {
+    "id": "navigation.menu.agnt-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.arb-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.audt-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.base-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.cap-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.cont-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.cont-w02",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.cont-w03",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.dash-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.excp-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.ledg-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.pol-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.reco-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.sche-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.sche-w02",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.tran-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.tran-w02",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.vrun-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.vrun-w02",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
     "id": "previews.policy-preview.a",
     "file": "previews/policyPreview.tsx",
     "element": "a"
+  },
+  {
+    "id": "reconciliation.kpi.difference",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "reconciliation.kpi.exception",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "reconciliation.kpi.match-rate",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "reconciliation.kpi.matched",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "reconciliation.kpi.total",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "reference.panel.agent",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.cap",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.commission",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.commission-item",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.history",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.insurer",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.management",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.organization",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.product",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.refund",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.rules",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.sources",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.panel.versions",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "reference.tab.agent",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.cap",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.commission",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.commission-item",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.history",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.insurer",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.management",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.organization",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.product",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.refund",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.rules",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.sources",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "reference.tab.versions",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
   }
 ]

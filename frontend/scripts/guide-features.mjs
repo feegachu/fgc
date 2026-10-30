@@ -4,10 +4,24 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const root = path.join(frontend, 'src')
+const rootArgument = process.argv.indexOf('--root')
+const root = rootArgument >= 0 ? path.resolve(process.argv[rootArgument + 1]) : path.join(frontend, 'src')
 const manifest = path.join(root, 'features/assistant/feature-targets.generated.json')
 const screensManifest = path.join(root, 'features/assistant/screens.generated.json')
-const tags = new Set(['button', 'input', 'select', 'textarea', 'form', 'section', 'table', 'a', 'Button', 'SearchSelect', 'ContextLink', 'Link'])
+const tags = new Set(['button', 'input', 'select', 'textarea', 'form', 'section', 'table', 'summary', 'a', 'Button', 'SearchSelect', 'ContextLink', 'Link', 'KpiCard'])
+const instances = JSON.parse(fs.readFileSync(path.join(root, 'features/assistant/feature-instances.v1.json'), 'utf8'))
+function targetIds(initializer) {
+  if (initializer && ts.isStringLiteral(initializer)) return [initializer.text]
+  if (initializer && ts.isJsxExpression(initializer) && initializer.expression && ts.isCallExpression(initializer.expression)) {
+    const call = initializer.expression
+    if (ts.isIdentifier(call.expression) && call.expression.text === 'guideFeatureId' && call.arguments[0] && ts.isStringLiteral(call.arguments[0])) {
+      const group = call.arguments[0].text
+      if (!Array.isArray(instances[group]) || instances[group].length === 0) throw new Error(`Unregistered guide instance group: ${group}`)
+      return instances[group].map((instance) => `${group}.${instance}`)
+    }
+  }
+  return []
+}
 const entries = []
 const missing = []
 function walk(dir) {
@@ -22,11 +36,13 @@ function walk(dir) {
     function visit(node) {
       if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
         const tag = node.tagName.getText(source)
-        if (tags.has(tag)) {
-          const attrs = node.attributes.properties.filter(ts.isJsxAttribute)
-          const id = attrs.find((attr) => attr.name.getText(source) === 'data-guide-feature')?.initializer
-          if (!id || !ts.isStringLiteral(id)) missing.push(`${relative}:${source.getLineAndCharacterOfPosition(node.pos).line + 1}`)
-          else entries.push({ id: id.text, file: relative, element: tag })
+        const attrs = node.attributes.properties.filter(ts.isJsxAttribute)
+        if (tags.has(tag) || (/^[a-z]/.test(tag) && attrs.some((attr) => ['onClick', 'onChange', 'onSubmit'].includes(attr.name.getText(source))))) {
+          const id = attrs.find((attr) => attr.name.getText(source) === (tag === 'KpiCard' ? 'guideId' : 'data-guide-feature'))?.initializer
+          const forwardedKpi = relative === 'components/KpiCard.tsx' && id && ts.isJsxExpression(id) && id.expression && ts.isIdentifier(id.expression) && id.expression.text === 'guideId'
+          const ids = targetIds(id)
+          if (!forwardedKpi && !ids.length) missing.push(`${relative}:${source.getLineAndCharacterOfPosition(node.pos).line + 1}`)
+          else for (const value of ids) entries.push({ id: value, file: relative, element: tag })
         }
       }
       ts.forEachChild(node, visit)
