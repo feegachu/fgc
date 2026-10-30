@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
+import { KpiCardContent } from '../../components/KpiCard'
 import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
@@ -147,7 +148,7 @@ export default function ArbitragePage() {
         </Field>
       </FilterBar>
       <QueryState error={insurers.error} />
-      <section className="kpi-grid arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
+      <section className="kpi-grid kpi-group arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
         {summaryCards.map((card) => (
           <button
             type="button"
@@ -156,17 +157,12 @@ export default function ArbitragePage() {
             aria-pressed={criteria.status === card.status}
             onClick={() => patch({ status: card.status })}
           >
-            <span className="kpi-card-header">
-              <span className="kpi-label">{card.label}</span>
-            </span>
-            <span className="kpi-value-row">
-              <strong className="kpi-value">
-                {query.data ? `${int(query.data.summary?.[card.count] ?? 0)}건` : '—'}
-              </strong>
-            </span>
-            <span className="kpi-card-footer">
-              <span className="kpi-comparison">{card.description}</span>
-            </span>
+            <KpiCardContent
+              label={card.label}
+              value={query.data ? int(query.data.summary?.[card.count] ?? 0) : '—'}
+              unit={query.data ? '건' : undefined}
+              footer={card.description}
+            />
           </button>
         ))}
       </section>

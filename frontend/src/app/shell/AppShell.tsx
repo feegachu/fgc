@@ -13,8 +13,10 @@ import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { AgentTopbar } from './AgentTopbar'
 import { DeveloperSettings } from './DeveloperSettings'
-import { resolveComponentDesign, sidebarAppearance, useDesignSettings } from '../../stores/designSettings'
+import { designAppearance, resolveComponentDesign, sidebarAppearance, useDesignSettings } from '../../stores/designSettings'
 import './component-designs.css'
+import './kpi-designs.css'
+import './design-experiments.css'
 import './agent-theme.css'
 export interface ShellContext {
   user: ShellUser
@@ -88,7 +90,24 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       data-field-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'fieldDesign') : undefined}
       data-table-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'tableDesign') : undefined}
       data-badge-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'badgeDesign') : undefined}
-      style={import.meta.env.DEV ? appearance.style : undefined}
+      data-summary-display={import.meta.env.DEV ? preferences.summaryDisplay : undefined}
+      data-tab-style={import.meta.env.DEV ? preferences.tabStyle : undefined}
+      data-table-header-style={import.meta.env.DEV ? preferences.tableHeaderStyle : undefined}
+      data-page-header-style={import.meta.env.DEV ? preferences.pageHeaderStyle : undefined}
+      data-background-style={import.meta.env.DEV ? preferences.backgroundStyle : undefined}
+      data-badge-style={import.meta.env.DEV ? preferences.badgeStyle : undefined}
+      data-badge-palette={import.meta.env.DEV ? preferences.badgePalette : undefined}
+      data-custom-button-color={import.meta.env.DEV ? preferences.buttonColor !== null : undefined}
+      data-custom-sidebar-button={import.meta.env.DEV ? preferences.sidebarButtonColor !== null : undefined}
+      data-custom-table-header={import.meta.env.DEV ? preferences.tableHeaderColor !== null : undefined}
+      data-custom-page-header={import.meta.env.DEV ? preferences.pageHeaderColor !== null : undefined}
+      data-custom-background={import.meta.env.DEV ? preferences.backgroundColor !== null : undefined}
+      data-custom-badge-color={import.meta.env.DEV ? preferences.badgeColor !== null : undefined}
+      data-glass-sidebar={import.meta.env.DEV ? preferences.glassSidebar : undefined}
+      data-glass-buttons={import.meta.env.DEV ? preferences.glassButtons : undefined}
+      data-glass-cards={import.meta.env.DEV ? preferences.glassCards : undefined}
+      data-glass-tabs={import.meta.env.DEV ? preferences.glassTabs : undefined}
+      style={import.meta.env.DEV ? designAppearance(preferences, user.roleCode === 'AGENT') : undefined}
     >
       <a className="skip-link" href="#main-content">
         본문으로 건너뛰기

@@ -1,0 +1,186 @@
+/* Every screen uses the dashboard card baseline, including interactive and agent KPIs. */
+.app-shell .page-content .kpi-group {
+  gap: var(--space-3);
+  min-width: 0;
+}
+.app-shell .page-content .ah-kpis {
+  padding: 0;
+}
+.app-shell .page-content .kpi-card {
+  --kpi-accent: var(--color-neutral-300);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  container-type: inline-size;
+  min-width: 0;
+  min-height: 10rem;
+  height: 100%;
+  gap: var(--space-1);
+  padding: var(--space-5) var(--space-6) var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-8);
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  box-shadow: none;
+  text-align: left;
+  transform: none;
+}
+.app-shell .page-content .kpi-card::before {
+  display: block;
+  width: 2rem;
+  height: 4px;
+  flex: 0 0 4px;
+  margin-bottom: var(--space-2);
+  border-radius: 999px;
+  background: var(--kpi-accent);
+  content: '';
+}
+.app-shell .page-content .kpi-card-success {
+  --kpi-accent: var(--color-status-success-solid);
+}
+.app-shell .page-content .kpi-card-warning {
+  --kpi-accent: var(--color-status-warning-solid);
+}
+.app-shell .page-content .kpi-card-error {
+  --kpi-accent: var(--color-status-error-solid);
+}
+.app-shell .page-content .kpi-card-risk {
+  --kpi-accent: var(--color-status-risk-solid);
+}
+.app-shell .page-content :is(.kpi-card-review, .arb-summary-review) {
+  --kpi-accent: var(--color-status-review-solid);
+}
+.app-shell .page-content .kpi-card-info {
+  --kpi-accent: var(--color-status-info-solid);
+}
+.app-shell .page-content .kpi-card-header {
+  width: 100%;
+}
+.app-shell .page-content .kpi-label {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.app-shell .page-content .kpi-value-row {
+  justify-content: flex-end;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  width: 100%;
+}
+.app-shell .page-content .kpi-value {
+  min-width: 0;
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+.app-shell .page-content .kpi-unit {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.app-shell .page-content .kpi-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.375rem;
+  align-self: stretch;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+.app-shell .page-content :is(button.kpi-card, a.kpi-card, .kpi-card-link):hover {
+  border-color: var(--color-border-strong);
+  text-decoration: none;
+}
+.app-shell .page-content .kpi-card:is([aria-pressed='true'], .is-active) {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+  background: var(--color-action-subtle);
+}
+.app-shell .page-content :is(.kpi-card, .kpi-card-link):focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.app-shell .page-content .kpi-card-link {
+  min-width: 0;
+  height: 100%;
+}
+.app-shell[data-kpi-style='summary'] .page-content .kpi-group {
+  display: grid;
+  grid-template-columns: repeat(var(--kpi-columns, 3), minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.75rem;
+  background: var(--color-bg-surface);
+}
+.dashboard-page > .kpi-group,
+.vrun-exception-grid {
+  --kpi-columns: 6;
+}
+.cap-react-kpis,
+.ah-kpis,
+.vrun-summary-grid,
+.exception-summary-grid {
+  --kpi-columns: 4;
+}
+.reco-react-kpis {
+  --kpi-columns: 5;
+}
+@media (max-width: 74.9375rem) {
+  .app-shell .page-content .kpi-group {
+    --kpi-columns: 3;
+  }
+  .app-shell .page-content :is(.cap-react-kpis, .ah-kpis, .vrun-summary-grid, .exception-summary-grid) {
+    --kpi-columns: 2;
+  }
+}
+.app-shell[data-kpi-style='summary'] .page-content .kpi-group > :is(.kpi-card, .kpi-card-link, .reco-react-rate) {
+  min-width: 0;
+  box-shadow:
+    1px 0 var(--color-border-default),
+    0 1px var(--color-border-default);
+}
+.app-shell[data-kpi-style='summary'] .page-content .kpi-card {
+  min-height: 9rem;
+  padding: 1.125rem 1rem;
+  border: 0;
+  border-radius: 0;
+}
+.app-shell[data-kpi-style='summary'] .page-content .kpi-card::before {
+  display: none;
+}
+.app-shell[data-kpi-style='summary'] .page-content .kpi-value-row {
+  justify-content: flex-start;
+}
+.app-shell[data-kpi-style='summary'] .page-content [data-zero='true'] .kpi-value {
+  color: #767676;
+}
+.app-shell[data-kpi-style='summary'] .page-content [data-attention='true'] .kpi-value {
+  color: var(--color-status-error-text);
+}
+.app-shell[data-kpi-style='summary'] .page-content .kpi-card-error .kpi-value:not([data-zero='true']) {
+  color: var(--color-status-error-text);
+}
+.app-shell[data-kpi-style='summary'] .page-content .kpi-card .kpi-value[data-zero='true'] {
+  color: #767676;
+}
+@media (max-width: 39.9375rem) {
+  .app-shell[data-kpi-style='summary'] .page-content .kpi-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-shell .page-content .kpi-card {
+    padding: 1rem;
+  }
+}

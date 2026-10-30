@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { useDesignSettings } from '../../stores/designSettings'
 export function WorkspaceTabs({ activeId }: { activeId?: string }) {
   const tabs = useWorkspaceStore((state) => state.tabs)
   const closeTab = useWorkspaceStore((state) => state.closeTab)
+  const tabStyle = useDesignSettings((state) => state.preferences.tabStyle)
+  const glassTabs = useDesignSettings((state) => state.preferences.glassTabs)
   const navigate = useNavigate()
   const rail = useRef<HTMLDivElement>(null)
   const [overflow, setOverflow] = useState(false)
@@ -21,7 +24,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
       observer?.disconnect()
       window.removeEventListener('resize', update)
     }
-  }, [tabs, activeId])
+  }, [tabs, activeId, tabStyle, glassTabs])
   return (
     <nav className="workspace-tab-bar" aria-label="열린 업무 화면">
       <div className="workspace-tabs" ref={rail}>

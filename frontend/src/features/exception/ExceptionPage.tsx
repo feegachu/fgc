@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
+import { KpiCardContent } from '../../components/KpiCard'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
@@ -98,7 +99,8 @@ export function ExceptionPage() {
       sortable: true,
       width: '4rem',
       align: 'left',
-      render: (row) => row.exceptionCaseId },
+      render: (row) => row.exceptionCaseId,
+    },
     {
       key: 'type',
       label: '유형',
@@ -129,7 +131,8 @@ export function ExceptionPage() {
       sortKey: 'contractNo',
       sortable: true,
       width: '12rem',
-      render: (row) => row.contractNo ?? '-' },
+      render: (row) => row.contractNo ?? '-',
+    },
     {
       key: 'title',
       label: '내용',
@@ -151,7 +154,8 @@ export function ExceptionPage() {
       sortKey: 'assigneeLoginId',
       sortable: true,
       width: '6rem',
-      render: (row) => row.assigneeLoginId ?? '미배정' },
+      render: (row) => row.assigneeLoginId ?? '미배정',
+    },
     {
       key: 'detectedAt',
       label: '최근 검출',
@@ -166,7 +170,8 @@ export function ExceptionPage() {
       sortKey: 'detectionCount',
       sortable: true,
       width: '4rem',
-      render: (row) => `${row.detectionCount ?? 0}회` },
+      render: (row) => `${row.detectionCount ?? 0}회`,
+    },
     {
       key: 'reference',
       label: '참조',
@@ -200,7 +205,7 @@ export function ExceptionPage() {
         </div>
       </header>
 
-      <section className="exception-summary-grid" aria-label="유형별 미처리 요약">
+      <section className="exception-summary-grid kpi-group" aria-label="유형별 미처리 요약">
         {data?.summary?.map((summary) => (
           <Link
             key={summary.type}
@@ -213,16 +218,12 @@ export function ExceptionPage() {
                 : `/exceptions?type=${summary.type}&status=${OPEN_STATUS}`
             }
           >
-            <div className="kpi-card-header">
-              <span className="kpi-label">{summary.typeLabel}</span>
-            </div>
-            <div className="kpi-value-row">
-              <strong className="kpi-value">{int(summary.count)}</strong>
-              <span className="kpi-unit">건</span>
-            </div>
-            <div className="kpi-card-footer">
-              <span className="kpi-comparison">{exceptionSummaryDescription(summary.type)}</span>
-            </div>
+            <KpiCardContent
+              label={summary.typeLabel ?? '-'}
+              value={int(summary.count)}
+              unit="건"
+              footer={exceptionSummaryDescription(summary.type)}
+            />
           </Link>
         ))}
         {data && !data.summary?.length && (

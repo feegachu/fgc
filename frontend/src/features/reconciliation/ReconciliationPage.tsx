@@ -590,7 +590,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
   return (
     <section className="reco-react-summary" aria-label="실행 요약">
       <h2 className="surface-title">실행 요약</h2>
-      <div className="reco-react-kpis">
+      <div className="reco-react-kpis kpi-group">
         <KpiCard label="대상" value={summary ? int(summary.resultCount) : EMPTY} unit="건" />
         <KpiCard label="일치" value={summary ? int(summary.matchedCount) : EMPTY} unit="건" tone="success" />
         <KpiCard label="불일치" value={summary ? int(summary.exceptionCount) : EMPTY} unit="건" tone="error" />
@@ -615,6 +615,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
         </div>
         <KpiCard
           label="차액 합계"
+          zero={summary?.differenceTotal === 0}
           value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
           unit="원"
           tone={summary?.differenceTotal === 0 ? 'success' : 'error'}

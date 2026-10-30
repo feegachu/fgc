@@ -1,12 +1,20 @@
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, Link, RouterProvider } from 'react-router'
-import { AppShellView } from '../app/shell/AppShell'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import type { DashboardSummary } from '../features/dashboard/api'
 import { Button } from '../components/Button'
 import { Field } from '../components/Field'
 import { StatusBadge } from '../components/StatusBadge'
+import { ContractStatusBadge } from '../features/contract/badges'
+import CapListPage from '../features/cap/CapListPage'
+import ArbitragePage from '../features/arbitrage/ArbitragePage'
+import { ExceptionPage } from '../features/exception/ExceptionPage'
+import ReconciliationPage from '../features/reconciliation/ReconciliationPage'
+import ValidationRunDetailPage from '../features/validation/ValidationRunDetailPage'
+import { AgentHomePage } from '../features/agent-home/AgentHomePage'
+import { designPreviewData } from './designFixtures'
+import { DesignPreviewShell, PreviewNavigation } from './DesignPreviewShell'
 import '../index.css'
 import '../styles/variables.css'
 import '../styles/reset.css'
@@ -15,6 +23,8 @@ import '../styles/components.css'
 import '../styles/utilities.css'
 import '../styles/react.css'
 import '../features/dashboard/dashboard.css'
+import '../features/arbitrage/arbitrage.css'
+import '../features/exception/exception.css'
 
 if (!import.meta.env.DEV) throw new Error('Design preview is only available in the development server.')
 
@@ -70,12 +80,24 @@ const originalFetch = globalThis.fetch
 globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input), location.origin)
   if (!url.pathname.startsWith('/api/')) return originalFetch(input, init)
-  if (url.pathname === '/api/v1/dashboard/summary' && (!init?.method || init.method === 'GET'))
+  const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+  if (method !== 'GET')
+    return Response.json(
+      {
+        data: null,
+        error: { code: 'PREVIEW_READ_ONLY', message: '예시 데이터 조회만 지원합니다.' },
+        requestId: 'design-preview',
+      },
+      { status: 405 },
+    )
+  if (url.pathname === '/api/v1/dashboard/summary')
     return Response.json({
       data: { ...summary, month: `${url.searchParams.get('month') ?? '2026-07'}-01` },
       error: null,
       requestId: 'design-preview',
     })
+  const data = designPreviewData(url)
+  if (data !== undefined) return Response.json({ data, error: null, requestId: 'design-preview' })
   return Response.json(
     {
       data: null,
@@ -88,23 +110,13 @@ globalThis.fetch = async (input, init) => {
 const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
 const router = createMemoryRouter([
   {
-    element: (
-      <AppShellView
-        user={{
-          loginId: 'design-preview',
-          userName: '디자인 미리보기',
-          roleCode: 'SETTLEMENT',
-          canProcess: true,
-          canViewAuditLog: false,
-        }}
-        defaultMonth="2026-07"
-      />
-    ),
+    element: <DesignPreviewShell />,
     children: [
       {
         path: '/',
         element: (
           <>
+            <PreviewNavigation />
             <p className="page-description" style={{ marginBottom: '1rem' }}>
               디자인 미리보기용 예시 데이터입니다. 상단 개발자 탭에서 설정을 변경하세요.
             </p>
@@ -131,11 +143,30 @@ const router = createMemoryRouter([
                 <StatusBadge tone="success">정상</StatusBadge>
                 <StatusBadge tone="warning">주의</StatusBadge>
                 <StatusBadge tone="error">위반</StatusBadge>
+                <ContractStatusBadge code="ACTIVE" />
+                <ContractStatusBadge code="UNPAID" />
+                <ContractStatusBadge code="LAPSED" />
               </div>
             </section>
           </>
         ),
       },
+      ...[
+        { path: '/cap-checks', element: <CapListPage /> },
+        { path: '/arbitrage-checks', element: <ArbitragePage /> },
+        { path: '/exceptions', element: <ExceptionPage /> },
+        { path: '/reconciliations', element: <ReconciliationPage /> },
+        { path: '/validation-runs/:id', element: <ValidationRunDetailPage /> },
+        { path: '/agent-home', element: <AgentHomePage /> },
+      ].map((route) => ({
+        ...route,
+        element: (
+          <>
+            <PreviewNavigation />
+            {route.element}
+          </>
+        ),
+      })),
       {
         path: '*',
         element: (
@@ -148,8 +179,18 @@ const router = createMemoryRouter([
     ],
   },
 ])
-createRoot(document.getElementById('root')!).render(
+const root = createRoot(document.getElementById('root')!)
+root.render(
   <QueryClientProvider client={client}>
     <RouterProvider router={router} />
   </QueryClientProvider>,
 )
+if (import.meta.hot) {
+  import.meta.hot.accept()
+  import.meta.hot.dispose(() => {
+    root.unmount()
+    router.dispose()
+    client.clear()
+    globalThis.fetch = originalFetch
+  })
+}

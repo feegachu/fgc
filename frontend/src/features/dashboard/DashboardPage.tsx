@@ -183,7 +183,7 @@ function DashboardContent({ month }: { month: string }) {
         <DashboardSkeleton />
       ) : (
         <>
-          <section className="kpi-grid" aria-label="주요 검증 지표">
+          <section className="kpi-grid kpi-group" aria-label="주요 검증 지표">
             {kpis?.map((kpi, index) => (
               <Link
                 key={kpi.label}
@@ -201,6 +201,7 @@ function DashboardContent({ month }: { month: string }) {
                   unit="건"
                   footer={<span className="kpi-comparison">{kpi.footer}</span>}
                   tone={kpi.tone}
+                  zero={(kpi.value ?? 0) === 0}
                 />
               </Link>
             ))}

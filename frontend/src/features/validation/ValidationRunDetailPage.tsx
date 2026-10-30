@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
+import { KpiCardContent } from '../../components/KpiCard'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
@@ -443,18 +444,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
 function SummaryCard({ label, value, unit, footer }: { label: string; value?: number; unit: string; footer?: string }) {
   return (
     <div className="kpi-card">
-      <p className="kpi-label">{label}</p>
-      <p className="kpi-value-row">
-        {value === undefined ? (
-          <span className="kpi-unit">{unit}</span>
-        ) : (
-          <>
-            <span className="kpi-value tabular-nums">{int(value)}</span>
-            <span className="kpi-unit">{unit}</span>
-          </>
-        )}
-      </p>
-      {footer && <p className="kpi-card-footer">{footer}</p>}
+      <KpiCardContent label={label} value={value === undefined ? null : int(value)} unit={unit} footer={footer} />
     </div>
   )
 }
@@ -473,7 +463,7 @@ function SummarySection({ detail, status }: { detail: ValidationRunDetail; statu
           ④ 결과 요약
         </h2>
       </header>
-      <div className="kpi-grid vrun-summary-grid">
+      <div className="kpi-grid kpi-group vrun-summary-grid">
         <SummaryCard
           label="1,200%"
           unit={before ? '실행 전' : '건 검사'}
@@ -523,7 +513,7 @@ function ExceptionSection({ detail, openLink }: { detail: ValidationRunDetail; o
           예외함 열기
         </Link>
       </header>
-      <div className="kpi-grid vrun-exception-grid">
+      <div className="kpi-grid kpi-group vrun-exception-grid">
         <SummaryCard label="이번 실행 검출" value={summary?.detectedCount ?? 0} unit="건" />
         <SummaryCard label="신규 업무건" value={summary?.newCount ?? 0} unit="건" />
         <SummaryCard label="기존 업무건 재검출" value={summary?.recurringCount ?? 0} unit="건" />

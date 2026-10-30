@@ -59,3 +59,36 @@ it('시안을 선택하면 사용자 지정 색을 해제하고 바깥 클릭으
   await user.click(screen.getByRole('button', { name: '본문 버튼' }))
   expect(screen.getByRole('button', { name: '개발자' })).toHaveAttribute('aria-expanded', 'false')
 })
+
+it('독립적인 표시·색상 설정과 글래스 프리셋을 저장하고 모두 기본값으로 복원한다', async () => {
+  const user = userEvent.setup()
+  render(<DeveloperSettings sidebarColor="#467aa2" />)
+  await user.click(screen.getByRole('button', { name: '개발자' }))
+  await user.selectOptions(screen.getByRole('combobox', { name: '검증 현황 요약 표시' }), 'bars')
+  await user.selectOptions(screen.getByRole('combobox', { name: '상단 탭바' }), 'underline')
+  await user.selectOptions(screen.getByRole('combobox', { name: '표 컬럼 머리글' }), 'plain')
+  fireEvent.input(screen.getByLabelText('공통 버튼색'), { target: { value: '#112233' } })
+  fireEvent.input(screen.getByLabelText('사이드바 메뉴 버튼색'), { target: { value: '#aabbcc' } })
+  expect(readDesignPreferences()).toMatchObject({
+    summaryDisplay: 'bars',
+    tabStyle: 'underline',
+    tableHeaderStyle: 'plain',
+    buttonColor: '#112233',
+    sidebarButtonColor: '#aabbcc',
+    sidebarColor: null,
+  })
+  await user.click(screen.getByRole('button', { name: '라벤더' }))
+  expect(readDesignPreferences()).toMatchObject({
+    backgroundStyle: 'lavender',
+    glassSidebar: true,
+    glassCards: true,
+    glassButtons: true,
+    glassTabs: true,
+    badgeStyle: 'glass',
+    glassBlur: 22,
+  })
+  await user.click(screen.getByRole('checkbox', { name: '사이드바 유리 효과' }))
+  expect(readDesignPreferences().glassSidebar).toBe(false)
+  await user.click(screen.getByRole('button', { name: '기본값 복원' }))
+  expect(readDesignPreferences()).toEqual(defaultDesignPreferences)
+})

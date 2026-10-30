@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
+import { KpiCardContent } from '../../components/KpiCard'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
@@ -206,26 +207,24 @@ export default function CapListPage() {
         onSearch={(filters) => update({ ...filters, size: String(criteria.size), capCheckId: '' })}
         onReset={() => update({ ...FILTER_KEYS, month: workspaceMonth ?? '', size: '20' })}
       />
-      <div className="cap-react-kpis" aria-busy={list.isFetching}>
+      <div className="cap-react-kpis kpi-group" aria-busy={list.isFetching}>
         {Object.entries(STATUSES)
           .filter(([code]) => code !== 'NOT_APPLICABLE')
           .map(([code, label]) => (
             <button
               key={code}
               type="button"
-              className={`surface cap-react-kpi cap-react-kpi-${code}`}
+              className={`kpi-card cap-react-kpi cap-react-kpi-${code} kpi-card-${({ NORMAL: 'success', WARNING: 'warning', VIOLATION: 'error', REVIEW_REQUIRED: 'review' } as Record<string, string>)[code]}`}
               aria-pressed={criteria.status === code}
               aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}`}
               onClick={() => update({ status: criteria.status === code ? '' : code, capCheckId: '' })}
             >
-              <span className="kpi-label">{label}</span>
-              <span className="cap-react-kpi-value">
-                <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
-                <small>건</small>
-              </span>
-              <span className="kpi-comparison">
-                {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
-              </span>
+              <KpiCardContent
+                label={label}
+                value={data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}
+                unit="건"
+                footer={code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
+              />
             </button>
           ))}
       </div>

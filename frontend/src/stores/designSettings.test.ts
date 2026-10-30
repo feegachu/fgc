@@ -43,6 +43,30 @@ it('저장이 차단돼도 설정을 적용하고 기본값으로 복원할 수 
   }
 })
 
+it('이전 설정을 유지하면서 새 항목은 기본값으로 채우고 잘못된 농도·색상을 무시한다', () => {
+  localStorage.setItem(
+    DESIGN_SETTINGS_KEY,
+    JSON.stringify({
+      kpiStyle: 'summary',
+      glassOpacity: 9,
+      glassBlur: -2,
+      badgeOpacity: '0.2',
+      buttonColor: 'url(example)',
+      tabStyle: 'unknown',
+    }),
+  )
+  expect(readDesignPreferences()).toEqual({ ...defaultDesignPreferences, kpiStyle: 'summary' })
+  useDesignSettings
+    .getState()
+    .update({ buttonColor: '#112233', sidebarColor: '#eeeeee', sidebarButtonColor: '#aabbcc', glassBlur: 24 })
+  expect(readDesignPreferences()).toMatchObject({
+    buttonColor: '#112233',
+    sidebarColor: '#eeeeee',
+    sidebarButtonColor: '#aabbcc',
+    glassBlur: 24,
+  })
+})
+
 it('기존 역할별 색은 유지하고 사용자 배경색에 대비되는 글자색을 선택한다', () => {
   expect(sidebarAppearance(defaultDesignPreferences, true)).toMatchObject({
     color: '#7f57ac',

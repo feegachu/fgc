@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { int, rate } from '../../lib/format'
 import { useDrawn } from '../../lib/motion'
 import { CIRCUMFERENCE, RADIUS, donutSegments } from './donut'
+import { useDesignSettings } from '../../stores/designSettings'
 
 export type CompositionItem = {
   key: string
@@ -19,44 +20,49 @@ export type CompositionItem = {
  * 각 줄은 해당 목록 화면으로 이동하는 링크다. 줄에 마우스를 올리거나 포커스하면 해당 조각이 강조된다.
  */
 export function RiskComposition({ items }: { items: CompositionItem[] }) {
+  const display = useDesignSettings((state) => state.preferences.summaryDisplay)
+  const mode = import.meta.env.DEV ? display : 'donut'
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const drawn = useDrawn()
   const total = items.reduce((sum, item) => sum + item.value, 0)
   const segments = new Map(donutSegments(items).map((segment) => [segment.key, segment]))
 
+  if (mode === 'hidden') return null
   if (total === 0) {
     return <div className="empty-state">이번 달 표시할 위험 건이 없습니다.</div>
   }
 
   return (
-    <div className="risk-composition">
-      <div className="risk-donut" aria-hidden="true">
-        <svg viewBox="0 0 100 100" className="risk-donut-svg">
-          <circle className="risk-donut-track" cx="50" cy="50" r={RADIUS} />
-          {items.map((item) => {
-            const segment = segments.get(item.key)
-            if (!segment) return null
-            const state = activeKey === null ? '' : activeKey === item.key ? ' is-active' : ' is-dimmed'
-            const dash = drawn ? segment.length : 0
-            return (
-              <circle
-                key={item.key}
-                className={`risk-donut-segment risk-color-${item.color}${state}`}
-                cx="50"
-                cy="50"
-                r={RADIUS}
-                strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
-                strokeDashoffset={-segment.offset}
-                onMouseEnter={() => setActiveKey(item.key)}
-                onMouseLeave={() => setActiveKey(null)}
-              />
-            )
-          })}
-        </svg>
-        <div className="risk-donut-center">
-          <span>항목별 비중</span>
+    <div className={`risk-composition risk-display-${mode}`}>
+      {mode === 'donut' && (
+        <div className="risk-donut" aria-hidden="true">
+          <svg viewBox="0 0 100 100" className="risk-donut-svg">
+            <circle className="risk-donut-track" cx="50" cy="50" r={RADIUS} />
+            {items.map((item) => {
+              const segment = segments.get(item.key)
+              if (!segment) return null
+              const state = activeKey === null ? '' : activeKey === item.key ? ' is-active' : ' is-dimmed'
+              const dash = drawn ? segment.length : 0
+              return (
+                <circle
+                  key={item.key}
+                  className={`risk-donut-segment risk-color-${item.color}${state}`}
+                  cx="50"
+                  cy="50"
+                  r={RADIUS}
+                  strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
+                  strokeDashoffset={-segment.offset}
+                  onMouseEnter={() => setActiveKey(item.key)}
+                  onMouseLeave={() => setActiveKey(null)}
+                />
+              )
+            })}
+          </svg>
+          <div className="risk-donut-center">
+            <span>항목별 비중</span>
+          </div>
         </div>
-      </div>
+      )}
       <ul className="risk-legend">
         {items.map((item, index) => {
           const share = total > 0 ? item.value / total : 0

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { AnimatedNumber } from '../../components/AnimatedNumber'
+import { KpiCardContent } from '../../components/KpiCard'
 import { errorText, int } from '../../lib/format'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { useAuth } from '../auth/useAuth'
@@ -188,79 +189,90 @@ function Snapshot({
         </div>
       </article>
       <h2 className="ah-heading">이번달 현황</h2>
-      <div className="ah-kpis" role="region" aria-label="이번 달 현황">
-        <article className="ah-kpi" aria-label="신규 계약 건수">
-          <span className="ah-kpi-label">신규 계약 건수</span>
-          <div className="ah-kpi-num">
-            <AnimatedNumber value={now.count} />
-            <span className="ah-kpi-unit">건</span>
-          </div>
-          <div className="ah-kpi-foot">
-            <span
-              className={`ah-delta ${countDelta >= 0 ? 'up' : 'down'}`}
-            >{`${countDelta >= 0 ? '▲' : '▼'} ${Math.abs(countDelta)}`}</span>
-            <span>전월 {before.count}건</span>
-          </div>
+      <div className="ah-kpis kpi-group" role="region" aria-label="이번 달 현황">
+        <article className="ah-kpi kpi-card kpi-card-info" aria-label="신규 계약 건수">
+          <KpiCardContent
+            label="신규 계약 건수"
+            value={<AnimatedNumber value={now.count} />}
+            zero={now.count === 0}
+            unit="건"
+            footer={
+              <>
+                <span
+                  className={`ah-delta ${countDelta >= 0 ? 'up' : 'down'}`}
+                >{`${countDelta >= 0 ? '▲' : '▼'} ${Math.abs(countDelta)}`}</span>
+                <span>전월 {before.count}건</span>
+              </>
+            }
+          />
         </article>
-        <article className="ah-kpi" aria-label="월 환산 초회보험료">
-          <span className="ah-kpi-label">월 환산 초회보험료</span>
-          <div className="ah-kpi-num">
-            <AnimatedNumber value={now.premium} format={int} />
-            <span className="ah-kpi-unit">원</span>
-          </div>
-          <div className="ah-kpi-foot">
-            <Delta value={deltaPercent(now.premium, before.premium)} />
-            <span>전월 대비</span>
-          </div>
+        <article className="ah-kpi kpi-card kpi-card-info" aria-label="월 환산 초회보험료">
+          <KpiCardContent
+            label="월 환산 초회보험료"
+            value={<AnimatedNumber value={now.premium} format={int} />}
+            zero={now.premium === 0}
+            unit="원"
+            footer={
+              <>
+                <Delta value={deltaPercent(now.premium, before.premium)} />
+                <span>전월 대비</span>
+              </>
+            }
+          />
         </article>
-        <article className="ah-kpi" aria-label="수령 예정 수수료">
-          <span className="ah-kpi-label">수령 예정 수수료</span>
+        <article className="ah-kpi kpi-card kpi-card-info" aria-label="수령 예정 수수료">
           {commission.isError ? (
-            <>
-              <div className="ah-kpi-num">확인 불가</div>
-              <div className="ah-kpi-foot">
+            <KpiCardContent
+              label="수령 예정 수수료"
+              value="확인 불가"
+              footer={
                 <button type="button" className="ah-retry" onClick={() => void commission.refetch()}>
                   다시 시도
                 </button>
-              </div>
-            </>
+              }
+            />
           ) : (
-            <>
-              <div className="ah-kpi-num">
-                {commission.data == null ? '…' : <AnimatedNumber value={commission.data} format={int} />}
-                <span className="ah-kpi-unit">원</span>
-              </div>
-              <div className="ah-kpi-foot">
-                {commission.data != null && previousCommission != null ? (
-                  <Delta value={deltaPercent(commission.data, previousCommission)} />
-                ) : (
-                  <span>-</span>
-                )}
-                <span>전월 대비</span>
-              </div>
-            </>
+            <KpiCardContent
+              label="수령 예정 수수료"
+              value={commission.data == null ? '…' : <AnimatedNumber value={commission.data} format={int} />}
+              zero={commission.data === 0}
+              unit="원"
+              footer={
+                <>
+                  {commission.data != null && previousCommission != null ? (
+                    <Delta value={deltaPercent(commission.data, previousCommission)} />
+                  ) : (
+                    <span>-</span>
+                  )}
+                  <span>전월 대비</span>
+                </>
+              }
+            />
           )}
         </article>
         <button
           type="button"
-          className="ah-kpi ah-kpi-alert"
+          className="ah-kpi ah-kpi-alert kpi-card kpi-card-warning"
           aria-haspopup="dialog"
           aria-label="확인 필요 계약"
           onClick={onNeed}
         >
-          <span className="ah-kpi-label">확인 필요 계약</span>
-          <div className="ah-kpi-num">
-            <AnimatedNumber value={need} />
-            <span className="ah-kpi-unit">건</span>
-          </div>
-          <div className="ah-badges">
-            <span className="ah-badge warn">
-              한도 근접 <b>{now.near}</b>
-            </span>
-            <span className="ah-badge danger">
-              검토 필요 <b>{now.review}</b>
-            </span>
-          </div>
+          <KpiCardContent
+            label="확인 필요 계약"
+            value={<AnimatedNumber value={need} />}
+            zero={need === 0}
+            unit="건"
+            footer={
+              <div className="ah-badges">
+                <span className="ah-badge warn">
+                  한도 근접 <b>{now.near}</b>
+                </span>
+                <span className="ah-badge danger">
+                  검토 필요 <b>{now.review}</b>
+                </span>
+              </div>
+            }
+          />
           <span className="ah-kpi-more">내역 보기 </span>
         </button>
       </div>
