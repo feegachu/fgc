@@ -85,7 +85,7 @@ public class PolicyDraftValidator {
         return requiredRegime;
     }
 
-    /** FUN-016 근거 상태 태그(요구사항 FUN-016 처리규칙). DB CHECK(V71)와 같은 목록이다. */
+    /** FUN-016 근거 상태 태그(요구사항 FUN-016 처리규칙). DB CHECK(V73)와 같은 목록이다. */
     static final Set<String> SOURCE_STATUS_TAGS = Set.of("현행규정", "개정고시", "시행세칙", "FAQ", "회사정책");
 
     private static void validateSourceDetails(PolicyDraft draft) {

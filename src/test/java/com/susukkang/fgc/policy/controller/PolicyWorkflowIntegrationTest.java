@@ -562,7 +562,7 @@ class PolicyWorkflowIntegrationTest {
 
     @Test
     void acceptsRegistryCodesNeverUsedByApprovedPoliciesButRejectsUnknownCodes() throws Exception {
-        // FUN-016: 규제조문표의 REG-17은 승인 정책에 쓰인 적이 없어도 레지스트리(V71)에 있으므로 처음 등록할 수 있다.
+        // FUN-016: 규제조문표의 REG-17은 승인 정책에 쓰인 적이 없어도 레지스트리(V73)에 있으므로 처음 등록할 수 있다.
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM fgc.policy_version
                 WHERE status IN ('APPROVED','ACTIVE','RETIRED') AND 'REG-17' = ANY (regulation_refs)
