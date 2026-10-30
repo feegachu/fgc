@@ -304,6 +304,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clawbacks/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IF-API-83 환수 검토 후보 검색 */
+        get: operations["searchClawbackCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clawbacks/candidates/{candidateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IF-API-84 환수 후보 원천·지급·보류 근거 조회 */
+        get: operations["getClawbackCandidate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts": {
         parameters: {
             query?: never;
@@ -1345,6 +1379,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseClawbackCandidateDetailResponse: {
+            data?: components["schemas"]["ClawbackCandidateDetailResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseCommissionPaymentResponse: {
             data?: components["schemas"]["CommissionPaymentResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1503,6 +1542,11 @@ export interface components {
         };
         ApiResponsePageResponseAuditLogResponse: {
             data?: components["schemas"]["PageResponseAuditLogResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseClawbackCandidateResponse: {
+            data?: components["schemas"]["PageResponseClawbackCandidateResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -1800,6 +1844,42 @@ export interface components {
             /** Format: int64 */
             contractId?: number;
             message?: string;
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
+        Calculation: {
+            amount?: number;
+            basis?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            calculatedAt?: string;
+            /** Format: int64 */
+            calculatedBy?: number;
+            /** Format: int32 */
+            calculationVersion?: number;
+            /** Format: int64 */
+            candidateId?: number;
+            /** Format: int64 */
+            clawbackCaseId?: number;
+            lines?: components["schemas"]["CalculationLine"][];
+            /** Format: int64 */
+            policyVersionId?: number;
+            sourceVersion?: string;
+        };
+        CalculationLine: {
+            appliedRatePct?: number;
+            basisAmount?: number;
+            basisCode?: string;
+            clawbackAmount?: number;
+            /** Format: int64 */
+            clawbackRuleId?: number;
+            /** Format: int64 */
+            commissionItemId?: number;
+            /** Format: int32 */
+            elapsedMonths?: number;
+            /** Format: int32 */
+            installmentNo?: number;
             /** Format: int64 */
             transactionAttributionId?: number;
         };
@@ -2129,6 +2209,54 @@ export interface components {
             violationCount?: number;
             /** Format: int64 */
             warningCount?: number;
+        };
+        ClawbackCandidateDetailResponse: {
+            candidate?: components["schemas"]["ClawbackCandidateResponse"];
+            effects?: components["schemas"]["ProcessingEffect"][];
+            /** Format: int32 */
+            elapsedMonths?: number | null;
+            latestCalculation?: components["schemas"]["Calculation"] | null;
+            paymentAttributions?: components["schemas"]["PaymentEvidence"][];
+            policyCandidates?: components["schemas"]["PolicyCandidate"][];
+            scheduleLines?: components["schemas"]["ScheduleEvidence"][];
+            sourceRefs?: components["schemas"]["SourceReference"][];
+        };
+        ClawbackCandidateResponse: {
+            /** Format: int64 */
+            agentId?: number;
+            agentName?: string;
+            allowedActions?: string[];
+            calculatedAmount?: number | null;
+            /** @enum {string} */
+            calculationStatus?: "UNCALCULATED" | "CALCULATED" | "REVIEW_REQUIRED";
+            /** Format: int64 */
+            candidateId?: number;
+            /** Format: int64 */
+            clawbackCaseId?: number | null;
+            /** Format: date */
+            contractDate?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            dateBasisLabel?: string;
+            /** Format: date */
+            eventDate?: string;
+            /** Format: int64 */
+            insurerId?: number;
+            insurerName?: string;
+            paidAmount?: number | null;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            productName?: string;
+            /** Format: int64 */
+            productOfferingId?: number;
+            reviewReasons?: string[];
+            /** Format: int64 */
+            sourceId?: number;
+            sourceVersion?: string;
+            /** @enum {string} */
+            triggerType?: "STATUS_EVENT" | "ARBITRAGE";
+            unpaidAmount?: number | null;
         };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
@@ -3360,6 +3488,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseClawbackCandidateResponse: {
+            content?: components["schemas"]["ClawbackCandidateResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseCommissionItemResponse: {
             content?: components["schemas"]["CommissionItemResponse"][];
             /** Format: int32 */
@@ -3461,6 +3601,25 @@ export interface components {
             key: string;
             value: components["schemas"]["JsonNode"];
         };
+        PaymentEvidence: {
+            attributedAmount?: number;
+            cashflowType?: string;
+            /** Format: int64 */
+            commissionItemId?: number;
+            /** Format: int64 */
+            commissionTransactionId?: number;
+            /** Format: int32 */
+            installmentNo?: number | null;
+            /** Format: date */
+            paidOn?: string | null;
+            /** Format: int64 */
+            recipientAgentId?: number;
+            /** Format: int64 */
+            scheduleLineId?: number | null;
+            status?: string;
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
         /** @description 정책 제출·승인·반려·활성화 요청 */
         PolicyActionRequest: {
             /** @enum {string} */
@@ -3493,6 +3652,18 @@ export interface components {
             /** Format: int64 */
             policyApprovalActionId?: number;
             reason?: string;
+        };
+        PolicyCandidate: {
+            /** Format: date */
+            effectiveFrom?: string;
+            /** Format: date */
+            effectiveTo?: string | null;
+            policyCode?: string;
+            policyName?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
+            /** Format: int32 */
+            versionNo?: number;
         };
         /** @description 정책 새 판의 적용기간과 복제 사유 */
         PolicyCloneRequest: {
@@ -3647,6 +3818,15 @@ export interface components {
             updatedAt?: string;
             /** Format: int32 */
             versionNo?: number;
+        };
+        ProcessingEffect: {
+            failureReason?: string | null;
+            /** Format: date-time */
+            processedAt?: string;
+            processingJob?: string;
+            processingStatus?: string;
+            /** Format: int64 */
+            validationRunId?: number | null;
         };
         /** @description 보험상품 판매버전 기준정보 */
         ProductResponse: {
@@ -3991,6 +4171,27 @@ export interface components {
             header?: components["schemas"]["ScheduleHeaderResponse"];
             lines?: components["schemas"]["ScheduleLineResponse"][];
         };
+        ScheduleEvidence: {
+            /** Format: int64 */
+            beneficiaryAgentId?: number;
+            /** Format: int64 */
+            commissionItemId?: number;
+            confirmedPaidAmount?: number;
+            /** Format: date */
+            dueDate?: string;
+            expectedAmount?: number;
+            generationReason?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            lineStatus?: string;
+            /** Format: int64 */
+            scheduleHeaderId?: number;
+            /** Format: int64 */
+            scheduleLineId?: number;
+            /** Format: int32 */
+            scheduleVersionNo?: number;
+            unpaidAmount?: number | null;
+        };
         ScheduleHeaderResponse: {
             activeYn?: boolean;
             contractNo?: string;
@@ -4073,6 +4274,19 @@ export interface components {
             ref: string;
             title: string;
             url?: string;
+        };
+        SourceReference: {
+            /** Format: date */
+            asOfDate?: string | null;
+            /** Format: date-time */
+            effectiveAt?: string | null;
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Format: int64 */
+            sourceId?: number;
+            status?: string;
+            triggerType?: string;
         };
         TargetSummary: {
             /** Format: int64 */
@@ -4734,6 +4948,61 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
+                };
+            };
+        };
+    };
+    searchClawbackCandidates: {
+        parameters: {
+            query?: {
+                dateBasis?: "EVENT_DATE" | "CONTRACT_DATE";
+                dateFrom?: string;
+                dateTo?: string;
+                contractNo?: string;
+                insurerId?: number;
+                productOfferingId?: number;
+                agentId?: number;
+                triggerType?: "STATUS_EVENT" | "ARBITRAGE";
+                calculationStatus?: "UNCALCULATED" | "CALCULATED" | "REVIEW_REQUIRED";
+                sort?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseClawbackCandidateResponse"];
+                };
+            };
+        };
+    };
+    getClawbackCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseClawbackCandidateDetailResponse"];
                 };
             };
         };
