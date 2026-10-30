@@ -126,7 +126,7 @@ export default function AgentStatementPage() {
       width: '8rem',
       align: 'center',
       render: (row) =>
-        row.amount == null || row.dataStatus === 'MISSING' ? <span className="ast-muted">자료 없음</span> : won(row.amount),
+        row.amount == null || row.dataStatus === 'MISSING' ? <span className="ast-muted">금액 미확인</span> : won(row.amount),
     },
     {
       key: 'evidence',
@@ -188,14 +188,14 @@ export default function AgentStatementPage() {
               emptyMessage={
                 <div className="ast-state" role={list.isError ? 'alert' : 'status'}>
                   <strong>
-                    {list.isError ? '명세를 불러오지 못했습니다' : list.isPending ? '불러오는 중' : '조회 결과가 없습니다'}
+                    {list.isError ? '명세를 불러오지 못했습니다' : list.isPending ? '불러오는 중' : '해당 조건의 명세가 없습니다'}
                   </strong>
                   <span>
                     {list.isError
                       ? statementError(list.error)
                       : list.isPending
                         ? '수수료 명세를 불러오는 중입니다.'
-                        : '해당 기준월에 조건에 맞는 명세가 없습니다.'}
+                        : '기준월이나 조회 조건을 바꿔 다시 조회해 보세요.'}
                   </span>
                   {list.isError && (
                     <Button variant="secondary" onClick={() => void list.refetch()}>
@@ -322,7 +322,7 @@ function DetailPanel({
             <div className="ast-hero">
               <TypeLabel type={entry.entryType} />
               <strong className="ast-hero-amount tabular-nums">
-                {entry.amount == null ? '자료 없음' : won(entry.amount)}
+                {entry.amount == null ? '금액 미확인' : won(entry.amount)}
               </strong>
               <span className="ast-muted">
                 {entry.statusLabel} · {date(entry.basisDate)}

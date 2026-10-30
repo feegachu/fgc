@@ -143,16 +143,16 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     expect(router.state.location.search).not.toContain('entryKey')
   })
 
-  it('금액 자료가 없는 행은 0원이 아니라 자료 없음으로 표시한다', async () => {
+  it('금액 자료가 없는 행은 0원이 아니라 금액 미확인으로 표시한다', async () => {
     handler = () => list([entry({ amount: null, dataStatus: 'MISSING' })])
     renderAt('/app/agent/statements?month=2026-07')
-    expect(await screen.findByText('자료 없음')).toBeInTheDocument()
+    expect(await screen.findByText('금액 미확인')).toBeInTheDocument()
   })
 
   it('0건과 조회 실패를 다른 문장으로 보여 주고 실패는 다시 시도할 수 있다', async () => {
     handler = () => list([])
     renderAt('/app/agent/statements?month=2026-07')
-    expect(await screen.findByText('조회 결과가 없습니다')).toBeInTheDocument()
+    expect(await screen.findByText('해당 조건의 명세가 없습니다')).toBeInTheDocument()
   })
 
   it('403 은 권한 문구로 구별한다', async () => {
@@ -161,7 +161,7 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     }
     renderAt('/app/agent/statements?month=2026-07')
     expect(await screen.findByText('이 명세를 조회할 권한이 없습니다.')).toBeInTheDocument()
-    expect(screen.queryByText('조회 결과가 없습니다')).not.toBeInTheDocument()
+    expect(screen.queryByText('해당 조건의 명세가 없습니다')).not.toBeInTheDocument()
   })
 
   it('서버 오류는 요청 ID 와 함께 실패로 표시하고 0건으로 보이지 않는다', async () => {
