@@ -156,7 +156,14 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await ready()
     await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
     expect(screen.getByRole('tooltip')).toHaveTextContent('제4-32조제12항제1·2호 [현행규정]')
-    expect(screen.getByRole('tooltip')).toHaveTextContent('지급 대상은 최초 모집자로 고정되지 않고')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      '유지관리수수료·장기유지수수료의 지급 대상은 최초 모집자로 고정되지 않고',
+    )
+    // 2차는 최초 연결 설계사를 고정하므로 담당 분리 관리를 전제로 한 안내를 하지 않는다(화면정의서 CONT-W03).
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      '2차 범위에서는 이 설계사를 고정하고 유지관리 담당 변경·승계는 지원하지 않습니다',
+    )
+    expect(screen.getByRole('tooltip')).not.toHaveTextContent('별도로 관리')
     await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
     await user.click(screen.getByRole('button', { name: '표준해약공제액 근거' }))
     expect(screen.getByRole('tooltip')).toHaveTextContent('REG-08 · 제4-32조제5항 [현행규정]')
