@@ -194,9 +194,6 @@ export async function savePolicyDraft(draft: DraftDocument, id: number | undefin
   if (id !== undefined && !draft.expectedUpdatedAt) {
     throw new Error('수정 시각 정보가 없습니다. 정책을 다시 조회한 후 저장하세요.')
   }
-  if (draft.clawbackRules.length) {
-    throw new Error('환수 기준(D-02)이 확정되지 않아 환수 규칙은 등록할 수 없습니다.')
-  }
   const body = serializePolicyDraft(draft)
   if (id === undefined) {
     delete body.expectedUpdatedAt

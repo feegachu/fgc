@@ -22,6 +22,16 @@ import java.util.stream.LongStream;
 public class PolicySuccessionValidator {
     public void validate(PolicyDraft previous, PolicyDraft replacement) {
         validateHeader(previous, replacement);
+        for (var oldRule : previous.clawbackRules()) {
+            List<long[]> intervals = replacement.clawbackRules().stream()
+                    .filter(rule -> coversScope(rule.insurerId(), oldRule.insurerId())
+                            && coversScope(rule.productOfferingId(), oldRule.productOfferingId())
+                            && coversScope(rule.commissionItemId(), oldRule.commissionItemId()))
+                    .map(rule -> new long[]{rule.elapsedMonthFrom(), rule.elapsedMonthTo()}).toList();
+            if (!coversRange(oldRule.elapsedMonthFrom(), oldRule.elapsedMonthTo(), intervals)) {
+                throw incomplete("clawbackRules", "승계본에 기존 환수 규칙의 대상·경과월 구간이 빠져 있습니다.");
+            }
+        }
         for (CommissionRuleDraft oldRule : previous.commissionRules()) {
             List<long[]> intervals = replacement.commissionRules().stream()
                     .filter(rule -> coversCommissionScope(rule, oldRule))

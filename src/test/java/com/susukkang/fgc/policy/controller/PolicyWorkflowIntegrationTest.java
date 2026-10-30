@@ -85,6 +85,70 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void clawbackDraftsPersistUpdateSubmitApproveActivateAndCloneWithoutChangingApprovedRules() throws Exception {
+        ObjectNode draft = draft();
+        draft.put("policyType", "CLAWBACK").putNull("feeRegimeCode");
+        draft.putArray("commissionRules");
+        ObjectNode rule = draft.putArray("clawbackRules").addObject();
+        rule.put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "33.333333");
+        rule.putNull("conditionExpression");
+        String requestKey = key();
+        JsonNode created = write(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 201);
+        assertThat(write(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 201)).isEqualTo(created);
+        long id = created.path("policyVersionId").asLong();
+        assertThat(count("clawback_rule", id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT condition_expression::text FROM fgc.clawback_rule WHERE policy_version_id=?",
+                String.class, id)).isEqualTo("{}");
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument");
+        assertThat(edit.path("clawbackRules").get(0).path("clawbackRatePct").asText()).isEqualTo("33.333333");
+        ((ObjectNode) edit.path("clawbackRules").get(0)).put("clawbackRatePct", "0.000000");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 200);
+        assertThat(count("clawback_rule", id)).isEqualTo(1);
+        assertThat(detail(id, writer).path("editDocument").path("clawbackRules").get(0)
+                .path("clawbackRatePct").asText()).isEqualTo("0.000000");
+        JsonNode review = action(id, "SUBMIT", updated, writer, 200);
+        assertThat(values(detail(id, approver).path("allowedActions"))).contains("APPROVE");
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        JsonNode active = action(id, "ACTIVATE", approved, approver, 200);
+        assertThat(active.path("status").asText()).isEqualTo("ACTIVE");
+        long originalRuleId = jdbc.queryForObject("SELECT clawback_rule_id FROM fgc.clawback_rule WHERE policy_version_id=?", Long.class, id);
+        JsonNode cloned = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2000-06-01"), writer, key(), 201);
+        long cloneId = cloned.path("policyVersionId").asLong();
+        assertThat(count("clawback_rule", cloneId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT clawback_rule_id FROM fgc.clawback_rule WHERE policy_version_id=?", Long.class, cloneId))
+                .isNotEqualTo(originalRuleId);
+        ObjectNode cloneEdit = (ObjectNode) detail(cloneId, writer).path("editDocument");
+        ((ObjectNode) cloneEdit.path("clawbackRules").get(0)).put("clawbackRatePct", "50.000000");
+        write(HttpMethod.PUT, "/api/v1/policies/" + cloneId, cloneEdit, writer, key(), 200);
+        assertThat(detail(id, writer).path("editDocument").path("clawbackRules").get(0)
+                .path("clawbackRatePct").asText()).isEqualTo("0.000000");
+        assertThat(count("policy_approval_action", cloneId)).isZero();
+    }
+
+    @Test
+    void clawbackInvalidRulesRollbackAndEmptyRulesCannotBeSubmitted() throws Exception {
+        ObjectNode draft = draft();
+        draft.put("policyType", "CLAWBACK").putNull("feeRegimeCode");
+        draft.putArray("commissionRules");
+        ObjectNode rule = draft.putArray("clawbackRules").addObject();
+        rule.put("elapsedMonthFrom", 12).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        JsonNode error = writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400);
+        assertThat(error.path("field").asText()).isEqualTo("clawbackRules[0].elapsedMonthTo");
+        rule.put("elapsedMonthTo", 23).putObject("conditionExpression").put("execute", "anything");
+        writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code=?",
+                Integer.class, draft.path("policyCode").asText())).isZero();
+        draft.putArray("clawbackRules");
+        JsonNode empty = create(draft, writer);
+        assertThat(actionError(empty.path("policyVersionId").asLong(), "SUBMIT", empty, writer, 422)
+                .path("field").asText()).isEqualTo("clawbackRules");
+    }
+
+    @Test
     void preservesFixedAmountDecimalTextAcrossReadAndEdit() throws Exception {
         ObjectNode draft = draft();
         ObjectNode rule = (ObjectNode) draft.path("commissionRules").get(0);

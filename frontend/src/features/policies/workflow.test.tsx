@@ -158,6 +158,42 @@ function mountManagement(
 }
 
 describe('production policy workflow', () => {
+  it('keeps input and concurrency token after a 409 while querying the latest header', async () => {
+    const request = vi
+      .spyOn(apiClient, 'request')
+      .mockRejectedValueOnce(new ApiError({ code: 'FGC-POL-003', message: '정책이 변경됐습니다.' }, 'conflict', 409))
+      .mockResolvedValueOnce({ data: wireDetail(), error: null, requestId: 'reload' })
+    const { user } = mountEditor(normalizePolicyDetail(wireDetail()).editDocument, 17)
+    await user.clear(screen.getByLabelText(/정책명/))
+    await user.type(screen.getByLabelText(/정책명/), '내 입력 보존')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    await user.click(await screen.findByRole('button', { name: '다시 조회' }))
+    await screen.findByText(/최신 정책:/)
+    expect(screen.getByLabelText(/정책명/)).toHaveValue('내 입력 보존')
+    expect(request).toHaveBeenLastCalledWith('/api/v1/policies/17')
+    expect(request.mock.calls[0][1]?.body).toMatchObject({ expectedUpdatedAt: updatedAt })
+  })
+
+  it('opens the draft evidence field when submission returns a missing-source error', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(
+      new ApiError(
+        {
+          code: 'FGC-POL-002',
+          field: 'sourceRefs',
+          message: '승인된 근거가 필요합니다.',
+        },
+        'missing-source',
+        422,
+      ),
+    )
+    const { user } = mountManagement('DRAFT', ['EDIT', 'SUBMIT'])
+    await user.click(screen.getByRole('button', { name: '제출' }))
+    await user.type(screen.getByLabelText(/작업 사유/), '검토 요청')
+    await user.click(screen.getByRole('button', { name: '제출 확인' }))
+    await waitFor(() => expect(screen.getByLabelText('출처 근거 코드')).toHaveFocus())
+    expect(screen.getByRole('heading', { name: '정책 초안 수정' })).toBeVisible()
+  })
+
   it('shows the saved offering document conditions alongside the installment limit', () => {
     const wire = wireDetail('ACTIVE', ['CLONE'])
     Object.assign(wire.editDocument!.feeRegimeRules[0], {
@@ -472,12 +508,15 @@ describe('production policy workflow', () => {
     expect(onSaved).not.toHaveBeenCalled()
   })
 
-  it('keeps clawback rule registration disabled while D-02 is unresolved', async () => {
+  it('opens clawback inputs without guessing a rate and focuses missing fields', async () => {
     const request = vi.spyOn(apiClient, 'request')
     const { user } = mountEditor({ ...emptyDraft(), policyType: 'CLAWBACK' })
     await user.click(screen.getByRole('button', { name: /환수 규칙/ }))
-    expect(screen.getByRole('button', { name: /환수 규칙 추가/ })).toBeDisabled()
-    expect(screen.getByText(/D-02/)).toBeVisible()
+    expect(screen.getByRole('button', { name: /환수 규칙 추가/ })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: /환수 규칙 추가/ }))
+    expect(screen.getByLabelText(/환수율/)).toHaveValue(null)
+    expect(screen.getByLabelText(/기준금액/)).toHaveValue('')
+    expect(screen.getByText(/환수는 확정 지급 귀속액/)).toBeVisible()
     expect(request).not.toHaveBeenCalled()
   })
 })

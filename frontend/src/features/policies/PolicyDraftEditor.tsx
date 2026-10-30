@@ -1,9 +1,9 @@
-import { useContext, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
-import { ApiError } from '../../lib/api/client'
+import { apiClient, ApiError } from '../../lib/api/client'
 import { ClawbackTargets, CommissionRow, DraftInput, DraftSelect } from './PolicyDraftFields'
 import {
   conditionOptions,
@@ -22,26 +22,48 @@ import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
 import type { DraftErrors } from './draftValidation'
 import { savePolicyDraft } from './writeApi'
+import type { PolicyDetailResponse } from './writeApi'
 import { usePolicyRequest } from './usePolicyRequest'
 
 type Section = 'basic' | 'commissionRules' | 'feeRegimeRules' | 'parameters' | 'clawbackRules' | 'sourceDetails'
+function sectionFor(path: string): Section {
+  const group = path.split('.')[0]
+  if (['regulationRefs', 'sourceRefs', 'sourceDetails'].includes(group)) return 'sourceDetails'
+  return ['commissionRules', 'feeRegimeRules', 'parameters', 'clawbackRules'].includes(group)
+    ? (group as Section)
+    : 'basic'
+}
+function focusPolicyField(path: string) {
+  const exact = document.getElementById(`policy-${path}`)
+  const fallback = [...document.querySelectorAll<HTMLElement>('[id^="policy-"]')].find((element) =>
+    element.id.startsWith(`policy-${path}.`),
+  )
+  ;(exact ?? fallback)?.focus()
+}
 export function PolicyDraftEditor({
   initial,
   policyId,
   onClose,
   onSaved,
+  initialProblem,
 }: {
   initial?: DraftDocument
   policyId?: number
   onClose: () => void
   onSaved: (id: number) => void
+  initialProblem?: { field: string; message: string }
 }) {
   const preview = useContext(PolicyPreviewContext)
   const [draft, setDraft] = useState(() => structuredClone(initial ?? emptyDraft()))
-  const [section, setSection] = useState<Section>('basic')
-  const [errors, setErrors] = useState<DraftErrors>({})
+  const initialPath = initialProblem?.field.replace(/\[(\d+)\]/g, '.$1')
+  const [section, setSection] = useState<Section>(() => sectionFor(initialPath ?? ''))
+  const [errors, setErrors] = useState<DraftErrors>(() =>
+    initialPath && initialProblem ? { [initialPath]: initialProblem.message } : {},
+  )
   const [busy, setBusy] = useState(false)
-  const [failure, setFailure] = useState('')
+  const [failure, setFailure] = useState(initialProblem?.message ?? '')
+  const [conflict, setConflict] = useState(false)
+  const [latest, setLatest] = useState('')
   const [discard, setDiscard] = useState(false)
   const [dirty, setDirty] = useState(false)
   const saving = useRef(false)
@@ -86,13 +108,33 @@ export function PolicyDraftEditor({
     else onClose()
   }
   function focusError(path: string) {
-    const group = ['regulationRefs', 'sourceRefs'].includes(path.split('.')[0])
-      ? 'sourceDetails'
-      : (path.split('.')[0] as Section)
+    const group = sectionFor(path)
     setSection(sections.some((item) => item.id === group) ? group : 'basic')
     const parameter = /^parameters\.(\d+)\./.exec(path)
     const focusPath = parameter ? `parameters.${draft.parameters[Number(parameter[1])]?.key}` : path
-    requestAnimationFrame(() => document.getElementById(`policy-${focusPath}`)?.focus())
+    requestAnimationFrame(() => focusPolicyField(focusPath))
+  }
+  useEffect(() => {
+    if (!initialPath) return
+    const frame = requestAnimationFrame(() => focusPolicyField(initialPath))
+    return () => cancelAnimationFrame(frame)
+  }, [initialPath])
+  async function reloadLatest() {
+    if (policyId === undefined || saving.current) return
+    saving.current = true
+    setBusy(true)
+    try {
+      const response = await apiClient.request<PolicyDetailResponse>(`/api/v1/policies/${policyId}`)
+      const header = response.data.header
+      setLatest(
+        `최신 정책: ${header?.policyName ?? ''} · ${header?.statusLabel ?? header?.status ?? ''}. 입력은 보존했습니다. 최신 내용으로 편집하려면 취소 후 다시 여세요.`,
+      )
+    } catch (cause) {
+      setLatest(cause instanceof Error ? cause.message : '최신 정책을 조회하지 못했습니다.')
+    } finally {
+      saving.current = false
+      setBusy(false)
+    }
   }
   async function save() {
     if (saving.current) return
@@ -134,6 +176,7 @@ export function PolicyDraftEditor({
       const message =
         cause instanceof Error ? cause.message : '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'
       setFailure(message)
+      setConflict(cause instanceof ApiError && cause.status === 409)
       if (cause instanceof ApiError && cause.field) {
         const path = cause.field.replace(/\[(\d+)\]/g, '.$1')
         setErrors({ [path]: message })
@@ -207,6 +250,15 @@ export function PolicyDraftEditor({
         <p role="alert" className="policy-notice policy-notice-warning">
           {failure}
         </p>
+      )}
+      {conflict && policyId !== undefined && (
+        <div className="policy-notice policy-notice-warning">
+          <span>조회 이후 정책이 변경됐습니다. 입력을 보존하고 최신 상태를 확인하세요.</span>
+          <Button variant="secondary" disabled={busy} onClick={() => void reloadLatest()}>
+            다시 조회
+          </Button>
+          {latest && <p role="status">{latest}</p>}
+        </div>
       )}
       <form
         noValidate
@@ -358,6 +410,7 @@ export function PolicyDraftEditor({
               )}
               <Button
                 variant="secondary"
+                id="policy-commissionRules"
                 onClick={() => set('commissionRules', [...draft.commissionRules, emptyCommission()])}
               >
                 + 수수료 규칙 추가
@@ -508,6 +561,7 @@ export function PolicyDraftEditor({
               )}
               <Button
                 variant="secondary"
+                id="policy-feeRegimeRules"
                 onClick={() => set('feeRegimeRules', [...draft.feeRegimeRules, emptyRegime(draft.policyType)])}
               >
                 + 분급 룰셋 추가
@@ -546,9 +600,9 @@ export function PolicyDraftEditor({
           )}
           {section === 'clawbackRules' && (
             <>
-              <div className="policy-notice policy-notice-warning">
-                환수 대상금액과 경과월 산정 기준(D-02)이 미확정입니다. 기준이 확정될 때까지 환수 규칙을 등록할 수
-                없습니다.
+              <div className="policy-notice">
+                환수는 확정 지급 귀속액을 기준으로 계산합니다. 경과월은 계약일부터 사건 기준일까지 채운 개월 수이며,
+                귀속행별 원 단위 반올림 후 합산합니다. 환수율은 회사 약정 근거에 따라 직접 입력하세요.
               </div>
               {draft.clawbackRules.map((rule, index) => {
                 const prefix = `clawbackRules.${index}.`
@@ -602,9 +656,15 @@ export function PolicyDraftEditor({
                         value={rule.elapsedMonthTo}
                         onChange={(v) => update({ elapsedMonthTo: numberValue(v) })}
                       />
-                      <Field label="기준금액 코드" helper="업무 기준 확정 후 설정할 수 있습니다.">
-                        <input readOnly value={rule.clawbackBasisCode || '설정 필요'} />
-                      </Field>
+                      <DraftSelect
+                        path={prefix + 'clawbackBasisCode'}
+                        label="기준금액"
+                        required
+                        errors={errors}
+                        value={rule.clawbackBasisCode}
+                        onChange={(value) => update({ clawbackBasisCode: value })}
+                        options={[{ value: 'PAID_ATTRIBUTED_AMOUNT', label: '확정 지급 귀속액' }]}
+                      />
                       <DraftInput
                         path={prefix + 'clawbackRatePct'}
                         label="환수율 (%)"
@@ -615,18 +675,21 @@ export function PolicyDraftEditor({
                         step="0.000001"
                         errors={errors}
                         value={rule.clawbackRatePct}
-                        onChange={(v) => update({ clawbackRatePct: numberValue(v) })}
+                        onChange={(v) => update({ clawbackRatePct: v })}
                       />
                     </div>
                   </section>
                 )
               })}
               {!draft.clawbackRules.length && (
-                <EditorEmpty text="등록된 환수 규칙이 없습니다." description="업무 기준 확정 후 등록할 수 있습니다." />
+                <EditorEmpty
+                  text="등록된 환수 규칙이 없습니다."
+                  description="회사 약정에 따른 경과월 구간과 환수율을 등록하세요."
+                />
               )}
               <Button
                 variant="secondary"
-                disabled
+                id="policy-clawbackRules"
                 onClick={() =>
                   set('clawbackRules', [
                     ...draft.clawbackRules,

@@ -282,7 +282,21 @@ class PolicyDraftValidatorTest {
         json.put("policyType", "CLAWBACK");
         array(json, "clawbackRules").add(MAPPER.createObjectNode().put("elapsedMonthFrom", 0)
                 .put("elapsedMonthTo", 12).put("clawbackBasisCode", "UNCONFIRMED").put("clawbackRatePct", 50));
-        assertInvalid(json, "clawbackRules");
+        assertInvalid(json, "clawbackRules[0].clawbackBasisCode");
+        ObjectNode rule = (ObjectNode) array(json, "clawbackRules").get(0);
+        rule.put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT");
+        rule.putNull("conditionExpression");
+        assertThatCode(() -> validator.validate(draft(json))).doesNotThrowAnyException();
+        rule.put("elapsedMonthTo", -1);
+        assertInvalid(json, "clawbackRules[0].elapsedMonthTo");
+        rule.put("elapsedMonthTo", 12).put("clawbackRatePct", "100.000001");
+        assertInvalid(json, "clawbackRules[0].clawbackRatePct");
+        rule.put("clawbackRatePct", "33.333333");
+        rule.putObject("conditionExpression").put("arbitrary", true);
+        assertInvalid(json, "clawbackRules[0].conditionExpression");
+        rule.putObject("conditionExpression");
+        array(json, "clawbackRules").add(rule.deepCopy().put("elapsedMonthFrom", 12).put("elapsedMonthTo", 24));
+        assertThatThrownBy(() -> validator.validate(draft(json))).isInstanceOf(FgcBusinessException.class);
     }
 
     @Test

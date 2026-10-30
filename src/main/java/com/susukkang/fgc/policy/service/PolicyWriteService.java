@@ -54,7 +54,7 @@ public class PolicyWriteService {
     private static final Set<String> APPROVERS = Set.of(Roles.GA_ADMIN, Roles.SYSTEM_ADMIN);
     private static final Set<PolicyType> WRITABLE_TYPES = Set.of(PolicyType.CURRENT_COMMISSION,
             PolicyType.FOUR_YEAR_COMMISSION, PolicyType.SEVEN_YEAR_COMMISSION,
-            PolicyType.SCHEDULE_ELIGIBILITY, PolicyType.ARBITRAGE, PolicyType.RECONCILIATION_TOLERANCE);
+            PolicyType.SCHEDULE_ELIGIBILITY, PolicyType.ARBITRAGE, PolicyType.RECONCILIATION_TOLERANCE, PolicyType.CLAWBACK);
     private static final Pattern REFERENCE = Pattern.compile("^(REG-\\d{2}[A-Z]?|SRC-\\d{3})(?:\\s++\\S.*)?$");
     private static final String ACTION_CLONE = "CLONE";
     private static final String FIELD_POLICY_TYPE = "policyType";
@@ -268,7 +268,7 @@ public class PolicyWriteService {
         offeringScopeValidator.validateForSubmission(draft);
         validateReferences(draft, storedReferences(draft), storedUrls(draft));
         if (draft.regulationRefs().isEmpty() && draft.sourceRefs().isEmpty()) {
-            throw invalid("sourceRefs", "제출할 정책에는 승인된 근거가 필요합니다.");
+            throw new FgcBusinessException(FgcErrorCode.POL_002, "sourceRefs", Map.of(), "제출할 정책에는 승인된 근거가 필요합니다.");
         }
         boolean complete = switch (draft.policyType()) {
             case CURRENT_COMMISSION -> !draft.commissionRules().isEmpty();
@@ -280,11 +280,19 @@ public class PolicyWriteService {
                     "ARBITRAGE_REFUND_ADDITION_MONTHS", "ARBITRAGE_REFUND_ADDITION_BOUNDARY_INCLUSIVE"));
             case RECONCILIATION_TOLERANCE -> parameterKeys(draft).containsAll(
                     Set.of("TOLERANCE_AMOUNT_KRW", "TOLERANCE_DAYS"));
-            // 전용 편집 계약이나 환수 D-02가 없는 유형을 빈 규칙으로 활성화하지 않는다.
+            case CLAWBACK -> !draft.clawbackRules().isEmpty();
+            // 전용 편집 계약이 없는 유형을 빈 규칙으로 활성화하지 않는다.
             default -> false;
         };
         if (!complete) {
-            throw invalid(FIELD_POLICY_TYPE, "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다.");
+            String field = switch (draft.policyType()) {
+                case CURRENT_COMMISSION -> "commissionRules";
+                case FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION -> draft.commissionRules().isEmpty() ? "commissionRules" : "feeRegimeRules";
+                case CLAWBACK -> "clawbackRules";
+                case SCHEDULE_ELIGIBILITY, ARBITRAGE, RECONCILIATION_TOLERANCE -> "parameters";
+                default -> FIELD_POLICY_TYPE;
+            };
+            throw new FgcBusinessException(FgcErrorCode.POL_002, field, Map.of(), "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다.");
         }
     }
 
