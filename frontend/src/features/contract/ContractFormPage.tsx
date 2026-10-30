@@ -137,7 +137,7 @@ function ContractEditor({
   const availableAgents = (agents.data ?? []).filter(
     (agent) => agent.rankCode === 'FC' && agent.agentStatus === 'ACTIVE' && agent.activeYn === true,
   )
-  // 수정은 최초 연결 설계사를 고정한다(#653). 계약일을 바꾸면 그날 기준 그 설계사의 소속으로 저장한다.
+  // 수정은 최초 연결 설계사를 고정한다(#653). 계약일을 바꾸면 그날 자격이 있는 그 설계사 행의 현재 소속을 보낸다(설계사 표는 현재 기준정보다).
   const redated = Boolean(original && draft.contractDate !== original.contractDate)
   const selectedAgent = availableAgents.find((row) => String(row.agentId) === draft.agentId)
   const form: ContractDraft = redated
@@ -147,9 +147,11 @@ function ContractEditor({
         organizationName: selectedAgent?.organizationName ?? '',
       }
     : draft
-  const agentUnavailable = redated && !agents.isFetching && !selectedAgent
+  const agentUnavailable = redated && !agents.isFetching && !agents.selectedError && !selectedAgent
   const product = products.data?.find((row) => String(row.productOfferingId) === draft.productOfferingId)
-  const referenceError = insurers.error ?? products.error ?? agents.error
+  // 고정 설계사 행은 계약일을 바꿨을 때만 필요하다. 그 조회 실패는 '자격 없음'이 아니라 기준정보 오류로 보인다.
+  const referenceError =
+    insurers.error ?? products.error ?? agents.error ?? (redated ? agents.selectedError : undefined)
   const loadingReferences = insurers.isFetching || products.isFetching || agents.isFetching
   const missingToken = Boolean(id && !original?.updatedAt)
   // 선택지는 서버 허용 전이 표(IF-API-12)만 쓴다. 상태를 바꿀 때만 사건을 입력·전송한다.
@@ -783,7 +785,7 @@ function ContractEditor({
             <Button variant="secondary" disabled={saving} onClick={() => setConfirmSave(false)}>
               다시 확인
             </Button>
-            <Button loading={saving} onClick={() => void save()}>
+            <Button loading={saving} disabled={disabled} onClick={() => void save()}>
               확인하고 저장
             </Button>
           </>

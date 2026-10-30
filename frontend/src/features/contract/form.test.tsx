@@ -392,7 +392,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     expect(save()).toBeDisabled()
   })
 
-  it('수정에서 계약일을 바꾸면 상품은 지우고, 고정된 설계사의 소속은 새 계약일 기준으로 저장한다', async () => {
+  it('수정에서 계약일을 바꾸면 상품은 지우고, 그날 자격이 있는 고정 설계사의 현재 소속으로 저장한다', async () => {
     const { user, writes } = renderAt()
     await ready()
     expect(field('모집 설계사')).toHaveAttribute('readonly')
@@ -418,6 +418,25 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     expect(await screen.findByText(/바꾼 계약일에 이 설계사가 활동 중인 FC가 아닙니다/)).toBeInTheDocument()
     expect(field('소속 조직')).toHaveValue('')
     expect(save()).toBeDisabled()
+  })
+
+  it('수정에서 바꾼 계약일의 고정 설계사 조회가 실패하면 자격 없음이 아니라 기준정보 오류로 알리고 다시 불러온다', async () => {
+    let failing = true
+    const { user } = renderAt(undefined, (url) => {
+      if (!url.startsWith('/api/v1/base/agents') || !url.includes('asOf=2026-06-01')) return undefined
+      // 첫 페이지에 없으면 selectedId로 따로 찾는다(useEntityChoices). 그 조회만 실패시킨다.
+      if (!url.includes('selectedId=3')) return { content: [{ ...agent, agentId: 99, agentName: '다른 설계사' }] }
+      if (failing) throw new ApiError({ code: 'FGC-COMMON-500', message: '설계사 조회 오류' }, 'agent-lookup', 500)
+      return { content: [agent] }
+    })
+    await ready()
+    fireEvent.change(field('계약일'), { target: { value: '2026-06-01' } })
+    await screen.findByRole('button', { name: '기준정보 다시 불러오기' })
+    expect(screen.queryByText(/활동 중인 FC가 아닙니다/)).not.toBeInTheDocument()
+    expect(save()).toBeDisabled()
+    failing = false
+    await user.click(screen.getByRole('button', { name: '기준정보 다시 불러오기' }))
+    await waitFor(() => expect(field('소속 조직')).toHaveValue('현재 조직'))
   })
 
   it('상품 조회의 이전 응답이 늦게 도착해도 새 보험사 옵션을 덮어쓰지 않는다', async () => {
