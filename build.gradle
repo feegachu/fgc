@@ -127,3 +127,19 @@ tasks.register('verifyPersistenceDependencies') {
 tasks.named('check') {
     dependsOn tasks.named('verifyPersistenceDependencies')
 }
+
+// DAR-012 600인 합성 데이터셋 생성기(시드명세 §50). Flyway 밖의 명시적 진입점이며 dar012 프로필에서만 동작한다.
+// 빈 DB에 Flyway(db/migration + db/demo)를 적용한 뒤 실행한다. DB 접속은 SPRING_DATASOURCE_* 환경변수를 쓴다.
+// 예: gradlew generateDar012 -Pdar012.dataset-id=D12-1K -Pdar012.contracts=1000 [-Pdar012.seed=20261118]
+tasks.register('generateDar012', org.springframework.boot.gradle.tasks.run.BootRun) {
+    group = 'application'
+    description = 'DAR-012 합성 데이터셋 기초 데이터를 적재하고 메타데이터·정답표를 build/dar012에 쓴다.'
+    mainClass = 'com.susukkang.fgc.FgcApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    systemProperty 'spring.profiles.active', 'dar012'
+    systemProperty 'spring.flyway.locations', 'classpath:db/migration,classpath:db/demo'
+    doFirst {
+        args = project.properties.findAll { k, v -> k.startsWith('dar012.') }
+                .collect { k, v -> "--fgc.${k}=${v}".toString() }
+    }
+}
