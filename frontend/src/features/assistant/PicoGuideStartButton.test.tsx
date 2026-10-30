@@ -80,7 +80,7 @@ it('waits for consent and revalidation before starting only the first highlight 
   })
   expect(useGuideRuntime.getState().observation?.precheck).toBe('NONE')
 })
-it.each([{ saved: false }, { ready: false }, { busy: true }, { paymentId: null }])(
+it.each([{ saved: false }, { ready: false }, { busy: true }, { paymentId: null }, { modalOpen: true }])(
   'disables start and explains invalid screen context %j',
   (changed) => {
     useGuideRuntime.setState({ observation: { ...observation, ...changed } })

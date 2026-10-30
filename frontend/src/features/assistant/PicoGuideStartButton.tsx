@@ -9,11 +9,13 @@ export function PicoGuideStartButton({
   contextRevision,
   canProcess,
   contextValid = true,
+  sourceContextAvailable = true,
 }: {
   workflowId: string
   contextRevision: string
   canProcess: boolean
   contextValid?: boolean
+  sourceContextAvailable?: boolean
 }) {
   const observation = useGuideRuntime((state) => state.observation)
   const controller = useRef<AbortController | null>(null)
@@ -28,7 +30,7 @@ export function PicoGuideStartButton({
       lock.current = false
       setBusy(false)
     },
-    [observation, contextRevision, workflowId, canProcess, contextValid],
+    [observation, contextRevision, workflowId, canProcess, contextValid, sourceContextAvailable],
   )
   const definition = findGuide(workflowId, '1.0')
   if (!definition) return null
@@ -41,11 +43,15 @@ export function PicoGuideStartButton({
           ? '저장된 지급 초안을 선택해야 화면 안내를 시작할 수 있습니다.'
           : observation.busy
             ? '지급 요청을 처리 중입니다. 결과를 확인한 뒤 안내를 시작하세요.'
-            : !observation.ready
-              ? '지급 화면의 기준정보를 확인 중이거나 불러오지 못했습니다. 화면의 조회 상태를 먼저 확인하세요.'
-              : !observation.saved
-                ? '현재 입력이 저장본과 다릅니다. 기존 수정 저장 버튼으로 저장한 뒤 다시 질문해주세요.'
-                : ''
+            : observation.modalOpen
+              ? '확정 확인 창을 닫고 현재 지급 상태에서 다시 질문해주세요.'
+              : !observation.ready
+                ? '지급 화면의 기준정보를 확인 중이거나 불러오지 못했습니다. 화면의 조회 상태를 먼저 확인하세요.'
+                : !observation.saved
+                  ? '현재 입력이 저장본과 다릅니다. 기존 수정 저장 버튼으로 저장한 뒤 다시 질문해주세요.'
+                  : !sourceContextAvailable
+                    ? '질문 당시 저장된 지급 상태를 확인하지 못했습니다. 현재 화면에서 다시 질문해주세요.'
+                    : ''
   const message = unavailable || notice
   async function start() {
     if (lock.current || unavailable || !observation?.paymentId || !definition) return

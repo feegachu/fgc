@@ -14,7 +14,7 @@ import './pico-assistant.css'
 import { PaymentCalculationPanel } from './PaymentCalculationPanel'
 import { PaymentGuideOverlay } from './PaymentGuide'
 import { useGuideRuntime } from './guide-runtime'
-import { askPico } from './pico-api'
+import { askPico, picoPaymentReference } from './pico-api'
 import { PicoGuideStartButton } from './PicoGuideStartButton'
 import type { PicoReply } from './pico-api'
 
@@ -61,7 +61,7 @@ type Entry =
   | { id: number; role: 'user'; text: string }
   | { id: number; role: 'notice'; text: string }
   | { id: number; role: 'assistant'; result: MessageResult }
-  | { id: number; role: 'live'; reply: PicoReply; guideContext: string }
+  | { id: number; role: 'live'; reply: PicoReply; guideContext: string; hasPaymentContext: boolean }
 interface Conversation {
   entries: Entry[]
   revision: number
@@ -170,6 +170,8 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
     observed?.scopeKey,
     observed?.revision,
     observed?.saved,
+    observed?.precheck,
+    observed?.modalOpen,
     canProcess,
   ])
   const [latestLiveQuestion, setLatestLiveQuestion] = useState<{ context: string; revision: string | null }>({
@@ -228,6 +230,8 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       observed?.saved,
       observed?.busy,
       observed?.ready,
+      observed?.precheck,
+      observed?.modalOpen,
       canProcess,
     ],
   )
@@ -263,7 +267,16 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
       if (controller.signal.aborted || sequence !== aiSequence.current) return
       setConversation((previous) => ({
         ...previous,
-        entries: [...previous.entries, { id: previous.entries.length, role: 'live', reply, guideContext }],
+        entries: [
+          ...previous.entries,
+          {
+            id: previous.entries.length,
+            role: 'live',
+            reply,
+            guideContext,
+            hasPaymentContext: Boolean(picoPaymentReference(paymentId)),
+          },
+        ],
       }))
     } catch (error) {
       if (controller.signal.aborted || sequence !== aiSequence.current) return
@@ -534,6 +547,7 @@ export function PicoAssistant({ canProcess }: { canProcess: boolean }) {
                                 workflowId={workflowId}
                                 contextRevision={entry.reply.contextRevision!}
                                 canProcess={canProcess}
+                                sourceContextAvailable={entry.hasPaymentContext}
                                 contextValid={
                                   !aiBusy &&
                                   entry.guideContext === guideContext &&
