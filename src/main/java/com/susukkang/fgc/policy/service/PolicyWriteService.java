@@ -102,7 +102,8 @@ public class PolicyWriteService {
             if (writeRepository.hasUnsupportedChildren(id)) {
                 throw invalid(FIELD_POLICY_TYPE, "전용 편집 계약이 없는 기존 규칙을 덮어쓸 수 없습니다.");
             }
-            validateReferences(draft, storedReferences(writeRepository.readDraft(policy)));
+            PolicyDraft stored = writeRepository.readDraft(policy);
+            validateReferences(draft, storedReferences(stored), storedUrls(stored));
             Map<String, Object> before = snapshot(policy, actor);
             writeRepository.updateDraft(policy, draft);
             return recordChange("UPDATE", policy, actor, before, null);
@@ -265,7 +266,7 @@ public class PolicyWriteService {
     private void validateSubmission(PolicyDraft draft) {
         draftValidator.validateForSubmission(draft);
         offeringScopeValidator.validateForSubmission(draft);
-        validateReferences(draft, storedReferences(draft));
+        validateReferences(draft, storedReferences(draft), storedUrls(draft));
         if (draft.regulationRefs().isEmpty() && draft.sourceRefs().isEmpty()) {
             throw invalid("sourceRefs", "제출할 정책에는 승인된 근거가 필요합니다.");
         }
@@ -292,10 +293,10 @@ public class PolicyWriteService {
     }
 
     private void validateReferences(PolicyDraft draft) {
-        validateReferences(draft, Set.of());
+        validateReferences(draft, Set.of(), Set.of());
     }
 
-    private void validateReferences(PolicyDraft draft, Set<String> inherited) {
+    private void validateReferences(PolicyDraft draft, Set<String> inherited, Set<String> inheritedUrls) {
         Set<String> approvedRefs = writeRepository.approvedReferences();
         Set<String> approved = approvedRefs.stream()
                 .map(PolicyWriteService::referenceCode).filter(Objects::nonNull).collect(Collectors.toSet());
@@ -315,20 +316,26 @@ public class PolicyWriteService {
             }
             // 새로 입력한 링크만 http(s)를 요구한다. 이 검사 이전에 저장된 링크는 복제·제출에서 그대로 보존한다.
             String url = detail.url();
-            if (url != null && !url.isBlank() && !inherited.contains(url) && !PolicyDraftValidator.isWebUrl(url)) {
+            if (url != null && !url.isBlank() && !inheritedUrls.contains(url) && !PolicyDraftValidator.isWebUrl(url)) {
                 throw invalid("sourceDetails[" + i + "].url", "근거 링크는 http 또는 https 주소만 등록할 수 있습니다.");
             }
         }
     }
 
-    /**
-     * 과거 승인본의 문서명·경로 참조와 이미 저장된 근거 링크는 복제 후에도 보존하되 신규 입력으로 추가하지 않는다.
-     */
+    /** 과거 승인본의 문서명·경로 참조는 복제 후에도 보존하되 신규 입력으로 추가하지 않는다. */
     private static Set<String> storedReferences(PolicyDraft draft) {
-        return Stream.of(draft.regulationRefs().stream(), draft.sourceRefs().stream(),
-                        draft.feeRegimeRules().stream().flatMap(rule -> rule.sourceRefs().stream()),
-                        draft.sourceDetails().stream().map(PolicyDraft.SourceDetailDraft::url).filter(Objects::nonNull))
-                .flatMap(s -> s).collect(Collectors.toSet());
+        return Stream.concat(Stream.concat(draft.regulationRefs().stream(), draft.sourceRefs().stream()),
+                draft.feeRegimeRules().stream().flatMap(rule -> rule.sourceRefs().stream()))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * URL 검사 이전에 저장된 근거 링크. 근거 코드 집합과 분리해, 같은 글자의 문서명 참조를 새 링크로 넣어도
+     * http(s) 검사를 건너뛰지 못하게 한다.
+     */
+    private static Set<String> storedUrls(PolicyDraft draft) {
+        return draft.sourceDetails().stream().map(PolicyDraft.SourceDetailDraft::url).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     /** 참조 원문에서 REG/SRC 코드를 읽는다. 형식이 아니면 null. */

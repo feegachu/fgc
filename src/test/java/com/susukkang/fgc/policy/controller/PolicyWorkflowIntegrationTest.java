@@ -624,6 +624,25 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void aStoredLegacyReferenceTextIsNotAcceptedAsANewLink() throws Exception {
+        Long sourceId = jdbc.queryForObject("""
+                SELECT policy_version_id FROM fgc.policy_version
+                WHERE policy_code = 'REG-FOUR-YEAR-2027-V1' AND version_no = 1
+                """, Long.class);
+        String legacyRef = "docs/FGC_가상_GA_운영정책서_v1_0.md#제46조";
+        long cloneId = write(HttpMethod.POST, "/api/v1/policies/" + sourceId + "/versions",
+                cloneRequest("2028-01-01"), writer, key(), 201).path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(cloneId, writer).path("editDocument").deepCopy();
+        assertThat(values(edit.path("sourceRefs"))).contains(legacyRef);
+        // 근거 코드로 물려받은 문서명 참조와 글자가 같아도, 링크로는 새 입력이라 http(s) 검사를 받는다.
+        int index = edit.withArray("sourceDetails").size();
+        edit.withArray("sourceDetails").addObject().put("ref", legacyRef).put("title", "옛 근거")
+                .putNull("explanation").put("url", legacyRef);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + cloneId, edit, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[" + index + "].url");
+    }
+
+    @Test
     void keepsAnAlreadyStoredNonWebLinkButRejectsANewOne() throws Exception {
         long id = create(draft(), writer).path("policyVersionId").asLong();
         // URL 검사가 생기기 전에 저장된 링크를 흉내 낸다(초안 상태라 DRAFT 전용 트리거가 허용한다).
