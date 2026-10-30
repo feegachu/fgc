@@ -3691,6 +3691,8 @@ export interface components {
             editDocument?: components["schemas"]["PolicyDraft"];
             /** @description 정책 버전 헤더 */
             header?: components["schemas"]["PolicyVersionResponse"];
+            /** @description FUN-016 근거 info 패널. regulationRefs·sourceRefs 순서대로 레지스트리 항목명과 저장된 상세를 합친 목록 */
+            references?: components["schemas"]["PolicyReferenceResponse"][];
             /** @description 예상 해약환급률표 탭 — 상품·납입기간·채널별 복수 */
             refundRateTables?: components["schemas"]["RefundRateTableResponse"][];
             /** @description 내부 근거 참조 목록(SRC-xx) */
@@ -3724,6 +3726,23 @@ export interface components {
             sourceClass: "REGULATORY" | "INSURER_RULE" | "GA_POLICY" | "PROJECT_ASSUMPTION";
             sourceDetails?: components["schemas"]["SourceDetailDraft"][];
             sourceRefs: string[];
+        };
+        /** @description 정책 근거 참조와 저장된 상세 설명 */
+        PolicyReferenceResponse: {
+            /** @description 참조에서 읽은 REG/SRC 코드. 형식이 아니면 null */
+            code?: string | null;
+            /** @description 이 정책버전에 저장된 근거 제목 */
+            detailTitle?: string | null;
+            /** @description 이 정책버전에 저장된 근거 설명 */
+            explanation?: string | null;
+            /** @description REGULATION(regulationRefs) 또는 SOURCE(sourceRefs) */
+            group?: string;
+            /** @description 정책에 저장된 참조 원문(코드 뒤 설명이 붙은 과거 형식 포함) */
+            ref?: string;
+            /** @description 근거 코드 레지스트리 항목명. 미등록·SRC는 null일 수 있음 */
+            registryTitle?: string | null;
+            /** @description 검증된 http(s) 링크 */
+            url?: string | null;
         };
         /** @description 정책 버전 */
         PolicyVersionResponse: {

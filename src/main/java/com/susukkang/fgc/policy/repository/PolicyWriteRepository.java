@@ -18,6 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -532,9 +533,14 @@ public class PolicyWriteRepository {
                 rs.getString(4), rs.getObject(5, OffsetDateTime.class), rs.getString(6), rs.getString(7)), id);
     }
 
-    /** 승인자·승인시각이 있는 기존 승인본에서 실제 사용된 참조만 승인된 등록부로 사용한다. */
+    /**
+     * 승인된 근거 참조: 근거 코드 레지스트리(V71, 규제조문표 기준)와, 승인자·승인시각이 있는 기존 승인본에서 실제 사용된 참조.
+     * 승인본의 과거 형식(코드 뒤 설명이 붙은 참조)은 복제 시 보존하기 위해 함께 돌려준다.
+     */
     public Set<String> approvedReferences() {
         return new HashSet<>(jdbc.queryForList("""
+                SELECT ref_code FROM fgc.policy_reference
+                UNION
                 SELECT DISTINCT unnest(regulation_refs || source_refs)
                 FROM fgc.policy_version
                 WHERE status IN ('APPROVED','ACTIVE','RETIRED') AND approved_by IS NOT NULL AND approved_at IS NOT NULL
@@ -543,6 +549,16 @@ public class PolicyWriteRepository {
                 FROM fgc.fee_regime_ruleset r JOIN fgc.policy_version p ON p.policy_version_id = r.policy_version_id
                 WHERE p.status IN ('APPROVED','ACTIVE','RETIRED') AND p.approved_by IS NOT NULL AND p.approved_at IS NOT NULL
                 """, String.class));
+    }
+
+    /** 근거 코드 레지스트리 항목명. 제목이 비어 있는 코드(SRC 등)는 결과에 넣지 않는다. */
+    public Map<String, String> referenceTitles(Set<String> codes) {
+        if (codes.isEmpty()) return Map.of();
+        Map<String, String> titles = new HashMap<>();
+        jdbc.query("SELECT ref_code, title FROM fgc.policy_reference WHERE title IS NOT NULL AND ref_code = ANY (?)",
+                rs -> { titles.put(rs.getString(1), rs.getString(2)); },
+                (Object) codes.toArray(String[]::new));
+        return titles;
     }
 
     private static final String COMMISSION_SCOPE_OVERLAP = """

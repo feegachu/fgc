@@ -13,6 +13,8 @@ import com.susukkang.fgc.policy.dto.PolicyDraft.ParameterDraft;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
@@ -89,6 +91,25 @@ public class PolicyDraftValidator {
             if (!detailRefs.add(draft.sourceDetails().get(i).ref())) {
                 throw invalid("sourceDetails[" + i + "].ref", "동일한 근거 상세를 중복 지정할 수 없습니다.");
             }
+            String url = draft.sourceDetails().get(i).url();
+            if (url != null && !url.isBlank() && !isWebUrl(url)) {
+                throw invalid("sourceDetails[" + i + "].url", "근거 링크는 http 또는 https 주소만 등록할 수 있습니다.");
+            }
+        }
+    }
+
+    /** info 패널이 새 창으로 여는 링크. 스크립트·파일 등 다른 scheme과 공백·제어문자, 사용자 정보가 든 주소는 받지 않는다. */
+    static boolean isWebUrl(String url) {
+        if (!url.equals(url.strip()) || url.chars().anyMatch(c -> Character.isWhitespace(c) || Character.isISOControl(c))) {
+            return false;
+        }
+        try {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            return scheme != null && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))
+                    && uri.getHost() != null && !uri.getHost().isBlank() && uri.getRawUserInfo() == null;
+        } catch (URISyntaxException e) {
+            return false;
         }
     }
 

@@ -663,3 +663,24 @@
     display: none;
   }
 }
+
+/* FUN-016 근거 info 패널 */
+.policy-reference-info {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+.policy-reference-info p {
+  margin: 0;
+}
+.policy-reference-registry,
+.policy-reference-empty {
+  color: var(--color-text-secondary);
+}
+.policy-reference-title {
+  font-weight: 600;
+}
+.policy-reference-explanation {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

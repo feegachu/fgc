@@ -17,6 +17,7 @@ import { date, int } from '../../lib/format'
 import { QueryState, ReferenceTabs, ReferenceText } from '../reference/ReferenceUI'
 import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
+import { PolicyReferenceInfo } from './PolicyReferenceInfo'
 const tabs = [
   { id: 'versions', label: '정책 버전' },
   { id: 'management', label: '관리 상세' },
@@ -227,7 +228,9 @@ export function PoliciesPage() {
                       r.regulationRefs.map((ref) => (
                         <EvidenceLink key={ref} label={ref}>
                           {r.policyName} · {ref}
-                          <p>저장된 근거 설명과 링크는 관리 상세에서 확인하세요.</p>
+                          {r.policyVersionId != null ? (
+                            <PolicyReferenceInfo policyVersionId={r.policyVersionId} refText={ref} />
+                          ) : null}
                           <p>{sourceReferenceNotice}</p>
                           <Button
                             variant="ghost"

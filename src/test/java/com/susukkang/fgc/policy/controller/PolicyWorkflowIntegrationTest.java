@@ -561,6 +561,60 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void acceptsRegistryCodesNeverUsedByApprovedPoliciesButRejectsUnknownCodes() throws Exception {
+        // FUN-016: 규제조문표의 REG-17은 승인 정책에 쓰인 적이 없어도 레지스트리(V71)에 있으므로 처음 등록할 수 있다.
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.policy_version
+                WHERE status IN ('APPROVED','ACTIVE','RETIRED') AND 'REG-17' = ANY (regulation_refs)
+                """, Integer.class)).isZero();
+        ObjectNode registered = draft();
+        registered.withArray("regulationRefs").add("REG-17");
+        assertThat(create(registered, writer).path("status").asText()).isEqualTo("DRAFT");
+        ObjectNode unknown = draft();
+        unknown.withArray("regulationRefs").add("REG-99");
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", unknown, writer, key(), 400).path("field").asText())
+                .isEqualTo("regulationRefs");
+    }
+
+    @Test
+    void acceptsOnlyWebLinksAndTextOnlySourceDetails() throws Exception {
+        for (String unsafe : List.of("javascript:alert(1)", "ftp://example.com/a", "file:///etc/passwd",
+                "https://user:pw@example.com/a", " https://example.com/a", "/relative/path", "https://")) {
+            ObjectNode draft = draft();
+            ((ObjectNode) draft.withArray("sourceDetails").get(0)).put("url", unsafe);
+            assertThat(writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400).path("field").asText())
+                    .as(unsafe).isEqualTo("sourceDetails[0].url");
+        }
+        ObjectNode textOnly = draft();
+        ((ObjectNode) textOnly.withArray("sourceDetails").get(0)).putNull("url");
+        long id = create(textOnly, writer).path("policyVersionId").asLong();
+        JsonNode source = StreamSupport.stream(detail(id, writer).path("references").spliterator(), false)
+                .filter(row -> row.path("code").asText().equals("SRC-022")).findFirst().orElseThrow();
+        assertThat(source.path("detailTitle").asText()).isEqualTo("승인된 근거 연결");
+        assertThat(source.path("url").isNull()).isTrue();
+    }
+
+    @Test
+    void detailMergesRegistryTitlesWithTheDetailsStoredOnThatPolicyVersion() throws Exception {
+        long id = create(draft(), writer).path("policyVersionId").asLong();
+        JsonNode references = detail(id, writer).path("references");
+        JsonNode regulation = references.get(0);
+        assertThat(regulation.path("ref").asText()).isEqualTo("REG-03");
+        assertThat(regulation.path("group").asText()).isEqualTo("REGULATION");
+        assertThat(regulation.path("registryTitle").asText()).isEqualTo("유지관리수수료");
+        // 상세를 저장하지 않은 근거는 공통 샘플 설명으로 채우지 않는다.
+        assertThat(regulation.path("detailTitle").isNull()).isTrue();
+        assertThat(regulation.path("explanation").isNull()).isTrue();
+        JsonNode source = StreamSupport.stream(references.spliterator(), false)
+                .filter(row -> row.path("group").asText().equals("SOURCE")).findFirst().orElseThrow();
+        assertThat(source.path("code").asText()).isEqualTo("SRC-022");
+        assertThat(source.path("registryTitle").isNull()).isTrue();
+        assertThat(source.path("detailTitle").asText()).isEqualTo("승인된 근거 연결");
+        assertThat(source.path("explanation").asText()).isEqualTo("정책 등록과 복제에서 근거를 보존한다.");
+        assertThat(source.path("url").asText()).isEqualTo("https://example.com/policy-evidence");
+    }
+
+    @Test
     void storesApprovalEvidenceWithItsDocumentVersionAndResetsItOnClone() throws Exception {
         JsonNode created = create(draft().put("basicDocumentVersion", "DOC-V1"), writer);
         long id = created.path("policyVersionId").asLong();

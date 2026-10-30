@@ -322,7 +322,8 @@ public class PolicyWriteService {
                 .collect(Collectors.toSet());
     }
 
-    private static String referenceCode(String ref) {
+    /** 참조 원문에서 REG/SRC 코드를 읽는다. 형식이 아니면 null. */
+    static String referenceCode(String ref) {
         if (ref == null) return null;
         Matcher matcher = REFERENCE.matcher(ref);
         return matcher.matches() ? matcher.group(1) : null;
@@ -332,7 +333,7 @@ public class PolicyWriteService {
         if (legacy.contains(ref)) return;
         String code = referenceCode(ref);
         if (code == null || !code.startsWith(prefix) || !approved.contains(code)) {
-            throw invalid(field, "승인 정책에서 확인할 수 없는 근거 코드입니다.");
+            throw invalid(field, "근거 코드 레지스트리와 승인 정책에서 확인할 수 없는 근거 코드입니다.");
         }
     }
 
