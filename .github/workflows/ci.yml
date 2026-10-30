@@ -150,6 +150,8 @@ jobs:
         if: needs.changes.outputs.run_checks == 'true'
       - run: npm run check:guide-features
         if: needs.changes.outputs.run_checks == 'true'
+      - run: npm run check:guide-knowledge
+        if: needs.changes.outputs.run_checks == 'true'
       - run: npm run check:e2e
         if: needs.changes.outputs.run_checks == 'true'
       - run: npm run lint

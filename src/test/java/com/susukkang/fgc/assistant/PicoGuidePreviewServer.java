@@ -28,10 +28,11 @@ public final class PicoGuidePreviewServer {
         var transactions=mock(PlatformTransactionManager.class);
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         // Explicitly empty key: even if the developer has an environment key, it is never consumed.
-        var gateway=new LlmGateway(new LlmProperties("","https://api.openai.com/v1","gpt-4o-mini",Duration.ofSeconds(5),20000,512,Duration.ofMinutes(10)),mock(AiCallLogRepository.class),transactions);
+        var properties=new LlmProperties("","https://api.openai.com/v1","gpt-4o-mini",Duration.ofSeconds(5),20000,512,Duration.ofMinutes(10));
+        var gateway=new LlmGateway(properties,mock(AiCallLogRepository.class),transactions);
         var context=mock(com.susukkang.fgc.assistant.service.PicoPaymentContextService.class);
         when(context.read(org.mockito.ArgumentMatchers.anyLong())).thenThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_004));
-        var service=new PicoAskService(gateway,new PicoGuideCatalog(mapper),mapper,context);
+        var service=new PicoAskService(gateway,new PicoGuideCatalog(mapper),mapper,context,properties);
         var validation=Validation.buildDefaultValidatorFactory();
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",port),0);
         server.createContext("/api/v1/ai/pico/ask",exchange->{

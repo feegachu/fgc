@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createMemoryRouter, Outlet, RouterProvider, useLocation } from 'react-router'
+import { workflowHelpSteps } from './workflow-catalog'
 import { WorkspaceGuide } from './WorkspaceGuide'
 import { useWorkflowGuide } from './workflow-state'
 import { useWorkspaceStore } from '../../stores/workspace'
@@ -120,3 +121,15 @@ it('waits for the user to select a repeated policy row instead of guessing the f
   expect(screen.getByRole('radio', { name: '정책 B' })).toBeChecked()
 })
 
+it('opens the exact registered source location cited by an answer without stepping through unrelated fields', async () => {
+  const router = setup()
+  const help = workflowHelpSteps('contract.register').find((step) => step.targetId === 'features.contract.contract-form-page.contract-no')!
+  expect(help).toBeDefined()
+  act(() => useWorkflowGuide.getState().start('contract.register', help.stepId))
+  await screen.findByRole('textbox', { name: '계약번호' })
+  expect(await screen.findByRole('heading', { name: help.title })).toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/contracts/new')
+  await userEvent.click(screen.getByRole('button', { name: '확인했어요 · 다음 안내' }))
+  expect(await screen.findByRole('heading', { name: '안내를 마쳤어요' })).toBeInTheDocument()
+  expect(screen.getByText(/실제 저장·검증·확정 결과/)).toBeInTheDocument()
+})

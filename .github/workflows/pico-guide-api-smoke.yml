@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       confirm_paid_call:
-        description: 'Authorize one synthetic gpt-4o-mini call through Pico ask API'
+        description: 'Authorize two conversational turns, four gpt-4o-mini provider calls'
         type: boolean
         required: true
         default: false
   push:
-    branches: [codex/664-pico-guide-answers]
+    branches: [codex/664-pico-guide-answers, codex/777-assistant-conversation-retrieval]
     paths:
       - '.github/workflows/pico-guide-api-smoke.yml'
       - 'src/test/java/com/susukkang/fgc/ai/service/PicoGuideApiLiveSmokeTest.java'
@@ -25,7 +25,7 @@ jobs:
   verify-guide-api:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true) ||
-      (github.event_name == 'push' && github.event.head_commit.message == '[Test] #664 verify Pico guide API once [pico-guide-live-smoke]')
+      (github.event_name == 'push' && (github.event.head_commit.message == '[Test] #664 verify Pico guide API once [pico-guide-live-smoke]' || github.event.head_commit.message == 'feat(assistant): connect contextual workflow tutorials (#775) [pico-guide-live-smoke]'))
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -37,7 +37,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c
-      - name: One synthetic request through secured controller and real service
+      - name: Two synthetic conversational turns through secured controller and real service
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           FGC_PICO_GUIDE_LIVE_SMOKE: 'true'
@@ -58,7 +58,7 @@ jobs:
               raise SystemExit('No API result was produced; check build status without dumping environment.')
           raw = json.loads(source.read_text())
           keys = ('endpoint', 'checksPassed', 'source', 'decision', 'evidenceCount', 'fallbackReason',
-                  'model', 'status', 'errorCode', 'inputTokens', 'outputTokens', 'latencyMs')
+                  'model', 'status', 'errorCode', 'inputTokens', 'outputTokens', 'latencyMs', 'providerCalls', 'followupPassed')
           safe = {key: raw.get(key) for key in keys}
           destination = Path('build/pico-guide-api-smoke/published-metrics.json')
           destination.write_text(json.dumps(safe, indent=2) + '\n')

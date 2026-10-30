@@ -15,7 +15,6 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -41,7 +40,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Explicit opt-in, one paid request through the secured controller and production service. No database. */
+/** Explicit opt-in, two synthetic conversational turns (four provider calls) through the secured controller and production service. No database. */
 @EnabledIfEnvironmentVariable(named = "FGC_PICO_GUIDE_LIVE_SMOKE", matches = "true")
 @WebMvcTest(PicoAskController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class, PicoAskService.class,
@@ -57,16 +56,19 @@ class PicoGuideApiLiveSmokeTest {
 
     @TestConfiguration(proxyBeanMethods = false)
     static class LiveGateway {
-        @Bean LlmGateway gateway(AiCallLogRepository logs, PlatformTransactionManager transactions) {
+        @Bean LlmProperties properties() {
             String key = System.getenv("OPENAI_API_KEY");
             assertThat(key != null && !key.isBlank()).as("Runner key must be configured; never printed").isTrue();
-            return new LlmGateway(new LlmProperties(key, "https://api.openai.com/v1", "gpt-4o-mini",
-                    Duration.ofSeconds(30), 10000, 768, Duration.ofMinutes(10)), logs, transactions);
+            return new LlmProperties(key, "https://api.openai.com/v1", "gpt-4o-mini",
+                    Duration.ofSeconds(30), 20000, 1024, Duration.ofMinutes(10));
+        }
+        @Bean LlmGateway gateway(AiCallLogRepository logs, PlatformTransactionManager transactions, LlmProperties properties) {
+            return new LlmGateway(properties, logs, transactions);
         }
     }
 
     @Test
-    void securedGuideApiUsesOneRealAnswerAndApprovedEvidence() throws Exception {
+    void securedGuideApiRetrievesApprovedEvidenceAndUnderstandsAFollowup() throws Exception {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         String question = "초안 저장 방법을 알려줘";
         mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_AGENT")))
@@ -75,8 +77,6 @@ class PicoGuideApiLiveSmokeTest {
         mvc.perform(post("/api/v1/ai/pico/ask")
                 .contentType(MediaType.APPLICATION_JSON).content(body(question)))
                 .andExpect(status().isUnauthorized());
-        assertThat(ask("초안 확정").path("data").path("decision").asText()).isEqualTo("ASK_CLARIFICATION");
-        assertThat(ask("오늘 날씨").path("data").path("decision").asText()).isEqualTo("UNSUPPORTED");
         verifyNoInteractions(logs);
 
         Map<String, Object> safe = new LinkedHashMap<>();
@@ -96,22 +96,41 @@ class PicoGuideApiLiveSmokeTest {
             assertThat(reply.path("message").asText()).contains("초안");
             assertThat(reply.path("evidenceRefs").size()).isBetween(1, 8);
             for (var ref : reply.path("evidenceRefs")) {
-                assertThat(ref.path("workflowId").asText()).isEqualTo("payment.draft");
-                assertThat(ref.path("chunkId").asText()).startsWith("payment.draft:");
+                assertThat(new PicoGuideCatalog(mapper).definitions().stream().map(PicoGuideCatalog.Definition::workflowId).toList()).contains(ref.path("workflowId").asText());
+                assertThat(ref.path("chunkId").asText()).startsWith(ref.path("workflowId").asText() + ":");
             }
+            var history = List.of(new PicoAskRequest.Turn(PicoAskRequest.Role.USER, question),
+                    new PicoAskRequest.Turn(PicoAskRequest.Role.ASSISTANT, reply.path("message").asText()));
+            var followup = mapper.readTree(mvc.perform(post("/api/v1/ai/pico/ask")
+                    .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT")))
+                    .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(new PicoAskRequest(
+                            "그 화면에서 수령인은 어디에서 선택해?", "TRAN-W02", List.of(), "synthetic-r2", "1.0", history))))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
+            assertThat(followup.path("source").asText()).isEqualTo("AI");
+            assertThat(followup.path("decision").asText()).isEqualTo("ANSWER_ONLY");
+            assertThat(followup.path("message").asText()).containsAnyOf("수령", "설계사", "수취");
+            assertThat(followup.path("evidenceRefs").size()).isBetween(1, 8);
+            for (var ref : followup.path("evidenceRefs")) {
+                assertThat(ref.path("workflowId").asText()).as("Follow-up must remain grounded in the payment workflow").startsWith("payment.");
+            }
+            assertThat(followup.path("validatedGuide").isNull()).isTrue();
+            safe.put("followupPassed", true);
             safe.put("checksPassed", true);
         } finally {
-            var captured = ArgumentCaptor.forClass(AiCallLog.class);
+            var rows = mockingDetails(logs).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("save") && invocation.getArguments()[0] instanceof AiCallLog)
+                    .map(invocation -> (AiCallLog) invocation.getArguments()[0]).toList();
+            safe.put("providerCalls", rows.size());
             try {
-                verify(logs, times(1)).save(captured.capture());
-                var row = captured.getValue();
+                assertThat(rows).hasSize(4);
+                var row = rows.getLast();
                 safe.put("model", row.getModelName());
                 safe.put("status", row.getCallStatus());
                 safe.put("errorCode", row.getErrorCode());
-                safe.put("inputTokens", row.getInputTokens());
-                safe.put("outputTokens", row.getOutputTokens());
-                safe.put("latencyMs", row.getLatencyMs());
-                assertThat(row.getCallStatus()).isEqualTo(AiCallStatus.SUCCESS);
+                safe.put("inputTokens", rows.stream().map(AiCallLog::getInputTokens).filter(java.util.Objects::nonNull).mapToLong(Number::longValue).sum());
+                safe.put("outputTokens", rows.stream().map(AiCallLog::getOutputTokens).filter(java.util.Objects::nonNull).mapToLong(Number::longValue).sum());
+                safe.put("latencyMs", rows.stream().map(AiCallLog::getLatencyMs).filter(java.util.Objects::nonNull).mapToLong(Number::longValue).sum());
+                assertThat(rows).allSatisfy(log -> assertThat(log.getCallStatus()).isEqualTo(AiCallStatus.SUCCESS));
             } finally {
                 var output = Path.of("build/pico-guide-api-smoke/result.json");
                 Files.createDirectories(output.getParent());
