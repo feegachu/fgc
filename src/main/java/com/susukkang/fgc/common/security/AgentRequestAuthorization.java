@@ -35,7 +35,8 @@ public final class AgentRequestAuthorization {
         return new AuthorizationDecision(HttpMethod.GET.matches(request.getMethod()) && (
                 PUBLIC_READS.contains(path)
                 || path.matches("/api/v1/contracts(?:/export\\.csv|/[1-9]\\d*(?:/status-events)?)?")
-                || path.matches("/api/v1/transactions(?:/[1-9]\\d*)?")));
+                || path.matches("/api/v1/transactions(?:/[1-9]\\d*)?")
+                || path.matches("/api/v1/agent/me/statements(?:/[A-Za-z0-9_-]{1,128})?")));
     };
 
     private AgentRequestAuthorization() { }
