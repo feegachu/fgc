@@ -88,7 +88,7 @@ public class ContractStatusFollowUpService {
         }
     }
 
-    /** 지금 처리할 수 있는 작업을 하나씩 처리하고 처리한(성공·실패) 수를 돌려준다. */
+    /** 지금 처리할 수 있는 작업을 하나씩 잡아 처리하고 잡은 수를 돌려준다(다시 잠그지 못해 건너뛴 작업 포함). */
     public int runDueJobs() {
         int handled = 0;
         while (handled < MAX_JOBS_PER_RUN && runOne()) {

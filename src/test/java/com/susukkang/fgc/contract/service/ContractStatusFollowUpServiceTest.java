@@ -7,6 +7,7 @@ import com.susukkang.fgc.contract.repository.ContractEventJobRepository.JobKey;
 import com.susukkang.fgc.contract.repository.ContractLockRepository;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -28,8 +29,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
-/** 후속 작업 실패 기록의 분기. 실DB 순서·경합은 ContractStatusEventIntegrationTest가 검증한다. */
+/** 후속 작업 행을 다시 잠글 때의 분기(처리 직전·실패 기록 직전). 실DB 순서·경합은 ContractStatusEventIntegrationTest가 검증한다. */
 @ExtendWith(MockitoExtension.class)
 class ContractStatusFollowUpServiceTest {
 
@@ -70,5 +72,22 @@ class ContractStatusFollowUpServiceTest {
         verify(processingHistory, never()).insertProcessing(any(), any(), org.mockito.ArgumentMatchers.eq("SUCCEEDED"),
                 isNull(), isNull());
         verify(jobs, never()).markSucceeded(any());
+    }
+
+    @Test
+    // 잡은 작업을 처리 트랜잭션에서 다시 잠그지 못하면(다른 worker가 처리 중이거나 이미 끝냄) 아무것도 남기지 않고 다음 작업으로 넘어간다.
+    void skipsTheJobWhenItCannotBeLockedForProcessing() {
+        given(transactionManager.getTransaction(any())).willReturn(new SimpleTransactionStatus());
+        given(jobs.claimNext(anyInt())).willReturn(Optional.of(JOB), Optional.empty());
+        given(jobs.lockForProcessing(JOB)).willReturn(false);
+
+        ContractStatusFollowUpService service = new ContractStatusFollowUpService(
+                processors, jobs, events, processingHistory, contractLocks, transactionManager);
+
+        assertThat(service.runDueJobs()).isEqualTo(1);
+        // 사건 조회부터 막혔는지 본다 — 처리기 호출만 보면 재잠금 검사를 지워도 빈 사건 조회가 먼저 실패해 통과한다.
+        verifyNoInteractions(events, contractLocks, processors, processingHistory);
+        verify(jobs, never()).markSucceeded(any());
+        verify(jobs, never()).markFailed(any(), any());
     }
 }
