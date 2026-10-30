@@ -93,6 +93,20 @@ public interface ContractService {
     ContractUpdateResponse updateContract(Long id, ContractUpdateRequest request);
 
     /**
+     * 설명 : IF-API-19 계약 수정. 상태를 바꾸면 허용 전이·사건 일자를 검사하고 사건·후속 작업·감사를 같은 트랜잭션에 남긴다.
+     * 같은 멱등키·같은 요청은 처음 결과를 돌려주며, 상태 변경에는 멱등키가 필요하다(사건 원천키로 쓴다).
+     *
+     * @param id 수정할 보험계약 ID
+     * @param request 보험계약 수정 요청(상태 변경 시 statusEvent 포함)
+     * @param idempotencyKey Idempotency-Key 헤더. 일반 수정은 생략할 수 있다
+     * @param userId 인증 사용자 ID. 사건 등록자와 멱등 결과 소유자로 남긴다
+     * @return 계약 ID·재생성 스케줄·수정 시각·상태 사건 ID·후속 처리 상태
+     * @author yslee
+     * @since 2026-10-30
+     */
+    ContractUpdateResponse updateContract(Long id, ContractUpdateRequest request, String idempotencyKey, Long userId);
+
+    /**
      * 설명 : 현재 계약·운영 스케줄을 기준으로 지급단계별 한도를 다시 검증한다.
      *
      * @param contractId 보험계약 ID

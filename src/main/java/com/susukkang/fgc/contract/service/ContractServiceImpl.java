@@ -1,11 +1,14 @@
 package com.susukkang.fgc.contract.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCheckSaveResult;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.common.code.CapCheckKind;
 import com.susukkang.fgc.common.code.ContractStatus;
+import com.susukkang.fgc.common.code.ContractStatusReasonCode;
 import com.susukkang.fgc.common.code.DataOrigin;
 import com.susukkang.fgc.common.code.PaymentCycleCode;
 import com.susukkang.fgc.common.code.PaymentStage;
@@ -22,6 +25,7 @@ import com.susukkang.fgc.contract.dto.ContractInput;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
+import com.susukkang.fgc.contract.dto.ContractStatusEventRequest;
 import com.susukkang.fgc.contract.dto.ContractStatusEventResponse;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractUpdateResponse;
@@ -33,6 +37,7 @@ import com.susukkang.fgc.contract.repository.ContractQueryRepository;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.contract.repository.ContractLockRepository;
+import com.susukkang.fgc.contract.repository.ContractWriteRequestRepository;
 import com.susukkang.fgc.schedule.dto.ScheduleGenerationResult;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
@@ -45,15 +50,19 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * 설명 : 보험계약 서비스의 조회·생성·수정·재검증 업무를 구현한다.
@@ -77,6 +86,10 @@ public class ContractServiceImpl implements ContractService {
     private static final String AUDIT_CONTRACT_UPDATED = "CONTRACT_UPDATED";
     private static final String AUDIT_CAP_RECHECKED = "CONTRACT_CAP_RECHECKED";
     private static final String AUDIT_SCHEDULES_REGENERATED = "CONTRACT_SCHEDULES_REGENERATED";
+    private static final String AGENT_ID_FIELD = "agentId";
+    // 상태 사건의 원천키(source_event_key)로 쓰므로 화면이 만드는 요청 UUID만 받는다.
+    private static final Pattern IDEMPOTENCY_KEY =
+            Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
     private final CapCheckService capCheckService;
     private final ScheduleService scheduleService;
@@ -87,6 +100,9 @@ public class ContractServiceImpl implements ContractService {
     private final ContractFinancialSnapshotRepository contractFinancialSnapshotRepository;
     private final ContractStatusEventRepository contractStatusEventRepository;
     private final AgentDataScopeService agentScope;
+    private final ContractWriteRequestRepository contractWriteRequestRepository;
+    private final ContractStatusFollowUpService statusFollowUpService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public PageResponse<ContractView> selectByCondition(ContractSearchCondition condition, int page, int size) {
@@ -155,7 +171,11 @@ public class ContractServiceImpl implements ContractService {
                     .add(processing.toResponse());
         }
 
-        // 5. 각 상태사건에 처리 이력을 붙여 반환(미처리 사건은 빈 처리 목록)
+        // 5. 등록자가 남은 사건만 사용자 정보를 붙인다(원천에 등록자가 없으면 null)
+        Map<Long, ContractStatusEventResponse.RegisteredBy> registrants = contractQueryRepository.findRegistrants(
+                events.stream().map(ContractStatusEvent::getRegisteredBy).filter(Objects::nonNull).distinct().toList());
+
+        // 6. 각 상태사건에 처리 이력을 붙여 반환(미처리 사건은 빈 처리 목록)
         return events.stream()
                 .map(event -> new ContractStatusEventResponse(
                         event.getEventSeq(),
@@ -165,7 +185,11 @@ public class ContractServiceImpl implements ContractService {
                         event.getReceivedAt(),
                         processingsByEvent.getOrDefault(event.getContractStatusEventId(), List.of()),
                         event.getSourceSystem(),
-                        event.getSourceEventKey()
+                        event.getSourceEventKey(),
+                        event.getContractStatusEventId(),
+                        event.getReasonCode(),
+                        event.getReasonText(),
+                        event.getRegisteredBy() == null ? null : registrants.get(event.getRegisteredBy())
                 ))
                 .toList();
     }
@@ -230,9 +254,41 @@ public class ContractServiceImpl implements ContractService {
     @Override
     @Transactional
     public ContractUpdateResponse updateContract(Long id, ContractUpdateRequest request) {
+        // 멱등키가 없는 수정. 상태 변경은 멱등키를 사건 원천키로 쓰므로 거절되고 일반 수정만 통과한다.
+        return update(id, request, null, null);
+    }
+
+    @Override
+    @Transactional
+    public ContractUpdateResponse updateContract(
+            Long id,
+            ContractUpdateRequest request,
+            String idempotencyKey,
+            Long userId
+    ) {
+        return update(id, request, idempotencyKey, userId);
+    }
+
+    // 두 공개 메서드의 공통 본문. 트랜잭션 경계는 호출한 공개 메서드가 연다(this로 @Transactional 메서드를 부르지 않는다).
+    private ContractUpdateResponse update(
+            Long id,
+            ContractUpdateRequest request,
+            String idempotencyKey,
+            Long userId
+    ) {
         // 1. 계약 ID를 검증하고 수정할 계약 엔티티 조회
         if (id == null) {
             throw validationException("contractId", "존재하지 않는 보험계약입니다.");
+        }
+        // #625: 같은 멱등키 재요청은 잠금·버전 비교 전에 처음 결과를 돌려준다(인터페이스정의서 §4-4-2 처리 순서).
+        String operation = "UPDATE:" + id;
+        String requestHash = idempotencyKey == null ? null : requestHash(request);
+        if (idempotencyKey != null) {
+            Optional<ContractUpdateResponse> repeated =
+                    findRepeatedRequest(idempotencyKey, userId, operation, requestHash);
+            if (repeated.isPresent()) {
+                return repeated.get();
+            }
         }
         // #431: 비교·감사 before·수정·재생성은 잠금 후 최신 계약으로 판단한다.
         contractLockRepository.lockAndRefresh(id);
@@ -245,6 +301,14 @@ public class ContractServiceImpl implements ContractService {
         if (!request.getExpectedUpdatedAt().toInstant().equals(currentContract.getUpdatedAt().toInstant())) {
             throw new FgcBusinessException(FgcErrorCode.CONT_003);
         }
+        // #653·#621: 최초 연결 설계사는 바꾸지 않는다. 담당 변경·승계 경로는 두지 않는다.
+        if (!Objects.equals(currentContract.getAgentId(), request.getAgentId())) {
+            throw fieldError(FgcErrorCode.IMPL_AGENT_FIXED, AGENT_ID_FIELD, "최초 연결 설계사는 바꿀 수 없습니다.");
+        }
+        // #653·#625: 상태를 바꾸는 요청만 사건을 받고 허용 전이·사건 일자를 잠근 계약 기준으로 검사한다.
+        ContractStatus previousStatus = currentContract.getCurrentStatus();
+        boolean statusChanged = previousStatus != request.getContractStatus();
+        validateStatusEvent(currentContract, request, statusChanged, idempotencyKey);
         // 2. 수정 요청의 계약일·기준정보·소속 관계와 계약번호 중복 여부 검증
         validateInputForUpdate(currentContract, request);
 
@@ -292,27 +356,44 @@ public class ContractServiceImpl implements ContractService {
             checkCapsForActiveSchedules(id, CapCheckKind.REALTIME);
         }
 
-        /*
-         * TODO(FUN-026, 2차)
-         * 수정 전 상태와 요청 상태가 다른 경우
-         * 계약상태 사건 이력을 등록한다.
-         */
+        // #625: 상태가 바뀌었으면 사건과 후속 작업을 같은 트랜잭션에 남긴다. 상태만으로는 스케줄을 재생성하지 않는다.
+        ContractUpdateResponse.FollowUp followUp = ContractUpdateResponse.FollowUp.NOT_REQUIRED;
+        Long statusEventId = null;
+        if (statusChanged) {
+            ContractStatusEvent event = contractStatusEventRepository.saveAndFlush(
+                    toManualStatusEvent(id, previousStatus, request, idempotencyKey, userId));
+            statusEventId = event.getContractStatusEventId();
+            followUp = statusFollowUpService.enqueue(event);
+        }
 
-        // 9. 복사해 둔 수정 전 값과 수정 후 값을 감사 로그에 기록
+        // 9. 복사해 둔 수정 전 값과 수정 후 값을 감사 로그에 기록(상태 사건은 사건 ID·자유 사유를 함께 남긴다)
+        Map<String, Object> after = toAuditSnapshot(currentContract, null);
+        if (statusEventId != null) {
+            after.put("statusEventId", statusEventId);
+        }
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_CONTRACT_UPDATED)
                 .entityType(AUDIT_ENTITY_TYPE)
                 .entityId(String.valueOf(id))
                 .before(before)
-                .after(toAuditSnapshot(currentContract, null))
+                .after(after)
+                .reason(statusChanged ? request.getStatusEvent().reason() : null)
                 .build());
 
-        // 10. 계약 ID와 재생성된 스케줄 ID 반환(재생성이 없으면 빈 목록)
-        return ContractUpdateResponse.builder()
+        // 10. DB 트리거가 정한 수정 시각을 다시 읽어 다음 수정의 expectedUpdatedAt으로 돌려준다
+        contractLockRepository.lockAndRefresh(id);
+        ContractUpdateResponse response = ContractUpdateResponse.builder()
                 .contractId(id)
                 .scheduleHeaderIds(scheduleHeaderIds)
                 .regeneratedScheduleIds(scheduleHeaderIds)
+                .updatedAt(currentContract.getUpdatedAt())
+                .statusEventId(statusEventId)
+                .followUp(followUp)
                 .build();
+        if (idempotencyKey != null) {
+            contractWriteRequestRepository.save(idempotencyKey, userId, operation, requestHash, response);
+        }
+        return response;
     }
 
     @Override
@@ -491,7 +572,7 @@ public class ContractServiceImpl implements ContractService {
                 request.getContractDate()
         )) {
             throw validationException(
-                    "agentId",
+                    AGENT_ID_FIELD,
                     "계약일 기준 활동 중인 FC 직급의 모집설계사만 선택할 수 있습니다."
             );
         }
@@ -569,12 +650,11 @@ public class ContractServiceImpl implements ContractService {
             String field,
             String detail
     ) {
-        return new FgcBusinessException(
-                FgcErrorCode.COMMON_002,
-                field,
-                Map.of("field", field),
-                detail
-        );
+        return fieldError(FgcErrorCode.COMMON_002, field, detail);
+    }
+
+    private FgcBusinessException fieldError(FgcErrorCode errorCode, String field, String detail) {
+        return new FgcBusinessException(errorCode, field, Map.of("field", field), detail);
     }
 
     /**
@@ -666,6 +746,135 @@ public class ContractServiceImpl implements ContractService {
                 .sourceEventKey("CONTRACT_CREATED:" + contractId)
                 .dataOrigin(DataOrigin.MANUAL)
                 .build();
+    }
+
+    /**
+     * 설명 : 상태를 바꾸는 요청만 상태 사건을 받는다. 허용 전이(운영정책서 제13조의2 1항)와
+     * 수기 사건 일자 범위(같은 조 3항)를 잠근 계약 기준으로 검사한다. 위반하면 아무것도 저장하지 않는다.
+     *
+     * @author yslee
+     * @since 2026-10-30
+     */
+    private void validateStatusEvent(
+            InsuranceContract current,
+            ContractUpdateRequest request,
+            boolean statusChanged,
+            String idempotencyKey
+    ) {
+        ContractStatusEventRequest event = request.getStatusEvent();
+        // 1. 상태가 같으면 일반 수정이며 사건을 받지 않는다
+        if (!statusChanged) {
+            if (event != null) {
+                throw validationException("statusEvent", "상태를 바꾸지 않는 수정에는 상태 사건을 보내지 않습니다.");
+            }
+            return;
+        }
+        // 2. 허용 전이 표에 없는 전이는 거절한다(enum 전체를 허용하지 않는다)
+        ContractStatus from = current.getCurrentStatus();
+        ContractStatus to = request.getContractStatus();
+        if (!from.nextStatuses().contains(to)) {
+            throw new FgcBusinessException(FgcErrorCode.IMPL_TRANSITION_DENIED, "contractStatus",
+                    Map.of("from", from.label(), "to", to.label()), from + " → " + to + " 전이는 허용되지 않습니다.");
+        }
+        // 3. 사건 입력·멱등키(사건 원천키)·사유코드 확인
+        if (event == null) {
+            throw validationException("statusEvent", "상태를 바꾸려면 효력일시·접수일시·사유를 입력하세요.");
+        }
+        if (idempotencyKey == null) {
+            throw validationException("Idempotency-Key", "상태 변경 요청에는 멱등키가 필요합니다.");
+        }
+        if (Arrays.stream(ContractStatusReasonCode.values()).noneMatch(code -> code.name().equals(event.reasonCode()))) {
+            throw validationException("statusEvent.reasonCode", "허용되지 않은 사유코드입니다.");
+        }
+        // 4. 최신 사건 효력일시(사건이 없으면 계약일 서울 자정) ≤ 효력일시 ≤ 접수일시 ≤ 현재
+        OffsetDateTime earliest = contractStatusEventRepository
+                .findFirstByContractIdOrderByEffectiveAtDescEventSeqDesc(current.getContractId())
+                .map(ContractStatusEvent::getEffectiveAt)
+                .orElseGet(() -> request.getContractDate().atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
+        if (event.effectiveAt().isBefore(earliest)) {
+            throw eventOrder("statusEvent.effectiveAt", "효력일시는 최신 사건의 효력일시 " + earliest + " 이후여야 합니다.");
+        }
+        if (event.effectiveAt().isAfter(event.receivedAt())) {
+            throw eventOrder("statusEvent.effectiveAt", "효력일시는 접수일시보다 늦을 수 없습니다.");
+        }
+        if (event.receivedAt().isAfter(DateUtil.nowSeoul())) {
+            throw eventOrder("statusEvent.receivedAt", "접수일시는 현재 시각보다 늦을 수 없습니다.");
+        }
+    }
+
+    private FgcBusinessException eventOrder(String field, String detail) {
+        return fieldError(FgcErrorCode.IMPL_EVENT_ORDER, field, detail);
+    }
+
+    /**
+     * 설명 : 수기 상태 사건을 만든다. 순번은 계약 잠금 안에서 최대값+1, 원천키는 요청 멱등키다.
+     *
+     * @author yslee
+     * @since 2026-10-30
+     */
+    private ContractStatusEvent toManualStatusEvent(
+            Long contractId,
+            ContractStatus previousStatus,
+            ContractUpdateRequest request,
+            String idempotencyKey,
+            Long userId
+    ) {
+        ContractStatusEventRequest event = request.getStatusEvent();
+        return ContractStatusEvent.builder()
+                .contractId(contractId)
+                .eventSeq(contractStatusEventRepository.findMaxEventSeq(contractId) + 1)
+                .previousStatus(previousStatus)
+                .newStatus(request.getContractStatus())
+                .effectiveAt(event.effectiveAt())
+                .receivedAt(event.receivedAt())
+                .reasonCode(event.reasonCode())
+                .reasonText(event.reason())
+                .sourceSystem("FGC_MANUAL")
+                .sourceEventKey(idempotencyKey)
+                .dataOrigin(DataOrigin.MANUAL)
+                .registeredBy(userId)
+                .build();
+    }
+
+    /**
+     * 설명 : 같은 멱등키의 처음 성공 응답을 찾는다. 같은 키로 다른 사용자·계약·본문이면 409, 처리 중이면 409다.
+     *
+     * @author yslee
+     * @since 2026-10-30
+     */
+    private Optional<ContractUpdateResponse> findRepeatedRequest(
+            String idempotencyKey,
+            Long userId,
+            String operation,
+            String requestHash
+    ) {
+        if (!IDEMPOTENCY_KEY.matcher(idempotencyKey).matches()) {
+            throw validationException("Idempotency-Key", "멱등키는 UUID 형식이어야 합니다.");
+        }
+        if (!contractWriteRequestRepository.tryLock(idempotencyKey)) {
+            throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
+        }
+        return contractWriteRequestRepository.find(idempotencyKey).map(stored -> {
+            if (!Objects.equals(stored.requestedBy(), userId)
+                    || !stored.operation().equals(operation)
+                    || !stored.requestHash().equals(requestHash)) {
+                throw new FgcBusinessException(FgcErrorCode.IMPL_IDEMPOTENCY_CONFLICT);
+            }
+            try {
+                return objectMapper.readValue(stored.responseBody(), ContractUpdateResponse.class);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("저장된 계약 수정 응답을 읽을 수 없습니다.", e);
+            }
+        });
+    }
+
+    private String requestHash(ContractUpdateRequest request) {
+        try {
+            byte[] body = objectMapper.writeValueAsBytes(request);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(body));
+        } catch (JsonProcessingException | NoSuchAlgorithmException e) {
+            throw new IllegalStateException("계약 수정 요청을 직렬화할 수 없습니다.", e);
+        }
     }
 
     private boolean hasScheduleImpactingChanges(
@@ -777,7 +986,7 @@ public class ContractServiceImpl implements ContractService {
         snapshot.put("productOfferingId", contract.getProductOfferingId());
         snapshot.put("contractNo", contract.getContractNo());
         snapshot.put("contractDate", contract.getContractDate());
-        snapshot.put("agentId", contract.getAgentId());
+        snapshot.put(AGENT_ID_FIELD, contract.getAgentId());
         snapshot.put("organizationId", contract.getOrganizationId());
         snapshot.put("premiumPerCycleAmount", contract.getPremiumPerCycleAmount());
         snapshot.put("firstPremiumAmount", contract.getFirstPremiumAmount());

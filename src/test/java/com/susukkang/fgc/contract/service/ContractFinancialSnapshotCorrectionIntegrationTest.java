@@ -250,6 +250,6 @@ class ContractFinancialSnapshotCorrectionIntegrationTest {
         return new ContractUpdateRequest(source.getContractNo(), source.getInsurerId(), source.getProductOfferingId(),
                 source.getContractDate(), source.getCurrentStatus(), source.getAgentId(), source.getOrganizationId(),
                 source.getPaymentCycleCode(), amount, amount, amount, source.getPaymentTermMonths(),
-                source.getStandardSurrenderDeductionAmount(), source.getUpdatedAt());
+                source.getStandardSurrenderDeductionAmount(), source.getUpdatedAt(), null);
     }
 }

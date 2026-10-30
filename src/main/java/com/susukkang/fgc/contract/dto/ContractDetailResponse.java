@@ -1,6 +1,7 @@
 package com.susukkang.fgc.contract.dto;
 
 import com.susukkang.fgc.common.code.ContractStatus;
+import com.susukkang.fgc.common.code.ContractStatusReasonCode;
 import com.susukkang.fgc.common.code.DataOrigin;
 import com.susukkang.fgc.common.code.PaymentCycleCode;
 import lombok.AllArgsConstructor;
@@ -12,6 +13,8 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 설명 : ResponseContractDetail
@@ -60,6 +63,16 @@ public class ContractDetailResponse {
 
     public String getDataOriginLabel() {
         return dataOrigin == null ? null : dataOrigin.label();
+    }
+
+    /** CONT-W03 변경 상태 선택지. 서버 전이 검사와 같은 표(ContractStatus#nextStatuses)다. */
+    public Set<ContractStatus> getAllowedNextStatuses() {
+        return contractStatus == null ? Set.of() : contractStatus.nextStatuses();
+    }
+
+    /** CONT-W03 상태 변경 사유코드 선택지. 서버가 받는 허용목록과 같다. */
+    public List<ContractStatusReasonCode> getStatusReasonCodes() {
+        return List.of(ContractStatusReasonCode.values());
     }
 
     //계약상태 사건 이력 List 2차

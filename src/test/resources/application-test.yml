@@ -22,3 +22,7 @@ fgc:
     daily-changed-contract:
       # 테스트 픽스처와 02시 예약 실행이 경합하지 않게 한다. 배치 테스트는 Job을 직접 실행한다.
       enabled: false
+  contract:
+    status-follow-up:
+      # 10초 주기 후속 작업 실행을 끈다. 테스트는 ContractStatusFollowUpService#runDueJobs를 직접 부른다.
+      enabled: false

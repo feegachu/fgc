@@ -77,6 +77,7 @@ class ContractConsistencyIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private jakarta.persistence.EntityManager entityManager;
+    @Autowired private com.susukkang.fgc.auth.service.FgcUserDetailsService users;
     @MockitoSpyBean private ScheduleWriteRepository scheduleWrites;
     @MockitoSpyBean private CommissionPaymentQueryRepository paymentQueries;
     @MockitoSpyBean private CapScheduleAmountQueryRepository capSchedules;
@@ -575,7 +576,11 @@ class ContractConsistencyIntegrationTest {
         stale.setExpectedUpdatedAt(java.time.OffsetDateTime.parse(objectMapper.readTree(detail).path("data").path("updatedAt").asText()));
         stale.setContractNo(stale.getContractNo() + "-STALE");
         contracts.updateContract(id, update(contractRepository.findById(id).orElseThrow(), "200000"));
+        // PUT은 운영과 같은 인증 사용자(FgcUserDetails)의 ID를 사건 등록자·멱등 결과 소유자로 쓴다(#625).
+        var settle = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                .user(users.loadUserByUsername("settle01"));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/contracts/{id}", id)
+                        .with(settle)
                         .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(stale)))
@@ -586,6 +591,7 @@ class ContractConsistencyIntegrationTest {
                 .withOffsetSameInstant(java.time.ZoneOffset.ofHours(9)));
         fresh.setContractNo(fresh.getContractNo() + "-FRESH");
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/contracts/{id}", id)
+                        .with(settle)
                         .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(fresh)))
@@ -735,7 +741,7 @@ class ContractConsistencyIntegrationTest {
         return new ContractUpdateRequest(source.getContractNo(), source.getInsurerId(), source.getProductOfferingId(),
                 source.getContractDate(), source.getCurrentStatus(), source.getAgentId(), source.getOrganizationId(),
                 source.getPaymentCycleCode(), premium, premium, premium, source.getPaymentTermMonths(),
-                source.getStandardSurrenderDeductionAmount(), source.getUpdatedAt());
+                source.getStandardSurrenderDeductionAmount(), source.getUpdatedAt(), null);
     }
 
     private CommissionPaymentAttributionRequest attribution(Long id, BigDecimal amount) {

@@ -1,14 +1,19 @@
 package com.susukkang.fgc.contract.controller;
 
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.CsvExportWriter;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.*;
 import com.susukkang.fgc.contract.service.ContractService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -97,9 +102,25 @@ public class ContractController {
      * @author hjKang
      * @since 2026-08-05
      */
+    @Operation(summary = "보험계약 수정·상태 변경 (IF-API-19)",
+            description = "expectedUpdatedAt으로 동시 수정을 검사합니다. 상태를 바꾸면 statusEvent와 Idempotency-Key가 "
+                    + "필요하며 사건·후속 작업을 같은 트랜잭션에 남깁니다. 200은 저장 성공이며 후속 처리 완료가 아닙니다.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "수정 저장 성공", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "수정 시각 충돌·허용되지 않은 상태전이·멱등키 충돌·같은 요청 처리 중"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "422", description = "최초 설계사 변경 요청 또는 허용 범위 밖의 사건 일자")
+    })
     @PutMapping("/{id}")
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<ContractUpdateResponse> updateContract(@PathVariable Long id, @Valid @RequestBody ContractUpdateRequest request) {
-        return ApiResponse.success(contractService.updateContract(id, request));
+    public ApiResponse<ContractUpdateResponse> updateContract(
+            @PathVariable Long id,
+            @Valid @RequestBody ContractUpdateRequest request,
+            @AuthenticationPrincipal FgcUserDetails principal,
+            @Parameter(description = "요청 UUID. 상태 변경 시 필수이며 같은 키 재요청은 처음 결과를 돌려줍니다")
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
+        return ApiResponse.success(contractService.updateContract(id, request, idempotencyKey, principal.getUserId()));
     }
 }

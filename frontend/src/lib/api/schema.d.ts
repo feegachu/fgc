@@ -438,6 +438,10 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getContractById"];
+        /**
+         * 보험계약 수정·상태 변경 (IF-API-19)
+         * @description expectedUpdatedAt으로 동시 수정을 검사합니다. 상태를 바꾸면 statusEvent와 Idempotency-Key가 필요하며 사건·후속 작업을 같은 트랜잭션에 남깁니다. 200은 저장 성공이며 후속 처리 완료가 아닙니다.
+         */
         put: operations["updateContract"];
         post?: never;
         delete?: never;
@@ -2752,6 +2756,7 @@ export interface components {
             /** Format: int64 */
             agentId?: number;
             agentName?: string;
+            allowedNextStatuses?: ("APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED")[];
             /** Format: date */
             contractDate?: string;
             /** Format: int64 */
@@ -2782,6 +2787,7 @@ export interface components {
             /** Format: int64 */
             productOfferingId?: number;
             standardSurrenderDeductionAmount?: number;
+            statusReasonCodes?: "MANUAL_STATUS_CHANGE"[];
             /** Format: date-time */
             updatedAt?: string;
         };
@@ -2872,9 +2878,20 @@ export interface components {
             processingJob?: string;
             processingStatus?: string;
         };
+        ContractStatusEventRequest: {
+            /** Format: date-time */
+            effectiveAt: string;
+            reason: string;
+            /** @enum {string} */
+            reasonCode: "MANUAL_STATUS_CHANGE";
+            /** Format: date-time */
+            receivedAt: string;
+        };
         ContractStatusEventResponse: {
             /** Format: date-time */
             effectiveAt?: string;
+            /** Format: int64 */
+            eventId?: number;
             /** Format: int32 */
             eventSeq?: number;
             /** @enum {string} */
@@ -2884,8 +2901,11 @@ export interface components {
             previousStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             previousStatusLabel?: string;
             processings?: components["schemas"]["ContractStatusEventProcessingResponse"][];
+            reason?: string | null;
+            reasonCode?: string | null;
             /** Format: date-time */
             receivedAt?: string;
+            registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
         };
@@ -2945,12 +2965,18 @@ export interface components {
             /** Format: int64 */
             productOfferingId: number;
             standardSurrenderDeductionAmount?: number;
+            statusEvent?: components["schemas"]["ContractStatusEventRequest"];
         };
         ContractUpdateResponse: {
             /** Format: int64 */
             contractId?: number;
+            followUp?: components["schemas"]["FollowUp"];
             regeneratedScheduleIds?: number[];
             scheduleHeaderIds?: number[];
+            /** Format: int64 */
+            statusEventId?: number | null;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         ContractView: {
             agentIdName?: string;
@@ -3225,6 +3251,12 @@ export interface components {
             finalizedAt?: string;
             finalizedBy?: string;
             status?: string;
+        };
+        FollowUp: {
+            /** Format: int64 */
+            eventId?: number | null;
+            /** @enum {string} */
+            status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -4355,6 +4387,12 @@ export interface components {
             /** @description 표준해약공제액 80% 이상 공제 대상 여부 */
             standardDeduction80Yn?: boolean;
         };
+        RegisteredBy: {
+            loginId?: string;
+            /** Format: int64 */
+            userId?: number;
+            userName?: string;
+        };
         ReverseJournalRequest: {
             evidenceRef?: string;
             reason: string;
@@ -5463,7 +5501,10 @@ export interface operations {
     updateContract: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 요청 UUID. 상태 변경 시 필수이며 같은 키 재요청은 처음 결과를 돌려줍니다 */
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: number;
             };
@@ -5475,8 +5516,26 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
+            /** @description 수정 저장 성공 */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractUpdateResponse"];
+                };
+            };
+            /** @description 수정 시각 충돌·허용되지 않은 상태전이·멱등키 충돌·같은 요청 처리 중 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractUpdateResponse"];
+                };
+            };
+            /** @description 최초 설계사 변경 요청 또는 허용 범위 밖의 사건 일자 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

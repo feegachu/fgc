@@ -3123,6 +3123,14 @@
           "agentName" : {
             "type" : "string"
           },
+          "allowedNextStatuses" : {
+            "items" : {
+              "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
           "contractDate" : {
             "format" : "date",
             "type" : "string"
@@ -3194,6 +3202,13 @@
           },
           "standardSurrenderDeductionAmount" : {
             "type" : "number"
+          },
+          "statusReasonCodes" : {
+            "items" : {
+              "enum" : [ "MANUAL_STATUS_CHANGE" ],
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "updatedAt" : {
             "format" : "date-time",
@@ -3428,11 +3443,40 @@
         },
         "type" : "object"
       },
+      "ContractStatusEventRequest" : {
+        "properties" : {
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 2000,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "enum" : [ "MANUAL_STATUS_CHANGE" ],
+            "maxLength" : 40,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "receivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "effectiveAt", "reason", "reasonCode", "receivedAt" ],
+        "type" : "object"
+      },
       "ContractStatusEventResponse" : {
         "properties" : {
           "effectiveAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "eventId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "eventSeq" : {
             "format" : "int32",
@@ -3458,9 +3502,22 @@
             },
             "type" : "array"
           },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "reasonCode" : {
+            "type" : [ "string", "null" ]
+          },
           "receivedAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "registeredBy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/RegisteredBy"
+            }, {
+              "type" : "null"
+            } ]
           },
           "sourceEventKey" : {
             "type" : "string"
@@ -3622,6 +3679,9 @@
           "standardSurrenderDeductionAmount" : {
             "minimum" : 0,
             "type" : "number"
+          },
+          "statusEvent" : {
+            "$ref" : "#/components/schemas/ContractStatusEventRequest"
           }
         },
         "required" : [ "agentId", "contractDate", "contractNo", "contractStatus", "expectedUpdatedAt", "firstPremiumAmount", "insurerId", "monthlyEquivalentFirstPremium", "organizationId", "paymentCycleCode", "paymentTermMonths", "premiumPerCycleAmount", "productOfferingId" ],
@@ -3632,6 +3692,9 @@
           "contractId" : {
             "format" : "int64",
             "type" : "integer"
+          },
+          "followUp" : {
+            "$ref" : "#/components/schemas/FollowUp"
           },
           "regeneratedScheduleIds" : {
             "items" : {
@@ -3646,6 +3709,14 @@
               "type" : "integer"
             },
             "type" : "array"
+          },
+          "statusEventId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -4362,6 +4433,19 @@
             "type" : "string"
           },
           "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FollowUp" : {
+        "properties" : {
+          "eventId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "status" : {
+            "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],
             "type" : "string"
           }
         },
@@ -6760,6 +6844,21 @@
         },
         "type" : "object"
       },
+      "RegisteredBy" : {
+        "properties" : {
+          "loginId" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userName" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ReverseJournalRequest" : {
         "properties" : {
           "evidenceRef" : {
@@ -8879,6 +8978,7 @@
         "tags" : [ "계약" ]
       },
       "put" : {
+        "description" : "expectedUpdatedAt으로 동시 수정을 검사합니다. 상태를 바꾸면 statusEvent와 Idempotency-Key가 필요하며 사건·후속 작업을 같은 트랜잭션에 남깁니다. 200은 저장 성공이며 후속 처리 완료가 아닙니다.",
         "operationId" : "updateContract",
         "parameters" : [ {
           "in" : "path",
@@ -8887,6 +8987,14 @@
           "schema" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        }, {
+          "description" : "요청 UUID. 상태 변경 시 필수이며 같은 키 재요청은 처음 결과를 돌려줍니다",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "requestBody" : {
@@ -8908,9 +9016,30 @@
                 }
               }
             },
-            "description" : "OK"
+            "description" : "수정 저장 성공"
+          },
+          "409" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractUpdateResponse"
+                }
+              }
+            },
+            "description" : "수정 시각 충돌·허용되지 않은 상태전이·멱등키 충돌·같은 요청 처리 중"
+          },
+          "422" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractUpdateResponse"
+                }
+              }
+            },
+            "description" : "최초 설계사 변경 요청 또는 허용 범위 밖의 사건 일자"
           }
         },
+        "summary" : "보험계약 수정·상태 변경 (IF-API-19)",
         "tags" : [ "contract-controller" ]
       }
     },
