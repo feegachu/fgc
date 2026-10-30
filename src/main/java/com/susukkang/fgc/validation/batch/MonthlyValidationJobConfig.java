@@ -44,6 +44,7 @@ public class MonthlyValidationJobConfig {
     private final ExceptionGenerationPort exceptionGenerationPort;
     private final LedgerImbalanceCheckPort ledgerImbalanceCheckPort;
     private final ReconciliationBatchPort reconciliationBatchPort;
+    private final ReconciliationSkipService reconciliationSkipService;
 
     @Bean
     public Job monthlyValidationJob(JobRepository jobRepository,
@@ -152,7 +153,7 @@ public class MonthlyValidationJobConfig {
     @Bean
     public Step reconciliationStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("reconciliationStep", jobRepository)
-                .tasklet(new ReconciliationTasklet(reconciliationBatchPort), transactionManager)
+                .tasklet(new ReconciliationTasklet(reconciliationBatchPort, reconciliationSkipService), transactionManager)
                 .listener(progressListener(7, false))
                 .build();
     }

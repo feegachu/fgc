@@ -1476,7 +1476,7 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 배치 진행 | batch_watermark, validation_run.current_step |
 | 1차 검증 | validation_run, validation_target, cap_check, cap_check_detail, arbitrage_check |
 | 2차 검증 | acquisition_cost_check, acquisition_cost_check_detail, maintenance_check |
-| 담당자·환수 | agent_history, contract_manager_assignment, policy_approval_action, clawback_rule, clawback_case, clawback_line, recovery_transaction |
+| 담당자·환수 | agent_history, contract_manager_assignment, policy_approval_action, clawback_rule, clawback_candidate, clawback_case, clawback_line, recovery_transaction |
 | 원장 | journal_account, journal_header, journal_line |
 | 대사 | reconciliation_run, reconciliation_result, reconciliation_match |
 | 예외 | exception_case, exception_occurrence, exception_action |
@@ -1487,6 +1487,8 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 `exception_occurrence`는 SRC-032(2026-08-18)가 신설한 월 통합검증 실행별 예외 검출 이력이다. `exception_case`는 검증월 기준 안정 업무키의 업무건으로, 같은 결정으로 `reason_code`, `validation_month`, `first/last_detected_run_id`, `first/last_detected_at`, `detection_count` 컬럼이 추가됐다.
 
 `cap_check_detail`은 계산 당시 `item_code`, `item_name`을 반드시 스냅샷으로 저장한다. `schedule_line_id`가 있는 상세행은 `contract_month_no`도 필수이고, 실제 귀속행에서 온 상세는 회차가 없으므로 `NULL`이 허용된다. `acquisition_cost_check_detail`은 초년도 1,200%가 아니라 REG-02·03·05의 계약체결비용 한도 상세만 저장한다.
+
+`clawback_candidate`(V69)는 정책 없는 환수 검토 원천도 보존한다. 상태 사건은 status_event_id, GA_TO_FC 차익거래는 계약·검증기준일을 유일 업무키로 사용하며 원천별 UNIQUE와 UPSERT arbiter를 일치시킨다. 다른 검증 실행으로 재검증해도 같은 candidate_id를 유지하고 현재 원천 FK/버전을 갱신한다. 차익거래 원천 행들은 별도로 남고 IF84 sourceRefs에 최신 ID 순으로 제공한다. 업무키 잠금 뒤 최신 판정을 재조회하므로 동시 CLEAR 판정이나 오래된 관측 재시도로 후보가 중복되거나 최신 상태가 되돌아가지 않는다. 원천·기존 case/line·과거 계산판은 변경하지 않는다(인터페이스 §4-4-5, #668).
 
 ## 47. 요구사항 연결
 

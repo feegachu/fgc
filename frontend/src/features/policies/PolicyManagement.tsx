@@ -434,6 +434,18 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
               <dd>{rule.maxInstallments === '' ? '설정 필요' : `${rule.maxInstallments}회차`}</dd>
             </div>
             <div>
+              <dt>기초서류 버전</dt>
+              <dd>{rule.basicDocumentVersion || '전체 버전'}</dd>
+            </div>
+            <div>
+              <dt>기초서류 일자 범위</dt>
+              <dd>
+                {rule.basicDocumentDateFrom ? date(rule.basicDocumentDateFrom) : '시작 제한 없음'}
+                {' ~ '}
+                {rule.basicDocumentDateTo ? date(rule.basicDocumentDateTo) : '종료 제한 없음'}
+              </dd>
+            </div>
+            <div>
               <dt>장기유지 구간</dt>
               <dd>
                 {rule.longTermMaintenanceFrom === ''
