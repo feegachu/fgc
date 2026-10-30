@@ -5,6 +5,7 @@ import com.susukkang.fgc.arbitrage.dto.ArbitrageCalculationSource;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSearchCondition;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSummary;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.arbitrage.dto.ConfirmedCommissionSummary;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
@@ -57,6 +58,8 @@ class ArbitrageServiceTest {
     private AuditLogService auditLogService;
     @Mock
     private ArbitrageApplicabilityPolicyService applicabilityPolicyService;
+    @Mock
+    private ClawbackCandidateCaptureService clawbackCandidateCaptureService;
 
     private ArbitrageService arbitrageService;
 
@@ -68,7 +71,7 @@ class ArbitrageServiceTest {
                 validationRunRepository,
                 exceptionCaseRepository,
                 new ObjectMapper().findAndRegisterModules(),
-                auditLogService, applicabilityPolicyService
+                auditLogService, applicabilityPolicyService, clawbackCandidateCaptureService
         );
         org.mockito.Mockito.lenient().when(applicabilityPolicyService.resolve(any())).thenReturn(
                 new ArbitrageApplicabilityPolicyService.Applicability(1L, LocalDate.of(2026, 3, 1), 36, false, null));

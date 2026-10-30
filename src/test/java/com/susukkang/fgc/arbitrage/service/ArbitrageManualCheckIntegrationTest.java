@@ -96,6 +96,9 @@ class ArbitrageManualCheckIntegrationTest {
         assertThat(result.getCalculationSnapshot()).contains(candidateType, "2026-03-01");
         Long cases = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.exception_case WHERE source_entity_type='ARBITRAGE_CHECK' AND source_entity_id=?", Long.class, result.getArbitrageCheckId().toString());
         assertThat(cases).isEqualTo("CLEAR".equals(status) ? 0L : 1L);
+        Long candidates = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.clawback_candidate WHERE arbitrage_check_id=?", Long.class, result.getArbitrageCheckId());
+        assertThat(candidates).isEqualTo("CANDIDATE".equals(status) ? 1L : 0L);
     }
 
     @Test

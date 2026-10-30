@@ -62,6 +62,19 @@ class OpenApiFrontendIntegrationTest {
         assertThat(paths.path("/api/v1/policies/{policyVersionId}").has("put")).isTrue();
         assertThat(paths.path("/api/v1/policies/{policyVersionId}/actions").has("post")).isTrue();
         assertThat(paths.path("/api/v1/policies/{policyVersionId}/versions").has("post")).isTrue();
+        JsonNode latestCalculation = root.path("components").path("schemas")
+                .path("ClawbackCandidateDetailResponse").path("properties").path("latestCalculation");
+        assertThat(latestCalculation.has("$ref")).isFalse();
+        assertThat(latestCalculation.path("anyOf").size()).isEqualTo(2);
+        assertThat(latestCalculation.path("anyOf").get(0).path("$ref").asText())
+                .isEqualTo("#/components/schemas/Calculation");
+        JsonNode nullType = latestCalculation.path("anyOf").get(1).path("type");
+        if (nullType.isArray()) {
+            assertThat(nullType.size()).isEqualTo(1);
+            assertThat(nullType.get(0).asText()).isEqualTo("null");
+        } else {
+            assertThat(nullType.asText()).isEqualTo("null");
+        }
         // Origin is environment-specific, not part of the API type contract.
         root.putArray("servers").addObject().put("url", "/");
         Path output = Path.of("frontend/openapi/schema.json");
