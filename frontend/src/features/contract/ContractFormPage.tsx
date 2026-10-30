@@ -13,13 +13,31 @@ import { toast } from '../../stores/toasts'
 import { useInsurerOptions } from '../base/api'
 import type { Agent, Product } from '../base/api'
 import { useEntityChoices } from '../base/selection'
+import { usePolicyRequest } from '../policies/usePolicyRequest'
 import { SearchSelect } from '../../components/SearchSelect'
 import { contractDetailQuery, createContract, updateContract } from './api'
-import type { ContractDetail } from './api'
-import { contractStatusLabels, paymentCycleLabels } from './labels'
+import type { ContractDetail, ContractUpdateRequest } from './api'
+import { ContractStatusBadge } from './badges'
+import {
+  contractStatusLabels,
+  followUpStatusLabels,
+  paymentCycleLabels,
+  responseLabel,
+  statusReasonLabels,
+} from './labels'
 import { contractErrorText } from './detailState'
-import { createRequest, fillCyclePremium, initialDraft, validateDraft } from './form'
-import type { ContractDraft, ContractField, ContractFieldErrors } from './form'
+import {
+  changesSchedule,
+  createRequest,
+  fillCyclePremium,
+  initialDraft,
+  initialStatusEvent,
+  seoulNow,
+  statusEventRequest,
+  validateDraft,
+  validateStatusEvent,
+} from './form'
+import type { ContractDraft, ContractField, ContractFieldErrors, StatusEventDraft } from './form'
 import './legacy.css'
 import './form.css'
 
@@ -96,6 +114,10 @@ function ContractEditor({
   const [saving, setSaving] = useState(false)
   const [confirmReload, setConfirmReload] = useState(false)
   const [reloading, setReloading] = useState(false)
+  // 접수일시 기본값은 화면을 연 시각으로 한 번만 정한다. 다시 보내도 본문·멱등키가 같아야 한다.
+  const [statusEvent, setStatusEvent] = useState(() => initialStatusEvent(seoulNow()))
+  const [confirmSave, setConfirmSave] = useState(false)
+  const requestKey = usePolicyRequest()
   const submitting = useRef(false)
   const mounted = useRef(true)
   const insurers = useInsurerOptions()
@@ -115,12 +137,42 @@ function ContractEditor({
   const availableAgents = (agents.data ?? []).filter(
     (agent) => agent.rankCode === 'FC' && agent.agentStatus === 'ACTIVE' && agent.activeYn === true,
   )
+  // 수정은 최초 연결 설계사를 고정한다(#653). 계약일을 바꾸면 그날 자격이 있는 그 설계사 행의 현재 소속을 보낸다(설계사 표는 현재 기준정보다).
+  const redated = Boolean(original && draft.contractDate !== original.contractDate)
+  const selectedAgent = availableAgents.find((row) => String(row.agentId) === draft.agentId)
+  const form: ContractDraft = redated
+    ? {
+        ...draft,
+        organizationId: String(selectedAgent?.organizationId ?? ''),
+        organizationName: selectedAgent?.organizationName ?? '',
+      }
+    : draft
+  const agentUnavailable = redated && !agents.isFetching && !agents.selectedError && !selectedAgent
   const product = products.data?.find((row) => String(row.productOfferingId) === draft.productOfferingId)
-  const referenceError = insurers.error ?? products.error ?? agents.error
+  // 고정 설계사 행은 계약일을 바꿨을 때만 필요하다. 그 조회 실패는 '자격 없음'이 아니라 기준정보 오류로 보인다.
+  const referenceError =
+    insurers.error ?? products.error ?? agents.error ?? (redated ? agents.selectedError : undefined)
   const loadingReferences = insurers.isFetching || products.isFetching || agents.isFetching
   const missingToken = Boolean(id && !original?.updatedAt)
-  const valid = Object.keys(validateDraft(draft, currentDate)).length === 0
+  // 선택지는 서버 허용 전이 표(IF-API-12)만 쓴다. 상태를 바꿀 때만 사건을 입력·전송한다.
+  const nextStatuses = original?.allowedNextStatuses ?? []
+  const reasonCodes = original?.statusReasonCodes ?? []
+  const statusChanged = Boolean(original) && draft.contractStatus !== original?.contractStatus
+  const draftErrors = validateDraft(form, currentDate)
+  const eventErrors: ContractFieldErrors = statusChanged
+    ? validateStatusEvent(statusEvent, seoulNow(), reasonCodes)
+    : {}
+  const validate = () => ({ ...draftErrors, ...eventErrors })
+  const valid = Object.keys(validate()).length === 0
+  // 무효면 저장 버튼이 잠겨 submit이 오류를 그리지 못하므로, 값을 넣은 사건 필드는 규칙 위반을 바로 보여 준다.
+  const eventError = (field: keyof StatusEventDraft) =>
+    errors[`statusEvent.${field}`] ?? (statusEvent[field] ? eventErrors[`statusEvent.${field}`] : undefined)
   const disabled = !valid || saving || loadingReferences || Boolean(referenceError) || conflict || missingToken
+  const changes = [
+    statusChanged && '상태 사건 기록·해당 미확정 대상 처리',
+    original && changesSchedule(createRequest(form), original) && '산정정보 변경에 따른 스케줄 새 버전',
+  ].filter(Boolean)
+  const changeSummary = changes.length ? changes.join(' · ') : '계약 정보만 저장(상태 사건·스케줄 새 버전 없음)'
   const productTerm = product?.paymentTermMonths
   const hasProductTerm = productTerm != null && Number.isInteger(productTerm) && productTerm > 0
   const missingRefundTable = product?.standardDeduction80Yn && product.paymentTermMonths == null
@@ -141,16 +193,15 @@ function ContractEditor({
     setDraft((current) => {
       let next = { ...current, [field]: value } as ContractDraft
       if (field === 'insurerId' || field === 'contractDate') next.productOfferingId = ''
-      if (field === 'contractDate') {
+      if (field === 'contractDate' && !id) {
         next.agentId = ''
         next.organizationId = ''
         next.organizationName = ''
       }
       if (field === 'agentId') {
         const agent = (selection as Agent | undefined) ?? availableAgents.find((row) => String(row.agentId) === value)
-        const historical = value === String(original?.agentId) && current.contractDate === original?.contractDate
-        next.organizationId = String((historical ? original?.organizationId : agent?.organizationId) ?? '')
-        next.organizationName = (historical ? original?.organizationName : agent?.organizationName) ?? ''
+        next.organizationId = String(agent?.organizationId ?? '')
+        next.organizationName = agent?.organizationName ?? ''
       }
       if (field === 'productOfferingId') {
         const selected =
@@ -172,20 +223,38 @@ function ContractEditor({
     })
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function changeEvent(field: keyof StatusEventDraft, value: string) {
+    setErrors((current) => ({ ...current, [`statusEvent.${field}`]: undefined }))
+    setStatusEvent((current) => ({ ...current, [field]: value }))
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting.current || conflict || missingToken) return
-    const validation = validateDraft(draft, currentDate)
+    const validation = validate()
     setErrors(validation)
     setSaveError('')
     if (Object.keys(validation).length || disabled) return
+    // 상태 변경은 전후 상태·일시·사유를 확인창에서 검토한 뒤에만 보낸다.
+    if (statusChanged) setConfirmSave(true)
+    else void save()
+  }
+
+  async function save() {
+    if (submitting.current) return
     submitting.current = true
     setSaving(true)
     try {
-      const body = createRequest(draft)
-      const saved = id
-        ? await updateContract(id, { ...body, expectedUpdatedAt: original!.updatedAt! })
-        : await createContract(body)
+      const body = createRequest(form)
+      const request: ContractUpdateRequest | undefined = id
+        ? {
+            ...body,
+            expectedUpdatedAt: original!.updatedAt!,
+            statusEvent: statusChanged ? statusEventRequest(statusEvent) : undefined,
+          }
+        : undefined
+      const updated = request ? await updateContract(id!, request, requestKey(request)) : undefined
+      const saved = updated ?? (await createContract(body))
       const savedId = saved.contractId ?? id
       if (!savedId) throw new Error('저장 결과의 계약 번호를 확인하지 못했습니다. 목록에서 저장 여부를 확인해 주세요.')
       // Invalidate inactive projections too: an update can regenerate schedules and financial snapshots.
@@ -195,8 +264,10 @@ function ContractEditor({
       // The save still updates caches after leaving, but must not navigate away from the user's new screen.
       if (!mounted.current) return
       const count = saved.scheduleHeaderIds?.length ?? 0
-      const action = id ? '수정' : '저장'
-      const message = `보험계약을 ${action}했습니다.${count ? ` 예상 스케줄 ${count}건을 함께 ${id ? '재생성' : '생성'}했습니다 — [예상 스케줄] 탭에서 확인하세요.` : ''}`
+      // 200은 계약·사건 저장 성공이다. 후속 처리 결과는 상세의 상태이력에서 따로 확인한다.
+      const message = id
+        ? `계약 수정이 저장되었습니다.${updated?.statusEventId != null ? ` 후속 처리 상태를 확인하세요. (후속 처리: ${responseLabel(followUpStatusLabels, updated.followUp?.status)})` : ''}${count ? ` 산정정보 변경에 따라 예상 스케줄 ${count}건을 새 버전으로 만들었습니다 — [예상 스케줄] 탭에서 확인하세요.` : ''}`
+        : `보험계약을 저장했습니다.${count ? ` 예상 스케줄 ${count}건을 함께 생성했습니다 — [예상 스케줄] 탭에서 확인하세요.` : ''}`
       if (!id && missingRefundTable)
         toast(
           '선택한 상품버전에 적용할 해약환급률표가 없습니다. 계약은 저장되며, 월 통합검증에서 검토필요로 처리됩니다.',
@@ -211,11 +282,17 @@ function ContractEditor({
       if (!mounted.current) return
       const message = contractErrorText(error instanceof Error ? error : new Error('보험계약을 저장하지 못했습니다.'))
       if (error instanceof ApiError) {
-        if (error.code === 'FGC-CONT-003') setConflict(true)
-        if (error.field && error.field in draft && error.code !== 'FGC-COMMON-500')
+        // 수정 시각 충돌과 그사이 바뀐 허용 전이는 최신 계약을 다시 불러와야 고칠 수 있다.
+        if (error.code === 'FGC-CONT-003' || error.code === 'FGC-IMPL-TRANSITION_DENIED') setConflict(true)
+        if (
+          error.field &&
+          (error.field in draft || error.field.startsWith('statusEvent.')) &&
+          error.code !== 'FGC-COMMON-500'
+        )
           setErrors({ [error.field]: error.message })
       }
       setSaveError(message)
+      setConfirmSave(false)
       submitting.current = false
       setSaving(false)
     }
@@ -386,21 +463,123 @@ function ContractEditor({
                   onChange={(event) => change('contractDate', event.target.value)}
                 />
               </Field>
-              <Field label="계약상태" required error={errors.contractStatus}>
-                <select
-                  name="contractStatus"
-                  className="select-control"
-                  value={draft.contractStatus}
-                  onChange={(event) => change('contractStatus', event.target.value)}
-                >
-                  {Object.entries(contractStatusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              {original ? (
+                <>
+                  <div className="field">
+                    <span className="field-label">현재 상태</span>
+                    <span>
+                      <ContractStatusBadge code={original.contractStatus} label={original.contractStatusLabel} />
+                    </span>
+                  </div>
+                  <Field
+                    label="변경 상태"
+                    required
+                    error={errors.contractStatus}
+                    helper={
+                      nextStatuses.length
+                        ? '허용된 상태로만 바꿀 수 있습니다.'
+                        : '이 상태에서는 바꿀 수 있는 상태가 없습니다.'
+                    }
+                  >
+                    <select
+                      name="contractStatus"
+                      className="select-control"
+                      value={draft.contractStatus}
+                      disabled={!nextStatuses.length}
+                      onChange={(event) => change('contractStatus', event.target.value)}
+                    >
+                      <option value={original.contractStatus}>변경 안 함</option>
+                      {nextStatuses.map((status) => (
+                        <option key={status} value={status}>
+                          {contractStatusLabels[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </>
+              ) : (
+                <Field label="계약상태" required error={errors.contractStatus}>
+                  <select
+                    name="contractStatus"
+                    className="select-control"
+                    value={draft.contractStatus}
+                    onChange={(event) => change('contractStatus', event.target.value)}
+                  >
+                    {Object.entries(contractStatusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </div>
+            {statusChanged && (
+              <fieldset className="contract-status-event">
+                <legend>상태 변경 사유</legend>
+                <p>상태를 바꿀 때만 입력합니다. 처리자와 처리 시각은 서버가 기록합니다.</p>
+                <div className="contract-form-fields">
+                  <Field
+                    label="효력일시"
+                    required
+                    error={eventError('effectiveAt')}
+                    helper="실제 효력 시각(서울). 최신 사건의 효력일시 이후, 접수일시 이전이어야 합니다."
+                  >
+                    <input
+                      type="datetime-local"
+                      name="statusEvent.effectiveAt"
+                      max={statusEvent.receivedAt || undefined}
+                      value={statusEvent.effectiveAt}
+                      onChange={(event) => changeEvent('effectiveAt', event.target.value)}
+                    />
+                  </Field>
+                  <Field
+                    label="접수일시"
+                    required
+                    error={eventError('receivedAt')}
+                    helper="실제로 접수한 시각(서울). 서버 처리 시각과 따로 기록합니다."
+                  >
+                    <input
+                      type="datetime-local"
+                      name="statusEvent.receivedAt"
+                      value={statusEvent.receivedAt}
+                      onChange={(event) => changeEvent('receivedAt', event.target.value)}
+                    />
+                  </Field>
+                  <Field label="사유코드" required error={eventError('reasonCode')}>
+                    <select
+                      name="statusEvent.reasonCode"
+                      className="select-control"
+                      value={statusEvent.reasonCode}
+                      onChange={(event) => changeEvent('reasonCode', event.target.value)}
+                    >
+                      <option value="">사유코드를 선택하세요</option>
+                      {reasonCodes.map((code) => (
+                        <option key={code} value={code}>
+                          {statusReasonLabels[code]}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    className="contract-status-event-reason"
+                    label="사유"
+                    required
+                    error={eventError('reason')}
+                    helper="1~2,000자"
+                  >
+                    <textarea
+                      name="statusEvent.reason"
+                      className="textarea-control"
+                      maxLength={2000}
+                      rows={3}
+                      value={statusEvent.reason}
+                      onChange={(event) => changeEvent('reason', event.target.value)}
+                    />
+                  </Field>
+                </div>
+              </fieldset>
+            )}
           </section>
           <section
             className="surface contract-form-card contract-agent-card contract-editor-agent"
@@ -419,30 +598,38 @@ function ContractEditor({
                 <Field
                   label="모집 설계사"
                   required
-                  error={errors.agentId}
+                  error={
+                    errors.agentId ??
+                    (agentUnavailable
+                      ? '바꾼 계약일에 이 설계사가 활동 중인 FC가 아닙니다. 설계사는 바꿀 수 없으니 계약일을 확인해 주세요.'
+                      : undefined)
+                  }
+                  helper={id ? '최초 연결 설계사는 바꿀 수 없습니다.' : undefined}
                   labelAccessory={
                     <EvidenceLink label="모집 설계사 근거" icon="help">
-                      REG-07 · 제4-32조제12항제1·2호 [현행규정]. 여기서 저장하는 값은 모집 설계사입니다. 지급 대상은
-                      최초 모집자로 고정되지 않고 계약을 유지관리하는 모집종사자이므로, 유지관리 담당 설계사는 별도로
-                      관리합니다.
+                      REG-07 · 제4-32조제12항제1·2호 [현행규정]. 유지관리수수료·장기유지수수료의 지급 대상은 최초
+                      모집자로 고정되지 않고 계약을 유지관리하는 모집종사자입니다. 이 화면이 저장하는 값은 계약에 처음
+                      연결한 모집 설계사이며, 2차 범위에서는 이 설계사를 고정하고 유지관리 담당 변경·승계는 지원하지
+                      않습니다.
                     </EvidenceLink>
                   }
                 >
-                  <SearchSelect
-                    name="agentId"
-                    value={draft.agentId}
-                    source={agents.source}
-                    selected={
-                      availableAgents.find((row) => String(row.agentId) === draft.agentId) ??
-                      (draft.agentId === String(original?.agentId) ? original : undefined)
-                    }
-                    placeholder="설계사 이름·코드 검색"
-                    disabled={!draft.contractDate}
-                    onSelect={(value, row) => {
-                      agents.remember(row)
-                      change('agentId', value, row)
-                    }}
-                  />
+                  {original ? (
+                    <input name="agentName" value={original.agentName ?? ''} readOnly />
+                  ) : (
+                    <SearchSelect
+                      name="agentId"
+                      value={draft.agentId}
+                      source={agents.source}
+                      selected={selectedAgent}
+                      placeholder="설계사 이름·코드 검색"
+                      disabled={!draft.contractDate}
+                      onSelect={(value, row) => {
+                        agents.remember(row)
+                        change('agentId', value, row)
+                      }}
+                    />
+                  )}
                 </Field>
               </div>
               <Field
@@ -453,7 +640,7 @@ function ContractEditor({
               >
                 <input
                   name="organizationName"
-                  value={draft.organizationName}
+                  value={form.organizationName}
                   readOnly
                   placeholder="설계사를 선택하면 자동으로 채워집니다"
                 />
@@ -543,7 +730,9 @@ function ContractEditor({
         <div className="surface contract-form-actions">
           <p id="contract-save-hint" className="contract-save-hint" role="status">
             {saving
-              ? '계약과 스케줄을 저장하고 있습니다.'
+              ? id
+                ? '계약 수정을 저장하고 있습니다.'
+                : '계약과 스케줄을 저장하고 있습니다.'
               : loadingReferences
                 ? '기준정보를 불러오는 중입니다.'
                 : conflict
@@ -551,8 +740,12 @@ function ContractEditor({
                   : missingToken
                     ? '수정 시각을 확인할 수 없습니다. 최신 계약을 다시 불러와 주세요.'
                     : valid && !referenceError
-                      ? '저장할 준비가 되었습니다.'
-                      : '필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.'}
+                      ? id
+                        ? `저장할 준비가 되었습니다. 변경 요약: ${changeSummary}`
+                        : '저장할 준비가 되었습니다.'
+                      : !referenceError && !Object.keys(draftErrors).length
+                        ? '상태 변경 사유의 필수 항목(*)과 일시를 확인해 주세요.'
+                        : '필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.'}
           </p>
           <div className="contract-action-buttons">
             {(conflict || missingToken) && (
@@ -575,11 +768,62 @@ function ContractEditor({
                   save
                 </span>
               )}
-              {id ? '수정하고 스케줄 재생성' : '저장하고 예상 스케줄 만들기'}
+              {id ? '수정 저장' : '저장하고 예상 스케줄 만들기'}
             </Button>
           </div>
         </div>
       </form>
+      <Modal
+        open={confirmSave}
+        title="상태 변경 저장 확인"
+        onClose={() => {
+          if (!saving) setConfirmSave(false)
+        }}
+        closeOnEscape={!saving}
+        footer={
+          <>
+            <Button variant="secondary" disabled={saving} onClick={() => setConfirmSave(false)}>
+              다시 확인
+            </Button>
+            <Button loading={saving} disabled={disabled} onClick={() => void save()}>
+              확인하고 저장
+            </Button>
+          </>
+        }
+      >
+        <dl className="contract-status-confirm">
+          <div>
+            <dt>상태</dt>
+            <dd>
+              {responseLabel(contractStatusLabels, original?.contractStatus, original?.contractStatusLabel)} →{' '}
+              {responseLabel(contractStatusLabels, draft.contractStatus)}
+            </dd>
+          </div>
+          <div>
+            <dt>효력일시</dt>
+            <dd>{statusEvent.effectiveAt.replace('T', ' ')}</dd>
+          </div>
+          <div>
+            <dt>접수일시</dt>
+            <dd>{statusEvent.receivedAt.replace('T', ' ')}</dd>
+          </div>
+          <div>
+            <dt>사유코드</dt>
+            <dd>{responseLabel(statusReasonLabels, statusEvent.reasonCode)}</dd>
+          </div>
+          <div>
+            <dt>사유</dt>
+            <dd>{statusEvent.reason.trim()}</dd>
+          </div>
+          <div>
+            <dt>변경 요약</dt>
+            <dd>{changeSummary}</dd>
+          </div>
+        </dl>
+        <p>
+          저장 성공은 계약·상태 사건 기록까지입니다. 후속 처리는 저장 뒤 따로 진행되며 상세의 상태이력에서 확인합니다.
+        </p>
+      </Modal>
       <Modal
         open={confirmReload}
         title="최신 계약 다시 불러오기"
