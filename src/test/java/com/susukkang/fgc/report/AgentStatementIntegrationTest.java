@@ -37,7 +37,9 @@ class AgentStatementIntegrationTest {
             JOIN fgc.transaction_attribution ta USING (commission_transaction_id)
             WHERE ct.recipient_agent_id = ? AND ct.payment_stage = 'GA_TO_FC' AND ct.status = 'CONFIRMED'
               AND ct.cashflow_type = 'PAYMENT' AND ct.source_type NOT IN ('ADJUSTMENT', 'CLAWBACK', 'RECOVERY')
-              AND ta.attribution_month = DATE '2026-07-01'
+              AND ta.agent_id = ct.recipient_agent_id AND ta.attribution_month = DATE '2026-07-01'
+              AND NOT EXISTS (SELECT 1 FROM fgc.payment_journal_correction pc
+                               WHERE pc.replacement_payment_id = ct.commission_transaction_id)
             """;
 
     @Autowired MockMvc mvc;
@@ -190,8 +192,87 @@ class AgentStatementIntegrationTest {
         JsonNode all = data(mine("month=" + MONTH + "&size=100"));
         long total = all.path("items").path("totalElements").asLong();
         JsonNode summary = all.path("summary");
+        // PAYMENT 건수를 원장 쪽에서 따로 센 값과 비교한다. 정정 지급건이 PAYMENT 에도 잡히면 여기서 깨진다.
+        assertThat(summary.path("payment").path("count").asLong())
+                .isEqualTo(jdbc.queryForObject("SELECT count(*) " + OWN_PAYMENTS, Long.class, ownAgent));
         assertThat(total).isEqualTo(summary.path("payment").path("count").asLong() + summary.path("held").path("count").asLong()
                 + summary.path("adjustment").path("count").asLong() + summary.path("clawback").path("count").asLong());
+    }
+
+    @Test
+    void correctionReplacementIsAdjustmentAndPaymentEvidenceCarriesTheScheduleBasis() throws Exception {
+        long paymentsBefore = jdbc.queryForObject("SELECT count(*) " + OWN_PAYMENTS, Long.class, ownAgent);
+        Long header = scheduleHeader();
+        Long scheduled = scheduleLine(header, 1, 6, "PLANNED");
+        // 스케줄 회차에 연결된 일반 지급: 상세 근거에 회차와 계산 근거가 실려야 한다.
+        Long plain = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 9000);
+        // 원장 정정으로 생긴 대체 지급: source_type 은 GA_MANUAL_PAYMENT 지만 ADJUSTMENT 로 분류돼야 한다.
+        Long original = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 7000);
+        Long replacement = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 7500);
+        linkCorrection(original, replacement);
+        // 귀속 설계사가 다른 지급건은 수취인이 본인이어도 본인 명세에 나오면 안 된다.
+        confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, otherAgent, scheduled, header, 3000);
+        // 대체 지급의 귀속행이 모두 다른 설계사 것이면, 귀속행이 없는 경우처럼 지급건 전액으로 대체하지 않고 제외한다.
+        Long foreignOriginal = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 4000);
+        Long foreignReplacement = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, otherAgent, scheduled, header, 4500);
+        linkCorrection(foreignOriginal, foreignReplacement);
+
+        JsonNode adjustment = data(mine("month=" + MONTH + "&entryType=ADJUSTMENT"));
+        assertThat(adjustment.path("summary").path("adjustment").path("count").asLong()).isEqualTo(1);
+        assertThat(adjustment.path("summary").path("adjustment").path("amount").decimalValue()).isEqualByComparingTo("7500");
+        JsonNode adjustmentDetail = data(mine("/" + adjustment.path("items").path("content").get(0).path("entryKey").asText()));
+        assertThat(adjustmentDetail.path("evidence").path("replacesPaymentId").asLong()).isEqualTo(original);
+        assertThat(adjustmentDetail.path("entry").path("entryType").asText()).isEqualTo("ADJUSTMENT");
+
+        // 대체 지급은 PAYMENT 에서 빠지고, 취소된 원본도 없으며, 남의 귀속행도 없다. 일반 지급 한 건만 늘어난다.
+        JsonNode payment = data(mine("month=" + MONTH + "&entryType=PAYMENT&size=100"));
+        assertThat(payment.path("summary").path("payment").path("count").asLong()).isEqualTo(paymentsBefore + 1);
+        assertThat(payment.path("summary").path("payment").path("count").asLong())
+                .isEqualTo(jdbc.queryForObject("SELECT count(*) " + OWN_PAYMENTS, Long.class, ownAgent));
+        JsonNode plainEvidence = null;
+        for (JsonNode entry : payment.path("items").path("content")) {
+            JsonNode evidence = data(mine("/" + entry.path("entryKey").asText())).path("evidence");
+            assertThat(evidence.path("commissionTransactionId").asLong()).isNotIn(original, replacement);
+            if (evidence.path("commissionTransactionId").asLong() == plain) {
+                plainEvidence = evidence;
+            }
+        }
+        assertThat(plainEvidence).isNotNull();
+        assertThat(plainEvidence.path("scheduleLineId").asLong()).isEqualTo(scheduled);
+        assertThat(plainEvidence.path("basisCode").asText()).isEqualTo("FIRST_YEAR_PREMIUM");
+        assertThat(plainEvidence.path("calculationType").asText()).isEqualTo("RATE");
+        assertThat(plainEvidence.path("ratePct").decimalValue()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void clawbackUsesSeoulMonthAndSkipsDetectedAndCancelledCases() throws Exception {
+        Long rule = id("""
+                INSERT INTO fgc.clawback_rule(policy_version_id, elapsed_month_from, elapsed_month_to,
+                    clawback_basis_code, clawback_rate_pct)
+                SELECT min(policy_version_id), 9999, 9999, 'STMT_BOUNDARY', 10 FROM fgc.policy_version
+                RETURNING clawback_rule_id
+                """);
+        Long attribution = id("""
+                SELECT min(a.transaction_attribution_id) FROM fgc.transaction_attribution a
+                JOIN fgc.commission_transaction t USING (commission_transaction_id)
+                WHERE t.recipient_agent_id = ? AND a.contract_id IS NOT NULL
+                """, ownAgent);
+        // 서울 7월 1일 00:30 (UTC 6월 30일), 서울 8월 1일 00:30 (UTC 7월 31일)
+        clawbackCase(rule, attribution, "CALCULATED", "2026-06-30 15:30:00+00");
+        clawbackCase(rule, attribution, "CALCULATED", "2026-07-31 15:30:00+00");
+        clawbackCase(rule, attribution, "DETECTED", "2026-07-15 10:00:00+09");
+        clawbackCase(rule, attribution, "CANCELLED", "2026-07-16 10:00:00+09");
+        // 수취인은 본인이지만 귀속 설계사가 다른 귀속행의 환수 라인은 제외한다.
+        Long header = scheduleHeader();
+        Long scheduled = scheduleLine(header, 1, 6, "PLANNED");
+        Long foreignPayment = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, otherAgent, scheduled, header, 3000);
+        Long foreignAttribution = id("SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id = ?",
+                foreignPayment);
+        clawbackCase(rule, foreignAttribution, "CALCULATED", "2026-07-15 10:00:00+09");
+
+        assertThat(data(mine("month=2026-06&entryType=CLAWBACK")).path("summary").path("clawback").path("count").asLong()).isZero();
+        assertThat(data(mine("month=2026-07&entryType=CLAWBACK")).path("summary").path("clawback").path("count").asLong()).isEqualTo(1);
+        assertThat(data(mine("month=2026-08&entryType=CLAWBACK")).path("summary").path("clawback").path("count").asLong()).isEqualTo(1);
     }
 
     @Test
@@ -229,6 +310,9 @@ class AgentStatementIntegrationTest {
                 .encodeToString("PAYMENT:999999999:0".getBytes(java.nio.charset.StandardCharsets.UTF_8)), agentToken)
                 .andExpect(status().isNotFound());
         request("/api/v1/agent/me/statements/not-a-key", agentToken).andExpect(status().isBadRequest());
+        // 내부 경로에서도 지정한 설계사의 범위를 벗어난 키는 404 다.
+        request("/api/v1/reports/agents/" + ownAgent + "/statements/" + foreignKey, internalToken)
+                .andExpect(status().isNotFound());
 
         // AGENT 는 내부 경로에 agentId 를 넣어도 접근할 수 없다.
         request("/api/v1/reports/agents/" + ownAgent + "/statements?month=" + MONTH, agentToken).andExpect(status().isForbidden());
@@ -251,8 +335,85 @@ class AgentStatementIntegrationTest {
         mine("month=" + MONTH + "&size=101").andExpect(status().isBadRequest());
         mine("month=" + MONTH + "&page=0").andExpect(status().isBadRequest());
         mine("month=" + MONTH + "&contractNo=" + "A".repeat(81)).andExpect(status().isBadRequest());
+        // offset 이 int 범위를 넘는 page 는 500 이 아니라 빈 목록이다.
+        mine("month=" + MONTH + "&page=2147483647&size=100").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.content").isEmpty());
         mine("month=" + MONTH + "&contractNo=%25").andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items.totalElements").value(0));
+    }
+
+    /** 원장 정정 그룹과 대체 지급 연결을 만든다. 원본은 취소 처리하고, 정정그룹용 분개는 차대 균형을 맞춰 POSTED 로 만든다. */
+    private void linkCorrection(Long original, Long replacement) {
+        String journalNo = "STMT-" + UUID.randomUUID().toString().substring(0, 8);
+        Long journal = id("""
+                INSERT INTO fgc.journal_header(journal_no, journal_date, journal_type, source_entity_type, source_entity_id)
+                VALUES (?, DATE '2099-01-01', 'ADJUSTMENT', 'STATEMENT_TEST', ?) RETURNING journal_header_id
+                """, journalNo, journalNo);
+        jdbc.update("INSERT INTO fgc.journal_line(journal_header_id, line_no, journal_account_id, debit_amount, credit_amount) SELECT ?, 1, min(journal_account_id), 100, 0 FROM fgc.journal_account", journal);
+        jdbc.update("INSERT INTO fgc.journal_line(journal_header_id, line_no, journal_account_id, debit_amount, credit_amount) SELECT ?, 2, min(journal_account_id), 0, 100 FROM fgc.journal_account", journal);
+        jdbc.update("UPDATE fgc.journal_header SET status = 'POSTED' WHERE journal_header_id = ?", journal);
+        String groupKey = "STMT-CORR-" + UUID.randomUUID().toString().substring(0, 8);
+        jdbc.update("INSERT INTO fgc.journal_correction_group(correction_group_key, original_journal_header_id, reason) VALUES (?, ?, 'statement test')",
+                groupKey, journal);
+        jdbc.update("UPDATE fgc.commission_transaction SET status = 'CANCELLED' WHERE commission_transaction_id = ?", original);
+        jdbc.update("INSERT INTO fgc.payment_journal_correction(correction_group_key, original_payment_id, replacement_payment_id) VALUES (?, ?, ?)",
+                groupKey, original, replacement);
+    }
+
+    private Long scheduleHeader() {
+        return id("""
+                INSERT INTO fgc.schedule_header(contract_id, payment_stage, policy_version_id, schedule_version_no, schedule_regime)
+                SELECT c.contract_id, 'GA_TO_FC', min(pv.policy_version_id), 1, 'CURRENT'
+                FROM fgc.insurance_contract c CROSS JOIN fgc.policy_version pv
+                WHERE c.contract_id = (SELECT min(contract_id) FROM fgc.insurance_contract WHERE agent_id = ?)
+                GROUP BY c.contract_id RETURNING schedule_header_id
+                """, ownAgent);
+    }
+
+    private Long scheduleLine(Long header, int lineNo, int installmentNo, String lineStatus) {
+        Long item = id("SELECT min(commission_item_id) FROM fgc.commission_transaction WHERE recipient_agent_id = ?", ownAgent);
+        return id("""
+                INSERT INTO fgc.schedule_line(schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                    commission_item_id, beneficiary_agent_id, basis_code, basis_amount, calculation_type, rate_pct,
+                    expected_amount, line_status)
+                VALUES (?, ?, ?, ?, DATE '2026-07-20', ?, ?, 'FIRST_YEAR_PREMIUM', 1000000, 'RATE', 10, 100000, ?)
+                RETURNING schedule_line_id
+                """, header, lineNo, installmentNo, installmentNo, item, ownAgent, lineStatus);
+    }
+
+    /** 원장 가드 때문에 DRAFT 로 넣고 귀속을 붙인 뒤 UPDATE 로 확정한다. 귀속 설계사를 수취인과 다르게 줄 수 있다. */
+    private Long confirmedPayment(String sourceType, Long recipient, Long attributedAgent, Long line, Long header, int amount) {
+        Long item = id("SELECT min(commission_item_id) FROM fgc.commission_transaction WHERE recipient_agent_id = ?", ownAgent);
+        Long payment = id("""
+                INSERT INTO fgc.commission_transaction(payment_stage, source_type, source_business_key, recipient_agent_id,
+                    commission_item_id, settlement_month, due_date, amount, cashflow_type, status)
+                VALUES ('GA_TO_FC', ?, ?, ?, ?, DATE '2026-07-01', DATE '2026-07-25', ?, 'PAYMENT', 'DRAFT')
+                RETURNING commission_transaction_id
+                """, sourceType, "STMT-PAY-" + UUID.randomUUID(), recipient, item, amount);
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, attribution_scope,
+                    contract_id, agent_id, schedule_line_id, attribution_date, attribution_month, attributed_amount,
+                    inclusion_status_snapshot, exclusion_type_snapshot, attribution_method, allocation_basis_snapshot, evidence_ref)
+                SELECT ?, 1, 'CONTRACT', sh.contract_id, ?, ?, DATE '2026-07-25', DATE '2026-07-01', ?,
+                       'EXCLUDED', 'NEW_AGENT_SUPPORT', 'DIRECT', '{}'::jsonb, 'EVD-STMT-PAY'
+                FROM fgc.schedule_header sh WHERE sh.schedule_header_id = ?
+                """, payment, attributedAgent, line, amount, header);
+        jdbc.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", payment);
+        return payment;
+    }
+
+    private void clawbackCase(Long rule, Long attribution, String status, String createdAt) {
+        Long caseId = id("""
+                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no, status, calculated_amount)
+                SELECT a.contract_id, r.policy_version_id, ?, ?, 10 FROM fgc.transaction_attribution a
+                CROSS JOIN fgc.clawback_rule r WHERE a.transaction_attribution_id = ? AND r.clawback_rule_id = ?
+                RETURNING clawback_case_id
+                """, "STMT-" + UUID.randomUUID(), status, attribution, rule);
+        jdbc.update("""
+                INSERT INTO fgc.clawback_line(clawback_case_id, line_no, transaction_attribution_id, clawback_rule_id,
+                    originally_paid_amount, applied_rate_pct, clawback_amount) VALUES (?, 1, ?, ?, 100, 10, 10)
+                """, caseId, attribution, rule);
+        jdbc.update("UPDATE fgc.clawback_case SET created_at = ?::timestamptz WHERE clawback_case_id = ?", createdAt, caseId);
     }
 
     private ResultActions mine(String queryOrPath) throws Exception {
