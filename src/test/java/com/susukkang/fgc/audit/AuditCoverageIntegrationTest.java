@@ -2,8 +2,10 @@ package com.susukkang.fgc.audit;
 
 import com.susukkang.fgc.common.code.ContractStatus;
 import com.susukkang.fgc.common.code.PaymentCycleCode;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.contract.dto.ContractCreateRequest;
 import com.susukkang.fgc.contract.dto.ContractCreateResponse;
+import com.susukkang.fgc.contract.dto.ContractStatusEventRequest;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.service.ContractService;
 import org.junit.jupiter.api.DisplayName;
@@ -77,12 +79,13 @@ class AuditCoverageIntegrationTest {
                 """, String.class, String.valueOf(created.contractId()));
         assertThat(afterValue).contains(contractNo);
 
+        // FUN-025: 상태 변경은 허용 전이(정상→미납)와 사건·멱등키를 갖춘 요청만 저장된다.
         ContractUpdateRequest updateRequest = new ContractUpdateRequest(
                 contractNo,
                 createRequest.getInsurerId(),
                 createRequest.getProductOfferingId(),
                 createRequest.getContractDate(),
-                ContractStatus.LAPSED,
+                ContractStatus.UNPAID,
                 createRequest.getAgentId(),
                 createRequest.getOrganizationId(),
                 PaymentCycleCode.MONTHLY,
@@ -92,18 +95,23 @@ class AuditCoverageIntegrationTest {
                 120,
                 BigDecimal.ZERO,
                 jdbcTemplate.queryForObject("SELECT updated_at FROM fgc.insurance_contract WHERE contract_id=?",
-                        java.time.OffsetDateTime.class, created.contractId())
+                        java.time.OffsetDateTime.class, created.contractId()),
+                new ContractStatusEventRequest(
+                        createRequest.getContractDate().atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime(),
+                        DateUtil.nowSeoul(), "MANUAL_STATUS_CHANGE", "감사 기록 확인용 미납 등록")
         );
+        Long userId = jdbcTemplate.queryForObject("SELECT min(user_id) FROM fgc.app_user", Long.class);
 
-        contractService.updateContract(created.contractId(), updateRequest);
+        contractService.updateContract(created.contractId(), updateRequest, UUID.randomUUID().toString(), userId);
 
         Map<String, Object> updatedAudit = jdbcTemplate.queryForMap("""
-                SELECT before_value::text AS before_value, after_value::text AS after_value
+                SELECT before_value::text AS before_value, after_value::text AS after_value, reason
                   FROM fgc.audit_log
                  WHERE action_code = 'CONTRACT_UPDATED' AND entity_type = 'CONTRACT' AND entity_id = ?
                 """, String.valueOf(created.contractId()));
         assertThat((String) updatedAudit.get("before_value")).contains("ACTIVE");
-        assertThat((String) updatedAudit.get("after_value")).contains("LAPSED");
+        assertThat((String) updatedAudit.get("after_value")).contains("UNPAID").contains("statusEventId");
+        assertThat(updatedAudit.get("reason")).isEqualTo("감사 기록 확인용 미납 등록");
     }
 
     private int realtimeCapCheckCount(Long contractId) {

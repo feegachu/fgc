@@ -1469,7 +1469,7 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 1,200% 정책 | cap_rule_set, cap_rule_item |
 | 배부근거 | allocation_policy |
 | 환급률 | refund_rate_table, refund_rate_line |
-| 계약·상태·재무 | insurance_contract, contract_status_event, contract_status_event_processing, contract_financial_snapshot |
+| 계약·상태·재무 | insurance_contract, contract_status_event, contract_status_event_processing, contract_event_job, contract_status_event_effect, contract_write_request, contract_financial_snapshot |
 | 실제 돈 | statement_batch, commission_transaction, transaction_attribution |
 | 예상 스케줄 | schedule_header, schedule_line |
 | 배치 진행 | batch_watermark, validation_run.current_step |

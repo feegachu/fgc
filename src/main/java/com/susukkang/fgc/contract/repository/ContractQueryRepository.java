@@ -5,6 +5,7 @@ import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
+import com.susukkang.fgc.contract.dto.ContractStatusEventResponse;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.querydsl.core.BooleanBuilder;
 
@@ -32,10 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 설명 : 계약 검색·CSV·상세 화면용 조회와 등록·수정에 필요한 기준정보 검증을 담당한다.
@@ -93,6 +96,20 @@ public class ContractQueryRepository {
                  ORDER BY p.contractStatusEventId, p.processedAt, p.contractStatusEventProcessingId
                 """, ContractStatusEventProcessingRow.class)
                 .setParameter(CONTRACT_ID_PARAMETER, contractId).getResultList();
+    }
+
+    /** IF-API-16 등록자. 등록자가 없는 사건은 찾지 않으며 현재 사용자로 채우지 않는다. */
+    @Transactional(readOnly = true)
+    public Map<Long, ContractStatusEventResponse.RegisteredBy> findRegistrants(Collection<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return entityManager.createQuery("""
+                SELECT u.userId, u.loginId, u.userName FROM AppUser u WHERE u.userId IN :userIds
+                """, Object[].class)
+                .setParameter("userIds", userIds).getResultStream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> new ContractStatusEventResponse.RegisteredBy(
+                        (Long) row[0], (String) row[1], (String) row[2])));
     }
 
     @Transactional(readOnly = true)

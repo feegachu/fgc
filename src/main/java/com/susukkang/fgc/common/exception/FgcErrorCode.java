@@ -251,6 +251,10 @@ public enum FgcErrorCode {
             "error.common.idempotencyConflict"),
     IMPL_REQUEST_IN_PROGRESS("FGC-IMPL-REQUEST_IN_PROGRESS", HttpStatus.CONFLICT,
             "error.common.requestInProgress"),
+    // FUN-025·026 계약 상태 사건(인터페이스정의서 §14-1 예약 코드)
+    IMPL_AGENT_FIXED("FGC-IMPL-AGENT_FIXED", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.agentFixed"),
+    IMPL_EVENT_ORDER("FGC-IMPL-EVENT_ORDER", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.eventOrder"),
+    IMPL_TRANSITION_DENIED("FGC-IMPL-TRANSITION_DENIED", HttpStatus.CONFLICT, "error.contract.transitionDenied"),
 
     COMMON_002(
             "FGC-COMMON-002",

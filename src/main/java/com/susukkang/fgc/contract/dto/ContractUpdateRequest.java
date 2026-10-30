@@ -2,6 +2,7 @@ package com.susukkang.fgc.contract.dto;
 
 import com.susukkang.fgc.common.code.ContractStatus;
 import com.susukkang.fgc.common.code.PaymentCycleCode;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -64,5 +65,8 @@ public class ContractUpdateRequest implements ContractInput {
 
     @NotNull
     private OffsetDateTime expectedUpdatedAt; // 상세 조회 당시 수정 시각. 오래된 편집 요청 검출
+
+    @Valid
+    private ContractStatusEventRequest statusEvent; // 상태를 바꿀 때만 필수(IF-API-19), 일반 수정은 null
 
 }

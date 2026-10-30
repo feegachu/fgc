@@ -124,6 +124,6 @@ class ContractFinancialSnapshotConcurrencyIntegrationTest {
         return new ContractUpdateRequest(source.getContractNo(), source.getInsurerId(), source.getProductOfferingId(),
                 source.getContractDate(), source.getCurrentStatus(), source.getAgentId(), source.getOrganizationId(),
                 source.getPaymentCycleCode(), value, value, value, source.getPaymentTermMonths(),
-                source.getStandardSurrenderDeductionAmount(), source.getUpdatedAt());
+                source.getStandardSurrenderDeductionAmount(), source.getUpdatedAt(), null);
     }
 }

@@ -86,6 +86,7 @@ public class ConstraintErrorCodeResolver {
         mappings.put("ex_fee_regime_ruleset_scope", FgcErrorCode.POL_002);
         mappings.put("uq_commission_rule", FgcErrorCode.POL_002);
         mappings.put("policy_write_request_pkey", FgcErrorCode.IMPL_IDEMPOTENCY_CONFLICT);
+        mappings.put("contract_write_request_pkey", FgcErrorCode.IMPL_IDEMPOTENCY_CONFLICT);
         mappings.put("commission_rule_commission_item_id_fkey", FgcErrorCode.COMMON_002);
         mappings.put("commission_rule_insurer_id_fkey", FgcErrorCode.COMMON_002);
         mappings.put("commission_rule_product_offering_id_fkey", FgcErrorCode.COMMON_002);
