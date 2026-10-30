@@ -81,10 +81,12 @@ public class ValidationRunDetailServiceImpl implements ValidationRunDetailServic
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public ValidationRunProgressResponse progress(Long validationRunId) {
         ValidationRun run = validationRunRepository.findById(validationRunId)
                 .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", validationRunId)));
-        return ValidationRunProgressResponse.from(ValidationRunRow.from(run));
+        var trace = validationRunRepository.findLatestAttemptTrace(validationRunId).orElse(null);
+        return ValidationRunProgressResponse.from(ValidationRunRow.from(run),
+                trace == null ? null : trace.getRequestId(), trace == null ? null : trace.getAttemptId());
     }
 }

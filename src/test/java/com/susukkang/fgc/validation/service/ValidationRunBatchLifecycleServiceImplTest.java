@@ -2,6 +2,9 @@ package com.susukkang.fgc.validation.service;
 
 import com.susukkang.fgc.common.code.ValidationRunType;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
+import com.susukkang.fgc.validation.repository.ValidationRunRepository;
+import com.susukkang.fgc.common.code.ValidationRunStatus;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -12,6 +15,7 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -32,9 +36,28 @@ class ValidationRunBatchLifecycleServiceImplTest {
 
     @Mock
     private ValidationRunBatchAuditService auditService;
+    @Mock
+    private ValidationRunRepository validationRunRepository;
 
     private ValidationRunBatchLifecycleServiceImpl service() {
-        return new ValidationRunBatchLifecycleServiceImpl(progressService, auditService);
+        return new ValidationRunBatchLifecycleServiceImpl(validationRunRepository, progressService, auditService);
+    }
+
+    @Test
+    void restartClaimsFailedRunBeforeRecordingAudit() {
+        given(validationRunRepository.restartFailed(100L, ValidationRunStatus.FAILED, ValidationRunStatus.RUNNING))
+                .willReturn(1);
+        service().restart(100L, parameters());
+        InOrder order = inOrder(validationRunRepository, auditService);
+        order.verify(validationRunRepository).restartFailed(100L, ValidationRunStatus.FAILED, ValidationRunStatus.RUNNING);
+        order.verify(auditService).recordRetried(100L, parameters());
+        verifyNoInteractions(progressService);
+    }
+
+    @Test
+    void concurrentRestartLoserDoesNotRecordRetryAudit() {
+        assertThatThrownBy(() -> service().restart(100L, parameters())).isInstanceOf(FgcBusinessException.class);
+        verifyNoInteractions(auditService, progressService);
     }
 
     private static MonthlyValidationJobParameters parameters() {

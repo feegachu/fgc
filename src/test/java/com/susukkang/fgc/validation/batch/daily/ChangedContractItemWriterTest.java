@@ -1,6 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,12 +32,15 @@ class ChangedContractItemWriterTest {
     private ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
     @Mock
     private ExceptionCaseRepository exceptionCaseRepository;
+    @Mock
+    private ClawbackCandidateCaptureService clawbackCandidateCaptureService;
 
     private ChangedContractItemWriter writer;
 
     @BeforeEach
     void setUp() {
-        writer = new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository);
+        writer = new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository,
+                clawbackCandidateCaptureService);
 
         JobExecution jobExecution = new JobExecution(
                 new JobInstance(1L, DailyChangedContractJobNames.JOB_NAME), new JobParameters());
@@ -53,6 +57,7 @@ class ChangedContractItemWriterTest {
         verify(contractStatusEventProcessingRepository).insertProcessing(10L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
         verify(contractStatusEventProcessingRepository).insertProcessing(11L, DailyChangedContractJobNames.JOB_NAME, "SUCCEEDED", 777L, null);
         verifyNoInteractions(exceptionCaseRepository);
+        verify(clawbackCandidateCaptureService).captureStatusEvents(List.of(10L, 11L));
     }
 
     @Test
@@ -62,5 +67,6 @@ class ChangedContractItemWriterTest {
 
         verify(exceptionCaseRepository).insertDataQualityCase(eq(777L), eq(2L), eq("일일 변경 계약 재검증 실패"), eq("FGC-CONT-001"));
         verify(contractStatusEventProcessingRepository).insertProcessing(20L, DailyChangedContractJobNames.JOB_NAME, "FAILED", 777L, "FGC-CONT-001");
+        verify(clawbackCandidateCaptureService).captureStatusEvents(List.of(20L));
     }
 }
