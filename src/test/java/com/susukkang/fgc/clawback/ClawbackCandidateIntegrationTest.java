@@ -58,7 +58,7 @@ class ClawbackCandidateIntegrationTest {
         contractId = cloneContract(contractNo);
         agentId = jdbc.queryForObject("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id=?", Long.class, contractId);
         itemId = jdbc.queryForObject("SELECT min(commission_item_id) FROM fgc.commission_item WHERE cashflow_type='PAYMENT'", Long.class);
-        // 데모 시드의 가상 환수율표(V72_1)는 모든 계약에 적용된다. 이 클래스는 직접 만든 정책으로만 정책 범위를 검증한다.
+        // 데모 시드의 가상 환수율표(V70_1)는 모든 계약에 적용된다. 이 클래스는 직접 만든 정책으로만 정책 범위를 검증한다.
         jdbc.update("""
                 DELETE FROM fgc.clawback_rule WHERE policy_version_id IN
                   (SELECT policy_version_id FROM fgc.policy_version WHERE policy_code = 'CLAW-GA-VIRTUAL-2026')

@@ -225,3 +225,14 @@ it('links evidence to the source contract, arbitrage check and payment', async (
   const arbitrage = await screen.findByRole('link', { name: '차익거래 검증' })
   expect(arbitrage).toHaveAttribute('href', '/arbitrage-checks?month=2026-07&contractNo=CLW-002')
 })
+
+it('keeps the calculate button off until the calculation form is wired even when the server allows it', async () => {
+  const allowed = {
+    ...detail,
+    candidate: { ...statusRow, allowedActions: ['CALCULATE'], reviewReasons: ['CALCULATION_STALE'] },
+  }
+  mount('/clawbacks', (p) => (p.includes('/candidates/42') ? envelope(allowed) : fixtures(p)))
+  expect(await screen.findByText('계산 후 원천이 바뀌어 다시 계산 필요', { selector: 'li' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
+  expect(screen.getByText(/계산할 수 있는 후보입니다/)).toBeInTheDocument()
+})

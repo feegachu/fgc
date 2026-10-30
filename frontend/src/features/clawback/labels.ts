@@ -19,5 +19,6 @@ export const reviewReasonLabels: Record<string, string> = {
   EVENT_NOT_EFFECTIVE: '사건 효력 전',
   ARBITRAGE_SOURCE_CHANGED: '차익거래 검증 결과 변경',
   CALCULATION_BASIS_UNCONFIRMED: '환수 산정 기준(D-02) 미확정',
+  CALCULATION_STALE: '계산 후 원천이 바뀌어 다시 계산 필요',
 }
 export const reasonText = (code: string) => reviewReasonLabels[code] ?? code
