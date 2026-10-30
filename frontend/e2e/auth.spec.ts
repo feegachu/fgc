@@ -149,3 +149,18 @@ test('로그인 PC·모바일 화면과 비밀번호 토글', async ({ page }, t
   await testInfo.attach('로그인 모바일', { path: testInfo.outputPath('login-mobile.png'), contentType: 'image/png' })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
+
+test('신규 지급의 실제 입력은 이동 취소 시 유지하고 명시적 버리기 후에만 이동한다', async ({ page }) => {
+  await authFixture(page)
+  await page.goto('transactions/new?month=2026-08')
+  await login(page)
+  await expect(page.getByRole('heading', { name: '지급 건 등록 · 귀속 · 확정' })).toBeVisible()
+  await page.locator('#bizKey').fill('UNSAVED-UI-ONLY')
+  await page.getByRole('link', { name: 'FGC 업무 대시보드' }).click()
+  await expect(page.getByRole('dialog', { name: '저장하지 않은 입력이 있어요' })).toBeVisible()
+  await page.getByRole('button', { name: '현재 입력 유지 · 돌아가기' }).click()
+  await expect(page.locator('#bizKey')).toHaveValue('UNSAVED-UI-ONLY')
+  await page.getByRole('link', { name: 'FGC 업무 대시보드' }).click()
+  await page.getByRole('button', { name: '입력을 버리고 이동' }).click()
+  await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
+})

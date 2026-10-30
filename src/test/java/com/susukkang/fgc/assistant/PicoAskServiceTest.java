@@ -70,14 +70,36 @@ class PicoAskServiceTest {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("오만원을 지급하세요.","payment.draft:overview"));
         assertThat(service.ask(request("얼마야")).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
     }
-    @Test void storedStateIsAuthorizedBeforeModelAndOnlyStateEnumIsSent() {
-        when(contexts.read(9876543210123L)).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.CONFIRMED));
-        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("확정된 지급은 기존 정정 절차를 확인하세요.","payment.draft:overview"));
-        var req=new PicoAskRequest("고객 김철수 1234567.89원 선택 어디서?","TRAN-W02",List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,9876543210123L)),"r1","1.0",List.of());
-        assertThat(service.ask(req).source()).isEqualTo(Source.AI);
-        var order=inOrder(contexts,gateway);order.verify(contexts).read(9876543210123L);order.verify(gateway).call(any(),eq(PicoAskService.GuideSelection.class));
-        var prompt=ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);verify(gateway).call(prompt.capture(),eq(PicoAskService.ModelAnswer.class));
-        assertThat(prompt.getValue().data()).contains("CONFIRMED").doesNotContain("9876543210123","1234567.89","김철수");
+    @Test void storedClosedStateIsAuthorizedAndDeterministicallyBlocksPaymentGuidanceWithoutExposingState() {
+        for (var state : List.of(CommissionPaymentStatus.CONFIRMED, CommissionPaymentStatus.CANCELLED)) {
+            when(contexts.read(9876543210123L)).thenReturn(new PicoPaymentContextService.Snapshot(state));
+            var req = new PicoAskRequest("고객 김철수 1234567.89원 선택 어디서?","TRAN-W02",List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,9876543210123L)),"r1","1.0",List.of());
+            var reply = service.ask(req);
+            assertThat(reply.source()).isEqualTo(Source.FIXED);
+            assertThat(reply.fallbackReason()).isIn("PAYMENT_ALREADY_CONFIRMED","PAYMENT_CANCELLED");
+            assertThat(reply.evidenceRefs()).isEmpty();
+        }
+        var prompts=ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),eq(PicoAskService.GuideSelection.class));
+        assertThat(prompts.getAllValues()).allSatisfy(prompt -> assertThat(prompt.data()).doesNotContain("storedPaymentState","CONFIRMED","CANCELLED","9876543210123","1234567.89","김철수"));
+        verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
+    }
+    @Test void aClosedPaymentDoesNotPreventQuestionsAboutAnotherBusinessWorkflow() {
+        when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.CONFIRMED));
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("contract.find")));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("보험계약 목록의 검색 조건에서 조회하세요.","contract.find:overview"));
+        var request = new PicoAskRequest("다른 보험계약을 찾고 싶어","TRAN-W02",List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)),"r1","1.0",List.of());
+        assertThat(service.ask(request).source()).isEqualTo(Source.AI);
+    }
+    @Test void unsupportedSingleEntityAndMultipleReferencesAreDifferentContracts() {
+        var contract = new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.CONTRACT,1L);
+        var unsupported = service.ask(new PicoAskRequest("이 계약 상태","CONT-W01",List.of(contract),"r1","1.0",List.of()));
+        assertThat(unsupported.decision()).isEqualTo(Decision.UNSUPPORTED);
+        assertThat(unsupported.fallbackReason()).isEqualTo("ENTITY_STATE_NOT_SUPPORTED");
+        var multiple = service.ask(new PicoAskRequest("상태","CONT-W01",List.of(contract,contract),"r1","1.0",List.of()));
+        assertThat(multiple.decision()).isEqualTo(Decision.ASK_CLARIFICATION);
+        assertThat(multiple.fallbackReason()).isEqualTo("SINGLE_PAYMENT_REQUIRED");
+        verifyNoInteractions(contexts,gateway);
     }
     @Test void unauthorizedEntityNeverReachesExternalProvider() {
         when(contexts.read(77L)).thenThrow(new org.springframework.security.access.AccessDeniedException("denied"));
