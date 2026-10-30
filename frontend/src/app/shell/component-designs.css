@@ -1,4 +1,43 @@
 /* PDF A/B/C experiments are enabled only by the development shell attributes. */
+.app-shell[data-button-design] {
+  --design-button-primary-bg: var(--design-accent);
+  --design-button-primary-hover: color-mix(in srgb, var(--design-accent), black 12%);
+  --design-button-primary-text: #fff;
+  --design-button-primary-border: transparent;
+  --design-button-secondary-bg: color-mix(in srgb, var(--design-accent) 5%, white);
+  --design-button-secondary-text: var(--design-accent);
+  --design-button-secondary-border: color-mix(in srgb, var(--design-accent) 20%, transparent);
+}
+.app-shell[data-button-design='a'],
+.design-button-preset[data-button-preset='a'] {
+  --design-button-primary-bg: #edf3ff;
+  --design-button-primary-hover: #dfeaff;
+  --design-button-primary-text: #1d4ed8;
+  --design-button-primary-border: #c6d7ff;
+  --design-button-secondary-bg: #fff;
+  --design-button-secondary-text: #1d4ed8;
+  --design-button-secondary-border: #c6d7ff;
+}
+.app-shell[data-button-design='b'],
+.design-button-preset[data-button-preset='b'] {
+  --design-button-primary-bg: #e8f1fb;
+  --design-button-primary-hover: #d9e8f8;
+  --design-button-primary-text: #315f92;
+  --design-button-primary-border: transparent;
+  --design-button-secondary-bg: #f6f9fc;
+  --design-button-secondary-text: #315f92;
+  --design-button-secondary-border: #d5e3f0;
+}
+.app-shell[data-button-design='c'],
+.design-button-preset[data-button-preset='c'] {
+  --design-button-primary-bg: #f1f3f5;
+  --design-button-primary-hover: #e5e9ed;
+  --design-button-primary-text: #344052;
+  --design-button-primary-border: #d7dde5;
+  --design-button-secondary-bg: #fff;
+  --design-button-secondary-text: #344052;
+  --design-button-secondary-border: #d7dde5;
+}
 .app-shell[data-button-design='a'] {
   --design-button-accent: #0046ff;
   --design-button-radius: 8px;
@@ -21,11 +60,13 @@
   border-radius: var(--design-button-radius);
 }
 .app-shell[data-button-design]:not([data-button-design='current']) .button-primary:not(:disabled):not(.is-disabled) {
-  background: var(--design-button-accent);
+  color: var(--design-button-primary-text);
+  border-color: var(--design-button-primary-border);
+  background: var(--design-button-primary-bg);
 }
 .app-shell[data-button-design]:not([data-button-design='current'])
   .button-primary:hover:not(:disabled):not(.is-disabled) {
-  background: color-mix(in srgb, var(--design-button-accent), black 14%);
+  background: var(--design-button-primary-hover);
 }
 .app-shell[data-button-design]:not([data-button-design='current']) .button-ghost:not(:disabled):not(.is-disabled) {
   color: var(--design-button-accent);

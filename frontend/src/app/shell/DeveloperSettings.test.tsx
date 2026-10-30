@@ -67,6 +67,22 @@ it('시안을 선택하면 사용자 지정 색을 해제하고 바깥 클릭으
   expect(screen.getByRole('button', { name: '개발자' })).toHaveAttribute('aria-expanded', 'false')
 })
 
+it('공통 버튼 시안을 고르면 글래스 덮어쓰기를 해제하고 전체 스타일 따름으로 되돌릴 수 있다', async () => {
+  const user = userEvent.setup()
+  render(<DeveloperSettings sidebarColor="#467aa2" />)
+  await user.click(screen.getByRole('button', { name: '개발자' }))
+  await user.click(screen.getByRole('button', { name: '아이스 블루' }))
+  await user.click(screen.getByRole('button', { name: /A안 · 블루 라인/ }))
+  expect(readDesignPreferences()).toMatchObject({ componentDesign: 'glass', buttonDesign: 'a', glassButtons: false })
+  expect(screen.getByRole('combobox', { name: '버튼' })).toHaveValue('a')
+  await user.click(screen.getByRole('button', { name: '전체 스타일 따름' }))
+  expect(readDesignPreferences()).toMatchObject({ buttonDesign: 'inherit', glassButtons: true })
+  await user.selectOptions(screen.getByRole('combobox', { name: '버튼 색상 적용' }), 'custom')
+  await user.selectOptions(screen.getByRole('combobox', { name: '버튼' }), 'b')
+  expect(readDesignPreferences()).toMatchObject({ buttonDesign: 'b', buttonColorMode: 'theme', glassButtons: false })
+  expect(screen.queryByLabelText('공통 버튼색')).not.toBeInTheDocument()
+})
+
 it('독립적인 표시·색상 설정과 글래스 프리셋을 저장하고 모두 기본값으로 복원한다', async () => {
   const user = userEvent.setup()
   render(<DeveloperSettings sidebarColor="#467aa2" />)

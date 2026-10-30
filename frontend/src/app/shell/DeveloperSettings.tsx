@@ -3,6 +3,12 @@ import { componentKinds, extraDesignOptions, sidebarDesigns, useDesignSettings }
 import type { DesignPreferences, SidebarDesign } from '../../stores/designSettings'
 import './developer-settings.css'
 
+const buttonColorPresets = [
+  { id: 'a', name: 'A안 · 블루 라인' },
+  { id: 'b', name: 'B안 · 소프트 블루' },
+  { id: 'c', name: 'C안 · 라이트 그레이' },
+] as const
+
 export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
   const [open, setOpen] = useState(false)
   const [wide, setWide] = useState(true)
@@ -177,6 +183,7 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                         [kind.key]: event.target.value,
                         ...(kind.key === 'buttonDesign'
                           ? {
+                              buttonColorMode: 'theme',
                               glassButtons:
                                 event.target.value === 'glass' ||
                                 (event.target.value === 'inherit' && preferences.componentDesign === 'glass'),
@@ -187,9 +194,9 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                   >
                     <option value="inherit">전체 스타일 따름</option>
                     <option value="current">기존 디자인</option>
-                    <option value="a">A안 / 표준 블루</option>
-                    <option value="b">B안 / 라운드</option>
-                    <option value="c">C안 / 컴팩트</option>
+                    <option value="a">{kind.key === 'buttonDesign' ? 'A안 / 블루 라인' : 'A안 / 표준 블루'}</option>
+                    <option value="b">{kind.key === 'buttonDesign' ? 'B안 / 소프트 블루' : 'B안 / 라운드'}</option>
+                    <option value="c">{kind.key === 'buttonDesign' ? 'C안 / 라이트 그레이' : 'C안 / 컴팩트'}</option>
                     <option value="glass">글래스 / 반투명</option>
                   </select>
                 </label>
@@ -221,7 +228,7 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
           </fieldset>
           <fieldset className="design-experiment-group">
             <legend>버튼 색상</legend>
-            <p>전체 시안에 맞춰 버튼과 메뉴의 강조색, 호버색을 함께 조정합니다.</p>
+            <p>신규 등록 링크와 조회·저장 등 공통 버튼에 적용합니다. A·B·C안은 옅은 배경과 진한 글자로 표시합니다.</p>
             <ChoiceSetting label="버튼 색상 적용" setting="buttonColorMode" />
             {preferences.buttonColorMode === 'custom' ? (
               <>
@@ -229,10 +236,37 @@ export function DeveloperSettings({ sidebarColor }: { sidebarColor: string }) {
                 <ColorSetting label="공통 버튼색" setting="buttonColor" fallback="#1f54e5" />
               </>
             ) : (
-              <div className="design-button-theme-preview" aria-label="시안에 맞춘 버튼 색상">
-                <span>기본 버튼</span>
-                <span>메뉴 강조</span>
-              </div>
+              <>
+                <button
+                  type="button"
+                  className="design-reset design-button-preset-follow"
+                  aria-pressed={preferences.buttonDesign === 'inherit'}
+                  onClick={() =>
+                    update({
+                      buttonDesign: 'inherit',
+                      buttonColorMode: 'theme',
+                      glassButtons: preferences.componentDesign === 'glass',
+                    })
+                  }
+                >
+                  전체 스타일 따름
+                </button>
+                <div className="design-button-presets" role="group" aria-label="공통 버튼 색상 시안">
+                  {buttonColorPresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className="design-button-preset"
+                      data-button-preset={preset.id}
+                      aria-pressed={preferences.buttonDesign === preset.id}
+                      onClick={() => update({ buttonDesign: preset.id, buttonColorMode: 'theme', glassButtons: false })}
+                    >
+                      <span>{preset.name}</span>
+                      <span className="design-button-preset-sample">＋ 신규 등록</span>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </fieldset>
           <fieldset className="design-experiment-group">

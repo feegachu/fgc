@@ -135,7 +135,10 @@ const router = createMemoryRouter([
                     <option>검토 중</option>
                   </select>
                 </Field>
-                <Button>기본 버튼</Button>
+                <Link className="button button-primary" to="/">
+                  ＋ 신규 등록
+                </Link>
+                <Button>조회</Button>
                 <Button variant="secondary">보조 버튼</Button>
                 <Button disabled>비활성</Button>
               </div>
