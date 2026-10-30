@@ -12,7 +12,6 @@ const item = (rank: number, patch: Partial<CompareItem> = {}): CompareItem => ({
   carryover: 0,
   clawbackExposure: 50_000,
   conservativeNet: 1_000_000,
-  clawbackRatePct: 4.8,
   capImpactPct: 60,
   associationGrade: null,
   evidence: [],
@@ -52,5 +51,19 @@ describe('capBadge', () => {
     expect(capBadge(100.04, 1).text).toBe('100.0% 초과·이월')
     expect(capBadge(99.96, 0).text).toBe('99.9% 근접')
     expect(capBadge(89.99).text).toBe('89.9% 여유')
+  })
+
+  it('한도와 정확히 같아 이월이 0원이면 초과가 아니라 근접이다', () => {
+    expect(capBadge(100, 0)).toEqual({ tone: 'warn', text: '100.0% 근접' })
+    expect(capBadge(110.833333, 130_000)).toEqual({ tone: 'bad', text: '110.8% 초과·이월' })
+  })
+})
+
+describe('한도·환수 연관 질문', () => {
+  it('환수 노출액은 환수 규칙으로 계산했다고 설명하고 해약환급률을 환수율로 쓰지 않는다', () => {
+    const answer = followUpAnswer('limit', [item(1)])
+
+    expect(answer).toContain('환수 규칙의 항목별 환수율')
+    expect(answer).not.toContain('해약환급률')
   })
 })

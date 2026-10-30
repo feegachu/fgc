@@ -20,12 +20,11 @@ const item = (rank: number, patch: Partial<CompareItem> = {}): CompareItem => ({
   carryover: 0,
   clawbackExposure: 200_000 + rank * 10_000,
   conservativeNet: 700_000 - rank * 50_000,
-  clawbackRatePct: 34.8,
-  capImpactPct: 67.1,
+  capImpactPct: 67.083333,
   associationGrade: null,
   evidence: [
     { label: '수령 예상액', rule: '현행수수료 1~1회차 · 기준 보험료 × 650%', value: 650_000, source: '수수료 규칙', policyVersion: 'GA-CUR-2026-V1 v1', asOf: '2026-07-31' },
-    { label: '환수 노출액', rule: '지급액 × 해약환급률 34.8% (환수 규칙 구현 전 임시 기준)', value: 226_200, source: '해약환급률표', policyVersion: 'INS-REFUND-2026-V1 v1', asOf: '2026-07-31' },
+    { label: '환수 노출액', rule: '현행수수료 1~1회차 · 한도 반영 지급액 × 환수율 34.8%', value: 226_200, source: '환수 규칙', policyVersion: 'CLAW-GA-VIRTUAL-2026 v1', asOf: '2026-07-31' },
   ],
   ...patch,
 })
@@ -124,13 +123,24 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(screen.getAllByText('자료 없음').length).toBeGreaterThan(0)
   })
 
-  it('결과 화면에 순위 기준이 승인 전 가정이고 환수율이 임시값이라는 안내를 규칙 버전과 함께 보여 준다', async () => {
+  it('결과 화면에 순위 기준이 D-01 가정이고 환수 노출액은 환수 규칙으로 계산했다는 안내를 규칙 버전과 함께 보여 준다', async () => {
     renderModal()
     await pickHealth()
     await result()
     const note = await screen.findByTestId('assumption-note')
-    expect(note).toHaveTextContent('승인 전 가정(PROJECT_ASSUMPTION, 규칙 TEST-RULE)')
-    expect(note).toHaveTextContent('해약환급률표 값을 임시로 써서 계산했어요')
+    expect(note).toHaveTextContent('D-01에서 정한 가정(PROJECT_ASSUMPTION, 규칙 TEST-RULE)')
+    expect(note).toHaveTextContent('1,200% 한도 공통 배수 근사')
+    expect(note).toHaveTextContent('12개월차에 해지된다고 보고 환수 규칙의 환수율로 계산했어요')
+    expect(note).not.toHaveTextContent('해약환급률')
+  })
+
+  it('카테고리를 고르고 결과가 나와도 포커스가 모달 안에 남아 Esc로 닫을 수 있다', async () => {
+    const onClose = renderModal()
+    await pickHealth()
+    await result()
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement)
+    await userEvent.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('세부 조건을 고르면 그 조건이 순위 요청에 담기고 결과에 적용 조건이 표시된다', async () => {
@@ -267,7 +277,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     await userEvent.click(screen.getByRole('button', { name: '한도와 환수가 어떻게 반영됐는지 궁금해요' }))
     await userEvent.click(screen.getByRole('button', { name: '보내기' }))
     expect(await screen.findByText(/1위 상품의 한도 영향은/)).toBeInTheDocument()
-    expect(screen.getByText(/해약환급률을 임시로 쓴 값이에요/)).toBeInTheDocument()
+    expect(screen.getByText(/환수 규칙의 항목별 환수율을 지급액에 곱한 값이에요/)).toBeInTheDocument()
   })
 
   it('후보 상품이 없으면 답변을 찾지 못했어요를 보여 준다', async () => {
@@ -299,7 +309,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     renderModal()
     await pickHealth()
     await result()
-    expect(screen.getByRole('list', { name: '비교에서 제외된 상품' })).toHaveTextContent('다보험 제외상품 — 환수율 자료 없음, 한도 규칙 없음')
+    expect(screen.getByRole('list', { name: '비교에서 제외된 상품' })).toHaveTextContent('다보험 제외상품 — 환수 규칙 없음, 한도 규칙 없음')
   })
 
   it('모든 상품이 제외돼 순위가 비어도 제외 상품과 사유를 보여 준다', async () => {
@@ -353,7 +363,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
   it('자주 묻는 질문은 고정 문구를 보여 주고 서버를 호출하지 않는다', async () => {
     renderModal()
     await userEvent.click(await screen.findByRole('button', { name: '개인정보 안내' }))
-    expect(screen.getByText(/고객 이름·주민번호·연락처는 입력받지 않아요/)).toBeInTheDocument()
+    expect(screen.getByText(/고객 이름·주민번호·연락처는 입력하지 마세요/)).toBeInTheDocument()
     expect(vi.mocked(apiClient.request).mock.calls.some(([path]) => String(path).endsWith('/rank'))).toBe(false)
   })
 })

@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * 설명 : 서버가 확정한 상품 비교 순위(LLM 없이 완성). 화면은 표시만 하고 금액·순위를 다시 계산하지 않는다.
- * 금액은 원 단위 long, 한도 사용률은 소수 한 자리다. 요약 문장은 별도 explain 응답으로 받는다.
+ * 금액은 원 단위 long, 비율은 반올림하지 않은 원값이며 화면이 소수 첫째 자리 절사로 표시한다. 요약 문장은 별도 explain 응답으로 받는다.
  */
 public record CompareRankingResponse(
         /** explain 호출에 쓰는 이번 계산 결과 ID(본인 세션에서만 유효, 단기 보관). 순위가 없으면 null */
@@ -15,12 +15,13 @@ public record CompareRankingResponse(
         String categoryCode,
         String categoryLabel,
         LocalDate asOf,
-        /** 순위 계산 기준 버전(fgc.compare.rule-version). 미설정이면 null */
+        /** 순위 산식 버전(D-01 compare-net-v1). 설정이 구현 버전과 다르면 RULE_NOT_CONFIGURED 이고 null */
         String ruleVersion,
         /** 이번 계산에 쓴 수수료 정책 버전. 후보가 없으면 null */
         String policyVersion,
         /** 순위 계산에 쓴 설계사 본인 계약의 평균 월 환산 보험료. 계약이 없으면 null */
         Long basePremium,
+        /** 환수 노출액을 가정한 해지 차월(n차월). 환수 규칙의 경과월은 n−1 이다 */
         int clawbackMonth,
         List<String> warnings,
         CapSummary capSummary,
@@ -51,12 +52,11 @@ public record CompareRankingResponse(
             long cappedReceipt,
             /** 한도 초과로 이월되는 예정액 */
             long carryover,
+            /** 환수 규칙의 항목별 환수율로 계산한 금액. 항목별 환수율은 evidence 에 있다 */
             long clawbackExposure,
             /** 보수적 순수령액 = 한도 반영 수령 예상액 − 환수 노출액 */
             long conservativeNet,
-            /** 환수 기준으로 쓴 환급률. 자료가 없으면 null */
-            Double clawbackRatePct,
-            /** 한도 적용 전 수령 예상액 ÷ 한도 금액(%). 한도 규칙이 없으면 null */
+            /** 한도 적용 전 수령 예상액 ÷ 한도 금액(%, 소수 6자리 버림). 한도 규칙이 없으면 null */
             Double capImpactPct,
             String associationGrade,
             List<Evidence> evidence) {

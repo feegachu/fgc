@@ -31,7 +31,7 @@ export interface CompareItem {
   carryover: number
   clawbackExposure: number
   conservativeNet: number
-  clawbackRatePct: number | null
+  /** 한도 영향(%) 원값. 화면은 소수 첫째 자리 절사로 보여 준다 */
   capImpactPct: number | null
   associationGrade: string | null
   evidence: CompareEvidence[]
@@ -44,7 +44,7 @@ export interface CompareExcluded {
 }
 export interface CompareRanking {
   rankResultId: string | null
-  /** READY | RULE_NOT_CONFIGURED(승인된 계산 기준 미설정) | INSUFFICIENT_DATA(자료 부족) */
+  /** READY | RULE_NOT_CONFIGURED(이 환경에서 순위 산식을 켜지 않음) | INSUFFICIENT_DATA(자료 부족) */
   status: 'READY' | 'RULE_NOT_CONFIGURED' | 'INSUFFICIENT_DATA'
   categoryCode: string
   categoryLabel: string

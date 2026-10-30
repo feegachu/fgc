@@ -13,11 +13,8 @@ import com.susukkang.fgc.compare.dto.CompareRankingResponse.CapSummary;
 import com.susukkang.fgc.compare.repository.CompareRankingRepository;
 import com.susukkang.fgc.compare.repository.CompareRankingRepository.AgentProfile;
 import com.susukkang.fgc.compare.repository.CompareRankingRepository.Offering;
-import com.susukkang.fgc.compare.repository.CompareRankingRepository.RefundRate;
 import com.susukkang.fgc.compare.service.CompareRankingCalculator.Candidate;
 import com.susukkang.fgc.compare.service.CompareRankingCalculator.Result;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 설명 : 설계사에게 상품 비교 순위를 계산해 돌려주는 서비스(FUN-079).
  * 순위·금액은 서버가 결정론으로 확정하고(LLM 없이 완성), 요약 문장은 explain 으로 따로 받는다.
- * 승인된 계산 기준(fgc.compare.rule-version)이 없으면 순위를 만들지 않는다.
+ * 설정(fgc.compare.rule-version)이 구현한 D-01 산식 버전과 같을 때만 순위를 만든다.
  * 설계사 ID는 세션에서만 얻는다(FUN-085).
  */
 @Service
@@ -62,11 +59,11 @@ public class CompareRankingService {
     private final CompareSummaryService summaryService;
     private final CompareAskService askService;
 
-    /** 순위 계산 기준 버전(D-01 승인본). 비어 있으면 순위를 만들지 않고 RULE_NOT_CONFIGURED 로 응답한다. */
+    /** 이 환경에서 켠 순위 산식 버전. 구현 버전(CompareRankingCalculator.RULE_VERSION)과 다르거나 비어 있으면 RULE_NOT_CONFIGURED 다. */
     @Value("${fgc.compare.rule-version:}")
     private String ruleVersion;
 
-    /** 환수 노출액을 가정하는 해지 차월. 지금은 이 차월의 해약환급률을 환수율로 임시 사용한다(CompareRankingCalculator 참고). */
+    /** 환수 노출액을 가정하는 해지 차월(n차월, D-01 가정). 환수 규칙은 경과 n−1개월 구간을 쓴다(FUN-055 와 같은 셈법). */
     @Value("${fgc.compare.clawback-month:12}")
     private int clawbackMonth;
 
@@ -90,8 +87,8 @@ public class CompareRankingService {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "categoryCode", Map.of("field", "categoryCode"), null);
         }
         Scope scope = new Scope(categoryCode, label, today(), capSummary(agentId), filters);
-        // 순위 계산 기준(D-01)이 승인·설정되기 전에는 임의 점수·순위를 만들지 않는다(FUN-079, CT-A02).
-        if (ruleVersion == null || ruleVersion.isBlank()) {
+        // 구현한 D-01 산식을 이 환경에서 켠 경우에만 순위를 만든다. 아무 문자열로는 열리지 않는다(FUN-079, CT-A02).
+        if (!CompareRankingCalculator.RULE_VERSION.equals(ruleVersion)) {
             return response(scope, new Outcome(CompareRankingResponse.RULE_NOT_CONFIGURED, null, null,
                     List.of("RULE_NOT_CONFIGURED"), List.of(), List.of()));
         }
@@ -169,10 +166,8 @@ public class CompareRankingService {
 
     private static CompareRankingResponse.Item item(int rank, Result r) {
         Candidate c = r.candidate();
-        Double refundPct = c.clawbackRatePct() == null ? null : c.clawbackRatePct().setScale(1, RoundingMode.HALF_UP).doubleValue();
         return new CompareRankingResponse.Item(rank, c.offeringId(), c.insurer(), c.product(), r.grossReceipt(), r.cappedReceipt(),
-                r.carryover(), r.clawbackExposure(), r.conservativeNet(), refundPct, r.capImpactPct(), c.associationGrade(),
-                r.evidence());
+                r.carryover(), r.clawbackExposure(), r.conservativeNet(), r.capImpactPct(), c.associationGrade(), r.evidence());
     }
 
     /** 순위 결과를 풀어 쓴 요약. LLM 요약이 되면 그것을, 안 되면(키 없음·장애·검증 실패) 규칙형 문장을 돌려준다. */
@@ -233,10 +228,11 @@ public class CompareRankingService {
     private Built build(Offering o, AgentProfile agent, LocalDate asOf) {
         CommissionRuleResolver.Resolution resolution = CommissionRuleResolver.resolve(
                 repository.findCommissionRules(o, agent, asOf), CompareRankingCalculator.FIRST_YEAR_INSTALLMENTS);
-        RefundRate refund = repository.findRefundRate(o, clawbackMonth, asOf).orElse(null);
+        ClawbackRuleResolver.Resolution clawback = ClawbackRuleResolver.resolve(repository.findClawbackRules(o, asOf),
+                resolution.runs().stream().map(run -> run.rule().itemId()).distinct().toList(), clawbackMonth - 1);
         CompareRankingCalculator.CapRule cap = repository.findCapRule(o, asOf).orElse(null);
-        if (resolution.excludeReason() != null || refund == null || cap == null) {
-            return excluded(o, missingReasons(resolution, refund, cap));
+        if (resolution.excludeReason() != null || clawback.excludeReason() != null || cap == null) {
+            return excluded(o, missingReasons(resolution, clawback, cap));
         }
         Map<Long, String> inclusion = cap.capRuleSetId() == null ? Map.of() : repository.findCapItemInclusion(cap.capRuleSetId());
         // 한도 규칙에 구분이 없는 항목은 산입 여부를 추정하지 않고 확인 필요로 본다(REG-11).
@@ -245,24 +241,25 @@ public class CompareRankingService {
         }
         List<CompareRankingCalculator.Rule> rules = resolution.runs().stream()
                 .map(run -> new CompareRankingCalculator.Rule(run.from(), run.to(), run.rule().ratePct(), run.rule().fixedAmount(),
-                        run.rule().label(), run.rule().policyVersion(), "EXCLUDED".equals(inclusionOf(inclusion, run))))
+                        run.rule().label(), run.rule().policyVersion(), "EXCLUDED".equals(inclusionOf(inclusion, run)),
+                        clawback.ratesByItem().get(run.rule().itemId())))
                 .toList();
-        return new Built(new Candidate(o.offeringId(), o.insurer(), o.product(), rules, refund.ratePct(), refund.policyVersion(),
-                cap, repository.findAssociationGrade(o.offeringId(), asOf).orElse(null)), null);
+        return new Built(new Candidate(o.offeringId(), o.insurer(), o.product(), rules, clawback.policyVersion(), cap,
+                repository.findAssociationGrade(o.offeringId(), asOf).orElse(null)), null);
     }
 
     private static String inclusionOf(Map<Long, String> inclusion, CommissionRuleResolver.Run run) {
         return inclusion.getOrDefault(run.rule().itemId(), "REVIEW_REQUIRED");
     }
 
-    private static List<String> missingReasons(CommissionRuleResolver.Resolution resolution, RefundRate refund,
-                                               CompareRankingCalculator.CapRule cap) {
+    private static List<String> missingReasons(CommissionRuleResolver.Resolution resolution,
+                                               ClawbackRuleResolver.Resolution clawback, CompareRankingCalculator.CapRule cap) {
         List<String> reasons = new ArrayList<>();
         if (resolution.excludeReason() != null) {
             reasons.add(resolution.excludeReason());
         }
-        if (refund == null) {
-            reasons.add("CLAWBACK_RATE_MISSING");
+        if (clawback.excludeReason() != null) {
+            reasons.add(clawback.excludeReason());
         }
         if (cap == null) {
             reasons.add("CAP_RULE_MISSING");
@@ -293,9 +290,8 @@ public class CompareRankingService {
 
     private CapSummary capSummary(long agentId) {
         var row = repository.findCapSummary(agentId);
-        Double pct = row.usagePct() == null ? null
-                : BigDecimal.valueOf(row.usagePct()).setScale(1, RoundingMode.HALF_UP).doubleValue();
-        return new CapSummary(pct, row.status(), row.contractCount());
+        // 사용률은 저장값 그대로 보낸다. 화면이 소수 첫째 자리 절사로 표시한다(화면정의서 공통규칙 3).
+        return new CapSummary(row.usagePct(), row.status(), row.contractCount());
     }
 
     /** 설계사가 아니면 접근을 거부한다. 설계사 ID는 요청이 아니라 인증 세션에서만 얻는다. */

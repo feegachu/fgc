@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class CompareSummaryServiceTest {
 
     private static Item item(int rank, String insurer, String product, long net) {
-        return new Item(rank, rank, insurer, product, net + 100_000, net + 50_000, 0, 50_000, net, 24.0, 90.5, null, List.of());
+        return new Item(rank, rank, insurer, product, net + 100_000, net + 50_000, 0, 50_000, net, 90.5, null, List.of());
     }
 
     private static CompareRankingResponse ranking() {
@@ -63,35 +63,31 @@ class CompareSummaryServiceTest {
     }
 
     @Test
-    @DisplayName("입력에 있는 숫자와 1위 상품명만 쓴 요약은 통과한다")
-    void acceptsSummaryUsingOnlyGivenFacts() {
-        CompareRankingResponse ranking = ranking();
-        String data = CompareSummaryService.describe(ranking);
+    @DisplayName("숫자 없이 1위 상품과 이유를 말로 쓴 요약은 통과한다")
+    void acceptsSummaryWithoutNumbers() {
+        String text = "가보험 든든건강이 환수 부담이 작아 가장 앞섰어요. 최종 선택은 설계사님이 하세요.";
 
-        String text = "가보험 든든건강이 1위이고 보수적 순수령액은 684,000원이에요. 최종 선택은 설계사님이 하세요.";
-
-        assertThat(CompareSummaryService.isValid(text, data, ranking.items().get(0))).isTrue();
+        assertThat(CompareSummaryService.isValid(text, ranking())).isTrue();
     }
 
     @Test
-    @DisplayName("입력에 없는 숫자가 나오면 버린다")
-    void rejectsInventedNumber() {
+    @DisplayName("숫자가 있으면 근거에 있는 값이어도 버린다 — 다른 항목·다른 상품의 값을 옮겨 쓸 수 있기 때문이다")
+    void rejectsAnyNumber() {
         CompareRankingResponse ranking = ranking();
-        String data = CompareSummaryService.describe(ranking);
 
-        String text = "가보험 든든건강이 1위이고 순수령액은 999,000원이에요.";
-
-        assertThat(CompareSummaryService.isValid(text, data, ranking.items().get(0))).isFalse();
+        assertThat(CompareSummaryService.isValid("가보험 든든건강이 1위이고 보수적 순수령액은 684,000원이에요.", ranking)).isFalse();
+        assertThat(CompareSummaryService.isValid("가보험 든든건강의 보수적 순수령액은 50,000원이에요.", ranking)).isFalse();
+        assertThat(CompareSummaryService.isValid("가보험 든든건강의 순수령액은 구백만원이에요.", ranking)).isFalse();
+        assertThat(CompareSummaryService.isValid("가보험 든든건강의 순수령액은 ６８４,０００원이에요.", ranking)).isFalse();
     }
 
     @Test
     @DisplayName("단정 표현이나 1위 상품이 빠진 요약은 버린다")
     void rejectsAssertiveOrOffTopicText() {
         CompareRankingResponse ranking = ranking();
-        String data = CompareSummaryService.describe(ranking);
 
-        assertThat(CompareSummaryService.isValid("가보험 든든건강이 반드시 1위예요.", data, ranking.items().get(0))).isFalse();
-        assertThat(CompareSummaryService.isValid("다른 상품을 보세요.", data, ranking.items().get(0))).isFalse();
-        assertThat(CompareSummaryService.isValid("   ", data, ranking.items().get(0))).isFalse();
+        assertThat(CompareSummaryService.isValid("가보험 든든건강이 반드시 가장 앞서요.", ranking)).isFalse();
+        assertThat(CompareSummaryService.isValid("다른 상품을 보세요.", ranking)).isFalse();
+        assertThat(CompareSummaryService.isValid("   ", ranking)).isFalse();
     }
 }

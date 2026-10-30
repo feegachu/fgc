@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.susukkang.fgc.ai.service.LlmGateway;
@@ -15,6 +17,8 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class CompareAskServiceTest {
 
@@ -22,14 +26,14 @@ class CompareAskServiceTest {
     private final CompareAskService service = new CompareAskService(gateway);
 
     private static CompareRankingResponse ranking() {
-        Item top = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 24.0, 90.5, null, List.of());
+        Item top = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
         return new CompareRankingResponse("r-1", "READY", "HEALTH_PROTECTION", "건강보험", LocalDate.of(2026, 7, 31), "TEST-RULE",
                 "GA-CUR-2026-V1 v1", 100_000L, 12, List.of(), null, List.of(top), List.of(), CompareRankingFilters.NONE);
     }
 
     private static CompareRankingResponse twoItems() {
         CompareRankingResponse base = ranking();
-        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 24.0, 80.0, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of());
         return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
                 base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
                 List.of(base.items().get(0), second), List.of(), CompareRankingFilters.NONE);
@@ -81,9 +85,9 @@ class CompareAskServiceTest {
 
     private static CompareRankingResponse tiedItems(long secondClawback) {
         CompareRankingResponse base = ranking();
-        Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 24.0, 90.5, null, List.of());
+        Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
         Item second = new Item(2, 2, "나보험", "튼튼건강", 784_000 + secondClawback - 50_000, 734_000 + secondClawback - 50_000,
-                0, secondClawback, 684_000, 24.0, 80.0, null, List.of());
+                0, secondClawback, 684_000, 80.0, null, List.of());
         return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
                 base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
                 List.of(first, second), List.of(), CompareRankingFilters.NONE);
@@ -132,14 +136,60 @@ class CompareAskServiceTest {
     }
 
     @Test
-    @DisplayName("근거 안의 숫자만 쓴 답변은 그대로 돌려준다")
-    void validAnswerIsReturned() {
-        llmReturns(true, "가보험 든든건강은 보수적 순수령액 684,000원으로 가장 커요. 최종 선택은 설계사님이 하세요.");
+    @DisplayName("순위 질문은 서버가 만든 순위·금액 문장 뒤에 숫자 없는 AI 풀이를 붙인다")
+    void rankQuestionCombinesServerFactsWithAiProse() {
+        llmReturns(true, "가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
 
         CompareAskResponse response = service.ask("왜 1위야?", ranking());
 
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).contains("684,000원");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 보수적 순수령액은 684,000원이에요.")
+                .endsWith("가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
+    }
+
+    @Test
+    @DisplayName("용어 질문은 숫자 없는 AI 답변을 그대로 돌려주고, 용어 이름 1,200%는 허용한다")
+    void conceptQuestionReturnsAiProse() {
+        llmReturns(true, "1,200% 룰은 첫해 수수료가 한도를 넘지 않게 하는 규칙이에요. 넘는 부분은 이월돼요.");
+
+        CompareAskResponse response = service.ask("1200% 룰이 뭐야?", null);
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).isEqualTo("1,200% 룰은 첫해 수수료가 한도를 넘지 않게 하는 규칙이에요. 넘는 부분은 이월돼요.");
+    }
+
+    @ParameterizedTest
+    @DisplayName("근거에 있는 값을 다른 항목에 옮겨 쓰거나 한글·전각 숫자로 쓴 AI 답변은 서버 문장(RULE)으로 대체한다")
+    @ValueSource(strings = {
+            "가보험 든든건강의 보수적 순수령액은 50,000원이에요.",
+            "가보험 든든건강의 보수적 순수령액은 구백만원이에요.",
+            "가보험 든든건강의 보수적 순수령액은 ９９９９９９９원이에요."})
+    void numbersFromAiAreReplacedByServerFacts(String answer) {
+        llmReturns(true, answer);
+
+        CompareAskResponse response = service.ask("1위 순수령액이 얼마야?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("보수적 순수령액은 684,000원이에요").doesNotContain(answer);
+    }
+
+    @Test
+    @DisplayName("주민번호·전화번호로 보이는 질문은 모델에 보내지 않고 개인정보 입력 금지 안내로 답한다")
+    void personalInfoIsNeverSentToTheModel() {
+        CompareAskResponse rrn = service.ask("고객 900101-1234567 에게 맞는 상품 뭐야?", ranking());
+        CompareAskResponse phone = service.ask("010-1234-5678 고객한테 추천할 상품?", ranking());
+
+        assertThat(rrn).isEqualTo(new CompareAskResponse(CompareAskService.PERSONAL_INFO, "RULE"));
+        assertThat(phone.answer()).isEqualTo(CompareAskService.PERSONAL_INFO);
+        verify(gateway, never()).call(any(), any());
+    }
+
+    @Test
+    @DisplayName("금액처럼 긴 숫자는 전화번호로 오인하지 않는다")
+    void longAmountIsNotTreatedAsPhoneNumber() {
+        llmReturns(false, "");
+
+        assertThat(service.ask("1000000000원이면 2순위는?", twoItems()).answer()).doesNotContain(CompareAskService.PERSONAL_INFO);
     }
 
     @Test

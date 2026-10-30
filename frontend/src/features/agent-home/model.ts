@@ -164,9 +164,3 @@ export function statusCounts(focus: Row[]) {
     return { ...def, count, pct: oneDecimal((count / total) * 100) }
   })
 }
-
-/** 확인 필요 계약: 한도 경고·위반이 먼저, 그다음 검토 필요. */
-export const needRows = (rows: Row[], month: string) =>
-  rows
-    .filter((r) => r.month === month && (r.near || r.review))
-    .sort((a, b) => Number(b.near) - Number(a.near) || b.date.localeCompare(a.date))
