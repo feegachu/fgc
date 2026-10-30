@@ -17,12 +17,16 @@ final class AnswerNumberGuard {
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:,\\d{3})*(?:\\.\\d+)?");
     /** 구백만원·삼십퍼센트처럼 한글 숫자 뒤에 단위가 붙은 표기. */
     private static final Pattern KOREAN_AMOUNT = Pattern.compile("[영일이삼사오육칠팔구십백천만억조]+\\s*(?:원|%|퍼센트|프로)");
+    /** 근거의 칸: | 와 줄바꿈, 그리고 한 줄 안의 문장·절(마침표·쉼표 뒤 공백) 경계. 숫자 속 쉼표(1,000)는 나누지 않는다. */
+    private static final Pattern SEGMENT_BREAK = Pattern.compile("[|\\n]|[.,]\\s");
     private static final Pattern CLAUSE_BREAK = Pattern.compile("[.!?\\n]");
     /** 같은 값을 가리키는 표현끼리 한 그룹이다. 그룹 안의 어느 말로 써도 같은 항목으로 본다. */
     private static final List<List<String>> LABEL_GROUPS = List.of(
             List.of("순수령액"),
             List.of("환수"),
-            List.of("한도 반영", "수령 예상"),
+            // 수령 예상(한도 반영 전)과 한도 반영(한도 적용 후)은 이월액만큼 다른 값이다. "한도 반영 수령 예상액"은 한도 반영 쪽이다.
+            List.of("한도 반영 수령 예상", "한도 반영"),
+            List.of("수령 예상"),
             List.of("이월"));
 
     private AnswerNumberGuard() {
@@ -55,7 +59,7 @@ final class AnswerNumberGuard {
 
     /** 숫자 바로 앞 같은 문장에서 가장 가까운 항목 이름을 찾고, 근거의 같은 줄·칸에 그 항목과 숫자가 함께 있는지 본다. */
     private static boolean labelledAmountsMatch(String answer, String facts) {
-        List<String> segments = List.of(facts.split("[|\\n]"));
+        List<String> segments = List.of(SEGMENT_BREAK.split(facts));
         Matcher m = NUMBER.matcher(answer);
         while (m.find()) {
             int sentenceStart = sentenceStart(answer, m.start());
@@ -84,12 +88,19 @@ final class AnswerNumberGuard {
 
     private static List<String> nearestLabelGroup(String beforeNumber) {
         List<String> best = null;
-        int bestAt = -1;
+        int bestEnd = -1;
+        int bestLength = 0;
         for (List<String> group : LABEL_GROUPS) {
             for (String label : group) {
                 int at = beforeNumber.lastIndexOf(label);
-                if (at > bestAt) {
-                    bestAt = at;
+                if (at < 0) {
+                    continue;
+                }
+                int end = at + label.length();
+                // 가장 뒤에서 끝나는 이름, 같은 위치면 더 긴 이름(한도 반영 수령 예상 > 수령 예상)을 고른다.
+                if (end > bestEnd || (end == bestEnd && label.length() > bestLength)) {
+                    bestEnd = end;
+                    bestLength = label.length();
                     best = group;
                 }
             }
