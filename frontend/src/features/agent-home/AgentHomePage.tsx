@@ -111,9 +111,14 @@ function AgentHomeContent({ month }: { month: string }) {
   const [chatOpen, setChatOpen] = useState(false)
   const closeChat = useCallback(() => setChatOpen(false), [])
 
+  // 보험사·상품 기준정보보다 먼저 그리면 생명·손해 구분과 보장 유형을 못 맞춰 그래프가 잠깐 틀리게 보인다.
+  const productsReady = insurerIds.length === 0 || products.data != null
   const rows = useMemo(
-    () => (contracts.data ? buildRows(contracts.data, insurers.data ?? [], products.data ?? []) : null),
-    [contracts.data, insurers.data, products.data],
+    () =>
+      contracts.data && insurers.data && productsReady
+        ? buildRows(contracts.data, insurers.data, products.data ?? [])
+        : null,
+    [contracts.data, insurers.data, products.data, productsReady],
   )
   const error = (contracts.error ?? insurers.error ?? products.error) as Error | null
 

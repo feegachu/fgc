@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -145,6 +145,24 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(within(panel).getByText('B손해 필터 적용 중')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: '보험사 필터 해제' }))
     expect(within(panel).queryByText('B손해 필터 적용 중')).not.toBeInTheDocument()
+  })
+
+  it('상품 기준정보를 받기 전에는 그래프를 그리지 않고, 받은 뒤 보장 유형을 맞춰 그린다', async () => {
+    contracts = async () => page([contract({})])
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const base = vi.mocked(apiClient.request).getMockImplementation()!
+    vi.mocked(apiClient.request).mockImplementation((async (path: string) => {
+      if (path.startsWith('/api/v1/base/products')) await held
+      return base(path)
+    }) as typeof apiClient.request)
+    renderHome()
+    await waitFor(() => expect(clients[0].getQueryData(['agent-home', 'contracts'])).toBeDefined())
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    expect(screen.getByText('불러오는 중입니다.')).toBeInTheDocument()
+    release()
+    const bars = await screen.findByRole('list', { name: '보장 유형별 계약 비중 가로 막대 차트' })
+    expect(within(bars).getByText('건강보장').closest('li')).toHaveTextContent('1건')
   })
 
   it('이번 달 계약이 없으면 지표가 0이어도 화면이 깨지지 않는다', async () => {
