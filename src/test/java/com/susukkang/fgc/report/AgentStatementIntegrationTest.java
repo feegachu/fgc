@@ -147,11 +147,16 @@ class AgentStatementIntegrationTest {
         jdbc.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", adjustmentTransaction);
 
         Long rule = id("""
+                WITH fixture_policy AS (
+                  INSERT INTO fgc.policy_version(policy_code,policy_name,policy_type,source_class,version_no,effective_from,status)
+                  VALUES (?, '명세 검증 환수 정책', 'CLAWBACK', 'PROJECT_ASSUMPTION', 1, DATE '2026-01-01', 'DRAFT')
+                  RETURNING policy_version_id
+                )
                 INSERT INTO fgc.clawback_rule(policy_version_id, elapsed_month_from, elapsed_month_to,
                     clawback_basis_code, clawback_rate_pct)
-                SELECT min(policy_version_id), 9999, 9999, 'STMT_FIXTURE', 10 FROM fgc.policy_version
+                SELECT policy_version_id, 9999, 9999, 'STMT_FIXTURE', 10 FROM fixture_policy
                 RETURNING clawback_rule_id
-                """);
+                """, "STMT-CLAW-" + UUID.randomUUID());
         Long attribution = id("""
                 SELECT min(a.transaction_attribution_id) FROM fgc.transaction_attribution a
                 JOIN fgc.commission_transaction t USING (commission_transaction_id)

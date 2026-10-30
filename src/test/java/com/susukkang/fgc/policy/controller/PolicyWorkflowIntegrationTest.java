@@ -85,6 +85,41 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void insurerSpecificClawbackCoexistsWithGenericDemoButIdenticalScopeOverlapIsRejected() throws Exception {
+        ObjectNode draft = draft();
+        draft.put("policyType", "CLAWBACK").putNull("feeRegimeCode")
+                .put("effectiveFrom", "2026-01-01").put("effectiveTo", "2026-12-31");
+        draft.putArray("commissionRules");
+        long baseItem = jdbc.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE item_code='BASE_COMMISSION'", Long.class);
+        draft.putArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        JsonNode first = create(draft, writer);
+        long id = first.path("policyVersionId").asLong();
+        JsonNode review = action(id, "SUBMIT", first, writer, 200);
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+
+        ObjectNode duplicate = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+        JsonNode second = create(duplicate, writer);
+        long secondId = second.path("policyVersionId").asLong();
+        JsonNode secondReview = action(secondId, "SUBMIT", second, writer, 200);
+        assertThat(actionError(secondId, "APPROVE", secondReview, approver, 422).path("code").asText())
+                .isEqualTo("FGC-POL-002");
+        long otherInsurer = jdbc.queryForObject("""
+                INSERT INTO fgc.insurer(insurer_code,insurer_name,insurer_type)
+                VALUES (?, '다른 보험회사 범위', 'LIFE') RETURNING insurer_id
+                """, Long.class, "P722-" + UUID.randomUUID().toString().substring(0, 12));
+        ObjectNode other = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+        ((ObjectNode) other.path("clawbackRules").get(0)).put("insurerId", otherInsurer);
+        JsonNode third = create(other, writer);
+        long thirdId = third.path("policyVersionId").asLong();
+        JsonNode thirdReview = action(thirdId, "SUBMIT", third, writer, 200);
+        JsonNode thirdApproved = action(thirdId, "APPROVE", thirdReview, approver, 200);
+        action(thirdId, "ACTIVATE", thirdApproved, approver, 200);
+    }
+
+    @Test
     void clawbackDraftsPersistUpdateSubmitApproveActivateAndCloneWithoutChangingApprovedRules() throws Exception {
         ObjectNode draft = draft();
         draft.put("policyType", "CLAWBACK").putNull("feeRegimeCode");

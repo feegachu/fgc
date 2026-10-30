@@ -1,0 +1,56 @@
+{
+  "migration": "V75",
+  "suites": [
+    {
+      "suite": "com.susukkang.fgc.auth.AgentDataScopeIntegrationTest",
+      "tests": 17,
+      "failures": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.clawback.ClawbackCalculationIntegrationTest",
+      "tests": 12,
+      "failures": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.clawback.ClawbackCandidateIntegrationTest",
+      "tests": 21,
+      "failures": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.compare.CompareRankingIntegrationTest",
+      "tests": 5,
+      "failures": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.controller.PolicyWorkflowIntegrationTest",
+      "tests": 41,
+      "failures": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.repository.PolicyWriteRepositoryIntegrationTest",
+      "tests": 4,
+      "failures": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.report.AgentStatementIntegrationTest",
+      "tests": 6,
+      "failures": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.repository.ClawbackPolicyLockIntegrationTest",
+      "tests": 4,
+      "failures": 0,
+      "skipped": 0
+    }
+  ],
+  "failures": 0,
+  "tests": 110,
+  "execution": "Related 106 tests and final corrected lock fixture 4 tests, separate runs"
+}

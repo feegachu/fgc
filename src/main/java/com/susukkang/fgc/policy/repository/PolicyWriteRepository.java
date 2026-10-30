@@ -630,11 +630,10 @@ public class PolicyWriteRepository {
                           SELECT 1 FROM fgc.clawback_rule a JOIN fgc.clawback_rule c
                             ON c.policy_version_id = candidate.policy_version_id
                           WHERE a.policy_version_id = active.policy_version_id
-                            AND (a.insurer_id IS NULL OR c.insurer_id IS NULL OR a.insurer_id = c.insurer_id)
-                            AND (a.product_offering_id IS NULL OR c.product_offering_id IS NULL
-                                 OR a.product_offering_id = c.product_offering_id)
-                            AND (a.commission_item_id IS NULL OR c.commission_item_id IS NULL
-                                 OR a.commission_item_id = c.commission_item_id)
+                            -- D-02: 전체 정책과 보험회사/판매버전 전용 정책은 코드 분리·명시 선택으로 공존한다.
+                            AND a.insurer_id IS NOT DISTINCT FROM c.insurer_id
+                            AND a.product_offering_id IS NOT DISTINCT FROM c.product_offering_id
+                            AND a.commission_item_id IS NOT DISTINCT FROM c.commission_item_id
                             AND a.elapsed_month_from <= c.elapsed_month_to
                             AND c.elapsed_month_from <= a.elapsed_month_to))
                       OR (active.policy_type = 'CURRENT_COMMISSION' AND candidate.policy_type = 'CURRENT_COMMISSION'
