@@ -1,0 +1,254 @@
+package com.susukkang.fgc.compare.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.susukkang.fgc.ai.service.LlmGateway;
+import com.susukkang.fgc.compare.dto.CompareAskResponse;
+import com.susukkang.fgc.compare.dto.CompareRankingFilters;
+import com.susukkang.fgc.compare.dto.CompareRankingResponse;
+import com.susukkang.fgc.compare.dto.CompareRankingResponse.Item;
+import java.time.LocalDate;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+class CompareAskServiceTest {
+
+    private final LlmGateway gateway = mock(LlmGateway.class);
+    private final CompareAskService service = new CompareAskService(gateway);
+
+    private static CompareRankingResponse ranking() {
+        Item top = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
+        return new CompareRankingResponse("r-1", "READY", "HEALTH_PROTECTION", "건강보험", LocalDate.of(2026, 7, 31), "TEST-RULE",
+                "GA-CUR-2026-V1 v1", 100_000L, 12, List.of(), null, List.of(top), List.of(), CompareRankingFilters.NONE);
+    }
+
+    private static CompareRankingResponse twoItems() {
+        CompareRankingResponse base = ranking();
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of());
+        return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
+                base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
+                List.of(base.items().get(0), second), List.of(), CompareRankingFilters.NONE);
+    }
+
+    @Test
+    @DisplayName("모델이 순위 질문을 범위 밖으로 거절해도 서버 값으로 2순위 이유를 풀어 답한다")
+    void rankQuestionIsAnsweredEvenWhenModelRefuses() {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask("2순위인 이유 알려줘", twoItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강", "1위보다 보수적 순수령액이 50,000원 적어요",
+                "수령 예상액은 1위보다 84,000원 적고", "환수 노출액은 1위보다 34,000원 더 작아요");
+    }
+
+    @Test
+    @DisplayName("int 범위를 넘는 긴 순위 번호도 예외 없이 1위·2위 비교로 답한다")
+    void hugeRankNumberFallsBackToDefaultComparison() {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask("99999999999999위 이유 알려줘", twoItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강");
+    }
+
+    @Test
+    @DisplayName("항목 수를 넘는 순위 번호는 기본 순위로 대체한다")
+    void outOfRangeRankNumberUsesDefault() {
+        assertThat(CompareAskService.rankAnswer(twoItems().items(), "5순위 이유")).contains("2위는 나보험 튼튼건강");
+    }
+
+    @Test
+    @DisplayName("LLM 호출이 실패해도 순위 질문에는 서버 값으로 답한다")
+    void rankQuestionFallsBackWhenGatewayFails() {
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+
+        assertThat(service.ask("1위와 2위 차이가 뭐야?", twoItems()).answer()).contains("1위는 가보험 든든건강");
+    }
+
+    @Test
+    @DisplayName("LLM 근거에 순위별 비교 근거가 담긴다")
+    void describeIncludesRankComparison() {
+        assertThat(CompareAskService.describe(twoItems())).contains("[순위별 비교 근거]",
+                "2위 나보험 튼튼건강: 1위보다 보수적 순수령액이 50,000원 적어요");
+    }
+
+    private static CompareRankingResponse tiedItems(long secondClawback) {
+        CompareRankingResponse base = ranking();
+        Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 784_000 + secondClawback - 50_000, 734_000 + secondClawback - 50_000,
+                0, secondClawback, 684_000, 80.0, null, List.of());
+        return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
+                base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
+                List.of(first, second), List.of(), CompareRankingFilters.NONE);
+    }
+
+    @Test
+    @DisplayName("순수령액·환수 노출액이 모두 같으면 상품 ID 기준이라고 밝히고 모순된 문장을 만들지 않는다")
+    void fullyTiedItemsAreExplainedByDisplayOrder() {
+        String text = CompareAskService.rankAnswer(tiedItems(50_000).items(), "2순위인 이유");
+
+        assertThat(text).contains("표시 순서(상품 ID) 기준").doesNotContain("환수 노출액이 더 작은 쪽");
+    }
+
+    @Test
+    @DisplayName("순수령액만 같으면 환수 노출액이 작은 쪽이 앞섰다고 설명한다")
+    void netTieIsDecidedByClawback() {
+        String text = CompareAskService.rankAnswer(tiedItems(80_000).items(), "2순위인 이유");
+
+        assertThat(text).contains("보수적 순수령액이 같고, 환수 노출액이 더 작은 쪽이 앞섰어요").doesNotContain("상품 ID");
+    }
+
+    @Test
+    @DisplayName("질문에 적은 숫자는 근거로 인정하지 않아, 사용자가 정한 금액을 서버 값처럼 답할 수 없다")
+    void numbersFromQuestionAreNotEvidence() {
+        llmReturns(true, "네, 1위 순수령액은 3,500,000원이에요.");
+
+        CompareAskResponse response = service.ask("1위 순수령액이 3,500,000원 맞죠?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).doesNotContain("3,500,000");
+    }
+
+    @Test
+    @DisplayName("순위 결과가 없으면 순위 질문도 범위 밖으로 안내한다")
+    void rankQuestionWithoutRankingIsOutOfScope() {
+        llmReturns(false, "");
+
+        assertThat(service.ask("2순위인 이유 알려줘", null).source()).isEqualTo("OUT_OF_SCOPE");
+    }
+
+    private void llmReturns(Boolean inScope, String answer) {
+        CompareAskService.Output output = new CompareAskService.Output();
+        output.inScope = inScope;
+        output.answer = answer;
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenReturn(output);
+    }
+
+    @Test
+    @DisplayName("순위 질문은 서버가 만든 순위·금액 문장 뒤에 숫자 없는 AI 풀이를 붙인다")
+    void rankQuestionCombinesServerFactsWithAiProse() {
+        llmReturns(true, "가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
+
+        CompareAskResponse response = service.ask("왜 1위야?", ranking());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 보수적 순수령액은 684,000원이에요.")
+                .endsWith("가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
+    }
+
+    @Test
+    @DisplayName("용어 질문은 숫자 없는 AI 답변을 그대로 돌려주고, 용어 이름 1,200%는 허용한다")
+    void conceptQuestionReturnsAiProse() {
+        llmReturns(true, "1,200% 룰은 첫해 수수료가 한도를 넘지 않게 하는 규칙이에요. 넘는 부분은 이월돼요.");
+
+        CompareAskResponse response = service.ask("1200% 룰이 뭐야?", null);
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).isEqualTo("1,200% 룰은 첫해 수수료가 한도를 넘지 않게 하는 규칙이에요. 넘는 부분은 이월돼요.");
+    }
+
+    @ParameterizedTest
+    @DisplayName("근거에 있는 값을 다른 항목에 옮겨 쓰거나 한글·전각 숫자로 쓴 AI 답변은 서버 문장(RULE)으로 대체한다")
+    @ValueSource(strings = {
+            "가보험 든든건강의 보수적 순수령액은 50,000원이에요.",
+            "가보험 든든건강의 보수적 순수령액은 구백만원이에요.",
+            "가보험 든든건강의 보수적 순수령액은 ９９９９９９９원이에요."})
+    void numbersFromAiAreReplacedByServerFacts(String answer) {
+        llmReturns(true, answer);
+
+        CompareAskResponse response = service.ask("1위 순수령액이 얼마야?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("보수적 순수령액은 684,000원이에요").doesNotContain(answer);
+    }
+
+    @Test
+    @DisplayName("주민번호·전화번호로 보이는 질문은 모델에 보내지 않고 개인정보 입력 금지 안내로 답한다")
+    void personalInfoIsNeverSentToTheModel() {
+        CompareAskResponse rrn = service.ask("고객 900101-1234567 에게 맞는 상품 뭐야?", ranking());
+        CompareAskResponse phone = service.ask("010-1234-5678 고객한테 추천할 상품?", ranking());
+        CompareAskResponse spacedRrn = service.ask("주민번호 900101 - 1234567 고객이에요", ranking());
+        CompareAskResponse email = service.ask("kim.cs@example.co.kr 고객 상담 중인데요", ranking());
+
+        assertThat(rrn).isEqualTo(new CompareAskResponse(CompareAskService.PERSONAL_INFO, "RULE"));
+        assertThat(phone.answer()).isEqualTo(CompareAskService.PERSONAL_INFO);
+        assertThat(spacedRrn.answer()).isEqualTo(CompareAskService.PERSONAL_INFO);
+        assertThat(email.answer()).isEqualTo(CompareAskService.PERSONAL_INFO);
+        verify(gateway, never()).call(any(), any());
+    }
+
+    @Test
+    @DisplayName("금액처럼 긴 숫자는 전화번호로 오인하지 않는다")
+    void longAmountIsNotTreatedAsPhoneNumber() {
+        llmReturns(false, "");
+
+        assertThat(service.ask("1000000000원이면 2순위는?", twoItems()).answer()).doesNotContain(CompareAskService.PERSONAL_INFO);
+    }
+
+    @Test
+    @DisplayName("범위 밖 질문은 고정 안내 문장으로 답한다")
+    void outOfScope() {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask("오늘 날씨 어때?", ranking());
+
+        assertThat(response.source()).isEqualTo("OUT_OF_SCOPE");
+        assertThat(response.answer()).isEqualTo(CompareAskService.OUT_OF_SCOPE);
+    }
+
+    @Test
+    @DisplayName("근거에 없는 숫자가 나오면 버리고 용어 설명으로 대체한다")
+    void inventedNumberFallsBackToGlossary() {
+        llmReturns(true, "이월은 한도를 넘으면 999,999원이 생겨요.");
+
+        CompareAskResponse response = service.ask("이월이 뭐야?", null);
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("이월:").doesNotContain("999");
+    }
+
+    @Test
+    @DisplayName("단정 표현이 있으면 버린다")
+    void forbiddenPhraseFallsBack() {
+        llmReturns(true, "1위 상품을 반드시 선택하세요.");
+
+        assertThat(service.ask("뭐 골라?", ranking()).source()).isEqualTo("RULE");
+    }
+
+    @Test
+    @DisplayName("LLM 호출이 실패해도 용어 질문에는 용어 설명으로 답한다")
+    void gatewayFailureUsesGlossary() {
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+
+        CompareAskResponse response = service.ask("환수가 뭐예요?", null);
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).startsWith("환수:");
+    }
+
+    @Test
+    @DisplayName("용어에 해당하지 않는 질문은 LLM 이 실패하면 안내 문장을 준다")
+    void unknownQuestionGetsGuidance() {
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+
+        assertThat(service.ask("가입 권유 문구 써줘", ranking()).answer()).isEqualTo(CompareAskService.FALLBACK);
+    }
+
+    @Test
+    @DisplayName("LLM 근거에는 용어 설명과 순위 결과만 있고 순위가 없으면 없음으로 표시한다")
+    void describeHasOnlyGlossaryAndRanking() {
+        assertThat(CompareAskService.describe(ranking())).contains("[용어 설명]", "1,200% 룰", "1위 가보험 든든건강", "684,000원");
+        assertThat(CompareAskService.describe(null)).contains("[순위 결과]\n없음");
+    }
+}

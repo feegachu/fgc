@@ -20,6 +20,12 @@ const envelope = <T>(data: T) => ({ data, error: null, requestId: 'contract-api-
 afterEach(() => vi.restoreAllMocks())
 
 describe('contract URL and labels', () => {
+  it('keeps a comma-separated cap status list only when every code is known', () => {
+    const status = (value: string) => criteriaFromParams(new URLSearchParams({ capResultStatus: value })).capResultStatus
+    expect(status('WARNING,VIOLATION,REVIEW_REQUIRED')).toBe('WARNING,VIOLATION,REVIEW_REQUIRED')
+    expect(status('WARNING,FAKE')).toBe('')
+  })
+
   it('preserves supported filters and rejects unsafe IDs, enums, dates, and pages', () => {
     expect(
       criteriaFromParams(

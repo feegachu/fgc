@@ -263,7 +263,8 @@ public class ContractQueryRepository {
         if (condition.getProductOfferingId() != null) where.and(c.productOfferingId.eq(condition.getProductOfferingId()));
         if (condition.getAgentId() != null) where.and(c.agentId.eq(condition.getAgentId()));
         if (condition.getOrgId() != null) where.and(c.organizationId.eq(condition.getOrgId()));
-        if (condition.getCapResultStatus() != null) where.and(latestCapCheck.resultStatus.eq(condition.getCapResultStatus()));
+        if (condition.getCapResultStatus() != null && !condition.getCapResultStatus().isEmpty())
+            where.and(latestCapCheck.resultStatus.in(condition.getCapResultStatus()));
         if (condition.getCurrentStatus() != null) where.and(c.currentStatus.eq(condition.getCurrentStatus()));
         if (condition.getContractDateFrom() != null) where.and(c.contractDate.goe(condition.getContractDateFrom()));
         if (condition.getContractDateTo() != null) where.and(c.contractDate.loe(condition.getContractDateTo()));

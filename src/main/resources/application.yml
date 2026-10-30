@@ -40,6 +40,12 @@ springdoc:
 # FGC 업무 설정 — 코드에 숫자를 박지 않기 위한 자리 (COR-004)
 fgc:
   demo-month: 2026-07
+  # 상품 비교 순위 산식(FUN-079 D-01, PROJECT_ASSUMPTION)을 켜는 스위치. 값이 구현 버전 compare-net-v1 과 같을 때만
+  # 순위를 만들고, 비어 있거나 다르면 RULE_NOT_CONFIGURED 다. 시연 Pod(podman/fgc-app-*.yaml)만 켜고 신한 prd 는 비워 둔다.
+  # clawback-month 는 환수 노출액을 가정한 해지 차월(n차월, 경과 n−1개월)이다.
+  compare:
+    rule-version: ${FGC_COMPARE_RULE_VERSION:}
+    clawback-month: 12
   # 2차 JWT 공존 모드(#400, 인터페이스정의서 §2-1-1). 키는 커밋하지 않는다 — 비어 있으면 기동마다 임의 키(JwtConfig).
   jwt:
     secret: ${FGC_JWT_SECRET:}
