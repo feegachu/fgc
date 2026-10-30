@@ -45,7 +45,7 @@ export default function ContractFormPage() {
     <div className="contract-form-page">
       <header className="page-header contract-form-page-header">
         <h1 className="page-title">보험계약 {id ? '수정' : '등록'}</h1>
-        <Link className="button button-secondary" to={returnTo}>
+        <Link data-guide-feature="features.contract.contract-form-page.link" className="button button-secondary" to={returnTo}>
           <span className="material-symbols-rounded" aria-hidden="true">
             arrow_back
           </span>
@@ -57,7 +57,7 @@ export default function ContractFormPage() {
       ) : id && !detail.data ? (
         <div className="surface contract-form-error" role="alert">
           <p>{contractErrorText(detail.error ?? new Error('계약을 불러오지 못했습니다.'))}</p>
-          <Button variant="secondary" onClick={() => void detail.refetch()}>
+          <Button data-guide-feature="features.contract.contract-form-page.button" variant="secondary" onClick={() => void detail.refetch()}>
             다시 불러오기
           </Button>
         </div>
@@ -249,7 +249,7 @@ function ContractEditor({
         ) : undefined
       }
     >
-      <input
+      <input data-guide-feature="features.contract.contract-form-page.input"
         type="number"
         name={field}
         min={field === 'paymentTermMonths' ? 1 : 0}
@@ -276,7 +276,7 @@ function ContractEditor({
       {referenceError && (
         <div className="surface contract-form-error">
           <p>기준정보를 불러오지 못했습니다. 다시 불러온 뒤 저장해 주세요.</p>
-          <Button
+          <Button data-guide-feature="features.contract.contract-form-page.button-2"
             variant="secondary"
             disabled={loadingReferences}
             onClick={() => {
@@ -289,14 +289,14 @@ function ContractEditor({
           </Button>
         </div>
       )}
-      <form
+      <form data-guide-feature="features.contract.contract-form-page.form"
         className="contract-editor"
         onSubmit={(event) => void submit(event)}
         noValidate
         aria-label={`보험계약 ${id ? '수정' : '등록'} 입력`}
       >
         <fieldset className="contract-editor-fields contract-form-layout" disabled={saving || reloading}>
-          <section
+          <section data-guide-feature="features.contract.contract-form-page.section"
             className="surface contract-form-card contract-basic-form-card contract-editor-basic"
             aria-labelledby="contract-basic-heading"
           >
@@ -310,7 +310,7 @@ function ContractEditor({
             </header>
             <div className="contract-form-fields">
               <Field label="보험회사" required error={errors.insurerId}>
-                <select
+                <select data-guide-feature="features.contract.contract-form-page.insurer-id"
                   name="insurerId"
                   className="select-control"
                   value={draft.insurerId}
@@ -345,7 +345,7 @@ function ContractEditor({
                     </EvidenceLink>
                   }
                 >
-                  <SearchSelect
+                  <SearchSelect data-guide-feature="features.contract.contract-form-page.product-offering-id"
                     name="productOfferingId"
                     value={draft.productOfferingId}
                     source={products.source}
@@ -368,7 +368,7 @@ function ContractEditor({
                 error={errors.contractNo}
                 helper="같은 보험회사 안에서는 중복될 수 없습니다."
               >
-                <input
+                <input data-guide-feature="features.contract.contract-form-page.contract-no"
                   name="contractNo"
                   placeholder="계약번호 입력"
                   maxLength={80}
@@ -378,7 +378,7 @@ function ContractEditor({
                 />
               </Field>
               <Field label="계약일" required error={errors.contractDate} helper="미래 날짜는 선택할 수 없습니다.">
-                <input
+                <input data-guide-feature="features.contract.contract-form-page.contract-date"
                   name="contractDate"
                   type="date"
                   max={currentDate}
@@ -387,7 +387,7 @@ function ContractEditor({
                 />
               </Field>
               <Field label="계약상태" required error={errors.contractStatus}>
-                <select
+                <select data-guide-feature="features.contract.contract-form-page.contract-status"
                   name="contractStatus"
                   className="select-control"
                   value={draft.contractStatus}
@@ -402,7 +402,7 @@ function ContractEditor({
               </Field>
             </div>
           </section>
-          <section
+          <section data-guide-feature="features.contract.contract-form-page.section-2"
             className="surface contract-form-card contract-agent-card contract-editor-agent"
             aria-labelledby="contract-agent-heading"
           >
@@ -428,7 +428,7 @@ function ContractEditor({
                     </EvidenceLink>
                   }
                 >
-                  <SearchSelect
+                  <SearchSelect data-guide-feature="features.contract.contract-form-page.agent-id"
                     name="agentId"
                     value={draft.agentId}
                     source={agents.source}
@@ -451,7 +451,7 @@ function ContractEditor({
                 error={errors.organizationId}
                 helper="직접 수정하지 않습니다. 계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다."
               >
-                <input
+                <input data-guide-feature="features.contract.contract-form-page.organization-name"
                   name="organizationName"
                   value={draft.organizationName}
                   readOnly
@@ -460,7 +460,7 @@ function ContractEditor({
               </Field>
             </div>
           </section>
-          <section
+          <section data-guide-feature="features.contract.contract-form-page.section-3"
             className="surface contract-form-card contract-premium-card contract-editor-premium"
             aria-labelledby="contract-premium-heading"
           >
@@ -474,7 +474,7 @@ function ContractEditor({
             </header>
             <div className="contract-form-fields contract-premium-fields">
               <Field label="납입주기" required error={errors.paymentCycleCode}>
-                <select
+                <select data-guide-feature="features.contract.contract-form-page.payment-cycle-code"
                   name="paymentCycleCode"
                   className="select-control"
                   value={draft.paymentCycleCode}
@@ -556,14 +556,14 @@ function ContractEditor({
           </p>
           <div className="contract-action-buttons">
             {(conflict || missingToken) && (
-              <Button variant="secondary" onClick={() => setConfirmReload(true)}>
+              <Button data-guide-feature="features.contract.contract-form-page.button-3" variant="secondary" onClick={() => setConfirmReload(true)}>
                 최신 계약 다시 불러오기
               </Button>
             )}
-            <Link className="button button-secondary" to={returnTo}>
+            <Link data-guide-feature="features.contract.contract-form-page.link-2" className="button button-secondary" to={returnTo}>
               취소
             </Link>
-            <Button
+            <Button data-guide-feature="features.contract.contract-form-page.button-4"
               className="contract-save-button"
               type="submit"
               loading={saving}
@@ -589,10 +589,10 @@ function ContractEditor({
         closeOnEscape={!reloading}
         footer={
           <>
-            <Button variant="secondary" disabled={reloading} onClick={() => setConfirmReload(false)}>
+            <Button data-guide-feature="features.contract.contract-form-page.button-5" variant="secondary" disabled={reloading} onClick={() => setConfirmReload(false)}>
               입력 유지
             </Button>
-            <Button loading={reloading} onClick={() => void reload()}>
+            <Button data-guide-feature="features.contract.contract-form-page.button-6" loading={reloading} onClick={() => void reload()}>
               최신 정보로 바꾸기
             </Button>
           </>

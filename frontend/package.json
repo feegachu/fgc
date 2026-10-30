@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "generate:guide-features": "node scripts/guide-features.mjs --write",
+    "check:guide-features": "node scripts/guide-features.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

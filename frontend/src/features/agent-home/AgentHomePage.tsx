@@ -63,7 +63,7 @@ function Segmented<T extends string | number>({
     <div className="ah-seg" role="group" aria-label={label} ref={rail}>
       <span className="ah-seg-thumb" style={{ left: thumb.left, width: thumb.width }} />
       {options.map((option) => (
-        <button
+        <button data-guide-feature="features.agent-home.agent-home-page.button"
           key={String(option.value)}
           type="button"
           aria-pressed={value === option.value}
@@ -112,7 +112,7 @@ function AgentHomeContent({ month }: { month: string }) {
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error, '포트폴리오를 불러오지 못했습니다.')}</p>
-          <button
+          <button data-guide-feature="features.agent-home.agent-home-page.button-2"
             type="button"
             className="button button-secondary"
             onClick={() => void Promise.all([contracts.refetch(), insurers.refetch(), products.refetch()])}
@@ -179,7 +179,7 @@ function Snapshot({
   const countDelta = now.count - before.count
   const need = now.near + now.review
   return (
-    <section className="ah-snapshot" aria-label="이번 달 판매 현황">
+    <section data-guide-feature="features.agent-home.agent-home-page.section" className="ah-snapshot" aria-label="이번 달 판매 현황">
       <article className="ah-hero" aria-label="설계사 프로필">
         <span className="ah-avatar">{name.slice(0, 1) || '설'}</span>
         <div className="ah-profile">
@@ -219,7 +219,7 @@ function Snapshot({
             <>
               <div className="ah-kpi-num">확인 불가</div>
               <div className="ah-kpi-foot">
-                <button type="button" className="ah-retry" onClick={() => void commission.refetch()}>
+                <button data-guide-feature="features.agent-home.agent-home-page.button-3" type="button" className="ah-retry" onClick={() => void commission.refetch()}>
                   다시 시도
                 </button>
               </div>
@@ -241,7 +241,7 @@ function Snapshot({
             </>
           )}
         </article>
-        <button
+        <button data-guide-feature="features.agent-home.agent-home-page.button-4"
           type="button"
           className="ah-kpi ah-kpi-alert"
           aria-haspopup="dialog"
@@ -294,7 +294,7 @@ function Charts({
   const label = periodLabel(period)
   const rate = statusCounts(focus)
   return (
-    <section className="ah-panel" aria-label="설계사 판매 관리 그래프">
+    <section data-guide-feature="features.agent-home.agent-home-page.section-2" className="ah-panel" aria-label="설계사 판매 관리 그래프">
       <div className="ah-panel-head">
         <div>
           <h2 className="ah-panel-title">설계사 판매 관리</h2>
@@ -310,7 +310,7 @@ function Charts({
           <div className="ah-chip">
             <span className="ah-chip-dot" />
             {insurer} 필터 적용 중
-            <button type="button" aria-label="보험사 필터 해제" onClick={() => onInsurer(insurer)}>
+            <button data-guide-feature="features.agent-home.agent-home-page.button-5" type="button" aria-label="보험사 필터 해제" onClick={() => onInsurer(insurer)}>
               ✕
             </button>
           </div>
@@ -367,14 +367,14 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="ah-modal" onClick={(event) => event.target === event.currentTarget && onClose()}>
+    <div data-guide-feature="features.agent-home.agent-home-page.div" className="ah-modal" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="ah-modal-card" role="dialog" aria-modal="true" aria-labelledby="ah-need-title">
         <div className="ah-modal-head">
           <div>
             <h3 id="ah-need-title">{`확인 필요 계약 ${list.length}건`}</h3>
             <p>{`${month} 기준 · 한도 근접 ${near}건 · 검토 필요 ${list.length - near}건`}</p>
           </div>
-          <button ref={closeRef} type="button" className="ah-modal-close" aria-label="닫기" onClick={onClose}>
+          <button data-guide-feature="features.agent-home.agent-home-page.button-6" ref={closeRef} type="button" className="ah-modal-close" aria-label="닫기" onClick={onClose}>
             ✕
           </button>
         </div>
@@ -399,7 +399,7 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
               </>
             )
             return r.contractId ? (
-              <Link className="ah-need-row" key={r.contractId} to={`/contracts/${r.contractId}`} onClick={onClose}>
+              <Link data-guide-feature="features.agent-home.agent-home-page.link" className="ah-need-row" key={r.contractId} to={`/contracts/${r.contractId}`} onClick={onClose}>
                 {content}
               </Link>
             ) : (
@@ -411,7 +411,7 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
         </div>
         <div className="ah-modal-foot">
           <p>한도 근접은 계약의 1,200% 한도 검증이 주의·위반으로 나온 경우, 검토 필요는 검증 자료가 부족한 경우예요.</p>
-          <button type="button" className="ah-btn-ghost" onClick={onClose}>
+          <button data-guide-feature="features.agent-home.agent-home-page.button-7" type="button" className="ah-btn-ghost" onClick={onClose}>
             닫기
           </button>
         </div>
@@ -439,7 +439,7 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
   const base = import.meta.env.BASE_URL
   return (
     <>
-      <button
+      <button data-guide-feature="features.agent-home.agent-home-page.fgc-ai"
         ref={launcher}
         type="button"
         className="ah-launcher"

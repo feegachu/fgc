@@ -26,7 +26,7 @@ export function CompareModal({
       className="modal-large reco-react-modal"
       onClose={onClose}
       footer={
-        <Button variant="secondary" onClick={onClose}>
+        <Button data-guide-feature="features.reconciliation.compare-modal.button" variant="secondary" onClick={onClose}>
           닫기
         </Button>
       }
@@ -95,7 +95,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         <SourceSide title="예상" matches={expected} detail={detail} expected />
         <SourceSide title="실제" matches={actual} detail={detail} expected={false} />
       </div>
-      <section className="surface reco-react-note" aria-label="차액 및 분류">
+      <section data-guide-feature="features.reconciliation.compare-modal.section" className="surface reco-react-note" aria-label="차액 및 분류">
         <p>
           예상 금액 <Money value={detail.expectedTotalAmount} /> · 실제 금액 <Money value={detail.actualTotalAmount} />
         </p>
@@ -112,17 +112,17 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
       </section>
       <nav className="reco-react-links" aria-label="관련 화면">
         {scheduleId != null && (
-          <Link className="button button-secondary" to={href(`/schedules/${scheduleId}`)}>
+          <Link data-guide-feature="features.reconciliation.compare-modal.link" className="button button-secondary" to={href(`/schedules/${scheduleId}`)}>
             스케줄 상세
           </Link>
         )}
-        <Link className="button button-secondary" to={href('/transactions')}>
+        <Link data-guide-feature="features.reconciliation.compare-modal.link-2" className="button button-secondary" to={href('/transactions')}>
           지급 건 목록
         </Link>
-        <Link className="button button-secondary" to={href('/journals')}>
+        <Link data-guide-feature="features.reconciliation.compare-modal.link-3" className="button button-secondary" to={href('/journals')}>
           관련 분개
         </Link>
-        <Link className="button button-secondary" to={href('/exceptions')}>
+        <Link data-guide-feature="features.reconciliation.compare-modal.link-4" className="button button-secondary" to={href('/exceptions')}>
           예외 건
         </Link>
       </nav>
@@ -143,7 +143,7 @@ function SourceSide({
   const agent = expected ? detail.expectedAgent : detail.actualAgent
   const agentLabel = agent?.agentName ? `${agent.agentName}${agent.agentCode ? ` · ${agent.agentCode}` : ''}` : '없음'
   return (
-    <section className="surface">
+    <section data-guide-feature="features.reconciliation.compare-modal.section-2" className="surface">
       <header className="surface-header">
         <h3 className="surface-title">{title}</h3>
         <span>{matches.length}개 원천</span>

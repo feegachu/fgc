@@ -91,7 +91,7 @@ export default function CapListPage() {
         row.contractId == null ? (
           row.contractNo || '—'
         ) : (
-          <Link to={`/contracts/${encodeURIComponent(String(row.contractId))}?tab=cap`}>{row.contractNo || '—'}</Link>
+          <Link data-guide-feature="features.cap.cap-list-page.link" to={`/contracts/${encodeURIComponent(String(row.contractId))}?tab=cap`}>{row.contractNo || '—'}</Link>
         ),
     },
     {
@@ -154,7 +154,7 @@ export default function CapListPage() {
       width: '9rem',
       align: 'number',
       render: (row) => (
-        <Button
+        <Button data-guide-feature="features.cap.cap-list-page.button"
           variant="ghost"
           disabled={row.capCheckId == null}
           onClick={() => openDetail(row)}
@@ -210,7 +210,7 @@ export default function CapListPage() {
         {Object.entries(STATUSES)
           .filter(([code]) => code !== 'NOT_APPLICABLE')
           .map(([code, label]) => (
-            <button
+            <button data-guide-feature="features.cap.cap-list-page.button-2"
               key={code}
               type="button"
               className={`surface cap-react-kpi cap-react-kpi-${code}`}
@@ -229,7 +229,7 @@ export default function CapListPage() {
             </button>
           ))}
       </div>
-      <section className="surface cap-react-stage-panel">
+      <section data-guide-feature="features.cap.cap-list-page.section" className="surface cap-react-stage-panel">
         <header className="surface-header">
           <h2 className="surface-title">지급단계별 한도 게이지</h2>
           <StatusBadge>전체 검색범위 집계</StatusBadge>
@@ -248,7 +248,7 @@ export default function CapListPage() {
           )}
         </div>
       </section>
-      <section className="surface">
+      <section data-guide-feature="features.cap.cap-list-page.section-2" className="surface">
         <header className="surface-header">
           <h2 className="surface-title">계약별 판정 목록</h2>
           <span>총 {data ? int(data.totalElements ?? 0) : '—'}건</span>
@@ -275,7 +275,7 @@ export default function CapListPage() {
           controls={
             <label>
               한 화면{' '}
-              <select
+              <select data-guide-feature="features.cap.cap-list-page.select"
                 className="select-control"
                 aria-label="한 화면 행 수"
                 value={criteria.size}
@@ -291,7 +291,7 @@ export default function CapListPage() {
           }
         />
       </section>
-      <section className="surface">
+      <section data-guide-feature="features.cap.cap-list-page.section-3" className="surface">
         <header className="surface-header">
           <h2 className="surface-title">설계사별 합계</h2>
           <span>모니터링 지표 · 규제 판정 아님</span>
@@ -394,7 +394,7 @@ function CapFilter({
       </option>
     ))
   return (
-    <section className="surface">
+    <section data-guide-feature="features.cap.cap-list-page.section-4" className="surface">
       <header className="surface-header">
         <h2 className="surface-title">검색 조건</h2>
       </header>
@@ -407,25 +407,25 @@ function CapFilter({
       >
         <div className="filter-field">
           <label htmlFor="cap-filter-month">기준월</label>
-          <input className="field-control" type="month" required {...bind('month')} />
+          <input data-guide-feature="features.cap.cap-list-page.input" className="field-control" type="month" required {...bind('month')} />
         </div>
         <div className="filter-field">
           <label htmlFor="cap-filter-stage">지급단계</label>
-          <select className="select-control" {...bind('stage')}>
+          <select data-guide-feature="features.cap.cap-list-page.select-2" className="select-control" {...bind('stage')}>
             <option value="">전체</option>
             {options(STAGES)}
           </select>
         </div>
         <div className="filter-field">
           <label htmlFor="cap-filter-status">판정</label>
-          <select className="select-control" {...bind('status')}>
+          <select data-guide-feature="features.cap.cap-list-page.select-3" className="select-control" {...bind('status')}>
             <option value="">전체</option>
             {options(STATUS_LABELS)}
           </select>
         </div>
         <div className="filter-field">
           <label htmlFor="cap-filter-insurerId">보험회사</label>
-          <select className="select-control" disabled={!insurers.data || insurers.isError} {...bind('insurerId')}>
+          <select data-guide-feature="features.cap.cap-list-page.select-4" className="select-control" disabled={!insurers.data || insurers.isError} {...bind('insurerId')}>
             <option value="">{insurers.isPending ? '불러오는 중' : '전체'}</option>
             {insurers.data?.content?.map((row) => (
               <option key={row.insurerId} value={row.insurerId} disabled={row.activeYn === false}>
@@ -436,7 +436,7 @@ function CapFilter({
         </div>
         <div className="filter-field">
           <label htmlFor="cap-filter-orgId">조직</label>
-          <select className="select-control" disabled={!organizations.data || organizations.isError} {...bind('orgId')}>
+          <select data-guide-feature="features.cap.cap-list-page.select-5" className="select-control" disabled={!organizations.data || organizations.isError} {...bind('orgId')}>
             <option value="">{organizations.isPending ? '불러오는 중' : '전체'}</option>
             {organizations.data?.content?.map((row) => (
               <option key={row.organizationId} value={row.organizationId} disabled={row.activeYn === false}>
@@ -447,7 +447,7 @@ function CapFilter({
         </div>
         <div className="filter-field">
           <label htmlFor="cap-filter-contractNo">계약번호</label>
-          <input type="search" className="field-control" placeholder="계약번호 입력" {...bind('contractNo')} />
+          <input data-guide-feature="features.cap.cap-list-page.input-2" type="search" className="field-control" placeholder="계약번호 입력" {...bind('contractNo')} />
         </div>
         {insurers.isError && <CapError error={insurers.error} retry={() => void insurers.refetch()} />}
         {organizations.isError && <CapError error={organizations.error} retry={() => void organizations.refetch()} />}

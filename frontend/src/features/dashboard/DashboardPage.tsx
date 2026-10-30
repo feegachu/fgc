@@ -57,7 +57,7 @@ function DashboardContent({ month }: { month: string }) {
       render: (e) => (
         <CellDisclosure
           singleLine
-          preview={<Link to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{e.title ?? '-'}</Link>}
+          preview={<Link data-guide-feature="features.dashboard.dashboard-page.link" to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{e.title ?? '-'}</Link>}
           full={e.title ?? '-'}
         />
       ),
@@ -175,7 +175,7 @@ function DashboardContent({ month }: { month: string }) {
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error as Error, '대시보드를 불러오지 못했습니다.')}</p>
-          <button type="button" className="button button-secondary" onClick={() => void refetch()}>
+          <button data-guide-feature="features.dashboard.dashboard-page.button" type="button" className="button button-secondary" onClick={() => void refetch()}>
             다시 시도
           </button>
         </div>
@@ -183,9 +183,9 @@ function DashboardContent({ month }: { month: string }) {
         <DashboardSkeleton />
       ) : (
         <>
-          <section className="kpi-grid" aria-label="주요 검증 지표">
+          <section data-guide-feature="features.dashboard.dashboard-page.section" className="kpi-grid" aria-label="주요 검증 지표">
             {kpis?.map((kpi, index) => (
-              <Link
+              <Link data-guide-feature={guideFeatureId('dashboard.kpi-link', kpi.id)}
                 key={kpi.label}
                 to={kpi.to}
                 className="kpi-card-link"
@@ -194,6 +194,7 @@ function DashboardContent({ month }: { month: string }) {
                 aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}
               >
                 <KpiCard
+                  guideId={guideFeatureId('dashboard.kpi', kpi.id)}
                   label={kpi.label}
                   value={<AnimatedNumber value={kpi.value ?? 0} />}
                   unit="건"
@@ -205,12 +206,12 @@ function DashboardContent({ month }: { month: string }) {
           </section>
           <div className="dashboard-main-grid">
             <div className="dashboard-primary-column">
-              <section className="surface" aria-labelledby="priority-title">
+              <section data-guide-feature="features.dashboard.dashboard-page.section-2" className="surface" aria-labelledby="priority-title">
                 <header className="surface-header">
                   <h2 id="priority-title" className="surface-title">
                     최근 예외
                   </h2>
-                  <Link className="run-list-link" to={href('/exceptions')}>
+                  <Link data-guide-feature="features.dashboard.dashboard-page.link-3" className="run-list-link" to={href('/exceptions')}>
                     예외함 전체 보기 →
                   </Link>
                 </header>
@@ -224,12 +225,12 @@ function DashboardContent({ month }: { month: string }) {
                   />
                 </div>
               </section>
-              <section className="surface run-list-card" aria-labelledby="run-list-title">
+              <section data-guide-feature="features.dashboard.dashboard-page.section-3" className="surface run-list-card" aria-labelledby="run-list-title">
                 <div className="run-list-header">
                   <h2 id="run-list-title" className="run-list-title">
                     최근 통합검증 실행
                   </h2>
-                  <Link className="run-list-link" to={href('/validation-runs')}>
+                  <Link data-guide-feature="features.dashboard.dashboard-page.link-4" className="run-list-link" to={href('/validation-runs')}>
                     실행 목록 →
                   </Link>
                 </div>
@@ -245,7 +246,7 @@ function DashboardContent({ month }: { month: string }) {
               </section>
             </div>
             <aside className="dashboard-secondary-column" aria-label="검증 현황 요약">
-              <section className="surface risk-composition-card" aria-labelledby="composition-title">
+              <section data-guide-feature="features.dashboard.dashboard-page.section-4" className="surface risk-composition-card" aria-labelledby="composition-title">
                 <header className="surface-header">
                   <h2 id="composition-title" className="surface-title">
                     검증 항목별 건수 비중
@@ -270,7 +271,7 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const drawn = useDrawn()
   const running = run.status === 'RUNNING'
   return (
-    <Link className="run-row" to={to}>
+    <Link data-guide-feature="features.dashboard.dashboard-page.link-5" className="run-row" to={to}>
       <strong className="run-title">{`${run.validationMonth ?? ''} · ${run.runNo}회차`}</strong>
       <span className="run-meta">{`${step}/${RUN_STEPS} 단계 · 실행 ${run.triggeredBy ?? '-'}`}</span>
       <StatusBadge tone={runStatusTone(run.status)}>{run.statusLabel ?? '-'}</StatusBadge>
@@ -297,3 +298,4 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
     </Link>
   )
 }
+import { guideFeatureId } from '../assistant/feature-ids'

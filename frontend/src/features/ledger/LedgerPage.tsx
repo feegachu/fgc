@@ -190,7 +190,7 @@ export default function LedgerPage() {
         label="분개 목록과 분개 상세 카드 너비"
         defaultRatio={55}
       >
-        <section className="surface" aria-busy={list.isFetching}>
+        <section data-guide-feature="features.ledger.ledger-page.section" className="surface" aria-busy={list.isFetching}>
           <header className="surface-header">
             <h2 className="surface-title">분개 목록</h2>
             <span>{int(data?.totalElements ?? 0)}건 · 한 화면 20행</span>
@@ -216,7 +216,7 @@ export default function LedgerPage() {
             onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
           />
         </section>
-        <section className="surface" aria-label="분개 상세" aria-busy={!!selected && detail.isFetching}>
+        <section data-guide-feature="features.ledger.ledger-page.section-2" className="surface" aria-label="분개 상세" aria-busy={!!selected && detail.isFetching}>
           <header className="surface-header">
             <h2 className="surface-title">분개 상세</h2>
             {detail.data && <Badge status={detail.data.status} label={detail.data.statusLabel} />}
@@ -264,10 +264,10 @@ export default function LedgerPage() {
                 <div className="ledger-react-actions">
                   {eligible ? (
                     <>
-                      <Button disabled={!canReverse} onClick={() => setAction('reverse')}>
+                      <Button data-guide-feature="features.ledger.ledger-page.button" disabled={!canReverse} onClick={() => setAction('reverse')}>
                         역분개
                       </Button>
-                      <Button variant="secondary" disabled={!canReverse} onClick={() => setAction('correction')}>
+                      <Button data-guide-feature="features.ledger.ledger-page.button-2" variant="secondary" disabled={!canReverse} onClick={() => setAction('correction')}>
                         역분개 + 재기표
                       </Button>
                       {!canReverse && <p>역분개는 SETTLEMENT·GA_ADMIN·SYSTEM_ADMIN 권한이 필요합니다.</p>}
@@ -328,7 +328,7 @@ function LedgerFilters({
   const field = (key: keyof typeof fields, label: string, options?: Record<string, string>, type = 'text') => (
     <Field label={label}>
       {options ? (
-        <select value={fields[key]} onChange={(e) => setFields({ ...fields, [key]: e.target.value })}>
+        <select data-guide-feature="features.ledger.ledger-page.select" value={fields[key]} onChange={(e) => setFields({ ...fields, [key]: e.target.value })}>
           <option value="">전체</option>
           {Object.entries(options).map(([value, name]) => (
             <option key={value} value={value}>
@@ -337,7 +337,7 @@ function LedgerFilters({
           ))}
         </select>
       ) : (
-        <input
+        <input data-guide-feature="features.ledger.ledger-page.input"
           type={type}
           maxLength={key === 'contractNo' ? 80 : undefined}
           value={fields[key]}
@@ -460,10 +460,10 @@ function JournalActionModal({
       initialFocusRef={reasonRef}
       footer={
         <>
-          <Button variant="secondary" disabled={mutation.isPending} onClick={close}>
+          <Button data-guide-feature="features.ledger.ledger-page.button-3" variant="secondary" disabled={mutation.isPending} onClick={close}>
             취소
           </Button>
-          <Button loading={mutation.isPending} disabled={!allowed} onClick={submit}>
+          <Button data-guide-feature="features.ledger.ledger-page.button-4" loading={mutation.isPending} disabled={!allowed} onClick={submit}>
             {isReverse ? '역분개 생성' : '예외함에서 정정 계속'}
           </Button>
         </>
@@ -483,7 +483,7 @@ function JournalActionModal({
         required
         error={reasonError ? (isReverse ? '역분개 사유를 입력하세요.' : '정정 요청 사유를 입력하세요.') : undefined}
       >
-        <textarea
+        <textarea data-guide-feature="features.ledger.ledger-page.textarea"
           ref={reasonRef}
           rows={5}
           maxLength={1000}
@@ -496,7 +496,7 @@ function JournalActionModal({
         />
       </Field>
       <Field label="증빙 참조">
-        <input
+        <input data-guide-feature="features.ledger.ledger-page.input-2"
           maxLength={500}
           value={evidence}
           disabled={mutation.isPending}

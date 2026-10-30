@@ -60,7 +60,7 @@ export function Sidebar({
     if (!canOpen(definition, user)) return null
     return (
       <li key={path}>
-        <Link
+        <Link data-guide-feature={guideFeatureId('navigation.menu', definition.id)}
           className={`${sub ? 'sidebar-subnav-link' : 'sidebar-nav-link'} ${current?.menu === path ? 'is-active' : ''}`}
           to={hrefFor(path)}
           aria-current={current?.menu === path ? 'page' : undefined}
@@ -79,7 +79,7 @@ export function Sidebar({
   return (
     <aside id="app-sidebar" className="app-sidebar">
       <div className="sidebar-brand">
-        <Link className="sidebar-brand-link sidebar-brand-home" to={hrefFor('/')} aria-label="FGC 업무 대시보드">
+        <Link data-guide-feature="app.shell.sidebar.fgc" className="sidebar-brand-link sidebar-brand-home" to={hrefFor('/')} aria-label="FGC 업무 대시보드">
           <img
             src={`${import.meta.env.BASE_URL}images/brand/logo-horizontal-white.png`}
             className="sidebar-brand-horizontal"
@@ -88,7 +88,7 @@ export function Sidebar({
             alt="FGC"
           />
         </Link>
-        <button
+        <button data-guide-feature="app.shell.sidebar.button"
           className="sidebar-expand-button"
           type="button"
           aria-label="사이드바 펼치기"
@@ -98,7 +98,7 @@ export function Sidebar({
         >
           <img src={`${import.meta.env.BASE_URL}images/brand/logo-symbol-white.png`} width={48} height={48} alt="" />
         </button>
-        <button
+        <button data-guide-feature="app.shell.sidebar.button-2"
           className="icon-button sidebar-collapse-button"
           type="button"
           aria-label="사이드바 접기"
@@ -119,6 +119,7 @@ export function Sidebar({
             <li key={group.id}>
               <details className="sidebar-nav-details" open={openSections.includes(group.id)}>
                 <summary
+                  data-guide-feature={guideFeatureId('navigation.group', group.id)}
                   className="sidebar-nav-summary"
                   onClick={(event) => {
                     event.preventDefault()
@@ -143,6 +144,7 @@ export function Sidebar({
           {hasVisibleLinks(groups[3].paths) && <li className="sidebar-nav-section">
             <details className="sidebar-nav-details" open={openSections.includes('admin')}>
               <summary
+                data-guide-feature="navigation.group.admin"
                 className="sidebar-nav-summary"
                 onClick={(event) => {
                   event.preventDefault()
@@ -172,7 +174,7 @@ export function Sidebar({
           <p className="sidebar-user-name">{user.userName}</p>
           <p className="sidebar-user-role">{roleLabels[user.roleCode] ?? user.roleCode}</p>
         </div>
-        <button
+        <button data-guide-feature="app.shell.sidebar.button-3"
           className="sidebar-logout-button"
           type="button"
           aria-label="로그아웃"
@@ -187,3 +189,4 @@ export function Sidebar({
     </aside>
   )
 }
+import { guideFeatureId } from '../../features/assistant/feature-ids'

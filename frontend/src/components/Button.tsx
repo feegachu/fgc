@@ -13,7 +13,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   return (
-    <button
+    <button data-guide-feature="components.button.button"
       type="button"
       {...props}
       className={`button button-${variant} ${className}`}

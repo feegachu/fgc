@@ -104,7 +104,7 @@ export function Donut({
             return d ? (
               <path key={s.name} d={d} {...common} />
             ) : (
-              <circle
+              <circle data-guide-feature="features.agent-home.charts.circle"
                 key={s.name}
                 cx="50"
                 cy="50"
@@ -132,7 +132,7 @@ export function Donut({
           const cls = selected ? (selected === s.name ? 'sel' : 'dim') : ''
           return (
             <li key={s.name} className={cls}>
-              <button
+              <button data-guide-feature="features.agent-home.charts.button"
                 type="button"
                 aria-pressed={selected === s.name}
                 onClick={() => onSelect(s.name)}
@@ -266,7 +266,7 @@ export function Trend({ points }: { points: { month: string; count: number; prem
           </g>
         )}
       </svg>
-      <table className="visually-hidden">
+      <table data-guide-feature="features.agent-home.charts.table" className="visually-hidden">
         <caption>월별 신규 계약 건수와 월 환산 보험료</caption>
         <thead>
           <tr>

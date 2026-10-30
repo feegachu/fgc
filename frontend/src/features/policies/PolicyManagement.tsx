@@ -163,14 +163,14 @@ export function PolicyManagement({
         </p>
         <div className="policy-actions">
           {allowed.includes('EDIT') && supported && (
-            <Button variant="secondary" disabled={refreshing || !draft} onClick={() => setEditing(true)}>
+            <Button data-guide-feature="features.policies.policy-management.button" variant="secondary" disabled={refreshing || !draft} onClick={() => setEditing(true)}>
               초안 수정
             </Button>
           )}
           {allowed
             .filter((a) => a !== 'EDIT' && (a !== 'NEW_VERSION' || supported))
             .map((a) => (
-              <Button
+              <Button data-guide-feature="features.policies.policy-management.button-2"
                 key={a}
                 variant={a === 'REJECT' || a === 'NEW_VERSION' ? 'secondary' : 'primary'}
                 disabled={refreshing || (a === 'APPROVE' && own)}
@@ -291,7 +291,7 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
             <p>{source.explanation || '설명 자료 없음'}</p>
           </div>
           {safeSourceUrl(source.url) && (
-            <a href={safeSourceUrl(source.url)!} target="_blank" rel="noopener noreferrer">
+            <a data-guide-feature="features.policies.policy-management.a" href={safeSourceUrl(source.url)!} target="_blank" rel="noopener noreferrer">
               원문 보기 ↗
             </a>
           )}
@@ -335,19 +335,19 @@ function ReadOnlyRuleSummary({ detail }: { detail: ManagedPolicyDetail }) {
   return (
     <div className="policy-rule-summary">
       {commission.length > 0 && (
-        <section>
+        <section data-guide-feature="features.policies.policy-management.section">
           <h3 className="policy-detail-title">수수료 규칙</h3>
           <CommissionRules rows={commission} />
         </section>
       )}
       {caps.length > 0 && (
-        <section>
+        <section data-guide-feature="features.policies.policy-management.section-2">
           <h3 className="policy-detail-title">1,200% 룰셋</h3>
           <CapRuleSets rows={caps} />
         </section>
       )}
       {refunds.length > 0 && (
-        <section>
+        <section data-guide-feature="features.policies.policy-management.section-3">
           <h3 className="policy-detail-title">예상 해약환급률표</h3>
           <RefundTables rows={refunds} />
         </section>
@@ -416,7 +416,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
         />
       )}
       {draft.feeRegimeRules.map((rule, i) => (
-        <section key={i} className="policy-regime-summary">
+        <section data-guide-feature="features.policies.policy-management.section-4" key={i} className="policy-regime-summary">
           <header>
             <StatusBadge tone="info">{rule.feeRegimeCode === 'FOUR_YEAR_2027' ? '4년 분급' : '7년 분급'}</StatusBadge>
             <h4>분급 룰셋 {i + 1}</h4>
@@ -586,10 +586,10 @@ function PolicyActionDialog({
       initialFocusRef={newVersion ? dateRef : reasonRef}
       footer={
         <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button data-guide-feature="features.policies.policy-management.button-3" variant="secondary" disabled={busy} onClick={onClose}>
             취소
           </Button>
-          <Button loading={busy} onClick={() => void submit()}>
+          <Button data-guide-feature="features.policies.policy-management.button-4" loading={busy} onClick={() => void submit()}>
             {newVersion ? '새 초안 만들기' : `${label} 확인`}
           </Button>
         </>
@@ -631,7 +631,7 @@ function PolicyActionDialog({
       {newVersion && (
         <div className="policy-form-grid policy-form-grid-two">
           <Field label="새 버전 적용 시작일" required error={dateError}>
-            <input
+            <input data-guide-feature="features.policies.policy-management.input"
               ref={dateRef}
               type="date"
               value={effectiveFrom}
@@ -640,7 +640,7 @@ function PolicyActionDialog({
             />
           </Field>
           <Field label="새 버전 적용 종료일">
-            <input type="date" value={effectiveTo} onChange={(e) => setTo(e.target.value)} disabled={busy} />
+            <input data-guide-feature="features.policies.policy-management.input-2" type="date" value={effectiveTo} onChange={(e) => setTo(e.target.value)} disabled={busy} />
           </Field>
         </div>
       )}
@@ -650,7 +650,7 @@ function PolicyActionDialog({
         error={error}
         helper={`${reason.length.toLocaleString()} / 2,000자`}
       >
-        <textarea
+        <textarea data-guide-feature="features.policies.policy-management.textarea"
           ref={reasonRef}
           value={reason}
           rows={4}
@@ -665,7 +665,7 @@ function PolicyActionDialog({
       </Field>
       {action === 'APPROVE' && !preview && (
         <Field label="승인 근거 문서" helper="상품위원회 의결서 등 승인 근거가 있으면 문서 참조를 입력하세요.">
-          <input
+          <input data-guide-feature="features.policies.policy-management.input-3"
             value={evidenceRef}
             onChange={(event) => setEvidenceRef(event.target.value)}
             maxLength={500}

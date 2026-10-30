@@ -201,14 +201,14 @@ export default function TransactionListPage() {
           '-'
         ) : user.canProcess ? (
           <div className="transaction-row-actions">
-            <ContextLink
+            <ContextLink data-guide-feature="features.transaction.transaction-list-page.context-link"
               className="button button-ghost"
               to={path(row.commissionTransactionId)}
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정`}
             >
               수정
             </ContextLink>
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button"
               variant="ghost"
               className="transaction-delete"
               disabled={deletion.isPending || row.sourceType !== 'GA_MANUAL_PAYMENT'}
@@ -223,14 +223,14 @@ export default function TransactionListPage() {
           </div>
         ) : (
           <div className="transaction-row-actions">
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-2"
               variant="ghost"
               disabled
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정 (조회 전용 권한)`}
             >
               수정
             </Button>
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-3"
               variant="ghost"
               disabled
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 삭제 (조회 전용 권한)`}
@@ -250,10 +250,10 @@ export default function TransactionListPage() {
         closeOnEscape={!deletion.isPending}
         footer={
           <>
-            <Button variant="secondary" disabled={deletion.isPending} onClick={closeDelete}>
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-4" variant="secondary" disabled={deletion.isPending} onClick={closeDelete}>
               취소
             </Button>
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-5"
               loading={deletion.isPending}
               disabled={deleteTarget?.commissionTransactionId == null}
               onClick={() => {
@@ -285,7 +285,7 @@ export default function TransactionListPage() {
         </div>
         <div className="page-header-actions">
           {user.canProcess && (
-            <ContextLink
+            <ContextLink data-guide-feature="features.transaction.transaction-list-page.context-link-2"
               className="button button-primary"
               to={returnLink(month ? withMonth('/transactions/new', month) : '/transactions/new', returnTo)}
             >
@@ -311,7 +311,7 @@ export default function TransactionListPage() {
           {listError(insurers.error)}
         </p>
       )}
-      <section
+      <section data-guide-feature="features.transaction.transaction-list-page.section"
         className="surface transaction-list-panel"
         aria-labelledby="transaction-list-title"
         aria-busy={search.isFetching}
@@ -357,7 +357,7 @@ export default function TransactionListPage() {
                     : '검색 조건을 바꾸어 다시 조회하세요.'}
               </span>
               {search.isError && (
-                <Button variant="secondary" onClick={() => void search.refetch()}>
+                <Button data-guide-feature="features.transaction.transaction-list-page.button-6" variant="secondary" onClick={() => void search.refetch()}>
                   다시 시도
                 </Button>
               )}
@@ -427,7 +427,7 @@ function TransactionFilters({
     entries: readonly (readonly [string, string])[],
   ) => (
     <Field label={label} className={`filter-field ${className}`}>
-      <select
+      <select data-guide-feature="features.transaction.transaction-list-page.select"
         id={id}
         className="select-control"
         value={draft[key]}
@@ -449,7 +449,7 @@ function TransactionFilters({
     >
       <div className="filter-fields transaction-filter-fields">
         <Field label="정산월" className="filter-field transaction-filter-month">
-          <input
+          <input data-guide-feature="features.transaction.transaction-list-page.f-month"
             id="f-month"
             type="month"
             value={draft.settlementMonth}
@@ -468,7 +468,7 @@ function TransactionFilters({
           insurers.map((row) => [String(row.insurerId), `${row.insurerCode} · ${row.insurerName}`]),
         )}
         <Field label="계약번호" className="filter-field transaction-filter-contract">
-          <input
+          <input data-guide-feature="features.transaction.transaction-list-page.f-contract-no"
             id="f-contract-no"
             type="search"
             placeholder="계약번호 입력"
@@ -482,7 +482,7 @@ function TransactionFilters({
         {select('commissionItemId', 'f-item', '수수료 항목', 'transaction-filter-item', remembered(known.items))}
         {select('status', 'f-status', '상태', 'transaction-filter-status-field', statusOptions)}
         <label className="transaction-filter-checkbox">
-          <input
+          <input data-guide-feature="features.transaction.transaction-list-page.f-noattr"
             id="f-noattr"
             type="checkbox"
             checked={draft.noAttributionOnly}

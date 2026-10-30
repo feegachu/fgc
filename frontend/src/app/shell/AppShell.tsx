@@ -74,7 +74,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   }, [errorTitle, current, allowed])
   return (
     <div className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}>
-      <a className="skip-link" href="#main-content">
+      <a data-guide-feature="app.shell.app-shell.a" className="skip-link" href="#main-content">
         본문으로 건너뛰기
       </a>
       <div className="app-shell-layout">
@@ -103,7 +103,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             </div>
           </div>
         </header>
-        <main id="main-content" className="app-main" tabIndex={-1}>
+        <main id="main-content" data-guide-page={current?.id} className="app-main" tabIndex={-1}>
           <div className="page-content">
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>

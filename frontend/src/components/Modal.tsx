@@ -92,7 +92,7 @@ export function Modal({
   })
   if (!open) return null
   return createPortal(
-    <div
+    <div data-guide-feature="components.modal.div"
       className="modal-backdrop"
       onClick={(event) => {
         if (closeOnBackdrop && event.target === event.currentTarget) onClose()
@@ -110,7 +110,7 @@ export function Modal({
           <h2 className="modal-title" id={titleId}>
             {title}
           </h2>
-          <button type="button" className="icon-button" aria-label="모달 닫기" onClick={onClose}>
+          <button data-guide-feature="components.modal.button" type="button" className="icon-button" aria-label="모달 닫기" onClick={onClose}>
             <span className="material-symbols-rounded" aria-hidden="true">
               close
             </span>

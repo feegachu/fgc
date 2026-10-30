@@ -6,7 +6,7 @@ export function AuthStatus({ error, retry }: { error?: unknown; retry?: () => vo
   return (
     <div className="shell-error">
       <p role="alert">{authErrorText(error)}</p>
-      <Button onClick={retry}>다시 시도</Button>
+      <Button data-guide-feature="features.auth.auth-status.button" onClick={retry}>다시 시도</Button>
     </div>
   )
 }
