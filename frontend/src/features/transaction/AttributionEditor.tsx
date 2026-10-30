@@ -59,7 +59,7 @@ export function AttributionEditor({
         newcomer ? (
           <span className="transaction-panel-meta">-</span>
         ) : (
-          <SearchSelect
+          <SearchSelect data-guide-feature="features.transaction.attribution-editor.search-select"
             {...control(row, 'contractId', '계약번호')}
             data-contract-id
             value={row.contractId}
@@ -79,7 +79,7 @@ export function AttributionEditor({
       label: '귀속일',
       width: '8rem',
       render: (row) => (
-        <input
+        <input data-guide-feature="features.transaction.attribution-editor.input"
           {...control(row, 'attributionDate', '귀속일')}
           data-attr-date
           type="date"
@@ -94,7 +94,7 @@ export function AttributionEditor({
       label: '귀속월',
       width: '8rem',
       render: (row) => (
-        <input
+        <input data-guide-feature="features.transaction.attribution-editor.input-2"
           aria-label={label(row, '귀속월')}
           data-attr-month
           readOnly
@@ -109,7 +109,7 @@ export function AttributionEditor({
       width: '8rem',
       align: 'number',
       render: (row) => (
-        <input
+        <input data-guide-feature="features.transaction.attribution-editor.input-3"
           {...control(row, 'amount', '귀속금액')}
           data-attr-amount
           type="number"
@@ -125,7 +125,7 @@ export function AttributionEditor({
       label: '산입 판정',
       width: '9rem',
       render: (row) => (
-        <select
+        <select data-guide-feature="features.transaction.attribution-editor.select"
           {...control(row, 'decision', '산입 판정')}
           data-inclusion
           value={row.decision}
@@ -149,7 +149,7 @@ export function AttributionEditor({
             -
           </span>
         ) : (
-          <select
+          <select data-guide-feature="features.transaction.attribution-editor.select-2"
             {...control(row, 'attributionMethod', '귀속 방법')}
             data-attr-method
             value={row.attributionMethod}
@@ -174,7 +174,7 @@ export function AttributionEditor({
       label: '배부정책',
       width: '9rem',
       render: (row) => (
-        <input
+        <input data-guide-feature="features.transaction.attribution-editor.input-4"
           {...control(row, 'allocationBasis', '배부정책')}
           data-allocation-basis
           value={row.allocationBasis}
@@ -187,7 +187,7 @@ export function AttributionEditor({
       label: '증빙',
       width: '13rem',
       render: (row) => (
-        <input
+        <input data-guide-feature="features.transaction.attribution-editor.input-5"
           {...control(row, 'evidenceRef', '증빙')}
           data-attr-evidence
           value={row.evidenceRef}
@@ -201,7 +201,7 @@ export function AttributionEditor({
       label: <span className="visually-hidden">행 삭제</span>,
       width: '3.5rem',
       render: (row) => (
-        <Button
+        <Button data-guide-feature="features.transaction.attribution-editor.button"
           variant="ghost"
           disabled={disabled}
           aria-label={`${rows.indexOf(row) + 1}번 귀속행 삭제`}
@@ -213,12 +213,12 @@ export function AttributionEditor({
     },
   ]
   return (
-    <section className="surface transaction-attribution-panel" aria-labelledby="transaction-attribution-title">
+    <section data-guide-feature="features.transaction.attribution-editor.section" className="surface transaction-attribution-panel" aria-labelledby="transaction-attribution-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-attribution-title">
           ② 귀속행 — 이 돈이 어느 계약 몫인가
         </h2>
-        <Button
+        <Button data-guide-feature="features.transaction.attribution-editor.btn-add-attr"
           variant="secondary"
           className="transaction-add-attribution"
           id="btn-add-attr"

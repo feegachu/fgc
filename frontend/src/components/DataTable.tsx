@@ -169,7 +169,7 @@ function TableContents<T>({
   }
   return (
     <div className={`data-table-viewport ${resizable ? 'resizable-table-viewport' : ''} ${viewportClassName}`}>
-      <table
+      <table data-guide-feature="components.data-table.table"
         ref={tableRef}
         className={`data-table ${resizable ? 'data-table-resizable' : ''} ${className}`}
         style={
@@ -208,7 +208,7 @@ function TableContents<T>({
           <tr>
             {onSelectionChange && (
               <th scope="col">
-                <input
+                <input data-guide-feature="components.data-table.input"
                   type="checkbox"
                   aria-label="현재 페이지 전체 선택"
                   checked={allSelected}
@@ -242,7 +242,7 @@ function TableContents<T>({
                 >
                   {column.sortable && onSort ? (
                     <>
-                      <button
+                      <button data-guide-feature="components.data-table.button"
                         type="button"
                         className={`table-sort-button ${active ? 'is-active' : ''}`}
                         onClick={() =>
@@ -298,7 +298,7 @@ function TableContents<T>({
               >
                 {onSelectionChange && (
                   <td>
-                    <input
+                    <input data-guide-feature="components.data-table.input-2"
                       type="checkbox"
                       aria-label={`${rowKey(row)} 선택`}
                       checked={selectedKeys.includes(rowKey(row))}
@@ -310,7 +310,7 @@ function TableContents<T>({
                   <td key={column.key} className={`is-${column.align ?? 'left'} ${column.cellClassName ?? ''}`}>
                     <Fragment>
                       {index === 0 && onRowClick ? (
-                        <button type="button" className="table-row-link" onClick={() => onRowClick(row)}>
+                        <button data-guide-feature="components.data-table.button-2" type="button" className="table-row-link" onClick={() => onRowClick(row)}>
                           {column.render(row)}
                         </button>
                       ) : (

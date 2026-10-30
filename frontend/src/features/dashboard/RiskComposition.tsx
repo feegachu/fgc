@@ -64,7 +64,7 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
           const sharePct = `${rate(total > 0 ? String((item.value * 100) / total) : '0')}%`
           return (
             <li key={item.key} style={{ '--i': index } as CSSProperties}>
-              <Link
+              <Link data-guide-feature="features.dashboard.risk-composition.link"
                 to={item.to}
                 className={`risk-legend-row${activeKey === item.key ? ' is-active' : ''}`}
                 aria-label={`${item.label} ${int(item.value)}건, 비중 ${sharePct}`}

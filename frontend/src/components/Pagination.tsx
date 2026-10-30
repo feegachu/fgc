@@ -26,11 +26,11 @@ export function Pagination({
   return (
     <nav className="pagination-controls" aria-label={label}>
       {!compact && !legacy && (
-        <Button variant="ghost" disabled={current === 1} onClick={() => onPageChange(1)}>
+        <Button data-guide-feature="components.pagination.button" variant="ghost" disabled={current === 1} onClick={() => onPageChange(1)}>
           처음
         </Button>
       )}
-      <button
+      <button data-guide-feature="components.pagination.button-2"
         type="button"
         className={compact || legacy ? 'pagination-button' : 'button button-ghost'}
         title={legacy ? '이전 5페이지' : undefined}
@@ -55,7 +55,7 @@ export function Pagination({
               {number}
             </span>
           ) : (
-            <button
+            <button data-guide-feature="components.pagination.button-3"
               type="button"
               className={`pagination-button ${current === number ? 'is-active' : ''}`}
               key={number}
@@ -66,7 +66,7 @@ export function Pagination({
             </button>
           ),
       )}
-      <button
+      <button data-guide-feature="components.pagination.button-4"
         type="button"
         className={compact || legacy ? 'pagination-button' : 'button button-ghost'}
         title={legacy ? '다음 5페이지' : undefined}
@@ -85,7 +85,7 @@ export function Pagination({
         )}
       </button>
       {!compact && !legacy && (
-        <Button variant="ghost" disabled={current === last} onClick={() => onPageChange(last)}>
+        <Button data-guide-feature="components.pagination.button-5" variant="ghost" disabled={current === last} onClick={() => onPageChange(last)}>
           마지막
         </Button>
       )}

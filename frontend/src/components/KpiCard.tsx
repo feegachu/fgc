@@ -14,7 +14,7 @@ export function KpiCard({
   tone?: StatusTone
 }) {
   return (
-    <section className={`kpi-card kpi-card-${tone}`} aria-label={label}>
+    <section data-guide-feature="components.kpi-card.section" className={`kpi-card kpi-card-${tone}`} aria-label={label}>
       <div className="kpi-card-header">
         <h2 className="kpi-label">{label}</h2>
       </div>

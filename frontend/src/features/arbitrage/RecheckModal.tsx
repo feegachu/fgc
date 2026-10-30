@@ -49,10 +49,10 @@ export function RecheckModal({
       }}
       footer={
         <>
-          <Button variant="secondary" disabled={mutation.isPending} onClick={onClose}>
+          <Button data-guide-feature="features.arbitrage.recheck-modal.button" variant="secondary" disabled={mutation.isPending} onClick={onClose}>
             취소
           </Button>
-          <Button loading={mutation.isPending} onClick={submit}>
+          <Button data-guide-feature="features.arbitrage.recheck-modal.button-2" loading={mutation.isPending} onClick={submit}>
             재검증 실행
           </Button>
         </>
@@ -63,7 +63,7 @@ export function RecheckModal({
           {row.contractNo} · {present(row.paymentStageLabel)}
         </p>
         <Field label="검증 기준일" error={submitted && !asOfDate ? '검증 기준일을 입력하세요.' : undefined}>
-          <input
+          <input data-guide-feature="features.arbitrage.recheck-modal.input"
             ref={initialFocus}
             type="date"
             value={asOfDate}
@@ -72,7 +72,7 @@ export function RecheckModal({
           />
         </Field>
         <Field label="재검증 사유" error={submitted && !reason.trim() ? '재검증 사유를 입력하세요.' : undefined}>
-          <textarea
+          <textarea data-guide-feature="features.arbitrage.recheck-modal.textarea"
             className="textarea-control"
             maxLength={200}
             rows={4}

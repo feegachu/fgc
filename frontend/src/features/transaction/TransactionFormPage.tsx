@@ -63,7 +63,7 @@ export default function TransactionFormPage() {
         {draft.error ? (
           <>
             {formError(draft.error, '지급 건 화면을 초기화하지 못했습니다. 화면을 새로고침하세요.')}{' '}
-            <Button variant="secondary" onClick={() => void draft.refetch()}>
+            <Button data-guide-feature="features.transaction.transaction-form-page.button" variant="secondary" onClick={() => void draft.refetch()}>
               다시 시도
             </Button>
           </>
@@ -75,7 +75,7 @@ export default function TransactionFormPage() {
   if (id && draft.data?.status !== 'DRAFT')
     return (
       <div className="transaction-screen-state is-error" role="alert">
-        수정 가능한 지급 초안이 아닙니다. <Link to={withMonth('/transactions', activeMonth)}>목록으로</Link>
+        수정 가능한 지급 초안이 아닙니다. <Link data-guide-feature="features.transaction.transaction-form-page.link" to={withMonth('/transactions', activeMonth)}>목록으로</Link>
       </div>
     )
   return (
@@ -409,7 +409,7 @@ function TransactionForm({
           <h1 className="page-title">지급 건 등록 · 귀속 · 확정</h1>
         </div>
         <div className="page-header-actions">
-          <Link className="button button-secondary" to={returnTo}>
+          <Link data-guide-feature="features.transaction.transaction-form-page.link-2" className="button button-secondary" to={returnTo}>
             <span className="material-symbols-rounded" aria-hidden="true">
               arrow_back
             </span>{' '}
@@ -444,7 +444,7 @@ function TransactionForm({
           {referenceError ? (
             <>
               {formError(referenceError, '기준정보를 불러오지 못했습니다.')}{' '}
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.button-2"
                 variant="secondary"
                 onClick={() => {
                   void agentQuery.refetch()
@@ -479,7 +479,7 @@ function TransactionForm({
         id="main-grid"
       >
         <div className="transaction-form-column">
-          <section
+          <section data-guide-feature="features.transaction.transaction-form-page.section"
             data-guide-target="payment.scope"
             className="surface transaction-form-panel"
             aria-labelledby="transaction-input-title"
@@ -496,7 +496,7 @@ function TransactionForm({
             </header>
             <div className="surface-body transaction-form-grid">
               <Field label="지급단계" required error={fieldMessage('stage')}>
-                <select
+                <select data-guide-feature="features.transaction.transaction-form-page.stage"
                   id="stage"
                   value={form.paymentStage}
                   disabled={inputDisabled}
@@ -507,7 +507,7 @@ function TransactionForm({
                 </select>
               </Field>
               <Field label="원천유형" required error={fieldMessage('sourceType')}>
-                <select id="sourceType" value={SOURCE_TYPE} disabled={inputDisabled} onChange={() => {}}>
+                <select data-guide-feature="features.transaction.transaction-form-page.source-type" id="sourceType" value={SOURCE_TYPE} disabled={inputDisabled} onChange={() => {}}>
                   <option value={SOURCE_TYPE}>GA 수기지급</option>
                 </select>
               </Field>
@@ -517,7 +517,7 @@ function TransactionForm({
                 helper="같은 원천유형 안에서 중복될 수 없습니다."
                 error={fieldMessage('bizKey')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.biz-key"
                   id="bizKey"
                   className="transaction-mono"
                   maxLength={160}
@@ -533,7 +533,7 @@ function TransactionForm({
                 helper="DB에는 항상 그 달 1일로 저장됩니다."
                 error={fieldMessage('settlementMonth')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.settlement-month"
                   id="settlementMonth"
                   type="month"
                   value={form.settlementMonth}
@@ -548,7 +548,7 @@ function TransactionForm({
                   helper="GA→설계사 단계에서는 반드시 있어야 합니다."
                   error={fieldMessage('recipient')}
                 >
-                  <SearchSelect
+                  <SearchSelect data-guide-feature="features.transaction.transaction-form-page.recipient"
                     id="recipient"
                     value={form.agentId}
                     disabled={inputDisabled}
@@ -563,7 +563,7 @@ function TransactionForm({
                 </Field>
               )}
               <Field label="수수료 항목" required error={fieldMessage('item')}>
-                <SearchSelect
+                <SearchSelect data-guide-feature="features.transaction.transaction-form-page.item"
                   id="item"
                   value={form.commissionItemId}
                   disabled={inputDisabled}
@@ -582,7 +582,7 @@ function TransactionForm({
                 helper="금액은 0 이상으로 입력하고 지급·차감은 흐름으로 구분합니다."
                 error={fieldMessage('amount')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.amount"
                   data-guide-target="payment.amount"
                   id="amount"
                   className="transaction-number"
@@ -595,7 +595,7 @@ function TransactionForm({
                 />
               </Field>
               <Field label="흐름" required>
-                <select
+                <select data-guide-feature="features.transaction.transaction-form-page.cashflow"
                   id="cashflow"
                   value={form.cashflowType}
                   disabled={inputDisabled}
@@ -610,7 +610,7 @@ function TransactionForm({
                 helper="귀속행에서 제외를 고르면 증빙이 반드시 필요합니다."
                 error={fieldMessage('evidence')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.evidence"
                   data-guide-target="payment.evidence"
                   id="evidence"
                   maxLength={200}
@@ -655,12 +655,12 @@ function TransactionForm({
         <div className="transaction-form-column">
           <GatePanel result={result} />
           <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} />
-          <section className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
+          <section data-guide-feature="features.transaction.transaction-form-page.section-2" className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
             <h2 className="visually-hidden" id="transaction-actions-title">
               지급 건 작업
             </h2>
             <div className="surface-body transaction-action-list">
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.btn-save"
                 data-guide-target="payment.save"
                 id="btn-save"
                 variant="secondary"
@@ -674,7 +674,7 @@ function TransactionForm({
                 </span>
                 {busy === 'save' ? '저장 중' : initialId && !locked ? '수정 저장' : '임시저장 (검증 없음)'}
               </Button>
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.btn-precheck"
                 data-guide-target="payment.precheck"
                 id="btn-precheck"
                 variant="secondary"
@@ -688,7 +688,7 @@ function TransactionForm({
                 </span>
                 {busy === 'precheck' ? '검증 중' : '사전검증'}
               </Button>
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.btn-confirm"
                 data-guide-target="payment.confirm"
                 id="btn-confirm"
                 disabled={!ready || !result || needsSave || confirmationRejected}

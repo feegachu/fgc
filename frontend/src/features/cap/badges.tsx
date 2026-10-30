@@ -60,7 +60,7 @@ export function CapError({ error, retry }: { error: Error; retry: () => void }) 
   return (
     <div role="alert" className="cap-react-error">
       <p>{message}</p>
-      <Button variant="secondary" onClick={retry}>
+      <Button data-guide-feature="features.cap.badges.button" variant="secondary" onClick={retry}>
         다시 시도
       </Button>
     </div>

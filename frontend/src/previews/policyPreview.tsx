@@ -222,7 +222,7 @@ const router = createMemoryRouter(
           path: '*',
           element: (
             <div className="surface" style={{ padding: 32 }}>
-              정책 UI 미리보기입니다. <a href="/policy-preview">정책 화면으로 돌아가기</a>
+              정책 UI 미리보기입니다. <a data-guide-feature="previews.policy-preview.a" href="/policy-preview">정책 화면으로 돌아가기</a>
             </div>
           ),
         },

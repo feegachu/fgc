@@ -70,7 +70,7 @@ export function EvidenceLink({
   )
   return (
     <span className="evidence">
-      <button
+      <button data-guide-feature="components.evidence-link.button"
         ref={trigger}
         className={icon ? 'evidence-trigger' : 'evidence-trigger react-evidence-trigger'}
         type="button"

@@ -34,7 +34,7 @@ export function ReferenceTabs<T extends string>({
     <>
       <div className="tab-list" role="tablist" aria-label={label}>
         {tabs.map((tab, index) => (
-          <button
+          <button data-guide-feature="features.reference.reference-ui.button"
             className="tab-button"
             key={tab.id}
             id={`${id}-${tab.id}`}
@@ -66,7 +66,7 @@ export function ReferenceTabs<T extends string>({
           </button>
         ))}
       </div>
-      <section
+      <section data-guide-feature="features.reference.reference-ui.section"
         id={`${id}-panel`}
         className={`tab-panel ${panelClassName}`}
         role="tabpanel"

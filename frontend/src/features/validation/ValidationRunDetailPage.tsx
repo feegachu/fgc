@@ -61,17 +61,17 @@ function DetailError({ error, onRetry }: { error: Error; onRetry: () => void }) 
           <h1 className="page-title">월 통합검증 상세 · 확정</h1>
         </div>
       </header>
-      <section className="surface">
+      <section data-guide-feature="features.validation.validation-run-detail-page.section" className="surface">
         <p className="vrun-inline-state is-error" role="alert">
           {notFound ? '존재하지 않는 검증 실행입니다.' : errorText(error, '실행 정보를 불러오지 못했습니다.')}
         </p>
         <p className="vrun-inline-state">
           {notFound ? (
-            <Link className="button button-secondary" to="/validation-runs">
+            <Link data-guide-feature="features.validation.validation-run-detail-page.link" className="button button-secondary" to="/validation-runs">
               실행 목록으로
             </Link>
           ) : (
-            <Button variant="secondary" onClick={onRetry}>
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button" variant="secondary" onClick={onRetry}>
               다시 시도
             </Button>
           )}
@@ -173,7 +173,7 @@ function DetailBody({
         </div>
       </div>
 
-      <section className="surface" aria-labelledby="vrun-header-title">
+      <section data-guide-feature="features.validation.validation-run-detail-page.section-2" className="surface" aria-labelledby="vrun-header-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-header-title">
             실행 <span className="tabular-nums">{header.validationRunId}</span>
@@ -221,13 +221,13 @@ function DetailBody({
         </div>
       </section>
 
-      <section className="surface" aria-labelledby="vrun-stepper-title">
+      <section data-guide-feature="features.validation.validation-run-detail-page.section-3" className="surface" aria-labelledby="vrun-stepper-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-stepper-title">
             진행 단계 (운영정책서 제43조)
           </h2>
           <div className="page-header-actions">
-            <Button
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button-2"
               variant="secondary"
               className="vrun-row-button"
               onClick={() => {
@@ -243,7 +243,7 @@ function DetailBody({
               새로고침
             </Button>
             {/* 실행은 SETTLEMENT (화면정의서 :1485, IF-API-48). CREATED 에서만 기동할 수 있다 — 재기동은 없다. */}
-            <Button
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button-3"
               className="vrun-row-button"
               aria-describedby="execute-action-note"
               loading={execute.isPending}
@@ -336,7 +336,7 @@ function RunPicker({ currentId, link }: { currentId: string; link: (path: string
         <label className="field-label" htmlFor="pick-run">
           실행
         </label>
-        <select
+        <select data-guide-feature="features.validation.validation-run-detail-page.pick-run"
           className="select-control"
           id="pick-run"
           value={value}
@@ -349,7 +349,7 @@ function RunPicker({ currentId, link }: { currentId: string; link: (path: string
           ))}
         </select>
       </div>
-      <Button variant="secondary" onClick={() => void navigate(link(`/validation-runs/${value}`))}>
+      <Button data-guide-feature="features.validation.validation-run-detail-page.button-4" variant="secondary" onClick={() => void navigate(link(`/validation-runs/${value}`))}>
         <span className="material-symbols-rounded" aria-hidden="true">
           open_in_new
         </span>
@@ -398,7 +398,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
     },
   ]
   return (
-    <section className="surface" aria-labelledby="vrun-target-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-4" className="surface" aria-labelledby="vrun-target-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-target-title">
           ③ 대상 선별 결과
@@ -447,7 +447,7 @@ function SummarySection({ detail, status }: { detail: ValidationRunDetail; statu
   const reco = detail.reconciliationSummary
   const before = status === 'CREATED'
   return (
-    <section className="surface" aria-labelledby="vrun-summary-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-5" className="surface" aria-labelledby="vrun-summary-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-summary-title">
           ④ 결과 요약
@@ -494,12 +494,12 @@ function ExceptionSection({ detail, openLink }: { detail: ValidationRunDetail; o
   // validationMonth 는 예외함의 검증월 검색조건이다(셸 기준월 month 와는 별개 파라미터).
   const href = openLink(`/exceptions?status=OPEN&validationMonth=${encodeURIComponent(month ?? '')}`)
   return (
-    <section className="surface" aria-labelledby="vrun-exception-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-6" className="surface" aria-labelledby="vrun-exception-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-exception-title">
           예외 생성 결과
         </h2>
-        <Link className="button button-secondary vrun-row-button" to={href}>
+        <Link data-guide-feature="features.validation.validation-run-detail-page.link-2" className="button button-secondary vrun-row-button" to={href}>
           예외함 열기
         </Link>
       </header>
@@ -550,7 +550,7 @@ function ChecklistSection({
     body = (
       <p className="vrun-inline-state is-error" role="alert">
         {errorText(checklist.error as Error, '확정 조건을 불러오지 못했습니다.')}
-        <Button variant="secondary" onClick={() => void checklist.refetch()}>
+        <Button data-guide-feature="features.validation.validation-run-detail-page.button-5" variant="secondary" onClick={() => void checklist.refetch()}>
           다시 시도
         </Button>
       </p>
@@ -573,7 +573,7 @@ function ChecklistSection({
                   {condition.passed ? '통과' : `미충족 ${condition.count}건`}
                 </StatusBadge>
                 {to && (
-                  <Link to={to} aria-label={`${condition.label} 미충족 건 바로가기`}>
+                  <Link data-guide-feature="features.validation.validation-run-detail-page.link-3" to={to} aria-label={`${condition.label} 미충족 건 바로가기`}>
                     바로가기
                   </Link>
                 )}
@@ -591,7 +591,7 @@ function ChecklistSection({
     )
   }
   return (
-    <section className="surface" aria-labelledby="vrun-checklist-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
           ⑤ 확정 조건 (운영정책서 제44조 · 8개 전부 통과해야 함)
@@ -662,7 +662,7 @@ function FinalizeSection({
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
   else if (!passed) reason = '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
   return (
-    <section className="surface" aria-labelledby="vrun-finalize-section-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-8" className="surface" aria-labelledby="vrun-finalize-section-title">
       <div className="vrun-finalize-row">
         <div className="vrun-finalize-copy">
           <p className="vrun-finalize-title" id="vrun-finalize-section-title">
@@ -683,7 +683,7 @@ function FinalizeSection({
             {reason}
           </p>
         </div>
-        <Button
+        <Button data-guide-feature="features.validation.validation-run-detail-page.btn-finalize"
           id="btn-finalize"
           aria-describedby="finalize-action-guide finalize-action-note"
           loading={mutation.isPending}

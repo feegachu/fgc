@@ -27,7 +27,7 @@ function Toast({ item }: { item: ToastMessage }) {
         <p className="toast-message">{title}</p>
         {details.length > 0 && <p className="toast-message-detail">{details.join(' — ')}</p>}
       </div>
-      <button type="button" className="icon-button toast-close" aria-label="알림 닫기" onClick={() => close(item.id)}>
+      <button data-guide-feature="components.toast.button" type="button" className="icon-button toast-close" aria-label="알림 닫기" onClick={() => close(item.id)}>
         <span className="material-symbols-rounded" aria-hidden="true">
           close
         </span>

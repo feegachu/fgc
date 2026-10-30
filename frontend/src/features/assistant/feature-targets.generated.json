@@ -1,0 +1,2042 @@
+[
+  {
+    "id": "app.shell.app-shell.a",
+    "file": "app/shell/AppShell.tsx",
+    "element": "a"
+  },
+  {
+    "id": "app.shell.sidebar.button",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.sidebar.button-2",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.sidebar.button-3",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.sidebar.fgc",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "app.shell.sidebar.link",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "app.shell.workspace-tabs.button",
+    "file": "app/shell/WorkspaceTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.workspace-tabs.button-2",
+    "file": "app/shell/WorkspaceTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.workspace-tabs.link",
+    "file": "app/shell/WorkspaceTabs.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "components.button.button",
+    "file": "components/Button.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.context-link.link",
+    "file": "components/ContextLink.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "components.data-table.button",
+    "file": "components/DataTable.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.data-table.button-2",
+    "file": "components/DataTable.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.data-table.input",
+    "file": "components/DataTable.tsx",
+    "element": "input"
+  },
+  {
+    "id": "components.data-table.input-2",
+    "file": "components/DataTable.tsx",
+    "element": "input"
+  },
+  {
+    "id": "components.data-table.table",
+    "file": "components/DataTable.tsx",
+    "element": "table"
+  },
+  {
+    "id": "components.evidence-link.button",
+    "file": "components/EvidenceLink.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.filter-bar.button",
+    "file": "components/FilterBar.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "components.filter-bar.button-2",
+    "file": "components/FilterBar.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "components.filter-bar.form",
+    "file": "components/FilterBar.tsx",
+    "element": "form"
+  },
+  {
+    "id": "components.kpi-card.section",
+    "file": "components/KpiCard.tsx",
+    "element": "section"
+  },
+  {
+    "id": "components.modal.button",
+    "file": "components/Modal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.month-selector.button",
+    "file": "components/MonthSelector.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.month-selector.button-2",
+    "file": "components/MonthSelector.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.month-selector.button-3",
+    "file": "components/MonthSelector.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.month-selector.button-4",
+    "file": "components/MonthSelector.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.month-selector.button-5",
+    "file": "components/MonthSelector.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "components.month-selector.button-6",
+    "file": "components/MonthSelector.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "components.pagination.button",
+    "file": "components/Pagination.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "components.pagination.button-2",
+    "file": "components/Pagination.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.pagination.button-3",
+    "file": "components/Pagination.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.pagination.button-4",
+    "file": "components/Pagination.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.pagination.button-5",
+    "file": "components/Pagination.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "components.search-select.button",
+    "file": "components/SearchSelect.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.search-select.button-2",
+    "file": "components/SearchSelect.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.search-select.button-3",
+    "file": "components/SearchSelect.tsx",
+    "element": "button"
+  },
+  {
+    "id": "components.search-select.input",
+    "file": "components/SearchSelect.tsx",
+    "element": "input"
+  },
+  {
+    "id": "components.toast.button",
+    "file": "components/Toast.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button-2",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button-3",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button-4",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button-5",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button-6",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button-7",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.fgc-ai",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.link",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.section",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.section-2",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-home.charts.button",
+    "file": "features/agent-home/charts.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.charts.table",
+    "file": "features/agent-home/charts.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-detail.section",
+    "file": "features/arbitrage/ArbitrageDetail.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.button",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.button-2",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.input",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.input-2",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.section",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.section-2",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.section-3",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.select",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.select-2",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-page.select-3",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.arbitrage.recheck-modal.button",
+    "file": "features/arbitrage/RecheckModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.arbitrage.recheck-modal.button-2",
+    "file": "features/arbitrage/RecheckModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.arbitrage.recheck-modal.input",
+    "file": "features/arbitrage/RecheckModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.arbitrage.recheck-modal.textarea",
+    "file": "features/arbitrage/RecheckModal.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.audit.audit-log-page.input",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.audit.audit-log-page.input-2",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.audit.audit-log-page.input-3",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.audit.audit-log-page.section",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.audit.audit-log-page.section-2",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.audit.audit-log-page.select",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.audit.audit-log-page.select-2",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.audit.audit-log-page.select-3",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.audit.audit-log-page.table",
+    "file": "features/audit/AuditLogPage.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.auth.auth-status.button",
+    "file": "features/auth/AuthStatus.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.auth.login-page.button",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.auth.login-page.button-2",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.auth.login-page.button-3",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.auth.login-page.form",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.auth.login-page.password",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.auth.login-page.section",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.auth.login-page.section-2",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.auth.login-page.username",
+    "file": "features/auth/LoginPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.base.base-page.input",
+    "file": "features/base/BasePage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.base.base-page.input-2",
+    "file": "features/base/BasePage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.base.base-page.select",
+    "file": "features/base/BasePage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.base.base-page.select-2",
+    "file": "features/base/BasePage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.cap.badges.button",
+    "file": "features/cap/badges.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.button",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.link",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.section",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.section-2",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.section-3",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.section-4",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.section-5",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-detail-modal.table",
+    "file": "features/cap/CapDetailModal.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.cap.cap-list-page.button",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.cap.cap-list-page.button-2",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.cap.cap-list-page.input",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.cap.cap-list-page.input-2",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.cap.cap-list-page.link",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.cap.cap-list-page.section",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-list-page.section-2",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-list-page.section-3",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-list-page.section-4",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.cap.cap-list-page.select",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.cap.cap-list-page.select-2",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.cap.cap-list-page.select-3",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.cap.cap-list-page.select-4",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.cap.cap-list-page.select-5",
+    "file": "features/cap/CapListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-detail-page.button",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-detail-page.button-2",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-detail-page.button-3",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-detail-page.link",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.contract.contract-detail-page.link-2",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.contract.contract-detail-page.section",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-form-page.agent-id",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.contract.contract-form-page.button",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.button-2",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.button-3",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.button-4",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.button-5",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.button-6",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.contract-date",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-form-page.contract-no",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-form-page.contract-status",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-form-page.form",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.contract.contract-form-page.input",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-form-page.insurer-id",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-form-page.link",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.contract.contract-form-page.link-2",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.contract.contract-form-page.organization-name",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-form-page.payment-cycle-code",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-form-page.product-offering-id",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.contract.contract-form-page.section",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-form-page.section-2",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-form-page.section-3",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-list-page.button",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-list-page.button-2",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-list-page.button-3",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-list-page.button-4",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-list-page.context-link",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.contract.contract-list-page.context-link-2",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.contract.contract-list-page.input",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-list-page.section",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-list-page.section-2",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-list-page.select",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-tabs.button",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-tabs.button-2",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.contract.contract-tabs.button-3",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-tabs.button-4",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-tabs.button-5",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-tabs.section",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-tabs.section-2",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-tabs.section-3",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-tabs.section-4",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract.contract-tabs.section-5",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.button",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.link",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.link-2",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.link-3",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.link-4",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.link-5",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.section",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.section-2",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.section-3",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.section-4",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.risk-composition.link",
+    "file": "features/dashboard/RiskComposition.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.error.error-pages.button",
+    "file": "features/error/ErrorPages.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.error.error-pages.link",
+    "file": "features/error/ErrorPages.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.error.error-pages.section",
+    "file": "features/error/ErrorPages.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.action-panel.button",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.action-panel.button-2",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.action-panel.form",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.exception.action-panel.input",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.action-panel.link",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.action-panel.link-2",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.action-panel.select",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.action-panel.textarea",
+    "file": "features/exception/ActionPanel.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.exception.exception-page.button",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.exception.exception-page.f-contract",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.exception-page.link",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.exception-page.link-2",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.exception-page.link-3",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.exception-page.section",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.exception-page.section-2",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.exception-page.section-3",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.exception-page.section-4",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.exception-page.section-5",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.exception-page.select",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.button",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.button-2",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.button-3",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.button-4",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.form",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.input",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.input-2",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.input-3",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.input-4",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.input-5",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.input-6",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.link",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.link-2",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.link-3",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.link-4",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.link-5",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.section",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.section-2",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.section-3",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.select",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.exception.journal-correction-modal.textarea",
+    "file": "features/exception/JournalCorrectionModal.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.ledger.ledger-page.button",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.ledger.ledger-page.button-2",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.ledger.ledger-page.button-3",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.ledger.ledger-page.button-4",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.ledger.ledger-page.input",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.ledger.ledger-page.input-2",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.ledger.ledger-page.section",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.ledger.ledger-page.section-2",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.ledger.ledger-page.select",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.ledger.ledger-page.textarea",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.policies.policies-page.button",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.button-2",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.button-3",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.button-4",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.button-5",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.button-6",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.button-7",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.input",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policies-page.policy-version",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-10",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-11",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-12",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-13",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-2",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-3",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-4",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-5",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-6",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-7",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-8",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.button-9",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.form",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.input",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.input-2",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.input-3",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.input-4",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.input-5",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.policy-policy-name",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.section",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.section-2",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.section-3",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.section-4",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.textarea",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.policies.policy-draft-fields.button",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-fields.button-2",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-fields.button-3",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-draft-fields.input",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-fields.input-2",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-fields.section",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-draft-fields.select",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.policies.policy-management.a",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "a"
+  },
+  {
+    "id": "features.policies.policy-management.button",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-management.button-2",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-management.button-3",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-management.button-4",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policy-management.input",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-management.input-2",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-management.input-3",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.policies.policy-management.section",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-management.section-2",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-management.section-3",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-management.section-4",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.policies.policy-management.textarea",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.reconciliation.compare-modal.button",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.reconciliation.compare-modal.link",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.reconciliation.compare-modal.link-2",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.reconciliation.compare-modal.link-3",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.reconciliation.compare-modal.link-4",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.reconciliation.compare-modal.section",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.reconciliation.compare-modal.section-2",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.button",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.button-2",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.button-3",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.button-4",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.button-5",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.button-6",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.input",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.input-2",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.link",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.reco-result-type",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.section",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.section-2",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.section-3",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.section-4",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.select",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.reconciliation.reconciliation-page.select-2",
+    "file": "features/reconciliation/ReconciliationPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.reference.reference-ui.button",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.reference.reference-ui.section",
+    "file": "features/reference/ReferenceUI.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button-2",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button-3",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button-4",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button-5",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button-6",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button-7",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.button-8",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.link",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.link-2",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.link-3",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.regenerate-reason",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.schedule-stage",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.section",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.section-2",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.section-3",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.table",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.schedule.schedule-detail-page.table-2",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.button",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.button-2",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.context-link",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.context-link-2",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.input",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.section",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.select",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.select-2",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.select-3",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.schedule.schedule-list-page.select-4",
+    "file": "features/schedule/ScheduleListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.transaction.attribution-editor.btn-add-attr",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.attribution-editor.button",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.attribution-editor.input",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.attribution-editor.input-2",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.attribution-editor.input-3",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.attribution-editor.input-4",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.attribution-editor.input-5",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.attribution-editor.search-select",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.transaction.attribution-editor.section",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.transaction.attribution-editor.select",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.transaction.attribution-editor.select-2",
+    "file": "features/transaction/AttributionEditor.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.transaction.confirmation-panels.btn-confirm-submit",
+    "file": "features/transaction/ConfirmationPanels.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.confirmation-panels.button",
+    "file": "features/transaction/ConfirmationPanels.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.transaction.confirmation-panels.cap-panel",
+    "file": "features/transaction/ConfirmationPanels.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.transaction.confirmation-panels.link",
+    "file": "features/transaction/ConfirmationPanels.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.transaction.confirmation-panels.link-2",
+    "file": "features/transaction/ConfirmationPanels.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.transaction.confirmation-panels.link-3",
+    "file": "features/transaction/ConfirmationPanels.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.transaction.confirmation-panels.section",
+    "file": "features/transaction/ConfirmationPanels.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.amount",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.biz-key",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-confirm",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-precheck",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-save",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.button",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.button-2",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.cashflow",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.evidence",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.item",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.link",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.link-2",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.recipient",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.section",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.section-2",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.settlement-month",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.source-type",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.stage",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.button",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.button-2",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.button-3",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.button-4",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.button-5",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.button-6",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.context-link",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.context-link-2",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.f-contract-no",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.f-month",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.f-noattr",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.section",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.transaction.transaction-list-page.select",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.validation.finalize-dialogs.button",
+    "file": "features/validation/FinalizeDialogs.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.finalize-dialogs.button-2",
+    "file": "features/validation/FinalizeDialogs.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.finalize-dialogs.button-3",
+    "file": "features/validation/FinalizeDialogs.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.btn-finalize",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.button",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.button-2",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.button-3",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.button-4",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.button-5",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.link",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.link-2",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.link-3",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.pick-run",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section-2",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section-3",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section-4",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section-5",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section-6",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section-7",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.section-8",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.btn-create",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.f-status",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.form",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.input",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.link",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.section",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.section-2",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-list-page.select",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "previews.policy-preview.a",
+    "file": "previews/policyPreview.tsx",
+    "element": "a"
+  }
+]

@@ -62,7 +62,7 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
     // 계약번호는 폭을 넓게 잡아 토글 없이 항상 전체를 보여준다(#326).
     render: (row) =>
       hasId(row) ? (
-        <ContextLink to={detailHref(row, back)}>{row.contractNo || EMPTY}</ContextLink>
+        <ContextLink data-guide-feature="features.schedule.schedule-list-page.context-link" to={detailHref(row, back)}>{row.contractNo || EMPTY}</ContextLink>
       ) : (
         row.contractNo || EMPTY
       ),
@@ -156,7 +156,7 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
     align: 'left',
     render: (row) =>
       hasId(row) ? (
-        <ContextLink
+        <ContextLink data-guide-feature="features.schedule.schedule-list-page.context-link-2"
           className="button button-secondary schedule-row-button"
           to={detailHref(row, back)}
           aria-label={`${row.contractNo || '선택한 계약'} 회차 보기`}
@@ -202,7 +202,7 @@ export default function ScheduleListPage() {
           <h1 className="page-title">예상 스케줄 목록</h1>
         </div>
         <div className="page-header-actions">
-          <Button variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>
+          <Button data-guide-feature="features.schedule.schedule-list-page.button" variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>
             <span className="material-symbols-rounded" aria-hidden="true">
               download
             </span>
@@ -219,7 +219,7 @@ export default function ScheduleListPage() {
         onReset={() => search(DEFAULT_FILTERS)}
       />
 
-      <section className="surface schedule-results-card" aria-labelledby="schedule-results-title">
+      <section data-guide-feature="features.schedule.schedule-list-page.section" className="surface schedule-results-card" aria-labelledby="schedule-results-title">
         <header className="surface-header schedule-results-header">
           <h2 id="schedule-results-title" className="surface-title">
             스케줄
@@ -242,7 +242,7 @@ export default function ScheduleListPage() {
           <div className="schedule-error-state" role="alert">
             <strong>예상 스케줄을 불러오지 못했습니다.</strong>
             <p>{errorText(list.error)}</p>
-            <Button variant="secondary" onClick={() => void list.refetch()}>
+            <Button data-guide-feature="features.schedule.schedule-list-page.button-2" variant="secondary" onClick={() => void list.refetch()}>
               다시 시도
             </Button>
           </div>
@@ -318,7 +318,7 @@ function ScheduleFilter({
           <label className="filter-field-label" htmlFor="schedule-filter-contractNo">
             계약번호
           </label>
-          <input
+          <input data-guide-feature="features.schedule.schedule-list-page.input"
             className="field-control"
             type="search"
             placeholder="계약번호 입력"
@@ -330,7 +330,7 @@ function ScheduleFilter({
           <label className="filter-field-label" htmlFor="schedule-filter-stage">
             지급단계
           </label>
-          <select className="select-control" {...bind('stage')}>
+          <select data-guide-feature="features.schedule.schedule-list-page.select" className="select-control" {...bind('stage')}>
             <option value="">전체</option>
             {options(PAYMENT_STAGE)}
           </select>
@@ -339,7 +339,7 @@ function ScheduleFilter({
           <label className="filter-field-label" htmlFor="schedule-filter-regime">
             적용 체계
           </label>
-          <select className="select-control" {...bind('regime')}>
+          <select data-guide-feature="features.schedule.schedule-list-page.select-2" className="select-control" {...bind('regime')}>
             <option value="">전체</option>
             {options(SCHEDULE_REGIME)}
           </select>
@@ -348,7 +348,7 @@ function ScheduleFilter({
           <label className="filter-field-label" htmlFor="schedule-filter-purpose">
             용도
           </label>
-          <select className="select-control" {...bind('purpose')}>
+          <select data-guide-feature="features.schedule.schedule-list-page.select-3" className="select-control" {...bind('purpose')}>
             {options(SCHEDULE_PURPOSE)}
           </select>
         </div>
@@ -356,7 +356,7 @@ function ScheduleFilter({
           <label className="filter-field-label" htmlFor="schedule-filter-status">
             상태
           </label>
-          <select className="select-control" {...bind('status')}>
+          <select data-guide-feature="features.schedule.schedule-list-page.select-4" className="select-control" {...bind('status')}>
             <option value="">전체</option>
             {options(SCHEDULE_STATUS)}
           </select>

@@ -102,7 +102,7 @@ export default function AuditLogPage() {
         label="감사 기록과 변경 내용 비교 카드 너비"
         defaultRatio={60}
       >
-        <section className="surface audit-list-panel" aria-labelledby="audit-list-title">
+        <section data-guide-feature="features.audit.audit-log-page.section" className="surface audit-list-panel" aria-labelledby="audit-list-title">
           <header className="surface-header audit-panel-header">
             <h2 id="audit-list-title" className="surface-title">
               감사 기록
@@ -141,7 +141,7 @@ export default function AuditLogPage() {
           )}
         </section>
 
-        <section className="surface audit-diff-panel" aria-labelledby="audit-diff-title">
+        <section data-guide-feature="features.audit.audit-log-page.section-2" className="surface audit-diff-panel" aria-labelledby="audit-diff-title">
           <header className="surface-header audit-panel-header">
             <h2 id="audit-diff-title" className="surface-title">
               변경 내용 비교
@@ -192,19 +192,19 @@ function AuditFilter({
           <label className="filter-field-label" htmlFor="f-from">
             발생 시각 (시작)
           </label>
-          <input className="field-control" type="date" {...bind('from')} />
+          <input data-guide-feature="features.audit.audit-log-page.input" className="field-control" type="date" {...bind('from')} />
         </div>
         <div className="filter-field audit-filter-date">
           <label className="filter-field-label" htmlFor="f-to">
             발생 시각 (끝)
           </label>
-          <input className="field-control" type="date" {...bind('to')} />
+          <input data-guide-feature="features.audit.audit-log-page.input-2" className="field-control" type="date" {...bind('to')} />
         </div>
         <div className="filter-field audit-filter-user">
           <label className="filter-field-label" htmlFor="f-userId">
             행위자
           </label>
-          <select className="select-control" {...bind('userId')}>
+          <select data-guide-feature="features.audit.audit-log-page.select" className="select-control" {...bind('userId')}>
             <option value="">전체</option>
             {options?.users?.map((user) => (
               <option key={user.userId} value={String(user.userId)}>
@@ -217,7 +217,7 @@ function AuditFilter({
           <label className="filter-field-label" htmlFor="f-action">
             행위 종류
           </label>
-          <select className="select-control" {...bind('action')}>
+          <select data-guide-feature="features.audit.audit-log-page.select-2" className="select-control" {...bind('action')}>
             <option value="">전체</option>
             {options?.actionCodes?.map((code) => (
               <option key={code} value={code}>
@@ -230,7 +230,7 @@ function AuditFilter({
           <label className="filter-field-label" htmlFor="f-entityType">
             대상 종류
           </label>
-          <select className="select-control" {...bind('entityType')}>
+          <select data-guide-feature="features.audit.audit-log-page.select-3" className="select-control" {...bind('entityType')}>
             <option value="">전체</option>
             {options?.entityTypes?.map((type) => (
               <option key={type} value={type}>
@@ -243,7 +243,7 @@ function AuditFilter({
           <label className="filter-field-label" htmlFor="f-entityId">
             대상 ID
           </label>
-          <input className="field-control" type="text" placeholder="4104" {...bind('entityId')} />
+          <input data-guide-feature="features.audit.audit-log-page.input-3" className="field-control" type="text" placeholder="4104" {...bind('entityId')} />
         </div>
       </div>
     </FilterBar>
@@ -272,7 +272,7 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
         </p>
       )}
       <div className="data-table-viewport">
-        <table className="data-table audit-diff-table">
+        <table data-guide-feature="features.audit.audit-log-page.table" className="data-table audit-diff-table">
           <caption className="visually-hidden">선택한 감사 기록의 변경 전후 값 비교</caption>
           <colgroup>
             <col className="audit-diff-field" />

@@ -13,7 +13,7 @@ import type { FormValues } from './form-model'
 
 export function GatePanel({ result }: { result: Precheck | null }) {
   return (
-    <section
+    <section data-guide-feature="features.transaction.confirmation-panels.section"
       data-guide-target="payment.precheck.result"
       className="surface transaction-gate-panel"
       aria-labelledby="transaction-gate-title"
@@ -111,7 +111,7 @@ function CapCard({ preview }: { preview: CapPreview }) {
 }
 export function CapPanel({ result, pending, error }: { result: Precheck | null; pending: boolean; error: string }) {
   return (
-    <section className="surface transaction-cap-panel" id="cap-panel" aria-labelledby="transaction-cap-title">
+    <section data-guide-feature="features.transaction.confirmation-panels.cap-panel" className="surface transaction-cap-panel" id="cap-panel" aria-labelledby="transaction-cap-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-cap-title">
           1,200% 사전검증
@@ -225,7 +225,7 @@ export function ConfirmationModal({
       initialFocusRef={cancelRef}
       footer={
         <>
-          <button
+          <button data-guide-feature="features.transaction.confirmation-panels.button"
             type="button"
             ref={cancelRef}
             className="button button-secondary"
@@ -235,7 +235,7 @@ export function ConfirmationModal({
             취소
           </button>
           {canSubmit && (
-            <Button id="btn-confirm-submit" loading={pending} onClick={onConfirm}>
+            <Button data-guide-feature="features.transaction.confirmation-panels.btn-confirm-submit" id="btn-confirm-submit" loading={pending} onClick={onConfirm}>
               {pending ? '확정 중' : recordable ? '확정 시도 · 예외 등록' : '확정 실행'}
             </Button>
           )}
@@ -294,7 +294,7 @@ export function ConfirmationModal({
             )}
             <div className="transaction-confirm-followup-actions">
               {recorded && reviewRequired && (
-                <Link
+                <Link data-guide-feature="features.transaction.confirmation-panels.link"
                   className="button button-secondary"
                   reloadDocument
                   to={withMonth(`/transactions/new?id=${encodeURIComponent(paymentId ?? '')}`, month)}
@@ -303,12 +303,12 @@ export function ConfirmationModal({
                 </Link>
               )}
               {hasException && (
-                <Link className="button button-secondary" to={withMonth(`/exceptions?${exceptionParams}`, month)}>
+                <Link data-guide-feature="features.transaction.confirmation-panels.link-2" className="button button-secondary" to={withMonth(`/exceptions?${exceptionParams}`, month)}>
                   예외함에서 처리하기
                 </Link>
               )}
               {capCheckId && (
-                <Link
+                <Link data-guide-feature="features.transaction.confirmation-panels.link-3"
                   className="button button-secondary"
                   to={withMonth(`/cap-checks?capCheckId=${encodeURIComponent(capCheckId)}`, month)}
                 >

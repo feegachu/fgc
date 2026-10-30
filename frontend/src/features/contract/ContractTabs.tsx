@@ -45,7 +45,7 @@ export function ContractLoadState({ message, error, retry }: { message: string; 
     <div className={`contract-detail-state ${error ? 'is-error' : ''}`} role={error ? 'alert' : 'status'}>
       <p>{message}</p>
       {retry && (
-        <Button variant="secondary" onClick={retry}>
+        <Button data-guide-feature="features.contract.contract-tabs.button" variant="secondary" onClick={retry}>
           다시 시도
         </Button>
       )}
@@ -132,7 +132,7 @@ export function ContractTabs({
     <>
       <div className="tab-list contract-detail-tabs" role="tablist" aria-label="계약 상세 영역">
         {visibleTabs.map(([name, label], index) => (
-          <button
+          <button data-guide-feature="features.contract.contract-tabs.button-2"
             key={name}
             ref={(element) => {
               tabButtons.current[index] = element
@@ -167,7 +167,7 @@ export function ContractTabs({
         ))}
       </div>
       {visibleTabs.map(([name]) => (
-        <section
+        <section data-guide-feature="features.contract.contract-tabs.section"
           key={name}
           id={`contract-panel-${name}`}
           role="tabpanel"
@@ -219,7 +219,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
         </p>
       </header>
       <div className="contract-basic-layout">
-        <section className="contract-information-panel" aria-labelledby="contract-information-title">
+        <section data-guide-feature="features.contract.contract-tabs.section-2" className="contract-information-panel" aria-labelledby="contract-information-title">
           <h3 id="contract-information-title">계약 정보</h3>
           <ContractFacts
             className="contract-information-grid"
@@ -243,14 +243,14 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
           />
         </section>
         <div className="contract-side-panels">
-          <section className="contract-history-panel" aria-labelledby="contract-history-title">
+          <section data-guide-feature="features.contract.contract-tabs.section-3" className="contract-history-panel" aria-labelledby="contract-history-title">
             <header className="contract-history-panel-header">
               <div>
                 <h3 id="contract-history-title">상태이력</h3>
                 <p>사건 발생과 후속 처리 작업을 분리해 표시합니다.</p>
               </div>
               <div className="contract-history-sort" role="group" aria-label="상태이력 정렬 기준">
-                <Button
+                <Button data-guide-feature="features.contract.contract-tabs.button-3"
                   className={`contract-history-sort-button ${sort === 'effectiveAt' ? 'is-active' : ''}`}
                   variant="secondary"
                   aria-pressed={sort === 'effectiveAt'}
@@ -258,7 +258,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                 >
                   효력 순
                 </Button>
-                <Button
+                <Button data-guide-feature="features.contract.contract-tabs.button-4"
                   className={`contract-history-sort-button ${sort === 'receivedAt' ? 'is-active' : ''}`}
                   variant="secondary"
                   aria-pressed={sort === 'receivedAt'}
@@ -361,7 +361,7 @@ function SchedulesTab({ id }: { id: string }) {
 function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA_TO_FC' }) {
   const query = useQuery(contractSchedulesQuery(id, stage))
   return (
-    <section aria-label={PAYMENT_STAGE[stage]} className="contract-tab-section">
+    <section data-guide-feature="features.contract.contract-tabs.section-4" aria-label={PAYMENT_STAGE[stage]} className="contract-tab-section">
       <QueryContent query={query}>
         {(data) => (
           <>
@@ -437,7 +437,7 @@ function CapTab({ id }: { id: string }) {
       key: 'basis',
       label: '계산근거',
       render: (row) => (
-        <Button
+        <Button data-guide-feature="features.contract.contract-tabs.button-5"
           variant="ghost"
           disabled={row.capCheckId == null}
           onClick={() => select(row.capCheckId ?? null)}
@@ -596,7 +596,7 @@ const reconciliationColumns: TableColumn<Reconciliation>[] = [
 ]
 function TabSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
   return (
-    <section className="contract-tab-section" aria-label={title}>
+    <section data-guide-feature="features.contract.contract-tabs.section-5" className="contract-tab-section" aria-label={title}>
       <header className="surface-header contract-basic-header">
         <div>
           <h3 className="surface-title">{title}</h3>
