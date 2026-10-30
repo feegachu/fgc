@@ -113,7 +113,7 @@ UPDATE policy_version SET status = 'ACTIVE' WHERE status = 'APPROVED' AND policy
 -- 상품 비교는 보험사 전용 정책을 전체 정책(V70_1)보다 먼저 쓴다(인터페이스정의서 §4-4-6).
 INSERT INTO policy_version(policy_code, policy_name, policy_type, source_class, version_no, effective_from, effective_to, status,
                            regulation_refs, source_refs, created_by)
-SELECT v.code, v.name, 'CLAWBACK', 'GA_POLICY', 1, DATE '2026-01-01', NULL, 'DRAFT',
+SELECT v.code, v.name, 'CLAWBACK', 'PROJECT_ASSUMPTION', 1, DATE '2026-01-01', NULL, 'DRAFT',
        ARRAY['REG-13', 'REG-14'], ARRAY['D-01 시연 가정', 'FGC 운영정책서 제48조의3'],
        (SELECT user_id FROM app_user WHERE login_id = 'settle01')
   FROM (VALUES ('CLAW-FGN03-DEMO-2026', '다온가상손해보험 환수율(시연 가정)'),
