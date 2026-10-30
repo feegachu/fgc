@@ -6,9 +6,9 @@ import java.util.regex.Pattern;
 /** Pattern redaction for user-authored prose; business records are never added to the prompt. */
 public final class PicoTextSanitizer {
     private static final Pattern SECRET = Pattern.compile("(?i)(?:sk-[a-z0-9_-]{8,}|bearer\\s+[a-z0-9._-]+)");
-    private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}");
-    private static final Pattern NAMED_PERSON = Pattern.compile("(고객|수취인|설계사|성명|이름)\\s*[:：]?\\s*[가-힣]{2,6}");
-    private static final Pattern NUMERIC = Pattern.compile("[\\p{N}]+(?:[\\s.,/-][\\p{N}]+)*");
+    private static final Pattern EMAIL = Pattern.compile("(?<![\\w.+-])[\\w.+-]++@[\\w-]++(?:\\.[\\w-]++)*+");
+    private static final Pattern NAMED_PERSON = Pattern.compile("(고객|수취인|설계사|성명|이름)\\s*[:：]?\\s*\\p{IsHangul}{2,6}");
+    private static final Pattern NUMERIC = Pattern.compile("[\\p{N}]++(?:[\\s.,/-][\\p{N}]++)*+");
 
     private PicoTextSanitizer() {}
 

@@ -108,7 +108,7 @@ public class PicoAskService {
             if (selection == null || selection.workflowIds() == null || selection.workflowIds().size() > 2
                     || selection.workflowIds().stream().distinct().count() != selection.workflowIds().size()
                     || selection.workflowIds().stream().anyMatch(id -> id == null || !allowedIds.contains(id)))
-                return fallback(request, chunks, "INVALID_AI_SELECTION");
+                return fallback(request, "INVALID_AI_SELECTION");
             // Stored state stays in the program. Semantic selection may still answer unrelated workflow questions.
             if (paymentState != null && !"DRAFT".equals(paymentState) && catalog.paymentDefinitions().stream().anyMatch(guide -> selection.workflowIds().contains(guide.workflowId()))) {
                 boolean confirmed = "CONFIRMED".equals(paymentState);
@@ -137,14 +137,14 @@ public class PicoAskService {
             if (rejection != null) {
                 // Bounded enum only: never log the model message, question, IDs or credentials.
                 log.warn("Pico answer rejected: {}", rejection);
-                return fallback(request,chunks,"INVALID_AI_OUTPUT");
+                return fallback(request,"INVALID_AI_OUTPUT");
             }
             var references=chunks.stream().filter(c->output.evidenceChunkIds().contains(c.chunkId())).toList();
             return response(request,output.decision(),output.message(),references,Source.AI,null);
         } catch (FgcBusinessException error) {
             if (error.getErrorCode()!=FgcErrorCode.AI_001) throw error;
-            return fallback(request,chunks,"AI_UNAVAILABLE");
-        } catch (JsonProcessingException error) { return fallback(request,chunks,"INPUT_ENCODING_ERROR"); }
+            return fallback(request,"AI_UNAVAILABLE");
+        } catch (JsonProcessingException error) { return fallback(request,"INPUT_ENCODING_ERROR"); }
     }
     private PicoAskResponse contextError(PicoAskRequest request) {
         if (!catalog.supportsScreen(request.screenId()))
@@ -168,7 +168,7 @@ public class PicoAskService {
             return OutputRejection.INVALID_EVIDENCE;
         return null;
     }
-    private PicoAskResponse fallback(PicoAskRequest request,List<PicoGuideCatalog.Chunk> chunks,String reason) {
+    private PicoAskResponse fallback(PicoAskRequest request,String reason) {
         return fixed(request,Decision.ASK_CLARIFICATION,"지금 AI 답변을 확인할 수 없습니다. 질문은 대화에 남아 있으며 잠시 후 다시 시도하거나 화면의 업무 안내를 이용해주세요.",List.of(),reason);
     }
     private PicoAskResponse fixed(PicoAskRequest request,Decision decision,String message,List<PicoGuideCatalog.Chunk> chunks,String reason) { return response(request,decision,message,chunks,Source.FIXED,reason); }
