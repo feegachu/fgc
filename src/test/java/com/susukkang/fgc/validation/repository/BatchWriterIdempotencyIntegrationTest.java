@@ -43,7 +43,7 @@ class BatchWriterIdempotencyIntegrationTest {
                 INSERT INTO fgc.validation_run (validation_month, run_no, run_type)
                 VALUES (?, ?, 'MANUAL_CONTRACT')
                 RETURNING validation_run_id
-                """, Long.class, LocalDate.of(2031, 4, 1), (int) (System.nanoTime() % 100000));
+                """, Long.class, LocalDate.of(2031, 4, 1), 1 + (int) Math.floorMod(System.nanoTime(), 100000L));
     }
 
     @Test
