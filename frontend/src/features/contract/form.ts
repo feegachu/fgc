@@ -169,7 +169,8 @@ export function validateStatusEvent(event: StatusEventDraft, now: string, codes:
 export const statusEventRequest = (event: StatusEventDraft): NonNullable<ContractUpdateRequest['statusEvent']> => ({
   effectiveAt: `${event.effectiveAt}:00+09:00`,
   receivedAt: `${event.receivedAt}:00+09:00`,
-  reasonCode: event.reasonCode,
+  // validateStatusEvent가 서버 statusReasonCodes 안의 값인지 확인한 뒤에만 보낸다.
+  reasonCode: event.reasonCode as NonNullable<ContractUpdateRequest['statusEvent']>['reasonCode'],
   reason: event.reason.trim(),
 })
 
