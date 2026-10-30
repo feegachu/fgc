@@ -61,6 +61,7 @@ public class PolicyWriteService {
     private final PolicyVersionRepository policyVersionRepository;
     private final PolicyWriteRepository writeRepository;
     private final PolicyDraftValidator draftValidator;
+    private final PolicyOfferingScopeValidator offeringScopeValidator;
     private final PolicySuccessionValidator successionValidator;
     private final Validator validator;
     private final AuditLogService auditLogService;
@@ -263,6 +264,7 @@ public class PolicyWriteService {
 
     private void validateSubmission(PolicyDraft draft) {
         draftValidator.validateForSubmission(draft);
+        offeringScopeValidator.validateForSubmission(draft);
         validateReferences(draft, storedReferences(draft));
         if (draft.regulationRefs().isEmpty() && draft.sourceRefs().isEmpty()) {
             throw invalid("sourceRefs", "제출할 정책에는 승인된 근거가 필요합니다.");
