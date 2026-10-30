@@ -40,6 +40,26 @@
     "element": "Link"
   },
   {
+    "id": "clawback.evidence.effects",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "section"
+  },
+  {
+    "id": "clawback.evidence.payment",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "section"
+  },
+  {
+    "id": "clawback.evidence.schedule",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "section"
+  },
+  {
+    "id": "clawback.evidence.source",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "section"
+  },
+  {
     "id": "components.button.button",
     "file": "components/Button.tsx",
     "element": "button"
@@ -707,6 +727,101 @@
   {
     "id": "features.cap.cap-list-page.select-5",
     "file": "features/cap/CapListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.clawback.clawback-detail.button",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.clawback.clawback-detail.contextlink",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.clawback.clawback-detail.contextlink-2",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.clawback.clawback-detail.contextlink-3",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.clawback.clawback-detail.contextlink-4",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.clawback.clawback-detail.section-2",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.clawback.clawback-page.button",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.clawback.clawback-page.button-2",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.clawback.clawback-page.input",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.clawback.clawback-page.input-2",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.clawback.clawback-page.input-3",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.clawback.clawback-page.section",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.clawback.clawback-page.section-2",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.clawback.clawback-page.select",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.clawback.clawback-page.select-2",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.clawback.clawback-page.select-3",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.clawback.clawback-page.select-4",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.clawback.clawback-page.select-5",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.clawback.clawback-page.select-6",
+    "file": "features/clawback/ClawbackPage.tsx",
     "element": "select"
   },
   {
@@ -1860,6 +1975,61 @@
     "element": "section"
   },
   {
+    "id": "features.transaction.payment-guide.button",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-10",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-2",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-3",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-4",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-5",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-6",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-7",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-8",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.button-9",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.payment-guide.section",
+    "file": "features/transaction/PaymentGuide.tsx",
+    "element": "section"
+  },
+  {
     "id": "features.transaction.transaction-form-page.amount",
     "file": "features/transaction/TransactionFormPage.tsx",
     "element": "input"
@@ -1891,6 +2061,11 @@
   },
   {
     "id": "features.transaction.transaction-form-page.button-2",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.button-3",
     "file": "features/transaction/TransactionFormPage.tsx",
     "element": "Button"
   },
@@ -2201,6 +2376,11 @@
   },
   {
     "id": "navigation.menu.cap-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "navigation.menu.claw-w01",
     "file": "app/shell/Sidebar.tsx",
     "element": "Link"
   },

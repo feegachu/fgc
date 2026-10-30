@@ -67,7 +67,7 @@ export function PicoGuideStartButton({
         abort.signal,
       )
       if (abort.signal.aborted || useGuideRuntime.getState().observation !== captured) return
-      if (!useGuideRuntime.getState().start(definition.workflowId)) throw new Error('GUIDE_NOT_READY')
+      if (!launchPaymentGuide(definition.workflowId) && !useGuideRuntime.getState().start(definition.workflowId)) throw new Error('GUIDE_NOT_READY')
     } catch {
       if (!abort.signal.aborted)
         setNotice('지급 상태나 시작 허가를 다시 확인해야 합니다. 현재 화면에서 안내 시작을 다시 선택해주세요.')
@@ -97,3 +97,4 @@ export function PicoGuideStartButton({
     </div>
   )
 }
+import { launchPaymentGuide } from '../transaction/payment-guide-launch'

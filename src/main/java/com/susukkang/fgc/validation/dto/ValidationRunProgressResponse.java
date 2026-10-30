@@ -14,11 +14,21 @@ public record ValidationRunProgressResponse(
         Integer totalSteps,
         Integer progressPct,
         Integer failedStep,
-        String failureMessage
+        String failureMessage,
+        String requestId,
+        Long attemptId
 ) {
     private static final int TOTAL_STEPS = 10;
 
     public static ValidationRunProgressResponse from(ValidationRunRow row) {
+        return from(row, null);
+    }
+
+    public static ValidationRunProgressResponse from(ValidationRunRow row, String requestId) {
+        return from(row, requestId, null);
+    }
+
+    public static ValidationRunProgressResponse from(ValidationRunRow row, String requestId, Long attemptId) {
         ValidationRunStatus status = ValidationRunStatus.valueOf(row.getStatus());
         return new ValidationRunProgressResponse(
                 status.name(),
@@ -27,6 +37,6 @@ public record ValidationRunProgressResponse(
                 TOTAL_STEPS,
                 row.getCurrentStep() * 100 / TOTAL_STEPS,
                 status == ValidationRunStatus.FAILED ? row.getCurrentStep() : null,
-                row.getFailureMessage());
+                row.getFailureMessage(), requestId, attemptId);
     }
 }

@@ -567,3 +567,75 @@ test('기록된 한도 거절 응답 유실 뒤 CAP-003 재응답에도 예외�
     ['TRAN-CONFIRM-101', 'TRAN-CONFIRM-101'],
   )
 })
+
+for (const viewport of [
+  { width: 1440, height: 1000 },
+  { width: 390, height: 844 },
+]) {
+  test(`FUN-087 도움말 → 실제 확정 → 완료 표시 → 목록 (${viewport.width})`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    const fixture = await installApi(page, {
+      initialDraft: {
+        commissionTransactionId: 101,
+        status: 'DRAFT',
+        paymentStage: 'GA_TO_FC',
+        sourceBusinessKey: 'GUIDE-101',
+        settlementMonth: '2026-07-01',
+        agentId: 6,
+        commissionItemId: 1,
+        amount: 20,
+        cashflowType: 'PAYMENT',
+        attributions: [
+          {
+            contractId: 1,
+            attributionDate: '2026-07-31',
+            amount: 20,
+            inclusionDecisionStatus: 'INCLUDED',
+            attributionMethod: 'DIRECT',
+          },
+        ],
+      },
+    })
+    await page.goto('transactions/new?id=101&month=2026-07')
+    await expect(page.locator('#btn-precheck')).toBeEnabled()
+    const help = page.getByRole('button', { name: '도움말', exact: true })
+    await help.click()
+    const card = page.getByRole('region', { name: '지급 업무 가이드' })
+    await card.getByRole('button', { name: '지급 사전검증·확정' }).click()
+    await expect(page.getByTestId('payment-guide-spotlight')).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('guide-scope.png') })
+    await card.getByRole('button', { name: '확인하고 다음' }).click()
+    await expect(card.getByRole('heading', { name: '사전검증을 실행하세요' })).toBeVisible()
+    expect(
+      fixture.requests.filter((request) => request.method === 'POST' && request.path.includes('/transactions')),
+    ).toHaveLength(0)
+    await expect(card.getByRole('button', { name: '다음', exact: true })).toBeDisabled()
+    await page.locator('#btn-precheck').click()
+    await card.getByRole('button', { name: '다음', exact: true }).click()
+    await card.getByRole('button', { name: '확인하고 다음' }).click()
+    await expect(page.getByTestId('payment-guide-spotlight')).toBeVisible()
+    await expect(card.getByRole('heading', { name: '지급을 확정하세요' })).toBeVisible()
+    await expect
+      .poll(async () => {
+        const bounds = await card.boundingBox()
+        return !!bounds && bounds.y >= 0 && bounds.y + bounds.height <= viewport.height
+      })
+      .toBe(true)
+    await page.screenshot({ path: testInfo.outputPath('guide-confirm-target.png') })
+    await page.locator('#btn-confirm').click()
+    await expect(card).toBeHidden()
+    await expect(page.getByTestId('payment-guide-spotlight')).toBeHidden()
+    await page.getByRole('button', { name: '확정 실행', exact: true }).click()
+    await expect(card.getByRole('heading', { name: '지급 확정 완료' })).toBeVisible()
+    await expect(card).toHaveAttribute('data-guide-status', 'COMPLETED')
+    await expect(page).toHaveURL(/transactions\/new/)
+    await page.screenshot({ path: testInfo.outputPath('guide-complete.png') })
+    await card.getByRole('button', { name: '목록으로 이동' }).click()
+    await expect(page).toHaveURL(/\/transactions(?:\?.*)?$/)
+    expect(fixture.requests.filter((request) => request.path.endsWith('/confirm'))).toHaveLength(1)
+    expect(errors).toEqual([])
+  })
+}

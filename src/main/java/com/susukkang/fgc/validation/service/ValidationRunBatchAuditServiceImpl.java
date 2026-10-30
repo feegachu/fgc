@@ -48,7 +48,9 @@ public class ValidationRunBatchAuditServiceImpl implements ValidationRunBatchAud
     @Override
     public void recordRetried(Long validationRunId, MonthlyValidationJobParameters parameters) {
         record("VALIDATION_RUN_RETRIED", "VALIDATION_RUN", validationRunId, parameters,
-                "FAILED validation_run retried (status reverted to RUNNING)");
+                "FAILED validation_run retried (status reverted to RUNNING)",
+                parameters.restartFromExecutionId() == null ? null
+                        : "{\"restartFromExecutionId\":" + parameters.restartFromExecutionId() + "}");
     }
 
     /**
@@ -60,12 +62,17 @@ public class ValidationRunBatchAuditServiceImpl implements ValidationRunBatchAud
      */
     private void record(String actionCode, String entityType, Long entityId,
                         MonthlyValidationJobParameters parameters, String reason) {
+        record(actionCode, entityType, entityId, parameters, reason, null);
+    }
+
+    private void record(String actionCode, String entityType, Long entityId,
+                        MonthlyValidationJobParameters parameters, String reason, String afterValue) {
         // 2026-09-27 hjKang - 배치 감사 저장을 JPA Repository로 전환한다.
         // 기존 코드: MyBatis 저장 DTO와 INSERT 영향 행 수로 저장 결과를 확인했다.
         // 문제: 배치 감사 경로만 별도의 XML 쿼리에 의존했다.
         // 개선: 길이 보정과 배치 문맥을 유지하고 saveAndFlush 오류를 전파해 상태 변경도 함께 롤백한다.
         AuditLog auditLog = AuditLog.create(parameters.triggeredBy(), actionCode, entityType,
-                String.valueOf(entityId), null, null, limit(reason, 1000),
+                String.valueOf(entityId), null, afterValue, limit(reason, 1000),
                 limit(parameters.requestId(), 80), null, null);
         auditLogRepository.saveAndFlush(auditLog);
     }

@@ -131,7 +131,7 @@ tasks.named('check') {
 // #664: server and frontend consume one approved payment-guide source.
 tasks.named('processResources') {
     from('frontend/src/features/assistant') {
-        include 'payment-guides.v1.json'
+        include 'payment-guides.v1.json', 'screens.generated.json', 'feature-targets.generated.json', 'workflow-guides.v1.json'
         into 'ai/pico'
     }
 }
