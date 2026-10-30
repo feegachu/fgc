@@ -62,12 +62,21 @@ public class AgentStatementRepository {
                      'TRANSACTION_ATTRIBUTION' AS source_entity_type,
                      jsonb_build_object('commissionTransactionId', ct.commission_transaction_id,
                                         'sourceType', ct.source_type, 'attributionMethod', ta.attribution_method,
-                                        'settlementMonth', ct.settlement_month, 'paidOn', ct.paid_on) AS detail
+                                        'settlementMonth', ct.settlement_month, 'paidOn', ct.paid_on,
+                                        'scheduleLineId', ta.schedule_line_id,
+                                        'scheduleHeaderId', sl.schedule_header_id,
+                                        'paymentConditionCode', sl.payment_condition_code,
+                                        'basisCode', sl.basis_code, 'basisAmount', sl.basis_amount,
+                                        'calculationType', sl.calculation_type,
+                                        'ratePct', sl.rate_pct, 'fixedAmount', sl.fixed_amount) AS detail
                 FROM fgc.commission_transaction ct
                 JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
-               WHERE ct.recipient_agent_id = :agentId AND ct.payment_stage = 'GA_TO_FC'
+                LEFT JOIN fgc.schedule_line sl ON sl.schedule_line_id = ta.schedule_line_id
+               WHERE ct.recipient_agent_id = :agentId AND ta.agent_id = :agentId AND ct.payment_stage = 'GA_TO_FC'
                  AND ct.status = 'CONFIRMED' AND ct.cashflow_type = 'PAYMENT'
                  AND ct.source_type NOT IN ('ADJUSTMENT', 'CLAWBACK', 'RECOVERY')
+                 AND NOT EXISTS (SELECT 1 FROM fgc.payment_journal_correction pc
+                                  WHERE pc.replacement_payment_id = ct.commission_transaction_id)
               UNION ALL
               SELECT 'ADJUSTMENT', ct.commission_transaction_id, COALESCE(ta.transaction_attribution_id, 0),
                      ta.contract_id, ct.commission_item_id, ct.installment_no,
@@ -86,8 +95,12 @@ public class AgentStatementRepository {
                                            WHERE p.original_payment_id = ct.commission_transaction_id))
                 FROM fgc.commission_transaction ct
                 LEFT JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
+                                                        AND ta.agent_id = :agentId
                WHERE ct.recipient_agent_id = :agentId AND ct.payment_stage = 'GA_TO_FC'
-                 AND ct.status = 'CONFIRMED' AND ct.source_type = 'ADJUSTMENT'
+                 AND ct.status = 'CONFIRMED'
+                 AND (ct.source_type = 'ADJUSTMENT'
+                      OR EXISTS (SELECT 1 FROM fgc.payment_journal_correction pc
+                                  WHERE pc.replacement_payment_id = ct.commission_transaction_id))
               UNION ALL
               SELECT 'HELD', sl.schedule_line_id, 0::bigint,
                      sh.contract_id, sl.commission_item_id, sl.installment_no,
@@ -132,7 +145,7 @@ public class AgentStatementRepository {
     private static final String SELECT_ROWS = """
             SELECT e.entry_type, e.source_id, e.sub_id, e.contract_id, ic.contract_no, ci.item_code, ci.item_name,
                    e.installment_no, e.basis_date, e.status_code, e.amount, e.policy_version_id,
-                   e.source_entity_type, e.detail::text
+                   e.source_entity_type, e.detail::text, e.basis_month
             """;
 
     private final EntityManager entityManager;
@@ -144,7 +157,7 @@ public class AgentStatementRepository {
     public record Row(String entryType, long sourceId, long subId, Long contractId, String contractNo,
                       String itemCode, String itemName, Integer installmentNo, LocalDate basisDate,
                       String statusCode, BigDecimal amount, Long policyVersionId, String sourceEntityType,
-                      String detailJson) {
+                      String detailJson, LocalDate basisMonth) {
     }
 
     public boolean agentExists(long agentId) {
@@ -153,7 +166,7 @@ public class AgentStatementRepository {
         return count.longValue() > 0;
     }
 
-    public List<Row> search(Filter filter, ListSort sort, int offset, int limit) {
+    public List<Row> search(Filter filter, ListSort sort, long offset, int limit) {
         StringBuilder sql = new StringBuilder(ENTRIES_CTE).append(SELECT_ROWS).append(JOINS);
         Map<String, Object> params = where(sql, filter);
         sql.append(SqlSort.orderBy(sort, SORTABLE, "e.entry_type ASC, e.source_id ASC, e.sub_id ASC"));
@@ -221,7 +234,7 @@ public class AgentStatementRepository {
             return new Row((String) c[0], ((Number) c[1]).longValue(), ((Number) c[2]).longValue(),
                     c[3] == null ? null : ((Number) c[3]).longValue(), (String) c[4], (String) c[5], (String) c[6],
                     c[7] == null ? null : ((Number) c[7]).intValue(), date(c[8]), (String) c[9], (BigDecimal) c[10],
-                    c[11] == null ? null : ((Number) c[11]).longValue(), (String) c[12], (String) c[13]);
+                    c[11] == null ? null : ((Number) c[11]).longValue(), (String) c[12], (String) c[13], date(c[14]));
         }).toList();
     }
 
