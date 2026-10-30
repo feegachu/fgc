@@ -985,6 +985,34 @@
         },
         "type" : "object"
       },
+      "ApiResponseStatementDetail" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/StatementDetail"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseStatementListResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/StatementListResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseTokenResponse" : {
         "properties" : {
           "data" : {
@@ -1401,6 +1429,18 @@
             "type" : "string"
           },
           "transactionAttributionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Bucket" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "count" : {
             "format" : "int64",
             "type" : "integer"
           }
@@ -5439,6 +5479,36 @@
         },
         "type" : "object"
       },
+      "PageResponseStatementEntry" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StatementEntry"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ParameterDraft" : {
         "properties" : {
           "description" : {
@@ -6008,6 +6078,19 @@
           "standardProductCode" : {
             "description" : "FGC 표준 상품코드",
             "example" : "STD-LIFE-B",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Range" : {
+        "properties" : {
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "to" : {
+            "format" : "date",
             "type" : "string"
           }
         },
@@ -6847,6 +6930,18 @@
         },
         "type" : "object"
       },
+      "Source" : {
+        "properties" : {
+          "entityType" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "SourceDetailDraft" : {
         "properties" : {
           "explanation" : {
@@ -6895,6 +6990,126 @@
           },
           "triggerType" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementBasis" : {
+        "properties" : {
+          "dateBasis" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "month" : {
+            "type" : "string"
+          },
+          "range" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementDetail" : {
+        "properties" : {
+          "basis" : {
+            "$ref" : "#/components/schemas/StatementBasis"
+          },
+          "entry" : {
+            "$ref" : "#/components/schemas/StatementEntry"
+          },
+          "evidence" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementEntry" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "basisDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "commissionItemCode" : {
+            "type" : "string"
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "dataStatus" : {
+            "type" : "string"
+          },
+          "entryKey" : {
+            "type" : "string"
+          },
+          "entryType" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "source" : {
+            "$ref" : "#/components/schemas/Source"
+          },
+          "statusCode" : {
+            "type" : "string"
+          },
+          "statusLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementListResponse" : {
+        "properties" : {
+          "basis" : {
+            "$ref" : "#/components/schemas/StatementBasis"
+          },
+          "items" : {
+            "$ref" : "#/components/schemas/PageResponseStatementEntry"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/StatementSummary"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementSummary" : {
+        "properties" : {
+          "adjustment" : {
+            "$ref" : "#/components/schemas/Bucket"
+          },
+          "clawback" : {
+            "$ref" : "#/components/schemas/Bucket"
+          },
+          "held" : {
+            "$ref" : "#/components/schemas/Bucket"
+          },
+          "payment" : {
+            "$ref" : "#/components/schemas/Bucket"
           }
         },
         "type" : "object"
@@ -7078,9 +7293,6 @@
             "format" : "int64",
             "type" : "integer"
           },
-          "requestId" : {
-            "type" : "string"
-          },
           "currentStep" : {
             "format" : "int32",
             "type" : "integer"
@@ -7095,6 +7307,9 @@
           "progressPct" : {
             "format" : "int32",
             "type" : "integer"
+          },
+          "requestId" : {
+            "type" : "string"
           },
           "status" : {
             "type" : "string"
@@ -7181,6 +7396,117 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/agent/me/statements" : {
+      "get" : {
+        "description" : "지급·보류·조정·환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.",
+        "operationId" : "mine",
+        "parameters" : [ {
+          "description" : "기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다",
+          "example" : "2026-07",
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "계약번호(부분 일치)",
+          "in" : "query",
+          "name" : "contractNo",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "수수료 항목 ID",
+          "in" : "query",
+          "name" : "commissionItemId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK",
+          "in" : "query",
+          "name" : "entryType",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "페이지(1-base)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "페이지 크기(최대 100)",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 수수료 명세 목록",
+        "tags" : [ "설계사 수수료 명세" ]
+      }
+    },
+    "/api/v1/agent/me/statements/{entryKey}" : {
+      "get" : {
+        "description" : "원천 ID·정책·계산 근거를 돌려줍니다. 남의 명세는 조회되지 않습니다.",
+        "operationId" : "mineDetail",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "entryKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementDetail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 수수료 명세 상세",
+        "tags" : [ "설계사 수수료 명세" ]
+      }
+    },
     "/api/v1/arbitrage-checks" : {
       "get" : {
         "operationId" : "getArbitrageChecks_1",
@@ -9762,6 +10088,132 @@
         "tags" : [ "대사" ]
       }
     },
+    "/api/v1/reports/agents/{agentId}/statements" : {
+      "get" : {
+        "description" : "AGENT 를 제외한 내부 조회 역할이 설계사를 지정해 조회합니다.",
+        "operationId" : "forAgent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "agentId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다",
+          "example" : "2026-07",
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "계약번호(부분 일치)",
+          "in" : "query",
+          "name" : "contractNo",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "수수료 항목 ID",
+          "in" : "query",
+          "name" : "commissionItemId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK",
+          "in" : "query",
+          "name" : "entryType",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "페이지(1-base)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "페이지 크기(최대 100)",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "설계사별 수수료 명세 목록(내부)",
+        "tags" : [ "설계사 수수료 명세" ]
+      }
+    },
+    "/api/v1/reports/agents/{agentId}/statements/{entryKey}" : {
+      "get" : {
+        "operationId" : "detailForAgent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "agentId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "entryKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementDetail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "설계사별 수수료 명세 상세(내부)",
+        "tags" : [ "설계사 수수료 명세" ]
+      }
+    },
     "/api/v1/schedules" : {
       "get" : {
         "operationId" : "getSchedulesByCondition",
@@ -10923,6 +11375,9 @@
     "url" : "/"
   } ],
   "tags" : [ {
+    "description" : "FUN-060 지급·보류·조정·환수 명세 조회 API",
+    "name" : "설계사 수수료 명세"
+  }, {
     "description" : "FUN-061 핵심 업무 감사로그 조회 API",
     "name" : "감사로그"
   }, {
