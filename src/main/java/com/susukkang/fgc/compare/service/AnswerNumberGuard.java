@@ -16,8 +16,8 @@ final class AnswerNumberGuard {
     private static final Pattern TERM = Pattern.compile("1,?200\\s*%");
     private static final Pattern DIGIT = Pattern.compile("\\p{Nd}");
     /** 구백만원·삼십퍼센트처럼 한글 숫자로 쓴 금액·비율. 자릿수 글자(십·백·천·만·억·조)가 있으면 띄어 써도 잡는다. */
-    private static final Pattern KOREAN_AMOUNT = Pattern.compile("[영일이삼사오육칠팔구십백천만억조]+(?:원|%|퍼센트|프로)"
-            + "|[영일이삼사오육칠팔구]*[십백천만억조][영일이삼사오육칠팔구십백천만억조]*\\s+(?:원|%|퍼센트|프로)");
+    private static final Pattern KOREAN_AMOUNT = Pattern.compile("[영일이삼사오육칠팔구십백천만억조]++(?:원|%|퍼센트|프로)"
+            + "|[영일이삼사오육칠팔구]*+[십백천만억조][영일이삼사오육칠팔구십백천만억조]*+\\s++(?:원|%|퍼센트|프로)", Pattern.CANON_EQ);
 
     private AnswerNumberGuard() {
     }

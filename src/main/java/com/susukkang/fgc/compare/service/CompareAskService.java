@@ -59,10 +59,11 @@ public class CompareAskService {
     static final String PERSONAL_INFO = "주민등록번호·연락처·이메일 같은 고객 개인정보는 입력하지 말아 주세요. 상품 비교 결과와 수수료 용어만 답해 드려요.";
 
     private static final int MAX_LENGTH = 600;
-    /** 주민등록번호·휴대전화/전화번호·이메일 형태. 이름은 판별할 수 없어 화면 안내로 막는다(SRC-027 D-05, LlmGateway 규약). */
-    private static final Pattern PERSONAL_INFO_PATTERN = Pattern.compile(
-            "(?<!\\d)\\d{6}\\s*-?\\s*[1-8]\\d{6}(?!\\d)|(?<!\\d)0\\d{1,2}[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}(?!\\d)"
-                    + "|[\\w.+-]+@[\\w-]+\\.[\\w.]+");
+    /** 주민등록번호·전화번호·이메일 형태. 이름은 판별할 수 없어 화면 안내로 막는다(SRC-027 D-05, LlmGateway 규약). */
+    private static final List<Pattern> PERSONAL_INFO_PATTERNS = List.of(
+            Pattern.compile("(?<!\\d)\\d{6}[\\s-]{0,3}[1-8]\\d{6}(?!\\d)"),
+            Pattern.compile("(?<!\\d)0\\d{1,2}[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}(?!\\d)"),
+            Pattern.compile("[\\w.+-]++@[\\w-]++\\.\\w"));
     private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)", Pattern.CANON_EQ);
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
@@ -78,7 +79,8 @@ public class CompareAskService {
     /** ranking 은 없을 수 있다(개념 질문). */
     public CompareAskResponse ask(String question, CompareRankingResponse ranking) {
         String q = question.strip();
-        if (PERSONAL_INFO_PATTERN.matcher(Normalizer.normalize(q, Normalizer.Form.NFKC)).find()) {
+        String normalized = Normalizer.normalize(q, Normalizer.Form.NFKC);
+        if (PERSONAL_INFO_PATTERNS.stream().anyMatch(p -> p.matcher(normalized).find())) {
             // 외부 모델에 개인정보를 보내지 않는다. 질문 원문은 저장하지도 않는다.
             return new CompareAskResponse(PERSONAL_INFO, CompareAskResponse.RULE);
         }

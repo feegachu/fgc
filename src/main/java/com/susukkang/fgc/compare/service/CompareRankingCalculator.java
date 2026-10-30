@@ -73,8 +73,8 @@ public final class CompareRankingCalculator {
                 .toList();
     }
 
-    /** 한도를 적용한 지급액과 그 지급액에 대한 환수 노출액(합계와 규칙별). */
-    private record Payout(long paid, long clawback, long[] clawbackByRule) {
+    /** 한도를 적용한 지급액과 그 지급액에 대한 환수 노출액. 규칙별 환수액은 호출자가 넘긴 배열에 쌓는다. */
+    private record Payout(long paid, long clawback) {
     }
 
     static Result calculate(Candidate candidate, long basePremium, LocalDate asOf) {
@@ -86,7 +86,8 @@ public final class CompareRankingCalculator {
         long includedGross = rows.stream().filter(row -> !row.exempt()).mapToLong(Row::amount).sum();
 
         long capAmount = cap == null ? Long.MAX_VALUE : round(base.multiply(cap.limitMultiplier()));
-        Payout payout = pay(rows, capAmount, candidate.rules());
+        long[] clawbackByRule = new long[candidate.rules().size()];
+        Payout payout = pay(rows, capAmount, candidate.rules(), clawbackByRule);
         long carryover = gross - payout.paid();
         // 표시용으로 반올림하지 않는다. 99.96%를 100.0%로 올리면 화면 절사 규칙과 초과 판정이 어긋난다.
         Double capImpact = cap == null || capAmount == 0 ? null
@@ -94,7 +95,7 @@ public final class CompareRankingCalculator {
                         .divide(BigDecimal.valueOf(capAmount), 6, RoundingMode.DOWN).doubleValue();
 
         evidence.add(capEvidence(cap, gross, payout.paid(), carryover, asOf));
-        clawbackEvidence(candidate, payout.clawbackByRule(), asOf, evidence);
+        clawbackEvidence(candidate, clawbackByRule, asOf, evidence);
         return new Result(candidate, gross, payout.paid(), carryover, payout.clawback(), payout.paid() - payout.clawback(),
                 capImpact, evidence);
     }
@@ -122,12 +123,11 @@ public final class CompareRankingCalculator {
         return rows;
     }
 
-    /** 지급행을 회차 순서로 쌓다가 한도를 넘는 부분은 지급하지 않는다. 환수 노출액은 행마다 그 항목의 환수율로 반올림해 합한다. */
-    private static Payout pay(List<Row> rows, long capAmount, List<Rule> rules) {
+    /** 지급행을 회차 순서로 쌓다가 한도를 넘는 부분은 지급하지 않는다. 환수 노출액은 행마다 그 항목의 환수율로 반올림해 합하고 규칙별 금액은 clawbackByRule 에 더한다. */
+    private static Payout pay(List<Row> rows, long capAmount, List<Rule> rules, long[] clawbackByRule) {
         long remaining = capAmount;
         long paid = 0;
         long clawback = 0;
-        long[] clawbackByRule = new long[rules.size()];
         for (Row row : rows) {
             long payable = row.exempt() ? row.amount() : Math.min(row.amount(), remaining);
             if (!row.exempt()) {
@@ -141,7 +141,7 @@ public final class CompareRankingCalculator {
                 clawback += amount;
             }
         }
-        return new Payout(paid, clawback, clawbackByRule);
+        return new Payout(paid, clawback);
     }
 
     /** 환수 근거는 1~12회차에 지급행이 있는 규칙마다 한 줄이다. 환수율이 없는 항목은 대상이 아님을 남기고 금액은 비운다. */

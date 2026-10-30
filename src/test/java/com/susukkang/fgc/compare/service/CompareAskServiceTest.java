@@ -178,9 +178,13 @@ class CompareAskServiceTest {
     void personalInfoIsNeverSentToTheModel() {
         CompareAskResponse rrn = service.ask("고객 900101-1234567 에게 맞는 상품 뭐야?", ranking());
         CompareAskResponse phone = service.ask("010-1234-5678 고객한테 추천할 상품?", ranking());
+        CompareAskResponse spacedRrn = service.ask("주민번호 900101 - 1234567 고객이에요", ranking());
+        CompareAskResponse email = service.ask("kim.cs@example.co.kr 고객 상담 중인데요", ranking());
 
         assertThat(rrn).isEqualTo(new CompareAskResponse(CompareAskService.PERSONAL_INFO, "RULE"));
         assertThat(phone.answer()).isEqualTo(CompareAskService.PERSONAL_INFO);
+        assertThat(spacedRrn.answer()).isEqualTo(CompareAskService.PERSONAL_INFO);
+        assertThat(email.answer()).isEqualTo(CompareAskService.PERSONAL_INFO);
         verify(gateway, never()).call(any(), any());
     }
 
