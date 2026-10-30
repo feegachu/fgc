@@ -3,6 +3,10 @@ spring:
     name: feegachu
   profiles:
     active: local
+  servlet:
+    multipart:
+      max-file-size: ${FGC_UPLOAD_MAX_SIZE:20MB}
+      max-request-size: ${FGC_UPLOAD_MAX_REQUEST_SIZE:21MB}
   jpa:
     open-in-view: false         # 엔티티 조회·DTO 변환은 서비스 트랜잭션 안에서 처리
     hibernate:
@@ -40,6 +44,9 @@ springdoc:
 # FGC 업무 설정 — 코드에 숫자를 박지 않기 위한 자리 (COR-004)
 fgc:
   demo-month: 2026-07
+  storage:
+    root: ${FGC_STORAGE_ROOT:./files}
+    max-file-bytes: ${FGC_UPLOAD_MAX_BYTES:20971520}
   # 2차 JWT 공존 모드(#400, 인터페이스정의서 §2-1-1). 키는 커밋하지 않는다 — 비어 있으면 기동마다 임의 키(JwtConfig).
   jwt:
     secret: ${FGC_JWT_SECRET:}

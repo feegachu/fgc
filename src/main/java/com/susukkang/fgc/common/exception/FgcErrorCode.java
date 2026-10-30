@@ -244,6 +244,16 @@ public enum FgcErrorCode {
             "error.ai.unavailable"
     ),
 
+    INTK_001(
+            "FGC-INTK-001",
+            HttpStatus.BAD_REQUEST,
+            "error.intake.invalidFile"
+    ),
+    INTK_002(
+            "FGC-INTK-002",
+            HttpStatus.CONFLICT,
+            "error.intake.duplicateFile"
+    ),
     POL_001("FGC-POL-001", HttpStatus.CONFLICT, "error.policy.selfApproval"),
     POL_002("FGC-POL-002", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.overlap"),
     POL_003("FGC-POL-003", HttpStatus.CONFLICT, "error.policy.stateChanged"),
