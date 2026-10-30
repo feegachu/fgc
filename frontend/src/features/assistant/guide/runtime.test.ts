@@ -305,7 +305,7 @@ describe('FUN-087 execution boundary', () => {
     const targets = new GuideTargets()
     const conditions: GuideEnvironment<State>['conditions'] = Object.fromEntries(
       PAYMENT_GUIDES.flatMap((g) =>
-        g.steps.flatMap((s) => [s.entryConditionId, s.completionConditionId, 'ALWAYS']),
+        g.steps.flatMap((s) => [s.entryConditionId, s.completionConditionId, ...s.next.map((edge) => edge.conditionId)]),
       ).map((id) => [id, () => 'SATISFIED']),
     )
     const registered = new Set<string>()

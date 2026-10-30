@@ -19,8 +19,11 @@ import static com.susukkang.fgc.assistant.dto.PicoAskResponse.*;
 
 class PicoAskServiceTest {
     LlmGateway gateway; PicoAskService service; PicoGuideCatalog catalog; PicoPaymentContextService contexts;
+    static com.susukkang.fgc.ai.config.LlmProperties limits(int maximum) {
+        return new com.susukkang.fgc.ai.config.LlmProperties("", "https://api.openai.com/v1", "gpt-4o-mini", java.time.Duration.ofSeconds(5),maximum,1024,java.time.Duration.ofMinutes(10));
+    }
     @BeforeEach void setup() throws Exception {
-        gateway=mock(LlmGateway.class); var mapper=new ObjectMapper(); catalog=new PicoGuideCatalog(mapper); contexts=mock(PicoPaymentContextService.class); service=new PicoAskService(gateway,catalog,mapper,contexts); role("SETTLEMENT");
+        gateway=mock(LlmGateway.class); var mapper=new ObjectMapper(); catalog=new PicoGuideCatalog(mapper); contexts=mock(PicoPaymentContextService.class); service=new PicoAskService(gateway,catalog,mapper,contexts,limits(20000)); role("SETTLEMENT");
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.draft")));
     }
     @AfterEach void cleanup() { SecurityContextHolder.clearContext(); }
@@ -174,4 +177,32 @@ class PicoAskServiceTest {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("입력한 원본을 원칙에 따라 확인하고 배정 근거를 조회하세요.","payment.draft:overview"));
         assertThat(service.ask(request("초안 저장")).source()).isEqualTo(Source.AI);
     }
+    @Test void largeEvidenceAndHistoryAreBoundedBeforeBothProviderCalls() throws Exception {
+        var mapper = new ObjectMapper();
+        service = new PicoAskService(gateway,catalog,mapper,contexts,limits(12000));
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+            .thenReturn(new PicoAskService.GuideSelection(List.of("contract.detail","settlement.journey")));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+            .thenReturn(answer("계약 상세의 실제 근거를 확인하세요.","contract.detail:overview"));
+        var turns = java.util.stream.IntStream.range(0,6).mapToObj(index -> new PicoAskRequest.Turn(
+            index % 2 == 0 ? PicoAskRequest.Role.USER : PicoAskRequest.Role.ASSISTANT,
+            ("보험계약 스케줄 지급 대사 업무 안내 ".repeat(150)).substring(0,2000))).toList();
+        var req = new PicoAskRequest(("계약 1a ".repeat(400)).substring(0,2000),"CONT-W03",List.of(),"r1","1.0",turns);
+        assertThat(service.ask(req).source()).isEqualTo(Source.AI);
+        var prompts = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),any());
+        for (var prompt : prompts.getAllValues()) {
+            assertThat(prompt.data().length()).isLessThanOrEqualTo(12000);
+            assertThat(mapper.readTree(prompt.data()).path("question").asText().length()).isLessThanOrEqualTo(2000);
+        }
+        assertThat(mapper.readTree(prompts.getAllValues().getLast().data()).path("evidence").size()).isPositive();
+    }
+    @Test void impossibleInputLimitIsClarificationNotProviderFailure() {
+        service = new PicoAskService(gateway,catalog,new ObjectMapper(),contexts,limits(64));
+        var response = service.ask(request("계약 안내"));
+        assertThat(response.fallbackReason()).isEqualTo("INPUT_TOO_LARGE");
+        assertThat(response.message()).contains("짧게 질문");
+        verifyNoInteractions(gateway);
+    }
 }
+
