@@ -2873,8 +2873,25 @@ export interface components {
             code?: string;
             /** Format: int32 */
             insurerCount?: number;
-            insurers?: components["schemas"]["InsurerOption"][];
+            insurers?: components["schemas"]["CompareInsurerOption"][];
             label?: string;
+        };
+        CompareEvidence: {
+            /** Format: date */
+            asOf?: string;
+            label?: string;
+            policyVersion?: string;
+            rule?: string;
+            source?: string;
+            /** Format: int64 */
+            value?: number;
+        };
+        CompareExcluded: {
+            insurer?: string;
+            /** Format: int64 */
+            offeringId?: number;
+            product?: string;
+            reasonCodes?: string[];
         };
         CompareExplainRequest: {
             rankResultId: string;
@@ -2884,6 +2901,33 @@ export interface components {
             summary?: string;
             summaryError?: string;
             summarySource?: string;
+        };
+        CompareInsurerOption: {
+            /** Format: int64 */
+            id?: number;
+            name?: string;
+        };
+        CompareItem: {
+            associationGrade?: string;
+            /** Format: double */
+            capImpactPct?: number;
+            /** Format: int64 */
+            cappedReceipt?: number;
+            /** Format: int64 */
+            carryover?: number;
+            /** Format: int64 */
+            clawbackExposure?: number;
+            /** Format: int64 */
+            conservativeNet?: number;
+            evidence?: components["schemas"]["CompareEvidence"][];
+            /** Format: int64 */
+            expectedReceipt?: number;
+            insurer?: string;
+            /** Format: int64 */
+            offeringId?: number;
+            product?: string;
+            /** Format: int32 */
+            rank?: number;
         };
         CompareRankingFilters: {
             empty?: boolean;
@@ -2904,9 +2948,9 @@ export interface components {
             categoryLabel?: string;
             /** Format: int32 */
             clawbackMonth?: number;
-            excludedItems?: components["schemas"]["Excluded"][];
+            excludedItems?: components["schemas"]["CompareExcluded"][];
             filters?: components["schemas"]["CompareRankingFilters"];
-            items?: components["schemas"]["Item"][];
+            items?: components["schemas"]["CompareItem"][];
             policyVersion?: string;
             rankResultId?: string;
             ruleVersion?: string;
@@ -3229,16 +3273,6 @@ export interface components {
             /** Format: int64 */
             reconMismatch?: number;
         };
-        Evidence: {
-            /** Format: date */
-            asOf?: string;
-            label?: string;
-            policyVersion?: string;
-            rule?: string;
-            source?: string;
-            /** Format: int64 */
-            value?: number;
-        };
         EvidenceItem: {
             label?: string;
             value?: string;
@@ -3408,13 +3442,6 @@ export interface components {
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
             typeLabel?: string;
         };
-        Excluded: {
-            insurer?: string;
-            /** Format: int64 */
-            offeringId?: number;
-            product?: string;
-            reasonCodes?: string[];
-        };
         FeeRegimeRuleDraft: {
             /** Format: date */
             basicDocumentDateFrom?: string;
@@ -3464,11 +3491,6 @@ export interface components {
             /** @enum {string} */
             status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
         };
-        InsurerOption: {
-            /** Format: int64 */
-            id?: number;
-            name?: string;
-        };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
             /**
@@ -3502,28 +3524,6 @@ export interface components {
              * @example 생명보험
              */
             insurerTypeLabel?: string;
-        };
-        Item: {
-            associationGrade?: string;
-            /** Format: double */
-            capImpactPct?: number;
-            /** Format: int64 */
-            cappedReceipt?: number;
-            /** Format: int64 */
-            carryover?: number;
-            /** Format: int64 */
-            clawbackExposure?: number;
-            /** Format: int64 */
-            conservativeNet?: number;
-            evidence?: components["schemas"]["Evidence"][];
-            /** Format: int64 */
-            expectedReceipt?: number;
-            insurer?: string;
-            /** Format: int64 */
-            offeringId?: number;
-            product?: string;
-            /** Format: int32 */
-            rank?: number;
         };
         JournalAccountRow: {
             accountCode?: string;
@@ -5591,14 +5591,12 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -5623,14 +5621,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
             /** @description capCheckId에 해당하는 판정이 없음 (FGC-COMMON-004) */
             404: {
@@ -6123,14 +6119,12 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -7397,14 +7391,12 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -7439,14 +7431,12 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음 */
             403: {
@@ -7501,14 +7491,12 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -7533,14 +7521,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
             404: {
@@ -7574,14 +7560,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음 */
             403: {
@@ -7643,14 +7627,12 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음 */
             403: {
@@ -7701,14 +7683,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
             /** @description 검증 실행 없음 (FGC-COMMON-004) */
             404: {
@@ -7742,14 +7722,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["ApiFailureResponse"];
-                };
+                content?: never;
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
             404: {

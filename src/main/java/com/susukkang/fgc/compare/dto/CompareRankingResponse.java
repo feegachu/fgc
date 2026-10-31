@@ -36,14 +36,16 @@ public record CompareRankingResponse(
     public static final String RULE_NOT_CONFIGURED = "RULE_NOT_CONFIGURED";
     public static final String INSUFFICIENT_DATA = "INSUFFICIENT_DATA";
 
+    @Schema(name = "CompareExcluded")
     public record Excluded(long offeringId, String insurer, String product, List<String> reasonCodes) {
     }
 
-    // springdoc은 단순 클래스명을 스키마 이름으로 쓰므로 ValidationRunDetailResponse.CapSummary와 겹치지 않게 한다.
+    // springdoc은 단순 클래스명을 스키마 이름으로 쓰므로 중첩 레코드는 Compare 접두어로 이름을 고정한다.
     @Schema(name = "CompareCapSummary")
     public record CapSummary(Double usagePct, String status, int contractCount) {
     }
 
+    @Schema(name = "CompareItem")
     public record Item(
             int rank,
             long offeringId,
@@ -65,6 +67,7 @@ public record CompareRankingResponse(
             List<Evidence> evidence) {
     }
 
+    @Schema(name = "CompareEvidence")
     public record Evidence(String label, String rule, Long value, String source, String policyVersion, LocalDate asOf) {
     }
 }

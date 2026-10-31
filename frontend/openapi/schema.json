@@ -3181,12 +3181,58 @@
           },
           "insurers" : {
             "items" : {
-              "$ref" : "#/components/schemas/InsurerOption"
+              "$ref" : "#/components/schemas/CompareInsurerOption"
             },
             "type" : "array"
           },
           "label" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareEvidence" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "policyVersion" : {
+            "type" : "string"
+          },
+          "rule" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "value" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareExcluded" : {
+        "properties" : {
+          "insurer" : {
+            "type" : "string"
+          },
+          "offeringId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "product" : {
+            "type" : "string"
+          },
+          "reasonCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -3214,6 +3260,70 @@
           },
           "summarySource" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareInsurerOption" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareItem" : {
+        "properties" : {
+          "associationGrade" : {
+            "type" : "string"
+          },
+          "capImpactPct" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "cappedReceipt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "carryover" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "clawbackExposure" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "conservativeNet" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "evidence" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CompareEvidence"
+            },
+            "type" : "array"
+          },
+          "expectedReceipt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurer" : {
+            "type" : "string"
+          },
+          "offeringId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "product" : {
+            "type" : "string"
+          },
+          "rank" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -3276,7 +3386,7 @@
           },
           "excludedItems" : {
             "items" : {
-              "$ref" : "#/components/schemas/Excluded"
+              "$ref" : "#/components/schemas/CompareExcluded"
             },
             "type" : "array"
           },
@@ -3285,7 +3395,7 @@
           },
           "items" : {
             "items" : {
-              "$ref" : "#/components/schemas/Item"
+              "$ref" : "#/components/schemas/CompareItem"
             },
             "type" : "array"
           },
@@ -4150,31 +4260,6 @@
         },
         "type" : "object"
       },
-      "Evidence" : {
-        "properties" : {
-          "asOf" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "label" : {
-            "type" : "string"
-          },
-          "policyVersion" : {
-            "type" : "string"
-          },
-          "rule" : {
-            "type" : "string"
-          },
-          "source" : {
-            "type" : "string"
-          },
-          "value" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
       "EvidenceItem" : {
         "properties" : {
           "label" : {
@@ -4617,27 +4702,6 @@
         },
         "type" : "object"
       },
-      "Excluded" : {
-        "properties" : {
-          "insurer" : {
-            "type" : "string"
-          },
-          "offeringId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "product" : {
-            "type" : "string"
-          },
-          "reasonCodes" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          }
-        },
-        "type" : "object"
-      },
       "FeeRegimeRuleDraft" : {
         "properties" : {
           "basicDocumentDateFrom" : {
@@ -4769,18 +4833,6 @@
         },
         "type" : "object"
       },
-      "InsurerOption" : {
-        "properties" : {
-          "id" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "name" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "InsurerResponse" : {
         "description" : "보험회사(원수사) 기준정보",
         "properties" : {
@@ -4814,58 +4866,6 @@
             "description" : "보험회사 유형 한글명",
             "example" : "생명보험",
             "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "Item" : {
-        "properties" : {
-          "associationGrade" : {
-            "type" : "string"
-          },
-          "capImpactPct" : {
-            "format" : "double",
-            "type" : "number"
-          },
-          "cappedReceipt" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "carryover" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "clawbackExposure" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "conservativeNet" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "evidence" : {
-            "items" : {
-              "$ref" : "#/components/schemas/Evidence"
-            },
-            "type" : "array"
-          },
-          "expectedReceipt" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "insurer" : {
-            "type" : "string"
-          },
-          "offeringId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "product" : {
-            "type" : "string"
-          },
-          "rank" : {
-            "format" : "int32",
-            "type" : "integer"
           }
         },
         "type" : "object"
@@ -9095,14 +9095,7 @@
             "description" : "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류 등 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "1,200% 한도 판정 목록 조회 (IF-API-30)",
@@ -9135,14 +9128,7 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {
@@ -9863,14 +9849,7 @@
             "description" : "month 형식(yyyy-MM) 오류 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "업무 대시보드 요약 조회 (IF-API-03)",
@@ -11711,14 +11690,7 @@
             "description" : "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류, status 값 오류 등 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "월 통합검증 실행 목록 조회",
@@ -11759,14 +11731,7 @@
             "description" : "validationMonth 형식(yyyy-MM) 오류, runType 값 오류 등 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "403" : {
             "content" : {
@@ -11829,14 +11794,7 @@
             "description" : "month 누락 또는 형식(yyyy-MM) 오류 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "진행 중인 월간 실행 존재 여부 (IF-API-46A)",
@@ -11869,14 +11827,7 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {
@@ -11919,14 +11870,7 @@
             "description" : "기동 수락"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "403" : {
             "content" : {
@@ -12005,14 +11949,7 @@
             "description" : "Idempotency-Key 형식 오류 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "403" : {
             "content" : {
@@ -12074,14 +12011,7 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {
@@ -12124,14 +12054,7 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {

@@ -41,6 +41,11 @@ class OpenApiFailureResponseTest {
                 String name = operation.getKey() + " " + path.getKey() + " " + response.getKey();
                 errorResponses.add(name);
                 JsonNode content = response.getValue().path("content");
+                // 토큰 없는 401은 본문이 없으므로 본문 타입을 두지 않는다.
+                if (response.getKey().equals("401")) {
+                    if (!content.isMissingNode()) mismatched.add(name);
+                    return;
+                }
                 if (content.size() != 1 || !content.path("application/json").path("schema").path("$ref").asText()
                         .equals("#/components/schemas/ApiFailureResponse")) {
                     mismatched.add(name);
@@ -54,7 +59,8 @@ class OpenApiFailureResponseTest {
         JsonNode schemas = root.path("components").path("schemas");
         JsonNode failure = schemas.path("ApiFailureResponse");
         assertThat(failure.path("properties").path("data").path("type").toString()).contains("null");
-        assertThat(failure.path("required").toString()).contains("\"error\"");
+        assertThat(failure.path("required")).extracting(JsonNode::asText)
+                .containsExactlyInAnyOrder("data", "error", "requestId");
         assertThat(schemas.path("ApiError").path("properties").path("field").path("type").toString())
                 .contains("string").contains("null");
         assertThat(schemas.path("ApiError").path("properties").path("detail").path("type").toString())
