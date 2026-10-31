@@ -23,6 +23,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -280,10 +282,7 @@ class ClawbackNoticeDocumentIntegrationTest {
     @Test
     @DisplayName("FGC-FUN-084 계산판이 없는 case는 422 FGC-CLAW-001이고 판을 만들지 않는다")
     void uncalculatedCaseIsRejectedAsNotCalculated() throws Exception {
-        long caseId = jdbc.queryForObject("""
-                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no)
-                VALUES (?, (SELECT min(policy_version_id) FROM fgc.policy_version), ?) RETURNING clawback_case_id
-                """, Long.class, contractId, "C671-" + UUID.randomUUID());
+        long caseId = uncalculatedCase();
 
         assertThatThrownBy(() -> notices.issue(caseId, request(1, "source-v1"), key(), settlementUser))
                 .isInstanceOfSatisfying(FgcBusinessException.class, e -> {
@@ -299,6 +298,49 @@ class ClawbackNoticeDocumentIntegrationTest {
                         .with(csrf()).header("Idempotency-Key", key()).contentType(APPLICATION_JSON)
                         .content("{\"calculationVersion\":1,\"expectedSourceVersion\":\"source-v1\"}"))
                 .andExpect(status().isNotFound());
+        assertThat(noticeCount(caseId)).isZero();
+    }
+
+    @ParameterizedTest(name = "page={0}, size={1} → {2}")
+    @CsvSource({"0,20,400", "1,0,400", "1,101,400", "1,100,200"})
+    @DisplayName("FGC-FUN-084 발행 이력(IF-86)은 page≥1, size 1~100만 받는다")
+    void historyRejectsOutOfRangePaging(int page, int size, int expected) throws Exception {
+        long caseId = uncalculatedCase();
+        var result = mvc.perform(get("/api/v1/clawbacks/{id}/notice-documents", caseId)
+                        .param("page", String.valueOf(page)).param("size", String.valueOf(size))
+                        .with(user(insertUser("COMPLIANCE"))))
+                .andExpect(status().is(expected));
+        if (expected == 400) result.andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-084 발행(IF-73)의 id·멱등키·본문 경계를 벗어나면 400 FGC-COMMON-002이고 판을 만들지 않는다")
+    void issueRejectsInvalidInputBeforeIssuing() throws Exception {
+        long caseId = uncalculatedCase();
+        var settlement = insertUser("SETTLEMENT");
+        String body = "{\"calculationVersion\":1,\"expectedSourceVersion\":\"source-v1\"}";
+        String path = "/api/v1/clawbacks/{id}/notice-documents";
+
+        mvc.perform(get(path, 0L).with(user(settlement)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+        mvc.perform(post(path, 0L).with(user(settlement)).with(csrf())
+                        .header("Idempotency-Key", key()).contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+        for (String badKey : List.of("k".repeat(101), "a/b", "a b")) {
+            mvc.perform(post(path, caseId).with(user(settlement)).with(csrf())
+                            .header("Idempotency-Key", badKey).contentType(APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+        }
+        for (String badBody : List.of("{\"calculationVersion\":0,\"expectedSourceVersion\":\"source-v1\"}",
+                "{\"calculationVersion\":1,\"expectedSourceVersion\":\"  \"}")) {
+            mvc.perform(post(path, caseId).with(user(settlement)).with(csrf())
+                            .header("Idempotency-Key", key()).contentType(APPLICATION_JSON).content(badBody))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+        }
+        // 100자 키는 형식 검사를 통과해 다음 단계(계산판 없음 422)까지 간다.
+        mvc.perform(post(path, caseId).with(user(settlement)).with(csrf())
+                        .header("Idempotency-Key", "k".repeat(100)).contentType(APPLICATION_JSON).content(body))
+                .andExpect(status().isUnprocessableEntity());
         assertThat(noticeCount(caseId)).isZero();
     }
 
@@ -384,8 +426,15 @@ class ClawbackNoticeDocumentIntegrationTest {
                         notices.issue(calc.caseId(), request(1, calc.sourceVersion()), key(), settlementUser));
                 await().alias("발행이 재계산의 case 행 잠금을 기다린다")
                         .pollInterval(Duration.ofMillis(10)).atMost(Duration.ofSeconds(10))
-                        .until(() -> Boolean.TRUE.equals(jdbc.queryForObject(
-                                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE NOT granted)", Boolean.class)));
+                        // 다른 대기 세션과 섞이지 않게 발행의 lockCase(WHERE clawback_case_id = ? FOR UPDATE)만 본다.
+                        // 재계산 잠금은 WHERE candidate_id = ...라 이 패턴에 걸리지 않는다.
+                        .until(() -> Boolean.TRUE.equals(jdbc.queryForObject("""
+                                SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+                                                WHERE datname = current_database()
+                                                  AND pid <> pg_backend_pid()
+                                                  AND wait_event_type = 'Lock'
+                                                  AND query LIKE '%WHERE clawback_case_id = %FOR UPDATE%')
+                                """, Boolean.class)));
                 assertThat(issue.isDone()).isFalse();
                 commit.countDown();
                 assertThat(recalculation.get(15, TimeUnit.SECONDS)).isEqualTo(2);
@@ -398,6 +447,14 @@ class ClawbackNoticeDocumentIntegrationTest {
             }
         }
         assertThat(noticeCount(calc.caseId())).isZero();
+    }
+
+    /** 계산판 없이 case만 있는 상태(후보 없는 legacy case). */
+    private long uncalculatedCase() {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no)
+                VALUES (?, (SELECT min(policy_version_id) FROM fgc.policy_version), ?) RETURNING clawback_case_id
+                """, Long.class, contractId, "C671-" + UUID.randomUUID());
     }
 
     private long noticeCount(long caseId) {
