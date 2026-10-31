@@ -222,18 +222,7 @@ public class PolicyWriteRepository {
         for (PolicyDraft.FeeRegimeRuleDraft rule : draft.feeRegimeRules()) {
             saveFeeRule(id, rule, rule.feeRegimeRulesetId() == null ? null : detachedFeeRows.get(rule.feeRegimeRulesetId()));
         }
-        jdbc.update("DELETE FROM fgc.clawback_rule WHERE policy_version_id = ?", id);
-        for (PolicyDraft.ClawbackRuleDraft rule : draft.clawbackRules()) {
-            jdbc.update("""
-                    INSERT INTO fgc.clawback_rule
-                      (policy_version_id, insurer_id, product_offering_id, commission_item_id,
-                       elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
-                    """, id, rule.insurerId(), rule.productOfferingId(), rule.commissionItemId(),
-                    rule.elapsedMonthFrom(), rule.elapsedMonthTo(), rule.clawbackBasisCode(),
-                    rule.clawbackRatePct(), rule.conditionExpression() == null || rule.conditionExpression().isNull()
-                            ? "{}" : json(rule.conditionExpression()));
-        }
+        replaceClawbackRules(id, draft.clawbackRules());
         jdbc.update("DELETE FROM fgc.policy_parameter WHERE policy_version_id = ?", id);
         for (PolicyDraft.ParameterDraft parameter : draft.parameters()) {
             jdbc.update("""
@@ -248,6 +237,21 @@ public class PolicyWriteRepository {
                     VALUES (?, ?, ?, ?, ?, ?)
                     """, id, source.ref(), source.title(), source.explanation(), source.url(),
                     source.statusTags().toArray(String[]::new));
+        }
+    }
+
+    private void replaceClawbackRules(Long id, List<PolicyDraft.ClawbackRuleDraft> rules) {
+        jdbc.update("DELETE FROM fgc.clawback_rule WHERE policy_version_id = ?", id);
+        for (PolicyDraft.ClawbackRuleDraft rule : rules) {
+            jdbc.update("""
+                    INSERT INTO fgc.clawback_rule
+                      (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                       elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                    """, id, rule.insurerId(), rule.productOfferingId(), rule.commissionItemId(),
+                    rule.elapsedMonthFrom(), rule.elapsedMonthTo(), rule.clawbackBasisCode(),
+                    rule.clawbackRatePct(), rule.conditionExpression() == null || rule.conditionExpression().isNull()
+                            ? "{}" : json(rule.conditionExpression()));
         }
     }
 

@@ -58,6 +58,7 @@ public class PolicyWriteService {
     private static final Pattern REFERENCE = Pattern.compile("^(REG-\\d{2}[A-Z]?|SRC-\\d{3})(?:\\s++\\S.*)?$");
     private static final String ACTION_CLONE = "CLONE";
     private static final String FIELD_POLICY_TYPE = "policyType";
+    private static final String FIELD_COMMISSION_RULES = "commissionRules";
     private final PolicyVersionRepository policyVersionRepository;
     private final PolicyWriteRepository writeRepository;
     private final PolicyDraftValidator draftValidator;
@@ -97,7 +98,7 @@ public class PolicyWriteService {
                 throw invalid("policyCode", "정책 코드는 최초 생성 이후 변경할 수 없습니다.");
             }
             if (!writeRepository.verifyChildOwnership(id, draft)) {
-                throw invalid("commissionRules", "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
+                throw invalid(FIELD_COMMISSION_RULES, "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
             }
             if (writeRepository.hasUnsupportedChildren(id)) {
                 throw invalid(FIELD_POLICY_TYPE, "전용 편집 계약이 없는 기존 규칙을 덮어쓸 수 없습니다.");
@@ -286,8 +287,8 @@ public class PolicyWriteService {
         };
         if (!complete) {
             String field = switch (draft.policyType()) {
-                case CURRENT_COMMISSION -> "commissionRules";
-                case FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION -> draft.commissionRules().isEmpty() ? "commissionRules" : "feeRegimeRules";
+                case CURRENT_COMMISSION -> FIELD_COMMISSION_RULES;
+                case FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION -> draft.commissionRules().isEmpty() ? FIELD_COMMISSION_RULES : "feeRegimeRules";
                 case CLAWBACK -> "clawbackRules";
                 case SCHEDULE_ELIGIBILITY, ARBITRAGE, RECONCILIATION_TOLERANCE -> "parameters";
                 default -> FIELD_POLICY_TYPE;

@@ -7,6 +7,8 @@ LANGUAGE plpgsql
 SET search_path = fgc, pg_temp
 AS $$
 DECLARE
+  c_insert CONSTANT text := 'INSERT';
+  c_delete CONSTANT text := 'DELETE';
   v_old_policy_id bigint;
   v_new_policy_id bigint;
   v_policy_id bigint;
@@ -15,38 +17,38 @@ BEGIN
   CASE
     WHEN TG_TABLE_NAME IN ('commission_rule','cap_rule_set','allocation_policy',
                            'refund_rate_table','policy_parameter','fee_regime_ruleset','clawback_rule') THEN
-      IF TG_OP <> 'INSERT' THEN v_old_policy_id := OLD.policy_version_id; END IF;
-      IF TG_OP <> 'DELETE' THEN v_new_policy_id := NEW.policy_version_id; END IF;
+      IF TG_OP <> c_insert THEN v_old_policy_id := OLD.policy_version_id; END IF;
+      IF TG_OP <> c_delete THEN v_new_policy_id := NEW.policy_version_id; END IF;
     WHEN TG_TABLE_NAME = 'cap_rule_item' THEN
-      IF TG_OP <> 'INSERT' THEN
+      IF TG_OP <> c_insert THEN
         SELECT policy_version_id INTO v_old_policy_id
           FROM fgc.cap_rule_set WHERE cap_rule_set_id = OLD.cap_rule_set_id
           FOR SHARE;
       END IF;
-      IF TG_OP <> 'DELETE' THEN
+      IF TG_OP <> c_delete THEN
         SELECT policy_version_id INTO v_new_policy_id
           FROM fgc.cap_rule_set WHERE cap_rule_set_id = NEW.cap_rule_set_id
           FOR SHARE;
       END IF;
     WHEN TG_TABLE_NAME = 'refund_rate_line' THEN
-      IF TG_OP <> 'INSERT' THEN
+      IF TG_OP <> c_insert THEN
         SELECT policy_version_id INTO v_old_policy_id
           FROM fgc.refund_rate_table WHERE refund_rate_table_id = OLD.refund_rate_table_id
           FOR SHARE;
       END IF;
-      IF TG_OP <> 'DELETE' THEN
+      IF TG_OP <> c_delete THEN
         SELECT policy_version_id INTO v_new_policy_id
           FROM fgc.refund_rate_table WHERE refund_rate_table_id = NEW.refund_rate_table_id
           FOR SHARE;
       END IF;
     -- 분급 룰셋 자식: 한도는 룰셋 헤더를 거쳐 정책버전을 찾는다
     WHEN TG_TABLE_NAME IN ('fee_regime_ruleset_limit') THEN
-      IF TG_OP <> 'INSERT' THEN
+      IF TG_OP <> c_insert THEN
         SELECT policy_version_id INTO v_old_policy_id
           FROM fgc.fee_regime_ruleset WHERE fee_regime_ruleset_id = OLD.fee_regime_ruleset_id
           FOR SHARE;
       END IF;
-      IF TG_OP <> 'DELETE' THEN
+      IF TG_OP <> c_delete THEN
         SELECT policy_version_id INTO v_new_policy_id
           FROM fgc.fee_regime_ruleset WHERE fee_regime_ruleset_id = NEW.fee_regime_ruleset_id
           FOR SHARE;
@@ -69,7 +71,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  IF TG_OP = c_delete THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
 $$;

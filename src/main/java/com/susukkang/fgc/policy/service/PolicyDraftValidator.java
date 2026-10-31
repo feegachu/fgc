@@ -34,6 +34,7 @@ public class PolicyDraftValidator {
     private static final String FIELD_FEE_REGIME = "feeRegimeCode";
     private static final String FEE_RULE_PREFIX = "feeRegimeRules[";
     private static final String COMMISSION_RULE_PREFIX = "commissionRules[";
+    private static final String CONFLICTING_INDEX = "conflictingIndex";
     private static final Set<String> HEADER_REGIMES = Set.of("CURRENT", FOUR_YEAR, SEVEN_YEAR);
     private static final Map<String, String> SCHEDULE_VALUES = Map.of(
             "STATUS_MONTH_RULE", "PAY_IF_ACTIVE_ON_DUE_DATE",
@@ -70,16 +71,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.clawbackRules().size(); i++) {
             var rule = draft.clawbackRules().get(i);
             String field = "clawbackRules[" + i + "]";
-            if (rule.elapsedMonthTo() < rule.elapsedMonthFrom()) {
-                throw invalid(field + ".elapsedMonthTo", "경과월 끝은 시작 이상이어야 합니다.");
-            }
-            if (!"PAID_ATTRIBUTED_AMOUNT".equals(rule.clawbackBasisCode())) {
-                throw invalid(field + ".clawbackBasisCode", "확정 지급 귀속액 기준만 지원합니다.");
-            }
-            JsonNode condition = rule.conditionExpression();
-            if (condition != null && !condition.isNull() && (!condition.isObject() || !condition.isEmpty())) {
-                throw invalid(field + ".conditionExpression", "귀책 조건식은 지원하지 않습니다. 회사 약정 확보 후 별도 결정이 필요합니다.");
-            }
+            validateClawbackRule(rule, field);
             for (int j = 0; j < i; j++) {
                 var other = draft.clawbackRules().get(j);
                 // uq_clawback_rule의 키도 사전 검사하여 DB 중복을 필드 오류로 돌려준다.
@@ -92,9 +84,22 @@ public class PolicyDraftValidator {
                 if (duplicateKey || (sameScope && rule.elapsedMonthFrom() <= other.elapsedMonthTo()
                         && other.elapsedMonthFrom() <= rule.elapsedMonthTo())) {
                     throw new FgcBusinessException(FgcErrorCode.POL_002, field + ".elapsedMonthFrom",
-                            Map.of("conflictingIndex", j), "환수 규칙의 경과월 구간 또는 저장 키가 겹칩니다.");
+                            Map.of(CONFLICTING_INDEX, j), "환수 규칙의 경과월 구간 또는 저장 키가 겹칩니다.");
                 }
             }
+        }
+    }
+
+    private static void validateClawbackRule(PolicyDraft.ClawbackRuleDraft rule, String field) {
+        if (rule.elapsedMonthTo() < rule.elapsedMonthFrom()) {
+            throw invalid(field + ".elapsedMonthTo", "경과월 끝은 시작 이상이어야 합니다.");
+        }
+        if (!"PAID_ATTRIBUTED_AMOUNT".equals(rule.clawbackBasisCode())) {
+            throw invalid(field + ".clawbackBasisCode", "확정 지급 귀속액 기준만 지원합니다.");
+        }
+        JsonNode condition = rule.conditionExpression();
+        if (condition != null && !condition.isNull() && (!condition.isObject() || !condition.isEmpty())) {
+            throw invalid(field + ".conditionExpression", "귀책 조건식은 지원하지 않습니다. 회사 약정 확보 후 별도 결정이 필요합니다.");
         }
     }
 
@@ -219,7 +224,7 @@ public class PolicyDraftValidator {
                         && left.installmentFrom() <= right.installmentTo()
                         && right.installmentFrom() <= left.installmentTo()) {
                     throw new FgcBusinessException(FgcErrorCode.POL_002, COMMISSION_RULE_PREFIX + j + "]",
-                            Map.of("conflictingIndex", i), "같은 적용 범위·우선순위의 수수료 규칙 회차가 겹칩니다.");
+                            Map.of(CONFLICTING_INDEX, i), "같은 적용 범위·우선순위의 수수료 규칙 회차가 겹칩니다.");
                 }
             }
         }
@@ -303,7 +308,7 @@ public class PolicyDraftValidator {
                         && overlaps(left.basicDocumentDateFrom(), left.basicDocumentDateTo(),
                                     right.basicDocumentDateFrom(), right.basicDocumentDateTo())) {
                     throw new FgcBusinessException(FgcErrorCode.POL_002, FEE_RULE_PREFIX + j + "]",
-                            Map.of("conflictingIndex", i), "같은 분급 룰셋의 적용 구간이 겹칩니다.");
+                            Map.of(CONFLICTING_INDEX, i), "같은 분급 룰셋의 적용 구간이 겹칩니다.");
                 }
             }
         }

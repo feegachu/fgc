@@ -296,7 +296,41 @@ class PolicyDraftValidatorTest {
         assertInvalid(json, "clawbackRules[0].conditionExpression");
         rule.putObject("conditionExpression");
         array(json, "clawbackRules").add(rule.deepCopy().put("elapsedMonthFrom", 12).put("elapsedMonthTo", 24));
-        assertThatThrownBy(() -> validator.validate(draft(json))).isInstanceOf(FgcBusinessException.class);
+        PolicyDraft overlapping = draft(json);
+        assertThatThrownBy(() -> validator.validate(overlapping))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.POL_002);
+                    assertThat(error.getField()).isEqualTo("clawbackRules[1].elapsedMonthFrom");
+                });
+    }
+
+    /** FGC-FUN-017: 경과월 양끝 포함 구간과 환수율 0%·100%의 저장 경계. */
+    @Test
+    void permitsAdjacentClawbackBandsWithZeroAndHundredPercent() {
+        ObjectNode json = baseDraft().put("policyType", "CLAWBACK");
+        ObjectNode first = MAPPER.createObjectNode().put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "0.000000");
+        array(json, "clawbackRules").add(first)
+                .add(first.deepCopy().put("elapsedMonthFrom", 12).put("elapsedMonthTo", 23)
+                        .put("clawbackRatePct", "100.000000"));
+        PolicyDraft adjacent = draft(json);
+        assertThatCode(() -> validator.validate(adjacent)).doesNotThrowAnyException();
+    }
+
+    /** FGC-FUN-017: uq_clawback_rule은 보험회사를 저장 키에 포함하지 않는다. */
+    @Test
+    void rejectsSameClawbackItemAndBandEvenWhenInsurersDiffer() {
+        ObjectNode json = baseDraft().put("policyType", "CLAWBACK");
+        ObjectNode first = MAPPER.createObjectNode().put("commissionItemId", 1).put("insurerId", 1)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50.000000");
+        array(json, "clawbackRules").add(first).add(first.deepCopy().put("insurerId", 2));
+        PolicyDraft conflicting = draft(json);
+        assertThatThrownBy(() -> validator.validate(conflicting))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.POL_002);
+                    assertThat(error.getField()).isEqualTo("clawbackRules[1].elapsedMonthFrom");
+                });
     }
 
     @Test
