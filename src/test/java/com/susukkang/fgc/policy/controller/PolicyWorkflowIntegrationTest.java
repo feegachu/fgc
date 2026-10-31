@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 외부 테스트 트랜잭션으로 감싸지 않아 실패 시 부분 커밋·멱등키 누락·동시성 오류를 드러낸다.
  * test 프로필의 일회성 DB에서 UUID 업무키와 독립 보험회사/항목을 사용한다.
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_policy_workflow_647?currentSchema=fgc")
 @AutoConfigureMockMvc
 class PolicyWorkflowIntegrationTest {
 
@@ -1136,6 +1136,15 @@ class PolicyWorkflowIntegrationTest {
         edit.put("expectedUpdatedAt", active.path("updatedAt").asText());
         writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, systemWriter, key(), 409);
 
+        assertClawbackClonePreservesOriginal(id, identities);
+        assertThat(detail(id, writer).path("approvalActions").findValuesAsText("actionType"))
+                .containsExactly("SUBMIT", "APPROVE", "ACTIVATE");
+        for (String action : List.of("CREATE", "UPDATE", "SUBMIT", "APPROVE", "ACTIVATE")) {
+            assertThat(auditCount(id, "POLICY_" + action)).isEqualTo(1);
+        }
+    }
+
+    private void assertClawbackClonePreservesOriginal(long id, List<java.util.Map<String, Object>> identities) throws Exception {
         JsonNode originalRules = detail(id, writer).path("editDocument").path("clawbackRules");
         JsonNode cloned = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
                 cloneRequest("2001-01-01"), writer, key(), 201);
@@ -1147,17 +1156,12 @@ class PolicyWorkflowIntegrationTest {
         assertThat(count("policy_source_detail", cloneId)).isEqualTo(1);
         ObjectNode clonedEdit = (ObjectNode) detail(cloneId, writer).path("editDocument");
         for (JsonNode rule : clonedEdit.path("clawbackRules")) {
-            assertThat(identities).noneSatisfy(row -> assertThat(row.get("clawback_rule_id"))
-                    .isEqualTo(rule.path("clawbackRuleId").asLong()));
+            assertThat(identities).extracting(row -> row.get("clawback_rule_id"))
+                    .doesNotContain(rule.path("clawbackRuleId").asLong());
         }
         ((ObjectNode) clonedEdit.path("clawbackRules").get(1)).put("clawbackRatePct", "25.000000");
         write(HttpMethod.PUT, "/api/v1/policies/" + cloneId, clonedEdit, writer, key(), 200);
         assertThat(detail(id, writer).path("editDocument").path("clawbackRules")).isEqualTo(originalRules);
-        assertThat(detail(id, writer).path("approvalActions").findValuesAsText("actionType"))
-                .containsExactly("SUBMIT", "APPROVE", "ACTIVATE");
-        for (String action : List.of("CREATE", "UPDATE", "SUBMIT", "APPROVE", "ACTIVATE")) {
-            assertThat(auditCount(id, "POLICY_" + action)).isEqualTo(1);
-        }
         assertThat(auditCount(cloneId, "POLICY_CLONE")).isEqualTo(1);
     }
 
