@@ -94,20 +94,20 @@ public class AgentDataScopeService {
                 + " AND agent_id = :agentId", explanationId, false);
     }
 
-    /** 문서번호뿐 아니라 요청한 PDF 판의 생성자/수신자를 확인한다. */
+    /**
+     * 문서번호뿐 아니라 요청한 PDF 판의 생성자를 확인한다. 환수 통지서(CLAWBACK_NOTICE)는 FUN-084에서
+     * 내부 관리 기능으로 정해져 수신자라도 AGENT에는 열지 않는다(#671).
+     */
     public void requireDocument(String documentNo, int version) {
         requireAuthenticated();
         Long agentId = currentAgentId();
         if (agentId == null) return;
         var query = entityManager.createNativeQuery("""
                 SELECT count(*) FROM fgc.generated_document d
-                WHERE d.document_no = :documentNo AND d.version_no = :version AND (
-                  (d.document_kind = 'COMPARE_CONFIRMATION' AND d.source_entity_type = 'COMPARE_EXPLANATION'
-                    AND EXISTS (SELECT 1 FROM fgc.compare_explanation e
-                      WHERE e.compare_explanation_id = d.source_entity_id AND e.agent_id = :agentId))
-                  OR (d.document_kind = 'CLAWBACK_NOTICE' AND EXISTS (
-                    SELECT 1 FROM fgc.clawback_notice_delivery n
-                    WHERE n.generated_document_id = d.generated_document_id AND n.recipient_agent_id = :agentId)))
+                WHERE d.document_no = :documentNo AND d.version_no = :version
+                  AND d.document_kind = 'COMPARE_CONFIRMATION' AND d.source_entity_type = 'COMPARE_EXPLANATION'
+                  AND EXISTS (SELECT 1 FROM fgc.compare_explanation e
+                    WHERE e.compare_explanation_id = d.source_entity_id AND e.agent_id = :agentId)
                 """);
         query.setParameter("documentNo", documentNo).setParameter("version", version)
                 .setParameter("agentId", agentId);

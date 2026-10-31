@@ -244,6 +244,8 @@ public enum FgcErrorCode {
             "error.ai.unavailable"
     ),
 
+    // IF-API-73 환수 통지서: 계산판(FUN-055)이 없는 case는 통지서를 만들 수 없다.
+    CLAW_001("FGC-CLAW-001", HttpStatus.UNPROCESSABLE_ENTITY, "error.clawback.notCalculated"),
     POL_001("FGC-POL-001", HttpStatus.CONFLICT, "error.policy.selfApproval"),
     POL_002("FGC-POL-002", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.overlap"),
     POL_003("FGC-POL-003", HttpStatus.CONFLICT, "error.policy.stateChanged"),

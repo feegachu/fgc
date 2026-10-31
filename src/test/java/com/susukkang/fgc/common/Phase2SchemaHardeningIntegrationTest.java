@@ -200,16 +200,38 @@ class Phase2SchemaHardeningIntegrationTest {
         try (var conn = connect()) {
             conn.setAutoCommit(false);
             try {
-                long notice = insertDocument(conn, "KIND-NOTICE", "CLAWBACK_NOTICE");
+                insertCalculatedCase(conn, "KIND");
+                long notice = insertNotice(conn, "KIND-NOTICE", "KIND-CASE", 1, 1);
                 long confirmation = insertDocument(conn, "KIND-CONFIRM", "COMPARE_CONFIRMATION");
                 assertRejected(conn, receiptSql(notice), "must reference a COMPARE_CONFIRMATION document");
                 execute(conn, receiptSql(confirmation));
-                execute(conn, """
-                        INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no)
-                        SELECT (SELECT min(contract_id) FROM fgc.insurance_contract),
-                               (SELECT min(policy_version_id) FROM fgc.policy_version), 'KIND-CASE'""");
                 assertRejected(conn, noticeSql(confirmation), "must reference a CLAWBACK_NOTICE document");
                 execute(conn, noticeSql(notice));
+            } finally {
+                conn.rollback();
+            }
+        }
+    }
+
+    /** V75(#671): 통지서 판은 실제 계산판에서만, case별 고정 문서번호로, 판 번호를 건너뛰지 않고 쌓는다. */
+    @Test
+    void clawbackNoticeMustFollowItsCaseCalculationAndVersionSequence() throws Exception {
+        try (var conn = connect()) {
+            conn.setAutoCommit(false);
+            try {
+                insertCalculatedCase(conn, "SEQ-A");
+                insertCalculatedCase(conn, "SEQ-B");
+                assertRejected(conn, """
+                        INSERT INTO fgc.generated_document(document_no, document_kind, source_entity_type, source_entity_id,
+                                                           storage_key, content_hash, created_by)
+                        SELECT 'SEQ-X', 'CLAWBACK_NOTICE', 'TEST', 1, 'key', 'hash', min(user_id) FROM fgc.app_user""",
+                        "must reference a CLAWBACK_CASE calculation version");
+                assertRejected(conn, noticeDocumentSql("SEQ-A-DOC", "SEQ-A-CASE", 2, 1), "references missing calculation");
+                insertNotice(conn, "SEQ-A-DOC", "SEQ-A-CASE", 1, 1);
+                assertRejected(conn, noticeDocumentSql("SEQ-A-DOC", "SEQ-A-CASE", 1, 3), "must be the next version");
+                assertRejected(conn, noticeDocumentSql("SEQ-A-OTHER", "SEQ-A-CASE", 1, 1), "must stay fixed");
+                assertRejected(conn, noticeDocumentSql("SEQ-A-DOC", "SEQ-B-CASE", 1, 2), "must stay fixed");
+                insertNotice(conn, "SEQ-A-DOC", "SEQ-A-CASE", 1, 2);
             } finally {
                 conn.rollback();
             }
@@ -238,7 +260,8 @@ class Phase2SchemaHardeningIntegrationTest {
                 // 최근 PDF 연결은 내용 변경이 아니므로 판을 올리지 않아도 된다
                 long pdf = insertDocument(conn, "VER-PDF", "COMPARE_CONFIRMATION");
                 execute(conn, "UPDATE fgc.compare_explanation SET generated_document_id = " + pdf);
-                long notice = insertDocument(conn, "VER-NOTICE", "CLAWBACK_NOTICE");
+                insertCalculatedCase(conn, "VER");
+                long notice = insertNotice(conn, "VER-NOTICE", "VER-CASE", 1, 1);
                 assertRejected(conn, "UPDATE fgc.compare_explanation SET generated_document_id = " + notice,
                         "must reference a COMPARE_CONFIRMATION document");
             } finally {
@@ -308,6 +331,55 @@ class Phase2SchemaHardeningIntegrationTest {
                 INSERT INTO fgc.compare_confirmation_receipt(generated_document_id, received_on, receipt_confirmed_by,
                                                              paper_storage_ref)
                 SELECT %d, DATE '2026-09-01', min(user_id), 'ref' FROM fgc.app_user""".formatted(documentId);
+    }
+
+    /** 실효 사건 → 후보 → case({prefix}-CASE) → 계산판 1판. 통지서가 가리킬 실제 계산판을 만든다. */
+    private static void insertCalculatedCase(Connection conn, String prefix) throws SQLException {
+        execute(conn, """
+                INSERT INTO fgc.insurance_contract(insurer_id, product_offering_id, contract_no, contract_date, agent_id,
+                    organization_id, premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium,
+                    payment_term_months)
+                SELECT insurer_id, product_offering_id, '%1$s-CONTRACT', DATE '2026-01-01', agent_id, organization_id,
+                       premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium, payment_term_months
+                  FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1""".formatted(prefix));
+        execute(conn, """
+                INSERT INTO fgc.contract_status_event(contract_id, event_seq, new_status, effective_at, received_at,
+                                                      source_system, source_event_key)
+                SELECT contract_id, 1, 'LAPSED', TIMESTAMPTZ '2026-04-01T00:00:00+09:00', now(), 'TEST-671', '%1$s'
+                  FROM fgc.insurance_contract WHERE contract_no = '%1$s-CONTRACT'""".formatted(prefix));
+        execute(conn, """
+                INSERT INTO fgc.clawback_candidate(contract_id, trigger_type, status_event_id, source_version, event_date)
+                SELECT contract_id, 'STATUS_EVENT', contract_status_event_id, 'v', DATE '2026-04-01'
+                  FROM fgc.contract_status_event WHERE source_system = 'TEST-671' AND source_event_key = '%1$s'"""
+                .formatted(prefix));
+        execute(conn, """
+                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no, candidate_id)
+                SELECT c.contract_id, (SELECT min(policy_version_id) FROM fgc.policy_version), '%1$s-CASE', c.candidate_id
+                  FROM fgc.clawback_candidate c JOIN fgc.contract_status_event e
+                    ON e.contract_status_event_id = c.status_event_id
+                 WHERE e.source_system = 'TEST-671' AND e.source_event_key = '%1$s'""".formatted(prefix));
+        execute(conn, """
+                INSERT INTO fgc.clawback_calculation(clawback_case_id, candidate_id, version_no, source_version,
+                    policy_version_id, calc_rule_version, elapsed_months, amount, reason, result_snapshot, calculated_by)
+                SELECT clawback_case_id, candidate_id, 1, 'v', policy_version_id, 'claw-calc-v1', 3, 0, 'test', '{}',
+                       (SELECT min(user_id) FROM fgc.app_user)
+                  FROM fgc.clawback_case WHERE case_no = '%1$s-CASE'""".formatted(prefix));
+    }
+
+    private static long insertNotice(Connection conn, String documentNo, String caseNo, int calculationVersion,
+                                     int versionNo) throws SQLException {
+        execute(conn, noticeDocumentSql(documentNo, caseNo, calculationVersion, versionNo));
+        return scalar(conn, "SELECT generated_document_id FROM fgc.generated_document WHERE document_no = '"
+                + documentNo + "' AND version_no = " + versionNo);
+    }
+
+    private static String noticeDocumentSql(String documentNo, String caseNo, int calculationVersion, int versionNo) {
+        return """
+                INSERT INTO fgc.generated_document(document_no, version_no, document_kind, source_entity_type,
+                                                   source_entity_id, source_version_no, storage_key, content_hash, created_by)
+                SELECT '%s', %d, 'CLAWBACK_NOTICE', 'CLAWBACK_CASE', clawback_case_id, %d, 'key', 'hash',
+                       (SELECT min(user_id) FROM fgc.app_user)
+                  FROM fgc.clawback_case WHERE case_no = '%s'""".formatted(documentNo, versionNo, calculationVersion, caseNo);
     }
 
     private static String noticeSql(long documentId) {

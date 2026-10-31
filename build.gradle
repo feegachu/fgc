@@ -73,6 +73,9 @@ dependencies {
     // Swagger / OpenAPI - Spring Boot 3용
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
 
+    // 환수 통지서 PDF(FUN-084, #671). 한글은 resources/fonts 의 NanumGothic(OFL)을 서브셋으로 임베드한다.
+    implementation 'org.apache.pdfbox:pdfbox:3.0.8'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
