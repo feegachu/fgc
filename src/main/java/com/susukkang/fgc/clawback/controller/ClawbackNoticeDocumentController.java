@@ -44,7 +44,9 @@ public class ClawbackNoticeDocumentController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "201", description = "발행한 문서 판", useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "계산판·원천 버전 변경 또는 멱등키 충돌")
+                    responseCode = "409", description = "계산판·원천 버전 변경 또는 멱등키 충돌"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "422", description = "FGC-CLAW-001 환수액 미계산(계산판 없음)")
     })
     public ResponseEntity<ApiResponse<ClawbackNoticeDocumentResponse>> issue(
             @PathVariable long id,

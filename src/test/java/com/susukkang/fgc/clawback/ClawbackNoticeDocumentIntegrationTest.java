@@ -20,7 +20,9 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,17 +33,32 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
@@ -54,7 +71,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** CT-W02 / IF-API-73·86·67A: 실제 PostgreSQL과 비공개 볼륨에서 발행판·멱등·낡은 요청·권한·파일 증빙을 검증한다. */
+/** FGC-FUN-084 CT-W02 / IF-API-73·86·67A: 실제 PostgreSQL과 비공개 볼륨에서 발행판·멱등·낡은 요청·동시 요청·권한·파일 증빙을 검증한다. */
+@DisplayName("FGC-FUN-084 환수 통지서 PDF 발행·이력·다운로드")
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_clawback_671?currentSchema=fgc",
         "fgc.storage.root=build/tmp/fgc-storage-671"})
@@ -71,6 +89,8 @@ class ClawbackNoticeDocumentIntegrationTest {
     @Autowired private AgentDataScopeService scope;
     @Autowired private FgcUserDetailsService users;
     @Autowired private FileStorageProperties storageProperties;
+    @Autowired private DataSource dataSource;
+    @Autowired private PlatformTransactionManager transactionManager;
     @MockitoSpyBean private ClawbackNoticePdfRenderer renderer;
     private long contractId;
     private String contractNo;
@@ -255,6 +275,134 @@ class ClawbackNoticeDocumentIntegrationTest {
         String documentNo = "CLN-" + calc.caseId();
         assertThatThrownBy(() -> scope.requireDocument(documentNo, 1))
                 .isInstanceOf(FgcBusinessException.class);
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-084 계산판이 없는 case는 422 FGC-CLAW-001이고 판을 만들지 않는다")
+    void uncalculatedCaseIsRejectedAsNotCalculated() throws Exception {
+        long caseId = jdbc.queryForObject("""
+                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no)
+                VALUES (?, (SELECT min(policy_version_id) FROM fgc.policy_version), ?) RETURNING clawback_case_id
+                """, Long.class, contractId, "C671-" + UUID.randomUUID());
+
+        assertThatThrownBy(() -> notices.issue(caseId, request(1, "source-v1"), key(), settlementUser))
+                .isInstanceOfSatisfying(FgcBusinessException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.CLAW_001);
+                    assertThat(e.getField()).isEqualTo("calculationVersion");
+                });
+        mvc.perform(post("/api/v1/clawbacks/{id}/notice-documents", caseId).with(user(insertUser("SETTLEMENT")))
+                        .with(csrf()).header("Idempotency-Key", key()).contentType(APPLICATION_JSON)
+                        .content("{\"calculationVersion\":1,\"expectedSourceVersion\":\"source-v1\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("FGC-CLAW-001"));
+        mvc.perform(post("/api/v1/clawbacks/{id}/notice-documents", 999_999_999L).with(user(insertUser("SETTLEMENT")))
+                        .with(csrf()).header("Idempotency-Key", key()).contentType(APPLICATION_JSON)
+                        .content("{\"calculationVersion\":1,\"expectedSourceVersion\":\"source-v1\"}"))
+                .andExpect(status().isNotFound());
+        assertThat(noticeCount(caseId)).isZero();
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-084 snapshot에 소수 금액이 있으면 반올림으로 가리지 않고 렌더링이 실패한다")
+    void fractionalSnapshotAmountsFailRendering() {
+        var line = new ClawbackNoticePdfRenderer.Line("기본수수료", 1, new BigDecimal("1000.5"), new BigDecimal("50"),
+                new BigDecimal("500"));
+        var notice = new ClawbackNoticePdfRenderer.Notice("CLN-1", 1, OffsetDateTime.now(), "C-1", "보험사", "상품",
+                "A-1", "설계사", "계약 실효", LocalDate.of(2026, 4, 1), LocalDate.of(2026, 1, 1), "정책", 1,
+                OffsetDateTime.now(), 3, "HALF_UP", List.of(line), new BigDecimal("500"));
+        assertThatThrownBy(() -> renderer.render(notice)).isInstanceOf(ArithmeticException.class);
+    }
+
+    @Test
+    @DisplayName("FGC-FUN-084 같은 키 요청이 처리 중이면 409 REQUEST_IN_PROGRESS이고 판을 만들지 않는다")
+    void sameKeyInProgressIsRejected() throws Exception {
+        Calculated calc = calculated("1000", "100");
+        String key = key();
+        try (Connection other = dataSource.getConnection()) {
+            other.setAutoCommit(false);
+            try (PreparedStatement lock = other.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+                lock.setString(1, "clawback-notice-request:" + key);
+                lock.execute();
+            }
+            assertThatThrownBy(() -> notices.issue(calc.caseId(), request(1, calc.sourceVersion()), key, settlementUser))
+                    .isInstanceOfSatisfying(FgcBusinessException.class,
+                            e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS));
+            other.rollback();
+        }
+        assertThat(noticeCount(calc.caseId())).isZero();
+    }
+
+    @Test
+    @Timeout(60)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("FGC-FUN-084 같은 case에 다른 키로 동시에 발행하면 1판·2판이 빈틈없이 쌓인다")
+    void concurrentIssuesWithDifferentKeysAppendConsecutiveVersions() throws Exception {
+        Calculated calc = calculated("1000", "100");
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            Callable<Integer> task = () -> {
+                ready.countDown();
+                assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
+                return notices.issue(calc.caseId(), request(1, calc.sourceVersion()), key(), settlementUser).version();
+            };
+            var first = workers.submit(task);
+            var second = workers.submit(task);
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(1, 2);
+        }
+        assertThat(jdbc.queryForList("SELECT version_no FROM fgc.generated_document WHERE document_no=? ORDER BY version_no",
+                Integer.class, "CLN-" + calc.caseId())).containsExactly(1, 2);
+    }
+
+    @Test
+    @Timeout(60)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("FGC-FUN-084 재계산(IF85)이 case를 잡고 있으면 발행은 기다렸다가 낡은 판 요청으로 409가 된다")
+    void issueWaitsForAConcurrentRecalculationAndRejectsTheOldVersion() throws Exception {
+        // 정책 후보도 원천 버전에 들어가므로 두 번째 정책을 먼저 만든 뒤 1판을 계산한다.
+        long otherPolicy = policy("C671-" + UUID.randomUUID(), "50");
+        Calculated calc = calculated("1000", "100");
+        var calculated = new CountDownLatch(1);
+        var commit = new CountDownLatch(1);
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            // 다른 정책으로 다시 계산하면 같은 원천이라도 2판이 쌓인다. 커밋 전까지 case 행 잠금을 쥐고 있다.
+            var recalculation = workers.submit(() -> new TransactionTemplate(transactionManager).execute(tx -> {
+                var result = calculation.calculate(calc.candidateId(),
+                        new ClawbackCalculationRequest(calc.sourceVersion(), otherPolicy, "동시 재계산"), key(), settlementUser);
+                calculated.countDown();
+                try { assertThat(commit.await(15, TimeUnit.SECONDS)).isTrue(); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                return result.calculationVersion();
+            }));
+            try {
+                // 재계산이 먼저 실패하면 그 원인을 그대로 드러낸다.
+                if (!calculated.await(15, TimeUnit.SECONDS)) recalculation.get(1, TimeUnit.SECONDS);
+                var issue = workers.submit(() ->
+                        notices.issue(calc.caseId(), request(1, calc.sourceVersion()), key(), settlementUser));
+                await().alias("발행이 재계산의 case 행 잠금을 기다린다")
+                        .pollInterval(Duration.ofMillis(10)).atMost(Duration.ofSeconds(10))
+                        .until(() -> Boolean.TRUE.equals(jdbc.queryForObject(
+                                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE NOT granted)", Boolean.class)));
+                assertThat(issue.isDone()).isFalse();
+                commit.countDown();
+                assertThat(recalculation.get(15, TimeUnit.SECONDS)).isEqualTo(2);
+                assertThatThrownBy(() -> issue.get(15, TimeUnit.SECONDS))
+                        .isInstanceOf(ExecutionException.class)
+                        .cause().isInstanceOfSatisfying(FgcBusinessException.class,
+                                e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_STATE_CHANGED));
+            } finally {
+                commit.countDown();
+            }
+        }
+        assertThat(noticeCount(calc.caseId())).isZero();
+    }
+
+    private long noticeCount(long caseId) {
+        return jdbc.queryForObject("SELECT count(*) FROM fgc.generated_document WHERE source_entity_id=? "
+                + "AND document_kind='CLAWBACK_NOTICE'", Long.class, caseId);
     }
 
     private record Calculated(long candidateId, long caseId, String sourceVersion, long policyId, String policyCode) { }

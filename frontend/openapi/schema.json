@@ -9547,6 +9547,16 @@
               }
             },
             "description" : "계산판·원천 버전 변경 또는 멱등키 충돌"
+          },
+          "422" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClawbackNoticeDocumentResponse"
+                }
+              }
+            },
+            "description" : "FGC-CLAW-001 환수액 미계산(계산판 없음)"
           }
         },
         "summary" : "IF-API-73 환수 통지서 PDF 발행",

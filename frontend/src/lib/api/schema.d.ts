@@ -5878,6 +5878,15 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseClawbackNoticeDocumentResponse"];
                 };
             };
+            /** @description FGC-CLAW-001 환수액 미계산(계산판 없음) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseClawbackNoticeDocumentResponse"];
+                };
+            };
         };
     };
     getContractListByCondition: {

@@ -96,7 +96,7 @@ public class ClawbackNoticeDocumentService {
     }
 
     /**
-     * 발행 직전 신선도 검사. 낡았으면 409 FGC-IMPL-STATE_CHANGED로 멈추고 새 판을 만들지 않는다.
+     * 발행 직전 검사. 계산판이 없으면 422 FGC-CLAW-001, 낡았으면 409 FGC-IMPL-STATE_CHANGED로 멈추고 새 판을 만들지 않는다.
      *
      * @param request              화면이 본 계산판(calculationVersion)과 원천 버전(expectedSourceVersion)
      * @param latest               case의 최신 계산판. 계산한 적이 없으면 null
@@ -104,9 +104,13 @@ public class ClawbackNoticeDocumentService {
      */
     private static void ensureFresh(ClawbackNoticeDocumentRequest request, LatestCalculation latest,
                                     String currentSourceVersion) {
-        // 화면이 본 판이 case의 최신 판이어야 한다. 계산 전이거나 그 사이 새 판이 쌓였으면 낡았다.
-        if (latest == null || latest.versionNo() != request.calculationVersion()) {
-            throw stale("calculationVersion", latest == null ? null : latest.versionNo());
+        // 계산 전이면 '다시 조회'가 아니라 '환수 계산 먼저'를 안내해야 하므로 낡음(409)과 따로 낸다.
+        if (latest == null) {
+            throw new FgcBusinessException(FgcErrorCode.CLAW_001, "calculationVersion", Map.of(), null);
+        }
+        // 화면이 본 판이 case의 최신 판이어야 한다. 그 사이 새 판이 쌓였으면 낡았다.
+        if (latest.versionNo() != request.calculationVersion()) {
+            throw stale("calculationVersion", latest.versionNo());
         }
         // 그 판을 만든 원천이 화면이 본 원천과 같아야 한다.
         if (!latest.sourceVersion().equals(request.expectedSourceVersion())) {

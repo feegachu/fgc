@@ -36,10 +36,9 @@ public class PrivateVolumeFileStorage implements FileStorage {
     }
 
     private void prepareRoot() throws IOException {
-        // 심볼릭 링크를 따라 다른 볼륨·웹 루트로 저장하거나 삭제하지 않는다.
-        for (Path current = root; current != null; current = current.getParent()) {
-            if (Files.isSymbolicLink(current)) throw new IOException("저장소 링크 경로는 허용하지 않습니다");
-        }
+        // 저장소 디렉터리 자체가 링크면 다른 볼륨·웹 루트로 저장하거나 삭제할 수 있으므로 거절한다.
+        // 조상 경로는 운영자가 정한 설정이며 macOS /var처럼 OS가 링크로 두기도 하므로 검사하지 않는다.
+        if (Files.isSymbolicLink(root)) throw new IOException("저장소 링크 경로는 허용하지 않습니다");
         Files.createDirectories(root);
         if (Files.getFileStore(root).supportsFileAttributeView("posix")) {
             Files.setPosixFilePermissions(root, PosixFilePermissions.fromString("rwx------"));

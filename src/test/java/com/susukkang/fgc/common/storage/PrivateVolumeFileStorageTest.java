@@ -55,6 +55,22 @@ class PrivateVolumeFileStorageTest {
         assertThat(Files.readAllBytes(outside)).containsExactly(9);
     }
 
+    @Test void refusesALinkedRootButAllowsLinkedAncestors() throws Exception {
+        assumeTrue(Files.getFileStore(temp).supportsFileAttributeView("posix"));
+        Path real = Files.createDirectory(temp.resolve("real"));
+        Path linkedParent = Files.createSymbolicLink(temp.resolve("linked-parent"), real);
+        var throughAncestor = new PrivateVolumeFileStorage(new FileStorageProperties(linkedParent.resolve("volume"), 1024));
+        String key = throughAncestor.store(new byte[]{7});
+        try (var stream = throughAncestor.open(key)) {
+            assertThat(stream.readAllBytes()).containsExactly(7);
+        }
+
+        Path linkedRoot = Files.createSymbolicLink(temp.resolve("linked-root"), real.resolve("volume"));
+        var storage = new PrivateVolumeFileStorage(new FileStorageProperties(linkedRoot, 1024));
+        assertThatThrownBy(() -> storage.open(key)).isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> storage.store(new byte[]{1})).isInstanceOf(IOException.class);
+    }
+
     @Test void ownerOnlyNonExecutableOnWindowsAcl() throws Exception {
         assumeTrue(Files.getFileStore(temp).supportsFileAttributeView("acl"));
         var root = temp.resolve("volume");
