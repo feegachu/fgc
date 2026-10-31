@@ -362,15 +362,41 @@ class Phase2SchemaMigrationIntegrationTest {
                 INSERT INTO fgc.intake_document(original_file_name, storage_key, media_type, file_size_bytes, content_hash,
                                                 uploaded_by)
                 SELECT 'test.pdf', 'test-key', 'application/pdf', 1, 'test-hash-guard', min(user_id) FROM fgc.app_user""");
+        // V75(#671): 통지서 판은 실제 case의 계산판을 가리켜야 한다. 실효 사건 → 후보 → case → 계산판 1판을 만든다.
+        execute(conn, """
+                INSERT INTO fgc.insurance_contract(insurer_id, product_offering_id, contract_no, contract_date, agent_id,
+                    organization_id, premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium,
+                    payment_term_months)
+                SELECT insurer_id, product_offering_id, 'TEST-CONTRACT', DATE '2026-01-01', agent_id, organization_id,
+                       premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium, payment_term_months
+                  FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1""");
+        execute(conn, """
+                INSERT INTO fgc.contract_status_event(contract_id, event_seq, new_status, effective_at, received_at,
+                                                      source_system, source_event_key)
+                SELECT contract_id, 1, 'LAPSED', TIMESTAMPTZ '2026-04-01T00:00:00+09:00', now(), 'TEST-671', 'TEST-EVENT'
+                  FROM fgc.insurance_contract WHERE contract_no = 'TEST-CONTRACT'""");
+        execute(conn, """
+                INSERT INTO fgc.clawback_candidate(contract_id, trigger_type, status_event_id, source_version, event_date)
+                SELECT contract_id, 'STATUS_EVENT', contract_status_event_id, 'v', DATE '2026-04-01'
+                  FROM fgc.contract_status_event WHERE source_system = 'TEST-671' AND source_event_key = 'TEST-EVENT'""");
+        execute(conn, """
+                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no, candidate_id)
+                SELECT contract_id, (SELECT min(policy_version_id) FROM fgc.policy_version), 'TEST-CASE', candidate_id
+                  FROM fgc.clawback_candidate WHERE status_event_id =
+                       (SELECT contract_status_event_id FROM fgc.contract_status_event
+                         WHERE source_system = 'TEST-671' AND source_event_key = 'TEST-EVENT')""");
+        execute(conn, """
+                INSERT INTO fgc.clawback_calculation(clawback_case_id, candidate_id, version_no, source_version,
+                    policy_version_id, calc_rule_version, elapsed_months, amount, reason, result_snapshot, calculated_by)
+                SELECT clawback_case_id, candidate_id, 1, 'v', policy_version_id, 'claw-calc-v1', 3, 0, 'test', '{}',
+                       (SELECT min(user_id) FROM fgc.app_user)
+                  FROM fgc.clawback_case WHERE case_no = 'TEST-CASE'""");
         execute(conn, """
                 INSERT INTO fgc.generated_document(document_no, document_kind, source_entity_type, source_entity_id,
-                                                   storage_key, content_hash, created_by)
-                SELECT 'TEST-DOC', 'CLAWBACK_NOTICE', 'CLAWBACK_CASE', 1, 'doc-key', 'doc-hash', min(user_id)
-                FROM fgc.app_user""");
-        execute(conn, """
-                INSERT INTO fgc.clawback_case(contract_id, policy_version_id, case_no)
-                SELECT (SELECT min(contract_id) FROM fgc.insurance_contract),
-                       (SELECT min(policy_version_id) FROM fgc.policy_version), 'TEST-CASE'""");
+                                                   source_version_no, storage_key, content_hash, created_by)
+                SELECT 'TEST-DOC', 'CLAWBACK_NOTICE', 'CLAWBACK_CASE', clawback_case_id, 1, 'doc-key', 'doc-hash',
+                       (SELECT min(user_id) FROM fgc.app_user)
+                  FROM fgc.clawback_case WHERE case_no = 'TEST-CASE'""");
     }
 
     private void insertDraftRow(Connection conn, int rowNo, String status) throws SQLException {
