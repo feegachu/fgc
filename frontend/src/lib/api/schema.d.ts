@@ -3874,7 +3874,7 @@ export interface components {
         /** @description 정책 초안. 빈 규칙 목록을 저장할 수 있으며 제출 검증은 별도 동작이다. */
         PolicyDraft: {
             basicDocumentVersion?: string;
-            /** @description 환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다. */
+            /** @description CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다. */
             clawbackRules: components["schemas"]["ClawbackRuleDraft"][];
             commissionRules: components["schemas"]["CommissionRuleDraft"][];
             /** Format: date */

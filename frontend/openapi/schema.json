@@ -5868,7 +5868,7 @@
             "type" : "string"
           },
           "clawbackRules" : {
-            "description" : "환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다.",
+            "description" : "CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다.",
             "items" : {
               "$ref" : "#/components/schemas/ClawbackRuleDraft"
             },

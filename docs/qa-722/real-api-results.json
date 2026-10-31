@@ -1,0 +1,37 @@
+{
+  "environment": "disposable local HTTP + PostgreSQL 17 + Chromium",
+  "baseCommit": "224d4374",
+  "issue": 722,
+  "cases": [
+    {
+      "seconds": "62.843",
+      "failed": false,
+      "name": "POL-W01 CT-P01 환수 등록·타 사용자 승인·활성화·복제와 원본 보존"
+    },
+    {
+      "seconds": "30.438",
+      "failed": false,
+      "name": "POL-W01 CT-P02 실제 422 필드 이동·입력 보존·중복 클릭 잠금·편집 취소"
+    },
+    {
+      "seconds": "37.155",
+      "failed": false,
+      "name": "POL-W01 조회 로딩·0건·403·서버 실패·재시도 표시 (응답 장애 주입)"
+    },
+    {
+      "seconds": "59.109",
+      "failed": false,
+      "name": "POL-W01 실제 409 입력 보존·최신 조회와 응답 유실 재시도·401 복구"
+    },
+    {
+      "seconds": "32.718",
+      "failed": false,
+      "name": "POL-W01 CT-P02 실제 제출 근거 누락은 초안의 근거 필드로 이동"
+    }
+  ],
+  "supplemental": {
+    "seconds": "40.714",
+    "scenario": "loading, stale response ignored, filter reset, empty/403/500/retry",
+    "passed": true
+  }
+}

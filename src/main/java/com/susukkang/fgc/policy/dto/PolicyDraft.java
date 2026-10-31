@@ -47,7 +47,7 @@ public record PolicyDraft(
         @NotNull List<@NotNull @Valid CommissionRuleDraft> commissionRules,
         @NotNull List<@NotNull @Valid FeeRegimeRuleDraft> feeRegimeRules,
         @NotNull List<@NotNull @Valid ParameterDraft> parameters,
-        @Schema(description = "환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다.")
+        @Schema(description = "CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다.")
         @NotNull List<@NotNull @Valid ClawbackRuleDraft> clawbackRules,
         @Schema(description = "수정 요청의 조회 시점 updatedAt. 최초 생성에서는 지정하지 않는다.")
         OffsetDateTime expectedUpdatedAt

@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-31",
+  "baseCommit": "64672319cf28f00103e0b525df0586124489ecfe",
+  "purpose": "Match cross-policy clawback overlap checks to insurer/offering selection; isolate SQL lock tests",
+  "command": ".\\gradlew.bat test --tests '*PolicyWorkflowIntegrationTest' --tests '*ClawbackPolicyLockIntegrationTest' --tests '*CompareRankingIntegrationTest' --console=plain",
+  "tests": 50,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suites": [
+    {
+      "suite": "com.susukkang.fgc.compare.CompareRankingIntegrationTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.controller.PolicyWorkflowIntegrationTest",
+      "tests": 41,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.repository.ClawbackPolicyLockIntegrationTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}

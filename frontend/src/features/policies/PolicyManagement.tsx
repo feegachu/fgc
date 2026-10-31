@@ -1,4 +1,5 @@
 import { useContext, useRef, useState } from 'react'
+import { ApiError } from '../../lib/api/client'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { Field } from '../../components/Field'
@@ -61,6 +62,7 @@ export function PolicyManagement({
 }) {
   const { user } = useAuth()
   const [editing, setEditing] = useState(false)
+  const [problem, setProblem] = useState<{ field: string; message: string }>()
   const [action, setAction] = useState<PolicyAction | null>(null)
   const [panel, setPanel] = useState<(typeof panels)[number]['id']>(initialPanel)
   const draft = detail.editDocument
@@ -247,10 +249,15 @@ export function PolicyManagement({
       {editing && draft && (
         <PolicyDraftEditor
           initial={draft}
+          initialProblem={problem}
           policyId={policy.policyVersionId}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false)
+            setProblem(undefined)
+          }}
           onSaved={(id) => {
             setEditing(false)
+            setProblem(undefined)
             onSaved(id)
           }}
         />
@@ -261,6 +268,11 @@ export function PolicyManagement({
           detail={detail}
           action={action}
           onClose={() => setAction(null)}
+          onInvalid={(field, message) => {
+            setProblem({ field, message })
+            setAction(null)
+            setEditing(true)
+          }}
           onSaved={(id) => {
             setAction(null)
             onSaved(id)
@@ -552,12 +564,14 @@ function PolicyActionDialog({
   action,
   onClose,
   onSaved,
+  onInvalid,
 }: {
   policy: Policy
   detail: ManagedPolicyDetail
   action: PolicyAction
   onClose: () => void
   onSaved: (id: number) => void
+  onInvalid: (field: string, message: string) => void
 }) {
   const preview = useContext(PolicyPreviewContext)
   const [reason, setReason] = useState('')
@@ -617,6 +631,13 @@ function PolicyActionDialog({
       onSaved(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
+      if (
+        action === 'SUBMIT' &&
+        cause instanceof ApiError &&
+        cause.field &&
+        (cause.status === 400 || cause.status === 422)
+      )
+        onInvalid(cause.field, cause.message)
     } finally {
       saving.current = false
       setBusy(false)
