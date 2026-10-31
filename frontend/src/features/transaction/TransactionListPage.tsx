@@ -21,6 +21,7 @@ import { withMonth } from '../../stores/workspace'
 import { useInsurers } from '../base/api'
 import type { Insurer } from '../base/api'
 import {
+  effectiveFilters,
   filterParams,
   listError,
   readFilters,
@@ -40,8 +41,12 @@ export default function TransactionListPage() {
   const location = useLocation()
   const returnTo = location.pathname + location.search
   const [params, setParams] = useSearchParams()
-  const filters = readFilters(params)
-  const search = useQuery(transactionListQuery(filters))
+  const filters = effectiveFilters(params, month)
+  const search = useQuery({
+    ...transactionListQuery(filters),
+    // 셸이 기준 정산월을 정하기 전에는 표시와 다른 전체월 조회가 먼저 나가지 않게 기다린다.
+    enabled: params.has('settlementMonth') || month != null,
+  })
   const queryClient = useQueryClient()
   const [deleteTarget, setDeleteTarget] = useState<PaymentRow | null>(null)
   const deletion = useMutation({
@@ -299,7 +304,7 @@ export default function TransactionListPage() {
       </header>
       <TransactionFilters
         key={`${params.toString()}|${month}`}
-        initial={{ ...filters, settlementMonth: params.has('settlementMonth') ? filters.settlementMonth : month || '' }}
+        initial={filters}
         known={known}
         insurers={insurers.data?.content ?? []}
         insurersLoading={insurers.isPending}
