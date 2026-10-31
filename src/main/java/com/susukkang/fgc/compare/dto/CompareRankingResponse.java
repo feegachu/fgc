@@ -1,5 +1,7 @@
 package com.susukkang.fgc.compare.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -38,6 +40,8 @@ public record CompareRankingResponse(
     public record Excluded(long offeringId, String insurer, String product, List<String> reasonCodes) {
     }
 
+    /** OpenAPI 스키마 이름이 검증 실행 상세의 CapSummary와 겹치지 않게 따로 둔다(springdoc은 단순 클래스명을 쓴다). */
+    @Schema(name = "CompareCapSummary")
     public record CapSummary(Double usagePct, String status, int contractCount) {
     }
 
