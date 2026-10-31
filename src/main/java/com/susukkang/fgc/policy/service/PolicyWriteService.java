@@ -54,7 +54,8 @@ public class PolicyWriteService {
     private static final Set<String> APPROVERS = Set.of(Roles.GA_ADMIN, Roles.SYSTEM_ADMIN);
     private static final Set<PolicyType> WRITABLE_TYPES = Set.of(PolicyType.CURRENT_COMMISSION,
             PolicyType.FOUR_YEAR_COMMISSION, PolicyType.SEVEN_YEAR_COMMISSION,
-            PolicyType.SCHEDULE_ELIGIBILITY, PolicyType.ARBITRAGE, PolicyType.RECONCILIATION_TOLERANCE);
+            PolicyType.SCHEDULE_ELIGIBILITY, PolicyType.ARBITRAGE, PolicyType.RECONCILIATION_TOLERANCE,
+            PolicyType.CLAWBACK);
     private static final Pattern REFERENCE = Pattern.compile("^(REG-\\d{2}[A-Z]?|SRC-\\d{3})(?:\\s++\\S.*)?$");
     private static final String ACTION_CLONE = "CLONE";
     private static final String FIELD_POLICY_TYPE = "policyType";
@@ -97,7 +98,8 @@ public class PolicyWriteService {
                 throw invalid("policyCode", "정책 코드는 최초 생성 이후 변경할 수 없습니다.");
             }
             if (!writeRepository.verifyChildOwnership(id, draft)) {
-                throw invalid("commissionRules", "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
+                throw invalid(draft.clawbackRules().isEmpty() ? "commissionRules" : "clawbackRules",
+                        "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
             }
             if (writeRepository.hasUnsupportedChildren(id)) {
                 throw invalid(FIELD_POLICY_TYPE, "전용 편집 계약이 없는 기존 규칙을 덮어쓸 수 없습니다.");
@@ -280,7 +282,8 @@ public class PolicyWriteService {
                     "ARBITRAGE_REFUND_ADDITION_MONTHS", "ARBITRAGE_REFUND_ADDITION_BOUNDARY_INCLUSIVE"));
             case RECONCILIATION_TOLERANCE -> parameterKeys(draft).containsAll(
                     Set.of("TOLERANCE_AMOUNT_KRW", "TOLERANCE_DAYS"));
-            // 전용 편집 계약이나 환수 D-02가 없는 유형을 빈 규칙으로 활성화하지 않는다.
+            case CLAWBACK -> !draft.clawbackRules().isEmpty();
+            // 전용 편집 계약이 없는 유형을 빈 규칙으로 활성화하지 않는다.
             default -> false;
         };
         if (!complete) {
@@ -458,7 +461,8 @@ public class PolicyWriteService {
 
     private static boolean hasChildIds(PolicyDraft draft) {
         return draft.commissionRules().stream().anyMatch(rule -> rule.commissionRuleId() != null)
-                || draft.feeRegimeRules().stream().anyMatch(rule -> rule.feeRegimeRulesetId() != null);
+                || draft.feeRegimeRules().stream().anyMatch(rule -> rule.feeRegimeRulesetId() != null)
+                || draft.clawbackRules().stream().anyMatch(rule -> rule.clawbackRuleId() != null);
     }
 
     private <T> void validate(T request) {

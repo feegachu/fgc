@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 외부 테스트 트랜잭션으로 감싸지 않아 실패 시 부분 커밋·멱등키 누락·동시성 오류를 드러낸다.
  * test 프로필의 일회성 DB에서 UUID 업무키와 독립 보험회사/항목을 사용한다.
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_policy_workflow_647?currentSchema=fgc")
 @AutoConfigureMockMvc
 class PolicyWorkflowIntegrationTest {
 
@@ -58,6 +58,7 @@ class PolicyWorkflowIntegrationTest {
     @MockitoBean(name = "policyClock") private Clock policyClock;
     @Autowired private FeeRegimeSchedulePolicyService schedulePolicies;
     @Autowired private FeeRegimeRulesetService limitPolicies;
+    @Autowired private com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService clawbackCapture;
 
     private FgcUserDetails writer;
     private FgcUserDetails systemWriter;
@@ -1107,6 +1108,247 @@ class PolicyWorkflowIntegrationTest {
         assertThat(review.commissionPolicy()).isNull();
         assertThat(review.selection().resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.COMMISSION_RULE_INVALID);
         assertThat(review.selection().resolution().candidateRulesetIds()).hasSize(1);
+    }
+
+    @Test
+    void clawbackWorkflowPreservesEditedIdsAndClonesApprovedRulesWithNewIdsAndHistory() throws Exception {
+        JsonNode created = create(clawbackDraft(), systemWriter);
+        long id = created.path("policyVersionId").asLong();
+        assertThat(values(created.path("allowedActions"))).contains("EDIT", "SUBMIT");
+        ObjectNode edit = (ObjectNode) detail(id, systemWriter).path("editDocument");
+        var identities = clawbackIdentities(id);
+        ObjectNode first = (ObjectNode) edit.path("clawbackRules").get(0);
+        ObjectNode second = (ObjectNode) edit.path("clawbackRules").get(1);
+        assertThat(first.path("clawbackRatePct").isTextual()).isTrue();
+        // 같은 ID를 유지하며 두 유일 구간을 한 PUT에서 맞바꾼다.
+        first.put("elapsedMonthFrom", 12).put("elapsedMonthTo", 1199).put("clawbackRatePct", "0.000000");
+        second.put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11).put("clawbackRatePct", "33.333333");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, systemWriter, key(), 200);
+        assertThat(clawbackIdentities(id)).isEqualTo(identities);
+        JsonNode review = action(id, "SUBMIT", updated, systemWriter, 200);
+        assertThat(actionError(id, "APPROVE", review, systemWriter, 409).path("code").asText())
+                .isEqualTo("FGC-POL-001");
+        edit.put("expectedUpdatedAt", review.path("updatedAt").asText());
+        writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, systemWriter, key(), 409);
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        JsonNode active = action(id, "ACTIVATE", approved, approver, 200);
+        assertThat(values(active.path("allowedActions"))).contains("CLONE");
+        edit.put("expectedUpdatedAt", active.path("updatedAt").asText());
+        writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, systemWriter, key(), 409);
+
+        assertClawbackClonePreservesOriginal(id, identities);
+        assertThat(detail(id, writer).path("approvalActions").findValuesAsText("actionType"))
+                .containsExactly("SUBMIT", "APPROVE", "ACTIVATE");
+        for (String action : List.of("CREATE", "UPDATE", "SUBMIT", "APPROVE", "ACTIVATE")) {
+            assertThat(auditCount(id, "POLICY_" + action)).isEqualTo(1);
+        }
+    }
+
+    private void assertClawbackClonePreservesOriginal(long id, List<java.util.Map<String, Object>> identities) throws Exception {
+        JsonNode originalRules = detail(id, writer).path("editDocument").path("clawbackRules");
+        JsonNode cloned = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2001-01-01"), writer, key(), 201);
+        long cloneId = cloned.path("policyVersionId").asLong();
+        assertThat(cloned.path("status").asText()).isEqualTo("DRAFT");
+        assertThat(cloned.path("approvedBy").isNull()).isTrue();
+        assertThat(cloned.path("approvedAt").isNull()).isTrue();
+        assertThat(count("policy_approval_action", cloneId)).isZero();
+        assertThat(count("policy_source_detail", cloneId)).isEqualTo(1);
+        ObjectNode clonedEdit = (ObjectNode) detail(cloneId, writer).path("editDocument");
+        for (JsonNode rule : clonedEdit.path("clawbackRules")) {
+            assertThat(identities).extracting(row -> row.get("clawback_rule_id"))
+                    .isNotEmpty()
+                    .doesNotContain(rule.path("clawbackRuleId").asLong());
+        }
+        ((ObjectNode) clonedEdit.path("clawbackRules").get(1)).put("clawbackRatePct", "25.000000");
+        write(HttpMethod.PUT, "/api/v1/policies/" + cloneId, clonedEdit, writer, key(), 200);
+        assertThat(detail(id, writer).path("editDocument").path("clawbackRules")).isEqualTo(originalRules);
+        assertThat(auditCount(cloneId, "POLICY_CLONE")).isEqualTo(1);
+    }
+
+    @Test
+    void clawbackOwnershipAndFailedChildWritePreserveOriginalDocumentAndAllowCorrectedRetry() throws Exception {
+        JsonNode created = create(clawbackDraft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode before = (ObjectNode) detail(id, writer).path("editDocument");
+        long otherId = create(clawbackDraft(), writer).path("policyVersionId").asLong();
+        long foreign = detail(otherId, writer).path("editDocument").path("clawbackRules").get(0)
+                .path("clawbackRuleId").asLong();
+        ObjectNode edit = before.deepCopy();
+        ((ObjectNode) edit.path("clawbackRules").get(0)).put("clawbackRuleId", foreign);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 400)
+                .path("field").asText()).isEqualTo("clawbackRules");
+        ObjectNode invalidCreate = clawbackDraft();
+        ((ObjectNode) invalidCreate.path("clawbackRules").get(0)).put("clawbackRuleId", foreign);
+        writeError(HttpMethod.POST, "/api/v1/policies", invalidCreate, writer, key(), 400);
+
+        edit = before.deepCopy().put("policyName", "실패 시 헤더도 롤백");
+        ((ObjectNode) edit.path("clawbackRules").get(1)).put("commissionItemId", Long.MAX_VALUE);
+        String retryKey = key();
+        MvcResult failed = perform(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, retryKey);
+        assertThat(failed.getResponse().getStatus()).isBetween(400, 499);
+        assertThat(detail(id, writer).path("editDocument")).isEqualTo(before);
+        assertThat(auditCount(id, "POLICY_UPDATE")).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_write_request WHERE idempotency_key = ?",
+                Integer.class, retryKey)).isZero();
+        ((ObjectNode) edit.path("clawbackRules").get(1)).put("commissionItemId", itemId);
+        JsonNode saved = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, retryKey, 200);
+        assertThat(write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, retryKey, 200)).isEqualTo(saved);
+        writeError(HttpMethod.PUT, "/api/v1/policies/" + id,
+                edit.deepCopy().put("policyName", "같은 키 다른 요청"), writer, retryKey, 409);
+        assertThat(count("clawback_rule", id)).isEqualTo(2);
+        assertThat(auditCount(id, "POLICY_UPDATE")).isEqualTo(1);
+    }
+
+    @Test
+    void clawbackSubmissionRejectsEmptyRulesAmbiguousBandsAndMismatchedOfferingInsurer() throws Exception {
+        ObjectNode draft = clawbackDraft();
+        draft.withArray("clawbackRules").removeAll();
+        JsonNode empty = create(draft, writer);
+        long id = empty.path("policyVersionId").asLong();
+        actionError(id, "SUBMIT", empty, writer, 400);
+        ObjectNode overlapping = clawbackDraft();
+        ((ObjectNode) overlapping.path("clawbackRules").get(1)).put("elapsedMonthFrom", 11);
+        JsonNode overlap = create(overlapping, writer);
+        long overlapId = overlap.path("policyVersionId").asLong();
+        assertThat(actionError(overlapId, "SUBMIT", overlap, writer, 422).path("code").asText())
+                .isEqualTo("FGC-POL-002");
+        assertThat(statusOf(overlapId)).isEqualTo("DRAFT");
+        assertThat(count("policy_approval_action", overlapId)).isZero();
+        assertThat(auditCount(overlapId, "POLICY_SUBMIT")).isZero();
+
+        long offering = insertOffering(false, "2000-01-01", "CLAW-" + UUID.randomUUID());
+        long otherInsurer = jdbc.queryForObject("SELECT min(insurer_id) FROM fgc.insurer WHERE insurer_id <> ?",
+                Long.class, insurerId);
+        ObjectNode mismatch = clawbackDraft();
+        ((ObjectNode) mismatch.path("clawbackRules").get(0)).put("productOfferingId", offering).put("insurerId", otherInsurer);
+        JsonNode mismatched = create(mismatch, writer);
+        long mismatchId = mismatched.path("policyVersionId").asLong();
+        assertThat(actionError(mismatchId, "SUBMIT", mismatched, writer, 400).path("field").asText())
+                .isEqualTo("clawbackRules[0].insurerId");
+        assertThat(count("policy_approval_action", mismatchId)).isZero();
+    }
+
+    @Test
+    void apiWrittenClawbackPolicyIsExcludedUntilActiveAndThenCalculatesUsingD02() throws Exception {
+        long offering = insertOffering(false, "2000-01-01", "CLAW-" + UUID.randomUUID());
+        long contract = insertContract(offering, "2000-01-05");
+        long agent = jdbc.queryForObject("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id=?", Long.class, contract);
+        long transaction = jdbc.queryForObject("""
+                INSERT INTO fgc.commission_transaction(payment_stage,source_type,source_business_key,insurer_id,
+                    recipient_agent_id,commission_item_id,settlement_month,paid_on,amount,cashflow_type,installment_no)
+                VALUES ('GA_TO_FC','GA_MANUAL_PAYMENT',?,?,?, ?,DATE '2000-03-01',DATE '2000-03-01',100.4,'PAYMENT',1)
+                RETURNING commission_transaction_id
+                """, Long.class, key(), insurerId, agent, itemId);
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id,contract_id,agent_id,
+                    attribution_date,attribution_month,attributed_amount,inclusion_status_snapshot,attribution_method)
+                VALUES (?,?,?,DATE '2000-03-01',DATE '2000-03-01',100.4,'INCLUDED','DIRECT')
+                """, transaction, contract, agent);
+        jdbc.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", transaction);
+        long event = jdbc.queryForObject("""
+                INSERT INTO fgc.contract_status_event(contract_id,event_seq,new_status,effective_at,received_at,
+                    source_system,source_event_key,source_version)
+                VALUES (?,1,'LAPSED',TIMESTAMPTZ '2000-04-05 00:00:00+09',now(),'TEST-647',?,'v1')
+                RETURNING contract_status_event_id
+                """, Long.class, contract, key());
+        clawbackCapture.captureStatusEvents(List.of(event));
+        long candidateId = jdbc.queryForObject("SELECT candidate_id FROM fgc.clawback_candidate WHERE status_event_id=?",
+                Long.class, event);
+        JsonNode created = create(clawbackDraft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        assertThat(candidateDetail(candidateId).path("policyCandidates").findValuesAsText("policyVersionId"))
+                .doesNotContain(Long.toString(id));
+        JsonNode review = action(id, "SUBMIT", created, writer, 200);
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        assertThat(candidateDetail(candidateId).path("policyCandidates").findValuesAsText("policyVersionId"))
+                .doesNotContain(Long.toString(id));
+        action(id, "ACTIVATE", approved, approver, 200);
+        JsonNode candidate = candidateDetail(candidateId);
+        assertThat(candidate.path("policyCandidates").findValuesAsText("policyVersionId")).contains(Long.toString(id));
+        ObjectNode request = mapper.createObjectNode().put("policyVersionId", id).put("reason", "D-02 API 등록 정책 계산")
+                .put("expectedSourceVersion", candidate.path("candidate").path("sourceVersion").asText());
+        JsonNode calculated = write(HttpMethod.POST, "/api/v1/clawbacks/candidates/" + candidateId + "/calculations",
+                request, writer, key(), 201);
+        assertThat(new java.math.BigDecimal(calculated.path("amount").asText())).isEqualByComparingTo("33");
+        assertThat(calculated.path("lines").get(0).path("basisCode").asText()).isEqualTo("PAID_ATTRIBUTED_AMOUNT");
+        assertThat(calculated.path("lines").get(0).path("elapsedMonths").asInt()).isEqualTo(3);
+        assertThat(new java.math.BigDecimal(calculated.path("lines").get(0).path("basisAmount").asText()))
+                .isEqualByComparingTo("100");
+        long ruleId = detail(id, writer).path("editDocument").path("clawbackRules").get(0).path("clawbackRuleId").asLong();
+        assertThat(calculated.path("lines").get(0).path("clawbackRuleId").asLong()).isEqualTo(ruleId);
+    }
+
+    private JsonNode candidateDetail(long id) throws Exception {
+        return body(mvc.perform(get("/api/v1/clawbacks/candidates/" + id).with(user(writer)))
+                .andExpect(status().isOk()).andReturn()).path("data");
+    }
+
+    @Test
+    void clawbackCreateRejectsUnsupportedBasisConditionsAndPrecisionWithoutPartialWrites() throws Exception {
+        for (String invalid : List.of("basis", "condition", "precision", "months", "duplicate")) {
+            ObjectNode draft = clawbackDraft();
+            ObjectNode rule = (ObjectNode) draft.path("clawbackRules").get(0);
+            switch (invalid) {
+                case "basis" -> rule.put("clawbackBasisCode", "PAID_AMOUNT");
+                case "condition" -> rule.putObject("conditionExpression").put("fault", "AGENT");
+                case "precision" -> rule.put("clawbackRatePct", "33.3333333");
+                case "months" -> rule.put("elapsedMonthTo", -1);
+                case "duplicate" -> draft.withArray("clawbackRules").add(rule.deepCopy().putNull("insurerId"));
+                default -> throw new IllegalArgumentException(invalid);
+            }
+            writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), invalid.equals("duplicate") ? 422 : 400);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code=?",
+                    Integer.class, draft.path("policyCode").asText())).isZero();
+        }
+    }
+
+    @Test
+    void clawbackConcurrentClonesHaveDistinctVersionsAndRulesAndCannotDropSuccessorCoverage() throws Exception {
+        JsonNode created = create(clawbackDraft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode approved = action(id, "APPROVE", action(id, "SUBMIT", created, writer, 200), approver, 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+        List<MvcResult> clones = concurrently(
+                () -> perform(HttpMethod.POST, "/api/v1/policies/" + id + "/versions", cloneRequest("2001-01-01"), writer, key()),
+                () -> perform(HttpMethod.POST, "/api/v1/policies/" + id + "/versions", cloneRequest("2001-01-01"), writer, key()));
+        java.util.Set<Integer> versions = new java.util.HashSet<>();
+        java.util.Set<Long> ruleIds = new java.util.HashSet<>();
+        for (MvcResult result : clones) {
+            assertThat(result.getResponse().getStatus()).withFailMessage(result.getResponse().getContentAsString()).isEqualTo(201);
+            JsonNode cloned = body(result).path("data");
+            versions.add(cloned.path("versionNo").asInt());
+            for (JsonNode rule : detail(cloned.path("policyVersionId").asLong(), writer).path("editDocument").path("clawbackRules")) {
+                assertThat(ruleIds.add(rule.path("clawbackRuleId").asLong())).isTrue();
+            }
+        }
+        assertThat(versions).containsExactlyInAnyOrder(2, 3);
+        assertThat(ruleIds).hasSize(4);
+        long nextId = body(clones.get(0)).path("data").path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(nextId, writer).path("editDocument");
+        edit.withArray("clawbackRules").remove(1);
+        JsonNode changed = write(HttpMethod.PUT, "/api/v1/policies/" + nextId, edit, writer, key(), 200);
+        assertThat(actionError(nextId, "SUBMIT", changed, writer, 400).path("field").asText()).isEqualTo("clawbackRules");
+        assertThat(statusOf(id)).isEqualTo("ACTIVE");
+        assertThat(count("policy_approval_action", nextId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_succession WHERE previous_policy_version_id=?",
+                Integer.class, id)).isZero();
+    }
+
+    private List<java.util.Map<String, Object>> clawbackIdentities(long id) {
+        return jdbc.queryForList("SELECT clawback_rule_id, created_at FROM fgc.clawback_rule WHERE policy_version_id=? ORDER BY clawback_rule_id", id);
+    }
+
+    private ObjectNode clawbackDraft() {
+        ObjectNode draft = draft().put("policyType", "CLAWBACK").putNull("feeRegimeCode").putNull("effectiveTo");
+        draft.withArray("commissionRules").removeAll();
+        draft.withArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11).put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT")
+                .put("clawbackRatePct", "33.333333");
+        draft.withArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 12).put("elapsedMonthTo", 1199).put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT")
+                .put("clawbackRatePct", "0.000000");
+        return draft;
     }
 
     private ObjectNode installmentDraft(boolean seven, long offering, String from, String document) {

@@ -62,6 +62,13 @@ class OpenApiFrontendIntegrationTest {
         assertThat(paths.path("/api/v1/policies/{policyVersionId}").has("put")).isTrue();
         assertThat(paths.path("/api/v1/policies/{policyVersionId}/actions").has("post")).isTrue();
         assertThat(paths.path("/api/v1/policies/{policyVersionId}/versions").has("post")).isTrue();
+        JsonNode clawbackDraft = root.path("components").path("schemas").path("ClawbackRuleDraft");
+        assertThat(clawbackDraft.path("properties").has("clawbackRuleId")).isTrue();
+        assertThat(clawbackDraft.path("properties").path("clawbackRatePct").path("type").toString())
+                .contains("string");
+        assertThat(clawbackDraft.path("required").toString()).doesNotContain("clawbackRuleId");
+        assertThat(root.path("components").path("schemas").path("PolicyDraft").path("properties")
+                .path("clawbackRules").path("description").asText()).contains("D-02", "PAID_ATTRIBUTED_AMOUNT");
         JsonNode latestCalculation = root.path("components").path("schemas")
                 .path("ClawbackCandidateDetailResponse").path("properties").path("latestCalculation");
         assertThat(latestCalculation.has("$ref")).isFalse();
