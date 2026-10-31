@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-31",
+  "baseCommit": "336c22e48448f702e2aa553af8c4857b6cbf134d",
+  "purpose": "Reject same-scope cross-code policies even with adjacent month bands; verify actual offering query and resolver at months 0/11/12/23",
+  "command": ".\\gradlew.bat test --tests '*PolicyWorkflowIntegrationTest' --tests '*PolicyDraftValidatorTest' --tests '*ClawbackPolicyLockIntegrationTest' --tests '*CompareRankingIntegrationTest' --tests '*ClawbackRuleResolverTest' --console=plain",
+  "tests": 83,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suites": [
+    {
+      "suite": "com.susukkang.fgc.compare.CompareRankingIntegrationTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.compare.service.ClawbackRuleResolverTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.controller.PolicyWorkflowIntegrationTest",
+      "tests": 41,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.repository.ClawbackPolicyLockIntegrationTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.susukkang.fgc.policy.service.PolicyDraftValidatorTest",
+      "tests": 25,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "focusedRecheck": {
+    "purpose": "Only the alternative item/global rule is present in each conflicting policy",
+    "command": ".\\gradlew.bat test --tests '*PolicyWorkflowIntegrationTest.insurerSpecificClawbackCoexistsWithGenericDemoButIdenticalScopeOverlapIsRejected' --console=plain",
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

@@ -7,6 +7,8 @@ import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.FeeComponentType;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.compare.repository.CompareRankingRepository;
+import com.susukkang.fgc.compare.service.ClawbackRuleResolver;
 import com.susukkang.fgc.policy.code.FeeRegimeReasonCode;
 import com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService;
 import com.susukkang.fgc.policy.service.FeeRegimeRulesetService;
@@ -22,6 +24,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 
 import java.util.List;
@@ -58,6 +61,7 @@ class PolicyWorkflowIntegrationTest {
     @MockitoBean(name = "policyClock") private Clock policyClock;
     @Autowired private FeeRegimeSchedulePolicyService schedulePolicies;
     @Autowired private FeeRegimeRulesetService limitPolicies;
+    @Autowired private CompareRankingRepository comparisonPolicies;
 
     private FgcUserDetails writer;
     private FgcUserDetails systemWriter;
@@ -91,9 +95,13 @@ class PolicyWorkflowIntegrationTest {
                 .put("effectiveFrom", "2026-01-01").put("effectiveTo", "2026-12-31");
         draft.putArray("commissionRules");
         long baseItem = jdbc.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE item_code='BASE_COMMISSION'", Long.class);
-        draft.putArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
+        var rules = draft.putArray("clawbackRules");
+        rules.addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
                 .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
                 .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        rules.addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
+                .put("elapsedMonthFrom", 12).put("elapsedMonthTo", 23)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "25");
         JsonNode first = create(draft, writer);
         long id = first.path("policyVersionId").asLong();
         JsonNode review = action(id, "SUBMIT", first, writer, 200);
@@ -110,7 +118,9 @@ class PolicyWorkflowIntegrationTest {
         // 전체 항목이나 다른 항목으로 바꾸어도 같은 정책 선택 범위의 겹침을 우회할 수 없다.
         for (Long alternativeItem : new Long[]{null, itemId}) {
             ObjectNode alternative = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
-            ((ObjectNode) alternative.path("clawbackRules").get(0)).put("commissionItemId", alternativeItem);
+            alternative.putArray("clawbackRules").addObject().put("insurerId", insurerId)
+                    .put("commissionItemId", alternativeItem).put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                    .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
             JsonNode alternativeCreated = create(alternative, writer);
             long alternativeId = alternativeCreated.path("policyVersionId").asLong();
             JsonNode alternativeReview = action(alternativeId, "SUBMIT", alternativeCreated, writer, 200);
@@ -118,24 +128,43 @@ class PolicyWorkflowIntegrationTest {
                     .isEqualTo("FGC-POL-002");
         }
         ObjectNode adjacent = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
-        ((ObjectNode) adjacent.path("clawbackRules").get(0)).put("commissionItemId", itemId)
-                .put("elapsedMonthFrom", 12).put("elapsedMonthTo", 23);
+        adjacent.putArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
+                .put("elapsedMonthFrom", 24).put("elapsedMonthTo", 35)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "0");
         JsonNode adjacentCreated = create(adjacent, writer);
         long adjacentId = adjacentCreated.path("policyVersionId").asLong();
         JsonNode adjacentReview = action(adjacentId, "SUBMIT", adjacentCreated, writer, 200);
-        JsonNode adjacentApproved = action(adjacentId, "APPROVE", adjacentReview, approver, 200);
-        action(adjacentId, "ACTIVATE", adjacentApproved, approver, 200);
+        assertThat(actionError(adjacentId, "APPROVE", adjacentReview, approver, 422).path("code").asText())
+                .isEqualTo("FGC-POL-002");
         long otherInsurer = jdbc.queryForObject("""
                 INSERT INTO fgc.insurer(insurer_code,insurer_name,insurer_type)
                 VALUES (?, '다른 보험회사 범위', 'LIFE') RETURNING insurer_id
                 """, Long.class, "P722-" + UUID.randomUUID().toString().substring(0, 12));
         ObjectNode other = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
-        ((ObjectNode) other.path("clawbackRules").get(0)).put("insurerId", otherInsurer);
+        other.path("clawbackRules").forEach(rule -> ((ObjectNode) rule).put("insurerId", otherInsurer));
         JsonNode third = create(other, writer);
         long thirdId = third.path("policyVersionId").asLong();
         JsonNode thirdReview = action(thirdId, "SUBMIT", third, writer, 200);
         JsonNode thirdApproved = action(thirdId, "APPROVE", thirdReview, approver, 200);
         action(thirdId, "ACTIVATE", thirdApproved, approver, 200);
+
+        // 같은 정책 안의 인접 구간은 허용한다. 실제 판매버전으로 비교 SQL과 resolver의 선택 결과까지 확인한다.
+        long offeringId = insertOffering(false, "2026-01-01", "BD-722");
+        jdbc.update("""
+                UPDATE fgc.product_offering SET fee_regime_code='CURRENT', governance_status='APPROVED',
+                  committee_approval_date=DATE '2025-12-01', committee_document_ref='환수 비교 검증'
+                WHERE product_offering_id=?
+                """, offeringId);
+        LocalDate asOf = LocalDate.of(2026, 6, 1);
+        var offering = comparisonPolicies.findSellableOfferings(asOf).stream()
+                .filter(candidate -> candidate.offeringId() == offeringId).findFirst().orElseThrow();
+        var comparisonRules = comparisonPolicies.findClawbackRules(offering, asOf);
+        for (int month : new int[]{0, 11, 12, 23}) {
+            var resolution = ClawbackRuleResolver.resolve(comparisonRules, List.of(baseItem), month);
+            assertThat(resolution.excludeReason()).isNull();
+            assertThat(resolution.policyVersion()).isEqualTo(draft.path("policyCode").asText() + " v1");
+            assertThat(resolution.ratesByItem().get(baseItem)).isEqualByComparingTo(month < 12 ? "50" : "25");
+        }
     }
 
     @Test

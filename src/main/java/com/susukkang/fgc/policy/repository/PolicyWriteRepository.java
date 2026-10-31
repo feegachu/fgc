@@ -635,10 +635,9 @@ public class PolicyWriteRepository {
                             ON c.policy_version_id = candidate.policy_version_id
                           WHERE a.policy_version_id = active.policy_version_id
                             -- D-02: 전체 정책과 보험회사/판매버전 전용 정책은 코드 분리·명시 선택으로 공존한다.
+                            -- FUN-079는 항목·경과월을 고르기 전에 보험회사/판매버전으로 정책 하나를 선택한다.
                             AND a.insurer_id IS NOT DISTINCT FROM c.insurer_id
-                            AND a.product_offering_id IS NOT DISTINCT FROM c.product_offering_id
-                            AND a.elapsed_month_from <= c.elapsed_month_to
-                            AND c.elapsed_month_from <= a.elapsed_month_to))
+                            AND a.product_offering_id IS NOT DISTINCT FROM c.product_offering_id))
                       OR (active.policy_type = 'CURRENT_COMMISSION' AND candidate.policy_type = 'CURRENT_COMMISSION'
                         AND COALESCE(active.fee_regime_code, 'CURRENT') = 'CURRENT'
                         AND COALESCE(candidate.fee_regime_code, 'CURRENT') = 'CURRENT'
