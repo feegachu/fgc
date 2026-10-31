@@ -88,8 +88,9 @@ public class ClawbackNoticeDocumentService {
         byte[] pdf = renderer.render(notice(documentNo, version, issuedAt, header, calculation));
         String contentHash = sha256(pdf);
         String storageKey = storeWithRollbackCleanup(pdf);
-        long documentId = documents.insert(documentNo, version, DOCUMENT_KIND, SOURCE_ENTITY_TYPE, caseId,
-                calculation.calculationVersion(), storageKey, contentHash, userId, issuedAt);
+        long documentId = documents.insert(new GeneratedDocumentRepository.NewDocument(documentNo, version,
+                DOCUMENT_KIND, SOURCE_ENTITY_TYPE, caseId, calculation.calculationVersion(), storageKey, contentHash,
+                userId, issuedAt));
         store.saveRequest(idempotencyKey, userId, caseId, hash, documentId);
         return toResponse(documents.findById(documentId).orElseThrow());
     }

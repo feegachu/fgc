@@ -19,6 +19,11 @@ public class GeneratedDocumentRepository {
                                  String sourceEntityType, long sourceEntityId, Integer sourceVersionNo,
                                  String storageKey, String contentHash, long createdBy, OffsetDateTime createdAt) { }
 
+    /** 새로 저장할 판. id는 INSERT가 돌려준다. */
+    public record NewDocument(String documentNo, int versionNo, String documentKind, String sourceEntityType,
+                              long sourceEntityId, Integer sourceVersionNo, String storageKey, String contentHash,
+                              long createdBy, OffsetDateTime createdAt) { }
+
     private static final String COLUMNS = """
             SELECT generated_document_id, document_no, version_no, document_kind, source_entity_type,
                    source_entity_id, source_version_no, storage_key, content_hash, created_by, created_at
@@ -46,16 +51,15 @@ public class GeneratedDocumentRepository {
         return max == null ? 1 : max + 1;
     }
 
-    public long insert(String documentNo, int versionNo, String documentKind, String sourceEntityType,
-                       long sourceEntityId, Integer sourceVersionNo, String storageKey, String contentHash,
-                       long createdBy, OffsetDateTime createdAt) {
+    public long insert(NewDocument d) {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.generated_document (document_no, version_no, document_kind, source_entity_type,
                     source_entity_id, source_version_no, storage_key, content_hash, created_by, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING generated_document_id
-                """, Long.class, documentNo, versionNo, documentKind, sourceEntityType, sourceEntityId,
-                sourceVersionNo, storageKey, contentHash, createdBy, createdAt);
+                """, Long.class, d.documentNo(), d.versionNo(), d.documentKind(), d.sourceEntityType(),
+                d.sourceEntityId(), d.sourceVersionNo(), d.storageKey(), d.contentHash(), d.createdBy(),
+                d.createdAt());
     }
 
     /** 원천 하나의 발행 이력. 최신 판부터. */

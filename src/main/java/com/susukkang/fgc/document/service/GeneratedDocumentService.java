@@ -12,8 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -29,7 +31,24 @@ public class GeneratedDocumentService {
     private final GeneratedDocumentRepository documents;
     private final FileStorage storage;
 
-    public record DocumentFile(String documentNo, int version, byte[] content) { }
+    /** 배열 필드라 record 기본 equals·hashCode는 참조만 비교한다. 내용 기준으로 바꾸고 toString에는 원본 대신 크기만 남긴다. */
+    public record DocumentFile(String documentNo, int version, byte[] content) {
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof DocumentFile other && version == other.version
+                    && documentNo.equals(other.documentNo) && Arrays.equals(content, other.content);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(documentNo, version) + Arrays.hashCode(content);
+        }
+
+        @Override
+        public String toString() {
+            return "DocumentFile[documentNo=" + documentNo + ", version=" + version + ", bytes=" + content.length + "]";
+        }
+    }
 
     @Transactional(readOnly = true)
     public DocumentFile download(String documentNo, int version) {

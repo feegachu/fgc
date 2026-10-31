@@ -124,7 +124,7 @@ class ClawbackNoticeDocumentIntegrationTest {
     }
 
     @Test
-    void sameKeyReplaysTheSameVersionAndANewRequestAppendsANewVersion() throws Exception {
+    void sameKeyReplaysTheSameVersionAndANewRequestAppendsANewVersion() {
         Calculated calc = calculated("1000", "100");
         String key = key();
         var first = notices.issue(calc.caseId(), request(1, calc.sourceVersion()), key, settlementUser);
@@ -252,7 +252,8 @@ class ClawbackNoticeDocumentIntegrationTest {
                 .andExpect(status().isForbidden());
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
                 agent, null, agent.getAuthorities()));
-        assertThatThrownBy(() -> scope.requireDocument("CLN-" + calc.caseId(), 1))
+        String documentNo = "CLN-" + calc.caseId();
+        assertThatThrownBy(() -> scope.requireDocument(documentNo, 1))
                 .isInstanceOf(FgcBusinessException.class);
     }
 
