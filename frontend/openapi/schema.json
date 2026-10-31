@@ -256,10 +256,66 @@
         },
         "type" : "object"
       },
+      "ApiResponseClawbackNoticeDocumentResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ClawbackNoticeDocumentResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseCommissionPaymentResponse" : {
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/CommissionPaymentResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseCompareAskResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CompareAskResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseCompareExplainResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CompareExplainResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseCompareRankingResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CompareRankingResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -573,6 +629,23 @@
         },
         "type" : "object"
       },
+      "ApiResponseListCompareCategoryResponse" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CompareCategoryResponse"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseListContractJournalResponse" : {
         "properties" : {
           "data" : {
@@ -630,6 +703,23 @@
             "items" : {
               "format" : "int64",
               "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseListNewsHeadline" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/NewsHeadline"
             },
             "type" : "array"
           },
@@ -737,6 +827,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PageResponseClawbackCandidateResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePageResponseClawbackNoticeDocumentResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseClawbackNoticeDocumentResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -2346,6 +2450,55 @@
         },
         "type" : "object"
       },
+      "ClawbackNoticeDocumentRequest" : {
+        "properties" : {
+          "calculationVersion" : {
+            "description" : "PDF 원본으로 쓸 계산판. case의 최신 판이 아니면 409 FGC-IMPL-STATE_CHANGED",
+            "exclusiveMinimum" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "expectedSourceVersion" : {
+            "description" : "IF-API-84에서 받은 sourceVersion. 계산판·현재 원천과 다르면 409 FGC-IMPL-STATE_CHANGED",
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "calculationVersion", "expectedSourceVersion" ],
+        "type" : "object"
+      },
+      "ClawbackNoticeDocumentResponse" : {
+        "properties" : {
+          "calculationVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdBy" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "documentNo" : {
+            "type" : "string"
+          },
+          "downloadPath" : {
+            "description" : "IF-API-67A 다운로드 경로. 호출 시 권한을 다시 검사한다",
+            "type" : "string"
+          },
+          "sha256" : {
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ClawbackRuleDraft" : {
         "properties" : {
           "clawbackBasisCode" : {
@@ -3034,6 +3187,187 @@
             "description" : "요율(%). 문자열로 정밀도 보존, FIXED 규칙이면 null",
             "example" : "650.000000",
             "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "CompareAskRequest" : {
+        "properties" : {
+          "question" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "rankResultId" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "question" ],
+        "type" : "object"
+      },
+      "CompareAskResponse" : {
+        "properties" : {
+          "answer" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareCapSummary" : {
+        "properties" : {
+          "contractCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "usagePct" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareCategoryResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "insurerCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "insurers" : {
+            "items" : {
+              "$ref" : "#/components/schemas/InsurerOption"
+            },
+            "type" : "array"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareExplainRequest" : {
+        "properties" : {
+          "rankResultId" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "rankResultId" ],
+        "type" : "object"
+      },
+      "CompareExplainResponse" : {
+        "properties" : {
+          "rankResultId" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "summaryError" : {
+            "type" : "string"
+          },
+          "summarySource" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareRankingFilters" : {
+        "properties" : {
+          "empty" : {
+            "type" : "boolean"
+          },
+          "excludeCapOverflow" : {
+            "type" : "boolean"
+          },
+          "insurerIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 30,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareRankingRequest" : {
+        "properties" : {
+          "categoryCode" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "filters" : {
+            "$ref" : "#/components/schemas/CompareRankingFilters"
+          }
+        },
+        "required" : [ "categoryCode" ],
+        "type" : "object"
+      },
+      "CompareRankingResponse" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basePremium" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "capSummary" : {
+            "$ref" : "#/components/schemas/CompareCapSummary"
+          },
+          "categoryCode" : {
+            "type" : "string"
+          },
+          "categoryLabel" : {
+            "type" : "string"
+          },
+          "clawbackMonth" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excludedItems" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Excluded"
+            },
+            "type" : "array"
+          },
+          "filters" : {
+            "$ref" : "#/components/schemas/CompareRankingFilters"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          },
+          "policyVersion" : {
+            "type" : "string"
+          },
+          "rankResultId" : {
+            "type" : "string"
+          },
+          "ruleVersion" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -3878,6 +4212,31 @@
         },
         "type" : "object"
       },
+      "Evidence" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "policyVersion" : {
+            "type" : "string"
+          },
+          "rule" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "value" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "EvidenceItem" : {
         "properties" : {
           "label" : {
@@ -4320,6 +4679,27 @@
         },
         "type" : "object"
       },
+      "Excluded" : {
+        "properties" : {
+          "insurer" : {
+            "type" : "string"
+          },
+          "offeringId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "product" : {
+            "type" : "string"
+          },
+          "reasonCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "FeeRegimeRuleDraft" : {
         "properties" : {
           "basicDocumentDateFrom" : {
@@ -4451,6 +4831,18 @@
         },
         "type" : "object"
       },
+      "InsurerOption" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "InsurerResponse" : {
         "description" : "보험회사(원수사) 기준정보",
         "properties" : {
@@ -4484,6 +4876,58 @@
             "description" : "보험회사 유형 한글명",
             "example" : "생명보험",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Item" : {
+        "properties" : {
+          "associationGrade" : {
+            "type" : "string"
+          },
+          "capImpactPct" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "cappedReceipt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "carryover" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "clawbackExposure" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "conservativeNet" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "evidence" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Evidence"
+            },
+            "type" : "array"
+          },
+          "expectedReceipt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurer" : {
+            "type" : "string"
+          },
+          "offeringId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "product" : {
+            "type" : "string"
+          },
+          "rank" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -5135,6 +5579,20 @@
         "required" : [ "demoMonth" ],
         "type" : "object"
       },
+      "NewsHeadline" : {
+        "properties" : {
+          "link" : {
+            "type" : "string"
+          },
+          "publishedAt" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "Option" : {
         "properties" : {
           "code" : {
@@ -5301,6 +5759,36 @@
           "content" : {
             "items" : {
               "$ref" : "#/components/schemas/ClawbackCandidateResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageResponseClawbackNoticeDocumentResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ClawbackNoticeDocumentResponse"
             },
             "type" : "array"
           },
@@ -7722,6 +8210,116 @@
         "tags" : [ "설계사 수수료 명세" ]
       }
     },
+    "/api/v1/ai/compare-chat/ask" : {
+      "post" : {
+        "description" : "순위 결과(rankResultId, 선택)와 기본 용어 설명만 근거로 질문에 답한다. 범위 밖·검증 실패는 고정 문장으로 대체한다.",
+        "operationId" : "ask",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompareAskRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCompareAskResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "자연어 질문 답변",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
+    "/api/v1/ai/compare-chat/categories" : {
+      "get" : {
+        "description" : "챗봇 1단계에서 고르는 카테고리와 비교 가능한 보험사 수를 돌려준다.",
+        "operationId" : "categories",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListCompareCategoryResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "비교 카테고리 목록",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
+    "/api/v1/ai/compare-chat/explain" : {
+      "post" : {
+        "description" : "서버가 보관한 순위 결과(rankResultId)를 풀어 쓴 요약을 돌려준다. 요약 실패는 200 + summaryError 로 알린다.",
+        "operationId" : "explain",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompareExplainRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCompareExplainResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "순위 요약 문장",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
+    "/api/v1/ai/compare-chat/rank" : {
+      "post" : {
+        "description" : "카테고리와 선택 세부 조건(보험사·한도 초과 제외)을 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).",
+        "operationId" : "rank",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompareRankingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCompareRankingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "상품 비교 참고 순위",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
     "/api/v1/arbitrage-checks" : {
       "get" : {
         "operationId" : "getArbitrageChecks_1",
@@ -8854,6 +9452,107 @@
         "tags" : [ "clawback-candidate-controller" ]
       }
     },
+    "/api/v1/clawbacks/{id}/notice-documents" : {
+      "get" : {
+        "operationId" : "listClawbackNoticeDocuments",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseClawbackNoticeDocumentResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "IF-API-86 환수 통지서 발행 이력",
+        "tags" : [ "clawback-notice-document-controller" ]
+      },
+      "post" : {
+        "description" : "지정한 계산판 snapshot으로 새 판을 만듭니다. 같은 Idempotency-Key 재요청은 같은 판을 반환하고, 환수 상태·통지일·확정액은 바꾸지 않습니다.",
+        "operationId" : "issueClawbackNoticeDocument",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "발행 요청의 멱등키",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ClawbackNoticeDocumentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClawbackNoticeDocumentResponse"
+                }
+              }
+            },
+            "description" : "발행한 문서 판"
+          },
+          "409" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClawbackNoticeDocumentResponse"
+                }
+              }
+            },
+            "description" : "계산판·원천 버전 변경 또는 멱등키 충돌"
+          }
+        },
+        "summary" : "IF-API-73 환수 통지서 PDF 발행",
+        "tags" : [ "clawback-notice-document-controller" ]
+      }
+    },
     "/api/v1/contracts" : {
       "get" : {
         "operationId" : "getContractListByCondition",
@@ -9361,6 +10060,54 @@
         "tags" : [ "업무 대시보드" ]
       }
     },
+    "/api/v1/documents/{documentNo}.pdf" : {
+      "get" : {
+        "description" : "문서번호와 판이 모두 필요합니다. 발행 때 기록한 sha256과 원본이 다르면 내려주지 않습니다.",
+        "operationId" : "downloadGeneratedDocument",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "documentNo",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "version",
+          "required" : true,
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/pdf" : {
+                "schema" : {
+                  "format" : "binary",
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "PDF 파일"
+          },
+          "404" : {
+            "content" : {
+              "application/pdf" : {
+                "schema" : {
+                  "format" : "byte",
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "없는 문서·판"
+          }
+        },
+        "summary" : "IF-API-67A 생성 PDF 판 다운로드",
+        "tags" : [ "generated-document-controller" ]
+      }
+    },
     "/api/v1/exceptions" : {
       "get" : {
         "operationId" : "search_3",
@@ -9761,6 +10508,26 @@
           }
         },
         "tags" : [ "journal-correction-controller" ]
+      }
+    },
+    "/api/v1/news/headlines" : {
+      "get" : {
+        "description" : "보험 전문 매체 RSS 의 최신 제목과 원문 링크만 돌려준다. 가져오지 못하면 빈 목록이다.",
+        "operationId" : "headlines",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListNewsHeadline"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "최신 뉴스 헤드라인",
+        "tags" : [ "보험 뉴스" ]
       }
     },
     "/api/v1/policies" : {
@@ -11620,6 +12387,9 @@
     "url" : "/"
   } ],
   "tags" : [ {
+    "description" : "설계사 홈 챗봇에 보여 주는 최신 뉴스 헤드라인",
+    "name" : "보험 뉴스"
+  }, {
     "description" : "FUN-060 지급·보류·조정·환수 명세 조회 API",
     "name" : "설계사 수수료 명세"
   }, {
@@ -11646,6 +12416,9 @@
   }, {
     "description" : "검증원장 상세 조회 API",
     "name" : "검증원장"
+  }, {
+    "description" : "FUN-079 상품 비교·참고 순위 API",
+    "name" : "상품 비교 챗봇"
   }, {
     "description" : "FUN-065 수수료 지급 건 등록·수정·확정 API",
     "name" : "수수료 지급 건"
