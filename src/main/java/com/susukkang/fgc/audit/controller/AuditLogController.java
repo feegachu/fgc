@@ -11,6 +11,7 @@ import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -93,8 +94,12 @@ public class AuditLogController {
             summary = "감사로그 상세",
             description = "감사로그 한 건과 before/after JSON 을 리프 경로로 비교한 diff 를 돌려줍니다."
     )
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "404", description = "auditLogId에 해당하는 감사로그가 없음 (FGC-COMMON-004)")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "조회 성공", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "auditLogId에 해당하는 감사로그가 없음 (FGC-COMMON-004)")
+    })
     @GetMapping("/{auditLogId}")
     @PreAuthorize(Roles.CAN_VIEW_AUDIT_LOG)
     public ApiResponse<AuditLogDetailResponse> detail(

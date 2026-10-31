@@ -44,6 +44,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/compare-chat/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자연어 질문 답변
+         * @description 순위 결과(rankResultId, 선택)와 기본 용어 설명만 근거로 질문에 답한다. 범위 밖·검증 실패는 고정 문장으로 대체한다.
+         */
+        post: operations["ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/compare-chat/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 비교 카테고리 목록
+         * @description 챗봇 1단계에서 고르는 카테고리와 비교 가능한 보험사 수를 돌려준다.
+         */
+        get: operations["categories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/compare-chat/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 순위 요약 문장
+         * @description 서버가 보관한 순위 결과(rankResultId)를 풀어 쓴 요약을 돌려준다. 요약 실패는 200 + summaryError 로 알린다.
+         */
+        post: operations["explain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/compare-chat/rank": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 상품 비교 참고 순위
+         * @description 카테고리와 선택 세부 조건(보험사·한도 초과 제외)을 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).
+         */
+        post: operations["rank"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arbitrage-checks": {
         parameters: {
             query?: never;
@@ -790,6 +870,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/news/headlines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 최신 뉴스 헤드라인
+         * @description 보험 전문 매체 RSS 의 최신 제목과 원문 링크만 돌려준다. 가져오지 못하면 빈 목록이다.
+         */
+        get: operations["headlines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policies": {
         parameters: {
             query?: never;
@@ -1443,12 +1543,17 @@ export interface components {
         };
         ApiError: {
             code?: string;
-            detail?: string;
-            field?: string;
+            detail?: string | null;
+            field?: string | null;
             message?: string;
             params?: {
                 [key: string]: unknown;
             };
+        };
+        ApiFailureResponse: {
+            data: null;
+            error: components["schemas"]["ApiError"];
+            requestId: string;
         };
         ApiResponseActiveMonthlyRunResponse: {
             data?: components["schemas"]["ActiveMonthlyRunResponse"];
@@ -1492,6 +1597,21 @@ export interface components {
         };
         ApiResponseCommissionPaymentResponse: {
             data?: components["schemas"]["CommissionPaymentResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseCompareAskResponse: {
+            data?: components["schemas"]["CompareAskResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseCompareExplainResponse: {
+            data?: components["schemas"]["CompareExplainResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseCompareRankingResponse: {
+            data?: components["schemas"]["CompareRankingResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -1600,6 +1720,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseListCompareCategoryResponse: {
+            data?: components["schemas"]["CompareCategoryResponse"][];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseListContractJournalResponse: {
             data?: components["schemas"]["ContractJournalResponse"][];
             error?: components["schemas"]["ApiError"];
@@ -1617,6 +1742,11 @@ export interface components {
         };
         ApiResponseListLong: {
             data?: number[];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseListNewsHeadline: {
+            data?: components["schemas"]["NewsHeadline"][];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2724,6 +2854,109 @@ export interface components {
              */
             ratePct?: string | null;
         };
+        CompareAskRequest: {
+            question: string;
+            rankResultId?: string;
+        };
+        CompareAskResponse: {
+            answer?: string;
+            source?: string;
+        };
+        CompareCapSummary: {
+            /** Format: int32 */
+            contractCount?: number;
+            status?: string;
+            /** Format: double */
+            usagePct?: number;
+        };
+        CompareCategoryResponse: {
+            code?: string;
+            /** Format: int32 */
+            insurerCount?: number;
+            insurers?: components["schemas"]["CompareInsurerOption"][];
+            label?: string;
+        };
+        CompareEvidence: {
+            /** Format: date */
+            asOf?: string;
+            label?: string;
+            policyVersion?: string;
+            rule?: string;
+            source?: string;
+            /** Format: int64 */
+            value?: number;
+        };
+        CompareExcluded: {
+            insurer?: string;
+            /** Format: int64 */
+            offeringId?: number;
+            product?: string;
+            reasonCodes?: string[];
+        };
+        CompareExplainRequest: {
+            rankResultId: string;
+        };
+        CompareExplainResponse: {
+            rankResultId?: string;
+            summary?: string;
+            summaryError?: string;
+            summarySource?: string;
+        };
+        CompareInsurerOption: {
+            /** Format: int64 */
+            id?: number;
+            name?: string;
+        };
+        CompareItem: {
+            associationGrade?: string;
+            /** Format: double */
+            capImpactPct?: number;
+            /** Format: int64 */
+            cappedReceipt?: number;
+            /** Format: int64 */
+            carryover?: number;
+            /** Format: int64 */
+            clawbackExposure?: number;
+            /** Format: int64 */
+            conservativeNet?: number;
+            evidence?: components["schemas"]["CompareEvidence"][];
+            /** Format: int64 */
+            expectedReceipt?: number;
+            insurer?: string;
+            /** Format: int64 */
+            offeringId?: number;
+            product?: string;
+            /** Format: int32 */
+            rank?: number;
+        };
+        CompareRankingFilters: {
+            empty?: boolean;
+            excludeCapOverflow?: boolean;
+            insurerIds?: number[];
+        };
+        CompareRankingRequest: {
+            categoryCode: string;
+            filters?: components["schemas"]["CompareRankingFilters"];
+        };
+        CompareRankingResponse: {
+            /** Format: date */
+            asOf?: string;
+            /** Format: int64 */
+            basePremium?: number;
+            capSummary?: components["schemas"]["CompareCapSummary"];
+            categoryCode?: string;
+            categoryLabel?: string;
+            /** Format: int32 */
+            clawbackMonth?: number;
+            excludedItems?: components["schemas"]["CompareExcluded"][];
+            filters?: components["schemas"]["CompareRankingFilters"];
+            items?: components["schemas"]["CompareItem"][];
+            policyVersion?: string;
+            rankResultId?: string;
+            ruleVersion?: string;
+            status?: string;
+            warnings?: string[];
+        };
         ContractCreateRequest: {
             /** Format: int64 */
             agentId: number;
@@ -3549,6 +3782,11 @@ export interface components {
             loginId?: string;
             roleCode?: string;
             userName?: string;
+        };
+        NewsHeadline: {
+            link?: string;
+            publishedAt?: string;
+            title?: string;
         };
         Option: {
             code?: string;
@@ -4753,6 +4991,98 @@ export interface operations {
             };
         };
     };
+    ask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareAskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCompareAskResponse"];
+                };
+            };
+        };
+    };
+    categories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListCompareCategoryResponse"];
+                };
+            };
+        };
+    };
+    explain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareExplainRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCompareExplainResponse"];
+                };
+            };
+        };
+    };
+    rank: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareRankingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCompareRankingResponse"];
+                };
+            };
+        };
+    };
     getArbitrageChecks_1: {
         parameters: {
             query: {
@@ -4875,13 +5205,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description 조회 성공 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAuditLogDetailResponse"];
+                };
+            };
             /** @description auditLogId에 해당하는 감사로그가 없음 (FGC-COMMON-004) */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseAuditLogDetailResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5249,17 +5588,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckSearchResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckSearchResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -5284,14 +5621,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
-                };
+                content?: never;
             };
             /** @description capCheckId에 해당하는 판정이 없음 (FGC-COMMON-004) */
             404: {
@@ -5299,7 +5634,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5392,7 +5727,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCalculation"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 적용 정책·계산 근거 부족 */
@@ -5401,7 +5736,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCalculation"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5531,7 +5866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseContractUpdateResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 최초 설계사 변경 요청 또는 허용 범위 밖의 사건 일자 */
@@ -5540,7 +5875,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseContractUpdateResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5781,17 +6116,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseDashboardSummaryResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseDashboardSummaryResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -6050,6 +6383,26 @@ export interface operations {
             };
         };
     };
+    headlines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListNewsHeadline"];
+                };
+            };
+        };
+    };
     findPolicyVersions: {
         parameters: {
             query?: {
@@ -6117,7 +6470,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정책 작성 권한 없음 (FGC-AUTH-003) */
@@ -6126,7 +6479,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정책 코드 또는 멱등키 충돌 */
@@ -6135,7 +6488,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정책 규칙의 적용 구간 충돌 */
@@ -6144,7 +6497,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6179,7 +6532,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyDetailResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6217,7 +6570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6255,7 +6608,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 자기 승인·정책 상태·수정 시각 또는 멱등키 충돌 */
@@ -6264,7 +6617,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 활성 정책의 적용기간 충돌 (FGC-POL-002) */
@@ -6273,7 +6626,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6311,7 +6664,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6737,7 +7090,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -6746,7 +7099,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 지급 건 자연키 중복 */
@@ -6755,7 +7108,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6813,7 +7166,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -6822,7 +7175,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description DRAFT가 아니거나 자연키 중복 */
@@ -6831,7 +7184,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6862,7 +7215,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 지급 처리 권한 없음 */
@@ -6871,7 +7224,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 초안이 아니거나 삭제할 수 없는 연관 이력 */
@@ -6880,7 +7233,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6915,7 +7268,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -6924,7 +7277,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description DRAFT 상태가 아님 */
@@ -6933,7 +7286,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description FUN-033 한도 초과 또는 정책 검토 필요 */
@@ -6942,7 +7295,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6974,7 +7327,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -6983,7 +7336,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description DRAFT 상태가 아님 (FGC-TRAN-005) */
@@ -6992,7 +7345,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -7035,17 +7388,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunSearchResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunSearchResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -7077,17 +7428,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음 */
             403: {
@@ -7095,7 +7444,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001) */
@@ -7104,7 +7453,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -7139,17 +7488,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -7174,14 +7521,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
-                };
+                content?: never;
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
             404: {
@@ -7189,7 +7534,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -7215,14 +7560,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음 */
             403: {
@@ -7230,7 +7573,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
@@ -7239,7 +7582,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description FINALIZED (FGC-VRUN-003), 허용 상태 아님 (FGC-VRUN-004), 재시작 이력 확인 불가·경합 (FGC-VRUN-005) */
@@ -7248,7 +7591,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -7281,17 +7624,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음 */
             403: {
@@ -7299,7 +7640,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005), 확정할 수 없는 실행 유형(계약수동) (FGC-VRUN-004) */
@@ -7308,7 +7649,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 확정 조건 미충족 (FGC-VRUN-002) */
@@ -7317,7 +7658,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -7342,14 +7683,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
-                };
+                content?: never;
             };
             /** @description 검증 실행 없음 (FGC-COMMON-004) */
             404: {
@@ -7357,7 +7696,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -7383,14 +7722,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
-                };
+                content?: never;
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
             404: {
@@ -7398,7 +7735,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };

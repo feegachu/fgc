@@ -1,5 +1,6 @@
 package com.susukkang.fgc.compare.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 /**
@@ -7,6 +8,7 @@ import java.util.List;
  */
 public record CompareCategoryResponse(String code, String label, int insurerCount, List<InsurerOption> insurers) {
 
+    @Schema(name = "CompareInsurerOption")
     public record InsurerOption(long id, String name) {
     }
 }

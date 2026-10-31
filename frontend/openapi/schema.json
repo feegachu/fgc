@@ -129,10 +129,10 @@
             "type" : "string"
           },
           "detail" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "field" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "message" : {
             "type" : "string"
@@ -142,6 +142,21 @@
             "type" : "object"
           }
         },
+        "type" : "object"
+      },
+      "ApiFailureResponse" : {
+        "properties" : {
+          "data" : {
+            "type" : "null"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "data", "error", "requestId" ],
         "type" : "object"
       },
       "ApiResponseActiveMonthlyRunResponse" : {
@@ -260,6 +275,48 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/CommissionPaymentResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseCompareAskResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CompareAskResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseCompareExplainResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CompareExplainResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseCompareRankingResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CompareRankingResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -573,6 +630,23 @@
         },
         "type" : "object"
       },
+      "ApiResponseListCompareCategoryResponse" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CompareCategoryResponse"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseListContractJournalResponse" : {
         "properties" : {
           "data" : {
@@ -630,6 +704,23 @@
             "items" : {
               "format" : "int64",
               "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseListNewsHeadline" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/NewsHeadline"
             },
             "type" : "array"
           },
@@ -3038,6 +3129,297 @@
         },
         "type" : "object"
       },
+      "CompareAskRequest" : {
+        "properties" : {
+          "question" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "rankResultId" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "question" ],
+        "type" : "object"
+      },
+      "CompareAskResponse" : {
+        "properties" : {
+          "answer" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareCapSummary" : {
+        "properties" : {
+          "contractCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "usagePct" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareCategoryResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "insurerCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "insurers" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CompareInsurerOption"
+            },
+            "type" : "array"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareEvidence" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "policyVersion" : {
+            "type" : "string"
+          },
+          "rule" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "value" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareExcluded" : {
+        "properties" : {
+          "insurer" : {
+            "type" : "string"
+          },
+          "offeringId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "product" : {
+            "type" : "string"
+          },
+          "reasonCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareExplainRequest" : {
+        "properties" : {
+          "rankResultId" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "rankResultId" ],
+        "type" : "object"
+      },
+      "CompareExplainResponse" : {
+        "properties" : {
+          "rankResultId" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "summaryError" : {
+            "type" : "string"
+          },
+          "summarySource" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareInsurerOption" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareItem" : {
+        "properties" : {
+          "associationGrade" : {
+            "type" : "string"
+          },
+          "capImpactPct" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "cappedReceipt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "carryover" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "clawbackExposure" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "conservativeNet" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "evidence" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CompareEvidence"
+            },
+            "type" : "array"
+          },
+          "expectedReceipt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurer" : {
+            "type" : "string"
+          },
+          "offeringId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "product" : {
+            "type" : "string"
+          },
+          "rank" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareRankingFilters" : {
+        "properties" : {
+          "empty" : {
+            "type" : "boolean"
+          },
+          "excludeCapOverflow" : {
+            "type" : "boolean"
+          },
+          "insurerIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 30,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "CompareRankingRequest" : {
+        "properties" : {
+          "categoryCode" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "filters" : {
+            "$ref" : "#/components/schemas/CompareRankingFilters"
+          }
+        },
+        "required" : [ "categoryCode" ],
+        "type" : "object"
+      },
+      "CompareRankingResponse" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basePremium" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "capSummary" : {
+            "$ref" : "#/components/schemas/CompareCapSummary"
+          },
+          "categoryCode" : {
+            "type" : "string"
+          },
+          "categoryLabel" : {
+            "type" : "string"
+          },
+          "clawbackMonth" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excludedItems" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CompareExcluded"
+            },
+            "type" : "array"
+          },
+          "filters" : {
+            "$ref" : "#/components/schemas/CompareRankingFilters"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CompareItem"
+            },
+            "type" : "array"
+          },
+          "policyVersion" : {
+            "type" : "string"
+          },
+          "rankResultId" : {
+            "type" : "string"
+          },
+          "ruleVersion" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "ContractCreateRequest" : {
         "properties" : {
           "agentId" : {
@@ -5133,6 +5515,20 @@
           }
         },
         "required" : [ "demoMonth" ],
+        "type" : "object"
+      },
+      "NewsHeadline" : {
+        "properties" : {
+          "link" : {
+            "type" : "string"
+          },
+          "publishedAt" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "Option" : {
@@ -7722,6 +8118,116 @@
         "tags" : [ "설계사 수수료 명세" ]
       }
     },
+    "/api/v1/ai/compare-chat/ask" : {
+      "post" : {
+        "description" : "순위 결과(rankResultId, 선택)와 기본 용어 설명만 근거로 질문에 답한다. 범위 밖·검증 실패는 고정 문장으로 대체한다.",
+        "operationId" : "ask",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompareAskRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCompareAskResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "자연어 질문 답변",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
+    "/api/v1/ai/compare-chat/categories" : {
+      "get" : {
+        "description" : "챗봇 1단계에서 고르는 카테고리와 비교 가능한 보험사 수를 돌려준다.",
+        "operationId" : "categories",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListCompareCategoryResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "비교 카테고리 목록",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
+    "/api/v1/ai/compare-chat/explain" : {
+      "post" : {
+        "description" : "서버가 보관한 순위 결과(rankResultId)를 풀어 쓴 요약을 돌려준다. 요약 실패는 200 + summaryError 로 알린다.",
+        "operationId" : "explain",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompareExplainRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCompareExplainResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "순위 요약 문장",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
+    "/api/v1/ai/compare-chat/rank" : {
+      "post" : {
+        "description" : "카테고리와 선택 세부 조건(보험사·한도 초과 제외)을 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).",
+        "operationId" : "rank",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CompareRankingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCompareRankingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "상품 비교 참고 순위",
+        "tags" : [ "상품 비교 챗봇" ]
+      }
+    },
     "/api/v1/arbitrage-checks" : {
       "get" : {
         "operationId" : "getArbitrageChecks_1",
@@ -7910,11 +8416,21 @@
           }
         } ],
         "responses" : {
-          "404" : {
+          "200" : {
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseAuditLogDetailResponse"
+                }
+              }
+            },
+            "description" : "조회 성공"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -8570,23 +9086,16 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCapCheckSearchResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
             "description" : "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류 등 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCapCheckSearchResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "1,200% 한도 판정 목록 조회 (IF-API-30)",
@@ -8619,20 +9128,13 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCapCheckBasisResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCapCheckBasisResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -8831,9 +9333,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -8841,9 +9343,9 @@
           },
           "422" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9020,9 +9522,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseContractUpdateResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9030,9 +9532,9 @@
           },
           "422" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseContractUpdateResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9338,23 +9840,16 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseDashboardSummaryResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
             "description" : "month 형식(yyyy-MM) 오류 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseDashboardSummaryResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "업무 대시보드 요약 조회 (IF-API-03)",
@@ -9763,6 +10258,26 @@
         "tags" : [ "journal-correction-controller" ]
       }
     },
+    "/api/v1/news/headlines" : {
+      "get" : {
+        "description" : "보험 전문 매체 RSS 의 최신 제목과 원문 링크만 돌려준다. 가져오지 못하면 빈 목록이다.",
+        "operationId" : "headlines",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListNewsHeadline"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "최신 뉴스 헤드라인",
+        "tags" : [ "보험 뉴스" ]
+      }
+    },
     "/api/v1/policies" : {
       "get" : {
         "description" : "정책 유형·기준일·상태로 정책 버전 목록을 조회합니다. 기준일(asOf)은 해당 일자에 유효한 버전만 남깁니다 — 정책은 계약일 기준으로 고르는 경우가 많습니다. 조건에 맞는 자료가 없으면 200과 빈 배열을 반환합니다.",
@@ -9848,9 +10363,9 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9858,9 +10373,9 @@
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9868,9 +10383,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9878,9 +10393,9 @@
           },
           "422" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9919,9 +10434,9 @@
           },
           "404" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyDetailResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -9974,9 +10489,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10031,9 +10546,9 @@
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10041,9 +10556,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10051,9 +10566,9 @@
           },
           "422" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10108,9 +10623,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10780,9 +11295,9 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10790,9 +11305,9 @@
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10800,9 +11315,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10839,9 +11354,9 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10849,9 +11364,9 @@
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10859,9 +11374,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10932,9 +11447,9 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10942,9 +11457,9 @@
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -10952,9 +11467,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11000,9 +11515,9 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11010,9 +11525,9 @@
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11020,9 +11535,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11030,9 +11545,9 @@
           },
           "422" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCommissionPaymentResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11070,9 +11585,9 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseTransactionPrecheckResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11080,9 +11595,9 @@
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseTransactionPrecheckResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11090,9 +11605,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseTransactionPrecheckResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11166,23 +11681,16 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunSearchResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
             "description" : "page<1, size가 1~100 범위 밖, month 형식(yyyy-MM) 오류, status 값 오류 등 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunSearchResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "월 통합검증 실행 목록 조회",
@@ -11214,29 +11722,22 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCreateValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
             "description" : "validationMonth 형식(yyyy-MM) 오류, runType 값 오류 등 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCreateValidationRunResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCreateValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11244,9 +11745,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseCreateValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11284,23 +11785,16 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseActiveMonthlyRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
             "description" : "month 누락 또는 형식(yyyy-MM) 오류 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseActiveMonthlyRunResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           }
         },
         "summary" : "진행 중인 월간 실행 존재 여부 (IF-API-46A)",
@@ -11333,20 +11827,13 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunDetailResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunDetailResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11383,20 +11870,13 @@
             "description" : "기동 수락"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunExecuteResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunExecuteResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11404,9 +11884,9 @@
           },
           "404" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunExecuteResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11414,9 +11894,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunExecuteResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11460,29 +11940,22 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseFinalizeValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
             "description" : "Idempotency-Key 형식 오류 (FGC-COMMON-002)"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseFinalizeValidationRunResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "403" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseFinalizeValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11490,9 +11963,9 @@
           },
           "409" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseFinalizeValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11500,9 +11973,9 @@
           },
           "422" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseFinalizeValidationRunResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11538,20 +12011,13 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseFinalizeChecklistResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseFinalizeChecklistResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11588,20 +12054,13 @@
             "description" : "조회 성공"
           },
           "401" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunProgressResponse"
-                }
-              }
-            },
-            "description" : "인증되지 않은 요청"
+            "description" : "인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다."
           },
           "404" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseValidationRunProgressResponse"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
@@ -11620,6 +12079,9 @@
     "url" : "/"
   } ],
   "tags" : [ {
+    "description" : "설계사 홈 챗봇에 보여 주는 최신 뉴스 헤드라인",
+    "name" : "보험 뉴스"
+  }, {
     "description" : "FUN-060 지급·보류·조정·환수 명세 조회 API",
     "name" : "설계사 수수료 명세"
   }, {
@@ -11646,6 +12108,9 @@
   }, {
     "description" : "검증원장 상세 조회 API",
     "name" : "검증원장"
+  }, {
+    "description" : "FUN-079 상품 비교·참고 순위 API",
+    "name" : "상품 비교 챗봇"
   }, {
     "description" : "FUN-065 수수료 지급 건 등록·수정·확정 API",
     "name" : "수수료 지급 건"
