@@ -1157,6 +1157,7 @@ class PolicyWorkflowIntegrationTest {
         ObjectNode clonedEdit = (ObjectNode) detail(cloneId, writer).path("editDocument");
         for (JsonNode rule : clonedEdit.path("clawbackRules")) {
             assertThat(identities).extracting(row -> row.get("clawback_rule_id"))
+                    .isNotEmpty()
                     .doesNotContain(rule.path("clawbackRuleId").asLong());
         }
         ((ObjectNode) clonedEdit.path("clawbackRules").get(1)).put("clawbackRatePct", "25.000000");
