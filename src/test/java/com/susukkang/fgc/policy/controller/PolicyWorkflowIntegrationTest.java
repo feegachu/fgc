@@ -106,6 +106,25 @@ class PolicyWorkflowIntegrationTest {
         JsonNode secondReview = action(secondId, "SUBMIT", second, writer, 200);
         assertThat(actionError(secondId, "APPROVE", secondReview, approver, 422).path("code").asText())
                 .isEqualTo("FGC-POL-002");
+        // FGC-FUN-017/079: 상품 비교는 보험회사·판매버전으로 정책을 고른 뒤 그 안에서 항목을 푼다.
+        // 전체 항목이나 다른 항목으로 바꾸어도 같은 정책 선택 범위의 겹침을 우회할 수 없다.
+        for (Long alternativeItem : new Long[]{null, itemId}) {
+            ObjectNode alternative = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+            ((ObjectNode) alternative.path("clawbackRules").get(0)).put("commissionItemId", alternativeItem);
+            JsonNode alternativeCreated = create(alternative, writer);
+            long alternativeId = alternativeCreated.path("policyVersionId").asLong();
+            JsonNode alternativeReview = action(alternativeId, "SUBMIT", alternativeCreated, writer, 200);
+            assertThat(actionError(alternativeId, "APPROVE", alternativeReview, approver, 422).path("code").asText())
+                    .isEqualTo("FGC-POL-002");
+        }
+        ObjectNode adjacent = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+        ((ObjectNode) adjacent.path("clawbackRules").get(0)).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 12).put("elapsedMonthTo", 23);
+        JsonNode adjacentCreated = create(adjacent, writer);
+        long adjacentId = adjacentCreated.path("policyVersionId").asLong();
+        JsonNode adjacentReview = action(adjacentId, "SUBMIT", adjacentCreated, writer, 200);
+        JsonNode adjacentApproved = action(adjacentId, "APPROVE", adjacentReview, approver, 200);
+        action(adjacentId, "ACTIVATE", adjacentApproved, approver, 200);
         long otherInsurer = jdbc.queryForObject("""
                 INSERT INTO fgc.insurer(insurer_code,insurer_name,insurer_type)
                 VALUES (?, '다른 보험회사 범위', 'LIFE') RETURNING insurer_id
