@@ -1,5 +1,6 @@
 package com.susukkang.fgc.compare.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -38,6 +39,8 @@ public record CompareRankingResponse(
     public record Excluded(long offeringId, String insurer, String product, List<String> reasonCodes) {
     }
 
+    // springdoc은 단순 클래스명을 스키마 이름으로 쓰므로 ValidationRunDetailResponse.CapSummary와 겹치지 않게 한다.
+    @Schema(name = "CompareCapSummary")
     public record CapSummary(Double usagePct, String status, int contractCount) {
     }
 
