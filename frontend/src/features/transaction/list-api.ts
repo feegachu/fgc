@@ -50,6 +50,14 @@ export function readFilters(params: URLSearchParams): PaymentFilters {
     page: Number.isInteger(page) && page > 0 ? page : 1,
   }
 }
+/**
+ * 화면 표시·조회·정렬·페이지 이동이 함께 쓰는 적용 필터(#752).
+ * settlementMonth 키가 없으면 전역 기준 정산월을 쓰고, 빈 값(`settlementMonth=`)은 사용자가 비운 전체월로 보존한다.
+ */
+export function effectiveFilters(params: URLSearchParams, globalMonth: string | null): PaymentFilters {
+  const filters = readFilters(params)
+  return params.has('settlementMonth') ? filters : { ...filters, settlementMonth: globalMonth ?? '' }
+}
 export function filterParams(filters: PaymentFilters) {
   const query = new URLSearchParams()
   for (const key of filterKeys) if (filters[key]) query.set(key, filters[key])
