@@ -6235,6 +6235,15 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
                 };
             };
+            /** @description 정책 규칙의 적용 구간 충돌 (FGC-POL-002) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
         };
     };
     executePolicyAction: {

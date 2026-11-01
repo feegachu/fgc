@@ -9996,6 +9996,16 @@
               }
             },
             "description" : "정책 상태·수정 시각 또는 멱등키 충돌"
+          },
+          "422" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                }
+              }
+            },
+            "description" : "정책 규칙의 적용 구간 충돌 (FGC-POL-002)"
           }
         },
         "summary" : "정책 초안 수정 (IF-API-80)",
