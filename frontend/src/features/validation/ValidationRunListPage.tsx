@@ -232,7 +232,7 @@ function CreateSection() {
     if (monthOk) mutation.mutate()
   }
   return (
-    <section className="surface" aria-labelledby="vrun-create-title">
+    <section data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-create-title">
           ① 새 실행 만들기

@@ -1,5 +1,6 @@
+import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
 import { ResizableSplit } from '../../components/ResizableSplit'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -112,6 +113,7 @@ function TransactionForm({
   const root = useRef<HTMLDivElement>(null)
   const help = useRef<HTMLButtonElement>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const fullFlow = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   const closeHelp = () => {
     setHelpOpen(false)
     help.current?.focus()
@@ -440,6 +442,7 @@ function TransactionForm({
     <div
       ref={root}
       className={`publishing-page transaction-page transaction-form-page${helpOpen ? ' has-payment-guide' : ''}`}
+      data-guide-target="payment.form"
       data-transaction-form
       aria-busy={loading || busy !== null}
     >
@@ -452,6 +455,8 @@ function TransactionForm({
             ref={help}
             type="button"
             className="button button-secondary"
+            disabled={fullFlow}
+            title={fullFlow ? '전체 업무 가이드가 진행 중입니다.' : undefined}
             aria-expanded={helpOpen}
             onClick={() => setHelpOpen(true)}
           >
