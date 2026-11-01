@@ -8,6 +8,8 @@ import com.susukkang.fgc.policy.dto.CapRuleSetResponse;
 import com.susukkang.fgc.policy.dto.CapRuleSetRow;
 import com.susukkang.fgc.policy.dto.CommissionRuleResponse;
 import com.susukkang.fgc.policy.dto.PolicyDetailResponse;
+import com.susukkang.fgc.policy.dto.PolicyDraft;
+import com.susukkang.fgc.policy.dto.PolicyReferenceResponse;
 import com.susukkang.fgc.policy.dto.PolicyVersionResponse;
 import com.susukkang.fgc.policy.dto.PolicyVersionRow;
 import com.susukkang.fgc.policy.dto.RefundRateTableResponse;
@@ -23,9 +25,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -73,17 +78,44 @@ public class PolicyQueryService {
                 RefundRateTableRow.fromDetails(refundRateTableRepository.selectRefundRateTables(policyVersionId)).stream()
                         .map(RefundRateTableResponse::from)
                         .toList();
+        PolicyDraft draft = policyWriteRepository.readDraft(policy);
         return new PolicyDetailResponse(
                 PolicyVersionResponse.from(header),
                 header.getSourceRefs(),
                 commissionRules,
                 capRuleSets,
                 refundRateTables,
-                policyWriteRepository.readDraft(policy),
+                draft,
                 policyWriteRepository.findApprovalActions(policyVersionId),
                 policyWriteService.allowedActions(policy),
                 policy.getApprovalEvidenceRef(),
-                policyWriteRepository.applicationPeriod(policyVersionId));
+                policyWriteRepository.applicationPeriod(policyVersionId),
+                references(draft),
+                policyWriteRepository.offeringGovernance(policyVersionId));
+    }
+
+    /** 근거 info 패널: 정책에 연결된 참조마다 레지스트리 항목명과 이 정책버전에 저장된 상세를 붙인다. */
+    private List<PolicyReferenceResponse> references(PolicyDraft draft) {
+        Map<String, PolicyDraft.SourceDetailDraft> details = draft.sourceDetails().stream()
+                .collect(Collectors.toMap(PolicyDraft.SourceDetailDraft::ref, d -> d, (a, b) -> a));
+        Set<String> codes = new LinkedHashSet<>();
+        Stream.concat(draft.regulationRefs().stream(), draft.sourceRefs().stream())
+                .map(PolicyWriteService::referenceCode).filter(Objects::nonNull).forEach(codes::add);
+        Map<String, String> titles = policyWriteRepository.referenceTitles(codes);
+        List<PolicyReferenceResponse> rows = new ArrayList<>();
+        draft.regulationRefs().forEach(ref -> rows.add(reference(ref, "REGULATION", titles, details)));
+        draft.sourceRefs().forEach(ref -> rows.add(reference(ref, "SOURCE", titles, details)));
+        return rows;
+    }
+
+    private static PolicyReferenceResponse reference(String ref, String group, Map<String, String> titles,
+                                                     Map<String, PolicyDraft.SourceDetailDraft> details) {
+        String code = PolicyWriteService.referenceCode(ref);
+        PolicyDraft.SourceDetailDraft detail = details.get(ref);
+        return new PolicyReferenceResponse(ref, code, group, code == null ? null : titles.get(code),
+                detail == null ? null : detail.title(), detail == null ? null : detail.explanation(),
+                detail == null || detail.url() == null || detail.url().isBlank() ? null : detail.url(),
+                detail == null ? List.of() : detail.statusTags());
     }
 
     private Map<Long, String> findUserLogins(List<PolicyVersion> policies) {

@@ -113,7 +113,7 @@ class ContractDetailControllerTest {
     void statusEventLabelsKeepNullablePreviousStatus() throws Exception {
         when(contractService.selectStatusEventsByContractId(21L)).thenReturn(List.of(
                 new ContractStatusEventResponse(1, null, ContractStatus.ACTIVE,
-                        null, null, List.of(), "TEST", "1")));
+                        null, null, List.of(), "TEST", "1", 7L, null, null, null)));
 
         mockMvc.perform(get("/api/v1/contracts/{id}/status-events", 21L)
                         .with(user("settlement").roles("SETTLEMENT")))

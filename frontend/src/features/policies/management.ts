@@ -42,7 +42,7 @@ export interface SourceDetail {
   title: string
   explanation: string
   url: string | null
-  // Optional UI metadata; the write API's status-tag mapping is not connected yet.
+  // Older responses may omit the persisted source status tags.
   statusTags?: string[]
 }
 export interface CommissionDraft {
@@ -79,6 +79,7 @@ export interface FeeRegimeDraft {
   sourceRefs: string[]
 }
 export interface ClawbackDraft {
+  clawbackRuleId?: number
   insurerId: NumberInput
   productOfferingId: NumberInput
   commissionItemId: NumberInput

@@ -284,6 +284,10 @@ export class GuideRuntime<State> {
       )
     })
   }
+  /** Previous only returns to a step visited under the current context; resume after an edit clears the visits. */
+  canGoBack(): boolean {
+    return this.history.length > 0
+  }
   async previous(): Promise<void> {
     if (!this.active() || !this.history.length || this.snapshot.status === 'PREPARING' || this.operation) return
     const previous = this.history.pop()!

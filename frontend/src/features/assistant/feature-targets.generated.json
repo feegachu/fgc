@@ -400,29 +400,14 @@
     "element": "button"
   },
   {
-    "id": "features.agent-home.agent-home-page.button-4",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "button"
-  },
-  {
     "id": "features.agent-home.agent-home-page.button-5",
     "file": "features/agent-home/AgentHomePage.tsx",
     "element": "button"
   },
   {
-    "id": "features.agent-home.agent-home-page.button-6",
+    "id": "features.agent-home.agent-home-page.commission-link",
     "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "button"
-  },
-  {
-    "id": "features.agent-home.agent-home-page.button-7",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "button"
-  },
-  {
-    "id": "features.agent-home.agent-home-page.div",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "div"
+    "element": "Link"
   },
   {
     "id": "features.agent-home.agent-home-page.fgc-ai",
@@ -430,7 +415,7 @@
     "element": "button"
   },
   {
-    "id": "features.agent-home.agent-home-page.link",
+    "id": "features.agent-home.agent-home-page.need-contracts-link",
     "file": "features/agent-home/AgentHomePage.tsx",
     "element": "Link"
   },
@@ -458,6 +443,116 @@
     "id": "features.agent-home.charts.table",
     "file": "features/agent-home/charts.tsx",
     "element": "table"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.calc-section",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.category",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.close",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.compare-table",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.evidence-close",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.faq",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.follow-up",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.news",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.news-link",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "a"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.question-input",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.restart",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.retry-categories",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.retry-category",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.row-evidence",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.send",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.suggest-restart",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.top-evidence",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.chatbot-modal.top-rank",
+    "file": "features/agent-home/chatbot/ChatbotModal.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-home.chatbot.filter-panel.exclude-cap-overflow",
+    "file": "features/agent-home/chatbot/FilterPanel.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.chatbot.filter-panel.insurer-chip",
+    "file": "features/agent-home/chatbot/FilterPanel.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.filter-panel.reset",
+    "file": "features/agent-home/chatbot/FilterPanel.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.chatbot.filter-panel.section",
+    "file": "features/agent-home/chatbot/FilterPanel.tsx",
+    "element": "section"
   },
   {
     "id": "features.arbitrage.arbitrage-detail.section",
@@ -895,6 +990,11 @@
     "element": "SearchSelect"
   },
   {
+    "id": "features.contract.contract-form-page.agent-name",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "input"
+  },
+  {
     "id": "features.contract.contract-form-page.button",
     "file": "features/contract/ContractFormPage.tsx",
     "element": "Button"
@@ -921,6 +1021,16 @@
   },
   {
     "id": "features.contract.contract-form-page.button-6",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.confirm-save",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-form-page.confirm-save-back",
     "file": "features/contract/ContractFormPage.tsx",
     "element": "Button"
   },
@@ -965,6 +1075,11 @@
     "element": "Link"
   },
   {
+    "id": "features.contract.contract-form-page.next-contract-status",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "select"
+  },
+  {
     "id": "features.contract.contract-form-page.organization-name",
     "file": "features/contract/ContractFormPage.tsx",
     "element": "input"
@@ -993,6 +1108,26 @@
     "id": "features.contract.contract-form-page.section-3",
     "file": "features/contract/ContractFormPage.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.contract.contract-form-page.status-event-effective-at",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-form-page.status-event-reason",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.contract.contract-form-page.status-event-reason-code",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-form-page.status-event-received-at",
+    "file": "features/contract/ContractFormPage.tsx",
+    "element": "input"
   },
   {
     "id": "features.contract.contract-list-page.button",
@@ -1530,11 +1665,6 @@
     "element": "input"
   },
   {
-    "id": "features.policies.policy-draft-editor.input-4",
-    "file": "features/policies/PolicyDraftEditor.tsx",
-    "element": "input"
-  },
-  {
     "id": "features.policies.policy-draft-editor.input-5",
     "file": "features/policies/PolicyDraftEditor.tsx",
     "element": "input"
@@ -1543,6 +1673,11 @@
     "id": "features.policies.policy-draft-editor.policy-policy-name",
     "file": "features/policies/PolicyDraftEditor.tsx",
     "element": "input"
+  },
+  {
+    "id": "features.policies.policy-draft-editor.reload-latest",
+    "file": "features/policies/PolicyDraftEditor.tsx",
+    "element": "Button"
   },
   {
     "id": "features.policies.policy-draft-editor.section",
@@ -1635,6 +1770,11 @@
     "element": "input"
   },
   {
+    "id": "features.policies.policy-management.offering-governance",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "section"
+  },
+  {
     "id": "features.policies.policy-management.section",
     "file": "features/policies/PolicyManagement.tsx",
     "element": "section"
@@ -1658,6 +1798,11 @@
     "id": "features.policies.policy-management.textarea",
     "file": "features/policies/PolicyManagement.tsx",
     "element": "textarea"
+  },
+  {
+    "id": "features.policies.policy-reference-info.source-link",
+    "file": "features/policies/PolicyReferenceInfo.tsx",
+    "element": "a"
   },
   {
     "id": "features.reconciliation.compare-modal.button",

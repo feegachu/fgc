@@ -249,13 +249,23 @@ public enum FgcErrorCode {
     IMPL_GUIDE_VERSION_MISMATCH("FGC-IMPL-GUIDE_VERSION_MISMATCH", HttpStatus.CONFLICT,
             "error.ai.guideVersionMismatch"),
 
+    // IF-API-73 환수 통지서: 계산판(FUN-055)이 없는 case는 통지서를 만들 수 없다.
+    CLAW_001("FGC-CLAW-001", HttpStatus.UNPROCESSABLE_ENTITY, "error.clawback.notCalculated"),
     POL_001("FGC-POL-001", HttpStatus.CONFLICT, "error.policy.selfApproval"),
     POL_002("FGC-POL-002", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.overlap"),
     POL_003("FGC-POL-003", HttpStatus.CONFLICT, "error.policy.stateChanged"),
+    POL_004("FGC-POL-004", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.submissionRequired"),
+    POL_005("FGC-POL-005", HttpStatus.BAD_REQUEST, "error.policy.invalidClawbackTarget"),
     IMPL_IDEMPOTENCY_CONFLICT("FGC-IMPL-IDEMPOTENCY_CONFLICT", HttpStatus.CONFLICT,
             "error.common.idempotencyConflict"),
     IMPL_REQUEST_IN_PROGRESS("FGC-IMPL-REQUEST_IN_PROGRESS", HttpStatus.CONFLICT,
             "error.common.requestInProgress"),
+    IMPL_STATE_CHANGED("FGC-IMPL-STATE_CHANGED", HttpStatus.CONFLICT, "error.common.stateChanged"),
+    IMPL_POLICY_MISSING("FGC-IMPL-POLICY_MISSING", HttpStatus.UNPROCESSABLE_ENTITY, "error.common.policyMissing"),
+    // FUN-025·026 계약 상태 사건(인터페이스정의서 §14-1 예약 코드)
+    IMPL_AGENT_FIXED("FGC-IMPL-AGENT_FIXED", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.agentFixed"),
+    IMPL_EVENT_ORDER("FGC-IMPL-EVENT_ORDER", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.eventOrder"),
+    IMPL_TRANSITION_DENIED("FGC-IMPL-TRANSITION_DENIED", HttpStatus.CONFLICT, "error.contract.transitionDenied"),
 
     COMMON_002(
             "FGC-COMMON-002",

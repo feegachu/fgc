@@ -23,7 +23,15 @@ import type { Agent } from '../base/api'
 import { Amount, CapStatus } from '../cap/badges'
 import { STATUSES } from '../cap/labels'
 import { QueryState } from '../reference/ReferenceUI'
-import { CONTRACT_SORT_KEYS, contractListQuery, criteriaFromParams, listCsvPath, normalizePage, PAGE_SIZE } from './api'
+import {
+  CONTRACT_SORT_KEYS,
+  contractListQuery,
+  criteriaFromParams,
+  listCsvPath,
+  NEED_CHECK_STATUSES,
+  normalizePage,
+  PAGE_SIZE,
+} from './api'
 import type { ContractCriteria, ContractSummary } from './api'
 import { contractStatusLabels } from './labels'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
@@ -379,7 +387,10 @@ function ContractFilters({
           {select(
             'capResultStatus',
             '1,200% 판정',
-            Object.entries(STATUSES).map(([value, label]) => ({ value, label })),
+            [
+              ...Object.entries(STATUSES).map(([value, label]) => ({ value, label })),
+              { value: NEED_CHECK_STATUSES, label: '확인 필요(주의·위반·검토필요)' },
+            ],
           )}
         </div>
       </FilterBar>

@@ -865,6 +865,29 @@ describe('FUN-087 real form observer', () => {
     expect(writes().filter(([path]) => path.endsWith('/precheck'))).toHaveLength(1)
     expect(screen.queryByText('1,200% 사전검증을 수행하지 못했습니다.')).not.toBeInTheDocument()
   })
+  it('does not let a hung guide evidence read hold up precheck', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    const timeouts = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController()
+      setTimeout(() => controller.abort(new DOMException('timed out', 'TimeoutError')), 20)
+      return controller.signal
+    })
+    const request = vi.mocked(apiClient.request)
+    const original = request.getMockImplementation()!
+    // The detail GET never answers until its signal aborts.
+    request.mockImplementation(((path: string, options: RequestOptions = {}) =>
+      path === '/api/v1/transactions/77' && !options.method
+        ? new Promise((_, reject) =>
+            options.signal?.addEventListener('abort', () => reject(options.signal!.reason), { once: true }),
+          )
+        : original(path, options)) as typeof apiClient.request)
+    await user.click(button('btn-precheck'))
+    await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    expect(timeouts).toHaveBeenCalledWith(5000)
+    expect(writes().filter(([path]) => path.endsWith('/precheck'))).toHaveLength(1)
+    expect(screen.queryByText('1,200% 사전검증을 수행하지 못했습니다.')).not.toBeInTheDocument()
+  })
 
   it.each([0, 503, 422])('shows confirmation failure after a guide revision change: %s', async (status) => {
     const { user } = mount()
@@ -1034,5 +1057,37 @@ describe('FUN-087 guide card and spotlight', () => {
     expect(help).toHaveFocus()
     expect(screen.getByLabelText(/금액 \(원\)/)).toHaveValue(250000)
     expect(writes()).toHaveLength(0)
+  })
+  it('enables 이전 only while a visited step remains after an edit resumes the guide', async () => {
+    const { user } = mount()
+    await fillNew(user)
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    await user.click(within(panel()).getByRole('button', { name: '지급 초안 저장' }))
+    await next(user, true)
+    await waitFor(() =>
+      expect(within(panel()).getByRole('heading')).toHaveTextContent('지급액과 계산 근거를 비교하세요'),
+    )
+    await waitFor(() => expect(within(panel()).getByRole('button', { name: '이전' })).toBeEnabled())
+    await user.type(screen.getByLabelText('증빙', { selector: 'input', exact: true }), 'x')
+    await user.click(await within(panel()).findByRole('button', { name: '현재 내용으로 다시 찾기' }))
+    await within(panel()).findByRole('button', { name: '확인하고 다음' })
+    expect(within(panel()).getByRole('heading')).toHaveTextContent('지급액과 계산 근거를 비교하세요')
+    expect(within(panel()).getByRole('button', { name: '이전' })).toBeDisabled()
+  })
+  it('lets an open search list take Esc before the guide closes', async () => {
+    const { user } = mount()
+    await waitFor(() => expect(screen.getByLabelText(/수령 설계사/)).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    const recipient = screen.getByLabelText(/수령 설계사/)
+    await user.click(recipient)
+    await user.type(recipient, '1')
+    await waitFor(() => expect(screen.getByRole('listbox')).toBeInTheDocument())
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(panel()).toBeInTheDocument()
+    expect(recipient).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('region', { name: '지급 업무 가이드' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '도움말' })).toHaveFocus()
   })
 })
