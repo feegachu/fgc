@@ -412,7 +412,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     <div className="pico-assistant-root">
       {!visible && (
         <div className="pico-launcher">
-          <span className="pico-launcher-hint">업무가 막히면 피코를 불러요</span>
           <button
             id={`${panelId}-launcher`}
             className="pico-launcher-button"
@@ -424,7 +423,8 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
               setOpen(true)
             }}
           >
-            <img src={basic} alt="피코" />
+            <img src={basic} alt="" />
+            <span className="pico-launcher-hint">업무 비서 AI</span>
           </button>
         </div>
       )}
