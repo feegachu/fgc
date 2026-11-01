@@ -35,6 +35,7 @@ public class PolicyDraftValidator {
     private static final String FEE_RULE_PREFIX = "feeRegimeRules[";
     private static final String COMMISSION_RULE_PREFIX = "commissionRules[";
     private static final String CONFLICTING_INDEX = "conflictingIndex";
+    private static final String DUPLICATE_CHILD_ID = "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.";
     private static final Set<String> HEADER_REGIMES = Set.of("CURRENT", FOUR_YEAR, SEVEN_YEAR);
     private static final Map<String, String> SCHEDULE_VALUES = Map.of(
             "STATUS_MONTH_RULE", "PAY_IF_ACTIVE_ON_DUE_DATE",
@@ -73,7 +74,7 @@ public class PolicyDraftValidator {
             var rule = draft.clawbackRules().get(i);
             String field = "clawbackRules[" + i + "]";
             if (rule.clawbackRuleId() != null && !ids.add(rule.clawbackRuleId())) {
-                throw invalid(field + ".clawbackRuleId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
+                throw invalid(field + ".clawbackRuleId", DUPLICATE_CHILD_ID);
             }
             validateClawbackRule(rule, field);
             for (int j = 0; j < i; j++) {
@@ -167,7 +168,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.commissionRules().size(); i++) {
             CommissionRuleDraft rule = draft.commissionRules().get(i);
             if (rule.commissionRuleId() != null && !commissionIds.add(rule.commissionRuleId())) {
-                throw invalid(COMMISSION_RULE_PREFIX + i + "].commissionRuleId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
+                throw invalid(COMMISSION_RULE_PREFIX + i + "].commissionRuleId", DUPLICATE_CHILD_ID);
             }
             validateCommission(rule, COMMISSION_RULE_PREFIX + i + "]");
         }
@@ -181,7 +182,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.feeRegimeRules().size(); i++) {
             FeeRegimeRuleDraft rule = draft.feeRegimeRules().get(i);
             if (rule.feeRegimeRulesetId() != null && !feeIds.add(rule.feeRegimeRulesetId())) {
-                throw invalid(FEE_RULE_PREFIX + i + "].feeRegimeRulesetId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
+                throw invalid(FEE_RULE_PREFIX + i + "].feeRegimeRulesetId", DUPLICATE_CHILD_ID);
             }
             validateFeeRule(rule, requiredRegime, FEE_RULE_PREFIX + i + "]");
             if (draft.basicDocumentVersion() != null && rule.basicDocumentVersion() != null
