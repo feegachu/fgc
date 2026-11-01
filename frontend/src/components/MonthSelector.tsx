@@ -196,7 +196,7 @@ export function MonthSelector({
             </p>
           </div>
           <div className="month-selector-footer">
-            <p className="month-selector-selection">선택 · {draft ?? '-'}</p>
+            <p className="month-selector-selection">선택, {draft ?? '-'}</p>
             <div className="month-selector-actions">
               <Button variant="secondary" disabled={busy} onClick={close}>
                 취소

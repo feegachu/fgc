@@ -1,7 +1,7 @@
 import { ReferenceText } from '../reference/ReferenceUI'
 import { present } from '../reference/utils'
 import type { TableColumn } from '../../components/DataTable'
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { date } from '../../lib/format'
 import type { Agent, CommissionItem, Insurer, Organization, Product } from './api'
 const active = (value?: boolean) => (
@@ -29,7 +29,9 @@ export const organizationColumns: TableColumn<Organization>[] = [
     label: '유형',
     render: (r) => (
       <>
-        {present(r.organizationTypeLabel)} <span className="base-code-label">{r.organizationType}</span>
+        <CategoryBadge value={r.organizationType} optionCount={5}>
+          {present(r.organizationTypeLabel)}
+        </CategoryBadge>
       </>
     ),
   },
@@ -67,7 +69,9 @@ export const insurerColumns: TableColumn<Insurer>[] = [
     label: '구분',
     render: (r) => (
       <>
-        {present(r.insurerTypeLabel)} <span className="base-code-label">{r.insurerType}</span>
+        <CategoryBadge value={r.insurerType} optionCount={2}>
+          {present(r.insurerTypeLabel)}
+        </CategoryBadge>
       </>
     ),
   },
@@ -130,13 +134,21 @@ export const productColumns: TableColumn<Product>[] = [
     label: '채널',
     render: (r) => present(r.channelCode),
   },
-  { key: 'fee', label: '수수료체계', render: (r) => present(r.feeRegimeCode) },
+  {
+    key: 'fee',
+    label: '수수료체계',
+    render: (r) => (
+      <CategoryBadge value={r.feeRegimeCode} optionCount={3}>
+        {present(r.feeRegimeCode)}
+      </CategoryBadge>
+    ),
+  },
   {
     key: 'deduction',
     label: '80% 공제',
     align: 'center',
     render: (r) => (
-      <StatusBadge tone={r.standardDeduction80Yn ? 'warning' : 'neutral'}>
+      <StatusBadge kind="category" tone={r.standardDeduction80Yn ? 'warning' : 'neutral'}>
         {r.standardDeduction80Yn ? '예' : '아니오'}
       </StatusBadge>
     ),
@@ -155,11 +167,7 @@ export const agentColumns: TableColumn<Agent>[] = [
   {
     key: 'rank',
     label: '직급',
-    render: (r) => (
-      <>
-        {present(r.rankLabel)} <span className="base-code-label">{r.rankCode}</span>
-      </>
-    ),
+    render: (r) => <>{present(r.rankLabel)}</>,
   },
   {
     key: 'org',
@@ -245,7 +253,7 @@ export const commissionColumns: TableColumn<CommissionItem>[] = [
     label: '지급/차감',
     align: 'center',
     render: (r) => (
-      <StatusBadge tone={r.cashflowType === 'PAYMENT' ? 'success' : 'warning'}>
+      <StatusBadge kind="category" tone={r.cashflowType === 'PAYMENT' ? 'success' : 'warning'}>
         {r.cashflowType === 'PAYMENT' ? '지급' : r.cashflowType === 'DEDUCTION' ? '차감' : '-'}
       </StatusBadge>
     ),
@@ -253,12 +261,15 @@ export const commissionColumns: TableColumn<CommissionItem>[] = [
   {
     key: 'category',
     label: '분류',
-    render: (r) =>
-      r.itemCode === 'SETTLEMENT_SUPPORT'
-        ? '정착지원'
-        : r.itemCode === 'NEWCOMER_SUPPORT'
-          ? '신인지원'
-          : (categories[r.itemCategory ?? ''] ?? present(r.itemCategory)),
+    render: (r) => (
+      <CategoryBadge value={r.itemCategory ?? r.itemCode} optionCount={Object.keys(categories).length}>
+        {r.itemCode === 'SETTLEMENT_SUPPORT'
+          ? '정착지원'
+          : r.itemCode === 'NEWCOMER_SUPPORT'
+            ? '신인지원'
+            : (categories[r.itemCategory ?? ''] ?? present(r.itemCategory))}
+      </CategoryBadge>
+    ),
   },
   { key: 'from', label: '적용 시작일', render: (r) => date(r.effectiveFrom) },
   { key: 'to', label: '적용 종료일', render: (r) => date(r.effectiveTo) },

@@ -94,7 +94,7 @@ public class PolicyDraftValidator {
 
     private static void validateCommissionRules(PolicyDraft draft) {
         if (!draft.commissionRules().isEmpty() && !COMMISSION_TYPES.contains(draft.policyType())) {
-            throw invalid("commissionRules", "수수료 규칙은 현행·4년·7년 수수료 정책에만 등록할 수 있습니다.");
+            throw invalid("commissionRules", "수수료 규칙은 현행/4년/7년 수수료 정책에만 등록할 수 있습니다.");
         }
         Set<Long> commissionIds = new HashSet<>();
         for (int i = 0; i < draft.commissionRules().size(); i++) {
@@ -108,7 +108,7 @@ public class PolicyDraftValidator {
 
     private static void validateFeeRules(PolicyDraft draft, String requiredRegime) {
         if (!draft.feeRegimeRules().isEmpty() && requiredRegime == null) {
-            throw invalid("feeRegimeRules", "분급 룰셋은 4년·7년 수수료 정책에만 등록할 수 있습니다.");
+            throw invalid("feeRegimeRules", "분급 룰셋은 4년/7년 수수료 정책에만 등록할 수 있습니다.");
         }
         Set<Long> feeIds = new HashSet<>();
         for (int i = 0; i < draft.feeRegimeRules().size(); i++) {
@@ -161,7 +161,7 @@ public class PolicyDraftValidator {
                         && left.installmentFrom() <= right.installmentTo()
                         && right.installmentFrom() <= left.installmentTo()) {
                     throw new FgcBusinessException(FgcErrorCode.POL_002, COMMISSION_RULE_PREFIX + j + "]",
-                            Map.of("conflictingIndex", i), "같은 적용 범위·우선순위의 수수료 규칙 회차가 겹칩니다.");
+                            Map.of("conflictingIndex", i), "같은 적용 범위/우선순위의 수수료 규칙 회차가 겹칩니다.");
                 }
             }
         }

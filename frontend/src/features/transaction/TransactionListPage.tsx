@@ -14,7 +14,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { errorText, int, isNegative, month as formatMonth, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { withMonth } from '../../stores/workspace'
@@ -110,7 +110,13 @@ export default function TransactionListPage() {
       key: 'source',
       label: '원천유형',
       width: '7rem',
-      render: (row) => disclosure(row.sourceTypeLabel || row.sourceType),
+      render: (row) => (
+        <CategoryBadge tablePresentation="text" value={row.sourceType} optionCount={sourceOptions.length}>
+          {disclosure(
+            row.sourceTypeLabel || sourceOptions.find(([code]) => code === row.sourceType)?.[1] || '확인 필요',
+          )}
+        </CategoryBadge>
+      ),
     },
     {
       key: 'key',
@@ -158,6 +164,7 @@ export default function TransactionListPage() {
       align: 'center',
       render: (row) => (
         <StatusBadge
+          kind="category"
           tone={row.status === 'CANCELLED' ? 'neutral' : row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}
         >
           {row.status === 'CANCELLED' ? '취소' : row.cashflowTypeLabel || row.cashflowType}
@@ -170,8 +177,11 @@ export default function TransactionListPage() {
       width: '5.5rem',
       align: 'center',
       render: (row) => (
-        <StatusBadge tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}>
-          {row.statusLabel || row.status}
+        <StatusBadge
+          tablePresentation="dot"
+          tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}
+        >
+          {row.statusLabel || statusOptions.find(([code]) => code === row.status)?.[1] || '확인 필요'}
         </StatusBadge>
       ),
     },
@@ -186,7 +196,7 @@ export default function TransactionListPage() {
         const imbalance = count === 0 || Number(row.differenceAmount ?? 0) !== 0
         return (
           <StatusBadge tone={imbalance ? 'error' : 'success'}>
-            {count}건 · {imbalance ? '확인필요' : '일치'}
+            {count}건, {imbalance ? '확인필요' : '일치'}
           </StatusBadge>
         )
       },
@@ -270,7 +280,7 @@ export default function TransactionListPage() {
           <strong>{deleteTarget?.sourceBusinessKey || '선택한 지급 건'}</strong> 초안을 삭제하시겠습니까?
         </p>
         <p>
-          {deleteTarget?.paymentStageLabel} · {formatMonth(deleteTarget?.settlementMonth)} · {won(deleteTarget?.amount)}
+          {deleteTarget?.paymentStageLabel}, {formatMonth(deleteTarget?.settlementMonth)}, {won(deleteTarget?.amount)}
         </p>
         <p>삭제한 초안은 복구할 수 없습니다.</p>
         {deletion.isError && (
@@ -324,7 +334,7 @@ export default function TransactionListPage() {
             <span className="tabular-nums" id="row-count">
               {int(total)}
             </span>
-            건 · 한 화면 20행
+            건, 한 화면 20행
           </span>
         </header>
         <DataTable
@@ -465,7 +475,7 @@ function TransactionFilters({
           'f-insurer',
           '보험회사',
           'transaction-filter-insurer',
-          insurers.map((row) => [String(row.insurerId), `${row.insurerCode} · ${row.insurerName}`]),
+          insurers.map((row) => [String(row.insurerId), `${row.insurerCode}, ${row.insurerName}`]),
         )}
         <Field label="계약번호" className="filter-field transaction-filter-contract">
           <input

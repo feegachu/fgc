@@ -1,9 +1,10 @@
+import { policyCodeLabel } from './labels'
 import { useContext, useRef, useState } from 'react'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { Field } from '../../components/Field'
 import { DataTable } from '../../components/DataTable'
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date, dateTime, rate, won, today } from '../../lib/format'
 import { ReferenceTabs } from '../reference/ReferenceUI'
@@ -66,7 +67,8 @@ export function PolicyManagement({
   const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
   const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
   const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
-  const successorRef = detail.approvalActions?.find((entry) => entry.actionType === 'RETIRE')
+  const successorRef = detail.approvalActions
+    ?.find((entry) => entry.actionType === 'RETIRE')
     ?.evidenceRefs?.find((ref) => /^policy:\d+$/.test(ref))
   const refs = [
     ...new Set([...(policy.regulationRefs ?? []), ...(detail.sourceRefs ?? []), ...(draft?.sourceRefs ?? [])]),
@@ -75,12 +77,9 @@ export function PolicyManagement({
     <div className="policy-management">
       <header className="policy-detail-hero">
         <div>
-          <p className="policy-eyebrow">
-            {policy.policyCode} <span>VERSION {policy.versionNo}</span>
-          </p>
           <h2>{policy.policyName ?? '정책명 자료 없음'}</h2>
           <p>
-            {policy.policyTypeLabel ?? '유형 자료 없음'} <span>·</span> {policy.sourceClassLabel ?? '출처 자료 없음'}
+            {policy.policyTypeLabel ?? '유형 자료 없음'} <span>, </span> {policy.sourceClassLabel ?? '출처 자료 없음'}
           </p>
         </div>
         <StatusBadge tone={tones[policy.status ?? '']}>
@@ -113,7 +112,8 @@ export function PolicyManagement({
           <div>
             <dt>계약일 적용 기간</dt>
             <dd>
-              {date(detail.applicationPeriod.from)} ~ {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
+              {date(detail.applicationPeriod.from)} ~{' '}
+              {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
               {detail.applicationPeriod.successorPolicyVersionId && <small>이후 계약은 후속 버전 적용</small>}
             </dd>
           </div>
@@ -122,17 +122,17 @@ export function PolicyManagement({
           <div>
             <dt>계약일 적용 기간</dt>
             <dd>
-              {successorRef ? '정정·승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
+              {successorRef ? '정정/승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
               {successorRef && <small>후속 정책 {successorRef.replace('policy:', '#')}</small>}
             </dd>
           </div>
         )}
         <div>
           <dt>작성자</dt>
-          <dd>{policy.createdBy ?? detail.createdBy ?? '자료 없음'}</dd>
+          <dd>{policy.createdBy ?? detail.createdBy ?? '-'}</dd>
         </div>
         <div>
-          <dt>승인자 · 승인 일시</dt>
+          <dt>승인자, 승인 일시</dt>
           <dd>
             {policy.approvedBy ?? detail.approvedBy ?? '미승인'}
             <small>
@@ -144,11 +144,11 @@ export function PolicyManagement({
         </div>
         <div>
           <dt>기초서류 버전</dt>
-          <dd>{draft?.basicDocumentVersion || '자료 없음'}</dd>
+          <dd>{draft?.basicDocumentVersion || '-'}</dd>
         </div>
         <div>
           <dt>승인 근거 문서</dt>
-          <dd>{detail.approvalEvidenceRef || '자료 없음'}</dd>
+          <dd>{detail.approvalEvidenceRef || '-'}</dd>
         </div>
       </dl>
       <div className="policy-action-bar">
@@ -207,7 +207,7 @@ export function PolicyManagement({
             {!detail.approvalActions?.length ? (
               <div className="policy-editor-empty">
                 <strong>기록된 승인 이력이 없습니다.</strong>
-                <p>제출·승인·반려·활성화 이력이 시간순으로 표시됩니다.</p>
+                <p>제출/승인/반려/활성화 이력이 시간순으로 표시됩니다.</p>
               </div>
             ) : (
               <ol className="policy-timeline">
@@ -228,7 +228,7 @@ export function PolicyManagement({
                       <p>{entry.reason}</p>
                       <small>
                         {entry.actor}
-                        {entry.evidenceRefs?.length ? ` · ${entry.evidenceRefs.join(', ')}` : ''}
+                        {entry.evidenceRefs?.length ? `, ${entry.evidenceRefs.join(', ')}` : ''}
                       </small>
                     </div>
                   </li>
@@ -276,7 +276,7 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
       {!sources.length && !missing.length && (
         <div className="policy-editor-empty">
           <strong>연결된 근거 자료가 없습니다.</strong>
-          <p>정책에 연결한 근거의 제목·설명·링크를 확인할 수 있습니다.</p>
+          <p>정책에 연결한 근거의 제목/설명/링크를 확인할 수 있습니다.</p>
         </div>
       )}
       {sources.map((source) => (
@@ -302,7 +302,7 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
           <div>
             <StatusBadge>{ref}</StatusBadge>
             <SourceStatusTags />
-            <p>제목·설명·링크 자료가 아직 제공되지 않았습니다.</p>
+            <p>제목/설명/링크 자료가 아직 제공되지 않았습니다.</p>
           </div>
         </article>
       ))}
@@ -329,7 +329,7 @@ function ReadOnlyRuleSummary({ detail }: { detail: ManagedPolicyDetail }) {
     return (
       <div className="policy-editor-empty">
         <strong>조회된 설정 규칙이 없습니다.</strong>
-        <p>이 정책에 수수료·한도·환급률 규칙 자료가 제공되지 않았습니다.</p>
+        <p>이 정책에 수수료/한도/환급률 규칙 자료가 제공되지 않았습니다.</p>
       </div>
     )
   return (
@@ -382,12 +382,12 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             },
             {
               key: 'product',
-              label: '상품 · 판매버전',
+              label: '상품, 판매버전',
               render: (r) =>
                 r.productOfferingId ? (
                   <span>
                     {detail.commissionRules?.[r.row - 1]?.productName ?? '상품명 자료 없음'}
-                    <small className="policy-cell-subtitle">판매버전 ID · {r.productOfferingId}</small>
+                    <small className="policy-cell-subtitle">판매버전 ID, {r.productOfferingId}</small>
                   </span>
                 ) : (
                   '전체'
@@ -398,13 +398,17 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
               label: '수수료 항목',
               render: (r) =>
                 detail.commissionRules?.[r.row - 1]?.itemName ??
-                (r.commissionItemId ? `항목 ID · ${r.commissionItemId}` : '자료 없음'),
+                (r.commissionItemId ? `항목 ID, ${r.commissionItemId}` : '-'),
             },
             { key: 'range', label: '회차', render: (r) => `${r.installmentFrom} ~ ${r.installmentTo}` },
             {
               key: 'type',
               label: '계산 방식',
-              render: (r) => <StatusBadge tone="info">{r.calculationType}</StatusBadge>,
+              render: (r) => (
+                <CategoryBadge value={r.calculationType} optionCount={2}>
+                  {policyCodeLabel(r.calculationType)}
+                </CategoryBadge>
+              ),
             },
             {
               key: 'value',
@@ -457,7 +461,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             </div>
             <div>
               <dt>근거</dt>
-              <dd>{rule.sourceRefs.join(', ') || '자료 없음'}</dd>
+              <dd>{rule.sourceRefs.join(', ') || '-'}</dd>
             </div>
           </dl>
         </section>
@@ -485,7 +489,14 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             {
               key: 'basis',
               label: '기준금액 코드',
-              render: (r) => r.clawbackBasisCode || <StatusBadge tone="warning">설정 필요</StatusBadge>,
+              render: (r) =>
+                r.clawbackBasisCode ? (
+                  <CategoryBadge value={r.clawbackBasisCode} optionCount={0}>
+                    {policyCodeLabel(r.clawbackBasisCode)}
+                  </CategoryBadge>
+                ) : (
+                  '설정 필요'
+                ),
             },
             {
               key: 'rate',
@@ -612,9 +623,9 @@ function PolicyActionDialog({
           <dd>{policy.policyName}</dd>
         </div>
         <div>
-          <dt>버전 · 상태</dt>
+          <dt>버전, 상태</dt>
           <dd>
-            v{policy.versionNo} · {statusLabels[policy.status ?? '']}
+            v{policy.versionNo}, {statusLabels[policy.status ?? '']}
           </dd>
         </div>
         <div>
@@ -625,7 +636,7 @@ function PolicyActionDialog({
         </div>
         <div>
           <dt>규칙 행 수</dt>
-          <dd>{detail.editDocument ? `${ruleCount(detail.editDocument)}개` : '자료 없음'}</dd>
+          <dd>{detail.editDocument ? `${ruleCount(detail.editDocument)}개` : '-'}</dd>
         </div>
       </dl>
       {newVersion && (

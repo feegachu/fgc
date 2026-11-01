@@ -65,7 +65,7 @@ class CommissionItemRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("시작일·종료일을 포함하고 비활성·미래·만료 항목을 제외한다")
+    @DisplayName("시작일/종료일을 포함하고 비활성/미래/만료 항목을 제외한다")
     void includesPeriodBoundariesAndExcludesInactiveFutureAndExpiredItems() {
         String prefix = uniqueCode();
         long inactiveId = insertItem(prefix + "-INACTIVE", "비활성 항목", "PAYMENT", "SALES",

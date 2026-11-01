@@ -1,3 +1,4 @@
+import { nameWithCode } from '../../lib/screenText'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
@@ -76,7 +77,7 @@ export default function ClawbackPage() {
     <div className="claw-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">환수 검토·계산</h1>
+          <h1 className="page-title">환수 검토/계산</h1>
         </div>
       </header>
       <FilterBar
@@ -141,7 +142,7 @@ export default function ClawbackPage() {
             <option value="">{insurers.error ? '보험회사 조회 실패' : '전체'}</option>
             {insurers.data?.map((row) => (
               <option key={row.insurerId} value={row.insurerId}>
-                {row.insurerCode} · {row.insurerName}
+                {row.insurerCode}, {row.insurerName}
               </option>
             ))}
           </select>
@@ -158,7 +159,7 @@ export default function ClawbackPage() {
             </option>
             {products.data?.map((row) => (
               <option key={row.productOfferingId} value={row.productOfferingId}>
-                {row.productName} · {row.offeringVersion}
+                {row.productName}, {row.offeringVersion}
               </option>
             ))}
           </select>
@@ -177,7 +178,7 @@ export default function ClawbackPage() {
             {!agents.data && draft.agentId ? <option value={draft.agentId}>설계사 #{draft.agentId}</option> : null}
             {agents.data?.map((row) => (
               <option key={row.agentId} value={row.agentId}>
-                {row.agentName} · {row.agentCode}
+                {nameWithCode(row.agentName, row.agentCode)}
               </option>
             ))}
           </select>
@@ -262,7 +263,7 @@ export default function ClawbackPage() {
         <section className="surface claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
             <h2 className="surface-title" id="claw-detail-title">
-              ③ 후보 근거 · ④ 계산
+              ③ 후보 근거, ④ 계산
             </h2>
             {selected && !query.error ? <CalculationBadge row={selected} /> : null}
           </header>

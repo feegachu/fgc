@@ -61,7 +61,7 @@ function DetailError({ error, onRetry }: { error: Error; onRetry: () => void }) 
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">월 통합검증 상세 · 확정</h1>
+          <h1 className="page-title">월 통합검증 상세, 확정</h1>
         </div>
       </header>
       <section className="surface">
@@ -171,7 +171,7 @@ function DetailBody({
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">월 통합검증 상세 · 확정</h1>
+          <h1 className="page-title">월 통합검증 상세, 확정</h1>
         </div>
         <RunPicker currentId={id} link={link} />
       </header>
@@ -223,9 +223,9 @@ function DetailBody({
               <dd className="tabular-nums">{dateTime(header.completedAt)}</dd>
             </div>
             <div>
-              <dt>확정자 · 확정시각</dt>
+              <dt>확정자, 확정시각</dt>
               <dd className="tabular-nums">
-                {header.finalizedAt ? `${header.finalizedBy ?? '-'} · ${dateTime(header.finalizedAt)}` : '-'}
+                {header.finalizedAt ? `${header.finalizedBy ?? '-'}, ${dateTime(header.finalizedAt)}` : '-'}
               </dd>
             </div>
           </dl>
@@ -365,7 +365,7 @@ function RunPicker({ currentId, link }: { currentId: string; link: (path: string
         >
           {(runs.data?.content ?? []).map((run) => (
             <option key={run.validationRunId} value={String(run.validationRunId)}>
-              {formatMonth(run.validationMonth)} · {run.runNo}회차 · {run.statusLabel}
+              {formatMonth(run.validationMonth)}, {run.runNo}회차, {run.statusLabel}
             </option>
           ))}
         </select>
@@ -425,7 +425,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
           ③ 대상 선별 결과
         </h2>
         <p className="vrun-card-note">
-          선정 {summary?.selectedCount ?? 0} · 제외 {summary?.excludedCount ?? 0} · 검토필요{' '}
+          선정 {summary?.selectedCount ?? 0}, 제외 {summary?.excludedCount ?? 0}, 검토필요{' '}
           {summary?.reviewRequiredCount ?? 0}
         </p>
       </header>
@@ -471,14 +471,14 @@ function SummarySection({ detail, status }: { detail: ValidationRunDetail; statu
           footer={
             before
               ? undefined
-              : `위반 ${cap?.violationCount} · 주의 ${cap?.warningCount} · 검토 ${cap?.reviewRequiredCount}`
+              : `위반 ${cap?.violationCount}, 주의 ${cap?.warningCount}, 검토 ${cap?.reviewRequiredCount}`
           }
         />
         <SummaryCard
           label="차익거래"
           unit={before ? '실행 전' : '건 검사'}
           value={before ? undefined : arb?.checkedCount}
-          footer={before ? undefined : `검토대상 ${arb?.candidateCount} · 검토 ${arb?.reviewRequiredCount}`}
+          footer={before ? undefined : `검토대상 ${arb?.candidateCount}, 검토 ${arb?.reviewRequiredCount}`}
         />
         <SummaryCard
           label="원장"
@@ -604,7 +604,7 @@ function ChecklistSection({
     <section className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
-          ⑤ 확정 조건 (운영정책서 제44조 · 8개 전부 통과해야 함)
+          ⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)
         </h2>
         {summary.tone ? (
           <StatusBadge tone={summary.tone}>{summary.text}</StatusBadge>
@@ -681,11 +681,11 @@ function FinalizeSection({
           <p className="field-helper vrun-finalize-guide" id="finalize-action-guide">
             위 8개 조건이 모두 통과한 실행만 확정할 수 있습니다.
             <br />
-            확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 <strong>잠깁니다</strong>.{' '}
-            <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong>
+            확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 <strong>잠깁니다</strong>.{' '}
+            <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
             <br />
             <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요. 확정 권한은{' '}
-            <span className="tabular-nums">GA_ADMIN</span> · <span className="tabular-nums">SYSTEM_ADMIN</span> 에게만
+            <span className="tabular-nums">GA_ADMIN</span>, <span className="tabular-nums">SYSTEM_ADMIN</span> 에게만
             있습니다.
           </p>
           {/* 비활성 사유는 title 이 아니라 가시 텍스트로 전한다 — disabled 버튼은 포커스가 가지 않는다. */}

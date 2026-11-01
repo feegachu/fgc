@@ -94,7 +94,7 @@ final class StatementGoldSample {
         List<GoldRow> gold = new ArrayList<>();
 
         Sheet note = new Sheet(NOTE_SHEET, List.of(
-                cells("본 파일은 TER-011 평가용 합성 명세입니다. 실제 회사·개인정보가 없습니다."),
+                cells("본 파일은 TER-011 평가용 합성 명세입니다. 실제 회사/개인정보가 없습니다."),
                 cells("금액이 음수인 행은 차감(환수) 금액입니다."),
                 cells("2026년 10월 지급 예정분은 포함하지 않습니다.")));
 
@@ -123,7 +123,7 @@ final class StatementGoldSample {
         fee.add(cells("합계", null, null, null, null, null, null, feeTotal));
 
         List<List<Object>> thousand = new ArrayList<>();
-        thousand.add(cells("(단위: 천원) 2026년 9월 환수·차감 및 시책 정산"));
+        thousand.add(cells("(단위: 천원) 2026년 9월 환수/차감 및 시책 정산"));
         thousand.add(cells("정산월", "증권번호", "설계사코드", "상품", "회차", "항목", "금액(천원)"));
         BigDecimal thousandTotal = BigDecimal.ZERO;
         for (int i = 0; i < THOUSAND_DATA_ROWS; i++) {

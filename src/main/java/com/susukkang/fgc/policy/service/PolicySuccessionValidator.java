@@ -27,12 +27,12 @@ public class PolicySuccessionValidator {
                     .filter(rule -> coversCommissionScope(rule, oldRule))
                     .map(rule -> new long[]{rule.installmentFrom(), rule.installmentTo()}).toList();
             if (!coversRange(oldRule.installmentFrom(), oldRule.installmentTo(), intervals)) {
-                throw incomplete("commissionRules", "승계본에 기존 ACTIVE 수수료 규칙의 적용 범위·항목·회차가 빠져 있습니다.");
+                throw incomplete("commissionRules", "승계본에 기존 ACTIVE 수수료 규칙의 적용 범위/항목/회차가 빠져 있습니다.");
             }
         }
         for (FeeRegimeRuleDraft oldRule : previous.feeRegimeRules()) {
             if (!coversFeeRule(oldRule, replacement.feeRegimeRules())) {
-                throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 룰셋의 판매일·기초서류 적용 범위가 빠져 있습니다.");
+                throw incomplete("feeRegimeRules", "승계본에 기존 ACTIVE 분급 룰셋의 판매일/기초서류 적용 범위가 빠져 있습니다.");
             }
         }
     }

@@ -77,7 +77,7 @@ public record ExceptionOccurrenceResponse(
 
     @JsonProperty("detectionLabel")
     public String detectionLabel() {
-        if (reopened) return "재발·재개";
+        if (reopened) return "재발/재개";
         return newCase ? "신규" : "재검출";
     }
 

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
  * @since 2026-08-06
  * @version 1.2
  */
-@Tag(name = "수수료 지급 건", description = "FUN-065 수수료 지급 건 등록·수정·확정 API")
+@Tag(name = "수수료 지급 건", description = "FUN-065 수수료 지급 건 등록/수정/확정 API")
 @RestController
 // 2026-08-10 yslee - 인터페이스정의서의 지급 거래 리소스명 적용
 // 기존 코드: /api/v1/commission-payments 경로 사용
@@ -70,13 +70,13 @@ public class CommissionPaymentApiController {
     // 개선: 등록·수정·확정 Operation에 주요 성공 및 업무 오류 상태를 명시
     @Operation(
             summary = "수수료 지급 건 DRAFT 등록",
-            description = "필수값과 계약·설계사·수수료 항목을 검증한 후 DRAFT로 저장합니다."
+            description = "필수값과 계약/설계사/수수료 항목을 검증한 후 DRAFT로 저장합니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "201", description = "DRAFT 등록 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400", description = "필수값·귀속·증빙 검증 실패"),
+                    responseCode = "400", description = "필수값/귀속/증빙 검증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "지급 건 자연키 중복"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -101,7 +101,7 @@ public class CommissionPaymentApiController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "DRAFT 수정 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400", description = "필수값·귀속·증빙 검증 실패"),
+                    responseCode = "400", description = "필수값/귀속/증빙 검증 실패"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "DRAFT가 아니거나 자연키 중복"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -120,7 +120,7 @@ public class CommissionPaymentApiController {
     }
 
     @Operation(summary = "수수료 지급 초안 삭제",
-            description = "직접 작성한 DRAFT와 귀속행을 삭제합니다. 검출·감사 이력은 보존하며, 확정 건과 원장·대사·환수·정정에 연결된 건은 거절합니다.")
+            description = "직접 작성한 DRAFT와 귀속행을 삭제합니다. 검출/감사 이력은 보존하며, 확정 건과 원장/대사/환수/정정에 연결된 건은 거절합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "초안 삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "존재하지 않는 지급 건"),
@@ -163,8 +163,8 @@ public class CommissionPaymentApiController {
 
     @Operation(
             summary = "지급 전 한도 사전검증 미리보기 (IF-API-24)",
-            description = "저장·상태 변경 없이 DRAFT 지급 건을 제31조 확정 게이트로 검사해 "
-                    + "계약·지급단계별 1,200% 게이지(capPreview)와 확정 차단 사유(blockers)를 반환합니다. "
+            description = "저장/상태 변경 없이 DRAFT 지급 건을 제31조 확정 게이트로 검사해 "
+                    + "계약/지급단계별 1,200% 게이지(capPreview)와 확정 차단 사유(blockers)를 반환합니다. "
                     + "차단 사유가 있어도 200으로 응답합니다."
     )
     @ApiResponses({

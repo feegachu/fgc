@@ -175,7 +175,7 @@ public class JournalPersistenceServiceImpl implements JournalPersistenceService 
         int seq = journalHeaderRepository.findNextJournalSeq(year, month);
         if (seq > MAX_MONTHLY_SEQ) {
             throw new IllegalStateException(
-                    "journal_no 월간 일련번호 상한(" + MAX_MONTHLY_SEQ + ") 초과 — year=" + year
+                    "journal_no 월간 일련번호 상한(" + MAX_MONTHLY_SEQ + ") 초과, year=" + year
                             + ", month=" + month + ", seq=" + seq);
         }
         String journalNo = String.format("JV-%s-%s-%04d", year, month, seq);

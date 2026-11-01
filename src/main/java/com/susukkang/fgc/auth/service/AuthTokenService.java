@@ -153,7 +153,7 @@ public class AuthTokenService {
             int revoked = refreshTokenRepository.revokeActiveByUserId(
                     token.getUserId(), RevokedReason.REUSE_DETECTED, now);
             auditListener.recordTokenEvent("REFRESH_REUSE_DETECTED", token.getUserId(), loginId,
-                    "회전된 Refresh 재사용 — 활성 로그인 " + revoked + "건 무효화");
+                    "회전된 Refresh 재사용, 활성 로그인 " + revoked + "건 무효화");
         }
         return RefreshResult.rejected(FgcErrorCode.AUTH_002);
     }

@@ -221,7 +221,7 @@ class ValidationRunFinalizeMonthLockConcurrencyIntegrationTest {
             }
             TimeUnit.MILLISECONDS.sleep(20);
         }
-        throw new AssertionError("10초 안에 검증월 advisory 잠금을 기다리는 세션이 없었다 — 잠금을 잡지 않는 경로다");
+        throw new AssertionError("10초 안에 검증월 advisory 잠금을 기다리는 세션이 없었다, 잠금을 잡지 않는 경로다");
     }
 
     private FgcBusinessException finalizeFailure(Future<FinalizeValidationRunResponse> finalize) throws Exception {

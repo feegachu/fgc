@@ -1,4 +1,5 @@
 import type { TableColumn } from '../../components/DataTable'
+import { CategoryBadge } from '../../components/StatusBadge'
 import { date } from '../../lib/format'
 import { present } from '../arbitrage/utils'
 import type { CandidateRow } from './api'
@@ -23,24 +24,26 @@ export const columns: TableColumn<CandidateRow>[] = [
   },
   {
     key: 'product',
-    label: '보험회사 · 상품',
+    label: '보험회사, 상품',
     width: '13rem',
     render: (r) => (
-      <span title={`${present(r.insurerName)} · ${present(r.productName)}`}>
-        {present(r.insurerName)} · {present(r.productName)}
+      <span title={`${present(r.insurerName)}, ${present(r.productName)}`}>
+        {present(r.insurerName)}, {present(r.productName)}
       </span>
     ),
   },
   { key: 'agent', label: '설계사', width: '7rem', render: (r) => present(r.agentName) },
   {
     key: 'event',
-    label: '발생 사유 · 기준일',
+    label: '발생 사유, 기준일',
     sortKey: 'eventDate',
     sortable: true,
     width: '11rem',
     render: (r) => (
       <>
-        {triggerLabels[r.triggerType ?? ''] ?? present(r.triggerType)}
+        <CategoryBadge value={r.triggerType} optionCount={Object.keys(triggerLabels).length}>
+          {triggerLabels[r.triggerType ?? ''] ?? present(r.triggerType)}
+        </CategoryBadge>
         <div className="claw-cell-sub tabular-nums">
           {present(r.dateBasisLabel)} {date(r.eventDate)}
         </div>

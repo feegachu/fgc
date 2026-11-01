@@ -127,7 +127,7 @@ export default function ArbitragePage() {
             <option value="">{insurers.error ? '보험회사 조회 실패' : '전체'}</option>
             {insurers.data?.map((row) => (
               <option key={row.insurerId} value={row.insurerId} disabled={row.activeYn === false}>
-                {row.insurerCode} · {row.insurerName}
+                {row.insurerCode}, {row.insurerName}
               </option>
             ))}
           </select>
@@ -159,7 +159,7 @@ export default function ArbitragePage() {
           >
             <KpiCardContent
               label={card.label}
-              value={query.data ? int(query.data.summary?.[card.count] ?? 0) : '—'}
+              value={query.data ? int(query.data.summary?.[card.count] ?? 0) : '-'}
               unit={query.data ? '건' : undefined}
               footer={card.description}
             />

@@ -8,7 +8,6 @@ import { routes } from '../../app/routes'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
 import { useWorkspaceStore } from '../../stores/workspace'
-import { defaultDesignPreferences, useDesignSettings } from '../../stores/designSettings'
 import type { DashboardSummary } from './api'
 
 const user = {
@@ -62,7 +61,6 @@ let summaryResponse: () => Promise<unknown>
 
 beforeEach(() => {
   localStorage.clear()
-  useDesignSettings.setState({ preferences: { ...defaultDesignPreferences } })
   useAuthStore.setState({ accessToken: null, loggingOut: false })
   useWorkspaceStore.getState().clear()
   sessionStorage.clear()
@@ -95,19 +93,17 @@ const summaryCalls = () =>
     .filter((path) => path.includes('/dashboard/summary'))
 
 describe('DASH-W01 업무 대시보드', () => {
-  it('기존 카드형을 기본으로 하며 버전과 컴포넌트를 바꿔도 KPI 값·링크와 조회는 유지한다', async () => {
-    const { actions } = renderDashboard()
+  it('이전 브라우저 시안 설정을 무시하고 확정된 한 줄 KPI와 조회 링크를 제공한다', async () => {
+    localStorage.setItem('fgc.design-settings.v1', JSON.stringify({ kpiStyle: 'cards', buttonDesign: 'c' }))
+    renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
-    const links = within(kpis).getAllByRole('link').map((link) => link.getAttribute('href'))
-    expect(kpis.closest('.app-shell')).toHaveAttribute('data-kpi-style', 'cards')
-    await actions.click(screen.getByRole('button', { name: '개발자' }))
-    await actions.click(screen.getByRole('radio', { name: /2. 한 줄 요약형/ }))
-    await actions.selectOptions(screen.getByRole('combobox', { name: '전체 스타일' }), 'b')
-    await actions.selectOptions(screen.getByRole('combobox', { name: '버튼' }), 'c')
+    const links = within(kpis)
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'))
     expect(kpis.closest('.app-shell')).toHaveAttribute('data-kpi-style', 'summary')
-    expect(kpis.closest('.app-shell')).toHaveAttribute('data-button-design', 'c')
-    expect(kpis.closest('.app-shell')).toHaveAttribute('data-field-design', 'b')
-    expect(within(kpis).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(links)
+    expect(kpis.closest('.app-shell')).toHaveClass('app-theme')
+    expect(screen.queryByRole('button', { name: '개발자' })).not.toBeInTheDocument()
+    expect(links[0]).toContain('/cap-checks?status=VIOLATION')
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
     expect(summaryCalls()).toHaveLength(1)
   })
@@ -121,9 +117,9 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(within(table).getByText('C-0001')).toBeInTheDocument()
     // UTC 15:30 은 Asia/Seoul 로 다음 날 00:30 이다.
     expect(within(table).getByText('2026-07-11 00:30')).toBeInTheDocument()
-    const run = screen.getByRole('link', { name: /2026-07-01 · 2회차/ })
+    const run = screen.getByRole('link', { name: /2026년 7월 2회차/ })
     expect(within(run).getByRole('progressbar', { name: '검증 진행률' })).toHaveAttribute('aria-valuenow', '40')
-    expect(run).toHaveTextContent('4/10 단계 · 실행 settle01')
+    expect(run).toHaveTextContent('4/10 단계, 실행 settle01')
   })
 
   it('기준월을 바꾸면 해당 월로 다시 조회한다', async () => {
@@ -156,7 +152,7 @@ describe('DASH-W01 업무 대시보드', () => {
       'href',
       '/app/exceptions?contractNo=C-0001&month=2026-07',
     )
-    expect(screen.getByRole('link', { name: /2026-07-01 · 2회차/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /2026년 7월 2회차/ })).toHaveAttribute(
       'href',
       '/app/validation-runs/77?month=2026-07',
     )
@@ -198,6 +194,6 @@ describe('DASH-W01 업무 대시보드', () => {
           })) as typeof apiClient.request)
     renderDashboard()
     expect(await screen.findByRole('region', { name: '주요 검증 지표' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '403 · 권한 없음' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: '권한 없음' })).toBeNull()
   })
 })

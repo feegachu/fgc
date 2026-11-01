@@ -7,7 +7,7 @@ export const RESULT_TYPE = {
   DUPLICATE: '중복 지급',
   AGENT_MISMATCH: '설계사 불일치',
   INSTALLMENT_MISMATCH: '회차 불일치',
-  INVALID_CONTRACT_PAYMENT: '무효·취소 계약 지급',
+  INVALID_CONTRACT_PAYMENT: '무효/취소 계약 지급',
   POLICY_VERSION_ERROR: '정책 버전 오류',
   JOURNAL_IMBALANCE: '분개 불균형',
   REVIEW_REQUIRED: '검토 필요',
@@ -19,5 +19,5 @@ export const RUN_STATUS = {
   FAILED: '실패',
   FINALIZED: '확정됨',
 } as const
-export const EMPTY = '—'
+export const EMPTY = '-'
 export const text = (value: unknown) => (value == null || value === '' ? EMPTY : String(value))

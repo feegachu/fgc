@@ -10,7 +10,7 @@ import java.util.Optional;
  */
 public enum ReconciliationReasonCode {
     JOURNAL_IMBALANCE(10, "분개 불균형", ReconciliationResultType.JOURNAL_IMBALANCE),
-    INVALID_CONTRACT_PAYMENT(20, "무효·취소 계약 지급", ReconciliationResultType.INVALID_CONTRACT_PAYMENT),
+    INVALID_CONTRACT_PAYMENT(20, "무효/취소 계약 지급", ReconciliationResultType.INVALID_CONTRACT_PAYMENT),
     POLICY_VERSION_ERROR(30, "정책 버전 오류", ReconciliationResultType.POLICY_VERSION_ERROR),
     DUPLICATE(40, "중복 지급", ReconciliationResultType.DUPLICATE),
     EXPECTED_MISSING(50, "예상 내역 없음", ReconciliationResultType.EXPECTED_MISSING),

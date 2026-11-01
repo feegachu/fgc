@@ -61,7 +61,7 @@ describe('AppShell·라우트', () => {
   })
   it('AGENT가 저장된 내부 화면 URL로 들어가도 업무 화면을 호출하지 않는다', async () => {
     renderAt('/journals', 'AGENT')
-    await screen.findByRole('heading', { name: '403 · 권한 없음' })
+    await screen.findByRole('heading', { name: '권한 없음' })
     expect(vi.mocked(apiClient.request).mock.calls.some(([path]) => path.startsWith('/api/v1/journals'))).toBe(false)
   })
   it('AGENT가 홈의 월 링크를 다시 열면 요청한 정산월을 적용한다', async () => {
@@ -94,15 +94,15 @@ describe('AppShell·라우트', () => {
         '보험계약',
         '수수료 지급',
         '예상 스케줄',
-        '환수 검토·계산',
+        '환수 검토/계산',
         '1,200% 한도 검증',
         '차익거래 검증',
         '월 통합검증',
         '검증원장',
-        '대사 실행·결과',
+        '대사 실행/결과',
         '예외',
         '기준정보',
-        '정책·룰셋',
+        '정책/룰셋',
       ])
     },
   )
@@ -114,11 +114,11 @@ describe('AppShell·라우트', () => {
   })
   it('미등록 경로를 404 연결 화면으로 보낸다', async () => {
     renderAt('/xyz')
-    expect(await screen.findByRole('heading', { name: '404 · 찾을 수 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '찾을 수 없음' })).toBeInTheDocument()
   })
   it('수정 라우트 메타데이터를 등록하고 쓰기 권한이 없으면 403을 보여 준다', async () => {
     renderAt('/contracts/12/edit', 'COMPLIANCE')
-    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
     expect(screens.find((route) => route.path === '/contracts/:id/edit')?.permission).toBe('canProcess')
   })
 })

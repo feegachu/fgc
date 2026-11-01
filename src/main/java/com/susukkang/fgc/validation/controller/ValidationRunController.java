@@ -53,7 +53,7 @@ import java.util.Map;
 /**
  * FGC-FUN-041 검증 실행 생성/목록 조회 API
  */
-@Tag(name = "검증 실행", description = "월 통합검증·수동검증 실행 생성/조회 API")
+@Tag(name = "검증 실행", description = "월 통합검증/수동검증 실행 생성/조회 API")
 @RestController
 @RequestMapping("/api/v1/validation-runs")
 @RequiredArgsConstructor
@@ -79,7 +79,7 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403", description = "허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음"),
+                    responseCode = "403", description = "허용 역할(SETTLEMENT/SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001)")
     })
@@ -117,7 +117,7 @@ public class ValidationRunController {
 
     @Operation(
             summary = "월 통합검증 실행 목록 조회",
-            description = "검증월·상태로 검색하고, 실행/확정/실패/진행 단계 정보를 페이징된 목록으로 돌려준다. "
+            description = "검증월/상태로 검색하고, 실행/확정/실패/진행 단계 정보를 페이징된 목록으로 돌려준다. "
                     + "인증된 전체 사용자(SYSTEM_ADMIN, GA_ADMIN, SETTLEMENT, COMPLIANCE)가 조회할 수 있다."
     )
     @ApiResponses({
@@ -137,7 +137,7 @@ public class ValidationRunController {
             @RequestParam(required = false) String month,
             @Parameter(description = "실행 상태(CREATED/RUNNING/COMPLETED/FAILED/FINALIZED)")
             @RequestParam(required = false) String status,
-            @Parameter(description = "정렬(key,asc|desc). validationMonth·runNo·triggeredBy·startedAt·completedAt·finalizedAt. 비우면 검증월·회차 내림차순")
+            @Parameter(description = "정렬(key,asc|desc). validationMonth/runNo/triggeredBy/startedAt/completedAt/finalizedAt. 비우면 검증월/회차 내림차순")
             @RequestParam(required = false) String sort,
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size
@@ -204,8 +204,8 @@ public class ValidationRunController {
 
     @Operation(
             summary = "검증 실행 상세 조회 (IF-API-47)",
-            description = "실행 헤더 + 대상 선별 결과(validation_target) + 결과 요약 4블록(1,200%·차익거래·원장·대사). "
-                    + "요약은 결과 테이블을 매번 집계한다 — 화면용 복제 저장 없음(FUN-043)."
+            description = "실행 헤더 + 대상 선별 결과(validation_target) + 결과 요약 4블록(1,200%/차익거래/원장/대사). "
+                    + "요약은 결과 테이블을 매번 집계한다, 화면용 복제 저장 없음(FUN-043)."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -226,10 +226,10 @@ public class ValidationRunController {
 
     @Operation(
             summary = "검증 실행 기동 (IF-API-48)",
-            description = "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 "
+            description = "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다, MONTHLY/PRE_CONFIRM은 "
                     + "MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. "
                     + "202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. "
-                    + "FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). "
+                    + "FAILED인 MONTHLY/PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). "
                     + "MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다."
     )
     @ApiResponses({
@@ -239,11 +239,11 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403", description = "허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음"),
+                    responseCode = "403", description = "허용 역할(SETTLEMENT/SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404", description = "실행 미존재 (FGC-COMMON-004)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "FINALIZED (FGC-VRUN-003), 허용 상태 아님 (FGC-VRUN-004), 재시작 이력 확인 불가·경합 (FGC-VRUN-005)")
+                    responseCode = "409", description = "FINALIZED (FGC-VRUN-003), 허용 상태 아님 (FGC-VRUN-004), 재시작 이력 확인 불가/경합 (FGC-VRUN-005)")
     })
     @PostMapping("/{id}/execute")
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -259,7 +259,7 @@ public class ValidationRunController {
 
     @Operation(
             summary = "검증 실행 진행률 조회 (IF-API-49)",
-            description = "validation_run.current_step 기반 진행률 — 화면이 2초 간격으로 폴링한다. "
+            description = "validation_run.current_step 기반 진행률, 화면이 2초 간격으로 폴링한다. "
                     + "progressPct = current_step / 10 × 100 (운영정책서 제43조)."
     )
     @ApiResponses({
@@ -303,7 +303,7 @@ public class ValidationRunController {
     @Operation(
             summary = "검증 실행 확정 (IF-API-51)",
             description = "8개 조건을 서버에서 재검사한 뒤 COMPLETED/8 실행을 FINALIZED/10으로 잠근다. "
-                    + "이는 검증 결과 잠금이며 실제 송금·법정 회계마감이 아니다."
+                    + "이는 검증 결과 잠금이며 실제 송금/법정 회계마감이 아니다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -314,7 +314,7 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401", description = "인증되지 않은 요청"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "403", description = "허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음"),
+                    responseCode = "403", description = "허용 역할(GA_ADMIN/SYSTEM_ADMIN) 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005), "
                             + "확정할 수 없는 실행 유형(계약수동) (FGC-VRUN-004)"),

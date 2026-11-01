@@ -1,7 +1,8 @@
 import { JOURNAL_TYPE } from '../ledger/labels'
+import { screenMessage } from '../../lib/screenText'
 
 // 감사 이벤트 기록 경로의 코드 표시용 매핑. 저장값과 검색값은 원본 코드를 유지한다.
-const actionLabels = {
+export const actionLabels = {
   LOGIN_SUCCESS: '로그인 성공',
   LOGIN_FAIL: '로그인 실패',
   LOGOUT: '로그아웃',
@@ -33,7 +34,7 @@ const actionLabels = {
   VALIDATION_RUN_FINALIZED: '검증 실행 확정',
 } as const
 
-const entityTypeLabels = {
+export const entityTypeLabels = {
   APP_USER: '사용자 계정',
   CONTRACT: '보험계약',
   COMMISSION_PAYMENT: '수수료 지급',
@@ -49,17 +50,13 @@ const entityTypeLabels = {
 
 function label(code: string | null | undefined, labels: Record<string, string>) {
   if (code == null || code === '') return '-'
-  return Object.hasOwn(labels, code) ? labels[code] : code
-}
-
-function withCode(code: string | null | undefined, display: string) {
-  return code && display !== code ? `${display} (${code})` : display
+  return Object.hasOwn(labels, code) ? labels[code] : '확인 필요'
 }
 
 export const auditActionLabel = (code?: string | null) => label(code, actionLabels)
 export const auditEntityTypeLabel = (code?: string | null) => label(code, entityTypeLabels)
-export const auditActionWithCode = (code?: string | null) => withCode(code, auditActionLabel(code))
-export const auditEntityTypeWithCode = (code?: string | null) => withCode(code, auditEntityTypeLabel(code))
+export const auditActionWithCode = auditActionLabel
+export const auditEntityTypeWithCode = auditEntityTypeLabel
 
 const loginFailureReasons = {
   BadCredentialsException: '아이디 또는 비밀번호 불일치',
@@ -75,8 +72,7 @@ export function auditReasonLabel(actionCode?: string | null, reason?: string | n
   if (reason == null || reason === '') return '-'
   if (actionCode === 'EXCEPTION_ACTION') {
     const deletion = /^초안 삭제\(PAYMENT_DELETED\): 지급 ([0-9]+)의 지급 예정이 철회되어 종결$/.exec(reason)
-    if (deletion && deletion[0] === reason)
-      return `지급 초안 삭제: 지급 ${deletion[1]}의 지급 예정이 철회되어 종결`
+    if (deletion && deletion[0] === reason) return `지급 초안 삭제: 지급 ${deletion[1]}의 지급 예정이 철회되어 종결`
   }
   if (actionCode === 'VALIDATION_RUN_STARTED' && reason === 'MonthlyValidationJob started') return '월 통합검증 시작'
   if (actionCode === 'VALIDATION_RUN_COMPLETED' && reason === 'MonthlyValidationJob completed')
@@ -85,7 +81,7 @@ export function auditReasonLabel(actionCode?: string | null, reason?: string | n
     actionCode === 'VALIDATION_RUN_RETRIED' &&
     reason === 'FAILED validation_run retried (status reverted to RUNNING)'
   )
-    return '실패한 월 통합검증 재시도 · 실행 중으로 전환'
+    return '실패한 월 통합검증 재시도, 실행 중으로 전환'
   if (actionCode === 'VALIDATION_RUN_STEP_ADVANCED') {
     const step = /^MonthlyValidationJob advanced to step ([0-9]+)$/.exec(reason)
     if (step && step[0] === reason) return `월 통합검증 ${step[1]}단계 진행`
@@ -107,16 +103,70 @@ export function auditReasonLabel(actionCode?: string | null, reason?: string | n
       const source = entityTypeLabels[draft[2] as keyof typeof entityTypeLabels]
       const sourceId = draft[3] === 'null' ? ' (식별자 없음)' : ` #${draft[3]}`
       const run = draft[4] === 'null' ? '검증 실행 없음' : `검증 실행 #${draft[4]}`
-      return `${type} 분개 초안 저장 · 원천: ${source}${sourceId} · ${run}`
+      return `${type} 분개 초안 저장, 원천: ${source}${sourceId}, ${run}`
     }
   }
-  return reason
+  return /^[a-zA-Z]\w*=/.test(reason) ? '처리 사유 확인 필요' : screenMessage(reason)
 }
 /** 배열 인덱스("[0]")만 "1번째"로 풀어 읽기 쉽게 한다("[0].result.details[1].amount" → "1번째.result.details.2번째.amount"). 점 경로는 그대로 두고 원래 경로는 title 로 남긴다. */
 export function diffFieldLabel(field: string): string {
+  const fields: Record<string, string> = {
+    value: '값',
+    payment: '지급',
+    amount: '금액',
+    status: '상태',
+    contract: '계약',
+    result: '결과',
+    details: '상세',
+    journal: '분개',
+    type: '유형',
+    activeYn: '사용 여부',
+    agent: '설계사',
+    policy: '정책',
+    name: '이름',
+    reason: '사유',
+    before: '이전값',
+    after: '이후값',
+    expectedAmount: '예상액',
+    actualAmount: '실제액',
+    differenceAmount: '차액',
+    paymentStage: '지급단계',
+  }
   return field
     .replace(/\[(\d+)]/g, (_, index: string) => `.${Number(index) + 1}번째.`)
     .split('.')
     .filter(Boolean)
-    .join('.')
+    .map((part) => fields[part] ?? (/^\d+번째$/.test(part) ? part : '기타 항목'))
+    .join(' / ')
+}
+
+export function auditValueLabel(value: string | null | undefined, field?: string) {
+  value ??= '-'
+  if (!/(status|type|method|stage|regime|decision|severity|origin)$/i.test(field ?? '')) return value
+  const labels: Record<string, string> = {
+    CREATED: '생성',
+    STARTED: '시작',
+    DRAFT: '작성중',
+    CONFIRMED: '확정',
+    POSTED: '기표완료',
+    REVERSED: '역분개',
+    ACTIVE: '활성',
+    INACTIVE: '비활성',
+    CANCELLED: '취소',
+    NEW: '신규',
+    IN_REVIEW: '검토중',
+    RESOLVED: '해결',
+    REJECTED: '반려',
+    COMPLETED: '완료',
+    RUNNING: '실행중',
+    FAILED: '실패',
+    INSURER_TO_GA: '원수사 → GA',
+    GA_TO_FC: 'GA → 설계사',
+    RATE: '요율',
+    FIXED: '정액',
+    INCLUDED: '산입',
+    EXCLUDED: '제외',
+    REVIEW_REQUIRED: '검토필요',
+  }
+  return labels[value] ?? (/^[A-Z][A-Z0-9_]*$/.test(value) ? '확인 필요' : value)
 }

@@ -56,6 +56,12 @@ export const processingStatusLabels: Record<string, string> = {
   SKIPPED: '건너뜀',
 }
 
+export const paymentStatusLabels: Record<string, string> = {
+  DRAFT: '작성중',
+  CONFIRMED: '확정',
+  CANCELLED: '취소',
+}
+
 export function responseLabel(labels: Record<string, string>, code: string | null | undefined, label?: string | null) {
-  return label || (code ? labels[code] || code : '—')
+  return label || (code ? labels[code] || '확인 필요' : '-')
 }

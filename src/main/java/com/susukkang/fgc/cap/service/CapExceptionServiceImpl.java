@@ -133,8 +133,8 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         // 목업 편집 관행(title = '판정 — 수치 근거')을 따라 건별 수치를 제목에 담는다.
         DecimalFormat amountFormat = new DecimalFormat("#,##0.##");
         String title = exceptionType == ExceptionType.CAP_VIOLATION
-                ? "1,200% 한도 초과 — 사용률 " + command.usagePct() + "%"
-                : "1,200% 주의 — 잔여 한도 " + amountFormat.format(command.remainingAmount()) + "원";
+                ? "1,200% 한도 초과, 사용률 " + command.usagePct() + "%"
+                : "1,200% 주의, 잔여 한도 " + amountFormat.format(command.remainingAmount()) + "원";
 
         return CapExceptionInsertDTO.builder()
                 .exceptionKey(createExceptionKey(
@@ -181,12 +181,12 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         // 예외 설명에는 관리자가 판단에 쓰는 수치만 사람이 읽는 문장으로 남긴다.
         DecimalFormat amount = new DecimalFormat("#,##0.##");
         return "지급단계 " + command.paymentStage()
-                + " · 기준일 " + command.asOfDate()
-                + " · 한도액 " + amount.format(command.limitAmount()) + "원"
-                + " · 산입액 " + amount.format(command.includedAmount()) + "원"
-                + " · 잔여 " + amount.format(command.remainingAmount()) + "원"
-                + " · 사용률 " + command.usagePct() + "%"
-                + " · 초과액 " + amount.format(exceededAmount) + "원";
+                + ", 기준일 " + command.asOfDate()
+                + ", 한도액 " + amount.format(command.limitAmount()) + "원"
+                + ", 산입액 " + amount.format(command.includedAmount()) + "원"
+                + ", 잔여 " + amount.format(command.remainingAmount()) + "원"
+                + ", 사용률 " + command.usagePct() + "%"
+                + ", 초과액 " + amount.format(exceededAmount) + "원";
     }
 
     private void validateCreateCommand(CapExceptionCreateCommand command) {

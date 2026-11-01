@@ -28,10 +28,10 @@ public class PlaceholderStepTasklet implements Tasklet {
 
         // 일단 로그만 남기고 끝 — 실제 이슈에서 이 if/else 블록 전체를 진짜 로직으로 바꾸기
         if (paymentStage != null) {
-            log.info("[TODO][validationRunId={}] {} (paymentStage={}) — 실제 로직 미구현",
+            log.info("[TODO][validationRunId={}] {} (paymentStage={}), 실제 로직 미구현",
                     validationRunId, stepDescription, paymentStage);
         } else {
-            log.info("[TODO][validationRunId={}] {} — 실제 로직 미구현", validationRunId, stepDescription);
+            log.info("[TODO][validationRunId={}] {}, 실제 로직 미구현", validationRunId, stepDescription);
         }
 
         throw new PlaceholderStepExecutionBlockedException(stepDescription);

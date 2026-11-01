@@ -141,14 +141,14 @@ it('BASE five tabs, required product selection, dropdowns and item categories', 
   await screen.findByText('서울지사')
   expect(screen.getByLabelText(/기준일/)).toHaveValue('2026-08-01')
   await user.click(screen.getByRole('tab', { name: '상품' }))
-  await screen.findByRole('option', { name: '가상생명 · 사용중지' })
+  await screen.findByRole('option', { name: '가상생명, 사용중지' })
   expect(request.mock.calls.some(([p]) => p.includes('/products'))).toBe(false)
   await user.selectOptions(screen.getByLabelText(/보험회사/), '1')
   await user.click(screen.getByRole('button', { name: '조회' }))
   await screen.findByText('보험상품')
   await user.click(screen.getByRole('tab', { name: '설계사' }))
   await screen.findByText('김설계')
-  await screen.findByRole('option', { name: '서울지사 · 사용중지' })
+  await screen.findByRole('option', { name: '서울지사, 사용중지' })
   expect(screen.getByText('확인 전')).toBeVisible()
   await user.click(screen.getByRole('tab', { name: '수수료 항목' }))
   await screen.findByText('기본수수료')
@@ -238,7 +238,7 @@ it('POL 직급을 한글로 표시하고 GA 수령과 누락·미등록 값을 �
     '-',
     '-',
     '-',
-    '<NEW_RANK>',
+    '확인 필요',
   ])
   expect(table.querySelector('NEW_RANK')).toBeNull()
   expect(within(table).getAllByText('650.1')).toHaveLength(rankInputs.length)
@@ -279,9 +279,7 @@ it('POL 404 detail does not discard version rows', async () => {
       throw new ApiError({ code: 'FGC-POL-404', message: '정책을 찾을 수 없습니다.' }, 'trace-404', 404)
     return fixtures(p)
   })
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    '정책을 찾을 수 없습니다. (FGC-POL-404 · 요청 ID: trace-404)',
-  )
+  expect(await screen.findByRole('alert')).toHaveTextContent('정책을 찾을 수 없습니다.')
   await user.click(screen.getByRole('tab', { name: '정책 버전' }))
   expect(screen.getByText('규제 정책')).toBeVisible()
 })
@@ -303,7 +301,7 @@ it('non-JSON 404 is not shown as a 500 request-id-only error (#466)', async () =
   mount('/base', () => {
     throw new ApiError(null, 'trace-404', 404)
   })
-  expect(await screen.findByRole('alert')).toHaveTextContent('요청을 처리하지 못했습니다. (요청 ID: trace-404)')
+  expect(await screen.findByRole('alert')).toHaveTextContent('요청을 처리하지 못했습니다.')
   expect(screen.queryByText(/FGC-COMMON-500/)).not.toBeInTheDocument()
 })
 it.each(['commission', 'cap', 'refund'])('POL %s handles empty detail', async (tab) => {
@@ -356,8 +354,8 @@ it.each(['organization', 'insurer', 'product', 'agent'])(
     )
     await screen.findByRole('table')
     await waitFor(() => expect(request.mock.calls.some(([p]) => p.includes('page=2&size=20'))).toBe(true))
-    if (tab === 'product') await screen.findByRole('option', { name: '가상생명 · 사용중지' })
-    if (tab === 'agent') await screen.findByRole('option', { name: '서울지사 · 사용중지' })
+    if (tab === 'product') await screen.findByRole('option', { name: '가상생명, 사용중지' })
+    if (tab === 'agent') await screen.findByRole('option', { name: '서울지사, 사용중지' })
     await user.click(screen.getByRole('button', { name: '조회' }))
     await waitFor(() => expect(router.state.location.search).not.toContain('page='))
     if (tab === 'insurer') expect(router.state.location.search).not.toContain('asOf=')
@@ -387,7 +385,10 @@ it.each([
         .at(-1)!
         .split('?')[1],
     )
-  expect(within(table).getByRole('columnheader', { name: new RegExp(`^${header}`) })).toHaveAttribute('aria-sort', 'none')
+  expect(within(table).getByRole('columnheader', { name: new RegExp(`^${header}`) })).toHaveAttribute(
+    'aria-sort',
+    'none',
+  )
   await user.click(within(table).getByRole('button', { name: header }))
   await waitFor(() => expect(lastQuery().get('sort')).toBe(`${key},asc`))
   expect(lastQuery().has('page') ? lastQuery().get('page') : '1').toBe('1')

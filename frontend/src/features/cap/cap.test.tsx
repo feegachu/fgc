@@ -201,7 +201,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     expect(within(table).getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/contracts/3?tab=cap')
     expect(screen.getByRole('button', { name: /저장 판정 정상\s*30/ })).toBeVisible()
     expect(screen.getByText('30,000,000원')).toBeVisible() // 현재 페이지 1행으로 합산하지 않음
-    expect(screen.getByText('모니터링 지표 · 규제 판정 아님')).toBeVisible()
+    expect(screen.getByText('모니터링 지표, 규제 판정 아님')).toBeVisible()
   })
   it('필터·페이지·행 수를 URL에 유지하고 뒤로 이동 시 조건을 복원한다', async () => {
     const { router, user } = renderAt(
@@ -291,7 +291,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText(storedReason)).toBeInTheDocument()
-    expect(screen.queryByText('적용대상 아님 — 시행 전 계약')).not.toBeInTheDocument()
+    expect(screen.queryByText('적용대상 아님, 시행 전 계약')).not.toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
@@ -310,7 +310,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
       details: [],
       calculationSnapshot: {
         applicability: {
-          reason: '적용대상 아님 — 시행 전 계약',
+          reason: '적용대상 아님, 시행 전 계약',
           reasonCode: 'CONTRACT_BEFORE_EFFECTIVE_DATE',
           contractDate: '2026-06-30',
           effectiveContractDate: '2026-07-01',
@@ -326,7 +326,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('적용대상 아님 — 시행 전 계약')).toBeInTheDocument()
+    expect(await screen.findByText('적용대상 아님, 시행 전 계약')).toBeInTheDocument()
     expect(screen.getByText('CONTRACT_BEFORE_EFFECTIVE_DATE')).toBeInTheDocument()
     expect(screen.getByText('2026-06-30')).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()

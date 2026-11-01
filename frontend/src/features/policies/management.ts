@@ -16,7 +16,7 @@ export const sources = {
   PROJECT_ASSUMPTION: '프로젝트 가정',
 }
 export const sourceStatusTags = ['현행규정', '개정고시', '시행세칙', 'FAQ', '회사정책'] as const
-export const sourceReferenceNotice = 'FGC의 근거 정보는 참조용이며 상품위원회 등 법정 심의·의결을 대체하지 않습니다.'
+export const sourceReferenceNotice = 'FGC의 근거 정보는 참조용이며 상품위원회 등 법정 심의/의결을 대체하지 않습니다.'
 export const statusLabels: Record<string, string> = {
   DRAFT: '초안',
   REVIEW: '검토 중',

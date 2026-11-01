@@ -340,7 +340,7 @@ class ContractControllerTest {
      * 컨트롤러 advice 가 아니라 apiAccessDeniedHandler 가 써 준다 — 봉투까지 확인한다.
      */
     @Test
-    @DisplayName("준법·감사는 보험계약을 생성할 수 없다")
+    @DisplayName("준법/감사는 보험계약을 생성할 수 없다")
     void createContractRejectsComplianceUser() throws Exception {
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("comp01").roles("COMPLIANCE"))
@@ -355,7 +355,7 @@ class ContractControllerTest {
     }
 
     @Test
-    @DisplayName("준법·감사는 보험계약을 수정할 수 없다")
+    @DisplayName("준법/감사는 보험계약을 수정할 수 없다")
     void updateContractRejectsComplianceUser() throws Exception {
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
                         .with(user("comp01").roles("COMPLIANCE"))

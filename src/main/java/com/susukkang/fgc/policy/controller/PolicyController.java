@@ -40,7 +40,7 @@ import java.util.List;
  * 설명 : POL-W01 정책·룰셋 조회 및 작성·승인 API (FGC-FUN-012·013·017).
  * 초안은 작성 서비스에서 저장하고 기존 계산 경로는 승인·활성 정책만 선택한다.
  */
-@Tag(name = "정책·룰셋", description = "FGC 정책·룰셋 조회 및 작성·승인 API")
+@Tag(name = "정책/룰셋", description = "FGC 정책/룰셋 조회 및 작성/승인 API")
 @RestController
 @RequestMapping("/api/v1/policies")
 public class PolicyController {
@@ -56,7 +56,7 @@ public class PolicyController {
     @Operation(
             summary = "정책 초안 생성 (IF-API-79)",
             description = "정책 헤더와 유형별 규칙을 한 트랜잭션에 저장합니다. "
-                    + "버전 번호·DRAFT 상태·작성자는 서버가 결정합니다. "
+                    + "버전 번호/DRAFT 상태/작성자는 서버가 결정합니다. "
                     + "Idempotency-Key로 같은 요청을 다시 보내면 기존 생성 결과를 반환합니다."
     )
     @ApiResponses({
@@ -91,7 +91,7 @@ public class PolicyController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "초안 수정 성공", useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "정책 상태·수정 시각 또는 멱등키 충돌")
+                    responseCode = "409", description = "정책 상태/수정 시각 또는 멱등키 충돌")
     })
     @PutMapping("/{policyVersionId}")
     @PreAuthorize(Roles.CAN_WRITE_POLICY)
@@ -130,20 +130,20 @@ public class PolicyController {
                 .body(ApiResponse.success(result));
     }
 
-    @Operation(summary = "정책 제출·승인·반려·활성화 (IF-API-75)",
-            description = "SUBMIT은 정책 작성 역할, APPROVE·REJECT·ACTIVATE는 GA_ADMIN·SYSTEM_ADMIN만 가능합니다. "
-                    + "작성자 자기 승인과 기대 상태·수정 시각 충돌을 거절합니다. "
+    @Operation(summary = "정책 제출/승인/반려/활성화 (IF-API-75)",
+            description = "SUBMIT은 정책 작성 역할, APPROVE/REJECT/ACTIVATE는 GA_ADMIN/SYSTEM_ADMIN만 가능합니다. "
+                    + "작성자 자기 승인과 기대 상태/수정 시각 충돌을 거절합니다. "
                     + "ACTIVATE는 같은 코드의 기존 ACTIVE를 RETIRED로 전환하고 계약일별 적용 경계를 기록합니다. "
-                    + "새 적용일 전 계약은 구버전, 당일부터 체결한 계약은 변경 요율의 신버전을 선택하며 승인본의 기간·규칙은 보존합니다. "
+                    + "새 적용일 전 계약은 구버전, 당일부터 체결한 계약은 변경 요율의 신버전을 선택하며 승인본의 기간/규칙은 보존합니다. "
                     + "승계 적용일은 한국시간 내일 이후여야 하며 적용 전 미래 버전은 같은 적용일로 정정할 수 있습니다. "
-                    + "다른 코드와 충돌하면 종료·활성화·이력·감사를 모두 롤백합니다.")
+                    + "다른 코드와 충돌하면 종료/활성화/이력/감사를 모두 롤백합니다.")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "동작 실행 성공", useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "동작 수행 권한 없음 (FGC-AUTH-003)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "자기 승인·정책 상태·수정 시각 또는 멱등키 충돌"),
+                    responseCode = "409", description = "자기 승인/정책 상태/수정 시각 또는 멱등키 충돌"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "422", description = "활성 정책의 적용기간 충돌 (FGC-POL-002)")
     })
@@ -162,8 +162,8 @@ public class PolicyController {
 
     @Operation(
             summary = "정책 버전 목록 조회 (IF-API-09)",
-            description = "정책 유형·기준일·상태로 정책 버전 목록을 조회합니다. "
-                    + "기준일(asOf)은 해당 일자에 유효한 버전만 남깁니다 — 정책은 계약일 기준으로 고르는 경우가 많습니다. "
+            description = "정책 유형/기준일/상태로 정책 버전 목록을 조회합니다. "
+                    + "기준일(asOf)은 해당 일자에 유효한 버전만 남깁니다, 정책은 계약일 기준으로 고르는 경우가 많습니다. "
                     + "조건에 맞는 자료가 없으면 200과 빈 배열을 반환합니다."
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공")
@@ -173,7 +173,7 @@ public class PolicyController {
             @Parameter(description = "정책 유형", example = "CAP_1200")
             @RequestParam(required = false)
             PolicyType type,
-            @Parameter(description = "기준일(yyyy-MM-dd) — 해당 일자에 유효한 버전만 조회", example = "2026-07-01")
+            @Parameter(description = "기준일(yyyy-MM-dd), 해당 일자에 유효한 버전만 조회", example = "2026-07-01")
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate asOf,
@@ -186,7 +186,7 @@ public class PolicyController {
 
     @Operation(
             summary = "정책 버전 상세 조회 (IF-API-10)",
-            description = "정책 버전 1건의 상세를 POL-W01 탭 구성(수수료 규칙, 1,200% 룰셋·항목별 산입 판정, "
+            description = "정책 버전 1건의 상세를 POL-W01 탭 구성(수수료 규칙, 1,200% 룰셋/항목별 산입 판정, "
                     + "예상 해약환급률표, 근거 참조)으로 조회합니다. 탭 클릭 시 Ajax 로 호출됩니다."
     )
     @ApiResponses({

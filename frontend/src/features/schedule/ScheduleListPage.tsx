@@ -225,7 +225,7 @@ export default function ScheduleListPage() {
             스케줄
           </h2>
           <p className="schedule-result-summary" aria-live="polite">
-            <strong>{data ? int(data.totalElements ?? 0) : EMPTY}</strong>건 · 한 화면 {data?.size ?? PAGE_SIZE}행
+            <strong>{data ? int(data.totalElements ?? 0) : EMPTY}</strong>건, 한 화면 {data?.size ?? PAGE_SIZE}행
           </p>
         </header>
 

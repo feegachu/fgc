@@ -155,8 +155,8 @@ describe('RECO-W01·W02 React 전환', () => {
         : undefined,
     )
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('예상 원천 1 · schedule_line #12')).toBeVisible()
-    expect(within(dialog).getByText('실제 원천 1 · commission_transaction #8')).toBeVisible()
+    expect(await within(dialog).findByText('예상 원천 1, schedule_line #12')).toBeVisible()
+    expect(within(dialog).getByText('실제 원천 1, 수수료 지급 번호 8')).toBeVisible()
     expect(within(dialog).getAllByText('1개 원천')).toHaveLength(2)
     expect(within(dialog).queryByText('예상 없음')).not.toBeInTheDocument()
     expect(within(dialog).queryByText('실제 없음')).not.toBeInTheDocument()
@@ -211,7 +211,7 @@ describe('RECO-W01·W02 React 전환', () => {
         return results
       }
     })
-    await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+    await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
     await user.click(screen.getByRole('button', { name: '대사 실행' }))
     await waitFor(() => expect(finishInitial).toBeDefined())
     finishInitial!({ ...results, items: { ...results.items, content: [] } })
@@ -225,9 +225,7 @@ describe('RECO-W01·W02 React 전환', () => {
         : undefined,
     )
     expect(await screen.findByText('이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.')).toBeVisible()
-    expect(
-      within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '2' }),
-    ).toBeEnabled()
+    expect(within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '2' })).toBeEnabled()
     const footer = screen.getByRole('region', { name: '대사 결과' }).querySelector('tfoot')!
     expect(footer).toHaveTextContent('이 페이지 합계')
     expect(within(footer).getAllByText('0')).toHaveLength(3)
@@ -245,9 +243,9 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(screen.queryByText('이 페이지에는 불일치가 없습니다. 다른 페이지도 확인하세요.')).not.toBeInTheDocument()
   })
   for (const action of ['조회', '대사 실행'])
-    it(`다른 월 ${action}은 전역 탭 영향 확인 후 취소하면 URL·기준월·POST를 변경하지 않는다`, async () => {
+    it(`다른 월 ${action}은 전역 탭 영향 확인 후 취소하면 URL/기준월/POST를 변경하지 않는다`, async () => {
       const { router, user } = renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=1')
-      await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+      await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
       fireEvent.change(screen.getByLabelText(/정산월/, { selector: 'input' }), { target: { value: '2026-08' } })
       await user.click(screen.getByRole('button', { name: action }))
       const dialog = screen.getByRole('dialog', { name: '기준 정산월 변경 확인' })
@@ -264,7 +262,7 @@ describe('RECO-W01·W02 React 전환', () => {
         ? { content: [{ insurerId: 9, insurerCode: 'OLD', insurerName: '과거회사', activeYn: false }], totalPages: 1 }
         : undefined,
     )
-    expect(await screen.findByRole('option', { name: 'OLD · 과거회사' })).toBeEnabled()
+    expect(await screen.findByRole('option', { name: 'OLD, 과거회사' })).toBeEnabled()
     await user.selectOptions(screen.getByLabelText('보험회사'), '9')
     expect(screen.getByRole('button', { name: '대사 실행' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: '조회' }))
@@ -288,8 +286,8 @@ describe('RECO-W01·W02 React 전환', () => {
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText('0회차')).toBeVisible()
     expect(dialog).not.toHaveTextContent('-회차')
-    expect(dialog).not.toHaveTextContent('—회차')
-    expect(within(dialog).getByText('C-001 · 초회 수수료 · —')).toBeVisible()
+    expect(dialog).not.toHaveTextContent('-회차')
+    expect(within(dialog).getByText('C-001, 초회 수수료, -')).toBeVisible()
   })
   it('이력의 단계·보험회사·정산월·page/size/sort 조건 및 표시 규칙을 유지한다', async () => {
     const { router, user } = renderAt('/reconciliations?stage=GA_TO_FC&insurer=1')
@@ -319,7 +317,12 @@ describe('RECO-W01·W02 React 전환', () => {
     const historyTable = await screen.findByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' })
     const resultTable = await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
     const lastQuery = (match: (url: string) => boolean) =>
-      new URLSearchParams(calls.filter((call) => match(call.url)).at(-1)!.url.split('?')[1])
+      new URLSearchParams(
+        calls
+          .filter((call) => match(call.url))
+          .at(-1)!
+          .url.split('?')[1],
+      )
     const historyQuery = () => lastQuery((url) => url.startsWith('/api/v1/reconciliations?'))
     const resultQuery = () => lastQuery((url) => /\/41\/results/.test(url))
     // 순서 기준이 없는 상태·결과 유형 컬럼은 정렬 버튼이 없다.
@@ -397,9 +400,15 @@ describe('RECO-W01·W02 React 전환', () => {
     }
     const params = new URLSearchParams(router.state.location.search)
     for (const [key, value] of Object.entries({
-      month: '2026-07', stage: 'GA_TO_FC', insurer: '1', runId: '41',
-      runMonth: '2026-07', resultType: 'AMOUNT_DIFFERENCE', onlyMismatch: 'true',
-    })) expect(params.get(key)).toBe(value)
+      month: '2026-07',
+      stage: 'GA_TO_FC',
+      insurer: '1',
+      runId: '41',
+      runMonth: '2026-07',
+      resultType: 'AMOUNT_DIFFERENCE',
+      onlyMismatch: 'true',
+    }))
+      expect(params.get(key)).toBe(value)
     const resultCall = calls.filter((call) => call.url.includes('/41/results')).at(-1)!
     expect(new URLSearchParams(resultCall.url.split('?')[1]).get('resultType')).toBe('AMOUNT_DIFFERENCE')
   })
@@ -414,7 +423,7 @@ describe('RECO-W01·W02 React 전환', () => {
   })
   it('조회 버튼은 초안 조건을 URL로 반영하고 이전 실행 선택을 지운다', async () => {
     const { router, user } = renderAt('/reconciliations?runId=41')
-    await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+    await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
     await user.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
     await user.selectOptions(screen.getByLabelText('보험회사'), '1')
     await user.click(screen.getByRole('button', { name: '조회' }))
@@ -429,7 +438,7 @@ describe('RECO-W01·W02 React 전환', () => {
           ? { reconciliationRunId: 42, status: 'RUNNING' }
           : undefined,
     )
-    await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+    await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
     await user.click(screen.getByRole('button', { name: '대사 실행' }))
     await waitFor(() => expect(router.state.location.search).toContain('runId=42'))
     expect(router.state.location.search).not.toContain('page=2')
@@ -453,8 +462,8 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('-1,000원')
     await user.click(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' }))
     const dialog = screen.getByRole('dialog')
-    expect(await within(dialog).findByText('예상 원천 1 · schedule_line #12')).toBeVisible()
-    expect(within(dialog).getByText('실제 원천 1 · commission_transaction #8')).toBeVisible()
+    expect(await within(dialog).findByText('예상 원천 1, schedule_line #12')).toBeVisible()
+    expect(within(dialog).getByText('실제 원천 1, 수수료 지급 번호 8')).toBeVisible()
     expect(within(dialog).getByText('123.1%')).toBeVisible()
     for (const difference of within(dialog).getAllByText('-1,000원'))
       expect(difference).toHaveClass('is-negative-amount', 'reco-react-difference')
@@ -495,7 +504,7 @@ describe('RECO-W01·W02 React 전환', () => {
     const { user } = renderAt('/reconciliations?stage=GA_TO_FC&insurer=1', (url) =>
       url.startsWith('/api/v1/validation-runs?') ? { content: [] } : undefined,
     )
-    await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+    await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
     await user.click(screen.getByRole('button', { name: '대사 실행' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       '이 정산월의 월 통합검증이 아직 완료되지 않았습니다. 검증을 먼저 완료하세요.',
@@ -511,16 +520,14 @@ describe('RECO-W01·W02 React 전환', () => {
           409,
         )
     })
-    await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+    await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
     await user.click(screen.getByRole('button', { name: '대사 실행' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      '이미 같은 조건의 대사 실행이 있습니다. (FGC-RECO-002 · 요청 ID: trace-reco)',
-    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('이미 같은 조건의 대사 실행이 있습니다.')
   })
   for (const role of ['COMPLIANCE', 'GA_ADMIN'])
-    it(`${role}는 조회만 가능하고 실행·일괄 예외 버튼이 비활성이다`, async () => {
+    it(`${role}는 조회만 가능하고 실행/일괄 예외 버튼이 비활성이다`, async () => {
       renderAt('/reconciliations?stage=GA_TO_FC&insurer=1&runId=41', undefined, role)
-      await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+      await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
       expect(screen.getByRole('button', { name: '대사 실행' })).toBeDisabled()
       expect(screen.getByRole('button', { name: '불일치 예외 일괄 생성' })).toBeDisabled()
       expect(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })).toBeEnabled()
@@ -543,7 +550,7 @@ describe('RECO-W01·W02 React 전환', () => {
     const table = await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
     const footer = table.querySelector('tfoot')!
     expect(within(footer).getAllByText('0')).toHaveLength(3)
-    expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('—원')
+    expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('-원')
     await user.click(await screen.findByRole('button', { name: '41' }))
     await within(footer).findByText('24,000')
     expect(within(footer).getByText('23,000')).toBeVisible()
@@ -583,7 +590,7 @@ describe('RECO-W01·W02 React 전환', () => {
     const region = await screen.findByRole('region', { name: '대사 결과' })
     expect(await within(region).findByRole('alert')).toHaveTextContent('조회 실패')
     expect(within(region).getByRole('status')).toHaveTextContent('대사 결과를 불러오지 못했습니다.')
-    expect(within(region.querySelector('tfoot')!).getAllByText('—')).toHaveLength(3)
+    expect(within(region.querySelector('tfoot')!).getAllByText('-')).toHaveLength(3)
   })
   it('요약의 일치율은 건수 기준 한 자리이며 도움말은 요청할 때 제공한다', async () => {
     renderAt('/reconciliations?runId=41', (url) =>
@@ -608,9 +615,7 @@ describe('RECO-W01·W02 React 전환', () => {
     await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
     await user.selectOptions(screen.getByLabelText('결과 유형'), 'AMOUNT_DIFFERENCE')
     await waitFor(() => expect(calls.some((call) => call.url.includes('resultType=AMOUNT_DIFFERENCE'))).toBe(true))
-    await user.click(
-      within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '2' }),
-    )
+    await user.click(within(screen.getByRole('region', { name: '대사 결과' })).getByRole('button', { name: '2' }))
     expect(router.state.location.search).toContain('resultPage=2')
     expect(new URLSearchParams(router.state.location.search).get('page')).toBe('2')
   })
@@ -660,7 +665,7 @@ describe('RECO-W01·W02 React 전환', () => {
     const { router, user } = renderAt('/reconciliations?stage=GA_TO_FC&insurer=1', (url, options) =>
       url === '/api/v1/reconciliations' && options?.method === 'POST' ? { reconciliationRunId: 42 } : undefined,
     )
-    await screen.findByRole('option', { name: 'LIFE · 테스트생명' })
+    await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
     fireEvent.change(screen.getByLabelText(/정산월/, { selector: 'input' }), { target: { value: '2026-08' } })
     await user.click(screen.getByRole('button', { name: '대사 실행' }))
     await user.click(screen.getByRole('button', { name: '변경하고 실행' }))

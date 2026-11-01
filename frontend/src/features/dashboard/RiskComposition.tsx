@@ -4,7 +4,6 @@ import { Link } from 'react-router'
 import { int, rate } from '../../lib/format'
 import { useDrawn } from '../../lib/motion'
 import { CIRCUMFERENCE, RADIUS, donutSegments } from './donut'
-import { useDesignSettings } from '../../stores/designSettings'
 
 export type CompositionItem = {
   key: string
@@ -20,52 +19,46 @@ export type CompositionItem = {
  * 각 줄은 해당 목록 화면으로 이동하는 링크다. 줄에 마우스를 올리거나 포커스하면 해당 조각이 강조된다.
  */
 export function RiskComposition({ items }: { items: CompositionItem[] }) {
-  const display = useDesignSettings((state) => state.preferences.summaryDisplay)
-  const mode = import.meta.env.DEV ? display : 'donut'
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const drawn = useDrawn()
   const total = items.reduce((sum, item) => sum + item.value, 0)
   const segments = new Map(donutSegments(items).map((segment) => [segment.key, segment]))
 
-  if (mode === 'hidden') return null
   if (total === 0) {
     return <div className="empty-state">이번 달 표시할 위험 건이 없습니다.</div>
   }
 
   return (
-    <div className={`risk-composition risk-display-${mode}`}>
-      {mode === 'donut' && (
-        <div className="risk-donut" aria-hidden="true">
-          <svg viewBox="0 0 100 100" className="risk-donut-svg">
-            <circle className="risk-donut-track" cx="50" cy="50" r={RADIUS} />
-            {items.map((item) => {
-              const segment = segments.get(item.key)
-              if (!segment) return null
-              const state = activeKey === null ? '' : activeKey === item.key ? ' is-active' : ' is-dimmed'
-              const dash = drawn ? segment.length : 0
-              return (
-                <circle
-                  key={item.key}
-                  className={`risk-donut-segment risk-color-${item.color}${state}`}
-                  cx="50"
-                  cy="50"
-                  r={RADIUS}
-                  strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
-                  strokeDashoffset={-segment.offset}
-                  onMouseEnter={() => setActiveKey(item.key)}
-                  onMouseLeave={() => setActiveKey(null)}
-                />
-              )
-            })}
-          </svg>
-          <div className="risk-donut-center">
-            <span>항목별 비중</span>
-          </div>
+    <div className="risk-composition risk-display-donut">
+      <div className="risk-donut" aria-hidden="true">
+        <svg viewBox="0 0 100 100" className="risk-donut-svg">
+          <circle className="risk-donut-track" cx="50" cy="50" r={RADIUS} />
+          {items.map((item) => {
+            const segment = segments.get(item.key)
+            if (!segment) return null
+            const state = activeKey === null ? '' : activeKey === item.key ? ' is-active' : ' is-dimmed'
+            const dash = drawn ? segment.length : 0
+            return (
+              <circle
+                key={item.key}
+                className={`risk-donut-segment risk-color-${item.color}${state}`}
+                cx="50"
+                cy="50"
+                r={RADIUS}
+                strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
+                strokeDashoffset={-segment.offset}
+                onMouseEnter={() => setActiveKey(item.key)}
+                onMouseLeave={() => setActiveKey(null)}
+              />
+            )
+          })}
+        </svg>
+        <div className="risk-donut-center">
+          <span>항목별 비중</span>
         </div>
-      )}
+      </div>
       <ul className="risk-legend">
         {items.map((item, index) => {
-          const share = total > 0 ? item.value / total : 0
           // 화면정의서 공통 규칙 3: 소수점 첫째 자리까지 절사. (value*100)/total이라야 0.29*100 같은 곱셈 오차가 없다
           const sharePct = `${rate(total > 0 ? String((item.value * 100) / total) : '0')}%`
           return (
@@ -83,12 +76,6 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
                 <span className="risk-legend-label">{item.label}</span>
                 <span className="risk-legend-value tabular-nums">{int(item.value)}건</span>
                 <span className="risk-legend-share tabular-nums">{sharePct}</span>
-                <span className="risk-legend-bar" aria-hidden="true">
-                  <span
-                    className={`risk-legend-bar-fill risk-color-${item.color}`}
-                    style={{ transform: `scaleX(${drawn ? share : 0})` }}
-                  />
-                </span>
               </Link>
             </li>
           )

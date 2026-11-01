@@ -1,3 +1,4 @@
+import { typeBadgeTone } from '../exception/rules'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
@@ -106,7 +107,11 @@ export function ExceptionPage() {
       label: '유형',
       width: '8.5rem',
       align: 'center',
-      render: (row) => <StatusBadge tone={typeTone(row.type)}>{row.typeLabel ?? '-'}</StatusBadge>,
+      render: (row) => (
+        <StatusBadge optionCount={14} kind="category" tone={typeBadgeTone(row.type)}>
+          {row.typeLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     {
       key: 'reason',
@@ -123,7 +128,11 @@ export function ExceptionPage() {
       sortable: true,
       width: '5rem',
       align: 'center',
-      render: (row) => <StatusBadge tone={severityTone(row.severity)}>{row.severityLabel ?? '-'}</StatusBadge>,
+      render: (row) => (
+        <StatusBadge kind="severity" optionCount={4} tone={severityTone(row.severity)} tablePresentation="text">
+          {row.severityLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     {
       key: 'contract',
@@ -146,7 +155,11 @@ export function ExceptionPage() {
       label: '상태',
       width: '5.75rem',
       align: 'center',
-      render: (row) => <StatusBadge tone={statusTone(row.status)}>{row.statusLabel ?? '-'}</StatusBadge>,
+      render: (row) => (
+        <StatusBadge optionCount={4} tone={statusTone(row.status)} tablePresentation="dot">
+          {row.statusLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     {
       key: 'assignee',
@@ -301,7 +314,7 @@ export function ExceptionPage() {
                   {selected ? (
                     <Occurrences item={selected} />
                   ) : (
-                    <p className="text-secondary exception-placeholder">—</p>
+                    <p className="text-secondary exception-placeholder">-</p>
                   )}
                 </div>
               </section>
@@ -324,7 +337,7 @@ export function ExceptionPage() {
                   <span className="text-secondary exception-card-note">기록만 쌓입니다. 고치거나 지울 수 없습니다</span>
                 </div>
                 <div className="surface-body">
-                  {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">—</p>}
+                  {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">-</p>}
                 </div>
               </section>
             </div>
@@ -343,10 +356,10 @@ function Occurrences({ item }: { item: ExceptionCase }) {
       {occurrences.map((occurrence) => (
         <li className="exception-history-item" key={occurrence.exceptionOccurrenceId}>
           <strong>
-            {(occurrence.validationMonth ?? '').slice(0, 7)} · {occurrence.runNo}회차 · {occurrence.detectionLabel}
+            {(occurrence.validationMonth ?? '').slice(0, 7)}, {occurrence.runNo}회차, {occurrence.detectionLabel}
           </strong>
           <p className="text-secondary exception-occurrence-meta">
-            실행 <span className="tabular-nums">{occurrence.validationRunId}</span> ·{' '}
+            실행 <span className="tabular-nums">{occurrence.validationRunId}</span>,{' '}
             <span className="tabular-nums">
               {occurrence.sourceEntityType}:{occurrence.sourceEntityId}
             </span>
@@ -387,12 +400,12 @@ function History({ item }: { item: ExceptionCase }) {
           </strong>
           <span className="text-secondary">
             {' '}
-            · {action.fromStatusLabel} → {action.toStatusLabel}
+            , {action.fromStatusLabel} → {action.toStatusLabel}
           </span>
           <p className="exception-history-reason">{action.reason}</p>
           {action.evidenceRef && <p className="text-secondary exception-occurrence-meta">증빙: {action.evidenceRef}</p>}
           <small className="text-secondary">
-            {action.actionByLoginId} · {dateTime(action.actionAt)}
+            {action.actionByLoginId}, {dateTime(action.actionAt)}
           </small>
         </li>
       ))}

@@ -27,7 +27,11 @@ export function Money({
 }
 export function ResultBadge({ type, label }: { type?: string; label?: string }) {
   return (
-    <StatusBadge tone={type === 'MATCHED' ? 'success' : type === 'REVIEW_REQUIRED' ? 'review' : 'error'}>
+    <StatusBadge
+      optionCount={Object.keys(RESULT_TYPE).length}
+      kind="category"
+      tone={type === 'MATCHED' ? 'success' : type === 'REVIEW_REQUIRED' ? 'review' : 'error'}
+    >
       {label || RESULT_TYPE[type as keyof typeof RESULT_TYPE] || text(type)}
     </StatusBadge>
   )

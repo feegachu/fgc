@@ -50,7 +50,7 @@ public class WatermarkAdvanceStepListener implements StepExecutionListener {
                 stepExecution.getReadCount());
 
         if (affected == 0) {
-            log.error("batch_watermark 전진 실패 — (job_name={}, step_name={}) 행을 찾지 못했습니다. "
+            log.error("batch_watermark 전진 실패, (job_name={}, step_name={}) 행을 찾지 못했습니다. "
                             + "V2 마이그레이션 시드가 지워졌거나 이름 오타 여부를 확인하세요.",
                     DailyChangedContractJobNames.JOB_NAME, DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME);
         }

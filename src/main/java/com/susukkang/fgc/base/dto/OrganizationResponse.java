@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 
-@Schema(description = "GA·조직 기준정보")
+@Schema(description = "GA/조직 기준정보")
 public record OrganizationResponse(
         @Schema(description = "조직 ID", example = "11")
         Long organizationId,

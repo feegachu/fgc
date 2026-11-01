@@ -20,18 +20,18 @@ import org.springframework.web.bind.annotation.RestController;
  * RPT-W02 설계사 수수료 명세 조회(IF-API-87·88). 본인 경로는 AGENT, 내부 경로는 AGENT 가 아닌 역할이다.
  * 본인 경로에는 agentId 를 받지 않고 인증 연결에서 정한다.
  */
-@Tag(name = "설계사 수수료 명세", description = "FUN-060 지급·보류·조정·환수 명세 조회 API")
+@Tag(name = "설계사 수수료 명세", description = "FUN-060 지급/보류/조정/환수 명세 조회 API")
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class AgentStatementController {
 
-    private static final String MONTH = "기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다";
-    private static final String SORT = "정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순";
+    private static final String MONTH = "기준월(yyyy-MM). 유형마다 지급 귀속월/보류 예정월/조정 처리월/환수 계산월로 본다";
+    private static final String SORT = "정렬(key,asc|desc). basisDate/entryType/contractNo/commissionItemCode/installmentNo/statusCode/amount. 비우면 기준일 내림차순";
 
     private final AgentStatementService service;
 
-    @Operation(summary = "본인 수수료 명세 목록", description = "지급·보류·조정·환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.")
+    @Operation(summary = "본인 수수료 명세 목록", description = "지급/보류/조정/환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.")
     @GetMapping("/agent/me/statements")
     @PreAuthorize(Roles.IS_AGENT)
     public ApiResponse<StatementListResponse> mine(
@@ -45,7 +45,7 @@ public class AgentStatementController {
         return ApiResponse.success(service.listMine(month, contractNo, commissionItemId, entryType, sort, page, size));
     }
 
-    @Operation(summary = "본인 수수료 명세 상세", description = "원천 ID·정책·계산 근거를 돌려줍니다. 남의 명세는 조회되지 않습니다.")
+    @Operation(summary = "본인 수수료 명세 상세", description = "원천 ID/정책/계산 근거를 돌려줍니다. 남의 명세는 조회되지 않습니다.")
     @GetMapping("/agent/me/statements/{entryKey}")
     @PreAuthorize(Roles.IS_AGENT)
     public ApiResponse<StatementDetail> mineDetail(@PathVariable String entryKey) {

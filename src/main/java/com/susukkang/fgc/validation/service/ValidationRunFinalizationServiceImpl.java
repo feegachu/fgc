@@ -164,7 +164,7 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                         counts.getUnresolvedCriticalExceptionCount(),
                         "/exceptions?validationMonth=" + counts.getValidationMonth()
                                 + "&severity=CRITICAL&status=OPEN"),
-                condition(4, "정책 없음 · 정책 중복이 0건인가",
+                condition(4, "정책 없음, 정책 중복이 0건인가",
                         counts.getUnresolvedPolicyExceptionCount(),
                         "/exceptions?validationMonth=" + counts.getValidationMonth()
                                 + "&types=POLICY_MISSING&types=POLICY_DUPLICATE&status=OPEN"),
@@ -225,7 +225,7 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                         "finalizedBy", finalizedBy,
                         "finalizedAt", finalized.getFinalizedAt()
                 ))
-                .reason("월 통합검증 결과 확정(검증 결과 잠금; 실제 송금·법정 회계마감 아님)")
+                .reason("월 통합검증 결과 확정(검증 결과 잠금; 실제 송금/법정 회계마감 아님)")
                 .build());
     }
 

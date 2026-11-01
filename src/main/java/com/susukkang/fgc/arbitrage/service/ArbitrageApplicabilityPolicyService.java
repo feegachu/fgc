@@ -33,7 +33,7 @@ public class ArbitrageApplicabilityPolicyService {
             LocalDate effectiveDate = LocalDate.parse(policy.getEffectiveContractDate());
             if (policy.getRefundAdditionMonths() == null || policy.getRefundAdditionBoundaryInclusive() == null) {
                 return new Applicability(policy.getPolicyVersionId(), effectiveDate, null, null,
-                        "차익거래 환급금 합산 기간·경계 정책값이 없습니다.");
+                        "차익거래 환급금 합산 기간/경계 정책값이 없습니다.");
             }
             Integer months;
             try {
@@ -45,7 +45,7 @@ public class ArbitrageApplicabilityPolicyService {
             String boundary = policy.getRefundAdditionBoundaryInclusive();
             if (months < 1 || months > 1200 || !("true".equals(boundary) || "false".equals(boundary))) {
                 return new Applicability(policy.getPolicyVersionId(), effectiveDate, null, null,
-                        "차익거래 환급금 합산 기간·경계 정책값이 올바르지 않습니다.");
+                        "차익거래 환급금 합산 기간/경계 정책값이 올바르지 않습니다.");
             }
             return new Applicability(policy.getPolicyVersionId(), effectiveDate, months, Boolean.valueOf(boundary), null);
         } catch (DateTimeParseException e) {

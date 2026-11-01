@@ -107,7 +107,7 @@ public class MonthlyValidationJobTrigger {
         if ((expected != ValidationRunStatus.CREATED && expected != ValidationRunStatus.FAILED)
                 || fresh.isEmpty() || fresh.get().getStatus() != expected) {
             throw new IllegalStateException("validation_run " + validationRunId + " 은 이미 기동됨(status="
-                    + (fresh.isEmpty() ? "삭제됨" : fresh.get().getStatus()) + ") — 중복 실행 요청을 무시합니다.");
+                    + (fresh.isEmpty() ? "삭제됨" : fresh.get().getStatus()) + "), 중복 실행 요청을 무시합니다.");
         }
         try {
             Long expectedExecutionId = jobParameters.getLong("restartFromExecutionId");

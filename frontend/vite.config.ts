@@ -38,6 +38,8 @@ export default defineConfig({
     },
   ],
   server: {
+    // 같은 네트워크의 다른 기기도 PC의 내부 IP로 개발 화면에 접속할 수 있다.
+    host: '0.0.0.0',
     proxy: {
       // 문자열로 쓰면 Vite 가 changeOrigin: true 를 켜 Host 를 백엔드 주소로 바꾼다 → 토큰 API 출처 검사(FGC-AUTH-003)에 걸린다.
       '/api': { target: apiTarget },

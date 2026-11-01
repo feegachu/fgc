@@ -4,16 +4,41 @@ import { loginUrl, safeRedirect } from './redirect'
 import { errorText } from '../format'
 
 const ok = (data: unknown = { id: 1 }) => Response.json({ data, error: null, requestId: 'req-1' })
-const fail = (status = 401, code = 'FGC-AUTH-002') => Response.json({ data: null, error: { code, message: '서버 문구', field: 'name', params: { value: 1 }, detail: 'detail' }, requestId: 'error-1' }, { status })
+const fail = (status = 401, code = 'FGC-AUTH-002') =>
+  Response.json(
+    {
+      data: null,
+      error: { code, message: '서버 문구', field: 'name', params: { value: 1 }, detail: 'detail' },
+      requestId: 'error-1',
+    },
+    { status },
+  )
 function setup(fetcher: typeof fetch) {
   let token: string | null = 'old'
   const location = { pathname: '/app/contracts', search: '?status=ACTIVE', hash: '#detail', assign: vi.fn() }
-  const client = createApiClient({ fetch: fetcher, location, base: '/app/', getToken: () => token, setToken: (value) => { token = value } })
-  return { client, location, getToken: () => token, setToken: (value: string | null) => { token = value } }
+  const client = createApiClient({
+    fetch: fetcher,
+    location,
+    base: '/app/',
+    getToken: () => token,
+    setToken: (value) => {
+      token = value
+    },
+  })
+  return {
+    client,
+    location,
+    getToken: () => token,
+    setToken: (value: string | null) => {
+      token = value
+    },
+  }
 }
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((r) => { resolve = r })
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
   return { promise, resolve }
 }
 describe('API 계약', () => {
@@ -21,7 +46,14 @@ describe('API 계약', () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(ok({ content: [], page: 1 }))
     const { client } = setup(fetcher)
     const controller = new AbortController()
-    expect(await client.request('/api/v1/contracts', { method: 'POST', body: { name: 'x' }, idempotencyKey: 'key', signal: controller.signal })).toEqual({ data: { content: [], page: 1 }, error: null, requestId: 'req-1' })
+    expect(
+      await client.request('/api/v1/contracts', {
+        method: 'POST',
+        body: { name: 'x' },
+        idempotencyKey: 'key',
+        signal: controller.signal,
+      }),
+    ).toEqual({ data: { content: [], page: 1 }, error: null, requestId: 'req-1' })
     const [, options] = fetcher.mock.calls[0]
     const headers = new Headers(options?.headers)
     expect(headers.get('Authorization')).toBe('Bearer old')
@@ -31,24 +63,45 @@ describe('API 계약', () => {
     expect(options?.signal).toBe(controller.signal)
   })
   it('204는 null, requestId 헤더를 반환한다', async () => {
-    const { client } = setup(vi.fn().mockResolvedValue(new Response(null, { status: 204, headers: { 'X-Request-Id': 'empty' } })))
+    const { client } = setup(
+      vi.fn().mockResolvedValue(new Response(null, { status: 204, headers: { 'X-Request-Id': 'empty' } })),
+    )
     expect(await client.request('/api/v1/contracts')).toEqual({ data: null, error: null, requestId: 'empty' })
   })
   it.each([400, 403, 404, 409, 500])('%i 오류 필드를 보존하고 refresh하지 않는다', async (status) => {
     const fetcher = vi.fn().mockResolvedValue(fail(status, 'FGC-CONT-001'))
     const { client } = setup(fetcher)
-    await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({ name: 'ApiError', code: 'FGC-CONT-001', message: '서버 문구', field: 'name', params: { value: 1 }, detail: 'detail', requestId: 'error-1', status })
+    await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 'FGC-CONT-001',
+      message: '서버 문구',
+      field: 'name',
+      params: { value: 1 },
+      detail: 'detail',
+      requestId: 'error-1',
+      status,
+    })
     expect(fetcher).toHaveBeenCalledTimes(1)
   })
   it('비JSON 502에서 헤더 requestId를 보존한다', async () => {
-    const { client } = setup(vi.fn().mockResolvedValue(new Response('Bad Gateway', { status: 502, headers: { 'X-Request-Id': 'proxy' } })))
-    await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({ code: 'FGC-COMMON-500', requestId: 'proxy', status: 502 })
+    const { client } = setup(
+      vi.fn().mockResolvedValue(new Response('Bad Gateway', { status: 502, headers: { 'X-Request-Id': 'proxy' } })),
+    )
+    await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({
+      code: 'FGC-COMMON-500',
+      requestId: 'proxy',
+      status: 502,
+    })
   })
   it.each([404, 405, 413])('비JSON %i는 서버 장애 코드로 분류하지 않는다 (#466)', async (status) => {
-    const { client } = setup(vi.fn().mockResolvedValue(new Response('<html>Not Found</html>', { status, headers: { 'X-Request-Id': 'proxy' } })))
+    const { client } = setup(
+      vi
+        .fn()
+        .mockResolvedValue(new Response('<html>Not Found</html>', { status, headers: { 'X-Request-Id': 'proxy' } })),
+    )
     const error = await client.request('/api/v1/contracts').catch((caught: unknown) => caught)
     expect(error).toMatchObject({ code: '', requestId: 'proxy', status })
-    expect(errorText(error as ApiError)).toBe('요청을 처리하지 못했습니다. (요청 ID: proxy)')
+    expect(errorText(error as ApiError)).toBe('요청을 처리하지 못했습니다.')
   })
   it('성공 상태라도 잘못된 봉투는 오류다', async () => {
     const { client } = setup(vi.fn().mockResolvedValue(Response.json({ foo: 1 })))
@@ -64,11 +117,14 @@ describe('API 계약', () => {
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('Content-Type')).toBe(false)
     expect(fetcher.mock.calls[0][1]?.body).toBe(body)
   })
-  it.each(['https://example.com/api/v1/contracts', '//example.com/api/v1/contracts', '/api/v1/../external'])('API 경로 밖으로 토큰을 보내지 않는다: %s', async (path) => {
-    const fetcher = vi.fn()
-    await expect(setup(fetcher).client.request(path)).rejects.toBeInstanceOf(TypeError)
-    expect(fetcher).not.toHaveBeenCalled()
-  })
+  it.each(['https://example.com/api/v1/contracts', '//example.com/api/v1/contracts', '/api/v1/../external'])(
+    'API 경로 밖으로 토큰을 보내지 않는다: %s',
+    async (path) => {
+      const fetcher = vi.fn()
+      await expect(setup(fetcher).client.request(path)).rejects.toBeInstanceOf(TypeError)
+      expect(fetcher).not.toHaveBeenCalled()
+    },
+  )
 })
 describe('401과 세션 복구', () => {
   it('동시 요청 3개는 refresh 한 번을 공유하고 각각 재시도한다', async () => {
@@ -104,7 +160,11 @@ describe('401과 세션 복구', () => {
     expect(fetcher.mock.calls.filter(([p]) => p === '/api/v1/auth/refresh')).toHaveLength(1)
   })
   it('본문 없는 401도 refresh한다', async () => {
-    const fetcher = vi.fn().mockResolvedValueOnce(new Response(null, { status: 401 })).mockResolvedValueOnce(ok({ accessToken: 'new' })).mockResolvedValueOnce(ok())
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(ok({ accessToken: 'new' }))
+      .mockResolvedValueOnce(ok())
     await expect(setup(fetcher).client.request('/api/v1/contracts')).resolves.toMatchObject({ data: { id: 1 } })
     expect(fetcher).toHaveBeenCalledTimes(3)
   })
@@ -122,10 +182,16 @@ describe('401과 세션 복구', () => {
     await expect(client.request('/api/v1/contracts')).rejects.toMatchObject({ code: 'FGC-AUTH-004' })
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(getToken()).toBeNull()
-    expect(location.assign).toHaveBeenCalledWith('/app/login?reason=duplicate&redirect=%2Fcontracts%3Fstatus%3DACTIVE%23detail')
+    expect(location.assign).toHaveBeenCalledWith(
+      '/app/login?reason=duplicate&redirect=%2Fcontracts%3Fstatus%3DACTIVE%23detail',
+    )
   })
   it('재시도도 401이면 두 번째 refresh를 하지 않는다', async () => {
-    const fetcher = vi.fn().mockResolvedValueOnce(fail()).mockResolvedValueOnce(ok({ accessToken: 'new' })).mockResolvedValueOnce(fail())
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(fail())
+      .mockResolvedValueOnce(ok({ accessToken: 'new' }))
+      .mockResolvedValueOnce(fail())
     const { client, getToken } = setup(fetcher)
     await expect(client.request('/api/v1/contracts')).rejects.toBeInstanceOf(ApiError)
     expect(fetcher).toHaveBeenCalledTimes(3)
@@ -133,7 +199,13 @@ describe('401과 세션 복구', () => {
   })
   it('진행 중 refresh가 중복 로그인 차단을 되돌리지 못한다', async () => {
     const refreshing = deferred<Response>()
-    const fetcher = vi.fn<typeof fetch>(async (path) => path === '/api/v1/auth/refresh' ? refreshing.promise : path === '/api/v1/duplicate' ? fail(401, 'FGC-AUTH-004') : fail())
+    const fetcher = vi.fn<typeof fetch>(async (path) =>
+      path === '/api/v1/auth/refresh'
+        ? refreshing.promise
+        : path === '/api/v1/duplicate'
+          ? fail(401, 'FGC-AUTH-004')
+          : fail(),
+    )
     const { client, getToken } = setup(fetcher)
     const pending = client.request('/api/v1/contracts').catch((e) => e)
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
@@ -176,7 +248,11 @@ describe('401과 세션 복구', () => {
     expect(location.assign).not.toHaveBeenCalled()
   })
   it('/auth/me도 Bearer와 web 헤더를 사용하고 만료 시 갱신한다', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(fail()).mockResolvedValueOnce(ok({ accessToken: 'new' })).mockResolvedValueOnce(ok({ loginId: 'demo' }))
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(fail())
+      .mockResolvedValueOnce(ok({ accessToken: 'new' }))
+      .mockResolvedValueOnce(ok({ loginId: 'demo' }))
     const { client } = setup(fetcher)
     await client.request('/api/v1/auth/me')
     expect(new Headers(fetcher.mock.calls[2][1]?.headers).get('Authorization')).toBe('Bearer new')
@@ -184,7 +260,9 @@ describe('401과 세션 복구', () => {
   })
 })
 it('base=/ 전환과 안전한 redirect 형식을 지킨다', () => {
-  expect(loginUrl({ pathname: '/contracts', search: '?page=2', hash: '' }, '/')).toBe('/login?redirect=%2Fcontracts%3Fpage%3D2')
+  expect(loginUrl({ pathname: '/contracts', search: '?page=2', hash: '' }, '/')).toBe(
+    '/login?redirect=%2Fcontracts%3Fpage%3D2',
+  )
   expect(safeRedirect('//evil.test')).toBe('/')
   expect(safeRedirect('/\\evil.test')).toBe('/')
   expect(safeRedirect('https://evil.test')).toBe('/')
@@ -192,7 +270,7 @@ it('base=/ 전환과 안전한 redirect 형식을 지킨다', () => {
 })
 it('refresh 대기 중 취소된 원 요청을 재전송하지 않는다', async () => {
   const result = deferred<Response>()
-  const fetcher = vi.fn<typeof fetch>(async (path) => path === '/api/v1/auth/refresh' ? result.promise : fail())
+  const fetcher = vi.fn<typeof fetch>(async (path) => (path === '/api/v1/auth/refresh' ? result.promise : fail()))
   const { client } = setup(fetcher)
   const controller = new AbortController()
   const pending = client.request('/api/v1/contracts', { signal: controller.signal }).catch((error) => error)
@@ -204,7 +282,9 @@ it('refresh 대기 중 취소된 원 요청을 재전송하지 않는다', async
 })
 it('진행 중 refresh는 logout 이후 토큰을 되살리지 않는다', async () => {
   const result = deferred<Response>()
-  const fetcher = vi.fn<typeof fetch>(async (path) => path === '/api/v1/auth/refresh' ? result.promise : path === '/api/v1/auth/logout' ? ok(null) : fail())
+  const fetcher = vi.fn<typeof fetch>(async (path) =>
+    path === '/api/v1/auth/refresh' ? result.promise : path === '/api/v1/auth/logout' ? ok(null) : fail(),
+  )
   const { client, getToken } = setup(fetcher)
   const pending = client.request('/api/v1/contracts').catch((error) => error)
   await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
@@ -215,7 +295,9 @@ it('진행 중 refresh는 logout 이후 토큰을 되살리지 않는다', async
 })
 it('새 로그인 이후 도착한 이전 요청의 duplicate 응답이 새 토큰을 지우지 않는다', async () => {
   const result = deferred<Response>()
-  const fetcher = vi.fn<typeof fetch>(async (path) => path === '/api/v1/auth/login' ? ok({ accessToken: 'signed-in' }) : result.promise)
+  const fetcher = vi.fn<typeof fetch>(async (path) =>
+    path === '/api/v1/auth/login' ? ok({ accessToken: 'signed-in' }) : result.promise,
+  )
   const { client, getToken, location } = setup(fetcher)
   const pending = client.request('/api/v1/contracts').catch((error) => error)
   await client.login('demo', 'password')
@@ -225,7 +307,15 @@ it('새 로그인 이후 도착한 이전 요청의 duplicate 응답이 새 토�
   expect(location.assign).not.toHaveBeenCalled()
 })
 it('CSV도 refresh 후 같은 Accept와 새 Bearer로 다시 요청한다', async () => {
-  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(fail()).mockResolvedValueOnce(ok({ accessToken: 'new' })).mockResolvedValueOnce(new Response('id\n1', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=x.csv' } }))
+  const fetcher = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(fail())
+    .mockResolvedValueOnce(ok({ accessToken: 'new' }))
+    .mockResolvedValueOnce(
+      new Response('id\n1', {
+        headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=x.csv' },
+      }),
+    )
   const { client } = setup(fetcher)
   expect((await client.requestBlob('/api/v1/contracts/export')).disposition).toContain('x.csv')
   const headers = new Headers(fetcher.mock.calls[2][1]?.headers)
@@ -234,7 +324,7 @@ it('CSV도 refresh 후 같은 Accept와 새 Bearer로 다시 요청한다', asyn
 })
 it('로그아웃 뒤 도착한 이전 사용자의 성공 응답을 화면에 전달하지 않는다', async () => {
   const result = deferred<Response>()
-  const fetcher = vi.fn<typeof fetch>(async (path) => path === '/api/v1/auth/logout' ? ok(null) : result.promise)
+  const fetcher = vi.fn<typeof fetch>(async (path) => (path === '/api/v1/auth/logout' ? ok(null) : result.promise))
   const { client } = setup(fetcher)
   const pending = client.request('/api/v1/contracts').catch((error) => error)
   await client.logout()

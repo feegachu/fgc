@@ -196,7 +196,7 @@ function ContractEditor({
       if (!mounted.current) return
       const count = saved.scheduleHeaderIds?.length ?? 0
       const action = id ? '수정' : '저장'
-      const message = `보험계약을 ${action}했습니다.${count ? ` 예상 스케줄 ${count}건을 함께 ${id ? '재생성' : '생성'}했습니다 — [예상 스케줄] 탭에서 확인하세요.` : ''}`
+      const message = `보험계약을 ${action}했습니다.${count ? ` 예상 스케줄 ${count}건을 함께 ${id ? '재생성' : '생성'}했습니다, [예상 스케줄] 탭에서 확인하세요.` : ''}`
       if (!id && missingRefundTable)
         toast(
           '선택한 상품버전에 적용할 해약환급률표가 없습니다. 계약은 저장되며, 월 통합검증에서 검토필요로 처리됩니다.',
@@ -242,8 +242,8 @@ function ContractEditor({
       labelAccessory={
         field === 'standardSurrenderDeductionAmount' ? (
           <EvidenceLink label="표준해약공제액 근거" icon="help">
-            REG-08 · 제4-32조제5항 [현행규정]. 표준해약공제액 80% 이상을 공제하는 상품은 1,200% 한도 계산에서 1년
-            경과시점 예상 해약환급금을 합산합니다. REG-12 · 제4-32조제6항 [현행규정]. 차익거래 판정에서도 일정 상품의
+            REG-08, 제4-32조제5항 [현행규정]. 표준해약공제액 80% 이상을 공제하는 상품은 1,200% 한도 계산에서 1년
+            경과시점 예상 해약환급금을 합산합니다. REG-12, 제4-32조제6항 [현행규정]. 차익거래 판정에서도 일정 상품의
             36개월 이내 해지는 해약환급금을 합산합니다.
           </EvidenceLink>
         ) : undefined
@@ -339,8 +339,8 @@ function ContractEditor({
                   error={errors.productOfferingId}
                   labelAccessory={
                     <EvidenceLink label="판매버전 근거" icon="help">
-                      REG-19 · 부칙 제2조 [개정고시]. 분급 관련 조항은 시행 후 최초로 작성·변경된 기초서류로서
-                      판매개시일이 2027-01-01 이후인 상품부터 적용합니다. 1,200%룰·차익거래 적용 여부는 계약 체결일
+                      REG-19, 부칙 제2조 [개정고시]. 분급 관련 조항은 시행 후 최초로 작성/변경된 기초서류로서
+                      판매개시일이 2027-01-01 이후인 상품부터 적용합니다. 1,200%룰/차익거래 적용 여부는 계약 체결일
                       기준으로 별도 판단하므로 계약일에 유효한 판매버전을 선택해야 합니다.
                     </EvidenceLink>
                   }
@@ -353,7 +353,7 @@ function ContractEditor({
                       product ??
                       (draft.productOfferingId === String(original?.productOfferingId) ? original : undefined)
                     }
-                    placeholder="상품명·코드·판매버전 검색"
+                    placeholder="상품명/코드/판매버전 검색"
                     disabled={!draft.insurerId || !draft.contractDate}
                     onSelect={(value, row) => {
                       products.remember(row)
@@ -409,7 +409,7 @@ function ContractEditor({
             <header className="surface-header contract-form-card-header">
               <div>
                 <h2 id="contract-agent-heading" className="surface-title">
-                  모집 설계사 · 소속
+                  모집 설계사, 소속
                 </h2>
                 <p>설계사를 선택하면 계약일 기준 소속 조직을 자동으로 채웁니다.</p>
               </div>
@@ -422,8 +422,8 @@ function ContractEditor({
                   error={errors.agentId}
                   labelAccessory={
                     <EvidenceLink label="모집 설계사 근거" icon="help">
-                      REG-07 · 제4-32조제12항제1·2호 [현행규정]. 여기서 저장하는 값은 모집 설계사입니다. 지급 대상은
-                      최초 모집자로 고정되지 않고 계약을 유지관리하는 모집종사자이므로, 유지관리 담당 설계사는 별도로
+                      REG-07, 제4-32조제12항제1/2호 [현행규정]. 여기서 저장하는 값은 모집 설계사입니다. 지급 대상은 최초
+                      모집자로 고정되지 않고 계약을 유지관리하는 모집종사자이므로, 유지관리 담당 설계사는 별도로
                       관리합니다.
                     </EvidenceLink>
                   }
@@ -436,7 +436,7 @@ function ContractEditor({
                       availableAgents.find((row) => String(row.agentId) === draft.agentId) ??
                       (draft.agentId === String(original?.agentId) ? original : undefined)
                     }
-                    placeholder="설계사 이름·코드 검색"
+                    placeholder="설계사 이름/코드 검색"
                     disabled={!draft.contractDate}
                     onSelect={(value, row) => {
                       agents.remember(row)
@@ -467,7 +467,7 @@ function ContractEditor({
             <header className="surface-header contract-form-card-header">
               <div>
                 <h2 id="contract-premium-heading" className="surface-title">
-                  보험료 · 납입 조건
+                  보험료, 납입 조건
                 </h2>
                 <p>원주기 보험료와 월납환산 초회보험료를 구분해 입력합니다.</p>
               </div>
@@ -527,14 +527,14 @@ function ContractEditor({
                 <strong>
                   {draft.monthlyEquivalentFirstPremium === '' ||
                   !Number.isSafeInteger(Number(draft.monthlyEquivalentFirstPremium) * 12)
-                    ? '—'
+                    ? '-'
                     : int(Number(draft.monthlyEquivalentFirstPremium) * 12)}
                 </strong>
                 <span>원</span>
               </div>
               <p>월납환산 초회보험료 × 12</p>
               <p>
-                참고용 기본 계산식입니다. 실제 한도는 저장 후 적용 룰셋·해약환급금 합산 등을 반영해 서버가 다시
+                참고용 기본 계산식입니다. 실제 한도는 저장 후 적용 룰셋/해약환급금 합산 등을 반영해 서버가 다시
                 계산합니다.
               </p>
             </aside>

@@ -1,4 +1,5 @@
 import type { CandidateRow } from '../features/clawback/api'
+import type { CapBasis, CapItem } from '../features/cap/api'
 
 // Synthetic, read-only fixtures for comparing the actual screens in /design-preview.
 export const designPreviewUser = {
@@ -13,6 +14,29 @@ export const designPreviewUser = {
   canFinalizeValidation: false,
 }
 const page = { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
+const capItems: CapItem[] = Array.from({ length: 16 }, (_, index) => {
+  const violation = index < 3
+  const paymentStage = index < 11 ? 'INSURER_TO_GA' : 'GA_TO_FC'
+  const includedAmount = violation ? 1299600 : 894000
+  return {
+    capCheckId: index + 1,
+    contractId: index + 1,
+    contractNo: `PREVIEW-2026-${String(index + 1).padStart(3, '0')}`,
+    paymentStage,
+    paymentStageLabel: paymentStage === 'INSURER_TO_GA' ? '원수사 → GA' : 'GA → 설계사',
+    asOfDate: '2026-07-31',
+    basePremiumAmount: 100000,
+    refund12mAmount: 0,
+    complianceDeductionAmount: 0,
+    limitAmount: 1200000,
+    includedAmount,
+    remainingAmount: 1200000 - includedAmount,
+    usagePct: violation ? '108.3' : '74.5',
+    resultStatus: violation ? 'VIOLATION' : 'NORMAL',
+    resultStatusLabel: violation ? '위반' : '정상',
+    capRuleSetId: 1,
+  }
+})
 const clawbackCandidates: CandidateRow[] = [12, 11, 10].map((candidateId, index) => ({
   candidateId,
   contractId: candidateId,
@@ -59,6 +83,25 @@ const reconciliation = {
 export function designPreviewData(url: URL): unknown {
   const path = url.pathname
   if (path === '/api/v1/auth/me') return designPreviewUser
+  const capDetail = /^\/api\/v1\/cap-checks\/(\d+)\/details$/.exec(path)
+  if (capDetail) {
+    const capCheck = capItems.find((row) => row.capCheckId === Number(capDetail[1]))
+    if (capCheck)
+      return {
+        capCheck,
+        calculationSnapshot: { premiumMultiplier: 12, warningUsagePct: 90 },
+        warningStartUsagePct: '90.0',
+        details: [
+          {
+            detailSeq: 1,
+            commissionItemName: '예시 기본수수료',
+            amount: capCheck.includedAmount ?? undefined,
+            classificationSnapshot: 'INCLUDED',
+            decisionReason: '미리보기 산입 금액',
+          },
+        ],
+      } satisfies CapBasis
+  }
   if (path === '/api/v1/clawbacks/candidates')
     return { ...page, content: clawbackCandidates, totalElements: clawbackCandidates.length, totalPages: 1 }
   if (path.startsWith('/api/v1/clawbacks/candidates/'))
@@ -73,6 +116,9 @@ export function designPreviewData(url: URL): unknown {
   if (path === '/api/v1/cap-checks')
     return {
       ...page,
+      content: capItems,
+      totalElements: capItems.length,
+      totalPages: 1,
       summary: { normal: 13, warning: 0, violation: 3, reviewRequired: 0 },
       stageSummary: [
         {

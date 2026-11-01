@@ -30,7 +30,7 @@ export function sumAmounts(values: Amount[]): string | null {
 /** Use the same per-detail HALF_UP rule for table cells and page totals. */
 export function amountText(value: Amount, unit = true) {
   const part = decimal(value)
-  if (!part) return '—'
+  if (!part) return '-'
   const negative = part.coefficient < 0n
   const rounded = wholeWon(part)
   const digits = (rounded < 0n ? -rounded : rounded).toLocaleString('ko-KR')

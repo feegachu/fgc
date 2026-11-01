@@ -8,7 +8,7 @@ export const contractTabs = [
   ['cap', '1,200%'],
   ['arbitrage', '차익거래'],
   ['ledger', '원장'],
-  ['payment', '지급·대사'],
+  ['payment', '지급/대사'],
 ] as const
 export type ContractTab = (typeof contractTabs)[number][0]
 export const contractTab = (value: string | null): ContractTab =>
@@ -17,7 +17,7 @@ export const contractTab = (value: string | null): ContractTab =>
 /** COMMON-500은 서버 내부 상세 대신 요청 ID만 노출한다. */
 export const contractErrorText = (error: Error, fallback?: string) =>
   error instanceof ApiError && (error.code === 'FGC-COMMON-500' || error.status >= 500)
-    ? `요청 ID: ${error.requestId ?? '—'}`
+    ? `요청 ID: ${error.requestId ?? '-'}`
     : errorText(error, fallback)
 
 export type StatusSort = 'effectiveAt' | 'receivedAt'

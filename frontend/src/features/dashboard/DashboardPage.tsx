@@ -1,3 +1,4 @@
+import { typeBadgeTone } from '../exception/rules'
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
 import { Link, useOutletContext } from 'react-router'
@@ -8,6 +9,7 @@ import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { KpiCard } from '../../components/KpiCard'
 import { StatusBadge } from '../../components/StatusBadge'
 import { dateTime, errorText, int } from '../../lib/format'
+import { monthText, screenMessage } from '../../lib/screenText'
 import { useDrawn } from '../../lib/motion'
 import { withMonth } from '../../stores/workspace'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -16,7 +18,7 @@ import type { RecentException, RecentRun } from './api'
 import { DashboardSkeleton } from './DashboardSkeleton'
 import { RiskComposition } from './RiskComposition'
 import type { CompositionItem } from './RiskComposition'
-import { exceptionStatusTone, exceptionTypeTone, runStatusTone, severityTone } from './tones'
+import { exceptionStatusTone, runStatusTone, severityTone } from './tones'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
 
@@ -41,13 +43,21 @@ function DashboardContent({ month }: { month: string }) {
       key: 'severity',
       label: '심각도',
       align: 'center',
-      render: (e) => <StatusBadge tone={severityTone(e.severity)}>{e.severityLabel ?? '-'}</StatusBadge>,
+      render: (e) => (
+        <StatusBadge kind="severity" optionCount={4} tone={severityTone(e.severity)} tablePresentation="text">
+          {e.severityLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     {
       key: 'type',
       label: '유형',
       align: 'center',
-      render: (e) => <StatusBadge tone={exceptionTypeTone(e.exceptionType)}>{e.exceptionTypeLabel ?? '-'}</StatusBadge>,
+      render: (e) => (
+        <StatusBadge optionCount={14} kind="category" tone={typeBadgeTone(e.exceptionType)}>
+          {e.exceptionTypeLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     { key: 'contractNo', label: '계약번호', cellClassName: 'tabular-nums', render: (e) => e.contractNo ?? '-' },
     {
@@ -57,8 +67,8 @@ function DashboardContent({ month }: { month: string }) {
       render: (e) => (
         <CellDisclosure
           singleLine
-          preview={<Link to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{e.title ?? '-'}</Link>}
-          full={e.title ?? '-'}
+          preview={<Link to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{screenMessage(e.title)}</Link>}
+          full={screenMessage(e.title)}
         />
       ),
     },
@@ -66,7 +76,11 @@ function DashboardContent({ month }: { month: string }) {
       key: 'status',
       label: '상태',
       align: 'center',
-      render: (e) => <StatusBadge tone={exceptionStatusTone(e.status)}>{e.statusLabel ?? '-'}</StatusBadge>,
+      render: (e) => (
+        <StatusBadge optionCount={4} tone={exceptionStatusTone(e.status)} tablePresentation="dot">
+          {e.statusLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     { key: 'createdAt', label: '발생', cellClassName: 'tabular-nums', render: (e) => dateTime(e.createdAt) },
   ]
@@ -239,7 +253,11 @@ function DashboardContent({ month }: { month: string }) {
                 {data?.recentRuns?.length ? (
                   <div className="run-list-body">
                     {data.recentRuns.map((run) => (
-                      <RunRow key={run.validationRunId} run={run} to={href(`/validation-runs/${run.validationRunId}`)} />
+                      <RunRow
+                        key={run.validationRunId}
+                        run={run}
+                        to={href(`/validation-runs/${run.validationRunId}`)}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -255,7 +273,10 @@ function DashboardContent({ month }: { month: string }) {
                   </h2>
                 </header>
                 <RiskComposition items={compositionItems} />
-                <p className="risk-composition-note">미처리 예외는 일부가 위 항목과 겹치고 세는 단위(예외 건)가 달라 비중에서 제외했습니다. 비중은 항목별 건수의 단순 비율이며 세는 단위가 서로 다릅니다.</p>
+                <p className="risk-composition-note">
+                  미처리 예외는 일부가 위 항목과 겹치고 세는 단위(예외 건)가 달라 비중에서 제외했습니다. 비중은 항목별
+                  건수의 단순 비율이며 세는 단위가 서로 다릅니다.
+                </p>
               </section>
             </aside>
           </div>
@@ -274,8 +295,8 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const running = run.status === 'RUNNING'
   return (
     <Link className="run-row" to={to}>
-      <strong className="run-title">{`${run.validationMonth ?? ''} · ${run.runNo}회차`}</strong>
-      <span className="run-meta">{`${step}/${RUN_STEPS} 단계 · 실행 ${run.triggeredBy ?? '-'}`}</span>
+      <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}회차`}</strong>
+      <span className="run-meta">{`${step}/${RUN_STEPS} 단계, 실행 ${run.triggeredBy ?? '-'}`}</span>
       <StatusBadge tone={runStatusTone(run.status)}>{run.statusLabel ?? '-'}</StatusBadge>
       <span
         className="run-steps"

@@ -120,7 +120,7 @@ it('keeps uncalculated, review-required, missing and real 0 won apart', async ()
   const table = await screen.findByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
   const rowOf = (id: string) => within(table).getByText(id).closest('tr')!
   expect(within(rowOf('42')).getAllByText('검토필요')).toHaveLength(2)
-  expect(within(rowOf('42')).getByText('자료 없음')).toBeInTheDocument()
+  expect(within(rowOf('42')).getByText('-')).toBeInTheDocument()
   expect(within(rowOf('41')).getAllByText('미계산')).toHaveLength(2)
   expect(within(rowOf('41')).getByText('0원')).toBeInTheDocument()
   expect(within(rowOf('41')).getByText(/검증기준일/)).toBeInTheDocument()
@@ -157,10 +157,10 @@ it('blocks an inverted period without calling the server', async () => {
 
 it('shows source, payment and hold evidence with calculation locked by allowedActions', async () => {
   mount()
-  const evidence = await screen.findByRole('region', { name: '원천 사건 · 검증 근거' })
+  const evidence = await screen.findByRole('region', { name: '원천 사건, 검증 근거' })
   expect(within(evidence).getByText('상태 사건')).toBeInTheDocument()
-  expect(within(screen.getByRole('region', { name: '연결 지급 · 귀속' })).getByText('900')).toBeInTheDocument()
-  expect(within(screen.getByRole('region', { name: '보류 · 후속 처리 근거' })).getByText('HOLD')).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: '연결 지급, 귀속' })).getByText('900')).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: '보류, 후속 처리 근거' })).getByText('HOLD')).toBeInTheDocument()
   expect(screen.getByText('유효한 환수 정책 없음', { selector: 'li' })).toBeInTheDocument()
   expect(screen.getByText('자료 없음 (산정 기준 미확정)')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
@@ -200,7 +200,7 @@ it('keeps cleared dates as no period limit instead of falling back to the work m
 it('shows a single policy candidate as a candidate, not as the applied policy', async () => {
   const single = { ...detail, candidate: { ...statusRow, policyVersionId: 15 } }
   mount('/clawbacks', (p) => (p.includes('/candidates/42') ? envelope(single) : fixtures(p)))
-  expect(await screen.findByText('후보 1개 · 정책버전 15 (적용 선택 전)')).toBeInTheDocument()
+  expect(await screen.findByText('후보 1개, 정책버전 15 (적용 선택 전)')).toBeInTheDocument()
   expect(screen.getByText('정책 후보')).toBeInTheDocument()
   expect(screen.queryByText('적용 정책')).not.toBeInTheDocument()
 })
@@ -213,12 +213,12 @@ it('links evidence to the source contract, arbitrage check and payment', async (
   }
   const user = userEvent.setup()
   mount('/clawbacks', (p) => (p.includes('/candidates/41') ? envelope(arbitrageDetail) : fixtures(p)))
-  const payments = await screen.findByRole('region', { name: '연결 지급 · 귀속' })
+  const payments = await screen.findByRole('region', { name: '연결 지급, 귀속' })
   expect(within(payments).getByRole('link', { name: '800' })).toHaveAttribute(
     'href',
     '/transactions?contractNo=CLW-001&selectedId=800',
   )
-  const sources = screen.getByRole('region', { name: '원천 사건 · 검증 근거' })
+  const sources = screen.getByRole('region', { name: '원천 사건, 검증 근거' })
   expect(within(sources).getByRole('link', { name: '계약 사건 이력' })).toHaveAttribute('href', '/contracts/10')
   const table = screen.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
   await user.click(within(table).getByText('41'))

@@ -26,6 +26,7 @@ import '../styles/react.css'
 import '../features/dashboard/dashboard.css'
 import '../features/arbitrage/arbitrage.css'
 import '../features/exception/exception.css'
+import './designPreview.css'
 
 if (!import.meta.env.DEV) throw new Error('Design preview is only available in the development server.')
 
@@ -119,12 +120,12 @@ const router = createMemoryRouter([
           <>
             <PreviewNavigation />
             <p className="page-description" style={{ marginBottom: '1rem' }}>
-              디자인 미리보기용 예시 데이터입니다. 상단 개발자 탭에서 설정을 변경하세요.
+              확정된 화면 디자인을 예시 데이터로 확인하는 미리보기입니다.
             </p>
             <DashboardPage />
             <section className="surface design-component-samples" aria-label="공통 컴포넌트 미리보기">
               <h2>공통 컴포넌트 미리보기</h2>
-              <p className="page-description">버튼·입력·테이블을 비교하고, 배지는 ‘계약 상태와 배지’에서 변경하세요.</p>
+              <p className="page-description">A안 공통 버튼과 상태별 반투명 배지를 확인할 수 있습니다.</p>
               <div className="design-sample-controls">
                 <Field label="미리보기 입력">
                   <input placeholder="내용을 입력하세요" />

@@ -74,7 +74,7 @@ class AuditLogServiceTest {
      * @since 2026-09-26
      */
     @Test
-    @DisplayName("before/after 를 JSON 으로 직렬화하고 entityId·reason 을 컬럼 길이로 자른다")
+    @DisplayName("before/after 를 JSON 으로 직렬화하고 entityId/reason 을 컬럼 길이로 자른다")
     void serializesValuesAndClampsLengths() {
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode("CONTRACT_CREATED")

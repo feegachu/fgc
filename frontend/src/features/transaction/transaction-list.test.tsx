@@ -359,7 +359,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
   })
   it('COMPLIANCE의 등록 딥링크는 403이며 지급 API를 호출하지 않는다', async () => {
     renderAt('/app/transactions/new?id=41', false)
-    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
     expect(requests.some((path) => path.startsWith('/api/v1/transactions'))).toBe(false)
   })
   it('서버 500의 내부 문구 대신 요청 ID를 보여 주고 재조회할 수 있다', async () => {
@@ -377,6 +377,6 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     const table = await screen.findByRole('table')
     const amounts = await within(table).findAllByText('-1,000원')
     expect(amounts.every((element) => element.classList.contains('is-negative-amount'))).toBe(true)
-    expect(within(table).getByText('0건 · 확인필요')).toBeInTheDocument()
+    expect(within(table).getByText('0건, 확인필요')).toBeInTheDocument()
   })
 })

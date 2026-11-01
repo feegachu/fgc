@@ -13,7 +13,7 @@ public record CapCandidateExclusion(
         long excludedAmount, CapResultStatus resultStatus, String reasonCode, String reason
 ) {
     public static final String INVALID_PAYMENT_DATE_REASON_CODE = "OUTSIDE_FIRST_YEAR_PAYMENT_DATE_INVALID";
-    public static final String EXCLUSION_REASON = "초년도 밖 — 판정 대상 아님";
+    public static final String EXCLUSION_REASON = "초년도 밖, 판정 대상 아님";
 
     public static boolean isOutsideFirstYear(ConfirmationData data) {
         return isAttributionOutsideFirstYear(data) && data.scheduledPaymentDate() != null

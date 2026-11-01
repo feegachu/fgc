@@ -84,7 +84,7 @@ function BaseFilters({
               {organizations.data?.map((r) => (
                 <option key={r.organizationId} value={r.organizationId}>
                   {r.organizationName}
-                  {r.activeYn === false ? ' · 사용중지' : ''}
+                  {r.activeYn === false ? ', 사용중지' : ''}
                 </option>
               ))}
             </select>
@@ -116,7 +116,7 @@ function BaseFilters({
               {insurers.data?.map((r) => (
                 <option key={r.insurerId} value={r.insurerId}>
                   {r.insurerName}
-                  {r.activeYn === false ? ' · 사용중지' : ''}
+                  {r.activeYn === false ? ', 사용중지' : ''}
                 </option>
               ))}
             </select>

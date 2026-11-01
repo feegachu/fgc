@@ -89,7 +89,7 @@ export function Donut({
                   <>
                     <b>{s.name}</b>
                     <div>
-                      계약 <b>{real.value}건</b> · 비중 <b>{share}%</b>
+                      계약 <b>{real.value}건</b>, 비중 <b>{share}%</b>
                     </div>
                     <small>월환산 {int(real.premium)}원</small>
                   </>,
@@ -306,7 +306,7 @@ export function ProductBars({ items }: { items: { name: string; count: number; p
                 <>
                   <b>{item.name}</b>
                   <div>
-                    {item.count}건 · {item.pct.toFixed(1)}%
+                    {item.count}건, {item.pct.toFixed(1)}%
                   </div>
                 </>,
               )
@@ -321,7 +321,7 @@ export function ProductBars({ items }: { items: { name: string; count: number; p
               />
             </span>
             <b>
-              {item.count}건 · {item.pct.toFixed(1)}%
+              {item.count}건, {item.pct.toFixed(1)}%
             </b>
           </li>
         ))}

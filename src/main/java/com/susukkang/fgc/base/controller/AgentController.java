@@ -28,8 +28,8 @@ public class AgentController {
     private final AgentService agentService;
 
     @Operation(
-            summary = "보험설계사 기준정보 조회·선택 (IF-API-07)",
-            description = "기준일에 위촉 상태가 유효한 설계사를 조직·코드·이름으로 검색합니다. "
+            summary = "보험설계사 기준정보 조회/선택 (IF-API-07)",
+            description = "기준일에 위촉 상태가 유효한 설계사를 조직/코드/이름으로 검색합니다. "
                     + "계약 이력 조회에서 includeTerminated=true를 지정하면 기준일 이전에 해촉된 설계사도 포함합니다. "
                     + "includeHistorical=true이면 위촉기간 제한을 해제하고 조직별 기존 계약의 모집 설계사도 포함합니다. agentStatus와 activeYn은 신규 입력 선택 가능 여부를 판단할 때 사용합니다."
     )
@@ -50,10 +50,10 @@ public class AgentController {
             @Parameter(description = "기준일 이전 해촉 설계사 포함 여부(계약 이력 검색용, 위촉일은 기준일 이하로 유지)")
             @RequestParam(defaultValue = "false")
             boolean includeTerminated,
-            @Parameter(description = "계약 목록 이력 검색 모드. 기간·활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.")
+            @Parameter(description = "계약 목록 이력 검색 모드. 기간/활성 조건을 해제하며 입력 검증에는 사용하지 않습니다.")
             @RequestParam(defaultValue = "false")
             boolean includeHistorical,
-            @Parameter(description = "정렬(key,asc|desc). agentCode·agentName·organizationName·appointmentDate·terminationDate·latestRegistrationDate. 비우면 설계사 코드 오름차순")
+            @Parameter(description = "정렬(key,asc|desc). agentCode/agentName/organizationName/appointmentDate/terminationDate/latestRegistrationDate. 비우면 설계사 코드 오름차순")
             @RequestParam(required = false)
             String sort,
             @Parameter(description = "페이지(1-base)", example = "1")

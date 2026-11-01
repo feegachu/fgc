@@ -3,26 +3,24 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
+import { CategoryBadge } from '../../components/StatusBadge'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { dateTimeSeconds, errorText, int } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
-import {
-  AUDIT_SORT_KEYS,
-  auditLogDetailQuery,
-  auditLogOptionsQuery,
-  auditLogsQuery,
-  normalizeCriteria,
-} from './api'
+import { AUDIT_SORT_KEYS, auditLogDetailQuery, auditLogOptionsQuery, auditLogsQuery, normalizeCriteria } from './api'
 import type { AuditCriteria, AuditLog, AuditLogOptions } from './api'
 import {
+  actionLabels,
+  entityTypeLabels,
   auditActionLabel,
   auditActionWithCode,
   auditEntityTypeLabel,
   auditEntityTypeWithCode,
   auditReasonLabel,
   diffFieldLabel,
+  auditValueLabel,
 } from './labels'
 import './audit.css'
 
@@ -48,10 +46,41 @@ const dash = (value: unknown) => (value == null || value === '' ? '-' : String(v
 
 // 열 너비는 1차 audit.css 의 .audit-col-* 와 같은 값이다.
 const columns: TableColumn<AuditLog>[] = [
-  { key: 'occurredAt', label: '발생시각', sortable: true, width: '10rem', render: (row) => dateTimeSeconds(row.occurredAt) },
-  { key: 'user', label: '행위자', sortKey: 'userLoginId', sortable: true, width: '6.5rem', render: (row) => row.userLoginId ?? 'BATCH' },
-  { key: 'action', label: '행위', width: '11rem', render: (row) => auditActionLabel(row.actionCode) },
-  { key: 'entityType', label: '대상 종류', width: '11rem', render: (row) => auditEntityTypeLabel(row.entityType) },
+  {
+    key: 'occurredAt',
+    label: '발생시각',
+    sortable: true,
+    width: '10rem',
+    render: (row) => dateTimeSeconds(row.occurredAt),
+  },
+  {
+    key: 'user',
+    label: '행위자',
+    sortKey: 'userLoginId',
+    sortable: true,
+    width: '6.5rem',
+    render: (row) => row.userLoginId ?? 'BATCH',
+  },
+  {
+    key: 'action',
+    label: '행위',
+    width: '11rem',
+    render: (row) => (
+      <CategoryBadge value={row.actionCode} optionCount={Object.keys(actionLabels).length}>
+        {auditActionLabel(row.actionCode)}
+      </CategoryBadge>
+    ),
+  },
+  {
+    key: 'entityType',
+    label: '대상 종류',
+    width: '11rem',
+    render: (row) => (
+      <CategoryBadge value={row.entityType} optionCount={Object.keys(entityTypeLabels).length}>
+        {auditEntityTypeLabel(row.entityType)}
+      </CategoryBadge>
+    ),
+  },
   { key: 'entityId', label: '대상 ID', width: '6rem', render: (row) => dash(row.entityId) },
   {
     key: 'reason',
@@ -59,7 +88,14 @@ const columns: TableColumn<AuditLog>[] = [
     width: '14rem',
     render: (row) => auditReasonLabel(row.actionCode, row.reason),
   },
-  { key: 'policy', label: '정책버전', sortKey: 'policyVersionId', sortable: true, width: '7rem', render: (row) => dash(row.policyVersionId) },
+  {
+    key: 'policy',
+    label: '정책버전',
+    sortKey: 'policyVersionId',
+    sortable: true,
+    width: '7rem',
+    render: (row) => dash(row.policyVersionId),
+  },
   { key: 'requestId', label: '요청 ID', width: '10rem', render: (row) => dash(row.requestId) },
 ]
 
@@ -108,7 +144,7 @@ export default function AuditLogPage() {
               감사 기록
             </h2>
             <p className="audit-panel-caption">
-              <span className="tabular-nums">{int(logs.data?.totalElements ?? 0)}</span>건 · 한 화면 20행
+              <span className="tabular-nums">{int(logs.data?.totalElements ?? 0)}</span>건, 한 화면 20행
             </p>
           </header>
           {logs.isError && (
@@ -257,15 +293,10 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
   return (
     <div>
       <p className="audit-diff-context">
-        <span>{auditActionWithCode(log.actionCode)}</span> ·{' '}
+        <span>{auditActionWithCode(log.actionCode)}</span>,{' '}
         <span>{`${auditEntityTypeWithCode(log.entityType)} #${dash(log.entityId)}`}</span>
       </p>
-      {log.reason && reason !== log.reason && (
-        <details className="audit-reason-original">
-          <summary>사유 원문 보기</summary>
-          <p>{log.reason}</p>
-        </details>
-      )}
+      {log.reason && <p className="audit-reason">{reason}</p>}
       {detail.isError && (
         <p className="field-error" role="alert">
           {errorText(detail.error)}
@@ -291,7 +322,7 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
               <tr className="audit-state-row">
                 <td colSpan={3}>
                   <div className="empty-state audit-empty-state">
-                    {detail.isPending ? '불러오는 중입니다.' : '기록된 변경 전·후 값이 없습니다.'}
+                    {detail.isPending ? '불러오는 중입니다.' : '기록된 변경 전/후 값이 없습니다.'}
                   </div>
                 </td>
               </tr>
@@ -300,9 +331,13 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
                 const changed = entry.changed ? ' audit-diff-cell-changed' : ''
                 return (
                   <tr key={entry.field}>
-                    <td className="tabular-nums audit-diff-value" title={entry.field}>{diffFieldLabel(entry.field ?? '')}</td>
-                    <td className={`tabular-nums audit-diff-value${changed}`}>{entry.before}</td>
-                    <td className={`tabular-nums audit-diff-value${changed}`}>{entry.after}</td>
+                    <td className="tabular-nums audit-diff-value">{diffFieldLabel(entry.field ?? '')}</td>
+                    <td className={`tabular-nums audit-diff-value${changed}`}>
+                      {auditValueLabel(entry.before, entry.field)}
+                    </td>
+                    <td className={`tabular-nums audit-diff-value${changed}`}>
+                      {auditValueLabel(entry.after, entry.field)}
+                    </td>
                   </tr>
                 )
               })

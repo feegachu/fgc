@@ -55,7 +55,7 @@ public class MonthlyValidationJobExecutionListener implements JobExecutionListen
             // 조용히 넘기지 않고 경고를 남긴다.
             Long validationRunId = ValidationRunBatchContext.getValidationRunId(jobExecution.getExecutionContext());
             if (validationRunId == null) {
-                log.warn("Job이 COMPLETED인데 validationRunId가 없습니다 — createRunStep 배선을 확인하세요.");
+                log.warn("Job이 COMPLETED인데 validationRunId가 없습니다, createRunStep 배선을 확인하세요.");
                 return;
             }
 

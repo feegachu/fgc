@@ -33,7 +33,7 @@ function Timeline({ rows }: { rows: ArbitrageRow[] }) {
             r="4"
           >
             <title>
-              {date(rows[index].asOfDate)} · {won(rows[index].netDifferenceAmount)}
+              {date(rows[index].asOfDate)}, {won(rows[index].netDifferenceAmount)}
             </title>
           </circle>
         ))}
@@ -76,15 +76,15 @@ export function ArbitrageDetail({ row }: { row: ArbitrageRow }) {
     <>
       <dl className="arb-detail-list">
         <div>
-          <dt>계약 · 지급단계</dt>
+          <dt>계약, 지급단계</dt>
           <dd>
-            {row.contractNo} · {present(row.paymentStageLabel)}
+            {row.contractNo}, {present(row.paymentStageLabel)}
           </dd>
         </div>
         <div>
-          <dt>기준일 · 계약차월</dt>
+          <dt>기준일, 계약차월</dt>
           <dd>
-            {date(row.asOfDate)} · {int(row.contractMonthNo)}개월
+            {date(row.asOfDate)}, {int(row.contractMonthNo)}개월
           </dd>
         </div>
         <div>

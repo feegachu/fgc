@@ -49,7 +49,7 @@ class OrganizationServiceImplTest {
     }
 
     @Test
-    @DisplayName("검색어 공백을 제거하고 부모 이름·유형명·페이징 정보를 응답으로 변환한다")
+    @DisplayName("검색어 공백을 제거하고 부모 이름/유형명/페이징 정보를 응답으로 변환한다")
     void trimsKeywordMapsLabelsAndBuildsPageResponse() {
         LocalDate asOf = LocalDate.of(2026, 8, 11);
         OrganizationSearchCriteria input = new OrganizationSearchCriteria("  seoul  ", asOf);

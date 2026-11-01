@@ -45,7 +45,7 @@ class StatementExtractionEvalRunTest {
         Path markdown = ExtractionEvaluator.write(result, dir,
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")));
 
-        System.out.println("TER-011 결과표: " + markdown.toAbsolutePath() + " — " + result.verdict());
+        System.out.println("TER-011 결과표: " + markdown.toAbsolutePath() + ", " + result.verdict());
         assertThat(markdown).exists();
     }
 }

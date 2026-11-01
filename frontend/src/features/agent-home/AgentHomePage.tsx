@@ -310,7 +310,7 @@ function Charts({
       <div className="ah-panel-head">
         <div>
           <h2 className="ah-panel-title">설계사 판매 관리</h2>
-          <p className="ah-panel-sub">{`${label} · ${kindLabel(kind)}`}</p>
+          <p className="ah-panel-sub">{`${label}, ${kindLabel(kind)}`}</p>
         </div>
         <div className="ah-controls">
           <Segmented label="기간" options={PERIODS} value={period} onChange={onPeriod} />
@@ -347,7 +347,7 @@ function Charts({
         </div>
         <div className="ah-box ah-trend-box">
           <h3>
-            월별 신규 계약 추이 <span className="ah-sub">막대·선 건수 · 보험료는 마우스를 올려 확인</span>
+            월별 신규 계약 추이 <span className="ah-sub">막대/선 건수, 보험료는 마우스를 올려 확인</span>
           </h3>
           <Trend points={trendSeries(focus, months)} />
         </div>
@@ -384,7 +384,7 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
         <div className="ah-modal-head">
           <div>
             <h3 id="ah-need-title">{`확인 필요 계약 ${list.length}건`}</h3>
-            <p>{`${month} 기준 · 한도 근접 ${near}건 · 검토 필요 ${list.length - near}건`}</p>
+            <p>{`${month} 기준, 한도 근접 ${near}건, 검토 필요 ${list.length - near}건`}</p>
           </div>
           <button ref={closeRef} type="button" className="ah-modal-close" aria-label="닫기" onClick={onClose}>
             ✕
@@ -422,7 +422,7 @@ function NeedModal({ month, rows, onClose }: { month: string; rows: Row[]; onClo
           })}
         </div>
         <div className="ah-modal-foot">
-          <p>한도 근접은 계약의 1,200% 한도 검증이 주의·위반으로 나온 경우, 검토 필요는 검증 자료가 부족한 경우예요.</p>
+          <p>한도 근접은 계약의 1,200% 한도 검증이 주의/위반으로 나온 경우, 검토 필요는 검증 자료가 부족한 경우예요.</p>
           <button type="button" className="ah-btn-ghost" onClick={onClose}>
             닫기
           </button>

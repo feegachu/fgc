@@ -343,7 +343,7 @@ public class ArbitrageService {
                     fallbackMonth, valueOrZero(source.getCumulativePaidPremium()), BigDecimal.ZERO, false,
                     SurrenderValueSourceType.NOT_APPLICABLE, null, BigDecimal.ZERO, BigDecimal.ZERO,
                     ArbitrageCheckStatus.CLEAR, "NOT_APPLICABLE",
-                    "적용대상 아님 — " + applicability.effectiveContractDate() + " 이전 체결");
+                    "적용대상 아님, " + applicability.effectiveContractDate() + " 이전 체결");
         }
         if (source.getCumulativePaidPremium() == null || source.getContractMonthNo() == null) {
             return reviewRequired(fallbackMonth, "기준일 이하 계약 금융 스냅샷이 없습니다.");

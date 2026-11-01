@@ -143,7 +143,7 @@ describe('1차 schedule-list.test.cjs 이전', () => {
     const labels = { PLANNED: '예정' }
     expect(responseLabel('서버 예정', labels, 'PLANNED')).toBe('서버 예정')
     expect(responseLabel('', labels, 'PLANNED')).toBe('예정')
-    expect(responseLabel(null, labels, 'UNKNOWN')).toBe('UNKNOWN')
+    expect(responseLabel(null, labels, 'UNKNOWN')).toBe('확인 필요')
   })
   it('목록에 없는 코드값은 1차처럼 전체(용도는 운영)로 되돌린다', () => {
     expect(
@@ -293,9 +293,7 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
       return listPage([])
     })
     expect(await screen.findByText('예상 스케줄을 불러오지 못했습니다.')).toBeInTheDocument()
-    expect(
-      screen.getByText('처리 중 오류가 발생했습니다. 요청번호 req-9를 담당자에게 알려주세요. (FGC-COMMON-500)'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 req-9를 담당자에게 알려주세요.')).toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '다시 시도' }))
     expect(await screen.findByText('조건에 맞는 예상 스케줄이 없습니다.')).toBeInTheDocument()
   })
@@ -334,8 +332,8 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('헤더·회차·합계·버전 이력을 1차와 같은 표기로 보여 준다', async () => {
     renderAt('/schedules/11?month=2026-07', baseHandler())
-    expect(await screen.findByText('schedule_header #11')).toBeInTheDocument()
-    expect(screen.getByText('한빛생명 · 종신보험')).toBeInTheDocument()
+    expect(await screen.findByText('스케줄 번호 11')).toBeInTheDocument()
+    expect(screen.getByText('한빛생명, 종신보험')).toBeInTheDocument()
     const lines = screen.getByRole('table', { name: '회차별 예상 지급 금액' })
     expect(within(lines).getByText('1,000.1%')).toBeInTheDocument()
     expect(within(lines).getByRole('cell', { name: '요율' })).toBeInTheDocument()
@@ -353,17 +351,17 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     const { router, actions } = renderAt('/schedules/11?month=2026-07', (url) =>
       url === '/api/v1/schedules/11/active?paymentStage=INSURER_TO_GA' ? 10 : baseHandler()(url),
     )
-    await screen.findByText('schedule_header #11')
+    await screen.findByText('스케줄 번호 11')
     await actions.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
     await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/10'))
-    expect(await screen.findByText('schedule_header #10')).toBeInTheDocument()
+    expect(await screen.findByText('스케줄 번호 10')).toBeInTheDocument()
     await actions.click(
       within(await screen.findByRole('table', { name: '같은 계약의 스케줄 버전 이력' })).getByRole('link', {
         name: 'v2',
       }),
     )
     await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/11'))
-    expect(await screen.findByText('schedule_header #11')).toBeInTheDocument()
+    expect(await screen.findByText('스케줄 번호 11')).toBeInTheDocument()
   })
 
   it('지급단계 이동 대상이 없으면 경고하고 현재 단계를 유지한다', async () => {
@@ -372,9 +370,9 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
         throw new ApiError({ code: 'FGC-COMMON-002', message: '사용 중인 운영 스케줄이 없습니다.' }, 'r1', 404)
       return baseHandler()(url)
     })
-    await screen.findByText('schedule_header #11')
+    await screen.findByText('스케줄 번호 11')
     await actions.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
-    await waitFor(() => expect(toasts()).toContain('사용 중인 운영 스케줄이 없습니다. (FGC-COMMON-002 · 요청 ID: r1)'))
+    await waitFor(() => expect(toasts()).toContain('사용 중인 운영 스케줄이 없습니다.'))
     expect(screen.getByLabelText('지급단계')).toHaveValue('GA_TO_FC')
     expect(router.state.location.pathname).toBe('/schedules/11')
   })
@@ -394,7 +392,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
       }
       return baseHandler()(url)
     })
-    await screen.findByText('schedule_header #11')
+    await screen.findByText('스케줄 번호 11')
     await actions.click(screen.getByRole('button', { name: /새 버전 만들기/ }))
     const regenerate = await screen.findByRole('dialog', { name: '새 버전 만들기' })
     expect(within(regenerate).getByLabelText(/생성 사유/)).toHaveFocus()
@@ -404,7 +402,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     const regen = calls('/api/v1/schedules/11/regenerate')[0]
     expect(regen.options).toMatchObject({ method: 'POST', body: { reason: '2026-07 정책 개정' } })
     expect(toasts()).toContain('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.')
-    expect(await screen.findByText('schedule_header #12')).toBeInTheDocument()
+    expect(await screen.findByText('스케줄 번호 12')).toBeInTheDocument()
 
     await actions.click(screen.getByRole('button', { name: '확정' }))
     const confirm = await screen.findByRole('dialog', { name: '이 스케줄을 확정할까요?' })
@@ -419,13 +417,13 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('#4 사유 미입력·41자 사유는 저장하지 않고 필드 오류를 보여 준다', async () => {
     const { actions } = renderAt('/schedules/11', baseHandler())
-    await screen.findByText('schedule_header #11')
+    await screen.findByText('스케줄 번호 11')
     await actions.click(screen.getByRole('button', { name: /새 버전 만들기/ }))
     const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
     const submit = within(dialog).getByRole('button', { name: '새 버전 만들기' })
     const input = within(dialog).getByLabelText(/생성 사유/)
     await actions.click(submit)
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('저장 불가 — 생성 사유를 입력하세요.')
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('저장할 수 없습니다. 생성 사유를 입력하세요.')
     expect(input).toHaveAttribute('aria-invalid', 'true')
     // maxLength 로 41자 입력은 막히지만, 붙여 넣기·자동완성으로 들어온 값도 저장 전에 막는다.
     expect(input).toHaveAttribute('maxLength', '40')
@@ -441,7 +439,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
         throw new ApiError({ code: 'FGC-COMMON-001', message: '입력값을 확인하세요.', field: 'reason' }, 'r2', 400)
       return baseHandler()(url)
     })
-    await screen.findByText('schedule_header #11')
+    await screen.findByText('스케줄 번호 11')
     await actions.click(screen.getByRole('button', { name: /새 버전 만들기/ }))
     const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
     await actions.type(within(dialog).getByLabelText(/생성 사유/), '사유')
@@ -455,11 +453,11 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
       if (url.endsWith('/confirm')) throw new ApiError({ code: 'FGC-SCHE-001', message }, 'r3', 409)
       return baseHandler()(url)
     })
-    await screen.findByText('schedule_header #11')
+    await screen.findByText('스케줄 번호 11')
     await actions.click(screen.getByRole('button', { name: '확정' }))
     const dialog = await screen.findByRole('dialog', { name: '이 스케줄을 확정할까요?' })
     await actions.click(within(dialog).getByRole('button', { name: '확정' }))
-    const expected = `${message} (FGC-SCHE-001 · 요청 ID: r3)`
+    const expected = `${message}`
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(expected)
     expect(toasts()).toContain(expected)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -467,7 +465,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('#6 COMPLIANCE 는 확정·재생성 버튼이 비활성이고 권한 안내를 본다', async () => {
     renderAt('/schedules/11', baseHandler(), 'COMPLIANCE')
-    expect(await screen.findByText('확정·재생성은 정산 담당자만 할 수 있습니다.')).toBeInTheDocument()
+    expect(await screen.findByText('확정/재생성은 정산 담당자만 할 수 있습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /새 버전 만들기/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '확정' })).toHaveAttribute('aria-describedby', 'schedule-action-note')
@@ -483,7 +481,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('상세 CSV 는 회차 표 API 로 내려받는다', async () => {
     const { actions } = renderAt('/schedules/11', baseHandler())
-    await screen.findByText('schedule_header #11')
+    await screen.findByText('스케줄 번호 11')
     const blob = vi.spyOn(apiClient, 'requestBlob').mockResolvedValue({ blob: new Blob(['a']), disposition: null })
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} }))
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})

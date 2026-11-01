@@ -75,7 +75,7 @@ class AgentEntityIntegrationTest {
     }
 
     @Test
-    @DisplayName("직급·경력 확인값의 null과 DB의 활성·신인 지원 기본값을 보존한다")
+    @DisplayName("직급/경력 확인값의 null과 DB의 활성/신인 지원 기본값을 보존한다")
     void preservesNullableFieldsAndDatabaseDefaults() {
         long organizationId = insertOrganization();
         Long agentId = jdbcTemplate.queryForObject("""

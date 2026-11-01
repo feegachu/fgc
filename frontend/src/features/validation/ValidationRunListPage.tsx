@@ -7,6 +7,7 @@ import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
+import { CategoryBadge } from '../../components/StatusBadge'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
@@ -40,7 +41,7 @@ import './validation.css'
 const FILTER_KEYS = { status: '', sort: '', page: '' }
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const finalizedText = (run: ValidationRun) =>
-  run.finalizedAt ? `${run.finalizedBy ?? '-'} · ${dateTime(run.finalizedAt)}` : '-'
+  run.finalizedAt ? `${run.finalizedBy ?? '-'}, ${dateTime(run.finalizedAt)}` : '-'
 
 export default function ValidationRunListPage() {
   const { params, update } = useSearchParamsState(FILTER_KEYS)
@@ -60,7 +61,16 @@ export default function ValidationRunListPage() {
       render: (r) => formatMonth(r.validationMonth),
     },
     { key: 'runNo', label: '회차', sortable: true, width: '3.5rem', align: 'left', render: (r) => r.runNo },
-    { key: 'type', label: '실행 유형', width: '7rem', render: (r) => dash(r.runTypeLabel) },
+    {
+      key: 'type',
+      label: '실행 유형',
+      width: '7rem',
+      render: (r) => (
+        <CategoryBadge value={r.runType} optionCount={3}>
+          {dash(r.runTypeLabel)}
+        </CategoryBadge>
+      ),
+    },
     {
       key: 'status',
       label: '상태',
@@ -103,7 +113,7 @@ export default function ValidationRunListPage() {
     },
     {
       key: 'finalized',
-      label: '확정자 · 확정시각',
+      label: '확정자, 확정시각',
       sortKey: 'finalizedAt',
       sortable: true,
       width: '10.5rem',

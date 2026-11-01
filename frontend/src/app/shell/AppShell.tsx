@@ -12,17 +12,9 @@ import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { AgentTopbar } from './AgentTopbar'
-import { DeveloperSettings } from './DeveloperSettings'
-import {
-  designAppearance,
-  resolveComponentDesign,
-  sidebarAppearance,
-  useDesignSettings,
-} from '../../stores/designSettings'
-import './component-designs.css'
 import './kpi-designs.css'
-import './design-experiments.css'
 import './agent-theme.css'
+import './app-theme.css'
 export interface ShellContext {
   user: ShellUser
   month: string | null
@@ -35,8 +27,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
   const errorTitle = useErrorTitleStore((state) => state.title)
-  const preferences = useDesignSettings((state) => state.preferences)
-  const appearance = sidebarAppearance(preferences, user.roleCode === 'AGENT')
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)
   useEffect(() => {
@@ -76,49 +66,12 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   // 1차 화면 제목(layout/default의 "제목 (화면ID) · FGC")과 맞춘다. 에러 바운더리가 그린 오류 화면이 있으면 그 제목이 먼저다.
   useEffect(() => {
     document.title =
-      errorTitle ??
-      (!current
-        ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
-        : allowed
-          ? `${current.title} (${current.id}) · FGC`
-          : '권한 없음 (FGC-UI-ERR-403) · FGC')
+      errorTitle ?? (!current ? '찾을 수 없음, FGC' : allowed ? `${current.title} | FGC` : '권한 없음, FGC')
   }, [errorTitle, current, allowed])
   return (
     <div
-      className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
-      data-sidebar-design={import.meta.env.DEV ? preferences.sidebarDesign : undefined}
-      data-sidebar-dark-text={import.meta.env.DEV ? appearance.darkText : undefined}
-      data-sidebar-custom-color={import.meta.env.DEV ? preferences.sidebarColor !== null : undefined}
-      data-kpi-style={import.meta.env.DEV ? preferences.kpiStyle : undefined}
-      data-component-design={import.meta.env.DEV ? preferences.componentDesign : undefined}
-      data-button-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'buttonDesign') : undefined}
-      data-button-color-mode={import.meta.env.DEV ? preferences.buttonColorMode : undefined}
-      data-field-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'fieldDesign') : undefined}
-      data-table-design={import.meta.env.DEV ? resolveComponentDesign(preferences, 'tableDesign') : undefined}
-      data-summary-display={import.meta.env.DEV ? preferences.summaryDisplay : undefined}
-      data-tab-style={import.meta.env.DEV ? preferences.tabStyle : undefined}
-      data-table-header-style={import.meta.env.DEV ? preferences.tableHeaderStyle : undefined}
-      data-page-header-style={import.meta.env.DEV ? preferences.pageHeaderStyle : undefined}
-      data-background-style={import.meta.env.DEV ? preferences.backgroundStyle : undefined}
-      data-badge-style={import.meta.env.DEV ? preferences.badgeStyle : undefined}
-      data-badge-palette={import.meta.env.DEV ? preferences.badgePalette : undefined}
-      data-custom-button-color={
-        import.meta.env.DEV ? preferences.buttonColorMode === 'custom' && preferences.buttonColor !== null : undefined
-      }
-      data-custom-sidebar-button={
-        import.meta.env.DEV
-          ? preferences.buttonColorMode === 'custom' && preferences.sidebarButtonColor !== null
-          : undefined
-      }
-      data-custom-table-header={import.meta.env.DEV ? preferences.tableHeaderColor !== null : undefined}
-      data-custom-page-header={import.meta.env.DEV ? preferences.pageHeaderColor !== null : undefined}
-      data-custom-background={import.meta.env.DEV ? preferences.backgroundColor !== null : undefined}
-      data-custom-badge-color={import.meta.env.DEV ? preferences.badgeColor !== null : undefined}
-      data-glass-sidebar={import.meta.env.DEV ? preferences.glassSidebar : undefined}
-      data-glass-buttons={import.meta.env.DEV ? preferences.glassButtons : undefined}
-      data-glass-cards={import.meta.env.DEV ? preferences.glassCards : undefined}
-      data-glass-tabs={import.meta.env.DEV ? preferences.glassTabs : undefined}
-      style={import.meta.env.DEV ? designAppearance(preferences, user.roleCode === 'AGENT') : undefined}
+      className={`app-shell app-theme is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
+      data-kpi-style="summary"
     >
       <a className="skip-link" href="#main-content">
         본문으로 건너뛰기
@@ -138,7 +91,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <WorkspaceTabs activeId={current?.id} />
           )}
           <div className="app-header-actions">
-            {import.meta.env.DEV && <DeveloperSettings sidebarColor={appearance.color} />}
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
               {month && (
@@ -159,7 +111,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
         </main>
-        <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>
+        <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
       </div>
     </div>
   )

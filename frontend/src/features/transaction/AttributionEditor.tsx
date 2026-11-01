@@ -216,7 +216,7 @@ export function AttributionEditor({
     <section className="surface transaction-attribution-panel" aria-labelledby="transaction-attribution-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-attribution-title">
-          ② 귀속행 — 이 돈이 어느 계약 몫인가
+          ② 귀속행, 이 돈이 어느 계약 몫인가
         </h2>
         <Button
           variant="secondary"
@@ -251,7 +251,7 @@ export function AttributionEditor({
             <td colSpan={5}>
               <span id="attr-diff">
                 <StatusBadge tone={difference === 0 ? 'success' : 'error'}>
-                  {difference === 0 ? '일치' : `불일치 · 차액 ${won(difference)}`}
+                  {difference === 0 ? '일치' : `불일치, 차액 ${won(difference)}`}
                 </StatusBadge>
               </span>
             </td>

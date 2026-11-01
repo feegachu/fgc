@@ -16,7 +16,7 @@ import java.util.List;
 public record CapRuleSetResponse(
         @Schema(description = "룰셋 ID", example = "1")
         Long capRuleSetId,
-        @Schema(description = "지급단계 — 두 게이지는 분리 계산한다")
+        @Schema(description = "지급단계, 두 게이지는 분리 계산한다")
         PaymentStage paymentStage,
         @Schema(description = "지급단계 한글 라벨", example = "원수사→GA")
         String paymentStageLabel,
@@ -34,7 +34,7 @@ public record CapRuleSetResponse(
         String refundAdditionCondition,
         @Schema(description = "주의 기준 사용률(%). 90을 코드에 박지 말고 이 값을 읽는다(COR-004)", example = "90.0000")
         String warningUsagePct,
-        @Schema(description = "항목별 산입·제외 판정 목록")
+        @Schema(description = "항목별 산입/제외 판정 목록")
         List<CapRuleItemResponse> items
 ) {
     public static CapRuleSetResponse from(CapRuleSetRow row) {

@@ -230,16 +230,16 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                           WHEN 'REVIEW_REQUIRED' THEN '1,200% 한도 검토 필요'
                       END,
                       CASE WHEN cc.usage_pct IS NOT NULL
-                           THEN CONCAT(' — 사용률 ', cc.usage_pct, '%')
-                           ELSE CONCAT(' — 산입액 ', TO_CHAR(cc.included_amount, 'FM999,999,999,990'), '원')
+                           THEN CONCAT(', 사용률 ', cc.usage_pct, '%')
+                           ELSE CONCAT(', 산입액 ', TO_CHAR(cc.included_amount, 'FM999,999,999,990'), '원')
                       END
                   ),
                   CONCAT(
                       '지급단계 ', cc.payment_stage,
-                      ' · 한도액 ', TO_CHAR(cc.limit_amount, 'FM999,999,999,990'), '원',
-                      ' · 산입액 ', TO_CHAR(cc.included_amount, 'FM999,999,999,990'), '원',
+                      ', 한도액 ', TO_CHAR(cc.limit_amount, 'FM999,999,999,990'), '원',
+                      ', 산입액 ', TO_CHAR(cc.included_amount, 'FM999,999,999,990'), '원',
                       CASE WHEN cc.usage_pct IS NOT NULL
-                           THEN CONCAT(' · 사용률 ', cc.usage_pct, '%') ELSE '' END
+                           THEN CONCAT(', 사용률 ', cc.usage_pct, '%') ELSE '' END
                   ),
                   jsonb_build_object(
                       'capCheckId', cc.cap_check_id,
@@ -311,14 +311,14 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                   vr.validation_run_id, cur.contract_id, NULL, crs.policy_version_id,
                   'CAP_CHECK', CAST(cur.cap_check_id AS varchar),
                   CASE WHEN fin.result_status <> cur.result_status
-                       THEN CONCAT('확정 결과와 1,200% 판정 다름 — ', label.before_label, ' → ', label.after_label)
-                       ELSE CONCAT('확정 결과와 1,200% 한도액 다름 — ',
+                       THEN CONCAT('확정 결과와 1,200% 판정 다름, ', label.before_label, ' → ', label.after_label)
+                       ELSE CONCAT('확정 결과와 1,200% 한도액 다름, ',
                                    TO_CHAR(fin.limit_amount, 'FM999,999,999,990'), '원 → ',
                                    TO_CHAR(cur.limit_amount, 'FM999,999,999,990'), '원')
                   END,
                   CONCAT(
                       '지급단계 ', cur.payment_stage,
-                      ' · 확정 실행 #', base.validation_run_id,
+                      ', 확정 실행 #', base.validation_run_id,
                       ' 판정 ', label.before_label,
                       ' / 한도액 ', TO_CHAR(fin.limit_amount, 'FM999,999,999,990'), '원',
                       ' / 산입액 ', TO_CHAR(fin.included_amount, 'FM999,999,999,990'), '원',
@@ -408,14 +408,14 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                   CASE
                       WHEN detected.result_status = 'CANDIDATE'
                            AND detected.net_difference_amount IS NOT NULL THEN CONCAT(
-                          '차익거래 검토대상 — 순차액 ',
+                          '차익거래 검토대상, 순차액 ',
                           TO_CHAR(detected.net_difference_amount, 'FM999,999,999,990'), '원')
                       WHEN detected.result_status = 'CANDIDATE' THEN '차익거래 검토대상'
                       ELSE '차익거래 검증 자료 확인 필요'
                   END,
                   COALESCE(
                       detected.calculation_snapshot ->> 'decisionReason',
-                      CONCAT('지급단계 ', detected.payment_stage, ' · 순차액 ',
+                      CONCAT('지급단계 ', detected.payment_stage, ', 순차액 ',
                              TO_CHAR(COALESCE(detected.net_difference_amount, 0), 'FM999,999,999,990'), '원')
                   ),
                   jsonb_build_object(
@@ -451,29 +451,29 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                   'RECONCILIATION_RESULT', CAST(rr.reconciliation_result_id AS varchar),
                   CASE COALESCE(rr.primary_reason_code, rr.result_type)
                       WHEN 'ACTUAL_MISSING' THEN CONCAT(
-                          '실제 지급 없음 — 예상 ',
+                          '실제 지급 누락 (예상 ',
                           TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'),
-                          '원 지급 건 미발견')
+                          '원)')
                       WHEN 'EXPECTED_MISSING' THEN CONCAT(
-                          '예상 지급 없음 — 실제 ',
+                          '예상 지급 없음, 실제 ',
                           TO_CHAR(COALESCE(rr.actual_total_amount, 0), 'FM999,999,999,990'),
                           '원 대응 예상 건 없음')
                       WHEN 'AMOUNT_DIFFERENCE' THEN CONCAT(
                           '금액 차이 ', TO_CHAR(ABS(COALESCE(rr.difference_amount, 0)), 'FM999,999,999,990'),
-                          '원 — 예상 ', TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'),
+                          '원, 예상 ', TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'),
                           ' / 실제 ', TO_CHAR(COALESCE(rr.actual_total_amount, 0), 'FM999,999,999,990'))
                       WHEN 'DUPLICATE' THEN CONCAT(
-                          '대사 대상 중복 — 차액 ',
+                          '대사 대상 중복, 차액 ',
                           TO_CHAR(COALESCE(rr.difference_amount, 0), 'FM999,999,999,990'), '원')
                       ELSE CONCAT(
-                          '대사 불일치 — 차액 ',
+                          '대사 불일치, 차액 ',
                           TO_CHAR(COALESCE(rr.difference_amount, 0), 'FM999,999,999,990'), '원')
                   END,
                   CONCAT(
                       '지급단계 ', rrn.payment_stage,
-                      ' · 예상 ', TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'), '원',
+                      ', 예상 ', TO_CHAR(COALESCE(rr.expected_total_amount, 0), 'FM999,999,999,990'), '원',
                       ' / 실제 ', TO_CHAR(COALESCE(rr.actual_total_amount, 0), 'FM999,999,999,990'), '원',
-                      ' · 차액 ', TO_CHAR(COALESCE(rr.difference_amount, 0), 'FM999,999,999,990'), '원'
+                      ', 차액 ', TO_CHAR(COALESCE(rr.difference_amount, 0), 'FM999,999,999,990'), '원'
                   ),
                   jsonb_build_object(
                       'reconciliationResultId', rr.reconciliation_result_id,
@@ -512,13 +512,13 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                   'JOURNAL_IMBALANCE', 'JOURNAL_IMBALANCE', 'CRITICAL',
                   header.validation_run_id, header.contract_id, NULL, NULL,
                   'JOURNAL_HEADER', CAST(imbalance.journal_header_id AS varchar),
-                  CONCAT('검증원장 차변·대변 불균형 — 차액 ',
+                  CONCAT('검증원장 차변/대변 불균형, 차액 ',
                          TO_CHAR(COALESCE(imbalance.difference_amount, 0), 'FM999,999,999,990'), '원'),
                   CONCAT(
                       '분개번호 ', imbalance.journal_no,
-                      ' · 차변 ', TO_CHAR(COALESCE(imbalance.debit_total, 0), 'FM999,999,999,990'), '원',
+                      ', 차변 ', TO_CHAR(COALESCE(imbalance.debit_total, 0), 'FM999,999,999,990'), '원',
                       ' / 대변 ', TO_CHAR(COALESCE(imbalance.credit_total, 0), 'FM999,999,999,990'), '원',
-                      ' · 차액 ', TO_CHAR(COALESCE(imbalance.difference_amount, 0), 'FM999,999,999,990'), '원'
+                      ', 차액 ', TO_CHAR(COALESCE(imbalance.difference_amount, 0), 'FM999,999,999,990'), '원'
                   ),
                   jsonb_build_object(
                       'journalHeaderId', imbalance.journal_header_id,

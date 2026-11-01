@@ -1,3 +1,4 @@
+import { nameWithCode } from '../../lib/screenText'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation } from 'react-router'
@@ -52,7 +53,7 @@ const agentStatusLabels = { ACTIVE: '활동', INACTIVE: '비활동', TERMINATED:
 function agentOptionLabel(agent: Agent) {
   const status = agent.agentStatusLabel || (agent.agentStatus ? agentStatusLabels[agent.agentStatus] : '')
   const details = [status, agent.activeYn === false ? '기준정보 사용중지' : ''].filter(Boolean)
-  return `${agent.agentCode} · ${agent.agentName}${details.length ? ` (${details.join(' · ')})` : ''}`
+  return `${nameWithCode(agent.agentName, agent.agentCode)}${details.length ? ` (${details.join(', ')})` : ''}`
 }
 const columns = (back: string): TableColumn<ContractSummary>[] => [
   {
@@ -185,7 +186,7 @@ export default function ContractListPage() {
             검색 결과
           </h2>
           <p className="contract-result-summary">
-            {int(list.data?.totalElements ?? 0)}건 · 한 화면 {PAGE_SIZE}행
+            {int(list.data?.totalElements ?? 0)}건, 한 화면 {PAGE_SIZE}행
           </p>
         </header>
         <QueryState loading={list.isPending} error={list.error} />
@@ -335,7 +336,7 @@ function ContractFilters({
             '보험회사',
             (insurers.data ?? []).map((row) => ({
               value: String(row.insurerId),
-              label: `${row.insurerCode} · ${row.insurerName}${row.activeYn === false ? ' (사용중지)' : ''}`,
+              label: `${row.insurerCode}, ${row.insurerName}${row.activeYn === false ? ' (사용중지)' : ''}`,
             })),
             insurers,
           )}
@@ -344,31 +345,33 @@ function ContractFilters({
             '상품',
             (products.data ?? []).map((row) => ({
               value: String(row.productOfferingId),
-              label: `${row.productName} · ${row.offeringVersion}`,
+              label: `${row.productName}, ${row.offeringVersion}`,
             })),
             products,
             draft.insurerId ? '전체' : '보험회사를 선택하세요',
             !draft.insurerId,
           )}
-          {!isAgent && select(
-            'agentId',
-            '모집 설계사',
-            (agents.data ?? []).map((row) => ({ value: String(row.agentId), label: agentOptionLabel(row) })),
-            agents,
-            '전체',
-            false,
-            () => setAgentOptionsRequested(true),
-            false,
-          )}
-          {!isAgent && select(
-            'orgId',
-            '조직',
-            (organizations.data ?? []).map((row) => ({
-              value: String(row.organizationId),
-              label: `${row.organizationCode} · ${row.organizationName}${row.activeYn === false ? ' (사용중지)' : ''}`,
-            })),
-            organizations,
-          )}
+          {!isAgent &&
+            select(
+              'agentId',
+              '모집 설계사',
+              (agents.data ?? []).map((row) => ({ value: String(row.agentId), label: agentOptionLabel(row) })),
+              agents,
+              '전체',
+              false,
+              () => setAgentOptionsRequested(true),
+              false,
+            )}
+          {!isAgent &&
+            select(
+              'orgId',
+              '조직',
+              (organizations.data ?? []).map((row) => ({
+                value: String(row.organizationId),
+                label: `${row.organizationCode}, ${row.organizationName}${row.activeYn === false ? ' (사용중지)' : ''}`,
+              })),
+              organizations,
+            )}
           {input('contractDateFrom', '계약일 시작', 'date')}
           {input('contractDateTo', '계약일 끝', 'date')}
           {select(

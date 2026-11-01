@@ -38,7 +38,7 @@ public class JournalSearchController {
     private final JournalSearchService journalSearchService;
 
     @Operation(summary = "검증원장 목록 조회",
-            description = "기간(from/to)·분개유형·계정·계약(ID 또는 계약번호)·상태로 검색하고 페이징된 목록을 돌려준다.")
+            description = "기간(from/to)/분개유형/계정/계약(ID 또는 계약번호)/상태로 검색하고 페이징된 목록을 돌려준다.")
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<JournalSearchResponse> search(
@@ -53,7 +53,7 @@ public class JournalSearchController {
             @Parameter(description = "계약번호(대소문자 무시 부분 일치, 최대 80자)")
             @RequestParam(name = "contractNo", required = false) String contractNo,
             @Parameter(description = "상태(DRAFT/POSTED/REVERSED)") @RequestParam(required = false) String status,
-            @Parameter(description = "정렬(key,asc|desc). journalNo·journalDate·contractNo·debitTotal·creditTotal. 비우면 분개일 내림차순")
+            @Parameter(description = "정렬(key,asc|desc). journalNo/journalDate/contractNo/debitTotal/creditTotal. 비우면 분개일 내림차순")
             @RequestParam(required = false) String sort,
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size

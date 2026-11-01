@@ -58,7 +58,7 @@ public enum ExceptionStatus {
             case NEW -> "신규";
             case IN_REVIEW -> "검토중";
             case RESOLVED -> "해결";
-            case REJECTED -> "오탐·반려";
+            case REJECTED -> "오탐/반려";
         };
     }
 }

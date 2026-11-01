@@ -91,7 +91,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     renderAt('/audit-logs?action=PAYMENT_DELETED&selected=1', 'COMPLIANCE', [
       log(1, { actionCode: 'PAYMENT_DELETED', reason: undefined }),
     ])
-    expect(await screen.findByText('지급 초안 삭제 (PAYMENT_DELETED)')).toBeInTheDocument()
+    expect(await screen.findAllByText('지급 초안 삭제')).not.toHaveLength(0)
     expect(await screen.findByRole('option', { name: '지급 초안 삭제' })).toHaveValue('PAYMENT_DELETED')
     const table = screen.getByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     expect(within(table).getByText('지급 초안 삭제')).toBeInTheDocument()
@@ -103,9 +103,11 @@ describe('AUDT-W01 감사로그 조회', () => {
     const reason = '초안 삭제(PAYMENT_DELETED): 지급 9007199254740993의 지급 예정이 철회되어 종결'
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'EXCEPTION_ACTION', reason })])
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
-    expect(await within(table).findByText('지급 초안 삭제: 지급 9007199254740993의 지급 예정이 철회되어 종결')).toBeInTheDocument()
-    await screen.findByText('사유 원문 보기')
-    expect(document.querySelector('.audit-reason-original')).toHaveTextContent(reason)
+    expect(
+      await within(table).findByText('지급 초안 삭제: 지급 9007199254740993의 지급 예정이 철회되어 종결'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
+    expect(document.querySelector('.audit-reason-original')).toBeNull()
   })
 
   it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 BATCH 표기를 유지한다', async () => {
@@ -139,7 +141,7 @@ describe('AUDT-W01 감사로그 조회', () => {
 
   it('조회는 검색조건을 URL 에 남기고 page·selected 를 지운다', async () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07&page=2&selected=1')
-    await screen.findByText('payment.amount')
+    await screen.findByText('지급 / 금액')
     await actions.type(screen.getByLabelText('대상 ID'), '4104')
     await actions.click(screen.getByRole('button', { name: '조회' }))
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&entityId=4104'))
@@ -151,7 +153,12 @@ describe('AUDT-W01 감사로그 조회', () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07&entityType=COMMISSION_PAYMENT&page=2&selected=1')
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     const lastQuery = () =>
-      new URLSearchParams(requested.filter((url) => url.startsWith('/api/v1/audit-logs?')).at(-1)!.split('?')[1])
+      new URLSearchParams(
+        requested
+          .filter((url) => url.startsWith('/api/v1/audit-logs?'))
+          .at(-1)!
+          .split('?')[1],
+      )
     // 순서 기준이 없는 행위·대상 종류 컬럼은 정렬 버튼이 없다.
     expect(within(table).queryByRole('button', { name: '행위' })).toBeNull()
     expect(within(table).getByRole('columnheader', { name: /정책버전/ })).toHaveAttribute('aria-sort', 'none')
@@ -178,12 +185,12 @@ describe('AUDT-W01 감사로그 조회', () => {
     await actions.click(first)
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&page=2&selected=1'))
     const table = await screen.findByRole('table', { name: '선택한 감사 기록의 변경 전후 값 비교' })
-    await within(table).findByText('payment.amount')
+    await within(table).findByText('지급 / 금액')
     expect(table.querySelectorAll('.audit-diff-cell-changed')).toHaveLength(2)
     expect(within(table).getByText('700000')).toHaveClass('audit-diff-cell-changed')
-    expect(within(table).getAllByText('DRAFT')[0]).not.toHaveClass('audit-diff-cell-changed')
-    expect(screen.getByText('지급 확정 (PAYMENT_CONFIRMED)')).toBeInTheDocument()
-    expect(screen.getByText('수수료 지급 (COMMISSION_PAYMENT) #42')).toBeInTheDocument()
+    expect(within(table).getAllByText('작성중')[0]).not.toHaveClass('audit-diff-cell-changed')
+    expect(document.querySelector('.audit-diff-context')).toHaveTextContent('지급 확정')
+    expect(document.querySelector('.audit-diff-context')).toHaveTextContent('수수료 지급 #42')
   })
 
   it('한글 인증 이벤트를 선택해도 원본 코드로 검색하고 상세·뒤로/앞으로에서 복원한다', async () => {
@@ -211,24 +218,26 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(within(list).getAllByRole('cell')[1]).toHaveTextContent('admin')
     expect(within(list).queryByText('TOKEN_REFRESH')).not.toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '2026-08-16 10:00:07' }))
-    expect(await screen.findByText('인증 토큰 갱신 (TOKEN_REFRESH)')).toBeInTheDocument()
-    expect(screen.getByText('사용자 계정 (APP_USER) #admin')).toBeInTheDocument()
-    expect(await screen.findByText('payment.status')).toBeInTheDocument()
-    expect(screen.getAllByText('DRAFT')).toHaveLength(2)
+    expect(await screen.findAllByText('인증 토큰 갱신')).not.toHaveLength(0)
+    expect(screen.getByText('사용자 계정 #admin')).toBeInTheDocument()
+    expect(await screen.findByText('지급 / 상태')).toBeInTheDocument()
+    expect(screen.getAllByText('작성중')).toHaveLength(2)
     await act(() => router.navigate(-1))
     expect(router.state.location.search).not.toContain('selected=')
     expect(screen.getByLabelText('행위 종류')).toHaveValue('TOKEN_REFRESH')
     await act(() => router.navigate(1))
-    expect(await screen.findByText('인증 토큰 갱신 (TOKEN_REFRESH)')).toBeInTheDocument()
+    expect(await screen.findAllByText('인증 토큰 갱신')).not.toHaveLength(0)
   })
 
-  it('미등록 코드는 검색과 상세에서 원문을 유지하고 중복 병기하지 않는다', async () => {
+  it('미등록 코드는 화면에서 숨기고 검색 값은 원본 코드를 유지한다', async () => {
     const { actions } = renderAt('/audit-logs?month=2026-07&selected=1', 'COMPLIANCE', [
       log(1, { actionCode: 'FUTURE_ACTION', entityType: 'FUTURE_ENTITY' }),
     ])
-    await screen.findByText('FUTURE_ENTITY #42')
-    expect(screen.getByRole('option', { name: 'FUTURE_ACTION' })).toHaveValue('FUTURE_ACTION')
-    expect(screen.queryByText('FUTURE_ACTION (FUTURE_ACTION)')).not.toBeInTheDocument()
+    await screen.findByText('확인 필요 #42')
+    expect(within(screen.getByLabelText('행위 종류')).getByRole('option', { name: '확인 필요' })).toHaveValue(
+      'FUTURE_ACTION',
+    )
+    expect(screen.queryByText('FUTURE_ACTION')).not.toBeInTheDocument()
     await actions.selectOptions(screen.getByLabelText('행위 종류'), 'FUTURE_ACTION')
     await actions.selectOptions(screen.getByLabelText('대상 종류'), 'FUTURE_ENTITY')
     await actions.click(screen.getByRole('button', { name: '조회' }))
@@ -238,8 +247,8 @@ describe('AUDT-W01 감사로그 조회', () => {
 
   it('누락된 코드는 목록과 상세에서 대시로 표시한다', async () => {
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: undefined, entityType: '' })])
-    await screen.findByText('payment.amount')
-    expect(document.querySelector('.audit-diff-context')).toHaveTextContent('- · - #42')
+    await screen.findByText('지급 / 금액')
+    expect(document.querySelector('.audit-diff-context')).toHaveTextContent('-, - #42')
     const row = screen.getByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' }).querySelector('tbody tr')!
     expect(within(row as HTMLElement).getAllByText('-')).toHaveLength(2)
   })
@@ -248,7 +257,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07')
     await actions.click(await screen.findByText('BATCH'))
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&selected=2'))
-    expect(await screen.findByText('STARTED')).toBeInTheDocument()
+    expect(await screen.findByText('시작')).toBeInTheDocument()
   })
 
   it('단계 진행과 분개 자동 사유를 한글로 표시하고 상세에서 원문과 큰 식별자를 보존한다', async () => {
@@ -263,16 +272,16 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(await within(table).findByText('월 통합검증 7단계 진행')).toBeInTheDocument()
     expect(
       within(table).getByText(
-        '확정 지급(GA→설계사) 분개 초안 저장 · 원천: 수수료 거래 #9007199254740993 · 검증 실행 #42',
+        '확정 지급(GA→설계사) 분개 초안 저장, 원천: 수수료 거래 #9007199254740993, 검증 실행 #42',
       ),
     ).toBeInTheDocument()
     expect(within(table).queryByText(stepReason)).not.toBeInTheDocument()
     expect(within(table).queryByText(draftReason)).not.toBeInTheDocument()
-    await actions.click(screen.getByText('사유 원문 보기'))
-    expect(screen.getByText(stepReason)).toBeVisible()
+    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
+    expect(screen.queryByText(stepReason)).not.toBeInTheDocument()
     await actions.click(screen.getAllByRole('button', { name: '2026-08-16 10:00:07' })[1])
-    expect(await screen.findByText(draftReason)).toBeInTheDocument()
-    expect(document.querySelector('.audit-reason-original')).toHaveTextContent(draftReason)
+    await waitFor(() => expect(document.querySelector('.audit-diff-context')).toHaveTextContent('분개 초안 저장'))
+    expect(document.querySelector('.audit-reason-original')).toBeNull()
   })
 
   it.each([
@@ -289,10 +298,10 @@ describe('AUDT-W01 감사로그 조회', () => {
     ],
   ])('사용자 사유나 미등록 형식은 원문을 보존한다 (%s: %s)', async (actionCode, reason) => {
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode, reason })])
-    await screen.findByText('payment.amount')
+    await screen.findByText('지급 / 금액')
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     const reasonCell = within(table).getAllByRole('cell')[5]
-    expect(reasonCell.textContent).toBe(reason)
+    expect(reasonCell.textContent).toBe(reason.startsWith('journalType=') ? '처리 사유 확인 필요' : reason)
     expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
   })
 
@@ -305,7 +314,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     await actions.keyboard('{Enter}')
     await waitFor(() => expect(router.state.location.search).toContain('selected=2'))
     expect(row).toHaveAttribute('aria-selected', 'true')
-    const [first] = screen.getAllByRole('button', { name: '2026-08-16 10:00:07' })
+    const [first] = await screen.findAllByRole('button', { name: '2026-08-16 10:00:07' })
     first.focus()
     await actions.keyboard('{Enter}')
     await waitFor(() => expect(router.state.location.search).toContain('selected=1'))
@@ -316,21 +325,21 @@ describe('AUDT-W01 감사로그 조회', () => {
 
   it('?selected= 로 새로 열어도 같은 로그의 선택 상태와 diff 를 복원한다', async () => {
     renderAt('/audit-logs?selected=1')
-    expect(await screen.findByText('payment.amount')).toBeInTheDocument()
+    expect(await screen.findByText('지급 / 금액')).toBeInTheDocument()
     expect(requested).toContain('/api/v1/audit-logs/1')
     expect(document.querySelector('tr.is-selected')).toHaveTextContent('2026-08-16 10:00:07')
   })
 
   it('before 가 없는 생성 로그도 오류 없이 이후값만 보여 준다', async () => {
     renderAt('/audit-logs?selected=2')
-    const cell = await screen.findByText('STARTED')
+    const cell = await screen.findByText('시작')
     expect(cell).toHaveClass('audit-diff-cell-changed')
-    expect(cell.previousElementSibling).toBeEmptyDOMElement()
+    expect(cell.previousElementSibling).toHaveTextContent('-')
   })
 
   it('SETTLEMENT 는 403 화면을 보고 감사로그 API 를 부르지 않는다', async () => {
     renderAt('/audit-logs', 'SETTLEMENT')
-    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
     expect(requested.filter((url) => url.startsWith('/api/v1/audit-logs'))).toEqual([])
   })
 
@@ -364,8 +373,8 @@ describe('normalizeCriteria', () => {
 
 describe('diffFieldLabel', () => {
   it('점 경로는 그대로 두고 배열 인덱스만 N번째로 푼다', () => {
-    expect(diffFieldLabel('payment.amount')).toBe('payment.amount')
-    expect(diffFieldLabel('[0].result.details[1].amount')).toBe('1번째.result.details.2번째.amount')
-    expect(diffFieldLabel('value')).toBe('value')
+    expect(diffFieldLabel('payment.amount')).toBe('지급 / 금액')
+    expect(diffFieldLabel('[0].result.details[1].amount')).toBe('1번째 / 결과 / 상세 / 2번째 / 금액')
+    expect(diffFieldLabel('value')).toBe('값')
   })
 })
