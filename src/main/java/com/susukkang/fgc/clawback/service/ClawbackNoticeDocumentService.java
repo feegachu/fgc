@@ -152,7 +152,12 @@ public class ClawbackNoticeDocumentService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
-                if (status == STATUS_COMMITTED) return;
+                // 롤백이 확실할 때만 지운다. STATUS_UNKNOWN은 DB에 판이 커밋됐을 수 있어 원본을 남기고
+                // DB 키 대조 정리(#707 연동 계약)에 맡긴다. 커밋된 판의 원본을 지우면 되돌릴 수 없다.
+                if (status != STATUS_ROLLED_BACK) {
+                    if (status == STATUS_UNKNOWN) log.warn("커밋 여부를 알 수 없는 환수 통지서 파일 storageKey={}", key);
+                    return;
+                }
                 try {
                     storage.delete(key);
                 } catch (IOException | RuntimeException e) {

@@ -213,7 +213,7 @@ class Phase2SchemaHardeningIntegrationTest {
         }
     }
 
-    /** V75(#671): 통지서 판은 실제 계산판에서만, case별 고정 문서번호로, 판 번호를 건너뛰지 않고 쌓는다. */
+    /** V76(#671): 통지서 판은 실제 계산판에서만, case별 고정 문서번호로, 판 번호를 건너뛰지 않고 쌓는다. */
     @Test
     void clawbackNoticeMustFollowItsCaseCalculationAndVersionSequence() throws Exception {
         try (var conn = connect()) {

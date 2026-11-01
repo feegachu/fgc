@@ -362,7 +362,7 @@ class Phase2SchemaMigrationIntegrationTest {
                 INSERT INTO fgc.intake_document(original_file_name, storage_key, media_type, file_size_bytes, content_hash,
                                                 uploaded_by)
                 SELECT 'test.pdf', 'test-key', 'application/pdf', 1, 'test-hash-guard', min(user_id) FROM fgc.app_user""");
-        // V75(#671): 통지서 판은 실제 case의 계산판을 가리켜야 한다. 실효 사건 → 후보 → case → 계산판 1판을 만든다.
+        // V76(#671): 통지서 판은 실제 case의 계산판을 가리켜야 한다. 실효 사건 → 후보 → case → 계산판 1판을 만든다.
         execute(conn, """
                 INSERT INTO fgc.insurance_contract(insurer_id, product_offering_id, contract_no, contract_date, agent_id,
                     organization_id, premium_per_cycle_amount, first_premium_amount, monthly_equivalent_first_premium,
