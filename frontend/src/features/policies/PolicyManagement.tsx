@@ -1,4 +1,5 @@
 import { useContext, useRef, useState } from 'react'
+import { ApiError } from '../../lib/api/client'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { Field } from '../../components/Field'
@@ -61,11 +62,14 @@ export function PolicyManagement({
 }) {
   const { user } = useAuth()
   const [editing, setEditing] = useState(false)
+  const [problem, setProblem] = useState<{ field: string; message: string }>()
   const [action, setAction] = useState<PolicyAction | null>(null)
   const [panel, setPanel] = useState<(typeof panels)[number]['id']>(initialPanel)
   const draft = detail.editDocument
   const allowed = permittedActions(policy, detail, user?.roleCode)
   const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
+  // 서버는 수정·제출에 참여한 승인자에게도 REJECT만 준다(allowedActions, FGC-POL-001).
+  const contributed = !own && allowed.includes('REJECT') && !allowed.includes('APPROVE')
   const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
   const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
   const successorRef = detail.approvalActions
@@ -186,11 +190,15 @@ export function PolicyManagement({
             ))}
         </div>
       </div>
-      {own && policy.status === 'REVIEW' && ['GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
-        <p className="policy-notice policy-notice-warning">
-          작성자는 본인이 작성한 정책을 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.
-        </p>
-      )}
+      {(own || contributed) &&
+        policy.status === 'REVIEW' &&
+        ['GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
+          <p className="policy-notice policy-notice-warning">
+            {own
+              ? '작성자는 본인이 작성한 정책을 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.'
+              : '이 정책을 수정하거나 제출한 사용자는 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.'}
+          </p>
+        )}
       {!detail.allowedActions && <p className="policy-note">작업 권한 정보가 제공되지 않아 조회만 가능합니다.</p>}
       <ReferenceTabs
         tabs={panels}
@@ -247,10 +255,15 @@ export function PolicyManagement({
       {editing && draft && (
         <PolicyDraftEditor
           initial={draft}
+          initialProblem={problem}
           policyId={policy.policyVersionId}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false)
+            setProblem(undefined)
+          }}
           onSaved={(id) => {
             setEditing(false)
+            setProblem(undefined)
             onSaved(id)
           }}
         />
@@ -261,6 +274,11 @@ export function PolicyManagement({
           detail={detail}
           action={action}
           onClose={() => setAction(null)}
+          onInvalid={(field, message) => {
+            setProblem({ field, message })
+            setAction(null)
+            setEditing(true)
+          }}
           onSaved={(id) => {
             setAction(null)
             onSaved(id)
@@ -552,12 +570,14 @@ function PolicyActionDialog({
   action,
   onClose,
   onSaved,
+  onInvalid,
 }: {
   policy: Policy
   detail: ManagedPolicyDetail
   action: PolicyAction
   onClose: () => void
   onSaved: (id: number) => void
+  onInvalid: (field: string, message: string) => void
 }) {
   const preview = useContext(PolicyPreviewContext)
   const [reason, setReason] = useState('')
@@ -617,6 +637,13 @@ function PolicyActionDialog({
       onSaved(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
+      if (
+        action === 'SUBMIT' &&
+        cause instanceof ApiError &&
+        cause.field &&
+        (cause.status === 400 || cause.status === 422)
+      )
+        onInvalid(cause.field, cause.message)
     } finally {
       saving.current = false
       setBusy(false)

@@ -249,6 +249,8 @@ public enum FgcErrorCode {
     POL_001("FGC-POL-001", HttpStatus.CONFLICT, "error.policy.selfApproval"),
     POL_002("FGC-POL-002", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.overlap"),
     POL_003("FGC-POL-003", HttpStatus.CONFLICT, "error.policy.stateChanged"),
+    POL_004("FGC-POL-004", HttpStatus.UNPROCESSABLE_ENTITY, "error.policy.submissionRequired"),
+    POL_005("FGC-POL-005", HttpStatus.BAD_REQUEST, "error.policy.invalidClawbackTarget"),
     IMPL_IDEMPOTENCY_CONFLICT("FGC-IMPL-IDEMPOTENCY_CONFLICT", HttpStatus.CONFLICT,
             "error.common.idempotencyConflict"),
     IMPL_REQUEST_IN_PROGRESS("FGC-IMPL-REQUEST_IN_PROGRESS", HttpStatus.CONFLICT,

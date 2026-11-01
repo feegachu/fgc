@@ -58,10 +58,11 @@ class ClawbackCandidateIntegrationTest {
         contractId = cloneContract(contractNo);
         agentId = jdbc.queryForObject("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id=?", Long.class, contractId);
         itemId = jdbc.queryForObject("SELECT min(commission_item_id) FROM fgc.commission_item WHERE cashflow_type='PAYMENT'", Long.class);
-        // 데모 시드의 가상 환수율표(V70_1)는 모든 계약에 적용된다. 이 클래스는 직접 만든 정책으로만 정책 범위를 검증한다.
+        // 이 클래스의 격리 DB에서는 데모 정책을 정상 종료해 직접 만든 정책의 적용 범위만 검증한다.
+        // 승인 규칙은 삭제하지 않는다(V75). 일반 테스트는 종료도 테스트 트랜잭션과 함께 롤백한다.
         jdbc.update("""
-                DELETE FROM fgc.clawback_rule WHERE policy_version_id IN
-                  (SELECT policy_version_id FROM fgc.policy_version WHERE policy_code = 'CLAW-GA-VIRTUAL-2026')
+                UPDATE fgc.policy_version SET status='RETIRED'
+                WHERE policy_code='CLAW-GA-VIRTUAL-2026' AND status='ACTIVE'
                 """);
     }
 

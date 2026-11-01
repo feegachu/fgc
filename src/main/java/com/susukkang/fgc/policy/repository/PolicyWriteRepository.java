@@ -222,6 +222,7 @@ public class PolicyWriteRepository {
         for (PolicyDraft.FeeRegimeRuleDraft rule : draft.feeRegimeRules()) {
             saveFeeRule(id, rule, rule.feeRegimeRulesetId() == null ? null : detachedFeeRows.get(rule.feeRegimeRulesetId()));
         }
+        replaceClawbackRules(id, draft.clawbackRules());
         jdbc.update("DELETE FROM fgc.policy_parameter WHERE policy_version_id = ?", id);
         for (PolicyDraft.ParameterDraft parameter : draft.parameters()) {
             jdbc.update("""
@@ -236,6 +237,21 @@ public class PolicyWriteRepository {
                     VALUES (?, ?, ?, ?, ?, ?)
                     """, id, source.ref(), source.title(), source.explanation(), source.url(),
                     source.statusTags().toArray(String[]::new));
+        }
+    }
+
+    private void replaceClawbackRules(Long id, List<PolicyDraft.ClawbackRuleDraft> rules) {
+        jdbc.update("DELETE FROM fgc.clawback_rule WHERE policy_version_id = ?", id);
+        for (PolicyDraft.ClawbackRuleDraft rule : rules) {
+            jdbc.update("""
+                    INSERT INTO fgc.clawback_rule
+                      (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                       elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                    """, id, rule.insurerId(), rule.productOfferingId(), rule.commissionItemId(),
+                    rule.elapsedMonthFrom(), rule.elapsedMonthTo(), rule.clawbackBasisCode(),
+                    rule.clawbackRatePct(), rule.conditionExpression() == null || rule.conditionExpression().isNull()
+                            ? "{}" : json(rule.conditionExpression()));
         }
     }
 
@@ -439,13 +455,20 @@ public class PolicyWriteRepository {
                 SELECT EXISTS (SELECT 1 FROM fgc.cap_rule_set WHERE policy_version_id = ?)
                     OR EXISTS (SELECT 1 FROM fgc.refund_rate_table WHERE policy_version_id = ?)
                     OR EXISTS (SELECT 1 FROM fgc.allocation_policy WHERE policy_version_id = ?)
-                    OR EXISTS (SELECT 1 FROM fgc.clawback_rule WHERE policy_version_id = ?)
-                """, Boolean.class, id, id, id, id));
+                """, Boolean.class, id, id, id));
     }
 
     /** 승인 자식은 원본 값을 읽어 새 ID로 복사하며, 승인 이력은 복사하지 않는다. */
     public void copyChildren(Long sourceId, Long targetId) {
         entityManager.flush();
+        jdbc.update("""
+                INSERT INTO fgc.clawback_rule
+                  (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                   elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
+                SELECT ?, insurer_id, product_offering_id, commission_item_id,
+                   elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression
+                FROM fgc.clawback_rule WHERE policy_version_id = ?
+                """, targetId, sourceId);
         jdbc.update("""
                 INSERT INTO fgc.commission_rule
                     (policy_version_id, payment_stage, insurer_id, product_offering_id, organization_id,
@@ -606,6 +629,15 @@ public class PolicyWriteRepository {
                       active.policy_code = candidate.policy_code
                       OR (active.policy_type = candidate.policy_type
                         AND candidate.policy_type IN ('ARBITRAGE','SCHEDULE_ELIGIBILITY','RECONCILIATION_TOLERANCE'))
+                      OR (active.policy_type = 'CLAWBACK' AND candidate.policy_type = 'CLAWBACK'
+                        AND EXISTS (
+                          SELECT 1 FROM fgc.clawback_rule a JOIN fgc.clawback_rule c
+                            ON c.policy_version_id = candidate.policy_version_id
+                          WHERE a.policy_version_id = active.policy_version_id
+                            -- D-02: 전체 정책과 보험회사/판매버전 전용 정책은 코드 분리·명시 선택으로 공존한다.
+                            -- FUN-079는 항목·경과월을 고르기 전에 보험회사/판매버전으로 정책 하나를 선택한다.
+                            AND a.insurer_id IS NOT DISTINCT FROM c.insurer_id
+                            AND a.product_offering_id IS NOT DISTINCT FROM c.product_offering_id))
                       OR (active.policy_type = 'CURRENT_COMMISSION' AND candidate.policy_type = 'CURRENT_COMMISSION'
                         AND COALESCE(active.fee_regime_code, 'CURRENT') = 'CURRENT'
                         AND COALESCE(candidate.fee_regime_code, 'CURRENT') = 'CURRENT'
