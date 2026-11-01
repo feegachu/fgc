@@ -217,7 +217,7 @@ it('links evidence to the source contract, arbitrage check and payment', async (
   const payments = await screen.findByRole('region', { name: '연결 지급 · 귀속' })
   expect(within(payments).getByRole('link', { name: '800' })).toHaveAttribute(
     'href',
-    '/transactions?contractNo=CLW-001&selectedId=800',
+    '/transactions?contractNo=CLW-001&settlementMonth=&selectedId=800',
   )
   const sources = screen.getByRole('region', { name: '원천 사건 · 검증 근거' })
   expect(within(sources).getByRole('link', { name: '계약 사건 이력' })).toHaveAttribute('href', '/contracts/10')
