@@ -36,6 +36,8 @@ const positiveId = (id: string | number) => {
     throw new GuideFailure('INVALID_ENTITY_REFS')
   return value
 }
+// Same bound as the guide's target preparation (FUN-087 기본 5초).
+const EVIDENCE_READ_TIMEOUT_MS = 5000
 // Comparison keys stay in memory and are never emitted as guide events or server versions.
 const inputKey = (form: FormValues, rows: AttributionRow[]) =>
   JSON.stringify([form, rows.map((row) => ({ ...row, key: undefined }))])
@@ -160,7 +162,11 @@ export class PaymentGuideObserver {
   }
   async readOperationPayment(operation: PaymentOperation) {
     if (!this.isCurrent(operation) || !operation.paymentId) throw new GuideFailure('CONTEXT_CHANGED')
-    return readPayment(operation.paymentId, this.lifetime.signal)
+    // Evidence reads run even with the guide closed, so a slow GET must only cost the evidence, never the action.
+    return readPayment(
+      operation.paymentId,
+      AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(EVIDENCE_READ_TIMEOUT_MS)]),
+    )
   }
   acceptSaved(operation: PaymentOperation, payment: Payment) {
     if (
