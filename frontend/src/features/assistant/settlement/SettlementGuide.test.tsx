@@ -132,6 +132,15 @@ describe('FUN-088 shell guide', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('조회 안내만')
     expect(router.state.location.pathname).toBe('/')
   })
+  it('shows a business message instead of the browser text when the evidence read times out', async () => {
+    vi.spyOn(evidenceApi, 'readEvidence').mockRejectedValue(new DOMException('signal timed out', 'TimeoutError'))
+    const { actor } = mount()
+    await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+    await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('5초 안에 끝나지 않았습니다')
+    expect(alert).not.toHaveTextContent('signal timed out')
+  })
   it('ignores a late response after exit', async () => {
     const { actor, router } = mount()
     await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
