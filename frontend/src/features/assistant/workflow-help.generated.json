@@ -1730,6 +1730,15 @@
         "next": []
       },
       {
+        "stepId": "help.64517b0782b93328a624de1dec1c1ca2",
+        "screenId": "POL-W01",
+        "targetId": "policy.draft-select.clawbackrules.clawbackbasiscode",
+        "title": "정책·룰셋 · 기준금액",
+        "instruction": "정책·룰셋 화면의 ‘기준금액’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      },
+      {
         "stepId": "help.6666b68a9c204c804332a5c5c64fdc33",
         "screenId": "POL-W01",
         "targetId": "policy.draft-input.commissionrules.ratepct",
@@ -2739,6 +2748,15 @@
         "targetId": "features.policies.policy-draft-editor.input",
         "title": "정책·룰셋 · 수수료 체계",
         "instruction": "정책·룰셋 화면의 ‘수수료 체계’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      },
+      {
+        "stepId": "help.64517b0782b93328a624de1dec1c1ca2",
+        "screenId": "POL-W01",
+        "targetId": "policy.draft-select.clawbackrules.clawbackbasiscode",
+        "title": "정책·룰셋 · 기준금액",
+        "instruction": "정책·룰셋 화면의 ‘기준금액’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": []
       },

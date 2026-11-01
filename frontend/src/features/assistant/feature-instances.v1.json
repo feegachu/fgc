@@ -133,6 +133,7 @@
     "sourcerefs"
   ],
   "policy.draft-select": [
+    "clawbackrules.clawbackbasiscode",
     "clawbackrules.commissionitemid",
     "clawbackrules.insurerid",
     "clawbackrules.productofferingid",
