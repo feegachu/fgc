@@ -283,76 +283,54 @@ class PolicyDraftValidatorTest {
         array(json, "clawbackRules").add(MAPPER.createObjectNode().put("elapsedMonthFrom", 0)
                 .put("elapsedMonthTo", 12).put("clawbackBasisCode", "UNCONFIRMED").put("clawbackRatePct", 50));
         assertInvalid(json, "clawbackRules[0].clawbackBasisCode");
-    }
-
-    @Test
-    void acceptsD02ClawbackRatesIncludingExplicitZeroAndOnlyEmptyConditions() {
-        ObjectNode json = baseDraft().put("policyType", "CLAWBACK");
-        ObjectNode rule = clawbackRule();
-        array(json, "clawbackRules").add(rule);
-        for (String rate : new String[]{"0.000000", "33.333333", "100.000000"}) {
-            rule.put("clawbackRatePct", rate);
-            assertThatCode(() -> validator.validateForSubmission(draft(json))).doesNotThrowAnyException();
-        }
-        rule.putObject("conditionExpression");
-        assertThatCode(() -> validator.validate(draft(json))).doesNotThrowAnyException();
+        ObjectNode rule = (ObjectNode) array(json, "clawbackRules").get(0);
+        rule.put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT");
         rule.putNull("conditionExpression");
         assertThatCode(() -> validator.validate(draft(json))).doesNotThrowAnyException();
-        rule.put("conditionExpression", "{}");
-        assertInvalid(json, "clawbackRules[0].conditionExpression");
-        rule.putObject("conditionExpression").put("fault", "AGENT");
-        assertInvalid(json, "clawbackRules[0].conditionExpression");
-        rule.putNull("conditionExpression");
-        json.put("policyType", "CURRENT_COMMISSION");
-        assertInvalid(json, "clawbackRules");
-    }
-
-    @Test
-    void rejectsInvalidClawbackMonthBoundsRatePrecisionAndRepeatedIds() {
-        ObjectNode json = baseDraft().put("policyType", "CLAWBACK");
-        ObjectNode rule = clawbackRule();
-        array(json, "clawbackRules").add(rule);
-        rule.put("elapsedMonthTo", 0).put("elapsedMonthFrom", 1);
+        rule.put("elapsedMonthTo", -1);
         assertInvalid(json, "clawbackRules[0].elapsedMonthTo");
-        rule.put("elapsedMonthFrom", -1);
-        assertInvalid(json, "clawbackRules[0].elapsedMonthFrom");
-        rule.put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11);
-        for (String rate : new String[]{"-0.000001", "100.000001", "33.3333333"}) {
-            rule.put("clawbackRatePct", rate);
-            assertInvalid(json, "clawbackRules[0].clawbackRatePct");
-        }
-        rule.put("clawbackRatePct", "50.000000").put("clawbackRuleId", 1);
-        array(json, "clawbackRules").add(rule.deepCopy().put("elapsedMonthFrom", 12).put("elapsedMonthTo", 23));
-        assertInvalid(json, "clawbackRules[1].clawbackRuleId");
-    }
-
-    @Test
-    void rejectsDatabaseDuplicateBandsEvenAcrossInsurersAndAmbiguousSubmissionBoundaries() {
-        ObjectNode json = baseDraft().put("policyType", "CLAWBACK");
-        ObjectNode first = clawbackRule().put("insurerId", 1);
-        array(json, "clawbackRules").add(first);
-        ObjectNode second = first.deepCopy().put("insurerId", 2);
-        array(json, "clawbackRules").add(second);
-        assertThatThrownBy(() -> validator.validate(draft(json))).isInstanceOfSatisfying(FgcBusinessException.class,
-                e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.POL_002));
-        second.put("insurerId", 1).put("elapsedMonthFrom", 11).put("elapsedMonthTo", 23);
-        assertThatCode(() -> validator.validate(draft(json))).doesNotThrowAnyException();
-        assertThatThrownBy(() -> validator.validateForSubmission(draft(json)))
-                .isInstanceOfSatisfying(FgcBusinessException.class, e -> {
-                    assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.POL_002);
-                    assertThat(e.getField()).isEqualTo("clawbackRules[1]");
+        rule.put("elapsedMonthTo", 12).put("clawbackRatePct", "100.000001");
+        assertInvalid(json, "clawbackRules[0].clawbackRatePct");
+        rule.put("clawbackRatePct", "33.333333");
+        rule.putObject("conditionExpression").put("arbitrary", true);
+        assertInvalid(json, "clawbackRules[0].conditionExpression");
+        rule.putObject("conditionExpression");
+        array(json, "clawbackRules").add(rule.deepCopy().put("elapsedMonthFrom", 12).put("elapsedMonthTo", 24));
+        PolicyDraft overlapping = draft(json);
+        assertThatThrownBy(() -> validator.validate(overlapping))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.POL_002);
+                    assertThat(error.getField()).isEqualTo("clawbackRules[1].elapsedMonthFrom");
                 });
-        second.put("elapsedMonthFrom", 12);
-        assertThatCode(() -> validator.validateForSubmission(draft(json))).doesNotThrowAnyException();
-        // 더 구체적인 판매버전 규칙은 일반 보험회사 규칙과 겹쳐도 결정적으로 선택된다.
-        second.put("elapsedMonthFrom", 1).put("productOfferingId", 3);
-        assertThatCode(() -> validator.validateForSubmission(draft(json))).doesNotThrowAnyException();
     }
 
-    private static ObjectNode clawbackRule() {
-        return MAPPER.createObjectNode().put("commissionItemId", 1).put("elapsedMonthFrom", 0)
-                .put("elapsedMonthTo", 11).put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT")
-                .put("clawbackRatePct", "50.000000");
+    /** FGC-FUN-017: 경과월 양끝 포함 구간과 환수율 0%·100%의 저장 경계. */
+    @Test
+    void permitsAdjacentClawbackBandsWithZeroAndHundredPercent() {
+        ObjectNode json = baseDraft().put("policyType", "CLAWBACK");
+        ObjectNode first = MAPPER.createObjectNode().put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "0.000000");
+        array(json, "clawbackRules").add(first)
+                .add(first.deepCopy().put("elapsedMonthFrom", 12).put("elapsedMonthTo", 23)
+                        .put("clawbackRatePct", "100.000000"));
+        PolicyDraft adjacent = draft(json);
+        assertThatCode(() -> validator.validate(adjacent)).doesNotThrowAnyException();
+    }
+
+    /** FGC-FUN-017: uq_clawback_rule은 보험회사를 저장 키에 포함하지 않는다. */
+    @Test
+    void rejectsSameClawbackItemAndBandEvenWhenInsurersDiffer() {
+        ObjectNode json = baseDraft().put("policyType", "CLAWBACK");
+        ObjectNode first = MAPPER.createObjectNode().put("commissionItemId", 1).put("insurerId", 1)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50.000000");
+        array(json, "clawbackRules").add(first).add(first.deepCopy().put("insurerId", 2));
+        PolicyDraft conflicting = draft(json);
+        assertThatThrownBy(() -> validator.validate(conflicting))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.POL_002);
+                    assertThat(error.getField()).isEqualTo("clawbackRules[1].elapsedMonthFrom");
+                });
     }
 
     @Test

@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** V75: API를 통하지 않는 SQL도 불변 정책과 환수 계산 근거를 바꿀 수 없다. */
-@SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_clawback_policy_lock_647?currentSchema=fgc")
+@SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_clawback_lock_722?currentSchema=fgc")
 class ClawbackPolicyLockIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
 
@@ -52,8 +52,7 @@ class ClawbackPolicyLockIntegrationTest {
 
     @Test
     void allowsDraftInsertUpdateReparentAndDelete() {
-        long first = draft();
-        long second = draft();
+        long first = draft(), second = draft();
         long rule = insertRule(first, 0);
         assertThat(jdbc.update("UPDATE fgc.clawback_rule SET clawback_rate_pct=0 WHERE clawback_rule_id=?", rule)).isEqualTo(1);
         assertThat(jdbc.update("UPDATE fgc.clawback_rule SET policy_version_id=? WHERE clawback_rule_id=?", second, rule)).isEqualTo(1);

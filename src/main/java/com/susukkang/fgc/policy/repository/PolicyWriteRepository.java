@@ -248,13 +248,15 @@ public class PolicyWriteRepository {
         }
     }
 
-    /** 전체 문서 PUT에서 구간 맞교환을 허용하고 유지한 ID·생성시각은 보존한다. */
-    private void replaceClawbackRules(Long policyId, List<PolicyDraft.ClawbackRuleDraft> rules,
+    /**
+     * 전체 문서 PUT은 기존 환수 규칙을 모두 지운 뒤 다시 넣어 구간 맞교환도 유일키에 걸리지 않게 한다.
+     * 요청이 유지한 ID는 생성시각과 함께 복원하고(#647), ID가 없는 행만 새 ID를 받는다.
+     */
+    private void replaceClawbackRules(Long id, List<PolicyDraft.ClawbackRuleDraft> rules,
                                       Map<Long, OffsetDateTime> creationTimes) {
-        jdbc.update("DELETE FROM fgc.clawback_rule WHERE policy_version_id = ?", policyId);
+        jdbc.update("DELETE FROM fgc.clawback_rule WHERE policy_version_id = ?", id);
         for (PolicyDraft.ClawbackRuleDraft rule : rules) {
-            List<Object> values = new ArrayList<>();
-            values.add(policyId);
+            List<Object> values = new ArrayList<>(List.of(id));
             values.add(rule.insurerId());
             values.add(rule.productOfferingId());
             values.add(rule.commissionItemId());
@@ -262,23 +264,25 @@ public class PolicyWriteRepository {
             values.add(rule.elapsedMonthTo());
             values.add(rule.clawbackBasisCode());
             values.add(rule.clawbackRatePct());
-            // D-02에서는 조건식이 없으며 DB NOT NULL 계약에 맞춰 빈 객체로 저장한다.
-            if (rule.clawbackRuleId() == null) {
+            values.add(rule.conditionExpression() == null || rule.conditionExpression().isNull()
+                    ? "{}" : json(rule.conditionExpression()));
+            OffsetDateTime createdAt = rule.clawbackRuleId() == null ? null : creationTimes.get(rule.clawbackRuleId());
+            if (createdAt == null) {
                 jdbc.update("""
                         INSERT INTO fgc.clawback_rule
-                        (policy_version_id, insurer_id, product_offering_id, commission_item_id,
-                         elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}'::jsonb)
+                          (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                           elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
                         """, values.toArray());
             } else {
                 values.add(rule.clawbackRuleId());
-                values.add(creationTimes.get(rule.clawbackRuleId()));
+                values.add(createdAt);
                 jdbc.update("""
                         INSERT INTO fgc.clawback_rule
-                        (policy_version_id, insurer_id, product_offering_id, commission_item_id,
-                         elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression,
-                         clawback_rule_id, created_at)
-                        OVERRIDING SYSTEM VALUE VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}'::jsonb, ?, ?)
+                          (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                           elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression,
+                           clawback_rule_id, created_at)
+                        OVERRIDING SYSTEM VALUE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
                         """, values.toArray());
             }
         }
@@ -492,10 +496,10 @@ public class PolicyWriteRepository {
         entityManager.flush();
         jdbc.update("""
                 INSERT INTO fgc.clawback_rule
-                (policy_version_id, insurer_id, product_offering_id, commission_item_id, elapsed_month_from,
-                 elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
-                SELECT ?, insurer_id, product_offering_id, commission_item_id, elapsed_month_from,
-                       elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression
+                  (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                   elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
+                SELECT ?, insurer_id, product_offering_id, commission_item_id,
+                   elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression
                 FROM fgc.clawback_rule WHERE policy_version_id = ? ORDER BY clawback_rule_id
                 """, targetId, sourceId);
         jdbc.update("""
@@ -658,6 +662,15 @@ public class PolicyWriteRepository {
                       active.policy_code = candidate.policy_code
                       OR (active.policy_type = candidate.policy_type
                         AND candidate.policy_type IN ('ARBITRAGE','SCHEDULE_ELIGIBILITY','RECONCILIATION_TOLERANCE'))
+                      OR (active.policy_type = 'CLAWBACK' AND candidate.policy_type = 'CLAWBACK'
+                        AND EXISTS (
+                          SELECT 1 FROM fgc.clawback_rule a JOIN fgc.clawback_rule c
+                            ON c.policy_version_id = candidate.policy_version_id
+                          WHERE a.policy_version_id = active.policy_version_id
+                            -- D-02: 전체 정책과 보험회사/판매버전 전용 정책은 코드 분리·명시 선택으로 공존한다.
+                            -- FUN-079는 항목·경과월을 고르기 전에 보험회사/판매버전으로 정책 하나를 선택한다.
+                            AND a.insurer_id IS NOT DISTINCT FROM c.insurer_id
+                            AND a.product_offering_id IS NOT DISTINCT FROM c.product_offering_id))
                       OR (active.policy_type = 'CURRENT_COMMISSION' AND candidate.policy_type = 'CURRENT_COMMISSION'
                         AND COALESCE(active.fee_regime_code, 'CURRENT') = 'CURRENT'
                         AND COALESCE(candidate.fee_regime_code, 'CURRENT') = 'CURRENT'

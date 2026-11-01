@@ -1,6 +1,8 @@
 package com.susukkang.fgc.common.exception;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -40,15 +42,18 @@ class ConstraintErrorCodeResolverTest {
         assertThat(resolver.resolve(exception)).isEmpty();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"insurer_id", "product_offering_id", "commission_item_id"})
+    void mapsClawbackTargetForeignKeysToInputError(String column) {
+        RuntimeException exception = new RuntimeException(
+                "violates foreign key constraint clawback_rule_" + column + "_fkey");
+        assertThat(resolver.resolve(exception)).contains(FgcErrorCode.POL_005);
+    }
+
     @Test
-    void resolvesClawbackRuleUniqueAndReferenceConstraintsAsPolicyAndInputErrors() {
+    void mapsClawbackRuleUniqueKeyToPolicyOverlap() {
         assertThat(resolver.resolve(new RuntimeException("constraint uq_clawback_rule")))
                 .contains(FgcErrorCode.POL_002);
-        for (String constraint : List.of("clawback_rule_insurer_id_fkey", "clawback_rule_product_offering_id_fkey",
-                "clawback_rule_commission_item_id_fkey")) {
-            assertThat(resolver.resolve(new RuntimeException("constraint " + constraint)))
-                    .contains(FgcErrorCode.COMMON_002);
-        }
     }
 
     // 2026-08-11 yslee - 서로 다른 지급 건의 확정 멱등키 충돌 응답 검증

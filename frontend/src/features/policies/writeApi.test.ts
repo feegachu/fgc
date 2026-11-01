@@ -3,6 +3,7 @@ import { apiClient } from '../../lib/api/client'
 import { emptyCommission, emptyDraft, emptyRegime } from './management'
 import { normalizePolicyDetail, performPolicyAction, savePolicyDraft, serializePolicyDraft } from './writeApi'
 import type { PolicyDetailResponse, PolicyWriteResult } from './writeApi'
+import type { ClawbackDraft } from './management'
 
 const timestamp = '2026-10-28T01:02:03.123456Z'
 const result: PolicyWriteResult = {
@@ -255,32 +256,68 @@ describe('policy API contract adapter', () => {
     })
   })
 
-  it('refuses writes without a concurrency token or with unresolved clawback rules', async () => {
+  it('refuses writes without a concurrency token and serializes supported clawback rules', async () => {
     const request = vi.spyOn(apiClient, 'request')
     await expect(savePolicyDraft(emptyDraft(), 42, 'key')).rejects.toThrow('수정 시각')
     await expect(performPolicyAction(42, 'APPROVE', '검토', { expectedStatus: 'REVIEW' }, 'key')).rejects.toThrow(
       '수정 시각',
     )
-    await expect(
-      savePolicyDraft(
-        {
-          ...emptyDraft(),
-          clawbackRules: [
-            {
-              insurerId: '',
-              productOfferingId: '',
-              commissionItemId: '',
-              elapsedMonthFrom: 0,
-              elapsedMonthTo: 12,
-              clawbackBasisCode: '',
-              clawbackRatePct: '50.000000',
-            },
-          ],
-        },
-        undefined,
-        'key',
-      ),
-    ).rejects.toThrow('D-02')
     expect(request).not.toHaveBeenCalled()
+    request.mockResolvedValueOnce({ data: { policyVersionId: 43 } } as never)
+    await savePolicyDraft(
+      {
+        ...emptyDraft(),
+        clawbackRules: [
+          {
+            insurerId: '',
+            productOfferingId: '',
+            commissionItemId: '',
+            elapsedMonthFrom: 0,
+            elapsedMonthTo: 12,
+            clawbackBasisCode: 'PAID_ATTRIBUTED_AMOUNT',
+            clawbackRatePct: '50.000000',
+          },
+        ],
+      },
+      undefined,
+      'key',
+    )
+    expect(request).toHaveBeenCalledWith(
+      '/api/v1/policies',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          clawbackRules: [
+            expect.objectContaining({
+              insurerId: null,
+              productOfferingId: null,
+              commissionItemId: null,
+              clawbackBasisCode: 'PAID_ATTRIBUTED_AMOUNT',
+              clawbackRatePct: '50.000000',
+            }),
+          ],
+        }),
+      }),
+    )
+  })
+
+  it('keeps clawback rule IDs on update and strips them on create (#647)', async () => {
+    const request = vi.spyOn(apiClient, 'request').mockResolvedValue({ data: { policyVersionId: 43 } } as never)
+    const rule: ClawbackDraft = {
+      clawbackRuleId: 77,
+      insurerId: '',
+      productOfferingId: '',
+      commissionItemId: '',
+      elapsedMonthFrom: 0,
+      elapsedMonthTo: 11,
+      clawbackBasisCode: 'PAID_ATTRIBUTED_AMOUNT',
+      clawbackRatePct: '33.333333',
+    }
+    const draft = { ...emptyDraft(), clawbackRules: [rule], expectedUpdatedAt: '2026-10-29T03:04:05.123456Z' }
+    await savePolicyDraft(draft, 42, 'update-key')
+    expect(request.mock.calls[0][1]?.body).toMatchObject({ clawbackRules: [{ clawbackRuleId: 77 }] })
+    await savePolicyDraft(draft, undefined, 'create-key')
+    expect((request.mock.calls[1][1]?.body as { clawbackRules: object[] }).clawbackRules[0]).not.toHaveProperty(
+      'clawbackRuleId',
+    )
   })
 })

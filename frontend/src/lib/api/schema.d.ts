@@ -2394,7 +2394,10 @@ export interface components {
             clawbackBasisCode: string;
             /** @description 환수율(%), 0~100·소수점 최대6자리의 정밀도를 보존한 문자열 */
             clawbackRatePct: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 수정 시 유지할 기존 환수 규칙 ID. 최초 생성에서는 지정하지 않는다.
+             */
             clawbackRuleId?: number;
             /** Format: int64 */
             commissionItemId?: number;
@@ -3877,7 +3880,7 @@ export interface components {
         /** @description 정책 초안. 빈 규칙 목록을 저장할 수 있으며 제출 검증은 별도 동작이다. */
         PolicyDraft: {
             basicDocumentVersion?: string;
-            /** @description D-02 환수 규칙. CLAWBACK 유형만 허용하며 기준금액은 PAID_ATTRIBUTED_AMOUNT, 조건식은 null 또는 {}이다. */
+            /** @description CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다. */
             clawbackRules: components["schemas"]["ClawbackRuleDraft"][];
             commissionRules: components["schemas"]["CommissionRuleDraft"][];
             /** Format: date */
@@ -6114,7 +6117,7 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
                 };
             };
-            /** @description 요청 형식 또는 입력값 오류 (FGC-COMMON-002) */
+            /** @description 입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6214,6 +6217,15 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
                 };
             };
+            /** @description 입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                };
+            };
             /** @description 정책 상태·수정 시각 또는 멱등키 충돌 */
             409: {
                 headers: {
@@ -6270,7 +6282,7 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
                 };
             };
-            /** @description 활성 정책의 적용기간 충돌 (FGC-POL-002) */
+            /** @description 정책·규칙 적용 범위 충돌 (FGC-POL-002) 또는 제출 근거·필수 규칙 누락 (FGC-POL-004) */
             422: {
                 headers: {
                     [name: string]: unknown;

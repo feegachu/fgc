@@ -47,7 +47,7 @@ public record PolicyDraft(
         @NotNull List<@NotNull @Valid CommissionRuleDraft> commissionRules,
         @NotNull List<@NotNull @Valid FeeRegimeRuleDraft> feeRegimeRules,
         @NotNull List<@NotNull @Valid ParameterDraft> parameters,
-        @Schema(description = "D-02 환수 규칙. CLAWBACK 유형만 허용하며 기준금액은 PAID_ATTRIBUTED_AMOUNT, 조건식은 null 또는 {}이다.")
+        @Schema(description = "CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다.")
         @NotNull List<@NotNull @Valid ClawbackRuleDraft> clawbackRules,
         @Schema(description = "수정 요청의 조회 시점 updatedAt. 최초 생성에서는 지정하지 않는다.")
         OffsetDateTime expectedUpdatedAt
@@ -142,6 +142,7 @@ public record PolicyDraft(
     }
 
     public record ClawbackRuleDraft(
+            @Schema(description = "수정 시 유지할 기존 환수 규칙 ID. 최초 생성에서는 지정하지 않는다.")
             @Positive Long clawbackRuleId,
             @Positive Long insurerId,
             @Positive Long productOfferingId,

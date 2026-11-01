@@ -7,7 +7,6 @@ import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
-import com.susukkang.fgc.policy.dto.PolicyDraft.ClawbackRuleDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.CommissionRuleDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.FeeRegimeRuleDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.ParameterDraft;
@@ -19,7 +18,6 @@ import java.net.URISyntaxException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +34,6 @@ public class PolicyDraftValidator {
     private static final String FIELD_FEE_REGIME = "feeRegimeCode";
     private static final String FEE_RULE_PREFIX = "feeRegimeRules[";
     private static final String COMMISSION_RULE_PREFIX = "commissionRules[";
-    private static final String DUPLICATE_CHILD_ID = "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.";
     private static final String CONFLICTING_INDEX = "conflictingIndex";
     private static final Set<String> HEADER_REGIMES = Set.of("CURRENT", FOUR_YEAR, SEVEN_YEAR);
     private static final Map<String, String> SCHEDULE_VALUES = Map.of(
@@ -64,6 +61,50 @@ public class PolicyDraftValidator {
         validateCommissionRules(draft);
         validateFeeRules(draft, requiredRegime);
         validateParameters(draft);
+    }
+
+    /** D-02(운영정책서 제48조의3): IF85 계산기가 지원하는 확정 지급 귀속액만 받는다. */
+    private static void validateClawbackRules(PolicyDraft draft) {
+        if (!draft.clawbackRules().isEmpty() && draft.policyType() != PolicyType.CLAWBACK) {
+            throw invalid("clawbackRules", "환수 규칙은 환수 정책에만 등록할 수 있습니다.");
+        }
+        Set<Long> ids = new HashSet<>();
+        for (int i = 0; i < draft.clawbackRules().size(); i++) {
+            var rule = draft.clawbackRules().get(i);
+            String field = "clawbackRules[" + i + "]";
+            if (rule.clawbackRuleId() != null && !ids.add(rule.clawbackRuleId())) {
+                throw invalid(field + ".clawbackRuleId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
+            }
+            validateClawbackRule(rule, field);
+            for (int j = 0; j < i; j++) {
+                var other = draft.clawbackRules().get(j);
+                // uq_clawback_rule의 키도 사전 검사하여 DB 중복을 필드 오류로 돌려준다.
+                boolean duplicateKey = Objects.equals(rule.commissionItemId(), other.commissionItemId())
+                        && rule.elapsedMonthFrom().equals(other.elapsedMonthFrom())
+                        && rule.elapsedMonthTo().equals(other.elapsedMonthTo());
+                boolean sameScope = Objects.equals(rule.insurerId(), other.insurerId())
+                        && Objects.equals(rule.productOfferingId(), other.productOfferingId())
+                        && Objects.equals(rule.commissionItemId(), other.commissionItemId());
+                if (duplicateKey || (sameScope && rule.elapsedMonthFrom() <= other.elapsedMonthTo()
+                        && other.elapsedMonthFrom() <= rule.elapsedMonthTo())) {
+                    throw new FgcBusinessException(FgcErrorCode.POL_002, field + ".elapsedMonthFrom",
+                            Map.of(CONFLICTING_INDEX, j), "환수 규칙의 경과월 구간 또는 저장 키가 겹칩니다.");
+                }
+            }
+        }
+    }
+
+    private static void validateClawbackRule(PolicyDraft.ClawbackRuleDraft rule, String field) {
+        if (rule.elapsedMonthTo() < rule.elapsedMonthFrom()) {
+            throw invalid(field + ".elapsedMonthTo", "경과월 끝은 시작 이상이어야 합니다.");
+        }
+        if (!"PAID_ATTRIBUTED_AMOUNT".equals(rule.clawbackBasisCode())) {
+            throw invalid(field + ".clawbackBasisCode", "확정 지급 귀속액 기준만 지원합니다.");
+        }
+        JsonNode condition = rule.conditionExpression();
+        if (condition != null && !condition.isNull() && (!condition.isObject() || !condition.isEmpty())) {
+            throw invalid(field + ".conditionExpression", "귀책 조건식은 지원하지 않습니다. 회사 약정 확보 후 별도 결정이 필요합니다.");
+        }
     }
 
     private static String validateHeaderRegime(PolicyDraft draft) {
@@ -126,7 +167,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.commissionRules().size(); i++) {
             CommissionRuleDraft rule = draft.commissionRules().get(i);
             if (rule.commissionRuleId() != null && !commissionIds.add(rule.commissionRuleId())) {
-                throw invalid(COMMISSION_RULE_PREFIX + i + "].commissionRuleId", DUPLICATE_CHILD_ID);
+                throw invalid(COMMISSION_RULE_PREFIX + i + "].commissionRuleId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
             }
             validateCommission(rule, COMMISSION_RULE_PREFIX + i + "]");
         }
@@ -140,7 +181,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.feeRegimeRules().size(); i++) {
             FeeRegimeRuleDraft rule = draft.feeRegimeRules().get(i);
             if (rule.feeRegimeRulesetId() != null && !feeIds.add(rule.feeRegimeRulesetId())) {
-                throw invalid(FEE_RULE_PREFIX + i + "].feeRegimeRulesetId", DUPLICATE_CHILD_ID);
+                throw invalid(FEE_RULE_PREFIX + i + "].feeRegimeRulesetId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
             }
             validateFeeRule(rule, requiredRegime, FEE_RULE_PREFIX + i + "]");
             if (draft.basicDocumentVersion() != null && rule.basicDocumentVersion() != null
@@ -166,66 +207,9 @@ public class PolicyDraftValidator {
         }
     }
 
-    private static void validateClawbackRules(PolicyDraft draft) {
-        if (!draft.clawbackRules().isEmpty() && draft.policyType() != PolicyType.CLAWBACK) {
-            throw invalid("clawbackRules", "환수 규칙은 CLAWBACK 정책에만 등록할 수 있습니다.");
-        }
-        Set<Long> ids = new HashSet<>();
-        Map<ClawbackBand, Integer> bands = new HashMap<>();
-        for (int i = 0; i < draft.clawbackRules().size(); i++) {
-            ClawbackRuleDraft rule = draft.clawbackRules().get(i);
-            String field = "clawbackRules[" + i + "]";
-            if (rule.clawbackRuleId() != null && !ids.add(rule.clawbackRuleId())) {
-                throw invalid(field + ".clawbackRuleId", DUPLICATE_CHILD_ID);
-            }
-            validateClawbackRule(rule, field);
-            // uq_clawback_rule은 보험회사·판매버전을 포함하지 않는다(D-02 4항).
-            Integer previous = bands.putIfAbsent(new ClawbackBand(rule.commissionItemId(),
-                    rule.elapsedMonthFrom(), rule.elapsedMonthTo()), i);
-            if (previous != null) {
-                throw new FgcBusinessException(FgcErrorCode.POL_002, field,
-                        Map.of(CONFLICTING_INDEX, previous), "같은 항목·경과월 구간은 중복 등록할 수 없습니다. 회사별 정책은 코드를 나누세요.");
-            }
-        }
-    }
-
-    private record ClawbackBand(Long commissionItemId, int from, int to) { }
-
-    private static void validateClawbackRule(ClawbackRuleDraft rule, String field) {
-        if (rule.elapsedMonthTo() < rule.elapsedMonthFrom()) {
-            throw invalid(field + ".elapsedMonthTo", "종료 경과월은 시작 경과월 이상이어야 합니다.");
-        }
-        if (!"PAID_ATTRIBUTED_AMOUNT".equals(rule.clawbackBasisCode())) {
-            throw invalid(field + ".clawbackBasisCode", "D-02 기준금액은 확정 지급 귀속금액만 지원합니다.");
-        }
-        JsonNode condition = rule.conditionExpression();
-        if (condition != null && !condition.isNull() && !(condition.isObject() && condition.isEmpty())) {
-            throw invalid(field + ".conditionExpression", "D-02 귀책 조건식은 지원하지 않습니다. null 또는 빈 객체만 지정하세요.");
-        }
-    }
-
-    private static void validateClawbackOverlaps(List<ClawbackRuleDraft> rules) {
-        for (int i = 0; i < rules.size(); i++) {
-            ClawbackRuleDraft left = rules.get(i);
-            for (int j = i + 1; j < rules.size(); j++) {
-                ClawbackRuleDraft right = rules.get(j);
-                // 항목 > 판매버전 > 보험회사 순의 구체성이 같고 같은 대상·경과월에 적용되면 계산이 모호하다.
-                if (Objects.equals(left.commissionItemId(), right.commissionItemId())
-                        && Objects.equals(left.productOfferingId(), right.productOfferingId())
-                        && Objects.equals(left.insurerId(), right.insurerId())
-                        && left.elapsedMonthFrom() <= right.elapsedMonthTo()
-                        && right.elapsedMonthFrom() <= left.elapsedMonthTo()) {
-                    throw new FgcBusinessException(FgcErrorCode.POL_002, "clawbackRules[" + j + "]",
-                            Map.of(CONFLICTING_INDEX, i), "같은 적용 범위·구체성의 환수 규칙 경과월이 겹칩니다.");
-                }
-            }
-        }
-    }
-
     /** 제출 단계에서는 같은 회차의 최종 규칙을 고를 수 없는 중복도 차단한다. */
     public void validateForSubmission(PolicyDraft draft) {
         validate(draft);
-        validateClawbackOverlaps(draft.clawbackRules());
         validateCommissionRegimeBounds(draft);
         List<CommissionRuleDraft> rules = draft.commissionRules();
         for (int i = 0; i < rules.size(); i++) {

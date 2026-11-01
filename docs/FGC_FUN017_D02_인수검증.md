@@ -3,53 +3,36 @@
 검증일: 2026-10-30 (Asia/Seoul). 기준: `develop`, D-02 승인 PR #766 병합 이후.
 작업 브랜치: `codex/647-clawback-policy`. 최종 검증 SHA는 #647 및 연결 PR에 기록한다.
 
-## 변경 계약
+## 변경 계약 (2026-11-01 #800 병합 후 기준)
 
-- IF79 생성, IF80 DRAFT 수정, IF81 승인본 복제, IF75 제출·반려·타 사용자 승인·활성화에서 CLAWBACK 규칙을 지원한다.
-- 기준금액은 D-02의 `PAID_ATTRIBUTED_AMOUNT`, 경과월 구간은 양끝 포함·0 이상, 환수율은 0~100·소수점 최대6자리다. 조건식은 null/빈 객체만 허용하고 `{}`로 저장한다.
-- 수정 시 `clawbackRuleId`의 소유권을 검사하고 ID·생성시각을 보존한다. 전체 PUT의 구간 맞교환도 가능하다. 생성 시 기존 ID를 받지 않는다. 복제 시 새 ID를 발급하고 승인 정보·이력을 초기화한다.
-- 같은 항목·동일 경과월 구간은 기존 유일키에 따라 저장부터422, 같은 범위·구체성의 경과월 중첩은 제출부터422다. 보험회사·판매버전이 불일치하면 제출부터400이다. 회사별 환수율 정책은 코드를 나누며 서로 다른 코드의 선택 가능한 정책은 공존한다.
-- 헤더·자식·감사·멱등 결과는 한 트랜잭션이다. DB 참조 오류는400, 유일키 충돌은422로 변환한다. 실패 시 기존 규칙·헤더·감사·멱등 결과를 부분 저장하지 않는다.
-- 기존 `clawback_rule`, V67 작성 잠금·멱등·감사, V68 계약일 승계를 재사용한다. V75는 기존 정책 자식 잠금 함수에 `clawback_rule`을 추가하고 직접 INSERT/UPDATE/DELETE 가드를 설치한다. 새 판은 기존 대상 범위·항목·경과월을 보존하고 요율을 변경할 수 있다.
-- 화면 편집 연결은 별도 #722 범위다. 이 증적은 서버/API 인수 결과다.
+이 브랜치는 POL-W01 화면·서버 계약을 담은 #800(`codex/722-policy-completion`)을 병합한 위에 #647 전용 차이만 남긴다. 겹치던 서버 계약은 #800 기준으로 통일했다.
 
-## CT-P01 정상·실패 대응
+- IF79 생성, IF80 DRAFT 수정, IF81 승인본 복제, IF75 제출·반려·타 사용자 승인·활성화에서 CLAWBACK 규칙을 지원한다(#800).
+- 기준금액은 D-02의 `PAID_ATTRIBUTED_AMOUNT`, 경과월 구간은 양끝 포함·0 이상, 환수율은 0~100·소수점 최대6자리 문자열이다. 조건식은 생략/null/빈 객체만 허용한다(#800).
+- 같은 대상의 경과월 중첩과 `uq_clawback_rule` 키 중복은 **저장 단계부터** 422 POL-002다. 코드가 다른 환수 정책도 보험회사·판매버전 지정이 같고 적용 기간이 겹치면 승인·활성화를 막는다. 상품 비교(FUN-079)가 이 범위로 정책을 고르기 때문이다(#800).
+- 제출 근거·규칙 누락은 422 POL-004, 없는 보험회사·판매버전·항목 ID는 400 POL-005다. `uq_clawback_rule` 위반은 POL-002로 매핑한다(#800, #647).
+- **#647 전용**: 수정 요청의 선택 필드 `clawbackRuleId`는 그 정책에 속한 ID만 허용하고(아니면 400, field=`clawbackRules`), 유지한 행의 ID·생성시각을 보존한다. 같은 ID의 중복 지정과 생성 요청의 ID 지정은 400이다. 전체 PUT에서 두 구간을 맞바꿔도 된다. 복제는 새 ID를 발급한다. 화면도 편집 시 `clawbackRuleId`를 그대로 보낸다.
+- **#647 전용**: OpenAPI `ClawbackRuleDraft.clawbackRatePct`는 서버 응답과 같은 문자열 타입이고 `clawbackRuleId`를 선택 필드로 노출한다.
+- V75는 #800과 같은 파일이다. 승인·활성·종료 환수 규칙의 직접 INSERT/UPDATE/DELETE와 부모 재귀속을 DB에서 막는다.
 
-실제 Spring MVC 요청·인증과 일회성 PostgreSQL을 사용한다. `PolicyWorkflowIntegrationTest`는 외부 테스트 트랜잭션으로 감싸지 않으므로 실제 커밋/롤백을 검증한다.
-
-| 시나리오 | 테스트 | 기대 결과 |
-| --- | --- | --- |
-| 환수 초안→수정→제출→다른 사용자 승인→활성화→복제 | `clawbackWorkflowPreservesEditedIdsAndClonesApprovedRulesWithNewIdsAndHistory` | 규칙·소수 문자열·근거·승인 이력·감사 보존, 수정 ID·생성시각 보존, 복제 새 ID·승인 초기화 |
-| SYSTEM_ADMIN 자기 승인·REVIEW/ACTIVE 직접 수정 | 위 테스트 | 각각409, 원본 규칙과 승인 감사 보존 |
-| 활성화 전 계산 선택 차단, 활성화 후 실제 계산 | `apiWrittenClawbackPolicyIsExcludedUntilActiveAndThenCalculatesUsingD02` | DRAFT/APPROVED 계산 후보 제외, ACTIVE 포함, 확정 귀속100.4→기준100 ×33.333333%→33원, 경과3개월·실제 규칙 ID 연결 |
-| 동시 복제·새 버전의 기존 환수 구간 누락 | `clawbackConcurrentClonesHaveDistinctVersionsAndRulesAndCannotDropSuccessorCoverage` | v2/v3·자식4개 ID 중복 없음, 누락본 제출400, 기존 ACTIVE·승계 이력 불변 |
-| 기존 수수료 정책 흐름·기간 충돌·승계·동시 제출 | 기존 `PolicyWorkflowIntegrationTest`, `PolicySuccessionIntegrationTest` | 기존 계약의 이전 정책·요율 유지, 다른 코드의 충돌 거절, 실패 시 상태·감사·승계 롤백 |
-
-## CT-P02 정상·실패 대응
+## CT-P01·CT-P02 대응 (병합 후 테스트)
 
 | 시나리오 | 테스트 | 기대 결과 |
 | --- | --- | --- |
-| 다른 정책 자식 ID·생성 시 기존 ID | `clawbackOwnershipAndFailedChildWritePreserveOriginalDocumentAndAllowCorrectedRetry` | 400, 기존 문서 불변 |
-| 두 번째 규칙 FK 실패·같은 키 수정 재시도·같은 키 다른 본문 | 위 테스트 | 헤더·자식·감사·멱등키 롤백, 수정 재시도 성공, 동일 요청 재생, 다른 본문409·중복 감사 없음 |
-| 빈 규칙·같은 구체성의 양끝 경과월 중첩·보험회사/판매버전 불일치 | `clawbackSubmissionRejectsEmptyRulesAmbiguousBandsAndMismatchedOfferingInsurer` | 400/422/400, DRAFT 유지·제출 이력/감사 없음 |
-| 미지원 기준·귀책 조건·초과 정밀도·음수 월·DB 유일키 중복 | `clawbackCreateRejectsUnsupportedBasisConditionsAndPrecisionWithoutPartialWrites` | 400 또는422, 헤더 부분 저장 없음 |
-| 0%·100%·6자리율·빈 조건·중첩·구체성 우선 | `PolicyDraftValidatorTest`의 D-02 환수 테스트 | 허용 경계와 잘못된 입력을 구분. 다른 구체성 규칙의 중첩은 허용 |
-| 구간 분할·요율 변경·대상 범위/경과월 누락 | `PolicySuccessionValidatorTest.clawbackSuccessionAllowsNewRatesAndSplitBandsButPreservesScopeAndMonthCoverage` | 적용 범위 보존 시 허용, 누락은 거절 |
-| 기존 규칙·근거 누락·부분 저장·조회·CURRENT 계산 | 전체 `com.susukkang.fgc.policy.*` 회귀 | 기존 조회·계산 계약 유지 |
-| D-02 계산 경계·실제0원·조건/모호성·멱등·원천 변경 | 기존 `ClawbackCalculationIntegrationTest` | 기존 계산 판정과 저장 snapshot 유지 |
+| 초안→수정→제출→다른 사용자 승인→활성화→복제, 원본 보존 | `clawbackDraftsPersistUpdateSubmitApproveActivateAndCloneWithoutChangingApprovedRules` | 소수 문자열 보존, 복제 새 ID, 원본 규칙 불변 |
+| 수정 시 ID·생성시각 보존, 구간 맞교환, 복제 새 ID | `clawbackEditsPreserveRuleIdsAndCreationTimesWhileClonesReceiveNewIds` | PUT 전후 `(clawback_rule_id, created_at)` 동일, 복제본 ID는 원본과 겹치지 않음 |
+| 다른 정책 ID·중복 ID·생성 시 ID | `clawbackRuleIdsMustBelongToTheEditedPolicyAndAreRejectedOnCreate` | 400(field `clawbackRules`, `clawbackRules[1].clawbackRuleId`), 문서 불변 |
+| 없는 대상 ID의 생성·수정 롤백 | `missingClawbackTargetsReturnInputErrorsAndRollback` | 400 POL-005, 헤더·멱등 기록·기존 규칙 롤백 |
+| 빈 규칙·근거 누락 제출 | `missingSubmissionRequirementsHaveSpecificMessagesInsteadOfOverlap`, `clawbackInvalidRulesRollbackAndEmptyRulesCannotBeSubmitted` | 422 POL-004, DRAFT 유지 |
+| 타 코드 같은 범위 차단·다른 보험회사 공존·비교 선택 | `insurerSpecificClawbackCoexistsWithGenericDemoButIdenticalScopeOverlapIsRejected` | 같은 범위 422, 다른 보험회사 허용, 0·11·12·23개월 비교 선택 정상 |
+| DB 직접 변경 차단 | `ClawbackPolicyLockIntegrationTest` | 승인·활성·종료 규칙 변경 거절, DRAFT 허용 |
+| 승계본의 범위·경과월 누락 | `PolicySuccessionValidatorTest`의 환수 테스트 2건 | 범위 보존 시 허용, 누락 거절 |
+| 오류 매핑 | `ConstraintErrorCodeResolverTest` | FK 3개 → POL-005, `uq_clawback_rule` → POL-002 |
 
-## #647 완료 기준 대응
+## 실행 결과 (2026-10-30, #800 병합 전)
 
-| 완료 기준 | 증적 |
-| --- | --- |
-| 다른 사용자의 초안→제출→승인→활성화와 규칙·근거·이력 조회 | CT-P01 환수 workflow + 기존 수수료 workflow |
-| 자기 승인·REVIEW/ACTIVE 수정·기간 중첩 거절, 원자성 | CT-P01 실패 + CT-P02 FK 롤백 + 기존 정책 승계 회귀 |
-| 멱등 재요청·다른 본문409·동시 채번 유일성 | CT-P02 멱등 + 환수 동시 복제 + 기존 동시 제출/복제 |
-| GET 필드·CURRENT 활성 정책 선택 회귀 없음 | 정책 전체 회귀 + OpenAPI/실제 JWT HTTP 시험 |
-| CT-P01/P02 정상·실패 결과 기록 | 본 문서의 시나리오와 최종 실행 결과·검증 SHA |
-| DTO·오류·OpenAPI·문서 일치 | optional `clawbackRuleId`, 기존 COMMON-002/POL-002 매핑, 인증 OpenAPI 내보내기·타입 재생성·check:api, 인터페이스 §4-4-1/5 갱신. V75 환수 규칙 DB 가드 추가 |
+아래 기록은 #800 병합 전 브랜치의 결과다. 병합 후 결과는 맨 아래 절에 적는다.
 
-## 실행 결과
 
 정책·환수 회귀: **21개 클래스 253건 PASS, 실패0·오류0·건너뜀0**. 인증 OpenAPI 시험 안에서 실행한 실제 JWT HTTP 시험은 별도 **5건 PASS**다. PostgreSQL17 Testcontainers와 Node22.22.2를 사용했다.
 
@@ -93,3 +76,10 @@ OpenAPI 대상 컴포넌트·생성 타입 일치 및 TypeScript/Vite 프론트 
 - 재분석의 빈 목록 허위 통과 지적(S5841)은 원본 자식 ID 목록에 `isNotEmpty()`를 먼저 적용해 보완한다.
 - 보완 후 정책 작성·환수 계산/후보·권한·명세·월 배선·DB 가드 회귀9개 클래스 **135건 PASS(실패0·오류0·건너뜀0)**. 이전에 실패했던 `MonthlyValidationJobIntegrationTest`4건도 같은 실행에서 통과했다. 최종 SQL 상수화 파일의 직접 DB 가드 재검증과 전체 원격 CI 결과는 PR에 기록한다.
 - 최종 V75·기존 분급 DB 가드 **5건 재검증 PASS**, 빈 목록 검증을 추가한 복제 인수 시험 **1건 PASS**. `defa48d0`의 원격 전체 build는 **2369건 실행·2355통과·14건너뜀·실패0**으로 통과했다. 마지막 검증문 보완 뒤 전체 검사·리뷰 상태는 PR의 최신 커밋에서 다시 확인한다.
+
+## 2026-11-01 #800 병합 후 결과
+
+- #800과 이 PR이 같은 서버 파일을 다르게 바꿔 13개 파일이 충돌했다. 서로 반대되던 계약(중첩 검사 시점, 누락 오류 400/422, 다른 코드 같은 범위 공존, FK 오류 코드)은 #800 기준으로 통일했다. 근거: #800은 화면·상품 비교(FUN-079)와 함께 검증됐고, 누락·FK 오류를 전용 코드(POL-004/005)로 나눴다.
+- 이 PR에는 #647 전용 차이만 남겼다: `clawbackRuleId` 소유권·ID·생성시각 보존, 중복 ID·생성 시 ID 거절, `uq_clawback_rule`→POL-002 매핑, OpenAPI 환수율 문자열 타입, 복제 순서 고정, 화면의 편집 시 ID 전송.
+- 백엔드: 정책·환수 계산/후보·권한·명세·상품 비교·오류 매핑 **33개 클래스 364건 실행, 실패0·오류0·건너뜀2**(PostgreSQL 17 Testcontainers).
+- 프론트: `check:api`, `lint`, `tsc -b`, `build` 통과. 정책 테스트 **55건 PASS**.
