@@ -353,8 +353,15 @@ describe('TRAN-W01 수수료 지급 목록', () => {
   it('#752 정산월 없는 URL은 기준 정산월 변경을 따라 1페이지를 조회하고 명시한 정산월은 유지한다', async () => {
     const { router } = renderAt('/app/transactions?month=2026-10&page=3')
     await screen.findByText('3 / 7 페이지')
+    const before = listRequests().length
     await act(() => router.navigate('/transactions?month=2026-09'))
     await waitFor(() => expect(lastRequest().get('settlementMonth')).toBe('2026-09'))
+    // URL의 월을 셸이 반영하기 전 렌더에서 이전 기준 정산월(2026-10) 조회가 먼저 나가지 않는다.
+    expect(
+      listRequests()
+        .slice(before)
+        .map((query) => query.get('settlementMonth')),
+    ).toEqual(['2026-09'])
     expect(lastRequest().get('page')).toBe('1')
     expect(screen.getByLabelText('정산월')).toHaveValue('2026-09')
     await act(() => router.navigate('/transactions?month=2026-08&settlementMonth=2026-07'))
