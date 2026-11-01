@@ -76,6 +76,18 @@ class ArbitragePlannedCommissionIntegrationTest {
         assertPlanned(id, LocalDate.of(2030, 9, 1), "700");
     }
 
+    /** #648: 보류(HOLD) 회차는 계약이 회복되면 지급되므로 예정액에 남고, 처리기가 중단(CANCELLED)한 회차만 빠진다. */
+    @org.junit.jupiter.api.Test
+    void heldLinesStayPlannedWhileCancelledLinesDrop() {
+        Long id = plannedContract();
+        jdbcTemplate.update("""
+                UPDATE fgc.schedule_line SET line_status = CASE WHEN line_no <= 2 THEN 'HOLD' ELSE 'CANCELLED' END
+                 WHERE line_no <= 3 AND schedule_header_id = (SELECT schedule_header_id FROM fgc.schedule_header
+                       WHERE contract_id = ? AND active_yn AND schedule_purpose = 'OPERATIONAL' AND payment_stage = 'GA_TO_FC')
+                """, id);
+        assertPlanned(id, LocalDate.of(2030, 8, 30), "600");
+    }
+
     private Long plannedContract() {
         Long id = jdbcTemplate.queryForObject("""
                 SELECT c.contract_id FROM fgc.insurance_contract c

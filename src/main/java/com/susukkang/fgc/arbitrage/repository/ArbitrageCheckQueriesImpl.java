@@ -207,6 +207,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             ta.attribution_date  <=  :asOfDate
             """;
 
+    // #648: 보류(HOLD) 회차는 계약이 회복되면 지급되므로 예정액에 남기고, 상태별 지급조건으로 중단(CANCELLED)된 회차는 뺀다.
     private static final String SUM_PLANNED_COMMISSION_AMOUNT = """
             SELECT
             COALESCE(SUM(ROUND(sl.expected_amount, 0)), 0)
@@ -223,7 +224,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             AND
             sh.schedule_purpose = 'OPERATIONAL'
             AND
-            sl.line_status = 'PLANNED'
+            sl.line_status IN ('PLANNED', 'HOLD')
             AND NOT EXISTS (
                 SELECT 1 FROM fgc.contract_status_event e
                 WHERE e.contract_id = sh.contract_id
