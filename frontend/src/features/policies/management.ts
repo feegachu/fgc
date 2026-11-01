@@ -79,6 +79,7 @@ export interface FeeRegimeDraft {
   sourceRefs: string[]
 }
 export interface ClawbackDraft {
+  clawbackRuleId?: number
   insurerId: NumberInput
   productOfferingId: NumberInput
   commissionItemId: NumberInput

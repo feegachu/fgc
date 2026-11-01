@@ -75,6 +75,7 @@ export function serializePolicyDraft(draft: DraftDocument) {
       description: nullable(description),
     })),
     clawbackRules: draft.clawbackRules.map((rule) => ({
+      clawbackRuleId: rule.clawbackRuleId,
       insurerId: nullable(rule.insurerId),
       productOfferingId: nullable(rule.productOfferingId),
       commissionItemId: nullable(rule.commissionItemId),
@@ -172,6 +173,7 @@ export function normalizePolicyDetail(detail: PolicyDetailResponse | ManagedPoli
             commissionItemId: rule.commissionItemId ?? '',
             elapsedMonthFrom: rule.elapsedMonthFrom ?? '',
             elapsedMonthTo: rule.elapsedMonthTo ?? '',
+            clawbackRuleId: rule.clawbackRuleId ?? undefined,
             clawbackRatePct: rule.clawbackRatePct ?? '',
           })),
         }
@@ -199,6 +201,7 @@ export async function savePolicyDraft(draft: DraftDocument, id: number | undefin
     delete body.expectedUpdatedAt
     for (const rule of body.commissionRules) delete rule.commissionRuleId
     for (const rule of body.feeRegimeRules) delete rule.feeRegimeRulesetId
+    for (const rule of body.clawbackRules) delete rule.clawbackRuleId
   }
   const response = await apiClient.request<PolicyWriteResult>(
     id === undefined ? '/api/v1/policies' : `/api/v1/policies/${id}`,
