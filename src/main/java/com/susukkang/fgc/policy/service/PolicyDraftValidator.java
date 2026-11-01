@@ -6,6 +6,7 @@ import com.susukkang.fgc.common.code.FeeComponentType;
 import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.policy.code.ScheduleEligibilityParameter;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.CommissionRuleDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.FeeRegimeRuleDraft;
@@ -36,10 +37,6 @@ public class PolicyDraftValidator {
     private static final String COMMISSION_RULE_PREFIX = "commissionRules[";
     private static final String CONFLICTING_INDEX = "conflictingIndex";
     private static final Set<String> HEADER_REGIMES = Set.of("CURRENT", FOUR_YEAR, SEVEN_YEAR);
-    private static final Map<String, String> SCHEDULE_VALUES = Map.of(
-            "STATUS_MONTH_RULE", "PAY_IF_ACTIVE_ON_DUE_DATE",
-            "PRORATION_RULE", "NO_PRORATION",
-            "REVIVAL_BACKFILL_RULE", "NO_RETROACTIVE");
 
     private final Validator validator;
 
@@ -317,8 +314,7 @@ public class PolicyDraftValidator {
     private static boolean validParameter(PolicyType type, ParameterDraft parameter) {
         JsonNode value = parameter.value();
         return switch (type) {
-            case SCHEDULE_ELIGIBILITY -> value.isTextual()
-                    && Objects.equals(SCHEDULE_VALUES.get(parameter.key()), value.textValue());
+            case SCHEDULE_ELIGIBILITY -> ScheduleEligibilityParameter.accepts(parameter.key(), value);
             case ARBITRAGE -> switch (parameter.key()) {
                 case "ARBITRAGE_EFFECTIVE_CONTRACT_DATE" -> validDate(value);
                 case "ARBITRAGE_REFUND_ADDITION_MONTHS" -> value.isIntegralNumber() && value.canConvertToInt()
