@@ -5065,6 +5065,15 @@
     "workflowId": "dashboard.review",
     "steps": [
       {
+        "stepId": "help.101eef17743b425610e31f18c7b9b2ca",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.dashboard-page.settlement-guide",
+        "title": "업무 대시보드 · 전체 업무 가이드",
+        "instruction": "업무 대시보드 화면의 ‘전체 업무 가이드’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "next": []
+      },
+      {
         "stepId": "help.193852053924ae475e58e987c4740713",
         "screenId": "DASH-W01",
         "targetId": "dashboard.kpi.open",

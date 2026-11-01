@@ -1260,6 +1260,11 @@
     "element": "section"
   },
   {
+    "id": "features.dashboard.dashboard-page.settlement-guide",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "button"
+  },
+  {
     "id": "features.dashboard.risk-composition.link",
     "file": "features/dashboard/RiskComposition.tsx",
     "element": "Link"

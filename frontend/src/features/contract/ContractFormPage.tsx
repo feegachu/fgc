@@ -373,6 +373,7 @@ function ContractEditor({
         </div>
       )}
       <form data-guide-feature="features.contract.contract-form-page.form"
+        data-guide-target="contract.form"
         className="contract-editor"
         onSubmit={(event) => void submit(event)}
         noValidate

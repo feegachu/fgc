@@ -4,8 +4,9 @@ import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservat
 import { findGuide } from '../assistant/catalog'
 import { useWorkflowGuide } from '../assistant/workflow-state'
 import { connectPaymentGuideLaunch } from './payment-guide-launch'
+import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
 import { ResizableSplit } from '../../components/ResizableSplit'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -121,6 +122,7 @@ function TransactionForm({
   const [initialWorkflowId, setInitialWorkflowId] = useState<string | null>(null)
   const [guideRevision, setGuideRevision] = useState(0)
   const [guideSaved, setGuideSaved] = useState(Boolean(initialId))
+  const fullFlow = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   const closeHelp = () => {
     setHelpOpen(false)
     help.current?.focus()
@@ -513,6 +515,7 @@ function TransactionForm({
       data-guide-version="1.0"
       ref={root}
       className={`publishing-page transaction-page transaction-form-page${helpOpen ? ' has-payment-guide' : ''}`}
+      data-guide-target="payment.form"
       data-transaction-form
       aria-busy={loading || busy !== null}
     >
@@ -525,6 +528,8 @@ function TransactionForm({
             ref={help}
             type="button"
             className="button button-secondary"
+            disabled={fullFlow}
+            title={fullFlow ? '전체 업무 가이드가 진행 중입니다.' : undefined}
             aria-expanded={helpOpen}
             onClick={() => { setInitialWorkflowId(null); setHelpOpen(true) }}
           >
