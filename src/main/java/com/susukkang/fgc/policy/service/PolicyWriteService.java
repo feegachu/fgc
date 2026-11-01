@@ -12,6 +12,7 @@ import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.policy.code.ScheduleEligibilityParameter;
 import com.susukkang.fgc.policy.dto.PolicyActionRequest;
 import com.susukkang.fgc.policy.dto.PolicyCloneRequest;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
@@ -278,8 +279,7 @@ public class PolicyWriteService {
             case CURRENT_COMMISSION -> !draft.commissionRules().isEmpty();
             case FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION ->
                     !draft.commissionRules().isEmpty() && !draft.feeRegimeRules().isEmpty();
-            case SCHEDULE_ELIGIBILITY -> parameterKeys(draft).containsAll(
-                    Set.of("STATUS_MONTH_RULE", "PRORATION_RULE", "REVIVAL_BACKFILL_RULE"));
+            case SCHEDULE_ELIGIBILITY -> parameterKeys(draft).containsAll(ScheduleEligibilityParameter.KEYS);
             case ARBITRAGE -> parameterKeys(draft).containsAll(Set.of("ARBITRAGE_EFFECTIVE_CONTRACT_DATE",
                     "ARBITRAGE_REFUND_ADDITION_MONTHS", "ARBITRAGE_REFUND_ADDITION_BOUNDARY_INCLUSIVE"));
             case RECONCILIATION_TOLERANCE -> parameterKeys(draft).containsAll(

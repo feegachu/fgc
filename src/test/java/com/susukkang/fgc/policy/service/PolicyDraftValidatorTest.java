@@ -240,6 +240,11 @@ class PolicyDraftValidatorTest {
         parameter.put("value", "PAY_IF_ACTIVE_ON_DUE_DATE");
         json.put("policyType", "CURRENT_COMMISSION");
         assertInvalid(json, "parameters[0].value");
+        json.put("policyType", "SCHEDULE_ELIGIBILITY");
+        parameter.put("key", "FREE_CONDITION");
+        assertInvalid(json, "parameters[0].value");
+        parameter.put("key", "STATUS_MONTH_RULE").set("value", MAPPER.createObjectNode().put("when", "status == 'ACTIVE'"));
+        assertInvalid(json, "parameters[0].value");
     }
 
     @Test
