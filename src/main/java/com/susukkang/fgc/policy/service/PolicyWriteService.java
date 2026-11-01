@@ -59,6 +59,7 @@ public class PolicyWriteService {
     private static final String ACTION_CLONE = "CLONE";
     private static final String FIELD_POLICY_TYPE = "policyType";
     private static final String FIELD_COMMISSION_RULES = "commissionRules";
+    private static final String FIELD_REASON = "reason";
     private final PolicyVersionRepository policyVersionRepository;
     private final PolicyWriteRepository writeRepository;
     private final PolicyDraftValidator draftValidator;
@@ -270,7 +271,7 @@ public class PolicyWriteService {
         validateReferences(draft, storedReferences(draft), storedUrls(draft));
         if (draft.regulationRefs().isEmpty() && draft.sourceRefs().isEmpty()) {
             throw new FgcBusinessException(FgcErrorCode.POL_004, "sourceRefs",
-                    Map.of("reason", "제출할 정책에는 승인된 근거가 필요합니다."), null);
+                    Map.of(FIELD_REASON, "제출할 정책에는 승인된 근거가 필요합니다."), null);
         }
         boolean complete = switch (draft.policyType()) {
             case CURRENT_COMMISSION -> !draft.commissionRules().isEmpty();
@@ -295,7 +296,7 @@ public class PolicyWriteService {
                 default -> FIELD_POLICY_TYPE;
             };
             throw new FgcBusinessException(FgcErrorCode.POL_004, field,
-                    Map.of("reason", "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다."), null);
+                    Map.of(FIELD_REASON, "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다."), null);
         }
     }
 
@@ -389,7 +390,7 @@ public class PolicyWriteService {
         after.put("document", writeRepository.readDraft(policy));
         after.put("result", result);
         after.put("approvalEvidenceRef", policy.getApprovalEvidenceRef());
-        after.put("reason", reason);
+        after.put(FIELD_REASON, reason);
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode("POLICY_" + action).entityType("POLICY_VERSION")
                 .entityId(policy.getPolicyVersionId().toString()).policyVersionId(policy.getPolicyVersionId())
