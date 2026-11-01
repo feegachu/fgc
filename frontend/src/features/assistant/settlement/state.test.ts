@@ -73,6 +73,15 @@ describe('FUN-088 server evidence decisions', () => {
     state.payment!.attributions = [{ contractId: 999 }]
     expect(() => decide({ ...selection, paymentId: 30 }, state, 'GA_ADMIN')).toThrow('현재 안내 대상')
   })
+  it.each([
+    ['month', { settlementMonth: '2026-08-01' }],
+    ['stage', { paymentStage: 'INSURER_TO_GA' }],
+  ] as const)('rejects a replacement payment with a different %s', (_field, change) => {
+    const state = evidence()
+    Object.assign(state.payment!, { commissionTransactionId: 30, ...change })
+    state.validation = undefined
+    expect(() => decide(replacePayment(selection, 30), state, 'GA_ADMIN')).toThrow('현재 안내 대상')
+  })
   it('starts a new contract without synthetic IDs', () =>
     expect(decide({ month: '2026-07', stage: 'GA_TO_FC' }, { scheduleAcknowledged: false }, 'SETTLEMENT').step).toBe(
       'contract.create',
