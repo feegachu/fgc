@@ -5,8 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.code.FeeComponentType;
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.compare.repository.CompareRankingRepository;
+import com.susukkang.fgc.compare.service.ClawbackRuleResolver;
+import com.susukkang.fgc.policy.code.FeeRegimeReasonCode;
+import com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService;
+import com.susukkang.fgc.policy.service.FeeRegimeRulesetService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +26,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 
 import java.util.List;
@@ -51,6 +61,9 @@ class PolicyWorkflowIntegrationTest {
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
     @MockitoBean(name = "policyClock") private Clock policyClock;
+    @Autowired private FeeRegimeSchedulePolicyService schedulePolicies;
+    @Autowired private FeeRegimeRulesetService limitPolicies;
+    @Autowired private CompareRankingRepository comparisonPolicies;
 
     private FgcUserDetails writer;
     private FgcUserDetails systemWriter;
@@ -75,6 +88,266 @@ class PolicyWorkflowIntegrationTest {
                 VALUES (?, '정책 작성 API 검증 수수료', 'PAYMENT', 'SALES', DATE '2026-01-01', true)
                 RETURNING commission_item_id
                 """, Long.class, "P647-" + UUID.randomUUID());
+    }
+
+    @Test
+    void insurerSpecificClawbackCoexistsWithGenericDemoButIdenticalScopeOverlapIsRejected() throws Exception {
+        ObjectNode draft = draft();
+        draft.put("policyType", "CLAWBACK").putNull("feeRegimeCode")
+                .put("effectiveFrom", "2026-01-01").put("effectiveTo", "2026-12-31");
+        draft.putArray("commissionRules");
+        long baseItem = jdbc.queryForObject("SELECT commission_item_id FROM fgc.commission_item WHERE item_code='BASE_COMMISSION'", Long.class);
+        var rules = draft.putArray("clawbackRules");
+        rules.addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        rules.addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
+                .put("elapsedMonthFrom", 12).put("elapsedMonthTo", 23)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "25");
+        JsonNode first = create(draft, writer);
+        long id = first.path("policyVersionId").asLong();
+        JsonNode review = action(id, "SUBMIT", first, writer, 200);
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+
+        ObjectNode duplicate = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+        JsonNode second = create(duplicate, writer);
+        long secondId = second.path("policyVersionId").asLong();
+        JsonNode secondReview = action(secondId, "SUBMIT", second, writer, 200);
+        assertThat(actionError(secondId, "APPROVE", secondReview, approver, 422).path("code").asText())
+                .isEqualTo("FGC-POL-002");
+        // FGC-FUN-017/079: 상품 비교는 보험회사·판매버전으로 정책을 고른 뒤 그 안에서 항목을 푼다.
+        // 전체 항목이나 다른 항목으로 바꾸어도 같은 정책 선택 범위의 겹침을 우회할 수 없다.
+        for (Long alternativeItem : new Long[]{null, itemId}) {
+            ObjectNode alternative = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+            alternative.putArray("clawbackRules").addObject().put("insurerId", insurerId)
+                    .put("commissionItemId", alternativeItem).put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                    .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+            JsonNode alternativeCreated = create(alternative, writer);
+            long alternativeId = alternativeCreated.path("policyVersionId").asLong();
+            JsonNode alternativeReview = action(alternativeId, "SUBMIT", alternativeCreated, writer, 200);
+            assertThat(actionError(alternativeId, "APPROVE", alternativeReview, approver, 422).path("code").asText())
+                    .isEqualTo("FGC-POL-002");
+        }
+        ObjectNode adjacent = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+        adjacent.putArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", baseItem)
+                .put("elapsedMonthFrom", 24).put("elapsedMonthTo", 35)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "0");
+        JsonNode adjacentCreated = create(adjacent, writer);
+        long adjacentId = adjacentCreated.path("policyVersionId").asLong();
+        JsonNode adjacentReview = action(adjacentId, "SUBMIT", adjacentCreated, writer, 200);
+        assertThat(actionError(adjacentId, "APPROVE", adjacentReview, approver, 422).path("code").asText())
+                .isEqualTo("FGC-POL-002");
+        long otherInsurer = jdbc.queryForObject("""
+                INSERT INTO fgc.insurer(insurer_code,insurer_name,insurer_type)
+                VALUES (?, '다른 보험회사 범위', 'LIFE') RETURNING insurer_id
+                """, Long.class, "P722-" + UUID.randomUUID().toString().substring(0, 12));
+        ObjectNode other = draft.deepCopy().put("policyCode", "C722-" + UUID.randomUUID());
+        other.path("clawbackRules").forEach(rule -> ((ObjectNode) rule).put("insurerId", otherInsurer));
+        JsonNode third = create(other, writer);
+        long thirdId = third.path("policyVersionId").asLong();
+        JsonNode thirdReview = action(thirdId, "SUBMIT", third, writer, 200);
+        JsonNode thirdApproved = action(thirdId, "APPROVE", thirdReview, approver, 200);
+        action(thirdId, "ACTIVATE", thirdApproved, approver, 200);
+
+        // 같은 정책 안의 인접 구간은 허용한다. 실제 판매버전으로 비교 SQL과 resolver의 선택 결과까지 확인한다.
+        long offeringId = insertOffering(false, "2026-01-01", "BD-722");
+        jdbc.update("""
+                UPDATE fgc.product_offering SET fee_regime_code='CURRENT', governance_status='APPROVED',
+                  committee_approval_date=DATE '2025-12-01', committee_document_ref='환수 비교 검증'
+                WHERE product_offering_id=?
+                """, offeringId);
+        LocalDate asOf = LocalDate.of(2026, 6, 1);
+        var offering = comparisonPolicies.findSellableOfferings(asOf).stream()
+                .filter(candidate -> candidate.offeringId() == offeringId).findFirst().orElseThrow();
+        var comparisonRules = comparisonPolicies.findClawbackRules(offering, asOf);
+        for (int month : new int[]{0, 11, 12, 23}) {
+            var resolution = ClawbackRuleResolver.resolve(comparisonRules, List.of(baseItem), month);
+            assertThat(resolution.excludeReason()).isNull();
+            assertThat(resolution.policyVersion()).isEqualTo(draft.path("policyCode").asText() + " v1");
+            assertThat(resolution.ratesByItem().get(baseItem)).isEqualByComparingTo(month < 12 ? "50" : "25");
+        }
+    }
+
+    @Test
+    void clawbackDraftsPersistUpdateSubmitApproveActivateAndCloneWithoutChangingApprovedRules() throws Exception {
+        ObjectNode draft = draft();
+        draft.put("policyType", "CLAWBACK").putNull("feeRegimeCode");
+        draft.putArray("commissionRules");
+        ObjectNode rule = draft.putArray("clawbackRules").addObject();
+        rule.put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "33.333333");
+        rule.putNull("conditionExpression");
+        String requestKey = key();
+        JsonNode created = write(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 201);
+        assertThat(write(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 201)).isEqualTo(created);
+        long id = created.path("policyVersionId").asLong();
+        assertThat(count("clawback_rule", id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT condition_expression::text FROM fgc.clawback_rule WHERE policy_version_id=?",
+                String.class, id)).isEqualTo("{}");
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument");
+        assertThat(edit.path("clawbackRules").get(0).path("clawbackRatePct").asText()).isEqualTo("33.333333");
+        ((ObjectNode) edit.path("clawbackRules").get(0)).put("clawbackRatePct", "0.000000");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 200);
+        assertThat(count("clawback_rule", id)).isEqualTo(1);
+        assertThat(detail(id, writer).path("editDocument").path("clawbackRules").get(0)
+                .path("clawbackRatePct").asText()).isEqualTo("0.000000");
+        JsonNode review = action(id, "SUBMIT", updated, writer, 200);
+        assertThat(values(detail(id, approver).path("allowedActions"))).contains("APPROVE");
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        JsonNode active = action(id, "ACTIVATE", approved, approver, 200);
+        assertThat(active.path("status").asText()).isEqualTo("ACTIVE");
+        long originalRuleId = jdbc.queryForObject("SELECT clawback_rule_id FROM fgc.clawback_rule WHERE policy_version_id=?", Long.class, id);
+        JsonNode cloned = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2000-06-01"), writer, key(), 201);
+        long cloneId = cloned.path("policyVersionId").asLong();
+        assertThat(count("clawback_rule", cloneId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT clawback_rule_id FROM fgc.clawback_rule WHERE policy_version_id=?", Long.class, cloneId))
+                .isNotEqualTo(originalRuleId);
+        ObjectNode cloneEdit = (ObjectNode) detail(cloneId, writer).path("editDocument");
+        ((ObjectNode) cloneEdit.path("clawbackRules").get(0)).put("clawbackRatePct", "50.000000");
+        write(HttpMethod.PUT, "/api/v1/policies/" + cloneId, cloneEdit, writer, key(), 200);
+        assertThat(detail(id, writer).path("editDocument").path("clawbackRules").get(0)
+                .path("clawbackRatePct").asText()).isEqualTo("0.000000");
+        assertThat(count("policy_approval_action", cloneId)).isZero();
+    }
+
+    @Test
+    void clawbackInvalidRulesRollbackAndEmptyRulesCannotBeSubmitted() throws Exception {
+        ObjectNode draft = draft();
+        draft.put("policyType", "CLAWBACK").putNull("feeRegimeCode");
+        draft.putArray("commissionRules");
+        ObjectNode rule = draft.putArray("clawbackRules").addObject();
+        rule.put("elapsedMonthFrom", 12).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        JsonNode error = writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400);
+        assertThat(error.path("field").asText()).isEqualTo("clawbackRules[0].elapsedMonthTo");
+        rule.put("elapsedMonthTo", 23).putObject("conditionExpression").put("execute", "anything");
+        writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code=?",
+                Integer.class, draft.path("policyCode").asText())).isZero();
+        draft.putArray("clawbackRules");
+        JsonNode empty = create(draft, writer);
+        assertThat(actionError(empty.path("policyVersionId").asLong(), "SUBMIT", empty, writer, 422)
+                .path("field").asText()).isEqualTo("clawbackRules");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"insurerId", "productOfferingId", "commissionItemId"})
+    void missingClawbackTargetsReturnInputErrorsAndRollback(String field) throws Exception {
+        ObjectNode draft = clawbackDraft();
+        ObjectNode rule = (ObjectNode) draft.path("clawbackRules").get(0);
+        rule.put(field, Long.MAX_VALUE);
+        String requestKey = key();
+        JsonNode failure = writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 400);
+        assertThat(failure.path("code").asText()).isEqualTo("FGC-POL-005");
+        assertThat(failure.path("message").asText()).contains("존재하지 않습니다").doesNotContain("{", "500");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code=?",
+                Integer.class, draft.path("policyCode").asText())).isZero();
+
+        rule.putNull(field);
+        JsonNode created = write(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 201);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument");
+        JsonNode originalRules = edit.path("clawbackRules").deepCopy();
+        ((ObjectNode) edit.path("clawbackRules").get(0)).put(field, Long.MAX_VALUE);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 400)
+                .path("code").asText()).isEqualTo("FGC-POL-005");
+        JsonNode unchanged = detail(id, writer).path("editDocument");
+        assertThat(unchanged.path("clawbackRules")).isEqualTo(originalRules);
+        assertThat(unchanged.path("expectedUpdatedAt")).isEqualTo(edit.path("expectedUpdatedAt"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sourceRefs", "clawbackRules"})
+    void missingSubmissionRequirementsHaveSpecificMessagesInsteadOfOverlap(String field) throws Exception {
+        ObjectNode draft = clawbackDraft();
+        draft.putArray(field);
+        if (field.equals("sourceRefs")) {
+            draft.putArray("regulationRefs");
+            draft.putArray("sourceDetails");
+        }
+        JsonNode created = create(draft, writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode failure = actionError(id, "SUBMIT", created, writer, 422);
+        assertThat(failure.path("code").asText()).isEqualTo("FGC-POL-004");
+        assertThat(failure.path("field").asText()).isEqualTo(field);
+        assertThat(failure.path("message").asText()).contains(field.equals("sourceRefs") ? "근거" : "규칙")
+                .doesNotContain("겹치", "{reason}");
+        assertThat(detail(id, writer).path("header").path("status").asText()).isEqualTo("DRAFT");
+    }
+
+    @Test
+    void clawbackEditsPreserveRuleIdsAndCreationTimesWhileClonesReceiveNewIds() throws Exception {
+        // FGC-FUN-017 (#647): 전체 PUT은 유지한 환수 규칙의 ID·생성시각을 보존하고, 두 구간을 맞바꿔도 유일키에 걸리지 않는다.
+        JsonNode created = create(twoBandClawbackDraft(), systemWriter);
+        long id = created.path("policyVersionId").asLong();
+        var identities = clawbackIdentities(id);
+        ObjectNode edit = (ObjectNode) detail(id, systemWriter).path("editDocument");
+        ObjectNode first = (ObjectNode) edit.path("clawbackRules").get(0);
+        ObjectNode second = (ObjectNode) edit.path("clawbackRules").get(1);
+        assertThat(first.path("clawbackRuleId").asLong()).isPositive();
+        assertThat(first.path("clawbackRatePct").isTextual()).isTrue();
+        first.put("elapsedMonthFrom", 12).put("elapsedMonthTo", 1199).put("clawbackRatePct", "0.000000");
+        second.put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11).put("clawbackRatePct", "33.333333");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, systemWriter, key(), 200);
+        assertThat(clawbackIdentities(id)).isEqualTo(identities);
+        JsonNode review = action(id, "SUBMIT", updated, systemWriter, 200);
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+
+        JsonNode originalRules = detail(id, writer).path("editDocument").path("clawbackRules");
+        JsonNode cloned = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2001-01-01"), writer, key(), 201);
+        long cloneId = cloned.path("policyVersionId").asLong();
+        ObjectNode clonedEdit = (ObjectNode) detail(cloneId, writer).path("editDocument");
+        for (JsonNode rule : clonedEdit.path("clawbackRules")) {
+            assertThat(identities).extracting(row -> row.get("clawback_rule_id"))
+                    .isNotEmpty()
+                    .doesNotContain(rule.path("clawbackRuleId").asLong());
+        }
+        ((ObjectNode) clonedEdit.path("clawbackRules").get(1)).put("clawbackRatePct", "25.000000");
+        write(HttpMethod.PUT, "/api/v1/policies/" + cloneId, clonedEdit, writer, key(), 200);
+        assertThat(detail(id, writer).path("editDocument").path("clawbackRules")).isEqualTo(originalRules);
+    }
+
+    @Test
+    void clawbackRuleIdsMustBelongToTheEditedPolicyAndAreRejectedOnCreate() throws Exception {
+        // FGC-FUN-017 (#647): 다른 정책의 환수 규칙 ID로 덮어쓰거나, 생성 요청에 기존 ID를 넣을 수 없다.
+        JsonNode created = create(twoBandClawbackDraft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode before = (ObjectNode) detail(id, writer).path("editDocument");
+        long otherId = create(twoBandClawbackDraft(), writer).path("policyVersionId").asLong();
+        long foreign = detail(otherId, writer).path("editDocument").path("clawbackRules").get(0)
+                .path("clawbackRuleId").asLong();
+        ObjectNode edit = before.deepCopy();
+        ((ObjectNode) edit.path("clawbackRules").get(0)).put("clawbackRuleId", foreign);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 400)
+                .path("field").asText()).isEqualTo("clawbackRules");
+        ObjectNode duplicateIds = before.deepCopy();
+        ((ObjectNode) duplicateIds.path("clawbackRules").get(1)).put("clawbackRuleId",
+                before.path("clawbackRules").get(0).path("clawbackRuleId").asLong());
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, duplicateIds, writer, key(), 400)
+                .path("field").asText()).isEqualTo("clawbackRules[1].clawbackRuleId");
+        ObjectNode invalidCreate = twoBandClawbackDraft();
+        ((ObjectNode) invalidCreate.path("clawbackRules").get(0)).put("clawbackRuleId", foreign);
+        writeError(HttpMethod.POST, "/api/v1/policies", invalidCreate, writer, key(), 400);
+        assertThat(detail(id, writer).path("editDocument")).isEqualTo(before);
+    }
+
+    private ObjectNode twoBandClawbackDraft() {
+        ObjectNode draft = clawbackDraft();
+        ((ObjectNode) draft.path("clawbackRules").get(0)).put("clawbackRatePct", "33.333333");
+        draft.withArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 12).put("elapsedMonthTo", 1199)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "0.000000");
+        return draft;
+    }
+
+    private List<java.util.Map<String, Object>> clawbackIdentities(long id) {
+        return jdbc.queryForList("SELECT clawback_rule_id, created_at FROM fgc.clawback_rule "
+                + "WHERE policy_version_id=? ORDER BY clawback_rule_id", id);
     }
 
     @Test
@@ -554,6 +827,167 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void acceptsRegistryCodesNeverUsedByApprovedPoliciesButRejectsUnknownCodes() throws Exception {
+        // FUN-016: 규제조문표의 REG-17은 승인 정책에 쓰인 적이 없어도 레지스트리(V71)에 있으므로 처음 등록할 수 있다.
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.policy_version
+                WHERE status IN ('APPROVED','ACTIVE','RETIRED') AND 'REG-17' = ANY (regulation_refs)
+                """, Integer.class)).isZero();
+        ObjectNode registered = draft();
+        registered.withArray("regulationRefs").add("REG-17");
+        assertThat(create(registered, writer).path("status").asText()).isEqualTo("DRAFT");
+        ObjectNode unknown = draft();
+        unknown.withArray("regulationRefs").add("REG-99");
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", unknown, writer, key(), 400).path("field").asText())
+                .isEqualTo("regulationRefs");
+    }
+
+    @Test
+    void acceptsOnlyWebLinksAndTextOnlySourceDetails() throws Exception {
+        for (String unsafe : List.of("javascript:alert(1)", "ftp://example.com/a", "file:///etc/passwd",
+                "https://user:pw@example.com/a", " https://example.com/a", "/relative/path", "https://")) {
+            ObjectNode draft = draft();
+            ((ObjectNode) draft.withArray("sourceDetails").get(0)).put("url", unsafe);
+            assertThat(writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400).path("field").asText())
+                    .as(unsafe).isEqualTo("sourceDetails[0].url");
+        }
+        ObjectNode textOnly = draft();
+        ((ObjectNode) textOnly.withArray("sourceDetails").get(0)).putNull("url");
+        long id = create(textOnly, writer).path("policyVersionId").asLong();
+        JsonNode source = StreamSupport.stream(detail(id, writer).path("references").spliterator(), false)
+                .filter(row -> row.path("code").asText().equals("SRC-022")).findFirst().orElseThrow();
+        assertThat(source.path("detailTitle").asText()).isEqualTo("승인된 근거 연결");
+        assertThat(source.path("url").isNull()).isTrue();
+    }
+
+    @Test
+    void detailMergesRegistryTitlesWithTheDetailsStoredOnThatPolicyVersion() throws Exception {
+        long id = create(draft(), writer).path("policyVersionId").asLong();
+        JsonNode references = detail(id, writer).path("references");
+        JsonNode regulation = references.get(0);
+        assertThat(regulation.path("ref").asText()).isEqualTo("REG-03");
+        assertThat(regulation.path("group").asText()).isEqualTo("REGULATION");
+        assertThat(regulation.path("registryTitle").asText()).isEqualTo("유지관리수수료");
+        // 상세를 저장하지 않은 근거는 공통 샘플 설명으로 채우지 않는다.
+        assertThat(regulation.path("detailTitle").isNull()).isTrue();
+        assertThat(regulation.path("explanation").isNull()).isTrue();
+        JsonNode source = StreamSupport.stream(references.spliterator(), false)
+                .filter(row -> row.path("group").asText().equals("SOURCE")).findFirst().orElseThrow();
+        assertThat(source.path("code").asText()).isEqualTo("SRC-022");
+        assertThat(source.path("registryTitle").isNull()).isTrue();
+        assertThat(source.path("detailTitle").asText()).isEqualTo("승인된 근거 연결");
+        assertThat(source.path("explanation").asText()).isEqualTo("정책 등록과 복제에서 근거를 보존한다.");
+        assertThat(source.path("url").asText()).isEqualTo("https://example.com/policy-evidence");
+        assertThat(values(regulation.path("statusTags"))).isEmpty();
+    }
+
+    @Test
+    void rejectsNullStatusTagAsAFieldErrorInsteadOfFailingDeserialization() throws Exception {
+        ObjectNode draft = draft();
+        ((ObjectNode) draft.withArray("sourceDetails").get(0)).putArray("statusTags").addNull();
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, key(), 400).path("field").asText())
+                .startsWith("sourceDetails[0].statusTags");
+    }
+
+    @Test
+    void aStoredLegacyReferenceTextIsNotAcceptedAsANewLink() throws Exception {
+        Long sourceId = jdbc.queryForObject("""
+                SELECT policy_version_id FROM fgc.policy_version
+                WHERE policy_code = 'REG-FOUR-YEAR-2027-V1' AND version_no = 1
+                """, Long.class);
+        String legacyRef = "docs/FGC_가상_GA_운영정책서_v1_0.md#제46조";
+        long cloneId = write(HttpMethod.POST, "/api/v1/policies/" + sourceId + "/versions",
+                cloneRequest("2028-01-01"), writer, key(), 201).path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(cloneId, writer).path("editDocument").deepCopy();
+        assertThat(values(edit.path("sourceRefs"))).contains(legacyRef);
+        // 근거 코드로 물려받은 문서명 참조와 글자가 같아도, 링크로는 새 입력이라 http(s) 검사를 받는다.
+        int index = edit.withArray("sourceDetails").size();
+        edit.withArray("sourceDetails").addObject().put("ref", legacyRef).put("title", "옛 근거")
+                .putNull("explanation").put("url", legacyRef);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + cloneId, edit, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[" + index + "].url");
+    }
+
+    @Test
+    void keepsAnAlreadyStoredNonWebLinkButRejectsANewOne() throws Exception {
+        long id = create(draft(), writer).path("policyVersionId").asLong();
+        // URL 검사가 생기기 전에 저장된 링크를 흉내 낸다(초안 상태라 DRAFT 전용 트리거가 허용한다).
+        jdbc.update("UPDATE fgc.policy_source_detail SET url = 'ftp://legacy.example.com/a' WHERE policy_version_id = ?", id);
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument").deepCopy();
+        // 같은 링크를 다른 근거(REG-03)로 옮기면 물려받은 링크로 보지 않는다.
+        ObjectNode moved = edit.deepCopy();
+        ((ObjectNode) moved.withArray("sourceDetails").get(0)).putNull("url");
+        moved.withArray("sourceDetails").addObject().put("ref", "REG-03").put("title", "옮긴 링크")
+                .putNull("explanation").put("url", "ftp://legacy.example.com/a");
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, moved, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[1].url");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 200);
+        assertThat(action(id, "SUBMIT", updated, writer, 200).path("status").asText()).isEqualTo("REVIEW");
+
+        long other = create(draft(), writer).path("policyVersionId").asLong();
+        ObjectNode changed = (ObjectNode) detail(other, writer).path("editDocument").deepCopy();
+        ((ObjectNode) changed.withArray("sourceDetails").get(0)).put("url", "ftp://new.example.com/a");
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + other, changed, writer, key(), 400)
+                .path("field").asText()).isEqualTo("sourceDetails[0].url");
+    }
+
+    @Test
+    void detailShowsCommitteeMetadataOfTheOfferingsItsRulesTarget() throws Exception {
+        long product = jdbc.queryForObject("""
+                INSERT INTO fgc.product(insurer_id, insurer_product_code, standard_product_code, product_name, product_group_code)
+                VALUES (?, ?, ?, '상품위원회 검증 상품', 'TERM') RETURNING product_id
+                """, Long.class, insurerId, "P718-" + UUID.randomUUID().toString().substring(0, 12),
+                "S718-" + UUID.randomUUID().toString().substring(0, 12));
+        long offering = jdbc.queryForObject("""
+                INSERT INTO fgc.product_offering(product_id, offering_version, sales_start_date, basic_document_version,
+                    basic_document_date, channel_code, fee_regime_code, committee_approval_date, committee_document_ref,
+                    governance_status)
+                VALUES (?, 'V1', DATE '2000-01-01', 'BD-718', DATE '1999-12-01', 'FACE_TO_FACE', 'CURRENT',
+                        DATE '1999-12-15', '상품위원회 의결서 2026-07', 'APPROVED') RETURNING product_offering_id
+                """, Long.class, product);
+        ObjectNode draft = draft();
+        ((ObjectNode) draft.path("commissionRules").get(0)).put("productOfferingId", offering);
+        long id = create(draft, writer).path("policyVersionId").asLong();
+        JsonNode offerings = detail(id, writer).path("productOfferings");
+        assertThat(offerings).hasSize(1);
+        JsonNode row = offerings.get(0);
+        assertThat(row.path("productOfferingId").asLong()).isEqualTo(offering);
+        assertThat(row.path("committeeApprovalDate").asText()).isEqualTo("1999-12-15");
+        assertThat(row.path("committeeDocumentRef").asText()).isEqualTo("상품위원회 의결서 2026-07");
+        assertThat(row.path("basicDocumentVersion").asText()).isEqualTo("BD-718");
+        assertThat(row.path("salesStartDate").asText()).isEqualTo("2000-01-01");
+        assertThat(row.path("governanceStatus").asText()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void storesSourceStatusTagsAndKeepsThemThroughEditAndNewVersion() throws Exception {
+        ObjectNode tagged = draft();
+        ((ObjectNode) tagged.withArray("sourceDetails").get(0)).putArray("statusTags").add("현행규정").add("FAQ").add("FAQ");
+        JsonNode created = create(tagged, writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode saved = detail(id, writer);
+        assertThat(values(saved.path("editDocument").path("sourceDetails").get(0).path("statusTags")))
+                .containsExactly("현행규정", "FAQ");
+        JsonNode source = StreamSupport.stream(saved.path("references").spliterator(), false)
+                .filter(row -> row.path("code").asText().equals("SRC-022")).findFirst().orElseThrow();
+        assertThat(values(source.path("statusTags"))).containsExactly("현행규정", "FAQ");
+
+        ObjectNode unknown = draft();
+        ((ObjectNode) unknown.withArray("sourceDetails").get(0)).putArray("statusTags").add("보도자료");
+        assertThat(writeError(HttpMethod.POST, "/api/v1/policies", unknown, writer, key(), 400).path("field").asText())
+                .isEqualTo("sourceDetails[0].statusTags");
+
+        // 새 버전은 승인본에서만 만들 수 있다. 승인본의 태그는 DRAFT 전용 트리거로 바꿀 수 없고 복제본이 이어받는다.
+        JsonNode review = action(id, "SUBMIT", created, writer, 200);
+        action(id, "APPROVE", review, approver, 200);
+        JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2000-06-01"), writer, key(), 201);
+        assertThat(values(detail(clone.path("policyVersionId").asLong(), writer)
+                .path("editDocument").path("sourceDetails").get(0).path("statusTags")))
+                .containsExactly("현행규정", "FAQ");
+    }
+
+    @Test
     void storesApprovalEvidenceWithItsDocumentVersionAndResetsItOnClone() throws Exception {
         JsonNode created = create(draft().put("basicDocumentVersion", "DOC-V1"), writer);
         long id = created.path("policyVersionId").asLong();
@@ -659,6 +1093,341 @@ class PolicyWorkflowIntegrationTest {
         assertThat(auditCount(firstId, "POLICY_RETIRE")).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_succession WHERE previous_policy_version_id=?",
                 Integer.class, firstId)).isZero();
+    }
+
+    @Test
+    void registeredFourAndSevenYearPoliciesSupplyActualRulesWithoutCostLimitPrerequisite() throws Exception {
+        for (boolean seven : List.of(false, true)) {
+            String start = seven ? "2029-01-01" : "2027-01-01";
+            String contractDate = seven ? "2029-03-02" : "2027-03-02";
+            String document = "BD-" + UUID.randomUUID();
+            long offering = insertOffering(seven, start, document);
+            long contract = insertContract(offering, contractDate);
+            ObjectNode documentDraft = installmentDraft(seven, offering, start, document);
+            if (seven) {
+                ObjectNode regime = (ObjectNode) documentDraft.path("feeRegimeRules").get(0);
+                regime.put("longTermMaintenanceFrom", 67).put("longTermMaintenanceTo", 84);
+                ObjectNode longTerm = ((ObjectNode) documentDraft.path("commissionRules").get(0)).deepCopy();
+                longTerm.put("commissionItemId", insertItem()).put("feeComponentType", "LONG_TERM_MAINTENANCE")
+                        .put("installmentFrom", 67).put("calculationType", "FIXED")
+                        .putNull("ratePct").put("fixedAmount", "12000.00");
+                ((com.fasterxml.jackson.databind.node.ArrayNode) documentDraft.path("commissionRules")).add(longTerm);
+            }
+            JsonNode created = create(documentDraft, writer);
+            long id = created.path("policyVersionId").asLong();
+            assertThat(schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC).isSelected()).isFalse();
+            JsonNode review = action(id, "SUBMIT", created, writer, 200);
+            JsonNode approved = action(id, "APPROVE", review, approver, 200);
+            assertThat(schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC).isSelected()).isFalse();
+            action(id, "ACTIVATE", approved, approver, 200);
+
+            var selected = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+            assertThat(selected.isSelected()).isTrue();
+            assertThat(selected.versionNo()).isEqualTo(1);
+            assertThat(selected.sourceRefs()).contains("REG-03", "SRC-022");
+            assertThat(selected.selection().limits()).isEmpty();
+            assertThat(selected.selection().ruleset().maxInstallments()).isEqualTo(seven ? 84 : 48);
+            assertThat(selected.commissionPolicy().getPolicyVersionId()).isEqualTo(id);
+            var regular = selected.commissionPolicy().getRules().stream()
+                    .filter(r -> r.getFeeComponentType() == FeeComponentType.MAINTENANCE).toList();
+            assertThat(regular).hasSize(seven ? 84 : 48);
+            assertThat(regular).allSatisfy(r -> {
+                assertThat(r.isEqualMonthlyYn()).isTrue();
+                assertThat(r.getRatePct()).isEqualByComparingTo(seven ? "24" : "45");
+                assertThat(r.getBasisCode()).isEqualTo("MONTHLY_EQUIVALENT_FIRST_PREMIUM");
+            });
+            assertThat(regular.getLast().getInstallmentTo()).isEqualTo(seven ? 84 : 48);
+            var longTerm = selected.commissionPolicy().getRules().stream()
+                    .filter(r -> r.getFeeComponentType() == FeeComponentType.LONG_TERM_MAINTENANCE).toList();
+            if (seven) {
+                assertThat(longTerm).hasSize(18);
+                assertThat(longTerm.getFirst().getInstallmentFrom()).isEqualTo(67);
+                assertThat(longTerm).allSatisfy(r -> assertThat(r.getFixedAmount()).isEqualByComparingTo("12000"));
+            } else {
+                assertThat(longTerm).isEmpty();
+            }
+            assertThat(schedulePolicies.resolve(contract, PaymentStage.INSURER_TO_GA).isSelected()).isFalse();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id = ?",
+                    Integer.class, contract)).isZero(); // 조회는 생성·확정 부수효과가 없다.
+        }
+    }
+
+    @Test
+    void limitLookupSurvivesCoexistingOfferingSpecificPayoutPolicies() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long regulatoryId = jdbc.queryForObject("""
+                SELECT policy_version_id FROM fgc.policy_version
+                WHERE policy_code = 'REG-SEVEN-YEAR-2029-V1' AND status = 'ACTIVE'
+                """, Long.class);
+        long[] contracts = new long[2];
+        long[] policyIds = new long[2];
+        for (int i = 0; i < contracts.length; i++) {
+            long offering = insertOffering(true, "2029-01-01", document);
+            contracts[i] = insertContract(offering, "2029-03-02");
+            JsonNode created = create(installmentDraft(true, offering, "2029-01-01", document), writer);
+            policyIds[i] = created.path("policyVersionId").asLong();
+            JsonNode approved = action(policyIds[i], "APPROVE",
+                    action(policyIds[i], "SUBMIT", created, writer, 200), approver, 200);
+            action(policyIds[i], "ACTIVATE", approved, approver, 200);
+            // 규제 상한 + 지급 정책 하나, 이후 지급 정책 둘이 함께 활성화되어도 모두 조회된다.
+            for (int j = 0; j <= i; j++) {
+                var limit = limitPolicies.resolve(contracts[j]);
+                assertThat(limit.isSelected()).isTrue();
+                assertThat(limit.ruleset().policyVersionId()).isEqualTo(regulatoryId);
+                assertThat(limit.limit("MAINTENANCE_MONTHLY").orElseThrow().limitPct())
+                        .isEqualByComparingTo("0.8");
+                var payout = schedulePolicies.resolve(contracts[j], PaymentStage.GA_TO_FC);
+                assertThat(payout.isSelected()).isTrue();
+                assertThat(payout.commissionPolicy().getPolicyVersionId()).isEqualTo(policyIds[j]);
+            }
+        }
+    }
+
+    @Test
+    void rejectsOverlappingLimitRulesetsEvenWhenTheirPayoutOfferingsDiffer() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        for (int i = 0; i < 2; i++) {
+            long offering = insertOffering(false, "2027-01-01", document);
+            JsonNode created = create(installmentDraft(false, offering, "2027-01-01", document), writer);
+            long id = created.path("policyVersionId").asLong();
+            jdbc.update("""
+                    INSERT INTO fgc.fee_regime_ruleset_limit(fee_regime_ruleset_id, limit_code, limit_pct)
+                    SELECT fee_regime_ruleset_id, 'UPFRONT_TOTAL', 100
+                    FROM fgc.fee_regime_ruleset WHERE policy_version_id = ?
+                    """, id);
+            JsonNode review = action(id, "SUBMIT", created, writer, 200);
+            if (i == 0) {
+                action(id, "ACTIVATE", action(id, "APPROVE", review, approver, 200), approver, 200);
+                long contract = insertContract(offering, "2027-03-02");
+                assertThat(limitPolicies.resolve(contract).resolution().reasonCode())
+                        .isEqualTo(FeeRegimeReasonCode.RULESET_LIMIT_MISSING);
+            } else {
+                actionError(id, "APPROVE", review, approver, 422);
+                assertThat(statusOf(id)).isEqualTo("REVIEW");
+            }
+        }
+    }
+
+    @Test
+    void filtersPoliciesByActualOfferingEvenWhenDatesAndDocumentsAreIdentical() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        for (int i = 0; i < 2; i++) {
+            long offering = insertOffering(false, "2027-01-01", document);
+            long contract = insertContract(offering, "2027-03-02");
+            JsonNode created = create(installmentDraft(false, offering, "2027-01-01", document), writer);
+            long id = created.path("policyVersionId").asLong();
+            JsonNode approved = action(id, "APPROVE", action(id, "SUBMIT", created, writer, 200), approver, 200);
+            action(id, "ACTIVATE", approved, approver, 200);
+            var selected = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+            assertThat(selected.isSelected()).isTrue();
+            assertThat(selected.commissionPolicy().getPolicyVersionId()).isEqualTo(id);
+        }
+        // 두 번째 정책이 활성화된 후에도 첫 번째 판매버전 선택은 바뀌지 않는다.
+        var rows = jdbc.queryForList("""
+                SELECT c.contract_id, c.product_offering_id, cr.policy_version_id
+                FROM fgc.insurance_contract c
+                JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
+                JOIN fgc.commission_rule cr ON cr.product_offering_id = po.product_offering_id
+                WHERE po.basic_document_version = ?
+                """, document);
+        for (var row : rows) {
+            assertThat(schedulePolicies.resolve(((Number) row.get("contract_id")).longValue(), PaymentStage.GA_TO_FC)
+                    .commissionPolicy().getPolicyVersionId()).isEqualTo(((Number) row.get("policy_version_id")).longValue());
+        }
+        long sameOffering = ((Number) rows.getFirst().get("product_offering_id")).longValue();
+        JsonNode conflict = create(installmentDraft(false, sameOffering, "2027-01-01", document), writer);
+        long conflictingId = conflict.path("policyVersionId").asLong();
+        JsonNode conflictReview = action(conflictingId, "SUBMIT", conflict, writer, 200);
+        actionError(conflictingId, "APPROVE", conflictReview, approver, 422);
+        assertThat(statusOf(conflictingId)).isEqualTo("REVIEW");
+    }
+
+    @Test
+    void submissionChecksOfferingRegimeDocumentDatesPeriodAndInsurer() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-01-01", document);
+        ObjectNode base = installmentDraft(false, offering, "2027-01-01", document);
+        List<ObjectNode> invalid = new java.util.ArrayList<>();
+        invalid.add(base.deepCopy().put("feeRegimeCode", "SEVEN_YEAR_2029").put("policyType", "SEVEN_YEAR_COMMISSION"));
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("feeRegimeCode", "SEVEN_YEAR_2029");
+        invalid.add(base.deepCopy().put("basicDocumentVersion", document + "-wrong"));
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("basicDocumentVersion", document + "-wrong");
+        invalid.add(base.deepCopy());
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("salesStartDateFrom", "2027-01-02");
+        invalid.add(base.deepCopy());
+        ((ObjectNode) invalid.getLast().path("feeRegimeRules").get(0)).put("basicDocumentDateTo", "2026-12-31");
+        invalid.add(base.deepCopy().put("effectiveFrom", "2026-01-01").put("effectiveTo", "2026-12-31"));
+        invalid.add(base.deepCopy());
+        ((ObjectNode) invalid.getLast().path("commissionRules").get(0)).put("insurerId",
+                jdbc.queryForObject("SELECT min(insurer_id) FROM fgc.insurer", Long.class));
+        for (ObjectNode bad : invalid) {
+            bad.put("policyCode", "P014-" + UUID.randomUUID());
+            JsonNode created = create(bad, writer);
+            long id = created.path("policyVersionId").asLong();
+            actionError(id, "SUBMIT", created, writer, 400);
+            assertThat(statusOf(id)).isEqualTo("DRAFT");
+            assertThat(count("policy_approval_action", id)).isZero();
+        }
+    }
+
+    @Test
+    void validatesInstallmentLimitAgainstOnlyTheRulesetForTheSelectedOffering() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-07-01", document);
+        ObjectNode draft = installmentDraft(false, offering, "2027-01-01", document);
+        var regimes = (com.fasterxml.jackson.databind.node.ArrayNode) draft.path("feeRegimeRules");
+        ObjectNode later = ((ObjectNode) regimes.get(0)).deepCopy().put("salesStartDateFrom", "2027-07-01");
+        ((ObjectNode) regimes.get(0)).put("salesStartDateTo", "2027-06-30").put("maxInstallments", 24);
+        regimes.add(later);
+        JsonNode created = create(draft, writer);
+        action(created.path("policyVersionId").asLong(), "SUBMIT", created, writer, 200);
+
+        long earlier = insertOffering(false, "2027-01-01", document);
+        ObjectNode bad = draft.deepCopy().put("policyCode", "P014-" + UUID.randomUUID());
+        ((ObjectNode) bad.path("commissionRules").get(0)).put("productOfferingId", earlier);
+        JsonNode badCreated = create(bad, writer);
+        actionError(badCreated.path("policyVersionId").asLong(), "SUBMIT", badCreated, writer, 400);
+    }
+
+    @Test
+    void preservesMissingLongTermSettingsAndRoutesFlaggedPoliciesToReview() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(true, "2029-01-01", document);
+        long contract = insertContract(offering, "2029-03-02");
+        ObjectNode draft = installmentDraft(true, offering, "2029-01-01", document);
+        JsonNode created = create(draft, writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode approved = action(id, "APPROVE", action(id, "SUBMIT", created, writer, 200), approver, 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+        var selected = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+        assertThat(selected.isSelected()).isTrue();
+        assertThat(selected.selection().ruleset().longTermMaintenanceFrom()).isNull();
+        assertThat(selected.commissionPolicy().getRules()).allSatisfy(r ->
+                assertThat(r.getFeeComponentType()).isEqualTo(FeeComponentType.MAINTENANCE));
+
+        String flaggedDoc = "BD-" + UUID.randomUUID();
+        long flaggedOffering = insertOffering(false, "2027-01-01", flaggedDoc);
+        long flaggedContract = insertContract(flaggedOffering, "2027-03-02");
+        ObjectNode flagged = installmentDraft(false, flaggedOffering, "2027-01-01", flaggedDoc);
+        ((ObjectNode) flagged.path("feeRegimeRules").get(0)).put("reviewRequiredYn", true);
+        JsonNode flaggedCreated = create(flagged, writer);
+        long flaggedId = flaggedCreated.path("policyVersionId").asLong();
+        JsonNode flaggedApproved = action(flaggedId, "APPROVE",
+                action(flaggedId, "SUBMIT", flaggedCreated, writer, 200), approver, 200);
+        action(flaggedId, "ACTIVATE", flaggedApproved, approver, 200);
+        var review = schedulePolicies.resolve(flaggedContract, PaymentStage.GA_TO_FC);
+        assertThat(review.isSelected()).isFalse();
+        assertThat(review.commissionPolicy()).isNull();
+        assertThat(review.selection().resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.RULESET_FLAGGED);
+    }
+
+    @Test
+    void installmentPolicySuccessionKeepsOldContractRulesAndSelectsNewRulesByContractDate() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-01-01", document);
+        long oldContract = insertContract(offering, "2027-03-02");
+        long newContract = insertContract(offering, "2027-10-02");
+        JsonNode created = create(installmentDraft(false, offering, "2027-01-01", document), writer);
+        long originalId = created.path("policyVersionId").asLong();
+        JsonNode approved = action(originalId, "APPROVE",
+                action(originalId, "SUBMIT", created, writer, 200), approver, 200);
+        action(originalId, "ACTIVATE", approved, approver, 200);
+        JsonNode clone = write(HttpMethod.POST, "/api/v1/policies/" + originalId + "/versions",
+                cloneRequest("2027-07-01"), writer, key(), 201);
+        long nextId = clone.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(nextId, writer).path("editDocument").deepCopy();
+        ((ObjectNode) edit.path("commissionRules").get(0)).put("ratePct", "40.000000");
+        JsonNode changed = write(HttpMethod.PUT, "/api/v1/policies/" + nextId, edit, writer, key(), 200);
+        JsonNode nextApproved = action(nextId, "APPROVE",
+                action(nextId, "SUBMIT", changed, writer, 200), approver, 200);
+        action(nextId, "ACTIVATE", nextApproved, approver, 200);
+
+        var oldPolicy = schedulePolicies.resolve(oldContract, PaymentStage.GA_TO_FC);
+        var newPolicy = schedulePolicies.resolve(newContract, PaymentStage.GA_TO_FC);
+        assertThat(oldPolicy.commissionPolicy().getPolicyVersionId()).isEqualTo(originalId);
+        assertThat(oldPolicy.versionNo()).isEqualTo(1);
+        assertThat(oldPolicy.commissionPolicy().getRules()).allSatisfy(r ->
+                assertThat(r.getRatePct()).isEqualByComparingTo("45"));
+        assertThat(newPolicy.commissionPolicy().getPolicyVersionId()).isEqualTo(nextId);
+        assertThat(newPolicy.versionNo()).isEqualTo(2);
+        assertThat(newPolicy.commissionPolicy().getRules()).allSatisfy(r ->
+                assertThat(r.getRatePct()).isEqualByComparingTo("40"));
+    }
+
+    @Test
+    void legacyPolicyWithRulesBeyondItsLimitReturnsReviewInsteadOfUsableCalculationInput() throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(false, "2027-01-01", document);
+        long contract = insertContract(offering, "2027-03-02");
+        ObjectNode draft = installmentDraft(false, offering, "2027-01-01", document);
+        ((ObjectNode) draft.path("feeRegimeRules").get(0)).put("maxInstallments", 24);
+        JsonNode created = create(draft, writer);
+        long id = created.path("policyVersionId").asLong();
+        actionError(id, "SUBMIT", created, writer, 400);
+        // 시드/과거 적재로 형식 제약만 충족한 정책이 존재해도 읽기 경로가 자동 계산으로 넘기지 않는다.
+        jdbc.update("UPDATE fgc.policy_version SET status='APPROVED', approved_by=?, approved_at=clock_timestamp() WHERE policy_version_id=?",
+                approver.getUserId(), id);
+        jdbc.update("UPDATE fgc.policy_version SET status='ACTIVE' WHERE policy_version_id=?", id);
+        var review = schedulePolicies.resolve(contract, PaymentStage.GA_TO_FC);
+        assertThat(review.isSelected()).isFalse();
+        assertThat(review.commissionPolicy()).isNull();
+        assertThat(review.selection().resolution().reasonCode()).isEqualTo(FeeRegimeReasonCode.COMMISSION_RULE_INVALID);
+        assertThat(review.selection().resolution().candidateRulesetIds()).hasSize(1);
+    }
+
+    private ObjectNode installmentDraft(boolean seven, long offering, String from, String document) {
+        ObjectNode draft = draft().put("policyType", seven ? "SEVEN_YEAR_COMMISSION" : "FOUR_YEAR_COMMISSION")
+                .put("feeRegimeCode", seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027")
+                .put("effectiveFrom", from).putNull("effectiveTo").put("basicDocumentVersion", document);
+        ((ObjectNode) draft.path("commissionRules").get(0)).put("productOfferingId", offering)
+                .put("feeComponentType", "MAINTENANCE").put("installmentTo", seven ? 84 : 48)
+                .put("ratePct", seven ? "24.000000" : "45.000000").put("equalMonthlyYn", true);
+        ObjectNode regime = draft.putArray("feeRegimeRules").addObject()
+                .put("feeRegimeCode", seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027")
+                .put("salesStartDateFrom", from).put("basicDocumentVersion", document)
+                .put("maxInstallments", seven ? 84 : 48);
+        regime.putArray("sourceRefs").add("REG-03").add("SRC-022");
+        return draft;
+    }
+
+    private long insertOffering(boolean seven, String salesStart, String document) {
+        String code = UUID.randomUUID().toString();
+        long product = jdbc.queryForObject("""
+                INSERT INTO fgc.product(insurer_id, insurer_product_code, standard_product_code, product_name, product_group_code)
+                VALUES (?, ?, ?, '분급 정책 연결 검증 상품', 'LIFE') RETURNING product_id
+                """, Long.class, insurerId, code, code);
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.product_offering(product_id, offering_version, sales_start_date, basic_document_version,
+                                                basic_document_date, channel_code, fee_regime_code)
+                VALUES (?, 'P014', ?::date, ?, ?::date, 'FACE_TO_FACE', ?) RETURNING product_offering_id
+                """, Long.class, product, salesStart, document, salesStart, seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027");
+    }
+
+    private long insertContract(long offering, String contractDate) {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.insurance_contract(insurer_id, product_offering_id, contract_no, contract_date,
+                    agent_id, organization_id, premium_per_cycle_amount, first_premium_amount,
+                    monthly_equivalent_first_premium, payment_term_months)
+                SELECT ?, ?, ?, ?::date, agent_id, organization_id, 100000, 100000, 100000, 240
+                FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1 RETURNING contract_id
+                """, Long.class, insurerId, offering, "P014-" + UUID.randomUUID(), contractDate);
+    }
+
+    private long insertItem() {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.commission_item(item_code, item_name, cashflow_type, item_category, effective_from)
+                VALUES (?, '장기유지 예정 수수료', 'PAYMENT', 'SALES', DATE '2026-01-01')
+                RETURNING commission_item_id
+                """, Long.class, "P014-" + UUID.randomUUID());
+    }
+
+    private ObjectNode clawbackDraft() {
+        ObjectNode draft = draft().put("policyType", "CLAWBACK").putNull("feeRegimeCode");
+        draft.putArray("commissionRules");
+        draft.putArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        return draft;
     }
 
     private ObjectNode draft() {

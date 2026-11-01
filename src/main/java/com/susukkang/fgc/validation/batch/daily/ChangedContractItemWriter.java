@@ -1,6 +1,7 @@
 package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.validation.batch.ValidationRunBatchContext;
 import com.susukkang.fgc.validation.repository.ContractStatusEventProcessingRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class ChangedContractItemWriter implements ItemWriter<ChangedContractResu
 
     private final ContractStatusEventProcessingRepository contractStatusEventProcessingRepository;
     private final ExceptionCaseRepository exceptionCaseRepository;
+    private final ClawbackCandidateCaptureService clawbackCandidateCaptureService;
 
     private Long validationRunId;
 
@@ -36,6 +38,9 @@ public class ChangedContractItemWriter implements ItemWriter<ChangedContractResu
             // 결정을 내린 시점과 이 write() 시점 사이에 새로 들어온 이벤트까지 주워서
             // SUCCEEDED로 찍어버리는 TOCTOU 레이스가 생긴다(ChangedContractResult 참고).
             List<Long> pendingEventIds = result.pendingEventIds();
+
+            // FUN-054: 정책/스케줄 검증 실패여도 원천 후보는 보존한다. 사건 처리 성공 표시는 기존 분기를 따른다.
+            clawbackCandidateCaptureService.captureStatusEvents(pendingEventIds);
 
             if (result.success()) {
                 // 성공 시엔 SUCCEEDED로 기록한다 — uq_cse_processing_succeeded 부분 유니크

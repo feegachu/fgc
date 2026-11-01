@@ -2,6 +2,7 @@ package com.susukkang.fgc.validation.batch.daily;
 
 import com.susukkang.fgc.arbitrage.service.ArbitrageCheckBatchItemService;
 import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
@@ -62,6 +63,7 @@ public class DailyChangedContractJobConfig {
     private final ExceptionCaseRepository exceptionCaseRepository;
     private final ArbitrageCheckBatchItemService arbitrageCheckBatchItemService;
     private final ContractStatusEventRepository contractStatusEventRepository;
+    private final ClawbackCandidateCaptureService clawbackCandidateCaptureService;
 
     @Bean
     public Job dailyChangedContractJob(JobRepository jobRepository,
@@ -162,7 +164,8 @@ public class DailyChangedContractJobConfig {
     }
 
     private ChangedContractItemWriter changedContractItemWriter() {
-        return new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository);
+        return new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository,
+                clawbackCandidateCaptureService);
     }
 
     private ValidationRunStepProgressListener progressListener(int stepNo, boolean initialStep) {

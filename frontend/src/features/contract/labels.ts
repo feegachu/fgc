@@ -45,6 +45,19 @@ export const arbitrageStatusLabels = {
   REVIEW_REQUIRED: '자료부족',
 } satisfies Record<NonNullable<Schema['ArbitrageCheckView']['resultStatus']>, string>
 
+/** 상태 변경 사유코드(IF-API-12 statusReasonCodes). 서버가 라벨을 주지 않는다. */
+export const statusReasonLabels = {
+  MANUAL_STATUS_CHANGE: '수기 상태 변경',
+} satisfies Record<NonNullable<Schema['ContractDetailResponse']['statusReasonCodes']>[number], string>
+
+/** IF-API-19 응답 followUp.status. 200은 저장 성공이며 후속 처리 완료가 아니다. */
+export const followUpStatusLabels = {
+  PENDING: '대기 중',
+  SUCCEEDED: '완료',
+  FAILED: '실패',
+  NOT_REQUIRED: '대상 없음',
+} satisfies Record<NonNullable<Schema['FollowUp']['status']>, string>
+
 /** 처리 결과는 서버 문자열 코드다. 1차 상세 화면의 표시 규칙을 유지한다. */
 export const processingStatusLabels: Record<string, string> = {
   PENDING: '처리 대기',

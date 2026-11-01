@@ -1,6 +1,8 @@
 package com.susukkang.fgc.common.exception;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -38,6 +40,20 @@ class ConstraintErrorCodeResolverTest {
         );
 
         assertThat(resolver.resolve(exception)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"insurer_id", "product_offering_id", "commission_item_id"})
+    void mapsClawbackTargetForeignKeysToInputError(String column) {
+        RuntimeException exception = new RuntimeException(
+                "violates foreign key constraint clawback_rule_" + column + "_fkey");
+        assertThat(resolver.resolve(exception)).contains(FgcErrorCode.POL_005);
+    }
+
+    @Test
+    void mapsClawbackRuleUniqueKeyToPolicyOverlap() {
+        assertThat(resolver.resolve(new RuntimeException("constraint uq_clawback_rule")))
+                .contains(FgcErrorCode.POL_002);
     }
 
     // 2026-08-11 yslee - 서로 다른 지급 건의 확정 멱등키 충돌 응답 검증

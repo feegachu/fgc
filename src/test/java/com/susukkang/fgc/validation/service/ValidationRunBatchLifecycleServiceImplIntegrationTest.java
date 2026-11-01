@@ -12,6 +12,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,16 +40,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 그 뒤에 오는 findById는 완전히 새로운(정상 상태의) 트랜잭션에서 실행된다. 대신 롤백에
  * 기댈 수 없으니 @AfterEach에서 직접 지운다.
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_validation_run_lifecycle?currentSchema=fgc")
 class ValidationRunBatchLifecycleServiceImplIntegrationTest {
 
     // 존재하지 않는 app_user.user_id — audit_log INSERT를 FK 위반으로 실패시키기 위한 값.
     // demo 시드가 만드는 user_id는 한 자릿수라 이 값과 절대 겹치지 않는다.
     private static final long NON_EXISTENT_USER_ID = 999_999_999L;
 
-    // cleanUp()이 이 월을 통째로 지우므로(@Transactional 없이 실제 커밋한다) 이 클래스 전용 월이어야
-    // 한다 — 다른 테스트와 공유하는 월을 쓰면 남의 행까지 지우려다 FK 위반으로 DELETE가 통째로
-    // 실패하고, 그 뒤로 남은 행이 다른 테스트를 무너뜨린다(2099-01에서 실제로 발생, bee042b4).
+    // 다른 배치 테스트가 무작위 월에 남긴 실행·cap_check와 충돌하지 않도록 DB를 분리한다.
+    // 전용 DB 안에서는 각 테스트가 같은 월·회차를 재사용하므로 cleanUp()에서 정리한다.
     private static final LocalDate TEST_MONTH = LocalDate.of(2093, 1, 1);
 
     @Autowired
@@ -68,6 +71,92 @@ class ValidationRunBatchLifecycleServiceImplIntegrationTest {
                 VALUES (?, ?, 'CREATED')
                 RETURNING validation_run_id
                 """, Long.class, month, runNo);
+    }
+
+    private Long insertFailedRun() {
+        Long id = insertCreatedRun(TEST_MONTH, 1);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status='RUNNING',current_step=1,started_at=clock_timestamp() WHERE validation_run_id=?", id);
+        jdbcTemplate.update("UPDATE fgc.validation_run SET status='FAILED',current_step=5,failure_message='25번째 실패' WHERE validation_run_id=?", id);
+        return id;
+    }
+
+    @Test
+    void restartPreservesFailedStepAndStartTimeAndRecordsCurrentRequest() {
+        Long id = insertFailedRun();
+        var startedAt = validationRunRepository.findById(id).orElseThrow().getStartedAt();
+        Long userId = jdbcTemplate.queryForObject("SELECT MIN(user_id) FROM fgc.app_user", Long.class);
+        lifecycleService.restart(id, new MonthlyValidationJobParameters(
+                TEST_MONTH, 1L, ValidationRunType.MONTHLY, userId, "restart-db-success"));
+        var run = validationRunRepository.findById(id).orElseThrow();
+        assertThat(run.getStatus().name()).isEqualTo("RUNNING");
+        assertThat(run.getCurrentStep()).isEqualTo(5);
+        assertThat(run.getStartedAt()).isEqualTo(startedAt);
+        assertThat(run.getFailureMessage()).isNull();
+        assertThat(validationRunRepository.findLatestAttemptRequestId(id)).isEqualTo("restart-db-success");
+    }
+
+    @Test
+    void failedRetryAuditRollsBackTheRestartClaim() {
+        Long id = insertFailedRun();
+        assertThatThrownBy(() -> lifecycleService.restart(id, new MonthlyValidationJobParameters(
+                TEST_MONTH, 1L, ValidationRunType.MONTHLY, NON_EXISTENT_USER_ID, "restart-db-rollback")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        var run = validationRunRepository.findById(id).orElseThrow();
+        assertThat(run.getStatus().name()).isEqualTo("FAILED");
+        assertThat(run.getCurrentStep()).isEqualTo(5);
+        assertThat(run.getFailureMessage()).isEqualTo("25번째 실패");
+        assertThat(validationRunRepository.findLatestAttemptRequestId(id)).isNull();
+    }
+
+    @Test
+    void concurrentRestartsHaveOnlyOneClaimAndOneAudit() throws Exception {
+        Long id = insertFailedRun();
+        Long userId = jdbcTemplate.queryForObject("SELECT MIN(user_id) FROM fgc.app_user", Long.class);
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> attempt = () -> {
+                ready.countDown();
+                if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("재시작 경합 준비 시간 초과");
+                try {
+                    lifecycleService.restart(id, new MonthlyValidationJobParameters(
+                            TEST_MONTH, 1L, ValidationRunType.MONTHLY, userId, "restart-db-race", 42L));
+                    return true;
+                } catch (FgcBusinessException expectedConflict) {
+                    return false;
+                }
+            };
+            var first = executor.submit(attempt);
+            var second = executor.submit(attempt);
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(java.util.List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+        }
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.audit_log WHERE entity_type='VALIDATION_RUN'
+                  AND entity_id=? AND action_code='VALIDATION_RUN_RETRIED'
+                """, Long.class, id.toString())).isEqualTo(1L);
+    }
+
+    @Test
+    void consumedFailedExecutionCannotRestartAgainAfterItsRetryFails() {
+        Long id = insertFailedRun();
+        Long userId = jdbcTemplate.queryForObject("SELECT MIN(user_id) FROM fgc.app_user", Long.class);
+        var first = new MonthlyValidationJobParameters(TEST_MONTH, 1L, ValidationRunType.MONTHLY,
+                userId, "restart-db-parent", 42L);
+        lifecycleService.restart(id, first);
+        lifecycleService.fail(id, 6, first, "재시작도 실패");
+        assertThatThrownBy(() -> lifecycleService.restart(id, first)).isInstanceOf(FgcBusinessException.class);
+        assertThat(validationRunRepository.findById(id).orElseThrow().getStatus().name()).isEqualTo("FAILED");
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM fgc.audit_log WHERE entity_type='VALIDATION_RUN'
+                  AND entity_id=? AND action_code='VALIDATION_RUN_RETRIED'
+                """, Long.class, id.toString())).isEqualTo(1L);
+        // 새 실패를 확인한 뒤 사람이 새 요청을 보내는 것은 허용한다.
+        lifecycleService.restart(id, new MonthlyValidationJobParameters(TEST_MONTH, 1L, ValidationRunType.MONTHLY,
+                userId, "restart-db-new-parent", 43L));
+        assertThat(validationRunRepository.findById(id).orElseThrow().getStatus().name()).isEqualTo("RUNNING");
     }
 
     @Test

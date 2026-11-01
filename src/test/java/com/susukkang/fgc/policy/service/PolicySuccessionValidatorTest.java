@@ -22,6 +22,24 @@ class PolicySuccessionValidatorTest {
     private final PolicySuccessionValidator validator = new PolicySuccessionValidator();
 
     @Test
+    void clawbackSuccessionAllowsRateChangesAndSplitBandsButRequiresOriginalScopeCoverage() throws Exception {
+        ObjectNode previous = document().put("policyType", "CLAWBACK");
+        previous.putArray("commissionRules");
+        ObjectNode rule = previous.withArray("clawbackRules").addObject()
+                .put("insurerId", 1).put("elapsedMonthFrom", 0).put("elapsedMonthTo", 23)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
+        replacement.putArray("clawbackRules").add(rule.deepCopy().put("elapsedMonthTo", 11).put("clawbackRatePct", "100"))
+                .add(rule.deepCopy().put("elapsedMonthFrom", 12).put("clawbackRatePct", "0"));
+        assertValid(previous, replacement);
+        ((ObjectNode) replacement.path("clawbackRules").get(1)).put("elapsedMonthFrom", 13);
+        assertInvalid(previous, replacement, "clawbackRules");
+        replacement = previous.deepCopy();
+        ((ObjectNode) replacement.path("clawbackRules").get(0)).put("commissionItemId", 5);
+        assertInvalid(previous, replacement, "clawbackRules");
+    }
+
+    @Test
     void permitsChangedPricesAndPriorityFromTheNewContractDate() throws Exception {
         ObjectNode previous = document(), replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         assertValid(previous, replacement);
@@ -160,6 +178,27 @@ class PolicySuccessionValidatorTest {
         var changedIndirect = Map.of(2L, Set.of(new PolicyFeeLimit("UPFRONT_TOTAL", new BigDecimal("100"), false)));
         assertThatThrownBy(() -> validator.validateFeeLimits(draft(previous), draft(replacement), originalLimits, changedIndirect))
                 .isInstanceOf(FgcBusinessException.class);
+    }
+
+    @Test
+    void clawbackSuccessionAllowsNewRatesAndSplitBandsButPreservesScopeAndMonthCoverage() throws Exception {
+        ObjectNode previous = document().put("policyType", "CLAWBACK");
+        previous.withArray("commissionRules").removeAll();
+        previous.withArray("clawbackRules").addObject().put("insurerId", 1).put("commissionItemId", 2)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 23)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "100");
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
+        ObjectNode rule = (ObjectNode) replacement.path("clawbackRules").get(0);
+        rule.put("elapsedMonthTo", 11).put("clawbackRatePct", "50");
+        replacement.withArray("clawbackRules").add(rule.deepCopy().put("elapsedMonthFrom", 12)
+                .put("elapsedMonthTo", 23).put("clawbackRatePct", "0"));
+        assertValid(previous, replacement);
+        rule.put("insurerId", 3);
+        assertInvalid(previous, replacement, "clawbackRules");
+        rule.putNull("insurerId");
+        assertValid(previous, replacement);
+        rule.put("elapsedMonthTo", 10);
+        assertInvalid(previous, replacement, "clawbackRules");
     }
 
     private void assertValid(ObjectNode previous, ObjectNode replacement) {

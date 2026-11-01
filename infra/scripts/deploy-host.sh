@@ -77,10 +77,9 @@ listen 443 ssl;
 ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
 ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 ssl_protocols TLSv1.2 TLSv1.3;
-# 주의: location 안에 add_header가 있으면 그 location에서는 아래 헤더가 상속되지 않는다(nginx 규칙)
-add_header Strict-Transport-Security "max-age=31536000" always;
-add_header X-Content-Type-Options nosniff always;
-add_header X-Frame-Options DENY always;
+# 보안 헤더는 이미지의 fgc-security-headers.conf가 모든 location에 붙인다(#677). 여기서는 HTTPS 전용 HSTS 값만 채운다.
+# 예전처럼 여기서 add_header를 쓰면 add_header가 있는 location(/, /assets)에는 붙지 않는다(nginx 상속 규칙).
+set \$fgc_hsts "max-age=31536000";
 location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; }
 # 80으로 온 요청은 HTTPS로. 인증서 갱신 challenge도 리다이렉트를 따라 443에서 위 location이 응답한다
 if (\$scheme = http) { return 301 https://\$host\$request_uri; }

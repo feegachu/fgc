@@ -1,6 +1,7 @@
 package com.susukkang.fgc.policy.service;
 
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.policy.code.FeeRegimeReasonCode;
 import com.susukkang.fgc.policy.code.FeeRegimeResolutionStatus;
 import com.susukkang.fgc.policy.dto.FeeRegimeRulesetSelection;
@@ -22,7 +23,8 @@ import java.util.List;
  * REVIEW_REQUIRED·NOT_APPLICABLE 은 예외로 바꾸지 않고 사유와 사용한 키 값을 그대로 돌려준다.
  * NOT_APPLICABLE 이면 호출부(#649)는 기존 findApplicableCurrentCommissionPolicies 경로를 그대로 써야 한다.
  * 선택된 룰셋에 필수 한도 행(UPFRONT_TOTAL·MAINTENANCE_MONTHLY, 장기유지 구간이 있으면 LONG_TERM_MONTHLY)이 없으면
- * DB 제약으로 막을 수 없으므로 REVIEW_REQUIRED(RULESET_LIMIT_MISSING)로 돌려준다.
+ * DB 제약으로 막을 수 없으므로 resolve는 REVIEW_REQUIRED(RULESET_LIMIT_MISSING)로 돌려준다.
+ * resolveForSchedule은 실제 수수료 규칙 범위로 후보를 좁히고, 후순위 한도 검증을 선행조건으로 요구하지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,7 +39,15 @@ public class FeeRegimeRulesetService {
     private final FeeRegimeResolverRepository resolverRepository;
 
     public FeeRegimeRulesetSelection resolve(Long contractId) {
-        FeeRegimeResolution resolution = resolver.resolve(contractId);
+        return loadSelection(resolver.resolve(contractId), true);
+    }
+
+    /** FUN-014·037·038: 예정 생성용 조회는 후순위 FUN-062 한도 데이터의 완성을 요구하지 않는다. */
+    public FeeRegimeRulesetSelection resolveForSchedule(Long contractId, PaymentStage paymentStage) {
+        return loadSelection(resolver.resolveForSchedule(contractId, paymentStage), false);
+    }
+
+    private FeeRegimeRulesetSelection loadSelection(FeeRegimeResolution resolution, boolean requireLimits) {
         if (resolution.rulesetId() == null) {
             return new FeeRegimeRulesetSelection(resolution, null, List.of());
         }
@@ -52,7 +62,7 @@ public class FeeRegimeRulesetService {
                 .toList();
 
         List<String> missing = missingRequiredLimits(header, limits);
-        if (!missing.isEmpty()) {
+        if (requireLimits && !missing.isEmpty()) {
             // 한도 행이 비면 호출부가 "한도 없음"으로 읽어 REG-02·03·05 상한 검증 없이 확정할 수 있다 → 자동 확정하지 않는다
             return new FeeRegimeRulesetSelection(limitMissing(resolution), null, List.of());
         }
@@ -82,6 +92,7 @@ public class FeeRegimeRulesetService {
         return new Ruleset(h.getRulesetId(), h.getPolicyVersionId(), h.getFeeRegimeCode(),
                 h.getSalesStartDateFrom(), h.getSalesStartDateTo(), h.getBasicDocumentVersion(),
                 h.getBasicDocumentDateFrom(), h.getBasicDocumentDateTo(), h.getMaxInstallments(),
-                h.getLongTermMaintenanceFrom(), h.getLongTermMaintenanceTo());
+                h.getLongTermMaintenanceFrom(), h.getLongTermMaintenanceTo(),
+                h.getSourceRefs() == null ? List.of() : List.of(h.getSourceRefs()));
     }
 }

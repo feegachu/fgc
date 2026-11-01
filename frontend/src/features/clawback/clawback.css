@@ -1,0 +1,158 @@
+.claw-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+
+.claw-filter-fields {
+  flex: 1 1 auto;
+}
+.claw-filter-basis,
+.claw-filter-trigger,
+.claw-filter-status {
+  width: 8.5rem;
+}
+.claw-filter-date {
+  width: 9.5rem;
+}
+.claw-filter-contract,
+.claw-filter-agent {
+  width: 11rem;
+}
+.claw-filter-insurer,
+.claw-filter-product {
+  width: 13rem;
+}
+
+.claw-content-grid {
+  align-items: start;
+}
+.claw-list-panel,
+.claw-detail-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+.claw-detail-panel {
+  align-self: start;
+}
+.claw-panel-header {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.claw-result-count {
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+.claw-list-table {
+  min-width: 84rem;
+}
+.claw-result-row {
+  cursor: pointer;
+}
+.claw-result-row:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: -2px;
+}
+.claw-result-row.is-selected {
+  background: var(--color-action-subtle);
+}
+.claw-cell-sub,
+.claw-muted {
+  color: var(--color-text-tertiary);
+}
+.claw-cell-sub {
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+.claw-pagination-footer {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.claw-detail-placeholder {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+.claw-detail-list {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--color-border-default);
+}
+.claw-detail-list > div {
+  display: grid;
+  min-height: 2.5rem;
+  grid-template-columns: minmax(7.5rem, 36%) minmax(0, 1fr);
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-default);
+}
+.claw-detail-list dt,
+.claw-detail-list dd {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+.claw-detail-list dt {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.claw-detail-list dd {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.claw-reason-list {
+  margin: 0;
+  padding-left: 1rem;
+}
+
+.claw-evidence {
+  margin-top: var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+}
+.claw-evidence-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+.claw-evidence-table {
+  overflow-x: auto;
+}
+.claw-evidence-empty {
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+.claw-policy-badge {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-status-info-border);
+  border-radius: var(--radius-6);
+  color: var(--color-status-info-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.claw-calculation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+}
+.claw-calculation-actions .field-helper {
+  margin: 0;
+}

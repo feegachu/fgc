@@ -334,6 +334,8 @@ class ContractServiceImplTest {
         InsuranceContract current = withContractId(21L, InsuranceContract.builder()
                 .contractNo("KEEP-001")
                 .insurerId(1L)
+                .agentId(request.getAgentId())
+                .currentStatus(request.getContractStatus())
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
@@ -371,6 +373,8 @@ class ContractServiceImplTest {
         InsuranceContract current = withContractId(21L, InsuranceContract.builder()
                 .contractNo(request.getContractNo())
                 .insurerId(request.getInsurerId())
+                .agentId(request.getAgentId())
+                .currentStatus(request.getContractStatus())
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
@@ -393,6 +397,8 @@ class ContractServiceImplTest {
                 .insurerId(request.getInsurerId())
                 .productOfferingId(request.getProductOfferingId())
                 .contractDate(request.getContractDate())
+                .agentId(request.getAgentId())
+                .currentStatus(request.getContractStatus())
                 .paymentCycleCode(request.getPaymentCycleCode())
                 .firstPremiumAmount(new BigDecimal("90000"))
                 .monthlyEquivalentFirstPremium(new BigDecimal("90000"))
@@ -424,12 +430,20 @@ class ContractServiceImplTest {
     }
 
     @Test
-    @DisplayName("모집설계사가 변경되면 수령자를 다시 계산하도록 스케줄을 재생성한다")
-    void updateContractRegeneratesSchedulesWhenAgentChanges() {
+    @DisplayName("최초 설계사를 바꾸는 수정은 422로 거절하고 계약·스케줄·사건·감사를 바꾸지 않는다")
+    void updateContractRejectsAgentChangeBeforeAnySideEffects() {
+        // #653·#621: 최초 연결 설계사 고정. 이전에는 설계사 변경이 스케줄 재생성으로 이어졌다.
         ContractUpdateRequest request = updateRequest();
         InsuranceContract current = contractMatching(request, 99L, request.getOrganizationId());
+        given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
 
-        assertScheduleRegeneratedForRecipientChange(request, current);
+        assertThatThrownBy(() -> contractService.updateContract(21L, request))
+                .isInstanceOfSatisfying(FgcBusinessException.class, failure ->
+                        assertThat(failure.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_AGENT_FIXED));
+
+        assertThat(current.getAgentId()).isEqualTo(99L);
+        verify(insuranceContractRepository, never()).flush();
+        verifyNoInteractions(scheduleService, capCheckService, auditLogService, contractStatusEventRepository);
     }
 
     @Test
@@ -463,6 +477,8 @@ class ContractServiceImplTest {
                 .insurerId(request.getInsurerId())
                 .productOfferingId(request.getProductOfferingId())
                 .contractDate(request.getContractDate())
+                .agentId(request.getAgentId())
+                .currentStatus(request.getContractStatus())
                 .paymentCycleCode(request.getPaymentCycleCode())
                 .firstPremiumAmount(new BigDecimal("90000"))
                 .monthlyEquivalentFirstPremium(new BigDecimal("90000"))
@@ -494,6 +510,8 @@ class ContractServiceImplTest {
         InsuranceContract current = withContractId(21L, InsuranceContract.builder()
                 .contractNo("OLD-001")
                 .insurerId(request.getInsurerId())
+                .agentId(request.getAgentId())
+                .currentStatus(request.getContractStatus())
                 .dataOrigin(DataOrigin.SEED)
                 .build());
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
@@ -501,8 +519,10 @@ class ContractServiceImplTest {
         given(insuranceContractRepository.existsByInsurerIdAndContractNo(request.getInsurerId(), request.getContractNo()))
                 .willReturn(true);
 
+        // 앞단의 설계사 고정·상태 검사가 아니라 계약번호 중복으로 거절되는지까지 확인한다.
         assertThatThrownBy(() -> contractService.updateContract(21L, request))
-                .isInstanceOf(FgcBusinessException.class);
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        failure -> assertThat(failure.getField()).isEqualTo("contractNo"));
 
         verify(insuranceContractRepository, never()).flush();
         assertThat(current.getContractNo()).isEqualTo("OLD-001");
@@ -716,11 +736,14 @@ class ContractServiceImplTest {
 
     @Test
     void changingHistoricalRecipientStillRequiresEligibleAgent() {
+        // 설계사는 고정(#653)이므로 관리자 수령자가 바뀌는 조직 변경으로 같은 자격 검사를 확인한다.
         ContractUpdateRequest request = updateRequest();
-        InsuranceContract current = contractMatching(request, 999L, request.getOrganizationId());
+        InsuranceContract current = contractMatching(request, request.getAgentId(), 99L);
         given(insuranceContractRepository.findById(21L)).willReturn(Optional.of(current));
         given(contractQueryRepository.existsEligibleAgent(request.getAgentId(), request.getContractDate())).willReturn(false);
-        assertThatThrownBy(() -> contractService.updateContract(21L, request)).isInstanceOf(FgcBusinessException.class);
+        assertThatThrownBy(() -> contractService.updateContract(21L, request))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        failure -> assertThat(failure.getField()).isEqualTo("agentId"));
         verify(insuranceContractRepository, never()).flush();
         verifyNoInteractions(scheduleService, capCheckService, auditLogService);
     }
@@ -796,7 +819,8 @@ class ContractServiceImplTest {
                 new BigDecimal("100000"),
                 120,
                 new BigDecimal("50000"),
-                OffsetDateTime.parse("2026-10-11T01:00:00.123456Z")
+                OffsetDateTime.parse("2026-10-11T01:00:00.123456Z"),
+                null
         );
     }
 }

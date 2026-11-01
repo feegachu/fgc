@@ -4,6 +4,7 @@ import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 
 public interface ValidationRunBatchLifecycleService {
     void start(Long validationRunId, MonthlyValidationJobParameters parameters);
+    void restart(Long validationRunId, MonthlyValidationJobParameters parameters);
 
     void advance(Long validationRunId, int step, MonthlyValidationJobParameters parameters);
 

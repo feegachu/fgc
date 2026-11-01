@@ -72,10 +72,10 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
 
         // 2) stepExecution.getStatus()는 BatchStatus(COMPLETED/FAILED/...) 성공여부 판정
         if (stepExecution.getStatus() == BatchStatus.COMPLETED) {
-            if (initialStep) {
+            if (initialStep && stepExecution.getJobParameters().getLong("restartValidationRunId") == null) {
                 // 1 createRunStep 성공 = validation_run이 막 CREATED 상태로 만들어졌다는 뜻
                 lifecycleService.start(validationRunId, parameters);
-            } else {
+            } else if (!initialStep) {
                 // 2~8 성공 = RUNNING 상태를 유지한 채 current_step만 이 Step의 번호로 전진
                 lifecycleService.advance(validationRunId, stepNo, parameters);
             }

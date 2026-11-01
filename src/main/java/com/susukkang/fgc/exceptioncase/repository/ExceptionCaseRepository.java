@@ -171,6 +171,29 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
                                 @Param("paymentStage") String paymentStage,
                                 @Param("description") String description);
 
+    /** 대사 skip은 결과 행이 없으므로 계약·지급단계·사유를 안정 업무키로 직접 기록한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query(value = """
+            SELECT recorded.recorded_case_id
+              FROM fgc.validation_run vr
+              CROSS JOIN LATERAL fgc.record_exception_detection(
+                  CONCAT('DATA_QUALITY:', TO_CHAR(vr.validation_month, 'YYYY-MM'),
+                         ':CONTRACT:', :contractId, ':RECONCILIATION:', :paymentStage, ':', :reasonCode),
+                  'DATA_QUALITY', :reasonCode, 'WARNING', :validationRunId, :contractId, NULL, NULL,
+                  'INSURANCE_CONTRACT', CAST(:contractId AS varchar),
+                  CONCAT('대사 검토 필요 - ', CAST(:paymentStage AS text)), :description,
+                  jsonb_build_object('paymentStage', CAST(:paymentStage AS text),
+                                     'reasonCode', CAST(:reasonCode AS text),
+                                     'description', CAST(:description AS text))
+              ) recorded
+             WHERE vr.validation_run_id = :validationRunId
+            """, nativeQuery = true)
+    Long insertReconciliationSkip(@Param("validationRunId") Long validationRunId,
+                                  @Param("contractId") Long contractId,
+                                  @Param("paymentStage") String paymentStage,
+                                  @Param("reasonCode") String reasonCode,
+                                  @Param("description") String description);
+
     /** 월 검증 8단계: 이번 실행의 1,200% 한도 위반·검토필요 전부를 한 번에 탐지·기록한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """

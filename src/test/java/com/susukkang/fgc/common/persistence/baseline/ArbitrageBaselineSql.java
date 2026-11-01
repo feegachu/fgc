@@ -354,7 +354,7 @@ final class ArbitrageBaselineSql {
                     AND
                         sh.schedule_purpose = 'OPERATIONAL'
                     AND
-                        sl.line_status = 'PLANNED'
+                        sl.line_status IN ('PLANNED', 'HOLD')
                         AND NOT EXISTS (
                             SELECT 1 FROM fgc.contract_status_event e
                             WHERE e.contract_id=sh.contract_id

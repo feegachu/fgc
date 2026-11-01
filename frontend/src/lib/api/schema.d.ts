@@ -4,6 +4,126 @@
  */
 
 export interface paths {
+    "/api/v1/agent/me/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 본인 수수료 명세 목록
+         * @description 지급·보류·조정·환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.
+         */
+        get: operations["mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/me/statements/{entryKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 본인 수수료 명세 상세
+         * @description 원천 ID·정책·계산 근거를 돌려줍니다. 남의 명세는 조회되지 않습니다.
+         */
+        get: operations["mineDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/compare-chat/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자연어 질문 답변
+         * @description 순위 결과(rankResultId, 선택)와 기본 용어 설명만 근거로 질문에 답한다. 범위 밖·검증 실패는 고정 문장으로 대체한다.
+         */
+        post: operations["ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/compare-chat/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 비교 카테고리 목록
+         * @description 챗봇 1단계에서 고르는 카테고리와 비교 가능한 보험사 수를 돌려준다.
+         */
+        get: operations["categories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/compare-chat/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 순위 요약 문장
+         * @description 서버가 보관한 순위 결과(rankResultId)를 풀어 쓴 요약을 돌려준다. 요약 실패는 200 + summaryError 로 알린다.
+         */
+        post: operations["explain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/compare-chat/rank": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 상품 비교 참고 순위
+         * @description 카테고리와 선택 세부 조건(보험사·한도 초과 제외)을 받아 설계사 본인 기준 보수적 순수령액으로 상품 순위와 근거를 계산한다(LLM 없이 완성).
+         */
+        post: operations["rank"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arbitrage-checks": {
         parameters: {
             query?: never;
@@ -304,6 +424,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clawbacks/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IF-API-83 환수 검토 후보 검색 */
+        get: operations["searchClawbackCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clawbacks/candidates/{candidateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IF-API-84 환수 후보 원천·지급·보류 근거 조회 */
+        get: operations["getClawbackCandidate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clawbacks/candidates/{candidateId}/calculations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * IF-API-85 환수액 계산
+         * @description 선택한 정책버전과 서버가 잠근 원천으로 계산판을 만듭니다. 최신 판과 원천·정책·산식이 같으면 그 판을 반환하고, 같은 Idempotency-Key 재요청은 최초 결과를 반환합니다.
+         */
+        post: operations["calculateClawbackCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clawbacks/{id}/notice-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** IF-API-86 환수 통지서 발행 이력 */
+        get: operations["listClawbackNoticeDocuments"];
+        put?: never;
+        /**
+         * IF-API-73 환수 통지서 PDF 발행
+         * @description 지정한 계산판 snapshot으로 새 판을 만듭니다. 같은 Idempotency-Key 재요청은 같은 판을 반환하고, 환수 상태·통지일·확정액은 바꾸지 않습니다.
+         */
+        post: operations["issueClawbackNoticeDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts": {
         parameters: {
             query?: never;
@@ -344,6 +539,10 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getContractById"];
+        /**
+         * 보험계약 수정·상태 변경 (IF-API-19)
+         * @description expectedUpdatedAt으로 동시 수정을 검사합니다. 상태를 바꾸면 statusEvent와 Idempotency-Key가 필요하며 사건·후속 작업을 같은 트랜잭션에 남깁니다. 200은 저장 성공이며 후속 처리 완료가 아닙니다.
+         */
         put: operations["updateContract"];
         post?: never;
         delete?: never;
@@ -508,6 +707,26 @@ export interface paths {
          * @description 기준월의 KPI 6종(위반/주의/재정거래/대사불일치/전표불균형/미처리예외)과 최근 예외 5건, 최근 검증실행 3건을 함께 돌려준다. month 생략 시 이번 달을 기본값으로 쓴다.
          */
         get: operations["summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{documentNo}.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * IF-API-67A 생성 PDF 판 다운로드
+         * @description 문서번호와 판이 모두 필요합니다. 발행 때 기록한 sha256과 원본이 다르면 내려주지 않습니다.
+         */
+        get: operations["downloadGeneratedDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -692,6 +911,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/news/headlines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 최신 뉴스 헤드라인
+         * @description 보험 전문 매체 RSS 의 최신 제목과 원문 링크만 돌려준다. 가져오지 못하면 빈 목록이다.
+         */
+        get: operations["headlines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policies": {
         parameters: {
             query?: never;
@@ -841,6 +1080,43 @@ export interface paths {
         };
         /** 대사 결과 목록 조회 (IF-API-40) */
         get: operations["searchResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/agents/{agentId}/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 설계사별 수수료 명세 목록(내부)
+         * @description AGENT 를 제외한 내부 조회 역할이 설계사를 지정해 조회합니다.
+         */
+        get: operations["forAgent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/agents/{agentId}/statements/{entryKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 설계사별 수수료 명세 상세(내부) */
+        get: operations["detailForAgent"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1136,7 +1412,7 @@ export interface paths {
         put?: never;
         /**
          * 검증 실행 기동 (IF-API-48)
-         * @description CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. 1차는 재기동을 지원하지 않는다 — FAILED면 새 실행을 만든다(FUN-045는 2차).
+         * @description CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.
          */
         post: operations["execute"];
         delete?: never;
@@ -1308,12 +1584,17 @@ export interface components {
         };
         ApiError: {
             code?: string;
-            detail?: string;
-            field?: string;
+            detail?: string | null;
+            field?: string | null;
             message?: string;
             params?: {
                 [key: string]: unknown;
             };
+        };
+        ApiFailureResponse: {
+            data: null;
+            error: components["schemas"]["ApiError"];
+            requestId: string;
         };
         ApiResponseActiveMonthlyRunResponse: {
             data?: components["schemas"]["ActiveMonthlyRunResponse"];
@@ -1335,6 +1616,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseCalculation: {
+            data?: components["schemas"]["Calculation"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseCapCheckBasisResponse: {
             data?: components["schemas"]["CapCheckBasisResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1345,8 +1631,33 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseClawbackCandidateDetailResponse: {
+            data?: components["schemas"]["ClawbackCandidateDetailResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseClawbackNoticeDocumentResponse: {
+            data?: components["schemas"]["ClawbackNoticeDocumentResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseCommissionPaymentResponse: {
             data?: components["schemas"]["CommissionPaymentResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseCompareAskResponse: {
+            data?: components["schemas"]["CompareAskResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseCompareExplainResponse: {
+            data?: components["schemas"]["CompareExplainResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseCompareRankingResponse: {
+            data?: components["schemas"]["CompareRankingResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -1455,6 +1766,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseListCompareCategoryResponse: {
+            data?: components["schemas"]["CompareCategoryResponse"][];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseListContractJournalResponse: {
             data?: components["schemas"]["ContractJournalResponse"][];
             error?: components["schemas"]["ApiError"];
@@ -1472,6 +1788,11 @@ export interface components {
         };
         ApiResponseListLong: {
             data?: number[];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseListNewsHeadline: {
+            data?: components["schemas"]["NewsHeadline"][];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -1503,6 +1824,16 @@ export interface components {
         };
         ApiResponsePageResponseAuditLogResponse: {
             data?: components["schemas"]["PageResponseAuditLogResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseClawbackCandidateResponse: {
+            data?: components["schemas"]["PageResponseClawbackCandidateResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseClawbackNoticeDocumentResponse: {
+            data?: components["schemas"]["PageResponseClawbackNoticeDocumentResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -1588,6 +1919,16 @@ export interface components {
         };
         ApiResponseScheduleRegenResponse: {
             data?: components["schemas"]["ScheduleRegenResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseStatementDetail: {
+            data?: components["schemas"]["StatementDetail"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseStatementListResponse: {
+            data?: components["schemas"]["StatementListResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -1800,6 +2141,47 @@ export interface components {
             /** Format: int64 */
             contractId?: number;
             message?: string;
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
+        Bucket: {
+            amount?: number;
+            /** Format: int64 */
+            count?: number;
+        };
+        Calculation: {
+            amount?: number;
+            basis?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            calculatedAt?: string;
+            /** Format: int64 */
+            calculatedBy?: number;
+            /** Format: int32 */
+            calculationVersion?: number;
+            /** Format: int64 */
+            candidateId?: number;
+            /** Format: int64 */
+            clawbackCaseId?: number;
+            lines?: components["schemas"]["CalculationLine"][];
+            /** Format: int64 */
+            policyVersionId?: number;
+            sourceVersion?: string;
+        };
+        CalculationLine: {
+            appliedRatePct?: number;
+            basisAmount?: number;
+            basisCode?: string;
+            clawbackAmount?: number;
+            /** Format: int64 */
+            clawbackRuleId?: number;
+            /** Format: int64 */
+            commissionItemId?: number;
+            /** Format: int32 */
+            elapsedMonths?: number;
+            /** Format: int32 */
+            installmentNo?: number;
             /** Format: int64 */
             transactionAttributionId?: number;
         };
@@ -2130,9 +2512,97 @@ export interface components {
             /** Format: int64 */
             warningCount?: number;
         };
+        ClawbackCalculationRequest: {
+            /** @description IF-API-84에서 받은 sourceVersion. 다르면 409 FGC-IMPL-STATE_CHANGED */
+            expectedSourceVersion: string;
+            /**
+             * Format: int64
+             * @description IF-API-84 policyCandidates 중 사용자가 확인한 정책버전
+             */
+            policyVersionId: number;
+            /** @description 계산 사유 1~500자 */
+            reason: string;
+        };
+        ClawbackCandidateDetailResponse: {
+            candidate?: components["schemas"]["ClawbackCandidateResponse"];
+            effects?: components["schemas"]["ProcessingEffect"][];
+            /** Format: int32 */
+            elapsedMonths?: number | null;
+            latestCalculation?: components["schemas"]["Calculation"] | null;
+            paymentAttributions?: components["schemas"]["PaymentEvidence"][];
+            policyCandidates?: components["schemas"]["PolicyCandidate"][];
+            scheduleLines?: components["schemas"]["ScheduleEvidence"][];
+            sourceRefs?: components["schemas"]["SourceReference"][];
+        };
+        ClawbackCandidateResponse: {
+            /** Format: int64 */
+            agentId?: number;
+            agentName?: string;
+            allowedActions?: string[];
+            calculatedAmount?: number | null;
+            /** @enum {string} */
+            calculationStatus?: "UNCALCULATED" | "CALCULATED" | "REVIEW_REQUIRED";
+            /** Format: int64 */
+            candidateId?: number;
+            /** Format: int64 */
+            clawbackCaseId?: number | null;
+            /** Format: date */
+            contractDate?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            dateBasisLabel?: string;
+            /** Format: date */
+            eventDate?: string;
+            /** Format: int64 */
+            insurerId?: number;
+            insurerName?: string;
+            paidAmount?: number | null;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            productName?: string;
+            /** Format: int64 */
+            productOfferingId?: number;
+            reviewReasons?: string[];
+            /** Format: int64 */
+            sourceId?: number;
+            sourceVersion?: string;
+            /** @enum {string} */
+            triggerType?: "STATUS_EVENT" | "ARBITRAGE";
+            unpaidAmount?: number | null;
+        };
+        ClawbackNoticeDocumentRequest: {
+            /**
+             * Format: int32
+             * @description PDF 원본으로 쓸 계산판. case의 최신 판이 아니면 409 FGC-IMPL-STATE_CHANGED
+             */
+            calculationVersion: number;
+            /** @description IF-API-84에서 받은 sourceVersion. 계산판·현재 원천과 다르면 409 FGC-IMPL-STATE_CHANGED */
+            expectedSourceVersion: string;
+        };
+        ClawbackNoticeDocumentResponse: {
+            /** Format: int32 */
+            calculationVersion?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            createdBy?: number;
+            documentNo?: string;
+            /** @description IF-API-67A 다운로드 경로. 호출 시 권한을 다시 검사한다 */
+            downloadPath?: string;
+            sha256?: string;
+            /** Format: int32 */
+            version?: number;
+        };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
-            clawbackRatePct: number;
+            /** @description 환수율(%), 0~100·소수점 최대6자리의 정밀도를 보존한 문자열 */
+            clawbackRatePct: string;
+            /**
+             * Format: int64
+             * @description 수정 시 유지할 기존 환수 규칙 ID. 최초 생성에서는 지정하지 않는다.
+             */
+            clawbackRuleId?: number;
             /** Format: int64 */
             commissionItemId?: number;
             conditionExpression?: components["schemas"]["JsonNode"];
@@ -2464,6 +2934,109 @@ export interface components {
              */
             ratePct?: string | null;
         };
+        CompareAskRequest: {
+            question: string;
+            rankResultId?: string;
+        };
+        CompareAskResponse: {
+            answer?: string;
+            source?: string;
+        };
+        CompareCapSummary: {
+            /** Format: int32 */
+            contractCount?: number;
+            status?: string | null;
+            /** Format: double */
+            usagePct?: number | null;
+        };
+        CompareCategoryResponse: {
+            code?: string;
+            /** Format: int32 */
+            insurerCount?: number;
+            insurers?: components["schemas"]["CompareInsurerOption"][];
+            label?: string;
+        };
+        CompareEvidence: {
+            /** Format: date */
+            asOf?: string;
+            label?: string;
+            policyVersion?: string;
+            rule?: string;
+            source?: string;
+            /** Format: int64 */
+            value?: number | null;
+        };
+        CompareExcluded: {
+            insurer?: string;
+            /** Format: int64 */
+            offeringId?: number;
+            product?: string;
+            reasonCodes?: string[];
+        };
+        CompareExplainRequest: {
+            rankResultId: string;
+        };
+        CompareExplainResponse: {
+            rankResultId?: string;
+            summary?: string;
+            summaryError?: string;
+            summarySource?: string;
+        };
+        CompareInsurerOption: {
+            /** Format: int64 */
+            id?: number;
+            name?: string;
+        };
+        CompareItem: {
+            associationGrade?: string;
+            /** Format: double */
+            capImpactPct?: number | null;
+            /** Format: int64 */
+            cappedReceipt?: number;
+            /** Format: int64 */
+            carryover?: number;
+            /** Format: int64 */
+            clawbackExposure?: number;
+            /** Format: int64 */
+            conservativeNet?: number;
+            evidence?: components["schemas"]["CompareEvidence"][];
+            /** Format: int64 */
+            expectedReceipt?: number;
+            insurer?: string;
+            /** Format: int64 */
+            offeringId?: number;
+            product?: string;
+            /** Format: int32 */
+            rank?: number;
+        };
+        CompareRankingFilters: {
+            empty?: boolean;
+            excludeCapOverflow?: boolean;
+            insurerIds?: number[];
+        };
+        CompareRankingRequest: {
+            categoryCode: string;
+            filters?: components["schemas"]["CompareRankingFilters"];
+        };
+        CompareRankingResponse: {
+            /** Format: date */
+            asOf?: string;
+            /** Format: int64 */
+            basePremium?: number | null;
+            capSummary?: components["schemas"]["CompareCapSummary"];
+            categoryCode?: string;
+            categoryLabel?: string;
+            /** Format: int32 */
+            clawbackMonth?: number;
+            excludedItems?: components["schemas"]["CompareExcluded"][];
+            filters?: components["schemas"]["CompareRankingFilters"];
+            items?: components["schemas"]["CompareItem"][];
+            policyVersion?: string | null;
+            rankResultId?: string | null;
+            ruleVersion?: string | null;
+            status?: string;
+            warnings?: string[];
+        };
         ContractCreateRequest: {
             /** Format: int64 */
             agentId: number;
@@ -2496,6 +3069,7 @@ export interface components {
             /** Format: int64 */
             agentId?: number;
             agentName?: string;
+            allowedNextStatuses?: ("APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED")[];
             /** Format: date */
             contractDate?: string;
             /** Format: int64 */
@@ -2526,6 +3100,7 @@ export interface components {
             /** Format: int64 */
             productOfferingId?: number;
             standardSurrenderDeductionAmount?: number;
+            statusReasonCodes?: "MANUAL_STATUS_CHANGE"[];
             /** Format: date-time */
             updatedAt?: string;
         };
@@ -2594,8 +3169,7 @@ export interface components {
         ContractSearchCondition: {
             /** Format: int64 */
             agentId?: number;
-            /** @enum {string} */
-            capResultStatus?: "NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            capResultStatus?: ("NORMAL" | "WARNING" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE")[];
             /** Format: date */
             contractDateFrom?: string;
             /** Format: date */
@@ -2617,9 +3191,20 @@ export interface components {
             processingJob?: string;
             processingStatus?: string;
         };
+        ContractStatusEventRequest: {
+            /** Format: date-time */
+            effectiveAt: string;
+            reason: string;
+            /** @enum {string} */
+            reasonCode: "MANUAL_STATUS_CHANGE";
+            /** Format: date-time */
+            receivedAt: string;
+        };
         ContractStatusEventResponse: {
             /** Format: date-time */
             effectiveAt?: string;
+            /** Format: int64 */
+            eventId?: number;
             /** Format: int32 */
             eventSeq?: number;
             /** @enum {string} */
@@ -2629,8 +3214,11 @@ export interface components {
             previousStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             previousStatusLabel?: string;
             processings?: components["schemas"]["ContractStatusEventProcessingResponse"][];
+            reason?: string | null;
+            reasonCode?: string | null;
             /** Format: date-time */
             receivedAt?: string;
+            registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
         };
@@ -2690,12 +3278,18 @@ export interface components {
             /** Format: int64 */
             productOfferingId: number;
             standardSurrenderDeductionAmount?: number;
+            statusEvent?: components["schemas"]["ContractStatusEventRequest"];
         };
         ContractUpdateResponse: {
             /** Format: int64 */
             contractId?: number;
+            followUp?: components["schemas"]["FollowUp"];
             regeneratedScheduleIds?: number[];
             scheduleHeaderIds?: number[];
+            /** Format: int64 */
+            statusEventId?: number | null;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         ContractView: {
             agentIdName?: string;
@@ -2970,6 +3564,12 @@ export interface components {
             finalizedAt?: string;
             finalizedBy?: string;
             status?: string;
+        };
+        FollowUp: {
+            /** Format: int64 */
+            eventId?: number | null;
+            /** @enum {string} */
+            status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -3263,6 +3863,11 @@ export interface components {
             roleCode?: string;
             userName?: string;
         };
+        NewsHeadline: {
+            link?: string;
+            publishedAt?: string;
+            title?: string;
+        };
         Option: {
             code?: string;
             label?: string;
@@ -3350,6 +3955,30 @@ export interface components {
         };
         PageResponseAuditLogResponse: {
             content?: components["schemas"]["AuditLogResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageResponseClawbackCandidateResponse: {
+            content?: components["schemas"]["ClawbackCandidateResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageResponseClawbackNoticeDocumentResponse: {
+            content?: components["schemas"]["ClawbackNoticeDocumentResponse"][];
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -3456,10 +4085,41 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseStatementEntry: {
+            content?: components["schemas"]["StatementEntry"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         ParameterDraft: {
             description?: string;
             key: string;
             value: components["schemas"]["JsonNode"];
+        };
+        PaymentEvidence: {
+            attributedAmount?: number;
+            cashflowType?: string;
+            /** Format: int64 */
+            commissionItemId?: number;
+            /** Format: int64 */
+            commissionTransactionId?: number;
+            /** Format: int32 */
+            installmentNo?: number | null;
+            /** Format: date */
+            paidOn?: string | null;
+            /** Format: int64 */
+            recipientAgentId?: number;
+            /** Format: int64 */
+            scheduleLineId?: number | null;
+            status?: string;
+            /** Format: int64 */
+            transactionAttributionId?: number;
         };
         /** @description 정책 제출·승인·반려·활성화 요청 */
         PolicyActionRequest: {
@@ -3494,6 +4154,18 @@ export interface components {
             policyApprovalActionId?: number;
             reason?: string;
         };
+        PolicyCandidate: {
+            /** Format: date */
+            effectiveFrom?: string;
+            /** Format: date */
+            effectiveTo?: string | null;
+            policyCode?: string;
+            policyName?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
+            /** Format: int32 */
+            versionNo?: number;
+        };
         /** @description 정책 새 판의 적용기간과 복제 사유 */
         PolicyCloneRequest: {
             /** Format: date */
@@ -3520,6 +4192,10 @@ export interface components {
             editDocument?: components["schemas"]["PolicyDraft"];
             /** @description 정책 버전 헤더 */
             header?: components["schemas"]["PolicyVersionResponse"];
+            /** @description FUN-016 상품위원회 메타데이터. 수수료 규칙이 가리키는 판매버전의 승인일·승인문서·기초서류·판매 상태(참조정보) */
+            productOfferings?: components["schemas"]["PolicyOfferingGovernanceResponse"][];
+            /** @description FUN-016 근거 info 패널. regulationRefs·sourceRefs 순서대로 레지스트리 항목명과 저장된 상세를 합친 목록 */
+            references?: components["schemas"]["PolicyReferenceResponse"][];
             /** @description 예상 해약환급률표 탭 — 상품·납입기간·채널별 복수 */
             refundRateTables?: components["schemas"]["RefundRateTableResponse"][];
             /** @description 내부 근거 참조 목록(SRC-xx) */
@@ -3528,7 +4204,7 @@ export interface components {
         /** @description 정책 초안. 빈 규칙 목록을 저장할 수 있으며 제출 검증은 별도 동작이다. */
         PolicyDraft: {
             basicDocumentVersion?: string;
-            /** @description 환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다. */
+            /** @description CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다. */
             clawbackRules: components["schemas"]["ClawbackRuleDraft"][];
             commissionRules: components["schemas"]["CommissionRuleDraft"][];
             /** Format: date */
@@ -3553,6 +4229,53 @@ export interface components {
             sourceClass: "REGULATORY" | "INSURER_RULE" | "GA_POLICY" | "PROJECT_ASSUMPTION";
             sourceDetails?: components["schemas"]["SourceDetailDraft"][];
             sourceRefs: string[];
+        };
+        /** @description 정책이 적용되는 판매버전의 상품위원회·기초서류·판매 상태(참조정보) */
+        PolicyOfferingGovernanceResponse: {
+            /** @description 기초서류 버전 */
+            basicDocumentVersion?: string;
+            /**
+             * Format: date
+             * @description 상품위원회 승인일
+             */
+            committeeApprovalDate?: string | null;
+            /** @description 상품위원회 승인문서 참조 */
+            committeeDocumentRef?: string | null;
+            /** @description 판매 상태 APPROVED·REVISED·SUSPENDED·STOPPED. 미등록이면 null */
+            governanceStatus?: string | null;
+            offeringVersion?: string;
+            productName?: string;
+            /** Format: int64 */
+            productOfferingId?: number;
+            /**
+             * Format: date
+             * @description 판매종료일
+             */
+            salesEndDate?: string | null;
+            /**
+             * Format: date
+             * @description 판매개시일
+             */
+            salesStartDate?: string;
+        };
+        /** @description 정책 근거 참조와 저장된 상세 설명 */
+        PolicyReferenceResponse: {
+            /** @description 참조에서 읽은 REG/SRC 코드. 형식이 아니면 null */
+            code?: string | null;
+            /** @description 이 정책버전에 저장된 근거 제목 */
+            detailTitle?: string | null;
+            /** @description 이 정책버전에 저장된 근거 설명 */
+            explanation?: string | null;
+            /** @description REGULATION(regulationRefs) 또는 SOURCE(sourceRefs) */
+            group?: string;
+            /** @description 정책에 저장된 참조 원문(코드 뒤 설명이 붙은 과거 형식 포함) */
+            ref?: string;
+            /** @description 근거 코드 레지스트리 항목명. 미등록·SRC는 null일 수 있음 */
+            registryTitle?: string | null;
+            /** @description 이 정책버전에 저장된 근거 상태 태그. 상세가 없으면 [] */
+            statusTags?: string[];
+            /** @description 검증된 http(s) 링크 */
+            url?: string | null;
         };
         /** @description 정책 버전 */
         PolicyVersionResponse: {
@@ -3615,6 +4338,8 @@ export interface components {
              * @example 규제
              */
             sourceClassLabel?: string;
+            /** @description 근거자료 코드 목록(SRC-xx). REG와 함께 비어 있으면 '근거 미기재' */
+            sourceRefs?: string[];
             /**
              * @description 정책 상태
              * @enum {string}
@@ -3647,6 +4372,15 @@ export interface components {
             updatedAt?: string;
             /** Format: int32 */
             versionNo?: number;
+        };
+        ProcessingEffect: {
+            failureReason?: string | null;
+            /** Format: date-time */
+            processedAt?: string;
+            processingJob?: string;
+            processingStatus?: string;
+            /** Format: int64 */
+            validationRunId?: number | null;
         };
         /** @description 보험상품 판매버전 기준정보 */
         ProductResponse: {
@@ -3725,6 +4459,12 @@ export interface components {
              * @example STD-LIFE-B
              */
             standardProductCode?: string;
+        };
+        Range: {
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
         };
         ReArbitrageCheckRequest: {
             /** Format: date */
@@ -3977,6 +4717,12 @@ export interface components {
             /** @description 표준해약공제액 80% 이상 공제 대상 여부 */
             standardDeduction80Yn?: boolean;
         };
+        RegisteredBy: {
+            loginId?: string;
+            /** Format: int64 */
+            userId?: number;
+            userName?: string;
+        };
         ReverseJournalRequest: {
             evidenceRef?: string;
             reason: string;
@@ -3990,6 +4736,27 @@ export interface components {
         ScheduleDetailResponse: {
             header?: components["schemas"]["ScheduleHeaderResponse"];
             lines?: components["schemas"]["ScheduleLineResponse"][];
+        };
+        ScheduleEvidence: {
+            /** Format: int64 */
+            beneficiaryAgentId?: number;
+            /** Format: int64 */
+            commissionItemId?: number;
+            confirmedPaidAmount?: number;
+            /** Format: date */
+            dueDate?: string;
+            expectedAmount?: number;
+            generationReason?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            lineStatus?: string;
+            /** Format: int64 */
+            scheduleHeaderId?: number;
+            /** Format: int64 */
+            scheduleLineId?: number;
+            /** Format: int32 */
+            scheduleVersionNo?: number;
+            unpaidAmount?: number | null;
         };
         ScheduleHeaderResponse: {
             activeYn?: boolean;
@@ -4068,11 +4835,77 @@ export interface components {
             /** @enum {string} */
             status?: "PLANNED" | "CONFIRMED" | "MATCHED" | "ADJUSTED" | "HOLD" | "CANCELLED" | "RESTARTED";
         };
+        Source: {
+            entityType?: string;
+            /** Format: int64 */
+            id?: number;
+        };
         SourceDetailDraft: {
             explanation?: string;
             ref: string;
+            /** @description 근거 상태 태그. 현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수, 기본 [] */
+            statusTags?: string[];
             title: string;
             url?: string;
+        };
+        SourceReference: {
+            /** Format: date */
+            asOfDate?: string | null;
+            /** Format: date-time */
+            effectiveAt?: string | null;
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Format: int64 */
+            sourceId?: number;
+            status?: string;
+            triggerType?: string;
+        };
+        StatementBasis: {
+            dateBasis?: {
+                [key: string]: string;
+            };
+            month?: string;
+            range?: components["schemas"]["Range"];
+            warnings?: string[];
+        };
+        StatementDetail: {
+            basis?: components["schemas"]["StatementBasis"];
+            entry?: components["schemas"]["StatementEntry"];
+            evidence?: {
+                [key: string]: unknown;
+            };
+        };
+        StatementEntry: {
+            amount?: number;
+            /** Format: date */
+            basisDate?: string;
+            commissionItemCode?: string;
+            commissionItemName?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            dataStatus?: string;
+            entryKey?: string;
+            entryType?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            /** Format: int64 */
+            policyVersionId?: number;
+            source?: components["schemas"]["Source"];
+            statusCode?: string;
+            statusLabel?: string;
+        };
+        StatementListResponse: {
+            basis?: components["schemas"]["StatementBasis"];
+            items?: components["schemas"]["PageResponseStatementEntry"];
+            summary?: components["schemas"]["StatementSummary"];
+        };
+        StatementSummary: {
+            adjustment?: components["schemas"]["Bucket"];
+            clawback?: components["schemas"]["Bucket"];
+            held?: components["schemas"]["Bucket"];
+            payment?: components["schemas"]["Bucket"];
         };
         TargetSummary: {
             /** Format: int64 */
@@ -4142,6 +4975,8 @@ export interface components {
             validationRunId?: number;
         };
         ValidationRunProgressResponse: {
+            /** Format: int64 */
+            attemptId?: number;
             /** Format: int32 */
             currentStep?: number;
             /** Format: int32 */
@@ -4149,6 +4984,7 @@ export interface components {
             failureMessage?: string;
             /** Format: int32 */
             progressPct?: number;
+            requestId?: string;
             status?: string;
             statusLabel?: string;
             /** Format: int32 */
@@ -4187,6 +5023,158 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    mine: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다
+                 * @example 2026-07
+                 */
+                month?: string;
+                /** @description 계약번호(부분 일치) */
+                contractNo?: string;
+                /** @description 수수료 항목 ID */
+                commissionItemId?: number;
+                /** @description 내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK */
+                entryType?: string;
+                /** @description 정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순 */
+                sort?: string;
+                /** @description 페이지(1-base) */
+                page?: number;
+                /** @description 페이지 크기(최대 100) */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementListResponse"];
+                };
+            };
+        };
+    };
+    mineDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementDetail"];
+                };
+            };
+        };
+    };
+    ask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareAskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCompareAskResponse"];
+                };
+            };
+        };
+    };
+    categories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListCompareCategoryResponse"];
+                };
+            };
+        };
+    };
+    explain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareExplainRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCompareExplainResponse"];
+                };
+            };
+        };
+    };
+    rank: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareRankingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCompareRankingResponse"];
+                };
+            };
+        };
+    };
     getArbitrageChecks_1: {
         parameters: {
             query: {
@@ -4309,13 +5297,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description 조회 성공 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAuditLogDetailResponse"];
+                };
+            };
             /** @description auditLogId에 해당하는 감사로그가 없음 (FGC-COMMON-004) */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseAuditLogDetailResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -4683,17 +5680,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckSearchResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckSearchResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -4718,14 +5713,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
-                };
+                content?: never;
             };
             /** @description capCheckId에 해당하는 판정이 없음 (FGC-COMMON-004) */
             404: {
@@ -4733,7 +5726,181 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCapCheckBasisResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    searchClawbackCandidates: {
+        parameters: {
+            query?: {
+                dateBasis?: "EVENT_DATE" | "CONTRACT_DATE";
+                dateFrom?: string;
+                dateTo?: string;
+                contractNo?: string;
+                insurerId?: number;
+                productOfferingId?: number;
+                agentId?: number;
+                triggerType?: "STATUS_EVENT" | "ARBITRAGE";
+                calculationStatus?: "UNCALCULATED" | "CALCULATED" | "REVIEW_REQUIRED";
+                sort?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseClawbackCandidateResponse"];
+                };
+            };
+        };
+    };
+    getClawbackCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseClawbackCandidateDetailResponse"];
+                };
+            };
+        };
+    };
+    calculateClawbackCandidate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 계산 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                candidateId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClawbackCalculationRequest"];
+            };
+        };
+        responses: {
+            /** @description 계산판 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCalculation"];
+                };
+            };
+            /** @description 원천 버전 변경 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+            /** @description 적용 정책·계산 근거 부족 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    listClawbackNoticeDocuments: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseClawbackNoticeDocumentResponse"];
+                };
+            };
+        };
+    };
+    issueClawbackNoticeDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 발행 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClawbackNoticeDocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description 발행한 문서 판 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseClawbackNoticeDocumentResponse"];
+                };
+            };
+            /** @description 계산판·원천 버전 변경 또는 멱등키 충돌 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+            /** @description FGC-CLAW-001 환수액 미계산(계산판 없음) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -4833,7 +6000,10 @@ export interface operations {
     updateContract: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 요청 UUID. 상태 변경 시 필수이며 같은 키 재요청은 처음 결과를 돌려줍니다 */
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: number;
             };
@@ -4845,13 +6015,31 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
+            /** @description 수정 저장 성공 */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseContractUpdateResponse"];
+                };
+            };
+            /** @description 수정 시각 충돌·허용되지 않은 상태전이·멱등키 충돌·같은 요청 처리 중 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+            /** @description 최초 설계사 변경 요청 또는 허용 범위 밖의 사건 일자 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5092,16 +6280,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseDashboardSummaryResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
+                content?: never;
+            };
+        };
+    };
+    downloadGeneratedDocument: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                documentNo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF 파일 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseDashboardSummaryResponse"];
+                    "application/pdf": string;
+                };
+            };
+            /** @description 없는 문서·판 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5361,6 +6580,26 @@ export interface operations {
             };
         };
     };
+    headlines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListNewsHeadline"];
+                };
+            };
+        };
+    };
     findPolicyVersions: {
         parameters: {
             query?: {
@@ -5422,13 +6661,13 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
                 };
             };
-            /** @description 요청 형식 또는 입력값 오류 (FGC-COMMON-002) */
+            /** @description 입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005) */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정책 작성 권한 없음 (FGC-AUTH-003) */
@@ -5437,7 +6676,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정책 코드 또는 멱등키 충돌 */
@@ -5446,7 +6685,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정책 규칙의 적용 구간 충돌 */
@@ -5455,7 +6694,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5490,7 +6729,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyDetailResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5522,13 +6761,31 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
                 };
             };
+            /** @description 입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
             /** @description 정책 상태·수정 시각 또는 멱등키 충돌 */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+            /** @description 정책 규칙의 적용 구간 충돌 (FGC-POL-002) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5566,7 +6823,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 자기 승인·정책 상태·수정 시각 또는 멱등키 충돌 */
@@ -5575,16 +6832,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 활성 정책의 적용기간 충돌 (FGC-POL-002) */
+            /** @description 정책·규칙 적용 범위 충돌 (FGC-POL-002) 또는 제출 근거·필수 규칙 누락 (FGC-POL-004) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5622,7 +6879,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -5745,6 +7002,69 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseReconciliationResultSearchResponse"];
+                };
+            };
+        };
+    };
+    forAgent: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다
+                 * @example 2026-07
+                 */
+                month?: string;
+                /** @description 계약번호(부분 일치) */
+                contractNo?: string;
+                /** @description 수수료 항목 ID */
+                commissionItemId?: number;
+                /** @description 내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK */
+                entryType?: string;
+                /** @description 정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순 */
+                sort?: string;
+                /** @description 페이지(1-base) */
+                page?: number;
+                /** @description 페이지 크기(최대 100) */
+                size?: number;
+            };
+            header?: never;
+            path: {
+                agentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementListResponse"];
+                };
+            };
+        };
+    };
+    detailForAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agentId: number;
+                entryKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseStatementDetail"];
                 };
             };
         };
@@ -5985,7 +7305,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -5994,7 +7314,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 지급 건 자연키 중복 */
@@ -6003,7 +7323,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6061,7 +7381,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -6070,7 +7390,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description DRAFT가 아니거나 자연키 중복 */
@@ -6079,7 +7399,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6110,7 +7430,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 지급 처리 권한 없음 */
@@ -6119,7 +7439,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 초안이 아니거나 삭제할 수 없는 연관 이력 */
@@ -6128,7 +7448,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6163,7 +7483,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -6172,7 +7492,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description DRAFT 상태가 아님 */
@@ -6181,7 +7501,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description FUN-033 한도 초과 또는 정책 검토 필요 */
@@ -6190,7 +7510,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6222,7 +7542,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정산담당자 권한 없음 */
@@ -6231,7 +7551,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description DRAFT 상태가 아님 (FGC-TRAN-005) */
@@ -6240,7 +7560,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseTransactionPrecheckResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6283,17 +7603,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunSearchResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunSearchResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -6325,17 +7643,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음 */
             403: {
@@ -6343,7 +7659,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 동일 월 활성 MONTHLY 실행 중복 (FGC-VRUN-001) */
@@ -6352,7 +7668,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseCreateValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6387,17 +7703,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseActiveMonthlyRunResponse"];
-                };
+                content?: never;
             };
         };
     };
@@ -6422,14 +7736,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
-                };
+                content?: never;
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
             404: {
@@ -6437,7 +7749,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunDetailResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6463,14 +7775,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(SETTLEMENT·SYSTEM_ADMIN) 없음 */
             403: {
@@ -6478,7 +7788,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
@@ -6487,16 +7797,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description FINALIZED (FGC-VRUN-003) 또는 CREATED가 아닌 상태 (FGC-VRUN-004) */
+            /** @description FINALIZED (FGC-VRUN-003), 허용 상태 아님 (FGC-VRUN-004), 재시작 이력 확인 불가·경합 (FGC-VRUN-005) */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunExecuteResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6529,17 +7839,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
-                };
+                content?: never;
             };
             /** @description 허용 역할(GA_ADMIN·SYSTEM_ADMIN) 없음 */
             403: {
@@ -6547,7 +7855,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 확정 결과 불변 또는 상태 경합 (FGC-VRUN-003/005), 확정할 수 없는 실행 유형(계약수동) (FGC-VRUN-004) */
@@ -6556,7 +7864,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 확정 조건 미충족 (FGC-VRUN-002) */
@@ -6565,7 +7873,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeValidationRunResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6590,14 +7898,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
-                };
+                content?: never;
             };
             /** @description 검증 실행 없음 (FGC-COMMON-004) */
             404: {
@@ -6605,7 +7911,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseFinalizeChecklistResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
@@ -6631,14 +7937,12 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
                 };
             };
-            /** @description 인증되지 않은 요청 */
+            /** @description 인증되지 않은 요청 — 토큰이 없으면 본문 없음. Bearer 토큰이 만료·위조·무효화된 로그인이면 ApiFailureResponse(FGC-AUTH-002·FGC-AUTH-004). 클라이언트는 401 본문을 JSON이라고 가정하지 않는다. */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
-                };
+                content?: never;
             };
             /** @description 실행 미존재 (FGC-COMMON-004) */
             404: {
@@ -6646,7 +7950,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseValidationRunProgressResponse"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };

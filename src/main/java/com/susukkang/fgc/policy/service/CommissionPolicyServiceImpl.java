@@ -43,6 +43,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
 
     // 현재 시스템이 지원하는 7년 체계의 최대 회차이며 비정상 범위 확장을 방지한다.
     private static final int MAX_SUPPORTED_INSTALLMENT_NO = 84;
+    private static final String POLICY_VERSION_ID = "policyVersionId";
     private final PolicyVersionRepository policyVersionRepository;
     private final CommissionRuleRepository commissionRuleRepository;
 
@@ -112,9 +113,24 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
             );
         }
 
+        List<ResolvedCommissionRule> resolvedRules =
+                resolveCommissionRules(policy.getPolicyVersionId(), contractId, paymentStage);
+
+        return ResolvedCommissionPolicy.builder()
+                .policyVersionId(policy.getPolicyVersionId())
+                .policyType(policy.getPolicyType())
+                .paymentStage(paymentStage)
+                .scheduleRegime(policy.getScheduleRegime())
+                .rules(resolvedRules)
+                .build();
+    }
+
+    @Override
+    public List<ResolvedCommissionRule> resolveCommissionRules(Long policyVersionId, Long contractId, PaymentStage paymentStage) {
+        validateQueryCondition(contractId, paymentStage);
         List<ResolvedCommissionRule> rules =
                 commissionRuleRepository.findApplicableCommissionRules(
-                        policy.getPolicyVersionId(),
+                        policyVersionId,
                         contractId,
                         paymentStage
                 );
@@ -124,22 +140,14 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
                     Map.of(
-                            "policyVersionId", String.valueOf(policy.getPolicyVersionId()),
-                            "paymentStage", paymentStage.name()
+                            POLICY_VERSION_ID, String.valueOf(policyVersionId),
+                            "paymentStage", paymentStage.name(),
+                            "reason", "RULE_MISSING"
                     ),
                     "정책에 적용 가능한 수수료 규칙이 없습니다."
             );
         }
-        List<ResolvedCommissionRule> resolvedRules =
-                resolveApplicableRules(rules, policy.getPolicyVersionId());
-
-        return ResolvedCommissionPolicy.builder()
-                .policyVersionId(policy.getPolicyVersionId())
-                .policyType(policy.getPolicyType())
-                .paymentStage(paymentStage)
-                .scheduleRegime(policy.getScheduleRegime())
-                .rules(resolvedRules)
-                .build();
+        return resolveApplicableRules(rules, policyVersionId);
     }
 
     @Override
@@ -252,7 +260,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
                     Map.of(
-                            "policyVersionId", String.valueOf(policyVersionId),
+                            POLICY_VERSION_ID, String.valueOf(policyVersionId),
                             "commissionItemId", String.valueOf(key.commissionItemId()),
                             "agentRankCode", String.valueOf(key.agentRankCode()),
                             "installmentNo", key.installmentNo(),
@@ -290,7 +298,7 @@ public class CommissionPolicyServiceImpl implements CommissionPolicyService {
                     FgcErrorCode.COMMON_002,
                     "commissionRules",
                     Map.of(
-                            "policyVersionId", String.valueOf(policyVersionId),
+                            POLICY_VERSION_ID, String.valueOf(policyVersionId),
                             "reason", "INVALID_RULE"
                     ),
                     "수수료 규칙의 필수값 또는 회차 범위가 올바르지 않습니다."

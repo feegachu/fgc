@@ -12,6 +12,7 @@ import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.policy.code.ScheduleEligibilityParameter;
 import com.susukkang.fgc.policy.dto.PolicyActionRequest;
 import com.susukkang.fgc.policy.dto.PolicyCloneRequest;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
@@ -54,13 +55,16 @@ public class PolicyWriteService {
     private static final Set<String> APPROVERS = Set.of(Roles.GA_ADMIN, Roles.SYSTEM_ADMIN);
     private static final Set<PolicyType> WRITABLE_TYPES = Set.of(PolicyType.CURRENT_COMMISSION,
             PolicyType.FOUR_YEAR_COMMISSION, PolicyType.SEVEN_YEAR_COMMISSION,
-            PolicyType.SCHEDULE_ELIGIBILITY, PolicyType.ARBITRAGE, PolicyType.RECONCILIATION_TOLERANCE);
+            PolicyType.SCHEDULE_ELIGIBILITY, PolicyType.ARBITRAGE, PolicyType.RECONCILIATION_TOLERANCE, PolicyType.CLAWBACK);
     private static final Pattern REFERENCE = Pattern.compile("^(REG-\\d{2}[A-Z]?|SRC-\\d{3})(?:\\s++\\S.*)?$");
     private static final String ACTION_CLONE = "CLONE";
     private static final String FIELD_POLICY_TYPE = "policyType";
+    private static final String FIELD_COMMISSION_RULES = "commissionRules";
+    private static final String FIELD_REASON = "reason";
     private final PolicyVersionRepository policyVersionRepository;
     private final PolicyWriteRepository writeRepository;
     private final PolicyDraftValidator draftValidator;
+    private final PolicyOfferingScopeValidator offeringScopeValidator;
     private final PolicySuccessionValidator successionValidator;
     private final Validator validator;
     private final AuditLogService auditLogService;
@@ -96,12 +100,14 @@ public class PolicyWriteService {
                 throw invalid("policyCode", "정책 코드는 최초 생성 이후 변경할 수 없습니다.");
             }
             if (!writeRepository.verifyChildOwnership(id, draft)) {
-                throw invalid("commissionRules", "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
+                throw invalid(draft.clawbackRules().isEmpty() ? FIELD_COMMISSION_RULES : "clawbackRules",
+                        "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
             }
             if (writeRepository.hasUnsupportedChildren(id)) {
                 throw invalid(FIELD_POLICY_TYPE, "전용 편집 계약이 없는 기존 규칙을 덮어쓸 수 없습니다.");
             }
-            validateReferences(draft, storedReferences(writeRepository.readDraft(policy)));
+            PolicyDraft stored = writeRepository.readDraft(policy);
+            validateReferences(draft, storedReferences(stored), storedUrls(stored));
             Map<String, Object> before = snapshot(policy, actor);
             writeRepository.updateDraft(policy, draft);
             return recordChange("UPDATE", policy, actor, before, null);
@@ -263,25 +269,35 @@ public class PolicyWriteService {
 
     private void validateSubmission(PolicyDraft draft) {
         draftValidator.validateForSubmission(draft);
-        validateReferences(draft, storedReferences(draft));
+        offeringScopeValidator.validateForSubmission(draft);
+        validateReferences(draft, storedReferences(draft), storedUrls(draft));
         if (draft.regulationRefs().isEmpty() && draft.sourceRefs().isEmpty()) {
-            throw invalid("sourceRefs", "제출할 정책에는 승인된 근거가 필요합니다.");
+            throw new FgcBusinessException(FgcErrorCode.POL_004, "sourceRefs",
+                    Map.of(FIELD_REASON, "제출할 정책에는 승인된 근거가 필요합니다."), null);
         }
         boolean complete = switch (draft.policyType()) {
             case CURRENT_COMMISSION -> !draft.commissionRules().isEmpty();
             case FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION ->
                     !draft.commissionRules().isEmpty() && !draft.feeRegimeRules().isEmpty();
-            case SCHEDULE_ELIGIBILITY -> parameterKeys(draft).containsAll(
-                    Set.of("STATUS_MONTH_RULE", "PRORATION_RULE", "REVIVAL_BACKFILL_RULE"));
+            case SCHEDULE_ELIGIBILITY -> parameterKeys(draft).containsAll(ScheduleEligibilityParameter.KEYS);
             case ARBITRAGE -> parameterKeys(draft).containsAll(Set.of("ARBITRAGE_EFFECTIVE_CONTRACT_DATE",
                     "ARBITRAGE_REFUND_ADDITION_MONTHS", "ARBITRAGE_REFUND_ADDITION_BOUNDARY_INCLUSIVE"));
             case RECONCILIATION_TOLERANCE -> parameterKeys(draft).containsAll(
                     Set.of("TOLERANCE_AMOUNT_KRW", "TOLERANCE_DAYS"));
-            // 전용 편집 계약이나 환수 D-02가 없는 유형을 빈 규칙으로 활성화하지 않는다.
+            case CLAWBACK -> !draft.clawbackRules().isEmpty();
+            // 전용 편집 계약이 없는 유형을 빈 규칙으로 활성화하지 않는다.
             default -> false;
         };
         if (!complete) {
-            throw invalid(FIELD_POLICY_TYPE, "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다.");
+            String field = switch (draft.policyType()) {
+                case CURRENT_COMMISSION -> FIELD_COMMISSION_RULES;
+                case FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION -> draft.commissionRules().isEmpty() ? FIELD_COMMISSION_RULES : "feeRegimeRules";
+                case CLAWBACK -> "clawbackRules";
+                case SCHEDULE_ELIGIBILITY, ARBITRAGE, RECONCILIATION_TOLERANCE -> "parameters";
+                default -> FIELD_POLICY_TYPE;
+            };
+            throw new FgcBusinessException(FgcErrorCode.POL_004, field,
+                    Map.of(FIELD_REASON, "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다."), null);
         }
     }
 
@@ -290,10 +306,10 @@ public class PolicyWriteService {
     }
 
     private void validateReferences(PolicyDraft draft) {
-        validateReferences(draft, Set.of());
+        validateReferences(draft, Set.of(), Set.of());
     }
 
-    private void validateReferences(PolicyDraft draft, Set<String> inherited) {
+    private void validateReferences(PolicyDraft draft, Set<String> inherited, Set<String> inheritedUrls) {
         Set<String> approvedRefs = writeRepository.approvedReferences();
         Set<String> approved = approvedRefs.stream()
                 .map(PolicyWriteService::referenceCode).filter(Objects::nonNull).collect(Collectors.toSet());
@@ -306,9 +322,16 @@ public class PolicyWriteService {
         }
         Set<String> linked = Stream.concat(draft.regulationRefs().stream(), draft.sourceRefs().stream())
                 .collect(Collectors.toSet());
-        for (PolicyDraft.SourceDetailDraft detail : draft.sourceDetails()) {
+        for (int i = 0; i < draft.sourceDetails().size(); i++) {
+            PolicyDraft.SourceDetailDraft detail = draft.sourceDetails().get(i);
             if (!linked.contains(detail.ref())) {
                 throw invalid("sourceDetails.ref", "상세 근거는 정책의 근거 목록에 연결되어야 합니다.");
+            }
+            // 새로 입력한 링크만 http(s)를 요구한다. 이 검사 이전에 저장된 링크는 복제·제출에서 그대로 보존한다.
+            String url = detail.url();
+            if (url != null && !url.isBlank() && !inheritedUrls.contains(linkKey(detail.ref(), url))
+                    && !PolicyDraftValidator.isWebUrl(url)) {
+                throw invalid("sourceDetails[" + i + "].url", "근거 링크는 http 또는 https 주소만 등록할 수 있습니다.");
             }
         }
     }
@@ -320,7 +343,22 @@ public class PolicyWriteService {
                 .collect(Collectors.toSet());
     }
 
-    private static String referenceCode(String ref) {
+    /**
+     * URL 검사 이전에 저장된 (근거, 링크) 쌍. 근거 코드 집합과 분리해, 같은 글자의 문서명 참조를 새 링크로 넣어도
+     * http(s) 검사를 건너뛰지 못하게 한다.
+     */
+    private static Set<String> storedUrls(PolicyDraft draft) {
+        return draft.sourceDetails().stream().filter(detail -> detail.url() != null)
+                .map(detail -> linkKey(detail.ref(), detail.url())).collect(Collectors.toSet());
+    }
+
+    /** 링크 보존은 같은 근거(ref)에 저장돼 있던 링크만 인정한다. 다른 근거로 옮긴 링크는 새 입력으로 검사한다. */
+    private static String linkKey(String ref, String url) {
+        return ref + "\n" + url;
+    }
+
+    /** 참조 원문에서 REG/SRC 코드를 읽는다. 형식이 아니면 null. */
+    static String referenceCode(String ref) {
         if (ref == null) return null;
         Matcher matcher = REFERENCE.matcher(ref);
         return matcher.matches() ? matcher.group(1) : null;
@@ -330,7 +368,7 @@ public class PolicyWriteService {
         if (legacy.contains(ref)) return;
         String code = referenceCode(ref);
         if (code == null || !code.startsWith(prefix) || !approved.contains(code)) {
-            throw invalid(field, "승인 정책에서 확인할 수 없는 근거 코드입니다.");
+            throw invalid(field, "근거 코드 레지스트리와 승인 정책에서 확인할 수 없는 근거 코드입니다.");
         }
     }
 
@@ -353,7 +391,7 @@ public class PolicyWriteService {
         after.put("document", writeRepository.readDraft(policy));
         after.put("result", result);
         after.put("approvalEvidenceRef", policy.getApprovalEvidenceRef());
-        after.put("reason", reason);
+        after.put(FIELD_REASON, reason);
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode("POLICY_" + action).entityType("POLICY_VERSION")
                 .entityId(policy.getPolicyVersionId().toString()).policyVersionId(policy.getPolicyVersionId())
@@ -433,7 +471,8 @@ public class PolicyWriteService {
 
     private static boolean hasChildIds(PolicyDraft draft) {
         return draft.commissionRules().stream().anyMatch(rule -> rule.commissionRuleId() != null)
-                || draft.feeRegimeRules().stream().anyMatch(rule -> rule.feeRegimeRulesetId() != null);
+                || draft.feeRegimeRules().stream().anyMatch(rule -> rule.feeRegimeRulesetId() != null)
+                || draft.clawbackRules().stream().anyMatch(rule -> rule.clawbackRuleId() != null);
     }
 
     private <T> void validate(T request) {
