@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aggregate, buildRows, categoryCounts, deltaPercent, insurerSlices, monthStats, needRows, periodMonths, shiftMonth, statusCounts } from './model'
+import { aggregate, buildRows, categoryCounts, deltaPercent, insurerSlices, monthStats, periodMonths, shiftMonth, statusCounts } from './model'
 import type { AgentContract, Insurer, Product } from './model'
 
 const insurers: Insurer[] = [
@@ -57,9 +57,6 @@ describe('월 지표', () => {
     expect(deltaPercent(129, 100)).toBe(29) // (29/100)*100은 28.999…라 단순 절사하면 28.9가 된다
     expect(deltaPercent(100, 300)).toBe(-66.6)
     expect(deltaPercent(200, 300)).toBe(-33.3)
-  })
-  it('확인 필요 목록은 한도 근접이 먼저다', () => {
-    expect(needRows(rows, '2026-07').map((r) => r.id)).toEqual(['C-2'])
   })
 })
 

@@ -30,6 +30,13 @@ public class MonthlyValidationJobExecutionListener implements JobExecutionListen
     @Override
     public void beforeJob(JobExecution jobExecution) {
         RequestIdContext.set(MonthlyValidationJobParameters.from(jobExecution.getJobParameters()).requestId());
+        Long restartId = jobExecution.getJobParameters().getLong("restartValidationRunId");
+        if (restartId != null) {
+            if (!restartId.equals(ValidationRunBatchContext.getValidationRunId(jobExecution.getExecutionContext()))) {
+                throw new IllegalStateException("재시작 체크포인트의 검증 실행 ID가 일치하지 않습니다.");
+            }
+            lifecycleService.restart(restartId, MonthlyValidationJobParameters.from(jobExecution.getJobParameters()));
+        }
     }
 
     @Override

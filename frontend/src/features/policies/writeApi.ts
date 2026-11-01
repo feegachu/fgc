@@ -29,11 +29,12 @@ export function serializePolicyDraft(draft: DraftDocument) {
     basicDocumentVersion: nullable(draft.basicDocumentVersion),
     regulationRefs: cleanRefs(draft.regulationRefs),
     sourceRefs: cleanRefs(draft.sourceRefs),
-    sourceDetails: draft.sourceDetails.map(({ ref, title, explanation, url }) => ({
+    sourceDetails: draft.sourceDetails.map(({ ref, title, explanation, url, statusTags }) => ({
       ref: ref.trim(),
       title,
       explanation: nullable(explanation),
       url: nullable(url),
+      statusTags: [...new Set(statusTags ?? [])],
     })),
     commissionRules: draft.commissionRules.map((rule) => ({
       commissionRuleId: rule.commissionRuleId,
@@ -133,6 +134,7 @@ export function normalizePolicyDetail(detail: PolicyDetailResponse | ManagedPoli
             ...source,
             explanation: source.explanation ?? '',
             url: source.url ?? null,
+            statusTags: source.statusTags ?? [],
           })),
           commissionRules: draft.commissionRules.map((rule) => ({
             ...rule,
@@ -191,9 +193,6 @@ export function normalizePolicyDetail(detail: PolicyDetailResponse | ManagedPoli
 export async function savePolicyDraft(draft: DraftDocument, id: number | undefined, idempotencyKey: string) {
   if (id !== undefined && !draft.expectedUpdatedAt) {
     throw new Error('수정 시각 정보가 없습니다. 정책을 다시 조회한 후 저장하세요.')
-  }
-  if (draft.clawbackRules.length) {
-    throw new Error('환수 기준(D-02)이 확정되지 않아 환수 규칙은 등록할 수 없습니다.')
   }
   const body = serializePolicyDraft(draft)
   if (id === undefined) {

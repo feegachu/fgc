@@ -14,12 +14,47 @@ import org.springframework.batch.core.JobParametersBuilder;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class MonthlyValidationJobExecutionListenerTest {
 
     @Mock
     private ValidationRunBatchLifecycleService lifecycleService;
+
+    @Test
+    void restartClaimsRunBeforeStepsAndUsesNewRequestIdForAudit() {
+        var original = jobExecution(BatchStatus.FAILED);
+        var params = new JobParametersBuilder(original.getJobParameters())
+                .addLong("restartValidationRunId", 100L, false)
+                .addString("restartRequestId", "retry-request", false).toJobParameters();
+        var execution = new JobExecution(original.getJobInstance(), params);
+        execution.getExecutionContext().putLong("validationRunId", 100L);
+        var listener = new MonthlyValidationJobExecutionListener(lifecycleService);
+        try {
+            listener.beforeJob(execution);
+            verify(lifecycleService).restart(100L, MonthlyValidationJobParameters.from(params));
+        } finally {
+            listener.afterJob(execution);
+        }
+    }
+
+    @Test
+    void rejectsRestartWithWrongCheckpointWithoutClaimingAnyRun() {
+        var original = jobExecution(BatchStatus.FAILED);
+        var params = new JobParametersBuilder(original.getJobParameters())
+                .addLong("restartValidationRunId", 100L, false).toJobParameters();
+        var execution = new JobExecution(original.getJobInstance(), params);
+        execution.getExecutionContext().putLong("validationRunId", 101L);
+        var listener = new MonthlyValidationJobExecutionListener(lifecycleService);
+        try {
+            assertThatThrownBy(() -> listener.beforeJob(execution)).isInstanceOf(IllegalStateException.class);
+            verifyNoInteractions(lifecycleService);
+        } finally {
+            listener.afterJob(execution);
+        }
+    }
 
     private static MonthlyValidationJobParameters parameters() {
         return new MonthlyValidationJobParameters(

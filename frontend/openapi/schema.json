@@ -200,6 +200,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseCalculation" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Calculation"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseCapCheckBasisResponse" : {
         "properties" : {
           "data" : {
@@ -218,6 +232,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/CapCheckSearchResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseClawbackCandidateDetailResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ClawbackCandidateDetailResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -705,6 +733,20 @@
         },
         "type" : "object"
       },
+      "ApiResponsePageResponseClawbackCandidateResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseClawbackCandidateResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponsePageResponseCommissionItemResponse" : {
         "properties" : {
           "data" : {
@@ -933,6 +975,34 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/ScheduleRegenResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseStatementDetail" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/StatementDetail"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseStatementListResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/StatementListResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -1357,6 +1427,100 @@
           },
           "message" : {
             "type" : "string"
+          },
+          "transactionAttributionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Bucket" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Calculation" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "basis" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "calculatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "calculatedBy" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "calculationVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "candidateId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "clawbackCaseId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CalculationLine"
+            },
+            "type" : "array"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sourceVersion" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CalculationLine" : {
+        "properties" : {
+          "appliedRatePct" : {
+            "type" : "number"
+          },
+          "basisAmount" : {
+            "type" : "number"
+          },
+          "basisCode" : {
+            "type" : "string"
+          },
+          "clawbackAmount" : {
+            "type" : "number"
+          },
+          "clawbackRuleId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "commissionItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "elapsedMonths" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
           },
           "transactionAttributionId" : {
             "format" : "int64",
@@ -2013,6 +2177,171 @@
           "warningCount" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ClawbackCalculationRequest" : {
+        "properties" : {
+          "expectedSourceVersion" : {
+            "description" : "IF-API-84에서 받은 sourceVersion. 다르면 409 FGC-IMPL-STATE_CHANGED",
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "description" : "IF-API-84 policyCandidates 중 사용자가 확인한 정책버전",
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "description" : "계산 사유 1~500자",
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedSourceVersion", "policyVersionId", "reason" ],
+        "type" : "object"
+      },
+      "ClawbackCandidateDetailResponse" : {
+        "properties" : {
+          "candidate" : {
+            "$ref" : "#/components/schemas/ClawbackCandidateResponse"
+          },
+          "effects" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ProcessingEffect"
+            },
+            "type" : "array"
+          },
+          "elapsedMonths" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "latestCalculation" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Calculation"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "paymentAttributions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PaymentEvidence"
+            },
+            "type" : "array"
+          },
+          "policyCandidates" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyCandidate"
+            },
+            "type" : "array"
+          },
+          "scheduleLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ScheduleEvidence"
+            },
+            "type" : "array"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SourceReference"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ClawbackCandidateResponse" : {
+        "properties" : {
+          "agentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "agentName" : {
+            "type" : "string"
+          },
+          "allowedActions" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "calculatedAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "calculationStatus" : {
+            "enum" : [ "UNCALCULATED", "CALCULATED", "REVIEW_REQUIRED" ],
+            "type" : "string"
+          },
+          "candidateId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "clawbackCaseId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "contractDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "dateBasisLabel" : {
+            "type" : "string"
+          },
+          "eventDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "insurerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurerName" : {
+            "type" : "string"
+          },
+          "paidAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "productOfferingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reviewReasons" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "sourceId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sourceVersion" : {
+            "type" : "string"
+          },
+          "triggerType" : {
+            "enum" : [ "STATUS_EVENT", "ARBITRAGE" ],
+            "type" : "string"
+          },
+          "unpaidAmount" : {
+            "type" : [ "number", "null" ]
           }
         },
         "type" : "object"
@@ -2794,6 +3123,14 @@
           "agentName" : {
             "type" : "string"
           },
+          "allowedNextStatuses" : {
+            "items" : {
+              "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
           "contractDate" : {
             "format" : "date",
             "type" : "string"
@@ -2865,6 +3202,13 @@
           },
           "standardSurrenderDeductionAmount" : {
             "type" : "number"
+          },
+          "statusReasonCodes" : {
+            "items" : {
+              "enum" : [ "MANUAL_STATUS_CHANGE" ],
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "updatedAt" : {
             "format" : "date-time",
@@ -3045,8 +3389,11 @@
             "type" : "integer"
           },
           "capResultStatus" : {
-            "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
-            "type" : "string"
+            "items" : {
+              "enum" : [ "NORMAL", "WARNING", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "contractDateFrom" : {
             "format" : "date",
@@ -3096,11 +3443,40 @@
         },
         "type" : "object"
       },
+      "ContractStatusEventRequest" : {
+        "properties" : {
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 2000,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "enum" : [ "MANUAL_STATUS_CHANGE" ],
+            "maxLength" : 40,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "receivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "effectiveAt", "reason", "reasonCode", "receivedAt" ],
+        "type" : "object"
+      },
       "ContractStatusEventResponse" : {
         "properties" : {
           "effectiveAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "eventId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "eventSeq" : {
             "format" : "int32",
@@ -3126,9 +3502,22 @@
             },
             "type" : "array"
           },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "reasonCode" : {
+            "type" : [ "string", "null" ]
+          },
           "receivedAt" : {
             "format" : "date-time",
             "type" : "string"
+          },
+          "registeredBy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/RegisteredBy"
+            }, {
+              "type" : "null"
+            } ]
           },
           "sourceEventKey" : {
             "type" : "string"
@@ -3290,6 +3679,9 @@
           "standardSurrenderDeductionAmount" : {
             "minimum" : 0,
             "type" : "number"
+          },
+          "statusEvent" : {
+            "$ref" : "#/components/schemas/ContractStatusEventRequest"
           }
         },
         "required" : [ "agentId", "contractDate", "contractNo", "contractStatus", "expectedUpdatedAt", "firstPremiumAmount", "insurerId", "monthlyEquivalentFirstPremium", "organizationId", "paymentCycleCode", "paymentTermMonths", "premiumPerCycleAmount", "productOfferingId" ],
@@ -3300,6 +3692,9 @@
           "contractId" : {
             "format" : "int64",
             "type" : "integer"
+          },
+          "followUp" : {
+            "$ref" : "#/components/schemas/FollowUp"
           },
           "regeneratedScheduleIds" : {
             "items" : {
@@ -3314,6 +3709,14 @@
               "type" : "integer"
             },
             "type" : "array"
+          },
+          "statusEventId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -4030,6 +4433,19 @@
             "type" : "string"
           },
           "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FollowUp" : {
+        "properties" : {
+          "eventId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "status" : {
+            "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],
             "type" : "string"
           }
         },
@@ -4880,6 +5296,36 @@
         },
         "type" : "object"
       },
+      "PageResponseClawbackCandidateResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ClawbackCandidateResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageResponseCommissionItemResponse" : {
         "properties" : {
           "content" : {
@@ -5120,6 +5566,36 @@
         },
         "type" : "object"
       },
+      "PageResponseStatementEntry" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StatementEntry"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ParameterDraft" : {
         "properties" : {
           "description" : {
@@ -5137,6 +5613,48 @@
           }
         },
         "required" : [ "key", "value" ],
+        "type" : "object"
+      },
+      "PaymentEvidence" : {
+        "properties" : {
+          "attributedAmount" : {
+            "type" : "number"
+          },
+          "cashflowType" : {
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "commissionTransactionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "paidOn" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "recipientAgentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "transactionAttributionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
         "type" : "object"
       },
       "PolicyActionRequest" : {
@@ -5216,6 +5734,33 @@
         },
         "type" : "object"
       },
+      "PolicyCandidate" : {
+        "properties" : {
+          "effectiveFrom" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "effectiveTo" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "policyCode" : {
+            "type" : "string"
+          },
+          "policyName" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "versionNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PolicyCloneRequest" : {
         "description" : "정책 새 판의 적용기간과 복제 사유",
         "properties" : {
@@ -5283,6 +5828,20 @@
             "$ref" : "#/components/schemas/PolicyVersionResponse",
             "description" : "정책 버전 헤더"
           },
+          "productOfferings" : {
+            "description" : "FUN-016 상품위원회 메타데이터. 수수료 규칙이 가리키는 판매버전의 승인일·승인문서·기초서류·판매 상태(참조정보)",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyOfferingGovernanceResponse"
+            },
+            "type" : "array"
+          },
+          "references" : {
+            "description" : "FUN-016 근거 info 패널. regulationRefs·sourceRefs 순서대로 레지스트리 항목명과 저장된 상세를 합친 목록",
+            "items" : {
+              "$ref" : "#/components/schemas/PolicyReferenceResponse"
+            },
+            "type" : "array"
+          },
           "refundRateTables" : {
             "description" : "예상 해약환급률표 탭 — 상품·납입기간·채널별 복수",
             "items" : {
@@ -5309,7 +5868,7 @@
             "type" : "string"
           },
           "clawbackRules" : {
-            "description" : "환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다.",
+            "description" : "CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다.",
             "items" : {
               "$ref" : "#/components/schemas/ClawbackRuleDraft"
             },
@@ -5394,6 +5953,90 @@
         "required" : [ "clawbackRules", "commissionRules", "effectiveFrom", "feeRegimeRules", "parameters", "policyCode", "policyName", "policyType", "regulationRefs", "sourceClass", "sourceRefs" ],
         "type" : "object"
       },
+      "PolicyOfferingGovernanceResponse" : {
+        "description" : "정책이 적용되는 판매버전의 상품위원회·기초서류·판매 상태(참조정보)",
+        "properties" : {
+          "basicDocumentVersion" : {
+            "description" : "기초서류 버전",
+            "type" : "string"
+          },
+          "committeeApprovalDate" : {
+            "description" : "상품위원회 승인일",
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "committeeDocumentRef" : {
+            "description" : "상품위원회 승인문서 참조",
+            "type" : [ "string", "null" ]
+          },
+          "governanceStatus" : {
+            "description" : "판매 상태 APPROVED·REVISED·SUSPENDED·STOPPED. 미등록이면 null",
+            "type" : [ "string", "null" ]
+          },
+          "offeringVersion" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "productOfferingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesEndDate" : {
+            "description" : "판매종료일",
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "salesStartDate" : {
+            "description" : "판매개시일",
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PolicyReferenceResponse" : {
+        "description" : "정책 근거 참조와 저장된 상세 설명",
+        "properties" : {
+          "code" : {
+            "description" : "참조에서 읽은 REG/SRC 코드. 형식이 아니면 null",
+            "type" : [ "string", "null" ]
+          },
+          "detailTitle" : {
+            "description" : "이 정책버전에 저장된 근거 제목",
+            "type" : [ "string", "null" ]
+          },
+          "explanation" : {
+            "description" : "이 정책버전에 저장된 근거 설명",
+            "type" : [ "string", "null" ]
+          },
+          "group" : {
+            "description" : "REGULATION(regulationRefs) 또는 SOURCE(sourceRefs)",
+            "type" : "string"
+          },
+          "ref" : {
+            "description" : "정책에 저장된 참조 원문(코드 뒤 설명이 붙은 과거 형식 포함)",
+            "type" : "string"
+          },
+          "registryTitle" : {
+            "description" : "근거 코드 레지스트리 항목명. 미등록·SRC는 null일 수 있음",
+            "type" : [ "string", "null" ]
+          },
+          "statusTags" : {
+            "description" : "이 정책버전에 저장된 근거 상태 태그. 상세가 없으면 []",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "url" : {
+            "description" : "검증된 http(s) 링크",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
       "PolicyVersionResponse" : {
         "description" : "정책 버전",
         "properties" : {
@@ -5465,6 +6108,13 @@
             "example" : "규제",
             "type" : "string"
           },
+          "sourceRefs" : {
+            "description" : "근거자료 코드 목록(SRC-xx). REG와 함께 비어 있으면 '근거 미기재'",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
           "status" : {
             "description" : "정책 상태",
             "enum" : [ "DRAFT", "REVIEW", "APPROVED", "ACTIVE", "RETIRED" ],
@@ -5518,6 +6168,28 @@
           "versionNo" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ProcessingEffect" : {
+        "properties" : {
+          "failureReason" : {
+            "type" : [ "string", "null" ]
+          },
+          "processedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "processingJob" : {
+            "type" : "string"
+          },
+          "processingStatus" : {
+            "type" : "string"
+          },
+          "validationRunId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
           }
         },
         "type" : "object"
@@ -5598,6 +6270,19 @@
           "standardProductCode" : {
             "description" : "FGC 표준 상품코드",
             "example" : "STD-LIFE-B",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Range" : {
+        "properties" : {
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "to" : {
+            "format" : "date",
             "type" : "string"
           }
         },
@@ -6159,6 +6844,21 @@
         },
         "type" : "object"
       },
+      "RegisteredBy" : {
+        "properties" : {
+          "loginId" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userName" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ReverseJournalRequest" : {
         "properties" : {
           "evidenceRef" : {
@@ -6198,6 +6898,54 @@
               "$ref" : "#/components/schemas/ScheduleLineResponse"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ScheduleEvidence" : {
+        "properties" : {
+          "beneficiaryAgentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "commissionItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "confirmedPaidAmount" : {
+            "type" : "number"
+          },
+          "dueDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "expectedAmount" : {
+            "type" : "number"
+          },
+          "generationReason" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lineStatus" : {
+            "type" : "string"
+          },
+          "scheduleHeaderId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "scheduleVersionNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "unpaidAmount" : {
+            "type" : [ "number", "null" ]
           }
         },
         "type" : "object"
@@ -6389,6 +7137,18 @@
         },
         "type" : "object"
       },
+      "Source" : {
+        "properties" : {
+          "entityType" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "SourceDetailDraft" : {
         "properties" : {
           "explanation" : {
@@ -6399,6 +7159,14 @@
           "ref" : {
             "minLength" : 1,
             "type" : "string"
+          },
+          "statusTags" : {
+            "description" : "근거 상태 태그. 현행규정·개정고시·시행세칙·FAQ·회사정책 중 복수, 기본 []",
+            "items" : {
+              "minLength" : 1,
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "title" : {
             "maxLength" : 200,
@@ -6412,6 +7180,153 @@
           }
         },
         "required" : [ "ref", "title" ],
+        "type" : "object"
+      },
+      "SourceReference" : {
+        "properties" : {
+          "asOfDate" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "evidence" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "sourceId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "triggerType" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementBasis" : {
+        "properties" : {
+          "dateBasis" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "month" : {
+            "type" : "string"
+          },
+          "range" : {
+            "$ref" : "#/components/schemas/Range"
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementDetail" : {
+        "properties" : {
+          "basis" : {
+            "$ref" : "#/components/schemas/StatementBasis"
+          },
+          "entry" : {
+            "$ref" : "#/components/schemas/StatementEntry"
+          },
+          "evidence" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementEntry" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "basisDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "commissionItemCode" : {
+            "type" : "string"
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "dataStatus" : {
+            "type" : "string"
+          },
+          "entryKey" : {
+            "type" : "string"
+          },
+          "entryType" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "source" : {
+            "$ref" : "#/components/schemas/Source"
+          },
+          "statusCode" : {
+            "type" : "string"
+          },
+          "statusLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementListResponse" : {
+        "properties" : {
+          "basis" : {
+            "$ref" : "#/components/schemas/StatementBasis"
+          },
+          "items" : {
+            "$ref" : "#/components/schemas/PageResponseStatementEntry"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/StatementSummary"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementSummary" : {
+        "properties" : {
+          "adjustment" : {
+            "$ref" : "#/components/schemas/Bucket"
+          },
+          "clawback" : {
+            "$ref" : "#/components/schemas/Bucket"
+          },
+          "held" : {
+            "$ref" : "#/components/schemas/Bucket"
+          },
+          "payment" : {
+            "$ref" : "#/components/schemas/Bucket"
+          }
+        },
         "type" : "object"
       },
       "TargetSummary" : {
@@ -6589,6 +7504,10 @@
       },
       "ValidationRunProgressResponse" : {
         "properties" : {
+          "attemptId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "currentStep" : {
             "format" : "int32",
             "type" : "integer"
@@ -6603,6 +7522,9 @@
           "progressPct" : {
             "format" : "int32",
             "type" : "integer"
+          },
+          "requestId" : {
+            "type" : "string"
           },
           "status" : {
             "type" : "string"
@@ -6689,6 +7611,117 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/agent/me/statements" : {
+      "get" : {
+        "description" : "지급·보류·조정·환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.",
+        "operationId" : "mine",
+        "parameters" : [ {
+          "description" : "기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다",
+          "example" : "2026-07",
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "계약번호(부분 일치)",
+          "in" : "query",
+          "name" : "contractNo",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "수수료 항목 ID",
+          "in" : "query",
+          "name" : "commissionItemId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK",
+          "in" : "query",
+          "name" : "entryType",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "페이지(1-base)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "페이지 크기(최대 100)",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 수수료 명세 목록",
+        "tags" : [ "설계사 수수료 명세" ]
+      }
+    },
+    "/api/v1/agent/me/statements/{entryKey}" : {
+      "get" : {
+        "description" : "원천 ID·정책·계산 근거를 돌려줍니다. 남의 명세는 조회되지 않습니다.",
+        "operationId" : "mineDetail",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "entryKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementDetail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "본인 수수료 명세 상세",
+        "tags" : [ "설계사 수수료 명세" ]
+      }
+    },
     "/api/v1/arbitrage-checks" : {
       "get" : {
         "operationId" : "getArbitrageChecks_1",
@@ -7610,6 +8643,217 @@
         "tags" : [ "1200% 한도" ]
       }
     },
+    "/api/v1/clawbacks/candidates" : {
+      "get" : {
+        "operationId" : "searchClawbackCandidates",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "dateBasis",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "EVENT_DATE", "CONTRACT_DATE" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "dateFrom",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "dateTo",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "contractNo",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "insurerId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "productOfferingId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "agentId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "triggerType",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "STATUS_EVENT", "ARBITRAGE" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "calculationStatus",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "UNCALCULATED", "CALCULATED", "REVIEW_REQUIRED" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseClawbackCandidateResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "IF-API-83 환수 검토 후보 검색",
+        "tags" : [ "clawback-candidate-controller" ]
+      }
+    },
+    "/api/v1/clawbacks/candidates/{candidateId}" : {
+      "get" : {
+        "operationId" : "getClawbackCandidate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "candidateId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClawbackCandidateDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "IF-API-84 환수 후보 원천·지급·보류 근거 조회",
+        "tags" : [ "clawback-candidate-controller" ]
+      }
+    },
+    "/api/v1/clawbacks/candidates/{candidateId}/calculations" : {
+      "post" : {
+        "description" : "선택한 정책버전과 서버가 잠근 원천으로 계산판을 만듭니다. 최신 판과 원천·정책·산식이 같으면 그 판을 반환하고, 같은 Idempotency-Key 재요청은 최초 결과를 반환합니다.",
+        "operationId" : "calculateClawbackCandidate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "candidateId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "계산 요청의 멱등키",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ClawbackCalculationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                }
+              }
+            },
+            "description" : "계산판"
+          },
+          "409" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                }
+              }
+            },
+            "description" : "원천 버전 변경 또는 멱등키 충돌"
+          },
+          "422" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCalculation"
+                }
+              }
+            },
+            "description" : "적용 정책·계산 근거 부족"
+          }
+        },
+        "summary" : "IF-API-85 환수액 계산",
+        "tags" : [ "clawback-candidate-controller" ]
+      }
+    },
     "/api/v1/contracts" : {
       "get" : {
         "operationId" : "getContractListByCondition",
@@ -7734,6 +8978,7 @@
         "tags" : [ "계약" ]
       },
       "put" : {
+        "description" : "expectedUpdatedAt으로 동시 수정을 검사합니다. 상태를 바꾸면 statusEvent와 Idempotency-Key가 필요하며 사건·후속 작업을 같은 트랜잭션에 남깁니다. 200은 저장 성공이며 후속 처리 완료가 아닙니다.",
         "operationId" : "updateContract",
         "parameters" : [ {
           "in" : "path",
@@ -7742,6 +8987,14 @@
           "schema" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        }, {
+          "description" : "요청 UUID. 상태 변경 시 필수이며 같은 키 재요청은 처음 결과를 돌려줍니다",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "requestBody" : {
@@ -7763,9 +9016,30 @@
                 }
               }
             },
-            "description" : "OK"
+            "description" : "수정 저장 성공"
+          },
+          "409" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractUpdateResponse"
+                }
+              }
+            },
+            "description" : "수정 시각 충돌·허용되지 않은 상태전이·멱등키 충돌·같은 요청 처리 중"
+          },
+          "422" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractUpdateResponse"
+                }
+              }
+            },
+            "description" : "최초 설계사 변경 요청 또는 허용 범위 밖의 사건 일자"
           }
         },
+        "summary" : "보험계약 수정·상태 변경 (IF-API-19)",
         "tags" : [ "contract-controller" ]
       }
     },
@@ -8580,7 +9854,7 @@
                 }
               }
             },
-            "description" : "요청 형식 또는 입력값 오류 (FGC-COMMON-002)"
+            "description" : "입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005)"
           },
           "403" : {
             "content" : {
@@ -8698,6 +9972,16 @@
             },
             "description" : "초안 수정 성공"
           },
+          "400" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                }
+              }
+            },
+            "description" : "입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005)"
+          },
           "409" : {
             "content" : {
               "*/*" : {
@@ -8783,7 +10067,7 @@
                 }
               }
             },
-            "description" : "활성 정책의 적용기간 충돌 (FGC-POL-002)"
+            "description" : "정책·규칙 적용 범위 충돌 (FGC-POL-002) 또는 제출 근거·필수 규칙 누락 (FGC-POL-004)"
           }
         },
         "summary" : "정책 제출·승인·반려·활성화 (IF-API-75)",
@@ -9057,6 +10341,132 @@
         },
         "summary" : "대사 결과 목록 조회 (IF-API-40)",
         "tags" : [ "대사" ]
+      }
+    },
+    "/api/v1/reports/agents/{agentId}/statements" : {
+      "get" : {
+        "description" : "AGENT 를 제외한 내부 조회 역할이 설계사를 지정해 조회합니다.",
+        "operationId" : "forAgent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "agentId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "기준월(yyyy-MM). 유형마다 지급 귀속월·보류 예정월·조정 처리월·환수 계산월로 본다",
+          "example" : "2026-07",
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "계약번호(부분 일치)",
+          "in" : "query",
+          "name" : "contractNo",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "수수료 항목 ID",
+          "in" : "query",
+          "name" : "commissionItemId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "내역 구분: PAYMENT/HELD/ADJUSTMENT/CLAWBACK",
+          "in" : "query",
+          "name" : "entryType",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순",
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "페이지(1-base)",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "페이지 크기(최대 100)",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "설계사별 수수료 명세 목록(내부)",
+        "tags" : [ "설계사 수수료 명세" ]
+      }
+    },
+    "/api/v1/reports/agents/{agentId}/statements/{entryKey}" : {
+      "get" : {
+        "operationId" : "detailForAgent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "agentId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "entryKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStatementDetail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "설계사별 수수료 명세 상세(내부)",
+        "tags" : [ "설계사 수수료 명세" ]
       }
     },
     "/api/v1/schedules" : {
@@ -9959,7 +11369,7 @@
     },
     "/api/v1/validation-runs/{id}/execute" : {
       "post" : {
-        "description" : "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. 1차는 재기동을 지원하지 않는다 — FAILED면 새 실행을 만든다(FUN-045는 2차).",
+        "description" : "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.",
         "operationId" : "execute",
         "parameters" : [ {
           "description" : "validation_run_id",
@@ -10020,7 +11430,7 @@
                 }
               }
             },
-            "description" : "FINALIZED (FGC-VRUN-003) 또는 CREATED가 아닌 상태 (FGC-VRUN-004)"
+            "description" : "FINALIZED (FGC-VRUN-003), 허용 상태 아님 (FGC-VRUN-004), 재시작 이력 확인 불가·경합 (FGC-VRUN-005)"
           }
         },
         "summary" : "검증 실행 기동 (IF-API-48)",
@@ -10220,6 +11630,9 @@
     "url" : "/"
   } ],
   "tags" : [ {
+    "description" : "FUN-060 지급·보류·조정·환수 명세 조회 API",
+    "name" : "설계사 수수료 명세"
+  }, {
     "description" : "FUN-061 핵심 업무 감사로그 조회 API",
     "name" : "감사로그"
   }, {

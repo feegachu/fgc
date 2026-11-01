@@ -229,7 +229,8 @@ public class ValidationRunController {
             description = "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 "
                     + "MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. "
                     + "202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. "
-                    + "1차는 재기동을 지원하지 않는다 — FAILED면 새 실행을 만든다(FUN-045는 2차)."
+                    + "FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). "
+                    + "MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다."
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -242,7 +243,7 @@ public class ValidationRunController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404", description = "실행 미존재 (FGC-COMMON-004)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "FINALIZED (FGC-VRUN-003) 또는 CREATED가 아닌 상태 (FGC-VRUN-004)")
+                    responseCode = "409", description = "FINALIZED (FGC-VRUN-003), 허용 상태 아님 (FGC-VRUN-004), 재시작 이력 확인 불가·경합 (FGC-VRUN-005)")
     })
     @PostMapping("/{id}/execute")
     @ResponseStatus(HttpStatus.ACCEPTED)

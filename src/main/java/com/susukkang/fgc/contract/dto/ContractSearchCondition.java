@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.List;
 /**
  * 설명 : 계약 데이터 조회조건 DTO
  *
@@ -26,7 +27,7 @@ public class ContractSearchCondition {
     private Long productOfferingId; //상품
     private Long agentId; //FC ID
     private Long orgId; //조직 ID (IF-API-11, 계약 당시 소속 조직 기준)
-    private CapResultStatus capResultStatus; //1,200% 한도 판정
+    private List<CapResultStatus> capResultStatus; //1,200% 한도 판정(쉼표로 여러 개 가능)
     private ContractStatus currentStatus; //계약상태
     private LocalDate contractDateFrom; //계약일 시작
     private LocalDate contractDateTo; //계약일 끝

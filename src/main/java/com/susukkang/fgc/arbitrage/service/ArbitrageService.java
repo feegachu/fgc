@@ -8,6 +8,7 @@ import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService;
 import com.susukkang.fgc.arbitrage.service.ArbitrageApplicabilityPolicyService.Applicability;
 import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
 import com.susukkang.fgc.audit.service.AuditLogService;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
 import com.susukkang.fgc.common.code.ProtectionType;
 import com.susukkang.fgc.common.code.ValidationRunStatus;
@@ -59,6 +60,7 @@ public class ArbitrageService {
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
     private final ArbitrageApplicabilityPolicyService applicabilityPolicyService;
+    private final ClawbackCandidateCaptureService clawbackCandidateCaptureService;
 
     /**
      * 설명 : 검색 조건에 해당하는 차익거래 검증 결과 요약과 페이징 목록을 조회한다.
@@ -275,6 +277,9 @@ public class ArbitrageService {
         int insertedRows = arbitrageCheckRepository.insertArbitrageCheck(row);
         if (insertedRows != 1 || row.getArbitrageCheckId() == null)
             throw new FgcBusinessException(FgcErrorCode.COMMON_500, Map.of());
+
+        // FUN-054: 같은 원천 재관측은 동일 후보로 수렴한다. CLEAR로 바뀌어도 기존 후보/계산은 삭제하지 않는다.
+        clawbackCandidateCaptureService.captureArbitrageResult(row.getArbitrageCheckId());
 
         // 차익거래 후보만 공통 예외 목록에 중복 없이 등록
         if (row.getResultStatus() == ArbitrageCheckStatus.CANDIDATE) {

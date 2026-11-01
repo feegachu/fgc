@@ -2,8 +2,10 @@ package com.susukkang.fgc.policy.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
+import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 설명 : 계약과 지급 단계에 적용할 현행 수수료 정책을 조회하는 서비스
@@ -28,4 +30,7 @@ public interface CommissionPolicyService {
 
     /** 지정 기준일에 유효한 회사 공통 안분정책 버전을 조회한다. */
     Long resolveCurrentAllocationPolicyVersion(LocalDate asOf);
+
+    /** 이미 선택한 정책의 규칙에 계약·지급단계·구체성·우선순위 조건을 적용한다. */
+    List<ResolvedCommissionRule> resolveCommissionRules(Long policyVersionId, Long contractId, PaymentStage paymentStage);
 }

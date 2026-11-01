@@ -43,6 +43,7 @@ public class ResolvedCommissionRule {
     private Long organizationId;       // 조직 조건, NULL이면 모든 조직에 적용
     private Long productOfferingId;    // 상품 판매버전 조건, NULL이면 모든 상품에 적용
     private Integer priorityNo;        // 구체성이 같을 때 적용할 우선순위(작을수록 우선)
+    private boolean equalMonthlyYn;   // 정책에 설정한 매월 동일 금액 조건
 
     /** 네이티브 조회의 문자열 코드를 기존 계산용 enum으로 변환한다. */
     public ResolvedCommissionRule(
@@ -50,11 +51,11 @@ public class ResolvedCommissionRule {
             String agentRankCode, Integer installmentFrom, Integer installmentTo,
             String basisCode, String calculationType, BigDecimal ratePct, BigDecimal fixedAmount,
             Integer roundingScale, String roundingMode, String paymentConditionCode,
-            Long insurerId, Long organizationId, Long productOfferingId, Integer priorityNo) {
+            Long insurerId, Long organizationId, Long productOfferingId, Integer priorityNo, Boolean equalMonthlyYn) {
         this(FeeComponentType.valueOf(feeComponentType), commissionRuleId, commissionItemId,
                 agentRankCode == null ? null : AgentRankCode.valueOf(agentRankCode),
                 installmentFrom, installmentTo, basisCode, CalculationType.valueOf(calculationType),
                 ratePct, fixedAmount, roundingScale, RoundingMode.valueOf(roundingMode),
-                paymentConditionCode, insurerId, organizationId, productOfferingId, priorityNo);
+                paymentConditionCode, insurerId, organizationId, productOfferingId, priorityNo, Boolean.TRUE.equals(equalMonthlyYn));
     }
 }

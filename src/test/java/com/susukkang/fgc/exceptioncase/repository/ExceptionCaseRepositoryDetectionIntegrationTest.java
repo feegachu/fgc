@@ -34,6 +34,53 @@ class ExceptionCaseRepositoryDetectionIntegrationTest {
     private EntityManager entityManager;
 
     @Test
+    void reconciliationSkipPreservesContractStageReasonAndIsIdempotentOnRestart() {
+        Long runId = insertArbitrageValidationRun();
+        Long contractId = jdbcTemplate.queryForObject(
+                "SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1", Long.class);
+        Long caseId = exceptionCaseRepository.insertReconciliationSkip(runId, contractId,
+                "INSURER_TO_GA", "RECONCILIATION_FAILED", "보험사 전체 대사 요청 실패");
+        assertThat(caseId).isNotNull();
+        assertThat(exceptionCaseRepository.insertReconciliationSkip(runId, contractId,
+                "INSURER_TO_GA", "RECONCILIATION_FAILED", "보험사 전체 대사 요청 실패")).isEqualTo(caseId);
+        var recorded = jdbcTemplate.queryForMap("""
+                SELECT ec.contract_id, eo.reason_code, eo.evidence_snapshot ->> 'paymentStage' AS stage,
+                       eo.evidence_snapshot ->> 'description' AS description
+                  FROM fgc.exception_occurrence eo JOIN fgc.exception_case ec USING(exception_case_id)
+                 WHERE eo.exception_case_id=? AND eo.validation_run_id=?
+                """, caseId, runId);
+        assertThat(recorded).containsEntry("contract_id", contractId)
+                .containsEntry("reason_code", "RECONCILIATION_FAILED")
+                .containsEntry("stage", "INSURER_TO_GA")
+                .containsEntry("description", "보험사 전체 대사 요청 실패");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id=?", Long.class, caseId))
+                .isEqualTo(1L);
+        assertThat(exceptionCaseRepository.insertReconciliationSkip(runId, contractId,
+                "GA_TO_FC", "RECONCILIATION_FAILED", "설계사 지급 대사 실패")).isNotEqualTo(caseId);
+        Long nextRun = insertArbitrageValidationRun();
+        assertThat(exceptionCaseRepository.insertReconciliationSkip(nextRun, contractId,
+                "INSURER_TO_GA", "RECONCILIATION_FAILED", "후속 실행 재검출")).isEqualTo(caseId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id=?", Long.class, caseId))
+                .isEqualTo(2L);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void reconciliationSkipRequiresCallersTransaction() {
+        assertThatThrownBy(() -> exceptionCaseRepository.insertReconciliationSkip(1L, 1L,
+                "GA_TO_FC", "RECONCILIATION_FAILED", "오류"))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    @Test
+    void reconciliationSkipCannotRecordMissingValidationRun() {
+        assertThat(exceptionCaseRepository.insertReconciliationSkip(Long.MAX_VALUE, 1L,
+                "GA_TO_FC", "RECONCILIATION_FAILED", "오류")).isNull();
+    }
+
+    @Test
     void arbitrageDetectionReturnsNullWhenValidationRunDoesNotExist() {
         assertThat(exceptionCaseRepository.insertArbitrageCandidate(
                 Long.MAX_VALUE, 1L, 1L, "GA_TO_FC", null)).isNull();

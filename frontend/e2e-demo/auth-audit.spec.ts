@@ -159,3 +159,26 @@ test('COMPLIANCE 스케줄 확정 버튼 비활성·지급 등록 403', async ({
   await page.goto('transactions/new?month=2026-07')
   await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
 })
+
+test('패키징 서버 Swagger가 JWT 인증 후 정상이고 재시작 추적 필드를 노출한다', async ({ request }, testInfo) => {
+  const backend = 'http://127.0.0.1:18081'
+  const auth = await request.post(`${backend}/api/v1/auth/login`, {
+    headers: { Origin: backend, 'X-FGC-Client': 'web' },
+    data: { loginId: 'admin', password },
+  })
+  expect(auth.status()).toBe(200)
+  const token = (await auth.json()).data.accessToken
+  const response = await request.get(`${backend}/v3/api-docs`, { headers: { Authorization: `Bearer ${token}` } })
+  expect(response.status()).toBe(200)
+  const document = await response.json()
+  expect(document.openapi).toMatch(/^3\./)
+  expect(document.paths['/api/v1/validation-runs/{id}/execute']?.post).toBeDefined()
+  expect(document.paths['/api/v1/validation-runs/{id}/progress']?.get).toBeDefined()
+  const schemas = Object.values(document.components.schemas) as Array<{ properties?: Record<string, unknown> }>
+  const progress = schemas.find((schema) => schema.properties?.attemptId && schema.properties?.currentStep)
+  expect(progress?.properties).toHaveProperty('requestId')
+  await testInfo.attach('packaged-swagger-restart-summary', {
+    contentType: 'application/json',
+    body: JSON.stringify({ openapi: document.openapi, execute: true, progress: true, fields: Object.keys(progress!.properties!) }),
+  })
+})

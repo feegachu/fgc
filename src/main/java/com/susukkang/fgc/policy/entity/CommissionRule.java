@@ -56,7 +56,8 @@ import java.util.Map;
                         @ColumnResult(name = "insurer_id", type = Long.class),
                         @ColumnResult(name = "organization_id", type = Long.class),
                         @ColumnResult(name = "product_offering_id", type = Long.class),
-                        @ColumnResult(name = "priority_no", type = Integer.class)
+                        @ColumnResult(name = "priority_no", type = Integer.class),
+                        @ColumnResult(name = "equal_monthly_yn", type = Boolean.class)
                 }
         )
 )

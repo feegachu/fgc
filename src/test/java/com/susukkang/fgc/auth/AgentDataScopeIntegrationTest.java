@@ -238,11 +238,16 @@ class AgentDataScopeIntegrationTest {
         assertScopeDenied(() -> scope.requireInquiry(otherInquiry));
         assertScopeDenied(() -> scope.requireInquiry(otherWriter));
         Long rule = id("""
+                WITH fixture_policy AS (
+                  INSERT INTO fgc.policy_version(policy_code,policy_name,policy_type,source_class,version_no,effective_from,status)
+                  VALUES (?, '소유권 검증 환수 정책', 'CLAWBACK', 'PROJECT_ASSUMPTION', 1, DATE '2026-01-01', 'DRAFT')
+                  RETURNING policy_version_id
+                )
                 INSERT INTO fgc.clawback_rule(policy_version_id, elapsed_month_from, elapsed_month_to,
                     clawback_basis_code, clawback_rate_pct)
-                SELECT min(policy_version_id), 9999, 9999, 'SCOPE_FIXTURE', 10 FROM fgc.policy_version
+                SELECT policy_version_id, 9999, 9999, 'SCOPE_FIXTURE', 10 FROM fixture_policy
                 RETURNING clawback_rule_id
-                """);
+                """, "SCOPE-CLAW-" + UUID.randomUUID());
         Long ownCase = createClawback(ownAgent, rule);
         Long otherCase = createClawback(otherAgent, rule);
         scope.requireClawback(ownCase);

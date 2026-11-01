@@ -65,7 +65,8 @@ public interface CommissionRuleRepository extends JpaRepository<CommissionRule, 
                    cr.insurer_id,
                    cr.organization_id,
                    cr.product_offering_id,
-                   cr.priority_no
+                   cr.priority_no,
+                   cr.equal_monthly_yn
             FROM fgc.commission_rule cr
             JOIN fgc.insurance_contract c ON c.contract_id = :contractId
             WHERE cr.policy_version_id = :policyVersionId
