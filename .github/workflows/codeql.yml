@@ -1,0 +1,52 @@
+# .github/workflows/codeql.yml
+# TER-009 보안 테스트의 정적 분석 층(#677). 결과는 저장소 Security → Code scanning 에 쌓인다.
+# 공개 저장소라 비용이 없다. 필수 체크로 등록하지 않는다 — 경고 정리 방식을 팀이 정한 뒤 올린다.
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths-ignore: ["docs/**", "**/*.md"]
+  push:
+    branches: [develop, main]
+    paths-ignore: ["docs/**", "**/*.md"]
+  schedule:
+    - cron: "0 18 * * 0"   # 매주 월 03:00 KST — 코드가 그대로여도 새 규칙·새 취약점 패턴으로 다시 본다
+
+concurrency:
+  group: codeql-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write   # 결과(SARIF) 업로드
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # build-mode none: Gradle·npm 빌드 없이 소스만 분석한다(빌드 job과 따로 돌아 CI 시간을 늘리지 않음)
+          - language: java-kotlin
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions        # 워크플로 자체의 취약점(스크립트 주입·과한 권한)
+            build-mode: none
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: "/language:${{ matrix.language }}"

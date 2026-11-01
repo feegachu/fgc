@@ -141,6 +141,43 @@ describe('policy UI boundaries', () => {
     expect(screen.getByText('FAQ')).toBeVisible()
     expect(screen.getByText('상태 자료 없음')).toBeVisible()
   })
+  it('lists committee metadata of the offerings the policy targets as reference information', () => {
+    render(
+      <PolicySources
+        sources={[]}
+        refs={[]}
+        offerings={[
+          {
+            productOfferingId: 3,
+            productName: '가상 종신',
+            offeringVersion: 'V1',
+            basicDocumentVersion: 'BD-1',
+            salesStartDate: '2026-01-01',
+            salesEndDate: null,
+            committeeApprovalDate: '2025-12-15',
+            committeeDocumentRef: '의결서 2025-12',
+            governanceStatus: 'SUSPENDED',
+          },
+          {
+            productOfferingId: 4,
+            productName: '가상 정기',
+            offeringVersion: 'V2',
+            basicDocumentVersion: 'BD-2',
+            salesStartDate: '2026-02-01',
+            salesEndDate: null,
+            committeeApprovalDate: null,
+            committeeDocumentRef: null,
+            governanceStatus: null,
+          },
+        ]}
+      />,
+    )
+    const section = screen.getByRole('region', { name: '상품위원회 정보' })
+    expect(section).toHaveTextContent('가상 종신 · V1')
+    expect(section).toHaveTextContent('승인문서 의결서 2025-12')
+    expect(section).toHaveTextContent('판매 상태 판매보류')
+    expect(section).toHaveTextContent('승인일 미등록')
+  })
   it('focuses an invalid field and preserves input, then asks before discarding an edited draft', async () => {
     const save = vi.fn(),
       close = vi.fn()

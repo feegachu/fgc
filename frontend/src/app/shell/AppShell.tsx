@@ -111,7 +111,9 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
         </main>
-        <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
+        {!location.pathname.startsWith('/agent-home') && (
+          <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
+        )}
       </div>
     </div>
   )

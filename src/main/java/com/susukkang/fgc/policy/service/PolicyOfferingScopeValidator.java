@@ -25,6 +25,25 @@ public class PolicyOfferingScopeValidator {
     private final ProductRepository productRepository;
 
     public void validateForSubmission(PolicyDraft draft) {
+        validateClawbackOfferings(draft);
+        validateCommissionOfferings(draft);
+    }
+
+    private void validateClawbackOfferings(PolicyDraft draft) {
+        for (int i = 0; i < draft.clawbackRules().size(); i++) {
+            var rule = draft.clawbackRules().get(i);
+            if (rule.productOfferingId() == null) continue;
+            String field = "clawbackRules[" + i + "]";
+            ProductOffering offering = offeringRepository.findById(rule.productOfferingId()).orElseThrow(() ->
+                    invalid(field + PRODUCT_OFFERING_ID, "존재하지 않는 상품 판매버전입니다."));
+            if (rule.insurerId() != null && !Objects.equals(rule.insurerId(),
+                    productRepository.findById(offering.getProductId()).orElseThrow().getInsurerId())) {
+                throw invalid(field + ".insurerId", "선택한 보험회사에 속한 상품 판매버전이어야 합니다.");
+            }
+        }
+    }
+
+    private void validateCommissionOfferings(PolicyDraft draft) {
         if (draft.policyType() != PolicyType.FOUR_YEAR_COMMISSION
                 && draft.policyType() != PolicyType.SEVEN_YEAR_COMMISSION) return;
         Map<Long, ProductOffering> offerings = new HashMap<>();

@@ -22,6 +22,24 @@ class PolicySuccessionValidatorTest {
     private final PolicySuccessionValidator validator = new PolicySuccessionValidator();
 
     @Test
+    void clawbackSuccessionAllowsRateChangesAndSplitBandsButRequiresOriginalScopeCoverage() throws Exception {
+        ObjectNode previous = document().put("policyType", "CLAWBACK");
+        previous.putArray("commissionRules");
+        ObjectNode rule = previous.withArray("clawbackRules").addObject()
+                .put("insurerId", 1).put("elapsedMonthFrom", 0).put("elapsedMonthTo", 23)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        ObjectNode replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
+        replacement.putArray("clawbackRules").add(rule.deepCopy().put("elapsedMonthTo", 11).put("clawbackRatePct", "100"))
+                .add(rule.deepCopy().put("elapsedMonthFrom", 12).put("clawbackRatePct", "0"));
+        assertValid(previous, replacement);
+        ((ObjectNode) replacement.path("clawbackRules").get(1)).put("elapsedMonthFrom", 13);
+        assertInvalid(previous, replacement, "clawbackRules");
+        replacement = previous.deepCopy();
+        ((ObjectNode) replacement.path("clawbackRules").get(0)).put("commissionItemId", 5);
+        assertInvalid(previous, replacement, "clawbackRules");
+    }
+
+    @Test
     void permitsChangedPricesAndPriorityFromTheNewContractDate() throws Exception {
         ObjectNode previous = document(), replacement = previous.deepCopy().put("effectiveFrom", "2027-01-01");
         assertValid(previous, replacement);

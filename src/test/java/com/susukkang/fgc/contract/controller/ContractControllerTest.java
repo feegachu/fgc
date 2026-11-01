@@ -1,6 +1,8 @@
 package com.susukkang.fgc.contract.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.auth.dto.AppUserView;
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.config.SecurityConfig;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
@@ -35,6 +37,7 @@ import static com.susukkang.fgc.common.code.PaymentCycleCode.MONTHLY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -213,7 +216,9 @@ class ContractControllerTest {
     void updateContractAllowsSystemAdmin() throws Exception {
         when(contractService.updateContract(
                 eq(21L),
-                any(ContractUpdateRequest.class)
+                any(ContractUpdateRequest.class),
+                any(),
+                eq(1L)
         )).thenReturn(ContractUpdateResponse.builder()
                 .contractId(21L)
                 .scheduleHeaderIds(java.util.List.of(201L, 202L))
@@ -221,7 +226,7 @@ class ContractControllerTest {
                 .build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
-                        .with(user("admin").roles("SYSTEM_ADMIN"))
+                        .with(user(userDetails("SYSTEM_ADMIN")))
                         .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
@@ -237,16 +242,58 @@ class ContractControllerTest {
     void updateContractReturnsSuccess() throws Exception {
         when(contractService.updateContract(
                 eq(21L),
-                any(ContractUpdateRequest.class)
+                any(ContractUpdateRequest.class),
+                any(),
+                eq(1L)
         )).thenReturn(ContractUpdateResponse.builder().contractId(21L).build());
 
         mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
-                        .with(user("settlement").roles("SETTLEMENT"))
+                        .with(user(userDetails("SETTLEMENT")))
                         .with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.contractId").value(21));
+    }
+
+    @Test
+    @DisplayName("Idempotency-Key 헤더와 인증 사용자 ID를 서비스에 그대로 넘긴다")
+    void updateContractPassesIdempotencyKeyAndAuthenticatedUser() throws Exception {
+        String key = "3f2b8c1e-5d4a-4b6f-9e21-7a0c2d9e4b18";
+        when(contractService.updateContract(eq(21L), any(ContractUpdateRequest.class), eq(key), eq(1L)))
+                .thenReturn(ContractUpdateResponse.builder().contractId(21L).statusEventId(7L)
+                        .followUp(new ContractUpdateResponse.FollowUp(ContractUpdateResponse.FollowUp.Status.PENDING, 7L))
+                        .build());
+
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L)
+                        .with(user(userDetails("SETTLEMENT")))
+                        .with(csrf())
+                        .header("Idempotency-Key", key)
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.statusEventId").value(7))
+                .andExpect(jsonPath("$.data.followUp.status").value("PENDING"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "IMPL_AGENT_FIXED, 422, FGC-IMPL-AGENT_FIXED",
+            "IMPL_EVENT_ORDER, 422, FGC-IMPL-EVENT_ORDER",
+            "IMPL_TRANSITION_DENIED, 409, FGC-IMPL-TRANSITION_DENIED"
+    })
+    @DisplayName("상태 사건 오류는 예약 코드·HTTP 상태와 사용자 문구로 응답한다")
+    void updateContractMapsStatusEventErrors(
+            com.susukkang.fgc.common.exception.FgcErrorCode errorCode, int httpStatus, String code) throws Exception {
+        when(contractService.updateContract(eq(21L), any(ContractUpdateRequest.class), any(), eq(1L)))
+                .thenThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(errorCode, "contractStatus",
+                        java.util.Map.of("field", "statusEvent.effectiveAt", "from", "해지", "to", "정상"), null));
+
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L).with(user(userDetails("SETTLEMENT")))
+                        .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(updateRequest())))
+                .andExpect(status().is(httpStatus))
+                .andExpect(jsonPath("$.error.code").value(code))
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.startsWith("저장 불가 — ")));
     }
 
     @Test
@@ -257,14 +304,14 @@ class ContractControllerTest {
                         .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.field").value("expectedUpdatedAt"));
-        org.mockito.Mockito.verify(contractService, org.mockito.Mockito.never()).updateContract(any(), any());
+        verify(contractService, never()).updateContract(any(), any(), any(), any());
     }
 
     @Test
     void updateContractReturns409AndAnActionableConflictMessage() throws Exception {
-        when(contractService.updateContract(eq(21L), any())).thenThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(
+        when(contractService.updateContract(eq(21L), any(), any(), any())).thenThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(
                 com.susukkang.fgc.common.exception.FgcErrorCode.CONT_003));
-        mockMvc.perform(put("/api/v1/contracts/{id}", 21L).with(user("settlement").roles("SETTLEMENT"))
+        mockMvc.perform(put("/api/v1/contracts/{id}", 21L).with(user(userDetails("SETTLEMENT")))
                         .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("FGC-CONT-003"))
@@ -304,8 +351,20 @@ class ContractControllerTest {
                 new BigDecimal("100000"),
                 120,
                 new BigDecimal("50000"),
-                OffsetDateTime.parse("2026-10-11T01:00:00.123456Z")
+                OffsetDateTime.parse("2026-10-11T01:00:00.123456Z"),
+                null
         );
+    }
+
+    private static FgcUserDetails userDetails(String role) {
+        AppUserView user = new AppUserView();
+        user.setUserId(1L);
+        user.setLoginId("settle01");
+        user.setPasswordHash("x");
+        user.setUserName("테스트 사용자");
+        user.setRoleCode(role);
+        user.setAccountStatus("ACTIVE");
+        return new FgcUserDetails(user, true, true);
     }
 
     @Test

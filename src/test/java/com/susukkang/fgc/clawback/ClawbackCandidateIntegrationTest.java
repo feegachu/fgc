@@ -58,6 +58,12 @@ class ClawbackCandidateIntegrationTest {
         contractId = cloneContract(contractNo);
         agentId = jdbc.queryForObject("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id=?", Long.class, contractId);
         itemId = jdbc.queryForObject("SELECT min(commission_item_id) FROM fgc.commission_item WHERE cashflow_type='PAYMENT'", Long.class);
+        // 이 클래스의 격리 DB에서는 데모 정책을 정상 종료해 직접 만든 정책의 적용 범위만 검증한다.
+        // 승인 규칙은 삭제하지 않는다(V75). 일반 테스트는 종료도 테스트 트랜잭션과 함께 롤백한다.
+        jdbc.update("""
+                UPDATE fgc.policy_version SET status='RETIRED'
+                WHERE policy_code='CLAW-GA-VIRTUAL-2026' AND status='ACTIVE'
+                """);
     }
 
     @ParameterizedTest
@@ -73,13 +79,15 @@ class ClawbackCandidateIntegrationTest {
         var detail = query.detail(id);
         assertThat(detail.candidate().eventDate()).isEqualTo(LocalDate.of(2026, 4, 1));
         assertThat(detail.candidate().calculationStatus()).isEqualTo(CalculationStatus.REVIEW_REQUIRED);
-        assertThat(detail.candidate().reviewReasons()).contains("POLICY_MISSING", "CALCULATION_BASIS_UNCONFIRMED");
+        assertThat(detail.candidate().reviewReasons()).contains("POLICY_MISSING").doesNotContain("CALCULATION_BASIS_UNCONFIRMED");
+        assertThat(detail.candidate().allowedActions()).isEmpty();
         assertThat(detail.candidate().paidAmount()).isEqualByComparingTo("0");
         assertThat(detail.candidate().unpaidAmount()).isNull();
         assertThat(detail.candidate().calculatedAmount()).isNull();
         assertThat(detail.candidate().clawbackCaseId()).isNull();
         assertThat(detail.latestCalculation()).isNull();
-        assertThat(detail.elapsedMonths()).isNull();
+        // D-02: 계약일 2026-01-01부터 효력일 2026-04-01까지 채운 개월 수
+        assertThat(detail.elapsedMonths()).isEqualTo(3);
         assertThat(detail.sourceRefs()).singleElement().satisfies(ref -> {
             assertThat(ref.sourceId()).isEqualTo(event);
             assertThat(ref.asOfDate()).isNull();
@@ -366,7 +374,10 @@ class ClawbackCandidateIntegrationTest {
         assertThat(detail.policyCandidates()).extracting(row -> row.policyVersionId()).containsExactly(policy).doesNotContain(retired);
         assertThat(detail.candidate().policyVersionId()).isEqualTo(policy);
         assertThat(detail.candidate().reviewReasons()).doesNotContain("POLICY_MISSING");
-        assertThat(detail.candidate().reviewReasons()).contains("CALCULATION_BASIS_UNCONFIRMED");
+        assertThat(detail.candidate().reviewReasons()).doesNotContain("CALCULATION_BASIS_UNCONFIRMED");
+        // 정책 후보가 있고 막는 근거가 없으면 미계산이다. 계산 권한이 없는 COMPLIANCE에게는 동작을 주지 않는다.
+        assertThat(detail.candidate().calculationStatus()).isEqualTo(CalculationStatus.UNCALCULATED);
+        assertThat(detail.candidate().allowedActions()).isEmpty();
         long second = policy("ACTIVE");
         detail = query.detail(id);
         assertThat(detail.policyCandidates()).extracting(row -> row.policyVersionId()).containsExactly(policy, second);

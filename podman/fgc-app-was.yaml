@@ -17,6 +17,8 @@ spec:
         - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://fgc-db:5432/fgc"}
         - {name: SPRING_DATASOURCE_USERNAME, value: fgc}
         - {name: SPRING_FLYWAY_LOCATIONS, value: "classpath:db/migration,classpath:db/demo,classpath:db/demo-agent"}
+        # 상품 추천 AI 순위 산식(FUN-079 D-01 가정). demo-agent 를 읽는 시연 Pod 에서만 켠다
+        - {name: FGC_COMPARE_RULE_VERSION, value: "compare-net-v1"}
         - {name: JAVA_TOOL_OPTIONS, value: "-Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m"}
         - name: SPRING_DATASOURCE_PASSWORD
           valueFrom: {secretKeyRef: {name: fgc-app, key: SPRING_DATASOURCE_PASSWORD}}

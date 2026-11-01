@@ -391,6 +391,6 @@ class ContractTransactionIntegrationTest {
         return new ContractUpdateRequest(seed.getContractNo(), seed.getInsurerId(), seed.getProductOfferingId(),
                 date, seed.getCurrentStatus(), seed.getAgentId(), seed.getOrganizationId(),
                 seed.getPaymentCycleCode(), premium, premium, premium, seed.getPaymentTermMonths(),
-                seed.getStandardSurrenderDeductionAmount(), seed.getUpdatedAt());
+                seed.getStandardSurrenderDeductionAmount(), seed.getUpdatedAt(), null);
     }
 }
