@@ -379,7 +379,7 @@ function GuideSession({
                 <>
                   <Button
                     variant="secondary"
-                    disabled={working || snapshot.status === 'PREPARING' || current?.steps[0].stepId === step.stepId}
+                    disabled={working || snapshot.status === 'PREPARING' || !runtime.canGoBack()}
                     onClick={() => void run(() => runtime.previous())}
                   >
                     이전

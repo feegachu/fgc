@@ -221,6 +221,21 @@ describe('FUN-087 execution boundary', () => {
     await s.runtime.next()
     expect(s.runtime.getSnapshot().status).toBe('WAITING_INPUT')
   })
+  it('reports a previous step only while one was visited in the current context', async () => {
+    const s = setup()
+    s.updateState({ valid: true })
+    await s.runtime.start(s.request())
+    expect(s.runtime.canGoBack()).toBe(false)
+    await s.runtime.next()
+    expect(s.runtime.getSnapshot()).toMatchObject({ status: 'SHOWING', step: { stepId: 'save' } })
+    expect(s.runtime.canGoBack()).toBe(true)
+    s.updateContext({ clientContextRevision: '2', dirty: true })
+    s.runtime.contextChanged()
+    await s.runtime.resume()
+    expect(s.runtime.getSnapshot()).toMatchObject({ status: 'SHOWING', step: { stepId: 'save' } })
+    // Resume discards the visits made under the previous revision.
+    expect(s.runtime.canGoBack()).toBe(false)
+  })
   it('does not resume a different selected entity', async () => {
     const s = setup()
     await s.runtime.start(s.request())

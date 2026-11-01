@@ -997,4 +997,20 @@ describe('FUN-087 guide card and spotlight', () => {
     expect(screen.getByLabelText(/금액 \(원\)/)).toHaveValue(250000)
     expect(writes()).toHaveLength(0)
   })
+  it('enables 이전 only while a visited step remains after an edit resumes the guide', async () => {
+    const { user } = mount()
+    await fillNew(user)
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    await user.click(within(panel()).getByRole('button', { name: '지급 초안 저장' }))
+    await next(user, true)
+    await waitFor(() =>
+      expect(within(panel()).getByRole('heading')).toHaveTextContent('지급액과 계산 근거를 비교하세요'),
+    )
+    await waitFor(() => expect(within(panel()).getByRole('button', { name: '이전' })).toBeEnabled())
+    await user.type(screen.getByLabelText('증빙', { selector: 'input', exact: true }), 'x')
+    await user.click(await within(panel()).findByRole('button', { name: '현재 내용으로 다시 찾기' }))
+    await within(panel()).findByRole('button', { name: '확인하고 다음' })
+    expect(within(panel()).getByRole('heading')).toHaveTextContent('지급액과 계산 근거를 비교하세요')
+    expect(within(panel()).getByRole('button', { name: '이전' })).toBeDisabled()
+  })
 })
