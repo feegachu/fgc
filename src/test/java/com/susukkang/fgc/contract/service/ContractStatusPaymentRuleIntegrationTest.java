@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.susukkang.fgc.auth.dto.AppUserView;
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.contract.dto.ContractStatusEffect;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
+import com.susukkang.fgc.policy.service.ScheduleEligibilityPolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +22,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +30,7 @@ import java.util.UUID;
 import static com.susukkang.fgc.contract.dto.ContractStatusEffect.EntityType.PAYMENT;
 import static com.susukkang.fgc.contract.dto.ContractStatusEffect.EntityType.SCHEDULE_LINE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -50,6 +54,7 @@ class ContractStatusPaymentRuleIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ContractStatusPaymentRule rule;
     @Autowired private ContractStatusEventRepository events;
+    @Autowired private ScheduleEligibilityPolicyService policies;
 
     private FgcUserDetails writer;
     private FgcUserDetails approver;
@@ -85,6 +90,33 @@ class ContractStatusPaymentRuleIntegrationTest {
         assertThat(effects).extracting(ContractStatusEffect::entityId, ContractStatusEffect::nextState,
                         ContractStatusEffect::policyVersionId)
                 .containsExactly(tuple(lineId, "CANCELLED", policyId));
+    }
+
+    /** V77 뒤 db/migration만 적용한 운영 DB의 복구 절차(POL-W01 새 버전 작성)가 기존 계약까지 덮는지 실제 API로 확인한다. */
+    @Test
+    void retiredLegacyVersionCanBeReissuedFromItsStartDateThroughTheApi() throws Exception {
+        // 적용할 판이 없는 상태: 데모 v2를 승계 기록 없이 폐기한다(데모 V3·V77이 v1에 한 처리와 같다, 롤백됨).
+        jdbc.update("UPDATE fgc.policy_version SET status = 'RETIRED' "
+                + "WHERE policy_code = 'STATUS-MONTH-RULE-2026' AND status = 'ACTIVE'");
+        Long legacy = jdbc.queryForObject("""
+                SELECT policy_version_id FROM fgc.policy_version
+                 WHERE policy_code = 'STATUS-MONTH-RULE-2026' AND version_no = 1
+                """, Long.class);
+        LocalDate existingContract = LocalDate.of(2026, 3, 1);
+        assertThatThrownBy(() -> policies.resolve(existingContract)).isInstanceOf(FgcBusinessException.class);
+
+        JsonNode cloned = write(HttpMethod.POST, "/api/v1/policies/" + legacy + "/versions",
+                mapper.createObjectNode().put("effectiveFrom", "2026-01-01").put("reason", "유산 v1 재발행"), 201);
+        long policyId = cloned.path("policyVersionId").asLong();
+        ObjectNode edit = detail(policyId).path("editDocument").deepCopy();
+        edit.set("parameters", scheduleDraft("2026-01-01", null).path("parameters"));
+        edit.putArray("sourceRefs"); // 승인자 없는 v1의 코드 없는 문서 경로는 새 판에 남기지 않는다
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + policyId, edit, 200);
+        JsonNode review = action(policyId, "SUBMIT", updated, writer, 200);
+        JsonNode approved = action(policyId, "APPROVE", review, approver, 200);
+        action(policyId, "ACTIVATE", approved, approver, 200);
+
+        assertThat(policies.resolve(existingContract)).isEqualTo(policyId);
     }
 
     @Test
@@ -304,9 +336,13 @@ class ContractStatusPaymentRuleIntegrationTest {
     }
 
     private JsonNode create(ObjectNode draft) throws Exception {
-        MvcResult result = perform(HttpMethod.POST, "/api/v1/policies", draft, writer);
+        return write(HttpMethod.POST, "/api/v1/policies", draft, 201);
+    }
+
+    private JsonNode write(HttpMethod method, String path, JsonNode payload, int expected) throws Exception {
+        MvcResult result = perform(method, path, payload, writer);
         assertThat(result.getResponse().getStatus()).withFailMessage(result.getResponse().getContentAsString())
-                .isEqualTo(201);
+                .isEqualTo(expected);
         return body(result).path("data");
     }
 
