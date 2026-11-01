@@ -396,6 +396,15 @@ describe('production policy workflow', () => {
     )
   })
 
+  it('explains the self-approval block to an approver who edited or submitted the draft', () => {
+    // 서버는 작성·수정·제출에 참여한 승인자에게 REJECT만 준다. 이 사용자는 생성자가 아니다.
+    mountManagement('REVIEW', ['REJECT'])
+    expect(screen.queryByRole('button', { name: '승인' })).toBeNull()
+    expect(
+      screen.getByText('이 정책을 수정하거나 제출한 사용자는 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.'),
+    ).toBeVisible()
+  })
+
   it('includes optional approval evidence in the real approval request', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
     const { user, onSaved } = mountManagement('REVIEW', ['APPROVE'])
