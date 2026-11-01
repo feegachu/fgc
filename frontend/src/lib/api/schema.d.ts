@@ -6785,7 +6785,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
         };
