@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { Modal } from '../../components/Modal'
@@ -21,7 +22,7 @@ import {
 import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
 import type { DraftErrors } from './draftValidation'
-import { savePolicyDraft } from './writeApi'
+import { normalizePolicyDetail, savePolicyDraft } from './writeApi'
 import type { PolicyDetailResponse } from './writeApi'
 import { usePolicyRequest } from './usePolicyRequest'
 
@@ -54,6 +55,7 @@ export function PolicyDraftEditor({
   initialProblem?: { field: string; message: string }
 }) {
   const preview = useContext(PolicyPreviewContext)
+  const cache = useQueryClient()
   const [draft, setDraft] = useState(() => structuredClone(initial ?? emptyDraft()))
   const initialPath = initialProblem?.field.replace(/\[(\d+)\]/g, '.$1')
   const [section, setSection] = useState<Section>(() => sectionFor(initialPath ?? ''))
@@ -125,6 +127,8 @@ export function PolicyDraftEditor({
     setBusy(true)
     try {
       const response = await apiClient.request<PolicyDetailResponse>(`/api/v1/policies/${policyId}`)
+      // Preserve this edit session while refreshing the server document used when editing is reopened.
+      cache.setQueryData(['policies', 'detail', policyId], normalizePolicyDetail(response.data))
       const header = response.data.header
       setLatest(
         `최신 정책: ${header?.policyName ?? ''} · ${header?.statusLabel ?? header?.status ?? ''}. 입력은 보존했습니다. 최신 내용으로 편집하려면 취소 후 다시 여세요.`,

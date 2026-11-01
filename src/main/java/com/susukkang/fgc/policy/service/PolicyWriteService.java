@@ -269,7 +269,8 @@ public class PolicyWriteService {
         offeringScopeValidator.validateForSubmission(draft);
         validateReferences(draft, storedReferences(draft), storedUrls(draft));
         if (draft.regulationRefs().isEmpty() && draft.sourceRefs().isEmpty()) {
-            throw new FgcBusinessException(FgcErrorCode.POL_002, "sourceRefs", Map.of(), "제출할 정책에는 승인된 근거가 필요합니다.");
+            throw new FgcBusinessException(FgcErrorCode.POL_004, "sourceRefs",
+                    Map.of("reason", "제출할 정책에는 승인된 근거가 필요합니다."), null);
         }
         boolean complete = switch (draft.policyType()) {
             case CURRENT_COMMISSION -> !draft.commissionRules().isEmpty();
@@ -293,7 +294,8 @@ public class PolicyWriteService {
                 case SCHEDULE_ELIGIBILITY, ARBITRAGE, RECONCILIATION_TOLERANCE -> "parameters";
                 default -> FIELD_POLICY_TYPE;
             };
-            throw new FgcBusinessException(FgcErrorCode.POL_002, field, Map.of(), "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다.");
+            throw new FgcBusinessException(FgcErrorCode.POL_004, field,
+                    Map.of("reason", "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다."), null);
         }
     }
 

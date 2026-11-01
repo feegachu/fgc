@@ -1,0 +1,61 @@
+{
+  "date": "2026-11-01",
+  "baseCommit": "21d076c35d1bc59fca87fd2c7dc70a0fd655cb70",
+  "backend": {
+    "command": ".\\gradlew.bat test --tests '*PolicyWorkflowIntegrationTest' --tests '*PolicyDraftValidatorTest' --tests '*ConstraintErrorCodeResolverTest' --tests '*GlobalExceptionHandlerTest' --console=plain",
+    "tests": 92,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": [
+      {
+        "suite": "com.susukkang.fgc.common.exception.ConstraintErrorCodeResolverTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "com.susukkang.fgc.common.exception.GlobalExceptionHandlerTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "com.susukkang.fgc.policy.controller.PolicyWorkflowIntegrationTest",
+        "tests": 46,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "com.susukkang.fgc.policy.service.PolicyDraftValidatorTest",
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "frontend": {
+    "command": "npm test -- --run src/features/policies",
+    "tests": 54,
+    "failures": 0,
+    "checks": [
+      "build",
+      "lint",
+      "check:api",
+      "check:e2e"
+    ],
+    "reproducedBeforeFix": "After conflict reload, cancelling and reopening showed the old policy name",
+    "verifiedAfterFix": "Current input preserved; reopen uses latest updatedAt and child IDs, then saves successfully"
+  },
+  "realServerE2E": {
+    "status": "Regression assertions added to the CI real-server suite; local E2E execution is not included in this record",
+    "scenarios": [
+      "409 -> reload -> cancel -> reopen -> successful PUT",
+      "Missing evidence -> 422 POL-004 with evidence-specific message"
+    ]
+  }
+}

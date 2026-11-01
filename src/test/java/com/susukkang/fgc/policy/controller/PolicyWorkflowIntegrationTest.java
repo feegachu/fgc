@@ -14,6 +14,8 @@ import com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService;
 import com.susukkang.fgc.policy.service.FeeRegimeRulesetService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -229,6 +231,51 @@ class PolicyWorkflowIntegrationTest {
         JsonNode empty = create(draft, writer);
         assertThat(actionError(empty.path("policyVersionId").asLong(), "SUBMIT", empty, writer, 422)
                 .path("field").asText()).isEqualTo("clawbackRules");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"insurerId", "productOfferingId", "commissionItemId"})
+    void missingClawbackTargetsReturnInputErrorsAndRollback(String field) throws Exception {
+        ObjectNode draft = clawbackDraft();
+        ObjectNode rule = (ObjectNode) draft.path("clawbackRules").get(0);
+        rule.put(field, Long.MAX_VALUE);
+        String requestKey = key();
+        JsonNode failure = writeError(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 400);
+        assertThat(failure.path("code").asText()).isEqualTo("FGC-POL-005");
+        assertThat(failure.path("message").asText()).contains("존재하지 않습니다").doesNotContain("{", "500");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.policy_version WHERE policy_code=?",
+                Integer.class, draft.path("policyCode").asText())).isZero();
+
+        rule.putNull(field);
+        JsonNode created = write(HttpMethod.POST, "/api/v1/policies", draft, writer, requestKey, 201);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode edit = (ObjectNode) detail(id, writer).path("editDocument");
+        JsonNode originalRules = edit.path("clawbackRules").deepCopy();
+        ((ObjectNode) edit.path("clawbackRules").get(0)).put(field, Long.MAX_VALUE);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 400)
+                .path("code").asText()).isEqualTo("FGC-POL-005");
+        JsonNode unchanged = detail(id, writer).path("editDocument");
+        assertThat(unchanged.path("clawbackRules")).isEqualTo(originalRules);
+        assertThat(unchanged.path("expectedUpdatedAt")).isEqualTo(edit.path("expectedUpdatedAt"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sourceRefs", "clawbackRules"})
+    void missingSubmissionRequirementsHaveSpecificMessagesInsteadOfOverlap(String field) throws Exception {
+        ObjectNode draft = clawbackDraft();
+        draft.putArray(field);
+        if (field.equals("sourceRefs")) {
+            draft.putArray("regulationRefs");
+            draft.putArray("sourceDetails");
+        }
+        JsonNode created = create(draft, writer);
+        long id = created.path("policyVersionId").asLong();
+        JsonNode failure = actionError(id, "SUBMIT", created, writer, 422);
+        assertThat(failure.path("code").asText()).isEqualTo("FGC-POL-004");
+        assertThat(failure.path("field").asText()).isEqualTo(field);
+        assertThat(failure.path("message").asText()).contains(field.equals("sourceRefs") ? "근거" : "규칙")
+                .doesNotContain("겹치", "{reason}");
+        assertThat(detail(id, writer).path("header").path("status").asText()).isEqualTo("DRAFT");
     }
 
     @Test
@@ -1300,6 +1347,15 @@ class PolicyWorkflowIntegrationTest {
                 VALUES (?, '장기유지 예정 수수료', 'PAYMENT', 'SALES', DATE '2026-01-01')
                 RETURNING commission_item_id
                 """, Long.class, "P014-" + UUID.randomUUID());
+    }
+
+    private ObjectNode clawbackDraft() {
+        ObjectNode draft = draft().put("policyType", "CLAWBACK").putNull("feeRegimeCode");
+        draft.putArray("commissionRules");
+        draft.putArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "50");
+        return draft;
     }
 
     private ObjectNode draft() {
