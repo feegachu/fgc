@@ -289,7 +289,7 @@ function ContractEditor({
           (error.field in draft || error.field.startsWith('statusEvent.')) &&
           error.code !== 'FGC-COMMON-500'
         )
-          setErrors({ [error.field]: error.message })
+          setErrors({ [error.field]: message })
       }
       setSaveError(message)
       setConfirmSave(false)

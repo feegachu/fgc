@@ -688,7 +688,10 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     await confirm(user)
     await waitFor(() => expect(field('효력일시')).toHaveAttribute('aria-invalid', 'true'))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByText(/FGC-IMPL-EVENT_ORDER/)).toHaveTextContent('event-order')
+    expect(field('효력일시')).toHaveAccessibleDescription(
+      '저장할 수 없습니다. 효력일시는 최신 사건의 효력일시 이후여야 합니다.',
+    )
+    expect(screen.queryByText(/FGC-IMPL-EVENT_ORDER/)).not.toBeInTheDocument()
     expect(field('효력일시')).toHaveValue('2026-10-20T00:00')
     expect(reason()).toHaveValue('  보험회사 해지 접수 반영  ')
     await confirm(user)
