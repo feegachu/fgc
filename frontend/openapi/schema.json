@@ -5868,7 +5868,7 @@
             "type" : "string"
           },
           "clawbackRules" : {
-            "description" : "환수 기준은 D-02 미결이다. 현재는 빈 배열만 허용한다.",
+            "description" : "CLAWBACK 정책의 환수 규칙. D-02 기준 PAID_ATTRIBUTED_AMOUNT, 조건식은 빈 객체만 지원한다.",
             "items" : {
               "$ref" : "#/components/schemas/ClawbackRuleDraft"
             },
@@ -9854,7 +9854,7 @@
                 }
               }
             },
-            "description" : "요청 형식 또는 입력값 오류 (FGC-COMMON-002)"
+            "description" : "입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005)"
           },
           "403" : {
             "content" : {
@@ -9972,6 +9972,16 @@
             },
             "description" : "초안 수정 성공"
           },
+          "400" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                }
+              }
+            },
+            "description" : "입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005)"
+          },
           "409" : {
             "content" : {
               "*/*" : {
@@ -10057,7 +10067,7 @@
                 }
               }
             },
-            "description" : "활성 정책의 적용기간 충돌 (FGC-POL-002)"
+            "description" : "정책·규칙 적용 범위 충돌 (FGC-POL-002) 또는 제출 근거·필수 규칙 누락 (FGC-POL-004)"
           }
         },
         "summary" : "정책 제출·승인·반려·활성화 (IF-API-75)",

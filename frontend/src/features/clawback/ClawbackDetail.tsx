@@ -72,10 +72,11 @@ const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions']
     label: '지급 ID',
     cellClassName: 'tabular-nums',
     // 지급 목록을 이 계약으로 거르고 해당 지급 행을 선택한 상태로 연다.
+    // 지급 목록은 정산월 키가 없으면 기준 정산월로 거르므로(#752) 다른 월 지급도 보이게 전체월(빈 값)로 연다.
     render: (r) =>
       r.commissionTransactionId != null && c.contractNo ? (
         <ContextLink
-          to={`/transactions?${query({ contractNo: c.contractNo, selectedId: String(r.commissionTransactionId) })}`}
+          to={`/transactions?${query({ contractNo: c.contractNo, settlementMonth: '', selectedId: String(r.commissionTransactionId) })}`}
         >
           {r.commissionTransactionId}
         </ContextLink>
