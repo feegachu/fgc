@@ -279,6 +279,78 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @Test
+    void clawbackEditsPreserveRuleIdsAndCreationTimesWhileClonesReceiveNewIds() throws Exception {
+        // FGC-FUN-017 (#647): 전체 PUT은 유지한 환수 규칙의 ID·생성시각을 보존하고, 두 구간을 맞바꿔도 유일키에 걸리지 않는다.
+        JsonNode created = create(twoBandClawbackDraft(), systemWriter);
+        long id = created.path("policyVersionId").asLong();
+        var identities = clawbackIdentities(id);
+        ObjectNode edit = (ObjectNode) detail(id, systemWriter).path("editDocument");
+        ObjectNode first = (ObjectNode) edit.path("clawbackRules").get(0);
+        ObjectNode second = (ObjectNode) edit.path("clawbackRules").get(1);
+        assertThat(first.path("clawbackRuleId").asLong()).isPositive();
+        assertThat(first.path("clawbackRatePct").isTextual()).isTrue();
+        first.put("elapsedMonthFrom", 12).put("elapsedMonthTo", 1199).put("clawbackRatePct", "0.000000");
+        second.put("elapsedMonthFrom", 0).put("elapsedMonthTo", 11).put("clawbackRatePct", "33.333333");
+        JsonNode updated = write(HttpMethod.PUT, "/api/v1/policies/" + id, edit, systemWriter, key(), 200);
+        assertThat(clawbackIdentities(id)).isEqualTo(identities);
+        JsonNode review = action(id, "SUBMIT", updated, systemWriter, 200);
+        JsonNode approved = action(id, "APPROVE", review, approver, 200);
+        action(id, "ACTIVATE", approved, approver, 200);
+
+        JsonNode originalRules = detail(id, writer).path("editDocument").path("clawbackRules");
+        JsonNode cloned = write(HttpMethod.POST, "/api/v1/policies/" + id + "/versions",
+                cloneRequest("2001-01-01"), writer, key(), 201);
+        long cloneId = cloned.path("policyVersionId").asLong();
+        ObjectNode clonedEdit = (ObjectNode) detail(cloneId, writer).path("editDocument");
+        for (JsonNode rule : clonedEdit.path("clawbackRules")) {
+            assertThat(identities).extracting(row -> row.get("clawback_rule_id"))
+                    .isNotEmpty()
+                    .doesNotContain(rule.path("clawbackRuleId").asLong());
+        }
+        ((ObjectNode) clonedEdit.path("clawbackRules").get(1)).put("clawbackRatePct", "25.000000");
+        write(HttpMethod.PUT, "/api/v1/policies/" + cloneId, clonedEdit, writer, key(), 200);
+        assertThat(detail(id, writer).path("editDocument").path("clawbackRules")).isEqualTo(originalRules);
+    }
+
+    @Test
+    void clawbackRuleIdsMustBelongToTheEditedPolicyAndAreRejectedOnCreate() throws Exception {
+        // FGC-FUN-017 (#647): 다른 정책의 환수 규칙 ID로 덮어쓰거나, 생성 요청에 기존 ID를 넣을 수 없다.
+        JsonNode created = create(twoBandClawbackDraft(), writer);
+        long id = created.path("policyVersionId").asLong();
+        ObjectNode before = (ObjectNode) detail(id, writer).path("editDocument");
+        long otherId = create(twoBandClawbackDraft(), writer).path("policyVersionId").asLong();
+        long foreign = detail(otherId, writer).path("editDocument").path("clawbackRules").get(0)
+                .path("clawbackRuleId").asLong();
+        ObjectNode edit = before.deepCopy();
+        ((ObjectNode) edit.path("clawbackRules").get(0)).put("clawbackRuleId", foreign);
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, edit, writer, key(), 400)
+                .path("field").asText()).isEqualTo("clawbackRules");
+        ObjectNode duplicateIds = before.deepCopy();
+        ((ObjectNode) duplicateIds.path("clawbackRules").get(1)).put("clawbackRuleId",
+                before.path("clawbackRules").get(0).path("clawbackRuleId").asLong());
+        assertThat(writeError(HttpMethod.PUT, "/api/v1/policies/" + id, duplicateIds, writer, key(), 400)
+                .path("field").asText()).isEqualTo("clawbackRules[1].clawbackRuleId");
+        ObjectNode invalidCreate = twoBandClawbackDraft();
+        ((ObjectNode) invalidCreate.path("clawbackRules").get(0)).put("clawbackRuleId", foreign);
+        writeError(HttpMethod.POST, "/api/v1/policies", invalidCreate, writer, key(), 400);
+        assertThat(detail(id, writer).path("editDocument")).isEqualTo(before);
+    }
+
+    private ObjectNode twoBandClawbackDraft() {
+        ObjectNode draft = clawbackDraft();
+        ((ObjectNode) draft.path("clawbackRules").get(0)).put("clawbackRatePct", "33.333333");
+        draft.withArray("clawbackRules").addObject().put("insurerId", insurerId).put("commissionItemId", itemId)
+                .put("elapsedMonthFrom", 12).put("elapsedMonthTo", 1199)
+                .put("clawbackBasisCode", "PAID_ATTRIBUTED_AMOUNT").put("clawbackRatePct", "0.000000");
+        return draft;
+    }
+
+    private List<java.util.Map<String, Object>> clawbackIdentities(long id) {
+        return jdbc.queryForList("SELECT clawback_rule_id, created_at FROM fgc.clawback_rule "
+                + "WHERE policy_version_id=? ORDER BY clawback_rule_id", id);
+    }
+
+    @Test
     void preservesFixedAmountDecimalTextAcrossReadAndEdit() throws Exception {
         ObjectNode draft = draft();
         ObjectNode rule = (ObjectNode) draft.path("commissionRules").get(0);

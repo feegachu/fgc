@@ -36,6 +36,7 @@ public class PolicyDraftValidator {
     private static final String FEE_RULE_PREFIX = "feeRegimeRules[";
     private static final String COMMISSION_RULE_PREFIX = "commissionRules[";
     private static final String CONFLICTING_INDEX = "conflictingIndex";
+    private static final String DUPLICATE_CHILD_ID = "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.";
     private static final Set<String> HEADER_REGIMES = Set.of("CURRENT", FOUR_YEAR, SEVEN_YEAR);
 
     private final Validator validator;
@@ -65,9 +66,13 @@ public class PolicyDraftValidator {
         if (!draft.clawbackRules().isEmpty() && draft.policyType() != PolicyType.CLAWBACK) {
             throw invalid("clawbackRules", "환수 규칙은 환수 정책에만 등록할 수 있습니다.");
         }
+        Set<Long> ids = new HashSet<>();
         for (int i = 0; i < draft.clawbackRules().size(); i++) {
             var rule = draft.clawbackRules().get(i);
             String field = "clawbackRules[" + i + "]";
+            if (rule.clawbackRuleId() != null && !ids.add(rule.clawbackRuleId())) {
+                throw invalid(field + ".clawbackRuleId", DUPLICATE_CHILD_ID);
+            }
             validateClawbackRule(rule, field);
             for (int j = 0; j < i; j++) {
                 var other = draft.clawbackRules().get(j);
@@ -160,7 +165,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.commissionRules().size(); i++) {
             CommissionRuleDraft rule = draft.commissionRules().get(i);
             if (rule.commissionRuleId() != null && !commissionIds.add(rule.commissionRuleId())) {
-                throw invalid(COMMISSION_RULE_PREFIX + i + "].commissionRuleId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
+                throw invalid(COMMISSION_RULE_PREFIX + i + "].commissionRuleId", DUPLICATE_CHILD_ID);
             }
             validateCommission(rule, COMMISSION_RULE_PREFIX + i + "]");
         }
@@ -174,7 +179,7 @@ public class PolicyDraftValidator {
         for (int i = 0; i < draft.feeRegimeRules().size(); i++) {
             FeeRegimeRuleDraft rule = draft.feeRegimeRules().get(i);
             if (rule.feeRegimeRulesetId() != null && !feeIds.add(rule.feeRegimeRulesetId())) {
-                throw invalid(FEE_RULE_PREFIX + i + "].feeRegimeRulesetId", "동일한 자식 규칙 ID를 중복 지정할 수 없습니다.");
+                throw invalid(FEE_RULE_PREFIX + i + "].feeRegimeRulesetId", DUPLICATE_CHILD_ID);
             }
             validateFeeRule(rule, requiredRegime, FEE_RULE_PREFIX + i + "]");
             if (draft.basicDocumentVersion() != null && rule.basicDocumentVersion() != null

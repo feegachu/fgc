@@ -93,7 +93,9 @@ public class PolicyController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "정책 상태·수정 시각 또는 멱등키 충돌")
+                    responseCode = "409", description = "정책 상태·수정 시각 또는 멱등키 충돌"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "422", description = "정책 규칙의 적용 구간 충돌 (FGC-POL-002)")
     })
     @PutMapping("/{policyVersionId}")
     @PreAuthorize(Roles.CAN_WRITE_POLICY)

@@ -142,6 +142,8 @@ public record PolicyDraft(
     }
 
     public record ClawbackRuleDraft(
+            @Schema(description = "수정 시 유지할 기존 환수 규칙 ID. 최초 생성에서는 지정하지 않는다.")
+            @Positive Long clawbackRuleId,
             @Positive Long insurerId,
             @Positive Long productOfferingId,
             @Positive Long commissionItemId,
@@ -150,6 +152,7 @@ public record PolicyDraft(
             @NotBlank @Size(max = 40) String clawbackBasisCode,
             @NotNull @DecimalMin("0") @DecimalMax("100")
             @JsonFormat(shape = JsonFormat.Shape.STRING)
+            @Schema(type = "string", description = "환수율(%), 0~100·소수점 최대6자리의 정밀도를 보존한 문자열")
             @Digits(integer = 3, fraction = 6) BigDecimal clawbackRatePct,
             JsonNode conditionExpression
     ) {

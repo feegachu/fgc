@@ -2596,7 +2596,13 @@ export interface components {
         };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
-            clawbackRatePct: number;
+            /** @description 환수율(%), 0~100·소수점 최대6자리의 정밀도를 보존한 문자열 */
+            clawbackRatePct: string;
+            /**
+             * Format: int64
+             * @description 수정 시 유지할 기존 환수 규칙 ID. 최초 생성에서는 지정하지 않는다.
+             */
+            clawbackRuleId?: number;
             /** Format: int64 */
             commissionItemId?: number;
             conditionExpression?: components["schemas"]["JsonNode"];
@@ -6766,6 +6772,15 @@ export interface operations {
             };
             /** @description 정책 상태·수정 시각 또는 멱등키 충돌 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+            /** @description 정책 규칙의 적용 구간 충돌 (FGC-POL-002) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
