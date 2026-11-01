@@ -120,11 +120,15 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
     .filter({ has: page.getByRole('cell', { name: String(reconId), exact: true }) })
     .click()
   // The guide's own reads decide the branch; record them instead of re-reading through another session.
-  const resultsRead = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === `/api/v1/reconciliations/${reconId}/results` &&
-      response.request().method() === 'GET',
-  )
+  const resultsRead = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    // The page's own results query always sends sort; the guide's read does not.
+    return (
+      url.pathname === `/api/v1/reconciliations/${reconId}/results` &&
+      !url.searchParams.has('sort') &&
+      response.request().method() === 'GET'
+    )
+  })
   const openRead = page.waitForResponse((response) => {
     const url = new URL(response.url())
     return (
