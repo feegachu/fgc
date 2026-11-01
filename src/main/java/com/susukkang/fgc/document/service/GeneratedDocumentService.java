@@ -35,8 +35,8 @@ public class GeneratedDocumentService {
     public record DocumentFile(String documentNo, int version, byte[] content) {
         @Override
         public boolean equals(Object o) {
-            return o instanceof DocumentFile other && version == other.version
-                    && documentNo.equals(other.documentNo) && Arrays.equals(content, other.content);
+            return o instanceof DocumentFile(String otherNo, int otherVersion, byte[] otherContent)
+                    && version == otherVersion && documentNo.equals(otherNo) && Arrays.equals(content, otherContent);
         }
 
         @Override

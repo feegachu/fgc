@@ -2939,9 +2939,9 @@ export interface components {
         CompareCapSummary: {
             /** Format: int32 */
             contractCount?: number;
-            status?: string;
+            status?: string | null;
             /** Format: double */
-            usagePct?: number;
+            usagePct?: number | null;
         };
         CompareCategoryResponse: {
             code?: string;
@@ -2958,7 +2958,7 @@ export interface components {
             rule?: string;
             source?: string;
             /** Format: int64 */
-            value?: number;
+            value?: number | null;
         };
         CompareExcluded: {
             insurer?: string;
@@ -2984,7 +2984,7 @@ export interface components {
         CompareItem: {
             associationGrade?: string;
             /** Format: double */
-            capImpactPct?: number;
+            capImpactPct?: number | null;
             /** Format: int64 */
             cappedReceipt?: number;
             /** Format: int64 */
@@ -3016,7 +3016,7 @@ export interface components {
             /** Format: date */
             asOf?: string;
             /** Format: int64 */
-            basePremium?: number;
+            basePremium?: number | null;
             capSummary?: components["schemas"]["CompareCapSummary"];
             categoryCode?: string;
             categoryLabel?: string;
@@ -3025,9 +3025,9 @@ export interface components {
             excludedItems?: components["schemas"]["CompareExcluded"][];
             filters?: components["schemas"]["CompareRankingFilters"];
             items?: components["schemas"]["CompareItem"][];
-            policyVersion?: string;
-            rankResultId?: string;
-            ruleVersion?: string;
+            policyVersion?: string | null;
+            rankResultId?: string | null;
+            ruleVersion?: string | null;
             status?: string;
             warnings?: string[];
         };
@@ -6761,7 +6761,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponsePolicyWriteResult"];
+                    "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
             /** @description 정책 상태·수정 시각 또는 멱등키 충돌 */

@@ -10,18 +10,18 @@ import java.util.List;
  */
 public record CompareRankingResponse(
         /** explain 호출에 쓰는 이번 계산 결과 ID(본인 세션에서만 유효, 단기 보관). 순위가 없으면 null */
-        String rankResultId,
+        @Schema(nullable = true) String rankResultId,
         /** READY | RULE_NOT_CONFIGURED(승인된 계산 기준 미설정, items=[]) | INSUFFICIENT_DATA(자료 부족으로 순위 없음) */
         String status,
         String categoryCode,
         String categoryLabel,
         LocalDate asOf,
         /** 순위 산식 버전(D-01 compare-net-v1). 설정이 구현 버전과 다르면 RULE_NOT_CONFIGURED 이고 null */
-        String ruleVersion,
+        @Schema(nullable = true) String ruleVersion,
         /** 이번 계산에 쓴 수수료 정책 버전. 후보가 없으면 null */
-        String policyVersion,
+        @Schema(nullable = true) String policyVersion,
         /** 순위 계산에 쓴 설계사 본인 계약의 평균 월 환산 보험료. 계약이 없으면 null */
-        Long basePremium,
+        @Schema(nullable = true) Long basePremium,
         /** 환수 노출액을 가정한 해지 차월(n차월). 환수 규칙의 경과월은 n−1 이다 */
         int clawbackMonth,
         List<String> warnings,
@@ -41,8 +41,10 @@ public record CompareRankingResponse(
     }
 
     // springdoc은 단순 클래스명을 스키마 이름으로 쓰므로 중첩 레코드는 Compare 접두어로 이름을 고정한다.
+    // 한도 검증 결과가 없으면 사용률·상태가 null이다.
     @Schema(name = "CompareCapSummary")
-    public record CapSummary(Double usagePct, String status, int contractCount) {
+    public record CapSummary(@Schema(nullable = true) Double usagePct, @Schema(nullable = true) String status,
+                             int contractCount) {
     }
 
     @Schema(name = "CompareItem")
@@ -62,12 +64,14 @@ public record CompareRankingResponse(
             /** 보수적 순수령액 = 한도 반영 수령 예상액 − 환수 노출액 */
             long conservativeNet,
             /** 한도 적용 전 수령 예상액 ÷ 한도 금액(%, 소수 6자리 버림). 한도 규칙이 없으면 null */
-            Double capImpactPct,
+            @Schema(nullable = true) Double capImpactPct,
             String associationGrade,
             List<Evidence> evidence) {
     }
 
+    // 환수 규칙 대상이 아닌 근거는 금액(value)이 null이다.
     @Schema(name = "CompareEvidence")
-    public record Evidence(String label, String rule, Long value, String source, String policyVersion, LocalDate asOf) {
+    public record Evidence(String label, String rule, @Schema(nullable = true) Long value, String source,
+                           String policyVersion, LocalDate asOf) {
     }
 }

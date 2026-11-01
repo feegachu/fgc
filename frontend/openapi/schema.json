@@ -3238,11 +3238,11 @@
             "type" : "integer"
           },
           "status" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "usagePct" : {
             "format" : "double",
-            "type" : "number"
+            "type" : [ "number", "null" ]
           }
         },
         "type" : "object"
@@ -3288,7 +3288,7 @@
           },
           "value" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           }
         },
         "type" : "object"
@@ -3360,7 +3360,7 @@
           },
           "capImpactPct" : {
             "format" : "double",
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "cappedReceipt" : {
             "format" : "int64",
@@ -3446,7 +3446,7 @@
           },
           "basePremium" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "capSummary" : {
             "$ref" : "#/components/schemas/CompareCapSummary"
@@ -3477,13 +3477,13 @@
             "type" : "array"
           },
           "policyVersion" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "rankResultId" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "ruleVersion" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "status" : {
             "type" : "string"
@@ -10754,9 +10754,9 @@
           },
           "400" : {
             "content" : {
-              "*/*" : {
+              "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePolicyWriteResult"
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
                 }
               }
             },
