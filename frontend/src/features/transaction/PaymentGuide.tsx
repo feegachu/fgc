@@ -103,6 +103,14 @@ function GuideSession({
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || modalOpen) return
+      // An open search list or popup handles its own Escape first (WAI-ARIA APG); the next Escape ends the guide.
+      if (
+        event.target instanceof Element &&
+        event.target.closest(
+          '[role="combobox"][aria-expanded="true"], [aria-haspopup][aria-expanded="true"], [role="dialog"]',
+        )
+      )
+        return
       event.preventDefault()
       event.stopPropagation()
       runtime.stop()
