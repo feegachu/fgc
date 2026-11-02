@@ -42,6 +42,10 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       JAVA_TOOL_OPTIONS: "-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=384m"
       TZ: Asia/Seoul
+      # 환수 통지서 PDF 원본(#671). 이미지 밖 볼륨이어야 재배포 뒤에도 과거 판이 남는다
+      FGC_STORAGE_ROOT: /var/lib/fgc/files
+    volumes:
+      - files:/var/lib/fgc/files
     ports:
       - "127.0.0.1:18081:8080"
     mem_limit: 2g
@@ -65,3 +69,4 @@ services:
 
 volumes:
   pgdata:
+  files:
