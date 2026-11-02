@@ -69,6 +69,19 @@ it('requests only the selected stored payment and displays exact server strings 
   )
   expect(request).toHaveBeenCalledTimes(1)
 })
+it('lists amounts in a fixed order whatever key order the server JSON has', async () => {
+  vi.spyOn(apiClient, 'request').mockResolvedValue(
+    envelope({ ...snapshot, amounts: { differenceAmount: '10000', attributedTotal: '90000', amount: '100000' } }),
+  )
+  render(<PaymentCalculationPanel observation={observation} canProcess />)
+  await userEvent.click(screen.getByRole('button', { name: '귀속 차액 조회' }))
+  await screen.findByText('10,000원')
+  expect(screen.getAllByRole('term').slice(0, 3).map((term) => term.textContent)).toEqual([
+    '저장된 지급액',
+    '귀속 합계',
+    '지급액 − 귀속 합계',
+  ])
+})
 it('preserves null amounts and candidate blockers and never treats confirmable as completed precheck', async () => {
   vi.spyOn(apiClient, 'request').mockResolvedValue(
     envelope({

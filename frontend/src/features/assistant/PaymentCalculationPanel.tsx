@@ -17,6 +17,8 @@ const names: Record<string, string> = {
   remainingAmount: '잔여 한도',
   candidateAmount: '지급 후보 산입액',
 }
+// JSON key order is not part of the contract (the server builds it with Map.of), so the card fixes it.
+const rank = (key: string) => (key in names ? Object.keys(names).indexOf(key) : Number.MAX_SAFE_INTEGER)
 const won = (value: unknown) => (isWonAmount(value) ? `${BigInt(value).toLocaleString('ko-KR')}원` : '확인 전')
 /** Mounted with the form identity/revision key; never reuses a previous account or edited form response. */
 export function PaymentCalculationPanel({
@@ -121,7 +123,7 @@ export function PaymentCalculationPanel({
           </strong>
           <p>저장 상태: {result.paymentStatus ?? '미확인'} · 지급 완료액과 구분하세요.</p>
           <dl>
-            {Object.entries(result.amounts ?? {}).map(([key, value]) => (
+            {Object.entries(result.amounts ?? {}).sort(([left], [right]) => rank(left) - rank(right)).map(([key, value]) => (
               <div key={key}>
                 <dt>{names[key] ?? key}</dt>
                 <dd>{won(value)}</dd>
