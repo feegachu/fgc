@@ -545,7 +545,8 @@ test('빈 저장 초안은 빈 귀속표로 보여 주고 서버 입력 오류�
   await page.locator('#btn-precheck').click()
   await expect(page.locator('#btn-confirm')).toBeEnabled()
   await page.locator('#btn-confirm').click()
-  await expect(page.getByRole('dialog')).toContainText('FGC-TRAN-002')
+  await expect(page.getByRole('dialog')).toContainText('귀속행을 입력하세요.')
+  await expect(page.getByRole('dialog')).not.toContainText('FGC-TRAN-002')
   await expect(page.locator('#btn-confirm-submit')).toHaveCount(0)
 })
 
@@ -557,7 +558,7 @@ test('기록된 한도 거절 응답 유실 뒤 CAP-003 재응답에도 예외�
   await page.getByRole('button', { name: '취소', exact: true }).click()
   await page.locator('#btn-confirm').click()
   await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
-  await expect(page.getByRole('dialog')).toContainText('FGC-CAP-003')
+  await expect(page.getByRole('dialog')).toContainText('1,200% 한도를 초과했습니다.')
   const link = page.getByRole('link', { name: '예외함에서 처리하기' })
   await expect(link).toHaveAttribute('href', /type=CAP_VIOLATION/)
   await expect(link).not.toHaveAttribute('href', /contractNo=/)

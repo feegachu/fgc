@@ -103,7 +103,7 @@ describe('AUTH-W01 로그인', () => {
     )
     const { actions } = renderAt()
     await enterCredentials(actions)
-    expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: trace-404')
+    expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 trace-404를 담당자에게 알려주세요.')
     expect(screen.queryByText(/internal details|FGC-COMMON-500/)).toBeNull()
   })
 

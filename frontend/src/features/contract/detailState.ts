@@ -1,5 +1,5 @@
 import { ApiError } from '../../lib/api/errors'
-import { errorText } from '../../lib/format'
+import { errorText, internalErrorText } from '../../lib/format'
 import type { ContractStatusEvent } from './api'
 
 export const contractTabs = [
@@ -14,10 +14,10 @@ export type ContractTab = (typeof contractTabs)[number][0]
 export const contractTab = (value: string | null): ContractTab =>
   contractTabs.find(([name]) => name === value)?.[0] ?? 'basic'
 
-/** COMMON-500은 서버 내부 상세 대신 요청 ID만 노출한다. */
+/** COMMON-500은 서버 내부 상세 대신 표준 문구와 요청번호만 노출한다. */
 export const contractErrorText = (error: Error, fallback?: string) =>
   error instanceof ApiError && (error.code === 'FGC-COMMON-500' || error.status >= 500)
-    ? `요청 ID: ${error.requestId ?? '-'}`
+    ? internalErrorText(error.requestId)
     : errorText(error, fallback)
 
 export type StatusSort = 'effectiveAt' | 'receivedAt'

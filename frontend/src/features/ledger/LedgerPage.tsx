@@ -18,7 +18,7 @@ import { journalAccountsQueryOptions, journalDetailQueryOptions } from '../excep
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { sortBinding } from '../../lib/tableSort'
 import { ApiError } from '../../lib/api/errors'
-import { date, errorText, int, isNegative, won } from '../../lib/format'
+import { date, errorText, int, internalErrorText, isNegative, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { useWorkspaceStore, withMonth } from '../../stores/workspace'
 import {
@@ -47,7 +47,7 @@ function Failure({ error }: { error: unknown }) {
     <p role="alert" className="guidance guidance-warning ledger-action-guidance">
       {error instanceof ApiError
         ? error.code === 'FGC-COMMON-500'
-          ? `요청 ID: ${error.requestId ?? EMPTY}`
+          ? internalErrorText(error.requestId)
           : errorText(error)
         : errorText(error instanceof Error ? error : null)}
     </p>

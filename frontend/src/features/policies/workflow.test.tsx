@@ -228,6 +228,18 @@ describe('production policy workflow', () => {
     expect(request.mock.calls[0][1]?.body).toMatchObject({ expectedUpdatedAt: updatedAt })
   })
 
+  it('정책 처리 오류는 다른 화면처럼 공통 문구 정리와 요청번호를 거친다', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(
+      new ApiError({ code: 'FGC-POL-003', message: '처리 불가 — 정책 상태가 바뀌었습니다.' }, 'req-pol-1', 409),
+    )
+    const { user } = mountManagement('DRAFT', ['EDIT', 'SUBMIT'])
+    await user.click(screen.getByRole('button', { name: '제출' }))
+    await user.type(screen.getByLabelText(/작업 사유/), '검토 요청')
+    await user.click(screen.getByRole('button', { name: '제출 확인' }))
+    expect(await screen.findByText('처리할 수 없습니다. 정책 상태가 바뀌었습니다. (요청번호: req-pol-1)')).toBeInTheDocument()
+    expect(screen.queryByText(/FGC-POL-003/)).not.toBeInTheDocument()
+  }, 15_000)
+
   it('opens the draft evidence field when submission returns a missing-source error', async () => {
     vi.spyOn(apiClient, 'request').mockRejectedValue(
       new ApiError(

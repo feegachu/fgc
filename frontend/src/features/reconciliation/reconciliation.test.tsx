@@ -672,7 +672,7 @@ describe('RECO-W01·W02 React 전환', () => {
       if (url.endsWith('/results/7'))
         throw new ApiError({ code: 'FGC-COMMON-500', message: 'private DB info' }, 'reco-500', 500)
     })
-    expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: reco-500')
+    expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 reco-500를 담당자에게 알려주세요.')
     expect(screen.queryByText(/private DB/)).not.toBeInTheDocument()
     expect(criteriaFromParams(new URLSearchParams('stage=BAD&insurer=-1&page=oops'), '2026-07')).toMatchObject({
       stage: '',

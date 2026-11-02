@@ -184,6 +184,10 @@
   .app-shell[data-kpi-style='summary'] .page-content .kpi-group {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* 지표가 홀수 개면 마지막 지표가 두 칸을 다 써서 빈칸이 남지 않는다. */
+  .app-shell[data-kpi-style='summary'] .page-content .kpi-group > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
   .app-shell .page-content .kpi-card {
     padding: 0.75rem 1rem;
   }

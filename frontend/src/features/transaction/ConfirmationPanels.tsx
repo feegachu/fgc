@@ -265,16 +265,10 @@ export function ConfirmationModal({
         {Boolean(failureText || result?.blockers?.length) && (
           <div id="transaction-confirm-blockers" className="transaction-confirm-blockers" role="alert">
             {failureText ? (
-              <p>
-                {failure?.code && failure.status < 500 ? `${failure.code}, ` : ''}
-                {rateText(failureText)}
-              </p>
+              <p>{rateText(failureText)}</p>
             ) : (
               result?.blockers?.map((blocker, index) => (
-                <p key={index}>
-                  {blocker.code ? `${blocker.code}, ` : ''}
-                  {rateText(blocker.message || '확정 차단 사유를 확인하세요.')}
-                </p>
+                <p key={index}>{rateText(blocker.message || '확정 차단 사유를 확인하세요.')}</p>
               ))
             )}
           </div>

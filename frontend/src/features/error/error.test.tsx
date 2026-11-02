@@ -123,7 +123,7 @@ describe('오류 화면 (#417)', () => {
     onTestFinished(() => window.removeEventListener('error', onError))
     const router = renderAt(HOME)
     expect(await screen.findByRole('heading', { name: '처리 오류' })).toBeInTheDocument()
-    expect(screen.getByText('처리 중 오류가 발생했습니다. 요청번호 -를 담당자에게 알려주세요.')).toBeInTheDocument()
+    expect(screen.getByText('처리 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.')).toBeInTheDocument()
     expect(screen.queryByText(/secret\.stack/)).toBeNull()
     await waitFor(() => expect(document.title).toBe('처리 오류 | FGC'))
     await userEvent.click(screen.getByRole('link', { name: '보험계약' }))

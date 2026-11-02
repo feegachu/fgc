@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { KpiCardContent } from '../../components/KpiCard'
 import { errorText, int } from '../../lib/format'
-import { monthText } from '../../lib/screenText'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { useAuth } from '../auth/useAuth'
 import { NEED_CHECK_STATUSES } from '../contract/api'
@@ -77,12 +77,17 @@ function Segmented<T extends string | number>({
   )
 }
 
-/** 전월 대비 증감. 전월 실적이 0이면 비율을 낼 수 없으므로 '전월 실적 없음'이라고 쓴다. */
+/** 전월 대비 증감. 전월 실적이 0이면 비율을 낼 수 없으므로 '전월 실적 없음'이라고 쓴다(B2). */
 function Delta({ now, before }: { now: number; before?: number }) {
   if (before == null) return <span>-</span>
   if (before === 0) return <span>전월 실적 없음</span>
   const value = deltaPercent(now, before)
-  return <span className="ah-delta">{`전월 대비 ${value >= 0 ? '▲' : '▼'} ${Math.abs(value).toFixed(1)}%`}</span>
+  return (
+    <>
+      <span className={`ah-delta ${value >= 0 ? 'up' : 'down'}`}>{`${value >= 0 ? '▲' : '▼'} ${Math.abs(value).toFixed(1)}%`}</span>
+      <span>전월 대비</span>
+    </>
+  )
 }
 
 /** 카드의 건수와 같은 조건(이번 달 계약·한도 주의/위반/검토필요)으로 계약 목록을 연다. */
@@ -125,18 +130,6 @@ function AgentHomeContent({ month }: { month: string }) {
   return (
     <div className="ah">
       <h1 className="visually-hidden">포트폴리오</h1>
-      <header className="page-header ah-header">
-        <div className="page-header-copy">
-          <p className="page-title">{user?.userName ? `${user.userName}님의 판매 현황` : '판매 현황'}</p>
-          <p className="page-description">{`${monthText(month)} 기준`}</p>
-        </div>
-        <div className="page-header-actions">
-          <Link className="button button-secondary" to="/contracts">
-            내 계약 목록
-          </Link>
-          <ChatbotLauncher open={chatOpen} onOpen={() => setChatOpen(true)} onClose={closeChat} />
-        </div>
-      </header>
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error, '포트폴리오를 불러오지 못했습니다.')}</p>
@@ -157,6 +150,8 @@ function AgentHomeContent({ month }: { month: string }) {
           <Snapshot
             month={month}
             rows={rows}
+            name={user?.userName ?? ''}
+            launcher={<ChatbotLauncher open={chatOpen} onOpen={() => setChatOpen(true)} onClose={closeChat} />}
             commission={commission}
             previousCommission={previousCommission.data}
           />
@@ -186,19 +181,35 @@ function AgentHomeContent({ month }: { month: string }) {
 function Snapshot({
   month,
   rows,
+  name,
+  launcher,
   commission,
   previousCommission,
 }: {
   month: string
   rows: Row[]
+  name: string
+  launcher: ReactNode
   commission: { data?: number; isError: boolean; refetch: () => unknown }
   previousCommission?: number
 }) {
   const now = monthStats(rows, month)
   const before = monthStats(rows, shiftMonth(month, -1))
+  const countDelta = now.count - before.count
   const need = now.near + now.review
   return (
     <section className="ah-snapshot" aria-label="이번 달 판매 현황">
+      <article className="ah-hero" aria-label="설계사 프로필">
+        <span className="ah-avatar" aria-hidden="true">
+          {name.slice(0, 1) || '설'}
+        </span>
+        <div className="ah-profile">
+          <p className="ah-profile-role">안녕하세요</p>
+          <p className="ah-profile-name">{name ? `${name}님` : '설계사님'}</p>
+        </div>
+        {launcher}
+      </article>
+      <h2 className="ah-heading">이번달 현황</h2>
       <div className="ah-kpis kpi-group" role="region" aria-label="이번 달 현황">
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="신규 계약 건수">
           <KpiCardContent
@@ -206,7 +217,14 @@ function Snapshot({
             value={int(now.count)}
             zero={now.count === 0}
             unit="건"
-            footer={<span>전월 {int(before.count)}건</span>}
+            footer={
+              <>
+                <span className={`ah-delta ${countDelta >= 0 ? 'up' : 'down'}`}>
+                  {`${countDelta >= 0 ? '▲' : '▼'} ${Math.abs(countDelta)}`}
+                </span>
+                <span>전월 {int(before.count)}건</span>
+              </>
+            }
           />
         </article>
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="월 환산 초회보험료">
@@ -253,7 +271,16 @@ function Snapshot({
             value={int(need)}
             zero={need === 0}
             unit="건"
-            footer={<span>{`한도 근접 ${int(now.near)}건, 검토 필요 ${int(now.review)}건`}</span>}
+            footer={
+              <div className="ah-badges">
+                <span className="ah-badge warn">
+                  한도 근접 <b>{now.near}</b>
+                </span>
+                <span className="ah-badge danger">
+                  검토 필요 <b>{now.review}</b>
+                </span>
+              </div>
+            }
           />
         </Link>
       </div>
@@ -362,7 +389,7 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
       <button
         ref={launcher}
         type="button"
-        className="button button-primary"
+        className="button button-primary ah-ai-button"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={onOpen}

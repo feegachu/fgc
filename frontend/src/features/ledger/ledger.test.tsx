@@ -302,7 +302,7 @@ describe('LEDG-W01 검증원장 React 전환', () => {
       if (url === '/api/v1/journals/11')
         throw new ApiError({ code: 'FGC-COMMON-500', message: 'sensitive backend detail' }, 'trace-500', 500)
     })
-    expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
+    expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 trace-500를 담당자에게 알려주세요.')
     expect(screen.queryByText(/sensitive backend/)).not.toBeInTheDocument()
   })
   it('searched=true로 날짜 없이 다시 열어도 입력칸을 기준 월로 채우지 않고 기간 제한 없이 조회한다', async () => {

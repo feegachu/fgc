@@ -150,6 +150,13 @@ export function today() {
   return parts.year + '-' + parts.month + '-' + parts.day
 }
 
+/** 서버 내부 오류(500)는 상세를 숨기고 오류 화면과 같은 문구로 요청번호를 알린다. */
+export function internalErrorText(requestId?: string | null) {
+  return requestId
+    ? `처리 중 오류가 발생했습니다. 요청번호 ${requestId}를 담당자에게 알려주세요.`
+    : '처리 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.'
+}
+
 /** 내부 오류 코드는 숨기고, 문의에 필요한 요청번호는 한 번만 표시한다. */
 export function errorText(
   error?: { message?: string; code?: string; requestId?: string | null } | null,
