@@ -304,7 +304,7 @@ export function ExceptionPage() {
                   )}
                 </div>
               </section>
-              <section className="surface">
+              <section className="surface" data-guide-target="exception.action">
                 <div className="surface-header">
                   <span className="surface-title">처리</span>
                   {selected && <span>#{selected.exceptionCaseId}</span>}
