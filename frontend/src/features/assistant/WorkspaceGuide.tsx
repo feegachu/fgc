@@ -212,8 +212,8 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
   const guide = findWorkflowGuide(snapshot.workflowId ?? '', '1.0')
   const stop = () => { runtime.engine.stop(); useWorkflowGuide.getState().clear() }
   return createPortal(<>
-    {position.box && snapshot.status !== 'PAUSED' && <div className="payment-guide-spotlight" style={position.box} aria-hidden="true" />}
-    <section ref={card} className="payment-guide-card" aria-label="업무 튜토리얼" style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}>
+    {position.box && snapshot.status !== 'PAUSED' && <div className="pico-guide-spotlight" style={position.box} aria-hidden="true" />}
+    <section ref={card} className="pico-guide-card" aria-label="업무 튜토리얼" style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}>
       <header><img src={mascot} alt="" /><div><strong>{guide?.title}</strong><small>화면과 입력 위치 안내</small></div><button onClick={stop} aria-label="업무 튜토리얼 종료">닫기</button></header>
       <h3>{snapshot.status === 'COMPLETED' ? '안내를 마쳤어요' : guide && workflowSteps(guide).find((step) => step.stepId === snapshot.step?.stepId)?.title}</h3>
       <p>{snapshot.status === 'COMPLETED' ? '안내 확인을 마쳤습니다. 실제 저장·검증·확정 결과는 기존 업무 화면에서 확인해주세요.' : snapshot.step?.instruction}</p>

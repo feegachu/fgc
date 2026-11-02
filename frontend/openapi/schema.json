@@ -1449,6 +1449,26 @@
         },
         "type" : "object"
       },
+      "AssistantCalculationSource" : {
+        "properties" : {
+          "entityId" : {
+            "type" : "string"
+          },
+          "sourceId" : {
+            "type" : "string"
+          },
+          "sourceType" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AuditDiffEntry" : {
         "description" : "변경 내용 비교 행 — before/after JSON 의 리프 경로 하나",
         "properties" : {
@@ -1625,7 +1645,7 @@
           },
           "sourceRefs" : {
             "items" : {
-              "$ref" : "#/components/schemas/Source"
+              "$ref" : "#/components/schemas/AssistantCalculationSource"
             },
             "type" : "array"
           }
@@ -8108,20 +8128,12 @@
       },
       "Source" : {
         "properties" : {
-          "entityId" : {
+          "entityType" : {
             "type" : "string"
           },
-          "sourceId" : {
-            "type" : "string"
-          },
-          "sourceType" : {
-            "type" : "string"
-          },
-          "title" : {
-            "type" : "string"
-          },
-          "version" : {
-            "type" : "string"
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -8702,7 +8714,7 @@
     "/api/v1/ai/compare-chat/ask" : {
       "post" : {
         "description" : "순위 결과(rankResultId, 선택)와 기본 용어 설명만 근거로 질문에 답한다. 범위 밖·검증 실패는 고정 문장으로 대체한다.",
-        "operationId" : "ask_1",
+        "operationId" : "ask",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -8812,7 +8824,7 @@
     "/api/v1/ai/pico/ask" : {
       "post" : {
         "description" : "비식별 질문·최근 대화와 역할별 업무 자료로 의미 검색 후 근거를 인용합니다. validatedGuide=null. 금융 계산·업무 쓰기는 기존 프로그램에서 수행합니다.",
-        "operationId" : "ask",
+        "operationId" : "picoAsk",
         "requestBody" : {
           "content" : {
             "application/json" : {

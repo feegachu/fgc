@@ -171,7 +171,7 @@ export function PaymentGuideOverlay() {
     ? document.querySelector<HTMLElement>('.transaction-confirm-modal[role="dialog"]')
     : null
   const card = (
-    <aside className={`payment-guide-card${modal ? ' is-in-modal' : ''}`} aria-label="피코 지급 단계 안내">
+    <aside className={`pico-guide-card${modal ? ' is-in-modal' : ''}`} aria-label="피코 지급 단계 안내">
       <header>
         <img src={mascot} alt="" />
         <div>
@@ -249,7 +249,7 @@ export function PaymentGuideOverlay() {
       {running && box && (
         <div
           aria-hidden="true"
-          className="payment-guide-spotlight"
+          className="pico-guide-spotlight"
           style={{ ...box.rect, visibility: box.key === measurementKey ? 'visible' : 'hidden' }}
         />
       )}

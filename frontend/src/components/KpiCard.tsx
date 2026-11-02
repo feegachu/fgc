@@ -8,7 +8,7 @@ export function KpiCard({
   footer,
   tone = 'neutral',
 }: {
-  guideId: string
+  guideId: string | undefined
   label: string
   value: ReactNode
   unit?: string

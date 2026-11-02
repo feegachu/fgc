@@ -57,7 +57,7 @@ export interface paths {
          * 자연어 질문 답변
          * @description 순위 결과(rankResultId, 선택)와 기본 용어 설명만 근거로 질문에 답한다. 범위 밖·검증 실패는 고정 문장으로 대체한다.
          */
-        post: operations["ask_1"];
+        post: operations["ask"];
         delete?: never;
         options?: never;
         head?: never;
@@ -137,7 +137,7 @@ export interface paths {
          * 승인된 업무 가이드의 대화형 질문 답변
          * @description 비식별 질문·최근 대화와 역할별 업무 자료로 의미 검색 후 근거를 인용합니다. validatedGuide=null. 금융 계산·업무 쓰기는 기존 프로그램에서 수행합니다.
          */
-        post: operations["ask"];
+        post: operations["picoAsk"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2137,6 +2137,13 @@ export interface components {
             originalAmount?: string;
             roundedAmount?: string;
         };
+        AssistantCalculationSource: {
+            entityId?: string;
+            sourceId?: string;
+            sourceType?: string;
+            title?: string;
+            version?: string;
+        };
         /** @description 변경 내용 비교 행 — before/after JSON 의 리프 경로 하나 */
         AuditDiffEntry: {
             /**
@@ -2244,7 +2251,7 @@ export interface components {
             policyVersionIds?: string[];
             rounding?: components["schemas"]["Rounding"];
             ruleIds?: string[];
-            sourceRefs?: components["schemas"]["Source"][];
+            sourceRefs?: components["schemas"]["AssistantCalculationSource"][];
         };
         Blocker: {
             code?: string;
@@ -5066,11 +5073,9 @@ export interface components {
             paymentId?: string;
         };
         Source: {
-            entityId?: string;
-            sourceId?: string;
-            sourceType?: string;
-            title?: string;
-            version?: string;
+            entityType?: string;
+            /** Format: int64 */
+            id?: number;
         };
         SourceDetailDraft: {
             explanation?: string;
@@ -5315,7 +5320,7 @@ export interface operations {
             };
         };
     };
-    ask_1: {
+    ask: {
         parameters: {
             query?: never;
             header?: never;
@@ -5407,7 +5412,7 @@ export interface operations {
             };
         };
     };
-    ask: {
+    picoAsk: {
         parameters: {
             query?: never;
             header?: never;

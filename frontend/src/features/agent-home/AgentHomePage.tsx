@@ -23,7 +23,7 @@ import {
 import type { InsurerKind, Period, Row } from './model'
 import { ChatbotModal } from './chatbot/ChatbotModal'
 import './agent-home.css'
-import { WORKFLOW_GUIDES } from '../assistant/workflow-catalog'
+import workflowGuides from '../assistant/workflow-guides.v1.json'
 import { useWorkflowGuide } from '../assistant/workflow-state'
 import { guideFeatureId } from '../assistant/feature-ids'
 
@@ -132,7 +132,7 @@ function AgentHomeContent({ month }: { month: string }) {
         <details className="surface" style={{ padding: 12, marginBottom: 12 }}>
           <summary data-guide-feature="agent.guide-menu.open" style={{ cursor: 'pointer' }}>업무 안내</summary>
           <nav aria-label="본인 업무 튜토리얼" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            {WORKFLOW_GUIDES.filter((guide) => guide.roles.includes('AGENT')).map((guide) => (
+            {workflowGuides.filter((guide) => guide.enabled && guide.roles.includes('AGENT')).map((guide) => (
               <button data-guide-feature={guideFeatureId('agent.guide-menu', guide.workflowId)} key={guide.workflowId} type="button" className="button button-secondary"
                 onClick={(event) => {
                   const menu = event.currentTarget.closest('details')

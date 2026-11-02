@@ -1,5 +1,5 @@
 import { SettlementGuide } from '../../features/assistant/settlement/SettlementGuide'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
@@ -12,11 +12,12 @@ import { WorkspaceTabs } from './WorkspaceTabs'
 import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
-import { AssistantDemoMount } from '../../features/assistant/PicoAssistant'
-import { WorkspaceGuide } from '../../features/assistant/WorkspaceGuide'
 import { DraftNavigationGuard } from './DraftNavigationGuard'
 import { AgentTopbar } from './AgentTopbar'
 import './agent-theme.css'
+const AssistantDemoMount = lazy(() => import('../../features/assistant/PicoAssistant').then((module) => ({ default: module.AssistantDemoMount })))
+const WorkspaceGuide = lazy(() => import('../../features/assistant/WorkspaceGuide').then((module) => ({ default: module.WorkspaceGuide })))
+
 export interface ShellContext {
   user: ShellUser
   month: string | null
@@ -122,8 +123,12 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         <SettlementGuide user={user} month={month} />
         {!location.pathname.startsWith('/agent-home') && <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>}
       </div>
-      <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} />
-      {!loggingOut && <WorkspaceGuide user={user} />}
+      {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (
+        <Suspense fallback={null}>
+          <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} />
+          {!loggingOut && import.meta.env.VITE_ASSISTANT_AI === 'true' && <WorkspaceGuide user={user} />}
+        </Suspense>
+      )}
       <DraftNavigationGuard />
     </div>
   )

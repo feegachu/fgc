@@ -4,7 +4,7 @@
   gap: 8px;
   margin: 0 0 16px;
 }
-.payment-guide-spotlight {
+.pico-guide-spotlight {
   position: fixed;
   z-index: 82;
   pointer-events: none;
@@ -18,7 +18,7 @@
     width 200ms ease,
     height 200ms ease;
 }
-.payment-guide-card {
+.pico-guide-card {
   position: fixed;
   z-index: 84;
   left: 50%;
@@ -35,41 +35,41 @@
   box-shadow: 0 12px 36px rgb(19 47 77 / 20%);
   font: inherit;
 }
-.payment-guide-card header {
+.pico-guide-card header {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.payment-guide-card header img {
+.pico-guide-card header img {
   width: 42px;
   height: 42px;
   object-fit: contain;
 }
-.payment-guide-card header div {
+.pico-guide-card header div {
   flex: 1;
 }
-.payment-guide-card small {
+.pico-guide-card small {
   display: block;
   font-size: 11px;
   color: #617c95;
   line-height: 1.6;
 }
-.payment-guide-card h3 {
+.pico-guide-card h3 {
   font-size: 16px;
   margin: 12px 0 6px;
 }
-.payment-guide-card p {
+.pico-guide-card p {
   font-size: 12px;
   line-height: 1.7;
   margin: 6px 0;
 }
-.payment-guide-card nav {
+.pico-guide-card nav {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
   margin: 12px 0 8px;
 }
-.payment-guide-card button {
+.pico-guide-card button {
   background: #f3f7fc;
   border: 1px solid #d7e2ef;
   border-radius: 8px;
@@ -79,15 +79,15 @@
   font-size: 12px;
   cursor: pointer;
 }
-.payment-guide-card button:focus-visible {
+.pico-guide-card button:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
-.payment-guide-card button:disabled {
+.pico-guide-card button:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.payment-guide-card.is-in-modal {
+.pico-guide-card.is-in-modal {
   position: static;
   width: auto;
   max-height: none;
@@ -101,21 +101,21 @@
   }
 }
 @media (max-width: 760px) {
-  .payment-guide-card {
+  .pico-guide-card {
     bottom: 8px;
     padding: 10px 14px;
     max-height: 38dvh;
   }
-  .payment-guide-card header img {
+  .pico-guide-card header img {
     width: 32px;
     height: 32px;
   }
-  .payment-guide-card h3 {
+  .pico-guide-card h3 {
     margin-top: 6px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .payment-guide-spotlight {
+  .pico-guide-spotlight {
     animation: none;
     transition: none;
   }

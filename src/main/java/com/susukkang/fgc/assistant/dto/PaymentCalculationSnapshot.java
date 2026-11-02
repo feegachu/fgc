@@ -15,6 +15,7 @@ public record PaymentCalculationSnapshot(
         OffsetDateTime calculatedAt,
         @Schema(types = {"object", "null"}, description = "Always null in snapshot-only phase; not a server proof") Object validity) {
     public record Reason(String code, String message, String contractId, String transactionAttributionId) {}
+    @Schema(name = "AssistantCalculationSource")
     public record Source(String sourceId, String sourceType, String title, String version, String entityId) {}
     public record Basis(List<Source> sourceRefs, Rounding rounding, String asOfDate,
             List<String> policyVersionIds, List<String> ruleIds, List<AttributionLine> lines) {}
