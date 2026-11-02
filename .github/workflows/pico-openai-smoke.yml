@@ -8,11 +8,6 @@ on:
         type: boolean
         required: true
         default: false
-  push:
-    branches: [codex/664-openai-pico-connection]
-    paths:
-      - '.github/workflows/pico-openai-smoke.yml'
-      - 'src/test/java/com/susukkang/fgc/ai/service/PicoOpenAiLiveSmokeTest.java'
 
 permissions:
   contents: read
@@ -23,10 +18,8 @@ concurrency:
 
 jobs:
   verify-existing-key:
-    # The initial authorized branch push runs once; ordinary pushes/PRs do not spend API tokens.
-    if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true) ||
-      (github.event_name == 'push' && github.event.head_commit.message == 'test(ai): verify registered OpenAI secret once [pico-live-smoke]')
+    # Paid calls require the explicit manual input.
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

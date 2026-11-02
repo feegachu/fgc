@@ -8,11 +8,6 @@ on:
         type: boolean
         required: true
         default: false
-  push:
-    branches: [codex/664-pico-guide-answers, codex/777-assistant-conversation-retrieval]
-    paths:
-      - '.github/workflows/pico-guide-api-smoke.yml'
-      - 'src/test/java/com/susukkang/fgc/ai/service/PicoGuideApiLiveSmokeTest.java'
 
 permissions:
   contents: read
@@ -23,9 +18,7 @@ concurrency:
 
 jobs:
   verify-guide-api:
-    if: >-
-      (github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true) ||
-      (github.event_name == 'push' && (github.event.head_commit.message == '[Test] #664 verify Pico guide API once [pico-guide-live-smoke]' || github.event.head_commit.message == 'feat(assistant): connect contextual workflow tutorials (#775) [pico-guide-live-smoke]'))
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

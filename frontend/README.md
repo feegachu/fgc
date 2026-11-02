@@ -367,3 +367,18 @@ API·업무 규칙·DB·기존 Thymeleaf는 변경하지 않았다. #481 관련 
 실제 API 캡처와 장애 주입 캡처는 Playwright `test-results`의 시나리오별 출력 폴더에 분리한다.
 409는 입력과 기존 동시성 토큰을 보존하고 최신 정책을 조회한다. 제출의 필드 오류는 초안 편집의 해당 필드로 이동한다.
 새 버전의 기간이 목록 기준일 밖이어도 기준일을 바꾸지 않고 새 DRAFT 상세를 선택한다.
+
+## 피코·튜토리얼 검사 (#813, SRC-028)
+
+화면 텍스트·기능 요소 변경 시 `data-guide-feature`와 `feature-instances.v1.json`을 확인합니다.
+새 대상은 `feature-permissions.v1.json`에 기존 화면 권한에 맞춰 등록합니다. 미등록 대상은 생성검사에서 실패합니다.
+`npm run generate:guide-features` 뒤 `npm run generate:guide-knowledge`를 실행하고 생성 JSON을 함께 커밋합니다.
+필수 `frontend` 체크가 `check:guide-features`·`check:guide-knowledge`로 최신 여부를 검사합니다.
+생성기는 정상 화면에서의 대상 가시성을 증명하지 않으므로 해당 역할로 안내를 실행해 확인합니다.
+
+`npm run test:e2e:demo`는 `VITE_ASSISTANT_AI=true`로 피코를 포함해 검증합니다.
+실서버 E2E는 서버 키를 비워 비용 없이 고정 안내를 검증하며 유료 실모델 평가는 대체하지 않습니다.
+서버 키가 없을 때의 고정 안내와 실제 모델 응답은 별도 검증입니다. 유료 실호출은 수동 스모크 워크플로의
+`confirm_paid_call`을 선택해 실행하고 결과의 커밋 SHA를 기록합니다.
+배포 이미지는 빌드 시 저장소 변수 `FGC_ASSISTANT_AI_ENABLED`를 읽습니다. 기본값은 `false`이며,
+값을 바꾼 뒤에는 웹 이미지를 다시 빌드해야 합니다. 배포 플래그 결정과 실제 이미지 검증은 병합 조건입니다.
