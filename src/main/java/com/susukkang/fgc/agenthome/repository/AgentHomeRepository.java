@@ -43,7 +43,7 @@ public class AgentHomeRepository {
                             String currentStatus, boolean followUp, boolean statusEvent, boolean heldLine,
                             LocalDate nextCheckDate, OffsetDateTime lastEventEffectiveAt, int maxEventSeq,
                             String lastCheckResult, OffsetDateTime lastCheckedAt, LocalDate lastNextCheckDate,
-                            long total) {
+                            BigDecimal expectedAmount, BigDecimal heldAmount, long heldCount, long total) {
     }
 
     public record StoredCheck(long checkId, OffsetDateTime checkedAt, long contractId, String contextVersion,
@@ -110,7 +110,8 @@ public class AgentHomeRepository {
                                       OffsetDateTime recentFrom, List<String> eventStatuses, int limit) {
         String sql = """
                 WITH last_check AS (
-                  SELECT DISTINCT ON (k.contract_id) k.contract_id, k.check_result, k.next_check_date, k.checked_at
+                  SELECT DISTINCT ON (k.contract_id) k.contract_id, k.check_result, k.next_check_date, k.checked_at,
+                         k.checked_event_seq
                     FROM fgc.agent_contract_check k
                    WHERE k.agent_id = :agentId
                    ORDER BY k.contract_id, k.checked_at DESC, k.agent_contract_check_id DESC),
@@ -118,29 +119,50 @@ public class AgentHomeRepository {
                   SELECT DISTINCT ON (e.contract_id) e.contract_id, e.effective_at
                     FROM fgc.contract_status_event e WHERE e.effective_at < :asOfEnd
                    ORDER BY e.contract_id, e.effective_at DESC, e.event_seq DESC),
+                held AS (
+                  SELECT sh.contract_id, count(*) AS held_count, sum(sl.expected_amount) AS held_amount,
+                         max(sl.created_at) AS latest_created_at
+                    FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                   WHERE sl.beneficiary_agent_id = :agentId AND sh.payment_stage = 'GA_TO_FC'
+                     AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn AND sl.line_status = 'HOLD'
+                   GROUP BY sh.contract_id),
+                expected AS (
+                  SELECT sh.contract_id, sum(sl.expected_amount) AS amount
+                    FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                   WHERE sl.beneficiary_agent_id = :agentId AND sh.payment_stage = 'GA_TO_FC'
+                     AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn AND sl.line_status = 'PLANNED'
+                     AND sl.due_month = :month
+                   GROUP BY sh.contract_id),
                 cand AS (
                   SELECT c.contract_id, c.contract_no, i.insurer_name, p.product_name, c.current_status,
                          (lc.check_result = 'FOLLOW_UP' AND lc.next_check_date <= :asOf) AS follow_up,
+                         -- 확인 이후 새 사건은 접수일시(소급 입력 가능)가 아니라 사건 순번으로 판정한다.
+                         -- 확인 기록이 없으면 최근 N일 안의 사건만 후보로 본다.
                          EXISTS (SELECT 1 FROM fgc.contract_status_event e
                                   WHERE e.contract_id = c.contract_id AND e.new_status IN (:eventStatuses)
-                                    AND e.effective_at >= :recentFrom AND e.effective_at < :asOfEnd
-                                    AND (lc.checked_at IS NULL OR e.received_at > lc.checked_at)) AS status_event,
-                         EXISTS (SELECT 1 FROM fgc.schedule_line sl
-                                   JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
-                                  WHERE sh.contract_id = c.contract_id AND sl.beneficiary_agent_id = :agentId
-                                    AND sh.payment_stage = 'GA_TO_FC' AND sh.schedule_purpose = 'OPERATIONAL'
-                                    AND sh.active_yn AND sl.line_status = 'HOLD'
-                                    AND (lc.checked_at IS NULL OR sl.created_at > lc.checked_at)) AS held_line,
+                                    AND e.effective_at < :asOfEnd
+                                    AND ((lc.contract_id IS NULL AND e.effective_at >= :recentFrom)
+                                         OR e.event_seq > lc.checked_event_seq)) AS status_event,
+                         -- 미해결 보류: HOLD 회차가 있고, 확인이 없거나 확인 뒤 새 사건·새 회차가 있을 때.
+                         -- 보류는 기존 PLANNED 회차가 사건으로 HOLD 로 바뀌어 생기므로 새 사건 순번으로 잡는다.
+                         (hl.held_count > 0 AND (lc.contract_id IS NULL OR hl.latest_created_at > lc.checked_at
+                              OR EXISTS (SELECT 1 FROM fgc.contract_status_event e
+                                          WHERE e.contract_id = c.contract_id AND e.event_seq > lc.checked_event_seq
+                                            AND e.effective_at < :asOfEnd))) AS held_line,
                          lc.next_check_date, le.effective_at AS last_effective_at,
                          COALESCE((SELECT max(e.event_seq) FROM fgc.contract_status_event e
                                     WHERE e.contract_id = c.contract_id), 0) AS max_seq,
-                         lc.check_result, lc.checked_at, lc.next_check_date AS last_next
+                         lc.check_result, lc.checked_at, lc.next_check_date AS last_next,
+                         COALESCE(ex.amount, 0) AS expected_amount, COALESCE(hl.held_amount, 0) AS held_amount,
+                         COALESCE(hl.held_count, 0) AS held_count
                     FROM fgc.insurance_contract c
                     JOIN fgc.insurer i ON i.insurer_id = c.insurer_id
                     LEFT JOIN fgc.product_offering o ON o.product_offering_id = c.product_offering_id
                     LEFT JOIN fgc.product p ON p.product_id = o.product_id
                     LEFT JOIN last_check lc ON lc.contract_id = c.contract_id
                     LEFT JOIN last_event le ON le.contract_id = c.contract_id
+                    LEFT JOIN held hl ON hl.contract_id = c.contract_id
+                    LEFT JOIN expected ex ON ex.contract_id = c.contract_id
                    WHERE c.contract_date <= :asOf AND
                 """ + SCOPED + """
                 )
@@ -153,13 +175,15 @@ public class AgentHomeRepository {
                 """;
         MapSqlParameterSource params = new MapSqlParameterSource("agentId", agentId).addValue("today", today)
                 .addValue("asOf", asOf).addValue("asOfEnd", asOfEnd).addValue("recentFrom", recentFrom)
-                .addValue("eventStatuses", eventStatuses).addValue("limit", limit);
+                .addValue("eventStatuses", eventStatuses).addValue("limit", limit)
+                .addValue("month", asOf.withDayOfMonth(1));
         return jdbc.query(sql, params, (rs, row) -> new Candidate(rs.getLong("contract_id"), rs.getString("contract_no"),
                 rs.getString("insurer_name"), rs.getString("product_name"), rs.getString("current_status"),
                 rs.getBoolean("follow_up"), rs.getBoolean("status_event"), rs.getBoolean("held_line"),
                 rs.getObject("next_check_date", LocalDate.class), rs.getObject("last_effective_at", OffsetDateTime.class),
                 rs.getInt("max_seq"), rs.getString("check_result"), rs.getObject("checked_at", OffsetDateTime.class),
-                rs.getObject("last_next", LocalDate.class), rs.getLong("total")));
+                rs.getObject("last_next", LocalDate.class), rs.getBigDecimal("expected_amount"),
+                rs.getBigDecimal("held_amount"), rs.getLong("held_count"), rs.getLong("total")));
     }
 
     /** 계약의 마지막 사건 순번(없으면 0). contextVersion 의 재료다. */
@@ -186,15 +210,17 @@ public class AgentHomeRepository {
 
     @Transactional
     public StoredCheck insert(long agentId, long contractId, String result, LocalDate nextCheckDate, String memo,
-                              String key, String hash, String contextVersion) {
+                              String key, String hash, String contextVersion, int checkedEventSeq) {
         return jdbc.query("""
                 INSERT INTO fgc.agent_contract_check
-                    (agent_id, contract_id, check_result, next_check_date, memo, idempotency_key, request_hash, context_version)
-                VALUES (:agentId, :contractId, :result, :next, :memo, :key, :hash, :version)
+                    (agent_id, contract_id, check_result, next_check_date, memo, idempotency_key, request_hash, context_version,
+                     checked_event_seq)
+                VALUES (:agentId, :contractId, :result, :next, :memo, :key, :hash, :version, :seq)
                 RETURNING agent_contract_check_id, checked_at, contract_id, context_version, request_hash
                 """, new MapSqlParameterSource("agentId", agentId).addValue("contractId", contractId)
                         .addValue("result", result).addValue("next", nextCheckDate).addValue("memo", memo)
-                        .addValue("key", key).addValue("hash", hash).addValue("version", contextVersion),
+                        .addValue("key", key).addValue("hash", hash).addValue("version", contextVersion)
+                        .addValue("seq", checkedEventSeq),
                 AgentHomeRepository::stored).get(0);
     }
 

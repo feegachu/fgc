@@ -196,8 +196,9 @@ public class AgentHomeService {
         LastCheck last = c.lastCheckResult() == null ? null
                 : new LastCheck(c.lastCheckResult(), c.lastCheckedAt(), c.lastNextCheckDate());
         return new PriorityContract(c.contractId(), c.contractNo(), c.insurerName(), c.productName(),
-                statusLabel(c.currentStatus()), reasons, c.followUp() ? c.nextCheckDate() : null,
-                c.lastEventEffectiveAt(), elapsed, contextVersion(c.contractId(), c.maxEventSeq()), last);
+                statusLabel(c.currentStatus()), c.currentStatus(), reasons, c.followUp() ? c.nextCheckDate() : null,
+                c.lastEventEffectiveAt(), elapsed, contextVersion(c.contractId(), c.maxEventSeq()), last,
+                c.expectedAmount(), c.heldAmount(), c.heldCount());
     }
 
     /** IF-API-74A. 같은 멱등키·같은 본문은 처음 기록을 그대로 돌려주고, 다른 본문이면 409 다. */
@@ -220,13 +221,14 @@ public class AgentHomeService {
             return replay(existing.get(), hash, request.contractId());
         }
         scope.requireContract(request.contractId());
-        String current = contextVersion(request.contractId(), repository.maxEventSeq(request.contractId()));
+        int seenSeq = repository.maxEventSeq(request.contractId());
+        String current = contextVersion(request.contractId(), seenSeq);
         if (!current.equals(request.expectedContextVersion())) {
             throw new FgcBusinessException(FgcErrorCode.IMPL_STATE_CHANGED, "expectedContextVersion",
                     Map.of("contextVersion", current), null);
         }
         StoredCheck saved = repository.insert(agentId, request.contractId(), request.result(), request.nextCheckDate(),
-                request.memo(), idempotencyKey, hash, current);
+                request.memo(), idempotencyKey, hash, current, seenSeq);
         return new ContractCheckResponse(saved.checkId(), saved.checkedAt(), saved.contractId(), saved.contextVersion());
     }
 

@@ -70,8 +70,9 @@ public record AgentHomeResponse(
 
     @Schema(name = "AgentHomePriorityContract")
     public record PriorityContract(Long contractId, String contractNo, String insurerName, String productName,
-                                   String currentStatus, List<String> reasonCodes, LocalDate nextCheckDate,
+                                   String currentStatus, String currentStatusCode, List<String> reasonCodes, LocalDate nextCheckDate,
                                    OffsetDateTime lastEventEffectiveAt, Long elapsedDays, String contextVersion,
-                                   LastCheck lastCheck) {
+                                   LastCheck lastCheck, BigDecimal expectedAmount, BigDecimal heldAmount,
+                                   long heldCount) {
     }
 }
