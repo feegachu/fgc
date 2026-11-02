@@ -1,3 +1,4 @@
+import { typeBadgeTone } from '../exception/rules'
 import { openSettlementGuide } from '../assistant/settlement/entry'
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
@@ -64,7 +65,7 @@ function DashboardContent({ month }: { month: string }) {
       key: 'type',
       label: '유형',
       render: (e) => (
-        <StatusBadge optionCount={14} kind="category">
+        <StatusBadge optionCount={14} kind="category" tone={typeBadgeTone(e.exceptionType)}>
           {e.exceptionTypeLabel ?? '-'}
         </StatusBadge>
       ),
@@ -87,7 +88,7 @@ function DashboardContent({ month }: { month: string }) {
       label: '상태',
       align: 'center',
       render: (e) => (
-        <StatusBadge optionCount={4} tone={exceptionStatusTone(e.status)} tablePresentation="text">
+        <StatusBadge optionCount={4} tone={exceptionStatusTone(e.status)} tablePresentation="dot">
           {e.statusLabel ?? '-'}
         </StatusBadge>
       ),
@@ -95,7 +96,7 @@ function DashboardContent({ month }: { month: string }) {
     { key: 'createdAt', label: '발생', cellClassName: 'tabular-nums', render: (e) => dateTime(e.createdAt) },
   ]
 
-  // 미처리 예외는 아래 '처리할 예외' 제목 숫자로 보여 준다(공통 원칙 03). 숫자 색은 확정 위반과 원장 불균형만 위험색이다.
+  // 미처리 예외는 아래 '처리할 예외' 제목 숫자로 보여 준다.
   const kpis =
     data &&
     ([
@@ -112,7 +113,7 @@ function DashboardContent({ month }: { month: string }) {
         label: '1,200% 주의',
         value: data.capWarning,
         footer: '사용률 경고 기준 이상',
-        tone: 'neutral',
+        tone: 'warning',
         to: href('/cap-checks', { status: 'WARNING' }),
       },
       {
@@ -120,7 +121,7 @@ function DashboardContent({ month }: { month: string }) {
         label: '차익거래 검토대상',
         value: data.arbitrageCandidate,
         footer: '위반 확정 아님',
-        tone: 'neutral',
+        tone: 'warning',
         to: href('/arbitrage-checks', { status: 'CANDIDATE' }),
       },
       {
@@ -128,7 +129,7 @@ function DashboardContent({ month }: { month: string }) {
         label: '대사 불일치',
         value: data.reconMismatch,
         footer: '허용오차 0원',
-        tone: 'neutral',
+        tone: 'risk',
         to: href('/reconciliations', { onlyMismatch: 'true' }),
       },
       {
@@ -136,7 +137,7 @@ function DashboardContent({ month }: { month: string }) {
         label: '원장 불균형',
         value: data.journalImbalance,
         footer: '기표 전 0건 필수',
-        tone: 'error',
+        tone: data.journalImbalance === 0 ? 'success' : 'error',
         to: href('/journals', { imbalanceOnly: 'true' }),
       },
     ] as const)

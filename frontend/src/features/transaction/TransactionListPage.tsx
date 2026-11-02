@@ -299,7 +299,7 @@ export default function TransactionListPage() {
         <div className="page-header-actions">
           {user.canProcess && (
             <ContextLink
-              className="button button-secondary"
+              className="button button-primary"
               to={returnLink(month ? withMonth('/transactions/new', month) : '/transactions/new', returnTo)}
             >
               <span className="material-symbols-rounded" aria-hidden="true">

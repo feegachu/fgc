@@ -328,7 +328,7 @@ function Charts({
         </div>
         <div className="ah-box ah-trend-box">
           <h3>
-            월별 신규 계약 추이 <span className="ah-sub">건수, 이번 달 강조, 보험료는 마우스를 올려 확인</span>
+            월별 신규 계약 추이 <span className="ah-sub">막대 건수, 선 월환산 보험료(오른쪽 축)</span>
           </h3>
           <Trend points={trendSeries(focus, months)} />
         </div>
@@ -367,7 +367,7 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
         aria-expanded={open}
         onClick={onOpen}
       >
-        상품 추천 AI에게 묻기
+        상품 추천 AI
       </button>
       {open && <ChatbotModal onClose={onClose} />}
     </>

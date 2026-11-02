@@ -77,10 +77,13 @@
   & .ah-trend { height: 246px; }
   & .ah-trend svg { width: 100%; height: 100%; display: block; }
   & .ah-axis { font-size: 12px; fill: var(--muted); }
-  & .ah-bar { fill: #b3c8ff; transition: opacity 0.15s; }
+  & .ah-bar { fill: color-mix(in srgb, var(--color-action-primary) 30%, white); transition: opacity 0.15s; }
   & .ah-bar.is-current { fill: var(--color-action-primary); }
   & .ah-bar.is-hover { opacity: 0.8; }
   & .ah-bar-hit { fill: transparent; }
+  & .ah-line { stroke: var(--color-blue-800); }
+  & .ah-line-dot { fill: var(--color-blue-800); stroke: #fff; }
+  & .ah-axis-premium { fill: var(--color-blue-800); }
   & .ah-bar-hit.is-hover { fill: rgb(0 70 255 / 5%); }
 
   & .ah-product { display: grid; gap: var(--space-3); padding: var(--space-3) 0 var(--space-2); }

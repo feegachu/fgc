@@ -104,6 +104,13 @@
   display: none;
 }
 
+.auth-heading-anchor {
+  width: 2.25rem;
+  height: 0.1875rem;
+  margin-bottom: 1.125rem;
+  background: var(--color-action-primary);
+}
+
 .auth-login-header {
   display: grid;
   gap: 0.5rem;

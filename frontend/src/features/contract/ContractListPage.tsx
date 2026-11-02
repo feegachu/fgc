@@ -172,7 +172,7 @@ export default function ContractListPage() {
             CSV 내보내기
           </Button>
           {canProcess && (
-            <ContextLink className="button button-secondary" to={returnLink('/contracts/new', back)}>
+            <ContextLink className="button button-primary" to={returnLink('/contracts/new', back)}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 add
               </span>

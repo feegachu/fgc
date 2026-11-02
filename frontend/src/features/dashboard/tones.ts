@@ -26,10 +26,11 @@ export function exceptionTypeTone(type = ''): StatusTone {
   return 'neutral'
 }
 
-/** 처리 상태(신규, 검토중, 해결)는 색 없이 쓴다. 위험은 심각도가 알린다. */
 export function exceptionStatusTone(status?: string): StatusTone {
+  if (status === 'NEW') return 'error'
+  if (status === 'IN_REVIEW') return 'info'
   if (status === 'RESOLVED') return 'success'
-  return 'neutral'
+  return 'review'
 }
 
 export function runStatusTone(status?: string): StatusTone {

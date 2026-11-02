@@ -127,6 +127,7 @@ export function LoginPage() {
             width={96}
             height={40}
           />
+          <div className="auth-heading-anchor" aria-hidden="true" />
           <header className="auth-login-header">
             <h2 id="login-title">로그인</h2>
             <p>업무 계정의 아이디와 비밀번호를 입력하세요.</p>

@@ -11,7 +11,7 @@ import { Link } from 'react-router'
 import { applyActionToCache, postAction } from './api'
 import type { ExceptionCase } from './api'
 import { JournalCorrectionModal } from './JournalCorrectionModal'
-import { availableActions, isActionable, JOURNAL_CORRECTION_TYPE, severityTone, statusTone } from './rules'
+import { availableActions, isActionable, JOURNAL_CORRECTION_TYPE, severityTone, statusTone, typeTone } from './rules'
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
@@ -32,7 +32,7 @@ function Detail({ item }: { item: ExceptionCase }) {
       <div>
         <dt>유형</dt>
         <dd>
-          <StatusBadge kind="category">{item.typeLabel ?? '-'}</StatusBadge>
+          <StatusBadge tone={typeTone(item.type)}>{item.typeLabel ?? '-'}</StatusBadge>
         </dd>
       </div>
       <div>

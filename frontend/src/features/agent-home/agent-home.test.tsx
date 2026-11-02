@@ -212,9 +212,9 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
-  it('상품 추천 AI 버튼을 누르면 모달이 열리고 Esc로 닫으면 버튼으로 돌아온다', async () => {
+  it('[상품 추천 AI] 버튼을 누르면 모달이 열리고 Esc로 닫으면 버튼으로 돌아온다', async () => {
     renderHome()
-    const launcher = await screen.findByRole('button', { name: '상품 추천 AI에게 묻기' })
+    const launcher = await screen.findByRole('button', { name: '상품 추천 AI' })
     await userEvent.click(launcher)
     const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
     expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()

@@ -10,6 +10,23 @@ export function severityTone(severity?: string): StatusTone {
   return 'neutral'
 }
 
+const warningTypes = ['CAP_WARNING', 'ARBITRAGE_CANDIDATE', 'ALLOCATION_EVIDENCE_MISSING']
+const errorTypes = [
+  'CAP_VIOLATION',
+  'RECONCILIATION_MISMATCH',
+  'JOURNAL_IMBALANCE',
+  'POLICY_MISSING',
+  'POLICY_DUPLICATE',
+]
+const reviewTypes = ['CAP_REVIEW_REQUIRED', 'REFUND_TABLE_MISSING', 'PRODUCT_CODE_MISMATCH', 'DATA_QUALITY']
+
+export function typeTone(type = ''): StatusTone {
+  if (warningTypes.includes(type)) return 'warning'
+  if (errorTypes.includes(type)) return 'error'
+  if (reviewTypes.includes(type)) return 'review'
+  return 'neutral'
+}
+
 /** Category colors are separate from severity and the KPI warning colors. */
 export function typeBadgeTone(type = ''): StatusTone {
   if (type.startsWith('RECON')) return 'info'
@@ -20,10 +37,11 @@ export function typeBadgeTone(type = ''): StatusTone {
   return 'neutral'
 }
 
-/** 처리 상태(신규, 검토중, 해결, 반려)는 색 없이 쓴다. 위험은 심각도가 알린다(공통 원칙 02). */
 export function statusTone(status?: string): StatusTone {
+  if (status === 'NEW') return 'error'
+  if (status === 'IN_REVIEW') return 'info'
   if (status === 'RESOLVED') return 'success'
-  return 'neutral'
+  return 'review'
 }
 
 export const statusOptions = [

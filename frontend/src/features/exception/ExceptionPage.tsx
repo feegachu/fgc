@@ -24,12 +24,14 @@ import {
   OPEN_STATUS,
 } from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
-import { severityTone, statusOptions, statusTone } from './rules'
+import { severityTone, statusOptions, statusTone, typeTone } from './rules'
 import { exceptionSummaryDescription } from './labels'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
-/** 요약 띠 숫자는 대시보드와 같이 확정 위반과 원장 불균형만 위험색이다(공통 원칙 03). */
-const cardTone = (type: string) => (type === 'CAP_VIOLATION' || type === 'JOURNAL_IMBALANCE' ? 'error' : 'neutral')
+const cardTone = (type: string) => {
+  const tone = typeTone(type)
+  return tone === 'review' ? 'risk' : tone
+}
 
 /** URL 이 상태의 단일 출처다 — status 가 없으면 미처리, 빈 값이면 전체(레거시 링크 호환). */
 function filtersFromParams(params: URLSearchParams): ExceptionFilters {

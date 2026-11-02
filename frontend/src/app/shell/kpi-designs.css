@@ -169,7 +169,7 @@
   justify-content: flex-start;
 }
 .app-shell[data-kpi-style='summary'] .page-content [data-zero='true'] .kpi-value {
-  color: #858c98;
+  color: #767676;
 }
 .app-shell[data-kpi-style='summary'] .page-content [data-attention='true'] .kpi-value {
   color: var(--color-status-error-text);
@@ -178,7 +178,7 @@
   color: var(--color-status-error-text);
 }
 .app-shell[data-kpi-style='summary'] .page-content .kpi-card .kpi-value[data-zero='true'] {
-  color: #858c98;
+  color: #767676;
 }
 @media (max-width: 39.9375rem) {
   .app-shell[data-kpi-style='summary'] .page-content .kpi-group {

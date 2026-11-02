@@ -71,7 +71,7 @@ export function Donut({
       <div className="ah-donut-canvas ah-chart">
         <svg viewBox="0 0 100 100" role="img" aria-label="보험사별 계약 건수 도넛 차트">
           {sum === 0 && (
-            <circle cx="50" cy="50" r={(R_OUT + R_IN) / 2} fill="none" stroke="#f1f3f6" strokeWidth={R_OUT - R_IN} />
+            <circle cx="50" cy="50" r={(R_OUT + R_IN) / 2} fill="none" stroke="#f1f5f9" strokeWidth={R_OUT - R_IN} />
           )}
           {arcs.map(({ s, d }) => {
             const dim = selected && selected !== s.name
@@ -154,11 +154,16 @@ export function Donut({
   )
 }
 
+/** 오른쪽 보험료 축 글자(예: 20만). */
+const compactWon = (value: number) =>
+  value ? new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 }).format(value) : '0'
+
 export function Trend({ points }: { points: { month: string; count: number; premium: number }[] }) {
   const { tip, show, hide } = useTip()
   const W = 560
   const H = 232
   const L = 30
+  const R = 40
   const T = 30
   const B = 24
   const maxCount = Math.max(1, ...points.map((p) => p.count))
@@ -166,8 +171,10 @@ export function Trend({ points }: { points: { month: string; count: number; prem
     (v, i, a) => a.indexOf(v) === i,
   )
   const top = Math.max(...ticks, 1)
-  const step = (W - L - 8) / points.length
+  const step = (W - L - R) / points.length
   const y = (v: number) => T + (H - T - B) * (1 - v / top)
+  const premiumTop = Math.max(1, ...points.map((p) => p.premium))
+  const yp = (v: number) => T + (H - T - B) * (1 - v / premiumTop)
   // 처음 그릴 때는 바닥에서 올라오고, 필터를 바꾸면 새 값으로 옮겨 간다.
   const shownCounts = useTween(
     points.map((p) => p.count),
@@ -175,26 +182,37 @@ export function Trend({ points }: { points: { month: string; count: number; prem
     true,
   )
   const shown = points.map((_, i) => shownCounts[i] ?? 0)
+  const shownPremiums = useTween(
+    points.map((p) => p.premium),
+    500,
+    true,
+  )
+  const line = points.map((_, i) => [L + step * (i + 0.5), yp(shownPremiums[i] ?? 0)])
+  const path = line.map(([x, v], i) => `${i ? 'L' : 'M'}${x} ${v}`).join('')
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
-  // 보험료는 마우스를 올리면 보인다.
   const every = points.length > 12 ? 2 : 1
   return (
     <div className="ah-trend ah-chart">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="월별 신규 계약 건수 막대 차트"
+        aria-label="월별 신규 계약 건수 막대와 월환산 초회보험료 선 차트"
         preserveAspectRatio="none"
       >
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#f1f3f6" />
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="#f1f5f9" />
             <text x={L - 6} y={y(t) + 3} textAnchor="end" className="ah-axis">
               {t}
             </text>
           </g>
         ))}
-        <line x1={L} x2={W - 8} y1={H - B} y2={H - B} stroke="#e3e6eb" />
+        <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#e2e8f0" />
+        {[premiumTop, 0].map((v) => (
+          <text key={v} x={W - R + 6} y={yp(v) + 3} className="ah-axis ah-axis-premium">
+            {compactWon(v)}
+          </text>
+        ))}
         {points.map((p, i) => {
           const h = (H - T - B) * (shown[i] / top)
           const x = L + step * (i + 0.5)
@@ -240,6 +258,11 @@ export function Trend({ points }: { points: { month: string; count: number; prem
             </g>
           )
         })}
+        <path d={path} className="ah-line" fill="none" strokeWidth="2" strokeLinejoin="round" />
+        {points.length <= 12 &&
+          line.map(([x, v], i) => (
+            <circle key={points[i].month} cx={x} cy={v} r="2.6" className="ah-line-dot" strokeWidth="1.5" />
+          ))}
       </svg>
       <table className="visually-hidden">
         <caption>월별 신규 계약 건수와 월 환산 보험료</caption>
