@@ -202,7 +202,20 @@
           "currentStatus" : {
             "type" : "string"
           },
+          "currentStatusCode" : {
+            "type" : "string"
+          },
           "elapsedDays" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedAmount" : {
+            "type" : "number"
+          },
+          "heldAmount" : {
+            "type" : "number"
+          },
+          "heldCount" : {
             "format" : "int64",
             "type" : "integer"
           },

@@ -59,6 +59,10 @@ const priority = (patch = {}) => ({
   currentStatus: '미납',
   reasonCodes: ['STATUS_EVENT_UNCONFIRMED'],
   elapsedDays: 3,
+  currentStatusCode: 'UNPAID',
+  expectedAmount: 100000,
+  heldAmount: 70000,
+  heldCount: 1,
   contextVersion: 'contract91-event4',
   ...patch,
 })
@@ -211,6 +215,7 @@ describe('확인할 계약', () => {
     expect(panel).toHaveTextContent('후속 확인일 도래 (2026-07-30)')
     expect(panel).toHaveTextContent('보류 미해결')
     expect(panel).toHaveTextContent('마지막 사건 3일 경과')
+    expect(panel).toHaveTextContent('이번 달 예정 100,000원 · 보류 1건 70,000원')
   })
 
   it('종결을 기록하면 멱등키와 본 맥락 버전을 보내고 목록을 다시 받는다', async () => {

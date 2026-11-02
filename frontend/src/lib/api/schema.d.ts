@@ -1599,8 +1599,13 @@ export interface components {
             contractId?: number;
             contractNo?: string;
             currentStatus?: string;
+            currentStatusCode?: string;
             /** Format: int64 */
             elapsedDays?: number;
+            expectedAmount?: number;
+            heldAmount?: number;
+            /** Format: int64 */
+            heldCount?: number;
             insurerName?: string;
             lastCheck?: components["schemas"]["AgentHomeLastCheck"];
             /** Format: date-time */

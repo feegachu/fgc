@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../../lib/api/client'
-import { errorText } from '../../lib/format'
+import { errorText, int } from '../../lib/format'
 import { recordContractCheck } from './api'
 import type { AgentHome, PriorityContract } from './api'
 
@@ -36,6 +36,11 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
                 <span className="ah-priority-meta">
                   {item.insurerName} · {item.productName} · {item.currentStatus}
                   {item.elapsedDays != null && ` · 마지막 사건 ${item.elapsedDays}일 경과`}
+                </span>
+                <span className="ah-priority-meta">
+                  {`이번 달 예정 ${int(item.expectedAmount ?? 0)}원`}
+                  {(item.heldCount ?? 0) > 0 && ` · 보류 ${item.heldCount}건 ${int(item.heldAmount ?? 0)}원`}
+                  {item.lastCheck && ` · 마지막 확인 ${item.lastCheck.checkedAt?.slice(0, 10)}`}
                 </span>
                 <span className="ah-priority-reasons">
                   {(item.reasonCodes ?? []).map((code) => (
