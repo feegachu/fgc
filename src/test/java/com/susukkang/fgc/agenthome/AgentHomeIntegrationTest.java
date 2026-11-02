@@ -146,6 +146,40 @@ class AgentHomeIntegrationTest {
                     && p.path("reasonCodes").toString().contains("HOLD_UNRESOLVED");
         }
         assertThat(heldCandidate).isTrue();
+        JsonNode item = priorityItem(ownContract, today);
+        assertThat(item.path("heldCount").asLong()).isEqualTo(1);
+        assertThat(item.path("heldAmount").decimalValue()).isEqualByComparingTo("70000");
+        assertThat(item.path("expectedAmount").decimalValue()).isEqualByComparingTo("100000");
+        assertThat(item.path("currentStatusCode").asText()).isNotBlank();
+    }
+
+    @Test
+    void anEventRegisteredAfterTheCheckWithAnEarlierReceivedAtStillComesBack() throws Exception {
+        addEvent("UNPAID");
+        record(ownContract, "CLOSED", null, null, version(ownContract), "k-retro-1").andExpect(status().isOk());
+        assertThat(reasons(ownContract, today)).isNull();
+        // 보험사에서 어제 받은 사건을 확인 뒤에 소급 등록: 접수일시는 확인 시각보다 과거여도 순번이 더 크다.
+        jdbc.update("""
+                INSERT INTO fgc.contract_status_event(contract_id, event_seq, new_status, effective_at, received_at,
+                    reason_code, source_system, source_event_key)
+                SELECT ?, max(event_seq) + 1, 'LAPSED', clock_timestamp() - interval '2 days',
+                       clock_timestamp() - interval '1 day', 'TEST', 'IT-HOME', ?
+                  FROM fgc.contract_status_event WHERE contract_id = ?
+                """, ownContract, UUID.randomUUID().toString(), ownContract);
+        assertThat(reasons(ownContract, today)).contains("STATUS_EVENT_UNCONFIRMED");
+    }
+
+    @Test
+    void aPlannedLineTurnedHoldAfterTheCheckIsStillAnUnresolvedHold() throws Exception {
+        long header = scheduleHeader();
+        scheduleLine(header, 1, 1, "PLANNED", today.withDayOfMonth(1).plusDays(2), 90000);
+        record(ownContract, "CLOSED", null, null, version(ownContract), "k-hold-1").andExpect(status().isOk());
+        assertThat(reasons(ownContract, today)).isNull();
+        // 사건으로 기존 회차가 HOLD 로 바뀐다(생성 시각은 그대로). 사건 자체는 확인 대상 상태가 아니다.
+        addEvent("ACTIVE");
+        jdbc.update("UPDATE fgc.schedule_line SET line_status = 'HOLD' WHERE schedule_header_id = ?", header);
+        assertThat(reasons(ownContract, today)).contains("HOLD_UNRESOLVED").doesNotContain("STATUS_EVENT_UNCONFIRMED");
+        assertThat(priorityItem(ownContract, today).path("heldAmount").decimalValue()).isEqualByComparingTo("90000");
     }
 
     @Test
