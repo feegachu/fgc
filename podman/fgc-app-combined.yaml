@@ -45,6 +45,7 @@ spec:
         - {name: fgchttp, mountPath: /etc/nginx/conf.d/fgc-http.conf, readOnly: true}
   volumes:
     # fgc-db의 fgc-pgdata와 같은 Podman named volume. .kube에 KubeDownForce가 없어 재배포에도 지워지지 않는다
+    # noexec 미적용: rootless Podman의 local driver는 uid/gid 외 마운트 옵션(mount-options)에 root가 필요하다. 앱은 파일을 바이트로만 읽는다
     - name: files
       persistentVolumeClaim: {claimName: fgc-files}
     - name: fgcd
