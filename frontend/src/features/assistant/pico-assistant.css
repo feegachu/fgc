@@ -481,6 +481,13 @@
   color: var(--color-steel-700);
   cursor: pointer;
 }
+.pico-context {
+  margin: 0 0 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-steel-700);
+  overflow-wrap: anywhere;
+}
 .pico-composer {
   position: relative;
 }

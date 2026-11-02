@@ -18,7 +18,8 @@ import { askPico, picoPaymentReference } from './pico-api'
 import { PicoGuideStartButton } from './PicoGuideStartButton'
 import type { PicoReply } from './pico-api'
 import type { PicoTurn } from './pico-api'
-import { screenFor } from '../../app/screens'
+import { screenFor, screens } from '../../app/screens'
+import { useWorkspaceStore } from '../../stores/workspace'
 import { findWorkflowGuide, WORKFLOW_GUIDES, workflowSteps } from './workflow-catalog'
 import { useWorkflowGuide } from './workflow-state'
 
@@ -176,6 +177,10 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   const [calculationEpoch, setCalculationEpoch] = useState(0)
   const runtimeSession = useGuideRuntime((state) => state.session)
   const observed = useGuideRuntime((state) => state.observation)
+  const month = useWorkspaceStore((state) => state.month)
+  // CMN-C04: show the same screen/target/month context the question carries (화면정의서 v3.0 :3267, #622).
+  const contextScreen = observed ? 'TRAN-W02' : currentScreen
+  const contextTitle = screens.find((screen) => screen.id === contextScreen)?.title ?? '공통 화면'
   const workflowActive = useWorkflowGuide((state) => state.active)
   const paymentActive = useWorkflowGuide((state) => state.paymentActive)
   const settlementActive = useWorkflowGuide((state) => state.settlementActive)
@@ -759,6 +764,9 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                 승인된 가이드로 답변을 준비하고 있어요.
               </p>
             )}
+            <p className="pico-context">
+              현재 화면 {contextTitle} · 대상 {observed?.paymentId ? `지급 #${observed.paymentId}` : '선택 없음'} · 기준월 {month ?? '선택 없음'}
+            </p>
             <form onSubmit={send} className="pico-composer">
               <textarea
                 ref={textarea}
