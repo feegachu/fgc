@@ -205,7 +205,7 @@ function ScheduleDetailView({ id }: { id: string }) {
         </div>
       </section>
 
-      <section className="surface schedule-detail-card" aria-labelledby="schedule-lines-title">
+      <section data-guide-target="schedule.lines" className="surface schedule-detail-card" aria-labelledby="schedule-lines-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-lines-title">
             회차별 예상 금액
