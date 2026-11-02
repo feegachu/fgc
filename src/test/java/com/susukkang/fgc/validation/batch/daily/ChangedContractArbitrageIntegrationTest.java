@@ -49,7 +49,8 @@ import static org.mockito.Mockito.verify;
  * 넣으면 FK 검사(FOR KEY SHARE)가 그 잠금을 기다리고 청크 스레드는 차익거래를 기다려 끝없이 멈춘다.
  * PostgreSQL은 대기자가 하나뿐이라 교착으로 감지하지 못한다 — 순서가 바뀌면 @Timeout으로 실패한다.
  */
-@SpringBootTest
+// 지우지 못하는 실행이 공유 DB에 남으면 같은 월·회차를 고정으로 쓰는 다른 테스트가 깨진다(#764) — DB를 분리한다.
+@SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_changed_contract_arbitrage?currentSchema=fgc")
 class ChangedContractArbitrageIntegrationTest {
 
     private static final String A1_CONTRACT_NO = "FGC-FGL02-202601-0001";
@@ -88,8 +89,8 @@ class ChangedContractArbitrageIntegrationTest {
         writer = new ChangedContractItemWriter(contractStatusEventProcessingRepository, exceptionCaseRepository,
                 clawbackCandidateCaptureService);
 
-        // exception_occurrence가 append-only라 이 실행은 정리하지 못하고 남는다 — 다른 테스트의
-        // 예외 키(검증월 포함)·uq_validation_run과 겹치지 않도록 먼 미래의 무작위 월을 쓴다.
+        // exception_occurrence가 append-only라 이 실행은 정리하지 못하고 남는다 — 전용 DB 안에서도
+        // 앞선 실행의 예외 키(검증월 포함)와 겹치지 않도록 먼 미래의 무작위 월을 쓴다.
         LocalDate month = LocalDate.of(2040 + ThreadLocalRandom.current().nextInt(60),
                 1 + ThreadLocalRandom.current().nextInt(12), 1);
         validationRunId = jdbcTemplate.queryForObject("""
