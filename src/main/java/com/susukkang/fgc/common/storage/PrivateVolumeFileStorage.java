@@ -64,7 +64,7 @@ public class PrivateVolumeFileStorage implements FileStorage {
         if (content.length == 0 || content.length > maxBytes) throw new IOException("파일 크기 제한 초과");
         String key = UUID.randomUUID().toString().replace("-", "");
         Path file = resolve(key);
-        // 생성 시점부터 소유자 읽기/쓰기만 허용한다. 배포 볼륨에는 noexec도 적용한다.
+        // 생성 시점부터 소유자 읽기/쓰기만 허용한다(실행 비트 없음). 배포 볼륨에는 noexec를 걸지 않았다 — podman/fgc-app-combined.yaml 주석.
         FileAttribute<?>[] attributes;
         if (Files.getFileStore(root).supportsFileAttributeView("posix")) {
             attributes = new FileAttribute<?>[]{PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))};
