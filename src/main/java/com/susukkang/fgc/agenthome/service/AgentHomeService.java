@@ -127,6 +127,7 @@ public class AgentHomeService {
                                 List<String> warnings) {
         Map<Long, long[]> insurerCount = new LinkedHashMap<>();
         Map<Long, String> insurerName = new LinkedHashMap<>();
+        Map<Long, BigDecimal> insurerPremium = new LinkedHashMap<>();
         Map<String, long[]> monthCount = new TreeMap<>();
         Map<String, BigDecimal> monthPremium = new TreeMap<>();
         for (LocalDate m = range.from().withDayOfMonth(1); !m.isAfter(range.to()); m = m.plusMonths(1)) {
@@ -139,6 +140,7 @@ public class AgentHomeService {
         for (PortfolioRow r : rows) {
             insurerCount.computeIfAbsent(r.insurerId(), k -> new long[1])[0]++;
             insurerName.put(r.insurerId(), r.insurerName());
+            insurerPremium.merge(r.insurerId(), r.monthlyEquivalentFirstPremium(), BigDecimal::add);
             String month = r.contractDate().toString().substring(0, 7);
             monthCount.get(month)[0]++;
             monthPremium.merge(month, r.monthlyEquivalentFirstPremium(), BigDecimal::add);
@@ -155,7 +157,8 @@ public class AgentHomeService {
             warnings.add("기준일 시점의 상태 이력이 없는 계약 " + unknownStatus + "건은 현재 상태로 단정하지 않고 '상태 미확인'으로 집계했다.");
         }
         List<InsurerCount> insurers = insurerCount.entrySet().stream()
-                .map(e -> new InsurerCount(e.getKey(), insurerName.get(e.getKey()), e.getValue()[0])).toList();
+                .map(e -> new InsurerCount(e.getKey(), insurerName.get(e.getKey()), e.getValue()[0],
+                        insurerPremium.get(e.getKey()))).toList();
         List<MonthlyCount> monthly = monthCount.entrySet().stream()
                 .map(e -> new MonthlyCount(e.getKey(), e.getValue()[0], monthPremium.get(e.getKey()))).toList();
         List<CodeCount> categoryList = categories.entrySet().stream()

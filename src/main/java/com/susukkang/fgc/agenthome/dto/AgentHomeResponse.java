@@ -52,7 +52,7 @@ public record AgentHomeResponse(
     }
 
     @Schema(name = "AgentHomeInsurerCount")
-    public record InsurerCount(Long insurerId, String name, long contractCount) {
+    public record InsurerCount(Long insurerId, String name, long contractCount, BigDecimal monthlyEquivalentFirstPremiumSum) {
     }
 
     @Schema(name = "AgentHomeMonthlyCount")
