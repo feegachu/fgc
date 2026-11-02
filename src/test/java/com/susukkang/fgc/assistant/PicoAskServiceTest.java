@@ -225,13 +225,15 @@ class PicoAskServiceTest {
         }
     }
     @Test void normalKoreanParticlesAreNotMistakenForNumerals() {
-        for (var message : List.of("조회만 할 수 있습니다.", "내용은 조회만 할 수 있습니다.", "통화기호 표시 위치를 조회하세요.", "권한을 확인할 수 있습니다.", "기간을 확인한 다음 조회하세요.", "상세 내용을 확인하세요.")) {
+        for (var message : List.of("조회만 할 수 있습니다.", "내용은 조회만 할 수 있습니다.", "통화기호 표시 위치를 조회하세요.", "권한을 확인할 수 있습니다.", "기간을 확인한 다음 조회하세요.", "상세 내용을 확인하세요.",
+                "이번 정산월의 지급 목록을 확인하세요.", "이번에는 사전검증을 실행하세요.", "이달의 지급 초안을 저장하세요.", "지급 구분을 확인하세요.", "원천 구분은 상세에서 확인하세요.",
+                "저장 전에 한 번 더 확인하세요.", "한번 더 조회해 보세요.", "한 차례 더 조회하세요.", "만일 오류가 있으면 정정하세요.", "일할 계산 근거를 확인하세요.")) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
             assertThat(service.ask(request("조회 방법")).source()).as(message).isEqualTo(Source.AI);
         }
     }
     @Test void generatedKoreanDurationsCountsAndUnicodeNumbersAreRejected() {
-        for (var message : List.of("지급금액십만원입니다.", "수수료십만원입니다.", "수수료십퍼센트입니다.", "수수료십프로입니다.", "수수료십%입니다.", "₩오만입니다.", "$오만입니다.", "€오만입니다.", "지급액은십만원입니다.", "수수료는백원입니다.", "총열두달에 걸쳐 지급됩니다.", "약두번 나누어 지급됩니다.", "열두 달에 걸쳐 지급됩니다.", "두 번 나누어 지급됩니다.", "세 차례 지급합니다.", "삼 일 이내입니다.", "스무 개를 선택하세요.", "예순 회에 걸쳐 지급됩니다.", "²원입니다.", "Ⅻ개월입니다.", "½을 지급합니다.")) {
+        for (var message : List.of("지급금액십만원입니다.", "수수료십만원입니다.", "수수료십퍼센트입니다.", "수수료십프로입니다.", "수수료십%입니다.", "₩오만입니다.", "$오만입니다.", "€오만입니다.", "지급액은십만원입니다.", "수수료는백원입니다.", "총열두달에 걸쳐 지급됩니다.", "약두번 나누어 지급됩니다.", "열두 달에 걸쳐 지급됩니다.", "두 번 나누어 지급됩니다.", "세 차례 지급합니다.", "열한 번 나누어 지급됩니다.", "두 차례 지급합니다.", "삼 일 이내입니다.", "이 주 뒤 지급됩니다.", "스무 개를 선택하세요.", "예순 회에 걸쳐 지급됩니다.", "²원입니다.", "Ⅻ개월입니다.", "½을 지급합니다.")) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
             assertThat(service.ask(request("지급 방법")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
         }

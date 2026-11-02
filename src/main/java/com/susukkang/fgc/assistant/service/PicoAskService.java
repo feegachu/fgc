@@ -68,12 +68,12 @@ public class PicoAskService {
             // 조회 is a lookup word, but a preceding numeral (일조회/일조 회) remains a quantity.
             boolean lookupWord = unit.equals("회") && index > 0 && text.charAt(index - 1) == '조'
                     && (index == 1 || MONEY_PREFIXES.indexOf(text.charAt(index - 2)) < 0);
-            if (!lookupWord && boundary && previous >= 0 && numeralEnding(text.substring(0, previous + 1), unit)) return true;
+            if (!lookupWord && boundary && previous >= 0 && numeralEnding(text.substring(0, previous + 1), unit, previous == index - 1)) return true;
             index = text.indexOf(unit, index + unit.length());
         }
         return false;
     }
-    private static boolean numeralEnding(String prefix, String unit) {
+    private static boolean numeralEnding(String prefix, String unit, boolean glued) {
         int start = prefix.length() - 1;
         while (start >= 0 && Character.isLetter(prefix.charAt(start))) start--;
         String token = prefix.substring(start + 1);
@@ -82,6 +82,11 @@ public class PicoAskService {
             case "원", "퍼센트", "프로", "%", "％" -> KOREAN_MONEY_SUFFIX;
             default -> KOREAN_NUMERAL_SUFFIX;
         };
+        if (numeral == KOREAN_NUMERAL_SUFFIX) {
+            // One glued Sino-Korean syllable is a word (이번·이달·구분·만일·일할), and 한 번 더 is an instruction (SRC-028).
+            if (glued && token.length() == 1 && MONEY_PREFIXES.indexOf(token.charAt(0)) >= 0) return false;
+            if (token.equals("한") && (unit.equals("번") || unit.equals("차례"))) return false;
+        }
         return numeral.matcher(token).find();
     }
 
