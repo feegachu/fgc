@@ -173,7 +173,12 @@ export default function LedgerPage() {
   return (
     <div className="ledger-react-page">
       <header className="page-header">
-        <h1 className="page-title">검증원장 조회</h1>
+        <div className="page-header-copy">
+          <h1 className="page-title">검증원장 조회</h1>
+          <p className="page-description">
+            이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.
+          </p>
+        </div>
       </header>
       {params.get('imbalanceOnly') === 'true' && (
         <p className="guidance guidance-neutral" role="status">

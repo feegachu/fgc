@@ -15,7 +15,6 @@ const tones: Record<string, StatusTone> = {
 export function CapStatus({ code, label }: { code?: string; label?: string }) {
   return (
     <StatusBadge
-      kind="category"
       tablePresentation="badge"
       optionCount={Object.keys(STATUS_LABELS).length}
       tone={tones[code ?? ''] ?? 'neutral'}

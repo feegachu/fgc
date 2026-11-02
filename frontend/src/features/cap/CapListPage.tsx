@@ -104,6 +104,21 @@ export default function CapListPage() {
       render: (row) => row.paymentStageLabel || STAGES[row.paymentStage as keyof typeof STAGES] || '-',
     },
     {
+      key: 'status',
+      label: '판정',
+      width: '6rem',
+      align: 'center',
+      render: (row) => <CapStatus code={row.resultStatus} label={row.resultStatusLabel} />,
+    },
+    {
+      key: 'usage',
+      label: '사용률',
+      sortKey: 'usagePct',
+      sortable: true,
+      width: '12rem',
+      render: (row) => <CapUsage value={row.usagePct} status={row.resultStatus} />,
+    },
+    {
       key: 'date',
       label: '기준일',
       sortKey: 'asOfDate',
@@ -175,21 +190,6 @@ export default function CapListPage() {
       width: '8rem',
       align: 'number',
       render: (row) => <Amount value={row.remainingAmount} />,
-    },
-    {
-      key: 'usage',
-      label: '사용률',
-      sortKey: 'usagePct',
-      sortable: true,
-      width: '14rem',
-      render: (row) => <CapUsage value={row.usagePct} status={row.resultStatus} />,
-    },
-    {
-      key: 'status',
-      label: '판정',
-      width: '6rem',
-      align: 'center',
-      render: (row) => <CapStatus code={row.resultStatus} label={row.resultStatusLabel} />,
     },
     {
       key: 'ruleset',

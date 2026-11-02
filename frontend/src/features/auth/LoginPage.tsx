@@ -122,12 +122,11 @@ export function LoginPage() {
         <div className="auth-login-content">
           <img
             className="auth-mobile-logo"
-            src={`${import.meta.env.BASE_URL}images/brand/logo-horizontal-flat.png`}
+            src={`${import.meta.env.BASE_URL}images/brand/logo-horizontal-white.png`}
             alt="FGC"
             width={96}
             height={40}
           />
-          <div className="auth-heading-anchor" aria-hidden="true" />
           <header className="auth-login-header">
             <h2 id="login-title">로그인</h2>
             <p>업무 계정의 아이디와 비밀번호를 입력하세요.</p>

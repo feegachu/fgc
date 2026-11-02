@@ -160,21 +160,21 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
       insurerId: '',
       orgId: '',
       contractNo: 'C',
-      sort: '',
+      sort: 'usagePct,desc',
     })
     expect(criteriaFromParams(new URLSearchParams(), null).month).toBe('')
   })
-  it('#604 허용된 정렬만 요청에 싣고 나머지는 서버 기본 정렬로 되돌린다', () => {
+  it('#604 허용된 정렬만 요청에 싣고 나머지는 화면 기본 정렬(사용률 높은 순)로 되돌린다', () => {
     expect(criteriaFromParams(new URLSearchParams('sort=usagePct,desc'), '2026-07').sort).toBe('usagePct,desc')
-    expect(criteriaFromParams(new URLSearchParams('sort=resultStatus,asc'), '2026-07').sort).toBe('')
-    expect(criteriaFromParams(new URLSearchParams('sort=usagePct'), '2026-07').sort).toBe('')
+    expect(criteriaFromParams(new URLSearchParams('sort=resultStatus,asc'), '2026-07').sort).toBe('usagePct,desc')
+    expect(criteriaFromParams(new URLSearchParams('sort=usagePct'), '2026-07').sort).toBe('usagePct,desc')
   })
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 유지한다', async () => {
     const { router, user } = renderAt('/cap-checks?month=2026-07&contractNo=C-1&page=2')
     const table = await screen.findByRole('table', { name: '계약별 판정 목록' })
     // 순서 기준이 없는 판정 컬럼은 정렬 버튼이 없다. 도움말 버튼은 정렬 버튼과 분리되어 있다.
     expect(within(table).queryByRole('button', { name: '판정' })).toBeNull()
-    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'none')
+    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'descending')
     await user.click(within(table).getByRole('button', { name: '사용률' }))
     await waitFor(() => expect(new URLSearchParams(listCalls().at(-1)!.split('?')[1]).get('sort')).toBe('usagePct,asc'))
     const last = new URLSearchParams(listCalls().at(-1)!.split('?')[1])

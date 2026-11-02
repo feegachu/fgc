@@ -106,8 +106,8 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(
       await within(table).findByText('지급 초안 삭제: 지급 9007199254740993의 지급 예정이 철회되어 종결'),
     ).toBeInTheDocument()
-    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
-    expect(document.querySelector('.audit-reason-original')).toBeNull()
+    await screen.findByText('사유 원문 보기')
+    expect(document.querySelector('.audit-reason-original')).toHaveTextContent(reason)
   })
 
   it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 BATCH 표기를 유지한다', async () => {
@@ -229,15 +229,14 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(await screen.findAllByText('인증 토큰 갱신')).not.toHaveLength(0)
   })
 
-  it('미등록 코드는 화면에서 숨기고 검색 값은 원본 코드를 유지한다', async () => {
+  it('미등록 코드는 검색과 상세에서 원문을 유지한다', async () => {
     const { actions } = renderAt('/audit-logs?month=2026-07&selected=1', 'COMPLIANCE', [
       log(1, { actionCode: 'FUTURE_ACTION', entityType: 'FUTURE_ENTITY' }),
     ])
-    await screen.findByText('확인 필요 #42')
-    expect(within(screen.getByLabelText('행위 종류')).getByRole('option', { name: '확인 필요' })).toHaveValue(
+    await screen.findByText('FUTURE_ENTITY #42')
+    expect(within(screen.getByLabelText('행위 종류')).getByRole('option', { name: 'FUTURE_ACTION' })).toHaveValue(
       'FUTURE_ACTION',
     )
-    expect(screen.queryByText('FUTURE_ACTION')).not.toBeInTheDocument()
     await actions.selectOptions(screen.getByLabelText('행위 종류'), 'FUTURE_ACTION')
     await actions.selectOptions(screen.getByLabelText('대상 종류'), 'FUTURE_ENTITY')
     await actions.click(screen.getByRole('button', { name: '조회' }))
@@ -277,11 +276,11 @@ describe('AUDT-W01 감사로그 조회', () => {
     ).toBeInTheDocument()
     expect(within(table).queryByText(stepReason)).not.toBeInTheDocument()
     expect(within(table).queryByText(draftReason)).not.toBeInTheDocument()
-    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
-    expect(screen.queryByText(stepReason)).not.toBeInTheDocument()
+    await actions.click(screen.getByText('사유 원문 보기'))
+    expect(screen.getByText(stepReason)).toBeVisible()
     await actions.click(screen.getAllByRole('button', { name: '2026-08-16 10:00:07' })[1])
     await waitFor(() => expect(document.querySelector('.audit-diff-context')).toHaveTextContent('분개 초안 저장'))
-    expect(document.querySelector('.audit-reason-original')).toBeNull()
+    expect(document.querySelector('.audit-reason-original')).toHaveTextContent(draftReason)
   })
 
   it.each([
@@ -301,7 +300,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     await screen.findByText('지급 / 금액')
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     const reasonCell = within(table).getAllByRole('cell')[5]
-    expect(reasonCell.textContent).toBe(reason.startsWith('journalType=') ? '처리 사유 확인 필요' : reason)
+    expect(reasonCell.textContent).toBe(reason)
     expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
   })
 

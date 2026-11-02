@@ -115,7 +115,7 @@ export default function TransactionListPage() {
     {
       key: 'source',
       label: '원천유형',
-      width: '7rem',
+      width: '6.5rem',
       render: (row) => (
         <CategoryBadge tablePresentation="text" value={row.sourceType} optionCount={sourceOptions.length}>
           {disclosure(
@@ -128,7 +128,7 @@ export default function TransactionListPage() {
       key: 'key',
       label: '업무키',
       sortable: true,
-      width: '12rem',
+      width: '10rem',
       cellClassName: 'transaction-mono',
       render: (row) => <span title={row.sourceBusinessKey}>{row.sourceBusinessKey || '-'}</span>,
     },
@@ -143,14 +143,14 @@ export default function TransactionListPage() {
       key: 'agent',
       label: '수령 설계사',
       sortable: true,
-      width: '9rem',
+      width: '6.5rem',
       render: (row) => disclosure(row.recipientAgentName),
     },
     {
       key: 'item',
       label: '수수료 항목',
       sortable: true,
-      width: '8.5rem',
+      width: '7.5rem',
       render: (row) => disclosure(row.commissionItemName || row.commissionItemCode),
     },
     {
@@ -166,7 +166,7 @@ export default function TransactionListPage() {
     {
       key: 'flow',
       label: '흐름',
-      width: '5rem',
+      width: '4rem',
       align: 'center',
       render: (row) => (
         <StatusBadge
@@ -180,7 +180,7 @@ export default function TransactionListPage() {
     {
       key: 'status',
       label: '상태',
-      width: '5.5rem',
+      width: '5rem',
       align: 'center',
       render: (row) => (
         <StatusBadge
@@ -195,14 +195,19 @@ export default function TransactionListPage() {
       key: 'attributions',
       label: '귀속 계약',
       sortable: true,
-      width: '6.5rem',
+      width: '5.5rem',
       align: 'center',
-      render: (row) => `${int(row.attributionCount ?? 0)}건`,
+      render: (row) =>
+        (row.attributionCount ?? 0) === 0 ? (
+          <StatusBadge tone="error">0건</StatusBadge>
+        ) : (
+          `${int(row.attributionCount ?? 0)}건`
+        ),
     },
     {
       key: 'action',
       label: '작업',
-      width: '9rem',
+      width: '7rem',
       align: 'center',
       render: (row) =>
         row.status !== 'DRAFT' ? (
@@ -294,7 +299,7 @@ export default function TransactionListPage() {
         <div className="page-header-actions">
           {user.canProcess && (
             <ContextLink
-              className="button button-primary"
+              className="button button-secondary"
               to={returnLink(month ? withMonth('/transactions/new', month) : '/transactions/new', returnTo)}
             >
               <span className="material-symbols-rounded" aria-hidden="true">

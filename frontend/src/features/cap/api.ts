@@ -35,6 +35,8 @@ export const CAP_SORT_KEYS = [
   'remainingAmount',
   'usagePct',
 ] as const
+/** 처음 열면 사용률이 높은 순(위반이 맨 위)으로 본다. 사용률이 없는 적용대상 아님은 서버가 맨 뒤로 보낸다. API 기본값(asOfDate,desc)은 그대로다. */
+const DEFAULT_SORT = { key: 'usagePct', direction: 'desc' } as const
 export interface CapCriteria {
   month: string
   stage: string
@@ -67,7 +69,7 @@ export function criteriaFromParams(params: URLSearchParams, workspaceMonth: stri
     insurerId: referenceId(params.get('insurerId')),
     orgId: referenceId(params.get('orgId')),
     contractNo: params.get('contractNo')?.trim() ?? '',
-    sort: formatSort(parseSort(params.get('sort'), CAP_SORT_KEYS)),
+    sort: formatSort(parseSort(params.get('sort'), CAP_SORT_KEYS) ?? DEFAULT_SORT),
     page: positive(params.get('page')),
     size: [10, 20, 50].includes(size) ? size : 20,
   }

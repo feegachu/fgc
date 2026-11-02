@@ -32,6 +32,14 @@ export const actionLabels = {
   VALIDATION_RUN_CREATION_FAILED: '검증 실행 생성 실패',
   VALIDATION_RUN_RETRIED: '검증 실행 재시도',
   VALIDATION_RUN_FINALIZED: '검증 실행 확정',
+  POLICY_CREATE: '정책 초안 등록',
+  POLICY_UPDATE: '정책 초안 수정',
+  POLICY_CLONE: '정책 복제',
+  POLICY_SUBMIT: '정책 승인 요청',
+  POLICY_APPROVE: '정책 승인',
+  POLICY_REJECT: '정책 반려',
+  POLICY_ACTIVATE: '정책 시행',
+  POLICY_RETIRE: '정책 종료',
 } as const
 
 export const entityTypeLabels = {
@@ -46,11 +54,13 @@ export const entityTypeLabels = {
   JOURNAL_HEADER: '회계전표',
   EXCEPTION_CASE: '예외 건',
   SCHEDULE_LINE: '스케줄행',
+  POLICY_VERSION: '정책 버전',
+  CLAWBACK_CASE: '환수 건',
 } as const
 
 function label(code: string | null | undefined, labels: Record<string, string>) {
   if (code == null || code === '') return '-'
-  return Object.hasOwn(labels, code) ? labels[code] : '확인 필요'
+  return Object.hasOwn(labels, code) ? labels[code] : code
 }
 
 export const auditActionLabel = (code?: string | null) => label(code, actionLabels)
@@ -106,7 +116,7 @@ export function auditReasonLabel(actionCode?: string | null, reason?: string | n
       return `${type} 분개 초안 저장, 원천: ${source}${sourceId}, ${run}`
     }
   }
-  return /^[a-zA-Z]\w*=/.test(reason) ? '처리 사유 확인 필요' : screenMessage(reason)
+  return /^[a-zA-Z]\w*=/.test(reason) ? reason : screenMessage(reason)
 }
 /** 배열 인덱스("[0]")만 "1번째"로 풀어 읽기 쉽게 한다("[0].result.details[1].amount" → "1번째.result.details.2번째.amount"). 점 경로는 그대로 두고 원래 경로는 title 로 남긴다. */
 export function diffFieldLabel(field: string): string {
@@ -136,7 +146,7 @@ export function diffFieldLabel(field: string): string {
     .replace(/\[(\d+)]/g, (_, index: string) => `.${Number(index) + 1}번째.`)
     .split('.')
     .filter(Boolean)
-    .map((part) => fields[part] ?? (/^\d+번째$/.test(part) ? part : '기타 항목'))
+    .map((part) => fields[part] ?? part)
     .join(' / ')
 }
 
@@ -168,5 +178,5 @@ export function auditValueLabel(value: string | null | undefined, field?: string
     EXCLUDED: '제외',
     REVIEW_REQUIRED: '검토필요',
   }
-  return labels[value] ?? (/^[A-Z][A-Z0-9_]*$/.test(value) ? '확인 필요' : value)
+  return labels[value] ?? value
 }

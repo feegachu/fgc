@@ -36,7 +36,7 @@ function ErrorCard({ title, message, help, requestId, copyRequestId }: ErrorCard
         </header>
         <div className="surface-body error-card-body">
           <p className="error-message" role="alert">
-            {errorScreenMessage(message)}
+            {errorScreenMessage(message, requestId)}
           </p>
           {help && <p className="error-help">{help}</p>}
           <div className="error-action">

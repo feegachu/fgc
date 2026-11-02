@@ -295,6 +295,12 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
         <span>{`${auditEntityTypeWithCode(log.entityType)} #${dash(log.entityId)}`}</span>
       </p>
       {log.reason && <p className="audit-reason">{reason}</p>}
+      {log.reason && reason !== log.reason && (
+        <details className="audit-reason-original">
+          <summary>사유 원문 보기</summary>
+          <p>{log.reason}</p>
+        </details>
+      )}
       {detail.isError && (
         <p className="field-error" role="alert">
           {errorText(detail.error)}
@@ -329,11 +335,13 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
                 const changed = entry.changed ? ' audit-diff-cell-changed' : ''
                 return (
                   <tr key={entry.field}>
-                    <td className="tabular-nums audit-diff-value">{diffFieldLabel(entry.field ?? '')}</td>
-                    <td className={`tabular-nums audit-diff-value${changed}`}>
+                    <td className="tabular-nums audit-diff-value" title={entry.field}>
+                      {diffFieldLabel(entry.field ?? '')}
+                    </td>
+                    <td className={`tabular-nums audit-diff-value${changed}`} title={entry.before ?? undefined}>
                       {auditValueLabel(entry.before, entry.field)}
                     </td>
-                    <td className={`tabular-nums audit-diff-value${changed}`}>
+                    <td className={`tabular-nums audit-diff-value${changed}`} title={entry.after ?? undefined}>
                       {auditValueLabel(entry.after, entry.field)}
                     </td>
                   </tr>

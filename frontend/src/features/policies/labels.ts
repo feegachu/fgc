@@ -27,6 +27,7 @@ const policyCodeLabels: Record<string, string> = {
   TOTAL_PAID: '총 지급액',
   CONFIRMED_PAID: '확정 지급액',
   PAID_COMMISSION: '지급 수수료',
+  PAID_ATTRIBUTED_AMOUNT: '확정 지급 귀속액',
 }
 export function policyCodeLabel(code?: string | null) {
   return code ? (policyCodeLabels[code] ?? '확인 필요') : '-'
