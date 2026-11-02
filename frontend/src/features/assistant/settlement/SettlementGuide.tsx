@@ -263,7 +263,13 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       if (result.complete) await runner.next()
     } catch (failure) {
       if (!controller.signal.aborted && token === epoch.current)
-        setError(failure instanceof Error ? failure.message : '최신 상태를 확인하지 못했습니다.')
+        setError(
+          failure instanceof DOMException && failure.name === 'TimeoutError'
+            ? '최신 상태 조회가 5초 안에 끝나지 않았습니다. 잠시 후 다시 확인하세요.'
+            : failure instanceof Error
+              ? failure.message
+              : '최신 상태를 확인하지 못했습니다.',
+        )
     } finally {
       if (token === epoch.current) setBusy(false)
     }
