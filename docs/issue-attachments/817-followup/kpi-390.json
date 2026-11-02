@@ -1,0 +1,87 @@
+[
+  {
+    "page": "dashboard",
+    "before": [
+      {
+        "count": 5,
+        "groupWidth": 286,
+        "lastWidth": 142
+      }
+    ],
+    "after": [
+      {
+        "count": 5,
+        "groupWidth": 286,
+        "lastWidth": 284
+      }
+    ]
+  },
+  {
+    "page": "cap",
+    "before": [
+      {
+        "count": 4,
+        "groupWidth": 286,
+        "lastWidth": 142
+      }
+    ],
+    "after": [
+      {
+        "count": 4,
+        "groupWidth": 286,
+        "lastWidth": 142
+      }
+    ]
+  },
+  {
+    "page": "arbitrage",
+    "before": [
+      {
+        "count": 3,
+        "groupWidth": 286,
+        "lastWidth": 142
+      }
+    ],
+    "after": [
+      {
+        "count": 3,
+        "groupWidth": 286,
+        "lastWidth": 284
+      }
+    ]
+  },
+  {
+    "page": "reconciliation",
+    "before": [
+      {
+        "count": 5,
+        "groupWidth": 286,
+        "lastWidth": 142
+      }
+    ],
+    "after": [
+      {
+        "count": 5,
+        "groupWidth": 286,
+        "lastWidth": 284
+      }
+    ]
+  },
+  {
+    "page": "exception",
+    "before": [
+      {
+        "count": 1,
+        "groupWidth": 286,
+        "lastWidth": 142
+      }
+    ],
+    "after": [
+      {
+        "count": 1,
+        "groupWidth": 286,
+        "lastWidth": 284
+      }
+    ]
+  }
+]
