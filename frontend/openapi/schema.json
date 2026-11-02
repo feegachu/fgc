@@ -2522,9 +2522,14 @@
             "type" : "string"
           },
           "clawbackRatePct" : {
-            "maximum" : 100,
-            "minimum" : 0,
-            "type" : "number"
+            "description" : "환수율(%), 0~100·소수점 최대6자리의 정밀도를 보존한 문자열",
+            "type" : "string"
+          },
+          "clawbackRuleId" : {
+            "description" : "수정 시 유지할 기존 환수 규칙 ID. 최초 생성에서는 지정하지 않는다.",
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
           },
           "commissionItemId" : {
             "exclusiveMinimum" : 0,
@@ -10771,6 +10776,16 @@
               }
             },
             "description" : "정책 상태·수정 시각 또는 멱등키 충돌"
+          },
+          "422" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
+                }
+              }
+            },
+            "description" : "정책 규칙의 적용 구간 충돌 (FGC-POL-002)"
           }
         },
         "summary" : "정책 초안 수정 (IF-API-80)",

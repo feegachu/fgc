@@ -3,11 +3,15 @@ package com.susukkang.fgc.common.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +26,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OpenApiFailureResponseTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
+
+    @ParameterizedTest
+    @CsvSource({"/api/v1/policies,post", "/api/v1/policies/{policyVersionId},put"})
+    void policyConflictSnapshotMatchesLiveFailureEnvelope(String path, String method) throws Exception {
+        JsonNode live = json.readTree(mvc.perform(get("/v3/api-docs").with(user("schema-check").roles("SYSTEM_ADMIN")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        JsonNode snapshot = json.readTree(Files.readString(Path.of("frontend/openapi/schema.json")));
+        JsonNode response = live.path("paths").path(path).path(method).path("responses").path("422");
+
+        assertThat(response.path("content").size()).isEqualTo(1);
+        assertThat(response.path("content").path("application/json").path("schema").path("$ref").asText())
+                .isEqualTo("#/components/schemas/ApiFailureResponse");
+        assertThat(snapshot.path("paths").path(path).path(method).path("responses").path("422"))
+                .as("%s %s 422 snapshot matches authenticated server export", method, path).isEqualTo(response);
+        for (String name : List.of("ApiFailureResponse", "ApiError")) {
+            assertThat(snapshot.path("components").path("schemas").path(name))
+                    .as("%s failure component matches server", name)
+                    .isEqualTo(live.path("components").path("schemas").path(name));
+        }
+    }
 
     @Test
     void errorResponsesUseFailureEnvelope() throws Exception {

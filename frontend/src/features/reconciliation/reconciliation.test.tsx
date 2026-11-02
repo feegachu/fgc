@@ -479,7 +479,7 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(calls.find((call) => call.url.startsWith('/api/v1/validation-runs?'))?.url).toContain(
       'status=COMPLETED&page=1&size=1',
     )
-    expect(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })).toBeVisible()
+    await waitFor(() => expect(screen.getByRole('button', { name: '대사 결과 7 비교 보기' })).toBeVisible())
   })
   it('실행 선택 → 결과 보기 → 비교 모달·원천·요율·관련 경로를 제공한다', async () => {
     const { router, user } = renderAt()

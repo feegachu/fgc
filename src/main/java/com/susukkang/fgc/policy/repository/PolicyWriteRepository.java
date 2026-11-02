@@ -119,8 +119,11 @@ public class PolicyWriteRepository {
                 "SELECT commission_rule_id FROM fgc.commission_rule WHERE policy_version_id = ?", Long.class, id));
         Set<Long> feeIds = new HashSet<>(jdbc.queryForList(
                 "SELECT fee_regime_ruleset_id FROM fgc.fee_regime_ruleset WHERE policy_version_id = ?", Long.class, id));
+        Set<Long> clawbackIds = new HashSet<>(jdbc.queryForList(
+                "SELECT clawback_rule_id FROM fgc.clawback_rule WHERE policy_version_id = ?", Long.class, id));
         return draft.commissionRules().stream().allMatch(row -> row.commissionRuleId() == null || commissionIds.contains(row.commissionRuleId()))
-                && draft.feeRegimeRules().stream().allMatch(row -> row.feeRegimeRulesetId() == null || feeIds.contains(row.feeRegimeRulesetId()));
+                && draft.feeRegimeRules().stream().allMatch(row -> row.feeRegimeRulesetId() == null || feeIds.contains(row.feeRegimeRulesetId()))
+                && draft.clawbackRules().stream().allMatch(row -> row.clawbackRuleId() == null || clawbackIds.contains(row.clawbackRuleId()));
     }
 
     /**
@@ -133,6 +136,11 @@ public class PolicyWriteRepository {
         Long id = policy.getPolicyVersionId();
         Map<Long, OffsetDateTime> detachedCommissionRows = creationTimes(false, id);
         Map<Long, OffsetDateTime> detachedFeeRows = creationTimes(true, id);
+        Map<Long, OffsetDateTime> clawbackRows = new LinkedHashMap<>();
+        org.springframework.jdbc.core.RowCallbackHandler collectClawback = rs ->
+                clawbackRows.put(rs.getLong(1), rs.getObject(2, OffsetDateTime.class));
+        jdbc.query("SELECT clawback_rule_id, created_at FROM fgc.clawback_rule WHERE policy_version_id = ?",
+                collectClawback, id);
         List<FeeLimit> savedLimits = jdbc.query("""
                 SELECT l.fee_regime_ruleset_limit_id, l.fee_regime_ruleset_id, l.limit_code,
                        l.limit_pct, l.includes_indirect_expense_yn, l.created_at
@@ -149,7 +157,7 @@ public class PolicyWriteRepository {
         jdbc.update("DELETE FROM fgc.fee_regime_ruleset WHERE policy_version_id = ?", id);
         policy.revise(draft);
         entityManager.flush();
-        replaceChildren(id, draft, detachedCommissionRows, detachedFeeRows);
+        replaceChildren(id, draft, detachedCommissionRows, detachedFeeRows, clawbackRows);
         Set<Long> retainedFeeIds = new HashSet<>();
         draft.feeRegimeRules().forEach(row -> retainedFeeIds.add(row.feeRegimeRulesetId()));
         for (FeeLimit limit : savedLimits) {
@@ -194,11 +202,11 @@ public class PolicyWriteRepository {
 
     /** 유지한 자식 ID는 UPDATE하여 분급 한도 등 요청에 없는 부속 데이터를 보존한다. */
     public void replaceChildren(Long id, PolicyDraft draft) {
-        replaceChildren(id, draft, Map.of(), Map.of());
+        replaceChildren(id, draft, Map.of(), Map.of(), Map.of());
     }
 
     private void replaceChildren(Long id, PolicyDraft draft, Map<Long, OffsetDateTime> detachedCommissionRows,
-                                 Map<Long, OffsetDateTime> detachedFeeRows) {
+                                 Map<Long, OffsetDateTime> detachedFeeRows, Map<Long, OffsetDateTime> clawbackRows) {
         entityManager.flush();
         Set<Long> retainedCommissionIds = new HashSet<>();
         draft.commissionRules().forEach(row -> retainedCommissionIds.add(row.commissionRuleId()));
@@ -222,7 +230,7 @@ public class PolicyWriteRepository {
         for (PolicyDraft.FeeRegimeRuleDraft rule : draft.feeRegimeRules()) {
             saveFeeRule(id, rule, rule.feeRegimeRulesetId() == null ? null : detachedFeeRows.get(rule.feeRegimeRulesetId()));
         }
-        replaceClawbackRules(id, draft.clawbackRules());
+        replaceClawbackRules(id, draft.clawbackRules(), clawbackRows);
         jdbc.update("DELETE FROM fgc.policy_parameter WHERE policy_version_id = ?", id);
         for (PolicyDraft.ParameterDraft parameter : draft.parameters()) {
             jdbc.update("""
@@ -240,18 +248,43 @@ public class PolicyWriteRepository {
         }
     }
 
-    private void replaceClawbackRules(Long id, List<PolicyDraft.ClawbackRuleDraft> rules) {
+    /**
+     * 전체 문서 PUT은 기존 환수 규칙을 모두 지운 뒤 다시 넣어 구간 맞교환도 유일키에 걸리지 않게 한다.
+     * 요청이 유지한 ID는 생성시각과 함께 복원하고(#647), ID가 없는 행만 새 ID를 받는다.
+     */
+    private void replaceClawbackRules(Long id, List<PolicyDraft.ClawbackRuleDraft> rules,
+                                      Map<Long, OffsetDateTime> creationTimes) {
         jdbc.update("DELETE FROM fgc.clawback_rule WHERE policy_version_id = ?", id);
         for (PolicyDraft.ClawbackRuleDraft rule : rules) {
-            jdbc.update("""
-                    INSERT INTO fgc.clawback_rule
-                      (policy_version_id, insurer_id, product_offering_id, commission_item_id,
-                       elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
-                    """, id, rule.insurerId(), rule.productOfferingId(), rule.commissionItemId(),
-                    rule.elapsedMonthFrom(), rule.elapsedMonthTo(), rule.clawbackBasisCode(),
-                    rule.clawbackRatePct(), rule.conditionExpression() == null || rule.conditionExpression().isNull()
-                            ? "{}" : json(rule.conditionExpression()));
+            List<Object> values = new ArrayList<>(List.of(id));
+            values.add(rule.insurerId());
+            values.add(rule.productOfferingId());
+            values.add(rule.commissionItemId());
+            values.add(rule.elapsedMonthFrom());
+            values.add(rule.elapsedMonthTo());
+            values.add(rule.clawbackBasisCode());
+            values.add(rule.clawbackRatePct());
+            values.add(rule.conditionExpression() == null || rule.conditionExpression().isNull()
+                    ? "{}" : json(rule.conditionExpression()));
+            OffsetDateTime createdAt = rule.clawbackRuleId() == null ? null : creationTimes.get(rule.clawbackRuleId());
+            if (createdAt == null) {
+                jdbc.update("""
+                        INSERT INTO fgc.clawback_rule
+                          (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                           elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                        """, values.toArray());
+            } else {
+                values.add(rule.clawbackRuleId());
+                values.add(createdAt);
+                jdbc.update("""
+                        INSERT INTO fgc.clawback_rule
+                          (policy_version_id, insurer_id, product_offering_id, commission_item_id,
+                           elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression,
+                           clawback_rule_id, created_at)
+                        OVERRIDING SYSTEM VALUE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
+                        """, values.toArray());
+            }
         }
     }
 
@@ -404,7 +437,7 @@ public class PolicyWriteRepository {
                 FROM fgc.policy_parameter WHERE policy_version_id = ? ORDER BY parameter_key
                 """, id));
         document.put("clawbackRules", rows("""
-                SELECT insurer_id, product_offering_id, commission_item_id, elapsed_month_from, elapsed_month_to,
+                SELECT clawback_rule_id, insurer_id, product_offering_id, commission_item_id, elapsed_month_from, elapsed_month_to,
                        clawback_basis_code, clawback_rate_pct, condition_expression
                 FROM fgc.clawback_rule WHERE policy_version_id = ? ORDER BY clawback_rule_id
                 """, id));
@@ -467,7 +500,7 @@ public class PolicyWriteRepository {
                    elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression)
                 SELECT ?, insurer_id, product_offering_id, commission_item_id,
                    elapsed_month_from, elapsed_month_to, clawback_basis_code, clawback_rate_pct, condition_expression
-                FROM fgc.clawback_rule WHERE policy_version_id = ?
+                FROM fgc.clawback_rule WHERE policy_version_id = ? ORDER BY clawback_rule_id
                 """, targetId, sourceId);
         jdbc.update("""
                 INSERT INTO fgc.commission_rule

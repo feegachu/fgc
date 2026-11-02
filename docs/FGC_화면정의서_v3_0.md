@@ -3248,7 +3248,7 @@ PDF영역은같은상세아래[PDF 생성]/[재발행]/[발행 이력].발행대
 | CONT-W03 | contract.form,contract.save | 입력폼/등록또는수정저장,저장API성공 |
 | CONT-W02 | contract.statusHistory,contract.schedules | 상태이력/스케줄탭,조회성공 |
 | SCHE-W01/W02 | schedule.filters,schedule.lines,schedule.generate | 체계조건/회차표/기존재생성동작 |
-| TRAN-W01/W02 | payment.filters,payment.form,payment.save,payment.precheck,payment.confirm | 검색/귀속포함폼/초안저장/사전검증/확정 |
+| TRAN-W01/W02 | payment.filters,payment.form,payment.scope,payment.amount,payment.attributions,payment.evidence,payment.save,payment.precheck,payment.precheck.result,payment.confirm | 검색/귀속포함폼(088 전체흐름)/지급대상·금액·귀속행·근거(087 단계)/초안저장/사전검증·검증결과/확정 (SRC-028) |
 | VRUN-W01/W02 | validation.create,validation.execute,validation.progress,validation.restart,validation.checklist,validation.finalize | 기존실행·상태·신규재시작·8조건·확정 |
 | RECO-W01/W02 | reconciliation.filters,reconciliation.results,reconciliation.detail | 대사조건/결과목록/비교상세 |
 | EXCP-W01 | exception.filters,exception.detail,exception.action | 검색/원천상세/기존처리버튼 |

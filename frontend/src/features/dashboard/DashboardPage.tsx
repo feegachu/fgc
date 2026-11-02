@@ -1,4 +1,5 @@
 import { typeBadgeTone } from '../exception/rules'
+import { openSettlementGuide } from '../assistant/settlement/entry'
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
 import { Link, useOutletContext } from 'react-router'
@@ -184,6 +185,14 @@ function DashboardContent({ month }: { month: string }) {
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>
+        <button
+          type="button"
+          className="button button-secondary"
+          data-guide-target="dashboard.guide"
+          onClick={openSettlementGuide}
+        >
+          전체 업무 가이드
+        </button>
       </header>
       {error ? (
         <div role="alert" className="empty-state">

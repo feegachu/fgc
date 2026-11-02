@@ -1,3 +1,4 @@
+import { SettlementGuide } from '../../features/assistant/settlement/SettlementGuide'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
@@ -111,6 +112,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
         </main>
+        <SettlementGuide user={user} month={month} />
         {!location.pathname.startsWith('/agent-home') && (
           <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
         )}

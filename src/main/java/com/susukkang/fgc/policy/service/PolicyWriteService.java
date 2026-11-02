@@ -100,7 +100,8 @@ public class PolicyWriteService {
                 throw invalid("policyCode", "정책 코드는 최초 생성 이후 변경할 수 없습니다.");
             }
             if (!writeRepository.verifyChildOwnership(id, draft)) {
-                throw invalid(FIELD_COMMISSION_RULES, "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
+                throw invalid(draft.clawbackRules().isEmpty() ? FIELD_COMMISSION_RULES : "clawbackRules",
+                        "자식 규칙은 이 정책에 속한 ID만 수정할 수 있습니다.");
             }
             if (writeRepository.hasUnsupportedChildren(id)) {
                 throw invalid(FIELD_POLICY_TYPE, "전용 편집 계약이 없는 기존 규칙을 덮어쓸 수 없습니다.");
@@ -470,7 +471,8 @@ public class PolicyWriteService {
 
     private static boolean hasChildIds(PolicyDraft draft) {
         return draft.commissionRules().stream().anyMatch(rule -> rule.commissionRuleId() != null)
-                || draft.feeRegimeRules().stream().anyMatch(rule -> rule.feeRegimeRulesetId() != null);
+                || draft.feeRegimeRules().stream().anyMatch(rule -> rule.feeRegimeRulesetId() != null)
+                || draft.clawbackRules().stream().anyMatch(rule -> rule.clawbackRuleId() != null);
     }
 
     private <T> void validate(T request) {
