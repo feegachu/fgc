@@ -830,13 +830,13 @@
   table-layout: fixed;
 }
 
-/* 다른 목록과 같은 밀도로 배치하고 긴 보험료 머리글은 두 줄로 표시한다. */
+/* 다른 목록과 같은 밀도로 배치하고 보험료 머리글은 한 줄로 표시한다. */
 .contract-col-number { width: 10rem; }
 .contract-col-insurer { width: 6.5rem; }
 .contract-col-product { width: 10.5rem; }
 .contract-col-date { width: 5.75rem; }
 /* 근거 팝오버 트리거(1.25rem)까지 들어가는 폭 — th 는 overflow:hidden 이라 모자라면 잘린다. */
-.contract-col-premium { width: 8.5rem; }
+.contract-col-premium { width: 12.5rem; }
 .contract-col-agent { width: 7rem; }
 .contract-col-status { width: 5.25rem; }
 .contract-col-cap { width: 7rem; }
@@ -853,9 +853,8 @@
 }
 
 .contract-premium-heading {
-  max-width: 4rem;
   line-height: 1rem;
-  white-space: normal;
+  white-space: nowrap;
   word-break: keep-all;
 }
 

@@ -2,20 +2,20 @@ import { useState } from 'react'
 import type { ArbitrageRow } from './api'
 import { ArbitrageAmount } from './badges'
 
-const STORAGE_KEY = 'fgc:arbitrage:amount-view'
+const STORAGE_KEY = 'fgc:arbitrage:amount-view:v2'
 const views = [
+  { key: 'list', label: '목록형' },
   { key: 'compare', label: '비교형' },
   { key: 'cards', label: '카드형' },
-  { key: 'list', label: '목록형' },
 ] as const
-type View = typeof views[number]['key']
+type View = (typeof views)[number]['key']
 
 function initialView(): View {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    return views.find((view) => view.key === saved)?.key ?? 'compare'
+    return views.find((view) => view.key === saved)?.key ?? 'list'
   } catch {
-    return 'compare'
+    return 'list'
   }
 }
 
@@ -26,7 +26,7 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
     { key: 'refund', label: '가산 해약환급금', value: row.includedSurrenderValueAmount },
     { key: 'premium', label: '누적 납입보험료', value: row.cumulativePaidPremium },
   ]
-  const values = metrics.flatMap(({ value }) => typeof value === 'number' && Number.isFinite(value) ? [value] : [])
+  const values = metrics.flatMap(({ value }) => (typeof value === 'number' && Number.isFinite(value) ? [value] : []))
   const min = Math.min(0, ...values)
   const max = Math.max(0, ...values)
   const range = max - min || 1
@@ -69,66 +69,86 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
           ))}
         </div>
       </header>
-      {view === 'list' ? (
-        <dl className="arb-amount-list">
-          {metrics.map((metric) => (
-            <div key={metric.key}>
-              <dt>{metric.label}</dt>
-              <dd><ArbitrageAmount value={metric.value} /></dd>
+      <div key={view} className="arb-amount-content">
+        {view === 'list' ? (
+          <dl className="arb-amount-list">
+            {metrics.map((metric) => (
+              <div key={metric.key}>
+                <dt>{metric.label}</dt>
+                <dd>
+                  <ArbitrageAmount value={metric.value} />
+                </dd>
+              </div>
+            ))}
+            <div className="arb-amount-list-excess">
+              <dt>지급분 기준 초과액</dt>
+              <dd>
+                <ArbitrageAmount value={row.netDifferenceAmount} excess />
+              </dd>
             </div>
-          ))}
-          <div className="arb-amount-list-excess">
-            <dt>지급분 기준 초과액</dt>
-            <dd><ArbitrageAmount value={row.netDifferenceAmount} excess /></dd>
+          </dl>
+        ) : (
+          <>
+            {view === 'compare' && (
+              <div className="arb-amount-bars">
+                {metrics.map((metric) => {
+                  const amount = typeof metric.value === 'number' && Number.isFinite(metric.value) ? metric.value : null
+                  return (
+                    <div key={metric.key}>
+                      <dl className="arb-amount-bar-heading">
+                        <dt>{metric.label}</dt>
+                        <dd>
+                          <ArbitrageAmount value={metric.value} />
+                        </dd>
+                      </dl>
+                      <div className={`arb-amount-track is-${metric.key}`} aria-hidden="true">
+                        {amount !== null && (
+                          <span
+                            className={`arb-amount-fill${amount < 0 ? ' is-negative' : ''}`}
+                            style={{
+                              left: `${((Math.min(0, amount) - min) / range) * 100}%`,
+                              width: `${(Math.abs(amount) / range) * 100}%`,
+                            }}
+                          />
+                        )}
+                        {min < 0 && <span className="arb-amount-zero" style={{ left: `${zero}%` }} />}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div className="arb-amount-excess">
+              <span>지급분 기준 초과액</span>
+              <strong className="tabular-nums">
+                <ArbitrageAmount value={row.netDifferenceAmount} excess />
+              </strong>
+            </div>
+            {view === 'cards' && (
+              <dl className="arb-amount-cards">
+                {metrics.map((metric) => (
+                  <div key={metric.key}>
+                    <dt>{metric.label}</dt>
+                    <dd>
+                      <ArbitrageAmount value={metric.value} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </>
+        )}
+        <dl className="arb-amount-reference">
+          <div>
+            <dt>
+              <span className="arb-amount-reference-label">참고</span>전체 지급예정액
+            </dt>
+            <dd>
+              <ArbitrageAmount value={row.plannedCommissionAmount} />
+            </dd>
           </div>
         </dl>
-      ) : (
-        <>
-          <div className="arb-amount-excess">
-            <span>지급분 기준 초과액</span>
-            <strong className="tabular-nums"><ArbitrageAmount value={row.netDifferenceAmount} excess /></strong>
-          </div>
-          {view === 'cards' ? (
-            <dl className="arb-amount-cards">
-              {metrics.map((metric) => (
-                <div key={metric.key}>
-                  <dt>{metric.label}</dt>
-                  <dd><ArbitrageAmount value={metric.value} /></dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <div className="arb-amount-bars">
-              {metrics.map((metric) => {
-                const amount = typeof metric.value === 'number' && Number.isFinite(metric.value) ? metric.value : null
-                return (
-                  <div key={metric.key}>
-                    <dl className="arb-amount-bar-heading">
-                      <dt>{metric.label}</dt>
-                      <dd><ArbitrageAmount value={metric.value} /></dd>
-                    </dl>
-                    <div className={`arb-amount-track is-${metric.key}`} aria-hidden="true">
-                      {amount !== null && (
-                        <span
-                          className={`arb-amount-fill${amount < 0 ? ' is-negative' : ''}`}
-                          style={{ left: `${((Math.min(0, amount) - min) / range) * 100}%`, width: `${(Math.abs(amount) / range) * 100}%` }}
-                        />
-                      )}
-                      {min < 0 && <span className="arb-amount-zero" style={{ left: `${zero}%` }} />}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </>
-      )}
-      <dl className="arb-amount-reference">
-        <div>
-          <dt><span className="arb-amount-reference-label">참고</span>전체 지급예정액</dt>
-          <dd><ArbitrageAmount value={row.plannedCommissionAmount} /></dd>
-        </div>
-      </dl>
+      </div>
     </section>
   )
 }

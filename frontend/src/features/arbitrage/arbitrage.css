@@ -236,6 +236,7 @@
   color: var(--color-text-tertiary);
   background: transparent;
   cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
 }
 
 .arb-amount-view-button svg {
@@ -264,6 +265,15 @@
   outline-offset: 1px;
 }
 
+.arb-amount-content {
+  animation: arb-amount-enter 180ms ease-out;
+}
+
+@keyframes arb-amount-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .arb-amount-excess {
   display: flex;
   align-items: baseline;
@@ -283,6 +293,11 @@
   font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.arb-amount-summary.is-compare .arb-amount-excess {
+  margin-top: var(--space-4);
+  margin-bottom: 0;
 }
 
 .arb-amount-bars,
@@ -322,6 +337,13 @@
   height: 100%;
   border-radius: inherit;
   background: var(--color-action-primary);
+  transform-origin: left center;
+  animation: arb-amount-fill 320ms ease-out;
+}
+
+@keyframes arb-amount-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .arb-amount-track.is-refund .arb-amount-fill {
@@ -334,6 +356,7 @@
 
 .arb-amount-track .arb-amount-fill.is-negative {
   background: var(--color-status-error-solid);
+  transform-origin: right center;
 }
 
 .arb-amount-zero {
@@ -535,7 +558,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #arb-recheck-button.is-loading .arb-recheck-icon {
+  #arb-recheck-button.is-loading .arb-recheck-icon,
+  .arb-amount-content,
+  .arb-amount-fill {
     animation: none;
+  }
+
+  .arb-amount-view-button {
+    transition: none;
   }
 }

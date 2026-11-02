@@ -12,7 +12,7 @@ public enum OrganizationType {
 
     public String label() {
         return switch (this) {
-            case GA -> "GA 본체";
+            case GA -> "GA";
             case HQ -> "본사";
             case DIVISION -> "본부";
             case BRANCH -> "지사";

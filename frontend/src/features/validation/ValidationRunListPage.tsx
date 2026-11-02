@@ -250,7 +250,7 @@ function CreateSection() {
           ① 새 실행 만들기
         </h2>
       </header>
-      <form className="vrun-create-form" onSubmit={submit}>
+      <form className="vrun-create-form search-conditions" onSubmit={submit}>
         <div className="vrun-create-month">
           <Field label="검증월" required>
             <input type="month" value={month} onChange={(event) => setPicked(event.target.value)} />

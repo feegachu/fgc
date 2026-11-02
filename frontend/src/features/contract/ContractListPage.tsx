@@ -104,7 +104,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
       </EvidenceLink>
     ),
     sortable: true,
-    width: '8.5rem',
+    width: '12.5rem',
     align: 'number',
     render: (row) => <Amount value={row.monthlyEquivalentFirstPremium} />,
   },
