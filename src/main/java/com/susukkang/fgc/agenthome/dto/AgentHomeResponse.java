@@ -1,5 +1,7 @@
 package com.susukkang.fgc.agenthome.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -24,38 +26,49 @@ public record AgentHomeResponse(
     public static final String AVAILABLE = "AVAILABLE";
     public static final String PARTIAL = "PARTIAL";
 
+    @Schema(name = "AgentHomeRange")
     public record Range(LocalDate from, LocalDate to) {
     }
 
+    @Schema(name = "AgentHomeFilters")
     public record Filters(String insurerType, Long insurerId) {
     }
 
+    @Schema(name = "AgentHomeBasis")
     public record Basis(LocalDate asOf, Range range, List<String> warnings) {
     }
 
     /** 금액이 없으면 null 이다. 0 으로 대체하지 않는다. */
+    @Schema(name = "AgentHomeAmountBucket")
     public record Bucket(BigDecimal amount, long count) {
     }
 
+    @Schema(name = "AgentHomeCommission")
     public record MyCommission(String month, Bucket expected, Bucket held, Bucket clawback, String dataStatus) {
     }
 
+    @Schema(name = "AgentHomeCodeCount")
     public record CodeCount(String code, String label, long count) {
     }
 
+    @Schema(name = "AgentHomeInsurerCount")
     public record InsurerCount(Long insurerId, String name, long contractCount) {
     }
 
+    @Schema(name = "AgentHomeMonthlyCount")
     public record MonthlyCount(String month, long newContractCount, BigDecimal monthlyEquivalentFirstPremiumSum) {
     }
 
+    @Schema(name = "AgentHomePortfolio")
     public record Portfolio(long contractCount, List<InsurerCount> insurers, List<MonthlyCount> monthly,
                             List<CodeCount> categories, List<CodeCount> statuses) {
     }
 
+    @Schema(name = "AgentHomeLastCheck")
     public record LastCheck(String result, OffsetDateTime checkedAt, LocalDate nextCheckDate) {
     }
 
+    @Schema(name = "AgentHomePriorityContract")
     public record PriorityContract(Long contractId, String contractNo, String insurerName, String productName,
                                    String currentStatus, List<String> reasonCodes, LocalDate nextCheckDate,
                                    OffsetDateTime lastEventEffectiveAt, Long elapsedDays, String contextVersion,
