@@ -38,7 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 유무에 따라 갈림)까지는 이 테스트의 관심사가 아니다 — 그건 ChangedContractItem* 단위테스트가
  * 이미 다루고 있다.
  */
-@SpringBootTest
+// 지우지 못하는 실행이 공유 DB에 남으면 같은 월·회차를 고정으로 쓰는 다른 테스트가 깨진다(#764) — DB를 분리한다.
+@SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_daily_changed_contract_job?currentSchema=fgc")
 @SpringBatchTest
 class DailyChangedContractJobIntegrationTest {
 
@@ -99,7 +100,7 @@ class DailyChangedContractJobIntegrationTest {
     // 고정 월을 계속 재사용하면 다음 실행이 uq_validation_run(validation_month, run_no)에 걸리고
     // (해당 실행뿐 아니라 같은 월·회차를 쓰는 다른 통합테스트와도 충돌할 수 있다 — CI에서
     // ValidationRunDetailMapperIntegrationTest와 실제로 충돌 재현됨) 무작위 월을 쓰면 이 문제를
-    // 피한다.
+    // 피한다. 다만 공유 DB에서는 이 무작위 월이 다른 테스트의 고정 월과 겹쳤다(#764) — 그래서 DB도 분리한다.
     private JobParameters jobParameters(String requestId) {
         int year = 2040 + ThreadLocalRandom.current().nextInt(60);
         int month = 1 + ThreadLocalRandom.current().nextInt(12);
