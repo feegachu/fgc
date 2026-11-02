@@ -178,7 +178,7 @@ class GlobalExceptionHandlerTest {
                 FgcErrorCode.POL_004, "sourceRefs", Map.of("reason", "승인된 근거를 등록하세요."), "private-detail"));
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         assertThat(response.getBody().error().field()).isEqualTo("sourceRefs");
-        assertThat(response.getBody().error().message()).isEqualTo("제출 불가 — 승인된 근거를 등록하세요.");
+        assertThat(response.getBody().error().message()).isEqualTo("제출할 수 없습니다. 승인된 근거를 등록하세요.");
         assertThat(response.getBody().error().detail()).isNull();
     }
 

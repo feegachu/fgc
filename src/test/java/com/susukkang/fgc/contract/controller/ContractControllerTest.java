@@ -293,7 +293,7 @@ class ContractControllerTest {
                         .with(csrf()).contentType(APPLICATION_JSON).content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().is(httpStatus))
                 .andExpect(jsonPath("$.error.code").value(code))
-                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.startsWith("저장 불가 — ")));
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.startsWith("저장할 수 없습니다. ")));
     }
 
     @Test
