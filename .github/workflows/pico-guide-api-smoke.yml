@@ -51,7 +51,8 @@ jobs:
               raise SystemExit('No API result was produced; check build status without dumping environment.')
           raw = json.loads(source.read_text())
           keys = ('endpoint', 'checksPassed', 'source', 'decision', 'evidenceCount', 'fallbackReason',
-                  'model', 'status', 'errorCode', 'inputTokens', 'outputTokens', 'latencyMs', 'providerCalls', 'followupPassed')
+                  'model', 'status', 'errorCode', 'inputTokens', 'outputTokens', 'latencyMs', 'providerCalls', 'followupPassed',
+                  'evidenceWorkflows', 'followupEvidenceWorkflows')
           safe = {key: raw.get(key) for key in keys}
           destination = Path('build/pico-guide-api-smoke/published-metrics.json')
           destination.write_text(json.dumps(safe, indent=2) + '\n')

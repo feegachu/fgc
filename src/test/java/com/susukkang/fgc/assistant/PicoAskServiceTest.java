@@ -81,6 +81,19 @@ class PicoAskServiceTest {
                 .thenReturn(answer("근거를 확인하세요.","ledger.review:ledger.review.step.3"));
         assertThat(service.ask(request("역분개 방법")).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
     }
+    @Test void selectionKnowsEachGuideScreenSoCurrentScreenFollowupsStayOnThatScreen() throws Exception {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("수령 설계사 칸에서 고르세요.","payment.draft:overview"));
+        assertThat(service.ask(request("그 화면에서 수령인은 어디에서 선택해?")).source()).isEqualTo(Source.AI);
+        var prompts = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),any());
+        var selection = prompts.getAllValues().getFirst();
+        assertThat(selection.instructions()).contains("screens에 screenId가 있는 안내");
+        var screens = new java.util.HashMap<String, String>();
+        new ObjectMapper().readTree(selection.data()).path("availableGuides")
+                .forEach(guide -> screens.put(guide.path("workflowId").asText(), guide.path("screens").toString()));
+        assertThat(screens.get("payment.draft")).contains("TRAN-W02");
+        assertThat(screens.get("contract.register")).contains("CONT-W03").doesNotContain("TRAN-W02");
+    }
     @Test void validationFinalizationUsesItsOwnRoleInsteadOfPaymentProcessingPermission() {
         var guide = catalog.definitions().stream().filter(item -> item.workflowId().equals("validation.detail")).findFirst().orElseThrow();
         assertThat(catalog.chunks(guide,"확정",List.of("GA_ADMIN"))).extracting(PicoGuideCatalog.Chunk::stepId)

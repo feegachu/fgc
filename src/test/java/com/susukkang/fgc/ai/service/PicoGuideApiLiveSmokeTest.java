@@ -88,6 +88,7 @@ class PicoGuideApiLiveSmokeTest {
             safe.put("decision", reply.path("decision").asText());
             safe.put("evidenceCount", reply.path("evidenceRefs").size());
             safe.put("fallbackReason", reply.path("fallbackReason").isNull() ? null : reply.path("fallbackReason").asText());
+            safe.put("evidenceWorkflows", reply.path("evidenceRefs").findValuesAsText("workflowId"));
             assertThat(reply.path("source").asText()).isEqualTo("AI");
             assertThat(reply.path("decision").asText()).isEqualTo("ANSWER_ONLY");
             assertThat(reply.path("contextRevision").asText()).isEqualTo("synthetic-r1");
@@ -106,6 +107,7 @@ class PicoGuideApiLiveSmokeTest {
                     .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(new PicoAskRequest(
                             "그 화면에서 수령인은 어디에서 선택해?", "TRAN-W02", List.of(), "synthetic-r2", "1.0", history))))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
+            safe.put("followupEvidenceWorkflows", followup.path("evidenceRefs").findValuesAsText("workflowId"));
             assertThat(followup.path("source").asText()).isEqualTo("AI");
             assertThat(followup.path("decision").asText()).isEqualTo("ANSWER_ONLY");
             assertThat(followup.path("message").asText()).containsAnyOf("수령", "설계사", "수취");
