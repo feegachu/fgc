@@ -8,7 +8,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
-/** IF-API-84: 실제 원천·귀속·운영 스케줄·후속 처리 이력을 제공한다. D-02 경과월은 추정하지 않는다. */
+/** IF-API-84: 실제 원천·귀속·운영 스케줄·후속 처리 이력과 최신 계산판. 경과월은 D-02(제48조의3) 기준이다. */
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record ClawbackCandidateDetailResponse(
         ClawbackCandidateResponse candidate, List<SourceReference> sourceRefs,
@@ -43,7 +43,7 @@ public record ClawbackCandidateDetailResponse(
                                    @Schema(nullable = true) Long validationRunId, OffsetDateTime processedAt,
                                    @Schema(nullable = true) String failureReason) { }
 
-    /** #669의 계산판 응답 계약. #668은 계산판을 생성하지 않으며 latestCalculation은 null이다. */
+    /** IF-API-85 계산판. 판마다 snapshot으로 보존하며 basis에 원천 버전·경과월·반올림·제외 항목을 남긴다. */
     public record Calculation(Long clawbackCaseId, Long candidateId, Integer calculationVersion,
                               String sourceVersion, Long policyVersionId, OffsetDateTime calculatedAt,
                               Long calculatedBy, BigDecimal amount, List<CalculationLine> lines, Map<String, Object> basis) { }

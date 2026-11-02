@@ -87,6 +87,10 @@ public class ContractStatusEvent {
     @Column(name = "registered_by")
     private Long registeredBy;
 
+    // 수기 상태 사건의 자유 사유. source_ref(원천 참조)와 섞지 않는다.
+    @Column(name = "reason_text", length = 2000)
+    private String reasonText;
+
     // DB 기본값으로 생성
     @Column(
             name = "created_at",
@@ -111,7 +115,8 @@ public class ContractStatusEvent {
             String sourceVersion,
             DataOrigin dataOrigin,
             String sourceRef,
-            Long registeredBy
+            Long registeredBy,
+            String reasonText
     ) {
         this.contractId = contractId;
         this.eventSeq = eventSeq;
@@ -126,5 +131,6 @@ public class ContractStatusEvent {
         this.dataOrigin = dataOrigin;
         this.sourceRef = sourceRef;
         this.registeredBy = registeredBy;
+        this.reasonText = reasonText;
     }
 }

@@ -33,12 +33,14 @@
 }
 
 .app-sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
   z-index: var(--z-sidebar);
   display: flex;
-  width: 100%;
+  width: var(--layout-sidebar-current-width);
   height: 100dvh;
+  transition: width var(--transition-standard);
   flex-direction: column;
   grid-column: 1;
   grid-row: 1 / -1;
