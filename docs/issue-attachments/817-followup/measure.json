@@ -1,0 +1,104 @@
+{
+  "390": {
+    "C_chosen": {
+      "floatingOutsideShell": [
+        "skip-link"
+      ],
+      "overlapArea": 0,
+      "aiButton": {
+        "x": 183,
+        "y": 257,
+        "w": 96,
+        "h": 36
+      },
+      "aiButtonInsideProfile": true,
+      "pageScrollWidth": 390,
+      "viewportWidth": 390,
+      "kpiValueLines": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "B_mockupLauncher": {
+      "scrollPositions": 8,
+      "positionsWithOverlap": 8,
+      "maxOverlapArea": 8520,
+      "positionsWithCoveredText": 8,
+      "coveredTextExamples": [
+        "12개월",
+        "전체",
+        "손해",
+        "합계",
+        "6",
+        "건",
+        "최근 12개월"
+      ]
+    }
+  },
+  "1440": {
+    "C_chosen": {
+      "floatingOutsideShell": [
+        "skip-link"
+      ],
+      "overlapArea": 0,
+      "aiButton": {
+        "x": 363,
+        "y": 257,
+        "w": 96,
+        "h": 36
+      },
+      "aiButtonInsideProfile": true,
+      "pageScrollWidth": 1440,
+      "viewportWidth": 1440,
+      "kpiValueLines": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "B_mockupLauncher": {
+      "scrollPositions": 2,
+      "positionsWithOverlap": 2,
+      "maxOverlapArea": 12144,
+      "positionsWithCoveredText": 2,
+      "coveredTextExamples": [
+        "0.0",
+        "%",
+        "50.0"
+      ]
+    }
+  },
+  "1920": {
+    "C_chosen": {
+      "floatingOutsideShell": [
+        "skip-link"
+      ],
+      "overlapArea": 0,
+      "aiButton": {
+        "x": 395,
+        "y": 257,
+        "w": 96,
+        "h": 36
+      },
+      "aiButtonInsideProfile": true,
+      "pageScrollWidth": 1920,
+      "viewportWidth": 1920,
+      "kpiValueLines": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "B_mockupLauncher": {
+      "scrollPositions": 1,
+      "positionsWithOverlap": 0,
+      "maxOverlapArea": 0,
+      "positionsWithCoveredText": 0,
+      "coveredTextExamples": []
+    }
+  }
+}
