@@ -153,6 +153,19 @@ export function AssistantDemoMount({
     return null
   return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} roleCode={user.roleCode} screenId={screenId} screenContext={screenContext} />
 }
+/**
+ * CMN-C04: the screen/target/month the question carries (화면정의서 v3.0 :3267, #622).
+ * Only the open panel subscribes to the month, so a month change never re-renders the closed assistant.
+ */
+function PicoContextLine({ screenId, paymentId }: { screenId: string; paymentId: string | null }) {
+  const month = useWorkspaceStore((state) => state.month)
+  const title = screens.find((screen) => screen.id === screenId)?.title ?? '공통 화면'
+  return (
+    <p className="pico-context">
+      현재 화면 {title} · 대상 {paymentId ? `지급 #${paymentId}` : '선택 없음'} · 기준월 {month ?? '선택 없음'}
+    </p>
+  )
+}
 function AssistantWithGuide({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
   useEffect(() => () => useGuideRuntime.getState().reset(), [])
   return (
@@ -177,10 +190,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   const [calculationEpoch, setCalculationEpoch] = useState(0)
   const runtimeSession = useGuideRuntime((state) => state.session)
   const observed = useGuideRuntime((state) => state.observation)
-  const month = useWorkspaceStore((state) => state.month)
-  // CMN-C04: show the same screen/target/month context the question carries (화면정의서 v3.0 :3267, #622).
-  const contextScreen = observed ? 'TRAN-W02' : currentScreen
-  const contextTitle = screens.find((screen) => screen.id === contextScreen)?.title ?? '공통 화면'
   const workflowActive = useWorkflowGuide((state) => state.active)
   const paymentActive = useWorkflowGuide((state) => state.paymentActive)
   const settlementActive = useWorkflowGuide((state) => state.settlementActive)
@@ -764,9 +773,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                 승인된 가이드로 답변을 준비하고 있어요.
               </p>
             )}
-            <p className="pico-context">
-              현재 화면 {contextTitle} · 대상 {observed?.paymentId ? `지급 #${observed.paymentId}` : '선택 없음'} · 기준월 {month ?? '선택 없음'}
-            </p>
+            <PicoContextLine screenId={observed ? 'TRAN-W02' : currentScreen} paymentId={observed?.paymentId ?? null} />
             <form onSubmit={send} className="pico-composer">
               <textarea
                 ref={textarea}
