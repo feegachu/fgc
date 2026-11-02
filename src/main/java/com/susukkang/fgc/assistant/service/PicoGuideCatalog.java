@@ -13,9 +13,10 @@ public class PicoGuideCatalog {
     @JsonIgnoreProperties(ignoreUnknown=true)
     public record Definition(String workflowId,String guideVersion,String title,String description,String capability,List<String> keywords,List<Step> steps,boolean enabled,List<String> roles) {}
     @JsonIgnoreProperties(ignoreUnknown=true)
-    public record Step(String stepId,String screenId,String targetId,String title,String instruction,String completionRuleId,List<Next> next) {}
+    public record Step(String stepId,String screenId,String targetId,String title,String instruction,String completionRuleId,List<Next> next,List<String> roles) {}
     public record Next(String conditionId,String stepId) {}
     public record Chunk(String chunkId,String workflowId,String stepId,String title,String content) {}
+    private static final Set<String> ROLES = Set.of("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE", "AGENT");
     private final List<Definition> definitions;
     private final Set<String> screenIds;
     private final Set<String> paymentWorkflowIds;
@@ -40,7 +41,7 @@ public class PicoGuideCatalog {
                 loaded.addAll(mapper.readValue(stream,new TypeReference<List<Definition>>(){}));
             }
         }
-        definitions = List.copyOf(loaded);
+        definitions = loaded.stream().filter(Definition::enabled).toList();
         try(var stream=new ClassPathResource("ai/pico/payment-guides.v1.json").getInputStream()) {
             List<Definition> payments = mapper.readValue(stream,new TypeReference<>(){});
             paymentWorkflowIds = payments.stream().map(Definition::workflowId).collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -49,20 +50,21 @@ public class PicoGuideCatalog {
             List<HelpDefinition> locations = mapper.readValue(stream,new TypeReference<>(){});
             var map = new LinkedHashMap<String, List<Step>>();
             for (var location : locations) {
-                if (definitions.stream().noneMatch(guide -> guide.workflowId().equals(location.workflowId())) || map.containsKey(location.workflowId()) || location.steps() == null) throw new IllegalStateException("Unknown help workflow");
+                if (loaded.stream().noneMatch(guide -> guide.workflowId().equals(location.workflowId())) || map.containsKey(location.workflowId()) || location.steps() == null) throw new IllegalStateException("Unknown help workflow");
+                if (definitions.stream().noneMatch(guide -> guide.workflowId().equals(location.workflowId()))) continue;
                 var ids = new HashSet<String>();
-                for (var step : location.steps()) if (step.stepId() == null || !step.stepId().matches("help\\.[a-f0-9]{32}") || !ids.add(step.stepId()) || !featureIds.contains(step.targetId()) || !screenIds.contains(step.screenId()) || !"USER_REVIEWED".equals(step.completionRuleId()) || step.next() == null || !step.next().isEmpty()) throw new IllegalStateException("Invalid UI help");
+                for (var step : location.steps()) if (step.stepId() == null || !step.stepId().matches("help\\.[a-f0-9]{32}") || !ids.add(step.stepId()) || !featureIds.contains(step.targetId()) || !screenIds.contains(step.screenId()) || !"USER_REVIEWED".equals(step.completionRuleId()) || step.next() == null || !step.next().isEmpty() || !validRoles(step.roles())) throw new IllegalStateException("Invalid UI help");
                 map.put(location.workflowId(), List.copyOf(location.steps()));
             }
             help = Map.copyOf(map);
         }
-        if (definitions.isEmpty() || definitions.stream().map(Definition::workflowId).distinct().count()!=definitions.size()) throw new IllegalStateException("Invalid guide registry");
+        if (loaded.isEmpty() || loaded.stream().map(Definition::workflowId).distinct().count()!=loaded.size()) throw new IllegalStateException("Invalid guide registry");
         for (var guide:definitions) {
-            if (!guide.workflowId().matches("[a-z][a-z0-9.]+") || !"1.0".equals(guide.guideVersion()) || !guide.enabled() || !Set.of("READ","PROCESS").contains(guide.capability()) || guide.steps()==null || guide.steps().isEmpty()) throw new IllegalStateException("Invalid guide definition");
+            if (!guide.workflowId().matches("[a-z][a-z0-9.]+") || !"1.0".equals(guide.guideVersion()) || !Set.of("READ","PROCESS").contains(guide.capability()) || guide.steps()==null || guide.steps().isEmpty()) throw new IllegalStateException("Invalid guide definition");
             var expectedRoles = "READ".equals(guide.capability()) ? Set.of("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE") : Set.of("SYSTEM_ADMIN", "SETTLEMENT");
             if (guide.roles() == null || guide.roles().isEmpty() || !Set.of("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE", "AGENT").containsAll(guide.roles()) || (guide.workflowId().startsWith("payment.") && Set.of("payment.amount.review", "payment.draft", "payment.confirm").contains(guide.workflowId()) && !new HashSet<>(guide.roles()).equals(expectedRoles))) throw new IllegalStateException("Invalid guide roles");
             var ids=new HashSet<String>();
-            for(var step:guide.steps()) if (!ids.add(step.stepId()) || !screenIds.contains(step.screenId()) ||
+            for(var step:guide.steps()) if (!validRoles(step.roles()) || !ids.add(step.stepId()) || !screenIds.contains(step.screenId()) ||
                     !(featureIds.contains(step.targetId()) || (step.stepId().equals(step.targetId()) && "TRAN-W02".equals(step.screenId()) && Set.of("payment.scope","payment.amount","payment.attributions","payment.evidence","payment.save","payment.precheck","payment.precheck.result","payment.confirm").contains(step.targetId())))) throw new IllegalStateException("Invalid guide target");
             for (var step : guide.steps()) {
                 if (step.next() == null) throw new IllegalStateException("Missing guide transitions");
@@ -87,10 +89,15 @@ public class PicoGuideCatalog {
         for (int size = 2; size <= 3; size++) for (int index = 0; index + size <= normalized.length(); index++) result.add(normalized.substring(index,index+size));
         return result;
     }
-    public List<Chunk> chunks(Definition guide, String query) {
-        var chunks = new ArrayList<>(chunks(guide));
+    private static boolean validRoles(List<String> roles) { return roles != null && !roles.isEmpty() && ROLES.containsAll(roles); }
+    public List<Step> allowedSteps(Definition guide, Collection<String> roles) {
+        return guide.steps().stream().filter(step -> step.roles().stream().anyMatch(roles::contains)).toList();
+    }
+    public List<Chunk> chunks(Definition guide, String query, Collection<String> roles) {
+        var chunks = new ArrayList<>(chunks(guide, roles));
         var terms = grams(query);
         var ranked = help.getOrDefault(guide.workflowId(),List.of()).stream()
+            .filter(step -> step.roles().stream().anyMatch(roles::contains))
             .map(step -> Map.entry(step, grams(step.title()).stream().filter(terms::contains).count()))
             .filter(entry -> entry.getValue() > 0)
             .sorted(Comparator.<Map.Entry<Step,Long>>comparingLong(Map.Entry::getValue).reversed().thenComparing(entry -> entry.getKey().stepId()))
@@ -101,10 +108,14 @@ public class PicoGuideCatalog {
         }
         return List.copyOf(chunks);
     }
-    public List<Chunk> chunks(Definition guide) {
+    public List<Chunk> chunks(Definition guide, Collection<String> roles) {
+        var steps = allowedSteps(guide, roles);
+        if (steps.isEmpty()) return List.of();
         var chunks=new ArrayList<Chunk>();
-        chunks.add(new Chunk(guide.workflowId()+":overview",guide.workflowId(),null,guide.title(),guide.description()));
-        for(var step:guide.steps()) chunks.add(new Chunk(guide.workflowId()+":"+step.stepId(),guide.workflowId(),step.stepId(),step.title(),step.instruction()));
+        // A shared overview must not reintroduce instructions removed by the step permission filter.
+        String overview = steps.stream().map(Step::title).collect(java.util.stream.Collectors.joining(" · "));
+        chunks.add(new Chunk(guide.workflowId()+":overview",guide.workflowId(),null,guide.title(),overview));
+        for(var step:steps) chunks.add(new Chunk(guide.workflowId()+":"+step.stepId(),guide.workflowId(),step.stepId(),step.title(),step.instruction()));
         return List.copyOf(chunks);
     }
 }

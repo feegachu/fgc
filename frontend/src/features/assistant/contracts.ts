@@ -68,6 +68,7 @@ export interface LocalGuideStep {
   targetId: TargetId
   title: string
   instruction: string
+  roles: readonly string[]
   entryRuleId: 'CONTEXT_AVAILABLE'
   completionRuleId: CompletionRuleId
   missingTargetBehavior: 'PAUSE'

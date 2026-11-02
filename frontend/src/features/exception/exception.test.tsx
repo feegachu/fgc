@@ -1,3 +1,4 @@
+import { workflowHelpSteps } from '../assistant/workflow-catalog'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -564,4 +565,25 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
   await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
   expect(await within(dialog).findByText(/1번 라인은 차변 또는 대변 중 한쪽에만/)).toBeInTheDocument()
   expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
+})
+
+
+it('gives different exception summary types distinct guide targets and preserves unknown types', async () => {
+  searchResponse = () => ({ ...search([baseCase]), summary: [
+    { type: 'CAP_VIOLATION', typeLabel: '1,200% 위반', count: 2 },
+    { type: 'JOURNAL_CORRECTION_REQUIRED', typeLabel: '원장 정정 필요', count: 3 },
+    { type: 'FUTURE_TYPE', typeLabel: '새 예외', count: 1 },
+  ] })
+  renderPage()
+  await table()
+  for (const [type, label] of [['cap_violation', '1,200% 위반'], ['journal_correction_required', '원장 정정 필요']]) {
+    const id = `exception.summary.${type}`
+    const nodes = document.querySelectorAll(`[data-guide-feature="${id}"]`)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]).toHaveTextContent(label)
+    expect(nodes[0]).toHaveAttribute('href', expect.stringContaining(`type=${type.toUpperCase()}`))
+    expect(workflowHelpSteps('exception.resolve', 'COMPLIANCE').some((step) => step.targetId === id)).toBe(true)
+  }
+  expect(screen.getByRole('link', { name: '새 예외 1건' })).not.toHaveAttribute('data-guide-feature')
+  expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
 })

@@ -75,6 +75,21 @@
     "element": "Link"
   },
   {
+    "id": "arbitrage.summary.candidate",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "arbitrage.summary.clear",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "arbitrage.summary.review_required",
+    "file": "features/arbitrage/ArbitragePage.tsx",
+    "element": "button"
+  },
+  {
     "id": "clawback.evidence.effects",
     "file": "features/clawback/ClawbackDetail.tsx",
     "element": "section"
@@ -255,6 +270,71 @@
     "element": "button"
   },
   {
+    "id": "contract.filter.input.contractdatefrom",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "contract.filter.input.contractdateto",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "contract.filter.input.contractno",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "contract.filter.retry.agentid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "contract.filter.retry.insurerid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "contract.filter.retry.orgid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "contract.filter.retry.productofferingid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "contract.filter.select.agentid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "contract.filter.select.capresultstatus",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "contract.filter.select.currentstatus",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "contract.filter.select.insurerid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "contract.filter.select.orgid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "contract.filter.select.productofferingid",
+    "file": "features/contract/ContractListPage.tsx",
+    "element": "select"
+  },
+  {
     "id": "contract.panel.arbitrage",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
@@ -383,6 +463,76 @@
     "id": "dashboard.kpi.recon",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "KpiCard"
+  },
+  {
+    "id": "exception.summary.allocation_evidence_missing",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.arbitrage_candidate",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.cap_review_required",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.cap_violation",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.cap_warning",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.data_quality",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.journal_correction_required",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.journal_imbalance",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.other",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.policy_duplicate",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.policy_missing",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.product_code_mismatch",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.reconciliation_mismatch",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "exception.summary.refund_table_missing",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Link"
   },
   {
     "id": "features.agent-home.agent-home-page.button",
@@ -558,11 +708,6 @@
     "id": "features.arbitrage.arbitrage-detail.section",
     "file": "features/arbitrage/ArbitrageDetail.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.arbitrage.arbitrage-page.button",
-    "file": "features/arbitrage/ArbitragePage.tsx",
-    "element": "button"
   },
   {
     "id": "features.arbitrage.arbitrage-page.button-2",
@@ -1140,11 +1285,6 @@
     "element": "Button"
   },
   {
-    "id": "features.contract.contract-list-page.button-3",
-    "file": "features/contract/ContractListPage.tsx",
-    "element": "Button"
-  },
-  {
     "id": "features.contract.contract-list-page.button-4",
     "file": "features/contract/ContractListPage.tsx",
     "element": "Button"
@@ -1160,11 +1300,6 @@
     "element": "ContextLink"
   },
   {
-    "id": "features.contract.contract-list-page.input",
-    "file": "features/contract/ContractListPage.tsx",
-    "element": "input"
-  },
-  {
     "id": "features.contract.contract-list-page.section",
     "file": "features/contract/ContractListPage.tsx",
     "element": "section"
@@ -1173,11 +1308,6 @@
     "id": "features.contract.contract-list-page.section-2",
     "file": "features/contract/ContractListPage.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.contract.contract-list-page.select",
-    "file": "features/contract/ContractListPage.tsx",
-    "element": "select"
   },
   {
     "id": "features.contract.contract-tabs.button",
@@ -1345,11 +1475,6 @@
     "element": "Link"
   },
   {
-    "id": "features.exception.exception-page.link-3",
-    "file": "features/exception/ExceptionPage.tsx",
-    "element": "Link"
-  },
-  {
     "id": "features.exception.exception-page.section",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "section"
@@ -1510,11 +1635,6 @@
     "element": "Button"
   },
   {
-    "id": "features.ledger.ledger-page.input",
-    "file": "features/ledger/LedgerPage.tsx",
-    "element": "input"
-  },
-  {
     "id": "features.ledger.ledger-page.input-2",
     "file": "features/ledger/LedgerPage.tsx",
     "element": "input"
@@ -1528,11 +1648,6 @@
     "id": "features.ledger.ledger-page.section-2",
     "file": "features/ledger/LedgerPage.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.ledger.ledger-page.select",
-    "file": "features/ledger/LedgerPage.tsx",
-    "element": "select"
   },
   {
     "id": "features.ledger.ledger-page.textarea",
@@ -1740,12 +1855,12 @@
     "element": "a"
   },
   {
-    "id": "features.policies.policy-management.button",
+    "id": "features.policies.policy-management.actions",
     "file": "features/policies/PolicyManagement.tsx",
-    "element": "Button"
+    "element": "div"
   },
   {
-    "id": "features.policies.policy-management.button-2",
+    "id": "features.policies.policy-management.button",
     "file": "features/policies/PolicyManagement.tsx",
     "element": "Button"
   },
@@ -2520,6 +2635,36 @@
     "element": "select"
   },
   {
+    "id": "ledger.filter.input.contractno",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.filter.input.from",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.filter.input.to",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "ledger.filter.select.account",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "ledger.filter.select.status",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "ledger.filter.select.type",
+    "file": "features/ledger/LedgerPage.tsx",
+    "element": "select"
+  },
+  {
     "id": "navigation.group.admin",
     "file": "app/shell/Sidebar.tsx",
     "element": "summary"
@@ -2638,6 +2783,31 @@
     "id": "navigation.menu.vrun-w02",
     "file": "app/shell/Sidebar.tsx",
     "element": "Link"
+  },
+  {
+    "id": "policy.action.activate",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "policy.action.approve",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "policy.action.new_version",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "policy.action.reject",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "policy.action.submit",
+    "file": "features/policies/PolicyManagement.tsx",
+    "element": "Button"
   },
   {
     "id": "policy.draft-input.basicdocumentversion",
@@ -2836,21 +3006,6 @@
   },
   {
     "id": "policy.draft-select.commissionrules.productofferingid",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "select"
-  },
-  {
-    "id": "policy.draft-select.feeregimerules.commissionitemid",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "select"
-  },
-  {
-    "id": "policy.draft-select.feeregimerules.insurerid",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "select"
-  },
-  {
-    "id": "policy.draft-select.feeregimerules.productofferingid",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "select"
   },

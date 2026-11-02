@@ -7,6 +7,8 @@ import { useGuideRuntime } from './guide-runtime'
 import type { ShellUser } from '../../app/shell/Sidebar'
 import { workflowHelpSteps } from './workflow-catalog'
 import { useWorkflowGuide } from './workflow-state'
+import { connectPaymentGuideLaunch } from '../transaction/payment-guide-launch'
+let disconnectPayment = () => {}
 const reply = {
   decision: 'ANSWER_ONLY',
   message: '초안 저장은 지급 확정과 구분됩니다.',
@@ -34,6 +36,8 @@ beforeEach(() => {
   useGuideRuntime.setState({ session: null, observation: null })
 })
 afterEach(() => {
+  disconnectPayment()
+  useWorkflowGuide.setState({ paymentActive: false, settlementActive: false })
   useWorkflowGuide.getState().clear()
   cleanup()
   useGuideRuntime.setState({ session: null, observation: null })
@@ -41,7 +45,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 async function open() {
-  await userEvent.click(screen.getByRole('button', { name: '피코 업무 비서 열기' }))
+  await userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' }))
 }
 async function send() {
   await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '초안 저장하면 지급 끝인가요?')
@@ -246,6 +250,8 @@ it('aborts and discards a state-aware reply when only the payment id changes', a
 
 it('connects the latest answer evidence to an explicitly selected and server-revalidated current guide', async () => {
   observePayment()
+  const launch = vi.fn()
+  disconnectPayment = connectPaymentGuideLaunch(launch)
   const request = vi.spyOn(apiClient, 'request').mockImplementation((async (path, options) => {
     const body = options!.body as Record<string, unknown>
     if (path.endsWith('/ask')) return envelope({ ...reply, contextRevision: body.clientContextRevision })
@@ -266,14 +272,8 @@ it('connects the latest answer evidence to an explicitly selected and server-rev
   const button = await screen.findByRole('button', { name: /이 업무 안내 시작/ })
   expect(request).toHaveBeenCalledTimes(1)
   await userEvent.click(button)
-  await waitFor(() =>
-    expect(useGuideRuntime.getState().session).toMatchObject({
-      workflowId: 'payment.draft',
-      paymentId: '77',
-      index: 0,
-      status: 'PREPARING',
-    }),
-  )
+  await waitFor(() => expect(launch).toHaveBeenCalledWith('payment.draft'))
+  expect(useGuideRuntime.getState().session).toBeNull()
   expect(request.mock.calls.map(([path]) => path)).toEqual([
     '/api/v1/ai/pico/ask',
     '/api/v1/ai/pico/guides/prepare',
@@ -452,4 +452,28 @@ it.each(['general', 'before-draft'] as const)('invalidates %s answer actions on 
   await act(async () => finish(envelope({ ...response, contextRevision: revision })))
   await waitFor(() => expect(screen.getAllByRole('button', { name }).at(-1)).toBeEnabled())
   expect(useWorkflowGuide.getState().request).toBeNull()
+})
+
+it.each(['active', 'paymentActive', 'settlementActive'] as const)('does not queue a launcher click during another guide: %s', async (state) => {
+  render(<PicoAssistant canProcess />)
+  act(() => useWorkflowGuide.setState({ [state]: true }))
+  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
+  act(() => useWorkflowGuide.setState({ [state]: false }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toHaveTextContent('업무 비서 AI')
+})
+it('does not offer payment form tutorials to a read-only role', async () => {
+  render(<PicoAssistant canProcess={false} roleCode="COMPLIANCE" />)
+  await open()
+  await userEvent.click(screen.getByRole('tab', { name: '업무 안내' }))
+  expect(screen.queryByRole('button', { name: /지급 금액 확인/ })).not.toBeInTheDocument()
+})
+
+it('closes the panel when another guide opens without unexpectedly reopening afterward', async () => {
+  render(<PicoAssistant canProcess />)
+  await open()
+  act(() => useWorkflowGuide.setState({ settlementActive: true }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  act(() => useWorkflowGuide.setState({ settlementActive: false }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })

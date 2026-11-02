@@ -11,20 +11,20 @@ const user: ShellUser = {
   canViewAuditLog: false,
 }
 afterEach(() => vi.unstubAllEnvs())
-const open = () => userEvent.click(screen.getByRole('button', { name: '피코 업무 비서 열기' }))
+const open = () => userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' }))
 
 it('requires explicit demo opt-in and hides for AGENT, unknown roles and logout', () => {
   vi.stubEnv('VITE_ASSISTANT_DEMO', '')
   const view = render(<AssistantDemoMount user={user} />)
-  expect(screen.queryByRole('button', { name: '피코 업무 비서 열기' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
   view.rerender(<AssistantDemoMount user={user} enabled />)
-  expect(screen.getByRole('button', { name: '피코 업무 비서 열기' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toBeInTheDocument()
   for (const roleCode of ['AGENT', 'UNKNOWN']) {
     view.rerender(<AssistantDemoMount user={{ ...user, roleCode }} enabled />)
-    expect(screen.queryByRole('button', { name: '피코 업무 비서 열기' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
   }
   view.rerender(<AssistantDemoMount user={user} enabled loggingOut />)
-  expect(screen.queryByRole('button', { name: '피코 업무 비서 열기' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
 })
 it('opens closed-by-default chat, preserves the four removals and restores keyboard focus', async () => {
   render(<PicoAssistant canProcess />)
@@ -36,7 +36,7 @@ it('opens closed-by-default chat, preserves the four removals and restores keybo
   expect(document.querySelector('.launcher-dot,.pico-launcher-dot,.live-dot')).not.toBeInTheDocument()
   await userEvent.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '피코 업무 비서 열기' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toHaveFocus()
 })
 it('renders a selected fixture and read-only plan without a financial request', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No financial calls'))

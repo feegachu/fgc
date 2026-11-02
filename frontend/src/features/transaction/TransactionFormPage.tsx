@@ -386,9 +386,16 @@ function TransactionForm({
     const operation = observer.begin('save')
     try {
       const saved = await saveDraft(paymentId, payload)
-      if (!observer.isCurrent(operation)) return
-      if (!observer.acceptSaved(operation, saved)) throw new Error('저장된 지급 초안을 확인할 수 없습니다.')
-      setGuideSaved(true)
+      if (!observer.isSamePayment(operation)) return
+      if (
+        saved.status !== 'DRAFT' ||
+        !Number.isSafeInteger(saved.commissionTransactionId) ||
+        Number(saved.commissionTransactionId) <= 0 ||
+        (paymentId && saved.commissionTransactionId !== Number(paymentId))
+      )
+        throw new Error('저장된 지급 초안을 확인할 수 없습니다.')
+      // Guide evidence can expire while the server commits the same payment.
+      setGuideSaved(observer.acceptSaved(operation, saved))
       setPaymentId(String(saved.commissionTransactionId))
       setForm(initialForm(month, saved))
       setRows(draftRows(saved))
@@ -400,7 +407,7 @@ function TransactionForm({
       queryClient.setQueryData(draftQuery(String(saved.commissionTransactionId)).queryKey, saved)
       toast('작성중(DRAFT)으로 저장했습니다. 저장만 했을 뿐 검증은 하지 않았습니다.', 'success')
     } catch (error) {
-      if (!observer.isCurrent(operation)) return
+      if (!observer.isSamePayment(operation)) return
       observer.fail(operation)
       const message = showError(error, '수수료 지급 건을 저장하지 못했습니다.')
       setSaveError(message)
@@ -531,7 +538,7 @@ function TransactionForm({
             disabled={fullFlow}
             title={fullFlow ? '전체 업무 가이드가 진행 중입니다.' : undefined}
             aria-expanded={helpOpen}
-            onClick={() => { setInitialWorkflowId(null); setHelpOpen(true) }}
+            onClick={() => { useWorkflowGuide.getState().clear(); setInitialWorkflowId(null); setHelpOpen(true) }}
           >
             도움말
           </button>

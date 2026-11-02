@@ -37,7 +37,7 @@ function walk(dir) {
       if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
         const tag = node.tagName.getText(source)
         const attrs = node.attributes.properties.filter(ts.isJsxAttribute)
-        if (tags.has(tag) || (/^[a-z]/.test(tag) && attrs.some((attr) => ['onClick', 'onChange', 'onSubmit'].includes(attr.name.getText(source))))) {
+        if (tags.has(tag) || attrs.some((attr) => attr.name.getText(source) === 'data-guide-feature') || (/^[a-z]/.test(tag) && attrs.some((attr) => ['onClick', 'onChange', 'onSubmit'].includes(attr.name.getText(source))))) {
           const id = attrs.find((attr) => attr.name.getText(source) === (tag === 'KpiCard' ? 'guideId' : 'data-guide-feature'))?.initializer
           const forwardedKpi = relative === 'components/KpiCard.tsx' && id && ts.isJsxExpression(id) && id.expression && ts.isIdentifier(id.expression) && id.expression.text === 'guideId'
           const ids = targetIds(id)

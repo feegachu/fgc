@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { useUnsavedWork, useUnsavedWorkStore } from '../../../stores/unsavedWork'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +9,11 @@ import * as evidenceApi from './api'
 import type { Evidence } from './state'
 import { SettlementGuide } from './SettlementGuide'
 import { openSettlementGuide, closeSettlementGuide } from './entry'
+function DirtyInput({ label }: { label: string }) {
+  const [value, setValue] = useState('')
+  useUnsavedWork(value !== '')
+  return <input aria-label={label} value={value} onChange={(event) => setValue(event.target.value)} />
+}
 const user = {
   loginId: 'tester',
   userName: '정산 담당',
@@ -58,6 +65,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   closeSettlementGuide()
+  useUnsavedWorkStore.setState({ owners: {} })
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -85,7 +93,7 @@ function mount(role = 'SETTLEMENT') {
           path: '/contracts/new',
           element: (
             <form data-guide-target="contract.form">
-              <input aria-label="계약 입력" />
+              <DirtyInput label="계약 입력" />
             </form>
           ),
         },
@@ -97,7 +105,7 @@ function mount(role = 'SETTLEMENT') {
             <section data-guide-target="schedule.lines">
               실제 스케줄
               <form>
-                <input aria-label="스케줄 메모" />
+                <DirtyInput label="스케줄 메모" />
               </form>
             </section>
           ),
@@ -302,4 +310,23 @@ describe('role handoff in later stages', () => {
       vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET'),
     ).toBe(true)
   })
+})
+
+it('uses shared unsaved state for portal inputs and permits navigation after reverting a form', async () => {
+  const { actor, router } = mount()
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
+  act(() => useUnsavedWorkStore.getState().mark('portal-dialog', true))
+  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('안내 이동은 취소했습니다')
+  expect(router.state.location.pathname).toBe('/schedules/2')
+  act(() => useUnsavedWorkStore.getState().mark('portal-dialog', false))
+  await actor.type(screen.getByLabelText('스케줄 메모'), '수정했다 복원')
+  await actor.clear(screen.getByLabelText('스케줄 메모'))
+  await actor.click(screen.getByRole('button', { name: '펼치기' }))
+  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  await screen.findByText('지급 입력')
+  expect(router.state.location.pathname).toBe('/transactions/new')
 })

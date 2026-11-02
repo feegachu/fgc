@@ -1,3 +1,4 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation } from 'react-router'
@@ -268,7 +269,7 @@ function ContractFilters({
   }
   const input = (key: string, label: string, type = 'text', placeholder?: string) => (
     <Field key={key} label={label} className="filter-field">
-      <input data-guide-feature="features.contract.contract-list-page.input"
+      <input data-guide-feature={guideFeatureId('contract.filter.input', key)}
         type={type}
         placeholder={placeholder}
         value={draft[key]}
@@ -288,7 +289,7 @@ function ContractFilters({
   ) => (
     <div key={key} className="filter-field">
       <Field label={label}>
-        <select data-guide-feature="features.contract.contract-list-page.select"
+        <select data-guide-feature={guideFeatureId('contract.filter.select', key)}
           className="select-control"
           value={draft[key]}
           disabled={disabled || (blockWhileFetching && query?.isFetching) || Boolean(query?.error)}
@@ -310,7 +311,7 @@ function ContractFilters({
       {query?.error && (
         <>
           <QueryState error={query.error} />
-          <Button data-guide-feature="features.contract.contract-list-page.button-3" variant="ghost" onClick={() => query.refetch()} aria-label={`${label} 목록 다시 불러오기`}>
+          <Button data-guide-feature={guideFeatureId('contract.filter.retry', key)} variant="ghost" onClick={() => query.refetch()} aria-label={`${label} 목록 다시 불러오기`}>
             다시 시도
           </Button>
         </>

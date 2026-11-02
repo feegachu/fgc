@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { PicoGuideStartButton } from './PicoGuideStartButton'
 import { useGuideRuntime } from './guide-runtime'
+import { connectPaymentGuideLaunch } from '../transaction/payment-guide-launch'
+import { useWorkflowGuide } from './workflow-state'
 import type { PaymentObservation } from './guide-runtime'
 const observation: PaymentObservation = {
   owner: 'page',
@@ -43,6 +45,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+  useWorkflowGuide.setState({ paymentActive: false, settlementActive: false })
   useGuideRuntime.setState({ session: null, observation: null })
 })
 function mount(canProcess = true, workflowId = 'payment.draft') {
@@ -146,4 +150,26 @@ it('locks duplicate clicks while preparation is pending', () => {
   fireEvent.click(button)
   expect(request).toHaveBeenCalledTimes(1)
   expect(useGuideRuntime.getState().session).toBeNull()
+})
+
+it('uses the real payment help launcher in AI mode and never falls back to the synthetic runtime', async () => {
+  vi.stubEnv('VITE_ASSISTANT_AI', 'true')
+  vi.spyOn(apiClient, 'request').mockImplementation((async (path, options) => response(path.endsWith('prepare') ? 'prepare' : 'start', options!.body as Record<string, unknown>)) as typeof apiClient.request)
+  const launch = vi.fn()
+  const disconnect = connectPaymentGuideLaunch(launch)
+  mount()
+  await userEvent.click(screen.getByRole('button'))
+  await waitFor(() => expect(launch).toHaveBeenCalledWith('payment.draft'))
+  expect(useGuideRuntime.getState().session).toBeNull()
+  disconnect()
+  useWorkflowGuide.setState({ paymentActive: false })
+  await userEvent.click(screen.getByRole('button'))
+  expect(await screen.findByRole('status')).toHaveTextContent('시작 허가를 다시 확인')
+  expect(useGuideRuntime.getState().session).toBeNull()
+})
+it('does not start payment help during the whole settlement guide', () => {
+  useWorkflowGuide.setState({ settlementActive: true })
+  mount()
+  expect(screen.getByRole('button')).toBeDisabled()
+  expect(screen.getByRole('status')).toHaveTextContent('전체 업무 가이드를 닫은 뒤')
 })

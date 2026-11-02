@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class PicoTextSanitizerTest {
     @Test void redactsCompleteEmailAndCanonicallyEquivalentHangulNames() {
-        String input = Normalizer.normalize("고객 김철수 ops+demo@sample.co.kr 123,456.78원", Normalizer.Form.NFD);
+        String input = Normalizer.normalize("고객  :  김철수 ops+demo@sample.co.kr 123,456.78원", Normalizer.Form.NFD);
         assertThat(PicoTextSanitizer.redact(input))
             .contains("고객 [이름 제거]", "[이메일 제거]", "[수치 제거]원")
             .doesNotContain("김철수", "ops+demo", "sample.co.kr", "123", "456");
@@ -17,6 +17,8 @@ class PicoTextSanitizerTest {
     @Test void longRunsAndSeparatedNumbersDoNotBacktrackOrOverflowTheStack() {
         assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
             assertThat(PicoTextSanitizer.redact("a".repeat(50000) + "@example.com")).isEqualTo("[이메일 제거]");
+            String missingName = "고객" + " ".repeat(50000) + "!";
+            assertThat(PicoTextSanitizer.redact(missingName)).isEqualTo(missingName);
             String plain = "a".repeat(50000) + "!";
             assertThat(PicoTextSanitizer.redact(plain)).isEqualTo(plain);
             assertThat(PicoTextSanitizer.redact("7.".repeat(5000) + "7")).isEqualTo("[수치 제거]");

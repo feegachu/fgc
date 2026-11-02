@@ -3,6 +3,7 @@ import { findGuide } from './catalog'
 import { useGuideRuntime } from './guide-runtime'
 import { startPicoGuide } from './pico-guide-api'
 import { isEntityId } from './guards'
+import { useWorkflowGuide } from './workflow-state'
 
 export function PicoGuideStartButton({
   workflowId,
@@ -17,6 +18,7 @@ export function PicoGuideStartButton({
   contextValid?: boolean
   sourceContextAvailable?: boolean
 }) {
+  const settlementActive = useWorkflowGuide((state) => state.settlementActive)
   const observation = useGuideRuntime((state) => state.observation)
   const controller = useRef<AbortController | null>(null)
   const lock = useRef(false)
@@ -35,6 +37,7 @@ export function PicoGuideStartButton({
   const definition = findGuide(workflowId, '1.0')
   if (!definition) return null
   const unavailable =
+    settlementActive ? '전체 업무 가이드를 닫은 뒤 지급 안내를 시작해주세요.' :
     !canProcess && definition.capability === 'PROCESS'
       ? '현재 계정은 조회 안내만 사용할 수 있습니다. 지급 처리 안내는 정산 담당자에게 요청하세요.'
       : !contextValid
@@ -67,7 +70,8 @@ export function PicoGuideStartButton({
         abort.signal,
       )
       if (abort.signal.aborted || useGuideRuntime.getState().observation !== captured) return
-      if (!launchPaymentGuide(definition.workflowId) && !useGuideRuntime.getState().start(definition.workflowId)) throw new Error('GUIDE_NOT_READY')
+      if (useWorkflowGuide.getState().settlementActive) throw new Error('GUIDE_ALREADY_ACTIVE')
+      if (!launchPaymentGuide(definition.workflowId) && (import.meta.env.VITE_ASSISTANT_AI === 'true' || !useGuideRuntime.getState().start(definition.workflowId))) throw new Error('GUIDE_NOT_READY')
     } catch {
       if (!abort.signal.aborted)
         setNotice('지급 상태나 시작 허가를 다시 확인해야 합니다. 현재 화면에서 안내 시작을 다시 선택해주세요.')

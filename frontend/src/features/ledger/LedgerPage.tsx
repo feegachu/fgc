@@ -1,3 +1,4 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
@@ -329,7 +330,7 @@ function LedgerFilters({
   const field = (key: keyof typeof fields, label: string, options?: Record<string, string>, type = 'text') => (
     <Field label={label}>
       {options ? (
-        <select data-guide-feature="features.ledger.ledger-page.select" value={fields[key]} onChange={(e) => setFields({ ...fields, [key]: e.target.value })}>
+        <select data-guide-feature={guideFeatureId('ledger.filter.select', key)} value={fields[key]} onChange={(e) => setFields({ ...fields, [key]: e.target.value })}>
           <option value="">전체</option>
           {Object.entries(options).map(([value, name]) => (
             <option key={value} value={value}>
@@ -338,7 +339,7 @@ function LedgerFilters({
           ))}
         </select>
       ) : (
-        <input data-guide-feature="features.ledger.ledger-page.input"
+        <input data-guide-feature={guideFeatureId('ledger.filter.input', key)}
           type={type}
           maxLength={key === 'contractNo' ? 80 : undefined}
           value={fields[key]}

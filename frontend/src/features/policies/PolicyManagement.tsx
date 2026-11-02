@@ -1,4 +1,5 @@
 import { useContext, useRef, useState } from 'react'
+import { guideFeatureId } from '../assistant/feature-ids'
 import { ApiError } from '../../lib/api/client'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
@@ -169,7 +170,7 @@ export function PolicyManagement({
                 ? '검토 중인 정책은 반려 후 수정할 수 있습니다.'
                 : '승인된 정책은 새 버전으로 변경사항을 작성하세요.'}
         </p>
-        <div className="policy-actions">
+        <div data-guide-feature="features.policies.policy-management.actions" className="policy-actions">
           {allowed.includes('EDIT') && supported && (
             <Button data-guide-feature="features.policies.policy-management.button" variant="secondary" disabled={refreshing || !draft} onClick={() => setEditing(true)}>
               초안 수정
@@ -178,7 +179,7 @@ export function PolicyManagement({
           {allowed
             .filter((a) => a !== 'EDIT' && (a !== 'NEW_VERSION' || supported))
             .map((a) => (
-              <Button data-guide-feature="features.policies.policy-management.button-2"
+              <Button data-guide-feature={guideFeatureId('policy.action', a)}
                 key={a}
                 variant={a === 'REJECT' || a === 'NEW_VERSION' ? 'secondary' : 'primary'}
                 disabled={refreshing || (a === 'APPROVE' && own)}

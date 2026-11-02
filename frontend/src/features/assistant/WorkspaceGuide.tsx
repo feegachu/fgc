@@ -15,6 +15,7 @@ import './payment-guide.css'
 import { findGuide } from './catalog'
 import { launchPaymentGuide } from '../transaction/payment-guide-launch'
 import { toast } from '../../stores/toasts'
+import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 
 const messages: Record<string, string> = {
   SELECT_TARGET: '목록에서 안내받을 대상을 직접 선택한 뒤 현재 대상에서 다시 시작하세요.',
@@ -23,10 +24,19 @@ const messages: Record<string, string> = {
   CONTEXT_CHANGED: '기준월 또는 대상이 바뀌었습니다. 현재 정보를 확인한 뒤 다시 시작하세요.',
   ENTITY_CHANGED_RESTART_REQUIRED: '대상이 바뀌었습니다. 현재 대상에서 다시 시작하세요.',
   TARGET_CHANGED: '화면 구성이 바뀌었습니다. 현재 영역을 확인한 뒤 이어가세요.',
+  PREPARATION_TIMEOUT: '화면 이동을 기다리지 못했습니다. 이동 확인 창을 처리한 뒤 돌아와 이어가세요.',
+  UNSAVED_NAVIGATION_CANCELLED: '저장하지 않은 입력이 있습니다. 입력을 저장하거나 화면에서 직접 이동한 뒤 돌아와 이어가세요.',
   TARGET_TIMEOUT: '안내 영역이 아직 보이지 않습니다. 필요한 탭·상세·확인 창을 직접 연 뒤 이어가세요.',
   USER_PAUSED: '안내를 잠시 멈췄습니다. 다른 화면을 자유롭게 확인할 수 있습니다.',
   PERMISSION_DENIED: '현재 계정으로 열 수 없는 업무입니다.',
+  NO_ALLOWED_ACTION: '현재 선택한 정책과 계정에 실행 가능한 상태 동작이 없습니다. 정책의 상태와 권한을 확인하고 다른 정책을 선택한 뒤 다시 시작하세요.',
   CONDITION_NOT_READY: '현재 항목을 입력하거나 검색 결과의 실제 항목을 선택한 뒤 다음 안내로 진행하세요.',
+}
+
+// SRC-028: an empty/disabled action container is not a usable policy workflow step.
+function requirePolicyAction(target: HTMLElement | null) {
+  if (target?.dataset.guideFeature === 'features.policies.policy-management.actions' && !target.querySelector('button:not(:disabled)'))
+    throw new GuideFailure('NO_ALLOWED_ACTION')
 }
 
 function waitForScreen(id: string, signal: AbortSignal): Promise<void> {
@@ -56,17 +66,21 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
   const location = useLocation()
   const request = useWorkflowGuide((state) => state.request)
   const card = useRef<HTMLElement>(null)
+  const [portalRoot, setPortalRoot] = useState<HTMLElement>(() => document.body)
   const mounted = useRef(false)
   const [runtime] = useState(() => {
     const targets = new GuideTargets()
     const selected = new Map<string, HTMLElement>()
-    const allowed = WORKFLOW_GUIDES.filter((guide) => guide.roles.includes(user.roleCode))
+    const allowed = WORKFLOW_GUIDES.filter((guide) => guide.roles.includes(user.roleCode) && workflowSteps(guide, user.roleCode).length > 0)
     const registered = new Set<string>()
-    for (const guide of allowed) for (const step of workflowSteps(guide)) {
+    for (const guide of allowed) for (const step of workflowSteps(guide, user.roleCode)) {
       const key = `${step.screenId}:${step.targetId}`
       if (registered.has(key)) continue
       registered.add(key)
-      targets.register({ screenId: step.screenId, guideVersion: guide.guideVersion, targetId: step.targetId, attribute: 'data-guide-feature', root: () => {
+      targets.register({ screenId: step.screenId, guideVersion: guide.guideVersion, targetId: step.targetId, attribute: 'data-guide-feature', prepare: async () => {
+        if (step.targetId === 'features.policies.policy-management.actions')
+          requirePolicyAction(document.querySelector<HTMLElement>('[data-guide-feature="features.policies.policy-management.actions"]'))
+      }, root: () => {
         if (document.querySelector<HTMLElement>('[data-guide-page]')?.dataset.guidePage !== step.screenId) return null
         const picked = selected.get(key)
         return picked?.isConnected ? picked : document.body
@@ -75,7 +89,7 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
     const definitions: GuideDefinition[] = allowed.map((guide) => ({
       workflowId: guide.workflowId, guideVersion: guide.guideVersion, title: guide.title, roles: guide.roles,
       keywords: [], exampleQuestions: [], requiredEntities: [],
-      steps: workflowSteps(guide).map((step) => ({ ...step, entryConditionId: 'AVAILABLE', completionConditionId: step.completionRuleId })),
+      steps: workflowSteps(guide, user.roleCode).map((step) => ({ ...step, entryConditionId: 'AVAILABLE', completionConditionId: step.completionRuleId })),
     }))
     const readContext = (): GuideContext => ({
       screenId: document.querySelector<HTMLElement>('[data-guide-page]')?.dataset.guidePage ?? 'CMN-C04',
@@ -95,6 +109,7 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
       readContext, readBusinessState: async (): Promise<{ available: boolean; inputValid: boolean }> => {
         const current = engine.getSnapshot()
         const target = current.step ? targets.find(current.step.screenId, '1.0', current.step.targetId) : null
+        requirePolicyAction(target)
         const control = target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement ? target : null
         return {
           available: target != null && (current.step?.stepId.startsWith('help.') === true || (!(control?.disabled) && !(target instanceof HTMLButtonElement && target.disabled))),
@@ -111,6 +126,7 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
         return guide?.steps[0].screenId === step.screenId && !matchPath({ path: guide.route, end: true }, pathname)
       },
       openScreen: async (id, signal) => {
+        if (Object.keys(useUnsavedWorkStore.getState().owners).length) throw new GuideFailure('UNSAVED_NAVIGATION_CANCELLED')
         const guide = findWorkflowGuide(engine.getSnapshot().workflowId ?? '', '1.0')
         const screen = (guide?.steps[0].screenId === id ? screens.find((screen) => screen.path === guide.route) : null)
           ?? screens.find((screen) => screen.id === id && !screen.path.includes(':')) ?? screens.find((screen) => screen.id === id)
@@ -143,6 +159,7 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
   }, [snapshot.status, snapshot.workflowId, snapshot.step])
   useEffect(() => {
     if (!request) { runtime.engine.stop(); return }
+    if (useWorkflowGuide.getState().settlementActive) { useWorkflowGuide.getState().clear(); return }
     const payment = findGuide(request.id, '1.0')
     if (payment) {
       const controller = new AbortController()
@@ -150,6 +167,7 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
         try {
           const screen = screens.find((screen) => screen.id === 'TRAN-W02')!
           if (!payment.roles.includes(user.roleCode as typeof payment.roles[number]) || !canOpen(screen, user)) throw new GuideFailure('PERMISSION_DENIED')
+          if (runtime.readContext().screenId !== screen.id && Object.keys(useUnsavedWorkStore.getState().owners).length) throw new GuideFailure('UNSAVED_NAVIGATION_CANCELLED')
           if (runtime.readContext().screenId !== screen.id) await navigate(withMonth(screen.path, useWorkspaceStore.getState().month ?? ''))
           await waitForScreen(screen.id, controller.signal)
           const deadline = Date.now() + 5000
@@ -171,17 +189,27 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
       return () => controller.abort()
     }
     const guide = findWorkflowGuide(request.id, '1.0')
-    if (!guide || !guide.roles.includes(user.roleCode)) { useWorkflowGuide.getState().clear(); return }
+    if (!guide || !guide.roles.includes(user.roleCode) || !workflowSteps(guide, user.roleCode).length) { useWorkflowGuide.getState().clear(); return }
     runtime.engine.stop()
     runtime.selected.clear()
     const context = runtime.readContext()
-    void runtime.engine.start({ workflowId: guide.workflowId, stepId: request.stepId && workflowSteps(guide).some((step) => step.stepId === request.stepId) ? request.stepId : guide.steps[0].stepId, guideVersion: guide.guideVersion,
+    void runtime.engine.start({ workflowId: guide.workflowId, stepId: request.stepId && workflowSteps(guide, user.roleCode).some((step) => step.stepId === request.stepId) ? request.stepId : workflowSteps(guide, user.roleCode)[0].stepId, guideVersion: guide.guideVersion,
       entityRefs: context.entityRefs, clientContextRevision: context.clientContextRevision, serverStateVersion: null })
   }, [request, runtime, user, navigate])
   useEffect(() => { runtime.engine.contextChanged() }, [location.pathname, location.search, runtime])
   useEffect(() => {
     mounted.current = true
-    const mutations = new MutationObserver(() => runtime.engine.contextChanged())
+    // SRC-028: modal controls must remain in the dialog's ARIA/focus boundary, including
+    // paused/completed states where snapshot.target is null. Return to body after close.
+    const syncPortalRoot = () => {
+      const dialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')]
+        .filter((element) => !element.closest('[hidden], [inert], [aria-hidden="true"]') &&
+          getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden').at(-1)
+      const root = dialog ?? document.body
+      setPortalRoot((current) => current === root ? current : root)
+    }
+    syncPortalRoot()
+    const mutations = new MutationObserver(() => { runtime.engine.contextChanged(); syncPortalRoot() })
     mutations.observe(document.body, { childList: true, subtree: true, attributes: true,
       attributeFilter: ['hidden', 'inert', 'aria-hidden', 'class', 'style', 'data-guide-page', 'data-guide-feature'] })
     const choose = (event: MouseEvent) => {
@@ -215,18 +243,18 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
     {position.box && snapshot.status !== 'PAUSED' && <div className="pico-guide-spotlight" style={position.box} aria-hidden="true" />}
     <section ref={card} className="pico-guide-card" aria-label="업무 튜토리얼" style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}>
       <header><img src={mascot} alt="" /><div><strong>{guide?.title}</strong><small>화면과 입력 위치 안내</small></div><button onClick={stop} aria-label="업무 튜토리얼 종료">닫기</button></header>
-      <h3>{snapshot.status === 'COMPLETED' ? '안내를 마쳤어요' : guide && workflowSteps(guide).find((step) => step.stepId === snapshot.step?.stepId)?.title}</h3>
+      <h3>{snapshot.status === 'COMPLETED' ? '안내를 마쳤어요' : guide && workflowSteps(guide, user.roleCode).find((step) => step.stepId === snapshot.step?.stepId)?.title}</h3>
       <p>{snapshot.status === 'COMPLETED' ? '안내 확인을 마쳤습니다. 실제 저장·검증·확정 결과는 기존 업무 화면에서 확인해주세요.' : snapshot.step?.instruction}</p>
       {snapshot.reasonCode && <p role="status">{messages[snapshot.reasonCode] ?? '화면의 조건을 확인하고 필요한 영역을 연 뒤 이어가세요.'}</p>}
       <nav aria-label="튜토리얼 단계 이동">
-        <button onClick={() => void runtime.engine.previous()} disabled={['PREPARING', 'COMPLETED'].includes(snapshot.status)}>이전 안내</button>
+        <button onClick={() => void runtime.engine.previous()} disabled={['PREPARING', 'COMPLETED'].includes(snapshot.status) || !runtime.engine.canGoBack()}>이전 안내</button>
         {snapshot.status === 'PAUSED' ? <>
           <button onClick={() => void runtime.engine.resume()}>돌아와 이어가기</button>
-          <button onClick={() => guide && useWorkflowGuide.getState().start(guide.workflowId)}>현재 대상에서 다시 시작</button>
+          <button onClick={() => guide && useWorkflowGuide.getState().start(guide.workflowId, request?.stepId)}>현재 대상에서 다시 시작</button>
         </> : snapshot.status !== 'COMPLETED' && <button disabled={snapshot.status === 'PREPARING'} onClick={() => void runtime.engine.next()}>확인했어요 · 다음 안내</button>}
         {snapshot.status === 'COMPLETED' ? <button onClick={stop}>안내 닫기</button> : <button onClick={() => runtime.engine.pause()}>잠시 멈추기</button>}
       </nav>
       <small>업무 버튼은 직접 누르세요. 안내 확인은 실제 업무 처리 완료를 뜻하지 않습니다.</small>
     </section>
-  </>, document.body)
+  </>, portalRoot)
 }

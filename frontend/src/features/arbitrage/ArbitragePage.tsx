@@ -1,3 +1,4 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -149,7 +150,7 @@ export default function ArbitragePage() {
       <QueryState error={insurers.error} />
       <section data-guide-feature="features.arbitrage.arbitrage-page.section" className="kpi-grid arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
         {summaryCards.map((card) => (
-          <button data-guide-feature="features.arbitrage.arbitrage-page.button"
+          <button data-guide-feature={guideFeatureId('arbitrage.summary', card.status)}
             type="button"
             key={card.status}
             className={`kpi-card arb-summary-card ${card.tone}`}

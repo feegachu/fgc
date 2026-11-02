@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { stepState } from './steps'
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 
 const baseUser = {
   loginId: 'settle01',
@@ -453,4 +454,16 @@ it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수�
   await waitFor(() => expect(restart).toBeEnabled())
   expect(message).not.toBeVisible()
   expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+})
+
+
+it('resolves tutorial overview and progress targets on a successful detail response', async () => {
+  detailHandlers()
+  renderAt('/app/validation-runs/7?month=2026-07')
+  await screen.findByRole('heading', { name: /진행 단계/ })
+  const [overview, progress] = findWorkflowGuide('validation.detail', '1.0')!.steps
+  const overviewElement = document.querySelector(`[data-guide-feature="${overview.targetId}"]`)
+  expect(overviewElement).toBeVisible()
+  expect(overviewElement).toHaveTextContent('검증월')
+  expect(document.querySelector(`[data-guide-feature="${progress.targetId}"]`)).toContainElement(screen.getByRole('heading', { name: /진행 단계/ }))
 })

@@ -1,3 +1,4 @@
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -353,4 +354,16 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     ])
       expect(correctionTarget(url)).toBeNull()
   })
+})
+
+
+it('targets the unique start date field in the ledger tutorial', async () => {
+  renderAt()
+  await screen.findByRole('button', { name: 'JRN-001' })
+  const target = findWorkflowGuide('ledger.review', '1.0')!.steps[0].targetId
+  const matches = document.querySelectorAll(`[data-guide-feature="${target}"]`)
+  expect(matches).toHaveLength(1)
+  expect(matches[0]).toBe(screen.getByLabelText('분개일 (시작)'))
+  const ids = [...document.querySelectorAll('[data-guide-feature^="ledger.filter."]')].map((el) => el.getAttribute('data-guide-feature'))
+  expect(new Set(ids).size).toBe(ids.length)
 })

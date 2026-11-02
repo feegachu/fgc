@@ -91,7 +91,9 @@ export function CapDetailModal({ capCheckId, onClose }: CapDetailModalProps) {
       {detail.isError ? (
         <CapError error={detail.error} retry={() => void detail.refetch()} />
       ) : detail.data?.capCheck ? (
-        <BasisContent data={detail.data} />
+        <section data-guide-feature="features.cap.cap-detail-modal.section">
+          <BasisContent data={detail.data} />
+        </section>
       ) : (
         <p role="status">계산근거를 불러오는 중입니다.</p>
       )}
@@ -105,7 +107,7 @@ function BasisContent({ data }: { data: CapBasis }) {
   if (item.resultStatus === 'NOT_APPLICABLE') {
     const decision = snapshot.applicability as Record<string, unknown> | undefined
     return (
-      <section data-guide-feature="features.cap.cap-detail-modal.section" className="surface">
+      <div className="surface">
         <h3>
           {item.contractNo || '—'} · {item.paymentStageLabel || '—'}
         </h3>
@@ -130,7 +132,7 @@ function BasisContent({ data }: { data: CapBasis }) {
           </div>
         </dl>
         <p>한도·산입금액·사용률 계산 대상이 아닙니다.</p>
-      </section>
+      </div>
     )
   }
   const details = data.details ?? []

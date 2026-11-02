@@ -196,6 +196,37 @@ describe('TRAN-W02 React form workflow', () => {
     expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('C-003 · 상품')
     expect(document.getElementById('amount')).toHaveValue(250000)
   })
+  it('keeps a committed draft save when a guide read changes the revision', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    const observer = getPaymentGuideObserver()!
+    mutation = async () => {
+      draftResponse = { ...saved, updatedAt: '2026-11-02T09:00:00+09:00' }
+      await expect(observer.readBusinessState(observer.readContext(), new AbortController().signal))
+        .rejects.toThrow()
+      return draftResponse
+    }
+    await user.click(button('btn-save'))
+    await screen.findByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')
+    expect(button('btn-save')).toBeDisabled()
+    expect(button('btn-precheck')).toBeEnabled()
+    expect(useToastStore.getState().messages.some((message) => message.message.includes('저장했습니다'))).toBe(true)
+    expect(writes()).toHaveLength(1)
+  })
+
+  it.each([
+    { ...saved, status: 'CONFIRMED' },
+    { ...saved, commissionTransactionId: 88 },
+    { ...saved, commissionTransactionId: -1 },
+  ])('rejects invalid draft save response %#', async (response) => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    mutation = () => response
+    await user.click(button('btn-save'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('저장된 지급 초안을 확인할 수 없습니다')
+    expect(screen.queryByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')).not.toBeInTheDocument()
+  })
+
   it('계약 상세에서 전달한 맥락으로 실제 선택값을 채우고 저장한다', async () => {
     const { user } = mount(
       '/app/transactions/new?month=2026-07&contractId=3&agentId=1&commissionItemId=1&attributionDate=2026-07-20&amount=150000&returnTo=%2Fcontracts%2F3',

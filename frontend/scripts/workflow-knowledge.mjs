@@ -9,8 +9,15 @@ const folder = path.join(root, 'features/assistant')
 const read = (name) => JSON.parse(fs.readFileSync(path.join(folder, name), 'utf8'))
 const registry = read('feature-targets.generated.json')
 const screens = read('screens.generated.json')
-const workflows = [...read('workflow-guides.v1.json'), ...read('payment-guides.v1.json')]
+const workflows = [...read('workflow-guides.v1.json'), ...read('payment-guides.v1.json')].filter((guide) => guide.enabled)
 const instances = read('feature-instances.v1.json')
+const permissions = read('feature-permissions.v1.json')
+for (const feature of registry) {
+  if (!permissions.roles[permissions.targets[feature.id]]?.length) throw new Error(`Missing guide permissions: ${feature.id}`)
+}
+for (const id of Object.keys(permissions.targets)) {
+  if (!registry.some((feature) => feature.id === id)) throw new Error(`Obsolete guide permissions: ${id}`)
+}
 const parse = (file) => ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
 function resolve(from, specifier) {
   if (!specifier.startsWith('.')) return null
@@ -100,11 +107,11 @@ function load(file) {
   function visit(node) {
     if (ts.isObjectLiteralExpression(node)) {
       const props = new Map(node.properties.filter(ts.isPropertyAssignment).map((prop) => [prop.name.getText().replace(/^['"]|['"]$/g, ''), literal(prop.initializer)]))
-      remember(props.get('id') || props.get('key'), props.get('label') || props.get('title'))
+      remember(props.get('id') || props.get('key') || props.get('status'), props.get('label') || props.get('title'))
       for (const [key, value] of props) remember(key, value)
     }
     if (ts.isArrayLiteralExpression(node) && node.elements.length === 2) remember(literal(node.elements[0]), literal(node.elements[1]))
-    if (ts.isCallExpression(node) && ['field', 'numeric'].includes(node.expression.getText())) remember(literal(node.arguments[0]), literal(node.arguments[1]))
+    if (ts.isCallExpression(node) && ['field', 'numeric', 'input', 'select'].includes(node.expression.getText())) remember(literal(node.arguments[0]), literal(node.arguments[1]))
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const value = attr(node, 'data-guide-feature') ?? attr(node, 'guideId')
       let ids = literal(value) ? [literal(value)] : []
@@ -162,10 +169,17 @@ function closure(file, visited = new Set()) {
   return visited
 }
 const targetIds = new Set(registry.map((entry) => entry.id))
+// SRC-028: the same form module serves create/edit routes with mutually exclusive JSX.
+const contractFormTarget = (name) => `features.contract.contract-form-page.${name}`
+const excludedRouteTargets = new Map([
+  ['/contracts/new', new Set(['agent-name', 'next-contract-status', 'status-event-effective-at', 'status-event-received-at', 'status-event-reason-code', 'status-event-reason'].map(contractFormTarget))],
+  ['/contracts/:id/edit', new Set(['agent-id', 'contract-status'].map(contractFormTarget))],
+])
 const generated = []
 for (const guide of workflows) {
   const locations = new Map()
-  const routesForGuide = new Set([guide.route, ...guide.steps.map((step) => screens.find((screen) => screen.id === step.screenId)?.path)].filter(Boolean))
+  const entryScreen = screens.find((screen) => screen.path === guide.route)
+  const routesForGuide = new Set([guide.route, ...guide.steps.map((step) => step.screenId === entryScreen?.id ? guide.route : screens.find((screen) => screen.id === step.screenId)?.path)].filter(Boolean))
   for (const route of routesForGuide) {
     const screen = screens.find((entry) => entry.path === route)
     const file = pages.get(route)
@@ -177,18 +191,28 @@ for (const guide of workflows) {
       const module = load(dependency)
       const candidates = new Map(module.labels)
       for (const entry of module.enums) for (const targetId of entry.ids) {
+        // Shared tab components only expose instances declared by this screen.
+        if (entry.group.startsWith('reference.')) {
+          const tabs = screen.id === 'BASE-W01' ? ['organization', 'insurer', 'product', 'agent', 'commission-item']
+            : screen.id === 'POL-W01' ? ['versions', 'management', 'commission', 'cap', 'refund', 'rules', 'sources', 'history'] : []
+          if (!tabs.includes(targetId.slice(entry.group.length + 1))) continue
+        }
+        if (['contract.tab', 'contract.panel', 'contract.schedule-stage'].includes(entry.group) && screen.id !== 'CONT-W02') continue
         const key = targetId.slice(entry.group.length + 1)
         const label = entry.group === 'agent.guide-menu' ? workflows.find((workflow) => workflow.workflowId === key)?.title : instanceLabels.get(key) || instanceLabels.get(key.split('.').at(-1))
         if (label) candidates.set(targetId, { label, tag: entry.tag })
       }
       for (const [targetId, { label, tag }] of candidates) {
-      if (!targetIds.has(targetId) || guide.steps.some((step) => step.targetId === targetId)) continue
+      if (!targetIds.has(targetId) || excludedRouteTargets.get(route)?.has(targetId) || guide.steps.some((step) => step.targetId === targetId)) continue
+      const roles = permissions.roles[permissions.targets[targetId]].filter((role) => guide.roles.includes(role) &&
+        (screen.permission !== 'canProcess' || ['SYSTEM_ADMIN', 'SETTLEMENT'].includes(role)))
+      if (!roles.length) continue
       const key = `${screen.id}:${targetId}`
       const stepId = 'help.' + createHash('sha256').update(key).digest('hex').slice(0, 32)
       const kind = ['input', 'textarea', 'select', 'SearchSelect'].includes(tag) ? '입력 항목' : ['button', 'Button', 'a', 'Link', 'ContextLink', 'summary'].includes(tag) ? '버튼·메뉴' : '영역'
       locations.set(key, { stepId, screenId: screen.id, targetId, title: `${screen.title} · ${label}`,
         instruction: `${screen.title} 화면의 ‘${label}’ ${kind} 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.`,
-        completionRuleId: 'USER_REVIEWED', next: [] })
+        completionRuleId: 'USER_REVIEWED', roles, next: [] })
     }
     }
   }

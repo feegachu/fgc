@@ -33,6 +33,10 @@
             "conditionId": "SCOPE_ACKNOWLEDGED",
             "stepId": "payment.amount"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -44,7 +48,11 @@
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "AMOUNT_REVIEW_ACKNOWLEDGED",
         "missingTargetBehavior": "PAUSE",
-        "next": []
+        "next": [],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ]
       }
     ],
     "enabled": true,
@@ -93,6 +101,10 @@
             "conditionId": "SCOPE_ACKNOWLEDGED",
             "stepId": "payment.amount"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -109,6 +121,10 @@
             "conditionId": "AMOUNT_REVIEW_ACKNOWLEDGED",
             "stepId": "payment.attributions"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -125,6 +141,10 @@
             "conditionId": "ATTRIBUTIONS_REVIEWED",
             "stepId": "payment.evidence"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -141,6 +161,10 @@
             "conditionId": "EVIDENCE_FIELDS_VALID",
             "stepId": "payment.save"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -152,7 +176,11 @@
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "CURRENT_DRAFT_SAVED",
         "missingTargetBehavior": "PAUSE",
-        "next": []
+        "next": [],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ]
       }
     ],
     "enabled": true,
@@ -204,6 +232,10 @@
             "conditionId": "DRAFT_SAVE_REQUIRED",
             "stepId": "payment.save"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -220,6 +252,10 @@
             "conditionId": "CURRENT_DRAFT_SAVED",
             "stepId": "payment.precheck"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -236,6 +272,10 @@
             "conditionId": "CURRENT_PRECHECK_PASSED",
             "stepId": "payment.precheck.result"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -252,6 +292,10 @@
             "conditionId": "PRECHECK_RESULT_ACKNOWLEDGED",
             "stepId": "payment.confirm"
           }
+        ],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ]
       },
       {
@@ -263,7 +307,11 @@
         "entryRuleId": "CONTEXT_AVAILABLE",
         "completionRuleId": "PAYMENT_CONFIRMED",
         "missingTargetBehavior": "PAUSE",
-        "next": []
+        "next": [],
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ]
       }
     ],
     "enabled": true,

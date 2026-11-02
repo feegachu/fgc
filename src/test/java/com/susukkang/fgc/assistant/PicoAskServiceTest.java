@@ -60,6 +60,40 @@ class PicoAskServiceTest {
         assertThat(prompt.getValue().data()).doesNotContain("payment.draft", "payment.confirm", "audit.review", "agent.portfolio");
         verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
     }
+    @Test void complianceEvidenceOmitsProcessingStepsAndRejectsTheirCitation() throws Exception {
+        role("COMPLIANCE");
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+                .thenReturn(new PicoAskService.GuideSelection(List.of("ledger.review")));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer("원장 목록에서 상태를 조회하세요.","ledger.review:overview"));
+        assertThat(service.ask(request("역분개 사유 작성과 확인 버튼 위치" )).source()).isEqualTo(Source.AI);
+        var prompts = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),any());
+        var mapper = new ObjectMapper();
+        var selection = mapper.readTree(prompts.getAllValues().getFirst().data()).path("availableGuides");
+        var selected = java.util.stream.StreamSupport.stream(selection.spliterator(),false)
+                .filter(guide -> guide.path("workflowId").asText().equals("ledger.review")).findFirst().orElseThrow();
+        assertThat(selected.path("description").asText()).contains("원장 검색").doesNotContain("역분개 사유 작성", "실제 반영 확인");
+        var evidence = mapper.readTree(prompts.getAllValues().getLast().data()).path("evidence");
+        assertThat(evidence.toString()).contains("ledger.review.step.1", "ledger.review.step.2")
+                .doesNotContain("ledger.review.step.3", "ledger.review.step.4", "역분개 사유 작성");
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer("근거를 확인하세요.","ledger.review:ledger.review.step.3"));
+        assertThat(service.ask(request("역분개 방법")).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
+    }
+    @Test void validationFinalizationUsesItsOwnRoleInsteadOfPaymentProcessingPermission() {
+        var guide = catalog.definitions().stream().filter(item -> item.workflowId().equals("validation.detail")).findFirst().orElseThrow();
+        assertThat(catalog.chunks(guide,"확정",List.of("GA_ADMIN"))).extracting(PicoGuideCatalog.Chunk::stepId)
+                .contains("validation.detail.step.3");
+        assertThat(catalog.chunks(guide,"확정",List.of("SETTLEMENT"))).extracting(PicoGuideCatalog.Chunk::stepId)
+                .doesNotContain("validation.detail.step.3");
+        role("GA_ADMIN");
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+                .thenReturn(new PicoAskService.GuideSelection(List.of("validation.detail")));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer("확정 조건을 확인하세요.","validation.detail:validation.detail.step.3"));
+        assertThat(service.ask(request("검증 확정 조건")).source()).isEqualTo(Source.AI);
+    }
     @Test void semanticRetrievalRejectsUnknownAndDuplicateWorkflowIds() {
         for (var ids : List.of(List.of("invented.workflow"), List.of("payment.draft","payment.draft"))) {
             when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(ids));
@@ -93,6 +127,42 @@ class PicoAskServiceTest {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("보험계약 목록의 검색 조건에서 조회하세요.","contract.find:overview"));
         var request = new PicoAskRequest("다른 보험계약을 찾고 싶어","TRAN-W02",List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)),"r1","1.0",List.of());
         assertThat(service.ask(request).source()).isEqualTo(Source.AI);
+    }
+    @Test void changedPaymentStateOrContentDuringModelAnswerInvalidatesTheReply() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer("초안 저장은 지급 확정과 구분됩니다.","payment.draft:overview"));
+        for (var current : List.of(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.CONFIRMED,"new"),
+                new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.CANCELLED,"new"),
+                new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.DRAFT,"edited"))) {
+            when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.DRAFT,"original"),current);
+            var reply = service.ask(new PicoAskRequest("저장 방법", "TRAN-W02", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)), "r1", "1.0", List.of()));
+            assertThat(reply.source()).isEqualTo(Source.FIXED);
+            assertThat(reply.fallbackReason()).isEqualTo("PAYMENT_CONTEXT_CHANGED");
+            assertThat(reply.evidenceRefs()).isEmpty();
+        }
+    }
+    @Test void changedClosedPaymentWhileSelectingWorkflowDoesNotReportStaleStatus() {
+        when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.CONFIRMED,"confirmed"),
+                new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.CANCELLED,"cancelled"));
+        var reply = service.ask(new PicoAskRequest("현재 상태", "TRAN-W02", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)), "r1", "1.0", List.of()));
+        assertThat(reply.fallbackReason()).isEqualTo("PAYMENT_CONTEXT_CHANGED");
+        verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
+    }
+    @Test void disabledWorkflowAndItsGeneratedHelpAreExcludedWithoutPreventingStartup() throws Exception {
+        ObjectMapper mapper = spy(new ObjectMapper());
+        doAnswer(invocation -> {
+            Object value = invocation.callRealMethod();
+            if (value instanceof List<?> values && !values.isEmpty() && values.getFirst() instanceof PicoGuideCatalog.Definition) {
+                return values.stream().map(item -> {
+                    var guide = (PicoGuideCatalog.Definition) item;
+                    return new PicoGuideCatalog.Definition(guide.workflowId(),guide.guideVersion(),guide.title(),guide.description(),
+                            guide.capability(),guide.keywords(),guide.steps(),!guide.workflowId().equals("settlement.journey"),guide.roles());
+                }).toList();
+            }
+            return value;
+        }).when(mapper).readValue(any(java.io.InputStream.class),any(com.fasterxml.jackson.core.type.TypeReference.class));
+        assertThat(new PicoGuideCatalog(mapper).definitions()).extracting(PicoGuideCatalog.Definition::workflowId)
+                .contains("payment.draft").doesNotContain("settlement.journey");
     }
     @Test void unsupportedSingleEntityAndMultipleReferencesAreDifferentContracts() {
         var contract = new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.CONTRACT,1L);
@@ -129,9 +199,9 @@ class PicoAskServiceTest {
     }
     @Test void sourceLocationRetrievalUsesLabelsAndReturnsOnlyRegisteredHelp() {
         var guide = catalog.definitions().stream().filter(item -> item.workflowId().equals("contract.register")).findFirst().orElseThrow();
-        assertThat(catalog.chunks(guide,"계약번호 입력은 어디서 하나요").stream().filter(chunk -> chunk.stepId() != null && chunk.stepId().startsWith("help.")))
+        assertThat(catalog.chunks(guide,"계약번호 입력은 어디서 하나요",List.of("SETTLEMENT")).stream().filter(chunk -> chunk.stepId() != null && chunk.stepId().startsWith("help.")))
             .isNotEmpty().allSatisfy(chunk -> assertThat(chunk.chunkId()).startsWith("contract.register:help."));
-        assertThat(catalog.chunks(guide,"zzzzzz").stream().filter(chunk -> chunk.stepId() != null && chunk.stepId().startsWith("help."))).isEmpty();
+        assertThat(catalog.chunks(guide,"zzzzzz",List.of("SETTLEMENT")).stream().filter(chunk -> chunk.stepId() != null && chunk.stepId().startsWith("help."))).isEmpty();
     }
     @Test void sharedCatalogIncludesAllRegisteredBusinessScreens() {
         assertThat(catalog.definitions()).hasSizeGreaterThan(3);
@@ -153,6 +223,33 @@ class PicoAskServiceTest {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
             assertThat(service.ask(request("초안 저장")).source()).as(message).isEqualTo(Source.AI);
         }
+    }
+    @Test void normalKoreanParticlesAreNotMistakenForNumerals() {
+        for (var message : List.of("조회만 할 수 있습니다.", "내용은 조회만 할 수 있습니다.", "통화기호 표시 위치를 조회하세요.", "권한을 확인할 수 있습니다.", "기간을 확인한 다음 조회하세요.", "상세 내용을 확인하세요.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("조회 방법")).source()).as(message).isEqualTo(Source.AI);
+        }
+    }
+    @Test void generatedKoreanDurationsCountsAndUnicodeNumbersAreRejected() {
+        for (var message : List.of("지급금액십만원입니다.", "수수료십만원입니다.", "수수료십퍼센트입니다.", "수수료십프로입니다.", "수수료십%입니다.", "₩오만입니다.", "$오만입니다.", "€오만입니다.", "지급액은십만원입니다.", "수수료는백원입니다.", "총열두달에 걸쳐 지급됩니다.", "약두번 나누어 지급됩니다.", "열두 달에 걸쳐 지급됩니다.", "두 번 나누어 지급됩니다.", "세 차례 지급합니다.", "삼 일 이내입니다.", "스무 개를 선택하세요.", "예순 회에 걸쳐 지급됩니다.", "²원입니다.", "Ⅻ개월입니다.", "½을 지급합니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("지급 방법")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
+    @Test void readersOnlyReceiveStoredPaymentStatusWithoutCorrectionInstructions() {
+        for (var role : List.of("COMPLIANCE", "GA_ADMIN")) {
+            role(role);
+            when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+                    .thenReturn(new PicoAskService.GuideSelection(List.of("payment.find")));
+            for (var state : CommissionPaymentStatus.values()) {
+                when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(state));
+                var reply = service.ask(new PicoAskRequest("현재 지급 상태", "TRAN-W01", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)), "r1", "1.0", List.of()));
+                assertThat(reply.source()).isEqualTo(Source.FIXED);
+                assertThat(reply.fallbackReason()).isEqualTo("PAYMENT_STATE_READ_ONLY");
+                assertThat(reply.message()).contains("상태 조회 안내만").doesNotContain("정정", "저장", "다시 확정");
+            }
+        }
+        verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
     }
     @Test void sharedCatalogRegistersBothApprovedSavedDraftBranches() {
         var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("payment.confirm")).findFirst().orElseThrow();

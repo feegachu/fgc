@@ -18,6 +18,7 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 import java.util.*;
 import java.text.Normalizer;
+import java.util.regex.Pattern;
 import static com.susukkang.fgc.assistant.dto.PicoAskResponse.*;
 
 @Service
@@ -36,14 +37,22 @@ public class PicoAskService {
             "javascript:", "/api/", "/app/", "저장했습니다", "확정했습니다", "지급했습니다",
             "처리했습니다", "완료되었습니다");
     private static final String MONEY_PREFIXES = "일이삼사오육칠팔구십백천만억조";
+    private static final String KOREAN_NUMERAL = "(?:[" + MONEY_PREFIXES + "]+"
+            + "|(?:열|스물|스무|서른|마흔|쉰|예순|일흔|여든|아흔)(?:한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉)?"
+            + "|한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉)";
+    private static final Pattern KOREAN_NUMERAL_SUFFIX = Pattern.compile("(?:^|[은는이가을를의로에]|총|약|최대|최소)" + KOREAN_NUMERAL + "$");
+    private static final Pattern KOREAN_MONEY_SUFFIX = Pattern.compile(KOREAN_NUMERAL + "$");
 
     private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
 
     private static OutputRejection unsafeOutput(String message) {
-        String normalized = Normalizer.normalize(message, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
-        if (normalized.codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
+        String normalized = Normalizer.normalize(message, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+        if (message.codePoints().anyMatch(code -> Character.isDigit(code)
+                || Character.getType(code) == Character.LETTER_NUMBER || Character.getType(code) == Character.OTHER_NUMBER)
+                || normalized.codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
+        if (normalized.codePoints().anyMatch(code -> Character.getType(code) == Character.CURRENCY_SYMBOL)) return OutputRejection.GENERATED_AMOUNT;
         if (UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return OutputRejection.UNSAFE_TEXT;
-        if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "회", "개월", "년").stream()
+        if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "회", "개월", "년", "달", "번", "차례", "일", "주", "분", "초", "명", "개").stream()
                 .anyMatch(unit -> koreanQuantity(normalized, unit))) return OutputRejection.GENERATED_AMOUNT;
         return null;
     }
@@ -59,14 +68,21 @@ public class PicoAskService {
             // 조회 is a lookup word, but a preceding numeral (일조회/일조 회) remains a quantity.
             boolean lookupWord = unit.equals("회") && index > 0 && text.charAt(index - 1) == '조'
                     && (index == 1 || MONEY_PREFIXES.indexOf(text.charAt(index - 2)) < 0);
-            if (!lookupWord && boundary && previous >= 0 && numeralEnding(text.substring(0, previous + 1))) return true;
+            if (!lookupWord && boundary && previous >= 0 && numeralEnding(text.substring(0, previous + 1), unit)) return true;
             index = text.indexOf(unit, index + unit.length());
         }
         return false;
     }
-    private static boolean numeralEnding(String prefix) {
-        return MONEY_PREFIXES.indexOf(prefix.charAt(prefix.length() - 1)) >= 0
-                || List.of("한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열", "스물", "서른", "마흔", "쉰").stream().anyMatch(prefix::endsWith);
+    private static boolean numeralEnding(String prefix, String unit) {
+        int start = prefix.length() - 1;
+        while (start >= 0 && Character.isLetter(prefix.charAt(start))) start--;
+        String token = prefix.substring(start + 1);
+        // Money units are unambiguous enough to catch glued amounts; 할/회 still need word boundaries.
+        Pattern numeral = switch (unit) {
+            case "원", "퍼센트", "프로", "%", "％" -> KOREAN_MONEY_SUFFIX;
+            default -> KOREAN_NUMERAL_SUFFIX;
+        };
+        return numeral.matcher(token).find();
     }
 
     @PreAuthorize(Roles.ANY_ROLE)
@@ -78,16 +94,17 @@ public class PicoAskService {
                 .map(authority -> authority.getAuthority().replaceFirst("^ROLE_", "")).toList();
         var allowed = catalog.definitions().stream()
                 .filter(guide -> guide.roles().stream().anyMatch(authorities::contains))
-                .filter(guide -> canProcess || "READ".equals(guide.capability())).toList();
+                .filter(guide -> !catalog.allowedSteps(guide, authorities).isEmpty()).toList();
         List<PicoGuideCatalog.Chunk> chunks = List.of();
-        String paymentState = null;
+        PicoPaymentContextService.Snapshot paymentSnapshot = null;
         if (!request.entityRefs().isEmpty()) {
             if (request.entityRefs().size() != 1)
                 return fixed(request, Decision.ASK_CLARIFICATION, "현재 화면에서 지급 건을 하나 선택해주세요. 다른 업무는 대상 정보를 보내지 않고 절차를 질문할 수 있습니다.", List.of(), "SINGLE_PAYMENT_REQUIRED");
             if (request.entityRefs().getFirst().type() != PicoAskRequest.EntityType.PAYMENT)
                 return fixed(request, Decision.UNSUPPORTED, "이 대상의 실제 상태 조회는 연결되지 않았습니다. 대상 없이 일반 업무 절차를 질문해주세요.", List.of(), "ENTITY_STATE_NOT_SUPPORTED");
-            paymentState = paymentContext.read(request.entityRefs().getFirst().id()).status().name();
+            paymentSnapshot = paymentContext.read(request.entityRefs().getFirst().id());
         }
+        String paymentState = paymentSnapshot == null ? null : paymentSnapshot.status().name();
         try {
             var history = history(request);
             var input = new LinkedHashMap<String, Object>();
@@ -98,7 +115,7 @@ public class PicoAskService {
             input.put("permissions", Map.of("payments", permitted(Roles.CAN_PROCESS), "policies", permitted(Roles.CAN_WRITE_POLICY),
                     "exceptions", permitted(Roles.CAN_HANDLE_EXCEPTION), "reverseJournal", permitted(Roles.CAN_REVERSE_JOURNAL),
                     "finalizeValidation", permitted(Roles.CAN_FINALIZE_VALIDATION), "auditLog", permitted(Roles.CAN_VIEW_AUDIT_LOG)));
-            input.put("availableGuides", allowed.stream().map(guide -> Map.of("workflowId", guide.workflowId(), "title", guide.title(), "description", guide.description())).toList());
+            input.put("availableGuides", allowed.stream().map(guide -> Map.of("workflowId", guide.workflowId(), "title", guide.title(), "description", catalog.chunks(guide, authorities).getFirst().content())).toList());
             String selectionData = fitInput(input, history, null);
             if (selectionData == null) return fallback(request,"INPUT_TOO_LARGE");
             var selection = gateway.call(new LlmGateway.LlmRequest(AiCallPurpose.PICO_EXPLAIN,
@@ -111,9 +128,18 @@ public class PicoAskService {
                     || selection.workflowIds().stream().distinct().count() != selection.workflowIds().size()
                     || selection.workflowIds().stream().anyMatch(id -> id == null || !allowedIds.contains(id)))
                 return fallback(request, "INVALID_AI_SELECTION");
+            boolean asksPayment = selection.workflowIds().stream().anyMatch(id -> id.startsWith("payment."));
             // Stored state stays in the program. Semantic selection may still answer unrelated workflow questions.
-            if (paymentState != null && !"DRAFT".equals(paymentState) && catalog.paymentDefinitions().stream().anyMatch(guide -> selection.workflowIds().contains(guide.workflowId()))) {
+            if (paymentState != null && asksPayment && (!canProcess || !"DRAFT".equals(paymentState))) {
+                var changed = latestPaymentContextError(request, paymentSnapshot);
+                if (changed != null) return changed;
                 boolean confirmed = "CONFIRMED".equals(paymentState);
+                if (!canProcess) {
+                    String status = confirmed ? "확정" : "CANCELLED".equals(paymentState) ? "취소" : "초안";
+                    return fixed(request, Decision.ASK_CLARIFICATION,
+                            "현재 지급 건은 " + status + " 상태입니다. 현재 권한에서는 상태 조회 안내만 제공합니다. 다른 업무 안내는 업무 안내 탭에서 시작할 수 있습니다.",
+                            List.of(), "PAYMENT_STATE_READ_ONLY");
+                }
                 return fixed(request, Decision.ASK_CLARIFICATION,
                         confirmed ? "이미 확정된 지급 건입니다. 같은 건을 초안 저장하거나 다시 확정할 수 없습니다. 지급 목록에서 기존 정정 절차를 확인해주세요. 다른 업무 안내는 업무 안내 탭에서 시작할 수 있습니다."
                             : "취소된 지급 건입니다. 이 건을 저장하거나 확정할 수 없습니다. 지급 목록에서 취소 상태와 연결된 정정 내역을 확인해주세요. 다른 업무 안내는 업무 안내 탭에서 시작할 수 있습니다.",
@@ -121,7 +147,7 @@ public class PicoAskService {
             }
             String helpQuery = (String) input.get("question") + " " + history.stream().map(turn -> turn.get("text")).collect(java.util.stream.Collectors.joining(" "));
             chunks = new ArrayList<>(allowed.stream().filter(guide -> selection.workflowIds().contains(guide.workflowId()))
-                    .flatMap(guide -> catalog.chunks(guide, helpQuery).stream())
+                    .flatMap(guide -> catalog.chunks(guide, helpQuery, authorities).stream())
                     .sorted(Comparator.comparingInt(chunk -> chunk.stepId() == null ? 0 : chunk.stepId().startsWith("help.") ? 1 : 2)).toList());
             input.remove("availableGuides");
             input.put("evidence", chunks);
@@ -143,12 +169,22 @@ public class PicoAskService {
                 log.warn("Pico answer rejected: {}", rejection);
                 return fallback(request,"INVALID_AI_OUTPUT");
             }
+            if (paymentSnapshot != null && asksPayment) {
+                var changed = latestPaymentContextError(request, paymentSnapshot);
+                if (changed != null) return changed;
+            }
             var references=chunks.stream().filter(c->output.evidenceChunkIds().contains(c.chunkId())).toList();
             return response(request,output.decision(),output.message(),references,Source.AI,null);
         } catch (FgcBusinessException error) {
             if (error.getErrorCode()!=FgcErrorCode.AI_001) throw error;
             return fallback(request,"AI_UNAVAILABLE");
         } catch (JsonProcessingException error) { return fallback(request,"INPUT_ENCODING_ERROR"); }
+    }
+    private PicoAskResponse latestPaymentContextError(PicoAskRequest request, PicoPaymentContextService.Snapshot previous) {
+        if (previous.equals(paymentContext.read(request.entityRefs().getFirst().id()))) return null;
+        return fixed(request, Decision.ASK_CLARIFICATION,
+                "답변을 준비하는 동안 지급 정보가 변경되었습니다. 현재 지급 상태를 다시 조회한 뒤 질문해주세요.",
+                List.of(), "PAYMENT_CONTEXT_CHANGED");
     }
     private PicoAskResponse contextError(PicoAskRequest request) {
         if (!catalog.supportsScreen(request.screenId()))

@@ -1,3 +1,4 @@
+import { workflowHelpSteps } from '../assistant/workflow-catalog'
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
@@ -375,4 +376,19 @@ it('keeps projected-only excess separate from the CLEAR result in list and detai
   expect(screen.getByText(/지급예정 포함 시 초과 \(모니터링\)/)).toBeVisible()
   expect(screen.getAllByText('이상없음').length).toBeGreaterThan(0)
   expect(screen.getByText(/지급예정 포함 초과액 \(모니터링\)/)).toBeVisible()
+})
+
+
+it('gives the three arbitrage summary cards distinct guide targets matching their filters', async () => {
+  mount()
+  await screen.findAllByRole('row', { name: '계약 ARB-001 상세 보기' })
+  const ids = ['arbitrage.summary.clear', 'arbitrage.summary.candidate', 'arbitrage.summary.review_required']
+  const labels = ['이상없음', '검토대상', '자료부족']
+  for (const [index, id] of ids.entries()) {
+    const nodes = document.querySelectorAll(`[data-guide-feature="${id}"]`)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]).toHaveTextContent(labels[index])
+    expect(workflowHelpSteps('arbitrage.review', 'COMPLIANCE').some((step) => step.targetId === id)).toBe(true)
+  }
+  expect(document.querySelector('[data-guide-feature="features.arbitrage.arbitrage-page.button"]')).toBeNull()
 })

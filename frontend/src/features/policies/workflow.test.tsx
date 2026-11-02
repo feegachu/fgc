@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
 import { usePolicyDetail } from './api'
-import { emptyDraft } from './management'
+import { emptyDraft, emptyCommission, emptyRegime, policyTypes } from './management'
+import featureInstances from '../assistant/feature-instances.v1.json'
 import type { DraftDocument } from './management'
 import { normalizePolicyDetail } from './writeApi'
 import type { PolicyDetailResponse, PolicyWriteResult } from './writeApi'
@@ -582,4 +583,36 @@ describe('production policy workflow', () => {
     expect(screen.getByText(/환수는 확정 지급 귀속액/)).toBeVisible()
     expect(request).not.toHaveBeenCalled()
   })
+})
+
+
+it('registers exactly the draft field targets rendered by all five policy types', async () => {
+  const seen = new Set<string>()
+  const registered = new Set(['policy.draft-input', 'policy.draft-select'].flatMap((group) =>
+    featureInstances[group as 'policy.draft-input' | 'policy.draft-select'].map((value) => `${group}.${value}`)))
+  for (const policyType of Object.keys(policyTypes)) {
+    const initial: DraftDocument = {
+      ...emptyDraft(), policyType, effectiveFrom: '2027-01-01',
+      commissionRules: [emptyCommission()], feeRegimeRules: [emptyRegime(policyType)],
+      sourceDetails: [{ ref: 'SRC-022', title: '승인 근거', explanation: '', url: null }],
+      clawbackRules: [{ insurerId: '', productOfferingId: '', commissionItemId: '', elapsedMonthFrom: '', elapsedMonthTo: '', clawbackBasisCode: '', clawbackRatePct: '' }],
+    }
+    const { user } = mountEditor(initial)
+    const collect = () => {
+      const fields = [...document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[id^="policy-"], select[id^="policy-"]')]
+      for (const field of fields) {
+        // Only the shared DraftInput/DraftSelect contract uses the finite groups.
+        if (field.id === 'policy-policyName' || !field.closest('.field')) continue
+        const id = `policy.draft-${field.tagName.toLowerCase()}.${field.id.slice('policy-'.length).replace(/\.\d+(?=\.|$)/g, '').toLowerCase()}`
+        expect(field.getAttribute('data-guide-feature'), `${policyType}: ${field.id}`).toBe(id)
+        expect(registered.has(id), `${policyType}: ${id}`).toBe(true)
+        seen.add(id)
+      }
+    }
+    collect()
+    const tabs = within(screen.getByRole('navigation', { name: '정책 작성 단계' })).getAllByRole('button')
+    for (const tab of tabs) { await user.click(tab); collect() }
+    cleanup()
+  }
+  expect([...seen].sort()).toEqual([...registered].sort())
 })

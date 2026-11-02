@@ -1,3 +1,4 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
@@ -202,7 +203,7 @@ export function ExceptionPage() {
 
       <section data-guide-feature="features.exception.exception-page.section" className="exception-summary-grid" aria-label="유형별 미처리 요약">
         {data?.summary?.map((summary) => (
-          <Link data-guide-feature="features.exception.exception-page.link-3"
+          <Link data-guide-feature={guideFeatureId('exception.summary', summary.type ?? '')}
             key={summary.type}
             className={`kpi-card kpi-card-${cardTone(summary.type ?? '')} exception-summary-card ${filters.type === summary.type ? 'is-active' : ''}`}
             aria-current={filters.type === summary.type ? 'true' : undefined}

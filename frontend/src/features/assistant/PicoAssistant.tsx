@@ -166,7 +166,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   const aiEnabled = import.meta.env.VITE_ASSISTANT_AI === 'true'
   const currentScreen = screenId ?? screenFor(window.location.pathname)?.id ?? 'CMN-C04'
   const currentRole = roleCode ?? (canProcess ? 'SETTLEMENT' : 'GA_ADMIN')
-  const availableWorkflows = WORKFLOW_GUIDES.filter((guide) => guide.roles.includes(currentRole))
+  const availableWorkflows = WORKFLOW_GUIDES.filter((guide) => guide.roles.includes(currentRole) && workflowSteps(guide, currentRole).length > 0)
   const suggestions = availableWorkflows.filter((guide) => guide.steps.some((step) => step.screenId === currentScreen)).slice(0, 3)
   const syntheticEnabled = !aiEnabled
   const [aiBusy, setAiBusy] = useState(false)
@@ -178,6 +178,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   const observed = useGuideRuntime((state) => state.observation)
   const workflowActive = useWorkflowGuide((state) => state.active)
   const paymentActive = useWorkflowGuide((state) => state.paymentActive)
+  const settlementActive = useWorkflowGuide((state) => state.settlementActive)
   const activeGuideContext = useWorkflowGuide((state) => state.guideContext)
   const guideContext = JSON.stringify([
     observed?.owner,
@@ -198,7 +199,9 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   if (latestLiveQuestion.context !== guideContext) setLatestLiveQuestion({ context: guideContext, revision: null })
   const guideActive =
     runtimeSession != null && !['PAUSED', 'COMPLETED', 'CANCELLED', 'ERROR'].includes(runtimeSession.status)
-  const visible = open && !guideActive && !workflowActive && !paymentActive
+  const otherGuideActive = workflowActive || paymentActive || settlementActive
+  if (otherGuideActive && open) setOpen(false)
+  const visible = open && !guideActive && !otherGuideActive
   const [tab, setTab] = useState<'chat' | 'plan'>('chat')
   const [input, setInput] = useState('')
   const [pickedScenario, setPickedScenario] = useState<PaymentScenario>('PAY-02')
@@ -277,7 +280,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
       const generalGuide = activeGuideContext ? findWorkflowGuide(activeGuideContext.workflowId, '1.0') : null
       const paymentGuide = activeGuideContext ? findGuide(activeGuideContext.workflowId, '1.0') : null
       const contextGuide = generalGuide ?? paymentGuide
-      const contextStep = (generalGuide ? workflowSteps(generalGuide) : contextGuide?.steps)?.find((step) => step.stepId === activeGuideContext?.stepId)
+      const contextStep = (generalGuide ? workflowSteps(generalGuide, currentRole) : contextGuide?.steps)?.find((step) => step.stepId === activeGuideContext?.stepId)
       const history = conversation.entries.flatMap((entry): PicoTurn[] =>
         entry.role === 'user'
           ? [{ role: 'USER', text: entry.text }]
@@ -410,12 +413,12 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   }
   return (
     <div className="pico-assistant-root">
-      {!visible && (
+      {!visible && !otherGuideActive && (
         <div className="pico-launcher">
           <button
             id={`${panelId}-launcher`}
             className="pico-launcher-button"
-            aria-label="피코 업무 비서 열기"
+            aria-label="업무 비서 AI 열기 · 피코"
             aria-expanded="false"
             aria-controls={panelId}
             onClick={() => {
@@ -604,6 +607,8 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                                 contextValid={isCurrentLiveReply(entry)}
                               />
                             ))}
+                        {entry.reply.decision === 'ANSWER_ONLY' && !isCurrentLiveReply(entry) && <p className="pico-notice" role="status">질문 또는 화면이 바뀌었습니다. 현재 화면에서 다시 질문하면 안내를 시작할 수 있습니다.</p>}
+                        {entry.reply.decision === 'ANSWER_ONLY' && !canProcess && !observed?.paymentId && entry.reply.evidenceRefs?.some((ref) => ref.workflowId != null && !findWorkflowGuide(ref.workflowId, '1.0')) && <p className="pico-notice" role="status">지급 작성 화면 안내는 정산 담당자에게 요청하세요. 현재 계정은 조회 안내만 사용할 수 있습니다.</p>}
                         <small>일반 업무 안내 · 현재 지급 처리 완료를 뜻하지 않습니다.</small>
                       </article>
                     ) : (
@@ -670,7 +675,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                       <span><b>{workflow.title}</b><small>{workflow.description}</small></span><Symbol name="chevron_right" />
                     </button>
                   ))}
-                  {GUIDE_CATALOG.filter((workflow) => workflow.roles.some((role) => role === currentRole)).map((workflow) => (
+                  {GUIDE_CATALOG.filter((workflow) => workflow.enabled && canProcess && workflow.roles.some((role) => role === currentRole)).map((workflow) => (
                     <button key={workflow.workflowId} type="button" className="pico-suggestion"
                       onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflow.workflowId); setOpen(false) }}>
                       <span><b>{workflow.title}</b><small>지급 화면의 실제 입력·저장·검증 상태를 확인하며 안내합니다.</small></span><Symbol name="chevron_right" />

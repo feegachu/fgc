@@ -147,13 +147,67 @@
     "commissionrules.paymentconditioncode",
     "commissionrules.paymentstage",
     "commissionrules.productofferingid",
-    "feeregimerules.commissionitemid",
-    "feeregimerules.insurerid",
-    "feeregimerules.productofferingid",
     "parameters.proration_rule",
     "parameters.revival_backfill_rule",
     "parameters.status_month_rule",
     "policytype",
     "sourceclass"
+  ],
+  "policy.action": [
+    "submit",
+    "approve",
+    "reject",
+    "activate",
+    "new_version"
+  ],
+  "contract.filter.input": [
+    "contractno",
+    "contractdatefrom",
+    "contractdateto"
+  ],
+  "contract.filter.select": [
+    "insurerid",
+    "productofferingid",
+    "agentid",
+    "orgid",
+    "currentstatus",
+    "capresultstatus"
+  ],
+  "contract.filter.retry": [
+    "insurerid",
+    "productofferingid",
+    "agentid",
+    "orgid"
+  ],
+  "ledger.filter.input": [
+    "from",
+    "to",
+    "contractno"
+  ],
+  "ledger.filter.select": [
+    "type",
+    "account",
+    "status"
+  ],
+  "arbitrage.summary": [
+    "clear",
+    "candidate",
+    "review_required"
+  ],
+  "exception.summary": [
+    "cap_warning",
+    "cap_violation",
+    "cap_review_required",
+    "reconciliation_mismatch",
+    "journal_imbalance",
+    "journal_correction_required",
+    "arbitrage_candidate",
+    "refund_table_missing",
+    "product_code_mismatch",
+    "policy_missing",
+    "policy_duplicate",
+    "allocation_evidence_missing",
+    "data_quality",
+    "other"
   ]
 }
