@@ -67,7 +67,7 @@ test('판정 태그와 헤더를 최소 너비로 보호하고 과거 저장값�
   await assertFits()
   label = '적용대상 아님 · 추가 확인 필요'
   await page.reload()
-  await expect(page.getByText(label, { exact: true })).toBeVisible()
+  await expect(page.getByText('적용대상 아님, 추가 확인 필요', { exact: true })).toBeVisible()
   await assertFits()
   expect((await header.boundingBox())!.width).toBeGreaterThan(width)
 })
