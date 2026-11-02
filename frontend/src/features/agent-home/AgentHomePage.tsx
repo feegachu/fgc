@@ -82,6 +82,7 @@ function Delta({ now, before }: { now: number; before?: number }) {
   if (before == null) return <span>-</span>
   if (before === 0) return <span>전월 실적 없음</span>
   const value = deltaPercent(now, before)
+  if (value === 0) return <span>전월 대비 변동 없음</span>
   return (
     <>
       <span className={`ah-delta ${value >= 0 ? 'up' : 'down'}`}>{`${value >= 0 ? '▲' : '▼'} ${Math.abs(value).toFixed(1)}%`}</span>
@@ -219,9 +220,13 @@ function Snapshot({
             unit="건"
             footer={
               <>
-                <span className={`ah-delta ${countDelta >= 0 ? 'up' : 'down'}`}>
-                  {`${countDelta >= 0 ? '▲' : '▼'} ${Math.abs(countDelta)}`}
-                </span>
+                {countDelta === 0 ? (
+                  <span>변동 없음</span>
+                ) : (
+                  <span className={`ah-delta ${countDelta > 0 ? 'up' : 'down'}`}>
+                    {`${countDelta > 0 ? '▲' : '▼'} ${Math.abs(countDelta)}`}
+                  </span>
+                )}
                 <span>전월 {int(before.count)}건</span>
               </>
             }
