@@ -111,7 +111,7 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
     expect(screen.getByRole('article', { name: '월 환산 초회보험료' })).toHaveTextContent('200,000')
     await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('500,000'))
-    expect(screen.getByRole('article', { name: '설계사 프로필' })).toHaveTextContent('김설계')
+    expect(screen.getByText('김설계님의 판매 현황')).toBeInTheDocument()
   })
 
   it('확인 필요 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
@@ -212,9 +212,9 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
-  it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
+  it('상품 추천 AI 버튼을 누르면 모달이 열리고 Esc로 닫으면 버튼으로 돌아온다', async () => {
     renderHome()
-    const launcher = await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ })
+    const launcher = await screen.findByRole('button', { name: '상품 추천 AI에게 묻기' })
     await userEvent.click(launcher)
     const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
     expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()

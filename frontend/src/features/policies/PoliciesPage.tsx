@@ -74,7 +74,7 @@ export function PoliciesPage() {
     <div className="policy-page">
       <header className="page-header policy-page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">정책, 룰셋 관리</h1>
+          <h1 className="page-title">정책/룰셋 관리</h1>
           <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
         <div className="policy-header-actions">

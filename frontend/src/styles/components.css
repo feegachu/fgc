@@ -461,7 +461,7 @@
 .filter-bar .field-label,
 .filter-field-label {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.125rem;
 }
@@ -514,7 +514,7 @@
 .search-conditions :is(.field-label, .filter-field-label),
 .search-conditions .filter-field > label {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.125rem;
 }

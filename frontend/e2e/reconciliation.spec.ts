@@ -68,7 +68,7 @@ test('비교 모달의 null 회차는 대시, 음수 예상·실제·차액은 �
     const amounts = page.getByRole('dialog').getByText(text, { exact: true })
     await expect(amounts.first()).toBeVisible()
     for (const amount of await amounts.all()) {
-      await expect(amount).toHaveCSS('color', 'rgb(185, 28, 28)')
+      await expect(amount).toHaveCSS('color', 'rgb(215, 38, 30)')
     }
   }
 })
@@ -166,7 +166,7 @@ test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외
   await expect(differences.first()).toBeVisible()
   for (const difference of await differences.all()) {
     await expect(difference).toHaveText(/^-1,000(원)?$/)
-    await expect(difference).toHaveCSS('color', 'rgb(185, 28, 28)')
+    await expect(difference).toHaveCSS('color', 'rgb(215, 38, 30)')
   }
   await page.screenshot({ path: testInfo.outputPath('reconciliation-minus-differences.png'), fullPage: true })
   await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()

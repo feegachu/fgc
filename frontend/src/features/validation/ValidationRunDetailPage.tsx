@@ -61,7 +61,7 @@ function DetailError({ error, onRetry }: { error: Error; onRetry: () => void }) 
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">월 통합검증 상세, 확정</h1>
+          <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
       </header>
       <section className="surface">
@@ -171,7 +171,7 @@ function DetailBody({
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">월 통합검증 상세, 확정</h1>
+          <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
         <RunPicker currentId={id} link={link} />
       </header>
@@ -387,11 +387,12 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
   const summary = detail.targetSummary
   const targets = detail.targets ?? []
   const columns: TableColumn<ValidationTarget>[] = [
-    { key: 'contract', label: '계약', width: '8rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
+    // 계약번호는 자르지 않는다(좁은 화면에서는 표 안에서 가로로 넘긴다).
+    { key: 'contract', label: '계약', width: '11.5rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
     {
       key: 'status',
       label: '선별',
-      width: '6rem',
+      width: '5rem',
       align: 'center',
       render: (t) => <StatusBadge tone={selectionTone(t.selectionStatus)}>{t.selectionStatusLabel}</StatusBadge>,
     },
@@ -407,7 +408,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
     {
       key: 'refund',
       label: '환급률표',
-      width: '6.5rem',
+      width: '5.5rem',
       cellClassName: 'tabular-nums',
       render: (t) => dash(t.refundRateTableId),
     },

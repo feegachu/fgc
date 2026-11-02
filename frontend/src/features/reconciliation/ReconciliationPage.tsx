@@ -245,12 +245,15 @@ export default function ReconciliationPage() {
   const requestedRunId =
     !params.get('runMonth') || params.get('runMonth') === criteria.month ? positiveId(params.get('runId')) : ''
   const resultId = positiveId(params.get('resultId'))
+  // 이번 달 실행 중 대사 대상이 있는 가장 최근 실행을 미리 보여 준다. 대상 0건 실행(계약이 없는 보험사)은 건너뛴다.
+  const sameMonthRuns = (history.data?.content ?? []).filter(
+    (run) => run.settlementMonth?.slice(0, 7) === criteria.month,
+  )
   const previewRun =
-    !params.has('runId') && !resultId && !history.isPlaceholderData ? history.data?.content?.[0] : undefined
-  const previewRunId =
-    previewRun?.settlementMonth?.slice(0, 7) === criteria.month
-      ? positiveId(String(previewRun.reconciliationRunId ?? ''))
-      : ''
+    !params.has('runId') && !resultId && !history.isPlaceholderData
+      ? (sameMonthRuns.find((run) => (run.targetCount ?? 0) > 0) ?? sameMonthRuns[0])
+      : undefined
+  const previewRunId = previewRun ? positiveId(String(previewRun.reconciliationRunId ?? '')) : ''
   const runId = requestedRunId || previewRunId
   const resultPage = Number(positiveId(params.get('resultPage')) || 1)
   const rawType = params.get('resultType') ?? ''
@@ -341,7 +344,7 @@ export default function ReconciliationPage() {
   return (
     <div className="reco-react-page">
       <header className="page-header">
-        <h1 className="page-title">대사 실행, 결과</h1>
+        <h1 className="page-title">대사 실행/결과</h1>
       </header>
       <section className="surface reco-react-run">
         <header className="surface-header reco-react-panel-header">
@@ -707,7 +710,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
         <KpiCard
           label="차액 합계"
           zero={summary?.differenceTotal === 0}
-          value={summary ? <Money value={summary.differenceTotal} difference unit={false} animate /> : EMPTY}
+          value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
           unit="원"
           tone={summary?.differenceTotal === 0 ? 'success' : 'error'}
           footer="실제 지급액 - 예상 지급액 합계"

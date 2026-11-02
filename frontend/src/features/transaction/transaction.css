@@ -116,7 +116,7 @@
   gap: var(--space-4);
 }
 
-.transaction-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.transaction-mono { font-variant-numeric: tabular-nums; }
 .transaction-number,
 .transaction-attribution-table input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -206,8 +206,7 @@
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--color-border-default);
-  border-top: 3px solid var(--color-action-primary);
-  border-radius: var(--radius-8);
+  border-radius: var(--radius-12);
 }
 
 .transaction-cap-heading,

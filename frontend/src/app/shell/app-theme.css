@@ -1,166 +1,170 @@
-/* Approved theme: summary KPIs, glass sidebar, light blue buttons and soft status badges. */
+/* A안 신한 블루 업무형 공통 셸: 흰 사이드바와 흰 면, 파란색은 주 버튼과 선택 상태에만, 상태는 점과 글자로 표시한다. */
 html:root {
-  --app-canvas: #edf0fa;
-  --color-nav-bg-default: #eef4ff;
-  --color-nav-bg-hover: color-mix(in srgb, #0046ff 7%, transparent);
-  --color-nav-bg-active: color-mix(in srgb, #0046ff 12%, transparent);
-  --color-nav-text-default: #17334b;
-  --color-nav-text-muted: #17334b;
-  --color-action-primary: #0046ff;
-  --color-action-primary-hover: #dfeaff;
-  --color-action-primary-down: #dfeaff;
-  --color-action-subtle: color-mix(in srgb, #0046ff 8%, white);
+  --app-canvas: var(--color-bg-canvas);
 }
 
 .app-shell.app-theme {
   background: var(--app-canvas);
+  /* 한글은 단어 중간에서 줄을 바꾸지 않는다. 영문, 숫자의 줄바꿈은 그대로다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 :root .app-sidebar {
-  color: #17334b;
-  border-right: 1px solid #ffffffb3;
-  background: color-mix(in srgb, color-mix(in srgb, #eef4ff 30%, white) 70%, transparent);
-  backdrop-filter: blur(16px) saturate(150%);
-  box-shadow:
-    8px 0 28px #27416e0a,
-    inset -1px 0 #ffffff4d;
+  color: var(--color-nav-text-default);
+  border-right: 1px solid var(--color-border-default);
+  background: var(--color-bg-surface);
+  box-shadow: none;
 }
 :root .sidebar-brand img {
   filter: brightness(0) saturate(100%) invert(24%) sepia(54%) saturate(929%) hue-rotate(174deg);
 }
 .app-shell.app-theme .sidebar-collapse-button {
-  color: var(--color-nav-text-default);
+  color: var(--color-text-secondary);
 }
 :root .sidebar-brand button:focus-visible {
-  outline-color: var(--color-nav-text-default);
+  outline-color: var(--color-border-focus);
 }
 :root .sidebar-user-panel {
-  border-top: 1px solid #ffffff80;
+  border-top: 1px solid var(--color-border-default);
+  box-shadow: none;
+}
+:root .app-sidebar :is(.sidebar-nav-link, .sidebar-nav-summary, .sidebar-subnav-link) {
+  color: var(--color-nav-text-default);
+  border-radius: var(--radius-8);
   box-shadow: none;
 }
 :root .app-sidebar :is(.sidebar-nav-link, .sidebar-nav-summary, .sidebar-subnav-link):hover {
   background: var(--color-nav-bg-hover);
 }
-:root
-  .app-sidebar
-  :is(.sidebar-nav-link.is-active, .sidebar-nav-details[open] > .sidebar-nav-summary, .sidebar-subnav-link.is-active) {
-  color: color-mix(in srgb, #0046ff 35%, #0f172a);
-  background: color-mix(in srgb, #0046ff 10%, #ffffff66);
-  box-shadow:
-    inset 0 0 0 1px #ffffff80,
-    0 3px 12px #27416e0a;
+:root .app-sidebar .sidebar-nav-details[open] > .sidebar-nav-summary {
+  color: var(--color-text-primary);
+  background: transparent;
+  font-weight: 600;
+}
+:root .app-sidebar :is(.sidebar-nav-link.is-active, .sidebar-subnav-link.is-active) {
+  color: var(--color-action-primary);
+  background: var(--color-nav-bg-active);
+  font-weight: 700;
 }
 
-/* Links such as 신규 등록 and ordinary buttons share the same styles. */
+/* 한 화면의 주 행동만 파랗게 채운다. 나머지는 테두리 버튼과 글자 버튼이다. */
 :root .button {
   min-height: 36px;
   height: auto;
   padding-block: 0.375rem;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
+  font-weight: 600;
+}
+:root .button:active:not(:disabled) {
+  transform: none;
 }
 :root .button-primary:not(:disabled):not(.is-disabled) {
-  color: #1d4ed8;
-  border-color: #c6d7ff;
-  background: #edf3ff;
+  color: var(--color-text-inverse);
+  border-color: var(--color-action-primary);
+  background: var(--color-action-primary);
 }
 :root .button-primary:is(:hover, :active):not(:disabled):not(.is-disabled) {
-  background: #dfeaff;
+  border-color: var(--color-action-primary-hover);
+  background: var(--color-action-primary-hover);
 }
 :root .button-secondary:not(:disabled):not(.is-disabled) {
-  color: #1d4ed8;
-  border-color: #c6d7ff;
-  background: #fff;
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-surface);
 }
 :root .button-secondary:is(:hover, :active):not(:disabled):not(.is-disabled) {
-  color: #1d4ed8;
-  border-color: #c6d7ff;
-  background: #edf3ff;
+  border-color: var(--color-neutral-400);
+  background: var(--color-bg-canvas);
 }
 :root .button-ghost:not(:disabled):not(.is-disabled) {
-  color: #0046ff;
+  color: var(--color-text-link);
 }
 :root .button-ghost:is(:hover, :active):not(:disabled):not(.is-disabled) {
   background: var(--color-action-subtle);
 }
 
-/* Compact tabs keep the visible mouse/keyboard highlight and close controls. */
+/* 면은 1px 선과 여백으로 나눈다. 그림자는 떠 있는 메뉴와 창에만 쓴다. */
+:root .surface {
+  border-color: var(--color-border-default);
+  border-radius: var(--radius-12);
+  box-shadow: none;
+}
+:root .page-title {
+  font-size: 1.375rem;
+  line-height: 1.875rem;
+  letter-spacing: -0.02em;
+}
+
+/* 업무 탭: 선택한 탭은 파란 밑줄과 진한 글자로, 나머지는 회색 글자로 구분한다. */
 :root .workspace-tab {
   width: auto;
   min-width: 6.5rem;
   max-width: 16rem;
-  height: 2rem;
+  height: 100%;
   flex: 0 0 auto;
-  margin-bottom: 0.25rem;
   border: 0;
-  border-radius: 6px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--color-text-tertiary);
   background: transparent;
-  transition: background-color 140ms ease;
+  transition: background-color 120ms ease;
+}
+:root .workspace-tab + .workspace-tab {
+  margin-left: 0;
 }
 :root .workspace-tab.is-active {
-  background: var(--app-canvas);
+  border-bottom-color: var(--color-action-primary);
+  color: var(--color-text-primary);
+  background: transparent;
+  font-weight: 700;
 }
 :root .workspace-tab.is-active::before {
   display: none;
 }
 :root .workspace-tab:is(:hover, :focus-within) {
-  background: var(--app-canvas);
+  background: var(--color-bg-subtle);
 }
 :root .workspace-tab-close:hover {
-  background: color-mix(in srgb, #0046ff 16%, transparent);
+  background: var(--color-neutral-200);
 }
 
-/* Semantic colors and labels remain distinct at 12% background opacity. */
+/* 공통 원칙 02: 배지는 조치가 필요한 상태에만. 위험과 주의는 점과 색 글자, 나머지는 색 없는 글자다. */
 :root .status-badge {
-  --badge-ink: #475569;
+  --badge-ink: var(--color-text-primary);
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.375rem;
-  min-height: 1.5rem;
-  padding: 0.125rem 0.625rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   color: var(--badge-ink);
-  background: color-mix(in srgb, var(--badge-ink) 12%, transparent);
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  font-weight: 500;
-}
-:root .status-badge-success {
-  --badge-ink: #15803d;
-}
-:root .status-badge-info {
-  --badge-ink: #1d4ed8;
-}
-:root .status-badge-review {
-  --badge-ink: #6d28d9;
-}
-:root .status-badge-warning {
-  --badge-ink: #a35200;
-}
-:root :is(.status-badge-error, .status-badge-risk) {
-  --badge-ink: #b91c1c;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 400;
+  vertical-align: baseline;
 }
 :root .status-badge::before {
   display: none;
 }
-
-/* Four or more declared column choices use badges; up to three use text. */
-:root :is(table, [role='table']) .status-badge {
-  min-width: 0;
-  min-height: 0;
-  height: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  vertical-align: middle;
+:root .status-badge-success {
+  --badge-ink: var(--color-status-success-text);
 }
-:root :is(table, [role='table']) .status-badge[data-table-presentation='badge'] {
-  padding: 0.125rem 0.625rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--badge-ink) 12%, transparent);
+:root :is(.status-badge-warning, .status-badge-risk, .status-badge-error) {
+  font-weight: 600;
 }
-:root :is(table, [role='table']) .status-badge[data-table-presentation='dot']::before {
+:root .status-badge-warning {
+  --badge-ink: var(--color-status-warning-text);
+}
+:root :is(.status-badge-error, .status-badge-risk) {
+  --badge-ink: var(--color-status-error-text);
+}
+:root :is(.status-badge-warning, .status-badge-risk, .status-badge-error)::before {
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -169,14 +173,16 @@ html:root {
   background: currentColor;
   content: '';
 }
-:root :is(table, [role='table']) .status-badge[data-badge-kind='severity'] {
-  font-weight: 600;
-}
-:root .status-badge[data-badge-kind='severity'].status-badge-risk {
-  --badge-ink: #c2410c;
-}
 :root :is(table, [role='table']) .status-badge[data-badge-kind='text'] {
   color: inherit;
+}
+/* 유형, 출처, 지급 원천 같은 속성은 어느 화면에서나 색 없는 글자로 쓴다. */
+:root .status-badge[data-badge-kind='category'] {
+  --badge-ink: inherit;
+  font-weight: 400;
+}
+:root .status-badge[data-badge-kind='category']::before {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('policy-preview')
-  await expect(page.getByRole('heading', { name: '정책, 룰셋 관리' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '정책/룰셋 관리' })).toBeVisible()
 })
 
 test('policy list, detail, sources and timeline render without API network requests', async ({ page }) => {

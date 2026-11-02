@@ -158,7 +158,7 @@ test('실행을 만들고 돌려 확정한다', async ({ page }) => {
   await page.goto('validation-runs?month=2026-07')
   await expect(page.getByRole('heading', { name: '월 통합검증 실행 목록' })).toBeVisible()
   await page.getByRole('button', { name: '실행 생성' }).click()
-  await expect(page.getByRole('heading', { name: '월 통합검증 상세, 확정' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '월 통합검증 상세/확정' })).toBeVisible()
 
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '8/10 단계 (80%)' })).toBeVisible({ timeout: 10_000 })

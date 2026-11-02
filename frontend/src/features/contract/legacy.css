@@ -81,7 +81,7 @@
 
 .contract-form-card-header p {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
 }
 
@@ -104,7 +104,7 @@
 .contract-form-fields .field-helper,
 .contract-form-fields .field-error {
   min-height: 1rem;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
 }
 
@@ -275,7 +275,7 @@
 .contract-summary-item dt,
 .contract-information-item dt {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1rem;
 }
@@ -423,7 +423,7 @@
 .contract-history-panel-header p {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
 }
 
@@ -443,7 +443,7 @@
   padding-inline: var(--space-2);
   border-radius: var(--radius-6);
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -558,7 +558,7 @@
 
 .contract-history-event-card > header span {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
 }
 
@@ -575,7 +575,7 @@
 
 .contract-history-times dt {
   color: var(--color-text-secondary);
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 0.875rem;
 }
@@ -583,7 +583,7 @@
 .contract-history-times dd {
   overflow: hidden;
   margin-top: var(--space-1);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1rem;
   text-overflow: ellipsis;
@@ -611,7 +611,7 @@
 .contract-processing-job,
 .contract-processing-row time {
   overflow: hidden;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -629,7 +629,7 @@
 .contract-processing-row .status-badge {
   min-width: 3rem;
   height: 1.25rem;
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   line-height: 0.875rem;
 }
 
@@ -659,7 +659,7 @@
 .contract-history-empty p {
   margin-top: var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
 }
 
@@ -975,7 +975,7 @@
   min-width: 0;
   height: 1.5rem;
   padding-inline: var(--space-1);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 
 /* 로딩과 실패가 시각적으로 같아 보이면 사용자는 기다려야 할지 다시 눌러야 할지 모른다. */

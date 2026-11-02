@@ -1,5 +1,4 @@
 import { CellDisclosure } from '../../components/CellDisclosure'
-import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
 import { errorText, isNegative } from '../../lib/format'
@@ -13,25 +12,16 @@ export function Money({
   value,
   difference = false,
   unit = true,
-  animate = false,
 }: {
   value?: Amount
   difference?: boolean
   unit?: boolean
-  animate?: boolean
 }) {
   return (
     <span
       className={`${isNegative(value) ? 'is-negative-amount' : ''} ${difference && value != null && Number(value) !== 0 ? 'reco-react-difference' : ''}`}
     >
-      {animate && value != null && Number.isSafeInteger(Number(value)) ? (
-        <AnimatedNumber
-          value={Number(value)}
-          format={(current) => amountText(current === Number(value) ? value : current, unit)}
-        />
-      ) : (
-        amountText(value, unit)
-      )}
+      {amountText(value, unit)}
     </span>
   )
 }
@@ -39,7 +29,6 @@ export function ResultBadge({ type, label }: { type?: string; label?: string }) 
   return (
     <StatusBadge
       optionCount={Object.keys(RESULT_TYPE).length}
-      kind="category"
       tone={type === 'MATCHED' ? 'success' : type === 'REVIEW_REQUIRED' ? 'review' : 'error'}
     >
       {label || RESULT_TYPE[type as keyof typeof RESULT_TYPE] || text(type)}

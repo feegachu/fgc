@@ -121,7 +121,7 @@
 .cap-react-stage-usage > span {
   display: block;
   color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 .cap-react-stage dd,
 .cap-react-detail dd {
@@ -143,7 +143,7 @@
 .cap-react-stage-code {
   margin: var(--space-1) 0 0;
   color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 .cap-react-stage-usage {
   margin-top: var(--space-5);
@@ -168,7 +168,7 @@
   border-radius: var(--radius-8);
   color: var(--color-text-secondary);
   background: var(--color-bg-subtle);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.125rem;
 }
 .cap-react-detail p {

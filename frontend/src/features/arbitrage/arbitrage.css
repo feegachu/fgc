@@ -403,7 +403,7 @@
 .arb-amount-reference-label {
   margin-right: var(--space-1);
   color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 
 .arb-timeline-panel {
@@ -462,7 +462,7 @@
 .arb-timeline-axis-label {
   fill: currentColor;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .arb-timeline-axis-label {

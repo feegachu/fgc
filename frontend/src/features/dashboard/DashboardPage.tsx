@@ -1,4 +1,3 @@
-import { typeBadgeTone } from '../exception/rules'
 import { openSettlementGuide } from '../assistant/settlement/entry'
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
@@ -13,14 +12,26 @@ import { monthText, screenMessage } from '../../lib/screenText'
 import { useDrawn } from '../../lib/motion'
 import { withMonth } from '../../stores/workspace'
 import type { ShellContext } from '../../app/shell/AppShell'
+import { exceptionSearchQueryOptions, OPEN_STATUS } from '../exception/api'
+import type { ExceptionFilters } from '../exception/api'
 import { dashboardSummaryQueryOptions } from './api'
 import type { RecentException, RecentRun } from './api'
 import { DashboardSkeleton } from './DashboardSkeleton'
-import { RiskComposition } from './RiskComposition'
-import type { CompositionItem } from './RiskComposition'
 import { exceptionStatusTone, runStatusTone, severityTone } from './tones'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
+/** 예외함을 처음 열 때와 같은 조건(미처리 전체)이라 '예외함에서 처리'로 넘어가도 건수가 그대로다. */
+const OPEN_EXCEPTIONS: ExceptionFilters = {
+  type: '',
+  reasonCode: '',
+  severity: '',
+  status: OPEN_STATUS,
+  assigneeFilter: '',
+  validationMonth: '',
+  contractNo: '',
+  sort: '',
+  page: 1,
+}
 
 export function DashboardPage() {
   const { month } = useOutletContext<ShellContext>()
@@ -52,9 +63,8 @@ function DashboardContent({ month }: { month: string }) {
     {
       key: 'type',
       label: '유형',
-      align: 'center',
       render: (e) => (
-        <StatusBadge optionCount={14} kind="category" tone={typeBadgeTone(e.exceptionType)}>
+        <StatusBadge optionCount={14} kind="category">
           {e.exceptionTypeLabel ?? '-'}
         </StatusBadge>
       ),
@@ -77,7 +87,7 @@ function DashboardContent({ month }: { month: string }) {
       label: '상태',
       align: 'center',
       render: (e) => (
-        <StatusBadge optionCount={4} tone={exceptionStatusTone(e.status)} tablePresentation="dot">
+        <StatusBadge optionCount={4} tone={exceptionStatusTone(e.status)} tablePresentation="text">
           {e.statusLabel ?? '-'}
         </StatusBadge>
       ),
@@ -85,6 +95,7 @@ function DashboardContent({ month }: { month: string }) {
     { key: 'createdAt', label: '발생', cellClassName: 'tabular-nums', render: (e) => dateTime(e.createdAt) },
   ]
 
+  // 미처리 예외는 아래 '처리할 예외' 제목 숫자로 보여 준다(공통 원칙 03). 숫자 색은 확정 위반과 원장 불균형만 위험색이다.
   const kpis =
     data &&
     ([
@@ -101,7 +112,7 @@ function DashboardContent({ month }: { month: string }) {
         label: '1,200% 주의',
         value: data.capWarning,
         footer: '사용률 경고 기준 이상',
-        tone: 'warning',
+        tone: 'neutral',
         to: href('/cap-checks', { status: 'WARNING' }),
       },
       {
@@ -109,7 +120,7 @@ function DashboardContent({ month }: { month: string }) {
         label: '차익거래 검토대상',
         value: data.arbitrageCandidate,
         footer: '위반 확정 아님',
-        tone: 'warning',
+        tone: 'neutral',
         to: href('/arbitrage-checks', { status: 'CANDIDATE' }),
       },
       {
@@ -117,7 +128,7 @@ function DashboardContent({ month }: { month: string }) {
         label: '대사 불일치',
         value: data.reconMismatch,
         footer: '허용오차 0원',
-        tone: 'risk',
+        tone: 'neutral',
         to: href('/reconciliations', { onlyMismatch: 'true' }),
       },
       {
@@ -125,59 +136,10 @@ function DashboardContent({ month }: { month: string }) {
         label: '원장 불균형',
         value: data.journalImbalance,
         footer: '기표 전 0건 필수',
-        tone: data.journalImbalance === 0 ? 'success' : 'error',
+        tone: 'error',
         to: href('/journals', { imbalanceOnly: 'true' }),
       },
-      // OPEN 은 DB 상태값이 아니라 EXCP-W01 과 공유하는 화면 묶음 필터(NEW + IN_REVIEW)다.
-      {
-        id: 'open',
-        label: '미처리 예외',
-        value: data.openException,
-        footer: '신규 + 검토중',
-        tone: 'warning',
-        to: href('/exceptions', { status: 'OPEN' }),
-      },
     ] as const)
-
-  const compositionItems: CompositionItem[] = data
-    ? [
-        {
-          key: 'cap-violation',
-          label: '1,200% 위반',
-          value: data.capViolation ?? 0,
-          color: 'error',
-          to: href('/cap-checks', { status: 'VIOLATION' }),
-        },
-        {
-          key: 'cap-warning',
-          label: '1,200% 주의',
-          value: data.capWarning ?? 0,
-          color: 'warning',
-          to: href('/cap-checks', { status: 'WARNING' }),
-        },
-        {
-          key: 'arbitrage',
-          label: '차익거래 검토대상',
-          value: data.arbitrageCandidate ?? 0,
-          color: 'review',
-          to: href('/arbitrage-checks', { status: 'CANDIDATE' }),
-        },
-        {
-          key: 'recon',
-          label: '대사 불일치',
-          value: data.reconMismatch ?? 0,
-          color: 'info',
-          to: href('/reconciliations', { onlyMismatch: 'true' }),
-        },
-        {
-          key: 'journal',
-          label: '원장 불균형',
-          value: data.journalImbalance ?? 0,
-          color: 'success',
-          to: href('/journals', { imbalanceOnly: 'true' }),
-        },
-      ]
-    : []
 
   return (
     <div className="dashboard-page">
@@ -206,7 +168,7 @@ function DashboardContent({ month }: { month: string }) {
       ) : (
         <>
           <section className="kpi-grid kpi-group" aria-label="주요 검증 지표">
-            {kpis?.map((kpi, index) => (
+            {kpis?.map((kpi) => (
               <Link
                 key={kpi.label}
                 to={kpi.to}
@@ -214,7 +176,6 @@ function DashboardContent({ month }: { month: string }) {
                 data-kpi={kpi.id}
                 data-zero={(kpi.value ?? 0) === 0}
                 data-attention={kpi.tone === 'error' && (kpi.value ?? 0) > 0}
-                style={{ '--i': index } as CSSProperties}
                 aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}
               >
                 <KpiCard
@@ -229,33 +190,34 @@ function DashboardContent({ month }: { month: string }) {
             ))}
           </section>
           <div className="dashboard-main-grid">
-            <div className="dashboard-primary-column">
-              <section className="surface" aria-labelledby="priority-title">
-                <header className="surface-header">
-                  <h2 id="priority-title" className="surface-title">
-                    최근 예외
-                  </h2>
-                  <Link className="run-list-link" to={href('/exceptions')}>
-                    예외함 전체 보기 →
-                  </Link>
-                </header>
-                <div className="priority-table">
-                  <DataTable
-                    caption="최근 예외 목록"
-                    columns={exceptionColumns}
-                    rows={data?.recentExceptions ?? []}
-                    rowKey={(e) => String(e.exceptionCaseId)}
-                    emptyMessage={EMPTY_MESSAGE}
-                  />
-                </div>
-              </section>
+            <section className="surface" aria-labelledby="priority-title">
+              <header className="surface-header">
+                <h2 id="priority-title" className="surface-title">
+                  최근 예외
+                </h2>
+                <Link className="run-list-link" to={href('/exceptions')}>
+                  예외함 전체 보기
+                </Link>
+              </header>
+              <div className="priority-table">
+                <DataTable
+                  caption="최근 예외 목록"
+                  columns={exceptionColumns}
+                  rows={data?.recentExceptions ?? []}
+                  rowKey={(e) => String(e.exceptionCaseId)}
+                  emptyMessage={EMPTY_MESSAGE}
+                />
+              </div>
+            </section>
+            <div className="dashboard-side-column">
+              <OpenExceptions total={data?.openException ?? 0} href={href} />
               <section className="surface run-list-card" aria-labelledby="run-list-title">
                 <div className="run-list-header">
                   <h2 id="run-list-title" className="run-list-title">
                     최근 통합검증 실행
                   </h2>
                   <Link className="run-list-link" to={href('/validation-runs')}>
-                    실행 목록 →
+                    실행 목록
                   </Link>
                 </div>
                 {data?.recentRuns?.length ? (
@@ -273,20 +235,53 @@ function DashboardContent({ month }: { month: string }) {
                 )}
               </section>
             </div>
-            <aside className="dashboard-secondary-column" aria-label="검증 현황 요약">
-              <section className="surface risk-composition-card" aria-labelledby="composition-title">
-                <header className="surface-header">
-                  <h2 id="composition-title" className="surface-title">
-                    검증 항목별 건수 비중
-                  </h2>
-                </header>
-                <RiskComposition items={compositionItems} />
-              </section>
-            </aside>
           </div>
         </>
       )}
     </div>
+  )
+}
+
+/** 처리할 예외: 미처리 건수를 제목 숫자로, 유형별 건수를 예외함으로 가는 목록으로 보여 준다. */
+function OpenExceptions({
+  total,
+  href,
+}: {
+  total: number
+  href: (path: string, params?: Record<string, string>) => string
+}) {
+  const open = useQuery(exceptionSearchQueryOptions(OPEN_EXCEPTIONS))
+  const types = [...(open.data?.summary ?? [])]
+    .filter((item) => (item.count ?? 0) > 0)
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+  return (
+    <section className="surface dashboard-open" aria-labelledby="open-title">
+      <header className="surface-header">
+        <h2 id="open-title" className="surface-title">
+          처리할 예외 <span className="dashboard-open-total tabular-nums">{int(total)}건</span>
+        </h2>
+        <Link className="run-list-link" to={href('/exceptions', { status: OPEN_STATUS })}>
+          예외함에서 처리
+        </Link>
+      </header>
+      {types.length ? (
+        <ul className="dashboard-open-list">
+          {types.map((item) => (
+            <li key={item.type}>
+              <Link
+                to={href('/exceptions', { type: item.type ?? '', status: OPEN_STATUS })}
+                className={item.type === 'CAP_VIOLATION' ? 'is-danger' : undefined}
+              >
+                <span>{item.typeLabel ?? '-'}</span>
+                <strong className="tabular-nums">{int(item.count ?? 0)}건</strong>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="dashboard-open-empty">{total ? '유형별 건수는 예외함에서 확인할 수 있습니다.' : '처리할 예외가 없습니다.'}</p>
+      )}
+    </section>
   )
 }
 
@@ -296,7 +291,6 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const step = run.currentStep ?? 0
   const progress = Math.max(0, Math.min(100, step * 10))
   const drawn = useDrawn()
-  const running = run.status === 'RUNNING'
   return (
     <Link className="run-row" to={to}>
       <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}회차`}</strong>
@@ -310,17 +304,13 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
         aria-valuemax={100}
         aria-valuenow={progress}
       >
-        {Array.from({ length: RUN_STEPS }, (_, index) => {
-          const done = drawn && index < step
-          const current = running && index === step - 1
-          return (
-            <span
-              key={index}
-              className={`run-step${done ? ' is-done' : ''}${current ? ' is-current' : ''}`}
-              style={{ '--i': index } as CSSProperties}
-            />
-          )
-        })}
+        {Array.from({ length: RUN_STEPS }, (_, index) => (
+          <span
+            key={index}
+            className={`run-step${drawn && index < step ? ' is-done' : ''}`}
+            style={{ '--i': index } as CSSProperties}
+          />
+        ))}
       </span>
     </Link>
   )

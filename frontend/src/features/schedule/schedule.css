@@ -218,7 +218,7 @@
 
 .schedule-detail-kv dt {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.125rem;
 }
@@ -293,7 +293,7 @@
 
 .schedule-confirm-summary dt {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 

@@ -28,14 +28,6 @@ export function StatusBadge({
   )
 }
 
-// Category colors are stable for the same code, including server-defined values.
-function categoryTone(value: string | number): StatusTone {
-  const tones: StatusTone[] = ['info', 'review', 'success', 'warning', 'neutral']
-  let hash = 0
-  for (const char of String(value)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
-  return tones[hash % tones.length]
-}
-
 export function CategoryBadge({
   value,
   children,
@@ -52,7 +44,6 @@ export function CategoryBadge({
   return (
     <StatusBadge
       kind="category"
-      tone={categoryTone(key)}
       optionCount={optionCount}
       tablePresentation={tablePresentation}
     >

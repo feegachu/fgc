@@ -107,10 +107,12 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
     expect(summaryCalls()).toHaveLength(1)
   })
-  it('KPI 6종과 최근 예외·실행을 형식 규칙에 맞게 보여 준다', async () => {
+  it('KPI 5종과 처리할 예외, 최근 예외와 실행을 형식 규칙에 맞게 보여 준다', async () => {
     renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
-    expect(within(kpis).getAllByRole('link')).toHaveLength(6)
+    expect(within(kpis).getAllByRole('link')).toHaveLength(5)
+    // 미처리 예외는 KPI 대신 '처리할 예외' 제목 숫자로 보인다(공통 원칙 03).
+    expect(screen.getByRole('heading', { name: '처리할 예외 5건' })).toBeInTheDocument()
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
     expect(summaryCalls()).toEqual(['/api/v1/dashboard/summary?month=2026-07'])
     const table = screen.getByRole('table', { name: '최근 예외 목록' })

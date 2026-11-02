@@ -11,32 +11,6 @@ export function canAnimate(): boolean {
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
 
-/** 숫자를 이전 값에서 목표값까지 부드럽게 올린다. 모션을 쓰지 않으면 목표값을 그대로 돌려준다. */
-export function useCountUp(target: number, durationMs = 700): number {
-  const [animate] = useState(canAnimate)
-  const [value, setValue] = useState(animate ? 0 : target)
-  const currentRef = useRef(animate ? 0 : target)
-
-  useEffect(() => {
-    if (!animate) return
-    const from = currentRef.current
-    if (from === target) return
-    const start = performance.now()
-    let frame = 0
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs)
-      const next = t >= 1 ? target : Math.round(from + (target - from) * easeOutCubic(t))
-      currentRef.current = next
-      setValue(next)
-      if (t < 1) frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [animate, target, durationMs])
-
-  return animate ? value : target
-}
-
 /** 마운트 직후 한 프레임 뒤에 true 가 된다. CSS transition 으로 "그려지는" 효과를 낼 때 쓴다. 모션을 쓰지 않으면 처음부터 true. */
 export function useDrawn(): boolean {
   const [animate] = useState(canAnimate)
