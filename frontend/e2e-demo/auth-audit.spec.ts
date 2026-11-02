@@ -5,7 +5,7 @@ test('로그인 4개 역할·대시보드·사용자·메뉴·로그아웃', asy
     ['admin', '시스템관리자', '시스템관리자', true],
     ['gaadmin', 'GA관리자', 'GA관리자', false],
     ['settle01', '정산담당자', '정산담당자', false],
-    ['audit01', '준법감사자', '준법·감사', true],
+    ['audit01', '준법감사자', '준법/감사', true],
   ] as const) {
     const context = await browser.newContext({ baseURL })
     const page = await context.newPage()
@@ -43,7 +43,7 @@ test('비로그인 지급 등록 딥링크 → 로그인 → 쿼리·해시 복�
   await page.getByLabel(/^아이디/).fill('settle01')
   await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
   await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '지급 건 등록 · 귀속 · 확정' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '지급 건 등록, 귀속, 확정' })).toBeVisible()
   await expect(page).toHaveURL(new URL(route, page.url()).href)
 })
 
@@ -84,7 +84,7 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·AP
   await page.getByRole('button', { name: '조회', exact: true }).click()
   const firstPage = await successful(filtered)
   await expect(page).toHaveURL(/action=JOURNAL_DRAFT_SAVED/)
-  await expect(page.locator('.audit-panel-caption .tabular-nums')).toHaveText(firstPage.totalElements.toLocaleString('en-US'))
+  await expect(page.locator('.audit-panel-header .list-header-total')).toHaveText(`총 ${firstPage.totalElements.toLocaleString('ko-KR')}건`)
   const paged = responseFor(page, '/audit-logs', 'GET')
   await page.getByRole('button', { name: '2', exact: true }).click()
   const secondPage = await successful(paged)
@@ -114,27 +114,27 @@ test('AUDT A1–A5 목록·필터·페이지·키보드 선택·새로고침·AP
   await page.keyboard.press('Enter')
   await expect(row).toHaveAttribute('aria-selected', 'true')
   await expect(page).toHaveURL(/selected=\d+/)
-  await expect(page.locator('#diff-body')).toContainText('JOURNAL_DRAFT_SAVED')
+  await expect(page.locator('#diff-body')).toContainText('분개 초안 저장')
   // A4 includes any non-button cell, in addition to the keyboard path above.
   const mouseRow = rows.nth(1)
   await mouseRow.locator('td').nth(3).click()
   await expect(mouseRow).toHaveAttribute('aria-selected', 'true')
   await expect(row).toHaveAttribute('aria-selected', 'false')
   await expect(page.locator('.audit-diff-context')).toHaveText(
-    `${newCells[1][2]} (JOURNAL_DRAFT_SAVED) · ${newCells[1][3]} (JOURNAL_HEADER) #${newCells[1][4]}`,
+    `${newCells[1][2]}, ${newCells[1][3]} #${newCells[1][4]}`,
   )
   const selected = new URL(page.url()).searchParams.get('selected')
   await page.reload()
   await expect(table.locator('tr.is-selected')).toHaveCount(1)
   expect(new URL(page.url()).searchParams.get('selected')).toBe(selected)
-  await expect(page.locator('#diff-body')).toContainText('JOURNAL_DRAFT_SAVED')
+  await expect(page.locator('#diff-body')).toContainText('분개 초안 저장')
   await info.attach('react-audit', { body: await page.screenshot(), contentType: 'image/png' })
 })
 
 test('AUDT A6 SETTLEMENT 메뉴 숨김·화면 403·API 403', async ({ page }) => {
   await login(page, 'settle01', '/audit-logs?month=2026-07')
-  await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
-  await expect(page.getByRole('main')).toContainText('FGC-AUTH-003')
+  await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
+  await expect(page.getByRole('main')).not.toContainText('FGC-AUTH-003')
   await expect(page.getByText('이 작업을 할 권한이 없습니다.', { exact: true })).toBeVisible()
   await expect(page.locator('aside').getByRole('link', { name: /감사로그/ })).toHaveCount(0)
   const auth = await page.request.post('/api/v1/auth/login', {
@@ -157,7 +157,7 @@ test('COMPLIANCE 스케줄 확정 버튼 비활성·지급 등록 403', async ({
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '새 버전 만들기', exact: true })).toBeDisabled()
   await page.goto('transactions/new?month=2026-07')
-  await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
 })
 
 test('패키징 서버 Swagger가 JWT 인증 후 정상이고 재시작 추적 필드를 노출한다', async ({ request }, testInfo) => {

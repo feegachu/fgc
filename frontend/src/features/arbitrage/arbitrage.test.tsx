@@ -106,8 +106,8 @@ it('restores candidate URL, page and filters; stage is independent and all-stage
   await user.click(screen.getByRole('button', { name: '초기화' }))
   expect(screen.getByLabelText('지급단계')).toHaveValue('GA_TO_FC')
   expect(screen.getByLabelText('계약번호')).toHaveValue('')
-  await screen.findByRole('option', { name: 'INS1 · 가상생명' })
-  expect(screen.getByRole('option', { name: 'INS1 · 가상생명' })).toBeDisabled()
+  await screen.findByRole('option', { name: 'INS1, 가상생명' })
+  expect(screen.getByRole('option', { name: 'INS1, 가상생명' })).toBeDisabled()
 })
 it('rows support keyboard activation and timeline uses stored excess without recalculating', async () => {
   const user = userEvent.setup()
@@ -118,7 +118,7 @@ it('rows support keyboard activation and timeline uses stored excess without rec
   await user.keyboard('{Enter}')
   expect(rows[1]).toHaveAttribute('aria-selected', 'true')
   const detail = screen.getByRole('region', { name: '④ 상세' })
-  expect(within(detail).getByText('2026-07-01 · 7개월')).toBeVisible()
+  expect(within(detail).getByText('2026-07-01, 7개월')).toBeVisible()
   const cells = within(detail).getByRole('table').querySelectorAll('tbody tr td:first-child')
   expect([...cells].map((cell) => cell.textContent)).toEqual(['2026-07-01', '2026-07-31'])
 })
@@ -327,8 +327,9 @@ it('negative money uses common minus/red and displays stored excess independentl
   for (const amount of screen.getAllByText('-1,234원')) expect(amount).toHaveClass('is-negative-amount')
   await screen.findByRole('img', { name: '기준일별 초과액 추이' })
   for (const amount of screen.getAllByText('-987원')) expect(amount).toHaveClass('is-negative-amount')
-  const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector('.arb-calculation')!
-  expect(stored).toHaveTextContent('지급분 기준 초과액: -987원')
+  const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector<HTMLElement>('.arb-calculation')!
+  expect(within(stored).getByText('지급분 기준 초과액')).toBeVisible()
+  expect(within(stored).getByText('-987원')).toHaveClass('is-negative-amount')
 })
 
 it('timeline cache separates contract IDs even when contract number/stage match', async () => {
@@ -361,7 +362,7 @@ it('pagination shows at most five numbers and moves between page groups', async 
   expect(router.state.location.search).toContain('contractNo=ARB')
 })
 
-it('keeps projected-only excess separate from the CLEAR result in list and detail', async () => {
+it('preserves the CLEAR result and hides projected-only excess from the current judgement screen', async () => {
   const projected = {
     ...row,
     resultStatus: 'CLEAR' as const,
@@ -372,7 +373,11 @@ it('keeps projected-only excess separate from the CLEAR result in list and detai
   }
   mount(undefined, true, (path) => (path.includes('/insurers') ? fixtures(path) : result([projected], 1, 1)))
   await screen.findByText('서버 판정 근거')
-  expect(screen.getByText(/지급예정 포함 시 초과 \(모니터링\)/)).toBeVisible()
+  expect(screen.queryByText(/지급예정 포함 시 초과/)).not.toBeInTheDocument()
   expect(screen.getAllByText('이상없음').length).toBeGreaterThan(0)
-  expect(screen.getByText(/지급예정 포함 초과액 \(모니터링\)/)).toBeVisible()
+  expect(screen.queryByText(/지급예정 포함 초과액/)).not.toBeInTheDocument()
+  expect(screen.getByRole('columnheader', { name: '전체 지급예정액' })).toBeVisible()
+  const summary = screen.getByRole('region', { name: '차익거래 금액 요약' })
+  expect(within(summary).getByText('전체 지급예정액')).toBeVisible()
+  expect(within(summary).getByText('12,000원')).toBeVisible()
 })

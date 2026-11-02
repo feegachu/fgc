@@ -12,15 +12,21 @@ export default defineConfig({
   plugins: [
     react(),
     {
-      name: 'policy-ui-preview',
+      name: 'development-ui-previews',
       apply: 'serve',
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
-          if (req.url?.split('?')[0] !== '/policy-preview') return next()
+          const previews: Record<string, { title: string; entry: string }> = {
+            '/policy-preview': { title: '정책 UI 미리보기', entry: 'policyPreview' },
+            '/design-preview': { title: '디자인 미리보기', entry: 'designPreview' },
+          }
+          const path = req.url?.split('?')[0] ?? ''
+          const preview = previews[path]
+          if (!preview) return next()
           try {
             const html = await server.transformIndexHtml(
-              '/policy-preview',
-              '<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>정책 UI 미리보기 · FGC</title></head><body><div id="root"></div><script type="module" src="/src/previews/policyPreview.tsx"></script></body></html>',
+              path,
+              `<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>${preview.title} · FGC</title></head><body><div id="root"></div><script type="module" src="/src/previews/${preview.entry}.tsx"></script></body></html>`,
             )
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
             res.end(html)

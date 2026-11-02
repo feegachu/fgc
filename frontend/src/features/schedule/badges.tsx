@@ -1,11 +1,11 @@
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { EvidenceLink } from '../../components/EvidenceLink'
-import { CLASSIFICATION_TONE, isLocked, REGIME_EVIDENCE, statusTone } from './labels'
+import { isLocked, REGIME_EVIDENCE, SCHEDULE_STATUS, statusTone } from './labels'
 
 /** 상태 배지. 확정은 색에 더해 자물쇠로도 알린다(규칙 8, VRUN-W01 과 같은 표현). */
 export function ScheduleStatusBadge({ code, label }: { code?: string | null; label: string }) {
   return (
-    <StatusBadge tone={statusTone(code)}>
+    <StatusBadge tablePresentation="dot" optionCount={Object.keys(SCHEDULE_STATUS).length} tone={statusTone(code)}>
       {label}
       {isLocked(code) && (
         <span className="material-symbols-rounded schedule-badge-lock" aria-hidden="true">
@@ -17,7 +17,7 @@ export function ScheduleStatusBadge({ code, label }: { code?: string | null; lab
 }
 
 export const ClassificationBadge = ({ label }: { label: string }) => (
-  <StatusBadge tone={CLASSIFICATION_TONE}>{label}</StatusBadge>
+  <CategoryBadge optionCount={3}>{label}</CategoryBadge>
 )
 
 export const ActiveBadge = ({ active }: { active?: boolean }) => (

@@ -11,7 +11,8 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { Modal } from '../../components/Modal'
 import { ListPagination } from '../../components/ListPagination'
-import { StatusBadge } from '../../components/StatusBadge'
+import { ListHeader } from '../../components/ListHeader'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { usePermission } from '../auth/useAuth'
 import { journalAccountsQueryOptions, journalDetailQueryOptions } from '../exception/api'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
@@ -38,7 +39,7 @@ import { accountDisplayName } from './accountName'
 import { JOURNAL_ACCOUNT, JOURNAL_STATUS, JOURNAL_TYPE } from './labels'
 import './ledger.css'
 
-const EMPTY = '—'
+const EMPTY = '-'
 const text = (value: unknown) => (value == null || value === '' ? EMPTY : String(value))
 function Failure({ error }: { error: unknown }) {
   if (!error) return null
@@ -57,7 +58,10 @@ function Money({ value }: { value?: number }) {
 }
 function Badge({ status, label }: { status?: string; label?: string }) {
   return (
-    <StatusBadge tone={status === 'POSTED' ? 'success' : status === 'REVERSED' ? 'review' : 'neutral'}>
+    <StatusBadge
+      tablePresentation="dot"
+      tone={status === 'POSTED' ? 'success' : status === 'REVERSED' ? 'review' : 'neutral'}
+    >
       {label || JOURNAL_STATUS[status as keyof typeof JOURNAL_STATUS] || text(status)}
     </StatusBadge>
   )
@@ -85,7 +89,11 @@ const columns: TableColumn<Journal>[] = [
     key: 'type',
     label: '유형',
     width: '12rem',
-    render: (row) => row.journalTypeLabel || JOURNAL_TYPE[row.journalType!] || EMPTY,
+    render: (row) => (
+      <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>
+        {row.journalTypeLabel || JOURNAL_TYPE[row.journalType!] || EMPTY}
+      </CategoryBadge>
+    ),
   },
   {
     key: 'source',
@@ -165,11 +173,13 @@ export default function LedgerPage() {
   return (
     <div className="ledger-react-page">
       <header className="page-header">
-        <h1 className="page-title">검증원장 조회</h1>
+        <div className="page-header-copy">
+          <h1 className="page-title">검증원장 조회</h1>
+          <p className="page-description">
+            이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.
+          </p>
+        </div>
       </header>
-      <aside className="guidance guidance-neutral">
-        이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.
-      </aside>
       {params.get('imbalanceOnly') === 'true' && (
         <p className="guidance guidance-neutral" role="status">
           불균형만 조회하는 목록 필터는 지원하지 않습니다. 분개를 선택하면 연결된 검증 실행의 불균형을 확인할 수
@@ -191,10 +201,9 @@ export default function LedgerPage() {
         defaultRatio={55}
       >
         <section className="surface" aria-busy={list.isFetching}>
-          <header className="surface-header">
+          <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">분개 목록</h2>
-            <span>{int(data?.totalElements ?? 0)}건 · 한 화면 20행</span>
-          </header>
+          </ListHeader>
           <Failure error={list.error} />
           {list.isPending && list.fetchStatus !== 'idle' && <p role="status">분개 목록을 불러오는 중입니다.</p>}
           <DataTable
@@ -232,7 +241,7 @@ export default function LedgerPage() {
                 <DetailSummary detail={detail.data} />
                 {detail.data.balanced === false && (
                   <p className="guidance guidance-warning" role="alert">
-                    차변·대변이 맞지 않습니다. 차액 <Money value={detail.data.differenceAmount} />
+                    차변/대변이 맞지 않습니다. 차액 <Money value={detail.data.differenceAmount} />
                   </p>
                 )}
                 <Failure error={imbalance.error} />
@@ -249,7 +258,7 @@ export default function LedgerPage() {
                       className={`guidance ${(imbalance.data.totalCount ?? 0) > 0 ? 'guidance-warning' : 'guidance-info'}`}
                     >
                       {(imbalance.data.totalCount ?? 0) > 0
-                        ? `이 검증 실행에 차변·대변이 맞지 않는 분개가 ${imbalance.data.totalCount}건 있습니다.`
+                        ? `이 검증 실행에 차변/대변이 맞지 않는 분개가 ${imbalance.data.totalCount}건 있습니다.`
                         : '선택한 분개의 검증 실행은 원장 불균형이 0건입니다.'}
                     </p>
                   )
@@ -258,7 +267,7 @@ export default function LedgerPage() {
                   columns={lineColumns}
                   rows={detail.data.lines ?? []}
                   rowKey={(row) => String(row.lineNo)}
-                  caption="선택한 분개의 차변·대변 상세행"
+                  caption="선택한 분개의 차변/대변 상세행"
                   emptyMessage="분개 상세행이 없습니다."
                 />
                 <div className="ledger-react-actions">
@@ -270,7 +279,7 @@ export default function LedgerPage() {
                       <Button variant="secondary" disabled={!canReverse} onClick={() => setAction('correction')}>
                         역분개 + 재기표
                       </Button>
-                      {!canReverse && <p>역분개는 SETTLEMENT·GA_ADMIN·SYSTEM_ADMIN 권한이 필요합니다.</p>}
+                      {!canReverse && <p>역분개는 SETTLEMENT/GA_ADMIN/SYSTEM_ADMIN 권한이 필요합니다.</p>}
                     </>
                   ) : (
                     <p>POSTED 상태이고 아직 역분개되지 않은 원분개만 처리할 수 있습니다.</p>
@@ -470,11 +479,11 @@ function JournalActionModal({
       }
     >
       <p>
-        {detail.journalNo} · {detail.journalTypeLabel}
+        {detail.journalNo}, {detail.journalTypeLabel}
       </p>
       <p className="guidance guidance-neutral ledger-action-guidance">
         {isReverse
-          ? '원분개를 수정하거나 삭제하지 않고 반대 차변·대변의 새 분개를 만듭니다. 처리 후 되돌리려면 별도 정정 절차가 필요합니다.'
+          ? '원분개를 수정하거나 삭제하지 않고 반대 차변/대변의 새 분개를 만듭니다. 처리 후 되돌리려면 별도 정정 절차가 필요합니다.'
           : '원분개를 바로 바꾸지 않고 원장 정정 예외를 만든 뒤 예외함에서 올바른 신규 분개를 입력합니다.'}
       </p>
       <Failure error={mutation.error} />

@@ -296,7 +296,7 @@ describe('production policy workflow', () => {
         <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
       </QueryClientProvider>,
     )
-    expect(screen.getByText('정정·승계로 계산 적용에서 제외됨')).toBeVisible()
+    expect(screen.getByText('정정/승계로 계산 적용에서 제외됨')).toBeVisible()
     expect(screen.getByText('후속 정책 #18')).toBeVisible()
   })
 
@@ -429,7 +429,7 @@ describe('production policy workflow', () => {
     const { user, onSaved } = mountManagement('ACTIVE', ['CLONE'])
     await user.click(screen.getByRole('tab', { name: '승인 이력' }))
     expect(screen.getByText('검토를 요청합니다.')).toBeVisible()
-    expect(screen.getByText(/author · policy:17/)).toBeVisible()
+    expect(screen.getByText(/author, policy:17/)).toBeVisible()
     await user.click(screen.getByRole('button', { name: '새 버전 작성' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByLabelText(/새 버전 적용 시작일/)).toHaveValue('')

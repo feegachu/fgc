@@ -31,8 +31,8 @@ export function entityLabel<K extends EntityKind>(kind: K, option: Entities[K]):
   const coded = (name: unknown, code: unknown) => (code ? `${name ?? ''} (${code})` : String(name ?? ''))
   if (kind === 'agents') return coded(row.agentName, row.agentCode)
   if (kind === 'products')
-    return coded(`${row.productName ?? ''} · ${row.offeringVersion ?? ''}`, row.insurerProductCode)
-  if (kind === 'contracts') return `${row.contractNo ?? ''} · ${row.productName ?? ''}`
+    return coded(`${row.productName ?? ''}, ${row.offeringVersion ?? ''}`, row.insurerProductCode)
+  if (kind === 'contracts') return `${row.contractNo ?? ''}, ${row.productName ?? ''}`
   return coded(row.itemName, row.itemCode)
 }
 

@@ -94,7 +94,7 @@ describe('contract URL and labels', () => {
     expect(responseLabel(capStatusLabels, 'REVIEW_REQUIRED', '서버 표시명')).toBe('서버 표시명')
     expect(responseLabel(capStatusLabels, 'REVIEW_REQUIRED')).toBe('검토필요')
     expect(responseLabel(arbitrageStatusLabels, 'REVIEW_REQUIRED')).toBe('자료부족')
-    expect(responseLabel(capStatusLabels, 'FUTURE_STATUS')).toBe('FUTURE_STATUS')
+    expect(responseLabel(capStatusLabels, 'FUTURE_STATUS')).toBe('확인 필요')
   })
 })
 

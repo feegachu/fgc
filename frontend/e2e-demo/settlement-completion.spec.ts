@@ -118,7 +118,7 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
   await page.getByLabel('처리 사유').fill('원분개와 지급 예정 금액 확인')
   await page.getByRole('button', { name: '처리 저장', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '원분개 역분개 · 신규 재기표' })
+  const dialog = page.getByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await expect(dialog).toBeVisible()
   await dialog
     .getByRole('group', { name: '1번 라인', exact: true })

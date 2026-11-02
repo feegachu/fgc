@@ -105,12 +105,12 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
   const precheck = await successful(prechecked)
   expect(precheck.confirmable).toBe(expectedConfirmable)
   await expect(page.locator('#gate-list .transaction-gate-label')).toHaveText([
-    '1. 작성중(DRAFT) 저장 · 통과',
-    '2. 귀속행 입력 · 통과',
-    '3. 귀속합계 = 지급액 · 통과',
-    '4. 검토필요 귀속 해소 · 통과',
-    `5. 1,200% 사전검증 · ${expectedConfirmable ? '통과' : '차단'}`,
-    `6. 전부 통과 → 확정 · ${expectedConfirmable ? '통과' : '미확인'}`,
+    '1. 작성중(DRAFT) 저장, 통과',
+    '2. 귀속행 입력, 통과',
+    '3. 귀속합계 = 지급액, 통과',
+    '4. 검토필요 귀속 해소, 통과',
+    `5. 1,200% 사전검증, ${expectedConfirmable ? '통과' : '차단'}`,
+    `6. 전부 통과 → 확정, ${expectedConfirmable ? '통과' : '미확인'}`,
   ])
   await expect(page.locator('#btn-confirm')).toBeEnabled()
   await page.locator('#btn-confirm').click()
@@ -136,7 +136,7 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
   const contractNo = 'FGC-FGL01-202607-0005'
   const id = await payment(page, 250000, [contractNo], false)
   const rejected = responseFor(page, `/transactions/${id}/confirm`)
-  await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
+  await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
   const failure = await rejected
   expect(failure.ok()).toBe(false)
   const error = (await failure.json()).error

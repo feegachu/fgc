@@ -20,7 +20,7 @@
 
 .vrun-card-note {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.125rem;
 }
 
@@ -39,7 +39,7 @@
 
 .vrun-kv dt {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.125rem;
 }
@@ -176,7 +176,11 @@
   width: 14rem;
 }
 .vrun-col-open {
-  width: 5rem;
+  width: 6rem;
+}
+
+.vrun-run-table td.vrun-open-cell {
+  text-overflow: clip;
 }
 
 .vrun-row-button {
@@ -290,7 +294,7 @@
   display: block;
   padding: 0 var(--space-1);
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
   text-wrap: pretty;
 }
@@ -298,7 +302,7 @@
 .vrun-stepper-manual {
   display: block;
   color: var(--color-status-warning-text);
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
