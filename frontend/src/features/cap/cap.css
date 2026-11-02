@@ -22,6 +22,7 @@
 }
 .cap-react-filter .cap-react-error {
   grid-column: 1 / -1;
+  flex-basis: 100%;
 }
 .cap-react-filter .filter-field {
   min-width: 0;

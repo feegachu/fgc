@@ -1,6 +1,6 @@
 import { typeBadgeTone } from '../exception/rules'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { type CSSProperties, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import { KpiCardContent } from '../../components/KpiCard'
@@ -8,6 +8,7 @@ import { ResizableSplit } from '../../components/ResizableSplit'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { StatusBadge } from '../../components/StatusBadge'
 import { dateTime, errorText, int, rateText, usageRate } from '../../lib/format'
 import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
@@ -218,7 +219,11 @@ export function ExceptionPage() {
         </div>
       </header>
 
-      <section className="exception-summary-grid kpi-group" aria-label="유형별 미처리 요약">
+      <section
+        className="exception-summary-grid kpi-group"
+        aria-label="유형별 미처리 요약"
+        style={{ '--exception-kpi-count': data?.summary?.length || 1 } as CSSProperties}
+      >
         {data?.summary?.map((summary) => (
           <Link
             key={summary.type}
@@ -233,7 +238,7 @@ export function ExceptionPage() {
           >
             <KpiCardContent
               label={summary.typeLabel ?? '-'}
-              value={int(summary.count)}
+              value={summary.count ?? 0}
               unit="건"
               footer={exceptionSummaryDescription(summary.type)}
             />
@@ -266,12 +271,9 @@ export function ExceptionPage() {
           label="예외 목록과 상세 카드 너비"
           primary={
             <section className="surface">
-              <div className="surface-header">
+              <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
                 <span className="surface-title">예외 목록</span>
-                <span className="text-secondary exception-count-note">
-                  <span aria-live="polite">{int(data?.totalElements ?? 0)}</span>건
-                </span>
-              </div>
+              </ListHeader>
               {search.isPending ? (
                 <p role="status" className="empty-state">
                   불러오는 중입니다.

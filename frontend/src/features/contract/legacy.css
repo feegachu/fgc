@@ -816,8 +816,8 @@
 }
 
 .contract-table-viewport {
-  width: calc(100% - 2rem);
-  margin-inline: var(--space-4);
+  width: 100%;
+  margin-inline: 0;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-color: var(--color-neutral-300) transparent;
@@ -826,35 +826,37 @@
 
 .contract-table {
   width: 100%;
-  min-width: 68rem;
+  min-width: 62rem;
   table-layout: fixed;
 }
 
-/*
- * contract_no 는 최대 80자(form.html maxlength)라 4.625rem 에서는 거의 항상 잘렸고
- * 보험회사도 한글 4~5자를 담지 못했다 — [전체 보기]가 대부분의 행에 뜨는 상태였다.
- * 자주 잘리는 두 컬럼을 넓히고 판정·출처처럼 배지만 들어가는 컬럼에서 폭을 회수한다.
- */
-/* 계약번호는 차익거래 검증 화면(.arb-col-contract)과 동일한 폭으로 맞춰 토글 없이 항상 전체를 보여준다(이슈 326). */
-.contract-col-number { width: 12rem; }
+/* 다른 목록과 같은 밀도로 배치하고 긴 보험료 머리글은 두 줄로 표시한다. */
+.contract-col-number { width: 10rem; }
 .contract-col-insurer { width: 6.5rem; }
-.contract-col-product { width: 11.75rem; }
+.contract-col-product { width: 10.5rem; }
 .contract-col-date { width: 5.75rem; }
 /* 근거 팝오버 트리거(1.25rem)까지 들어가는 폭 — th 는 overflow:hidden 이라 모자라면 잘린다. */
-.contract-col-premium { width: 10.25rem; }
-.contract-col-agent { width: 8.5rem; }
+.contract-col-premium { width: 8.5rem; }
+.contract-col-agent { width: 7rem; }
 .contract-col-status { width: 5.25rem; }
 .contract-col-cap { width: 7rem; }
-.contract-col-origin { width: 6rem; }
+.contract-col-origin { width: 5.5rem; }
 
 .contract-table th,
 .contract-table td {
-  height: 2.75rem;
-  font-size: 0.8125rem;
+  height: 2.5rem;
+  font-size: 0.75rem;
 }
 
 .contract-table th {
-  height: 3rem;
+  height: 2.5rem;
+}
+
+.contract-premium-heading {
+  max-width: 4rem;
+  line-height: 1rem;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .contract-table th:first-child,
@@ -927,11 +929,6 @@
     max-width: none;
   }
 
-  .contract-table-viewport {
-    width: calc(100% - 1.5rem);
-    margin-inline: var(--space-3);
-  }
-
   .contract-pagination {
     margin-inline: var(--space-3);
     padding-inline: 0;
@@ -956,8 +953,9 @@
 .contract-filter-bar {
   align-items: flex-end;
   border: 0;
-  border-radius: 0;
-  padding: var(--space-1) var(--space-4) var(--space-4);
+  border-radius: inherit;
+  background: transparent;
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .contract-filter-fields {

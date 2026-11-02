@@ -75,6 +75,22 @@ describe('RiskComposition', () => {
     renderChart()
     await actions.tab()
     expect(screen.getByRole('link', { name: /1,200% 위반/ })).toHaveClass('is-active')
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/^1,200% 위반\s*6건, 60\.0%$/)
+    await actions.keyboard('{Escape}')
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('도넛 조각에 마우스를 올리면 항목명, 건수와 비중만 표시하고 벗어나면 닫는다', async () => {
+    const actions = userEvent.setup()
+    const { container } = renderChart()
+    const segment = container.querySelector('.risk-donut-segment')!
+    await actions.hover(segment)
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip).toHaveTextContent('1,200% 위반')
+    expect(tooltip).toHaveTextContent('6건, 60.0%')
+    expect(tooltip).toHaveTextContent(/^1,200% 위반\s*6건, 60\.0%$/)
+    await actions.unhover(segment)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
   it('중앙에는 합계 대신 안내 문구만 두어 단위가 다른 건수를 더하지 않는다', () => {

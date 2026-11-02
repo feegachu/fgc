@@ -198,7 +198,7 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
     expect(within(table).getByText('-1,517,944원')).toHaveClass('is-negative-amount')
     expect(within(table).getByText('미사용')).toBeInTheDocument()
     expect(within(table).getByText('확정').querySelector('.schedule-badge-lock')).not.toBeNull()
-    expect(screen.getByText('41')).toBeInTheDocument()
+    expect(screen.getByText('총 41건')).toBeInTheDocument()
     expect(screen.getByText('2 / 3 페이지')).toBeInTheDocument()
     expect(screen.getByLabelText('지급단계')).toHaveValue('GA_TO_FC')
     expect(screen.getByLabelText('용도')).toHaveValue('OPERATIONAL')

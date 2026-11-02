@@ -14,6 +14,13 @@ import ReconciliationPage from '../features/reconciliation/ReconciliationPage'
 import ValidationRunDetailPage from '../features/validation/ValidationRunDetailPage'
 import { AgentHomePage } from '../features/agent-home/AgentHomePage'
 import ClawbackPage from '../features/clawback/ClawbackPage'
+import ContractListPage from '../features/contract/ContractListPage'
+import TransactionListPage from '../features/transaction/TransactionListPage'
+import ScheduleListPage from '../features/schedule/ScheduleListPage'
+import LedgerPage from '../features/ledger/LedgerPage'
+import ValidationRunListPage from '../features/validation/ValidationRunListPage'
+import AuditLogPage from '../features/audit/AuditLogPage'
+import { BasePage } from '../features/base/BasePage'
 import { designPreviewData } from './designFixtures'
 import { DesignPreviewShell, PreviewNavigation } from './DesignPreviewShell'
 import '../index.css'
@@ -162,6 +169,13 @@ const router = createMemoryRouter([
         ),
       },
       ...[
+        { path: '/contracts', element: <ContractListPage /> },
+        { path: '/transactions', element: <TransactionListPage /> },
+        { path: '/schedules', element: <ScheduleListPage /> },
+        { path: '/journals', element: <LedgerPage /> },
+        { path: '/base', element: <BasePage /> },
+        { path: '/audit-logs', element: <AuditLogPage /> },
+        { path: '/validation-runs', element: <ValidationRunListPage /> },
         { path: '/cap-checks', element: <CapListPage /> },
         { path: '/arbitrage-checks', element: <ArbitragePage /> },
         { path: '/clawbacks', element: <ClawbackPage /> },

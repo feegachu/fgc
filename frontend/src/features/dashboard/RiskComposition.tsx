@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import { int, rate } from '../../lib/format'
@@ -20,9 +20,12 @@ export type CompositionItem = {
  */
 export function RiskComposition({ items }: { items: CompositionItem[] }) {
   const [activeKey, setActiveKey] = useState<string | null>(null)
+  const tooltipId = useId()
   const drawn = useDrawn()
   const total = items.reduce((sum, item) => sum + item.value, 0)
   const segments = new Map(donutSegments(items).map((segment) => [segment.key, segment]))
+  const activeItem = items.find((item) => item.key === activeKey)
+  const share = (value: number) => `${rate(total > 0 ? String((value * 100) / total) : '0')}%`
 
   if (total === 0) {
     return <div className="empty-state">이번 달 표시할 위험 건이 없습니다.</div>
@@ -30,8 +33,8 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
 
   return (
     <div className="risk-composition risk-display-donut">
-      <div className="risk-donut" aria-hidden="true">
-        <svg viewBox="0 0 100 100" className="risk-donut-svg">
+      <div className="risk-donut">
+        <svg viewBox="0 0 100 100" className="risk-donut-svg" aria-hidden="true">
           <circle className="risk-donut-track" cx="50" cy="50" r={RADIUS} />
           {items.map((item) => {
             const segment = segments.get(item.key)
@@ -53,24 +56,34 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
             )
           })}
         </svg>
-        <div className="risk-donut-center">
+        <div className="risk-donut-center" aria-hidden="true">
           <span>항목별 비중</span>
         </div>
+        {activeItem && (
+          <div id={tooltipId} className="risk-donut-tooltip" role="tooltip">
+            <strong>{activeItem.label}</strong>
+            <span className="tabular-nums">{int(activeItem.value)}건, {share(activeItem.value)}</span>
+          </div>
+        )}
       </div>
       <ul className="risk-legend">
         {items.map((item, index) => {
           // 화면정의서 공통 규칙 3: 소수점 첫째 자리까지 절사. (value*100)/total이라야 0.29*100 같은 곱셈 오차가 없다
-          const sharePct = `${rate(total > 0 ? String((item.value * 100) / total) : '0')}%`
+          const sharePct = share(item.value)
           return (
             <li key={item.key} style={{ '--i': index } as CSSProperties}>
               <Link
                 to={item.to}
                 className={`risk-legend-row${activeKey === item.key ? ' is-active' : ''}`}
                 aria-label={`${item.label} ${int(item.value)}건, 비중 ${sharePct}`}
+                aria-describedby={activeKey === item.key ? tooltipId : undefined}
                 onMouseEnter={() => setActiveKey(item.key)}
                 onMouseLeave={() => setActiveKey(null)}
                 onFocus={() => setActiveKey(item.key)}
                 onBlur={() => setActiveKey(null)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setActiveKey(null)
+                }}
               >
                 <span className={`risk-swatch risk-color-${item.color}`} aria-hidden="true" />
                 <span className="risk-legend-label">{item.label}</span>

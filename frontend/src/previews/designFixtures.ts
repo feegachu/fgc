@@ -1,5 +1,6 @@
 import type { CandidateRow } from '../features/clawback/api'
 import type { CapBasis, CapItem } from '../features/cap/api'
+import type { ArbitrageRow } from '../features/arbitrage/api'
 
 // Synthetic, read-only fixtures for comparing the actual screens in /design-preview.
 export const designPreviewUser = {
@@ -80,6 +81,31 @@ const reconciliation = {
   matchRatePct: 38.2,
   differenceTotal: -5000,
 }
+const arbitrageItems: ArbitrageRow[] = [
+  {
+    arbitrageCheckId: 2, contractId: 11, contractNo: 'PREVIEW-2026-001',
+    paymentStage: 'GA_TO_FC', paymentStageLabel: 'GA → 설계사',
+    asOfDate: '2026-07-02', contractMonthNo: 2,
+    paidCommissionAmount: 640000, plannedCommissionAmount: 850000,
+    includedSurrenderValueAmount: 0, cumulativePaidPremium: 100000,
+    netDifferenceAmount: 540000, projectedExcessAmount: 1390000,
+    refundAdditionAppliedYn: false, surrenderValueSourceType: 'NOT_APPLICABLE', surrenderValueSourceTypeLabel: '적용 대상 아님',
+    resultStatus: 'CANDIDATE', resultStatusLabel: '검토대상', candidateType: 'CURRENT_EXCESS',
+    decisionReason: '현재 확정 수수료와 해약환급금이 누적 납입보험료를 초과합니다.',
+  },
+  {
+    arbitrageCheckId: 1, contractId: 11, contractNo: 'PREVIEW-2026-001',
+    paymentStage: 'GA_TO_FC', paymentStageLabel: 'GA → 설계사',
+    asOfDate: '2026-07-01', contractMonthNo: 2,
+    paidCommissionAmount: 100000, plannedCommissionAmount: 1390000,
+    includedSurrenderValueAmount: 0, cumulativePaidPremium: 100000,
+    netDifferenceAmount: 0, projectedExcessAmount: 1390000,
+    refundAdditionAppliedYn: false, surrenderValueSourceType: 'NOT_APPLICABLE', surrenderValueSourceTypeLabel: '적용 대상 아님',
+    resultStatus: 'CLEAR', resultStatusLabel: '이상없음', candidateType: 'PROJECTED_EXCESS',
+    decisionReason: '현재 확정 수수료가 누적 납입보험료를 초과하지 않습니다.',
+  },
+]
+
 export function designPreviewData(url: URL): unknown {
   const path = url.pathname
   if (path === '/api/v1/auth/me') return designPreviewUser
@@ -152,8 +178,18 @@ export function designPreviewData(url: URL): unknown {
       ],
       agentSummary: [],
     }
-  if (path === '/api/v1/arbitrage-checks')
-    return { summary: { clearCount: 5, candidateCount: 6, reviewRequiredCount: 0 }, items: page }
+  if (path === '/api/v1/arbitrage-checks') {
+    const matches = arbitrageItems.filter((row) =>
+      (!url.searchParams.get('month') || row.asOfDate?.startsWith(url.searchParams.get('month')!)) &&
+      (!url.searchParams.get('contractNo') || row.contractNo?.includes(url.searchParams.get('contractNo')!)) &&
+      (!url.searchParams.get('stage') || row.paymentStage === url.searchParams.get('stage')),
+    )
+    const content = matches.filter((row) => !url.searchParams.get('status') || row.resultStatus === url.searchParams.get('status'))
+    return {
+      summary: { clearCount: matches.filter((row) => row.resultStatus === 'CLEAR').length, candidateCount: matches.filter((row) => row.resultStatus === 'CANDIDATE').length, reviewRequiredCount: 0 },
+      items: { ...page, content, totalElements: content.length, totalPages: content.length ? 1 : 0 },
+    }
+  }
   if (path === '/api/v1/exceptions/options')
     return { types: [], reasons: [], severities: [], assignees: [], validationMonths: ['2026-07-01'], statuses: [] }
   if (path === '/api/v1/exceptions')
@@ -167,6 +203,7 @@ export function designPreviewData(url: URL): unknown {
       ],
     }
   if (path === '/api/v1/validation-runs') return { ...page, content: [run], totalElements: 1, totalPages: 1 }
+  if (path === '/api/v1/validation-runs/active-monthly') return { active: false }
   if (path === '/api/v1/validation-runs/1')
     return {
       header: run,
@@ -190,6 +227,9 @@ export function designPreviewData(url: URL): unknown {
     return { ...page, content: [reconciliation], totalElements: 1, totalPages: 1 }
   if (path === '/api/v1/reconciliations/runs/41/results')
     return { ...page, summary: { resultCount: 47, matchedCount: 18, exceptionCount: 29, differenceTotal: -5000 } }
-  if (path.startsWith('/api/v1/base/') || path === '/api/v1/contracts' || path === '/api/v1/transactions') return page
+  if (path === '/api/v1/audit-logs/options') return { users: [], actions: [], entityTypes: [] }
+  if (path === '/api/v1/base/commission-items' || path === '/api/v1/base/accounts') return []
+  if (path === '/api/v1/journals') return { items: page }
+  if (path.startsWith('/api/v1/base/') || ['/api/v1/contracts', '/api/v1/transactions', '/api/v1/schedules', '/api/v1/audit-logs'].includes(path)) return page
   return undefined
 }

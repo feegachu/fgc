@@ -284,16 +284,17 @@
 .cb .cb-card, .cb .cb-info-card, .cb .cb-faq-card, .cb .cb-skeleton, .cb .cb-table-wrap { border: 1px solid #dfe3e8; box-shadow: none; }
 
 /* 세부 조건 패널(선택) */
-.cb .cb-filters { margin: 0 0 12px; border: 1px solid #cbd5e1; border-radius: 14px; background: #fff; }
-.cb .cb-filters-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 14px; font-weight: 700; color: var(--cb-brand-dark); }
-.cb .cb-filters-reset { margin-left: auto; padding: 0; border: 0; background: none; color: var(--cb-brand-dark); font-size: 12.5px; font-weight: 600; text-decoration: underline; cursor: pointer; }
-.cb .cb-filter-check { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; font-weight: 600; color: var(--cb-t700); white-space: nowrap; cursor: pointer; }
-.cb .cb-filter-check input { width: 16px; height: 16px; accent-color: var(--cb-brand-dark); }
-.cb .cb-filters-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 0 14px 14px; }
+.cb .cb-filters { margin: 0 0 12px; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-8); background: var(--color-bg-surface); box-shadow: var(--shadow-xs); }
+.cb .cb-filters-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); font-size: 0.6875rem; font-weight: 500; line-height: 1.125rem; color: var(--color-text-secondary); }
+.cb .cb-filters-head .cb-muted { font: inherit; }
+.cb .cb-filters-reset { margin-left: auto; font-size: 0.8125rem; font-weight: 500; line-height: 1.125rem; }
+.cb .cb-filters-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); }
+.cb .cb-filters .filter-checkbox { margin-left: auto; }
 .cb .cb-filters fieldset { flex: 1 1 260px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .cb .cb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .cb .cb-chip { padding: 6px 14px; border: 1.5px solid #cbd5e1; border-radius: 99px; background: #fff; font-size: 13px; font-weight: 600; color: var(--cb-t700); }
 .cb .cb-chip.on { border-color: var(--cb-brand-dark); background: var(--cb-brand-100); color: var(--cb-brand-dark); }
+.cb .cb-filters .cb-chip { min-height: var(--control-height-sm); padding: 0 var(--space-3); border-width: 1px; border-radius: var(--radius-8); font-weight: 400; line-height: 1.125rem; }
 
 /* 3단계 연관 질문 버튼(입력창 위, 대화 스크롤 밖에 고정) */
 .cb .cb-suggest { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px 22px 0; border-top: 1px solid var(--cb-line); background: #fff; }

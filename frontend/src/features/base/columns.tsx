@@ -213,6 +213,8 @@ export const agentColumns: TableColumn<Agent>[] = [
     key: 'support',
     label: '신인지원',
     align: 'center',
+    width: '9rem',
+    cellClassName: 'base-support-cell',
     render: (r) => (
       <>
         <StatusBadge tone={r.newcomerSupportEligibleYn ? 'warning' : 'neutral'}>

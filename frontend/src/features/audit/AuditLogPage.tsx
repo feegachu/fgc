@@ -6,8 +6,9 @@ import type { TableColumn } from '../../components/DataTable'
 import { CategoryBadge } from '../../components/StatusBadge'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
-import { dateTimeSeconds, errorText, int } from '../../lib/format'
+import { dateTimeSeconds, errorText } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { AUDIT_SORT_KEYS, auditLogDetailQuery, auditLogOptionsQuery, auditLogsQuery, normalizeCriteria } from './api'
 import type { AuditCriteria, AuditLog, AuditLogOptions } from './api'
@@ -139,14 +140,11 @@ export default function AuditLogPage() {
         defaultRatio={60}
       >
         <section className="surface audit-list-panel" aria-labelledby="audit-list-title">
-          <header className="surface-header audit-panel-header">
+          <ListHeader className="audit-panel-header" total={logs.data?.totalElements ?? 0} pageSize={20}>
             <h2 id="audit-list-title" className="surface-title">
               감사 기록
             </h2>
-            <p className="audit-panel-caption">
-              <span className="tabular-nums">{int(logs.data?.totalElements ?? 0)}</span>건, 한 화면 20행
-            </p>
-          </header>
+          </ListHeader>
           {logs.isError && (
             <p className="field-error" role="alert">
               {errorText(logs.error)}

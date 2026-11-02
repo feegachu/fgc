@@ -274,6 +274,7 @@ it('MonthSelector는 선택 초안을 적용하기 전까지 유지하고 비활
   act(() => screen.getByRole('gridcell', { name: '1월' }).focus())
   await user.keyboard('{ArrowRight}{Enter}')
   expect(screen.getByRole('gridcell', { name: '3월' })).toHaveFocus()
+  expect(screen.getByText('기준정산월 : 2026년 3월')).toBeInTheDocument()
   expect(apply).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: '적용' }))
   expect(apply).toHaveBeenCalledWith('2026-03')

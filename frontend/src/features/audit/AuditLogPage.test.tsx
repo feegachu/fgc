@@ -124,7 +124,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     })
     expect(screen.getByText('BATCH')).toBeInTheDocument()
     expect(screen.getByText('2 / 3 페이지')).toBeInTheDocument()
-    expect(screen.getByText('45')).toBeInTheDocument()
+    expect(screen.getByText('총 45건')).toBeInTheDocument()
     expect(await screen.findByRole('option', { name: 'settle01' })).toBeInTheDocument()
     expect(screen.getByLabelText('행위자')).toHaveValue('12')
     expect(screen.getByLabelText('행위 종류')).toHaveValue('PAYMENT_CONFIRMED')

@@ -9,7 +9,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
-import { dateTime, errorText, int, month as formatMonth } from '../../lib/format'
+import { dateTime, errorText, month as formatMonth } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { withMonth } from '../../stores/workspace'
 import { useAuth } from '../auth/useAuth'
@@ -353,8 +353,8 @@ function RunPicker({ currentId, link }: { currentId: string; link: (path: string
   const value = picked || currentId
   return (
     <div className="page-header-actions">
-      <div className="field vrun-run-picker">
-        <label className="field-label" htmlFor="pick-run">
+      <div className="filter-field vrun-run-picker">
+        <label className="filter-field-label" htmlFor="pick-run">
           실행
         </label>
         <select
@@ -444,7 +444,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
 function SummaryCard({ label, value, unit, footer }: { label: string; value?: number; unit: string; footer?: string }) {
   return (
     <div className="kpi-card">
-      <KpiCardContent label={label} value={value === undefined ? null : int(value)} unit={unit} footer={footer} />
+      <KpiCardContent label={label} value={value ?? null} unit={unit} footer={footer} />
     </div>
   )
 }

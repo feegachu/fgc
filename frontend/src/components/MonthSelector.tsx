@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Button } from './Button'
 import { today } from '../lib/format'
+import { monthText } from '../lib/screenText'
 export function MonthSelector({
   value,
   onApply,
@@ -196,7 +197,7 @@ export function MonthSelector({
             </p>
           </div>
           <div className="month-selector-footer">
-            <p className="month-selector-selection">선택, {draft ?? '-'}</p>
+            <p className="month-selector-selection">기준정산월 : {monthText(draft)}</p>
             <div className="month-selector-actions">
               <Button variant="secondary" disabled={busy} onClick={close}>
                 취소

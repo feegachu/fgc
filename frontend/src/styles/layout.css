@@ -443,7 +443,7 @@
   right: 0;
   z-index: var(--z-overlay);
   display: flex;
-  width: 22.5rem;
+  width: 24rem;
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);

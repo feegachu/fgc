@@ -157,7 +157,8 @@
   padding: 0 var(--space-3);
 }
 
-.select-control {
+.select-control,
+.search-conditions select.field-control {
   min-width: 7.5rem;
   appearance: none;
   padding-right: 2.25rem;
@@ -282,6 +283,47 @@
   line-height: 1.375rem;
 }
 
+.surface-header.list-header {
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.list-header-main,
+.list-header-aside {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.list-header-aside {
+  margin-left: auto;
+}
+
+.list-header-total,
+.list-header-page-size {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  white-space: nowrap;
+}
+
+.list-header-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.list-header-page-size .select-control {
+  width: auto;
+  min-width: 4.25rem;
+  height: 1.75rem;
+  padding-block: 0;
+  font-size: inherit;
+}
+
 .surface-body {
   padding: var(--space-4);
 }
@@ -401,15 +443,120 @@
   gap: var(--space-3);
 }
 
+.filter-fields {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filter-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
 .filter-field {
   display: grid;
   gap: var(--space-1);
 }
 
+.filter-bar .field-label,
 .filter-field-label {
   color: var(--color-text-secondary);
   font-size: 0.6875rem;
+  font-weight: 500;
   line-height: 1.125rem;
+}
+
+/* All search panels use the insurance contract filter layout. */
+.filter-bar.search-conditions {
+  display: flex;
+  min-width: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-8);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.filter-bar.search-conditions.is-embedded {
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+.filter-bar.search-conditions > .filter-fields {
+  display: flex;
+  width: auto;
+  min-width: 0;
+  flex: 1 1 11rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.filter-bar.search-conditions > .filter-fields > :is(.field, .filter-field),
+.filter-bar.search-conditions > :is(.field, .filter-field) {
+  width: auto;
+  min-width: 11rem;
+  max-width: 16rem;
+  flex: 1 1 11rem;
+}
+
+.search-conditions :is(.field, .filter-field) {
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.search-conditions :is(.field-label, .filter-field-label),
+.search-conditions .filter-field > label {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.125rem;
+}
+
+.search-conditions :is(.field-control, .select-control) {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-height-sm);
+  border-radius: var(--radius-8);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+}
+
+.filter-bar.search-conditions > .filter-actions {
+  width: auto;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-self: flex-end;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.filter-checkbox {
+  display: inline-flex;
+  min-height: var(--control-height-sm);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  cursor: pointer;
+}
+
+.filter-checkbox input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  accent-color: var(--color-action-primary);
 }
 
 .kpi-grid {
@@ -868,6 +1015,22 @@ body.is-modal-open {
 }
 
 @media (max-width: 63.9375rem) {
+  .filter-bar.search-conditions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filter-bar.search-conditions > .filter-fields {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .filter-bar.search-conditions > .filter-fields > :is(.field, .filter-field),
+  .filter-bar.search-conditions > :is(.field, .filter-field) {
+    min-width: 10rem;
+    flex-basis: 10rem;
+  }
+
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -883,6 +1046,24 @@ body.is-modal-open {
 }
 
 @media (max-width: 47.9375rem) {
+  .filter-bar.search-conditions > .filter-fields > :is(.field, .filter-field),
+  .filter-bar.search-conditions > :is(.field, .filter-field) {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 100%;
+  }
+
+  .filter-bar.search-conditions > .filter-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .filter-bar.search-conditions > .filter-actions > .button {
+    width: auto;
+    flex: 1 1 6rem;
+  }
+
   .kpi-grid {
     grid-template-columns: 1fr;
   }
@@ -891,6 +1072,10 @@ body.is-modal-open {
   .filter-actions,
   .filter-field {
     width: 100%;
+  }
+
+  .filter-actions {
+    flex-wrap: wrap;
   }
 
   .filter-field .select-control,

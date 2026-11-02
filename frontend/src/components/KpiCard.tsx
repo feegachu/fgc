@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { AnimatedNumber } from './AnimatedNumber'
 import type { StatusTone } from './StatusBadge'
 export function KpiCardContent({
   label,
@@ -7,6 +8,7 @@ export function KpiCardContent({
   footer,
   heading = false,
   zero,
+  format,
 }: {
   label: string
   value: ReactNode
@@ -14,6 +16,7 @@ export function KpiCardContent({
   footer?: ReactNode
   heading?: boolean
   zero?: boolean
+  format?: (value: number) => string
 }) {
   return (
     <>
@@ -25,7 +28,7 @@ export function KpiCardContent({
           className="kpi-value tabular-nums"
           data-zero={zero ?? (value === 0 || (typeof value === 'string' && /^0(?:\.0+)?$/.test(value)))}
         >
-          {value}
+          {typeof value === 'number' ? <AnimatedNumber value={value} format={format} /> : value}
         </strong>
         {unit && <span className="kpi-unit">{unit}</span>}
       </div>
@@ -40,6 +43,7 @@ export function KpiCard({
   footer,
   tone = 'neutral',
   zero,
+  format,
 }: {
   label: string
   value: ReactNode
@@ -47,10 +51,11 @@ export function KpiCard({
   footer?: ReactNode
   tone?: StatusTone
   zero?: boolean
+  format?: (value: number) => string
 }) {
   return (
     <section className={`kpi-card kpi-card-${tone}`} aria-label={label}>
-      <KpiCardContent label={label} value={value} unit={unit} footer={footer} zero={zero} heading />
+      <KpiCardContent label={label} value={value} unit={unit} footer={footer} zero={zero} format={format} heading />
     </section>
   )
 }

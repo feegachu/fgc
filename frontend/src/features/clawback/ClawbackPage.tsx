@@ -8,8 +8,9 @@ import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { ResizableSplit } from '../../components/ResizableSplit'
-import { int, today } from '../../lib/format'
+import { today } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useInsurerOptions, useProductOptions } from '../base/api'
 import { QueryState } from '../reference/ReferenceUI'
@@ -77,13 +78,14 @@ export default function ClawbackPage() {
     <div className="claw-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">환수 검토/계산</h1>
+          <h1 className="page-title">환수</h1>
         </div>
       </header>
       <FilterBar
         className="claw-filter-bar"
         fieldsClassName="claw-filter-fields"
         icons
+        resetFirst
         onSubmit={() => {
           if (!dateError) apply({ ...draft, contractNo: draft.contractNo.trim(), page: 1 })
         }}
@@ -220,14 +222,11 @@ export default function ClawbackPage() {
         defaultRatio={58}
       >
         <section className="surface claw-list-panel" aria-labelledby="claw-list-title">
-          <header className="surface-header claw-panel-header">
+          <ListHeader className="claw-panel-header" total={query.data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title" id="claw-list-title">
               ② 환수 검토 후보
             </h2>
-            <span className="claw-result-count">
-              <span className="tabular-nums">{int(query.data?.totalElements ?? 0)}</span>건
-            </span>
-          </header>
+          </ListHeader>
           {busy || query.error ? (
             <div className="empty-state">
               <QueryState loading={busy && !query.error} error={query.error} />

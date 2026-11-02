@@ -11,6 +11,7 @@ import { CategoryBadge } from '../../components/StatusBadge'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { sortBinding } from '../../lib/tableSort'
 import { dateTime, errorText, month as formatMonth } from '../../lib/format'
@@ -143,7 +144,8 @@ export default function ValidationRunListPage() {
     {
       key: 'open',
       label: '상세',
-      width: '5rem',
+      width: '6rem',
+      cellClassName: 'vrun-open-cell',
       align: 'left',
       render: (r) => <OpenLink run={r} />,
     },
@@ -160,11 +162,11 @@ export default function ValidationRunListPage() {
       <CreateSection />
 
       <section className="surface" aria-labelledby="vrun-list-title">
-        <header className="surface-header">
+        <ListHeader total={runs.data?.totalElements ?? 0} pageSize={20}>
           <h2 className="surface-title" id="vrun-list-title">
             ② 실행 목록
           </h2>
-        </header>
+        </ListHeader>
         <StatusFilter key={criteria.status} status={criteria.status} onSearch={(status) => update({ status })} />
         {runs.isError && (
           <p className="field-error" role="alert">
@@ -293,7 +295,7 @@ function CreateSection() {
 function StatusFilter({ status, onSearch }: { status: string; onSearch: (status: string) => void }) {
   const [draft, setDraft] = useState(status)
   return (
-    <FilterBar className="vrun-filter-bar" icons onSubmit={() => onSearch(draft)}>
+    <FilterBar className="vrun-filter-bar" embedded onSubmit={() => onSearch(draft)}>
       <div className="filter-field vrun-filter-status">
         <label className="filter-field-label" htmlFor="f-status">
           상태

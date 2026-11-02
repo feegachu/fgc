@@ -175,8 +175,8 @@ function ScheduleDetailView({ id }: { id: string }) {
             <span className="tabular-nums">스케줄 번호 {header ? value(header.scheduleHeaderId) : '-'}</span>
           </h2>
           {/* 지급단계는 이동 컨트롤이다(화면정의서 SCHE-W02, IF-API-28C). */}
-          <div className="field schedule-stage-field">
-            <label className="field-label" htmlFor="schedule-stage">
+          <div className="filter-field schedule-stage-field">
+            <label className="filter-field-label" htmlFor="schedule-stage">
               지급단계
             </label>
             <select

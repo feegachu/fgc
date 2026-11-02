@@ -9,6 +9,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { sortBinding } from '../../lib/tableSort'
@@ -222,7 +223,7 @@ export default function CapListPage() {
             >
               <KpiCardContent
                 label={label}
-                value={data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '-'}
+                value={data ? (data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '-'}
                 unit="건"
                 footer={code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
               />
@@ -249,10 +250,14 @@ export default function CapListPage() {
         </div>
       </section>
       <section className="surface">
-        <header className="surface-header">
+        <ListHeader
+          total={data ? data.totalElements ?? 0 : null}
+          pageSize={criteria.size}
+          pageSizeOptions={[10, 20, 50]}
+          onPageSizeChange={(size) => update({ size: String(size) })}
+        >
           <h2 className="surface-title">계약별 판정 목록</h2>
-          <span>총 {data ? int(data.totalElements ?? 0) : '-'}건</span>
-        </header>
+        </ListHeader>
         {list.isError ? (
           <CapError error={list.error} retry={() => void list.refetch()} />
         ) : (
@@ -272,23 +277,6 @@ export default function CapListPage() {
           page={criteria.page}
           totalPages={data?.totalPages ?? 0}
           onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-          controls={
-            <label>
-              한 화면{' '}
-              <select
-                className="select-control"
-                aria-label="한 화면 행 수"
-                value={criteria.size}
-                onChange={(event) => update({ size: event.target.value })}
-              >
-                {[10, 20, 50].map((size) => (
-                  <option key={size} value={size}>
-                    {size}행
-                  </option>
-                ))}
-              </select>
-            </label>
-          }
         />
       </section>
       <section className="surface">
@@ -393,12 +381,10 @@ function CapFilter({
       </option>
     ))
   return (
-    <section className="surface">
-      <header className="surface-header">
-        <h2 className="surface-title">검색 조건</h2>
-      </header>
+    <section className="surface" aria-label="한도 검증 조회 조건">
       <FilterBar
         className="cap-react-filter"
+        embedded
         resetFirst
         icons
         onSubmit={() => onSearch({ ...filters, contractNo: filters.contractNo.trim() })}

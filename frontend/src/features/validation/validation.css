@@ -176,7 +176,11 @@
   width: 14rem;
 }
 .vrun-col-open {
-  width: 5rem;
+  width: 6rem;
+}
+
+.vrun-run-table td.vrun-open-cell {
+  text-overflow: clip;
 }
 
 .vrun-row-button {

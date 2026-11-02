@@ -5,21 +5,20 @@ import { Button } from '../../components/Button'
 import { useAuth } from '../auth/useAuth'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
-import { PolicyPreviewContext, sourceReferenceNotice } from './management'
+import { PolicyPreviewContext } from './management'
 import './policies.css'
 import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
+import { ListHeader } from '../../components/ListHeader'
 import { Field } from '../../components/Field'
-import { EvidenceLink } from '../../components/EvidenceLink'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { date, int } from '../../lib/format'
+import { date } from '../../lib/format'
 import { QueryState, ReferenceTabs, ReferenceText } from '../reference/ReferenceUI'
 import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
-import { PolicyReferenceInfo } from './PolicyReferenceInfo'
 import type { Policy } from './api'
-/** 목록 근거 info 대상: 규제(REG)와 근거자료(SRC) 모두. 둘 다 없을 때만 '근거 미기재'다. */
+/** 규제와 근거자료가 모두 없는 정책 행을 구분한다. */
 const policyRefs = (policy: Policy) => [...(policy.regulationRefs ?? []), ...(policy.sourceRefs ?? [])]
 const tabs = [
   { id: 'versions', label: '정책 버전' },
@@ -79,10 +78,13 @@ export function PoliciesPage() {
           <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
         <div className="policy-header-actions">
-          <Field className="policy-date-field" label="적용 기준일">
+          <Field className="policy-date-field" variant="filter" label="적용 기준일">
             <input type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
           </Field>
           <Button variant="secondary" onClick={() => patch({ asOf: defaultDate, policyVersionId: null })}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              restart_alt
+            </span>
             초기화
           </Button>
           {['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
@@ -116,16 +118,13 @@ export function PoliciesPage() {
           active={active}
           onChange={(tab) => patch({ tab, ...(id !== undefined ? { policyVersionId: String(id) } : {}) })}
         >
-          <header className="surface-header policy-panel-header">
+          <ListHeader
+            className="policy-panel-header"
+            total={active === 'versions' ? policies.data?.length ?? null : undefined}
+            pageSize={active === 'versions' ? policies.data?.length ?? 0 : undefined}
+          >
             <h2 className="surface-title">{tabs.find((tab) => tab.id === active)?.label}</h2>
-            <p className="policy-panel-caption">
-              {active === 'versions'
-                ? `기준일 ${asOf}${policies.isSuccess ? `, ${int(policies.data?.length ?? 0)}건` : ''}, 행을 선택하면 나머지 탭에서 상세를 확인할 수 있습니다`
-                : selected
-                  ? `선택 정책: ${selected.policyCode} v${selected.versionNo}`
-                  : ''}
-            </p>
-          </header>
+          </ListHeader>
           <QueryState loading={policies.isLoading} error={policies.error} />
           {policies.error && (
             <Button variant="secondary" onClick={() => void policies.refetch()}>
@@ -151,8 +150,9 @@ export function PoliciesPage() {
               columns={[
                 {
                   key: 'select',
-                  label: <span className="visually-hidden">선택</span>,
-                  width: '3rem',
+                  label: '선택',
+                  width: '4rem',
+                  align: 'center',
                   cellClassName: 'policy-select-cell',
                   render: (r) => (
                     <input
@@ -235,38 +235,6 @@ export function PoliciesPage() {
                       {present(r.statusLabel)}
                     </StatusBadge>
                   ),
-                },
-                {
-                  key: 'refs',
-                  label: '근거',
-                  width: '11.5rem',
-                  cellClassName: 'policy-disclosure-cell',
-                  render: (r) =>
-                    policyRefs(r).length ? (
-                      policyRefs(r).map((ref) => (
-                        <EvidenceLink key={ref} label={ref}>
-                          {r.policyName}, {ref}
-                          {r.policyVersionId != null ? (
-                            <PolicyReferenceInfo policyVersionId={r.policyVersionId} refText={ref} />
-                          ) : null}
-                          <p>{sourceReferenceNotice}</p>
-                          <Button
-                            variant="ghost"
-                            onClick={() =>
-                              patch({
-                                policyVersionId: String(r.policyVersionId),
-                                tab: 'management',
-                                section: 'sources',
-                              })
-                            }
-                          >
-                            근거 상세 보기
-                          </Button>
-                        </EvidenceLink>
-                      ))
-                    ) : (
-                      <StatusBadge kind="text">근거 미기재</StatusBadge>
-                    ),
                 },
               ]}
             />

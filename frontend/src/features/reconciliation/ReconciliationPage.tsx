@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
 import { DataTable } from '../../components/DataTable'
+import { ListHeader } from '../../components/ListHeader'
 import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
@@ -241,9 +242,16 @@ export default function ReconciliationPage() {
   const { params, update } = useSearchParamsState(FILTER_KEYS)
   const criteria = criteriaFromParams(params, month)
   const history = useQuery(historyQuery(criteria))
-  const runId =
+  const requestedRunId =
     !params.get('runMonth') || params.get('runMonth') === criteria.month ? positiveId(params.get('runId')) : ''
   const resultId = positiveId(params.get('resultId'))
+  const previewRun =
+    !params.has('runId') && !resultId && !history.isPlaceholderData ? history.data?.content?.[0] : undefined
+  const previewRunId =
+    previewRun?.settlementMonth?.slice(0, 7) === criteria.month
+      ? positiveId(String(previewRun.reconciliationRunId ?? ''))
+      : ''
+  const runId = requestedRunId || previewRunId
   const resultPage = Number(positiveId(params.get('resultPage')) || 1)
   const rawType = params.get('resultType') ?? ''
   const type = Object.hasOwn(RESULT_TYPE, rawType) ? rawType : ''
@@ -305,6 +313,11 @@ export default function ReconciliationPage() {
   const filteredRows = (results.data?.items?.content ?? []).filter(
     (row) => !onlyMismatch || row.resultType !== 'MATCHED',
   )
+  const resultTotal = onlyMismatch && type === 'MATCHED'
+    ? 0
+    : onlyMismatch && !type
+      ? results.data?.summary?.exceptionCount
+      : results.data?.items?.totalElements
   const exceptionHref = `/exceptions?type=RECONCILIATION_MISMATCH&validationMonth=${criteria.month}-01&status=ALL`
   const compareColumns: TableColumn<Result>[] = [
     ...resultColumns,
@@ -385,37 +398,43 @@ export default function ReconciliationPage() {
           aria-label="대사 결과"
           aria-busy={!!runId && results.isFetching}
         >
-          <header className="surface-header reco-react-panel-header">
+          <ListHeader
+            className="reco-react-panel-header"
+            total={resultTotal ?? (runId ? null : 0)}
+            pageSize={20}
+            actions={
+              <div className="reco-react-result-filters">
+                <label className="filter-field-label" htmlFor="reco-result-type">
+                  결과 유형
+                </label>
+                <select
+                  id="reco-result-type"
+                  className="field-control select-control"
+                  value={type}
+                  onChange={(e) => update({ resultType: e.target.value, resultPage: '' }, { resetPage: false })}
+                >
+                  <option value="">전체 (11종)</option>
+                  {Object.entries(RESULT_TYPE).map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <label className="filter-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={onlyMismatch}
+                    onChange={(e) =>
+                      update({ onlyMismatch: e.target.checked ? 'true' : '', resultPage: '' }, { resetPage: false })
+                    }
+                  />{' '}
+                  불일치만
+                </label>
+              </div>
+            }
+          >
             <h2 className="surface-title">대사 결과</h2>
-            <div className="reco-react-result-filters">
-              <label className="filter-field-label" htmlFor="reco-result-type">
-                결과 유형
-              </label>
-              <select
-                id="reco-result-type"
-                className="field-control select-control"
-                value={type}
-                onChange={(e) => update({ resultType: e.target.value, resultPage: '' }, { resetPage: false })}
-              >
-                <option value="">전체 (11종)</option>
-                {Object.entries(RESULT_TYPE).map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <label className="reco-react-checkbox">
-                <input
-                  type="checkbox"
-                  checked={onlyMismatch}
-                  onChange={(e) =>
-                    update({ onlyMismatch: e.target.checked ? 'true' : '', resultPage: '' }, { resetPage: false })
-                  }
-                />{' '}
-                불일치만
-              </label>
-            </div>
-          </header>
+          </ListHeader>
           {onlyMismatch && (
             <p className="reco-react-note" role="status">
               불일치만은 현재 서버 페이지에서 일치 행을 숨깁니다. 전체 불일치 건수는 실행 요약이며, 다음 페이지에도
@@ -466,9 +485,9 @@ export default function ReconciliationPage() {
           />
         </section>
         <section className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching}>
-          <header className="surface-header reco-react-panel-header">
+          <ListHeader className="reco-react-panel-header" total={history.data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">실행 이력</h2>
-          </header>
+          </ListHeader>
           <Failure error={history.error} />
           <DataTable
             className="reco-react-history-table"
@@ -537,11 +556,12 @@ function RunFilters({
     <>
       <FilterBar
         className="reco-react-filters"
+        embedded
         showSubmit={false}
         onSubmit={() => submit('search')}
         actions={
           <>
-            <Button type="submit" variant="secondary">
+            <Button type="submit">
               <span className="material-symbols-rounded" aria-hidden="true">
                 search
               </span>
@@ -653,21 +673,23 @@ function RunFilters({
 }
 function RunSummary({ summary }: { summary?: Summary }) {
   const matchRate = summary?.resultCount
-    ? (((summary.matchedCount ?? 0) / summary.resultCount) * 100).toFixed(1)
+    ? ((summary.matchedCount ?? 0) / summary.resultCount) * 100
     : EMPTY
   return (
     <section className="reco-react-summary" aria-label="실행 요약">
       <h2 className="surface-title">실행 요약</h2>
       <div className="reco-react-kpis kpi-group">
-        <KpiCard label="대상" value={summary ? int(summary.resultCount) : EMPTY} unit="건" />
-        <KpiCard label="일치" value={summary ? int(summary.matchedCount) : EMPTY} unit="건" tone="success" />
-        <KpiCard label="불일치" value={summary ? int(summary.exceptionCount) : EMPTY} unit="건" tone="error" />
+        <KpiCard label="대상" value={summary?.resultCount ?? EMPTY} unit="건" footer="이번 실행의 전체 대사 결과" />
+        <KpiCard label="일치" value={summary?.matchedCount ?? EMPTY} unit="건" tone="success" footer="예상 내역과 실제 지급 일치" />
+        <KpiCard label="불일치" value={summary?.exceptionCount ?? EMPTY} unit="건" tone="error" footer="누락, 금액 차이 등 확인 필요" />
         <div className="reco-react-rate">
           <KpiCard
             label="일치율"
             value={matchRate}
+            format={(value) => value.toFixed(1)}
             unit="%"
             tone={summary && summary.resultCount === summary.matchedCount ? 'success' : 'warning'}
+            footer="일치 건수 / 대상 건수"
           />
           <details className="reco-react-rate-help">
             <summary aria-label="일치율 계산 안내">
@@ -684,9 +706,10 @@ function RunSummary({ summary }: { summary?: Summary }) {
         <KpiCard
           label="차액 합계"
           zero={summary?.differenceTotal === 0}
-          value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
+          value={summary ? <Money value={summary.differenceTotal} difference unit={false} animate /> : EMPTY}
           unit="원"
           tone={summary?.differenceTotal === 0 ? 'success' : 'error'}
+          footer="실제 지급액 - 예상 지급액 합계"
         />
       </div>
     </section>

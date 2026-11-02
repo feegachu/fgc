@@ -9,7 +9,7 @@ import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
-import { int } from '../../lib/format'
+import { ListHeader } from '../../components/ListHeader'
 import { sortBinding } from '../../lib/tableSort'
 import { useInsurerOptions } from '../base/api'
 import { QueryState } from '../reference/ReferenceUI'
@@ -159,7 +159,7 @@ export default function ArbitragePage() {
           >
             <KpiCardContent
               label={card.label}
-              value={query.data ? int(query.data.summary?.[card.count] ?? 0) : '-'}
+              value={query.data ? (query.data.summary?.[card.count] ?? 0) : '-'}
               unit={query.data ? '건' : undefined}
               footer={card.description}
             />
@@ -173,14 +173,11 @@ export default function ArbitragePage() {
         defaultRatio={56}
       >
         <section className="surface arb-list-panel" aria-labelledby="arb-list-title">
-          <header className="surface-header arb-panel-header">
+          <ListHeader className="arb-panel-header" total={query.data?.items?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title" id="arb-list-title">
               ③ 계약별 판정
             </h2>
-            <span className="arb-result-count">
-              <span className="tabular-nums">{int(query.data?.items?.totalElements ?? 0)}</span>건
-            </span>
-          </header>
+          </ListHeader>
           {busy || query.error ? (
             <div className="empty-state">
               <QueryState loading={busy && !query.error} error={query.error} />

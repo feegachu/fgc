@@ -14,6 +14,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { errorText, int, isNegative, month as formatMonth, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
@@ -192,19 +193,11 @@ export default function TransactionListPage() {
     },
     {
       key: 'attributions',
-      label: '귀속',
+      label: '귀속 계약',
       sortable: true,
       width: '6.5rem',
       align: 'center',
-      render: (row) => {
-        const count = row.attributionCount ?? 0
-        const imbalance = count === 0 || Number(row.differenceAmount ?? 0) !== 0
-        return (
-          <StatusBadge tone={imbalance ? 'error' : 'success'}>
-            {count}건, {imbalance ? '확인필요' : '일치'}
-          </StatusBadge>
-        )
-      },
+      render: (row) => `${int(row.attributionCount ?? 0)}건`,
     },
     {
       key: 'action',
@@ -331,17 +324,11 @@ export default function TransactionListPage() {
         aria-labelledby="transaction-list-title"
         aria-busy={search.isFetching}
       >
-        <header className="surface-header transaction-surface-header">
+        <ListHeader className="transaction-surface-header" total={total} totalId="row-count" pageSize={20}>
           <h2 className="surface-title" id="transaction-list-title">
             지급 건
           </h2>
-          <span className="transaction-result-count">
-            <span className="tabular-nums" id="row-count">
-              {int(total)}
-            </span>
-            건, 한 화면 20행
-          </span>
-        </header>
+        </ListHeader>
         <DataTable
           className="transaction-list-table"
           viewportClassName="transaction-table-viewport"
@@ -496,7 +483,7 @@ function TransactionFilters({
         {select('agentId', 'f-agent', '수령 설계사', 'transaction-filter-agent', remembered(known.agents))}
         {select('commissionItemId', 'f-item', '수수료 항목', 'transaction-filter-item', remembered(known.items))}
         {select('status', 'f-status', '상태', 'transaction-filter-status-field', statusOptions)}
-        <label className="transaction-filter-checkbox">
+        <label className="filter-checkbox">
           <input
             id="f-noattr"
             type="checkbox"

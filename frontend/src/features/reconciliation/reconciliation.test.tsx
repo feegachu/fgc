@@ -148,6 +148,33 @@ afterEach(() => {
 const bodyPosts = () =>
   calls.filter((call) => call.url === '/api/v1/reconciliations' && call.options?.method === 'POST')
 describe('RECO-W01·W02 React 전환', () => {
+  it('실행을 지정하지 않으면 맨 위 이력 결과를 바로 보여 주고 이후 직접 선택을 유지한다', async () => {
+    const { user } = renderAt('/reconciliations?month=2026-07', (url) =>
+      url.startsWith('/api/v1/reconciliations?')
+        ? { ...history, content: [{ ...run, reconciliationRunId: 42 }, run] }
+        : undefined,
+    )
+    await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })
+    expect(calls.some((call) => call.url.includes('/42/results'))).toBe(true)
+    expect(calls.some((call) => call.url.includes('/41/results'))).toBe(false)
+    const list = within(screen.getByRole('region', { name: '실행 이력' }))
+    expect(list.getByRole('button', { name: '42' }).closest('tr')).toHaveClass('is-selected')
+    await user.click(list.getByRole('button', { name: '41' }))
+    await waitFor(() => expect(calls.some((call) => call.url.includes('/41/results'))).toBe(true))
+    expect(list.getByRole('button', { name: '41' }).closest('tr')).toHaveClass('is-selected')
+  })
+
+  it('실행 이력이 없으면 임의의 결과를 조회하지 않고 초기 합계를 유지한다', async () => {
+    renderAt('/reconciliations?month=2026-07', (url) =>
+      url.startsWith('/api/v1/reconciliations?') ? { ...history, content: [], totalPages: 0 } : undefined,
+    )
+    await screen.findByText('대사를 실행하거나 이력을 선택하면 결과가 여기 표시됩니다.')
+    await waitFor(() => expect(screen.getByRole('region', { name: '실행 이력' })).toHaveAttribute('aria-busy', 'false'))
+    expect(calls.some((call) => /\/reconciliations\/\d+\/results/.test(call.url))).toBe(false)
+    const footer = screen.getByRole('region', { name: '대사 결과' }).querySelector('tfoot')!
+    expect(within(footer).getAllByText('0')).toHaveLength(3)
+  })
+
   it('BOTH 원천은 예상·실제 양쪽의 올바른 원천 ID로 표시한다', async () => {
     renderAt('/reconciliations?month=2026-07&resultId=7', (url) =>
       url.endsWith('/results/7')
@@ -303,8 +330,9 @@ describe('RECO-W01·W02 React 전환', () => {
       size: '20',
       sort: 'createdAt,desc',
     })
-    expect(screen.getByText('50.0%')).toBeVisible()
-    expect(screen.getByText('-1,000원')).toHaveClass('is-negative-amount', 'reco-react-difference')
+    const historyRegion = within(screen.getByRole('region', { name: '실행 이력' }))
+    expect(historyRegion.getByText('50.0%')).toBeVisible()
+    expect(historyRegion.getByText('-1,000원')).toHaveClass('is-negative-amount', 'reco-react-difference')
     const pagination = within(screen.getByRole('region', { name: '실행 이력' }))
     await user.click(pagination.getByRole('button', { name: '2' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
@@ -545,13 +573,10 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(within(footer).getByText('-1,000')).toHaveClass('reco-react-difference')
     expect(screen.getByRole('region', { name: '대상' })).toHaveTextContent('2건')
   })
-  it('미선택은 0 합계, 무필터 조회는 페이지 행이 아닌 서버 실행 합계를 표시한다', async () => {
-    const { user } = renderAt()
+  it('맨 위 실행 미리보기는 페이지 행이 아닌 서버 실행 합계를 표시한다', async () => {
+    renderAt()
     const table = await screen.findByRole('table', { name: '선택한 대사 실행의 계약별 결과' })
     const footer = table.querySelector('tfoot')!
-    expect(within(footer).getAllByText('0')).toHaveLength(3)
-    expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('-원')
-    await user.click(await screen.findByRole('button', { name: '41' }))
     await within(footer).findByText('24,000')
     expect(within(footer).getByText('23,000')).toBeVisible()
     expect(within(footer).getByRole('rowheader')).toHaveTextContent(/^합계$/)

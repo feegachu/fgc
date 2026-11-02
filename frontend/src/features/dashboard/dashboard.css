@@ -207,6 +207,11 @@
   padding: var(--space-3) var(--space-4);
 }
 
+.risk-composition-card > .surface-header {
+  min-height: 0;
+  padding: 0 0 var(--space-3);
+}
+
 .risk-composition {
   display: grid;
   gap: var(--space-3);
@@ -264,6 +269,33 @@
 .risk-donut-center span {
   color: var(--color-text-tertiary);
   font-size: 0.6875rem;
+}
+
+.risk-donut-tooltip {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: calc(100% + 3rem);
+  gap: var(--space-1);
+  padding: var(--space-3);
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-8);
+  background: color-mix(in srgb, var(--color-bg-surface) 85%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.risk-donut-tooltip > span {
+  margin: 0;
+  color: var(--color-text-secondary);
 }
 
 .risk-color-error {
@@ -377,13 +409,6 @@
   transition: transform 700ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-.risk-composition-note {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
-  line-height: 1rem;
-}
-
 /* 실행 단계 스테퍼: 10칸이 순서대로 채워지고, 실행 중이면 현재 칸이 깜빡인다. */
 .run-steps {
   display: grid;
@@ -394,15 +419,27 @@
 }
 
 .run-step {
+  position: relative;
   height: 0.375rem;
+  overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--color-bg-subtle);
-  transition: background-color 240ms ease;
-  transition-delay: calc(var(--i, 0) * 45ms);
 }
 
-.run-step.is-done {
+.run-step::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background: var(--color-action-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+  transition-delay: calc(var(--i, 0) * 90ms);
+  content: '';
+}
+
+.run-step.is-done::before {
+  transform: scaleX(1);
 }
 
 .run-step.is-current {
@@ -470,7 +507,7 @@
   .dashboard-page .kpi-card,
   .risk-donut-segment,
   .risk-legend-bar-fill,
-  .run-step {
+  .run-step::before {
     transition: none;
   }
 

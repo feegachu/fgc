@@ -11,6 +11,7 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { Modal } from '../../components/Modal'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { usePermission } from '../auth/useAuth'
 import { journalAccountsQueryOptions, journalDetailQueryOptions } from '../exception/api'
@@ -174,9 +175,6 @@ export default function LedgerPage() {
       <header className="page-header">
         <h1 className="page-title">검증원장 조회</h1>
       </header>
-      <aside className="guidance guidance-neutral">
-        이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.
-      </aside>
       {params.get('imbalanceOnly') === 'true' && (
         <p className="guidance guidance-neutral" role="status">
           불균형만 조회하는 목록 필터는 지원하지 않습니다. 분개를 선택하면 연결된 검증 실행의 불균형을 확인할 수
@@ -198,10 +196,9 @@ export default function LedgerPage() {
         defaultRatio={55}
       >
         <section className="surface" aria-busy={list.isFetching}>
-          <header className="surface-header">
+          <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">분개 목록</h2>
-            <span>{int(data?.totalElements ?? 0)}건, 한 화면 20행</span>
-          </header>
+          </ListHeader>
           <Failure error={list.error} />
           {list.isPending && list.fetchStatus !== 'idle' && <p role="status">분개 목록을 불러오는 중입니다.</p>}
           <DataTable
