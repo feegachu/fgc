@@ -24,7 +24,7 @@ public final class AuthTokenDtos {
                              Long agentId, boolean isAgent, boolean canUseAgentWorkspace,
                              boolean canProcess, boolean canViewAuditLog, boolean canHandleException,
                              boolean canReverseJournal, boolean canFinalizeValidation,
-                             @Schema(description = "서버 fgc.demo-month 설정의 기본 기준 정산월. URL/세션의 선택 월과 독립적이다.",
+                             @Schema(description = "서버 fgc.demo-month 설정의 기본 기준 정산월. URL·세션의 선택 월과 독립적이다.",
                                      type = "string", pattern = "^(?!0000)\\d{4}-(0[1-9]|1[0-2])$", example = "2026-07",
                                      requiredMode = Schema.RequiredMode.REQUIRED)
                              String demoMonth) {

@@ -41,7 +41,7 @@ class AuditCoverageIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("계약 등록/수정은 CONTRACT_CREATED / CONTRACT_UPDATED 감사행을 남긴다")
+    @DisplayName("계약 등록·수정은 CONTRACT_CREATED / CONTRACT_UPDATED 감사행을 남긴다")
     void contractCreateAndUpdateLeaveAuditRows() {
         Map<String, Object> reference = jdbcTemplate.queryForMap("""
                 SELECT insurer_id, product_offering_id, contract_date, agent_id, organization_id

@@ -11,7 +11,7 @@ it('표의 전체 선택지가 4종 이상이면 배지로, 3종 이하면 텍�
   const columns = [
     { key: 'four', label: '4종', render: () => <CategoryBadge optionCount={4}>네 가지 유형</CategoryBadge> },
     { key: 'three', label: '3종', render: () => <CategoryBadge optionCount={3}>세 가지 유형</CategoryBadge> },
-    { key: 'status', label: '계약 상태', render: () => <ContractStatusBadge code="ACTIVE" label="서버 계약 상태" /> },
+    { key: 'status', label: '계약 상태', render: () => <ContractStatusBadge code="ACTIVE" label="서버·계약 상태" /> },
     { key: 'origin', label: '출처', render: () => <DataOriginBadge code="SEED" /> },
     {
       key: 'source',
@@ -48,7 +48,7 @@ it('표의 전체 선택지가 4종 이상이면 배지로, 3종 이하면 텍�
   for (const label of ['네 가지 유형', '위반']) {
     expect(scope.getByText(label)).toHaveAttribute('data-table-presentation', 'badge')
   }
-  expect(scope.getByText('서버 계약 상태')).toHaveAttribute('data-table-presentation', 'dot')
+  expect(scope.getByText('서버/계약 상태')).toHaveAttribute('data-table-presentation', 'dot')
   expect(scope.getByText('미계산')).toHaveAttribute('data-table-presentation', 'dot')
   for (const label of ['세 가지 유형', '시드', '긴급', '원수사 명세']) {
     expect(scope.getByText(label)).toHaveAttribute('data-table-presentation', 'text')

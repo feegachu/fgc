@@ -40,7 +40,7 @@ public class ClawbackCandidateController {
     }
 
     @GetMapping("/{candidateId}")
-    @Operation(operationId = "getClawbackCandidate", summary = "IF-API-84 환수 후보 원천/지급/보류 근거 조회")
+    @Operation(operationId = "getClawbackCandidate", summary = "IF-API-84 환수 후보 원천·지급·보류 근거 조회")
     public ApiResponse<ClawbackCandidateDetailResponse> detail(@PathVariable long candidateId) {
         return ApiResponse.success(service.detail(candidateId));
     }

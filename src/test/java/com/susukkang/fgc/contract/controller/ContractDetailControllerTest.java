@@ -226,7 +226,7 @@ class ContractDetailControllerTest {
     }
 
     @Test
-    @DisplayName("준법/감사는 계약 상세 수동 검증을 실행할 수 없다")
+    @DisplayName("준법·감사는 계약 상세 수동 검증을 실행할 수 없다")
     void detailActionRejectsComplianceUser() throws Exception {
         mockMvc.perform(post("/api/v1/contracts/{id}/cap-check", 21L)
                         .with(user("comp01").roles("COMPLIANCE"))

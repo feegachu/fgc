@@ -12,6 +12,9 @@ const blockedActions: Record<string, string> = {
   '기표 불가': '기표할 수 없습니다',
   '정정 불가': '정정할 수 없습니다',
   '승인 불가': '승인할 수 없습니다',
+  '제출 불가': '제출할 수 없습니다',
+  '통지서 생성 불가': '통지서를 생성할 수 없습니다',
+  '되돌릴 수 없습니다': '되돌릴 수 없습니다',
   '한도 검증 보류': '한도 검증을 보류합니다',
 }
 
@@ -30,8 +33,11 @@ export function screenMessage(value?: string | null) {
     .replace(/\s*—\s*/g, ', ')
 }
 
-export function errorScreenMessage(value?: string | null) {
-  return screenMessage(value).replace(/\s*\((?:FGC-[A-Z0-9-]+[^)]*|요청 ID:[^)]*)\)/g, '')
+export function errorScreenMessage(value?: string | null, requestId?: string | null) {
+  const embeddedRequestId = value?.match(/\([^)]*요청 ID:\s*([^,)]+)[^)]*\)/)?.[1]?.trim()
+  const message = screenMessage(value).replace(/\s*\((?:FGC-[A-Z0-9-]+[^)]*|요청 ID:[^)]*)\)/g, '')
+  const traceId = requestId?.trim() || embeddedRequestId
+  return traceId && !message.includes(traceId) ? `${message} (요청번호: ${traceId})` : message
 }
 
 export function nameWithCode(name?: string | null, code?: string | null) {

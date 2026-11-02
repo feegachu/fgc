@@ -328,7 +328,7 @@ class AuditLogQueryRepositoryIntegrationTest {
      * @since 2026-09-26
      */
     @Test
-    @DisplayName("대상 ID/행위자/행위 종류 필터 (IF-API-52 검색조건, entityId 는 쿡북에 없던 조건)")
+    @DisplayName("대상 ID·행위자·행위 종류 필터 (IF-API-52 검색조건 — entityId 는 쿡북에 없던 조건)")
     void filtersByEntityIdUserIdAndAction() {
         assertThat(queryRepository.selectAuditLogs(
                 criteria(entityTypeA, "9001", null, null, null, null), PageRequest.of(0, 20)))
@@ -354,7 +354,7 @@ class AuditLogQueryRepositoryIntegrationTest {
      * @since 2026-09-26
      */
     @Test
-    @DisplayName("기간 필터, from 포함, toExclusive 미포함")
+    @DisplayName("기간 필터 — from 포함, toExclusive 미포함")
     void filtersByOccurredAtRange() {
         List<AuditLogRow> rows = queryRepository.selectAuditLogs(
                 criteria(entityTypeA, null, null, null, BASE, BASE.plusHours(1)), PageRequest.of(0, 20));
@@ -386,7 +386,7 @@ class AuditLogQueryRepositoryIntegrationTest {
      * 설명 : 상세 조회(#407)가 목록과 같은 프로젝션으로 한 건을 돌려주고, 서비스가 diff 를 붙이는지 검증한다.
      */
     @Test
-    @DisplayName("단건 조회, 처리자 LEFT JOIN 유지, 없는 ID 는 empty, 서비스 상세는 diff 포함")
+    @DisplayName("단건 조회 — 처리자 LEFT JOIN 유지, 없는 ID 는 empty, 서비스 상세는 diff 포함")
     void selectsSingleAuditLogWithDiff() {
         Long id = jdbcTemplate.queryForObject(
                 "SELECT audit_log_id FROM fgc.audit_log WHERE action_code = ? AND entity_id = '9001'",
@@ -415,7 +415,7 @@ class AuditLogQueryRepositoryIntegrationTest {
      * @since 2026-09-26
      */
     @Test
-    @DisplayName("필터 선택지, 행위/대상 종류 DISTINCT 와 감사행을 남긴 사용자 목록")
+    @DisplayName("필터 선택지 — 행위·대상 종류 DISTINCT 와 감사행을 남긴 사용자 목록")
     void returnsFilterOptions() {
         assertThat(queryRepository.selectDistinctActionCodes()).contains(actionA, actionB);
         assertThat(queryRepository.selectDistinctEntityTypes()).contains(entityTypeA, entityTypeB);

@@ -372,7 +372,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     })
     await screen.findByText('스케줄 번호 11')
     await actions.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
-    await waitFor(() => expect(toasts()).toContain('사용 중인 운영 스케줄이 없습니다.'))
+    await waitFor(() => expect(toasts()).toContain('사용 중인 운영 스케줄이 없습니다. (요청번호: r1)'))
     expect(screen.getByLabelText('지급단계')).toHaveValue('GA_TO_FC')
     expect(router.state.location.pathname).toBe('/schedules/11')
   })
@@ -457,7 +457,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     await actions.click(screen.getByRole('button', { name: '확정' }))
     const dialog = await screen.findByRole('dialog', { name: '이 스케줄을 확정할까요?' })
     await actions.click(within(dialog).getByRole('button', { name: '확정' }))
-    const expected = `${message}`
+    const expected = `${message} (요청번호: r3)`
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(expected)
     expect(toasts()).toContain(expected)
     expect(screen.getByRole('dialog')).toBeInTheDocument()

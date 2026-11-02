@@ -87,7 +87,7 @@ class ContractTransactionIntegrationTest {
                 Long.class, request.getContractNo())).isZero();
     }
 
-    @ParameterizedTest(name = "수정 후 {0}: 기존 계약/스케줄/한도/이력 복원")
+    @ParameterizedTest(name = "수정 후 {0}: 기존 계약·스케줄·한도·이력 복원")
     @EnumSource(FailurePoint.class)
     void updateFailureRestoresCommittedContractAndDependentRows(FailurePoint point) {
         Long createdId = contractService.createContract(createRequest()).contractId();

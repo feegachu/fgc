@@ -77,7 +77,7 @@ function CapCard({ preview }: { preview: CapPreview }) {
       </div>
       {status === 'NOT_APPLICABLE' ? (
         <>
-          <p>{preview.applicabilityReason || '적용대상 아님, 사유 정보 없음'}</p>
+          <p>{rateText(preview.applicabilityReason || '적용대상 아님, 사유 정보 없음')}</p>
         </>
       ) : (
         <>
@@ -140,7 +140,7 @@ export function CapPanel({ result, pending, error }: { result: Precheck | null; 
                     </span>
                     <StatusBadge tone="neutral">적용대상 아님</StatusBadge>
                   </div>
-                  <p>{excluded.reason}</p>
+                  <p>{rateText(excluded.reason)}</p>
 
                   <AmountLine label="초년도 산입 제외액" value={excluded.excludedAmount} />
                   <p>

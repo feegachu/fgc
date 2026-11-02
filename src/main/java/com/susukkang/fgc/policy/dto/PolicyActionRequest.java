@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
 
 /** IF-API-75 상태 전이 요청. 승인자·시각은 요청에서 받지 않는다. */
-@Schema(description = "정책 제출/승인/반려/활성화 요청")
+@Schema(description = "정책 제출·승인·반려·활성화 요청")
 public record PolicyActionRequest(
         @NotNull ActionType actionType,
         @NotBlank @Size(max = 2000) String reason,

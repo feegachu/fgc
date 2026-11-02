@@ -8,7 +8,12 @@ it('기존 서버 안내 문구를 한국어 업무 표현으로 표시한다', 
   expect(screenMessage('—')).toBe('-')
   expect(screenMessage(null)).toBe('-')
   expect(screenMessage('계약 (FGC-CONT-001)')).toBe('계약 (FGC-CONT-001)')
-  expect(errorScreenMessage('처리 실패 (FGC-CONT-001, 요청 ID: req-1)')).toBe('처리 실패')
+  expect(screenMessage('제출 불가 — 근거를 입력하세요.')).toBe('제출할 수 없습니다. 근거를 입력하세요.')
+  expect(screenMessage('초년도 밖 — 판정 대상 아님')).toBe('초년도 밖, 판정 대상 아님')
+  expect(errorScreenMessage('처리 실패 (FGC-CONT-001, 요청 ID: req-1)')).toBe('처리 실패 (요청번호: req-1)')
+  expect(errorScreenMessage('처리 실패 (FGC-CONT-001)')).toBe('처리 실패')
+  expect(errorScreenMessage('처리 실패 (FGC-CONT-001, 요청 ID: req-1)', 'req-1')).toBe('처리 실패 (요청번호: req-1)')
+  expect(errorScreenMessage('처리 실패 (요청번호: req-1)', 'req-1')).toBe('처리 실패 (요청번호: req-1)')
 })
 
 it('월과 회차에 쓸 월 표시를 만들고 업무 식별자는 이름 뒤 괄호에 보존한다', () => {

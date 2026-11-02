@@ -71,7 +71,7 @@ class OrganizationRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("시작일/종료일을 포함하고 비활성 조직 및 만료된 부모의 이름도 반환한다")
+    @DisplayName("시작일·종료일을 포함하고 비활성 조직 및 만료된 부모의 이름도 반환한다")
     void filtersByEffectivePeriodWithoutFilteringInactiveOrganizationsOrTheirParents() {
         long parentId = insertOrganization(uniqueCode(), "만료된 비활성 부모", "GA", null,
                 AS_OF.minusYears(2), AS_OF.minusYears(1), false);
@@ -102,7 +102,7 @@ class OrganizationRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("코드 검색은 대소문자를 구분하지 않으며 정렬/페이징/전체 건수가 일치한다")
+    @DisplayName("코드 검색은 대소문자를 구분하지 않으며 정렬·페이징·전체 건수가 일치한다")
     void searchesCodeIgnoringCaseAndKeepsSortingPagingAndFilteredCount() {
         String prefix = uniqueCode().toLowerCase(Locale.ROOT);
         // 삽입 순서와 코드 순서를 반대로 만들어 실제 정렬을 확인한다.

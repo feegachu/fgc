@@ -64,7 +64,7 @@ public class DailyChangedContractJobTrigger {
     @Scheduled(cron = "${fgc.batch.daily-changed-contract.cron}", zone = "Asia/Seoul")
     public void runScheduled() {
         if (!enabled) {
-            log.info("fgc.batch.daily-changed-contract.enabled=false, 자동 실행을 건너뜁니다.");
+            log.info("fgc.batch.daily-changed-contract.enabled=false — 자동 실행을 건너뜁니다.");
             return;
         }
         // 스케줄러 스레드는 결과를 기다리는 호출자가 없다 — launch() 안의 로깅으로 충분하다.

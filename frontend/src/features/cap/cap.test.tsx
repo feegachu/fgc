@@ -310,7 +310,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
       details: [],
       calculationSnapshot: {
         applicability: {
-          reason: '적용대상 아님, 시행 전 계약',
+          reason: '적용대상 아님 — 시행 전 계약',
           reasonCode: 'CONTRACT_BEFORE_EFFECTIVE_DATE',
           contractDate: '2026-06-30',
           effectiveContractDate: '2026-07-01',

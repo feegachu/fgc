@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { Children, type ReactNode } from 'react'
+import { screenMessage } from '../lib/screenText'
 export type StatusTone = 'success' | 'info' | 'review' | 'warning' | 'risk' | 'error' | 'neutral'
 export type BadgeKind = 'status' | 'category' | 'severity' | 'text'
 export type TableValuePresentation = 'badge' | 'text' | 'dot'
@@ -22,7 +23,7 @@ export function StatusBadge({
       data-badge-kind={kind}
       data-table-presentation={tablePresentation ?? (optionCount >= 4 ? 'badge' : 'text')}
     >
-      {children}
+      {Children.map(children, (child) => (typeof child === 'string' && child ? screenMessage(child) : child))}
     </span>
   )
 }

@@ -602,7 +602,7 @@ public class ContractServiceImpl implements ContractService {
                             "contractNo",
                             request.getContractNo()
                     ),
-                    "저장할 수 없습니다. 이미 등록된 계약번호입니다."
+                    "저장 불가 — 이미 등록된 계약번호입니다."
             );
         }
     }
@@ -641,7 +641,7 @@ public class ContractServiceImpl implements ContractService {
         )) {
             throw validationException(
                     "contractNo",
-                    "저장할 수 없습니다. 이미 등록된 계약번호입니다."
+                    "저장 불가 — 이미 등록된 계약번호입니다."
             );
         }
     }

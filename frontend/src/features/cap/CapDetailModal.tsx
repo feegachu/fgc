@@ -7,7 +7,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
-import { date, int, rate, usageRate, won } from '../../lib/format'
+import { date, int, rate, rateText, usageRate, won } from '../../lib/format'
 import { capDetailQuery } from './api'
 import { STAGES } from './labels'
 import type { CapBasis } from './api'
@@ -53,7 +53,7 @@ const columns: TableColumn<Detail>[] = [
     key: 'reason',
     label: '판단 이유',
     width: '12rem',
-    render: (row) => <CellDisclosure preview={row.decisionReason || '-'} full={row.decisionReason || '-'} />,
+    render: (row) => <CellDisclosure preview={rateText(row.decisionReason)} full={rateText(row.decisionReason)} />,
   },
   {
     key: 'evidence',
@@ -110,7 +110,7 @@ function BasisContent({ data }: { data: CapBasis }) {
           {item.contractNo || '-'}, {item.paymentStageLabel || '-'}
         </h3>
         <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
-        <p>{String(decision?.reason ?? snapshot.notApplicableReason ?? '적용대상 아님')}</p>
+        <p>{rateText(decision?.reason ?? snapshot.notApplicableReason ?? '적용대상 아님')}</p>
         <dl>
           <div>
             <dt>계약일</dt>

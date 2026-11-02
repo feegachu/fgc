@@ -24,7 +24,7 @@ public class JournalDetailController {
     private final JournalDetailService journalDetailService;
 
     @Operation(summary = "검증원장 상세 조회",
-            description = "분개 헤더 + 라인 목록 + 차변/대변 합계/차액/균형 여부를 반환한다.")
+            description = "분개 헤더 + 라인 목록 + 차변/대변 합계·차액·균형 여부를 반환한다.")
     @GetMapping("/{journalHeaderId}")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<JournalDetailResponse> findByJournalHeaderId(@PathVariable Long journalHeaderId) {

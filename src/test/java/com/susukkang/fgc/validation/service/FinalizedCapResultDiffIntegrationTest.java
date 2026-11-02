@@ -113,10 +113,10 @@ class FinalizedCapResultDiffIntegrationTest {
                 .containsEntry("validation_run_id", revalidationRunId)
                 .containsEntry("source_entity_type", "CAP_CHECK")
                 .containsEntry("source_entity_id", String.valueOf(violationCapCheckId))
-                .containsEntry("title", "확정 결과와 1,200% 판정 다름, 정상 → 위반");
+                .containsEntry("title", "확정 결과와 1,200% 판정 다름 — 정상 → 위반");
         assertThat(cases.get(1))
                 .containsEntry("contract_id", contractIds.get(1))
-                .containsEntry("title", "확정 결과와 1,200% 한도액 다름, 1,200,000원 → 1,000,000원");
+                .containsEntry("title", "확정 결과와 1,200% 한도액 다름 — 1,200,000원 → 1,000,000원");
 
         Map<String, Object> evidence = jdbcTemplate.queryForMap("""
                 SELECT (o.evidence_snapshot ->> 'finalizedRunId')::bigint AS finalized_run_id,

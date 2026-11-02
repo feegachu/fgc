@@ -538,7 +538,7 @@ class ContractServiceImplTest {
     }
 
     @Test
-    @DisplayName("스케줄 산정 정보가 그대로면 계약번호만 수정하고 스케줄/한도 검증을 건너뛴다")
+    @DisplayName("스케줄 산정 정보가 그대로면 계약번호만 수정하고 스케줄·한도 검증을 건너뛴다")
     void updateContractSkipsScheduleAndCapWhenOnlyContractNumberChanges() {
         ContractUpdateRequest request = updateRequest();
         InsuranceContract current = contractMatching(request, request.getAgentId(), request.getOrganizationId());

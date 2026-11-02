@@ -136,29 +136,29 @@ public class ExceptionCaseDetectionCommandsImpl implements ExceptionCaseDetectio
                               'RECONCILIATION_RESULT', CAST(c.reconciliation_result_id AS varchar),
                               CASE COALESCE(c.primary_reason_code, c.result_type)
                                   WHEN 'ACTUAL_MISSING' THEN CONCAT(
-                                      '실제 지급 누락 (예상 ',
+                                      '실제 지급 없음 — 예상 ',
                                       TO_CHAR(COALESCE(c.expected_total_amount, 0), 'FM999,999,999,990'),
-                                      '원)')
+                                      '원 지급 건 미발견')
                                   WHEN 'EXPECTED_MISSING' THEN CONCAT(
-                                      '예상 지급 없음, 실제 ',
+                                      '예상 지급 없음 — 실제 ',
                                       TO_CHAR(COALESCE(c.actual_total_amount, 0), 'FM999,999,999,990'),
                                       '원 대응 예상 건 없음')
                                   WHEN 'AMOUNT_DIFFERENCE' THEN CONCAT(
                                       '금액 차이 ', TO_CHAR(ABS(COALESCE(c.difference_amount, 0)), 'FM999,999,999,990'),
-                                      '원, 예상 ', TO_CHAR(COALESCE(c.expected_total_amount, 0), 'FM999,999,999,990'),
+                                      '원 — 예상 ', TO_CHAR(COALESCE(c.expected_total_amount, 0), 'FM999,999,999,990'),
                                       ' / 실제 ', TO_CHAR(COALESCE(c.actual_total_amount, 0), 'FM999,999,999,990'))
                                   WHEN 'DUPLICATE' THEN CONCAT(
-                                      '대사 대상 중복, 차액 ',
+                                      '대사 대상 중복 — 차액 ',
                                       TO_CHAR(COALESCE(c.difference_amount, 0), 'FM999,999,999,990'), '원')
                                   ELSE CONCAT(
-                                      '대사 불일치, 차액 ',
+                                      '대사 불일치 — 차액 ',
                                       TO_CHAR(COALESCE(c.difference_amount, 0), 'FM999,999,999,990'), '원')
                               END,
                               CONCAT(
                                   '지급단계 ', c.payment_stage,
-                                  ', 예상 ', TO_CHAR(COALESCE(c.expected_total_amount, 0), 'FM999,999,999,990'), '원',
+                                  ' · 예상 ', TO_CHAR(COALESCE(c.expected_total_amount, 0), 'FM999,999,999,990'), '원',
                                   ' / 실제 ', TO_CHAR(COALESCE(c.actual_total_amount, 0), 'FM999,999,999,990'), '원',
-                                  ', 차액 ', TO_CHAR(COALESCE(c.difference_amount, 0), 'FM999,999,999,990'), '원'
+                                  ' · 차액 ', TO_CHAR(COALESCE(c.difference_amount, 0), 'FM999,999,999,990'), '원'
                               ),
                               jsonb_build_object(
                                   'reconciliationResultId', c.reconciliation_result_id,

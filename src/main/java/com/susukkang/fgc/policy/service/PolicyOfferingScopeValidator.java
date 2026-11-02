@@ -60,7 +60,7 @@ public class PolicyOfferingScopeValidator {
                     || !overlaps(draft.effectiveFrom(), draft.effectiveTo(),
                                  offering.getSalesStartDate(), offering.getSalesEndDate())) {
                 throw invalid(field + PRODUCT_OFFERING_ID,
-                        "상품 판매버전의 수수료체계/기초서류/판매기간과 정책 적용 조건이 일치해야 합니다.");
+                        "상품 판매버전의 수수료체계·기초서류·판매기간과 정책 적용 조건이 일치해야 합니다.");
             }
             List<PolicyDraft.FeeRegimeRuleDraft> matches = draft.feeRegimeRules().stream()
                     .filter(regime -> matchesVersion(regime.basicDocumentVersion(), offering.getBasicDocumentVersion())
@@ -73,7 +73,7 @@ public class PolicyOfferingScopeValidator {
             }
             if (matches.size() != 1) {
                 throw invalid(field + PRODUCT_OFFERING_ID,
-                        "이 판매버전의 판매개시일/기초서류에 적용되는 분급 룰셋이 정확히 하나여야 합니다.");
+                        "이 판매버전의 판매개시일·기초서류에 적용되는 분급 룰셋이 정확히 하나여야 합니다.");
             }
             PolicyDraftValidator.validateCommissionRegimeBound(rule, matches.getFirst(), field);
         }

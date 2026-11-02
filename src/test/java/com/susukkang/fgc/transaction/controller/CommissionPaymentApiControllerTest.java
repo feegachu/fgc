@@ -449,7 +449,7 @@ class CommissionPaymentApiControllerTest {
                 )),
                 List.of(new TransactionPrecheckResponse.Blocker(
                         "FGC-CAP-001",
-                        "지급을 확정할 수 없습니다. 1,200% 한도 초과(사용률 108.333333%). 예외함에서 정정/감액/취소를 선택하세요.",
+                        "지급 확정 불가 — 1,200% 한도 초과(사용률 108.333333%). 예외함에서 정정·감액·취소를 선택하세요.",
                         3L,
                         201L
                 )),

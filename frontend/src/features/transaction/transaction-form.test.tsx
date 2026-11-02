@@ -235,7 +235,7 @@ describe('TRAN-W02 React form workflow', () => {
           existingIncludedAmount: null,
           usagePct: null,
           applicabilityReasonCode: 'CONTRACT_BEFORE_EFFECTIVE_DATE',
-          applicabilityReason: '적용대상 아님, 시행 전 계약',
+          applicabilityReason: '적용대상 아님 — 시행 전 계약',
         },
       ],
     }
@@ -279,7 +279,7 @@ describe('TRAN-W02 React form workflow', () => {
           excludedAmount: 200000,
           resultStatus: 'NOT_APPLICABLE',
           reasonCode: 'OUTSIDE_FIRST_YEAR',
-          reason: '초년도 밖, 판정 대상 아님',
+          reason: '초년도 밖 — 판정 대상 아님',
         },
       ],
     }

@@ -34,7 +34,7 @@ class ContractStatusEventRepositoryIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("상태 사건은 효력일시/순번 순으로, 처리 결과는 Job별 행으로 조회한다")
+    @DisplayName("상태 사건은 효력일시·순번 순으로, 처리 결과는 Job별 행으로 조회한다")
     void selectsEventsAndJobProcessings() {
         Long contractId = jdbcTemplate.queryForObject("""
                 SELECT contract_id
@@ -70,7 +70,7 @@ class ContractStatusEventRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("상태 사건을 저장하면 ID와 DB 생성시각이 채워지고 상태/출처/효력일시가 보존된다")
+    @DisplayName("상태 사건을 저장하면 ID와 DB 생성시각이 채워지고 상태·출처·효력일시가 보존된다")
     void persistsStatusEventAndReadsGeneratedFields() {
         Long contractId = jdbcTemplate.queryForObject(
                 "SELECT MIN(contract_id) FROM fgc.insurance_contract", Long.class);

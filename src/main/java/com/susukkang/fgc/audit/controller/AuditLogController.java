@@ -66,7 +66,7 @@ public class AuditLogController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate to,
-            @Parameter(description = "정렬(key,asc|desc). occurredAt/userLoginId/policyVersionId. 비우면 발생 시각 내림차순")
+            @Parameter(description = "정렬(key,asc|desc). occurredAt·userLoginId·policyVersionId. 비우면 발생 시각 내림차순")
             @RequestParam(required = false)
             String sort,
             @Parameter(description = "페이지(1-base)", example = "1")
@@ -82,7 +82,7 @@ public class AuditLogController {
 
     @Operation(
             summary = "감사로그 필터 선택지",
-            description = "AUDT-W01 필터의 행위 종류/대상 종류/행위자 선택지입니다. 감사행에 기록된 값만 나열합니다."
+            description = "AUDT-W01 필터의 행위 종류·대상 종류·행위자 선택지입니다. 감사행에 기록된 값만 나열합니다."
     )
     @GetMapping("/options")
     @PreAuthorize(Roles.CAN_VIEW_AUDIT_LOG)

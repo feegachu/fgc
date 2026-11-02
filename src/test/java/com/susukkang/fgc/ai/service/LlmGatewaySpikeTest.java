@@ -121,7 +121,7 @@ class LlmGatewaySpikeTest {
         assertThat(result.rows).extracting(row -> row.policyNo).doesNotContain("HACKED");
         assertThat(result.rows).extracting(row -> row.policyNo + "=" + row.amount)
                 .containsExactlyInAnyOrder("P-0001=120000", "P-0002=45000");
-        recordFromLog("지시문 주입 문서(게이트웨이)", "OK, 동작 변화 없음", "rows=" + result.rows.size());
+        recordFromLog("지시문 주입 문서(게이트웨이)", "OK — 동작 변화 없음", "rows=" + result.rows.size());
     }
 
     /** 시나리오 2 — PDF 1쪽을 Files API 없이 요청에 바로 넣는다(file_data). */
@@ -164,7 +164,7 @@ class LlmGatewaySpikeTest {
             long out = response.usage().orElseThrow().outputTokens();
             List<String> got = rows.rows.stream().map(row -> row.policyNo + "=" + row.amount).toList();
             boolean exact = got.size() == 2 && got.containsAll(List.of("P-0001=120000", "P-0002=45000"));
-            RESULTS.add(row(name, exact ? "가능, 정답 일치" : "가능, 값 불일치", in, out, String.valueOf(got)));
+            RESULTS.add(row(name, exact ? "가능 — 정답 일치" : "가능 — 값 불일치", in, out, String.valueOf(got)));
         } catch (OpenAIServiceException e) {
             // 메시지는 남기지 않는다 — 401 메시지에 키 일부가 들어 있다.
             RESULTS.add(row(name, "불가", 0, 0, e.getClass().getSimpleName() + " " + e.statusCode() + " " + e.code().orElse("")));

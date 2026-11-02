@@ -24,7 +24,7 @@ public class InsurerController {
     private final InsurerService insurerService;
 
     @Operation(
-            summary = "보험회사(원수사) 기준정보 조회/선택",
+            summary = "보험회사(원수사) 기준정보 조회·선택",
             description = "보험회사를 코드 또는 이름으로 검색합니다. "
                     + "사용중지된 보험회사도 반환되며 activeYn=false인 항목은 신규 입력에서 선택할 수 없습니다."
     )
@@ -34,7 +34,7 @@ public class InsurerController {
             @Parameter(description = "보험회사 코드 또는 보험회사명 검색어")
             @RequestParam(required = false)
             String keyword,
-            @Parameter(description = "정렬(key,asc|desc). insurerCode/insurerName. 비우면 보험회사 코드 오름차순")
+            @Parameter(description = "정렬(key,asc|desc). insurerCode·insurerName. 비우면 보험회사 코드 오름차순")
             @RequestParam(required = false)
             String sort,
             @Parameter(description = "페이지(1-base)", example = "1")

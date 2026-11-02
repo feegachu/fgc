@@ -85,7 +85,7 @@ class ContractFinancialSnapshotConcurrencyIntegrationTest {
                 }
                 Thread.sleep(20);
             }
-            assertThat(blocked).as("선행 계약/정정 버전 커밋까지 PostgreSQL에서 대기").isTrue();
+            assertThat(blocked).as("선행 계약·정정 버전 커밋까지 PostgreSQL에서 대기").isTrue();
             commit.countDown();
             holder.get(20, TimeUnit.SECONDS);
             assertThat(waiter.get(20, TimeUnit.SECONDS)).isEqualTo(staleEdit ? -1 : 0);

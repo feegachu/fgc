@@ -40,7 +40,7 @@ test('오류·예외 문구의 소수 백분율만 줄이고 정책 명칭과 �
   assert.strictEqual(format.rateText('사용률 1,234.56789%'), '사용률 1,234.5%')
   assert.strictEqual(
     format.errorText({ message, code: 'FGC-CAP-001', requestId: 'req-123' }),
-    '1,200% 한도 초과(사용률 104.1%). 2026-10-26, CAP-1.2345, -1.2%',
+    '1,200% 한도 초과(사용률 104.1%). 2026-10-26, CAP-1.2345, -1.2% (요청번호: req-123)',
   )
 })
 
@@ -70,14 +70,14 @@ test('빈 값과 잘못된 값은 대시로 통일한다', () => {
   assert.strictEqual(format.dateTime('not-a-date'), '-')
 })
 
-test('오류 문구에 오류코드와 요청 ID 를 병기한다 (FGC-SIR-007)', () => {
+test('서버 오류 문구는 화면에서 정리하고 오류 코드 대신 요청번호를 표시한다', () => {
   assert.strictEqual(
     format.errorText({
       code: 'FGC-CONT-001',
-      message: '저장할 수 없습니다. 이미 등록된 계약번호입니다.',
+      message: '저장 불가 — 이미 등록된 계약번호입니다.',
       requestId: '20260820-1a2b3c',
     }),
-    '저장할 수 없습니다. 이미 등록된 계약번호입니다.',
+    '저장할 수 없습니다. 이미 등록된 계약번호입니다. (요청번호: 20260820-1a2b3c)',
   )
   assert.strictEqual(format.errorText({ message: '저장 불가' }), '저장 불가')
   assert.strictEqual(format.errorText(null, '요청을 처리하지 못했습니다.'), '요청을 처리하지 못했습니다.')

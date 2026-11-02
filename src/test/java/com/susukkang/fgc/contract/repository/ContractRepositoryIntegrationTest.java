@@ -115,7 +115,7 @@ class ContractRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("보험사/상품판매버전/설계사/조직의 연관관계를 확인한다")
+    @DisplayName("보험사·상품판매버전·설계사·조직의 연관관계를 확인한다")
     void checksReferenceExistence() {
         References refs = references();
         LocalDate contractDate = LocalDate.now(DateUtil.SEOUL_ZONE);
@@ -210,7 +210,7 @@ class ContractRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("조건 객체와 검색값이 비어 있으면 목록/총건수/CSV를 조건 없이 조회한다")
+    @DisplayName("조건 객체와 검색값이 비어 있으면 목록·총건수·CSV를 조건 없이 조회한다")
     void supportsNullAndEmptySearchConditions() {
         InsuranceContract contract = insuranceContractRepository.saveAndFlush(newContract(references()));
         List<ContractView> expected = contractQueryRepository.searchAll(null);

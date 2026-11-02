@@ -101,7 +101,7 @@ describe('API 계약', () => {
     )
     const error = await client.request('/api/v1/contracts').catch((caught: unknown) => caught)
     expect(error).toMatchObject({ code: '', requestId: 'proxy', status })
-    expect(errorText(error as ApiError)).toBe('요청을 처리하지 못했습니다.')
+    expect(errorText(error as ApiError)).toBe('요청을 처리하지 못했습니다. (요청번호: proxy)')
   })
   it('성공 상태라도 잘못된 봉투는 오류다', async () => {
     const { client } = setup(vi.fn().mockResolvedValue(Response.json({ foo: 1 })))

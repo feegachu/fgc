@@ -271,7 +271,8 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     fireEvent.change(field('계약번호'), { target: { value: 'MY-DRAFT' } })
     await user.click(save())
     await screen.findByText(/현재 입력은 유지됩니다/)
-    expect(screen.queryByText(/FGC-CONT-003|conflict-trace/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/FGC-CONT-003/)).not.toBeInTheDocument()
+    expect(screen.getByText(/요청번호: conflict-trace/)).toBeInTheDocument()
     expect(screen.getByText(/다른 요청에서 계약을 수정했습니다/)).toBeInTheDocument()
     expect(screen.getAllByText(/현재 입력은 유지됩니다/)).toHaveLength(1)
     expect(field('계약번호')).toHaveValue('MY-DRAFT')
@@ -475,7 +476,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await ready()
   })
 
-  it('서버 안내를 필드 오류로 표시하고 내부 코드와 추적 번호는 숨긴다', async () => {
+  it('서버 안내를 필드 오류로 표시하고 내부 코드 대신 요청번호를 남긴다', async () => {
     const { user } = renderAt(undefined, (_url, options) => {
       if (options?.method)
         throw new ApiError(
@@ -492,9 +493,9 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await ready()
     await user.click(save())
     await waitFor(() => expect(field('모집 설계사')).toHaveAttribute('aria-invalid', 'true'))
-    expect(screen.getAllByText('입력값 오류')).not.toHaveLength(0)
+    expect(screen.getAllByText('입력값 오류 (요청번호: save-trace)')).not.toHaveLength(0)
     expect(screen.queryByText('조직 계층에 팀장 수령자가 없습니다.')).not.toBeInTheDocument()
-    expect(screen.queryByText(/FGC-COMMON-002|save-trace/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/FGC-COMMON-002/)).not.toBeInTheDocument()
     expect(save()).toBeEnabled()
   })
 })
@@ -689,7 +690,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     await waitFor(() => expect(field('효력일시')).toHaveAttribute('aria-invalid', 'true'))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(field('효력일시')).toHaveAccessibleDescription(
-      '저장할 수 없습니다. 효력일시는 최신 사건의 효력일시 이후여야 합니다.',
+      '저장할 수 없습니다. 효력일시는 최신 사건의 효력일시 이후여야 합니다. (요청번호: event-order)',
     )
     expect(screen.queryByText(/FGC-IMPL-EVENT_ORDER/)).not.toBeInTheDocument()
     expect(field('효력일시')).toHaveValue('2026-10-20T00:00')

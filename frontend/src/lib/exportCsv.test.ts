@@ -40,7 +40,7 @@ it('오류 봉투는 공통 Toast 연결점에 전달한 뒤 호출자에게 반
   const listener = vi.fn()
   const unsubscribe = subscribeApiErrors(listener)
   await expect(exportCsv('/api/v1/contracts/export')).rejects.toBe(error)
-  expect(listener).toHaveBeenCalledWith('다운로드 실패', error)
+  expect(listener).toHaveBeenCalledWith('다운로드 실패 (요청번호: csv-err)', error)
   unsubscribe()
 })
 it('CSV는 text/csv로 요청하고 JSON 실패를 ApiError로 반환한다', async () => {

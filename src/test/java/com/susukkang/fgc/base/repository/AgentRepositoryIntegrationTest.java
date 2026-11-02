@@ -47,7 +47,7 @@ class AgentRepositoryIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @ParameterizedTest(name = "{0}: 직급 문자열 및 조직/경력 필드를 모두 반환한다")
+    @ParameterizedTest(name = "{0}: 직급 문자열 및 조직·경력 필드를 모두 반환한다")
     @EnumSource(AgentRankCode.class)
     void mapsJoinedOrganizationAndAllAgentFields(AgentRankCode rank) {
         String organizationCode = uniqueCode();
@@ -67,7 +67,7 @@ class AgentRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("직급/경력/등록일이 없으면 null을 유지한다")
+    @DisplayName("직급·경력·등록일이 없으면 null을 유지한다")
     void preservesNullableFields() {
         long organizationId = insertOrganization(uniqueCode(), null);
         String code = uniqueCode();
@@ -94,7 +94,7 @@ class AgentRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("조직 및 위촉/해촉일을 필터링하고 비활성 설계사와 만료된 조직명도 반환한다")
+    @DisplayName("조직 및 위촉·해촉일을 필터링하고 비활성 설계사와 만료된 조직명도 반환한다")
     void filtersOrganizationAndInclusiveDatesWithoutFilteringInactiveRows() {
         long organizationId = insertOrganization(uniqueCode(), null);
         long otherId = insertOrganization(uniqueCode(), null);
@@ -131,7 +131,7 @@ class AgentRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("코드 부분 검색의 대소문자/정렬/페이징/전체 건수를 유지한다")
+    @DisplayName("코드 부분 검색의 대소문자·정렬·페이징·전체 건수를 유지한다")
     void searchesCodeIgnoringCaseAndKeepsSortingPagingAndCount() {
         long organizationId = insertOrganization(uniqueCode(), null);
         String prefix = uniqueCode().toLowerCase(Locale.ROOT);
@@ -214,7 +214,7 @@ class AgentRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("조직과 검색어가 모두 null이어도 목록/건수 쿼리가 정상 실행된다")
+    @DisplayName("조직과 검색어가 모두 null이어도 목록·건수 쿼리가 정상 실행된다")
     void handlesNullFiltersAndKeepsDateConditions() {
         long organizationId = insertOrganization(uniqueCode(), null);
         insertAgent(uniqueCode(), "유효", organizationId, AgentRankCode.FC, AS_OF, null, "ACTIVE", true);
@@ -260,7 +260,7 @@ class AgentRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("부적격 설계사를 제외하고 상위 조직에서 위촉/해촉 경계일의 활성 설계사를 찾는다")
+    @DisplayName("부적격 설계사를 제외하고 상위 조직에서 위촉·해촉 경계일의 활성 설계사를 찾는다")
     void hierarchySkipsIneligibleAgentsAndSearchesAncestors() {
         long root = insertOrganization(uniqueCode(), null);
         long parent = insertOrganization(uniqueCode(), root);
@@ -303,7 +303,7 @@ class AgentRepositoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("기준일에 유효한 데모 모집설계사마다 팀장/지사장/본부장을 조회한다")
+    @DisplayName("기준일에 유효한 데모 모집설계사마다 팀장·지사장·본부장을 조회한다")
     void everyActiveSeedFcHasTeamBranchAndDivisionManagers() {
         LocalDate asOf = LocalDate.of(2026, 8, 20);
         List<SeedFc> activeFcs = jdbcTemplate.query("""

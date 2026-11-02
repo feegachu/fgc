@@ -234,7 +234,7 @@ class ContractStatusEventIntegrationTest {
         put(id, update(id, ACTIVE, event(AUG_1.plusDays(1))), UUID.randomUUID().toString())
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.message")
-                        .value("저장할 수 없습니다. 해지에서 정상(으)로 바꿀 수 없습니다. 계약을 다시 조회해 허용된 상태를 고르세요."));
+                        .value("저장 불가 — 해지에서 정상(으)로 바꿀 수 없습니다. 계약을 다시 조회해 허용된 상태를 고르세요."));
         assertThat(contractStatus(id)).isEqualTo("TERMINATED");
         assertThat(events(id)).isEqualTo(2);
     }

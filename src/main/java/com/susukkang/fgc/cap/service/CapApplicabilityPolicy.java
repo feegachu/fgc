@@ -7,7 +7,7 @@ import java.util.Map;
 /** #482: 시행 기준은 활성 룰셋 유무와 독립적이다. 기준 변경 시 버전도 갱신한다. */
 public final class CapApplicabilityPolicy {
     public static final String BEFORE_EFFECTIVE_DATE = "CONTRACT_BEFORE_EFFECTIVE_DATE";
-    public static final String BEFORE_EFFECTIVE_DATE_LABEL = "적용대상 아님, 시행 전 계약";
+    public static final String BEFORE_EFFECTIVE_DATE_LABEL = "적용대상 아님 — 시행 전 계약";
     private CapApplicabilityPolicy() { }
 
     public static LocalDate effectiveContractDate(PaymentStage stage) {

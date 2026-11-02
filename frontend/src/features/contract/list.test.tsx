@@ -183,7 +183,7 @@ it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬
 
 it.each([
   [500, 'FGC-COMMON-500', 'internal CSV SQL detail', '요청 ID: csv-request'],
-  [400, 'FGC-COMMON-001', '검색 조건을 다시 확인해 주세요.', '검색 조건을 다시 확인해 주세요.'],
+  [400, 'FGC-COMMON-001', '검색 조건을 다시 확인해 주세요.', '검색 조건을 다시 확인해 주세요. (요청번호: csv-request)'],
 ] as const)(
   'CSV 오류 %i는 서버 메시지 또는 안전한 요청 ID를 한 번 표시한다',
   async (status, code, message, expected) => {

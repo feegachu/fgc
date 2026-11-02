@@ -146,10 +146,10 @@ final class ExtractionEvaluator {
         long editedRows = extracted.stream().filter(ExtractedRow::edited).count();
         boolean ai = meta.aiSuccessCalls() > 0;
         String path = ai ? "AI 추출(추출 호출 성공 " + meta.aiSuccessCalls() + "회)"
-                : "대체 경로 동작(결정론 파서, AI 추출 합격으로 보지 않음)";
+                : "대체 경로 동작(결정론 파서 — AI 추출 합격으로 보지 않음)";
         String verdict = falseAcceptances > 0
                 ? "시연 차단 결함 " + falseAcceptances + "건(오수락)"
-                : "차단 결함 0건, 합격 기준 미정(10/27 PoC 실측 뒤 TER-011 검증기준에 기록)";
+                : "차단 결함 0건 — 합격 기준 미정(10/27 PoC 실측 뒤 TER-011 검증기준에 기록)";
         BigDecimal cost = BigDecimal.valueOf(meta.inputTokens() * meta.inputUsdPerMTok() + meta.outputTokens() * meta.outputUsdPerMTok())
                 .divide(BigDecimal.valueOf(1_000_000), 6, RoundingMode.HALF_UP);
 
@@ -157,7 +157,7 @@ final class ExtractionEvaluator {
                 fieldAccuracy, percent(allFieldsCorrect, (long) goldRows * FIELDS.size()), falseAcceptances,
                 percent(reviewRows, extracted.size()), percent(noTouch, goldRows), percent(editedRows, extracted.size()),
                 meta.elapsedSeconds() == null ? "미측정" : meta.elapsedSeconds() + "초",
-                cost.toPlainString() + " (" + meta.model() + ", 입력 " + meta.inputTokens() + "/출력 " + meta.outputTokens() + " 토큰)",
+                cost.toPlainString() + " (" + meta.model() + ", 입력 " + meta.inputTokens() + "·출력 " + meta.outputTokens() + " 토큰)",
                 sums, failures);
     }
 
@@ -184,7 +184,7 @@ final class ExtractionEvaluator {
 
     static String markdown(Result result, String runId) {
         StringBuilder md = new StringBuilder();
-        md.append("# TER-011 정산데이터 추출 평가, ").append(result.datasetId()).append("\n\n")
+        md.append("# TER-011 정산데이터 추출 평가 — ").append(result.datasetId()).append("\n\n")
                 .append("- 실행: ").append(runId).append("\n")
                 .append("- 경로: ").append(result.path()).append("\n")
                 .append("- 판정: **").append(result.verdict()).append("**\n\n")
@@ -192,7 +192,7 @@ final class ExtractionEvaluator {
                 .append("| 정답 행 / 추출 행 | ").append(result.goldRows()).append(" / ").append(result.extractedRows()).append(" |\n")
                 .append("| 누락 행 / 초과 행 | ").append(result.missingRows()).append(" / ").append(result.extraRows()).append(" |\n")
                 .append("| 필드 정확도(전체) | ").append(result.overallFieldAccuracy()).append(" |\n")
-                .append("| 오수락(필수 식별값/금액) | ").append(result.falseAcceptances()).append("건 |\n")
+                .append("| 오수락(필수 식별값·금액) | ").append(result.falseAcceptances()).append("건 |\n")
                 .append("| 확인 필요 비율 | ").append(result.reviewRequiredRate()).append(" |\n")
                 .append("| 무수정 처리율 | ").append(result.noTouchRate()).append(" |\n")
                 .append("| 사람 수정률 | ").append(result.humanEditRate()).append(" |\n")
@@ -205,7 +205,7 @@ final class ExtractionEvaluator {
                 .append(" | ").append(sum.extractedNet().toPlainString()).append(" | ").append(sum.diff().toPlainString()).append(" |\n"));
         md.append("\n## 실패 목록 (").append(result.failures().size()).append("건");
         if (result.failures().size() > MARKDOWN_FAILURE_LIMIT) {
-            md.append(", 앞 ").append(MARKDOWN_FAILURE_LIMIT).append("건, 전체는 result-").append(runId).append(".json");
+            md.append(", 앞 ").append(MARKDOWN_FAILURE_LIMIT).append("건 — 전체는 result-").append(runId).append(".json");
         }
         md.append(")\n\n| 구분 | 시트 | 행 | 필드 | 정답 | 추출 | 행 상태 |\n|---|---|---|---|---|---|---|\n");
         result.failures().stream().limit(MARKDOWN_FAILURE_LIMIT).forEach(failure -> md.append("| ")

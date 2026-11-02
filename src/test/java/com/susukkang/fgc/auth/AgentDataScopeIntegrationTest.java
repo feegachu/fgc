@@ -105,7 +105,7 @@ class AgentDataScopeIntegrationTest {
         read("/api/v1/contracts/" + ownContract).andExpect(status().isOk());
         read("/api/v1/contracts/" + otherContract).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FGC-AUTH-005"))
-                .andExpect(jsonPath("$.error.message").value("본인 담당 자료만 조회/처리할 수 있습니다."));
+                .andExpect(jsonPath("$.error.message").value("본인 담당 자료만 조회·처리할 수 있습니다."));
         read("/api/v1/contracts/" + otherContract + "/status-events").andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FGC-AUTH-005"));
     }

@@ -150,10 +150,13 @@ export function today() {
   return parts.year + '-' + parts.month + '-' + parts.day
 }
 
-/** 사용자용 안내 문구. 오류 코드와 추적 번호는 본문에 덧붙이지 않는다. */
+/** 내부 오류 코드는 숨기고, 문의에 필요한 요청번호는 한 번만 표시한다. */
 export function errorText(
   error?: { message?: string; code?: string; requestId?: string | null } | null,
   fallbackMessage?: string,
 ) {
-  return errorScreenMessage(rateText((error && error.message) || fallbackMessage || '요청을 처리하지 못했습니다.'))
+  return errorScreenMessage(
+    rateText((error && error.message) || fallbackMessage || '요청을 처리하지 못했습니다.'),
+    error?.requestId,
+  )
 }

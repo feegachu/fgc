@@ -24,7 +24,7 @@ public record PolicyVersionResponse(
         PolicyType policyType,
         @Schema(description = "정책 유형 한글 라벨", example = "1,200% 한도")
         String policyTypeLabel,
-        @Schema(description = "출처분류, PROJECT_ASSUMPTION 은 근거 없는 프로젝트 가정값")
+        @Schema(description = "출처분류 — PROJECT_ASSUMPTION 은 근거 없는 프로젝트 가정값")
         PolicySourceClass sourceClass,
         @Schema(description = "출처분류 한글 라벨", example = "규제")
         String sourceClassLabel,
