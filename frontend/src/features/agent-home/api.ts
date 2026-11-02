@@ -1,78 +1,64 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
-import type { AgentContract } from './model'
 
 type Schema = components['schemas']
-const PAGE = 100
-const MAX_PAGES = 20
+export type AgentHome = Schema['AgentHomeResponse']
+export type PriorityContract = Schema['AgentHomePriorityContract']
+export type ContractCheckRequest = Schema['ContractCheckRequest']
+export type ContractCheckResponse = Schema['ContractCheckResponse']
 
-/** 서버가 로그인한 설계사의 자료만 돌려준다(FUN-085). 화면은 설계사 ID를 보내지 않는다. */
-async function allPages<T>(path: string, signal?: AbortSignal) {
-  const rows: T[] = []
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const { data } = await apiClient.request<{ content?: T[]; totalPages?: number }>(
-      `${path}${path.includes('?') ? '&' : '?'}page=${page}&size=${PAGE}`,
-      { signal },
-    )
-    if (!data || !Array.isArray(data.content)) throw new Error('응답 데이터를 확인할 수 없습니다.')
-    rows.push(...data.content)
-    if (page >= (data.totalPages ?? 1)) return rows
-  }
-  // 상한까지 읽고도 더 있으면 일부만 합산한 값을 정상으로 보여 주지 않도록 오류로 알린다.
-  throw new Error(`조회 건수가 너무 많아 일부만 읽었어요(최대 ${PAGE * MAX_PAGES}건).`)
+export interface HomeParams {
+  asOf: string
+  period: '6' | '12' | 'ALL'
+  insurerType: 'ALL' | 'LIFE' | 'NON_LIFE'
+  insurerId?: number | null
 }
 
-export const agentContractsQuery = () =>
+/** IF-API-74. 서버가 로그인한 설계사의 자료만 같은 기준일·모집단으로 집계한다(FUN-085·086). 화면은 설계사 ID를 보내지 않는다. */
+export const agentHomeQuery = ({ asOf, period, insurerType, insurerId }: HomeParams) =>
   queryOptions({
-    queryKey: ['agent-home', 'contracts'],
-    queryFn: ({ signal }) => allPages<AgentContract>('/api/v1/contracts?sort=contractDate,desc', signal),
-    meta: { errorToast: false },
-  })
-
-/** 보험사 구분(생명/손해)은 계약 응답에 없어 기준정보에서 가져온다. */
-export const agentInsurersQuery = () =>
-  queryOptions({
-    queryKey: ['agent-home', 'insurers'],
-    queryFn: ({ signal }) => allPages<Schema['InsurerResponse']>('/api/v1/base/insurers', signal),
-    staleTime: 5 * 60_000,
-    meta: { errorToast: false },
-  })
-
-/** 보장 유형(상품군)도 계약 응답에 없어 보험사별 상품 기준정보(이력 포함)와 상품명으로 맞춘다. */
-export const agentProductsQuery = (insurerIds: number[], asOf: string) =>
-  queryOptions({
-    queryKey: ['agent-home', 'products', insurerIds, asOf],
-    queryFn: async ({ signal }) =>
-      (
-        await Promise.all(
-          insurerIds.map((id) =>
-            allPages<Schema['ProductResponse']>(
-              `/api/v1/base/products?insurerId=${id}&asOf=${asOf}&includeHistorical=true`,
-              signal,
-            ),
-          ),
-        )
-      ).flat(),
-    enabled: insurerIds.length > 0,
-    staleTime: 5 * 60_000,
-    // 월을 바꾸면 기준일이 바뀌어 새로 받는다. 받는 동안 이전 목록으로 그려 화면이 '불러오는 중'으로 깜빡이지 않게 한다.
+    queryKey: ['agent-home', 'home', asOf, period, insurerType, insurerId ?? null],
+    queryFn: async ({ signal }) => {
+      const query = new URLSearchParams({ asOf, period, insurerType })
+      if (insurerId != null) query.set('insurerId', String(insurerId))
+      const { data } = await apiClient.request<AgentHome>(`/api/v1/agent/me/home?${query.toString()}`, { signal })
+      if (!data) throw new Error('응답 데이터를 확인할 수 없습니다.')
+      return data
+    },
+    // 필터를 바꾸는 동안 이전 그래프를 유지해 화면이 '불러오는 중'으로 깜빡이지 않게 한다.
     placeholderData: keepPreviousData,
     meta: { errorToast: false },
   })
 
-/** 해당 월 본인 수수료 지급 합계. 설계사 지급(GA_TO_FC)의 지급(PAYMENT) 건만 더하고 취소·공제(환수)는 제외한다. */
-export const agentCommissionQuery = (month: string) =>
+/** 해당 월 계약 중 지정한 한도 판정 상태의 건수. 목록 API의 totalElements 만 읽는다. */
+export const agentCapCountQuery = (month: string, capResultStatus: string) =>
   queryOptions({
-    queryKey: ['agent-home', 'commission', month],
+    queryKey: ['agent-home', 'cap-count', month, capResultStatus],
     queryFn: async ({ signal }) => {
-      const rows = await allPages<Schema['CommissionPaymentListResponse']>(
-        `/api/v1/transactions?settlementMonth=${encodeURIComponent(month)}`,
-        signal,
-      )
-      return rows
-        .filter((row) => row.status !== 'CANCELLED' && row.paymentStage === 'GA_TO_FC' && row.cashflowType === 'PAYMENT')
-        .reduce((sum, row) => sum + (row.amount ?? 0), 0)
+      const [year, mon] = month.split('-').map(Number)
+      const last = String(new Date(year, mon, 0).getDate()).padStart(2, '0')
+      const query = new URLSearchParams({
+        capResultStatus,
+        contractDateFrom: `${month}-01`,
+        contractDateTo: `${month}-${last}`,
+        page: '1',
+        size: '1',
+      })
+      const { data } = await apiClient.request<{ totalElements?: number }>(`/api/v1/contracts?${query.toString()}`, { signal })
+      if (data?.totalElements == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+      return data.totalElements
     },
     meta: { errorToast: false },
   })
+
+/** IF-API-74A. 멱등키는 확인 폼을 열 때 한 번 만들고, 같은 제출의 재시도에 그대로 쓴다. */
+export async function recordContractCheck(body: ContractCheckRequest, idempotencyKey: string) {
+  const { data } = await apiClient.request<ContractCheckResponse>('/api/v1/agent/me/contract-checks', {
+    method: 'POST',
+    body,
+    idempotencyKey,
+  })
+  if (!data) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  return data
+}

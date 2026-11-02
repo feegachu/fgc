@@ -260,3 +260,15 @@
 @keyframes ah-border-spin {
   to { --ah-angle: 360deg; }
 }
+
+.ah {
+  & .ah-priority-list { display: grid; gap: 8px; margin-top: 12px; padding: 0; list-style: none; }
+  & .ah-priority-item { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; }
+  & .ah-priority-main { display: grid; gap: 4px; }
+  & .ah-priority-meta { font-size: 12px; color: var(--muted); }
+  & .ah-priority-reasons { display: flex; flex-wrap: wrap; gap: 4px; }
+  & .ah-check-form { grid-column: 1 / -1; display: grid; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+  & .ah-check-result { display: flex; gap: 14px; font-size: 13px; }
+  & .ah-check-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  & .ah-check-error { font-size: 12px; color: #b91c1c; }
+}

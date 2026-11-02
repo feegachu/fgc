@@ -1,53 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { aggregate, buildRows, categoryCounts, deltaPercent, insurerSlices, monthStats, periodMonths, shiftMonth, statusCounts } from './model'
-import type { AgentContract, Insurer, Product } from './model'
+import type { AgentHome } from './api'
+import { asOfForMonth, categoryCounts, deltaPercent, insurerSlices, kindParam, monthStats, periodParam, shiftMonth, statusCounts, trendSeries } from './model'
 
-const insurers: Insurer[] = [
-  { insurerId: 1, insurerName: 'A생명', insurerType: 'LIFE' },
-  { insurerId: 2, insurerName: 'B손해', insurerType: 'NON_LIFE' },
-]
-const products: Product[] = [
-  { productName: '건강 A', productGroupCode: 'HEALTH_PROTECTION' },
-  { productName: '장기 B', productGroupCode: 'LONG_TERM_NONLIFE' },
-]
-const contract = (patch: Partial<AgentContract>): AgentContract => ({
-  contractId: 1,
-  contractNo: 'C-1',
-  contractDate: '2026-07-10',
-  contractStatus: 'ACTIVE',
-  capResultStatus: 'NORMAL',
-  insurerName: 'A생명',
-  productName: '건강 A',
-  monthlyEquivalentFirstPremium: 100000,
-  ...patch,
-})
-const rows = buildRows(
-  [
-    contract({}),
-    contract({ contractId: 2, contractNo: 'C-2', contractDate: '2026-07-20', monthlyEquivalentFirstPremium: 50000, capResultStatus: 'WARNING' }),
-    contract({ contractId: 3, contractNo: 'C-3', contractDate: '2026-06-01', insurerName: 'B손해', productName: '장기 B', contractStatus: 'UNPAID' }),
-    contract({ contractId: 4, contractNo: 'C-4', contractDate: '2025-01-01', capResultStatus: 'REVIEW_REQUIRED', contractStatus: 'TERMINATED' }),
-  ],
-  insurers,
-  products,
-)
-
-describe('buildRows', () => {
-  it('보험사 구분과 보장 유형을 기준정보로 채우고 모르면 기타로 둔다', () => {
-    expect(rows.map((r) => [r.insurerKind, r.category])).toEqual([
-      ['LIFE', '건강보장'],
-      ['LIFE', '건강보장'],
-      ['NON_LIFE', '장기손해'],
-      ['LIFE', '건강보장'],
-    ])
-    expect(buildRows([contract({ productName: '없는 상품' })], insurers, products)[0].category).toBe('기타')
-  })
-})
+const home: AgentHome = {
+  portfolio: {
+    contractCount: 4,
+    insurers: [
+      { insurerId: 1, name: 'A생명', contractCount: 3, monthlyEquivalentFirstPremiumSum: 250000 },
+      { insurerId: 2, name: 'B손해', contractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 },
+    ],
+    monthly: [
+      { month: '2026-06', newContractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 },
+      { month: '2026-07', newContractCount: 3, monthlyEquivalentFirstPremiumSum: 250000 },
+    ],
+    categories: [
+      { code: 'HEALTH_PROTECTION', label: '건강보장', count: 2 },
+      { code: 'UNKNOWN', label: '분류 미확인', count: 2 },
+    ],
+    statuses: [
+      { code: 'ACTIVE', label: '정상', count: 1 },
+      { code: 'REVIVED', label: '부활', count: 1 },
+      { code: 'UNPAID', label: '미납', count: 1 },
+      { code: 'UNKNOWN', label: '상태 미확인', count: 1 },
+    ],
+  },
+}
 
 describe('월 지표', () => {
-  it('기준월 신규 계약 건수·보험료와 한도 근접·검토 필요를 센다', () => {
-    expect(monthStats(rows, '2026-07')).toEqual({ count: 2, premium: 150000, near: 1, review: 0 })
-    expect(monthStats(rows, '2025-01')).toEqual({ count: 1, premium: 100000, near: 0, review: 1 })
+  it('서버 월별 집계에서 기준월 값을 읽고 없는 달은 0이다', () => {
+    expect(monthStats(home, '2026-07')).toEqual({ count: 3, premium: 250000 })
+    expect(monthStats(home, '2020-01')).toEqual({ count: 0, premium: 0 })
+    expect(monthStats(undefined, '2026-07')).toEqual({ count: 0, premium: 0 })
   })
   it('전월 값이 0이면 증감률은 0이다', () => {
     expect(deltaPercent(150000, 100000)).toBe(50)
@@ -60,24 +43,44 @@ describe('월 지표', () => {
   })
 })
 
-describe('차트 집계', () => {
-  it('기간은 기준월 포함 n개월이고 전체는 첫 계약월부터다', () => {
-    expect(periodMonths(rows, '2026-07', 6)).toEqual(['2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07'])
-    expect(periodMonths(rows, '2026-07', 'all')).toHaveLength(19)
+describe('차트 변환', () => {
+  it('도넛 조각은 서버 보험사 순서이고 보험료를 함께 가진다', () => {
+    expect(insurerSlices(home).map((s) => [s.name, s.value, s.premium, s.insurerId])).toEqual([
+      ['A생명', 3, 250000, 1],
+      ['B손해', 1, 100000, 2],
+    ])
+    expect(insurerSlices(undefined)).toEqual([])
   })
-  it('보험사 구분과 보험사 선택으로 좁힌다', () => {
-    expect(aggregate(rows, '2026-07', 12, 'all', null).base).toHaveLength(3)
-    expect(aggregate(rows, '2026-07', 12, 'NON_LIFE', null).base.map((r) => r.id)).toEqual(['C-3'])
-    expect(aggregate(rows, '2026-07', 12, 'all', 'A생명').focus).toHaveLength(2)
+  it('월별 추이는 서버 월 순서를 그대로 쓴다', () => {
+    expect(trendSeries(home).map((p) => p.month)).toEqual(['2026-06', '2026-07'])
   })
-  it('도넛 조각은 보험사 기준정보 순서이고 0건도 남긴다', () => {
-    const { base } = aggregate(rows, '2026-07', 12, 'all', null)
-    expect(insurerSlices(base, insurers, 'all').map((s) => [s.name, s.value])).toEqual([['A생명', 2], ['B손해', 1]])
+  it('보장 유형 비중은 건수 대비 비율을 첫째 자리에서 절사한다(공통규칙 3)', () => {
+    expect(categoryCounts(home).map((c) => [c.name, c.count, c.pct])).toEqual([['건강보장', 2, 50], ['분류 미확인', 2, 50]])
   })
-  it('보장 유형·상태 비중은 건수 대비 비율을 첫째 자리에서 절사한다(공통규칙 3)', () => {
-    const { focus } = aggregate(rows, '2026-07', 12, 'all', null)
-    expect(categoryCounts(focus).find((c) => c.name === '건강보장')).toMatchObject({ count: 2, pct: 66.6 })
-    expect(statusCounts(focus).map((s) => [s.label, s.count])).toEqual([['정상', 2], ['미납', 1], ['실효', 0], ['해지·종료', 0]])
+  it('상태는 4종으로 묶고 이력이 없는 계약은 상태 미확인으로 분모에 남긴다', () => {
+    expect(statusCounts(home).map((s) => [s.label, s.count])).toEqual([
+      ['정상', 2],
+      ['미납', 1],
+      ['실효', 0],
+      ['해지·종료', 0],
+      ['상태 미확인', 1],
+    ])
+    expect(statusCounts({ portfolio: { contractCount: 1, statuses: [{ code: 'ACTIVE', count: 1 }] } }).some((s) => s.key === 'UNKNOWN')).toBe(false)
+  })
+})
+
+describe('기준일·요청 변환', () => {
+  it('끝난 달은 월말, 진행 중인 달은 오늘이 기준일이다', () => {
+    expect(asOfForMonth('2026-07', '2026-11-02')).toBe('2026-07-31')
+    expect(asOfForMonth('2026-11', '2026-11-02')).toBe('2026-11-02')
+    expect(asOfForMonth('2028-02', '2030-01-01')).toBe('2028-02-29')
+  })
+  it('화면 선택값을 API 값으로 바꾼다', () => {
+    expect(periodParam(6)).toBe('6')
+    expect(periodParam(12)).toBe('12')
+    expect(periodParam('all')).toBe('ALL')
+    expect(kindParam('all')).toBe('ALL')
+    expect(kindParam('LIFE')).toBe('LIFE')
   })
 })
 
