@@ -97,15 +97,15 @@ export const availableItems = (form: FormValues, items: CommissionItem[]) =>
 export function inclusionOptions(insurer: boolean, newcomer: boolean): [string, string][] {
   if (newcomer)
     return [
-      ['EXCLUDED:NEW_AGENT_SUPPORT', '제외 · 신인 지원'],
+      ['EXCLUDED:NEW_AGENT_SUPPORT', '제외, 신인 지원'],
       ['REVIEW_REQUIRED', '검토필요'],
     ]
   return [
     ['INCLUDED', '산입'],
     ['REVIEW_REQUIRED', '검토필요'],
     ...(insurer
-      ? [['EXCLUDED:COMPLIANCE_3PCT', '제외 · 준법경영비']]
-      : [['EXCLUDED:NEW_AGENT_SUPPORT', '제외 · 신인 지원']]),
+      ? [['EXCLUDED:COMPLIANCE_3PCT', '제외, 준법경영비']]
+      : [['EXCLUDED:NEW_AGENT_SUPPORT', '제외, 신인 지원']]),
   ] as [string, string][]
 }
 export function normalizeRow(row: AttributionRow, insurer: boolean, newcomer: boolean): AttributionRow {

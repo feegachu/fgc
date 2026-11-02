@@ -46,7 +46,7 @@ export function ResizeHandle({
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={Math.round(value)}
-      title={`${label}: 드래그 또는 좌우 방향키로 조절 · 두 번 클릭 또는 Home으로 기본 너비 복원`}
+      title={`${label}: 드래그 또는 좌우 방향키로 조절, 두 번 클릭 또는 Home으로 기본 너비 복원`}
       className={`resize-handle ${className} ${active ? 'is-resizing' : ''}`}
       style={style}
       onPointerDown={(event) => {

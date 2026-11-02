@@ -81,16 +81,14 @@
     "cap-warning",
     "arbitrage",
     "recon",
-    "journal",
-    "open"
+    "journal"
   ],
   "dashboard.kpi-link": [
     "cap-violation",
     "cap-warning",
     "arbitrage",
     "recon",
-    "journal",
-    "open"
+    "journal"
   ],
   "clawback.evidence": [
     "source",

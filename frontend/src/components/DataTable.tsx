@@ -98,33 +98,33 @@ function TableContents<T>({
       })
       setHandles((previous) => (JSON.stringify(measured) === JSON.stringify(previous) ? previous : measured))
       const minimums = Array.from(table.tHead?.rows[0]?.cells ?? []).map((header, index) => {
-        let badgeWidth = 0
+        let contentWidth = 0
         for (const row of Array.from(table.tBodies[0]?.rows ?? [])) {
           const cell = row.cells[index]
           if (!cell || cell.colSpan !== 1) continue
           const padding = getComputedStyle(cell)
-          for (const badge of cell.querySelectorAll<HTMLElement>('.status-badge')) {
-            badgeWidth = Math.max(
-              badgeWidth,
-              badge.getBoundingClientRect().width + parseFloat(padding.paddingLeft) + parseFloat(padding.paddingRight),
+          for (const content of cell.querySelectorAll<HTMLElement>('.status-badge, .button')) {
+            contentWidth = Math.max(
+              contentWidth,
+              content.getBoundingClientRect().width + parseFloat(padding.paddingLeft) + parseFloat(padding.paddingRight),
             )
           }
         }
-        if (!badgeWidth) return MIN_COLUMN_WIDTH
-        // Keep both the heading and the longest tag on the current page readable.
+        if (!contentWidth) return MIN_COLUMN_WIDTH
+        // Keep the heading, badges and action buttons on the current page readable.
         const range = document.createRange()
         range.selectNodeContents(header)
         const padding = getComputedStyle(header)
         const headingWidth =
           range.getBoundingClientRect().width + parseFloat(padding.paddingLeft) + parseFloat(padding.paddingRight)
-        return Math.ceil(Math.max(MIN_COLUMN_WIDTH, badgeWidth, headingWidth)) + 1
+        return Math.ceil(Math.max(MIN_COLUMN_WIDTH, contentWidth, headingWidth)) + 1
       })
       setMinimumWidths((previous) => (JSON.stringify(previous) === JSON.stringify(minimums) ? previous : minimums))
     }
     const observer = new ResizeObserver(syncHandles)
     observer.observe(table)
     for (const cell of Array.from(table.tHead?.rows[0]?.cells ?? [])) observer.observe(cell)
-    for (const badge of table.querySelectorAll('.status-badge')) observer.observe(badge)
+    for (const content of table.querySelectorAll('.status-badge, .button')) observer.observe(content)
     // Sticky headers stay resizable while their viewport scrolls vertically.
     const viewport = table.parentElement
     viewport?.addEventListener('scroll', syncHandles, { passive: true })

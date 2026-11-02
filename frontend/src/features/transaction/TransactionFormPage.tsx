@@ -4,6 +4,7 @@ import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservat
 import { findGuide } from '../assistant/catalog'
 import { useWorkflowGuide } from '../assistant/workflow-state'
 import { connectPaymentGuideLaunch } from './payment-guide-launch'
+import { nameWithCode } from '../../lib/screenText'
 import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -226,7 +227,7 @@ function TransactionForm({
   const inputDisabled =
     !canProcess || confirmed || locked || busy !== null || loading || Boolean(referenceError) || confirmationNeedsRetry
   const selectedAgent = agents.find((agent) => String(agent.agentId) === form.agentId)
-  const agentLabel = selectedAgent ? `${selectedAgent.agentCode} ${selectedAgent.agentName}` : '—'
+  const agentLabel = selectedAgent ? nameWithCode(selectedAgent.agentName, selectedAgent.agentCode) : '-'
   const ready = canProcess && !loading && !referenceError && busy == null && !confirmed
   const fieldMessage = (field: string) => (fieldError?.field === field ? fieldError.message : undefined)
   useEffect(() => {
@@ -528,7 +529,7 @@ function TransactionForm({
     >
       <header className="page-header transaction-page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">지급 건 등록 · 귀속 · 확정</h1>
+          <h1 className="page-title">지급 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
           <button data-guide-feature="features.transaction.transaction-form-page.button-2"
@@ -606,7 +607,7 @@ function TransactionForm({
       <ResizableSplit
         className="transaction-form-layout"
         storageKey="transaction-form-workspace"
-        label="지급 건·귀속행과 확정 게이트 카드 너비"
+        label="지급 건/귀속행과 확정 게이트 카드 너비"
         defaultRatio={61}
         id="main-grid"
       >
@@ -622,7 +623,7 @@ function TransactionForm({
               </h2>
               <span id="tx-status">
                 <StatusBadge tone={confirmed ? 'success' : 'neutral'}>
-                  {paymentId ? `${confirmed ? '확정' : '작성중'} · #${paymentId}` : '미저장'}
+                  {paymentId ? `${confirmed ? '확정' : '작성중'}, #${paymentId}` : '미저장'}
                 </StatusBadge>
               </span>
             </header>
@@ -686,7 +687,7 @@ function TransactionForm({
                     disabled={inputDisabled}
                     source={agentQuery.source}
                     selected={selectedAgent}
-                    placeholder="설계사 이름·코드 검색"
+                    placeholder="설계사 이름/코드 검색"
                     onSelect={(agentId, row) => {
                       agentQuery.remember(row)
                       changeForm({ agentId })
@@ -701,7 +702,7 @@ function TransactionForm({
                   disabled={inputDisabled}
                   source={itemQuery.source}
                   selected={items.find((row) => String(row.commissionItemId) === form.commissionItemId)}
-                  placeholder="수수료 항목 이름·코드 검색"
+                  placeholder="수수료 항목 이름/코드 검색"
                   onSelect={(commissionItemId, row) => {
                     itemQuery.remember(row)
                     changeForm({ commissionItemId })
@@ -711,7 +712,7 @@ function TransactionForm({
               <Field
                 label="금액 (원)"
                 required
-                helper="금액은 0 이상으로 입력하고 지급·차감은 흐름으로 구분합니다."
+                helper="금액은 0 이상으로 입력하고 지급/차감은 흐름으로 구분합니다."
                 error={fieldMessage('amount')}
               >
                 <input data-guide-feature="features.transaction.transaction-form-page.amount"
@@ -746,7 +747,7 @@ function TransactionForm({
                   id="evidence"
                   data-guide-target="payment.evidence"
                   maxLength={200}
-                  placeholder="문서번호 · 링크"
+                  placeholder="문서번호, 링크"
                   value={form.evidenceRef}
                   disabled={inputDisabled}
                   onChange={(event) => changeForm({ evidenceRef: event.target.value })}
@@ -838,7 +839,7 @@ function TransactionForm({
               {needsSave && initialId && (
                 <p className="field-helper">
                   {normalized
-                    ? '현재 지급 단계·항목에 맞춰 귀속 입력을 조정했습니다. 먼저 저장한 뒤 사전검증하세요.'
+                    ? '현재 지급 단계/항목에 맞춰 귀속 입력을 조정했습니다. 먼저 저장한 뒤 사전검증하세요.'
                     : '변경한 내용을 먼저 저장한 뒤 사전검증하세요.'}
                 </p>
               )}
@@ -849,7 +850,7 @@ function TransactionForm({
               )}
               {!canProcess && (
                 <p className="field-error" id="transaction-permission-help">
-                  현재 계정은 조회만 가능하며 저장·사전검증·확정을 실행할 수 없습니다.
+                  현재 계정은 조회만 가능하며 저장/사전검증/확정을 실행할 수 없습니다.
                 </p>
               )}
               {saveError && (

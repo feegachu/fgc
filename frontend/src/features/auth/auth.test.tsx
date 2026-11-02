@@ -32,7 +32,11 @@ beforeEach(() => {
   sessionStorage.clear()
   vi.spyOn(apiClient, 'request').mockImplementation(async (url) => {
     if (url.startsWith('/api/v1/base/commission-items')) return envelope([])
-    if (url.startsWith('/api/v1/base/') || url.startsWith('/api/v1/contracts?') || url.startsWith('/api/v1/transactions?'))
+    if (
+      url.startsWith('/api/v1/base/') ||
+      url.startsWith('/api/v1/contracts?') ||
+      url.startsWith('/api/v1/transactions?')
+    )
       return envelope({ content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 })
     return envelope(user)
   })
@@ -120,7 +124,7 @@ describe('AUTH-W01 로그인', () => {
     sessionStorage.setItem('fgc.other.preference', 'old')
     localStorage.setItem('unrelated', 'keep')
     await enterCredentials(actions)
-    await screen.findByRole('heading', { name: '지급 건 등록 · 귀속 · 확정' })
+    await screen.findByRole('heading', { name: '지급 건 등록, 귀속, 확정' })
     expect(router.state.location.pathname).toBe(`${base}/transactions/new`)
     expect(router.state.location.search).toBe('?month=2026-08&status=ACTIVE')
     expect(router.state.location.hash).toBe('#form')

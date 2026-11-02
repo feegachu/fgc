@@ -1,3 +1,4 @@
+import { policyCodeLabel } from '../policies/labels'
 import { useRef, useState } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { ReactNode } from 'react'
@@ -6,6 +7,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router'
 import { paymentEntryHref, safeReturnTo } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
+import { CategoryBadge } from '../../components/StatusBadge'
 import { Modal } from '../../components/Modal'
 import { ApiError } from '../../lib/api/client'
 import { exportCsv } from '../../lib/exportCsv'
@@ -44,7 +46,7 @@ import './schedule.css'
 const value = (content: unknown) => (content == null || content === '' ? EMPTY : String(content))
 const versionText = (versionNo?: number) => (versionNo == null ? EMPTY : `v${versionNo}`)
 const join = (...parts: unknown[]) =>
-  parts.filter((part) => part != null && part !== '' && part !== EMPTY).join(' · ') || EMPTY
+  parts.filter((part) => part != null && part !== '' && part !== EMPTY).join(', ') || EMPTY
 const Money = ({ amount }: { amount: unknown }) => (
   <span className={isNegative(amount) ? 'is-negative-amount' : undefined}>{won(amount)}</span>
 )
@@ -99,7 +101,7 @@ function ScheduleDetailView({ id }: { id: string }) {
   const regenerateDisabled = !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
   const reasons: string[] = []
   if (header) {
-    if (!canProcess) reasons.push('확정·재생성은 정산 담당자만 할 수 있습니다.')
+    if (!canProcess) reasons.push('확정/재생성은 정산 담당자만 할 수 있습니다.')
     if (header.activeYn !== true) reasons.push('사용 중인 버전이 아닙니다.')
     if (header.status === 'CONFIRMED') reasons.push('이미 확정된 스케줄입니다.')
     else if (header.status !== 'PLANNED') reasons.push('예정 상태에서만 확정할 수 있습니다.')
@@ -170,12 +172,12 @@ function ScheduleDetailView({ id }: { id: string }) {
       <section data-guide-feature="features.schedule.schedule-detail-page.section" className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-header-title">
-            스케줄 헤더 ·{' '}
-            <span className="tabular-nums">schedule_header #{header ? value(header.scheduleHeaderId) : '-'}</span>
+            스케줄 헤더,{' '}
+            <span className="tabular-nums">스케줄 번호 {header ? value(header.scheduleHeaderId) : '-'}</span>
           </h2>
           {/* 지급단계는 이동 컨트롤이다(화면정의서 SCHE-W02, IF-API-28C). */}
-          <div className="field schedule-stage-field">
-            <label className="field-label" htmlFor="schedule-stage">
+          <div className="filter-field schedule-stage-field">
+            <label className="filter-field-label" htmlFor="schedule-stage">
               지급단계
             </label>
             <select data-guide-feature="features.schedule.schedule-detail-page.schedule-stage"
@@ -458,7 +460,7 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
         <dd className="tabular-nums">{value(header.contractNo)}</dd>
       </div>
       <div>
-        <dt>보험회사 · 상품</dt>
+        <dt>보험회사, 상품</dt>
         <dd>{join(header.insurerName, header.productName)}</dd>
       </div>
       <div>
@@ -503,7 +505,7 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
         <dd className="tabular-nums">{value(header.policyVersionLabel)}</dd>
       </div>
       <div>
-        <dt>생성 사유 · 일시</dt>
+        <dt>생성 사유, 일시</dt>
         <dd>{join(header.generationReason, dateTime(header.generatedAt))}</dd>
       </div>
     </dl>
@@ -524,12 +526,18 @@ function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: stri
         <Text content={line.recipientName} />
       </td>
       <td>
-        <Text content={line.basisCode} />
+        <CategoryBadge value={line.basisCode} optionCount={1}>
+          <Text content={policyCodeLabel(line.basisCode)} />
+        </CategoryBadge>
       </td>
       <td className="is-number tabular-nums">
         <Money amount={line.basisAmount} />
       </td>
-      <td className="is-left">{responseLabel(null, CALCULATION_TYPE, line.calculationType)}</td>
+      <td className="is-left">
+        <CategoryBadge value={line.calculationType} optionCount={2}>
+          {responseLabel(null, CALCULATION_TYPE, line.calculationType)}
+        </CategoryBadge>
+      </td>
       <td className="is-left tabular-nums">{line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
       <td className="is-number tabular-nums">
         <Money amount={line.expectedAmount} />
@@ -623,7 +631,7 @@ function ConfirmModal({
       }
     >
       <p className="schedule-modal-description">
-        되돌릴 수 없습니다 — 확정된 스케줄은 새 버전으로만 바꿉니다. 확정 후에는 금액을 고칠 수 없고, 고치려면{' '}
+        되돌릴 수 없습니다, 확정된 스케줄은 새 버전으로만 바꿉니다. 확정 후에는 금액을 고칠 수 없고, 고치려면{' '}
         <strong>[새 버전 만들기]</strong>를 눌러야 합니다.
       </p>
       <dl className="schedule-confirm-summary">
@@ -684,7 +692,7 @@ function RegenerateModal({
   function submit() {
     const trimmed = reason.trim()
     const message = !trimmed
-      ? '저장 불가 — 생성 사유를 입력하세요.'
+      ? '저장할 수 없습니다. 생성 사유를 입력하세요.'
       : trimmed.length > REASON_MAX
         ? `생성 사유는 ${REASON_MAX}자 이하여야 합니다.`
         : ''
@@ -747,7 +755,7 @@ function RegenerateModal({
           {error}
         </p>
         <p className="field-helper" id="regenerate-reason-help">
-          감사로그에 이전값·이후값과 함께 남습니다. ({REASON_MAX}자 이내)
+          감사로그에 이전값/이후값과 함께 남습니다. ({REASON_MAX}자 이내)
         </p>
       </div>
     </Modal>

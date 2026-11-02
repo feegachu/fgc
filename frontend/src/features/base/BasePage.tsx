@@ -5,7 +5,7 @@ import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
-import { int } from '../../lib/format'
+import { ListHeader } from '../../components/ListHeader'
 import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
 import { QueryState, ReferenceTabs } from '../reference/ReferenceUI'
 import {
@@ -68,7 +68,6 @@ function BaseFilters({
     <>
       <FilterBar
         className="base-filter-form"
-        wrapFields={false}
         resetFirst
         onSubmit={() => onSubmit(draft)}
         onReset={() => {
@@ -84,7 +83,7 @@ function BaseFilters({
               {organizations.data?.map((r) => (
                 <option key={r.organizationId} value={r.organizationId}>
                   {r.organizationName}
-                  {r.activeYn === false ? ' · 사용중지' : ''}
+                  {r.activeYn === false ? ', 사용중지' : ''}
                 </option>
               ))}
             </select>
@@ -116,7 +115,7 @@ function BaseFilters({
               {insurers.data?.map((r) => (
                 <option key={r.insurerId} value={r.insurerId}>
                   {r.insurerName}
-                  {r.activeYn === false ? ' · 사용중지' : ''}
+                  {r.activeYn === false ? ', 사용중지' : ''}
                 </option>
               ))}
             </select>
@@ -256,18 +255,16 @@ export function BasePage() {
             onReset={() => submit({ keyword: '', asOf: defaultDate, insurerId: '', organizationId: '' })}
           />
           <div className="surface base-result-surface">
-            <header className="surface-header base-result-header">
+            <ListHeader
+              className="base-result-header"
+              total={tab === 'commission-item' ? commission.data?.length ?? 0 : paged?.totalElements ?? 0}
+              pageSize={tab === 'commission-item' ? commission.data?.length ?? 0 : paged?.size ?? 20}
+            >
               <div>
                 <h2 className="surface-title">{resultCopy[tab].title}</h2>
                 <p className="base-result-description">{resultCopy[tab].description}</p>
               </div>
-              <span className="base-result-count">
-                <strong className="tabular-nums">
-                  {int(tab === 'commission-item' ? (commission.data?.length ?? 0) : (paged?.totalElements ?? 0))}
-                </strong>
-                건
-              </span>
-            </header>
+            </ListHeader>
             {(query.isLoading || query.error) && (
               <div className="empty-state base-result-message">
                 <QueryState loading={query.isLoading} error={query.error} />

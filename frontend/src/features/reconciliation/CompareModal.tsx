@@ -1,3 +1,4 @@
+import { nameWithCode } from '../../lib/screenText'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
@@ -57,16 +58,16 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
   return (
     <>
       <p>
-        대사 결과 #{detail.reconciliationResultId} ·{' '}
+        대사 결과 #{detail.reconciliationResultId},{' '}
         {PAYMENT_STAGE[stage as keyof typeof PAYMENT_STAGE] || stage || '지급단계 미확인'}
       </p>
       <p>예상 스케줄과 실제 지급 건을 필드별로 비교합니다.</p>
       <ResultBadge type={detail.resultType} label={detail.resultTypeLabel} />
       <dl className="reco-react-compare-summary">
         <div>
-          <dt>계약 · 항목 · 회차</dt>
+          <dt>계약, 항목, 회차</dt>
           <dd>
-            {text(detail.contractNo)} · {text(detail.commissionItemName)} ·{' '}
+            {text(detail.contractNo)}, {text(detail.commissionItemName)},{' '}
             {detail.installmentNo == null ? EMPTY : `${int(detail.installmentNo)}회차`}
           </dd>
         </div>
@@ -97,7 +98,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
       </div>
       <section data-guide-feature="features.reconciliation.compare-modal.section" className="surface reco-react-note" aria-label="차액 및 분류">
         <p>
-          예상 금액 <Money value={detail.expectedTotalAmount} /> · 실제 금액 <Money value={detail.actualTotalAmount} />
+          예상 금액 <Money value={detail.expectedTotalAmount} />, 실제 금액 <Money value={detail.actualTotalAmount} />
         </p>
         <p>
           결과 유형 <ResultBadge type={detail.resultType} label={detail.resultTypeLabel} />
@@ -108,7 +109,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
           차액 = 실제 <Money value={detail.actualTotalAmount} /> − 예상 <Money value={detail.expectedTotalAmount} /> ={' '}
           <Money value={detail.differenceAmount} difference />
         </p>
-        <p>허용오차 0원 · 시스템 계산 결과</p>
+        <p>허용오차 0원, 시스템 계산 결과</p>
       </section>
       <nav className="reco-react-links" aria-label="관련 화면">
         {scheduleId != null && (
@@ -141,7 +142,7 @@ function SourceSide({
   expected: boolean
 }) {
   const agent = expected ? detail.expectedAgent : detail.actualAgent
-  const agentLabel = agent?.agentName ? `${agent.agentName}${agent.agentCode ? ` · ${agent.agentCode}` : ''}` : '없음'
+  const agentLabel = agent?.agentName ? nameWithCode(agent.agentName, agent.agentCode) : '없음'
   return (
     <section data-guide-feature="features.reconciliation.compare-modal.section-2" className="surface">
       <header className="surface-header">
@@ -154,10 +155,10 @@ function SourceSide({
         matches.map((match, index) => (
           <div className="reco-react-source" key={`${match.matchSeq}-${index}`}>
             <h4>
-              {title} 원천 {index + 1} ·{' '}
+              {title} 원천 {index + 1},{' '}
               {expected
                 ? `schedule_line #${match.scheduleLineId ?? EMPTY}`
-                : `commission_transaction #${match.commissionTransactionId ?? EMPTY}`}
+                : `수수료 지급 번호 ${match.commissionTransactionId ?? EMPTY}`}
             </h4>
             <dl>
               <div>

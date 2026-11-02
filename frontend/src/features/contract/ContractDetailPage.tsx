@@ -123,7 +123,7 @@ function ContractDetailView({ id }: { id: string }) {
                 <p className="contract-summary-label">계약번호</p>
                 <div className="contract-summary-title-row">
                   <h2 id="contract-summary-title" className="contract-summary-number">
-                    {contract.contractNo || '—'}
+                    {contract.contractNo || '-'}
                   </h2>
                   <ContractStatusBadge code={contract.contractStatus} label={contract.contractStatusLabel} />
                   <DataOriginBadge code={contract.dataOrigin} label={contract.dataOriginLabel} />
@@ -195,7 +195,7 @@ function ContractDetailView({ id }: { id: string }) {
             </div>
             {!canProcess && (
               <p id="contract-action-note" className="contract-permission-note">
-                수정·스케줄 재생성·한도 재검증은 SETTLEMENT 권한이 필요합니다.
+                수정/스케줄 재생성/한도 재검증은 SETTLEMENT 권한이 필요합니다.
               </p>
             )}
             <ContractFacts
@@ -207,7 +207,7 @@ function ContractDetailView({ id }: { id: string }) {
                 ['월납환산 초회보험료', won(contract.monthlyEquivalentFirstPremium)],
                 ['모집 설계사', contract.agentName],
                 ['소속 조직', contract.organizationName],
-                ['납입기간', contract.paymentTermMonths == null ? '—' : `${int(contract.paymentTermMonths)}개월`],
+                ['납입기간', contract.paymentTermMonths == null ? '-' : `${int(contract.paymentTermMonths)}개월`],
               ]}
             />
           </section>

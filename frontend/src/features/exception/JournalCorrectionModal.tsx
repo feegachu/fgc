@@ -44,15 +44,15 @@ function OriginalJournal({ journal }: { journal: JournalDetail }) {
     <>
       <div className="journal-correction-original">
         <strong>
-          {journal.journalNo} · {journal.journalTypeLabel}
+          {journal.journalNo}, {journal.journalTypeLabel}
         </strong>
         <span className="text-secondary">분개일 {journal.journalDate}</span>
         <span className="text-secondary">
-          차변 {won(journal.debitTotal)} · 대변 {won(journal.creditTotal)}
+          차변 {won(journal.debitTotal)}, 대변 {won(journal.creditTotal)}
         </span>
         <span className="text-secondary">원장상태 {journal.statusLabel}</span>
         <strong className={`journal-correction-validation ${journal.balanced ? 'is-valid' : 'is-invalid'}`}>
-          {journal.balanced ? '차변·대변 검증 통과' : '차변·대변 검증 필요'}
+          {journal.balanced ? '차변/대변 검증 통과' : '차변/대변 검증 필요'}
         </strong>
         {journal.correctionGroupKey && <span className="text-secondary">정정그룹 {journal.correctionGroupKey}</span>}
         {journal.reversedByJournalHeaderId && (
@@ -130,13 +130,13 @@ export function JournalCorrectionModal({
   return (
     <Modal
       open={open}
-      title="원분개 역분개 · 신규 재기표"
+      title="원분개 역분개, 신규 재기표"
       onClose={onClose}
       closeOnBackdrop
       className="modal-large journal-correction-modal"
       footer={
         <>
-          <p className="text-secondary">정정 실행 전 원분개와 신규 분개의 차변·대변을 확인하세요.</p>
+          <p className="text-secondary">정정 실행 전 원분개와 신규 분개의 차변/대변을 확인하세요.</p>
           <Button data-guide-feature="features.exception.journal-correction-modal.button" variant="secondary" onClick={onClose}>
             닫기
           </Button>
@@ -359,7 +359,7 @@ function CorrectionBody({
                   </Link>
                 </div>
               ) : item.status === 'REJECTED' ? (
-                <p>오탐·반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
+                <p>오탐/반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
               ) : item.status === 'RESOLVED' ? (
                 <p>정정이 완료된 예외입니다. 원분개의 정정그룹과 연결 분개를 확인하세요.</p>
               ) : (

@@ -18,7 +18,7 @@ export function PolicyReferenceInfo({ policyVersionId, refText }: { policyVersio
     <div className="policy-reference-info">
       {reference.registryTitle ? (
         <p className="policy-reference-registry">
-          규제조문표 · <strong>{reference.registryTitle}</strong>
+          규제조문표, <strong>{reference.registryTitle}</strong>
         </p>
       ) : null}
       {reference.statusTags?.length ? (

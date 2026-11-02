@@ -9,6 +9,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { exportCsv } from '../../lib/exportCsv'
 import { sortBinding } from '../../lib/tableSort'
@@ -220,14 +221,15 @@ export default function ScheduleListPage() {
       />
 
       <section data-guide-feature="features.schedule.schedule-list-page.section" className="surface schedule-results-card" aria-labelledby="schedule-results-title">
-        <header className="surface-header schedule-results-header">
+        <ListHeader
+          className="schedule-results-header"
+          total={data ? data.totalElements ?? 0 : null}
+          pageSize={data?.size ?? PAGE_SIZE}
+        >
           <h2 id="schedule-results-title" className="surface-title">
-            스케줄
+            예상스케줄
           </h2>
-          <p className="schedule-result-summary" aria-live="polite">
-            <strong>{data ? int(data.totalElements ?? 0) : EMPTY}</strong>건 · 한 화면 {data?.size ?? PAGE_SIZE}행
-          </p>
-        </header>
+        </ListHeader>
 
         {hasDuplicateActiveOperational(rows) && (
           <div className="schedule-data-warning" role="alert">

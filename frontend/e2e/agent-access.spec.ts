@@ -65,6 +65,6 @@ test('계약 상세의 저장된 내부 탭은 기본정보로 제한하고 내�
 test('내부 화면 직접 URL은 403 화면으로 표시하고 업무 API를 호출하지 않는다', async ({ page }) => {
   const unexpected = await agentFixture(page)
   await page.goto('journals')
-  await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
   expect(unexpected).toEqual([])
 })

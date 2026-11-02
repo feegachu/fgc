@@ -60,15 +60,15 @@ function Detail({ item }: { item: ExceptionCase }) {
       </div>
       <div>
         <dt>검증월</dt>
-        <dd className="tabular-nums">{item.validationMonth ? date(item.validationMonth).slice(0, 7) : '—'}</dd>
+        <dd className="tabular-nums">{item.validationMonth ? date(item.validationMonth).slice(0, 7) : '-'}</dd>
       </div>
       <div>
         <dt>최초 검출 실행</dt>
-        <dd className="tabular-nums">{item.firstDetectedRunId ?? '—'}</dd>
+        <dd className="tabular-nums">{item.firstDetectedRunId ?? '-'}</dd>
       </div>
       <div>
         <dt>최근 검출 실행</dt>
-        <dd className="tabular-nums">{item.lastDetectedRunId ?? '—'}</dd>
+        <dd className="tabular-nums">{item.lastDetectedRunId ?? '-'}</dd>
       </div>
       <div>
         <dt>검출 횟수</dt>
@@ -209,8 +209,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
 export function ActionPanel({ item }: { item: ExceptionCase }) {
   const canHandle = usePermission('canHandleException')
   const [correctionOpen, setCorrectionOpen] = useState(false)
-  const deletedRejectedPayment =
-    item.status === 'REJECTED' && item.sourceDeleted === true
+  const deletedRejectedPayment = item.status === 'REJECTED' && item.sourceDeleted === true
   const actionable = isActionable(item.status) && !deletedRejectedPayment
   const isCorrection = item.type === JOURNAL_CORRECTION_TYPE
   return (

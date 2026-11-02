@@ -162,7 +162,7 @@
 }
 .contract-information-grid dt {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1rem;
 }
 .contract-information-grid dd {

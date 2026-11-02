@@ -156,24 +156,24 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     const { user } = renderAt()
     await ready()
     await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent('제4-32조제12항제1·2호 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('제4-32조제12항제1/2호 [현행규정]')
     expect(screen.getByRole('tooltip')).toHaveTextContent(
-      '유지관리수수료·장기유지수수료의 지급 대상은 최초 모집자로 고정되지 않고',
+      '유지관리수수료/장기유지수수료의 지급 대상은 최초 모집자로 고정되지 않고',
     )
     // 2차는 최초 연결 설계사를 고정하므로 담당 분리 관리를 전제로 한 안내를 하지 않는다(화면정의서 CONT-W03).
     expect(screen.getByRole('tooltip')).toHaveTextContent(
-      '2차 범위에서는 이 설계사를 고정하고 유지관리 담당 변경·승계는 지원하지 않습니다',
+      '2차 범위에서는 이 설계사를 고정하고 유지관리 담당 변경/승계는 지원하지 않습니다',
     )
     expect(screen.getByRole('tooltip')).not.toHaveTextContent('별도로 관리')
     await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
     await user.click(screen.getByRole('button', { name: '표준해약공제액 근거' }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-08 · 제4-32조제5항 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-08, 제4-32조제5항 [현행규정]')
     expect(screen.getByRole('tooltip')).toHaveTextContent('1,200% 한도 계산에서')
-    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-12 · 제4-32조제6항 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-12, 제4-32조제6항 [현행규정]')
   })
 
   it.each(['duplicate', 'network'])('저장 실패 %s는 입력을 보존하고 다시 저장할 수 있다', async (kind) => {
-    const message = kind === 'duplicate' ? '저장 불가 — 이미 등록된 계약번호입니다.' : 'Failed to fetch'
+    const message = kind === 'duplicate' ? '저장할 수 없습니다. 이미 등록된 계약번호입니다.' : 'Failed to fetch'
     const { user, writes } = renderAt('/contracts/21/edit', (_url, options) => {
       if (options?.method) {
         if (kind === 'duplicate')
@@ -272,8 +272,9 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     fireEvent.change(field('계약번호'), { target: { value: 'MY-DRAFT' } })
     await user.click(save())
     await screen.findByText(/현재 입력은 유지됩니다/)
-    expect(screen.getByText(/FGC-CONT-003/)).toHaveTextContent('conflict-trace')
-    expect(screen.getByText(/FGC-CONT-003/)).toHaveTextContent('다른 요청에서 계약을 수정했습니다.')
+    expect(screen.queryByText(/FGC-CONT-003/)).not.toBeInTheDocument()
+    expect(screen.getByText(/요청번호: conflict-trace/)).toBeInTheDocument()
+    expect(screen.getByText(/다른 요청에서 계약을 수정했습니다/)).toBeInTheDocument()
     expect(screen.getAllByText(/현재 입력은 유지됩니다/)).toHaveLength(1)
     expect(field('계약번호')).toHaveValue('MY-DRAFT')
     expect(save()).toBeDisabled()
@@ -476,7 +477,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await ready()
   })
 
-  it('서버 message를 그대로 필드 오류·추적 ID와 함께 표시하고 detail로 대체하지 않는다', async () => {
+  it('서버 안내를 필드 오류로 표시하고 내부 코드 대신 요청번호를 남긴다', async () => {
     const { user } = renderAt(undefined, (_url, options) => {
       if (options?.method)
         throw new ApiError(
@@ -493,9 +494,9 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await ready()
     await user.click(save())
     await waitFor(() => expect(field('모집 설계사')).toHaveAttribute('aria-invalid', 'true'))
-    expect(screen.getByText(/FGC-COMMON-002/)).toHaveTextContent('입력값 오류')
+    expect(screen.getAllByText('입력값 오류 (요청번호: save-trace)')).not.toHaveLength(0)
     expect(screen.queryByText('조직 계층에 팀장 수령자가 없습니다.')).not.toBeInTheDocument()
-    expect(screen.getByText(/FGC-COMMON-002/)).toHaveTextContent('save-trace')
+    expect(screen.queryByText(/FGC-COMMON-002/)).not.toBeInTheDocument()
     expect(save()).toBeEnabled()
   })
 })
@@ -552,7 +553,7 @@ describe('[FGC-FUN-018] 서버 오류·과거 기준정보', () => {
     )
     await ready()
     expect(field('보험회사')).toHaveValue('1')
-    expect(field('상품 판매버전')).toHaveValue('상품 · v1')
+    expect(field('상품 판매버전')).toHaveValue('상품, v1')
     expect(field('모집 설계사')).toHaveValue('설계사')
     expect(field('소속 조직')).toHaveValue('저장 당시 조직')
     await user.click(save())
@@ -605,7 +606,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
         .map((option) => option.textContent),
     ).toEqual(['변경 안 함', '미납', '해지', '만기', '청약철회'])
     expect(screen.queryByRole('group', { name: '상태 변경 사유' })).not.toBeInTheDocument()
-    expect(hint()).toHaveTextContent('계약 정보만 저장(상태 사건·스케줄 새 버전 없음)')
+    expect(hint()).toHaveTextContent('계약 정보만 저장(상태 사건, 스케줄 새 버전 없음)')
     fireEvent.change(field('계약번호'), { target: { value: 'NO-STATUS' } })
     await user.click(save())
     await screen.findByText('계약 상세')
@@ -628,7 +629,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     expect(field('접수일시').value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
     expect(save()).toBeDisabled()
     await fillEvent(user)
-    expect(hint()).toHaveTextContent('상태 사건 기록·해당 미확정 대상 처리')
+    expect(hint()).toHaveTextContent('상태 사건 기록, 해당 미확정 대상 처리')
     expect(hint()).not.toHaveTextContent('스케줄 새 버전')
     await user.click(save())
     await user.click(await screen.findByRole('button', { name: '다시 확인' }))
@@ -689,7 +690,10 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     await confirm(user)
     await waitFor(() => expect(field('효력일시')).toHaveAttribute('aria-invalid', 'true'))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByText(/FGC-IMPL-EVENT_ORDER/)).toHaveTextContent('event-order')
+    expect(field('효력일시')).toHaveAccessibleDescription(
+      '저장할 수 없습니다. 효력일시는 최신 사건의 효력일시 이후여야 합니다. (요청번호: event-order)',
+    )
+    expect(screen.queryByText(/FGC-IMPL-EVENT_ORDER/)).not.toBeInTheDocument()
     expect(field('효력일시')).toHaveValue('2026-10-20T00:00')
     expect(reason()).toHaveValue('  보험회사 해지 접수 반영  ')
     await confirm(user)
@@ -890,7 +894,7 @@ describe('[FGC-FUN-018·030] 보험료 파생·입력 검증', () => {
     fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '750599937895082' } })
     expect(preview.getByText('9,007,199,254,740,984')).toBeInTheDocument()
     fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '750599937895083' } })
-    expect(preview.getByText('—')).toBeInTheDocument()
+    expect(preview.getByText('-')).toBeInTheDocument()
     expect(preview.queryByText('9,007,199,254,740,984')).not.toBeInTheDocument()
   })
 })
@@ -904,5 +908,5 @@ it('points the edit tutorial at the actual read-only agent and premium card', as
   expect(agent).toBe(field('모집 설계사'))
   expect(agent).toHaveAttribute('readonly')
   expect(steps[3].completionRuleId).toBe('USER_REVIEWED')
-  expect(document.querySelector(`[data-guide-feature="${steps[4].targetId}"]`)).toContainElement(screen.getByRole('heading', { name: '보험료 · 납입 조건' }))
+  expect(document.querySelector(`[data-guide-feature="${steps[4].targetId}"]`)).toContainElement(screen.getByRole('heading', { name: '보험료, 납입 조건' }))
 })

@@ -32,7 +32,7 @@ export function GatePanel({ result }: { result: Precheck | null }) {
             </span>
             <div>
               <div className="transaction-gate-label">
-                {index + 1}. {gate.label} · {gate.state === 'pass' ? '통과' : gate.state === 'fail' ? '차단' : '미확인'}
+                {index + 1}. {gate.label}, {gate.state === 'pass' ? '통과' : gate.state === 'fail' ? '차단' : '미확인'}
               </div>
               <div className="transaction-gate-detail">
                 {gate.failures.length
@@ -72,7 +72,7 @@ function CapCard({ preview }: { preview: CapPreview }) {
     <div className="transaction-cap-card">
       <div className="transaction-cap-heading">
         <span>
-          {preview.paymentStageLabel || preview.paymentStage} · {preview.contractNo}
+          {preview.paymentStageLabel || preview.paymentStage}, {preview.contractNo}
         </span>
         <StatusBadge tone={tone[status]}>
           {preview.resultStatusLabel}
@@ -81,8 +81,7 @@ function CapCard({ preview }: { preview: CapPreview }) {
       </div>
       {status === 'NOT_APPLICABLE' ? (
         <>
-          <p>{preview.applicabilityReason || '적용대상 아님 — 사유 정보 없음'}</p>
-          <p>사유 코드: {preview.applicabilityReasonCode || '—'}</p>
+          <p>{rateText(preview.applicabilityReason || '적용대상 아님, 사유 정보 없음')}</p>
         </>
       ) : (
         <>
@@ -141,15 +140,15 @@ export function CapPanel({ result, pending, error }: { result: Precheck | null; 
                 <div className="transaction-cap-card" key={`excluded-${excluded.transactionAttributionId}-${index}`}>
                   <div className="transaction-cap-heading">
                     <span>
-                      계약 {excluded.contractId} · 귀속 {excluded.transactionAttributionId}
+                      계약 {excluded.contractId}, 귀속 {excluded.transactionAttributionId}
                     </span>
                     <StatusBadge tone="neutral">적용대상 아님</StatusBadge>
                   </div>
-                  <p>{excluded.reason}</p>
-                  <p>사유 코드: {excluded.reasonCode}</p>
+                  <p>{rateText(excluded.reason)}</p>
+
                   <AmountLine label="초년도 산입 제외액" value={excluded.excludedAmount} />
                   <p>
-                    귀속일 {excluded.attributionDate} · 초년도 종료일 {excluded.firstYearEndExclusive} (미포함)
+                    귀속일 {excluded.attributionDate}, 초년도 종료일 {excluded.firstYearEndExclusive} (미포함)
                   </p>
                 </div>
               ))}
@@ -236,7 +235,7 @@ export function ConfirmationModal({
           </button>
           {canSubmit && (
             <Button data-guide-feature="features.transaction.confirmation-panels.btn-confirm-submit" id="btn-confirm-submit" loading={pending} onClick={onConfirm}>
-              {pending ? '확정 중' : recordable ? '확정 시도 · 예외 등록' : '확정 실행'}
+              {pending ? '확정 중' : recordable ? '확정 시도, 예외 등록' : '확정 실행'}
             </Button>
           )}
         </>
@@ -271,13 +270,13 @@ export function ConfirmationModal({
           <div id="transaction-confirm-blockers" className="transaction-confirm-blockers" role="alert">
             {failureText ? (
               <p>
-                {failure?.code && failure.status < 500 ? `${failure.code} · ` : ''}
+                {failure?.code && failure.status < 500 ? `${failure.code}, ` : ''}
                 {rateText(failureText)}
               </p>
             ) : (
               result?.blockers?.map((blocker, index) => (
                 <p key={index}>
-                  {blocker.code ? `${blocker.code} · ` : ''}
+                  {blocker.code ? `${blocker.code}, ` : ''}
                   {rateText(blocker.message || '확정 차단 사유를 확인하세요.')}
                 </p>
               ))

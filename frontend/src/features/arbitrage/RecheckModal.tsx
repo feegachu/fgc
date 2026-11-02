@@ -60,7 +60,7 @@ export function RecheckModal({
     >
       <div className="arb-recheck-body">
         <p className="arb-recheck-contract">
-          {row.contractNo} · {present(row.paymentStageLabel)}
+          {row.contractNo}, {present(row.paymentStageLabel)}
         </p>
         <Field label="검증 기준일" error={submitted && !asOfDate ? '검증 기준일을 입력하세요.' : undefined}>
           <input data-guide-feature="features.arbitrage.recheck-modal.input"
@@ -76,7 +76,7 @@ export function RecheckModal({
             className="textarea-control"
             maxLength={200}
             rows={4}
-            placeholder="예) 지급·환수 자료 변경 확인"
+            placeholder="예) 지급/환수 자료 변경 확인"
             value={reason}
             disabled={mutation.isPending}
             onChange={(e) => setReason(e.target.value)}

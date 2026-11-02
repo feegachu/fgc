@@ -45,16 +45,16 @@ export function FinalizeDialogs({
         }
       >
         <p className="vrun-modal-description">
-          확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
+          확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
         </p>
         <div className="vrun-modal-points">
           <p>
-            <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong>
+            <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
           </p>
           <p>
-            수정 불가 — 확정된 검증 결과입니다. 결과를 바꾸려면 <strong>새 실행</strong>을 만드세요.
+            수정할 수 없습니다. 확정된 검증 결과입니다. 결과를 바꾸려면 <strong>새 실행</strong>을 만드세요.
           </p>
-          <p>확정 사실은 감사로그에 실행자·시각과 함께 남습니다.</p>
+          <p>확정 사실은 감사로그에 실행자/시각과 함께 남습니다.</p>
         </div>
         <dl className="vrun-kv">
           <div>
@@ -79,7 +79,7 @@ export function FinalizeDialogs({
         </p>
         <div className="vrun-modal-points">
           <p>
-            <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong>
+            <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
           </p>
         </div>
       </Modal>

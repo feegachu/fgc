@@ -1,4 +1,5 @@
 import { guideFeatureId } from '../assistant/feature-ids'
+import { nameWithCode } from '../../lib/screenText'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation } from 'react-router'
@@ -13,10 +14,11 @@ import { Field } from '../../components/Field'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { exportCsv } from '../../lib/exportCsv'
 import { sortBinding } from '../../lib/tableSort'
-import { date, int, today } from '../../lib/format'
+import { date, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { useAuth, usePermission } from '../auth/useAuth'
 import { useAgentOptions, useInsurerOptions, useOrganizationOptions, useProductOptions } from '../base/api'
@@ -61,14 +63,14 @@ const agentStatusLabels = { ACTIVE: '활동', INACTIVE: '비활동', TERMINATED:
 function agentOptionLabel(agent: Agent) {
   const status = agent.agentStatusLabel || (agent.agentStatus ? agentStatusLabels[agent.agentStatus] : '')
   const details = [status, agent.activeYn === false ? '기준정보 사용중지' : ''].filter(Boolean)
-  return `${agent.agentCode} · ${agent.agentName}${details.length ? ` (${details.join(' · ')})` : ''}`
+  return `${nameWithCode(agent.agentName, agent.agentCode)}${details.length ? ` (${details.join(', ')})` : ''}`
 }
 const columns = (back: string): TableColumn<ContractSummary>[] => [
   {
     key: 'contractNo',
     label: '계약번호',
     sortable: true,
-    width: '12rem',
+    width: '10rem',
     cellClassName: 'contract-number-cell',
     render: (row) =>
       row.contractId ? (
@@ -89,21 +91,21 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'productName',
     label: '상품명',
     sortable: true,
-    width: '11.75rem',
+    width: '10.5rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.productName),
   },
   { key: 'contractDate', label: '계약일', sortable: true, width: '5.75rem', render: (row) => date(row.contractDate) },
   {
     key: 'premium',
-    label: <span>월납환산 초회보험료</span>,
+    label: <span className="contract-premium-heading">월납환산 초회보험료</span>,
     labelExtra: (
       <EvidenceLink label="월납환산 초회보험료 설명 보기" icon="help">
         주기 보험료를 월 기준으로 환산한 값입니다. 1,200% 한도 계산 기준으로 사용합니다.
       </EvidenceLink>
     ),
     sortable: true,
-    width: '12rem',
+    width: '12.5rem',
     align: 'number',
     render: (row) => <Amount value={row.monthlyEquivalentFirstPremium} />,
   },
@@ -111,7 +113,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'agent',
     label: '모집 설계사',
     sortable: true,
-    width: '8.5rem',
+    width: '7rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.agentIdName),
   },
@@ -133,7 +135,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
   {
     key: 'origin',
     label: '데이터 출처',
-    width: '6rem',
+    width: '5.5rem',
     align: 'center',
     render: (row) => <DataOriginBadge code={row.dataOrigin} label={row.dataOriginLabel} />,
   },
@@ -180,7 +182,7 @@ export default function ContractListPage() {
           )}
         </div>
       </header>
-      <section data-guide-feature="features.contract.contract-list-page.section" className="surface contract-filter-card" aria-labelledby="contract-filter-title">
+      <section data-guide-feature="features.contract.contract-list-page.section" className="surface contract-filter-card" aria-label="보험계약 조회 조건">
         <ContractFilters
           key={JSON.stringify(criteria)}
           initial={criteria}
@@ -189,14 +191,11 @@ export default function ContractListPage() {
         />
       </section>
       <section data-guide-feature="features.contract.contract-list-page.section-2" className="surface contract-results-card" aria-labelledby="contract-results-title">
-        <header className="surface-header contract-results-header">
+        <ListHeader className="contract-results-header" total={list.data?.totalElements ?? 0} pageSize={PAGE_SIZE}>
           <h2 className="surface-title" id="contract-results-title">
-            검색 결과
+            보험계약
           </h2>
-          <p className="contract-result-summary">
-            {int(list.data?.totalElements ?? 0)}건 · 한 화면 {PAGE_SIZE}행
-          </p>
-        </header>
+        </ListHeader>
         <QueryState loading={list.isPending} error={list.error} />
         {list.isError && (
           <Button data-guide-feature="features.contract.contract-list-page.button-2" variant="secondary" onClick={() => void list.refetch()}>
@@ -207,6 +206,7 @@ export default function ContractListPage() {
           <>
             <DataTable
               className="contract-table"
+              resizeKey="contract-list-v2"
               viewportClassName="contract-table-viewport"
               caption="보험계약 검색 결과"
               columns={columns(back)}
@@ -320,23 +320,19 @@ function ContractFilters({
   )
   return (
     <>
-      <header className="contract-section-header">
-        <h2 className="surface-title" id="contract-filter-title">
-          검색 조건
-        </h2>
-        <Button data-guide-feature="features.contract.contract-list-page.button-4"
-          variant="ghost"
-          className="contract-reset-button"
-          onClick={() => {
-            setDraft(Object.fromEntries(Object.keys(draft).map((key) => [key, ''])))
-            setAgentOptionsRequested(false)
-            onReset()
-          }}
-        >
-          초기화
-        </Button>
-      </header>
-      <FilterBar className="contract-filter-bar" wrapFields={false} icons onSubmit={() => onSearch(draft)}>
+      <FilterBar
+        className="contract-filter-bar"
+        embedded
+        wrapFields={false}
+        icons
+        resetFirst
+        onSubmit={() => onSearch(draft)}
+        onReset={() => {
+          setDraft(Object.fromEntries(Object.keys(draft).map((key) => [key, ''])))
+          setAgentOptionsRequested(false)
+          onReset()
+        }}
+      >
         <div className="filter-fields contract-filter-fields">
           {input('contractNo', '계약번호', 'text', '계약번호 입력')}
           {select(
@@ -344,7 +340,7 @@ function ContractFilters({
             '보험회사',
             (insurers.data ?? []).map((row) => ({
               value: String(row.insurerId),
-              label: `${row.insurerCode} · ${row.insurerName}${row.activeYn === false ? ' (사용중지)' : ''}`,
+              label: `${row.insurerCode}, ${row.insurerName}${row.activeYn === false ? ' (사용중지)' : ''}`,
             })),
             insurers,
           )}
@@ -353,31 +349,33 @@ function ContractFilters({
             '상품',
             (products.data ?? []).map((row) => ({
               value: String(row.productOfferingId),
-              label: `${row.productName} · ${row.offeringVersion}`,
+              label: `${row.productName}, ${row.offeringVersion}`,
             })),
             products,
             draft.insurerId ? '전체' : '보험회사를 선택하세요',
             !draft.insurerId,
           )}
-          {!isAgent && select(
-            'agentId',
-            '모집 설계사',
-            (agents.data ?? []).map((row) => ({ value: String(row.agentId), label: agentOptionLabel(row) })),
-            agents,
-            '전체',
-            false,
-            () => setAgentOptionsRequested(true),
-            false,
-          )}
-          {!isAgent && select(
-            'orgId',
-            '조직',
-            (organizations.data ?? []).map((row) => ({
-              value: String(row.organizationId),
-              label: `${row.organizationCode} · ${row.organizationName}${row.activeYn === false ? ' (사용중지)' : ''}`,
-            })),
-            organizations,
-          )}
+          {!isAgent &&
+            select(
+              'agentId',
+              '모집 설계사',
+              (agents.data ?? []).map((row) => ({ value: String(row.agentId), label: agentOptionLabel(row) })),
+              agents,
+              '전체',
+              false,
+              () => setAgentOptionsRequested(true),
+              false,
+            )}
+          {!isAgent &&
+            select(
+              'orgId',
+              '조직',
+              (organizations.data ?? []).map((row) => ({
+                value: String(row.organizationId),
+                label: `${row.organizationCode}, ${row.organizationName}${row.activeYn === false ? ' (사용중지)' : ''}`,
+              })),
+              organizations,
+            )}
           {input('contractDateFrom', '계약일 시작', 'date')}
           {input('contractDateTo', '계약일 끝', 'date')}
           {select(

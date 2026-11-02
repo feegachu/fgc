@@ -25,7 +25,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'POL-W01',
     path: '/policies',
-    title: '정책·룰셋',
+    title: '정책/룰셋',
     menu: '/policies',
     section: 'admin',
     icon: 'settings',
@@ -33,7 +33,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'CONT-W03',
     path: '/contracts/new',
-    title: '보험계약 등록·수정',
+    title: '보험계약 등록/수정',
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',
@@ -42,7 +42,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'CONT-W03',
     path: '/contracts/:id/edit',
-    title: '보험계약 등록·수정',
+    title: '보험계약 등록/수정',
     menu: '/contracts',
     section: 'contracts',
     icon: 'description',
@@ -125,7 +125,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'RECO-W01',
     path: '/reconciliations',
-    title: '대사 실행·결과',
+    title: '대사 실행/결과',
     menu: '/reconciliations',
     section: 'ledger',
     icon: 'menu_book',
@@ -134,7 +134,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'CLAW-W01',
     path: '/clawbacks',
-    title: '환수 검토·계산',
+    title: '환수',
     menu: '/clawbacks',
     section: 'contracts',
     icon: 'payments',

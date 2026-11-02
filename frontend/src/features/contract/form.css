@@ -39,7 +39,7 @@
 }
 .contract-status-event > p {
   color: var(--color-text-secondary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 .contract-status-event .contract-form-fields {
   padding-inline: 0;

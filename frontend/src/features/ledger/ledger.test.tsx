@@ -201,7 +201,12 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     const { router, user } = renderAt('/journals?searched=true&contractNo=C-001&page=2&selected=11')
     const table = await screen.findByRole('table', { name: '조회 조건에 해당하는 검증원장 분개 목록' })
     const lastQuery = () =>
-      new URLSearchParams(calls.filter((call) => call.url.startsWith('/api/v1/journals?')).at(-1)!.url.split('?')[1])
+      new URLSearchParams(
+        calls
+          .filter((call) => call.url.startsWith('/api/v1/journals?'))
+          .at(-1)!
+          .url.split('?')[1],
+      )
     // 순서 기준이 없는 상태·유형 컬럼은 정렬 버튼이 없다.
     expect(within(table).queryByRole('button', { name: '상태' })).toBeNull()
     expect(within(table).getByRole('columnheader', { name: /차변 합계/ })).toHaveAttribute('aria-sort', 'none')
@@ -227,8 +232,8 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     renderAt('/journals?selected=11', (url) =>
       url.startsWith('/api/v1/journals/imbalances') ? { totalCount: 2, content: [] } : undefined,
     )
-    expect(await screen.findByText('이 검증 실행에 차변·대변이 맞지 않는 분개가 2건 있습니다.')).toBeVisible()
-    expect(screen.getByRole('table', { name: '선택한 분개의 차변·대변 상세행' })).toBeVisible()
+    expect(await screen.findByText('이 검증 실행에 차변/대변이 맞지 않는 분개가 2건 있습니다.')).toBeVisible()
+    expect(screen.getByRole('table', { name: '선택한 분개의 차변/대변 상세행' })).toBeVisible()
     expect(calls.some((call) => call.url.startsWith('/api/v1/journals?'))).toBe(true)
   })
   it('행 선택은 URL에 selected를 저장하고 상세를 표시한다', async () => {
@@ -279,9 +284,7 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.click(await screen.findByRole('button', { name: '역분개' }))
     await user.type(screen.getByRole('textbox', { name: '역분개 사유' }), '정정')
     await user.click(screen.getByRole('button', { name: '역분개 생성' }))
-    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(
-      '이미 역분개된 원장입니다. (FGC-LEDG-004 · 요청 ID: trace-11)',
-    )
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent('이미 역분개된 원장입니다.')
   })
   it('COMPLIANCE는 역분개와 정정 요청 버튼이 비활성이다', async () => {
     renderAt('/journals?selected=11', undefined, 'COMPLIANCE')

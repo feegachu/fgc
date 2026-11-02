@@ -3,7 +3,9 @@ import type { StatusTone } from '../../components/StatusBadge'
 // 색 분류는 templates/dashboard/index.html 의 th:classappend 규칙을 그대로 옮긴 것이다.
 export function severityTone(severity?: string): StatusTone {
   if (severity === 'WARNING') return 'warning'
-  if (severity === 'HIGH' || severity === 'CRITICAL') return 'error'
+  if (severity === 'INFO') return 'info'
+  if (severity === 'HIGH') return 'risk'
+  if (severity === 'CRITICAL') return 'error'
   return 'neutral'
 }
 

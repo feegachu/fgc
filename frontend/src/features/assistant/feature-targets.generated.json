@@ -170,6 +170,11 @@
     "element": "form"
   },
   {
+    "id": "components.list-header.select",
+    "file": "components/ListHeader.tsx",
+    "element": "select"
+  },
+  {
     "id": "components.modal.button",
     "file": "components/Modal.tsx",
     "element": "button"
@@ -457,7 +462,7 @@
   {
     "id": "dashboard.kpi.open",
     "file": "features/dashboard/DashboardPage.tsx",
-    "element": "KpiCard"
+    "element": "section"
   },
   {
     "id": "dashboard.kpi.recon",
@@ -556,6 +561,11 @@
   },
   {
     "id": "features.agent-home.agent-home-page.commission-link",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.contracts-link",
     "file": "features/agent-home/AgentHomePage.tsx",
     "element": "Link"
   },
@@ -697,11 +707,21 @@
   {
     "id": "features.agent-home.chatbot.filter-panel.reset",
     "file": "features/agent-home/chatbot/FilterPanel.tsx",
-    "element": "button"
+    "element": "Button"
   },
   {
     "id": "features.agent-home.chatbot.filter-panel.section",
     "file": "features/agent-home/chatbot/FilterPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-amount-summary.button",
+    "file": "features/arbitrage/ArbitrageAmountSummary.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.arbitrage.arbitrage-amount-summary.section",
+    "file": "features/arbitrage/ArbitrageAmountSummary.tsx",
     "element": "section"
   },
   {
@@ -978,11 +998,6 @@
     "id": "features.cap.cap-list-page.section-4",
     "file": "features/cap/CapListPage.tsx",
     "element": "section"
-  },
-  {
-    "id": "features.cap.cap-list-page.select",
-    "file": "features/cap/CapListPage.tsx",
-    "element": "select"
   },
   {
     "id": "features.cap.cap-list-page.select-2",
@@ -1285,11 +1300,6 @@
     "element": "Button"
   },
   {
-    "id": "features.contract.contract-list-page.button-4",
-    "file": "features/contract/ContractListPage.tsx",
-    "element": "Button"
-  },
-  {
     "id": "features.contract.contract-list-page.context-link",
     "file": "features/contract/ContractListPage.tsx",
     "element": "ContextLink"
@@ -1370,6 +1380,11 @@
     "element": "Link"
   },
   {
+    "id": "features.dashboard.dashboard-page.open-exception-type",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
     "id": "features.dashboard.dashboard-page.section",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "section"
@@ -1385,19 +1400,9 @@
     "element": "section"
   },
   {
-    "id": "features.dashboard.dashboard-page.section-4",
-    "file": "features/dashboard/DashboardPage.tsx",
-    "element": "section"
-  },
-  {
     "id": "features.dashboard.dashboard-page.settlement-guide",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "button"
-  },
-  {
-    "id": "features.dashboard.risk-composition.link",
-    "file": "features/dashboard/RiskComposition.tsx",
-    "element": "Link"
   },
   {
     "id": "features.error.error-pages.button",
@@ -1671,11 +1676,6 @@
   },
   {
     "id": "features.policies.policies-page.button-4",
-    "file": "features/policies/PoliciesPage.tsx",
-    "element": "Button"
-  },
-  {
-    "id": "features.policies.policies-page.button-5",
     "file": "features/policies/PoliciesPage.tsx",
     "element": "Button"
   },
@@ -3032,6 +3032,51 @@
   {
     "id": "policy.draft-select.sourceclass",
     "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "previews.design-preview-shell.link",
+    "file": "previews/DesignPreviewShell.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "previews.design-preview.button",
+    "file": "previews/designPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "previews.design-preview.button-2",
+    "file": "previews/designPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "previews.design-preview.button-3",
+    "file": "previews/designPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "previews.design-preview.input",
+    "file": "previews/designPreview.tsx",
+    "element": "input"
+  },
+  {
+    "id": "previews.design-preview.link",
+    "file": "previews/designPreview.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "previews.design-preview.link-2",
+    "file": "previews/designPreview.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "previews.design-preview.section",
+    "file": "previews/designPreview.tsx",
+    "element": "section"
+  },
+  {
+    "id": "previews.design-preview.select",
+    "file": "previews/designPreview.tsx",
     "element": "select"
   },
   {

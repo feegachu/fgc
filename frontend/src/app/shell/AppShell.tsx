@@ -14,7 +14,9 @@ import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { DraftNavigationGuard } from './DraftNavigationGuard'
 import { AgentTopbar } from './AgentTopbar'
+import './kpi-designs.css'
 import './agent-theme.css'
+import './app-theme.css'
 const AssistantDemoMount = lazy(() => import('../../features/assistant/PicoAssistant').then((module) => ({ default: module.AssistantDemoMount })))
 const WorkspaceGuide = lazy(() => import('../../features/assistant/WorkspaceGuide').then((module) => ({ default: module.WorkspaceGuide })))
 
@@ -69,19 +71,12 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   // 1차 화면 제목(layout/default의 "제목 (화면ID) · FGC")과 맞춘다. 에러 바운더리가 그린 오류 화면이 있으면 그 제목이 먼저다.
   useEffect(() => {
     document.title =
-      errorTitle ??
-      (!current
-        ? '찾을 수 없음 (FGC-UI-ERR-404) · FGC'
-        : allowed
-          ? // 설계사 포트폴리오 화면은 사용자에게 보이는 탭 제목에 화면 ID 를 붙이지 않는다.
-            current.id === 'AGNT-W01'
-            ? `${current.title} · FGC`
-            : `${current.title} (${current.id}) · FGC`
-          : '권한 없음 (FGC-UI-ERR-403) · FGC')
+      errorTitle ?? (!current ? '찾을 수 없음, FGC' : allowed ? `${current.title} | FGC` : '권한 없음, FGC')
   }, [errorTitle, current, allowed])
   return (
     <div
-      className={`app-shell is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
+      className={`app-shell app-theme is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
+      data-kpi-style="summary"
     >
       <a data-guide-feature="app.shell.app-shell.a" className="skip-link" href="#main-content">
         본문으로 건너뛰기
@@ -121,7 +116,9 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           </div>
         </main>
         <SettlementGuide user={user} month={month} />
-        {!location.pathname.startsWith('/agent-home') && <footer className="app-footer">FGC v2.0 · 수수료 정산·검증 Workspace</footer>}
+        {!location.pathname.startsWith('/agent-home') && (
+          <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
+        )}
       </div>
       {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (
         <Suspense fallback={null}>
