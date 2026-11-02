@@ -9,6 +9,10 @@
   bottom: 26px;
   z-index: calc(var(--z-overlay) - 1);
 }
+/* #808 review · design :131 — the last business buttons must scroll clear of the fixed launcher. */
+.app-shell:has(.pico-assistant-root) .page-content {
+  padding-bottom: calc(var(--space-8) + 120px);
+}
 /* Adopt the agent-home AI launcher treatment without coupling page styles. */
 @property --pico-launcher-angle {
   syntax: "<angle>";
@@ -566,6 +570,9 @@
   .pico-launcher {
     right: 16px;
     bottom: 78px;
+  }
+  .app-shell:has(.pico-assistant-root) .page-content {
+    padding-bottom: calc(var(--space-8) + 160px);
   }
   .pico-launcher-button {
     width: 104px;
