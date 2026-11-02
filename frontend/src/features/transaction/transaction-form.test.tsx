@@ -314,6 +314,21 @@ describe('TRAN-W02 React form workflow', () => {
     expect(screen.getByText('4. 검토필요 귀속 해소, 차단')).toBeVisible()
   })
 
+  it('문구 없는 차단 사유도 오류코드 대신 안내 문구로 보인다', async () => {
+    precheckResult = {
+      confirmable: false,
+      capPreview: [],
+      capExclusions: [],
+      blockers: [{ code: 'FGC-CAP-002', contractId: 3, transactionAttributionId: 201 }],
+    }
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(button('btn-precheck'))
+    expect(await screen.findByText('4. 검토필요 귀속 해소, 차단')).toBeVisible()
+    expect(screen.getByText('확정 차단 사유를 확인하세요.')).toBeVisible()
+    expect(screen.queryByText(/FGC-CAP-002/)).not.toBeInTheDocument()
+  })
+
   it('keeps a failed precheck unconfirmed until an explicit retry succeeds', async () => {
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())

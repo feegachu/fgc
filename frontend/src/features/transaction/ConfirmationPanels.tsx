@@ -32,7 +32,7 @@ export function GatePanel({ result }: { result: Precheck | null }) {
               </div>
               <div className="transaction-gate-detail">
                 {gate.failures.length
-                  ? gate.failures.map((blocker) => rateText(blocker.message || blocker.code)).join(' / ')
+                  ? gate.failures.map((blocker) => rateText(blocker.message || '확정 차단 사유를 확인하세요.')).join(' / ')
                   : gate.state === 'pass'
                     ? '서버 사전검증 결과 통과했습니다.'
                     : result
