@@ -38,4 +38,12 @@ public class PaymentHoldRepository {
                 ON CONFLICT (commission_transaction_id, contract_status_event_id) DO NOTHING
                 """, paymentId, eventId, policyVersionId, reasonCode);
     }
+
+    /** 납입 재개로 이 지급 건의 보류 사유가 모두 없어졌을 때 미해제 보류를 해제한다. 이미 해제된 행은 건드리지 않는다. */
+    public int releaseOpen(Long paymentId, Long releasedByEventId) {
+        return jdbc.update("""
+                UPDATE fgc.payment_hold SET released_at = clock_timestamp(), released_by_event_id = ?
+                 WHERE commission_transaction_id = ? AND released_at IS NULL
+                """, releasedByEventId, paymentId);
+    }
 }

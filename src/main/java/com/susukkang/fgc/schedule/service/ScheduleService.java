@@ -48,6 +48,7 @@ public class ScheduleService {
     private final ScheduleWriteRepository scheduleWriteRepository;
     private final AgentRepository agentRepository;
     private final CapCheckService capCheckService;
+    private final com.susukkang.fgc.contract.service.PaymentHoldFollowUpProcessor paymentHoldFollowUpProcessor;
     private final CapCheckQueryRepository capCheckQueryRepository;
     private final AuditLogService auditLogService;
     private final ScheduleReviewService scheduleReviewService;
@@ -419,6 +420,10 @@ public class ScheduleService {
         // 새로운 스케줄 라인 일괄 저장 및 저장 건수 검증
         int lineRows = scheduleWriteRepository.insertAllScheduleLines(lines);
         if (lineRows != lines.size()) throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        // FUN-028: 새 운영 버전은 보류·중단 회차를 PLANNED 로 다시 만들므로 같은 트랜잭션에서 최신 상태 사건으로 다시 맞춘다.
+        if (header.getSchedulePurpose() == SchedulePurpose.OPERATIONAL) {
+            paymentHoldFollowUpProcessor.reapplyLatest(contract.getContractId());
+        }
         // 생성한 스케줄 헤더 ID와 라인 수 반환
         return new CreatedSchedule(header.getScheduleHeaderId(), lineRows);
     }

@@ -37,6 +37,7 @@ class PaymentHoldFollowUpIntegrationTest {
     @Autowired private ContractStatusEventRepository events;
     @Autowired private CommissionPaymentService payments;
     @Autowired private ContractStatusEffectQueryService effectQuery;
+    @Autowired private PaymentHoldGate gate;
 
     @Test
     void lapseHoldsOnlyUnconfirmedTargetsAndKeepsConfirmedOnesUntouched() {
@@ -113,7 +114,7 @@ class PaymentHoldFollowUpIntegrationTest {
 
         assertThatThrownBy(() -> payments.confirm(f.draftPayment, "hold-key-1"))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_ON_HOLD));
+                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_HELD));
         assertThat(jdbc.queryForObject("SELECT status FROM fgc.commission_transaction WHERE commission_transaction_id = ?",
                 String.class, f.draftPayment)).isEqualTo("DRAFT");
     }
@@ -130,7 +131,100 @@ class PaymentHoldFollowUpIntegrationTest {
 
         assertThatThrownBy(() -> payments.confirm(payment, "pending-key-1"))
                 .isInstanceOfSatisfying(FgcBusinessException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_ON_HOLD));
+                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_HELD));
+    }
+
+    @Test
+    void resumingFromUnpaidReleasesTheHoldsAndResetsTheDueDateToTheResumeDate() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long unpaid = statusEvent(contract, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
+        long line = line(header(contract), 1, "2026-09-25", "PLANNED");
+        long payment = payment(contract, "2026-09-20", false);
+        processor.process(events.findById(unpaid).orElseThrow());
+        assertThat(lineStatus(line)).isEqualTo("HOLD");
+        assertThat(openHolds(payment)).isEqualTo(1);
+
+        long resumed = resumeEvent(contract, 3, "2026-10-05T00:00:00+09:00");
+        var event = events.findById(resumed).orElseThrow();
+        assertThat(processor.supports(event)).isTrue();
+        List<ContractStatusEffect> recorded = processor.process(event);
+
+        assertThat(recorded).extracting(ContractStatusEffect::entityType, ContractStatusEffect::entityId,
+                        ContractStatusEffect::nextState)
+                .containsExactlyInAnyOrder(tuple(ContractStatusEffect.EntityType.SCHEDULE_LINE, line, "PLANNED"),
+                        tuple(ContractStatusEffect.EntityType.PAYMENT, payment, "RELEASED"));
+        assertThat(lineStatus(line)).isEqualTo("PLANNED");
+        assertThat(jdbc.queryForObject("SELECT due_date::text FROM fgc.schedule_line WHERE schedule_line_id = ?", String.class, line))
+                .isEqualTo("2026-10-05");
+        assertThat(openHolds(payment)).isZero();
+        assertThat(gate.blockers(payment)).isEmpty();
+        // 다시 처리해도 같은 결과로 수렴한다.
+        assertThat(processor.process(event)).isEmpty();
+    }
+
+    @Test
+    void aRevivalIsNotTheProcessorsBusiness() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        statusEvent(contract, 2, "LAPSED", "2026-09-01T00:00:00+09:00");
+        long revived = statusEvent(contract, 3, "REVIVED", "2026-10-15T00:00:00+09:00");
+
+        assertThat(processor.supports(events.findById(revived).orElseThrow())).isFalse();
+    }
+
+    @Test
+    void aDraftCreatedAfterTheLapseWasProcessedIsStillBlockedByTheCurrentStatus() {
+        Fixture f = fixture();
+        processor.process(events.findById(f.lapse).orElseThrow());
+        // 처리가 끝난 뒤 실효 기간 귀속일로 새로 만든 초안에는 보류 행이 없지만, 현재 상태 이력으로 판단하면 보류 대상이다.
+        long late = payment(f.contract, "2026-09-28", false);
+        assertThat(openHolds(late)).isZero();
+
+        assertThatThrownBy(() -> payments.confirm(late, "late-key-1"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_HELD));
+    }
+
+    @Test
+    void aContractWithoutHoldingEventsIsNotJudgedByTheGate() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long payment = payment(contract, "2026-09-20", false);
+
+        assertThat(gate.blockers(payment)).isEmpty();
+    }
+
+    @Test
+    void aNewScheduleVersionIsHeldAgainFromTheLatestStatusEvent() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long unpaid = statusEvent(contract, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
+        long header = header(contract);
+        long confirmed = line(header, 1, "2026-08-10", "CONFIRMED");
+        // 새 버전이 HOLD·CANCELLED 회차를 PLANNED 로 다시 만든 상황
+        long rebuilt = line(header, 2, "2026-09-25", "PLANNED");
+
+        processor.reapplyLatest(contract);
+
+        assertThat(lineStatus(rebuilt)).isEqualTo("HOLD");
+        assertThat(lineStatus(confirmed)).isEqualTo("CONFIRMED");
+        assertThat(count("SELECT count(*) FROM fgc.contract_status_event_effect WHERE contract_status_event_id = " + unpaid
+                + " AND entity_id = " + rebuilt)).isEqualTo(1);
+        // 다시 불러도 이미 맞춰진 회차는 바뀌지 않는다.
+        processor.reapplyLatest(contract);
+        assertThat(count("SELECT count(*) FROM fgc.contract_status_event_effect WHERE entity_id = " + rebuilt)).isEqualTo(1);
+    }
+
+    @Test
+    void aContractWithoutHoldingEventsIsLeftAloneByReapply() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long line = line(header(contract), 1, "2026-09-25", "PLANNED");
+
+        processor.reapplyLatest(contract);
+
+        assertThat(lineStatus(line)).isEqualTo("PLANNED");
     }
 
     @Test
@@ -207,6 +301,16 @@ class PaymentHoldFollowUpIntegrationTest {
         long draftPayment = payment(contract, "2026-09-20", false);
         long confirmedPayment = payment(contract, "2026-09-21", true);
         return new Fixture(contract, lapse, plannedLine, confirmedLine, draftPayment, confirmedPayment);
+    }
+
+    /** 미납(UNPAID)에서 정상(ACTIVE)으로 돌아온 사건. */
+    private long resumeEvent(long contractId, int eventSeq, String effectiveAt) {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.contract_status_event(contract_id, event_seq, previous_status, new_status, effective_at,
+                    received_at, source_system, source_event_key, data_origin)
+                VALUES (?, ?, 'UNPAID', 'ACTIVE', ?::timestamptz, ?::timestamptz, 'TEST-523', ?, 'MANUAL')
+                RETURNING contract_status_event_id
+                """, Long.class, contractId, eventSeq, effectiveAt, effectiveAt, UUID.randomUUID().toString());
     }
 
     private int seq(long contract) {

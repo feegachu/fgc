@@ -107,6 +107,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final AuditLogService auditLogService;
     private final CommissionPolicyService commissionPolicyService;
     private final ExceptionCaseService exceptionCaseService;
+    private final com.susukkang.fgc.contract.service.PaymentHoldGate paymentHoldGate;
 
     @Override
     @Transactional
@@ -1240,12 +1241,12 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         if (isClawback(first)) {
             return null;
         }
-        List<CommissionPaymentQueryRepository.StatusHoldBlocker> blockers = queryRepository.findStatusHoldBlockers(paymentId);
+        List<com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker> blockers = paymentHoldGate.blockers(paymentId);
         if (blockers == null || blockers.isEmpty()) {
             return null;
         }
-        return new GateFailure(first, null, null, null, null, FgcErrorCode.IMPL_PAYMENT_ON_HOLD,
-                Map.of("blockers", blockers.stream().map(b -> b.code() + ":" + b.refId()).toList()));
+        return new GateFailure(first, null, null, null, null, FgcErrorCode.IMPL_PAYMENT_HELD,
+                Map.of("blockers", blockers.stream().map(com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker::label).toList()));
     }
 
     private GateFailure unresolvedViolationFailure(ConfirmationData first) {

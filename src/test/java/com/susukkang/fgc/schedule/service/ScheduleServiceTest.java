@@ -98,6 +98,9 @@ class ScheduleServiceTest {
     @Mock
     private ScheduleReviewService scheduleReviewService;
 
+    @Mock
+    private com.susukkang.fgc.contract.service.PaymentHoldFollowUpProcessor paymentHoldFollowUpProcessor;
+
     @InjectMocks
     private ScheduleService scheduleService;
 
