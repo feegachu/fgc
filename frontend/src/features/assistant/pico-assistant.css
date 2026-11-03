@@ -3,11 +3,97 @@
   font-family: inherit;
   color: var(--color-text-primary);
 }
-/* 앱 머리(기준 정산월 옆)의 진입 버튼. 본문 위에 떠서 표나 안내를 가리지 않는다(SRC-068). 크기와 선은 기준 정산월 버튼과 같다. */
-.pico-launcher {
+.pico-launcher:not(.is-compact) {
+  position: fixed;
+  right: 28px;
+  bottom: 26px;
+  z-index: calc(var(--z-overlay) - 1);
+}
+/* #808 review · design :131 — the last business buttons must scroll clear of the fixed launcher. */
+.app-shell:has(.pico-assistant-root:not(.is-minimized)) .page-content {
+  padding-bottom: calc(var(--space-8) + 120px);
+}
+/* Adopt the agent-home AI launcher treatment without coupling page styles. */
+@property --pico-launcher-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes pico-launcher-border-spin {
+  to { --pico-launcher-angle: 360deg; }
+}
+.pico-launcher:not(.is-compact) .pico-launcher-hint {
+  position: absolute;
+  right: 136px;
+  bottom: 46px;
+  padding: 7px 11px;
+  border: 1.5px solid transparent;
+  border-radius: 16px;
+  background: linear-gradient(#fff, #fff) padding-box,
+    conic-gradient(from var(--pico-launcher-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box;
+  animation: pico-launcher-border-spin 3.4s linear infinite;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #382450;
+  white-space: nowrap;
+}
+.pico-launcher:not(.is-compact) .pico-launcher-button {
+  display: grid;
+  place-items: center;
+  position: relative;
+  width: 132px;
+  height: 132px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.pico-launcher:not(.is-compact) .pico-launcher-button img {
+  display: block;
+  width: 128px;
+  height: 128px;
+  max-width: none;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgb(15 23 42 / 22%));
+  animation: pico-assistant-float 3.2s ease-in-out infinite;
+}
+.pico-launcher-button:hover img,
+.pico-launcher-button:focus-visible img {
+  animation-play-state: paused;
+}
+.pico-launcher:not(.is-compact) .pico-launcher-button:focus-visible .pico-launcher-hint {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 3px;
+}
+.pico-launcher-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.pico-launcher-close:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
+}
+.pico-launcher-close .material-symbols-rounded {
+  font-size: 16px;
+}
+.pico-launcher.is-compact {
   display: flex;
 }
-.pico-launcher-button {
+.pico-launcher.is-compact .pico-launcher-button {
   display: inline-flex;
   height: var(--control-height-sm);
   align-items: center;
@@ -24,20 +110,20 @@
   cursor: pointer;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.pico-launcher-button:hover {
+.pico-launcher.is-compact .pico-launcher-button:hover {
   border-color: var(--color-border-strong);
 }
-.pico-launcher-button:focus-visible {
+.pico-launcher.is-compact .pico-launcher-button:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
-.pico-launcher-button img {
+.pico-launcher.is-compact .pico-launcher-button img {
   display: block;
   width: 1.5rem;
   height: 1.5rem;
   object-fit: contain;
 }
-.pico-launcher-hint {
+.pico-launcher.is-compact .pico-launcher-hint {
   font-weight: 500;
 }
 .pico-assistant-root button:focus-visible,
@@ -124,6 +210,11 @@
 }
 .pico-icon-button .material-symbols-rounded {
   font-size: 17px;
+}
+.pico-icon-button img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
 }
 .pico-tabs {
   display: flex;
@@ -520,6 +611,15 @@
   margin-top: 7px;
   line-height: 1.8;
 }
+@keyframes pico-assistant-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-11px) rotate(2deg);
+  }
+}
 @keyframes pico-assistant-enter {
   from {
     opacity: 0;
@@ -531,6 +631,26 @@
   }
 }
 @media (max-width: 760px) {
+  .pico-launcher:not(.is-compact) {
+    right: 16px;
+    bottom: 78px;
+  }
+  .app-shell:has(.pico-assistant-root:not(.is-minimized)) .page-content {
+    padding-bottom: calc(var(--space-8) + 160px);
+  }
+  .pico-launcher:not(.is-compact) .pico-launcher-button {
+    width: 104px;
+    height: 104px;
+  }
+  .pico-launcher:not(.is-compact) .pico-launcher-button img {
+    width: 100px;
+    height: 100px;
+  }
+  .pico-launcher:not(.is-compact) .pico-launcher-hint {
+    right: 108px;
+    bottom: 34px;
+    font-size: 11px;
+  }
   .pico-panel-header {
     padding: 14px 17px 12px;
   }
@@ -547,6 +667,11 @@
     height: 63px;
   }
 }
+@media (max-width: 47.9375rem) {
+  .pico-launcher.is-compact .pico-launcher-hint {
+    display: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .pico-assistant-root *,
   .pico-assistant-root *:before,
@@ -554,10 +679,5 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
-  }
-}
-@media (max-width: 47.9375rem) {
-  .pico-launcher-hint {
-    display: none;
   }
 }

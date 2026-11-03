@@ -96,7 +96,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <WorkspaceTabs activeId={current?.id} />
           )}
           <div className="app-header-actions">
-            {/* 업무 비서 AI 진입 버튼이 들어올 자리. 본문 위에 떠서 내용을 가리지 않게 머리에 둔다(SRC-068). */}
             <div id="app-header-assistant" className="app-header-assistant" />
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>

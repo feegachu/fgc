@@ -13,17 +13,32 @@ const user: ShellUser = {
 afterEach(() => vi.unstubAllEnvs())
 const open = () => userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' }))
 
-it('keeps the launcher in the app header and opens chat from that slot', async () => {
+it('switches between the floating mascot and header button while preserving chat input and focus', async () => {
   const headerSlot = document.createElement('div')
   headerSlot.id = 'app-header-assistant'
   document.body.append(headerSlot)
   const view = render(<PicoAssistant canProcess />)
   try {
-    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toBeInTheDocument()
+    expect(within(headerSlot).queryByRole('button', { name: '업무 비서 AI 열기, 피코' })).not.toBeInTheDocument()
+    expect(within(view.container).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '피코를 상단 버튼으로 접기' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '피코를 상단 버튼으로 접기' })).not.toBeInTheDocument()
+    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveFocus()
     await open()
     expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveFocus()
     await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
     expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveFocus()
+    expect(within(view.container).queryByRole('button', { name: '업무 비서 AI 열기, 피코' })).not.toBeInTheDocument()
+    await open()
+    await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '작성 중인 질문')
+    await userEvent.click(screen.getByRole('button', { name: '피코를 오른쪽 아래에 표시' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(headerSlot).queryByRole('button', { name: '업무 비서 AI 열기, 피코' })).not.toBeInTheDocument()
+    expect(within(view.container).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: '피코를 상단 버튼으로 접기' })).toBeInTheDocument()
+    await open()
+    expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveValue('작성 중인 질문')
   } finally { view.unmount(); headerSlot.remove() }
 })
 
