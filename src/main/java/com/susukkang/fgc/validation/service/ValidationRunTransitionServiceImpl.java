@@ -29,7 +29,7 @@ public class ValidationRunTransitionServiceImpl implements ValidationRunTransiti
         ValidationRunStatus currentStatus = run.getStatus();
         if (!currentStatus.canTransitionTo(targetStatus)) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
-                    Map.of("from", currentStatus, "to", targetStatus));
+                    Map.of("from", currentStatus.label(), "to", targetStatus.label()));
         }
 
         int affected = validationRunRepository.updateStatusIfCurrent(validationRunId, currentStatus, targetStatus);

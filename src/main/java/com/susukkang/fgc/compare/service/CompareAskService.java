@@ -160,7 +160,7 @@ public class CompareAskService {
         long net = top.conservativeNet() - it.conservativeNet();
         // 서버 정렬: 순수령액 내림차순 → 환수 노출액 오름차순 → 상품 ID 오름차순. 실제로 순위를 가른 기준을 말한다.
         String tie = top.clawbackExposure() == it.clawbackExposure()
-                ? "1위와 보수적 순수령액·환수 노출액이 같아서 표시 순서(상품 ID) 기준으로 순위가 갈렸어요."
+                ? "1위와 보수적 순수령액과 환수 노출액이 같아서 상품 등록 순서로 순위를 정했어요."
                 : "1위와 보수적 순수령액이 같고, 환수 노출액이 더 작은 쪽이 앞섰어요.";
         String netText = net == 0 ? tie : "1위보다 보수적 순수령액이 %,d원 적어요.".formatted(net);
         return netText + " " + diff("한도 반영 수령 예상액", it.cappedReceipt() - top.cappedReceipt(), "많고", "적고", "같고")

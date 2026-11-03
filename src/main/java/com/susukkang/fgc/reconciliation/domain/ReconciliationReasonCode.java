@@ -9,17 +9,17 @@ import java.util.Optional;
  * FUN-049-01 대사 불일치 사유와 우선순위를 한 곳에서 관리한다.
  */
 public enum ReconciliationReasonCode {
-    JOURNAL_IMBALANCE(10, "분개 불균형", ReconciliationResultType.JOURNAL_IMBALANCE),
-    INVALID_CONTRACT_PAYMENT(20, "무효·취소 계약 지급", ReconciliationResultType.INVALID_CONTRACT_PAYMENT),
-    POLICY_VERSION_ERROR(30, "정책 버전 오류", ReconciliationResultType.POLICY_VERSION_ERROR),
+    JOURNAL_IMBALANCE(10, "원장 불균형", ReconciliationResultType.JOURNAL_IMBALANCE),
+    INVALID_CONTRACT_PAYMENT(20, "비유효 계약 지급", ReconciliationResultType.INVALID_CONTRACT_PAYMENT),
+    POLICY_VERSION_ERROR(30, "정책버전 오류", ReconciliationResultType.POLICY_VERSION_ERROR),
     DUPLICATE(40, "중복 지급", ReconciliationResultType.DUPLICATE),
-    EXPECTED_MISSING(50, "예상 내역 없음", ReconciliationResultType.EXPECTED_MISSING),
-    ACTUAL_MISSING(60, "실제 지급 없음", ReconciliationResultType.ACTUAL_MISSING),
+    EXPECTED_MISSING(50, "예상 금액 없음", ReconciliationResultType.EXPECTED_MISSING),
+    ACTUAL_MISSING(60, "실제 없음(누락)", ReconciliationResultType.ACTUAL_MISSING),
     INSTALLMENT_MISMATCH(70, "회차 불일치", ReconciliationResultType.INSTALLMENT_MISMATCH),
     ORGANIZATION_MISMATCH(80, "소속 조직 불일치", ReconciliationResultType.AGENT_MISMATCH),
     AGENT_MISMATCH(90, "설계사 불일치", ReconciliationResultType.AGENT_MISMATCH),
     AMOUNT_DIFFERENCE(100, "금액 차이", ReconciliationResultType.AMOUNT_DIFFERENCE),
-    REVIEW_REQUIRED(110, "검토 필요", ReconciliationResultType.REVIEW_REQUIRED),
+    REVIEW_REQUIRED(110, "검토필요", ReconciliationResultType.REVIEW_REQUIRED),
     UNKNOWN(120, "분류 불가", ReconciliationResultType.REVIEW_REQUIRED),
     MATCHED(999, "일치", ReconciliationResultType.MATCHED);
 

@@ -115,7 +115,7 @@ public final class CompareRankingCalculator {
                 rows.add(new Row(installment, amount, rule.capExempt(), i));
             }
             String formula = rule.ratePct() != null
-                    ? "%s %d~%d회차 · 기준 보험료 × %s%%".formatted(rule.label(), from, to, plain(rule.ratePct()))
+                    ? "%s %d~%d회차, 기준 보험료 × %s%%".formatted(rule.label(), from, to, plain(rule.ratePct()))
                     : "%s %d~%d회차 · 정액".formatted(rule.label(), from, to);
             evidence.add(new Evidence("수령 예상액", formula, amount * (to - from + 1), "수수료 규칙", rule.policyVersion(), asOf));
         }
@@ -172,7 +172,7 @@ public final class CompareRankingCalculator {
             return new Evidence("한도 영향", "한도 규칙 자료 없음 — 한도 미반영", paid, "한도 규칙", null, asOf);
         }
         return new Evidence("한도 영향",
-                "한도 %s%% = 기준 보험료 × %s배 · 한도 적용 전 %,d원 → 지급 %,d원, 이월 예정 %,d원"
+                "한도 %s%% = 기준 보험료 × %s배, 한도 적용 전 %,d원 → 지급 %,d원, 이월 예정 %,d원"
                         .formatted(plain(cap.limitMultiplier().movePointRight(2)), plain(cap.limitMultiplier()), gross, paid, carryover),
                 paid, "한도 규칙", cap.policyVersion(), asOf);
     }

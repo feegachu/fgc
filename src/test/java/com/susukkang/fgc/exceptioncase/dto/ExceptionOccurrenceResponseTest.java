@@ -25,7 +25,20 @@ class ExceptionOccurrenceResponseTest {
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::label)
                 .containsExactly("지급단계", "결과유형", "예상금액", "차액");
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
-                .containsExactly("GA→설계사", "실제 지급 없음", "5,000원", "-5,000원");
+                .containsExactly("GA→설계사", "실제 없음(누락)", "5,000원", "-5,000원");
+    }
+
+    /** SRC-074: 분개유형도 원문 코드 대신 화면정의서 분개유형 라벨로 푼다. 모르는 코드는 원문 유지. */
+    @Test
+    void 분개유형_코드는_한글_라벨로_풀고_모르는_코드는_원문을_유지한다() {
+        assertThat(withEvidence("""
+                {"journalType":"CONFIRMED_FC_PAYOUT"}
+                """).evidenceItems())
+                .containsExactly(new ExceptionOccurrenceResponse.EvidenceItem("분개유형", "확정 지급(GA→설계사)"));
+        assertThat(withEvidence("""
+                {"journalType":"FUTURE_TYPE"}
+                """).evidenceItems()).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
+                .containsExactly("FUTURE_TYPE");
     }
 
     /** CAP·차익거래 증거는 resultType 이 아니라 resultStatus 키를 쓴다 — 둘 다 풀린다. */

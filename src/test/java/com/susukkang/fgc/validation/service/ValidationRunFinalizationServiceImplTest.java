@@ -63,12 +63,12 @@ class ValidationRunFinalizationServiceImplTest {
         assertThat(response.passed()).isFalse();
         assertThat(response.conditions()).extracting("no").containsExactly(1, 2, 3, 4, 5, 6, 7, 8);
         assertThat(response.conditions()).extracting("label").containsExactly(
-                "검증 실행 상태가 계산완료(COMPLETED)인가",
-                "원장 불균형(차변≠대변)이 0건인가",
-                "심각도 긴급(CRITICAL) 미처리 예외가 0건인가",
+                "검증 실행이 계산완료 상태인가",
+                "차변과 대변이 다른 분개가 0건인가",
+                "긴급 미처리 예외가 0건인가",
                 "정책 없음 · 정책 중복이 0건인가",
                 "귀속합계 오류가 0건인가",
-                "계약별 상세 합계 = 실행 요약 합계인가",
+                "계약별 상세 합계와 실행 요약 합계가 같은가",
                 "같은 검증월의 가장 최근 실행인가",
                 "같은 검증월에 이미 확정된 실행이 없는가");
         assertThat(response.conditions().get(1).passed()).isFalse();
@@ -309,7 +309,8 @@ class ValidationRunFinalizationServiceImplTest {
         assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "finalize-44"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_004);
-                    assertThat(exception.getParams()).containsEntry("from", "계약수동 실행");
+                    assertThat(exception.getParams()).containsEntry("from", "계약수동 실행")
+                            .containsEntry("to", "확정(잠김)");
                 });
         verify(validationRunRepository, never()).lockValidationMonth(any());
         verify(validationRunRepository, never()).findFinalizeChecklistCounts(any());

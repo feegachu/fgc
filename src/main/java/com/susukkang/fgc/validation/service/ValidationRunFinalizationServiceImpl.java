@@ -90,12 +90,12 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         ValidationRunType runType = ValidationRunType.valueOf(lockedRun.getRunType());
         if (!runType.isFinalizable()) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
-                    Map.of("from", runType.label() + " 실행", "to", "FINALIZED"));
+                    Map.of("from", runType.label() + " 실행", "to", ValidationRunStatus.FINALIZED.label()));
         }
 
         if (lockedRun.getStatus() != ValidationRunStatus.COMPLETED || lockedRun.getCurrentStep() != 8) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
-                    Map.of("from", lockedRun.getStatus(), "to", "FINALIZED"));
+                    Map.of("from", lockedRun.getStatus().label(), "to", ValidationRunStatus.FINALIZED.label()));
         }
 
         // 2026-10-11 yslee - #491 PR 리뷰 반영: 조건 7의 check-then-act 경합 차단
@@ -153,14 +153,14 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         Long id = counts.getValidationRunId();
         String month = YearMonth.from(counts.getValidationMonth()).toString();
         List<FinalizeChecklistConditionResponse> conditions = List.of(
-                condition(1, "검증 실행 상태가 계산완료(COMPLETED)인가",
+                condition(1, "검증 실행이 계산완료 상태인가",
                         counts.getIncompleteRunCount(), "/validation-runs/" + id),
-                condition(2, "원장 불균형(차변≠대변)이 0건인가",
+                condition(2, "차변과 대변이 다른 분개가 0건인가",
                         counts.getJournalImbalanceCount(),
                         "/api/v1/journals/imbalances?validationRunId=" + id),
                 // 조건 3·4는 집계 쿼리와 같은 월(validation_month) 기준으로 조회해야
                 // 미충족 건수와 바로가기 목록이 일치한다(#330). 파라미터는 ISO 날짜(월 1일)다.
-                condition(3, "심각도 긴급(CRITICAL) 미처리 예외가 0건인가",
+                condition(3, "긴급 미처리 예외가 0건인가",
                         counts.getUnresolvedCriticalExceptionCount(),
                         "/exceptions?validationMonth=" + counts.getValidationMonth()
                                 + "&severity=CRITICAL&status=OPEN"),
@@ -171,7 +171,7 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
                 condition(5, "귀속합계 오류가 0건인가",
                         counts.getAttributionImbalanceCount(),
                         "/transactions?settlementMonth=" + month + "&attributionImbalanceOnly=true"),
-                condition(6, "계약별 상세 합계 = 실행 요약 합계인가",
+                condition(6, "계약별 상세 합계와 실행 요약 합계가 같은가",
                         counts.getCapDetailMismatchCount(),
                         "/validation-runs/" + id),
                 // #491: 같은 달을 다시 검증했다면 이전 실행의 결과를 잠그지 않는다.
