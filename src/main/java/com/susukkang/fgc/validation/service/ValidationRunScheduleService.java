@@ -127,19 +127,11 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
     private ContractSkip validatePolicies(Long validationRunId, Long contractId) {
         for (PaymentStage paymentStage : PaymentStage.values()) {
             try {
-                if (previews.isInstallmentContract(contractId)) {
-                    var selected = previewPolicies.resolve(contractId, paymentStage);
-                    if (!selected.isSelected()) throw new FgcBusinessException(
-                            FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED,
-                            "policyVersionId", Map.of("reason", "POLICY_MISSING"),
-                            "분급 예정 정책 검토 필요: " + selected.selection().resolution().reasonCode());
-                } else commissionPolicyService.resolveCurrentCommission(contractId, paymentStage);
+                validateStagePolicy(contractId, paymentStage);
             } catch (FgcBusinessException exception) {
                 String reasonCode = String.valueOf(
                         exception.getParams().getOrDefault("reason", "POLICY_MISSING"));
-                String message = exception.getDetail() != null ? exception.getDetail() : "POLICY_DUPLICATE".equals(reasonCode)
-                        ? "적용 가능한 현행 수수료 정책이 중복되었습니다."
-                        : "적용 가능한 현행 수수료 정책이 없습니다.";
+                String message = policyFailureMessage(exception, reasonCode);
                 scheduleWriteRepository.upsertPolicyReviewCase(
                         contractId,
                         paymentStage,
@@ -157,6 +149,23 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
             }
         }
         return null;
+    }
+
+    private void validateStagePolicy(Long contractId, PaymentStage paymentStage) {
+        if (previews.isInstallmentContract(contractId)) {
+            var selected = previewPolicies.resolve(contractId, paymentStage);
+            if (!selected.isSelected()) throw new FgcBusinessException(
+                    FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED,
+                    "policyVersionId", Map.of("reason", "POLICY_MISSING"),
+                    "분급 예정 정책 검토 필요: " + selected.selection().resolution().reasonCode());
+        } else commissionPolicyService.resolveCurrentCommission(contractId, paymentStage);
+    }
+
+    private String policyFailureMessage(FgcBusinessException exception, String reasonCode) {
+        if (exception.getDetail() != null) return exception.getDetail();
+        return "POLICY_DUPLICATE".equals(reasonCode)
+                ? "적용 가능한 현행 수수료 정책이 중복되었습니다."
+                : "적용 가능한 현행 수수료 정책이 없습니다.";
     }
 
     private String findStructuralError(List<ValidationScheduleState> states) {

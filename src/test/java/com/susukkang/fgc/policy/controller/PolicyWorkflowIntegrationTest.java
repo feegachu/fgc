@@ -1402,7 +1402,6 @@ class PolicyWorkflowIntegrationTest {
     @CsvSource({"false, 67", "true, 67", "true, 61"})
     void previewPersistsPolicyInstallmentsAndPreservesVersionsWithIdempotency(boolean seven, int longTermFrom) throws Exception {
         String regime = seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027";
-        int installments = seven ? 84 : 48;
         int lineCount = seven ? 84 + (85 - longTermFrom) : 96;
         String start = seven ? "2029-01-01" : "2027-01-01";
         String document = "BD-" + UUID.randomUUID();
@@ -1442,36 +1441,7 @@ class PolicyWorkflowIntegrationTest {
         writeError(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, approver, requestKey, 403);
         assertThat(write(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, requestKey, 200)).isEqualTo(generated);
         JsonNode detail = scheduleRead("/api/v1/schedules/" + header);
-        assertThat(detail.path("header").path("installmentCount").asInt()).isEqualTo(installments);
-        assertThat(detail.path("header").path("lineCount").asInt()).isEqualTo(lineCount);
-        assertThat(detail.path("header").path("maxInstallmentNo").asInt()).isEqualTo(installments);
-        assertThat(detail.path("header").path("schedulePurpose").asText()).isEqualTo("SIMULATION");
-        assertThat(detail.path("header").path("canConfirm").asBoolean()).isFalse();
-        assertThat(detail.path("lines").size()).isEqualTo(lineCount);
-        assertThat(detail.path("header").path("scheduleRegime").asText()).isEqualTo(regime);
-        assertThat(detail.path("header").path("expectedTotal").decimalValue()).isEqualByComparingTo(seven ? String.valueOf(2016000 + (85 - longTermFrom) * 12000) : "4320000");
-        assertThat(jdbc.queryForObject("SELECT scenario_code FROM fgc.schedule_header WHERE schedule_header_id=?", String.class, header))
-                .isEqualTo("PHASE2_" + regime + "_" + policy);
-        if (seven) {
-            var longTerm = StreamSupport.stream(detail.path("lines").spliterator(), false)
-                    .filter(line -> line.path("feeComponentType").asText().equals("LONG_TERM_MAINTENANCE")).toList();
-            assertThat(longTerm).hasSize(85 - longTermFrom);
-            assertThat(longTerm.stream().map(line -> line.path("installmentNo").asInt()).toList())
-                    .containsExactlyElementsOf(java.util.stream.IntStream.rangeClosed(longTermFrom, 84).boxed().toList());
-            assertThat(longTerm).allSatisfy(line -> assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("12000"));
-            assertThat(StreamSupport.stream(detail.path("lines").spliterator(), false)
-                    .filter(line -> line.path("feeComponentType").asText().equals("MAINTENANCE")).toList())
-                    .allSatisfy(line -> assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("24000"));
-        }
-        JsonNode listing = scheduleRead("/api/v1/schedules?regime=" + regime + "&page=1&size=100");
-        assertThat(StreamSupport.stream(listing.path("content").spliterator(), false)
-                .anyMatch(row -> row.path("scheduleHeaderId").asLong() == header && row.path("installmentCount").asInt() == installments)).isTrue();
-        JsonNode last = detail.path("lines").get(lineCount - 1);
-        assertThat(last.path("installmentNo").asInt()).isEqualTo(installments);
-        assertThat(last.path("dueDate").asText()).isEqualTo(seven ? "2036-02-02" : "2031-02-02");
-        assertThat(last.path("expectedAmount").decimalValue()).isEqualByComparingTo(seven ? "12000" : "45000");
-        assertThat(last.path("feeComponentType").asText()).isEqualTo(seven ? "LONG_TERM_MAINTENANCE" : "MAINTENANCE");
-        assertThat(last.path("scheduleLineId").asLong()).isPositive();
+        assertPreviewPolicyLines(detail, seven, longTermFrom, regime, header, policy);
         assertThat(writeError(HttpMethod.POST, "/api/v1/schedules/" + header + "/confirm", mapper.createObjectNode(), writer, key(), 409).path("code").asText())
                 .isEqualTo("FGC-IMPL-SCHEDULE_PREVIEW_ONLY");
         assertThat(writeError(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, key(), 409).path("code").asText())
@@ -1493,6 +1463,11 @@ class PolicyWorkflowIntegrationTest {
         assertThat(writeError(HttpMethod.POST, "/api/v1/schedules/" + header + "/regenerate", payload, writer, key(), 409).path("code").asText())
                 .isEqualTo("FGC-IMPL-SCHEDULE_SOURCE_CHANGED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION'", Integer.class, contract)).isEqualTo(2);
+        assertPreviewRollbackAndConcurrency(contract, current, payload);
+
+    }
+
+    private void assertPreviewRollbackAndConcurrency(long contract, long current, ObjectNode payload) throws Exception {
         // 헤더 INSERT/기존판 비활성화 뒤 계산에 실패해도 전체 트랜잭션이 복구된다.
         jdbc.execute("ALTER TABLE fgc.schedule_header ADD CONSTRAINT fun037_fault_" + contract + " CHECK (contract_id <> " + contract + " OR schedule_version_no < 3)");
         try {
@@ -1513,7 +1488,44 @@ class PolicyWorkflowIntegrationTest {
         jdbc.update("UPDATE fgc.schedule_header SET status='CANCELLED' WHERE schedule_header_id=?", newest);
         assertThat(writeError(HttpMethod.POST, "/api/v1/schedules/" + newest + "/regenerate", payload, writer, key(), 409).path("code").asText())
                 .isEqualTo("FGC-IMPL-SCHEDULE_SOURCE_CHANGED");
+    }
 
+    private void assertPreviewPolicyLines(JsonNode detail, boolean seven, int longTermFrom,
+            String regime, long header, long policy) throws Exception {
+        int installments = seven ? 84 : 48;
+        int lineCount = seven ? 84 + (85 - longTermFrom) : 96;
+        assertThat(detail.path("header").path("installmentCount").asInt()).isEqualTo(installments);
+        assertThat(detail.path("header").path("lineCount").asInt()).isEqualTo(lineCount);
+        assertThat(detail.path("header").path("maxInstallmentNo").asInt()).isEqualTo(installments);
+        assertThat(detail.path("header").path("schedulePurpose").asText()).isEqualTo("SIMULATION");
+        assertThat(detail.path("header").path("canConfirm").asBoolean()).isFalse();
+        assertThat(detail.path("lines").size()).isEqualTo(lineCount);
+        assertThat(detail.path("header").path("scheduleRegime").asText()).isEqualTo(regime);
+        assertThat(detail.path("header").path("expectedTotal").decimalValue()).isEqualByComparingTo(seven ? String.valueOf(2016000 + (85 - longTermFrom) * 12000) : "4320000");
+        assertThat(jdbc.queryForObject("SELECT scenario_code FROM fgc.schedule_header WHERE schedule_header_id=?", String.class, header))
+                .isEqualTo("PHASE2_" + regime + "_" + policy);
+        if (seven) assertLongTermLines(detail, longTermFrom);
+        JsonNode listing = scheduleRead("/api/v1/schedules?regime=" + regime + "&page=1&size=100");
+        assertThat(StreamSupport.stream(listing.path("content").spliterator(), false)
+                .anyMatch(row -> row.path("scheduleHeaderId").asLong() == header && row.path("installmentCount").asInt() == installments)).isTrue();
+        JsonNode last = detail.path("lines").get(lineCount - 1);
+        assertThat(last.path("installmentNo").asInt()).isEqualTo(installments);
+        assertThat(last.path("dueDate").asText()).isEqualTo(seven ? "2036-02-02" : "2031-02-02");
+        assertThat(last.path("expectedAmount").decimalValue()).isEqualByComparingTo(seven ? "12000" : "45000");
+        assertThat(last.path("feeComponentType").asText()).isEqualTo(seven ? "LONG_TERM_MAINTENANCE" : "MAINTENANCE");
+        assertThat(last.path("scheduleLineId").asLong()).isPositive();
+    }
+
+    private void assertLongTermLines(JsonNode detail, int longTermFrom) {
+        var longTerm = StreamSupport.stream(detail.path("lines").spliterator(), false)
+                .filter(line -> line.path("feeComponentType").asText().equals("LONG_TERM_MAINTENANCE")).toList();
+        assertThat(longTerm).hasSize(85 - longTermFrom);
+        assertThat(longTerm.stream().map(line -> line.path("installmentNo").asInt()).toList())
+                .containsExactlyElementsOf(java.util.stream.IntStream.rangeClosed(longTermFrom, 84).boxed().toList());
+        assertThat(longTerm).allSatisfy(line -> assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("12000"));
+        assertThat(StreamSupport.stream(detail.path("lines").spliterator(), false)
+                .filter(line -> line.path("feeComponentType").asText().equals("MAINTENANCE")).toList())
+                .allSatisfy(line -> assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("24000"));
     }
 
     @ParameterizedTest
@@ -1536,15 +1548,7 @@ class PolicyWorkflowIntegrationTest {
                 .put("expectedSourceVersion", scheduleRead(path + "?paymentStage=GA_TO_FC").path("previewContext").path("expectedSourceVersion").asText());
         long header = write(HttpMethod.POST, path + "/regenerate?paymentStage=GA_TO_FC", payload, writer, key(), 200).get(0).asLong();
         JsonNode detail = scheduleRead("/api/v1/schedules/" + header);
-        assertThat(detail.path("header").path("installmentCount").asInt()).isEqualTo(12);
-        assertThat(detail.path("header").path("lineCount").asInt()).isEqualTo(12);
-        assertThat(detail.path("lines").size()).isEqualTo(12);
-        for (JsonNode line : detail.path("lines")) {
-            assertThat(line.path("basisCode").asText()).isEqualTo("MONTHLY_EQUIVALENT_FIRST_PREMIUM");
-            assertThat(line.path("basisAmount").decimalValue()).isEqualByComparingTo("100000");
-            assertThat(line.path("fixedAmount").decimalValue()).isEqualByComparingTo("12000");
-            assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("12000");
-        }
+        assertFixedPolicyLines(detail);
         // 같은 원천·승인 정책이면 자동 생성은 수동 결과를 재사용한다.
         assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
         jdbc.update("UPDATE fgc.insurance_contract SET monthly_equivalent_first_premium=200000 WHERE contract_id=?", contract);
@@ -1564,6 +1568,23 @@ class PolicyWorkflowIntegrationTest {
         assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
         assertThat(scheduleRead("/api/v1/schedules/" + header).path("lines").get(0).path("basisAmount").decimalValue())
                 .isEqualByComparingTo("100000");
+        assertFixedPreviewCsv(header);
+
+    }
+
+    private void assertFixedPolicyLines(JsonNode detail) {
+        assertThat(detail.path("header").path("installmentCount").asInt()).isEqualTo(12);
+        assertThat(detail.path("header").path("lineCount").asInt()).isEqualTo(12);
+        assertThat(detail.path("lines").size()).isEqualTo(12);
+        for (JsonNode line : detail.path("lines")) {
+            assertThat(line.path("basisCode").asText()).isEqualTo("MONTHLY_EQUIVALENT_FIRST_PREMIUM");
+            assertThat(line.path("basisAmount").decimalValue()).isEqualByComparingTo("100000");
+            assertThat(line.path("fixedAmount").decimalValue()).isEqualByComparingTo("12000");
+            assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("12000");
+        }
+    }
+
+    private void assertFixedPreviewCsv(long header) throws Exception {
         String csv = mvc.perform(get("/api/v1/schedules/" + header + "/export.csv").with(user(writer)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         var csvLines = csv.lines().toList();
@@ -1579,8 +1600,7 @@ class PolicyWorkflowIntegrationTest {
             assertThat(cells[9]).isEmpty();
             assertThat(new java.math.BigDecimal(cells[10])).isEqualByComparingTo("12000");
             assertThat(new java.math.BigDecimal(cells[13])).isEqualByComparingTo("12000");
-        }
-    }
+        }    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
@@ -1811,14 +1831,11 @@ class PolicyWorkflowIntegrationTest {
             }
             var first = executor.submit(() -> perform(HttpMethod.POST, path, payload, writer, requestKey));
             try {
-                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-                boolean acquired;
-                do {
-                    acquired = Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(hashtextextended(?,0))", Boolean.class, "schedule-preview:" + requestKey));
-                    if (!acquired) break;
-                    Thread.sleep(20);
-                } while (System.nanoTime() < deadline);
-                assertThat(acquired).as("first request holds the idempotency lock").isFalse();
+                org.awaitility.Awaitility.await().atMost(Duration.ofSeconds(10))
+                        .pollInterval(Duration.ofMillis(20)).until(() ->
+                                Boolean.FALSE.equals(jdbc.queryForObject(
+                                        "SELECT pg_try_advisory_xact_lock(hashtextextended(?,0))", Boolean.class,
+                                        "schedule-preview:" + requestKey)));
                 assertThat(writeError(HttpMethod.POST, path, payload, writer, requestKey, 409).path("code").asText())
                         .isEqualTo("FGC-IMPL-REQUEST_IN_PROGRESS");
             } finally {

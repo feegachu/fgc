@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -76,7 +77,7 @@ class ValidationRunScheduleServiceTest {
         given(validationTargetRepository.selectScheduleStates(118L))
                 .willReturn(List.of(validState(10L, PaymentStage.GA_TO_FC)));
         given(previews.isInstallmentContract(10L)).willReturn(true);
-        var selected = org.mockito.Mockito.mock(com.susukkang.fgc.policy.dto.FeeRegimeSchedulePolicy.class);
+        var selected = mock(com.susukkang.fgc.policy.dto.FeeRegimeSchedulePolicy.class);
         given(selected.isSelected()).willReturn(true);
         given(previewPolicies.resolve(eq(10L), any())).willReturn(selected);
         given(itemService.process(10L, 118L)).willReturn(new ScheduleGenerationResult(List.of(200L), 108));
@@ -150,8 +151,8 @@ class ValidationRunScheduleServiceTest {
         // 직급 공석 등으로 수취인을 찾지 못하면 계약 전체의 예상 스케줄이 0행이 되는데,
         // 케이스를 남기지 않으면 담당자가 그 사실을 알 수 없고 대사가 엉뚱한 판정을 낸다.
         verify(exceptionCaseRepository).insertDataQualityCase(
-                eq(118L), eq(10L), eq("예상 스케줄 생성 실패"),
-                eq("GA_TO_FC: 취소된 예정판은 자동 재생성하지 않습니다."));
+                118L, 10L, "예상 스케줄 생성 실패",
+                "GA_TO_FC: 취소된 예정판은 자동 재생성하지 않습니다.");
         verify(itemService).process(10L, 118L);
         verify(itemService).process(20L, 118L);
     }

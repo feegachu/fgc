@@ -23,6 +23,8 @@
   to { --pico-launcher-angle: 360deg; }
 }
 .pico-launcher-hint {
+  /* The decorative label may extend over business controls; only the mascot button captures clicks. */
+  pointer-events: none;
   position: absolute;
   right: 136px;
   bottom: 46px;
