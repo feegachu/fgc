@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -632,4 +632,48 @@ it('resolved journal corrections expose read-only results without a write guide'
   expect(within(dialog).queryByRole('button', { name: '도움말' })).not.toBeInTheDocument()
   expect(within(dialog).queryByRole('button', { name: '정정 실행' })).not.toBeInTheDocument()
   expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
+})
+
+
+it.each(['status', 'sequence', 'pending refresh'])('committed action with %s mismatch refreshes and blocks resubmission', async (kind) => {
+  let finish: ((value: unknown) => void) | undefined
+  const response = { actionSeq: kind === 'sequence' ? 0 : 1, actionType: 'START_REVIEW', fromStatus: kind === 'status' ? 'IN_REVIEW' : 'NEW', toStatus: 'IN_REVIEW' }
+  postResponse = () => kind === 'pending refresh' ? new Promise(resolve => { finish = resolve }) : response
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  const form = await screen.findByRole('form', { name: '예외 처리' })
+  await actions.selectOptions(within(form).getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(within(form).getByLabelText(/처리 사유/), '원천 확인')
+  const reads = searchPaths().length
+  await actions.click(within(form).getByRole('button', { name: '처리 저장' }))
+  if (kind === 'pending refresh') {
+    await waitFor(() => expect(finish).toBeDefined())
+    await act(async () => { clients[0].setQueriesData({ queryKey: ['exceptions', 'search'] }, search([{ ...baseCase, status: 'IN_REVIEW' }])) })
+    await waitFor(() => expect(within(form).queryByRole('option', { name: '검토 시작' })).not.toBeInTheDocument())
+    await act(async () => { finish!(response) })
+  }
+  expect(await within(form).findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  await waitFor(() => expect(searchPaths().length).toBeGreaterThan(reads))
+  expect(within(form).getByRole('button', { name: '처리 저장' })).toBeDisabled()
+  fireEvent.submit(form)
+  expect(within(form).getByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+})
+
+it('committed correction with an invalid receipt refreshes and cannot be posted twice', async () => {
+  searchResponse = () => search([correctionCase])
+  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 0, toStatus: 'RESOLVED' })
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
+  const dialog = await screen.findByRole('dialog')
+  await within(dialog).findByText(/J-0070/)
+  await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
+  const reads = searchPaths().length
+  await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
+  expect(await within(dialog).findByText(/서버 정정 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  await waitFor(() => expect(searchPaths().length).toBeGreaterThan(reads))
+  expect(within(dialog).getByRole('button', { name: '정정 실행' })).toBeDisabled()
+  fireEvent.submit(dialog.querySelector('form')!)
+  expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
 })

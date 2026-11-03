@@ -129,6 +129,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
+  const [needsRefresh, setNeedsRefresh] = useState(false)
   const [saveGuide] = useState(() => new SaveGuide())
   const saved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
   const mounted = useRef(true)
@@ -142,8 +143,21 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
     meta: { errorToast: false },
     onSuccess: async (action) => {
       if (!mounted.current) return
-      if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '')) throw new Error('서버 처리 결과의 조치와 상태를 확인하지 못했습니다.')
-      if (!(await saveGuide.saved(Number(action.actionSeq))) || !mounted.current) return
+      let continueGuide: boolean
+      try {
+        if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '')) throw new Error('서버 처리 결과의 조치와 상태를 확인하지 못했습니다.')
+        continueGuide = await saveGuide.saved(Number(action.actionSeq))
+      } catch {
+        // The POST already succeeded: never expose a retry for an unverified receipt.
+        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 처리 이력을 확인한 뒤 화면을 다시 여세요.'
+        setNeedsRefresh(true)
+        saveGuide.fail(message)
+        setError(message)
+        toast(message, 'warning')
+        void client.invalidateQueries({ queryKey: ['exceptions', 'search'] })
+        return
+      }
+      if (!mounted.current) return
       applyActionToCache(client, item.exceptionCaseId!, action)
       setActionType('')
       setReason('')
@@ -151,7 +165,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
       toast('처리 내용이 저장되었습니다.', 'success')
       // 원장 정정 예외는 검토 시작(재검토)에 성공한 직후 정정 모달을 바로 연다.
       if (
-        item.type === JOURNAL_CORRECTION_TYPE &&
+        continueGuide && item.type === JOURNAL_CORRECTION_TYPE &&
         (action.actionType === 'START_REVIEW' || action.actionType === 'REOPEN') &&
         action.toStatus === 'IN_REVIEW'
       ) {
@@ -167,13 +181,14 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   })
   function submit(event: FormEvent) {
     event.preventDefault()
+    if (needsRefresh || mutation.isPending) return
     setError('')
-    if (valid && !mutation.isPending) mutation.mutate()
+    if (valid) mutation.mutate()
   }
   return (
     <form data-guide-scope="exception-action" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
       <ScreenHelp screenId="EXCP-W01" variant="action" saveGuide={saveGuide} outcome="processing" />
-      <fieldset data-guide-target="exception.actionInput" disabled={mutation.isPending} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--space-3)' }}>
+      <fieldset data-guide-target="exception.actionInput" disabled={mutation.isPending || needsRefresh} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--space-3)' }}>
       <Field label="조치" required>
         <select className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
           <option value="">조치를 선택하세요</option>
@@ -212,7 +227,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
         type="submit"
         className="exception-action-submit"
         loading={mutation.isPending && !saved}
-        disabled={!valid || mutation.isPending}
+        disabled={!valid || mutation.isPending || needsRefresh}
       >
         처리 저장
       </Button>

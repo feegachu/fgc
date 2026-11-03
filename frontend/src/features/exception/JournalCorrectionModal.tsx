@@ -189,6 +189,7 @@ function CorrectionBody({
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
+  const [needsRefresh, setNeedsRefresh] = useState(false)
   const [result, setResult] = useState<JournalCorrectionResult | null>(null)
 
   const [saveGuide] = useState(() => new SaveGuide())
@@ -216,8 +217,19 @@ function CorrectionBody({
       }),
     meta: { errorToast: false },
     onSuccess: async (done) => {
-      if (done.actionType !== 'CORRECT' || done.originalJournalHeaderId !== journal.journalHeaderId || done.toStatus !== 'RESOLVED' || !Number.isSafeInteger(done.reversalJournalHeaderId) || Number(done.reversalJournalHeaderId) <= 0) throw new Error('서버 원장 정정 결과를 확인하지 못했습니다.')
-      if (!await saveGuide.saved(Number(done.repostedJournalHeaderId)) || !mounted.current) return
+      try {
+        if (done.actionType !== 'CORRECT' || done.originalJournalHeaderId !== journal.journalHeaderId || done.toStatus !== 'RESOLVED' || !Number.isSafeInteger(done.reversalJournalHeaderId) || Number(done.reversalJournalHeaderId) <= 0) throw new Error('서버 원장 정정 결과를 확인하지 못했습니다.')
+        await saveGuide.saved(Number(done.repostedJournalHeaderId))
+      } catch {
+        const message = '서버 정정 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 실행하지 말고 정정 이력을 확인한 뒤 화면을 다시 여세요.'
+        setNeedsRefresh(true)
+        saveGuide.fail(message)
+        setError(message)
+        toast(message, 'warning')
+        void invalidateJournalCorrectionQueries(client)
+        return
+      }
+      if (!mounted.current) return
       applyActionToCache(client, item.exceptionCaseId!, toAction(item, done))
       void invalidateJournalCorrectionQueries(client)
       setResult(done)
@@ -236,7 +248,7 @@ function CorrectionBody({
   }
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (!editable || result || mutation.isPending) return
+    if (!editable || result || needsRefresh || mutation.isPending) return
     const invalid = validateCorrectionLines(lines)
     setError(invalid ?? '')
     if (!invalid && !mutation.isPending) { saveGuide.begin(); mutation.mutate() }
@@ -246,7 +258,7 @@ function CorrectionBody({
   return (
     <form className="journal-correction-form journal-correction-modal-form" data-guide-scope="journal-correction" data-guide-target="exception.correctionInput" onSubmit={submit}>
       {editable && !result && <ScreenHelp screenId="EXCP-W01" variant="correction" saveGuide={saveGuide} outcome="correction" />}
-      <fieldset disabled={mutation.isPending} style={{ display: 'contents' }}>
+      <fieldset disabled={mutation.isPending || needsRefresh} style={{ display: 'contents' }}>
       <div className="journal-correction-guidance">
         원분개는 직접 수정하지 않습니다. 아래 신규 분개가 검증을 통과하면 역분개와 재기표를 한 번에 처리합니다.
       </div>
@@ -410,7 +422,7 @@ function CorrectionBody({
             className="exception-action-submit"
             data-guide-target="exception.correctionSave"
             loading={mutation.isPending && !saved}
-            disabled={!lines.length || !journalDate || !description.trim() || !reason.trim()}
+            disabled={needsRefresh || !lines.length || !journalDate || !description.trim() || !reason.trim()}
           >
             정정 실행
           </Button>
