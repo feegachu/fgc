@@ -421,7 +421,7 @@
   min-width: 0;
   overflow: hidden;
   border-top: 0;
-  border-radius: 0 0 var(--radius-12) var(--radius-12);
+  border-radius: 0 0 var(--radius-8) var(--radius-8);
 }
 
 .filter-bar {
