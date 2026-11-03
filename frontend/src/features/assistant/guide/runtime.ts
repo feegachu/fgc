@@ -15,7 +15,7 @@ const entityTypes = new Set(['CONTRACT', 'PAYMENT', 'SCHEDULE', 'VALIDATION_RUN'
 function entitiesKey(refs: readonly EntityRef[]): string {
   if (
     refs.some((ref) => !entityTypes.has(ref.type) || !Number.isSafeInteger(ref.id) || ref.id <= 0) ||
-    new Set(refs.map((ref) => ref.type)).size !== refs.length
+    new Set(refs.map((ref) => `${ref.type}:${ref.id}`)).size !== refs.length
   )
     throw new GuideFailure('INVALID_ENTITY_REFS')
   return refs
@@ -200,7 +200,7 @@ export class GuideRuntime<State> {
     const context = this.context!
     this.assertContext(context)
     this.set({ status: 'PREPARING', step, target: null, reasonCode: null })
-    if (this.environment.readContext().screenId !== step.screenId) {
+    if (this.environment.readContext().screenId !== step.screenId || this.environment.needsNavigation?.(step)) {
       if (context.dirty) {
         const approved = await this.environment.confirmLeave()
         assertCurrent()
@@ -221,15 +221,16 @@ export class GuideRuntime<State> {
     const state = await this.environment.readBusinessState(structuredClone(context), signal)
     assertCurrent()
     this.assertContext(context, step.screenId)
-    const entry = this.environment.conditions[step.entryConditionId](this.capture(), state)
-    if (entry !== 'SATISFIED') {
-      this.set({ status: entry, target: null, reasonCode: 'ENTRY_NOT_READY' })
-      return
-    }
     if (this.targets.find(step.screenId, this.guide!.guideVersion, step.targetId) !== target)
       throw new GuideFailure('TARGET_CHANGED')
     const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
     target.scrollIntoView?.({ block: 'center', behavior: reduced ? 'instant' : 'smooth' })
+    const entry = this.environment.conditions[step.entryConditionId](this.capture(), state)
+    // A registered visible location remains useful while data loads. next() still rechecks entry and completion.
+    if (entry !== 'SATISFIED') {
+      this.set({ status: entry, target, reasonCode: 'ENTRY_NOT_READY' })
+      return
+    }
     this.set({ status: 'SHOWING', target, reasonCode: null })
     this.emit('STEP_CHANGED')
   }
@@ -309,6 +310,8 @@ export class GuideRuntime<State> {
     if (!this.active() || !this.context || this.snapshot.status === 'PAUSED') return
     try {
       this.assertContext(this.context, this.snapshot.status === 'PREPARING' ? undefined : this.snapshot.step?.screenId)
+      if (this.snapshot.status !== 'PREPARING' && this.snapshot.step && this.environment.needsNavigation?.(this.snapshot.step))
+        throw new GuideFailure('SCREEN_CHANGED')
       if (
         this.snapshot.target &&
         this.snapshot.step &&

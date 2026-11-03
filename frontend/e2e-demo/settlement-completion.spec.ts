@@ -79,6 +79,8 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   const created = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성', exact: true }).click()
   const run = await successful(created)
+  // A person resumes after the detail screen opens; resuming mid-navigation makes the guide report a screen change.
+  await expect(page).toHaveURL(new RegExp(`/validation-runs/${run.validationRunId}\\b`))
   await next.click()
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await expect

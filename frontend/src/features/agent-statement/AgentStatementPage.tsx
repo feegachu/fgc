@@ -135,7 +135,7 @@ export default function AgentStatementPage() {
       width: '6rem',
       align: 'center',
       render: (row) => (
-        <Button variant="secondary" onClick={() => select(row.entryKey)} aria-label={`${row.contractNo ?? row.commissionItemName} 근거 보기`}>
+        <Button data-guide-feature="features.agent-statement.agent-statement-page.row-evidence-button" variant="secondary" onClick={() => select(row.entryKey)} aria-label={`${row.contractNo ?? row.commissionItemName} 근거 보기`}>
           근거 보기
         </Button>
       ),
@@ -169,7 +169,7 @@ export default function AgentStatementPage() {
         <>
           <SummaryCards
             summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />
-          <section className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
+          <section data-guide-feature="features.agent-statement.agent-statement-page.list-panel" className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
             <header className="surface-header">
               <h2 className="surface-title" id="ast-list-title">
                 명세 내역
@@ -199,7 +199,7 @@ export default function AgentStatementPage() {
                         : '기준월이나 조회 조건을 바꿔 다시 조회해 보세요.'}
                   </span>
                   {list.isError && (
-                    <Button variant="secondary" onClick={() => void list.refetch()}>
+                    <Button data-guide-feature="features.agent-statement.agent-statement-page.list-retry-button" variant="secondary" onClick={() => void list.refetch()}>
                       다시 시도
                     </Button>
                   )}
@@ -257,7 +257,7 @@ function SummaryCards({
     ['CLAWBACK', 'clawback', '환수', '환수 계산액이며 실제 회수 완료액이 아닙니다'],
   ]
   return (
-    <section className="ast-summary" aria-label="유형별 요약">
+    <section data-guide-feature="features.agent-statement.agent-statement-page.summary" className="ast-summary" aria-label="유형별 요약">
       {cards.map(([type, key, label, note]) => {
         const bucket = summary?.[key]
         return (
@@ -302,12 +302,12 @@ function DetailPanel({
     ([key, value]) => value != null && value !== '' && EVIDENCE_LABELS[key],
   )
   return (
-    <section className="surface ast-detail" aria-labelledby="ast-detail-title" aria-live="polite">
+    <section data-guide-feature="features.agent-statement.agent-statement-page.detail-panel" className="surface ast-detail" aria-labelledby="ast-detail-title" aria-live="polite">
       <header className="surface-header">
         <h2 className="surface-title" id="ast-detail-title">
           명세 근거
         </h2>
-        <Button variant="secondary" onClick={onClose}>
+        <Button data-guide-feature="features.agent-statement.agent-statement-page.detail-close-button" variant="secondary" onClick={onClose}>
           닫기
         </Button>
       </header>
@@ -331,7 +331,7 @@ function DetailPanel({
                 {entry.statusLabel} · {date(entry.basisDate)}
               </span>
             </div>
-            <section className="ast-group" aria-label="기본 정보">
+            <section data-guide-feature="features.agent-statement.agent-statement-page.detail-basic" className="ast-group" aria-label="기본 정보">
               <h3 className="ast-group-title">기본 정보</h3>
               <dl className="ast-dl">
                 <Row label="계약번호" value={entry.contractNo ?? '연결 계약 없음'} />
@@ -343,7 +343,7 @@ function DetailPanel({
               </dl>
             </section>
             {evidence.length > 0 && (
-              <section className="ast-group" aria-label="계산 근거">
+              <section data-guide-feature="features.agent-statement.agent-statement-page.detail-evidence" className="ast-group" aria-label="계산 근거">
                 <h3 className="ast-group-title">계산 근거</h3>
                 <dl className="ast-dl">
                   {evidence.map(([key, value]) => (
@@ -355,7 +355,7 @@ function DetailPanel({
           </>
         )}
         {entry?.contractId != null && (
-          <ContextLink className="button button-secondary ast-link" to={`/contracts/${entry.contractId}`}>
+          <ContextLink data-guide-feature="features.agent-statement.agent-statement-page.contract-link" className="button button-secondary ast-link" to={`/contracts/${entry.contractId}`}>
             계약 상세 보기
           </ContextLink>
         )}
@@ -419,17 +419,17 @@ function StatementFiltersBar({
     >
       <div className="filter-fields ast-filter-fields">
         <Field label="기준월" required className="filter-field">
-          <input id="ast-month" type="month" required value={draft.month} onChange={(event) => set('month', event.target.value)} />
+          <input data-guide-feature="features.agent-statement.agent-statement-page.month-input" id="ast-month" type="month" required value={draft.month} onChange={(event) => set('month', event.target.value)} />
         </Field>
         {!isAgent && (
           <Field label="설계사" required className="filter-field">
-            <select id="ast-agent" value={draft.agentId} onChange={(event) => set('agentId', event.target.value)}>
+            <select data-guide-feature="features.agent-statement.agent-statement-page.agent-select" id="ast-agent" value={draft.agentId} onChange={(event) => set('agentId', event.target.value)}>
               {options(agents, draft.agentId)}
             </select>
           </Field>
         )}
         <Field label="계약번호" className="filter-field">
-          <input
+          <input data-guide-feature="features.agent-statement.agent-statement-page.contract-input"
             id="ast-contract"
             type="search"
             placeholder="계약번호 입력"
@@ -439,12 +439,12 @@ function StatementFiltersBar({
           />
         </Field>
         <Field label="수수료 항목" className="filter-field">
-          <select id="ast-item" value={draft.commissionItemId} onChange={(event) => set('commissionItemId', event.target.value)}>
+          <select data-guide-feature="features.agent-statement.agent-statement-page.item-select" id="ast-item" value={draft.commissionItemId} onChange={(event) => set('commissionItemId', event.target.value)}>
             {options(items, draft.commissionItemId)}
           </select>
         </Field>
         <Field label="내역 구분" className="filter-field">
-          <select id="ast-type" value={draft.entryType} onChange={(event) => set('entryType', event.target.value)}>
+          <select data-guide-feature="features.agent-statement.agent-statement-page.type-select" id="ast-type" value={draft.entryType} onChange={(event) => set('entryType', event.target.value)}>
             {options(ENTRY_TYPE_OPTIONS, draft.entryType)}
           </select>
         </Field>

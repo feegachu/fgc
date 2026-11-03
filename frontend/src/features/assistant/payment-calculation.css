@@ -1,0 +1,65 @@
+.payment-calculation {
+  margin: 0 0 20px;
+  padding: 14px;
+  border: 1px solid #d7e4f0;
+  border-radius: 12px;
+  background: #f7fafd;
+  color: #24455f;
+  font-size: 12px;
+}
+.payment-calculation summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+.payment-calculation p {
+  margin: 8px 0;
+  line-height: 1.7;
+}
+.payment-calculation small {
+  display: block;
+  font-size: 10px;
+  color: #637e96;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.payment-calculation-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.payment-calculation button {
+  padding: 8px 10px;
+  border: 1px solid #cbdced;
+  background: #fff;
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.payment-calculation button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.payment-calculation button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.payment-calculation dl {
+  margin: 10px 0;
+}
+.payment-calculation dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+}
+.payment-calculation dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.payment-calculation-cap {
+  padding: 10px 0;
+  border-bottom: 1px solid #dce6f0;
+}

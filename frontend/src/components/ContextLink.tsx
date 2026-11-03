@@ -5,7 +5,7 @@ import { useContextNavigation } from '../hooks/useContextNavigation'
 export function ContextLink({ to, onClick, ...props }: LinkProps & { to: string }) {
   const navigate = useContextNavigation()
   return (
-    <Link
+    <Link data-guide-feature="components.context-link.link"
       {...props}
       to={to}
       onClick={(event) => {

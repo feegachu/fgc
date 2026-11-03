@@ -95,7 +95,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.server == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # SRC-028: the demo suite grew to 54 tests (tutorials 25); stability runs it three times.
+    timeout-minutes: ${{ needs.changes.outputs.stability == 'true' && 90 || 45 }}
     services:
       postgres:
         image: postgres:17

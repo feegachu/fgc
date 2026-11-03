@@ -37,9 +37,10 @@ export function FilterBar({
         {name}
       </span>
     ) : null
-  const submitButton = <Button type="submit">{icon('search')}조회</Button>
+  const submitButton = <Button data-guide-feature="components.filter-bar.button" type="submit">{icon('search')}조회</Button>
   return (
     <form
+      data-guide-feature="components.filter-bar.form"
       className={`filter-bar search-conditions ${embedded ? 'is-embedded' : ''} ${className}`}
       aria-label="조회 조건"
       onSubmit={submit}
@@ -48,7 +49,7 @@ export function FilterBar({
       <div className={`filter-actions ${actionsClassName}`}>
         {showSubmit && !resetFirst && submitButton}
         {onReset && (
-          <Button variant="secondary" onClick={onReset}>
+          <Button data-guide-feature="components.filter-bar.button-2" variant="secondary" onClick={onReset}>
             {icon('restart_alt')}초기화
           </Button>
         )}

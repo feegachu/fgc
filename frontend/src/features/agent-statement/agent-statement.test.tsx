@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { canOpen, screens } from '../../app/screens'
 import { routes } from '../../app/routes'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
@@ -219,10 +220,13 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     expect(paths[0]).toContain('/api/v1/reports/agents/9/statements')
   })
 
-  it('설계사는 수수료 지급 화면을 열 수 없다', async () => {
-    renderAt('/app/transactions')
-    // 접근 거부 화면이 실제로 뜬 뒤에 수수료 지급 제목이 없음을 확인한다.
-    expect(await screen.findByRole('heading', { name: /권한 없음/ })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '수수료 지급' })).not.toBeInTheDocument()
+  it('설계사는 본인 지급 내역(TRAN-W01)과 수수료 명세(RPT-W02)를 열 수 있고 내부 업무 화면은 열 수 없다', () => {
+    const agent = { roleCode: 'AGENT' }
+    const open = (id: string) => canOpen(screens.find((screen) => screen.id === id)!, agent)
+    expect(open('TRAN-W01')).toBe(true)
+    expect(open('RPT-W02')).toBe(true)
+    expect(open('CONT-W01')).toBe(true)
+    expect(open('TRAN-W02')).toBe(false)
+    expect(open('AUDT-W01')).toBe(false)
   })
 })

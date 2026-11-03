@@ -79,10 +79,10 @@ export function CapDetailModal({ capCheckId, onClose }: CapDetailModalProps) {
       onClose={onClose}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button data-guide-feature="features.cap.cap-detail-modal.button" variant="secondary" onClick={onClose}>
             닫기
           </Button>
-          <Link className="button button-primary" to="/exceptions" onClick={onClose}>
+          <Link data-guide-feature="features.cap.cap-detail-modal.link" className="button button-primary" to="/exceptions" onClick={onClose}>
             예외 목록 보기
           </Link>
         </>
@@ -91,7 +91,9 @@ export function CapDetailModal({ capCheckId, onClose }: CapDetailModalProps) {
       {detail.isError ? (
         <CapError error={detail.error} retry={() => void detail.refetch()} />
       ) : detail.data?.capCheck ? (
-        <BasisContent data={detail.data} />
+        <section data-guide-feature="features.cap.cap-detail-modal.section">
+          <BasisContent data={detail.data} />
+        </section>
       ) : (
         <p role="status">계산근거를 불러오는 중입니다.</p>
       )}
@@ -105,7 +107,7 @@ function BasisContent({ data }: { data: CapBasis }) {
   if (item.resultStatus === 'NOT_APPLICABLE') {
     const decision = snapshot.applicability as Record<string, unknown> | undefined
     return (
-      <section className="surface">
+      <div className="surface">
         <h3>
           {item.contractNo || '-'}, {item.paymentStageLabel || '-'}
         </h3>
@@ -130,7 +132,7 @@ function BasisContent({ data }: { data: CapBasis }) {
           </div>
         </dl>
         <p>한도/산입금액/사용률 계산 대상이 아닙니다.</p>
-      </section>
+      </div>
     )
   }
   const details = data.details ?? []
@@ -169,9 +171,9 @@ function BasisContent({ data }: { data: CapBasis }) {
       </header>
       <div className="cap-react-detail-grid">
         <div className="cap-react-detail-left">
-          <section className="surface">
+          <section data-guide-feature="features.cap.cap-detail-modal.section-2" className="surface">
             <h3>① 입력값</h3>
-            <table className="data-table">
+            <table data-guide-feature="features.cap.cap-detail-modal.table" className="data-table">
               <tbody>
                 {inputs.map(([label, value, monetary]) => (
                   <tr key={label}>
@@ -182,7 +184,7 @@ function BasisContent({ data }: { data: CapBasis }) {
               </tbody>
             </table>
           </section>
-          <section className="surface">
+          <section data-guide-feature="features.cap.cap-detail-modal.section-3" className="surface">
             <h3>
               ② 계산식 <CapEvidence />
             </h3>
@@ -194,7 +196,7 @@ function BasisContent({ data }: { data: CapBasis }) {
             </p>
             <p>= {usageRate(item.usagePct)}%</p>
           </section>
-          <section className="surface">
+          <section data-guide-feature="features.cap.cap-detail-modal.section-4" className="surface">
             <h3>④ 합계와 판정</h3>
             <CapUsage value={item.usagePct} status={item.resultStatus} warning={data.warningStartUsagePct} />
             {snapshot.warningUsagePct != null && <p>주의 기준 (1,200% 예산) {rate(snapshot.warningUsagePct)}%</p>}
@@ -221,7 +223,7 @@ function BasisContent({ data }: { data: CapBasis }) {
             <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
           </section>
         </div>
-        <section className="surface cap-react-detail-lines">
+        <section data-guide-feature="features.cap.cap-detail-modal.section-5" className="surface cap-react-detail-lines">
           <h3>
             ③ 항목별 산입 내역 <small>{int(details.length)}개 항목</small>
           </h3>

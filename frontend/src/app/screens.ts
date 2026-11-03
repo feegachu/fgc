@@ -183,6 +183,6 @@ export const canOpen = (
 ) => {
   const agent = user.isAgent || user.roleCode === 'AGENT'
   if (screen.id === 'AGNT-W01') return agent
-  if (agent && !['CONT-W01', 'CONT-W02', 'RPT-W02'].includes(screen.id)) return false
+  if (agent && !['CONT-W01', 'CONT-W02', 'TRAN-W01', 'RPT-W02'].includes(screen.id)) return false
   return !screen.permission || user[screen.permission] === true
 }

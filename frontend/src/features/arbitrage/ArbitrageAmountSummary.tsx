@@ -42,12 +42,13 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
   }
 
   return (
-    <section className={`arb-calculation arb-amount-summary is-${view}`} aria-label="차익거래 금액 요약">
+    <section data-guide-feature="features.arbitrage.arbitrage-amount-summary.section" className={`arb-calculation arb-amount-summary is-${view}`} aria-label="차익거래 금액 요약">
       <header className="arb-amount-header">
         <h3>금액 요약</h3>
         <div className="arb-amount-views" role="group" aria-label="금액 표시 방식">
           {views.map((option) => (
             <button
+              data-guide-feature="features.arbitrage.arbitrage-amount-summary.button"
               key={option.key}
               type="button"
               className="arb-amount-view-button"
