@@ -5,14 +5,16 @@ final class ArbitragePlannedCommissionSql {
     private ArbitragePlannedCommissionSql() { }
 
     static final String SUMMARY = """
-            WITH operational_lines AS (
-                SELECT sh.contract_id, sl.schedule_line_id, sl.commission_item_id, sl.beneficiary_agent_id,
+            WITH source_lines AS (
+                SELECT sh.contract_id, sh.active_yn, sl.schedule_line_id, sl.commission_item_id, sl.beneficiary_agent_id,
                        sl.installment_no, sl.due_date, sl.due_month, sl.line_status,
                        ROUND(sl.expected_amount, 0) AS expected_amount
                   FROM fgc.schedule_header sh
                   JOIN fgc.schedule_line sl ON sl.schedule_header_id = sh.schedule_header_id
                  WHERE sh.contract_id = :contractId AND sh.payment_stage = :paymentStage
-                   AND sh.active_yn AND sh.schedule_purpose = 'OPERATIONAL'
+                   AND sh.schedule_purpose = 'OPERATIONAL'
+            ), operational_lines AS (
+                SELECT * FROM source_lines WHERE active_yn
             ), eligible_lines AS (
                 SELECT sl.* FROM operational_lines sl WHERE sl.line_status IN ('PLANNED', 'HOLD')
                    AND NOT EXISTS (
@@ -58,6 +60,17 @@ final class ArbitragePlannedCommissionSql {
                  GROUP BY result.reconciliation_result_id
                 HAVING COUNT(DISTINCT m.schedule_line_id) = 1
                    AND COUNT(DISTINCT m.transaction_attribution_id) = 1
+            ), referenced_obligations AS (
+                -- 이전 버전 연결은 차감 증거로 승격하지 않고, 현재 의무의 검토 범위와 연결 충돌을 확인하는 데만 쓴다.
+                SELECT p.transaction_attribution_id, sl.commission_item_id, sl.beneficiary_agent_id,
+                       sl.installment_no
+                  FROM payments p JOIN source_lines sl ON sl.schedule_line_id = p.schedule_line_id
+                UNION
+                SELECT p.transaction_attribution_id, sl.commission_item_id, sl.beneficiary_agent_id,
+                       sl.installment_no
+                  FROM payments p
+                  JOIN reconciled_pairs pair ON pair.transaction_attribution_id = p.transaction_attribution_id
+                  JOIN source_lines sl ON sl.schedule_line_id = pair.schedule_line_id
             ), evidence AS (
                 SELECT p.transaction_attribution_id, sl.schedule_line_id
                   FROM payments p JOIN operational_lines sl ON sl.schedule_line_id = p.schedule_line_id
@@ -72,10 +85,19 @@ final class ArbitragePlannedCommissionSql {
                  WHERE sl.commission_item_id = p.commission_item_id
                    AND sl.beneficiary_agent_id IS NOT DISTINCT FROM p.recipient_agent_id
                    AND (p.installment_no IS NULL OR sl.installment_no = p.installment_no)
-            ), resolved AS (
+            ), unique_evidence AS (
                 SELECT transaction_attribution_id, MIN(schedule_line_id) AS schedule_line_id
                   FROM evidence GROUP BY transaction_attribution_id
                 HAVING COUNT(*) = 1
+            ), resolved AS (
+                SELECT e.* FROM unique_evidence e
+                  JOIN operational_lines sl ON sl.schedule_line_id = e.schedule_line_id
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM referenced_obligations ref
+                      WHERE ref.transaction_attribution_id = e.transaction_attribution_id
+                        AND (ref.commission_item_id IS DISTINCT FROM sl.commission_item_id
+                             OR ref.beneficiary_agent_id IS DISTINCT FROM sl.beneficiary_agent_id
+                             OR ref.installment_no IS DISTINCT FROM sl.installment_no))
             ), consumed AS (
                 SELECT r.schedule_line_id, SUM(p.amount) AS amount
                   FROM resolved r JOIN payments p USING (transaction_attribution_id)
@@ -90,11 +112,19 @@ final class ArbitragePlannedCommissionSql {
                         WHERE sl.schedule_line_id = p.schedule_line_id
                            OR EXISTS (SELECT 1 FROM evidence e
                                       WHERE e.transaction_attribution_id = p.transaction_attribution_id)
+                           OR EXISTS (SELECT 1 FROM referenced_obligations ref
+                                       WHERE ref.transaction_attribution_id = p.transaction_attribution_id
+                                         AND ref.commission_item_id = sl.commission_item_id
+                                         AND ref.beneficiary_agent_id IS NOT DISTINCT FROM sl.beneficiary_agent_id
+                                         AND ref.installment_no = sl.installment_no)
                            OR (sl.commission_item_id = p.commission_item_id
                                AND (p.recipient_agent_id IS NULL
                                     OR sl.beneficiary_agent_id IS NOT DISTINCT FROM p.recipient_agent_id)
-                               AND sl.due_month = p.attribution_month
-                               AND (p.installment_no IS NULL OR sl.installment_no = p.installment_no)))
+                               -- 알려진 회차는 지급 지연으로 월이 달라도 검토한다.
+                               AND (sl.installment_no = p.installment_no
+                                    OR (p.installment_no IS NULL AND sl.due_month = p.attribution_month
+                                        AND NOT EXISTS (SELECT 1 FROM referenced_obligations ref
+                                                        WHERE ref.transaction_attribution_id = p.transaction_attribution_id)))))
             )
             SELECT COALESCE((SELECT SUM(GREATEST(sl.expected_amount - COALESCE(c.amount, 0), 0))
                                FROM eligible_lines sl LEFT JOIN consumed c USING (schedule_line_id)), 0),

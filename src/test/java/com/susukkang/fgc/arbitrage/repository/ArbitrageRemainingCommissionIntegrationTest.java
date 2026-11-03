@@ -1,10 +1,12 @@
 package com.susukkang.fgc.arbitrage.repository;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.transaction.performance.PaymentJdbcObservation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** #754: 실제 PostgreSQL 원천에서 동일 의무의 잔여액과 연결 불명확 여부를 검증한다. */
 @SpringBootTest
+@Import(PaymentJdbcObservation.Config.class)
 @Transactional
 class ArbitrageRemainingCommissionIntegrationTest {
     private static final LocalDate MONTH = LocalDate.of(2030, 8, 1);
@@ -197,6 +200,156 @@ class ArbitrageRemainingCommissionIntegrationTest {
         reconciliation(another, attribution, false);
         var summary = repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF);
         assertThat(summary.remainingAmount()).isEqualByComparingTo("200000");
+        assertThat(summary.unresolvedAttributionIds()).containsExactly(attribution);
+    }
+
+    @Test
+    void lateUnlinkedPaymentWithKnownInstallmentRequiresReview() {
+        Long attribution = latePayment(false);
+        assertUnresolved(attribution);
+    }
+
+    @Test
+    void lateUnlinkedPaymentForAnotherInstallmentDoesNotTriggerReview() {
+        latePayment(false, 2);
+        assertRemaining("100000");
+        assertThat(repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF)
+                .unresolvedAttributionIds()).isEmpty();
+    }
+
+    @Test
+    void inactiveDirectLinkWithMissingInstallmentRequiresReviewAcrossMonths() {
+        Long attribution = latePayment(true, null);
+        regenerateFixture(1);
+        assertUnresolved(attribution);
+    }
+
+    @Test
+    void inactiveReconciliationLinkWithMissingInstallmentRequiresReviewAcrossMonths() {
+        Long attribution = latePayment(false, null);
+        reconciliation(line, attribution, false);
+        regenerateFixture(1);
+        assertUnresolved(attribution);
+    }
+
+    @Test
+    void currentReconciliationCanResolveHistoricalLinkToSameObligation() {
+        Long attribution = latePayment(true, null);
+        regenerateFixture(1);
+        reconciliation(line, attribution, false);
+        var summary = repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF);
+        assertThat(summary.remainingAmount()).isEqualByComparingTo("50000");
+        assertThat(summary.unresolvedAttributionIds()).isEmpty();
+    }
+
+    @Test
+    void historicalDirectLinkConflictingWithCurrentReconciliationRequiresReview() {
+        Long attribution = latePayment(true, null);
+        regenerateFixture(2);
+        reconciliation(line, attribution, false);
+        assertUnresolved(attribution);
+    }
+
+    @Test
+    void inactiveLinkToDifferentInstallmentDoesNotFlagUnrelatedRemaining() {
+        latePayment(true, null);
+        regenerateFixture(2);
+        var summary = repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF);
+        assertThat(summary.remainingAmount()).isEqualByComparingTo("100000");
+        assertThat(summary.unresolvedAttributionIds()).isEmpty();
+    }
+
+    @Test
+    void inactiveKnownObligationDoesNotFlagAnotherInstallmentEvenInSameMonth() {
+        Long attribution = payment(line, "50000", "DRAFT", true);
+        clearOrSetInstallment(attribution, null);
+        confirm(attribution);
+        regenerateFixture(2);
+        var summary = repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF);
+        assertThat(summary.remainingAmount()).isEqualByComparingTo("100000");
+        assertThat(summary.unresolvedAttributionIds()).isEmpty();
+    }
+
+    @Test
+    void inactiveLinkToAnotherRecipientDoesNotFlagCurrentRecipient() {
+        latePayment(true, null);
+        Long other = id("SELECT agent_id FROM fgc.agent WHERE agent_id<>? ORDER BY agent_id LIMIT 1", agent);
+        agent = other;
+        regenerateFixture(1);
+        var summary = repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF);
+        assertThat(summary.remainingAmount()).isEqualByComparingTo("100000");
+        assertThat(summary.unresolvedAttributionIds()).isEmpty();
+    }
+
+    @Test
+    void conflictingNoneligibleLinksStillExposeSourceDataConflict() {
+        Long attribution = payment(line, "50000", "DRAFT", true);
+        clearOrSetInstallment(attribution, null);
+        confirm(attribution);
+        Long another = line(agent, 2);
+        reconciliation(another, attribution, false);
+        jdbc.update("UPDATE fgc.schedule_line SET line_status='MATCHED' WHERE schedule_header_id=?", header);
+        line(agent, 3);
+        assertUnresolved(attribution);
+    }
+
+    @Test
+    void balanceSnapshotReadsPaidDeductionRemainingAndUnresolvedInOneJdbcExecution() {
+        payment(line, "30000", "CONFIRMED", true);
+        Long unknown = payment(line, "20000", "CONFIRMED", false);
+        Long deduction = payment(line, "10000", "DRAFT", true);
+        jdbc.update("UPDATE fgc.commission_transaction SET cashflow_type='DEDUCTION' WHERE commission_transaction_id="
+                + "(SELECT commission_transaction_id FROM fgc.transaction_attribution WHERE transaction_attribution_id=?)", deduction);
+        confirm(deduction);
+        PaymentJdbcObservation.Snapshot observation;
+        PaymentJdbcObservation.start();
+        try {
+            var balance = repository.commissionBalanceSnapshot(contract, PaymentStage.GA_TO_FC, AS_OF);
+            assertThat(balance.confirmedPaymentAmount()).isEqualByComparingTo("50000");
+            assertThat(balance.confirmedDeductionAmount()).isEqualByComparingTo("10000");
+            assertThat(balance.planned().remainingAmount()).isEqualByComparingTo("70000");
+            assertThat(balance.planned().unresolvedAttributionIds()).containsExactly(unknown);
+        } finally {
+            observation = PaymentJdbcObservation.stop();
+        }
+        assertThat(observation.executions()).hasSize(1);
+    }
+
+    private Long latePayment(boolean linked) {
+        return latePayment(linked, 1);
+    }
+
+    private Long latePayment(boolean linked, Integer installment) {
+        Long attribution = payment(line, "50000", "DRAFT", linked);
+        jdbc.update("UPDATE fgc.transaction_attribution SET attribution_date=?,attribution_month=? WHERE transaction_attribution_id=?",
+                AS_OF, AS_OF, attribution);
+        clearOrSetInstallment(attribution, installment);
+        confirm(attribution);
+        return attribution;
+    }
+
+    private void clearOrSetInstallment(Long attribution, Integer installment) {
+        jdbc.update("UPDATE fgc.commission_transaction SET installment_no=? WHERE commission_transaction_id="
+                + "(SELECT commission_transaction_id FROM fgc.transaction_attribution WHERE transaction_attribution_id=?)",
+                installment, attribution);
+    }
+
+    // 재생성이 보존하는 이전 연결과 새 회차 ID를 DB에 구성한다. 서비스 자체의 재생성 검증과 구분한다.
+    private void regenerateFixture(int installment) {
+        Long oldHeader = header;
+        jdbc.update("UPDATE fgc.schedule_header SET active_yn=false,status='ADJUSTED' WHERE schedule_header_id=?", oldHeader);
+        header = id("""
+                INSERT INTO fgc.schedule_header(contract_id,payment_stage,policy_version_id,schedule_version_no,
+                    schedule_purpose,schedule_regime,regenerated_from_id)
+                SELECT contract_id,payment_stage,policy_version_id,2,'OPERATIONAL','CURRENT',schedule_header_id
+                  FROM fgc.schedule_header WHERE schedule_header_id=? RETURNING schedule_header_id
+                """, oldHeader);
+        line = line(agent, installment);
+    }
+
+    private void assertUnresolved(Long attribution) {
+        var summary = repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF);
+        assertThat(summary.remainingAmount()).isEqualByComparingTo("100000");
         assertThat(summary.unresolvedAttributionIds()).containsExactly(attribution);
     }
 
