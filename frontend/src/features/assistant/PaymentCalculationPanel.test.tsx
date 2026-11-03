@@ -104,7 +104,9 @@ it('preserves null amounts and candidate blockers and never treats confirmable a
   )
   render(<PaymentCalculationPanel observation={observation} canProcess />)
   await userEvent.click(screen.getByRole('button', { name: '지급 후보 검토 조회' }))
-  expect(await screen.findByText(/FGC-CAP-002 · 근거 확인/)).toBeInTheDocument()
+  // 화면정의서 공통규칙 10: 오류코드는 화면에 쓰지 않고 문구만 보인다.
+  expect(await screen.findByText('근거 확인')).toBeInTheDocument()
+  expect(screen.queryByText(/FGC-CAP-002/)).not.toBeInTheDocument()
   expect(screen.getAllByText('확인 전')).toHaveLength(2)
   expect(screen.getByText(/실제 사전검증 완료 증표가 아닙니다/)).toBeInTheDocument()
 })

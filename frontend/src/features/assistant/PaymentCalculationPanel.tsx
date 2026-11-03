@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '../../lib/api/client'
-import { dateTimeSeconds } from '../../lib/format'
+import { dateTimeSeconds, rateText } from '../../lib/format'
 import type { components } from '../../lib/api/schema'
 import { isWonAmount } from './guards'
 import type { PaymentObservation } from './guide-runtime'
@@ -175,9 +175,7 @@ export function PaymentCalculationPanel({
             </p>
           )}
           {result.blockers?.map((item, index) => (
-            <p key={index}>
-              {item.code} · {item.message}
-            </p>
+            <p key={index}>{rateText(item.message || '확정 차단 사유를 확인하세요.')}</p>
           ))}
           {result.basis?.sourceRefs?.map((source) => (
             <p key={source.sourceId}>
