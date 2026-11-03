@@ -309,7 +309,7 @@ class ValidationRunFinalizationServiceImplTest {
         assertThatThrownBy(() -> service.finalizeRun(44L, 7L, "finalize-44"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, exception -> {
                     assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_004);
-                    assertThat(exception.getParams()).containsEntry("from", "계약수동 실행")
+                    assertThat(exception.getParams()).containsEntry("from", "계약수동 실행의 계산완료")
                             .containsEntry("to", "확정(잠김)");
                 });
         verify(validationRunRepository, never()).lockValidationMonth(any());

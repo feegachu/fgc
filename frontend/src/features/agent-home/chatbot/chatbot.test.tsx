@@ -24,7 +24,7 @@ const item = (rank: number, patch: Partial<CompareItem> = {}): CompareItem => ({
   associationGrade: null,
   evidence: [
     { label: '수령 예상액', rule: '현행수수료 1~1회차, 기준 보험료 × 650%', value: 650_000, source: '수수료 규칙', policyVersion: 'GA-CUR-2026-V1 v1', asOf: '2026-07-31' },
-    { label: '환수 노출액', rule: '현행수수료 1~1회차 · 한도 반영 지급액 × 환수율 34.8%', value: 226_200, source: '환수 규칙', policyVersion: 'CLAW-GA-VIRTUAL-2026 v1', asOf: '2026-07-31' },
+    { label: '환수 노출액', rule: '현행수수료 1~1회차, 한도 반영 지급액 × 환수율 34.8%', value: 226_200, source: '환수 규칙', policyVersion: 'CLAW-GA-VIRTUAL-2026 v1', asOf: '2026-07-31' },
   ],
   ...patch,
 })

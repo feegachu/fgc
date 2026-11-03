@@ -104,7 +104,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'EXCEPTION_ACTION', reason })])
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     expect(
-      await within(table).findByText('지급 초안 삭제로 종결, 지급 9007199254740993'),
+      await within(table).findByText('지급 초안 삭제로 종결, 지급 건 9007199254740993'),
     ).toBeInTheDocument()
     await screen.findByText('사유 원문 보기')
     expect(document.querySelector('.audit-reason-original')).toHaveTextContent(reason)

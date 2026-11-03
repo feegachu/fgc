@@ -234,7 +234,7 @@ public class ExceptionCaseService {
         if (user == null) throw new org.springframework.security.access.AccessDeniedException("예외 조치 처리자 정보가 필요합니다.");
         Long userId = user.getUserId();
         String loginId = user.getUsername();
-        String reason = "지급 초안 삭제로 종결, 지급 " + paymentId;
+        String reason = "지급 초안 삭제로 종결, 지급 건 " + paymentId;
         for (var target : targets) {
             ExceptionStatus status = ExceptionStatus.valueOf(target.getStatus());
             if (status == ExceptionStatus.NEW) {

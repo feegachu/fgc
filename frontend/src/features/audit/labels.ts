@@ -81,7 +81,7 @@ const loginFailureReasons = {
 /** 지급 초안을 지워 예외를 닫을 때 서버가 남긴 사유. 감사로그와 예외 처리 이력이 같은 문구를 쓴다. */
 export function paymentDeletedReason(reason?: string | null) {
   const id = /^초안 삭제\(PAYMENT_DELETED\): 지급 ([0-9]+)의 지급 예정이 철회되어 종결$/.exec(reason ?? '')?.[1]
-  return id ? `지급 초안 삭제로 종결, 지급 ${id}` : null
+  return id ? `지급 초안 삭제로 종결, 지급 건 ${id}` : null
 }
 
 /** 알려진 자동 생성 형식만 번역한다. 사용자 사유·오류 원문·미등록 형식은 보존한다. */

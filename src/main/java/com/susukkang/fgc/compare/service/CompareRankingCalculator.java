@@ -116,7 +116,7 @@ public final class CompareRankingCalculator {
             }
             String formula = rule.ratePct() != null
                     ? "%s %d~%d회차, 기준 보험료 × %s%%".formatted(rule.label(), from, to, plain(rule.ratePct()))
-                    : "%s %d~%d회차 · 정액".formatted(rule.label(), from, to);
+                    : "%s %d~%d회차, 정액".formatted(rule.label(), from, to);
             evidence.add(new Evidence("수령 예상액", formula, amount * (to - from + 1), "수수료 규칙", rule.policyVersion(), asOf));
         }
         rows.sort(Comparator.comparingInt(Row::installment));
@@ -153,8 +153,8 @@ public final class CompareRankingCalculator {
             }
             String span = "%s %d~%d회차".formatted(rule.label(), firstFrom(rule), firstTo(rule));
             evidence.add(rule.clawbackRatePct() == null
-                    ? new Evidence("환수 노출액", span + " · 환수 규칙 대상 아님", null, "환수 규칙", candidate.clawbackPolicyVersion(), asOf)
-                    : new Evidence("환수 노출액", span + " · 한도 반영 지급액 × 환수율 %s%%".formatted(plain(rule.clawbackRatePct())),
+                    ? new Evidence("환수 노출액", span + ", 환수 규칙 대상 아님", null, "환수 규칙", candidate.clawbackPolicyVersion(), asOf)
+                    : new Evidence("환수 노출액", span + ", 한도 반영 지급액 × 환수율 %s%%".formatted(plain(rule.clawbackRatePct())),
                             clawbackByRule[i], "환수 규칙", candidate.clawbackPolicyVersion(), asOf));
         }
     }

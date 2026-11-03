@@ -90,7 +90,8 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         ValidationRunType runType = ValidationRunType.valueOf(lockedRun.getRunType());
         if (!runType.isFinalizable()) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
-                    Map.of("from", runType.label() + " 실행", "to", ValidationRunStatus.FINALIZED.label()));
+                    Map.of("from", runType.label() + " 실행의 " + lockedRun.getStatus().label(),
+                            "to", ValidationRunStatus.FINALIZED.label()));
         }
 
         if (lockedRun.getStatus() != ValidationRunStatus.COMPLETED || lockedRun.getCurrentStep() != 8) {
