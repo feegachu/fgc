@@ -132,7 +132,7 @@ src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 
 | 통합 테스트 | `src/test/resources/application-test.yml` | 포함 | 포함 |
 | E2E | `frontend/scripts/e2e-server.mjs` | 포함 | 제외 |
 | AWS 개발·검증계 | `podman/fgc-app-combined.yaml:19`, `podman/fgc-app-was.yaml:19` (`SPRING_FLYWAY_LOCATIONS`) | 포함 | 포함 |
-| 신한 서버(11/18 최종 발표 시연) | `infra/shinhan/compose.yaml` `SPRING_FLYWAY_LOCATIONS` | 포함 — 이미 적용된 데모 이력 보존 목적 | 포함(2026-11-03부터) — 최종 시연을 이 서버에서 한다(주최측 요구, SRC-076). V77까지 적용된 뒤 추가돼, 배포 스크립트가 V66, V72, V73이 아직 없을 때만 그 실행에서 순서 밖 적용을 켠다(기본 false. 한 번 적용한 뒤 false로 다시 기동되는 것을 로컬 모의로 확인) |
+| 신한 서버(11/18 최종 발표 시연) | `infra/shinhan/compose.yaml` `SPRING_FLYWAY_LOCATIONS` | 포함 — 이미 적용된 데모 이력 보존 목적 | 포함(2026-11-03부터) — 최종 시연을 이 서버에서 한다(주최측 요구, SRC-076). V77까지 적용된 뒤 추가돼, 배포 스크립트가 V66, V72, V73이 아직 없을 때만 그 실행에서 순서 밖 적용을 켠다(기본 false. 한 번 적용한 뒤 false로 다시 기동되는 것을 로컬 모의로 확인). 되돌릴 때 `fgc.flyway_schema_history`에 66, 72, 73 가운데 하나라도 있으면 `db-backup-path.txt`가 가리키는 백업(`$state/backups/`)을 먼저 복원한 뒤 `previous/compose.yaml`로 띄운다. 이전 compose에는 `db/demo-agent`가 없어 Flyway가 '적용됐지만 로컬에 없는 마이그레이션'으로 기동을 멈추기 때문이다(SRC-076) |
 | 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 | 해당 없음 |
 
 - 따라서 **`db/demo`에 넣는 모든 행은 신한 prd에도 들어간다.** 시연 환경 밖으로 내보내면 안 되는 데이터나 대량 데이터(DAR-012)는 `db/demo`에 넣지 않는다(§50).

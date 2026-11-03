@@ -13,7 +13,7 @@ exec 9>"$state/deploy.lock"
 flock -n 9 || { echo 'Another Shinhan deployment is running'; exit 1; }
 release="$state/releases/$(date -u +%Y%m%dT%H%M%SZ)-${commit:0:12}-${BUILD_NUMBER:-manual}"
 mkdir -p "$release/nginx" "$release/previous" "$state/backups"
-trap 'echo "Shinhan production promotion failed; inspect DB/API/web state. Release: $release. DB is not automatically rolled back." >&2' ERR
+trap 'echo "Shinhan production promotion failed; inspect DB/API/web state. Release: $release. DB is not automatically rolled back. To roll back after fgc.flyway_schema_history has 66, 72 or 73, restore the backup named in $release/db-backup-path.txt first, then start previous/compose.yaml." >&2' ERR
 python3 "$helper" origin "$public_url" > "$release/origin.txt"
 mapfile -t public < "$release/origin.txt"
 origin=${public[0]}
