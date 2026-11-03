@@ -1378,6 +1378,27 @@ class PolicyWorkflowIntegrationTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029"})
+    void contractRegenerationRejectsInvalidReasonBeforeAnyWrites(String regime) throws Exception {
+        boolean seven = regime.equals("SEVEN_YEAR_2029");
+        long offering = insertOffering(seven, seven ? "2029-01-01" : "2027-01-01", "REASON-" + UUID.randomUUID());
+        jdbc.update("UPDATE fgc.product_offering SET fee_regime_code=? WHERE product_offering_id=?", regime, offering);
+        long contract = insertContract(offering, seven ? "2029-03-02" : "2027-03-02");
+        long audits = jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log", Long.class);
+        String path = "/api/v1/contracts/" + contract + "/schedules/regenerate";
+        for (String reason : new String[]{null, "", "   ", "가".repeat(41)}) {
+            var legacy = request(HttpMethod.POST, path).with(user(writer)).with(csrf());
+            if (reason != null) legacy.param("reason", reason);
+            mvc.perform(legacy).andExpect(status().isBadRequest());
+            ObjectNode body = mapper.createObjectNode();
+            if (reason != null) body.put("reason", reason);
+            writeError(HttpMethod.POST, path, body, writer, key(), 400);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=?", Long.class, contract)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log", Long.class)).isEqualTo(audits);
+    }
+
+    @ParameterizedTest
     @CsvSource({"false, 67", "true, 67", "true, 61"})
     void previewPersistsPolicyInstallmentsAndPreservesVersionsWithIdempotency(boolean seven, int longTermFrom) throws Exception {
         String regime = seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027";
@@ -1416,7 +1437,7 @@ class PolicyWorkflowIntegrationTest {
         ObjectNode payload = mapper.createObjectNode().put("reason", "4년 예정 검증").put("regime", regime)
                 .put("policyVersionId", policy).put("expectedSourceVersion", context.path("expectedSourceVersion").asText());
         String requestKey = key();
-        JsonNode generated = write(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, requestKey, 200);
+        JsonNode generated = concurrentPreviewWithSameKey(contract, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, requestKey);
         long header = generated.get(0).asLong();
         writeError(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, approver, requestKey, 403);
         assertThat(write(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, requestKey, 200)).isEqualTo(generated);
@@ -1778,6 +1799,35 @@ class PolicyWorkflowIntegrationTest {
 
     private static List<String> values(JsonNode array) {
         return StreamSupport.stream(array.spliterator(), false).map(JsonNode::asText).toList();
+    }
+
+    /** Hold the contract row so the first HTTP request keeps its advisory lock while the second arrives. */
+    private JsonNode concurrentPreviewWithSameKey(long contract, String path, ObjectNode payload, String requestKey) throws Exception {
+        try (var blocker = jdbc.getDataSource().getConnection(); var executor = Executors.newSingleThreadExecutor()) {
+            blocker.setAutoCommit(false);
+            try (var statement = blocker.prepareStatement("SELECT contract_id FROM fgc.insurance_contract WHERE contract_id=? FOR UPDATE")) {
+                statement.setLong(1, contract);
+                statement.executeQuery().close();
+            }
+            var first = executor.submit(() -> perform(HttpMethod.POST, path, payload, writer, requestKey));
+            try {
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                boolean acquired;
+                do {
+                    acquired = Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(hashtextextended(?,0))", Boolean.class, "schedule-preview:" + requestKey));
+                    if (!acquired) break;
+                    Thread.sleep(20);
+                } while (System.nanoTime() < deadline);
+                assertThat(acquired).as("first request holds the idempotency lock").isFalse();
+                assertThat(writeError(HttpMethod.POST, path, payload, writer, requestKey, 409).path("code").asText())
+                        .isEqualTo("FGC-IMPL-REQUEST_IN_PROGRESS");
+            } finally {
+                blocker.rollback();
+            }
+            MvcResult result = first.get(20, TimeUnit.SECONDS);
+            assertThat(result.getResponse().getStatus()).isEqualTo(200);
+            return mapper.readTree(result.getResponse().getContentAsString()).path("data");
+        }
     }
 
     private static List<MvcResult> concurrently(Callable<MvcResult> first, Callable<MvcResult> second) throws Exception {

@@ -127,6 +127,13 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     if (schedule) next.scheduleId = Number(schedule)
     return next
   }
+  // The shell adds the selected month after navigation; this is the same business context.
+  function locationContext(location: { pathname: string; search: string }) {
+    const params = new URLSearchParams(location.search)
+    if (!params.has('month')) params.set('month', month)
+    params.sort()
+    return `${location.pathname}?${params}`
+  }
   async function show(base: Selection, initial = false, acknowledge = false, replacePayment = false) {
     request.current?.abort()
     const controller = new AbortController(),
@@ -138,14 +145,14 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     setError('')
     runtime.current?.pause('REFRESHING')
     try {
-      const sourceLocation = current.current.location.pathname + current.current.location.search
+      const sourceLocation = locationContext(current.current.location)
       const next = initial || replacePayment ? base : collect(base)
       const evidence = await readEvidence(next, signal)
       signal.throwIfAborted()
       if (current.current.user.roleCode !== user.roleCode)
         throw new Error('권한이 바뀌었습니다. 현재 권한으로 다시 시작하세요.')
       if (token !== epoch.current) return
-      if (sourceLocation !== current.current.location.pathname + current.current.location.search)
+      if (sourceLocation !== locationContext(current.current.location))
         throw new Error('조회 중 화면이 바뀌었습니다. 현재 대상으로 다시 확인하세요.')
       if (!next.scheduleId && evidence.schedule?.header?.scheduleHeaderId)
         next.scheduleId = evidence.schedule.header.scheduleHeaderId

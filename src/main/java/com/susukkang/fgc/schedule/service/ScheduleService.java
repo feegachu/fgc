@@ -440,6 +440,7 @@ public class ScheduleService {
      */
     @Transactional
     public List<Long> regenerateContractSchedules(Long contractId, String reason) {
+        validateRegenerationReason(reason);
         if (contractId == null) {
             throw validationException("contractId", "계약 ID가 존재하지 않습니다.");
         }
@@ -1245,6 +1246,13 @@ public class ScheduleService {
         return policyRegime;
     }
 
+    private void validateRegenerationReason(String reason) {
+        if (reason == null || reason.isBlank())
+            throw validationException("reason", "재생성 사유는 필수입니다.");
+        if (reason.length() > 40)
+            throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
+    }
+
     /**
      * 설명 : FUN-039 새 스케줄 생성 , 기존 스케줄은 유지하고 상태,활성화 여부만 변경하고 새 스케줄 헤더와 라인을 생성한다.
      *
@@ -1256,11 +1264,7 @@ public class ScheduleService {
      */
     @Transactional
     public ScheduleRegenResponse regenerateSchedules(Long scheduleId, String reason) {
-        // 서비스 직접 호출에서도 재생성 사유의 필수값과 DB 최대 길이를 검증
-        if (reason == null || reason.isBlank())
-            throw validationException("reason", "재생성 사유는 필수입니다.");
-        if (reason.length() > 40)
-            throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
+        validateRegenerationReason(reason);
 
         // 기존 스케줄 헤더 조회 및 존재 여부 검증
         ScheduleHeaderInsertDTO oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
