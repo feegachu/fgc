@@ -19,6 +19,7 @@ import { toast } from '../../stores/toasts'
 import {
   criteriaFromParams,
   DEFAULT_PURPOSE,
+  FILTER_NAMES,
   listCsvPath,
   normalizePage,
   PAGE_SIZE,
@@ -34,7 +35,7 @@ import './schedule.css'
  * FGC-UI-SCHE-W01 예상 스케줄 목록. 1차 schedule/list.html · schedule-list.js 와 같은 문구·딥링크를 쓴다.
  * 검색조건은 URL 쿼리(contractNo·stage·regime·purpose·status·page)가 단일 출처다.
  */
-const FILTER_KEYS = { contractNo: '', stage: '', regime: '', purpose: '', status: '', sort: '', page: '' }
+const FILTER_KEYS = { contractNo: '', stage: '', regime: '', purpose: '', status: '', sort: '', page: '', selectedId: '' }
 const DEFAULT_FILTERS: ScheduleFilters = { contractNo: '', stage: '', regime: '', purpose: DEFAULT_PURPOSE, status: '' }
 
 const detailHref = (row: ScheduleHeader, back: string) =>
@@ -54,7 +55,7 @@ function hasDuplicateActiveOperational(rows: ScheduleHeader[]) {
 }
 
 // 열 너비는 1차 schedule.css 의 .schedule-col-* 와 같은 값이다.
-const columns = (back: string): TableColumn<ScheduleHeader>[] => [
+const columns = (back: string, refreshing: boolean): TableColumn<ScheduleHeader>[] => [
   {
     key: 'contractNo',
     label: '계약번호',
@@ -64,7 +65,7 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
     // 계약번호는 폭을 넓게 잡아 토글 없이 항상 전체를 보여준다(#326).
     render: (row) =>
       hasId(row) ? (
-        <ContextLink data-guide-feature="features.schedule.schedule-list-page.context-link" to={detailHref(row, back)}>{row.contractNo || EMPTY}</ContextLink>
+        <ContextLink data-guide-feature="features.schedule.schedule-list-page.context-link" to={detailHref(row, back)} aria-disabled={refreshing || undefined} tabIndex={refreshing ? -1 : undefined} onClick={(event) => { if (refreshing) event.preventDefault() }}>{row.contractNo || EMPTY}</ContextLink>
       ) : (
         row.contractNo || EMPTY
       ),
@@ -126,7 +127,7 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
     sortable: true,
     width: '5.5rem',
     align: 'left',
-    render: (row) => `${int(row.installmentCount)}회 · ${int(row.lineCount)}행`,
+    render: (row) => `${row.installmentCount == null ? '회차 자료 없음' : `${int(row.installmentCount)}회`} · ${row.lineCount == null ? '행 수 자료 없음' : `${int(row.lineCount)}행`}`,
   },
   {
     key: 'total',
@@ -135,7 +136,7 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
     width: '8.5rem',
     align: 'number',
     render: (row) => (
-      <span className={isNegative(row.expectedTotal) ? 'is-negative-amount' : undefined}>{won(row.expectedTotal)}</span>
+      <span className={isNegative(row.expectedTotal) ? 'is-negative-amount' : undefined}>{row.expectedTotal == null ? '자료 없음' : won(row.expectedTotal)}</span>
     ),
   },
   {
@@ -160,7 +161,7 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
       hasId(row) ? (
         <ContextLink data-guide-feature="features.schedule.schedule-list-page.context-link-2"
           className="button button-secondary schedule-row-button"
-          to={detailHref(row, back)}
+          to={detailHref(row, back)} aria-disabled={refreshing || undefined} tabIndex={refreshing ? -1 : undefined} onClick={(event) => { if (refreshing) event.preventDefault() }}
           aria-label={`${row.contractNo || '선택한 계약'} 회차 보기`}
         >
           회차 보기
@@ -195,7 +196,16 @@ export default function ScheduleListPage() {
       update({ page: outOfRange > 1 ? String(outOfRange) : '' }, { resetPage: false, replace: true })
   }, [outOfRange, criteria.page, update])
 
-  const search = (filters: ScheduleFilters) => update({ ...filters })
+  const search = (filters: ScheduleFilters) => {
+    update({ ...filters, selectedId: '' })
+    if (criteria.page === 1 && FILTER_NAMES.every((name) => criteria[name] === filters[name])) void list.refetch()
+  }
+  const reset = () => {
+    update({ ...DEFAULT_FILTERS, sort: '', selectedId: '' })
+    if (criteria.page === 1 && !criteria.sort && FILTER_NAMES.every((name) => criteria[name] === DEFAULT_FILTERS[name])) void list.refetch()
+  }
+  const previewResults = ['FOUR_YEAR_2027', 'SEVEN_YEAR_2029'].includes(criteria.regime)
+    || rows.some((row) => row.scheduleRegime === 'FOUR_YEAR_2027' || row.scheduleRegime === 'SEVEN_YEAR_2029')
 
   return (
     <div className="schedule-list-page">
@@ -205,7 +215,7 @@ export default function ScheduleListPage() {
           <h1 className="page-title">예상 스케줄 목록</h1>
         </div>
         <div className="page-header-actions">
-          <Button data-guide-feature="features.schedule.schedule-list-page.button" variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>
+          <Button data-guide-feature="features.schedule.schedule-list-page.button" variant="secondary" loading={exporting.isPending} disabled={list.isFetching || list.isError} onClick={() => exporting.mutate()}>
             <span className="material-symbols-rounded" aria-hidden="true">
               download
             </span>
@@ -219,10 +229,10 @@ export default function ScheduleListPage() {
         key={params.toString()}
         initial={criteria}
         onSearch={search}
-        onReset={() => search(DEFAULT_FILTERS)}
+        onReset={reset}
       />
 
-      <section data-guide-feature="features.schedule.schedule-list-page.section" data-guide-target="schedule.results" className="surface schedule-results-card" aria-labelledby="schedule-results-title">
+      <section data-guide-feature="features.schedule.schedule-list-page.section" data-guide-target="schedule.results" className="surface schedule-results-card" aria-busy={list.isFetching} aria-labelledby="schedule-results-title">
         <ListHeader
           className="schedule-results-header"
           total={data ? data.totalElements ?? 0 : null}
@@ -232,6 +242,9 @@ export default function ScheduleListPage() {
             예상스케줄
           </h2>
         </ListHeader>
+
+        {previewResults && <p className="schedule-data-warning">4년·7년 스케줄은 예정 결과이며 지급 확정 대상이 아닙니다.</p>}
+        {list.isFetching && data && <p role="status">스케줄을 갱신 중입니다. 조회가 끝나면 결과를 확인해 주세요.</p>}
 
         {hasDuplicateActiveOperational(rows) && (
           <div className="schedule-data-warning" role="alert">
@@ -255,7 +268,7 @@ export default function ScheduleListPage() {
             className="schedule-table"
             viewportClassName="schedule-table-viewport"
             caption="예상 지급 스케줄 검색 결과"
-            columns={columns(location.pathname + location.search)}
+            columns={columns(location.pathname + location.search, list.isFetching)}
             selectedKeys={[params.get('selectedId') ?? '']}
             {...sortBinding(criteria.sort, SCHEDULE_SORT_KEYS, (sort) => update({ sort }))}
             rows={rows}

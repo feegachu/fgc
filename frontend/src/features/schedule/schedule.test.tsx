@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -167,6 +167,70 @@ describe('1차 schedule-list.test.cjs 이전', () => {
 })
 
 describe('SCHE-W01 예상 스케줄 목록', () => {
+  it('#725 페이지 갱신 중 이전 결과를 표시하고 상세 이동·CSV를 잠근다', async () => {
+    let finish!: (value: ReturnType<typeof listPage>) => void
+    const pending = new Promise<ReturnType<typeof listPage>>((resolve) => { finish = resolve })
+    const { actions, router } = renderAt('/schedules?month=2026-07', (url) => {
+      if (!url.startsWith('/api/v1/schedules?')) return undefined
+      return query(url).page === '2' ? pending : listPage([header(11)], { totalPages: 2, totalElements: 21 })
+    })
+    await screen.findByRole('link', { name: 'C-2026-0001 회차 보기' })
+    await actions.click(screen.getByRole('button', { name: '2' }))
+    expect(await screen.findByText(/스케줄을 갱신 중입니다/)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'C-2026-0001 회차 보기' })
+    expect(link).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeDisabled()
+    await actions.click(link)
+    expect(router.state.location.pathname).toBe('/schedules')
+    await act(async () => finish(listPage([header(22, { contractNo: 'C-PAGE-2' })], { page: 2, totalPages: 2, totalElements: 21 })))
+    expect(await screen.findByRole('link', { name: 'C-PAGE-2 회차 보기' })).not.toHaveAttribute('aria-disabled')
+    expect(screen.queryByText(/스케줄을 갱신 중입니다/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeEnabled()
+  })
+
+  it('#725 초기화는 정렬·선택·페이지를 지우고 같은 조건의 검색도 다시 조회한다', async () => {
+    const { actions, router } = renderAt('/schedules?month=2026-07&sort=total,desc&selectedId=11&page=2', (url) =>
+      url.startsWith('/api/v1/schedules?') ? listPage([header(11)], { totalPages: 2 }) : undefined,
+    )
+    await screen.findByRole('link', { name: 'C-2026-0001 회차 보기' })
+    await actions.click(screen.getByRole('button', { name: /초기화/ }))
+    await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&purpose=OPERATIONAL'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeEnabled())
+    const count = calls('/api/v1/schedules?').length
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(calls('/api/v1/schedules?').length).toBeGreaterThan(count))
+    expect(requested.every(({ options }) => !options?.method || options.method === 'GET')).toBe(true)
+  })
+
+  it('#725 예정 안내와 실제 회차·행 수, 자료 없음·0원·음수를 구분한다', async () => {
+    renderAt('/schedules?regime=SEVEN_YEAR_2029', (url) => url.startsWith('/api/v1/schedules?') ? listPage([
+      header(11, { scheduleRegime: 'SEVEN_YEAR_2029', installmentCount: 84, lineCount: 108, expectedTotal: 0 }),
+      header(12, { expectedTotal: undefined, installmentCount: undefined, lineCount: undefined }),
+      header(13, { expectedTotal: -1000 }),
+    ]) : undefined)
+    expect(await screen.findByText('84회 · 108행')).toBeInTheDocument()
+    expect(screen.getByText('회차 자료 없음 · 행 수 자료 없음')).toBeInTheDocument()
+    expect(screen.getByText('자료 없음')).toBeInTheDocument()
+    expect(screen.getByText('0원')).toBeInTheDocument()
+    expect(screen.getByText('-1,000원')).toBeInTheDocument()
+    expect(screen.getByText(/예정 결과이며 지급 확정 대상이 아닙니다/)).toBeInTheDocument()
+  })
+
+  it('#725 이전 체계의 늦은 응답이 현재 선택한 체계를 덮어쓰지 않는다', async () => {
+    let finish!: (value: ReturnType<typeof listPage>) => void
+    const pending = new Promise<ReturnType<typeof listPage>>((resolve) => { finish = resolve })
+    renderAt('/schedules?month=2026-07&regime=FOUR_YEAR_2027', (url) => {
+      if (!url.startsWith('/api/v1/schedules?')) return undefined
+      return query(url).regime === 'FOUR_YEAR_2027' ? pending : listPage([header(22, { contractNo: 'C-SEVEN' })])
+    })
+    fireEvent.change(await screen.findByLabelText('적용 체계'), { target: { value: 'SEVEN_YEAR_2029' } })
+    await screen.findByRole('link', { name: 'C-SEVEN 회차 보기' })
+    await act(async () => finish(listPage([header(11, { contractNo: 'C-FOUR' })])))
+    expect(screen.getByRole('link', { name: 'C-SEVEN 회차 보기' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'C-FOUR 회차 보기' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('적용 체계')).toHaveValue('SEVEN_YEAR_2029')
+  })
+
   it('#1 URL 조건으로 조회·라벨·금액 표시·페이지·URL 동기화·CSV 가 1차와 같다', async () => {
     const rows = [
       header(11),
