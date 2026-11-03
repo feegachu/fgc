@@ -13,7 +13,7 @@
 .app-shell:has(.pico-assistant-root) .page-content {
   padding-bottom: calc(var(--space-8) + 120px);
 }
-/* Adopt the agent-home AI launcher treatment without coupling page styles. */
+/* Internal AI uses the admin blue palette; agent-home keeps its own purple styles. */
 @property --pico-launcher-angle {
   syntax: "<angle>";
   inherits: false;
@@ -30,12 +30,12 @@
   border: 1.5px solid transparent;
   border-radius: 16px;
   background: linear-gradient(#fff, #fff) padding-box,
-    conic-gradient(from var(--pico-launcher-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box;
+    conic-gradient(from var(--pico-launcher-angle), #467aa2, #9bc9e8, #5e9bca, #3574a2, #c4e0f2, #467aa2) border-box;
   animation: pico-launcher-border-spin 3.4s linear infinite;
   box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
   font-size: 12px;
   font-weight: 600;
-  color: #382450;
+  color: #315e80;
   white-space: nowrap;
 }
 .pico-launcher-button {
@@ -492,6 +492,20 @@
   color: var(--color-steel-700);
   overflow-wrap: anywhere;
 }
+.pico-assistant-root.has-active-guide .pico-launcher {
+  left: 11px;
+  right: auto;
+  bottom: 78px;
+}
+.pico-assistant-root.has-active-guide .pico-launcher-button {
+  width: 56px;
+  height: 56px;
+}
+.pico-assistant-root.has-active-guide .pico-launcher-button img {
+  width: 52px;
+  height: 52px;
+}
+.pico-assistant-root.has-active-guide .pico-launcher-hint { display: none; }
 .pico-composer {
   position: relative;
 }

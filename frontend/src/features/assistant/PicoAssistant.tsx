@@ -214,8 +214,11 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   const guideActive =
     runtimeSession != null && !['PAUSED', 'COMPLETED', 'CANCELLED', 'ERROR'].includes(runtimeSession.status)
   const otherGuideActive = workflowActive || paymentActive || settlementActive
-  if (otherGuideActive && open) setOpen(false)
-  const visible = open && !guideActive && !otherGuideActive
+  useEffect(() => useWorkflowGuide.subscribe((state, previous) => {
+    if ((state.active && !previous.active) || (state.paymentActive && !previous.paymentActive)
+      || (state.settlementActive && !previous.settlementActive)) setOpen(false)
+  }), [])
+  const visible = open && !guideActive
   const [tab, setTab] = useState<'chat' | 'plan'>('chat')
   const [input, setInput] = useState('')
   const [pickedScenario, setPickedScenario] = useState<PaymentScenario>('PAY-02')
@@ -426,8 +429,8 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     setPlanError('')
   }
   return (
-    <div className="pico-assistant-root">
-      {!visible && !otherGuideActive && (
+      <div className={`pico-assistant-root${otherGuideActive ? ' has-active-guide' : ''}`}>
+      {!visible && (
         <div className="pico-launcher">
           <button
             id={`${panelId}-launcher`}
@@ -437,6 +440,8 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
             aria-controls={panelId}
             onClick={() => {
               if (guideActive) useGuideRuntime.getState().pause()
+              useWorkflowGuide.getState().requestChat()
+              if (otherGuideActive) setTab('chat')
               setOpen(true)
             }}
           >

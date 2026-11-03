@@ -11,7 +11,7 @@ function Card({ target }: { target: HTMLElement | null }) {
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
-it('keeps a top-anchored card stable when CSS supplies a default bottom inset', () => {
+it('attaches below the real target and keeps the opposite inset clear on repeated resizes', () => {
   vi.useFakeTimers()
   let resize: (() => void) | undefined
   vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback } observe() {} disconnect() {} })
@@ -30,7 +30,7 @@ it('keeps a top-anchored card stable when CSS supplies a default bottom inset', 
     render(<Card target={target} />)
     act(() => { vi.advanceTimersByTime(20) })
     const card = screen.getByRole('region', { name: 'Guide card' })
-    expect(card).toHaveStyle({ top: '16px', bottom: 'auto', right: '16px', left: 'auto' })
+    expect(card).toHaveStyle({ top: '524px', bottom: 'auto', right: 'auto', left: '270px', width: '360px' })
     const stable = card.getAttribute('style')
     for (let index = 0; index < 5; index++) {
       act(() => { resize?.(); vi.advanceTimersByTime(20) })

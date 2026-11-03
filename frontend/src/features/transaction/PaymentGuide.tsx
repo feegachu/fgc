@@ -12,6 +12,7 @@ import type { GuideDefinition } from '../assistant/guide/types'
 import { getPaymentGuideObserver, subscribePaymentGuide, paymentGuideConditions } from './payment-guide'
 import type { PaymentGuideObserver, PaymentGuideState } from './payment-guide'
 import './payment-guide.css'
+import guideMascot from '../assistant/assets/pico-guide.png'
 
 interface Props {
   initialWorkflowId?: string | null
@@ -75,6 +76,12 @@ function GuideSession({
   }, [snapshot.workflowId, snapshot.step])
   const revision = useSyncExternalStore(observer.subscribe, observer.getViewRevision)
   const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => useWorkflowGuide.subscribe((state, previous) => {
+    if (state.chatSequence !== previous.chatSequence) {
+      runtime.pause('USER_PAUSED')
+      setCollapsed(true)
+    }
+  }), [runtime])
   useEffect(() => {
     useWorkflowGuide.setState({ paymentActive: !collapsed && !['PAUSED', 'ERROR'].includes(snapshot.status) })
   }, [collapsed, snapshot.status])
@@ -216,9 +223,15 @@ function GuideSession({
     await runtime.resume()
     if (runtime.getSnapshot().reasonCode === 'ENTITY_CHANGED_RESTART_REQUIRED' && current) {
       // A newly issued payment ID can be revalidated at the saved-result step; other selections restart at scope.
+      let saved = false
+      if (snapshot.step?.stepId === 'payment.save') {
+        const latest = await observer.readBusinessState(observer.readContext(), AbortSignal.timeout(5000))
+        saved = latest.saved
+        setAssessment({ key, state: latest })
+      }
       await start(
         current,
-        snapshot.step?.stepId === 'payment.save' && state?.saved ? 'payment.save' : current.steps[0].stepId,
+        snapshot.step?.stepId === 'payment.save' && saved ? 'payment.save' : current.steps[0].stepId,
       )
     }
   }
@@ -285,26 +298,18 @@ function GuideSession({
         style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}
         aria-label="지급 업무 가이드"
         data-guide-status={snapshot.status}
+        data-guide-anchored={Boolean(snapshot.target && !folded && !paused && !modalOpen)}
       >
         <header className="payment-guide-header">
-          <svg className="payment-guide-mascot" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="3" y="6" width="22" height="18" rx="7" fill="currentColor" opacity=".12" />
-            <path
-              d="M8 17c2 3 10 3 12 0M14 3v3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <circle cx="9" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="19" cy="12" r="1.5" fill="currentColor" />
-          </svg>
-          <span>
-            업무 가이드
+          <img className="payment-guide-mascot" src={guideMascot} alt="" />
+          <div className="payment-guide-heading">
+            <small>피코의 단계별 가이드
             {current && step
               ? ` · ${current.steps.findIndex((entry) => entry.stepId === step.stepId) + 1}/${current.steps.length}`
               : ''}
-          </span>
+            </small>
+            <h2 ref={heading} tabIndex={-1}>{title}</h2>
+          </div>
           {!confirmed && (
             <Button data-guide-feature="features.transaction.payment-guide.button" variant="ghost" onClick={() => setCollapsed(!collapsed)}>
               {folded ? '펼치기' : '접기'}
@@ -316,9 +321,9 @@ function GuideSession({
         </header>
         {!folded && (
           <>
-            <h2 ref={heading} tabIndex={-1}>
-              {title}
-            </h2>
+            {current && step && <div className="payment-guide-progress" aria-hidden="true">
+              {current.steps.map((entry, index) => <span key={entry.stepId} className={index < current.steps.findIndex((candidate) => candidate.stepId === step.stepId) ? 'is-done' : entry.stepId === step.stepId ? 'is-current' : ''} />)}
+            </div>}
             <div aria-live="polite" aria-atomic="true">
               {confirmed ? (
                 <p>
@@ -341,7 +346,7 @@ function GuideSession({
                 </p>
               )}
               {!confirmed && !complete && step && (
-                <p className="payment-guide-condition">
+                <p className={`payment-guide-condition${canNext && !paused ? ' is-ready' : ''}`}>
                   {paused
                     ? (reasons[snapshot.reasonCode ?? ''] ??
                       '안내가 중단되었습니다. 현재 화면을 확인하고 다시 찾으세요.')
@@ -409,6 +414,7 @@ function GuideSession({
               ) : (
                 <>
                   <Button data-guide-feature="features.transaction.payment-guide.button-9"
+                    className="pico-guide-back"
                     variant="secondary"
                     disabled={working || snapshot.status === 'PREPARING' || !runtime.canGoBack()}
                     onClick={() => void run(() => runtime.previous())}
@@ -416,6 +422,7 @@ function GuideSession({
                     이전
                   </Button>
                   <Button data-guide-feature="features.transaction.payment-guide.button-10"
+                    className="pico-guide-next"
                     disabled={!canNext || working || snapshot.status === 'PREPARING'}
                     onClick={() => void run(next)}
                   >

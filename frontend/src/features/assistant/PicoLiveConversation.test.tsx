@@ -454,10 +454,14 @@ it.each(['general', 'before-draft'] as const)('invalidates %s answer actions on 
   expect(useWorkflowGuide.getState().request).toBeNull()
 })
 
-it.each(['active', 'paymentActive', 'settlementActive'] as const)('does not queue a launcher click during another guide: %s', async (state) => {
+it.each(['active', 'paymentActive', 'settlementActive'] as const)('explicitly opens follow-up chat during a guide and sends a pause signal: %s', async (state) => {
   render(<PicoAssistant canProcess />)
   act(() => useWorkflowGuide.setState({ [state]: true }))
-  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
+  const sequence = useWorkflowGuide.getState().chatSequence
+  await open()
+  expect(useWorkflowGuide.getState().chatSequence).toBe(sequence + 1)
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
   act(() => useWorkflowGuide.setState({ [state]: false }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toHaveTextContent('업무 비서 AI')

@@ -16,6 +16,8 @@ import type { Selection, Evidence, Decision } from './state'
 import { guideGet, readEvidence } from './api'
 import { destinations, settlementCatalog, titles, FLOW_VERSION } from './catalog'
 import './settlement.css'
+import guideMascot from '../assets/pico-guide.png'
+import { useWorkflowGuide } from '../workflow-state'
 
 const id = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
@@ -45,6 +47,14 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   const request = useRef<AbortController | null>(null)
   const epoch = useRef(0)
   const acknowledged = useRef('')
+  useEffect(() => useWorkflowGuide.subscribe((state, previous) => {
+    if (state.chatSequence !== previous.chatSequence) {
+      request.current?.abort()
+      setBusy(false)
+      setCollapsed(true)
+      runtime.current?.pause('USER_PAUSED')
+    }
+  }), [])
   const current = useRef({ location, user, selection })
   useLayoutEffect(() => {
     current.current = { ...current.current, location, user, selection }
@@ -316,15 +326,18 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     void navigate(path)
   }
   return (
+    <>
+    {position.box && !collapsed && snapshot?.target && <div className="payment-guide-spotlight" style={position.box} aria-hidden="true" />}
     <aside
       ref={card}
       style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
       className="settlement-guide"
+      data-guide-anchored={Boolean(snapshot?.target && !collapsed)}
       aria-label="전체 업무 가이드"
       aria-busy={busy}
     >
       <header>
-        <img src="/images/brand/agent-mascot.png" alt="" className="settlement-guide-mascot" width="32" height="32" />
+        <img src={guideMascot} alt="" className="settlement-guide-mascot" width="40" height="40" />
         <strong>전체 업무 가이드</strong>
         {selection && (
           <button type="button" onClick={() => setCollapsed((value) => !value)}>
@@ -335,6 +348,9 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
           종료
         </button>
       </header>
+      {!collapsed && (
+        <div className="payment-guide-progress" aria-hidden="true">{STEPS.map((step, index) => <span key={step} className={index < STEPS.indexOf(decision?.step ?? 'contract.create') ? 'is-done' : step === decision?.step ? 'is-current' : ''} />)}</div>
+      )}
       {!collapsed && (
         <p>
           {month} · {(selection?.stage ?? stage) === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'} ·{' '}
@@ -378,11 +394,11 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
           ) : (
             <div className="settlement-guide-actions">
               {decision?.step === 'schedule.review' && (
-                <button disabled={busy} onClick={() => void show(selection, false, true)}>
+                <button className="pico-guide-next" disabled={busy} onClick={() => void show(selection, false, true)}>
                   스케줄 확인 완료
                 </button>
               )}
-              <button disabled={busy} onClick={() => void show(selection)}>
+              <button className="pico-guide-next" disabled={busy} onClick={() => void show(selection)}>
                 현재 결과로 이어서 안내
               </button>
             </div>
@@ -438,5 +454,6 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       {error && <p role="alert">{error}</p>}
       {!collapsed && <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>}
     </aside>
+    </>
   )
 }

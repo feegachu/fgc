@@ -396,7 +396,9 @@ function TransactionForm({
       )
         throw new Error('저장된 지급 초안을 확인할 수 없습니다.')
       // Guide evidence can expire while the server commits the same payment.
-      setGuideSaved(observer.acceptSaved(operation, saved))
+      observer.acceptSaved(operation, saved)
+      // A guide revision must not turn a successful same-payment business save into unsaved AI context.
+      setGuideSaved(true)
       setPaymentId(String(saved.commissionTransactionId))
       setForm(initialForm(month, saved))
       setRows(draftRows(saved))

@@ -846,6 +846,33 @@ describe('read-only guide projection on the real payment form', () => {
 })
 
 describe('FUN-087 real form observer', () => {
+  it.each(['changed revision', 'rejected evidence'])(
+    'keeps a successful draft update when guide evidence has %s',
+    async (failure) => {
+      vi.stubEnv('VITE_ASSISTANT_AI', 'true')
+      const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+      const amount = await screen.findByLabelText(/금액 \(원\)/)
+      await waitFor(() => expect(amount).toBeEnabled())
+      await user.clear(amount)
+      await user.type(amount, '123000')
+      const observer = getPaymentGuideObserver()!
+      if (failure === 'rejected evidence') vi.spyOn(observer, 'acceptSaved').mockReturnValue(false)
+      mutation = () => {
+        if (failure === 'changed revision') observer.invalidateInput()
+        return { ...saved, amount: 123000 }
+      }
+
+      await user.click(button('btn-save'))
+
+      await waitFor(() => expect(button('btn-precheck')).toBeEnabled(), { timeout: 1000 })
+      expect(clients[0].getQueryData(draftQuery('77').queryKey)).toMatchObject({ amount: 123000 })
+      await waitFor(() => expect(useGuideRuntime.getState().observation?.saved).toBe(true))
+      expect(screen.queryByText('저장된 지급 초안을 확인할 수 없습니다.')).not.toBeInTheDocument()
+      expect(writes().filter(([, options]) => options?.method === 'PUT')).toHaveLength(1)
+    },
+    15_000,
+  )
+
   const read = async () => {
     const observer = getPaymentGuideObserver()!
     const context = observer.readContext()
