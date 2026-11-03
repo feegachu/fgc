@@ -1,3 +1,4 @@
+import { useUnsavedWorkStore } from '../../../stores/unsavedWork'
 import { useSpotlight } from '../guide/useSpotlight'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -47,9 +48,8 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   const runtime = useRef<GuideRuntime<Evidence> | null>(null)
   const request = useRef<AbortController | null>(null)
   const epoch = useRef(0)
-  const dirtyForm = useRef<Element | null>(null)
   const acknowledged = useRef('')
-  const current = useRef({ location, user, selection, dirty: false })
+  const current = useRef({ location, user, selection })
   useLayoutEffect(() => {
     current.current = { ...current.current, location, user, selection }
   })
@@ -66,8 +66,6 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         request.current?.abort()
         setBusy(false)
         setCollapsed(true)
-        current.current.dirty = true
-        dirtyForm.current = (event.target as HTMLElement).closest('form, [data-transaction-form]')
         runtime.current?.pause('INPUT_CHANGED')
       }
     }
@@ -86,7 +84,6 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     }
   }, []) // Shell-owned lifetime, no persisted progress.
   useEffect(() => {
-    if (!dirtyForm.current?.isConnected) current.current.dirty = false
     runtime.current?.contextChanged()
   }, [location.pathname, location.search, user.roleCode])
   useEffect(() => {
@@ -196,7 +193,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       const routes = destinations(next)
       const destination = routes[result.step]
       const paymentContext = getPaymentGuideObserver()?.readContext()
-      const dirty = paymentContext?.dirty ?? (current.current.dirty && !!dirtyForm.current?.isConnected)
+      const dirty = Boolean(paymentContext?.dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
       const pathNow = current.current.location.pathname
       const destinationUrl = new URL(destination.path, 'https://guide.local')
       const currentParams = new URLSearchParams(current.current.location.search)
@@ -275,6 +272,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       runner.observe(() => setSnapshot(runner.getSnapshot()))
       // A screen ID alone cannot distinguish another entity or a different tab on the same route.
       if (needsNavigation) {
+        if (allowDiscard) useUnsavedWorkStore.setState({ owners: {} })
         await navigate(destination.path)
         while (
           current.current.location.pathname !== destinationUrl.pathname ||
@@ -353,11 +351,12 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   }
   function revisit(path: string, allowDiscard = false) {
     const dirty =
-      getPaymentGuideObserver()?.readContext().dirty ?? (current.current.dirty && !!dirtyForm.current?.isConnected)
+      Boolean(getPaymentGuideObserver()?.readContext().dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
     if (dirty && !allowDiscard) {
       setLeave(() => () => revisit(path, true))
       return
     }
+    if (allowDiscard) useUnsavedWorkStore.setState({ owners: {} })
     runtime.current?.pause('USER_NAVIGATION')
     setCollapsed(true)
     void navigate(path)
@@ -369,13 +368,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       )}
       <aside
         ref={card}
-        style={{
-          left: 'auto',
-          right: 'auto',
-          top: 'auto',
-          bottom: 'auto',
-          ...(collapsed ? { top: 80, right: 16 } : position.card),
-        }}
+        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
         className="settlement-guide"
         aria-label="전체 업무 가이드"
         aria-busy={busy}

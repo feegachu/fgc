@@ -2,6 +2,7 @@ import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { SaveGuide } from '../assistant/guide/save-guide'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
@@ -95,7 +96,7 @@ function Detail({ item }: { item: ExceptionCase }) {
         <dt>참조</dt>
         <dd className="tabular-nums">
           {item.sourceLink ? (
-            <Link className="button button-secondary" to={item.sourceLink}>
+            <Link data-guide-feature="features.exception.action-panel.link" className="button button-secondary" to={item.sourceLink}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 open_in_new
               </span>
@@ -110,7 +111,7 @@ function Detail({ item }: { item: ExceptionCase }) {
         <div className="exception-detail-wide">
           <dt>계산근거</dt>
           <dd>
-            <Link className="button button-secondary" to={item.capBasisLink}>
+            <Link data-guide-feature="features.exception.action-panel.link-2" className="button button-secondary" to={item.capBasisLink}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 calculate
               </span>
@@ -138,10 +139,12 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const valid = actions.some(action => action.type === actionType) && Boolean(reason.trim()) && reason.trim().length <= 1000
   const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, reason, evidenceRef])
   useEffect(() => { saveGuide.update(context, valid) }, [saveGuide, context, valid])
+  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]))
   const mutation = useMutation({
     mutationFn: () => { saveGuide.begin(); return postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }) },
     meta: { errorToast: false },
     onSuccess: async (action) => {
+      clearUnsaved()
       if (!mounted.current) return
       let continueGuide: boolean
       try {
@@ -186,11 +189,11 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
     if (valid) mutation.mutate()
   }
   return (
-    <form data-guide-scope="exception-action" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
+    <form data-guide-feature="features.exception.action-panel.form" data-guide-scope="exception-action" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
       <ScreenHelp screenId="EXCP-W01" variant="action" saveGuide={saveGuide} outcome="processing" />
       <fieldset data-guide-target="exception.actionInput" disabled={mutation.isPending || needsRefresh} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--space-3)' }}>
       <Field label="조치" required>
-        <select className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
+        <select data-guide-feature="features.exception.action-panel.select" className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
           <option value="">조치를 선택하세요</option>
           {actions.map((action) => (
             <option key={action.type} value={action.type}>
@@ -200,7 +203,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
         </select>
       </Field>
       <Field label="처리 사유" required>
-        <textarea
+        <textarea data-guide-feature="features.exception.action-panel.textarea"
           className="textarea-control"
           maxLength={1000}
           placeholder="판단 근거와 처리 내용을 입력하세요."
@@ -209,7 +212,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
         />
       </Field>
       <Field label="증빙">
-        <input
+        <input data-guide-feature="features.exception.action-panel.input"
           type="text"
           placeholder="문서번호 또는 링크"
           value={evidenceRef}
@@ -222,7 +225,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
           {error}
         </p>
       )}
-      <Button
+      <Button data-guide-feature="features.exception.action-panel.button"
         data-guide-target="exception.actionSave"
         type="submit"
         className="exception-action-submit"
@@ -246,7 +249,7 @@ export function ActionPanel({ item }: { item: ExceptionCase }) {
       <Detail item={item} />
       {actionable && canHandle && <ActionForm item={item} onStarted={() => setCorrectionOpen(true)} />}
       {isCorrection && canHandle && item.status !== 'NEW' && (
-        <Button variant="secondary" className="journal-correction-open" onClick={() => setCorrectionOpen(true)}>
+        <Button data-guide-feature="features.exception.action-panel.button-2" variant="secondary" className="journal-correction-open" onClick={() => setCorrectionOpen(true)}>
           <span className="material-symbols-rounded" aria-hidden="true">
             receipt_long
           </span>

@@ -34,7 +34,7 @@ const contextKeys = [
 export function checkGuideProposal(
   response: MessageResult,
   context: AssistantContext,
-  options: { mode?: 'server' | 'synthetic'; now: number },
+  options: { mode?: 'server' | 'synthetic'; now: number; role?: string },
 ) {
   const proposal = response.workflowProposal
   if (response.outcome !== 'GUIDE_READY' || !proposal) return { ok: false, reason: 'NO_PROPOSAL' } as const
@@ -47,6 +47,11 @@ export function checkGuideProposal(
     return { ok: false, reason: 'EXPIRED' } as const
   const definition = findGuide(proposal.workflowId, proposal.guideVersion)
   if (!definition) return { ok: false, reason: 'UNREGISTERED_GUIDE' } as const
+  if (definition.requiredSlots.some((slot) => context[slot] == null || context[slot] === ''))
+    return { ok: false, reason: 'MISSING_REQUIRED_CONTEXT' } as const
+  if (options.role && !definition.roles.some((role) => role === options.role))
+    return { ok: false, reason: 'ROLE_DENIED' } as const
+  if (options.mode !== 'synthetic' && !options.role) return { ok: false, reason: 'ROLE_REQUIRED' } as const
   return { ok: true, definition } as const
 }
 
@@ -62,6 +67,10 @@ export function checkCalculationRecommendation(
   if (!Number.isFinite(options.now) || !Number.isFinite(expiry) || expiry <= options.now)
     return { ok: false, reason: 'EXPIRED' } as const
   const scope = result.resolvedScope
+  if (!scope || ['paymentId', 'contractId', 'settlementMonth', 'paymentStage'].some((key) => !(key in scope)))
+    return { ok: false, reason: 'UNRESOLVED_SCOPE' } as const
+  if ((result.mode === 'HYPOTHETICAL') !== (result.evidenceKind === 'HYPOTHETICAL'))
+    return { ok: false, reason: 'EVIDENCE_KIND_MISMATCH' } as const
   if (scope && contextKeys.some((key) => key in scope && scope[key] !== context[key])) {
     return { ok: false, reason: 'CONTEXT_CHANGED' } as const
   }

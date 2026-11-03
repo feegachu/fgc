@@ -336,7 +336,7 @@ export default function ReconciliationPage() {
       width: '4rem',
       align: 'left',
       render: (row) => (
-        <Button
+        <Button data-guide-feature="features.reconciliation.reconciliation-page.button"
           variant="ghost"
           disabled={row.reconciliationResultId == null}
           aria-label={`대사 결과 ${row.reconciliationResultId} 비교 보기`}
@@ -353,7 +353,7 @@ export default function ReconciliationPage() {
         <ScreenHelp screenId="RECO-W01" saveGuide={executionGuide} outcome="execution" />
         <h1 className="page-title">대사 실행/결과</h1>
       </header>
-      <section data-guide-target="reconciliation.filters" className="surface reco-react-run">
+      <section data-guide-feature="features.reconciliation.reconciliation-page.section" data-guide-target="reconciliation.filters" className="surface reco-react-run">
         <header className="surface-header reco-react-panel-header">
           <h2 className="surface-title">대사 실행</h2>
         </header>
@@ -391,7 +391,7 @@ export default function ReconciliationPage() {
         {bulkMessage?.runId === runId && (
           <p className="reco-react-note" role="status">
             {bulkMessage.message}{' '}
-            <Link to={month ? withMonth(exceptionHref, month) : exceptionHref}>예외함에서 확인</Link>
+            <Link data-guide-feature="features.reconciliation.reconciliation-page.link" to={month ? withMonth(exceptionHref, month) : exceptionHref}>예외함에서 확인</Link>
           </p>
         )}
       </section>
@@ -407,7 +407,7 @@ export default function ReconciliationPage() {
         </p>
       )}
       <div className="reco-react-grid">
-        <section
+        <section data-guide-feature="features.reconciliation.reconciliation-page.section-2"
           data-guide-target="reconciliation.results"
           className="surface reco-react-results"
           aria-label="대사 결과"
@@ -422,7 +422,7 @@ export default function ReconciliationPage() {
                 <label className="filter-field-label" htmlFor="reco-result-type">
                   결과 유형
                 </label>
-                <select
+                <select data-guide-feature="features.reconciliation.reconciliation-page.reco-result-type"
                   id="reco-result-type"
                   className="field-control select-control"
                   value={type}
@@ -436,7 +436,7 @@ export default function ReconciliationPage() {
                   ))}
                 </select>
                 <label className="filter-checkbox">
-                  <input
+                  <input data-guide-feature="features.reconciliation.reconciliation-page.input"
                     type="checkbox"
                     checked={onlyMismatch}
                     onChange={(e) =>
@@ -499,7 +499,7 @@ export default function ReconciliationPage() {
             onPageChange={(page) => update({ resultPage: String(page) }, { resetPage: false })}
           />
         </section>
-        <section className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching} data-guide-target="reconciliation.history">
+        <section data-guide-feature="features.reconciliation.reconciliation-page.section-3" className="surface reco-react-history" aria-label="실행 이력" aria-busy={history.isFetching} data-guide-target="reconciliation.history">
           <ListHeader className="reco-react-panel-header" total={history.data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">실행 이력</h2>
           </ListHeader>
@@ -591,13 +591,13 @@ function RunFilters({
         onSubmit={() => submit('search')}
         actions={
           <>
-            <Button type="submit">
+            <Button data-guide-feature="features.reconciliation.reconciliation-page.button-2" type="submit">
               <span className="material-symbols-rounded" aria-hidden="true">
                 search
               </span>
               조회
             </Button>
-            <Button
+            <Button data-guide-feature="features.reconciliation.reconciliation-page.button-3"
               data-guide-target="reconciliation.execute"
               loading={pending}
               disabled={
@@ -617,7 +617,7 @@ function RunFilters({
               )}
               대사 실행
             </Button>
-            <Button variant="secondary" disabled={bulkDisabled} onClick={onBulk}>
+            <Button data-guide-feature="features.reconciliation.reconciliation-page.button-4" variant="secondary" disabled={bulkDisabled} onClick={onBulk}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 playlist_add
               </span>
@@ -627,7 +627,7 @@ function RunFilters({
         }
       >
         <Field label="정산월" variant="filter" required>
-          <input type="month" value={fields.month} onChange={(e) => setFields({ ...fields, month: e.target.value })} />
+          <input data-guide-feature="features.reconciliation.reconciliation-page.input-2" type="month" value={fields.month} onChange={(e) => setFields({ ...fields, month: e.target.value })} />
         </Field>
         <Field
           label="지급단계"
@@ -639,7 +639,7 @@ function RunFilters({
             </span>
           }
         >
-          <select
+          <select data-guide-feature="features.reconciliation.reconciliation-page.select"
             className="select-control"
             value={fields.stage}
             onChange={(e) => setFields({ ...fields, stage: e.target.value })}
@@ -653,7 +653,7 @@ function RunFilters({
           </select>
         </Field>
         <Field label="보험회사" variant="filter">
-          <select
+          <select data-guide-feature="features.reconciliation.reconciliation-page.select-2"
             className="select-control"
             value={fields.insurer}
             disabled={insurers.isPending || pending}
@@ -676,10 +676,10 @@ function RunFilters({
           onClose={() => setMonthAction(null)}
           footer={
             <>
-              <Button variant="secondary" onClick={() => setMonthAction(null)}>
+              <Button data-guide-feature="features.reconciliation.reconciliation-page.button-5" variant="secondary" onClick={() => setMonthAction(null)}>
                 취소
               </Button>
-              <Button
+              <Button data-guide-feature="features.reconciliation.reconciliation-page.button-6"
                 onClick={() => {
                   const action = monthAction
                   setMonthAction(null)
@@ -707,14 +707,15 @@ function RunSummary({ summary }: { summary?: Summary }) {
     ? ((summary.matchedCount ?? 0) / summary.resultCount) * 100
     : EMPTY
   return (
-    <section className="reco-react-summary" aria-label="실행 요약">
+    <section data-guide-feature="features.reconciliation.reconciliation-page.section-4" className="reco-react-summary" aria-label="실행 요약">
       <h2 className="surface-title">실행 요약</h2>
       <div className="reco-react-kpis kpi-group">
-        <KpiCard label="대상" value={summary?.resultCount ?? EMPTY} unit="건" footer="이번 실행의 전체 대사 결과" />
-        <KpiCard label="일치" value={summary?.matchedCount ?? EMPTY} unit="건" tone="success" footer="예상 내역과 실제 지급 일치" />
-        <KpiCard label="불일치" value={summary?.exceptionCount ?? EMPTY} unit="건" tone="error" footer="누락, 금액 차이 등 확인 필요" />
+        <KpiCard guideId="reconciliation.kpi.total" label="대상" value={summary?.resultCount ?? EMPTY} unit="건" footer="이번 실행의 전체 대사 결과" />
+        <KpiCard guideId="reconciliation.kpi.matched" label="일치" value={summary?.matchedCount ?? EMPTY} unit="건" tone="success" footer="예상 내역과 실제 지급 일치" />
+        <KpiCard guideId="reconciliation.kpi.exception" label="불일치" value={summary?.exceptionCount ?? EMPTY} unit="건" tone="error" footer="누락, 금액 차이 등 확인 필요" />
         <div className="reco-react-rate">
           <KpiCard
+            guideId="reconciliation.kpi.match-rate"
             label="일치율"
             value={matchRate}
             format={(value) => value.toFixed(1)}
@@ -723,7 +724,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
             footer="일치 건수 / 대상 건수"
           />
           <details className="reco-react-rate-help">
-            <summary aria-label="일치율 계산 안내">
+            <summary data-guide-feature="features.reconciliation.reconciliation-page.summary" aria-label="일치율 계산 안내">
               <span className="material-symbols-rounded" aria-hidden="true">
                 info
               </span>
@@ -735,6 +736,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
           </details>
         </div>
         <KpiCard
+          guideId="reconciliation.kpi.difference"
           label="차액 합계"
           zero={summary?.differenceTotal === 0}
           value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}

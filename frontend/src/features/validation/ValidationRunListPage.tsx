@@ -164,7 +164,7 @@ export default function ValidationRunListPage() {
 
       <CreateSection />
 
-      <section className="surface" aria-labelledby="vrun-list-title">
+      <section data-guide-feature="features.validation.validation-run-list-page.section" className="surface" aria-labelledby="vrun-list-title">
         <ListHeader total={runs.data?.totalElements ?? 0} pageSize={20}>
           <h2 className="surface-title" id="vrun-list-title">
             ② 실행 목록
@@ -204,7 +204,7 @@ function OpenLink({ run }: { run: ValidationRun }) {
   const { month } = useOutletContext<ShellContext>()
   const to = `/validation-runs/${run.validationRunId}`
   return (
-    <Link
+    <Link data-guide-feature="features.validation.validation-run-list-page.link"
       className="button button-secondary vrun-row-button"
       to={month ? withMonth(to, month) : to}
       aria-label={`${formatMonth(run.validationMonth)} ${run.runNo}회차 실행 열기`}
@@ -253,22 +253,22 @@ function CreateSection() {
     if (monthOk && canProcess && !blockedByActive && !mutation.isPending) mutation.mutate()
   }
   return (
-    <section data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
+    <section data-guide-feature="features.validation.validation-run-list-page.section-2" data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
       <header className="surface-header">
         <ScreenHelp screenId="VRUN-W01" saveGuide={saveGuide} />
         <h2 className="surface-title" id="vrun-create-title">
           ① 새 실행 만들기
         </h2>
       </header>
-      <form className="vrun-create-form search-conditions" onSubmit={submit}>
+      <form data-guide-feature="features.validation.validation-run-list-page.form" className="vrun-create-form search-conditions" onSubmit={submit}>
         <div className="vrun-create-month">
           <Field label="검증월" required>
-            <input type="month" disabled={mutation.isPending} value={month} onChange={(event) => setPicked(event.target.value)} />
+            <input data-guide-feature="features.validation.validation-run-list-page.input" type="month" disabled={mutation.isPending} value={month} onChange={(event) => setPicked(event.target.value)} />
           </Field>
         </div>
         <div className="vrun-create-type">
           <Field label="실행 유형" required>
-            <select className="select-control" disabled={mutation.isPending} value={runType} onChange={(event) => setRunType(event.target.value)}>
+            <select data-guide-feature="features.validation.validation-run-list-page.select" className="select-control" disabled={mutation.isPending} value={runType} onChange={(event) => setRunType(event.target.value)}>
               {RUN_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
@@ -278,7 +278,7 @@ function CreateSection() {
           </Field>
         </div>
         {/* 실행 생성은 SETTLEMENT (화면정의서 :1379, IF-API-45). 해당 월에 활성 MONTHLY 가 있으면 비활성 */}
-        <Button
+        <Button data-guide-feature="features.validation.validation-run-list-page.btn-create"
           type="submit"
           data-guide-target="validation.createSubmit"
           id="btn-create"
@@ -311,7 +311,7 @@ function StatusFilter({ status, onSearch }: { status: string; onSearch: (status:
         <label className="filter-field-label" htmlFor="f-status">
           상태
         </label>
-        <select
+        <select data-guide-feature="features.validation.validation-run-list-page.f-status"
           className="select-control"
           id="f-status"
           value={draft}

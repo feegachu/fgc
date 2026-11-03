@@ -9,6 +9,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import type { RequestOptions } from '../../lib/api/client'
 import { useToastStore } from '../../stores/toasts'
 import ContractFormPage from './ContractFormPage'
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 import type { ContractDetail, ContractUpdateRequest } from './api'
 import {
   changesSchedule,
@@ -923,4 +924,16 @@ it('guide waits for server success and acknowledgement after failure', async () 
   expect(await screen.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
   await user.click(screen.getByRole('button', { name: '안내 마치기' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/21'))
+})
+
+
+it('points the edit tutorial at the actual read-only agent and premium card', async () => {
+  renderAt()
+  await ready()
+  const steps = findWorkflowGuide('contract.edit', '1.0')!.steps
+  const agent = document.querySelector(`[data-guide-feature="${steps[3].targetId}"]`)
+  expect(agent).toBe(field('모집 설계사'))
+  expect(agent).toHaveAttribute('readonly')
+  expect(steps[3].completionRuleId).toBe('USER_REVIEWED')
+  expect(document.querySelector(`[data-guide-feature="${steps[4].targetId}"]`)).toContainElement(screen.getByRole('heading', { name: '보험료, 납입 조건' }))
 })

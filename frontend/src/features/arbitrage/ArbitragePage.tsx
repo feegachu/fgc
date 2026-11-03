@@ -1,4 +1,5 @@
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { guideFeatureId } from '../assistant/feature-ids'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -96,10 +97,10 @@ export default function ArbitragePage() {
         onReset={reset}
       >
         <Field variant="filter" className="arb-filter-month" label="정산월">
-          <input type="month" value={criteria.month} onChange={(e) => patch({ month: e.target.value })} />
+          <input data-guide-feature="features.arbitrage.arbitrage-page.input" type="month" value={criteria.month} onChange={(e) => patch({ month: e.target.value })} />
         </Field>
         <Field variant="filter" className="arb-filter-status" label="판정">
-          <select
+          <select data-guide-feature="features.arbitrage.arbitrage-page.select"
             className="select-control"
             value={criteria.status}
             onChange={(e) => patch({ status: e.target.value })}
@@ -113,14 +114,14 @@ export default function ArbitragePage() {
           </select>
         </Field>
         <Field variant="filter" className="arb-filter-stage" label="지급단계">
-          <select className="select-control" value={criteria.stage} onChange={(e) => patch({ stage: e.target.value })}>
+          <select data-guide-feature="features.arbitrage.arbitrage-page.select-2" className="select-control" value={criteria.stage} onChange={(e) => patch({ stage: e.target.value })}>
             <option value="GA_TO_FC">GA→설계사</option>
             <option value="">전체</option>
             <option value="INSURER_TO_GA">원수사→GA</option>
           </select>
         </Field>
         <Field variant="filter" className="arb-filter-insurer" label="보험회사">
-          <select
+          <select data-guide-feature="features.arbitrage.arbitrage-page.select-3"
             className="select-control"
             value={criteria.insurerId}
             disabled={insurers.isLoading || Boolean(insurers.error)}
@@ -135,7 +136,7 @@ export default function ArbitragePage() {
           </select>
         </Field>
         <Field variant="filter" className="arb-filter-contract" label="계약번호">
-          <input
+          <input data-guide-feature="features.arbitrage.arbitrage-page.input-2"
             type="search"
             placeholder="계약번호 입력"
             onKeyDown={(event) => {
@@ -150,9 +151,9 @@ export default function ArbitragePage() {
         </Field>
       </FilterBar>
       <QueryState error={insurers.error} />
-      <section data-guide-target="arbitrage.overview" className="kpi-grid kpi-group arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
+      <section data-guide-feature="features.arbitrage.arbitrage-page.section" data-guide-target="arbitrage.overview" className="kpi-grid kpi-group arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
         {summaryCards.map((card) => (
-          <button
+          <button data-guide-feature={guideFeatureId('arbitrage.summary', card.status)}
             type="button"
             key={card.status}
             className={`kpi-card arb-summary-card ${card.tone}`}
@@ -174,7 +175,7 @@ export default function ArbitragePage() {
         label="계약별 판정과 상세 카드 너비"
         defaultRatio={56}
       >
-        <section className="surface arb-list-panel" aria-labelledby="arb-list-title">
+        <section data-guide-feature="features.arbitrage.arbitrage-page.section-2" className="surface arb-list-panel" aria-labelledby="arb-list-title">
           <ListHeader className="arb-panel-header" total={query.data?.items?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title" id="arb-list-title">
               ③ 계약별 판정
@@ -208,7 +209,7 @@ export default function ArbitragePage() {
             />
           )}
         </section>
-        <section className="surface arb-detail-panel" aria-labelledby="arb-detail-title">
+        <section data-guide-feature="features.arbitrage.arbitrage-page.section-3" className="surface arb-detail-panel" aria-labelledby="arb-detail-title">
           <header className="surface-header arb-panel-header">
             <h2 className="surface-title" id="arb-detail-title">
               ④ 상세
@@ -223,7 +224,7 @@ export default function ArbitragePage() {
             )}
           </div>
           <div className="arb-detail-actions">
-            <Button
+            <Button data-guide-feature="features.arbitrage.arbitrage-page.button-2"
               variant="secondary"
               disabled={!canRecheck || !selected?.contractId || busy || Boolean(query.error)}
               onClick={() => {

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { RefObject } from 'react'
 
+type CardPosition = { left: number | 'auto'; top: number | 'auto'; right: number | 'auto'; bottom: number | 'auto' }
+const bottomRight: CardPosition = { left: 'auto', top: 'auto', right: 16, bottom: 16 }
+
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>) {
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
-    card: { left?: number; top?: number; right?: number; bottom?: number }
-  }>({ box: null, card: { right: 16, bottom: 16 } })
+    card: CardPosition
+  }>({ box: null, card: bottomRight })
   useEffect(() => {
     let frame = 0
     const measure = () => {
@@ -24,11 +27,12 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           : null
         const cw = card.current?.offsetWidth ?? 360,
           ch = card.current?.offsetHeight ?? 300
-        const corners = [
-          { left: width - cw - 16, top: height - ch - 16, anchor: { right: 16, bottom: 16 } },
-          { left: 16, top: height - ch - 16, anchor: { left: 16, bottom: 16 } },
-          { left: width - cw - 16, top: 16, anchor: { right: 16, top: 16 } },
-          { left: 16, top: 16, anchor: { left: 16, top: 16 } },
+        // Reset opposite insets: CSS bottom defaults must not stretch a top-anchored card (SRC-028).
+        const corners: { left: number; top: number; anchor: CardPosition }[] = [
+          { left: width - cw - 16, top: height - ch - 16, anchor: bottomRight },
+          { left: 16, top: height - ch - 16, anchor: { left: 16, top: 'auto', right: 'auto', bottom: 16 } },
+          { left: width - cw - 16, top: 16, anchor: { left: 'auto', top: 16, right: 16, bottom: 'auto' } },
+          { left: 16, top: 16, anchor: { left: 16, top: 16, right: 'auto', bottom: 'auto' } },
         ]
         const free =
           box &&
@@ -43,7 +47,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           )
         setPosition({
           box: box?.width && box.height ? box : null,
-          card: free ? free.anchor : { right: 16, bottom: 16 },
+          card: free ? free.anchor : bottomRight,
         })
       })
     }

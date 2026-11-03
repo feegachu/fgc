@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { stepState } from './steps'
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 
 const baseUser = {
   loginId: 'settle01',
@@ -496,4 +497,16 @@ it('does not allow finalizing a partial contract run even with a passed checklis
   expect(await screen.findByText('월 전체를 계산한 월간·확정전 실행만 최종 확정할 수 있습니다.')).toBeVisible()
   expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
   expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
+})
+
+
+it('resolves tutorial overview and progress targets on a successful detail response', async () => {
+  detailHandlers()
+  renderAt('/app/validation-runs/7?month=2026-07')
+  await screen.findByRole('heading', { name: /진행 단계/ })
+  const [overview, progress] = findWorkflowGuide('validation.detail', '1.0')!.steps
+  const overviewElement = document.querySelector(`[data-guide-feature="${overview.targetId}"]`)
+  expect(overviewElement).toBeVisible()
+  expect(overviewElement).toHaveTextContent('검증월')
+  expect(document.querySelector(`[data-guide-feature="${progress.targetId}"]`)).toContainElement(screen.getByRole('heading', { name: /진행 단계/ }))
 })

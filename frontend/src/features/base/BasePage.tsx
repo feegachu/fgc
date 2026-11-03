@@ -79,7 +79,7 @@ function BaseFilters({
       >
         {tab === 'agent' && (
           <Field label="소속 조직" className="base-filter-select">
-            <select value={draft.organizationId} onChange={(e) => change('organizationId', e.target.value)}>
+            <select data-guide-feature="features.base.base-page.select" value={draft.organizationId} onChange={(e) => change('organizationId', e.target.value)}>
               <option value="">전체</option>
               {organizations.data?.map((r) => (
                 <option key={r.organizationId} value={r.organizationId}>
@@ -95,7 +95,7 @@ function BaseFilters({
             className="base-filter-keyword"
             label={tab === 'agent' ? '설계사 검색' : tab === 'insurer' ? '보험회사 검색' : '조직 검색'}
           >
-            <input
+            <input data-guide-feature="features.base.base-page.input"
               type="search"
               placeholder={
                 tab === 'agent'
@@ -111,7 +111,7 @@ function BaseFilters({
         )}
         {tab === 'product' && (
           <Field label="보험회사" className="base-filter-select">
-            <select value={draft.insurerId} required onChange={(e) => change('insurerId', e.target.value)}>
+            <select data-guide-feature="features.base.base-page.select-2" value={draft.insurerId} required onChange={(e) => change('insurerId', e.target.value)}>
               <option value="">보험회사를 선택하세요</option>
               {insurers.data?.map((r) => (
                 <option key={r.insurerId} value={r.insurerId}>
@@ -124,7 +124,7 @@ function BaseFilters({
         )}
         {tab !== 'insurer' && (
           <Field label={tab === 'product' ? '계약 기준일' : '기준일'}>
-            <input type="date" required value={draft.asOf} onChange={(e) => change('asOf', e.target.value)} />
+            <input data-guide-feature="features.base.base-page.input-2" type="date" required value={draft.asOf} onChange={(e) => change('asOf', e.target.value)} />
           </Field>
         )}
       </FilterBar>

@@ -64,6 +64,7 @@ export interface GuideEnvironment<State> {
   conditions: Readonly<Record<string, GuideCondition<State>>>
   /** Only registered navigation/tab actions; must not click a business button or perform a write. */
   openScreen(screenId: string, signal: AbortSignal): Promise<void>
+  needsNavigation?(step: GuideStep): boolean
   confirmLeave(): Promise<boolean>
   /** Optional memory-only form adapter, used only after the user agrees to navigate. */
   preserveInput?(): void

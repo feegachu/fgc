@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "generate:guide-features": "node scripts/guide-features.mjs --write",
+    "check:guide-features": "node scripts/guide-features.mjs",
     "dev": "vite",
     "build": "npm run check:guides && tsc -b && vite build",
     "lint": "eslint .",
@@ -17,7 +19,9 @@
     "check:e2e": "tsc -p tsconfig.e2e.json",
     "generate:api": "openapi-typescript openapi/schema.json -o src/lib/api/schema.d.ts",
     "check:api": "node scripts/check-api.mjs",
-    "check:guides": "node scripts/check-guide-targets.mjs && node --test scripts/check-guide-targets.test.mjs && vitest run src/features/assistant/guide/ScreenHelp.test.tsx"
+    "check:guides": "node scripts/check-guide-targets.mjs && node --test scripts/check-guide-targets.test.mjs && vitest run src/features/assistant/guide/ScreenHelp.test.tsx",
+    "generate:guide-knowledge": "node scripts/workflow-knowledge.mjs --write",
+    "check:guide-knowledge": "node scripts/workflow-knowledge.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",

@@ -1,3 +1,4 @@
+import workflowDefinitions from '../assistant/workflow-guides.v1.json'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -459,3 +460,28 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
 })
+
+
+it.each(['NORMAL', 'NOT_APPLICABLE'] as const)(
+  'provides one shared guide target for the %s calculation basis', async (resultStatus) => {
+    const data: CapBasis = {
+      ...basis,
+      capCheck: { ...item, resultStatus, resultStatusLabel: resultStatus === 'NORMAL' ? '정상' : '비적용' },
+    }
+    vi.spyOn(apiClient, 'request').mockResolvedValue(envelope(data))
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter><CapDetailModal capCheckId={11} onClose={() => {}} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    const dialog = await screen.findByRole('dialog', { name: '계산근거' })
+    const content = resultStatus === 'NORMAL' ? '① 입력값' : '한도/산입금액/사용률 계산 대상이 아닙니다.'
+    await within(dialog).findByText(content)
+    const targetId = workflowDefinitions.find((guide) => guide.workflowId === 'cap.review')!.steps[2].targetId
+    const targets = document.querySelectorAll(`[data-guide-feature="${targetId}"]`)
+    expect(targets).toHaveLength(1)
+    expect(dialog).toContainElement(targets[0] as HTMLElement)
+    expect(targets[0]).toHaveTextContent(content)
+    expect(targets[0]).toBeVisible()
+  },
+)

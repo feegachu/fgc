@@ -101,7 +101,7 @@ export function LoginPage() {
           />
           <p className="auth-brand-caption">GA 수수료 정산/검증 플랫폼</p>
         </div>
-        <section className="auth-brand-message" aria-labelledby="auth-brand-title">
+        <section data-guide-feature="features.auth.login-page.section" className="auth-brand-message" aria-labelledby="auth-brand-title">
           <h1 id="auth-brand-title">
             정산 결과를 연결하고,
             <br />
@@ -118,7 +118,7 @@ export function LoginPage() {
           <p>FGC v2.0</p>
         </footer>
       </aside>
-      <section className="auth-surface" aria-labelledby="login-title">
+      <section data-guide-feature="features.auth.login-page.section-2" className="auth-surface" aria-labelledby="login-title">
         <div className="auth-login-content">
           <img
             className="auth-mobile-logo"
@@ -138,7 +138,7 @@ export function LoginPage() {
             </p>
           )}
           {search.get('logout') === 'failed' && (
-            <Button variant="secondary" loading={loggingOut} onClick={() => void logout()}>
+            <Button data-guide-feature="features.auth.login-page.button" variant="secondary" loading={loggingOut} onClick={() => void logout()}>
               로그아웃 다시 시도
             </Button>
           )}
@@ -151,6 +151,7 @@ export function LoginPage() {
             </div>
           )}
           <form
+            data-guide-feature="features.auth.login-page.form"
             className="auth-form"
             onSubmit={(event) => void submit(event)}
             onInput={(event) => {
@@ -161,6 +162,7 @@ export function LoginPage() {
           >
             <Field label="아이디" required>
               <input
+                data-guide-feature="features.auth.login-page.username"
                 className="auth-control"
                 name="username"
                 autoComplete="username"
@@ -172,6 +174,7 @@ export function LoginPage() {
             <div className="auth-password-field">
               <Field label="비밀번호" required>
                 <input
+                  data-guide-feature="features.auth.login-page.password"
                   className="auth-control"
                   type={showPassword ? 'text' : 'password'}
                   name="password"
@@ -181,6 +184,7 @@ export function LoginPage() {
                 />
               </Field>
               <button
+                data-guide-feature="features.auth.login-page.button-2"
                 className="icon-button auth-password-toggle"
                 type="button"
                 aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
@@ -192,7 +196,7 @@ export function LoginPage() {
                 </span>
               </button>
             </div>
-            <Button className="button-large auth-submit" type="submit" loading={pending}>
+            <Button data-guide-feature="features.auth.login-page.button-3" className="button-large auth-submit" type="submit" loading={pending}>
               로그인
             </Button>
           </form>

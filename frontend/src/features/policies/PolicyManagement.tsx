@@ -1,6 +1,7 @@
 import { policyCodeLabel } from './labels'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useContext, useRef, useState } from 'react'
+import { guideFeatureId } from '../assistant/feature-ids'
 import { ApiError } from '../../lib/api/client'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
@@ -170,16 +171,16 @@ export function PolicyManagement({
                 ? '검토 중인 정책은 반려 후 수정할 수 있습니다.'
                 : '승인된 정책은 새 버전으로 변경사항을 작성하세요.'}
         </p>
-        <div className="policy-actions">
+        <div data-guide-feature="features.policies.policy-management.actions" className="policy-actions">
           {allowed.includes('EDIT') && supported && (
-            <Button variant="secondary" disabled={refreshing || !draft} onClick={() => setEditing(true)}>
+            <Button data-guide-feature="features.policies.policy-management.button" variant="secondary" disabled={refreshing || !draft} onClick={() => setEditing(true)}>
               초안 수정
             </Button>
           )}
           {allowed
             .filter((a) => a !== 'EDIT' && (a !== 'NEW_VERSION' || supported))
             .map((a) => (
-              <Button
+              <Button data-guide-feature={guideFeatureId('policy.action', a)}
                 key={a}
                 variant={a === 'REJECT' || a === 'NEW_VERSION' ? 'secondary' : 'primary'}
                 disabled={refreshing || (a === 'APPROVE' && own)}
@@ -325,7 +326,7 @@ export function PolicySources({
             <p>{source.explanation || '설명 자료 없음'}</p>
           </div>
           {safeSourceUrl(source.url) && (
-            <a href={safeSourceUrl(source.url)!} target="_blank" rel="noopener noreferrer">
+            <a data-guide-feature="features.policies.policy-management.a" href={safeSourceUrl(source.url)!} target="_blank" rel="noopener noreferrer">
               원문 보기 ↗
             </a>
           )}
@@ -347,7 +348,7 @@ export function PolicySources({
 /** FUN-016 상품위원회 메타데이터. 판매버전에 저장된 참조정보이며 법정 심의·의결을 대체하지 않는다. */
 function OfferingGovernanceList({ offerings }: { offerings: OfferingGovernance[] }) {
   return (
-    <section className="policy-offering-governance" aria-label="상품위원회 정보">
+    <section data-guide-feature="features.policies.policy-management.offering-governance" className="policy-offering-governance" aria-label="상품위원회 정보">
       <div className="policy-section-heading">
         <h3>상품위원회 정보</h3>
         <span>{offerings.length}건</span>
@@ -403,19 +404,19 @@ function ReadOnlyRuleSummary({ detail }: { detail: ManagedPolicyDetail }) {
   return (
     <div className="policy-rule-summary">
       {commission.length > 0 && (
-        <section>
+        <section data-guide-feature="features.policies.policy-management.section">
           <h3 className="policy-detail-title">수수료 규칙</h3>
           <CommissionRules rows={commission} />
         </section>
       )}
       {caps.length > 0 && (
-        <section>
+        <section data-guide-feature="features.policies.policy-management.section-2">
           <h3 className="policy-detail-title">1,200% 룰셋</h3>
           <CapRuleSets rows={caps} />
         </section>
       )}
       {refunds.length > 0 && (
-        <section>
+        <section data-guide-feature="features.policies.policy-management.section-3">
           <h3 className="policy-detail-title">예상 해약환급률표</h3>
           <RefundTables rows={refunds} />
         </section>
@@ -488,7 +489,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
         />
       )}
       {draft.feeRegimeRules.map((rule, i) => (
-        <section key={i} className="policy-regime-summary">
+        <section data-guide-feature="features.policies.policy-management.section-4" key={i} className="policy-regime-summary">
           <header>
             <StatusBadge tone="info">{rule.feeRegimeCode === 'FOUR_YEAR_2027' ? '4년 분급' : '7년 분급'}</StatusBadge>
             <h4>분급 룰셋 {i + 1}</h4>
@@ -597,6 +598,9 @@ function PolicyActionDialog({
   const [evidenceRef, setEvidenceRef] = useState('')
   const [effectiveFrom, setFrom] = useState('')
   const [effectiveTo, setTo] = useState(policy.effectiveTo ?? '')
+  const draftKey = JSON.stringify([reason, evidenceRef, effectiveFrom, effectiveTo])
+  const [initialDraftKey] = useState(draftKey)
+  const clearUnsaved = useUnsavedWork(draftKey !== initialDraftKey, draftKey)
   const [error, setError] = useState('')
   const [dateError, setDateError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -647,6 +651,7 @@ function PolicyActionDialog({
               requestKey({ id: policy.policyVersionId, action, reason: reason.trim(), context }),
             )
           ).policyVersionId
+      clearUnsaved()
       onSaved(id)
     } catch (cause) {
       setError(errorText(cause instanceof Error ? cause : null, '처리하지 못했습니다. 다시 시도하세요.'))
@@ -674,10 +679,10 @@ function PolicyActionDialog({
       initialFocusRef={newVersion ? dateRef : reasonRef}
       footer={
         <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button data-guide-feature="features.policies.policy-management.button-3" variant="secondary" disabled={busy} onClick={onClose}>
             취소
           </Button>
-          <Button loading={busy} onClick={() => void submit()}>
+          <Button data-guide-feature="features.policies.policy-management.button-4" loading={busy} onClick={() => void submit()}>
             {newVersion ? '새 초안 만들기' : `${label} 확인`}
           </Button>
         </>
@@ -719,7 +724,7 @@ function PolicyActionDialog({
       {newVersion && (
         <div className="policy-form-grid policy-form-grid-two">
           <Field label="새 버전 적용 시작일" required error={dateError}>
-            <input
+            <input data-guide-feature="features.policies.policy-management.input"
               ref={dateRef}
               type="date"
               value={effectiveFrom}
@@ -728,7 +733,7 @@ function PolicyActionDialog({
             />
           </Field>
           <Field label="새 버전 적용 종료일">
-            <input type="date" value={effectiveTo} onChange={(e) => setTo(e.target.value)} disabled={busy} />
+            <input data-guide-feature="features.policies.policy-management.input-2" type="date" value={effectiveTo} onChange={(e) => setTo(e.target.value)} disabled={busy} />
           </Field>
         </div>
       )}
@@ -738,7 +743,7 @@ function PolicyActionDialog({
         error={error}
         helper={`${reason.length.toLocaleString()} / 2,000자`}
       >
-        <textarea
+        <textarea data-guide-feature="features.policies.policy-management.textarea"
           ref={reasonRef}
           value={reason}
           rows={4}
@@ -753,7 +758,7 @@ function PolicyActionDialog({
       </Field>
       {action === 'APPROVE' && !preview && (
         <Field label="승인 근거 문서" helper="상품위원회 의결서 등 승인 근거가 있으면 문서 참조를 입력하세요.">
-          <input
+          <input data-guide-feature="features.policies.policy-management.input-3"
             value={evidenceRef}
             onChange={(event) => setEvidenceRef(event.target.value)}
             maxLength={500}
@@ -770,3 +775,4 @@ function PolicyActionDialog({
     </Modal>
   )
 }
+import { useUnsavedWork } from '../../stores/unsavedWork'

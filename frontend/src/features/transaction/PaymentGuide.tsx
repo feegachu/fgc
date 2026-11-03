@@ -1,4 +1,5 @@
 import { useSpotlight } from '../assistant/guide/useSpotlight'
+import { useWorkflowGuide } from '../assistant/workflow-state'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { RefObject } from 'react'
 import { createPortal } from 'react-dom'
@@ -13,6 +14,7 @@ import type { PaymentGuideObserver, PaymentGuideState } from './payment-guide'
 import './payment-guide.css'
 
 interface Props {
+  initialWorkflowId?: string | null
   root: RefObject<HTMLDivElement | null>
   modalOpen: boolean
   confirmed: boolean
@@ -40,6 +42,7 @@ const reasons: Record<string, string> = {
   SERVER_STATE_CHANGED: '서버 저장 상태가 바뀌었습니다. 현재 내용을 다시 확인하세요.',
 }
 function GuideSession({
+  initialWorkflowId,
   observer,
   root,
   modalOpen,
@@ -67,8 +70,14 @@ function GuideSession({
   }, [observer, root])
   const subscribe = useMemo(() => (listener: () => void) => runtime.observe(listener), [runtime])
   const snapshot = useSyncExternalStore(subscribe, runtime.getSnapshot)
+  useEffect(() => {
+    if (snapshot.workflowId && snapshot.step) useWorkflowGuide.setState({ guideContext: { workflowId: snapshot.workflowId, stepId: snapshot.step.stepId } })
+  }, [snapshot.workflowId, snapshot.step])
   const revision = useSyncExternalStore(observer.subscribe, observer.getViewRevision)
   const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    useWorkflowGuide.setState({ paymentActive: !collapsed && !['PAUSED', 'ERROR'].includes(snapshot.status) })
+  }, [collapsed, snapshot.status])
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState(false)
   const [refresh, setRefresh] = useState(0)
@@ -80,6 +89,21 @@ function GuideSession({
   const key = `${revision}:${snapshot.step?.stepId ?? ''}:${refresh}`
   const state = assessment?.key === key ? assessment.state : null
   const finalizing = useRef(false)
+  useEffect(() => {
+    if (!initialWorkflowId) return
+    const guide = PAYMENT_GUIDES.find((guide) => guide.workflowId === initialWorkflowId)
+    if (!guide) return
+    let cancelled = false
+    void Promise.resolve().then(async () => {
+      if (cancelled) return
+      const context = observer.readContext()
+      await runtime.start({ workflowId: guide.workflowId, stepId: guide.steps[0].stepId, guideVersion: guide.guideVersion,
+        entityRefs: context.entityRefs, clientContextRevision: context.clientContextRevision, serverStateVersion: context.serverStateVersion })
+    }).catch(() => {
+      if (!cancelled) setMessage('현재 선택 대상과 권한을 확인한 뒤 안내를 다시 시작해주세요.')
+    })
+    return () => { cancelled = true }
+  }, [initialWorkflowId, observer, runtime])
 
   useEffect(() => {
     const changed = () => runtime.contextChanged()
@@ -219,6 +243,7 @@ function GuideSession({
     canNext = !!(
       candidate &&
       step &&
+      paymentGuideConditions[step.entryConditionId](observer.readContext(), candidate) === 'SATISFIED' &&
       paymentGuideConditions[step.completionConditionId](observer.readContext(), candidate) === 'SATISFIED'
     )
   } catch {
@@ -254,10 +279,10 @@ function GuideSession({
           style={position.box}
         />
       )}
-      <section
+      <section data-guide-feature="features.transaction.payment-guide.section"
         ref={card}
         className={`payment-guide-card${folded ? ' is-collapsed' : ''}`}
-        style={position.card}
+        style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}
         aria-label="지급 업무 가이드"
         data-guide-status={snapshot.status}
       >
@@ -276,11 +301,11 @@ function GuideSession({
               : ''}
           </span>
           {!confirmed && (
-            <Button variant="ghost" onClick={() => setCollapsed(!collapsed)}>
+            <Button data-guide-feature="features.transaction.payment-guide.button" variant="ghost" onClick={() => setCollapsed(!collapsed)}>
               {folded ? '펼치기' : '접기'}
             </Button>
           )}
-          <Button variant="ghost" onClick={close} aria-label="가이드 종료">
+          <Button data-guide-feature="features.transaction.payment-guide.button-2" variant="ghost" onClick={close} aria-label="가이드 종료">
             종료
           </Button>
         </header>
@@ -328,7 +353,7 @@ function GuideSession({
               {readError && !confirmed && (
                 <p role="alert">
                   {readError}{' '}
-                  <Button variant="secondary" onClick={() => setRefresh(refresh + 1)}>
+                  <Button data-guide-feature="features.transaction.payment-guide.button-3" variant="secondary" onClick={() => setRefresh(refresh + 1)}>
                     다시 조회
                   </Button>
                 </p>
@@ -336,7 +361,7 @@ function GuideSession({
             </div>
             <div className="payment-guide-actions">
               {confirmed ? (
-                <Button
+                <Button data-guide-feature="features.transaction.payment-guide.button-4"
                   onClick={() => {
                     runtime.stop()
                     onList()
@@ -346,9 +371,9 @@ function GuideSession({
                 </Button>
               ) : complete ? (
                 <>
-                  <Button onClick={close}>안내 마치기</Button>
+                  <Button data-guide-feature="features.transaction.payment-guide.button-5" onClick={close}>안내 마치기</Button>
                   {current?.workflowId === 'payment.draft' && (
-                    <Button
+                    <Button data-guide-feature="features.transaction.payment-guide.button-6"
                       variant="secondary"
                       onClick={() =>
                         void run(() => start(PAYMENT_GUIDES.find((guide) => guide.workflowId === 'payment.confirm')!))
@@ -360,7 +385,7 @@ function GuideSession({
                 </>
               ) : !step ? (
                 available.map((guide) => (
-                  <Button
+                  <Button data-guide-feature="features.transaction.payment-guide.button-7"
                     key={guide.workflowId}
                     variant="secondary"
                     disabled={working}
@@ -370,7 +395,7 @@ function GuideSession({
                   </Button>
                 ))
               ) : paused ? (
-                <Button
+                <Button data-guide-feature="features.transaction.payment-guide.button-8"
                   disabled={working}
                   onClick={() => void run(snapshot.status === 'ERROR' ? () => start(current!) : resume)}
                 >
@@ -378,14 +403,14 @@ function GuideSession({
                 </Button>
               ) : (
                 <>
-                  <Button
+                  <Button data-guide-feature="features.transaction.payment-guide.button-9"
                     variant="secondary"
                     disabled={working || snapshot.status === 'PREPARING' || !runtime.canGoBack()}
                     onClick={() => void run(() => runtime.previous())}
                   >
                     이전
                   </Button>
-                  <Button
+                  <Button data-guide-feature="features.transaction.payment-guide.button-10"
                     disabled={!canNext || working || snapshot.status === 'PREPARING'}
                     onClick={() => void run(next)}
                   >

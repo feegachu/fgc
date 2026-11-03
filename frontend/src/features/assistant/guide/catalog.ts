@@ -2,7 +2,7 @@ import { GUIDE_CATALOG } from '../catalog'
 import type { GuideDefinition } from './types'
 
 const readers = ['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE']
-const processors = ['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT']
+const processors = ['SYSTEM_ADMIN', 'SETTLEMENT']
 
 /** Reuse #736's text and identifiers without pretending its proposed wire session exists. */
 export const PAYMENT_GUIDES: readonly GuideDefinition[] = GUIDE_CATALOG.map((guide) => ({
@@ -15,14 +15,14 @@ export const PAYMENT_GUIDES: readonly GuideDefinition[] = GUIDE_CATALOG.map((gui
   requiredEntities: guide.requiredSlots.flatMap((slot) =>
     slot === 'contractId' ? ['CONTRACT' as const] : slot === 'paymentId' ? ['PAYMENT' as const] : [],
   ),
-  steps: guide.steps.map((step, index) => ({
+  steps: guide.steps.map((step) => ({
     stepId: step.stepId,
     screenId: step.screenId,
     targetId: step.targetId,
     instruction: step.instruction,
     entryConditionId: step.entryRuleId,
     completionConditionId: step.completionRuleId,
-    next: guide.steps[index + 1] ? [{ conditionId: 'ALWAYS', stepId: guide.steps[index + 1].stepId }] : [],
+    next: step.next.map((edge) => ({ ...edge })),
   })),
 }))
 
