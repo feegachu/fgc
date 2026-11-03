@@ -49,6 +49,7 @@ public class ScheduleService {
     private final AgentRepository agentRepository;
     private final CapCheckService capCheckService;
     private final com.susukkang.fgc.contract.service.PaymentHoldFollowUpProcessor paymentHoldFollowUpProcessor;
+    private final com.susukkang.fgc.contract.service.PaymentHoldGate paymentHoldGate;
     private final CapCheckQueryRepository capCheckQueryRepository;
     private final AuditLogService auditLogService;
     private final ScheduleReviewService scheduleReviewService;
@@ -1236,6 +1237,10 @@ public class ScheduleService {
             );
         }
 
+        // FUN-028: 보류 회차가 남았거나 상태 사건 후속 작업이 끝나지 않았으면 확정하지 않는다(계약 잠금 안에서 검사).
+        if (!paymentHoldGate.scheduleBlockers(scheduleId, header.getContractId()).isEmpty()) {
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.IMPL_PAYMENT_HELD);
+        }
         BigDecimal evidenceAmount = header.getPaymentStage() == PaymentStage.INSURER_TO_GA
                 ? capCheckQueryRepository.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
                 : null;

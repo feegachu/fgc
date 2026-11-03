@@ -252,6 +252,64 @@ class PaymentHoldFollowUpIntegrationTest {
     }
 
     @Test
+    void regeneratingAfterALapseThroughTheScheduleServiceCancelsTheLinesAfterTheLapseAgain() {
+        Long contract = jdbc.queryForObject("SELECT min(contract_id) FROM fgc.insurance_contract", Long.class);
+        scheduleService.generateSchedulesByContractId(contract);
+        org.junit.jupiter.api.Assumptions.assumeTrue(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn AND sl.line_status = 'PLANNED'
+                """, Long.class, contract) > 0, "시드 계약에 운영 스케줄이 만들어지지 않았다");
+        LocalDate firstDue = jdbc.queryForObject("""
+                SELECT min(sl.due_date) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn AND sl.line_status = 'PLANNED'
+                """, LocalDate.class, contract);
+        long lapse = statusEvent(contract, seq(contract), "LAPSED", firstDue + "T12:00:00+09:00");
+        processor.process(events.findById(lapse).orElseThrow());
+        String afterLapse = """
+                SELECT count(*) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn
+                   AND sl.due_date > ? AND sl.line_status = ?
+                """;
+        assertThat(jdbc.queryForObject(afterLapse, Long.class, contract, firstDue, "CANCELLED")).isPositive();
+
+        scheduleService.regenerateContractSchedules(contract, "실효 뒤 보험료 수정으로 재생성");
+
+        assertThat(jdbc.queryForObject(afterLapse, Long.class, contract, firstDue, "CANCELLED")).as("재생성 뒤에도 실효 뒤 회차는 CANCELLED").isPositive();
+        assertThat(jdbc.queryForObject(afterLapse, Long.class, contract, firstDue, "PLANNED")).as("PLANNED 로 되살아난 회차 없음").isZero();
+    }
+
+    @Test
+    void aScheduleWithAHeldLineOrAPendingFollowUpCannotBeConfirmed() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long header = header(contract);
+        line(header, 1, "2026-09-25", "PLANNED");
+        long held = line(header, 2, "2026-10-25", "HOLD");
+
+        assertThatThrownBy(() -> scheduleService.confirmSchedule(header))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_HELD));
+        assertThat(lineStatus(held)).isEqualTo("HOLD");
+        assertThat(jdbc.queryForObject("SELECT status FROM fgc.schedule_header WHERE schedule_header_id = ?", String.class, header))
+                .isEqualTo("PLANNED");
+    }
+
+    @Test
+    void aScheduleWithAPendingFollowUpJobCannotBeConfirmedEither() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long lapse = statusEvent(contract, 2, "LAPSED", "2026-09-01T00:00:00+09:00");
+        long header = header(contract);
+        line(header, 1, "2026-09-25", "PLANNED");
+        jdbc.update("INSERT INTO fgc.contract_event_job (contract_status_event_id, processing_job) VALUES (?, ?)",
+                lapse, PaymentHoldFollowUpProcessor.JOB);
+
+        assertThatThrownBy(() -> scheduleService.confirmSchedule(header))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_HELD));
+    }
+
+    @Test
     void aRevivalIsNotTheProcessorsBusiness() {
         long contract = contract("2026-03-01");
         statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
@@ -297,11 +355,13 @@ class PaymentHoldFollowUpIntegrationTest {
 
         assertThat(lineStatus(rebuilt)).isEqualTo("HOLD");
         assertThat(lineStatus(confirmed)).isEqualTo("CONFIRMED");
+        // 새 작업이나 effect 행은 만들지 않는다(근거는 원래 작업의 effect 로 남아 있다).
         assertThat(count("SELECT count(*) FROM fgc.contract_status_event_effect WHERE contract_status_event_id = " + unpaid
-                + " AND entity_id = " + rebuilt)).isEqualTo(1);
+                + " AND entity_id = " + rebuilt)).isZero();
+        assertThat(count("SELECT count(*) FROM fgc.contract_event_job WHERE contract_status_event_id = " + unpaid)).isZero();
         // 다시 불러도 이미 맞춰진 회차는 바뀌지 않는다.
         processor.reapplyLatest(contract);
-        assertThat(count("SELECT count(*) FROM fgc.contract_status_event_effect WHERE entity_id = " + rebuilt)).isEqualTo(1);
+        assertThat(lineStatus(rebuilt)).isEqualTo("HOLD");
     }
 
     @Test

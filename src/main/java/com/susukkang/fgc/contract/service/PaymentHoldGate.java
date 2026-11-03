@@ -65,6 +65,22 @@ public class PaymentHoldGate {
         return blockers;
     }
 
+    /**
+     * 스케줄 확정 차단 사유: 보류(HOLD) 회차가 남았거나 계약에 끝나지 않은 상태 사건 후속 작업이 있다.
+     * 보류 중에 확정하면 납입이 재개돼도 확정 회차는 잠긴 대상이라 풀리지 않고, 처리 전에 확정하면 사건이 회차에 닿지 못한다.
+     */
+    public List<Blocker> scheduleBlockers(Long scheduleHeaderId, Long contractId) {
+        return jdbc.query("""
+                SELECT 'HOLD_SCHEDULE_LINE' AS code, sl.schedule_line_id AS ref_id
+                  FROM fgc.schedule_line sl WHERE sl.schedule_header_id = ? AND sl.line_status = 'HOLD'
+                UNION ALL
+                SELECT 'FOLLOW_UP_PENDING', j.contract_status_event_id
+                  FROM fgc.contract_event_job j
+                  JOIN fgc.contract_status_event e ON e.contract_status_event_id = j.contract_status_event_id
+                 WHERE j.state <> 'SUCCEEDED' AND e.contract_id = ?
+                """, (rs, row) -> new Blocker(rs.getString("code"), rs.getLong("ref_id")), scheduleHeaderId, contractId);
+    }
+
     /** 보류·중단 상태 사건이 있는 계약만 판단한다(없는 계약은 지급 대상이라 정책 해석도 하지 않는다). */
     private List<Blocker> currentStatusBlockers(Long paymentId) {
         List<Long> contractIds = jdbc.queryForList("""
