@@ -24,7 +24,7 @@ class PicoAskServiceTest {
     }
     @BeforeEach void setup() throws Exception {
         gateway=mock(LlmGateway.class); var mapper=new ObjectMapper(); catalog=new PicoGuideCatalog(mapper); contexts=mock(PicoPaymentContextService.class); service=new PicoAskService(gateway,catalog,mapper,contexts,limits(20000)); role("SETTLEMENT");
-        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.draft")));
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.draft"), false));
     }
     @AfterEach void cleanup() { SecurityContextHolder.clearContext(); }
     void role(String role) { SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("reader","unused",List.of(new SimpleGrantedAuthority("ROLE_"+role)))); }
@@ -63,7 +63,7 @@ class PicoAskServiceTest {
     @Test void complianceEvidenceOmitsProcessingStepsAndRejectsTheirCitation() throws Exception {
         role("COMPLIANCE");
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
-                .thenReturn(new PicoAskService.GuideSelection(List.of("ledger.review")));
+                .thenReturn(new PicoAskService.GuideSelection(List.of("ledger.review"), false));
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
                 .thenReturn(answer("원장 목록에서 상태를 조회하세요.","ledger.review:overview"));
         assertThat(service.ask(request("역분개 사유 작성과 확인 버튼 위치" )).source()).isEqualTo(Source.AI);
@@ -102,14 +102,14 @@ class PicoAskServiceTest {
                 .doesNotContain("validation.detail.step.3");
         role("GA_ADMIN");
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
-                .thenReturn(new PicoAskService.GuideSelection(List.of("validation.detail")));
+                .thenReturn(new PicoAskService.GuideSelection(List.of("validation.detail"), false));
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
                 .thenReturn(answer("확정 조건을 확인하세요.","validation.detail:validation.detail.step.3"));
         assertThat(service.ask(request("검증 확정 조건")).source()).isEqualTo(Source.AI);
     }
     @Test void semanticRetrievalRejectsUnknownAndDuplicateWorkflowIds() {
         for (var ids : List.of(List.of("invented.workflow"), List.of("payment.draft","payment.draft"))) {
-            when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(ids));
+            when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(ids, false));
             assertThat(service.ask(request("어떻게 시작해?")).fallbackReason()).isEqualTo("INVALID_AI_SELECTION");
         }
         verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
@@ -136,7 +136,7 @@ class PicoAskServiceTest {
     }
     @Test void aClosedPaymentDoesNotPreventQuestionsAboutAnotherBusinessWorkflow() {
         when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.CONFIRMED));
-        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("contract.find")));
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("contract.find"), false));
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("보험계약 목록의 검색 조건에서 조회하세요.","contract.find:overview"));
         var request = new PicoAskRequest("다른 보험계약을 찾고 싶어","TRAN-W02",List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)),"r1","1.0",List.of());
         assertThat(service.ask(request).source()).isEqualTo(Source.AI);
@@ -194,10 +194,21 @@ class PicoAskServiceTest {
         verifyNoInteractions(gateway);
     }
     @Test void emptyGuideSelectionGetsFixedOutOfScopeReplyWithoutSecondModelCall() {
-        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of()));
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of(), true));
         var reply = service.ask(request("오늘 날씨"));
         assertThat(reply.decision()).isEqualTo(Decision.UNSUPPORTED);
         assertThat(reply.source()).isEqualTo(Source.FIXED);
+        assertThat(reply.evidenceRefs()).isEmpty();
+        assertThat(reply.fallbackReason()).isEqualTo("OUT_OF_SCOPE");
+        verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
+    }
+    @Test void ambiguousInScopeQuestionIsAskedBackWithoutSecondModelCall() {
+        // FUN-073: 범위 안이지만 대상이 모호하면 '범위 밖'이 아니라 다시 묻는다.
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of(), false));
+        var reply = service.ask(request("이거 어떻게 해요?"));
+        assertThat(reply.decision()).isEqualTo(Decision.ASK_CLARIFICATION);
+        assertThat(reply.source()).isEqualTo(Source.FIXED);
+        assertThat(reply.fallbackReason()).isEqualTo("NEEDS_CLARIFICATION");
         assertThat(reply.evidenceRefs()).isEmpty();
         verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
     }
@@ -264,7 +275,7 @@ class PicoAskServiceTest {
         for (var role : List.of("COMPLIANCE", "GA_ADMIN")) {
             role(role);
             when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
-                    .thenReturn(new PicoAskService.GuideSelection(List.of("payment.find")));
+                    .thenReturn(new PicoAskService.GuideSelection(List.of("payment.find"), false));
             for (var state : CommissionPaymentStatus.values()) {
                 when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(state));
                 var reply = service.ask(new PicoAskRequest("현재 지급 상태", "TRAN-W01", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)), "r1", "1.0", List.of()));
@@ -302,7 +313,7 @@ class PicoAskServiceTest {
         var mapper = new ObjectMapper();
         service = new PicoAskService(gateway,catalog,mapper,contexts,limits(12000));
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
-            .thenReturn(new PicoAskService.GuideSelection(List.of("contract.detail","settlement.journey")));
+            .thenReturn(new PicoAskService.GuideSelection(List.of("contract.detail","settlement.journey"), false));
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
             .thenReturn(answer("계약 상세의 실제 근거를 확인하세요.","contract.detail:overview"));
         var turns = java.util.stream.IntStream.range(0,6).mapToObj(index -> new PicoAskRequest.Turn(

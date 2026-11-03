@@ -1,5 +1,6 @@
 package com.susukkang.fgc.ai.service;
 
+import com.fasterxml.jackson.core.io.JsonStringEncoder;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.errors.OpenAIException;
@@ -177,11 +178,17 @@ public class LlmGateway {
                     .anyMatch(StructuredResponseOutputMessage.Content::isRefusal);
             throw failed(request, AiCallStatus.ERROR, refused ? "REFUSAL" : "EMPTY_OUTPUT", usage.orElse(null), started);
         }
+        // 표식이 빠진 채 지시문 전체를 그대로 되풀이한 답도 막는다. 출력 원문이 JSON 이라 지시문도 JSON 문자열 표기로 찾는다.
+        String instructions = request.instructions();
+        String quotedInstructions = instructions == null || instructions.isBlank() ? null
+                : new String(JsonStringEncoder.getInstance().quoteAsString(instructions));
         boolean echoed = response.output().stream()
                 .flatMap(item -> item.message().stream())
                 .flatMap(message -> message.content().stream())
                 .flatMap(content -> content.rawContent().outputText().stream())
-                .anyMatch(text -> text.text().contains(INSTRUCTION_MARKER));
+                .map(text -> text.text())
+                .anyMatch(text -> text.contains(INSTRUCTION_MARKER)
+                        || (quotedInstructions != null && text.contains(quotedInstructions)));
         if (echoed) {
             throw failed(request, AiCallStatus.ERROR, "PROMPT_ECHO", usage.orElse(null), started);
         }

@@ -106,6 +106,27 @@ class LlmGatewayTest {
         assertThat(lastLog().getErrorCode()).isEqualTo("PROMPT_ECHO");
     }
 
+    @Test
+    void answerRepeatingTheWholeInstructionsWithoutTheMarkerIsDiscarded() {
+        reply = request -> json(Map.of("label", "문서 서식을 분류한다.", "rowCount", 3));
+        LlmGateway gateway = gateway();
+
+        assertAi001(() -> gateway.call(request(), DocKind.class));
+
+        assertThat(lastLog().getCallStatus()).isEqualTo(AiCallStatus.ERROR);
+        assertThat(lastLog().getErrorCode()).isEqualTo("PROMPT_ECHO");
+    }
+
+    @Test
+    void blankInstructionsAreNotMatchedAsAnEcho() {
+        LlmGateway gateway = gateway();
+        LlmGateway.LlmRequest blank = LlmGateway.LlmRequest.builder()
+                .purpose(AiCallPurpose.INTAKE_CLASSIFY).instructions(" ").data("정산 명세 3행").build();
+
+        assertThat(gateway.call(blank, DocKind.class).rowCount).isEqualTo(3);
+        assertThat(lastLog().getCallStatus()).isEqualTo(AiCallStatus.SUCCESS);
+    }
+
     private LlmGateway gateway() {
         LlmProperties properties = new LlmProperties("test-key", "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
                 "fgc-test-model", Duration.ofSeconds(5), 1000, 256, Duration.ofMinutes(10));
