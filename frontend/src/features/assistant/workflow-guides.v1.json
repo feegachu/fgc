@@ -1906,7 +1906,7 @@
   {
     "workflowId": "clawback.review",
     "guideVersion": "1.0",
-    "title": "환수 후보·근거 검토",
+    "title": "환수 후보와 근거 검토",
     "description": "환수 화면은 후보를 조회하고 원천, 지급, 스케줄, 정책 근거를 확인한 뒤 적용 정책을 골라 환수액을 계산하는 기능입니다. 계산 결과는 환수 확정이나 회수 완료가 아닙니다.",
     "capability": "READ",
     "keywords": [],
@@ -1924,7 +1924,7 @@
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-page.select",
         "title": "기간 기준 선택",
-        "instruction": "발생기준일과 계약일 중 검색 기준을 선택합니다. 시작일·종료일과 계약번호 등 조건을 입력한 뒤 후보 조회를 누릅니다.",
+        "instruction": "발생기준일과 계약일 중 검색 기준을 선택합니다. 시작일과 종료일, 계약번호 등 조건을 입력한 뒤 후보 조회를 누릅니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1983,8 +1983,8 @@
         "stepId": "clawback.review.step.4",
         "screenId": "CLAW-W01",
         "targetId": "clawback.evidence.payment",
-        "title": "연결 지급·귀속 확인",
-        "instruction": "기지급액·미지급액과 실제 연결 지급 및 귀속을 확인합니다. 실제 금액은 프로그램의 표시 결과이며 AI가 계산하지 않습니다.",
+        "title": "연결 지급과 귀속 확인",
+        "instruction": "기지급액과 미지급액, 실제 연결 지급과 귀속을 확인합니다. 실제 금액은 프로그램의 표시 결과이며 AI가 계산하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -2004,7 +2004,7 @@
         "screenId": "CLAW-W01",
         "targetId": "clawback.evidence.schedule",
         "title": "스케줄과 정책 후보 확인",
-        "instruction": "관련 스케줄·정책 후보와 적용 기준을 확인합니다. 정책 후보가 하나인 것을 적용 선택 완료로 취급하지 않습니다.",
+        "instruction": "관련 스케줄과 정책 후보, 적용 기준을 확인합니다. 정책 후보가 하나인 것을 적용 선택 완료로 취급하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
