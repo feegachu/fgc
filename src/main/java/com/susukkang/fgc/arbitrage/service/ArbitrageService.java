@@ -236,9 +236,9 @@ public class ArbitrageService {
         // 확정 지급·차감 순액과 활성 스케줄의 남은 지급예정액 조회
         CommissionBalanceSnapshot balance = arbitrageCheckRepository.commissionBalanceSnapshot(
                 contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate());
-        BigDecimal confirmedPaymentAmount = balance.confirmedPaymentAmount();
-        BigDecimal confirmedDeductionAmount = balance.confirmedDeductionAmount();
-        BigDecimal paidCommissionAmount = balance.paidCommissionAmount();
+        BigDecimal confirmedPaymentAmount = valueOrZero(balance.confirmedPaymentAmount());
+        BigDecimal confirmedDeductionAmount = valueOrZero(balance.confirmedDeductionAmount());
+        BigDecimal paidCommissionAmount = confirmedPaymentAmount.subtract(confirmedDeductionAmount);
         PlannedCommissionSummary planned = balance.planned();
         BigDecimal plannedCommissionAmount = planned.remainingAmount();
 
