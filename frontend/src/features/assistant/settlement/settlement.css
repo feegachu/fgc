@@ -1,17 +1,20 @@
+@import '../payment-guide.css';
 .settlement-guide {
   position: fixed;
   right: 20px;
   bottom: 20px;
-  z-index: 45;
+  z-index: calc(var(--z-overlay, 80) - 1);
   width: min(360px, calc(100vw - 32px));
-  max-height: 65vh;
+  max-height: min(460px, 50dvh);
   overflow: auto;
-  padding: 20px;
-  border: 1px solid var(--color-primary, #3154ff);
+  padding: 16px;
+  border: 1px solid #b7d5ed;
   border-radius: var(--radius-12);
   background: var(--color-surface, #fff);
-  box-shadow: 0 8px 32px #10205020;
-  font-size: 14px;
+  box-shadow: 0 14px 50px #173b6429;
+  color: #244a69;
+  font-size: 12px;
+  line-height: 1.8;
 }
 .settlement-guide header {
   display: flex;
@@ -51,7 +54,7 @@
   color: #526174;
 }
 .settlement-spotlight {
-  outline: 3px solid #3154ff !important;
+  outline: 1px solid #9bc7e7 !important;
   outline-offset: 6px;
   scroll-margin-block: 100px;
 }
@@ -95,3 +98,19 @@ body:has([role='dialog']) .settlement-spotlight {
 .settlement-guide header strong {
   flex: 1;
 }
+.settlement-guide button.pico-guide-next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  margin-left: auto;
+  padding: 7px 12px;
+  border-color: #286eaa;
+  border-radius: 7px;
+  background: #286eaa;
+  color: #fff;
+}
+.settlement-guide button.pico-guide-next:hover:not(:disabled) { background: #205c91; }
+.settlement-guide button.pico-guide-next:disabled { background: #eaf0f5; border-color: #eaf0f5; color: #8fa1b5; opacity: 1; }
+.settlement-guide header button { border-color: transparent; background: transparent; color: #7891a5; font-size: 12px; }

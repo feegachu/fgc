@@ -152,6 +152,9 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
     return { engine, readContext, selected }
   })
   const snapshot = useSyncExternalStore(runtime.engine.observe.bind(runtime.engine), runtime.engine.getSnapshot)
+  useEffect(() => useWorkflowGuide.subscribe((state, previous) => {
+    if (state.chatSequence !== previous.chatSequence) runtime.engine.pause('USER_PAUSED')
+  }), [runtime])
   const position = useSpotlight(snapshot.target, card)
   useEffect(() => {
     useWorkflowGuide.setState({ active: !['IDLE', 'PAUSED', 'COMPLETED', 'ERROR'].includes(snapshot.status),
@@ -238,21 +241,25 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
   }, [runtime])
   if (snapshot.status === 'IDLE') return null
   const guide = findWorkflowGuide(snapshot.workflowId ?? '', '1.0')
+  const permittedSteps = guide?.steps.filter((step) => step.roles.includes(user.roleCode)) ?? []
+  const visibleSteps = permittedSteps.some((step) => step.stepId === snapshot.step?.stepId) ? permittedSteps : snapshot.step ? [snapshot.step] : []
+  const stepIndex = visibleSteps.findIndex((step) => step.stepId === snapshot.step?.stepId)
   const stop = () => { runtime.engine.stop(); useWorkflowGuide.getState().clear() }
   return createPortal(<>
-    {position.box && snapshot.status !== 'PAUSED' && <div className="pico-guide-spotlight" style={position.box} aria-hidden="true" />}
-    <section ref={card} className="pico-guide-card" aria-label="업무 안내" style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}>
-      <header><img src={mascot} alt="" /><div><strong>{guide?.title}</strong><small>화면과 입력 위치 안내</small></div><button onClick={stop} aria-label="업무 안내 종료">닫기</button></header>
+    {position.box && snapshot.status !== 'PAUSED' && <div className="pico-guide-spotlight payment-guide-spotlight" style={position.box} aria-hidden="true" />}
+    <section ref={card} className="pico-guide-card payment-guide-card" data-guide-anchored={Boolean(snapshot.target && snapshot.status !== 'PAUSED')} aria-label="업무 안내" style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}>
+      <header><img src={mascot} alt="" /><div><small>피코의 단계별 가이드{stepIndex >= 0 ? ` · ${stepIndex + 1}/${visibleSteps.length}` : ''}</small><strong>{guide?.title}</strong></div><button onClick={stop} aria-label="업무 안내 종료">닫기</button></header>
+      {visibleSteps.length > 0 && <div className="payment-guide-progress" aria-hidden="true">{visibleSteps.map((step, index) => <span key={step.stepId} className={index < stepIndex ? 'is-done' : index === stepIndex ? 'is-current' : ''} />)}</div>}
       <h3>{snapshot.status === 'COMPLETED' ? '안내를 마쳤어요' : guide && workflowSteps(guide, user.roleCode).find((step) => step.stepId === snapshot.step?.stepId)?.title}</h3>
       <p>{snapshot.status === 'COMPLETED' ? '안내 확인을 마쳤습니다. 실제 저장, 검증, 확정 결과는 기존 업무 화면에서 확인해주세요.' : snapshot.step?.instruction}</p>
       {snapshot.reasonCode && <p role="status">{messages[snapshot.reasonCode] ?? '화면의 조건을 확인하고 필요한 영역을 연 뒤 이어가세요.'}</p>}
-      <nav aria-label="안내 단계 이동">
-        <button onClick={() => void runtime.engine.previous()} disabled={['PREPARING', 'COMPLETED'].includes(snapshot.status) || !runtime.engine.canGoBack()}>이전 안내</button>
+      <nav aria-label="튜토리얼 단계 이동">
+        <button className="pico-guide-back" aria-label="이전 안내" onClick={() => void runtime.engine.previous()} disabled={!runtime.engine.canGoBack() || ['PREPARING', 'COMPLETED'].includes(snapshot.status)}>이전</button>
         {snapshot.status === 'PAUSED' ? <>
           <button onClick={() => void runtime.engine.resume()}>돌아와 이어가기</button>
           <button onClick={() => guide && useWorkflowGuide.getState().start(guide.workflowId, request?.stepId)}>현재 대상에서 다시 시작</button>
-        </> : snapshot.status !== 'COMPLETED' && <button disabled={snapshot.status === 'PREPARING'} onClick={() => void runtime.engine.next()}>확인했어요, 다음 안내</button>}
-        {snapshot.status === 'COMPLETED' ? <button onClick={stop}>안내 닫기</button> : <button onClick={() => runtime.engine.pause()}>잠시 멈추기</button>}
+        </> : snapshot.status !== 'COMPLETED' && <button className="pico-guide-next" aria-label="확인했어요, 다음 안내" disabled={snapshot.status === 'PREPARING'} onClick={() => void runtime.engine.next()}>다음 안내</button>}
+        {snapshot.status === 'COMPLETED' ? <button onClick={stop}>안내 닫기</button> : <button className="pico-guide-pause" onClick={() => runtime.engine.pause()}>잠시 멈추기</button>}
       </nav>
       <small>업무 버튼은 직접 누르세요. 안내 확인은 실제 업무 처리 완료를 뜻하지 않습니다.</small>
     </section>

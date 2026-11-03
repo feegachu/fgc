@@ -34,6 +34,11 @@ for (const width of [1440, 390]) {
     await pico.getByRole('button', { name: /^보험계약 검색\/선택/ }).click()
     const tutorial = page.getByRole('region', { name: '업무 안내', exact: true })
     await expect(tutorial.getByRole('heading', { name: '계약 검색', exact: true })).toBeVisible()
+    await expect.poll(async () => {
+      const target = await page.locator('.payment-guide-spotlight').boundingBox()
+      const coach = await tutorial.boundingBox()
+      return target && coach ? Math.abs(coach.y - target.y - target.height - 16) : 999
+    }).toBeLessThan(2)
     await expect(tutorial.getByRole('button', { name: '이전 안내' })).toBeDisabled()
     await tutorial.getByRole('button', { name: '확인했어요, 다음 안내' }).click()
     await expect(tutorial.getByRole('heading', { name: '조회 결과 확인', exact: true })).toBeVisible()
@@ -46,14 +51,25 @@ for (const width of [1440, 390]) {
   })
 }
 
-test('피코와 전체 업무 가이드 진입은 서로 겹치지 않는다', async ({ page }) => {
+test('전체 업무 가이드를 보존하며 후속 채팅으로 전환한다', async ({ page }) => {
   await login(page, 'settle01', '/?month=2026-07')
   await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
   const settlement = page.getByRole('complementary', { name: '전체 업무 가이드' })
   await expect(settlement).toBeVisible()
-  await expect(page.getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveCount(0)
+  await settlement.getByRole('button', { name: '안내 시작', exact: true }).click()
+  await expect(settlement.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeVisible()
   await expect(page.getByRole('dialog', { name: '피코 업무 비서' })).toHaveCount(0)
-  await expect(page.getByRole('region', { name: '업무 안내', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '업무 안내' })).toHaveCount(0)
+  await page.getByRole('button', { name: '업무 비서 AI 열기, 피코' }).click()
+  const pico = page.getByRole('dialog', { name: '피코 업무 비서' })
+  await expect(pico.getByRole('tab', { name: '대화', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await pico.getByRole('textbox', { name: '피코에게 질문' }).fill('현재 단계의 입력 위치를 다시 알려주세요')
+  await expect(pico.getByRole('textbox', { name: '피코에게 질문' })).toHaveValue('현재 단계의 입력 위치를 다시 알려주세요')
+  await expect(page.getByRole('region', { name: '업무 안내' })).toHaveCount(0)
+  // The open chat deliberately hides the background guide. Inspect its preserved state after closing it.
+  await pico.getByRole('button', { name: '비서 닫기', exact: true }).click()
+  await expect(settlement.getByRole('button', { name: '펼치기' })).toBeVisible()
+  await expect(settlement.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeVisible()
 })
 
 for (const width of [1440, 390]) {
@@ -116,8 +132,10 @@ for (const width of [1440, 390]) {
     await pico.getByRole('button', { name: /^지급 초안 저장/ }).click()
     const guide = page.getByRole('region', { name: '지급 업무 가이드' })
     await expect(guide).toBeVisible()
-    await expect(page.getByRole('region', { name: '업무 안내', exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: '업무 안내' })).toHaveCount(0)
+    await page.getByRole('button', { name: '업무 비서 AI 열기, 피코' }).click()
+    await expect(guide.getByRole('button', { name: '펼치기' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: '피코에게 질문' })).toBeVisible()
     expect(writes).toEqual([])
     expect(errors).toEqual([])
   })
