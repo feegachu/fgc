@@ -1,5 +1,6 @@
 import { policyCodeLabel } from '../policies/labels'
 import { useRef, useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useLocation } from 'react-router'
@@ -56,7 +57,7 @@ function InlineState({ message, error, onRetry }: { message: string; error?: boo
     <p className={`schedule-inline-state ${error ? 'is-error' : 'is-loading'}`} role={error ? 'alert' : 'status'}>
       {message}
       {onRetry && (
-        <Button variant="secondary" onClick={onRetry}>
+        <Button data-guide-feature="features.schedule.schedule-detail-page.button" variant="secondary" onClick={onRetry}>
           다시 시도
         </Button>
       )}
@@ -120,13 +121,13 @@ function ScheduleDetailView({ id }: { id: string }) {
           <h1 className="page-title">예상 스케줄 상세</h1>
         </div>
         <div className="page-header-actions">
-          <Link
+          <Link data-guide-feature="features.schedule.schedule-detail-page.link"
             className="button button-secondary"
             to={safeReturnTo(new URLSearchParams(location.search).get('returnTo'), '/schedules')}
           >
             목록으로
           </Link>
-          <Button
+          <Button data-guide-feature="features.schedule.schedule-detail-page.button-2"
             variant="secondary"
             loading={exporting.isPending}
             disabled={!validId}
@@ -137,7 +138,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             </span>
             CSV 내보내기
           </Button>
-          <Button
+          <Button data-guide-feature="features.schedule.schedule-detail-page.button-3"
             variant="secondary"
             disabled={regenerateDisabled}
             aria-describedby={showNote ? 'schedule-action-note' : undefined}
@@ -148,7 +149,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             </span>
             새 버전 만들기
           </Button>
-          <Button
+          <Button data-guide-feature="features.schedule.schedule-detail-page.button-4"
             disabled={confirmDisabled}
             aria-describedby={showNote ? 'schedule-action-note' : undefined}
             onClick={() => setConfirmOpen(true)}
@@ -168,7 +169,7 @@ function ScheduleDetailView({ id }: { id: string }) {
         </p>
       )}
 
-      <section className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
+      <section data-guide-feature="features.schedule.schedule-detail-page.section" className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-header-title">
             스케줄 헤더,{' '}
@@ -179,7 +180,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             <label className="filter-field-label" htmlFor="schedule-stage">
               지급단계
             </label>
-            <select
+            <select data-guide-feature="features.schedule.schedule-detail-page.schedule-stage"
               className="select-control"
               id="schedule-stage"
               value={header?.paymentStage ?? 'GA_TO_FC'}
@@ -207,7 +208,7 @@ function ScheduleDetailView({ id }: { id: string }) {
         </div>
       </section>
 
-      <section data-guide-target="schedule.lines" className="surface schedule-detail-card" aria-labelledby="schedule-lines-title">
+      <section data-guide-feature="features.schedule.schedule-detail-page.section-2" data-guide-target="schedule.lines" className="surface schedule-detail-card" aria-labelledby="schedule-lines-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-lines-title">
             회차별 예상 금액
@@ -222,7 +223,7 @@ function ScheduleDetailView({ id }: { id: string }) {
           role="region"
           aria-label="회차별 예상 금액 표"
         >
-          <table className="data-table schedule-line-table" aria-busy={detail.isFetching}>
+          <table data-guide-feature="features.schedule.schedule-detail-page.table" className="data-table schedule-line-table" aria-busy={detail.isFetching}>
             <caption className="visually-hidden">회차별 예상 지급 금액</caption>
             <colgroup>
               {[
@@ -339,7 +340,7 @@ function ScheduleDetailView({ id }: { id: string }) {
         </div>
       </section>
 
-      <section className="surface schedule-detail-card" aria-labelledby="schedule-versions-title">
+      <section data-guide-feature="features.schedule.schedule-detail-page.section-3" className="surface schedule-detail-card" aria-labelledby="schedule-versions-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-versions-title">
             버전 비교
@@ -352,7 +353,7 @@ function ScheduleDetailView({ id }: { id: string }) {
           role="region"
           aria-label="스케줄 버전 비교 표"
         >
-          <table className="data-table schedule-version-table" aria-busy={versions.isFetching}>
+          <table data-guide-feature="features.schedule.schedule-detail-page.table-2" className="data-table schedule-version-table" aria-busy={versions.isFetching}>
             <caption className="visually-hidden">같은 계약의 스케줄 버전 이력</caption>
             <colgroup>
               {['no', 'status', 'active', 'policy', 'reason', 'generated', 'lines', 'total'].map((name) => (
@@ -432,8 +433,9 @@ function ScheduleDetailView({ id }: { id: string }) {
       <RegenerateModal
         open={regenerateOpen}
         onClose={() => setRegenerateOpen(false)}
-        onSubmit={async (reason) => {
+        onSubmit={async (reason, committed) => {
           const result = await regenerateSchedule(id, reason)
+          committed()
           void client.invalidateQueries({ queryKey: ['schedules'] })
           setRegenerateOpen(false)
           toast('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.', 'success', 3500)
@@ -546,7 +548,7 @@ function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: stri
       <td className="is-left tabular-nums">{line.ruleRef == null ? EMPTY : int(line.ruleRef)}</td>
       <td>
         {paymentHref && (
-          <Link className="button button-ghost" to={paymentHref} aria-label={`${line.lineNo}번 회차 지급 등록`}>
+          <Link data-guide-feature="features.schedule.schedule-detail-page.link-2" className="button button-ghost" to={paymentHref} aria-label={`${line.lineNo}번 회차 지급 등록`}>
             지급 등록
           </Link>
         )}
@@ -559,7 +561,7 @@ function VersionRow({ version, current }: { version: ScheduleHeader; current: bo
   return (
     <tr className={current ? 'is-selected' : undefined} aria-current={current || undefined}>
       <td className="is-left">
-        <Link className="tabular-nums" to={`/schedules/${encodeURIComponent(String(version.scheduleHeaderId))}`}>
+        <Link data-guide-feature="features.schedule.schedule-detail-page.link-3" className="tabular-nums" to={`/schedules/${encodeURIComponent(String(version.scheduleHeaderId))}`}>
           {versionText(version.scheduleVersionNo)}
         </Link>
       </td>
@@ -619,10 +621,10 @@ function ConfirmModal({
       onClose={close}
       footer={
         <>
-          <button ref={cancel} type="button" className="button button-secondary" onClick={close}>
+          <button data-guide-feature="features.schedule.schedule-detail-page.button-5" ref={cancel} type="button" className="button button-secondary" onClick={close}>
             취소
           </button>
-          <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button data-guide-feature="features.schedule.schedule-detail-page.button-6" loading={mutation.isPending} onClick={() => mutation.mutate()}>
             확정
           </Button>
         </>
@@ -666,13 +668,14 @@ function RegenerateModal({
 }: {
   open: boolean
   onClose: () => void
-  onSubmit: (reason: string) => Promise<void>
+  onSubmit: (reason: string, committed: () => void) => Promise<void>
 }) {
   const input = useRef<HTMLTextAreaElement>(null)
   const [reason, setReason] = useState('')
+  const clearUnsaved = useUnsavedWork(open && Boolean(reason), reason)
   const [error, setError] = useState('')
   const mutation = useMutation({
-    mutationFn: onSubmit,
+    mutationFn: (reason: string) => onSubmit(reason, clearUnsaved),
     meta: { errorToast: false },
     onError: (caught) => {
       // 서버 검증(@NotBlank·@Size)이 사유 필드를 지목하면 Toast 가 아니라 필드 옆에 둔다(가이드 §11).
@@ -710,10 +713,10 @@ function RegenerateModal({
       onClose={close}
       footer={
         <>
-          <button type="button" className="button button-secondary" onClick={close}>
+          <button data-guide-feature="features.schedule.schedule-detail-page.button-7" type="button" className="button button-secondary" onClick={close}>
             취소
           </button>
-          <Button loading={mutation.isPending} onClick={submit}>
+          <Button data-guide-feature="features.schedule.schedule-detail-page.button-8" loading={mutation.isPending} onClick={submit}>
             새 버전 만들기
           </Button>
         </>
@@ -731,7 +734,7 @@ function RegenerateModal({
             *
           </span>
         </label>
-        <textarea
+        <textarea data-guide-feature="features.schedule.schedule-detail-page.regenerate-reason"
           ref={input}
           className="textarea-control"
           id="regenerate-reason"

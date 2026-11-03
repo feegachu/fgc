@@ -89,7 +89,7 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
         }
       }}
     >
-      <input
+      <input data-guide-feature="components.search-select.input"
         {...input}
         id={id}
         ref={anchor}
@@ -147,7 +147,7 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
               aria-label={`${input['aria-label'] ?? input.placeholder ?? '선택'} 검색 결과`}
             >
               {options.map((option, index) => (
-                <div
+                <div data-guide-feature="components.search-select.div"
                   key={source.id(option)}
                   id={`${popupId}-${index}`}
                   role="option"
@@ -168,18 +168,18 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
             {result.isError && (
               <p role="alert">
                 자료를 불러오지 못했습니다.{' '}
-                <button type="button" onClick={() => void result.refetch()}>
+                <button data-guide-feature="components.search-select.button" type="button" onClick={() => void result.refetch()}>
                   다시 시도
                 </button>
               </p>
             )}
             {result.hasNextPage && (
-              <button type="button" disabled={result.isFetching} onClick={() => void result.fetchNextPage()}>
+              <button data-guide-feature="components.search-select.button-2" type="button" disabled={result.isFetching} onClick={() => void result.fetchNextPage()}>
                 더 불러오기
               </button>
             )}
             {value && (
-              <button type="button" onClick={() => choose()}>
+              <button data-guide-feature="components.search-select.button-3" type="button" onClick={() => choose()}>
                 선택 해제
               </button>
             )}

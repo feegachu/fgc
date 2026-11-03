@@ -28,7 +28,7 @@ function ErrorCard({ title, message, help, requestId, copyRequestId }: ErrorCard
   // 문구에 이미 요청 ID가 들어 있으면 다시 붙이지 않는다(format.ts errorText와 같은 규칙).
   return (
     <div className="error-page">
-      <section className="surface error-card" aria-labelledby="error-title">
+      <section data-guide-feature="features.error.error-pages.section" className="surface error-card" aria-labelledby="error-title">
         <header className="surface-header">
           <h1 id="error-title" className="surface-title">
             {title}
@@ -40,7 +40,7 @@ function ErrorCard({ title, message, help, requestId, copyRequestId }: ErrorCard
           </p>
           {help && <p className="error-help">{help}</p>}
           <div className="error-action">
-            <Link className="button button-secondary" to="/">
+            <Link data-guide-feature="features.error.error-pages.link" className="button button-secondary" to="/">
               대시보드로
             </Link>
             {copyRequestId && requestId && <CopyButton value={requestId} />}
@@ -56,7 +56,7 @@ function CopyButton({ value }: { value: string }) {
   // Clipboard API는 보안 컨텍스트(HTTPS·localhost)에서만 있다. 없으면 문구에서 직접 읽게 둔다.
   if (!navigator.clipboard) return null
   return (
-    <button
+    <button data-guide-feature="features.error.error-pages.button"
       type="button"
       className="button button-ghost"
       aria-live="polite"

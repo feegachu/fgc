@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { guideFeatureId } from '../assistant/feature-ids'
 import type { ReactNode } from 'react'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { ApiError } from '../../lib/api/client'
@@ -34,7 +35,7 @@ export function ReferenceTabs<T extends string>({
     <>
       <div className="tab-list" role="tablist" aria-label={label}>
         {tabs.map((tab, index) => (
-          <button
+          <button data-guide-feature={guideFeatureId('reference.tab', tab.id)}
             className="tab-button"
             key={tab.id}
             id={`${id}-${tab.id}`}
@@ -66,7 +67,7 @@ export function ReferenceTabs<T extends string>({
           </button>
         ))}
       </div>
-      <section
+      <section data-guide-feature={guideFeatureId('reference.panel', active)}
         id={`${id}-panel`}
         className={`tab-panel ${panelClassName}`}
         role="tabpanel"

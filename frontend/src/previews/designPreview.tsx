@@ -130,30 +130,30 @@ const router = createMemoryRouter([
               확정된 화면 디자인을 예시 데이터로 확인하는 미리보기입니다.
             </p>
             <DashboardPage />
-            <section className="surface design-component-samples" aria-label="공통 컴포넌트 미리보기">
+            <section data-guide-feature="previews.design-preview.section" className="surface design-component-samples" aria-label="공통 컴포넌트 미리보기">
               <h2>공통 컴포넌트 미리보기</h2>
               <p className="page-description">A안 공통 버튼과 상태별 반투명 배지를 확인할 수 있습니다.</p>
               <div className="design-sample-controls">
                 <Field label="미리보기 입력">
-                  <input placeholder="내용을 입력하세요" />
+                  <input data-guide-feature="previews.design-preview.input" placeholder="내용을 입력하세요" />
                 </Field>
                 <Field label="미리보기 선택">
-                  <select>
+                  <select data-guide-feature="previews.design-preview.select">
                     <option>전체</option>
                     <option>검토 중</option>
                   </select>
                 </Field>
-                <Link className="button button-primary" to="/">
+                <Link data-guide-feature="previews.design-preview.link" className="button button-primary" to="/">
                   ＋ 신규 등록
                 </Link>
-                <Button>조회</Button>
-                <Button variant="secondary">
+                <Button data-guide-feature="previews.design-preview.button">조회</Button>
+                <Button data-guide-feature="previews.design-preview.button-2" variant="secondary">
                   <span className="material-symbols-rounded" aria-hidden="true">
                     restart_alt
                   </span>
                   초기화
                 </Button>
-                <Button disabled>비활성</Button>
+                <Button data-guide-feature="previews.design-preview.button-3" disabled>비활성</Button>
               </div>
               <div className="design-sample-statuses">
                 <StatusBadge tone="neutral">신규</StatusBadge>
@@ -197,7 +197,7 @@ const router = createMemoryRouter([
         element: (
           <div className="empty-state">
             <p>이 미리보기에서는 대시보드 디자인을 확인할 수 있습니다.</p>
-            <Link to="/">대시보드로 돌아가기</Link>
+            <Link data-guide-feature="previews.design-preview.link-2" to="/">대시보드로 돌아가기</Link>
           </div>
         ),
       },

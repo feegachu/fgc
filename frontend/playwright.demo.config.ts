@@ -37,7 +37,7 @@ export default defineConfig({
     {
       command: 'npm run dev -- --host 127.0.0.1 --port 15173 --strictPort',
       url: 'http://127.0.0.1:15173/',
-      env: { FGC_API_TARGET: 'http://127.0.0.1:18081' },
+      env: { FGC_API_TARGET: 'http://127.0.0.1:18081', VITE_ASSISTANT_AI: 'true' },
       reuseExistingServer: false,
     },
   ],

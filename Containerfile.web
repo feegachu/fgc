@@ -13,7 +13,10 @@ WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-RUN npm run build
+# Public boolean only. Runtime env cannot change Vite's compiled feature flags.
+ARG VITE_ASSISTANT_AI=false
+RUN case "$VITE_ASSISTANT_AI" in true|false) ;; *) echo 'VITE_ASSISTANT_AI must be true or false' >&2; exit 1 ;; esac \
+    && VITE_ASSISTANT_AI="$VITE_ASSISTANT_AI" VITE_ASSISTANT_DEMO=false npm run build
 
 # ---------- 2단계: 실행 ----------
 FROM docker.io/library/nginx:stable-alpine
