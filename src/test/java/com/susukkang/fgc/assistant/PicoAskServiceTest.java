@@ -261,6 +261,13 @@ class PicoAskServiceTest {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.ANSWER_ONLY,"초안을 저장하세요.",List.of("payment.draft:overview","evil:source")));
         assertThat(service.ask(request("초안 저장")).fallbackReason()).as("one forged citation still rejects the answer").isEqualTo("INVALID_AI_OUTPUT");
     }
+    @Test void answerInstructionKeepsExactScreenNamesInsteadOfAReplacementWord() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("1,200% 한도 검증 화면에서 결과를 확인하세요.","payment.draft:overview"));
+        assertThat(service.ask(request("한도 결과는 어디서 보나요")).source()).isEqualTo(Source.AI);
+        var prompt=ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway).call(prompt.capture(),eq(PicoAskService.ModelAnswer.class));
+        assertThat(prompt.getValue().instructions()).contains("화면 이름은 숫자까지 그대로 쓰세요").contains("'수치' 같은 대체어");
+    }
     @Test void approvedScreenTitleWithDigitsIsNotAGeneratedNumber() {
         assertThat(catalog.numericScreenTitles()).containsExactly("1,200% 한도 검증");
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("1,200% 한도 검증 화면에서 결과를 확인하세요.","payment.draft:overview"));
