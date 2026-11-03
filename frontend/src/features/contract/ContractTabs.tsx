@@ -35,7 +35,13 @@ import type {
   ContractTransactions,
 } from './api'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
-import { arbitrageStatusLabels, contractStatusLabels, paymentCycleLabels, processingStatusLabels } from './labels'
+import {
+  arbitrageStatusLabels,
+  contractStatusLabels,
+  paymentCycleLabels,
+  processingJobLabels,
+  processingStatusLabels,
+} from './labels'
 import { contractErrorText, contractTabs as tabs, sortStatusEvents } from './detailState'
 import type { ContractTab, StatusSort } from './detailState'
 
@@ -311,7 +317,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                             <ul className="contract-processing-list" aria-label="후속 처리 작업">
                               {event.processings.map((job, jobIndex) => (
                                 <li className="contract-processing-row" key={`${job.processingJob}-${jobIndex}`}>
-                                  <strong>{job.processingJob || '처리 작업'}</strong>
+                                  <strong>{processingJobLabels[job.processingJob ?? ''] ?? '처리 작업'}</strong>
                                   <ResultStatus code={job.processingStatus} labels={processingStatusLabels} />
                                   <time dateTime={job.processedAt}>{dateTime(job.processedAt)}</time>
                                 </li>
