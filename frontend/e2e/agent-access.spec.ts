@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 // UI 전용 fixture. 실제 JWT·소유권·PostgreSQL 검증은 AgentDataScopeIntegrationTest에서 수행한다.
-async function agentFixture(page: Page) {
+async function agentFixture(page: Page, commission = 300000) {
   const unexpected: string[] = []
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
@@ -22,7 +22,10 @@ async function agentFixture(page: Page) {
       contractStatusLabel: '정상', agentIdName: 'A-FC-001 김정산', agentName: '김정산', dataOrigin: 'MANUAL',
     }
     if (path === '/api/v1/contracts') return fulfill({ content: [contract], totalPages: 1, totalElements: 1, page: 1, size: 20 })
-    if (path === '/api/v1/transactions') return fulfill({ content: [{ amount: 300000 }], totalPages: 1, totalElements: 1, page: 1, size: 100 })
+    if (path === '/api/v1/transactions') return fulfill({
+      content: [{ amount: commission, paymentStage: 'GA_TO_FC', cashflowType: 'PAYMENT' }],
+      totalPages: 1, totalElements: 1, page: 1, size: 100,
+    })
     if (path === '/api/v1/contracts/1') return fulfill(contract)
     if (path === '/api/v1/contracts/1/status-events') return fulfill([])
     unexpected.push(path)
@@ -52,6 +55,21 @@ test('AGENT 첫 화면은 포트폴리오이고 본인 계약 목록은 전체 �
   await expect(page.getByRole('link', { name: '신규 등록' })).toHaveCount(0)
   expect(unexpected).toEqual([])
   await page.screenshot({ path: 'e2e-artifacts/634-agent-contracts.png', fullPage: true })
+})
+
+test('1280px 화면에서도 7자리 수수료와 단위가 카드 안 한 줄에 보인다', async ({ page }) => {
+  await agentFixture(page, 1_910_000)
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.goto('./')
+  const card = page.getByRole('link', { name: '수령 예정 수수료' })
+  await expect(card.locator('.kpi-value')).toHaveText('1,910,000')
+  const box = (await card.boundingBox())!
+  const value = (await card.locator('.kpi-value').boundingBox())!
+  const unit = (await card.locator('.kpi-unit').boundingBox())!
+  // 줄바꿈되면 단위가 값 아래 줄 왼쪽으로 내려간다.
+  expect(unit.x).toBeGreaterThanOrEqual(value.x + value.width)
+  expect(unit.y).toBeLessThan(value.y + value.height)
+  expect(unit.x + unit.width).toBeLessThanOrEqual(box.x + box.width)
 })
 
 test('계약 상세의 저장된 내부 탭은 기본정보로 제한하고 내부 API를 호출하지 않는다', async ({ page }) => {
