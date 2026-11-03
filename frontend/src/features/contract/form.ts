@@ -1,4 +1,5 @@
-import type { ContractCreateRequest, ContractDetail } from './api'
+import { dateTime } from '../../lib/format'
+import type { ContractCreateRequest, ContractDetail, ContractUpdateRequest } from './api'
 
 export interface ContractDraft {
   insurerId: string
@@ -18,7 +19,16 @@ export interface ContractDraft {
   premiumEntered: boolean
 }
 export type ContractField = Exclude<keyof ContractDraft, 'premiumEntered' | 'organizationName'>
-export type ContractFieldErrors = Partial<Record<ContractField, string>>
+/** IF-API-19 statusEvent. 일시는 datetime-local 값(YYYY-MM-DDTHH:mm, 서울 시각)이다. */
+export interface StatusEventDraft {
+  effectiveAt: string
+  receivedAt: string
+  reasonCode: string
+  reason: string
+}
+/** 키는 서버 오류의 field 값(statusEvent.effectiveAt 등)과 같다. */
+export type StatusEventField = `statusEvent.${keyof StatusEventDraft}`
+export type ContractFieldErrors = Partial<Record<ContractField | StatusEventField, string>>
 
 const text = (value: unknown) => (value == null ? '' : String(value))
 const cycleMonths: Partial<Record<ContractDraft['paymentCycleCode'], number>> = {
@@ -119,3 +129,63 @@ export function createRequest(draft: ContractDraft): ContractCreateRequest {
       draft.standardSurrenderDeductionAmount === '' ? undefined : Number(draft.standardSurrenderDeductionAmount),
   }
 }
+
+/** 지금 서울 시각(분 단위). 접수일시 기본값과 미래 접수 검사에 쓴다. */
+export const seoulNow = () => dateTime(new Date()).replace(' ', 'T')
+
+export const initialStatusEvent = (now: string): StatusEventDraft => ({
+  effectiveAt: '',
+  receivedAt: now,
+  reasonCode: '',
+  reason: '',
+})
+
+const validDateTime = (value: string) => {
+  const parsed = new Date(`${value}:00Z`)
+  return (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) &&
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 16) === value
+  )
+}
+
+/** 서버(운영정책서 제13조의2 3항)가 다시 검사한다. 최신 사건 효력일시 하한은 서버만 안다. */
+export function validateStatusEvent(event: StatusEventDraft, now: string, codes: readonly string[]) {
+  const errors: ContractFieldErrors = {}
+  for (const field of ['effectiveAt', 'receivedAt'] as const)
+    if (!validDateTime(event[field])) errors[`statusEvent.${field}`] = '올바른 일시를 입력해 주세요.'
+  if (!errors['statusEvent.receivedAt'] && event.receivedAt > now)
+    errors['statusEvent.receivedAt'] = '접수일시는 현재 시각보다 늦을 수 없습니다.'
+  if (!errors['statusEvent.effectiveAt'] && !errors['statusEvent.receivedAt'] && event.effectiveAt > event.receivedAt)
+    errors['statusEvent.effectiveAt'] = '효력일시는 접수일시보다 늦을 수 없습니다.'
+  if (!codes.includes(event.reasonCode)) errors['statusEvent.reasonCode'] = '사유코드를 선택해 주세요.'
+  const reason = event.reason.trim()
+  if (!reason) errors['statusEvent.reason'] = '사유를 입력해 주세요.'
+  else if (reason.length > 2000) errors['statusEvent.reason'] = '사유는 2,000자 이내로 입력해 주세요.'
+  return errors
+}
+
+// 서울은 일광절약시간이 없어 +09:00으로 고정해 보낸다.
+export const statusEventRequest = (event: StatusEventDraft): NonNullable<ContractUpdateRequest['statusEvent']> => ({
+  effectiveAt: `${event.effectiveAt}:00+09:00`,
+  receivedAt: `${event.receivedAt}:00+09:00`,
+  // validateStatusEvent가 서버 statusReasonCodes 안의 값인지 확인한 뒤에만 보낸다.
+  reasonCode: event.reasonCode as NonNullable<ContractUpdateRequest['statusEvent']>['reasonCode'],
+  reason: event.reason.trim(),
+})
+
+// 서버 ContractServiceImpl#hasScheduleImpactingChanges와 같은 필드다. 저장 뒤 안내는 응답의 재생성 결과로 한다.
+const scheduleFields = [
+  'insurerId',
+  'productOfferingId',
+  'contractDate',
+  'agentId',
+  'organizationId',
+  'paymentCycleCode',
+  'firstPremiumAmount',
+  'monthlyEquivalentFirstPremium',
+  'paymentTermMonths',
+  'standardSurrenderDeductionAmount',
+] as const
+export const changesSchedule = (request: ContractCreateRequest, original: ContractDetail) =>
+  scheduleFields.some((field) => (request[field] ?? null) !== (original[field] ?? null))

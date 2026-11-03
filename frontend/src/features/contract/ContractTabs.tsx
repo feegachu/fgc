@@ -7,7 +7,7 @@ import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date, dateTime, int, month, won } from '../../lib/format'
 import { CapDetailModal } from '../cap/CapDetailModal'
@@ -36,7 +36,7 @@ import { arbitrageStatusLabels, contractStatusLabels, paymentCycleLabels, proces
 import { contractErrorText, contractTabs as tabs, sortStatusEvents } from './detailState'
 import type { ContractTab, StatusSort } from './detailState'
 
-const text = (value: unknown) => (value == null || value === '' ? '—' : String(value))
+const text = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const stageLabel = (code?: string, label?: string) => responseLabel(label, PAYMENT_STAGE, code)
 const Text = ({ value }: { value: unknown }) => <CellDisclosure singleLine preview={text(value)} />
 
@@ -68,7 +68,7 @@ export function ContractFacts({ items, className = '' }: { items: [string, React
           }
         >
           <dt>{label}</dt>
-          <dd>{value ?? '—'}</dd>
+          <dd>{value ?? '-'}</dd>
         </div>
       ))}
     </dl>
@@ -110,7 +110,11 @@ function ResultStatus({
   label?: string
   labels?: Record<string, string>
 }) {
-  return <StatusBadge tone={statusTones[code ?? ''] ?? 'neutral'}>{responseLabel(label, labels, code)}</StatusBadge>
+  return (
+    <StatusBadge optionCount={Object.keys(labels).length} tone={statusTones[code ?? ''] ?? 'neutral'}>
+      {responseLabel(label, labels, code)}
+    </StatusBadge>
+  )
 }
 
 export function ContractTabs({
@@ -174,6 +178,7 @@ export function ContractTabs({
           aria-labelledby={`contract-tab-${name}`}
           tabIndex={0}
           hidden={active !== name}
+          data-guide-target={name === 'schedules' ? 'contract.schedules' : undefined}
           className={`surface contract-detail-panel ${['basic', 'schedules', 'cap', 'payment'].includes(name) ? 'contract-basic-card' : ''}`}
         >
           {active === name &&
@@ -235,7 +240,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
               ],
               ['초회보험료', won(contract.firstPremiumAmount)],
               ['월납환산 초회보험료', won(contract.monthlyEquivalentFirstPremium)],
-              ['납입기간', contract.paymentTermMonths == null ? '—' : `${int(contract.paymentTermMonths)}개월`],
+              ['납입기간', contract.paymentTermMonths == null ? '-' : `${int(contract.paymentTermMonths)}개월`],
               ['표준해약공제액', won(contract.standardSurrenderDeductionAmount)],
               ['데이터 출처', <DataOriginBadge code={contract.dataOrigin} label={contract.dataOriginLabel} />],
               ['통화 단위', 'KRW (원)'],
@@ -281,7 +286,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                         <article className="contract-history-event-card">
                           <header>
                             <h4>
-                              #{event.eventSeq ?? '—'}{' '}
+                              #{event.eventSeq ?? '-'}{' '}
                               {event.previousStatus
                                 ? responseLabel(event.previousStatusLabel, contractStatusLabels, event.previousStatus)
                                 : '최초'}{' '}
@@ -289,7 +294,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                             </h4>
                             <span>
                               {event.sourceSystem || '계약 상태 사건'}
-                              {!event.processings?.length ? ' · 처리 대기' : ''}
+                              {!event.processings?.length ? ', 처리 대기' : ''}
                             </span>
                           </header>
                           <ContractFacts
@@ -370,7 +375,7 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
                 <h3 className="surface-title">{PAYMENT_STAGE[stage]}</h3>
                 <p>
                   {data.headers?.[0]
-                    ? `버전 ${data.headers[0].scheduleVersionNo ?? '—'} · ${int(data.headers[0].lineCount ?? data.lines?.length)}회차`
+                    ? `버전 ${data.headers[0].scheduleVersionNo ?? '-'}, ${int(data.headers[0].lineCount ?? data.lines?.length)}회차`
                     : '현재 운영 스케줄이 없습니다.'}
                 </p>
               </div>
@@ -458,7 +463,7 @@ function CapTab({ id }: { id: string }) {
           warning
         </span>
         <span className="guidance-copy">
-          두 규제를 더하지 마세요 — 원수사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
+          두 규제를 더하지 마세요, 원수사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
         </span>
       </p>
       <div className="contract-tab-body">
@@ -539,7 +544,11 @@ const journalColumns: TableColumn<ContractJournal>[] = [
   {
     key: 'type',
     label: '유형',
-    render: (row) => <Text value={JOURNAL_TYPE[row.journalType as keyof typeof JOURNAL_TYPE]} />,
+    render: (row) => (
+      <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>
+        <Text value={JOURNAL_TYPE[row.journalType as keyof typeof JOURNAL_TYPE]} />
+      </CategoryBadge>
+    ),
   },
   { key: 'stage', label: '지급단계', render: (row) => stageLabel(row.paymentStage, row.paymentStageLabel) },
   { key: 'debit', label: '차변', align: 'number', render: (row) => <Amount value={row.debitTotal} /> },
@@ -611,7 +620,7 @@ function PaymentTab({ id }: { id: string }) {
   const query = useQuery(contractTransactionsQuery(id))
   return (
     <>
-      <PanelHeading title="지급·대사" legacy>
+      <PanelHeading title="지급/대사" legacy>
         수수료 지급 건과 대사 결과를 함께 표시합니다.
       </PanelHeading>
       <div className="contract-tab-body">

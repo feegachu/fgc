@@ -16,8 +16,6 @@ export function validateDraft(draft: DraftDocument): DraftErrors {
   for (const key of ['policyCode', 'policyName', 'policyType', 'sourceClass', 'effectiveFrom'] as const)
     required(key, draft[key])
   range('', 'effectiveFrom', 'effectiveTo', draft.effectiveFrom, draft.effectiveTo)
-  if (draft.clawbackRules.length)
-    errors.clawbackRules = '환수 기준(D-02)이 미확정이므로 환수 규칙을 등록할 수 없습니다.'
   draft.commissionRules.forEach((rule, i) => {
     const prefix = `commissionRules.${i}.`
     for (const key of [
@@ -64,8 +62,13 @@ export function validateDraft(draft: DraftDocument): DraftErrors {
   })
   draft.clawbackRules.forEach((rule, i) => {
     const prefix = `clawbackRules.${i}.`
-    for (const key of ['elapsedMonthFrom', 'elapsedMonthTo', 'clawbackRatePct'] as const)
+    for (const key of ['elapsedMonthFrom', 'elapsedMonthTo', 'clawbackBasisCode', 'clawbackRatePct'] as const)
       required(prefix + key, rule[key])
+    for (const key of ['elapsedMonthFrom', 'elapsedMonthTo'] as const)
+      if (rule[key] !== '' && (!Number.isInteger(rule[key]) || rule[key] < 0))
+        errors[prefix + key] = '0 이상의 정수 개월 수로 입력하세요.'
+    if (rule.clawbackBasisCode && rule.clawbackBasisCode !== 'PAID_ATTRIBUTED_AMOUNT')
+      errors[prefix + 'clawbackBasisCode'] = '확정 지급 귀속액 기준만 지원합니다.'
     range(prefix, 'elapsedMonthFrom', 'elapsedMonthTo', rule.elapsedMonthFrom, rule.elapsedMonthTo)
     if (Number(rule.elapsedMonthFrom) < 0) errors[prefix + 'elapsedMonthFrom'] = '0개월 이상으로 입력하세요.'
     if (Number(rule.clawbackRatePct) < 0 || Number(rule.clawbackRatePct) > 100)

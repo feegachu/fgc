@@ -33,12 +33,14 @@
 }
 
 .app-sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
   z-index: var(--z-sidebar);
   display: flex;
-  width: 100%;
+  width: var(--layout-sidebar-current-width);
   height: 100dvh;
+  transition: width var(--transition-standard);
   flex-direction: column;
   grid-column: 1;
   grid-row: 1 / -1;
@@ -132,7 +134,7 @@
 .sidebar-nav-section-title {
   padding: 0 var(--space-3) var(--space-2);
   color: var(--color-nav-text-default);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.125rem;
 }
@@ -189,7 +191,7 @@
   border-radius: var(--radius-full);
   color: var(--color-text-link);
   background: var(--color-bg-surface);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.25rem;
   text-align: center;
@@ -262,7 +264,7 @@
 }
 
 .sidebar-user-role {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.125rem;
 }
 
@@ -441,7 +443,7 @@
   right: 0;
   z-index: var(--z-overlay);
   display: flex;
-  width: 22.5rem;
+  width: 24rem;
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -533,7 +535,7 @@
 }
 
 .month-selector-cell-state {
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 0.875rem;
 }
@@ -837,7 +839,7 @@
   border-top: 1px solid var(--color-border-subtle);
   color: var(--color-text-tertiary);
   background: var(--color-bg-surface);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.125rem;
 }
 

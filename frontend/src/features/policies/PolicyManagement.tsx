@@ -1,11 +1,14 @@
+import { policyCodeLabel } from './labels'
 import { useContext, useRef, useState } from 'react'
+import { ApiError } from '../../lib/api/client'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { Field } from '../../components/Field'
 import { DataTable } from '../../components/DataTable'
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { date, dateTime, rate, won, today } from '../../lib/format'
+import { date, dateTime, errorText, rate, won, today } from '../../lib/format'
+import { screenMessage } from '../../lib/screenText'
 import { ReferenceTabs } from '../reference/ReferenceUI'
 import { useAuth } from '../auth/useAuth'
 import type { Policy } from './api'
@@ -24,6 +27,8 @@ import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
 import { performPolicyAction } from './writeApi'
 import { usePolicyRequest } from './usePolicyRequest'
+import type { components } from '../../lib/api/schema'
+type OfferingGovernance = components['schemas']['PolicyOfferingGovernanceResponse']
 
 const tones: Record<string, StatusTone> = {
   DRAFT: 'warning',
@@ -59,14 +64,18 @@ export function PolicyManagement({
 }) {
   const { user } = useAuth()
   const [editing, setEditing] = useState(false)
+  const [problem, setProblem] = useState<{ field: string; message: string }>()
   const [action, setAction] = useState<PolicyAction | null>(null)
   const [panel, setPanel] = useState<(typeof panels)[number]['id']>(initialPanel)
   const draft = detail.editDocument
   const allowed = permittedActions(policy, detail, user?.roleCode)
   const own = (policy.createdBy ?? detail.createdBy) === user?.loginId
+  // 서버는 수정·제출에 참여한 승인자에게도 REJECT만 준다(allowedActions, FGC-POL-001).
+  const contributed = !own && allowed.includes('REJECT') && !allowed.includes('APPROVE')
   const sources = detail.sourceDetails ?? draft?.sourceDetails ?? []
   const supported = Boolean(policy.policyType && policy.policyType in policyTypes)
-  const successorRef = detail.approvalActions?.find((entry) => entry.actionType === 'RETIRE')
+  const successorRef = detail.approvalActions
+    ?.find((entry) => entry.actionType === 'RETIRE')
     ?.evidenceRefs?.find((ref) => /^policy:\d+$/.test(ref))
   const refs = [
     ...new Set([...(policy.regulationRefs ?? []), ...(detail.sourceRefs ?? []), ...(draft?.sourceRefs ?? [])]),
@@ -75,12 +84,9 @@ export function PolicyManagement({
     <div className="policy-management">
       <header className="policy-detail-hero">
         <div>
-          <p className="policy-eyebrow">
-            {policy.policyCode} <span>VERSION {policy.versionNo}</span>
-          </p>
           <h2>{policy.policyName ?? '정책명 자료 없음'}</h2>
           <p>
-            {policy.policyTypeLabel ?? '유형 자료 없음'} <span>·</span> {policy.sourceClassLabel ?? '출처 자료 없음'}
+            {policy.policyTypeLabel ?? '유형 자료 없음'} <span>, </span> {policy.sourceClassLabel ?? '출처 자료 없음'}
           </p>
         </div>
         <StatusBadge tone={tones[policy.status ?? '']}>
@@ -113,7 +119,8 @@ export function PolicyManagement({
           <div>
             <dt>계약일 적용 기간</dt>
             <dd>
-              {date(detail.applicationPeriod.from)} ~ {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
+              {date(detail.applicationPeriod.from)} ~{' '}
+              {detail.applicationPeriod.to ? date(detail.applicationPeriod.to) : '계속'}
               {detail.applicationPeriod.successorPolicyVersionId && <small>이후 계약은 후속 버전 적용</small>}
             </dd>
           </div>
@@ -122,17 +129,17 @@ export function PolicyManagement({
           <div>
             <dt>계약일 적용 기간</dt>
             <dd>
-              {successorRef ? '정정·승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
+              {successorRef ? '정정/승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
               {successorRef && <small>후속 정책 {successorRef.replace('policy:', '#')}</small>}
             </dd>
           </div>
         )}
         <div>
           <dt>작성자</dt>
-          <dd>{policy.createdBy ?? detail.createdBy ?? '자료 없음'}</dd>
+          <dd>{policy.createdBy ?? detail.createdBy ?? '-'}</dd>
         </div>
         <div>
-          <dt>승인자 · 승인 일시</dt>
+          <dt>승인자, 승인 일시</dt>
           <dd>
             {policy.approvedBy ?? detail.approvedBy ?? '미승인'}
             <small>
@@ -144,11 +151,11 @@ export function PolicyManagement({
         </div>
         <div>
           <dt>기초서류 버전</dt>
-          <dd>{draft?.basicDocumentVersion || '자료 없음'}</dd>
+          <dd>{draft?.basicDocumentVersion || '-'}</dd>
         </div>
         <div>
           <dt>승인 근거 문서</dt>
-          <dd>{detail.approvalEvidenceRef || '자료 없음'}</dd>
+          <dd>{detail.approvalEvidenceRef || '-'}</dd>
         </div>
       </dl>
       <div className="policy-action-bar">
@@ -182,11 +189,15 @@ export function PolicyManagement({
             ))}
         </div>
       </div>
-      {own && policy.status === 'REVIEW' && ['GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
-        <p className="policy-notice policy-notice-warning">
-          작성자는 본인이 작성한 정책을 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.
-        </p>
-      )}
+      {(own || contributed) &&
+        policy.status === 'REVIEW' &&
+        ['GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
+          <p className="policy-notice policy-notice-warning">
+            {own
+              ? '작성자는 본인이 작성한 정책을 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.'
+              : '이 정책을 수정하거나 제출한 사용자는 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.'}
+          </p>
+        )}
       {!detail.allowedActions && <p className="policy-note">작업 권한 정보가 제공되지 않아 조회만 가능합니다.</p>}
       <ReferenceTabs
         tabs={panels}
@@ -197,7 +208,9 @@ export function PolicyManagement({
       >
         {panel === 'rules' &&
           (draft ? <DraftRuleSummary draft={draft} detail={detail} /> : <ReadOnlyRuleSummary detail={detail} />)}
-        {panel === 'sources' && <PolicySources sources={sources} refs={refs} />}
+        {panel === 'sources' && (
+          <PolicySources sources={sources} refs={refs} offerings={detail.productOfferings ?? []} />
+        )}
         {panel === 'history' && (
           <>
             <div className="policy-section-heading">
@@ -207,7 +220,7 @@ export function PolicyManagement({
             {!detail.approvalActions?.length ? (
               <div className="policy-editor-empty">
                 <strong>기록된 승인 이력이 없습니다.</strong>
-                <p>제출·승인·반려·활성화 이력이 시간순으로 표시됩니다.</p>
+                <p>제출/승인/반려/활성화 이력이 시간순으로 표시됩니다.</p>
               </div>
             ) : (
               <ol className="policy-timeline">
@@ -228,7 +241,7 @@ export function PolicyManagement({
                       <p>{entry.reason}</p>
                       <small>
                         {entry.actor}
-                        {entry.evidenceRefs?.length ? ` · ${entry.evidenceRefs.join(', ')}` : ''}
+                        {entry.evidenceRefs?.length ? `, ${entry.evidenceRefs.join(', ')}` : ''}
                       </small>
                     </div>
                   </li>
@@ -241,10 +254,15 @@ export function PolicyManagement({
       {editing && draft && (
         <PolicyDraftEditor
           initial={draft}
+          initialProblem={problem}
           policyId={policy.policyVersionId}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false)
+            setProblem(undefined)
+          }}
           onSaved={(id) => {
             setEditing(false)
+            setProblem(undefined)
             onSaved(id)
           }}
         />
@@ -255,6 +273,11 @@ export function PolicyManagement({
           detail={detail}
           action={action}
           onClose={() => setAction(null)}
+          onInvalid={(field, message) => {
+            setProblem({ field, message })
+            setAction(null)
+            setEditing(true)
+          }}
           onSaved={(id) => {
             setAction(null)
             onSaved(id)
@@ -264,7 +287,15 @@ export function PolicyManagement({
     </div>
   )
 }
-export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs: string[] }) {
+export function PolicySources({
+  sources,
+  refs,
+  offerings = [],
+}: {
+  sources: SourceDetail[]
+  refs: string[]
+  offerings?: OfferingGovernance[]
+}) {
   const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref))
   return (
     <div className="policy-sources">
@@ -276,7 +307,7 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
       {!sources.length && !missing.length && (
         <div className="policy-editor-empty">
           <strong>연결된 근거 자료가 없습니다.</strong>
-          <p>정책에 연결한 근거의 제목·설명·링크를 확인할 수 있습니다.</p>
+          <p>정책에 연결한 근거의 제목/설명/링크를 확인할 수 있습니다.</p>
         </div>
       )}
       {sources.map((source) => (
@@ -302,12 +333,46 @@ export function PolicySources({ sources, refs }: { sources: SourceDetail[]; refs
           <div>
             <StatusBadge>{ref}</StatusBadge>
             <SourceStatusTags />
-            <p>제목·설명·링크 자료가 아직 제공되지 않았습니다.</p>
+            <p>제목/설명/링크 자료가 아직 제공되지 않았습니다.</p>
           </div>
         </article>
       ))}
+      {offerings.length > 0 && <OfferingGovernanceList offerings={offerings} />}
     </div>
   )
+}
+/** FUN-016 상품위원회 메타데이터. 판매버전에 저장된 참조정보이며 법정 심의·의결을 대체하지 않는다. */
+function OfferingGovernanceList({ offerings }: { offerings: OfferingGovernance[] }) {
+  return (
+    <section className="policy-offering-governance" aria-label="상품위원회 정보">
+      <div className="policy-section-heading">
+        <h3>상품위원회 정보</h3>
+        <span>{offerings.length}건</span>
+      </div>
+      <dl className="policy-offering-list">
+        {offerings.map((offering) => (
+          <div key={offering.productOfferingId} className="policy-offering-row">
+            <dt>
+              {offering.productName} · {offering.offeringVersion}
+            </dt>
+            <dd>
+              승인일 {offering.committeeApprovalDate ? date(offering.committeeApprovalDate) : '미등록'} · 승인문서{' '}
+              {offering.committeeDocumentRef || '미등록'} · 기초서류 {offering.basicDocumentVersion} · 판매개시{' '}
+              {date(offering.salesStartDate)}
+              {offering.salesEndDate ? ` ~ ${date(offering.salesEndDate)}` : ''} · 판매 상태{' '}
+              {governanceLabels[offering.governanceStatus ?? ''] ?? '미등록'}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+const governanceLabels: Record<string, string> = {
+  APPROVED: '판매',
+  REVISED: '개정',
+  SUSPENDED: '판매보류',
+  STOPPED: '판매중지',
 }
 function SourceStatusTags({ tags }: { tags?: string[] }) {
   const labels = [...new Set(tags?.map((tag) => tag.trim()).filter(Boolean))]
@@ -329,7 +394,7 @@ function ReadOnlyRuleSummary({ detail }: { detail: ManagedPolicyDetail }) {
     return (
       <div className="policy-editor-empty">
         <strong>조회된 설정 규칙이 없습니다.</strong>
-        <p>이 정책에 수수료·한도·환급률 규칙 자료가 제공되지 않았습니다.</p>
+        <p>이 정책에 수수료/한도/환급률 규칙 자료가 제공되지 않았습니다.</p>
       </div>
     )
   return (
@@ -382,12 +447,12 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             },
             {
               key: 'product',
-              label: '상품 · 판매버전',
+              label: '상품, 판매버전',
               render: (r) =>
                 r.productOfferingId ? (
                   <span>
                     {detail.commissionRules?.[r.row - 1]?.productName ?? '상품명 자료 없음'}
-                    <small className="policy-cell-subtitle">판매버전 ID · {r.productOfferingId}</small>
+                    <small className="policy-cell-subtitle">판매버전 ID, {r.productOfferingId}</small>
                   </span>
                 ) : (
                   '전체'
@@ -398,13 +463,17 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
               label: '수수료 항목',
               render: (r) =>
                 detail.commissionRules?.[r.row - 1]?.itemName ??
-                (r.commissionItemId ? `항목 ID · ${r.commissionItemId}` : '자료 없음'),
+                (r.commissionItemId ? `항목 ID, ${r.commissionItemId}` : '-'),
             },
             { key: 'range', label: '회차', render: (r) => `${r.installmentFrom} ~ ${r.installmentTo}` },
             {
               key: 'type',
               label: '계산 방식',
-              render: (r) => <StatusBadge tone="info">{r.calculationType}</StatusBadge>,
+              render: (r) => (
+                <CategoryBadge value={r.calculationType} optionCount={2}>
+                  {policyCodeLabel(r.calculationType)}
+                </CategoryBadge>
+              ),
             },
             {
               key: 'value',
@@ -457,7 +526,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             </div>
             <div>
               <dt>근거</dt>
-              <dd>{rule.sourceRefs.join(', ') || '자료 없음'}</dd>
+              <dd>{rule.sourceRefs.join(', ') || '-'}</dd>
             </div>
           </dl>
         </section>
@@ -485,7 +554,14 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             {
               key: 'basis',
               label: '기준금액 코드',
-              render: (r) => r.clawbackBasisCode || <StatusBadge tone="warning">설정 필요</StatusBadge>,
+              render: (r) =>
+                r.clawbackBasisCode ? (
+                  <CategoryBadge value={r.clawbackBasisCode} optionCount={0}>
+                    {policyCodeLabel(r.clawbackBasisCode)}
+                  </CategoryBadge>
+                ) : (
+                  '설정 필요'
+                ),
             },
             {
               key: 'rate',
@@ -504,12 +580,14 @@ function PolicyActionDialog({
   action,
   onClose,
   onSaved,
+  onInvalid,
 }: {
   policy: Policy
   detail: ManagedPolicyDetail
   action: PolicyAction
   onClose: () => void
   onSaved: (id: number) => void
+  onInvalid: (field: string, message: string) => void
 }) {
   const preview = useContext(PolicyPreviewContext)
   const [reason, setReason] = useState('')
@@ -568,7 +646,14 @@ function PolicyActionDialog({
           ).policyVersionId
       onSaved(id)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
+      setError(errorText(cause instanceof Error ? cause : null, '처리하지 못했습니다. 다시 시도하세요.'))
+      if (
+        action === 'SUBMIT' &&
+        cause instanceof ApiError &&
+        cause.field &&
+        (cause.status === 400 || cause.status === 422)
+      )
+        onInvalid(cause.field, screenMessage(cause.message))
     } finally {
       saving.current = false
       setBusy(false)
@@ -612,9 +697,9 @@ function PolicyActionDialog({
           <dd>{policy.policyName}</dd>
         </div>
         <div>
-          <dt>버전 · 상태</dt>
+          <dt>버전, 상태</dt>
           <dd>
-            v{policy.versionNo} · {statusLabels[policy.status ?? '']}
+            v{policy.versionNo}, {statusLabels[policy.status ?? '']}
           </dd>
         </div>
         <div>
@@ -625,7 +710,7 @@ function PolicyActionDialog({
         </div>
         <div>
           <dt>규칙 행 수</dt>
-          <dd>{detail.editDocument ? `${ruleCount(detail.editDocument)}개` : '자료 없음'}</dd>
+          <dd>{detail.editDocument ? `${ruleCount(detail.editDocument)}개` : '-'}</dd>
         </div>
       </dl>
       {newVersion && (

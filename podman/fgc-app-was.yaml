@@ -17,7 +17,11 @@ spec:
         - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://fgc-db:5432/fgc"}
         - {name: SPRING_DATASOURCE_USERNAME, value: fgc}
         - {name: SPRING_FLYWAY_LOCATIONS, value: "classpath:db/migration,classpath:db/demo,classpath:db/demo-agent"}
+        # 상품 추천 AI 순위 산식(FUN-079 D-01 가정). demo-agent 를 읽는 시연 Pod 에서만 켠다
+        - {name: FGC_COMPARE_RULE_VERSION, value: "compare-net-v1"}
         - {name: JAVA_TOOL_OPTIONS, value: "-Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m"}
+        # 환수 통지서 PDF 원본(#671). 이미지 밖 볼륨이어야 재배포(Pod 재생성) 뒤에도 과거 판이 남는다
+        - {name: FGC_STORAGE_ROOT, value: /var/lib/fgc/files}
         - name: SPRING_DATASOURCE_PASSWORD
           valueFrom: {secretKeyRef: {name: fgc-app, key: SPRING_DATASOURCE_PASSWORD}}
         - name: FGC_JWT_SECRET
@@ -26,3 +30,10 @@ spec:
           valueFrom: {secretKeyRef: {name: fgc-app, key: SPRING_AI_OPENAI_API_KEY, optional: true}}
       resources:
         limits: {memory: __API_MEMORY__}
+      volumeMounts:
+        - {name: files, mountPath: /var/lib/fgc/files}
+  volumes:
+    # fgc-db의 fgc-pgdata와 같은 Podman named volume. .kube에 KubeDownForce가 없어 재배포에도 지워지지 않는다
+    # noexec 미적용: rootless Podman의 local driver는 uid/gid 외 마운트 옵션(mount-options)에 root가 필요하다. 앱은 파일을 바이트로만 읽는다
+    - name: files
+      persistentVolumeClaim: {claimName: fgc-files}

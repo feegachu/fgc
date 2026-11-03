@@ -56,8 +56,8 @@ export const statusTone = (code?: string | null): StatusTone => (code && STATUS_
 export const isLocked = (code?: string | null) => code === 'CONFIRMED'
 
 export const REGIME_EVIDENCE = {
-  title: 'REG-19 · 적용 체계 판정',
-  body: '적용 체계는 계약 체결연도만으로 정하지 않습니다. 상품 판매개시일 · 기초서류 버전 · 판매채널을 함께 보고 정합니다.',
+  title: 'REG-19, 적용 체계 판정',
+  body: '적용 체계는 계약 체결연도만으로 정하지 않습니다. 상품 판매개시일, 기초서류 버전, 판매채널을 함께 보고 정합니다.',
 }
 
 /** 서버 라벨 → 코드표 → 코드값 → '-' 순서. 1차 responseLabel 과 같은 결과다. */
@@ -67,5 +67,5 @@ export function responseLabel(
   code?: string | null,
 ) {
   if (typeof serverLabel === 'string' && serverLabel.trim()) return serverLabel
-  return (code && labels[code]) || code || EMPTY
+  return (code && labels[code]) || (code ? '확인 필요' : EMPTY)
 }

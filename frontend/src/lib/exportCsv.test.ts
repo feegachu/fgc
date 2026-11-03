@@ -40,17 +40,15 @@ it('오류 봉투는 공통 Toast 연결점에 전달한 뒤 호출자에게 반
   const listener = vi.fn()
   const unsubscribe = subscribeApiErrors(listener)
   await expect(exportCsv('/api/v1/contracts/export')).rejects.toBe(error)
-  expect(listener).toHaveBeenCalledWith('다운로드 실패 (FGC-CONT-001 · 요청 ID: csv-err)', error)
+  expect(listener).toHaveBeenCalledWith('다운로드 실패 (요청번호: csv-err)', error)
   unsubscribe()
 })
 it('CSV는 text/csv로 요청하고 JSON 실패를 ApiError로 반환한다', async () => {
-  const fetcher = vi
-    .fn()
-    .mockResolvedValue(
-      new Response('id\n1', {
-        headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=x.csv' },
-      }),
-    )
+  const fetcher = vi.fn().mockResolvedValue(
+    new Response('id\n1', {
+      headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=x.csv' },
+    }),
+  )
   vi.stubGlobal('fetch', fetcher)
   expect((await apiClient.requestBlob('/api/v1/contracts/export')).disposition).toContain('x.csv')
   expect(new Headers(fetcher.mock.calls[0][1].headers).get('Accept')).toBe('text/csv')

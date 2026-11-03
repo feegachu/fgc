@@ -9,14 +9,19 @@ import { PolicyPreviewContext, sourceReferenceNotice } from './management'
 import './policies.css'
 import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
+import { ListHeader } from '../../components/ListHeader'
 import { Field } from '../../components/Field'
 import { EvidenceLink } from '../../components/EvidenceLink'
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { date, int } from '../../lib/format'
+import { date } from '../../lib/format'
 import { QueryState, ReferenceTabs, ReferenceText } from '../reference/ReferenceUI'
 import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
+import { PolicyReferenceInfo } from './PolicyReferenceInfo'
+import type { Policy } from './api'
+/** 규제와 근거자료가 모두 없는 정책 행을 구분한다. */
+const policyRefs = (policy: Policy) => [...(policy.regulationRefs ?? []), ...(policy.sourceRefs ?? [])]
 const tabs = [
   { id: 'versions', label: '정책 버전' },
   { id: 'management', label: '관리 상세' },
@@ -71,15 +76,17 @@ export function PoliciesPage() {
     <div className="policy-page">
       <header className="page-header policy-page-header">
         <div className="page-header-copy">
-          <p className="policy-eyebrow">POL-W01 · POLICY MANAGEMENT</p>
-          <h1 className="page-title">정책 · 룰셋 관리</h1>
+          <h1 className="page-title">정책/룰셋 관리</h1>
           <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
         <div className="policy-header-actions">
-          <Field className="policy-date-field" label="적용 기준일">
+          <Field className="policy-date-field" variant="filter" label="적용 기준일">
             <input type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
           </Field>
           <Button variant="secondary" onClick={() => patch({ asOf: defaultDate, policyVersionId: null })}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              restart_alt
+            </span>
             초기화
           </Button>
           {['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
@@ -91,8 +98,10 @@ export function PoliciesPage() {
       </header>
       {preview && (
         <div className="policy-preview-banner">
-          <StatusBadge tone="info">UI 미리보기</StatusBadge>
-          <span>예시 데이터입니다. 등록·수정·승인 결과는 현재 화면에서만 유지되며 새로고침하면 초기화됩니다.</span>
+          <StatusBadge tone="info" optionCount={5}>
+            UI 미리보기
+          </StatusBadge>
+          <span>예시 데이터입니다. 등록/수정/승인 결과는 현재 화면에서만 유지되며 새로고침하면 초기화됩니다.</span>
         </div>
       )}
       {message && (
@@ -111,16 +120,13 @@ export function PoliciesPage() {
           active={active}
           onChange={(tab) => patch({ tab, ...(id !== undefined ? { policyVersionId: String(id) } : {}) })}
         >
-          <header className="surface-header policy-panel-header">
+          <ListHeader
+            className="policy-panel-header"
+            total={active === 'versions' ? policies.data?.length ?? null : undefined}
+            pageSize={active === 'versions' ? policies.data?.length ?? 0 : undefined}
+          >
             <h2 className="surface-title">{tabs.find((tab) => tab.id === active)?.label}</h2>
-            <p className="policy-panel-caption">
-              {active === 'versions'
-                ? `기준일 ${asOf}${policies.isSuccess ? ` · ${int(policies.data?.length ?? 0)}건` : ''} · 행을 선택하면 나머지 탭에서 상세를 확인할 수 있습니다`
-                : selected
-                  ? `선택 정책: ${selected.policyCode} v${selected.versionNo}`
-                  : ''}
-            </p>
-          </header>
+          </ListHeader>
           <QueryState loading={policies.isLoading} error={policies.error} />
           {policies.error && (
             <Button variant="secondary" onClick={() => void policies.refetch()}>
@@ -141,13 +147,14 @@ export function PoliciesPage() {
               rows={policies.data ?? []}
               rowKey={(r) => String(r.policyVersionId)}
               selectedKeys={id === undefined ? [] : [String(id)]}
-              rowClassName={(r) => `policy-row ${r.regulationRefs?.length ? '' : 'policy-row-missing-reference'}`}
+              rowClassName={(r) => `policy-row ${policyRefs(r).length ? '' : 'policy-row-missing-reference'}`}
               onRowActivate={(r) => patch({ policyVersionId: String(r.policyVersionId) })}
               columns={[
                 {
                   key: 'select',
-                  label: <span className="visually-hidden">선택</span>,
-                  width: '3rem',
+                  label: '선택',
+                  width: '4rem',
+                  align: 'center',
                   cellClassName: 'policy-select-cell',
                   render: (r) => (
                     <input
@@ -174,14 +181,27 @@ export function PoliciesPage() {
                   cellClassName: 'policy-disclosure-cell',
                   render: (r) => <ReferenceText value={r.policyName} limit={28} />,
                 },
-                { key: 'type', label: '유형', width: '9rem', render: (r) => present(r.policyTypeLabel) },
+                {
+                  key: 'type',
+                  label: '유형',
+                  width: '9rem',
+                  render: (r) => (
+                    <CategoryBadge value={r.policyType} optionCount={10}>
+                      {present(r.policyTypeLabel)}
+                    </CategoryBadge>
+                  ),
+                },
                 {
                   key: 'source',
                   label: '출처분류',
                   width: '7.5rem',
                   align: 'center',
                   render: (r) => (
-                    <StatusBadge tone={sourceTones[r.sourceClass ?? ''] ?? 'neutral'}>
+                    <StatusBadge
+                      kind="category"
+                      tone={sourceTones[r.sourceClass ?? ''] ?? 'neutral'}
+                      optionCount={Object.keys(sourceTones).length}
+                    >
                       {present(r.sourceClassLabel)}
                     </StatusBadge>
                   ),
@@ -212,6 +232,7 @@ export function PoliciesPage() {
                                 ? 'info'
                                 : 'neutral'
                       }
+                      optionCount={5}
                     >
                       {present(r.statusLabel)}
                     </StatusBadge>
@@ -223,11 +244,13 @@ export function PoliciesPage() {
                   width: '11.5rem',
                   cellClassName: 'policy-disclosure-cell',
                   render: (r) =>
-                    r.regulationRefs?.length ? (
-                      r.regulationRefs.map((ref) => (
+                    policyRefs(r).length ? (
+                      policyRefs(r).map((ref) => (
                         <EvidenceLink key={ref} label={ref}>
-                          {r.policyName} · {ref}
-                          <p>저장된 근거 설명과 링크는 관리 상세에서 확인하세요.</p>
+                          {r.policyName}, {ref}
+                          {r.policyVersionId != null ? (
+                            <PolicyReferenceInfo policyVersionId={r.policyVersionId} refText={ref} />
+                          ) : null}
                           <p>{sourceReferenceNotice}</p>
                           <Button
                             variant="ghost"
@@ -254,7 +277,7 @@ export function PoliciesPage() {
                 <span>
                   선택한 정책{' '}
                   <strong>
-                    {selected.policyCode} · v{selected.versionNo}
+                    {selected.policyCode}, v{selected.versionNo}
                   </strong>
                 </span>
                 <Button variant="secondary" onClick={() => patch({ tab: 'management', policyVersionId: String(id) })}>

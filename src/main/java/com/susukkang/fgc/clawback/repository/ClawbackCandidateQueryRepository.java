@@ -170,14 +170,19 @@ public class ClawbackCandidateQueryRepository {
                            ORDER BY ep.processed_at, ep.contract_status_event_processing_id), '[]'::jsonb) AS rows
                     FROM fgc.contract_status_event_processing ep WHERE ep.contract_status_event_id = cc.status_event_id
                 ) effects
-            ), candidates AS (
+            ), observed AS (
               SELECT evidence.*,
                      'claw-v1-' || md5(jsonb_build_array(contract_source, source, payment_source, schedule_source,
                          policies, effects, superseded, arbitrage_source_refs)::text) AS source_version,
-                     -- 승인되지 않은 D-02를 성공 계산/기본 0원으로 바꾸지 않는다.
-                     'REVIEW_REQUIRED' AS calculation_status,
+                     -- D-02 경과월: 계약일부터 사건 기준일까지 채운 개월 수(응당일 당일부터 1개월). 운영정책서 제48조의3.
+                     CASE WHEN event_date >= contract_date THEN CAST(
+                       date_part('year', age(event_date, contract_date)) * 12
+                       + date_part('month', age(event_date, contract_date)) AS integer) END AS elapsed_months,
+                     -- 계산을 막는 근거 부족. 정책 선택 필요·스케줄 없음·회차 미연결은 계산 근거(귀속행)와 무관해 막지 않는다.
+                     COALESCE(policy_count = 0 OR scope_mismatch OR superseded OR event_date < contract_date
+                       OR event_date > CAST(current_timestamp AT TIME ZONE 'Asia/Seoul' AS date)
+                       OR (trigger_type = 'ARBITRAGE' AND arbitrage_status IS DISTINCT FROM 'CANDIDATE'), true) AS blocked,
                      to_jsonb(array_remove(ARRAY[
-                       'CALCULATION_BASIS_UNCONFIRMED',
                        CASE WHEN policy_count = 0 THEN 'POLICY_MISSING' END,
                        CASE WHEN policy_count > 1 THEN 'POLICY_SELECTION_REQUIRED' END,
                        CASE WHEN line_count = 0 THEN 'SCHEDULE_MISSING' END,
@@ -188,8 +193,25 @@ public class ClawbackCandidateQueryRepository {
                          THEN 'EVENT_NOT_EFFECTIVE' END,
                        CASE WHEN trigger_type = 'ARBITRAGE' AND arbitrage_status <> 'CANDIDATE'
                          THEN 'ARBITRAGE_SOURCE_CHANGED' END
-                     ]::text[], NULL)) AS review_reasons
+                     ]::text[], NULL)) AS base_reasons
                 FROM evidence
+            ), candidates AS (
+              SELECT observed.*, latest.clawback_case_id AS case_id, latest.amount AS latest_amount,
+                     latest.result_snapshot AS latest_calculation,
+                     -- 현재 원천 버전으로 만든 판만 계산완료다. 원천이 바뀐 과거 판은 보여 주되 다시 검토한다.
+                     CASE WHEN latest.clawback_calculation_id IS NOT NULL AND latest.source_version = observed.source_version
+                               AND NOT observed.blocked THEN 'CALCULATED'
+                          WHEN observed.blocked OR latest.clawback_calculation_id IS NOT NULL THEN 'REVIEW_REQUIRED'
+                          ELSE 'UNCALCULATED' END AS calculation_status,
+                     CASE WHEN latest.clawback_calculation_id IS NOT NULL AND latest.source_version <> observed.source_version
+                          THEN observed.base_reasons || '["CALCULATION_STALE"]'::jsonb
+                          ELSE observed.base_reasons END AS review_reasons
+                FROM observed
+                LEFT JOIN LATERAL (
+                  SELECT calc.* FROM fgc.clawback_calculation calc
+                   WHERE calc.candidate_id = observed.candidate_id
+                   ORDER BY calc.version_no DESC LIMIT 1
+                ) latest ON true
             )
             """;
 
@@ -204,11 +226,15 @@ public class ClawbackCandidateQueryRepository {
                 'contractDate', contract_date, 'sourceVersion', source_version,
                 'calculationStatus', calculation_status, 'reviewReasons', review_reasons,
                 'paidAmount', paid_amount, 'unpaidAmount', unpaid_amount, 'policyVersionId', policy_id,
-                'clawbackCaseId', NULL, 'calculatedAmount', NULL, 'allowedActions', '[]'::jsonb),
+                'clawbackCaseId', case_id,
+                'calculatedAmount', CASE WHEN calculation_status = 'CALCULATED' THEN latest_amount END,
+                -- 역할 판정 전 후보 동작. 처리 권한이 없으면 서비스가 비운다.
+                'allowedActions', CASE WHEN NOT blocked AND elapsed_months IS NOT NULL
+                                       THEN '["CALCULATE"]'::jsonb ELSE '[]'::jsonb END),
               'sourceRefs', CASE WHEN status_event_id IS NULL THEN arbitrage_source_refs
                                 ELSE jsonb_build_array(source_ref) END, 'paymentAttributions', payments,
               'scheduleLines', schedules, 'policyCandidates', policies, 'effects', effects,
-              'elapsedMonths', NULL, 'latestCalculation', NULL) AS text)
+              'elapsedMonths', elapsed_months, 'latestCalculation', latest_calculation) AS text)
               FROM candidates
             """;
 
