@@ -98,12 +98,13 @@ function renderAt(path: string, handler: Handler, roleCode = 'SETTLEMENT') {
     return envelope(result)
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, client, actions: userEvent.setup() }
 }
 const calls = (prefix: string) => requested.filter(({ url }) => url.startsWith(prefix))
 const query = (url: string) => Object.fromEntries(new URLSearchParams(url.split('?')[1]))
@@ -377,6 +378,40 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
       if (url === '/api/v1/schedules/10/versions') return versions
       return undefined
     }
+
+  it('#726 서버 확정 차단 사유를 버튼 설명으로 표시한다', async () => {
+    renderAt('/schedules/11?month=2026-07', baseHandler(detail({ canConfirm: false, confirmBlockedReason: '미처리 보류 사건이 있습니다.' })))
+    expect(await screen.findByText('미처리 보류 사건이 있습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '확정' })).toHaveAccessibleDescription('미처리 보류 사건이 있습니다.')
+  })
+
+  it('#726 상세 조회 실패를 0원 합계로 표시하지 않고 작업을 차단한다', async () => {
+    renderAt('/schedules/11?month=2026-07', () => { throw new Error('상세 조회 실패') })
+    await screen.findAllByText('상세 조회 실패')
+    expect(screen.queryByText('0원')).not.toBeInTheDocument()
+    expect(screen.getByText('자료 없음')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+  })
+
+  it('#726 재조회 실패는 기존 결과와 함께 알리고 재시도 성공 전까지 처리하지 않는다', async () => {
+    let failed = false
+    const { client, actions } = renderAt('/schedules/11?month=2026-07', (url) => {
+      if (url === '/api/v1/schedules/11' && failed) throw new Error('최신 상태 조회 실패')
+      return baseHandler()(url)
+    })
+    await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+    failed = true
+    await act(async () => { await client.invalidateQueries({ queryKey: ['schedules', 'detail', '11'] }) })
+    expect(await screen.findByText('최신 상태 조회 실패')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '새 버전 만들기' })).toBeDisabled()
+    expect(screen.queryByRole('link', { name: '1번 회차 지급 등록' })).not.toBeInTheDocument()
+    failed = false
+    await actions.click(screen.getByRole('button', { name: '다시 시도' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  })
 
   it('회차의 귀속일·ID·항목을 지급 등록에 전달하고 지급예정일로 바꾸지 않는다', async () => {
     renderAt('/schedules/11?month=2026-07', baseHandler())

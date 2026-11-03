@@ -39,4 +39,14 @@
 - production build: 통과. 도움말 검사기 및 ScreenHelp 39개 포함.
 - 전체 lint: 통과.
 - Chrome 기존 `e2e/schedule-preview.spec.ts`: 2개 통과(4년 48회차·7년 84회차 목록→상세→재생성 및 예정 확정/지급 진입 차단). 실제 Chrome과 API fixture를 사용했으며 실서버 재실행은 아님.
-- 이번 변경은 목록 UI에 한정한다. API-fixture Chrome 결과와 실서버 검증 결과를 구분한다. 이슈 체크·종료, 커밋·푸시는 아직 수행하지 않았다.
+- 이번 변경은 목록 UI에 한정한다. API-fixture Chrome 결과와 실서버 검증 결과를 구분한다. 이슈 체크·종료는 수행하지 않았다. #725 수정은 `d83367b6`으로 커밋·푸시했다.
+
+## #726 상세 상태 처리 1차 보완
+
+- 서버 `canConfirm=false`의 `confirmBlockedReason`을 확정 버튼의 가시 설명으로 연결했다. 사유 누락 시에도 차단 상태를 안내한다.
+- 상세 최초 조회·재조회 중 또는 재조회 실패 시 CSV·확정·재생성·지급 등록을 잠근다. 기존 조회 결과를 남기는 경우 갱신/오류 문구와 재시도를 표시한다.
+- 예정 생성 폼은 제거하지 않고 fieldset으로 비활성화해 입력을 유지한다.
+- 상세 조회 실패/금액 null을 0원 합계로 표시하지 않고 자료 없음으로 구분한다.
+- 스케줄 테스트 42개 통과, Chrome API-fixture 회귀 2개 통과, lint 통과. build의 테스트 타입 오류(`ByRoleOptions.exact`)를 수정한 뒤 production build도 통과했다.
+
+확인된 연계 누락: `ScheduleLineResponse.sourceStatusEventId`는 DTO 선언만 존재하며 `ScheduleQueryRepository.toDetail`은 값을 채우지 않는다. 따라서 회차→원천 상태 사건 추적과 CT-C02가 완료됐다고 볼 수 없다. #523·720의 실제 사건 저장/판정 모델과 관련 PR을 대조해 연결 방법을 확정하는 것이 다음 작업이다. 이번 UI 수정에서 임의 사건 ID나 보류·재개 정책을 만들지 않았다.

@@ -51,7 +51,7 @@ const versionText = (versionNo?: number) => (versionNo == null ? EMPTY : `v${ver
 const join = (...parts: unknown[]) =>
   parts.filter((part) => part != null && part !== '' && part !== EMPTY).join(', ') || EMPTY
 const Money = ({ amount }: { amount: unknown }) => (
-  <span className={isNegative(amount) ? 'is-negative-amount' : undefined}>{won(amount)}</span>
+  <span className={isNegative(amount) ? 'is-negative-amount' : undefined}>{amount == null ? '자료 없음' : won(amount)}</span>
 )
 const Text = ({ content }: { content: unknown }) => <CellDisclosure singleLine preview={value(content)} />
 
@@ -101,15 +101,18 @@ function ScheduleDetailView({ id }: { id: string }) {
   })
 
   const previewOnly = header?.scheduleRegime === 'FOUR_YEAR_2027' || header?.scheduleRegime === 'SEVEN_YEAR_2029'
+  const unavailable = !detail.isSuccess || detail.isFetching
   const confirmDisabled =
+    unavailable ||
     previewOnly ||
     header?.canConfirm === false ||
     !canProcess ||
     header?.status !== 'PLANNED' ||
     header.activeYn !== true
-  const regenerateDisabled = previewOnly || !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
+  const regenerateDisabled = unavailable || previewOnly || !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
   const reasons: string[] = []
   if (header) {
+    if (header.canConfirm === false) reasons.push(header.confirmBlockedReason || '서버에서 확정할 수 없는 상태로 확인했습니다.')
     if (previewOnly) reasons.push('4년·7년 예정판은 지급 확정 대상이 아닙니다.')
     if (!canProcess) reasons.push('확정/재생성은 정산 담당자만 할 수 있습니다.')
     if (header.activeYn !== true) reasons.push('사용 중인 버전이 아닙니다.')
@@ -141,7 +144,7 @@ function ScheduleDetailView({ id }: { id: string }) {
           <Button data-guide-feature="features.schedule.schedule-detail-page.button-2"
             variant="secondary"
             loading={exporting.isPending}
-            disabled={!validId}
+            disabled={!validId || unavailable}
             onClick={() => exporting.mutate()}
           >
             <span className="material-symbols-rounded" aria-hidden="true">
@@ -173,6 +176,9 @@ function ScheduleDetailView({ id }: { id: string }) {
         </div>
       </header>
 
+      {header && detail.isFetching && <InlineState message="스케줄을 갱신 중입니다. 최신 상태를 확인한 후 처리할 수 있습니다." />}
+      {header && loadError && <InlineState message={loadError} error onRetry={retry} />}
+
       {/* 비활성 사유는 title 이 아니라 가시 텍스트로 둔다 — 비활성 버튼은 포커스가 가지 않는다. */}
       {showNote && (
         <p className="schedule-action-note" id="schedule-action-note" role="status">
@@ -195,7 +201,7 @@ function ScheduleDetailView({ id }: { id: string }) {
               className="select-control"
               id="schedule-stage"
               value={header?.paymentStage ?? 'GA_TO_FC'}
-              disabled={previewOnly || !header?.paymentStage || moving.isPending}
+              disabled={unavailable || previewOnly || !header?.paymentStage || moving.isPending}
               aria-busy={moving.isPending || undefined}
               onChange={(event) => {
                 if (event.target.value !== header?.paymentStage) moving.mutate(event.target.value)
@@ -314,7 +320,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                     key={line.lineNo ?? index}
                     line={line}
                     paymentHref={
-                      canProcess && !previewOnly && line.contractId && line.commissionItemId
+                      canProcess && !unavailable && !previewOnly && line.contractId && line.commissionItemId
                         ? paymentEntryHref(
                             {
                               contractId: String(line.contractId),
@@ -342,7 +348,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 </td>
                 {/* 합계는 서버가 줄별 반올림 금액을 더한 expectedTotal 을 그대로 쓴다(화면에서 다시 계산하지 않는다). */}
                 <td className="is-number tabular-nums">
-                  <Money amount={header ? header.expectedTotal : 0} />
+                  <Money amount={header?.expectedTotal} />
                 </td>
                 <td colSpan={3} />
               </tr>
@@ -352,12 +358,14 @@ function ScheduleDetailView({ id }: { id: string }) {
       </section>
 
       {header?.activeYn && header.status !== 'CANCELLED' && header.contractId && header.paymentStage && (
+        <fieldset disabled={unavailable} className="schedule-preview-availability">
         <SchedulePreviewForm
           context={detail.data?.previewContext}
           contractId={String(header.contractId)}
           stage={header.paymentStage}
           scheduleId={id}
         />
+        </fieldset>
       )}
       {previewOnly && header && <p role="status">정책 정의 {header.installmentCount ?? '-'}회차 · {header.lineCount ?? '-'}행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.</p>}
       <section data-guide-feature="features.schedule.schedule-detail-page.section-3" className="surface schedule-detail-card" aria-labelledby="schedule-versions-title">
