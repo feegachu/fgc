@@ -7,7 +7,7 @@
     "generate:guide-features": "node scripts/guide-features.mjs --write",
     "check:guide-features": "node scripts/guide-features.mjs",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/check-preview-guide.mjs && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",

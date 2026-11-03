@@ -27,6 +27,7 @@ import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionPolicy;
+import com.susukkang.fgc.policy.dto.FeeRegimeSchedulePolicy;
 import com.susukkang.fgc.policy.dto.ResolvedCommissionRule;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.code.SchedulePurpose;
@@ -80,7 +81,7 @@ public class ScheduleService {
         return generatePreview(source.getContractId(), source.getPaymentStage(), request, key, scheduleId);
     }
 
-    /** 명시적 4년 예정 생성. 운영판과 확정 회차는 변경하지 않는다. */
+    /** 명시적 4년·7년 예정 생성. 운영판과 확정 회차는 변경하지 않는다. */
     @Transactional
     public ScheduleRegenResponse generatePreview(Long contractId, PaymentStage stage, ScheduleRegenRequest request, String key) {
         return generatePreview(contractId, stage, request, key, null);
@@ -92,9 +93,9 @@ public class ScheduleService {
                 || !List.of("SETTLEMENT", "SYSTEM_ADMIN").contains(actor.getRoleCode()))
             throw new AccessDeniedException("예정 생성 권한이 없습니다.");
         if (key == null || !key.matches("[A-Za-z0-9._:-]{1,100}")) throw validationException("Idempotency-Key", "멱등키가 필요합니다.");
-        if (stage == null || request.getRegime() != ScheduleRegime.FOUR_YEAR_2027 || request.getPolicyVersionId() == null
+        if (stage == null || (request.getRegime() != ScheduleRegime.FOUR_YEAR_2027 && request.getRegime() != ScheduleRegime.SEVEN_YEAR_2029) || request.getPolicyVersionId() == null
                 || request.getExpectedSourceVersion() == null || request.getExpectedSourceVersion().isBlank() || request.getReason() == null || request.getReason().isBlank() || request.getReason().length() > 40)
-            throw validationException("regime", "4년 체계·선택 정책·원천 버전·사유를 확인하세요.");
+            throw validationException("regime", "4년·7년 체계·선택 정책·원천 버전·사유를 확인하세요.");
         if (!previews.lockRequest(key)) throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
         String hash;
         try {
@@ -128,24 +129,85 @@ public class ScheduleService {
                 || !Objects.equals(selected.commissionPolicy().getPolicyVersionId(), request.getPolicyVersionId()))
             throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED, "policyVersionId",
                     Map.of("status", "REVIEW_REQUIRED", "reason", selected.selection().resolution().reasonCode()), "선택 정책과 상품 판매버전의 적용 근거를 다시 확인하세요.");
+        var header = persistPreview(insuranceContractRepository.findById(contractId).orElseThrow(), stage, selected, request.getReason());
         var policy = selected.commissionPolicy();
-        validateResolvedPolicy(policy, stage);
-        if (policy.getRules().stream().anyMatch(rule -> rule.getInstallmentTo() > 48))
-            throw validationException("installmentTo", "4년 예정은 최대 48회차입니다.");
-        var contract = insuranceContractRepository.findById(contractId).orElseThrow();
-        String scenario = "PHASE2_" + request.getRegime().name() + "_" + policy.getPolicyVersionId();
-        Long old = previews.active(contractId, stage, scenario);
-        var header = ScheduleHeaderInsertDTO.builder().contractId(contractId).paymentStage(stage)
-                .policyVersionId(policy.getPolicyVersionId()).scheduleVersionNo(previews.nextVersion(contractId, stage, scenario))
-                .schedulePurpose(SchedulePurpose.SIMULATION).scenarioCode(scenario).scheduleRegime(request.getRegime())
-                .status(ScheduleHeaderStatus.PLANNED).activeYn(true).generationReason(request.getReason()).regeneratedFromId(old).build();
-        previews.deactivate(old);
-        saveSchedule(contract, policy, header);
         auditLogService.record(AuditLogService.AuditEvent.builder().actionCode("SCHEDULE_PREVIEW_CREATED")
                 .entityType("SCHEDULE_REQUEST").entityId(key).policyVersionId(policy.getPolicyVersionId()).reason(request.getReason())
                 .after(Map.of("requestHash", hash, "scheduleHeaderId", header.getScheduleHeaderId(), "versionNo", header.getScheduleVersionNo(),
                         "sourceVersion", request.getExpectedSourceVersion(), "sourceRefs", selected.sourceRefs())).build());
         return ScheduleRegenResponse.builder().scheduleHeaderId(header.getScheduleHeaderId()).versionNo(header.getScheduleVersionNo().longValue()).build();
+    }
+
+    /** 수동·계약·배치 공통 저장. 호출자가 계약/정책 잠금을 보유한다. */
+    private ScheduleHeaderInsertDTO persistPreview(InsuranceContract contract, PaymentStage stage,
+            FeeRegimeSchedulePolicy selected, String reason) {
+        var policy = selected.commissionPolicy();
+        validateResolvedPolicy(policy, stage);
+        int maximum = policy.getScheduleRegime() == ScheduleRegime.SEVEN_YEAR_2029 ? 84 : 48;
+        if (policy.getRules().stream().anyMatch(rule -> rule.getInstallmentTo() > maximum))
+            throw validationException("installmentTo", "선택 체계의 최대 회차를 초과했습니다.");
+        Long contractId = contract.getContractId();
+        String scenario = "PHASE2_" + policy.getScheduleRegime().name() + "_" + policy.getPolicyVersionId();
+        Long old = previews.active(contractId, stage, scenario);
+        var header = ScheduleHeaderInsertDTO.builder().contractId(contractId).paymentStage(stage)
+                .policyVersionId(policy.getPolicyVersionId()).scheduleVersionNo(previews.nextVersion(contractId, stage, scenario))
+                .schedulePurpose(SchedulePurpose.SIMULATION).scenarioCode(scenario).scheduleRegime(policy.getScheduleRegime())
+                .status(ScheduleHeaderStatus.PLANNED).activeYn(true).generationReason(reason).regeneratedFromId(old).build();
+        previews.deactivate(old);
+        saveSchedule(contract, policy, header);
+        auditLogService.record(AuditLogService.AuditEvent.builder().actionCode("SCHEDULE_PREVIEW_CALCULATED")
+                .entityType("SCHEDULE").entityId(String.valueOf(header.getScheduleHeaderId()))
+                .policyVersionId(policy.getPolicyVersionId()).reason(reason)
+                .after(Map.of("fingerprint", calculationFingerprint(contractId, selected), "sourceRefs", selected.sourceRefs())).build());
+        return header;
+    }
+
+    private String calculationFingerprint(Long contractId, FeeRegimeSchedulePolicy selected) {
+        try {
+            String source = previews.calculationVersion(contractId) + ":" + objectMapper.writeValueAsString(selected);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)));
+        } catch (JsonProcessingException | NoSuchAlgorithmException error) { throw new IllegalStateException(error); }
+    }
+
+    private ScheduleGenerationResult generateAutomaticPreviews(InsuranceContract contract, boolean requireAllStages) {
+        List<Long> ids = new ArrayList<>();
+        int lines = 0;
+        for (PaymentStage stage : PaymentStage.values()) {
+            var selected = previewPolicies.resolve(contract.getContractId(), stage);
+            if (selected.isSelected()) {
+                Long lockedPolicy = selected.commissionPolicy().getPolicyVersionId();
+                previews.lockInputs(contract.getContractId(), lockedPolicy);
+                selected = previewPolicies.resolve(contract.getContractId(), stage);
+                if (selected.isSelected() && !lockedPolicy.equals(selected.commissionPolicy().getPolicyVersionId()))
+                    throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_SOURCE_CHANGED);
+            }
+            if (!selected.isSelected()) {
+                if (requireAllStages) throw new FgcBusinessException(
+                        FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED, "policyVersionId",
+                        Map.of("reason", "POLICY_MISSING"),
+                        stage + ": 분급 예정 정책 검토 필요: " + selected.selection().resolution().reasonCode());
+                scheduleReviewService.registerCapReviewBeforeCommit(contract.getContractId(), stage, "POLICY_MISSING",
+                        "분급 예정 정책 검토 필요", "REVIEW_REQUIRED: " + selected.selection().resolution().reasonCode());
+                continue;
+            }
+            var policy = selected.commissionPolicy();
+            String scenario = "PHASE2_" + policy.getScheduleRegime().name() + "_" + policy.getPolicyVersionId();
+            Long old = previews.active(contract.getContractId(), stage, scenario);
+            if (old != null && scheduleQueryRepository.selectScheduleHeaderById(old).getStatus() == ScheduleHeaderStatus.CANCELLED) {
+                if (requireAllStages) throw new FgcBusinessException(
+                        FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED, "scheduleHeaderId",
+                        Map.of("reason", "DATA_QUALITY"),
+                        stage + ": 취소된 예정판은 자동 재생성하지 않습니다. 원천과 처리 사유를 확인하세요.");
+                scheduleReviewService.registerCapReviewBeforeCommit(contract.getContractId(), stage, "DATA_QUALITY",
+                        "취소 예정판 자동 생성 검토 필요", "취소된 예정판은 자동 재생성하지 않습니다. 원천과 처리 사유를 확인하세요.");
+                continue;
+            }
+            if (previews.hasCalculation(old, calculationFingerprint(contract.getContractId(), selected))) continue;
+            var header = persistPreview(contract, stage, selected, "계약·배치 원천 및 승인 정책 반영");
+            ids.add(header.getScheduleHeaderId());
+            lines += policy.getRules().stream().mapToInt(rule -> rule.getInstallmentTo() - rule.getInstallmentFrom() + 1).sum();
+        }
+        return new ScheduleGenerationResult(List.copyOf(ids), lines);
     }
 
     /**
@@ -286,6 +348,16 @@ public class ScheduleService {
     /** 계약 DTO에 의존하지 않는 호출자를 위한 스케줄 생성 진입점. */
     @Transactional
     public ScheduleGenerationResult generateSchedulesByContractId(Long contractId) {
+        return generateSchedulesByContractId(contractId, false);
+    }
+
+    /** 월 검증은 두 지급단계 중 하나라도 생성 불가하면 계약 전체를 롤백하고 스킵한다. */
+    @Transactional
+    public ScheduleGenerationResult generateSchedulesForValidation(Long contractId) {
+        return generateSchedulesByContractId(contractId, true);
+    }
+
+    private ScheduleGenerationResult generateSchedulesByContractId(Long contractId, boolean requireAllStages) {
         // 입력값 검증
         if (contractId == null) {
             throw new FgcBusinessException(
@@ -308,6 +380,9 @@ public class ScheduleService {
                         Map.of("contractId", contractId),
                         "계약ID가 존재하지 않습니다."
                 ));
+
+        if (!Objects.equals(lockedContractId, contractId)) throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        if (previews.isInstallmentContract(contractId)) return generateAutomaticPreviews(savedContract, requireAllStages);
 
         List<PaymentStage> paymentStages = List.of(
                 PaymentStage.INSURER_TO_GA,
@@ -370,6 +445,9 @@ public class ScheduleService {
         }
 
         scheduleWriteRepository.lockContractForScheduleGeneration(contractId);
+
+        if (previews.isInstallmentContract(contractId))
+            return generateSchedulesByContractId(contractId).scheduleHeaderIds();
 
         List<Long> activeScheduleIds =
                 scheduleQueryRepository.selectActiveOperationalScheduleIds(contractId);
@@ -796,7 +874,9 @@ public class ScheduleService {
             );
         }
 
-        if (rule.getCalculationType() == CalculationType.FIXED) {
+        // 기준금액은 기준코드의 스냅샷이다. 정액 지급액과 보험료 기준금액을 혼용하지 않는다.
+        if (rule.getCalculationType() == CalculationType.FIXED
+                && "FIXED_AMOUNT".equals(rule.getBasisCode())) {
             if (rule.getFixedAmount() == null) {
                 throw new IllegalArgumentException(
                         "정액 계산에 필요한 고정금액이 없습니다."
