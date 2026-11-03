@@ -37,11 +37,12 @@ services:
       # Existing Shinhan DB includes applied demo migrations; retain their validation history.
       # Removing this location requires a separate data/history transition first.
       # 2026-11-18 최종 발표와 시연을 이 서버에서 한다(주최측 요구, SRC-076). 설계사 시연 계정 agent01과
-      # 상품 추천 AI 시연 상품(db/demo-agent V66, V72, V73)을 함께 읽는다.
+      # 상품 추천 AI 시연 상품(db/demo-agent V66, V72, V73)을 함께 읽는다. agent01 비밀번호는 배포 전에 Secret으로 넣고,
+      # 배포 스크립트는 공개된 시드 비밀번호가 남은 계정이 있으면 멈춘다(SRC-065).
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration,classpath:db/demo,classpath:db/demo-agent
-      # db/demo-agent는 이 DB에 V77까지 적용된 뒤 추가돼 번호가 더 낮다. 기본값(false)이면 기동 검증에서 막히므로
-      # 순서 밖 적용을 허용한다(로컬 모의로 적용, 재기동, agent01 로그인, 상품 순위 확인).
-      SPRING_FLYWAY_OUT_OF_ORDER: "true"
+      # db/demo-agent는 이 DB에 V77까지 적용된 뒤 추가돼 번호가 더 낮다. 배포 스크립트가 V66, V72, V73이 아직 없을 때만
+      # 그 실행에서 true를 넘긴다. 기본은 false라 늦게 병합된 낮은 번호는 지금처럼 기동을 멈춘다(.env에 저장하지 않음).
+      SPRING_FLYWAY_OUT_OF_ORDER: "${FGC_FLYWAY_OUT_OF_ORDER:-false}"
       # 상품 추천 AI 순위 산식 스위치(FUN-079 D-01, 프로젝트 가정). 비면 RULE_NOT_CONFIGURED로 순위가 나오지 않는다.
       FGC_COMPARE_RULE_VERSION: compare-net-v1
       FGC_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}

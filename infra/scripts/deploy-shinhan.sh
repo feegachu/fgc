@@ -33,6 +33,23 @@ cp "$root/infra/shinhan/compose.yaml" "$release/compose.yaml"
 cp "$root/infra/shinhan/nginx-guard.conf" "$release/nginx/guard.conf"
 compose=(docker compose --project-directory "$state" --env-file "$state/.env" --env-file "$release/release.env" -f "$release/compose.yaml")
 "${compose[@]}" config --quiet
+# SRC-065: this server is public and the demo seed passwords are published in the repository.
+# Refuse to deploy while a demo account still accepts one, or while V66 would give agent01 one.
+db_query() { "${compose[@]}" exec -T db psql -U fgc -d fgc -XAtq -v ON_ERROR_STOP=1; }
+unprotected=$(python3 "$helper" unprotected-sql "$root" | db_query)
+if [[ -n "$unprotected" ]]; then
+    echo "Demo accounts still accept a published seed password: $unprotected. Change or lock them first (seed spec section 5, SRC-065)." >&2
+    exit 1
+fi
+agent_unset=$(db_query <<< "SELECT EXISTS (SELECT 1 FROM fgc.app_user WHERE login_id = 'agent01' AND password_hash = '!') AND NOT EXISTS (SELECT 1 FROM fgc.flyway_schema_history WHERE version = '66' AND success);")
+if [[ "$agent_unset" == t ]]; then
+    echo "agent01 has no password yet and V66 would activate it with the published demo password. Set its Secret password first (seed spec section 5)." >&2
+    exit 1
+fi
+# db/demo-agent (V66, V72, V73) joined this DB after V77: apply exactly those once out of order.
+# Every later deploy keeps Flyway's ordering check, so a late lower-numbered migration still stops the API.
+pending=$(db_query <<< "SELECT 3 - count(DISTINCT version) FROM fgc.flyway_schema_history WHERE version IN ('66', '72', '73') AND success;")
+if [[ "$pending" == 0 ]]; then export FGC_FLYWAY_OUT_OF_ORDER=false; else export FGC_FLYWAY_OUT_OF_ORDER=true; fi
 
 # Back up the current database and deployment before applying any Flyway changes.
 cp "$state/compose.yaml" "$release/previous/compose.yaml"
@@ -59,6 +76,13 @@ done
 if [[ "$ready" != 1 ]]; then
     "${compose[@]}" logs --tail=120 api
     echo 'API readiness failed; web was not upgraded'
+    exit 1
+fi
+# The running web already proxies to the new API, so a failed recheck closes the public entry (SRC-065).
+unprotected=$(python3 "$helper" unprotected-sql "$root" | db_query)
+if [[ -n "$unprotected" ]]; then
+    "${compose[@]}" stop web
+    echo "Demo accounts accept a published seed password after migration: $unprotected. Public web stopped; protect them and rerun (SRC-065)." >&2
     exit 1
 fi
 "${compose[@]}" run --rm -T --no-deps web nginx -t
