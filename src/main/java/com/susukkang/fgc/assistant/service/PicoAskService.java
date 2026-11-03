@@ -42,6 +42,8 @@ public class PicoAskService {
             + "|한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉)";
     private static final Pattern KOREAN_NUMERAL_SUFFIX = Pattern.compile("(?:^|[은는이가을를의로에]|총|약|최대|최소)" + KOREAN_NUMERAL + "$");
     private static final Pattern KOREAN_MONEY_SUFFIX = Pattern.compile(KOREAN_NUMERAL + "$");
+    /** Numeral words are short, so the regex only sees this many trailing letters and long runs stay linear. */
+    private static final int NUMERAL_TAIL = 32;
 
     private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
 
@@ -75,7 +77,8 @@ public class PicoAskService {
     }
     private static boolean numeralEnding(String prefix, String unit, boolean glued) {
         int start = prefix.length() - 1;
-        while (start >= 0 && Character.isLetter(prefix.charAt(start))) start--;
+        int stop = Math.max(0, prefix.length() - NUMERAL_TAIL);
+        while (start >= stop && Character.isLetter(prefix.charAt(start))) start--;
         String token = prefix.substring(start + 1);
         // Money units are unambiguous enough to catch glued amounts; 할/회 still need word boundaries.
         Pattern numeral = switch (unit) {
@@ -156,6 +159,10 @@ public class PicoAskService {
             chunks = new ArrayList<>(allowed.stream().filter(guide -> selection.workflowIds().contains(guide.workflowId()))
                     .flatMap(guide -> catalog.chunks(guide, helpQuery, authorities).stream())
                     .sorted(Comparator.comparingInt(chunk -> chunk.stepId() == null ? 0 : chunk.stepId().startsWith("help.") ? 1 : 2)).toList());
+            // No registered evidence: answer with the fixed out-of-scope notice instead of a second, ungrounded model call.
+            if (chunks.isEmpty()) return fixed(request, Decision.UNSUPPORTED,
+                    "등록된 업무 안내에서 답할 수 있는 내용을 찾지 못했습니다. 화면 사용법이나 업무 처리 절차를 구체적으로 질문해주세요.",
+                    List.of(), "NO_MATCHING_GUIDE");
             input.remove("availableGuides");
             input.put("evidence", chunks);
             String data = fitInput(input, history, chunks);

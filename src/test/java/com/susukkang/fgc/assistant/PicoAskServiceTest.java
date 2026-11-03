@@ -193,10 +193,19 @@ class PicoAskServiceTest {
             .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         verifyNoInteractions(gateway);
     }
-    @Test void unsupportedQuestionMayBeAnsweredAsUnsupportedWithoutFabricatedEvidence() {
+    @Test void emptyGuideSelectionGetsFixedOutOfScopeReplyWithoutSecondModelCall() {
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of()));
-        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.UNSUPPORTED,"업무 가이드에 없는 내용입니다. 정산 업무에 대해 질문해주세요.",List.of()));
-        assertThat(service.ask(request("오늘 날씨")).decision()).isEqualTo(Decision.UNSUPPORTED);
+        var reply = service.ask(request("오늘 날씨"));
+        assertThat(reply.decision()).isEqualTo(Decision.UNSUPPORTED);
+        assertThat(reply.source()).isEqualTo(Source.FIXED);
+        assertThat(reply.evidenceRefs()).isEmpty();
+        verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
+    }
+    @Test void longAnswerIsStillScreenedForQuantitiesInBoundedTime() {
+        String message = "이".repeat(1000) + "다" + "원도".repeat(480) + " 세 번 나누어 지급됩니다.";
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+        var response = org.junit.jupiter.api.Assertions.assertTimeout(java.time.Duration.ofSeconds(2), () -> service.ask(request("초안 저장")));
+        assertThat(response.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
     }
     @Test void providerFailureIsExplicitAndDoesNotMasqueradeAsAWorkflowAnswer() {
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenThrow(new FgcBusinessException(FgcErrorCode.AI_001));
