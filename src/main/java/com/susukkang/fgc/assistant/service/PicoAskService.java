@@ -48,8 +48,12 @@ public class PicoAskService {
 
     private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
 
-    private static OutputRejection unsafeOutput(String message) {
-        String normalized = Normalizer.normalize(message, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+    private static OutputRejection unsafeOutput(String message, List<String> approvedNames) {
+        // Only an exact approved screen title is masked; any other digit, amount or count still rejects (SRC-075).
+        for (var name : approvedNames) message = message.replace(name, " ");
+        String folded = Normalizer.normalize(message, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+        for (var name : approvedNames) folded = folded.replace(name, " ");
+        String normalized = folded;
         if (message.codePoints().anyMatch(code -> Character.isDigit(code)
                 || Character.getType(code) == Character.LETTER_NUMBER || Character.getType(code) == Character.OTHER_NUMBER)
                 || normalized.codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
@@ -198,7 +202,8 @@ public class PicoAskService {
                 var changed = latestPaymentContextError(request, paymentSnapshot);
                 if (changed != null) return changed;
             }
-            var references=chunks.stream().filter(c->output.evidenceChunkIds().contains(c.chunkId())).toList();
+            var cited=output.evidenceChunkIds().stream().distinct().limit(8).toList();
+            var references=chunks.stream().filter(c->cited.contains(c.chunkId())).toList();
             return response(request,output.decision(),output.message(),references,Source.AI,null);
         } catch (FgcBusinessException error) {
             if (error.getErrorCode()!=FgcErrorCode.AI_001) throw error;
@@ -221,14 +226,14 @@ public class PicoAskService {
     private OutputRejection rejection(ModelAnswer output, List<PicoGuideCatalog.Chunk> chunks) {
         if (output == null || output.decision() == null || output.message() == null
                 || output.message().isBlank() || output.message().length() > 2000
-                || output.evidenceChunkIds() == null || output.evidenceChunkIds().size() > 8
-                || output.evidenceChunkIds().stream().distinct().count() != output.evidenceChunkIds().size())
+                || output.evidenceChunkIds() == null)
             return OutputRejection.INVALID_FIELDS;
-        OutputRejection unsafe = unsafeOutput(output.message());
+        OutputRejection unsafe = unsafeOutput(output.message(), catalog.numericScreenTitles());
         if (unsafe != null) return unsafe;
         var allowed = chunks.stream().map(PicoGuideCatalog.Chunk::chunkId).toList();
         if (output.decision() == Decision.ANSWER_ONLY && output.evidenceChunkIds().isEmpty())
             return OutputRejection.INVALID_EVIDENCE;
+        // Every citation must be retrieved evidence. Repeats and valid citations beyond eight are trimmed when shown.
         if (output.evidenceChunkIds().stream().anyMatch(id -> id == null || !allowed.contains(id)))
             return OutputRejection.INVALID_EVIDENCE;
         return null;

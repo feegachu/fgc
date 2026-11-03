@@ -247,6 +247,29 @@ class PicoAskServiceTest {
             var response=service.ask(request("초안 저장")); assertThat(response.source()).isEqualTo(Source.FIXED); assertThat(response.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT"); assertThat(response.message()).doesNotContain("evil","50000","지급했습니다");
         }
     }
+    @Test void validCitationsBeyondEightOrRepeatedAreTrimmedInsteadOfFallingBack() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.draft","payment.confirm"), false));
+        var ids=catalog.definitions().stream().filter(guide -> List.of("payment.draft","payment.confirm").contains(guide.workflowId()))
+            .flatMap(guide -> catalog.chunks(guide,List.of("SETTLEMENT")).stream()).map(PicoGuideCatalog.Chunk::chunkId).toList();
+        assertThat(ids).hasSizeGreaterThan(8);
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.ANSWER_ONLY,"초안을 저장한 뒤 사전검증을 실행하세요.",ids));
+        var many=service.ask(request("지급 등록 순서"));
+        assertThat(many.source()).isEqualTo(Source.AI);
+        assertThat(many.evidenceRefs()).hasSize(8).extracting(Evidence::chunkId).isSubsetOf(ids.subList(0,8));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.ANSWER_ONLY,"초안을 저장하세요.",List.of("payment.draft:overview","payment.draft:overview")));
+        assertThat(service.ask(request("초안 저장")).evidenceRefs()).extracting(Evidence::chunkId).containsExactly("payment.draft:overview");
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.ANSWER_ONLY,"초안을 저장하세요.",List.of("payment.draft:overview","evil:source")));
+        assertThat(service.ask(request("초안 저장")).fallbackReason()).as("one forged citation still rejects the answer").isEqualTo("INVALID_AI_OUTPUT");
+    }
+    @Test void approvedScreenTitleWithDigitsIsNotAGeneratedNumber() {
+        assertThat(catalog.numericScreenTitles()).containsExactly("1,200% 한도 검증");
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("1,200% 한도 검증 화면에서 결과를 확인하세요.","payment.draft:overview"));
+        assertThat(service.ask(request("한도 결과는 어디서 보나요")).source()).isEqualTo(Source.AI);
+        for (var message : List.of("1,200%를 넘으면 확정할 수 없습니다.", "1,200% 한도 검증 화면에서 사용률 1,350%를 확인하세요.", "1,200% 한도입니다.", "1,200% 한도 검증의 2단계를 보세요.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("한도 결과는 어디서 보나요")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
     @Test void normalProcessAndSupportWordsAreNotFinancialQuantities() {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("초안 저장 프로세스는 지급 확정과 구분됩니다. 지원 업무를 확인하세요.","payment.draft:overview"));
         assertThat(service.ask(request("초안 저장 방법")).source()).isEqualTo(Source.AI);
