@@ -182,7 +182,7 @@ it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬
 })
 
 it.each([
-  [500, 'FGC-COMMON-500', 'internal CSV SQL detail', '요청 ID: csv-request'],
+  [500, 'FGC-COMMON-500', 'internal CSV SQL detail', '처리 중 오류가 발생했습니다. 요청번호 csv-request를 담당자에게 알려주세요.'],
   [400, 'FGC-COMMON-001', '검색 조건을 다시 확인해 주세요.', '검색 조건을 다시 확인해 주세요. (요청번호: csv-request)'],
 ] as const)(
   'CSV 오류 %i는 서버 메시지 또는 안전한 요청 ID를 한 번 표시한다',
@@ -341,7 +341,7 @@ it('목록 500 오류는 내부 메시지를 노출하지 않고 재시도할 �
     if (failed) throw new ApiError({ code: 'FGC-COMMON-500', message: 'internal SQL detail' }, 'safe-id', 500)
     return pageData([row])
   })
-  expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: safe-id')
+  expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 safe-id를 담당자에게 알려주세요.')
   expect(screen.queryByText(/internal SQL/)).toBeNull()
   failed = false
   await user.click(screen.getByRole('button', { name: '다시 시도' }))

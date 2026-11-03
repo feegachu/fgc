@@ -421,7 +421,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
   it('서버 500의 내부 문구 대신 요청 ID를 보여 주고 재조회할 수 있다', async () => {
     failure = new ApiError({ code: 'FGC-COMMON-500', message: 'private SQL detail' }, 'trace-410', 500)
     const { actions } = renderAt()
-    expect(await screen.findByText('요청 ID: trace-410')).toBeInTheDocument()
+    expect(await screen.findByText('처리 중 오류가 발생했습니다. 요청번호 trace-410를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.queryByText(/private SQL detail/)).toBeNull()
     failure = null
     await actions.click(screen.getByRole('button', { name: '다시 시도' }))

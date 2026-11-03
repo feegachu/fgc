@@ -139,9 +139,12 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
   await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
   const failure = await rejected
   expect(failure.ok()).toBe(false)
-  const error = (await failure.json()).error
+  const body = await failure.json()
+  const error = body.error
   expect(error.code).toBe('FGC-CAP-001')
-  await expect(page.locator('#transaction-confirm-blockers')).toContainText(error.code)
+  // 코드는 API 봉투에만 남기고 화면은 문구와 요청번호만 보인다(화면정의서 공통규칙 10, SIR-007).
+  await expect(page.locator('#transaction-confirm-blockers')).not.toContainText(error.code)
+  await expect(page.locator('#transaction-confirm-blockers')).toContainText(`(요청번호: ${body.requestId})`)
   // API 오류는 원본 정밀도를 유지하고 화면 문구만 한 자리로 표시한다 (#712).
   expect(error.message).toContain('사용률 104.166667%')
   await expect(page.locator('#transaction-confirm-blockers')).toContainText(rateText(error.message))

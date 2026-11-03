@@ -2,7 +2,7 @@ import { Button } from '../../components/Button'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { errorText, isNegative, usageRate, won } from '../../lib/format'
+import { errorText, internalErrorText, isNegative, usageRate, won } from '../../lib/format'
 import { ApiError } from '../../lib/api/errors'
 import { STATUS_LABELS } from './labels'
 
@@ -60,7 +60,7 @@ export function CapUsage({ value, status, warning }: { value?: string | null; st
 export function CapError({ error, retry }: { error: Error; retry: () => void }) {
   const message =
     error instanceof ApiError && error.code === 'FGC-COMMON-500'
-      ? `요청 ID: ${error.requestId ?? '-'}`
+      ? internalErrorText(error.requestId)
       : errorText(error)
   return (
     <div role="alert" className="cap-react-error">

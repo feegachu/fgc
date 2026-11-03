@@ -111,7 +111,20 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
     expect(screen.getByRole('article', { name: '월 환산 초회보험료' })).toHaveTextContent('200,000')
     await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('500,000'))
-    expect(screen.getByText('김설계님의 판매 현황')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: '설계사 프로필' })).toHaveTextContent('김설계')
+  })
+
+  it('전월과 같으면 화살표 없이 변동 없음으로 보인다', async () => {
+    contracts = async () =>
+      page([contract({}), contract({ contractId: 2, contractNo: 'C-0002', contractDate: '2026-06-10' })])
+    renderHome()
+    expect(await kpi('신규 계약 건수')).toHaveTextContent('1건')
+    const count = screen.getByRole('article', { name: '신규 계약 건수' })
+    const premium = screen.getByRole('article', { name: '월 환산 초회보험료' })
+    expect(count).toHaveTextContent('변동 없음')
+    expect(count).toHaveTextContent('전월 1건')
+    expect(premium).toHaveTextContent('전월 대비 변동 없음')
+    for (const card of [count, premium]) expect(card).not.toHaveTextContent(/[▲▼]/)
   })
 
   it('확인 필요 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {

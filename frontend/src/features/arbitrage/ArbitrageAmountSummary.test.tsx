@@ -38,7 +38,9 @@ it('비교형은 현재 금액을 초과액 위의 막대로 비교하고 전체
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
   expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent('전체 지급예정액850,000원')
-  expect(summary).not.toHaveTextContent('1,390,000원')
+  expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent(
+    '지급예정 포함 초과액 (모니터링, 판정에 쓰지 않음)1,390,000원',
+  )
   expect(within(summary).getByText('540,000원')).toBeVisible()
 })
 
