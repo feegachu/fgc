@@ -111,7 +111,7 @@ src/main/resources/db/demo/        Flyway 버전 순서(db/migration·db/demo·d
   V65    4년·7년 분급 규제 상한 룰셋(REGULATORY, 한도 행 포함, #538
   V60    STD-LIFE-B 2026-CURRENT-B 판매기간 종료(#540)
   V64    AGENT 역할·agent01 → A-FC-001(초기 비밀번호 미지정·DISABLED, #634)
-src/main/resources/db/demo-agent/  시연 서버·로컬 한정(신한 prd·E2E 제외). 같은 버전 시퀀스
+src/main/resources/db/demo-agent/  시연 서버·로컬 한정(E2E 제외. 신한 서버는 2026-11-03부터 포함, SRC-076). 같은 버전 시퀀스
   V66    agent01 활성화 — password_hash='!'인 행만 BCrypt 해시·ACTIVE (V64 이후)
   V72    상품 추천 AI(FUN-079) 시연용 예시 — 가상 보험사 3곳·상품 12개·해약환급률표(상품 자료, 새 정책버전 DRAFT→ACTIVE)와 협회 등급·비교 상품군, 가상 보험사 3곳의 보험사 전용 환수 정책(CLAWBACK, 가정). 다른 보험사 상품의 환수율은 #766 V70_1 D-02 가상 환수율표에서 읽는다
   V73    agent01 표시 이름을 '손설계'로 변경 — login_id·설계사 연결은 그대로 (V64 이후, 시연 서버·로컬 한정)
@@ -132,11 +132,11 @@ src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 
 | 통합 테스트 | `src/test/resources/application-test.yml` | 포함 | 포함 |
 | E2E | `frontend/scripts/e2e-server.mjs` | 포함 | 제외 |
 | AWS 개발·검증계 | `podman/fgc-app-combined.yaml:19`, `podman/fgc-app-was.yaml:19` (`SPRING_FLYWAY_LOCATIONS`) | 포함 | 포함 |
-| 신한 prd(발표 시연) | `infra/shinhan/compose.yaml:39` | 포함 — 이미 적용된 데모 이력 보존 목적(:37-38) | 제외 — prd 에서 agent01 이 활성화되지 않게 한다 |
+| 신한 서버(11/18 최종 발표 시연) | `infra/shinhan/compose.yaml` `SPRING_FLYWAY_LOCATIONS` | 포함 — 이미 적용된 데모 이력 보존 목적 | 포함(2026-11-03부터) — 최종 시연을 이 서버에서 한다(주최측 요구, SRC-076). V77까지 적용된 뒤 추가해 `SPRING_FLYWAY_OUT_OF_ORDER=true`로 한 번 적용한다 |
 | 실제 운영 | 없음 | 해당 없음. 실제 운영 DB가 생기면 `db/demo`를 빼고 기준정보 이관 절차를 따로 만든다 | 해당 없음 |
 
 - 따라서 **`db/demo`에 넣는 모든 행은 신한 prd에도 들어간다.** 시연 환경 밖으로 내보내면 안 되는 데이터나 대량 데이터(DAR-012)는 `db/demo`에 넣지 않는다(§50).
-- **Flyway 번호**: `db/migration`·`db/demo`·`db/demo-agent`(시연 서버·로컬 한정, V66·V72·V73)는 하나의 버전 시퀀스다. 번호는 폴더와 무관하게 비어 있는 다음 값을 쓴다(예: V69는 `db/migration`의 `V69__clawback_review_candidates.sql`이 사용 중이다). 같은 번호를 세 폴더 중 어디에도 중복해서 쓰지 않는다 — prd·E2E 는 `db/demo-agent`를 읽지 않아 통과해도 시연 서버·통합 테스트에서 기동이 실패한다. #634는 사용자 지정 **V64**를 사용한다. 이 브랜치의 다음 번호는 **V65**이며 병합 직전 다른 PR의 번호도 대조한다. 결번(V47·V53 등)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
+- **Flyway 번호**: `db/migration`·`db/demo`·`db/demo-agent`(시연 서버·로컬 한정, V66·V72·V73)는 하나의 버전 시퀀스다. 번호는 폴더와 무관하게 비어 있는 다음 값을 쓴다(예: V69는 `db/migration`의 `V69__clawback_review_candidates.sql`이 사용 중이다). 같은 번호를 세 폴더 중 어디에도 중복해서 쓰지 않는다 — E2E는 `db/demo-agent`를 읽지 않아 통과해도 시연 서버, 신한 서버, 통합 테스트에서 기동이 실패한다. #634는 사용자 지정 **V64**를 사용한다. 이 브랜치의 다음 번호는 **V65**이며 병합 직전 다른 PR의 번호도 대조한다. 결번(V47·V53 등)은 채우지 않는다. 같은 번호를 두 폴더에 쓰지 않는다. 이미 적용된 파일은 고치지 않고 새 번호로 보정한다(SRC-027 D-04).
 
 ---
 
@@ -309,7 +309,7 @@ auth_refresh_token
 | `agent01` | AGENT | (2차, V64) `app_user.agent_id` = `A-FC-001`. 초기 DISABLED, 개별 비밀번호 설정 후 활성화(시연 서버·로컬은 V66, prd 제외). 시연 서버·로컬에서는 V73이 표시 이름 `user_name`을 '손설계'로 바꾼다 |
 
 
-**V66 예외(시연 서버·로컬 한정)**: 시연 편의를 위해 `db/demo-agent/V66__activate_agent_demo_account.sql`이 `password_hash='!'`인 `agent01`만 BCrypt 해시로 `ACTIVE` 처리한다. 위치를 `db/demo`와 분리했으므로 신한 prd는 Flyway locations에 `db/demo-agent`를 넣지 않는 한 이 계정을 활성화하지 않는다(`infra/shinhan/compose.yaml`은 그대로). 이 비밀번호는 V3의 공통 시연 비밀번호와 같은 값이라 공유 시연 자격 증명이며, 아래 prd 보호 규칙은 그대로 적용된다.
+**V66 예외(시연 서버·로컬 한정)**: 시연 편의를 위해 `db/demo-agent/V66__activate_agent_demo_account.sql`이 `password_hash='!'`인 `agent01`만 BCrypt 해시로 `ACTIVE` 처리한다. 위치를 `db/demo`와 분리했다. 신한 서버도 2026-11-03부터 `db/demo-agent`를 읽어 이 계정을 활성화한다(11/18 최종 시연, SRC-076). 시연이 끝나 실제 운영으로 바꾸면 시연 계정을 빼는 이관을 따로 한다. 이 비밀번호는 V3의 공통 시연 비밀번호와 같은 값이라 공유 시연 자격 증명이며, 아래 prd 보호 규칙은 그대로 적용된다.
 비밀번호는 BCrypt 해시로 저장한다. 문서에 평문 비밀번호를 남기지 않는다.
 
 `agent01`은 신한 prd에서 공통 시연 자격 증명을 복제하지 않는다(시연 서버·로컬의 V66 예외 제외). V64 신규 행의 `password_hash='!'`는 로그인 불가능한 미지정 표식이고 `account_status='DISABLED'`다. 시연 관리자가 별도 Secret으로 전달한 비밀번호를 애플리케이션의 BCryptPasswordEncoder로 해시한 뒤, 보호된 관리 연결에서 해당 행에 해시와 `ACTIVE` 상태를 함께 설정해야 실제 로그인할 수 있다. SQL·PR·로그에 비밀번호나 해시를 붙이지 않는다. 통합 테스트는 트랜잭션 안에서 일회성 UUID 비밀번호를 설정·활성화한 뒤 롤백한다. 이미 존재하는 동일 연결의 agent01은 V64가 덮어쓰지 않으므로 배포 전 별도 보호 검증이 필요하다.
