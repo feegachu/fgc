@@ -63,7 +63,9 @@ public class ContractDetailController {
     public ApiResponse<ContractScheduleResponse> getContractSchedules(
             @PathVariable Long id,
             @RequestParam PaymentStage paymentStage) {
-        return ApiResponse.success(scheduleService.selectByContractId(id, paymentStage));
+        var result = scheduleService.selectByContractId(id, paymentStage);
+        result.setPreviewContext(scheduleService.previewContext(id, paymentStage));
+        return ApiResponse.success(result);
     }
 
     @GetMapping("/{id}/cap-checks")
@@ -84,8 +86,13 @@ public class ContractDetailController {
     @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<List<Long>> regenerateSchedules(
             @PathVariable Long id,
-            @RequestParam(name = "reason") String reason) {
-        return ApiResponse.success(contractService.regenerateSchedules(id, reason));
+            @RequestParam(name = "reason", required = false) String reason,
+            @RequestParam(name = "paymentStage", defaultValue = "GA_TO_FC") PaymentStage stage,
+            @jakarta.validation.Valid @RequestBody(required = false) com.susukkang.fgc.schedule.dto.ScheduleRegenRequest request,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "Idempotency-Key", required = false) String key) {
+        if (request != null && request.getRegime() != null && request.getRegime() != com.susukkang.fgc.schedule.code.ScheduleRegime.CURRENT)
+            return ApiResponse.success(List.of(scheduleService.generatePreview(id, stage, request, key).getScheduleHeaderId()));
+        return ApiResponse.success(contractService.regenerateSchedules(id, request == null ? reason : request.getReason()));
     }
 
     @PostMapping("/{id}/arbitrage-check")

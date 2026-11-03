@@ -1,4 +1,5 @@
 import { policyCodeLabel } from '../policies/labels'
+import { SchedulePreviewForm } from './SchedulePreviewForm'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -96,10 +97,17 @@ function ScheduleDetailView({ id }: { id: string }) {
     onSuccess: () => toast('회차 표 CSV를 내려받았습니다.', 'success', 3500),
   })
 
-  const confirmDisabled = !canProcess || header?.status !== 'PLANNED' || header.activeYn !== true
-  const regenerateDisabled = !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
+  const previewOnly = header?.scheduleRegime === 'FOUR_YEAR_2027' || header?.scheduleRegime === 'SEVEN_YEAR_2029'
+  const confirmDisabled =
+    previewOnly ||
+    header?.canConfirm === false ||
+    !canProcess ||
+    header?.status !== 'PLANNED' ||
+    header.activeYn !== true
+  const regenerateDisabled = previewOnly || !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
   const reasons: string[] = []
   if (header) {
+    if (previewOnly) reasons.push('4년·7년 예정판은 지급 확정 대상이 아닙니다.')
     if (!canProcess) reasons.push('확정/재생성은 정산 담당자만 할 수 있습니다.')
     if (header.activeYn !== true) reasons.push('사용 중인 버전이 아닙니다.')
     if (header.status === 'CONFIRMED') reasons.push('이미 확정된 스케줄입니다.')
@@ -183,7 +191,7 @@ function ScheduleDetailView({ id }: { id: string }) {
               className="select-control"
               id="schedule-stage"
               value={header?.paymentStage ?? 'GA_TO_FC'}
-              disabled={!header?.paymentStage || moving.isPending}
+              disabled={previewOnly || !header?.paymentStage || moving.isPending}
               aria-busy={moving.isPending || undefined}
               onChange={(event) => {
                 if (event.target.value !== header?.paymentStage) moving.mutate(event.target.value)
@@ -266,7 +274,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                   계산방식
                 </th>
                 <th scope="col" className="is-left">
-                  요율
+                  요율 / 정액
                 </th>
                 <th scope="col" className="is-number">
                   예상금액
@@ -302,7 +310,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                     key={line.lineNo ?? index}
                     line={line}
                     paymentHref={
-                      canProcess && line.contractId && line.commissionItemId
+                      canProcess && !previewOnly && line.contractId && line.commissionItemId
                         ? paymentEntryHref(
                             {
                               contractId: String(line.contractId),
@@ -339,6 +347,15 @@ function ScheduleDetailView({ id }: { id: string }) {
         </div>
       </section>
 
+      {header?.activeYn && header.status !== 'CANCELLED' && header.contractId && header.paymentStage && (
+        <SchedulePreviewForm
+          context={detail.data?.previewContext}
+          contractId={String(header.contractId)}
+          stage={header.paymentStage}
+          scheduleId={id}
+        />
+      )}
+      {previewOnly && header && <p role="status">정책 정의 {header.installmentCount ?? '-'}회차 · {header.lineCount ?? '-'}행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.</p>}
       <section className="surface schedule-detail-card" aria-labelledby="schedule-versions-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-versions-title">
@@ -536,7 +553,7 @@ function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: stri
           {responseLabel(null, CALCULATION_TYPE, line.calculationType)}
         </CategoryBadge>
       </td>
-      <td className="is-left tabular-nums">{line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
+      <td className="is-left tabular-nums">{line.calculationType === 'FIXED' ? <Money amount={line.fixedAmount} /> : line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
       <td className="is-number tabular-nums">
         <Money amount={line.expectedAmount} />
       </td>
@@ -579,7 +596,7 @@ function VersionRow({ version, current }: { version: ScheduleHeader; current: bo
         <Text content={version.generationReason} />
       </td>
       <td>{dateTime(version.generatedAt)}</td>
-      <td className="is-left tabular-nums">{int(version.lineCount)}</td>
+      <td className="is-left tabular-nums">{int(version.installmentCount)}</td>
       <td className="is-number tabular-nums">
         <Money amount={version.expectedTotal} />
       </td>
@@ -643,7 +660,7 @@ function ConfirmModal({
         </div>
         <div>
           <dt>회차 수</dt>
-          <dd className="tabular-nums">{int(header.lineCount)}</dd>
+          <dd className="tabular-nums">{int(header.installmentCount)}</dd>
         </div>
         <div>
           <dt>예상 총액</dt>

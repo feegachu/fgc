@@ -75,6 +75,9 @@ class ScheduleServiceTest {
     private ScheduleQueryRepository scheduleQueryRepository;
 
     @Mock
+    private com.susukkang.fgc.schedule.repository.SchedulePreviewRepository previews;
+
+    @Mock
     private ScheduleWriteRepository scheduleWriteRepository;
 
     @Mock

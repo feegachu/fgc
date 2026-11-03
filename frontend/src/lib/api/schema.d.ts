@@ -3165,6 +3165,7 @@ export interface components {
         ContractScheduleResponse: {
             headers?: components["schemas"]["ScheduleHeaderResponse"][];
             lines?: components["schemas"]["ScheduleLineResponse"][];
+            previewContext?: components["schemas"]["SchedulePreviewContext"];
         };
         ContractSearchCondition: {
             /** Format: int64 */
@@ -3522,6 +3523,27 @@ export interface components {
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
             typeLabel?: string;
         };
+        FeeRegimeResolution: {
+            /** Format: date */
+            basicDocumentDate?: string;
+            basicDocumentVersion?: string;
+            candidateOfferingIds?: number[];
+            candidateRulesetIds?: number[];
+            /** Format: date */
+            contractDate?: string;
+            declaredFeeRegimeCode?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
+            /** @enum {string} */
+            reasonCode?: "UNKNOWN_REGIME" | "CONTRACT_OUTSIDE_SALES_PERIOD" | "OFFERING_NOT_UNIQUE" | "NOT_APPLICABLE" | "CURRENT_BUT_ELIGIBLE" | "REGIME_NOT_ELIGIBLE" | "FOUR_YEAR_AFTER_SPECIAL_PERIOD" | "SEVEN_YEAR_IN_SPECIAL_PERIOD" | "RULESET_MISSING" | "RULESET_AMBIGUOUS" | "RULESET_FLAGGED" | "RULESET_LIMIT_MISSING" | "COMMISSION_RULE_INVALID" | "RULESET_SELECTED";
+            regRefs?: string[];
+            /** Format: int64 */
+            rulesetId?: number;
+            /** Format: date */
+            salesStartDate?: string;
+            /** @enum {string} */
+            status?: "SELECTED" | "NOT_APPLICABLE" | "REVIEW_REQUIRED";
+        };
         FeeRegimeRuleDraft: {
             /** Format: date */
             basicDocumentDateFrom?: string;
@@ -3543,6 +3565,20 @@ export interface components {
             /** Format: date */
             salesStartDateTo?: string;
             sourceRefs: string[];
+        };
+        FeeRegimeRulesetSelection: {
+            limits?: components["schemas"]["RulesetLimit"][];
+            resolution?: components["schemas"]["FeeRegimeResolution"];
+            ruleset?: components["schemas"]["Ruleset"];
+            selected?: boolean;
+        };
+        FeeRegimeSchedulePolicy: {
+            commissionPolicy?: components["schemas"]["ResolvedCommissionPolicy"];
+            selected?: boolean;
+            selection?: components["schemas"]["FeeRegimeRulesetSelection"];
+            sourceRefs?: string[];
+            /** Format: int32 */
+            versionNo?: number;
         };
         FinalizeChecklistConditionResponse: {
             /** Format: int64 */
@@ -4723,6 +4759,50 @@ export interface components {
             userId?: number;
             userName?: string;
         };
+        ResolvedCommissionPolicy: {
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            /** @enum {string} */
+            policyType?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY" | "ARBITRAGE";
+            /** Format: int64 */
+            policyVersionId?: number;
+            rules?: components["schemas"]["ResolvedCommissionRule"][];
+            /** @enum {string} */
+            scheduleRegime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
+        };
+        ResolvedCommissionRule: {
+            /** @enum {string} */
+            agentRankCode?: "FC" | "TEAM_LEADER" | "BRANCH_MANAGER" | "DIVISION_HEAD";
+            basisCode?: string;
+            /** @enum {string} */
+            calculationType?: "FIXED" | "RATE";
+            /** Format: int64 */
+            commissionItemId?: number;
+            /** Format: int64 */
+            commissionRuleId?: number;
+            equalMonthlyYn?: boolean;
+            /** @enum {string} */
+            feeComponentType?: "CURRENT" | "UPFRONT" | "MAINTENANCE" | "LONG_TERM_MAINTENANCE" | "INCENTIVE" | "SETTLEMENT_SUPPORT" | "NEWCOMER_SUPPORT" | "COMMON_COST" | "OTHER";
+            fixedAmount?: number;
+            /** Format: int32 */
+            installmentFrom?: number;
+            /** Format: int32 */
+            installmentTo?: number;
+            /** Format: int64 */
+            insurerId?: number;
+            /** Format: int64 */
+            organizationId?: number;
+            paymentConditionCode?: string;
+            /** Format: int32 */
+            priorityNo?: number;
+            /** Format: int64 */
+            productOfferingId?: number;
+            ratePct?: number;
+            /** @enum {string} */
+            roundingMode?: "UP" | "DOWN" | "CEILING" | "FLOOR" | "HALF_UP" | "HALF_DOWN" | "HALF_EVEN" | "UNNECESSARY";
+            /** Format: int32 */
+            roundingScale?: number;
+        };
         ReverseJournalRequest: {
             evidenceRef?: string;
             reason: string;
@@ -4733,9 +4813,38 @@ export interface components {
             /** Format: int64 */
             reversalOfId?: number;
         };
+        Ruleset: {
+            /** Format: date */
+            basicDocumentDateFrom?: string;
+            /** Format: date */
+            basicDocumentDateTo?: string;
+            basicDocumentVersion?: string;
+            feeRegimeCode?: string;
+            /** Format: int32 */
+            longTermMaintenanceFrom?: number;
+            /** Format: int32 */
+            longTermMaintenanceTo?: number;
+            /** Format: int32 */
+            maxInstallments?: number;
+            /** Format: int64 */
+            policyVersionId?: number;
+            /** Format: int64 */
+            rulesetId?: number;
+            /** Format: date */
+            salesStartDateFrom?: string;
+            /** Format: date */
+            salesStartDateTo?: string;
+            sourceRefs?: string[];
+        };
+        RulesetLimit: {
+            includesIndirectExpense?: boolean;
+            limitCode?: string;
+            limitPct?: number;
+        };
         ScheduleDetailResponse: {
             header?: components["schemas"]["ScheduleHeaderResponse"];
             lines?: components["schemas"]["ScheduleLineResponse"][];
+            previewContext?: components["schemas"]["SchedulePreviewContext"];
         };
         ScheduleEvidence: {
             /** Format: int64 */
@@ -4760,17 +4869,27 @@ export interface components {
         };
         ScheduleHeaderResponse: {
             activeYn?: boolean;
+            canConfirm?: boolean;
+            confirmBlockedReason?: string;
+            /** Format: int64 */
+            contractId?: number;
             contractNo?: string;
             expectedTotal?: number;
             /** Format: date-time */
             generatedAt?: string;
             generationReason?: string;
+            /** Format: int32 */
+            installmentCount?: number;
             insurerName?: string;
             /** Format: int32 */
             lineCount?: number;
+            /** Format: int32 */
+            maxInstallmentNo?: number;
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             paymentStageLabel?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
             policyVersionLabel?: string;
             productName?: string;
             /** Format: int64 */
@@ -4804,6 +4923,8 @@ export interface components {
             /** Format: date */
             dueDate?: string;
             expectedAmount?: number;
+            feeComponentType?: string;
+            fixedAmount?: number;
             /** Format: int32 */
             installmentNo?: number;
             /** Format: int32 */
@@ -4813,9 +4934,22 @@ export interface components {
             recipientName?: string;
             /** Format: int64 */
             ruleRef?: number;
+            /** Format: int64 */
+            scheduleLineId?: number;
+            /** Format: int64 */
+            sourceStatusEventId?: number;
+        };
+        SchedulePreviewContext: {
+            expectedSourceVersion?: string;
+            policy?: components["schemas"]["FeeRegimeSchedulePolicy"];
         };
         ScheduleRegenRequest: {
+            expectedSourceVersion?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
             reason: string;
+            /** @enum {string} */
+            regime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
         };
         ScheduleRegenResponse: {
             /** Format: int64 */
@@ -6184,16 +6318,23 @@ export interface operations {
     };
     regenerateSchedules: {
         parameters: {
-            query: {
-                reason: string;
+            query?: {
+                reason?: string;
+                paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             };
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: number;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRegenRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -7140,7 +7281,9 @@ export interface operations {
     regenerate: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: number;
             };

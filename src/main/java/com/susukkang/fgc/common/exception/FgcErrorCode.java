@@ -88,6 +88,9 @@ public enum FgcErrorCode {
             "error.contract.concurrentUpdate"
     ),
 
+    IMPL_SCHEDULE_PREVIEW_ONLY("FGC-IMPL-SCHEDULE_PREVIEW_ONLY", HttpStatus.CONFLICT, "error.schedule.previewOnly"),
+    IMPL_SCHEDULE_SOURCE_CHANGED("FGC-IMPL-SCHEDULE_SOURCE_CHANGED", HttpStatus.CONFLICT, "error.schedule.sourceChanged"),
+    IMPL_SCHEDULE_REVIEW_REQUIRED("FGC-IMPL-SCHEDULE_REVIEW_REQUIRED", HttpStatus.UNPROCESSABLE_ENTITY, "error.schedule.reviewRequired"),
     SCHE_001(
             "FGC-SCHE-001",
             HttpStatus.CONFLICT,

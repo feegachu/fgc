@@ -121,11 +121,11 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
   },
   {
     key: 'lines',
-    label: '회차 수',
+    label: '회차 / 행 수',
     sortable: true,
     width: '5.5rem',
     align: 'left',
-    render: (row) => int(row.lineCount),
+    render: (row) => `${int(row.installmentCount)}회 · ${int(row.lineCount)}행`,
   },
   {
     key: 'total',
@@ -341,7 +341,21 @@ function ScheduleFilter({
           <label className="filter-field-label" htmlFor="schedule-filter-regime">
             적용 체계
           </label>
-          <select className="select-control" {...bind('regime')}>
+          <select
+            className="select-control"
+            {...bind('regime')}
+            onChange={(event) => {
+              const regime = event.target.value
+              const next = {
+                ...filters,
+                contractNo: filters.contractNo.trim(),
+                regime,
+                purpose: regime === 'FOUR_YEAR_2027' || regime === 'SEVEN_YEAR_2029' ? 'SIMULATION' : DEFAULT_PURPOSE,
+              }
+              setFilters(next)
+              onSearch(next)
+            }}
+          >
             <option value="">전체</option>
             {options(SCHEDULE_REGIME)}
           </select>
