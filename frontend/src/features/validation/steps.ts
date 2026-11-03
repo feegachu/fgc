@@ -65,3 +65,20 @@ export const progressText = (currentStep?: number | null) => {
   const step = currentStep ?? 0
   return `${step}/10 단계 (${step * 10}%)`
 }
+
+const ERROR_CODE = /^FGC-[A-Z0-9]+(?:-[A-Z0-9]+)*$/
+
+/**
+ * 실패 사유는 Step 예외 메시지를 ' | '로 이은 값이다. 업무 예외는 메시지로 오류코드만 남기므로
+ * 코드 조각은 빼고(화면정의서 공통규칙 10), 읽을 문장이 하나도 없으면 실패한 단계로 안내한다.
+ */
+export function failureText(message?: string | null, failedStep?: number | null) {
+  const sentences = (message ?? '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter((part) => part && !ERROR_CODE.test(part))
+  if (sentences.length) return sentences.join(' | ')
+  return failedStep && failedStep >= 1 && failedStep <= STEP_NAMES.length
+    ? `${failedStep}단계에서 실패했습니다.`
+    : '처리 중 오류로 실패했습니다.'
+}

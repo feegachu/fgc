@@ -106,7 +106,7 @@ describe('오류 화면 (#417)', () => {
     expect(screen.queryByText('FGC-COMMON-500')).not.toBeInTheDocument()
     expect(screen.queryByText(/SQLException/)).toBeNull()
     await waitFor(() => expect(document.title).toBe('처리 오류 | FGC'))
-    await userEvent.click(screen.getByRole('button', { name: '요청 ID 복사' }))
+    await userEvent.click(screen.getByRole('button', { name: '요청번호 복사' }))
     expect(writeText).toHaveBeenCalledWith('req-500')
     expect(await screen.findByRole('button', { name: '복사했습니다' })).toBeInTheDocument()
   })
@@ -186,7 +186,11 @@ describe('오류 화면 (#417)', () => {
     page.thrown = await apiErrorFrom(
       json(409, {
         data: null,
-        error: { code: 'FGC-SCHE-001', message: '되돌릴 수 없습니다, 확정된 스케줄은 새 버전으로만 바꿉니다.' },
+        error: {
+          code: 'FGC-SCHE-001',
+          message: '되돌릴 수 없습니다, 확정된 스케줄은 새 버전으로만 바꿉니다.',
+          detail: 'IllegalStateException at ScheduleServiceImpl',
+        },
         requestId: 'req-409',
       }),
     )
@@ -194,7 +198,8 @@ describe('오류 화면 (#417)', () => {
     expect(await screen.findByRole('heading', { name: '처리 오류' })).toBeInTheDocument()
     expect(screen.queryByText('FGC-SCHE-001, 요청 ID: req-409')).not.toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('(요청번호: req-409)')
-    expect(screen.queryByRole('button', { name: '요청 ID 복사' })).toBeNull()
+    expect(screen.queryByText(/IllegalStateException/)).toBeNull()
+    expect(screen.queryByRole('button', { name: '요청번호 복사' })).toBeNull()
     await waitFor(() => expect(document.title).toBe('처리 오류 | FGC'))
   })
 })

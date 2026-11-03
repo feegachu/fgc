@@ -1,4 +1,5 @@
 import { JOURNAL_TYPE } from '../ledger/labels'
+import { contractStatusLabels, dataOriginLabels, paymentCycleLabels } from '../contract/labels'
 import { screenMessage } from '../../lib/screenText'
 
 // 감사 이벤트 기록 경로의 코드 표시용 매핑. 저장값과 검색값은 원본 코드를 유지한다.
@@ -77,12 +78,18 @@ const loginFailureReasons = {
   CredentialsExpiredException: '비밀번호 유효기간 만료',
 } as const
 
+/** 지급 초안을 지워 예외를 닫을 때 서버가 남긴 사유. 감사로그와 예외 처리 이력이 같은 문구를 쓴다. */
+export function paymentDeletedReason(reason?: string | null) {
+  const id = /^초안 삭제\(PAYMENT_DELETED\): 지급 ([0-9]+)의 지급 예정이 철회되어 종결$/.exec(reason ?? '')?.[1]
+  return id ? `지급 초안 삭제로 종결, 지급 ${id}` : null
+}
+
 /** 알려진 자동 생성 형식만 번역한다. 사용자 사유·오류 원문·미등록 형식은 보존한다. */
 export function auditReasonLabel(actionCode?: string | null, reason?: string | null) {
   if (reason == null || reason === '') return '-'
   if (actionCode === 'EXCEPTION_ACTION') {
-    const deletion = /^초안 삭제\(PAYMENT_DELETED\): 지급 ([0-9]+)의 지급 예정이 철회되어 종결$/.exec(reason)
-    if (deletion && deletion[0] === reason) return `지급 초안 삭제: 지급 ${deletion[1]}의 지급 예정이 철회되어 종결`
+    const deletion = paymentDeletedReason(reason)
+    if (deletion) return deletion
   }
   if (actionCode === 'VALIDATION_RUN_STARTED' && reason === 'MonthlyValidationJob started') return '월 통합검증 시작'
   if (actionCode === 'VALIDATION_RUN_COMPLETED' && reason === 'MonthlyValidationJob completed')
@@ -141,6 +148,26 @@ export function diffFieldLabel(field: string): string {
     actualAmount: '실제액',
     differenceAmount: '차액',
     paymentStage: '지급단계',
+    // 계약 수정 감사행(ContractServiceImpl.toAuditSnapshot)의 항목
+    contractId: '계약 내부 번호',
+    insurerId: '보험사 번호',
+    productOfferingId: '상품 판매버전 번호',
+    contractNo: '계약번호',
+    contractDate: '계약일',
+    agentId: '설계사 번호',
+    organizationId: '조직 번호',
+    premiumPerCycleAmount: '주기 보험료',
+    firstPremiumAmount: '초회보험료',
+    monthlyEquivalentFirstPremium: '월납환산 초회보험료',
+    premiumConversionRuleCode: '보험료 환산 규칙',
+    paymentCycleCode: '납입주기',
+    paymentTermMonths: '납입기간(개월)',
+    standardSurrenderDeductionAmount: '표준해약공제액',
+    currentStatus: '계약상태',
+    dataOrigin: '데이터 출처',
+    createdBy: '등록자',
+    updatedAt: '수정 시각',
+    statusEventId: '상태 변경 번호',
   }
   return field
     .replace(/\[(\d+)]/g, (_, index: string) => `.${Number(index) + 1}번째.`)
@@ -150,16 +177,25 @@ export function diffFieldLabel(field: string): string {
     .join(' / ')
 }
 
+// 같은 코드라도 항목마다 뜻이 다르다(계약 ACTIVE는 '정상'). 항목 전용 표를 먼저 본다.
+const fieldValueLabels: Record<string, Record<string, string>> = {
+  currentStatus: contractStatusLabels,
+  dataOrigin: dataOriginLabels,
+  paymentCycleCode: paymentCycleLabels,
+}
+
 export function auditValueLabel(value: string | null | undefined, field?: string) {
   value ??= '-'
+  const own = fieldValueLabels[field?.split('.').at(-1) ?? '']
+  if (own) return own[value] ?? value
   if (!/(status|type|method|stage|regime|decision|severity|origin)$/i.test(field ?? '')) return value
   const labels: Record<string, string> = {
     CREATED: '생성',
     STARTED: '시작',
     DRAFT: '작성중',
     CONFIRMED: '확정',
-    POSTED: '기표완료',
-    REVERSED: '역분개',
+    POSTED: '기표됨',
+    REVERSED: '역분개됨',
     ACTIVE: '활성',
     INACTIVE: '비활성',
     CANCELLED: '취소',
@@ -170,8 +206,8 @@ export function auditValueLabel(value: string | null | undefined, field?: string
     COMPLETED: '완료',
     RUNNING: '실행중',
     FAILED: '실패',
-    INSURER_TO_GA: '원수사 → GA',
-    GA_TO_FC: 'GA → 설계사',
+    INSURER_TO_GA: '원수사→GA',
+    GA_TO_FC: 'GA→설계사',
     RATE: '요율',
     FIXED: '정액',
     INCLUDED: '산입',

@@ -7,7 +7,7 @@ import { date, int, month as formatMonth, rate } from '../../lib/format'
 import { withMonth } from '../../stores/workspace'
 import { detailQuery } from './api'
 import type { Detail, Match } from './api'
-import { Disclosure, Failure, Money, ResultBadge } from './display'
+import { Failure, Money, ResultBadge } from './display'
 import { EMPTY, PAYMENT_STAGE, text } from './labels'
 
 export function CompareModal({
@@ -58,10 +58,9 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
   return (
     <>
       <p>
-        대사 결과 #{detail.reconciliationResultId},{' '}
-        {PAYMENT_STAGE[stage as keyof typeof PAYMENT_STAGE] || stage || '지급단계 미확인'}
+        대사 결과, {PAYMENT_STAGE[stage as keyof typeof PAYMENT_STAGE] || stage || '지급단계 미확인'}
       </p>
-      <p>예상 스케줄과 실제 지급 건을 필드별로 비교합니다.</p>
+      <p>예상 스케줄과 실제 지급 건을 항목별로 비교합니다.</p>
       <ResultBadge type={detail.resultType} label={detail.resultTypeLabel} />
       <dl className="reco-react-compare-summary">
         <div>
@@ -72,7 +71,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
           </dd>
         </div>
         <div>
-          <dt>결과 ID</dt>
+          <dt>대사 결과 번호</dt>
           <dd>{detail.reconciliationResultId}</dd>
         </div>
         <div>
@@ -87,9 +86,8 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         </div>
         <div>
           <dt>매칭키</dt>
-          <dd>
-            <Disclosure value={detail.matchGroupKey} />
-          </dd>
+          {/* 내부 키 원문은 숨기고 맞춰 보는 기준만 보인다(RECO-W01 매칭키). */}
+          <dd>계약번호, 지급단계, 설계사, 수수료 항목, 회차</dd>
         </div>
       </dl>
       <div className="reco-react-compare-grid">
@@ -106,8 +104,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         <p>주 원인 {detail.primaryReason?.label || text(detail.primaryReasonCode)}</p>
         <p>보조 원인 {detail.secondaryReasons?.map((reason) => reason.label || reason.code).join(', ') || EMPTY}</p>
         <p>
-          차액 = 실제 <Money value={detail.actualTotalAmount} /> − 예상 <Money value={detail.expectedTotalAmount} /> ={' '}
-          <Money value={detail.differenceAmount} difference />
+          차액 <Money value={detail.differenceAmount} difference /> (실제에서 예상을 뺀 금액)
         </p>
         <p>허용오차 0원, 시스템 계산 결과</p>
       </section>
@@ -157,7 +154,7 @@ function SourceSide({
             <h4>
               {title} 원천 {index + 1},{' '}
               {expected
-                ? `schedule_line #${match.scheduleLineId ?? EMPTY}`
+                ? `스케줄행 번호 ${match.scheduleLineId ?? EMPTY}`
                 : `수수료 지급 번호 ${match.commissionTransactionId ?? EMPTY}`}
             </h4>
             <dl>
@@ -189,12 +186,8 @@ function SourceSide({
               ) : (
                 <>
                   <div>
-                    <dt>귀속 ID</dt>
-                    <dd>
-                      {match.transactionAttributionId == null
-                        ? EMPTY
-                        : `attribution #${match.transactionAttributionId}`}
-                    </dd>
+                    <dt>귀속 번호</dt>
+                    <dd>{match.transactionAttributionId ?? EMPTY}</dd>
                   </div>
                   <div>
                     <dt>지급일</dt>
