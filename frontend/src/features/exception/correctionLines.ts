@@ -26,10 +26,10 @@ export function validateCorrectionLines(lines: AmountPair[]): string | null {
     const debit = wonAmount(line.debitAmount)
     const credit = wonAmount(line.creditAmount)
     if (debit === null || credit === null) {
-      return `${index + 1}번 라인의 금액은 0 이상의 정수(원 단위)로 입력하세요.`
+      return `${index + 1}번 줄의 금액은 0 이상의 정수(원 단위)로 입력하세요.`
     }
     if (debit > 0 === credit > 0) {
-      return `${index + 1}번 라인은 차변 또는 대변 중 한쪽에만 금액을 입력하세요.`
+      return `${index + 1}번 줄은 차변 또는 대변 중 한쪽에만 금액을 입력하세요.`
     }
     debitTotal += debit
     creditTotal += credit

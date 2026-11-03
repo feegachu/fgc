@@ -138,7 +138,7 @@ function DashboardContent({ month }: { month: string }) {
         value: data.journalImbalance,
         footer: '기표 전 0건 필수',
         tone: data.journalImbalance === 0 ? 'success' : 'error',
-        to: href('/journals', { imbalanceOnly: 'true' }),
+        to: href('/journals'),
       },
     ] as const)
 

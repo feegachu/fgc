@@ -242,7 +242,7 @@ export function PolicyDraftEditor({
       }
     >
       <div className="policy-editor-intro">
-        <StatusBadge tone="warning">DRAFT, 초안</StatusBadge>
+        <StatusBadge tone="warning">초안</StatusBadge>
         <span>기본정보와 유형별 규칙을 작성한 후 검토를 요청하세요.</span>
         <span className="policy-required-note">* 필수 입력</span>
       </div>
@@ -544,7 +544,7 @@ export function PolicyDraftEditor({
                           checked={rule.reviewRequiredYn}
                           onChange={(e) => update({ reviewRequiredYn: e.target.checked })}
                         />
-                        검토 필요
+                        검토필요
                       </label>
                     </div>
                     {rule.feeRegimeCode === 'FOUR_YEAR_2027' &&
@@ -581,13 +581,13 @@ export function PolicyDraftEditor({
           {section === 'parameters' && (
             <>
               <p className="policy-section-description">
-                기존에 지원하는 지급조건을 선택합니다. 각 조건의 적용 근거는 근거 자료에서 연결하세요.
+                적용할 지급조건을 고릅니다. 각 조건의 적용 근거는 근거 자료에서 연결하세요.
               </p>
               {conditionOptions.map((option) => (
                 <section data-guide-feature="features.policies.policy-draft-editor.section-2" className="policy-condition-card" key={option.key}>
                   <header>
                     <h3>{option.label}</h3>
-                    <StatusBadge tone="info">지원 조건</StatusBadge>
+                    <StatusBadge tone="info">지급조건</StatusBadge>
                   </header>
                   <p>{option.description}</p>
 

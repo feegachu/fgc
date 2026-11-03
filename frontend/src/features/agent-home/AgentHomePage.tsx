@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { KpiCardContent } from '../../components/KpiCard'
+import { StatusBadge } from '../../components/StatusBadge'
 import { errorText, int } from '../../lib/format'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { useAuth } from '../auth/useAuth'
@@ -137,7 +138,7 @@ function AgentHomeContent({ month }: { month: string }) {
       {import.meta.env.VITE_ASSISTANT_AI === 'true' && (
         <details className="surface" style={{ padding: 12, marginBottom: 12 }}>
           <summary data-guide-feature="agent.guide-menu.open" style={{ cursor: 'pointer' }}>업무 안내</summary>
-          <nav aria-label="본인 업무 튜토리얼" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          <nav aria-label="본인 업무 안내" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
             {workflowGuides.filter((guide) => guide.enabled && guide.roles.includes('AGENT')).map((guide) => (
               <button data-guide-feature={guideFeatureId('agent.guide-menu', guide.workflowId)} key={guide.workflowId} type="button" className="button button-secondary"
                 onClick={(event) => {
@@ -250,9 +251,9 @@ function Snapshot({
             }
           />
         </article>
-        <article className="ah-kpi kpi-card kpi-card-info" aria-label="월 환산 초회보험료">
+        <article className="ah-kpi kpi-card kpi-card-info" aria-label="월납환산 초회보험료">
           <KpiCardContent
-            label="월 환산 초회보험료"
+            label="월납환산 초회보험료"
             value={int(now.premium)}
             zero={now.premium === 0}
             unit="원"
@@ -297,12 +298,12 @@ function Snapshot({
             unit="건"
             footer={
               <div className="ah-badges">
-                <span className="ah-badge warn">
+                <StatusBadge tone="warning">
                   한도 근접 <b>{now.near}</b>
-                </span>
-                <span className="ah-badge danger">
-                  검토 필요 <b>{now.review}</b>
-                </span>
+                </StatusBadge>
+                <StatusBadge tone="error">
+                  검토필요 <b>{now.review}</b>
+                </StatusBadge>
               </div>
             }
           />
@@ -379,7 +380,7 @@ function Charts({
         </div>
         <div className="ah-box ah-trend-box">
           <h3>
-            월별 신규 계약 추이 <span className="ah-sub">막대 건수, 선 월환산 보험료(오른쪽 축)</span>
+            월별 신규 계약 추이 <span className="ah-sub">막대 건수, 선 월납환산 초회보험료(오른쪽 축)</span>
           </h3>
           <Trend points={trendSeries(focus, months)} />
         </div>
