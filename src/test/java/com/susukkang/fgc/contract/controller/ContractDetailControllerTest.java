@@ -64,6 +64,7 @@ class ContractDetailControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockitoBean ContractService contractService;
+    @MockitoBean com.susukkang.fgc.contract.service.ContractStatusEffectQueryService effectQueryService;
     @MockitoBean ScheduleService scheduleService;
     @MockitoBean CapCheckService capCheckService;
     @MockitoBean ArbitrageService arbitrageService;

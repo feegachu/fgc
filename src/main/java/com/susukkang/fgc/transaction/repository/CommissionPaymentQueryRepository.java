@@ -359,6 +359,17 @@ public class CommissionPaymentQueryRepository {
         )).getResultList();
     }
 
+    /** 상태 사건 보류·후속 작업 대기로 확정을 막는 사유(없으면 빈 목록). */
+    public List<StatusHoldBlocker> findStatusHoldBlockers(Long paymentId) {
+        NativeQuery<?> query = nativeQuery(FIND_STATUS_HOLD_BLOCKERS);
+        query.setParameter("paymentId", paymentId);
+        return query.setTupleTransformer((row, aliases) -> new StatusHoldBlocker((String) row[0], ((Number) row[1]).longValue()))
+                .getResultList();
+    }
+
+    public record StatusHoldBlocker(String code, long refId) {
+    }
+
     public List<Long> lockAttributedContracts(Long paymentId) {
         NativeQuery<?> query = nativeQuery(LOCK_ATTRIBUTED_CONTRACTS);
         query.setParameter("paymentId", paymentId);

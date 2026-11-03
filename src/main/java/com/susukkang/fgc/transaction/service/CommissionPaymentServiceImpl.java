@@ -251,6 +251,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         queryRepository.lockAttributedContracts(paymentId);
         // #433: 최초 지급 조회의 계약일은 잠금 대기 중 변경될 수 있다.
         attributions = requireConfirmationData(paymentId);
+        // FUN-028: 계약 잠금 안에서 상태 사건 보류·후속 작업 대기를 확인해 worker 처리 전 확정이 우회되지 않게 한다.
+        failFirst(statusHoldFailure(paymentId, attributions.get(0)));
         if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failFirst(unresolvedViolationFailure(attributions.get(0)));
         }
@@ -380,6 +382,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         List<GateFailure> failures = new ArrayList<>();
         if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failures.add(unresolvedViolationFailure(first));
+        }
+        GateFailure statusHold = statusHoldFailure(paymentId, first);
+        if (statusHold != null) {
+            failures.add(statusHold);
         }
         failures.addAll(requiredValueFailures(attributions));
 
@@ -1227,6 +1233,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 failure.errorCode(),
                 failure.params()
         );
+    }
+
+    /** FUN-028: 환수(차감) 건은 대상이 아니다. 저장하는 예외 이력은 없고 409 로만 차단한다. */
+    private GateFailure statusHoldFailure(Long paymentId, ConfirmationData first) {
+        if (isClawback(first)) {
+            return null;
+        }
+        List<CommissionPaymentQueryRepository.StatusHoldBlocker> blockers = queryRepository.findStatusHoldBlockers(paymentId);
+        if (blockers == null || blockers.isEmpty()) {
+            return null;
+        }
+        return new GateFailure(first, null, null, null, null, FgcErrorCode.IMPL_PAYMENT_ON_HOLD,
+                Map.of("blockers", blockers.stream().map(b -> b.code() + ":" + b.refId()).toList()));
     }
 
     private GateFailure unresolvedViolationFailure(ConfirmationData first) {

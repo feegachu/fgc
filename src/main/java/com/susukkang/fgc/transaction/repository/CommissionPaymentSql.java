@@ -194,6 +194,28 @@ final class CommissionPaymentSql {
              WHERE ta.commission_transaction_id = :paymentId
             """;
 
+    /**
+     * FUN-028 확정 차단 사유: 미해제 상태 보류, 보류 중인 연결 스케줄 회차, 계약의 끝나지 않은 상태 사건 후속 작업.
+     * 계약 행 잠금 뒤에 부르면 worker 가 같은 잠금으로 처리하므로 worker 처리 전·중·후 어느 시점에도 우회되지 않는다.
+     */
+    static final String FIND_STATUS_HOLD_BLOCKERS = """
+            SELECT 'OPEN_HOLD' AS code, h.contract_status_event_id AS ref_id
+              FROM fgc.payment_hold h
+             WHERE h.commission_transaction_id = :paymentId AND h.released_at IS NULL
+            UNION ALL
+            SELECT 'HOLD_SCHEDULE_LINE', sl.schedule_line_id
+              FROM fgc.transaction_attribution ta
+              JOIN fgc.schedule_line sl ON sl.schedule_line_id = ta.schedule_line_id
+             WHERE ta.commission_transaction_id = :paymentId AND sl.line_status = 'HOLD'
+            UNION ALL
+            SELECT 'FOLLOW_UP_PENDING', j.contract_status_event_id
+              FROM fgc.contract_event_job j
+              JOIN fgc.contract_status_event e ON e.contract_status_event_id = j.contract_status_event_id
+             WHERE j.state <> 'SUCCEEDED'
+               AND e.contract_id IN (SELECT ta.contract_id FROM fgc.transaction_attribution ta
+                                      WHERE ta.commission_transaction_id = :paymentId AND ta.contract_id IS NOT NULL)
+            """;
+
     static final String LOCK_ATTRIBUTED_CONTRACTS = """
             SELECT c.contract_id
               FROM fgc.insurance_contract c
