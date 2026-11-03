@@ -17,6 +17,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
   const items = home.priorityContracts ?? []
   const total = home.priorityContractTotal ?? items.length
   const [open, setOpen] = useState<number | null>(null)
+  const month = home.myCommission?.month ?? home.asOf?.slice(0, 7) ?? ''
   return (
     <section className="ah-panel ah-priority" aria-label="확인할 계약">
       <div className="ah-panel-head">
@@ -38,9 +39,12 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
                   {item.elapsedDays != null && ` · 마지막 사건 ${item.elapsedDays}일 경과`}
                 </span>
                 <span className="ah-priority-meta">
-                  {`이번 달 예정 ${int(item.expectedAmount ?? 0)}원`}
+                  {`${month} 예정 ${int(item.expectedAmount ?? 0)}원`}
                   {(item.heldCount ?? 0) > 0 && ` · 보류 ${item.heldCount}건 ${int(item.heldAmount ?? 0)}원`}
-                  {item.lastCheck && ` · 마지막 확인 ${item.lastCheck.checkedAt?.slice(0, 10)}`}
+                  {item.lastCheck &&
+                    ` · 마지막 확인 ${item.lastCheck.checkedAt?.slice(0, 10)} ${item.lastCheck.result === 'CLOSED' ? '종결' : '후속 확인'}${
+                      item.lastCheck.nextCheckDate ? ` (다음 ${item.lastCheck.nextCheckDate})` : ''
+                    }`}
                 </span>
                 <span className="ah-priority-reasons">
                   {(item.reasonCodes ?? []).map((code) => (
@@ -68,6 +72,14 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
   )
 }
 
+function conflictText(error: unknown) {
+  if (!(error instanceof ApiError)) return null
+  if (error.code === 'FGC-IMPL-STATE_CHANGED') return '그 사이 계약 상태가 바뀌었어요. 목록을 새로 불러왔으니 다시 확인해 주세요.'
+  if (error.code === 'FGC-IMPL-IDEMPOTENCY_CONFLICT') return '이미 기록됐을 수 있어요. 목록을 새로 불러왔으니 확인한 뒤 필요하면 다시 기록해 주세요.'
+  if (error.code === 'FGC-IMPL-REQUEST_IN_PROGRESS') return '같은 요청을 처리하고 있어요. 잠시 후 다시 시도해 주세요.'
+  return null
+}
+
 function CheckForm({ item, onDone }: { item: PriorityContract; onDone: () => void }) {
   const client = useQueryClient()
   // 같은 제출을 다시 보내도 한 번만 기록되도록 폼을 열 때 키를 한 번 만든다.
@@ -92,8 +104,14 @@ function CheckForm({ item, onDone }: { item: PriorityContract; onDone: () => voi
       onDone()
     },
     onError: (error) => {
-      // 다른 변경이 먼저 있었다면 최신 상태를 다시 받아 새 맥락으로 기록하게 한다.
-      if (error instanceof ApiError && error.status === 409) void client.invalidateQueries({ queryKey: ['agent-home', 'home'] })
+      if (!(error instanceof ApiError)) return
+      // 계약 상태가 먼저 바뀐 경우: 최신 맥락으로 다시 기록하게 목록을 새로 받는다. 같은 키를 다시 써도 이중 기록은 없다.
+      if (error.code === 'FGC-IMPL-STATE_CHANGED') void client.invalidateQueries({ queryKey: ['agent-home', 'home'] })
+      // 같은 키로 다른 내용을 보낸 경우: 앞선 저장이 이미 됐을 수 있으니 목록을 확인하고 새 키로 다시 시도하게 한다.
+      if (error.code === 'FGC-IMPL-IDEMPOTENCY_CONFLICT') {
+        key.current = crypto.randomUUID()
+        void client.invalidateQueries({ queryKey: ['agent-home', 'home'] })
+      }
     },
     meta: { errorToast: false },
   })
@@ -127,9 +145,7 @@ function CheckForm({ item, onDone }: { item: PriorityContract; onDone: () => voi
       </label>
       {save.isError && (
         <p role="alert" className="ah-check-error">
-          {save.error instanceof ApiError && save.error.status === 409
-            ? '그 사이 계약 상태가 바뀌었어요. 목록을 새로 불러왔으니 다시 확인해 주세요.'
-            : errorText(save.error as Error, '확인 기록을 저장하지 못했습니다.')}
+          {conflictText(save.error) ?? errorText(save.error as Error, '확인 기록을 저장하지 못했습니다.')}
         </p>
       )}
       <button type="submit" className="button" disabled={save.isPending || invalid}>

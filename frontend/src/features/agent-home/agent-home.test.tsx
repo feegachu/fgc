@@ -69,6 +69,7 @@ const priority = (patch = {}) => ({
 
 let home: (path: string) => Promise<unknown>
 let capCount: (status: string) => number
+let focusHome: (path: string) => Promise<unknown> | undefined
 let check: (body: unknown, key: string) => Promise<unknown>
 const clients: QueryClient[] = []
 
@@ -78,9 +79,10 @@ beforeEach(() => {
   sessionStorage.clear()
   home = async () => envelope(baseHome())
   capCount = () => 0
+  focusHome = () => undefined
   check = async () => envelope({ checkId: 1, checkedAt: '2026-07-31T10:00:00+09:00', contractId: 91, contextVersion: 'contract91-event4' })
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, options?: { idempotencyKey?: string; body?: unknown }) => {
-    if (path.startsWith('/api/v1/agent/me/home')) return home(path)
+    if (path.startsWith('/api/v1/agent/me/home')) return (path.includes('insurerId=') && focusHome(path)) || home(path)
     if (path.startsWith('/api/v1/agent/me/contract-checks')) return check(options?.body, options?.idempotencyKey ?? '')
     if (path.startsWith('/api/v1/contracts')) {
       const status = new URLSearchParams(path.split('?')[1]).get('capResultStatus') ?? ''
@@ -160,6 +162,64 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(within(panel).queryByText('B손해 필터 적용 중')).not.toBeInTheDocument()
   })
 
+  it('기준일·집계 기간·분모와 수수료 기준월을 화면에 표시한다', async () => {
+    renderHome()
+    const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
+    expect(panel).toHaveTextContent('기준일 2026-07-31 · 집계 기간 2025-08-01 ~ 2026-07-31 · 분모 계약 3건')
+    expect(await screen.findByLabelText('수령 예정 수수료')).toHaveTextContent('2026-07 기준')
+  })
+
+  it('한도 건수 조회도 기준일까지로 맞춘다', async () => {
+    renderHome()
+    const card = await screen.findByRole('link', { name: '확인 필요 계약' })
+    expect(card.getAttribute('href')).toContain('contractDateTo=2026-07-31')
+    const calls = vi.mocked(apiClient.request).mock.calls.map(([path]) => String(path)).filter((p) => p.includes('capResultStatus'))
+    expect(calls.every((p) => p.includes('contractDateTo=2026-07-31'))).toBe(true)
+  })
+
+  it('한도 건수 조회가 실패하면 로딩으로 두지 않고 확인 불가와 다시 시도를 보여 준다', async () => {
+    capCount = () => {
+      throw new ApiError(null, 'req-4', 500)
+    }
+    renderHome()
+    await waitFor(() => expect(screen.getByLabelText('확인 필요 계약')).toHaveTextContent('확인 불가'))
+    expect(within(screen.getByLabelText('확인 필요 계약')).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+  })
+
+  it('보험사를 고른 뒤 그 집계가 로딩 중이거나 실패하면 0건 차트로 그리지 않는다', async () => {
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    focusHome = () => held.then(() => envelope(baseHome()))
+    renderHome()
+    const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
+    await userEvent.click(within(panel).getByRole('button', { name: /B손해/ }))
+    expect(await within(panel).findByText('선택한 보험사 집계를 불러오는 중입니다.')).toBeInTheDocument()
+    expect(within(panel).queryByText(/^합계/)).not.toBeInTheDocument()
+    release()
+    await waitFor(() => expect(within(panel).queryByText('선택한 보험사 집계를 불러오는 중입니다.')).not.toBeInTheDocument())
+  })
+
+  it('보험사 집계 조회가 실패하면 오류와 다시 시도를 보여 준다', async () => {
+    focusHome = () => Promise.reject(new ApiError(null, 'req-5', 500))
+    renderHome()
+    const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
+    await userEvent.click(within(panel).getByRole('button', { name: /B손해/ }))
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('선택한 보험사의 집계를 불러오지 못했습니다.')
+    expect(within(panel).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+  })
+
+  it('경고는 선택한 보험사의 집계에서 읽는다', async () => {
+    focusHome = () =>
+      Promise.resolve(envelope(baseHome({ basis: { asOf: '2026-07-31', warnings: [] } })))
+    home = async () =>
+      envelope(baseHome({ dataStatus: 'PARTIAL', basis: { asOf: '2026-07-31', warnings: ['상태 이력이 없는 계약 2건은 상태 미확인으로 집계했다.'] } }))
+    renderHome()
+    const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
+    expect(await within(panel).findByRole('note')).toBeInTheDocument()
+    await userEvent.click(within(panel).getByRole('button', { name: /B손해/ }))
+    await waitFor(() => expect(within(panel).queryByRole('note')).not.toBeInTheDocument())
+  })
+
   it('기준일 시점 상태 이력이 부족하면 서버 경고를 그래프 위에 보여 준다', async () => {
     home = async () =>
       envelope(baseHome({ dataStatus: 'PARTIAL', basis: { asOf: '2026-07-31', warnings: ['상태 이력이 없는 계약 1건은 상태 미확인으로 집계했다.'] } }))
@@ -215,7 +275,7 @@ describe('확인할 계약', () => {
     expect(panel).toHaveTextContent('후속 확인일 도래 (2026-07-30)')
     expect(panel).toHaveTextContent('보류 미해결')
     expect(panel).toHaveTextContent('마지막 사건 3일 경과')
-    expect(panel).toHaveTextContent('이번 달 예정 100,000원 · 보류 1건 70,000원')
+    expect(panel).toHaveTextContent('2026-07 예정 100,000원 · 보류 1건 70,000원')
   })
 
   it('종결을 기록하면 멱등키와 본 맥락 버전을 보내고 목록을 다시 받는다', async () => {
@@ -248,18 +308,61 @@ describe('확인할 계약', () => {
     expect(within(panel).getByRole('button', { name: '기록' })).toBeEnabled()
   })
 
-  it('다른 변경이 먼저 있었다면(409) 안내하고 목록을 새로 받는다', async () => {
+  const openForm = async () => {
+    const panel = await screen.findByRole('region', { name: '확인할 계약' })
+    await userEvent.click(within(panel).getByRole('button', { name: '확인 기록' }))
+    return panel
+  }
+
+  it('계약 상태가 먼저 바뀌었다면(STATE_CHANGED) 안내하고 목록을 새로 받는다', async () => {
     withPriority()
     check = async () => {
       throw new ApiError({ code: 'FGC-IMPL-STATE_CHANGED' }, 'req-3', 409)
     }
     renderHome()
-    const panel = await screen.findByRole('region', { name: '확인할 계약' })
+    const panel = await openForm()
     const before = homeCalls().length
-    await userEvent.click(within(panel).getByRole('button', { name: '확인 기록' }))
     await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
     expect(await within(panel).findByRole('alert')).toHaveTextContent('계약 상태가 바뀌었어요')
     await waitFor(() => expect(homeCalls().length).toBeGreaterThan(before))
+  })
+
+  it('같은 키로 다른 내용을 보냈다면(IDEMPOTENCY_CONFLICT) 이미 기록됐을 수 있다고 안내하고 새 키로 다시 보낸다', async () => {
+    withPriority()
+    const keys: string[] = []
+    let first = true
+    check = async (_body, key) => {
+      keys.push(key)
+      if (first) {
+        first = false
+        throw new ApiError({ code: 'FGC-IMPL-IDEMPOTENCY_CONFLICT' }, 'req-6', 409)
+      }
+      return envelope({ checkId: 9, checkedAt: '2026-07-31T10:00:00+09:00', contractId: 91, contextVersion: 'contract91-event4' })
+    }
+    renderHome()
+    const panel = await openForm()
+    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('이미 기록됐을 수 있어요')
+    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
+    await waitFor(() => expect(keys).toHaveLength(2))
+    expect(keys[1]).not.toBe(keys[0])
+  })
+
+  it('같은 요청이 처리 중이면(REQUEST_IN_PROGRESS) 잠시 후 다시 시도하라고 안내한다', async () => {
+    withPriority()
+    check = async () => {
+      throw new ApiError({ code: 'FGC-IMPL-REQUEST_IN_PROGRESS' }, 'req-7', 409)
+    }
+    renderHome()
+    const panel = await openForm()
+    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('처리하고 있어요')
+  })
+
+  it('지난 달을 골라도 예정 금액에 기준월을 표시한다', async () => {
+    withPriority()
+    renderHome()
+    expect(await screen.findByRole('region', { name: '확인할 계약' })).toHaveTextContent('2026-07 예정 100,000원')
   })
 })
 

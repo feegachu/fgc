@@ -5194,8 +5194,9 @@ export interface operations {
     record: {
         parameters: {
             query?: never;
-            header?: {
-                "Idempotency-Key"?: string;
+            header: {
+                /** @description 멱등키(1~160자). 없으면 서비스가 400 으로 거절한다 */
+                "Idempotency-Key": string;
             };
             path?: never;
             cookie?: never;

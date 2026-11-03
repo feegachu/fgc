@@ -37,7 +37,8 @@ const KINDS: { value: InsurerKind; label: string }[] = [
   { value: 'LIFE', label: '생명' },
   { value: 'NON_LIFE', label: '손해' },
 ]
-type CountQuery = { data?: number }
+type CountQuery = { data?: number; isError: boolean; refetch?: () => unknown }
+type FocusState = 'ready' | 'loading' | 'error'
 const periodLabel = (p: Period) => (p === 'all' ? '전체 기간' : `최근 ${p}개월`)
 const kindLabel = (k: InsurerKind) => (k === 'all' ? '전체 보험사' : k === 'LIFE' ? '생명보험' : '손해보험')
 
@@ -90,13 +91,11 @@ function Delta({ value }: { value: number }) {
 }
 
 /** 카드의 건수와 같은 조건(이번 달 계약·한도 주의/위반/검토필요)으로 계약 목록을 연다. */
-const needContractsHref = (month: string) => {
-  const [year, mon] = month.split('-').map(Number)
-  const last = String(new Date(year, mon, 0).getDate()).padStart(2, '0')
+const needContractsHref = (month: string, asOf: string) => {
   const query = new URLSearchParams({
     capResultStatus: NEED_CHECK_STATUSES,
     contractDateFrom: `${month}-01`,
-    contractDateTo: `${month}-${last}`,
+    contractDateTo: asOf,
   })
   return `/contracts?${query.toString()}`
 }
@@ -118,11 +117,14 @@ function AgentHomeContent({ month }: { month: string }) {
     ...agentHomeQuery({ asOf, period: periodParam(period), insurerType: kindParam(kind), insurerId }),
     enabled: insurerId != null,
   })
-  const near = useQuery(agentCapCountQuery(month, 'WARNING,VIOLATION'))
-  const review = useQuery(agentCapCountQuery(month, 'REVIEW_REQUIRED'))
+  const near = useQuery(agentCapCountQuery(month, asOf, 'WARNING,VIOLATION'))
+  const review = useQuery(agentCapCountQuery(month, asOf, 'REVIEW_REQUIRED'))
   const error = (summary.error ?? chart.error) as Error | null
   const chartData = chart.data
-  const focusData = insurerId != null ? focus.data : chartData
+  // 보험사를 고른 직후(이전 집계를 임시로 보여 주는 동안)나 조회 실패를 0건 차트로 그리지 않는다.
+  const focusState: FocusState =
+    insurerId == null ? 'ready' : focus.isError ? 'error' : focus.isPending || focus.isPlaceholderData ? 'loading' : 'ready'
+  const focusData = insurerId != null ? (focusState === 'ready' ? focus.data : undefined) : chartData
 
   return (
     <div className="ah">
@@ -148,6 +150,7 @@ function AgentHomeContent({ month }: { month: string }) {
             month={month}
             home={summary.data}
             name={user?.userName ?? ''}
+            asOf={asOf}
             near={near}
             review={review}
           />
@@ -155,6 +158,8 @@ function AgentHomeContent({ month }: { month: string }) {
           <Charts
             home={chartData}
             focusHome={focusData}
+            focusState={focusState}
+            onRetryFocus={() => void focus.refetch()}
             period={period}
             kind={kind}
             insurerId={insurerId}
@@ -180,12 +185,14 @@ function Snapshot({
   month,
   home,
   name,
+  asOf,
   near,
   review,
 }: {
   month: string
   home: AgentHome
   name: string
+  asOf: string
   near: CountQuery
   review: CountQuery
 }) {
@@ -195,6 +202,7 @@ function Snapshot({
   const commission = home.myCommission
   const expected = commission?.expected?.amount ?? 0
   const needReady = near.data != null && review.data != null
+  const needFailed = near.isError || review.isError
   const need = (near.data ?? 0) + (review.data ?? 0)
   return (
     <section className="ah-snapshot" aria-label="이번 달 판매 현황">
@@ -238,24 +246,40 @@ function Snapshot({
             <span className="ah-kpi-unit">원</span>
           </div>
           <div className="ah-kpi-foot">
-            <span>{`보류 ${int(commission?.held?.amount ?? 0)}원 · 환수 계산 ${int(commission?.clawback?.amount ?? 0)}원`}</span>
+            <span>{`${commission?.month ?? month} 기준 · 보류 ${int(commission?.held?.amount ?? 0)}원 · 환수 계산 ${int(commission?.clawback?.amount ?? 0)}원`}</span>
           </div>
         </Link>
-        <Link className="ah-kpi ah-kpi-link ah-kpi-alert" to={needContractsHref(month)} aria-label="확인 필요 계약">
-          <span className="ah-kpi-label">확인 필요 계약</span>
-          <div className="ah-kpi-num">
-            {needReady ? <AnimatedNumber value={need} /> : '…'}
-            <span className="ah-kpi-unit">건</span>
-          </div>
-          <div className="ah-badges">
-            <span className="ah-badge warn">
-              한도 근접 <b>{near.data ?? '-'}</b>
-            </span>
-            <span className="ah-badge danger">
-              검토 필요 <b>{review.data ?? '-'}</b>
-            </span>
-          </div>
-        </Link>
+        {needFailed ? (
+          <article className="ah-kpi ah-kpi-alert" aria-label="확인 필요 계약">
+            <span className="ah-kpi-label">확인 필요 계약</span>
+            <div className="ah-kpi-num">확인 불가</div>
+            <div className="ah-kpi-foot">
+              <button
+                type="button"
+                className="ah-retry"
+                onClick={() => void Promise.all([near.refetch?.(), review.refetch?.()])}
+              >
+                다시 시도
+              </button>
+            </div>
+          </article>
+        ) : (
+          <Link className="ah-kpi ah-kpi-link ah-kpi-alert" to={needContractsHref(month, asOf)} aria-label="확인 필요 계약">
+            <span className="ah-kpi-label">확인 필요 계약</span>
+            <div className="ah-kpi-num">
+              {needReady ? <AnimatedNumber value={need} /> : '…'}
+              <span className="ah-kpi-unit">건</span>
+            </div>
+            <div className="ah-badges">
+              <span className="ah-badge warn">
+                한도 근접 <b>{near.data ?? '-'}</b>
+              </span>
+              <span className="ah-badge danger">
+                검토 필요 <b>{review.data ?? '-'}</b>
+              </span>
+            </div>
+          </Link>
+        )}
       </div>
     </section>
   )
@@ -264,6 +288,8 @@ function Snapshot({
 function Charts({
   home,
   focusHome,
+  focusState,
+  onRetryFocus,
   period,
   kind,
   insurerId,
@@ -273,6 +299,8 @@ function Charts({
 }: {
   home: AgentHome
   focusHome: AgentHome | undefined
+  focusState: FocusState
+  onRetryFocus: () => void
   period: Period
   kind: InsurerKind
   insurerId: number | null
@@ -284,13 +312,17 @@ function Charts({
   const selected = slices.find((s) => s.insurerId === insurerId) ?? null
   const label = periodLabel(period)
   const rate = statusCounts(focusHome)
-  const warnings = home.basis?.warnings ?? []
+  // 경고·합계·분포는 모두 같은 모집단(선택한 보험사까지 좁힌 집계)에서 읽는다.
+  const shown = focusHome ?? home
+  const warnings = focusState === 'ready' ? (shown.basis?.warnings ?? []) : []
+  const range = shown.range
   return (
     <section className="ah-panel" aria-label="설계사 판매 관리 그래프">
       <div className="ah-panel-head">
         <div>
           <h2 className="ah-panel-title">설계사 판매 관리</h2>
           <p className="ah-panel-sub">{`${label} · ${kindLabel(kind)}`}</p>
+          <p className="ah-panel-sub">{`기준일 ${home.asOf} · 집계 기간 ${range?.from ?? '-'} ~ ${range?.to ?? '-'} · 분모 계약 ${home.portfolio?.contractCount ?? 0}건`}</p>
         </div>
         <div className="ah-controls">
           <Segmented label="기간" options={PERIODS} value={period} onChange={onPeriod} />
@@ -307,14 +339,26 @@ function Charts({
             </button>
           </div>
         )}
-        <p className="ah-note">합계 {focusHome?.portfolio?.contractCount ?? 0}건</p>
+        {focusState === 'ready' && <p className="ah-note">합계 {focusHome?.portfolio?.contractCount ?? 0}건</p>}
       </div>
       {warnings.map((warning) => (
         <p key={warning} className="ah-note" role="note">
           {warning}
         </p>
       ))}
-      <div className="ah-chart-grid">
+      {focusState === 'error' ? (
+        <div role="alert" className="empty-state">
+          <p>선택한 보험사의 집계를 불러오지 못했습니다.</p>
+          <button type="button" className="button button-secondary" onClick={onRetryFocus}>
+            다시 시도
+          </button>
+        </div>
+      ) : focusState === 'loading' ? (
+        <div className="empty-state" aria-busy="true">
+          선택한 보험사 집계를 불러오는 중입니다.
+        </div>
+      ) : (
+        <div className="ah-chart-grid">
         <div className="ah-box ah-donut-box">
           <h3>
             보험사별 계약 건수 <span className="ah-sub">{label}</span>
@@ -351,7 +395,8 @@ function Charts({
           </h3>
           <StatusBar items={rate} />
         </div>
-      </div>
+        </div>
+      )}
     </section>
   )
 }

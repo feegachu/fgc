@@ -31,17 +31,15 @@ export const agentHomeQuery = ({ asOf, period, insurerType, insurerId }: HomePar
     meta: { errorToast: false },
   })
 
-/** 해당 월 계약 중 지정한 한도 판정 상태의 건수. 목록 API의 totalElements 만 읽는다. */
-export const agentCapCountQuery = (month: string, capResultStatus: string) =>
+/** 해당 월 1일~기준일 계약 중 지정한 한도 판정 상태의 건수(다른 지표와 같은 기준일). 목록 API의 totalElements 만 읽는다. */
+export const agentCapCountQuery = (month: string, asOf: string, capResultStatus: string) =>
   queryOptions({
-    queryKey: ['agent-home', 'cap-count', month, capResultStatus],
+    queryKey: ['agent-home', 'cap-count', month, asOf, capResultStatus],
     queryFn: async ({ signal }) => {
-      const [year, mon] = month.split('-').map(Number)
-      const last = String(new Date(year, mon, 0).getDate()).padStart(2, '0')
       const query = new URLSearchParams({
         capResultStatus,
         contractDateFrom: `${month}-01`,
-        contractDateTo: `${month}-${last}`,
+        contractDateTo: asOf,
         page: '1',
         size: '1',
       })

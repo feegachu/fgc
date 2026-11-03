@@ -8472,9 +8472,10 @@
         "description" : "종결 또는 후속 확인을 기록합니다. Idempotency-Key 와 expectedContextVersion 이 필요합니다.",
         "operationId" : "record",
         "parameters" : [ {
+          "description" : "멱등키(1~160자). 없으면 서비스가 400 으로 거절한다",
           "in" : "header",
           "name" : "Idempotency-Key",
-          "required" : false,
+          "required" : true,
           "schema" : {
             "type" : "string"
           }
