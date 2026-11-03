@@ -199,6 +199,7 @@ export function AttributionEditor({
     {
       key: 'remove',
       label: <span className="visually-hidden">행 삭제</span>,
+      labelText: '행 삭제',
       width: '3.5rem',
       render: (row) => (
         <Button data-guide-feature="features.transaction.attribution-editor.button"

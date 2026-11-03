@@ -33,7 +33,7 @@ export function PaymentGuideHelp({ canProcess }: { canProcess: boolean }) {
             data-guide-launch
             onClick={() => useGuideRuntime.getState().start('payment.confirm')}
           >
-            검증·확정 도움말
+            검증/확정 도움말
           </button>
         </>
       )}
@@ -177,7 +177,7 @@ export function PaymentGuideOverlay() {
         <div>
           <strong>{guide.title}</strong>
           <small>
-            {session.index + 1} / {guide.steps.length} ·{' '}
+            {session.index + 1} / {guide.steps.length},{' '}
             {['PAUSED', 'ERROR'].includes(session.status)
               ? '중지됨'
               : session.status === 'BLOCKED'
@@ -218,7 +218,7 @@ export function PaymentGuideOverlay() {
               disabled={session.restartRequired || !observation}
               onClick={() => useGuideRuntime.getState().resume()}
             >
-              복귀·다시 시도
+              복귀/다시 시도
             </button>
           ) : (
             <>
@@ -241,7 +241,7 @@ export function PaymentGuideOverlay() {
           )}
         </nav>
       )}
-      <small>직접 입력·저장하는 안내입니다. 자동 처리하지 않습니다.</small>
+      <small>직접 입력하고 저장하는 안내입니다. 자동 처리하지 않습니다.</small>
     </aside>
   )
   return (

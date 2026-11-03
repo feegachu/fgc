@@ -1,6 +1,7 @@
 import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import type { ShellUser } from '../../app/shell/Sidebar'
 import { findGuide, GUIDE_CATALOG } from './catalog'
 import type { AssistantContext, CalculationResult, MessageResult } from './contracts'
@@ -34,14 +35,14 @@ const labels: Record<PaymentScenario, string> = {
   'PAY-08': '검증 후 금액을 수정했어요',
   'PAY-09': '수수료 수정하고 싶어요',
   'PAY-10': '조회 권한으로 지급 확정 요청',
-  'PAY-11': '4년·7년 분급이면 월 얼마야?',
+  'PAY-11': '4년/7년 분급이면 월 얼마야?',
   'PAY-12': '다른 탭에서 지급이 변경됐어요',
 }
 const statuses = {
   CALCULATED: '계산 예시',
-  REVIEW_REQUIRED: '검토 필요',
+  REVIEW_REQUIRED: '검토필요',
   INSUFFICIENT_DATA: '자료 부족',
-  UNSUPPORTED: '지원 준비 중',
+  UNSUPPORTED: '이 계산은 여기서 볼 수 없어요',
   STALE: '다시 확인 필요',
 }
 const amountLabels = {
@@ -125,12 +126,12 @@ function CalculationCard({ result, current }: { result: CalculationResult; curre
       </dl>
       {result.basis.sourceRefs.map((source) => (
         <p key={source.sourceId}>
-          {source.title} · v{source.version}
+          {source.title} (v{source.version})
         </p>
       ))}
-      {result.missingInputs.length > 0 && <p>전체 지급 후보·귀속·원천 근거를 먼저 확인해야 합니다.</p>}
+      {result.missingInputs.length > 0 && <p>전체 지급 후보, 귀속, 원천 근거를 먼저 확인해야 합니다.</p>}
       <p>{result.recommendation.reason}</p>
-      <small>합성 자료 · 입력값 반영/실제 지급 없음</small>
+      <small>합성 자료, 입력값 반영/실제 지급 없음</small>
     </section>
   )
 }
@@ -162,7 +163,7 @@ function PicoContextLine({ screenId, paymentId }: { screenId: string; paymentId:
   const title = screens.find((screen) => screen.id === screenId)?.title ?? '공통 화면'
   return (
     <p className="pico-context">
-      현재 화면 {title} · 대상 {paymentId ? `지급 #${paymentId}` : '선택 없음'} · 기준월 {month ?? '선택 없음'}
+      현재 화면 {title}, 대상 {paymentId ? `지급 번호 ${paymentId}` : '선택 없음'}, 기준월 {month ?? '선택 없음'}
     </p>
   )
 }
@@ -228,6 +229,9 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     stream = useRef<HTMLDivElement>(null)
   const panelId = useId(),
     titleId = useId()
+  // 진입 버튼은 앱 머리의 자리(AppShell #app-header-assistant)에 그린다. 셸 밖(단위 시험)에서는 제자리에 그린다.
+  const [launcherSlot, setLauncherSlot] = useState<HTMLElement | null | undefined>(undefined)
+  useEffect(() => setLauncherSlot(document.getElementById('app-header-assistant')), [])
   useEffect(() => {
     if (!visible) return
     textarea.current?.focus()
@@ -344,8 +348,8 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                 : error instanceof Error && error.message === 'STALE_PICO_CONTEXT'
                   ? '질문 이후 화면이나 입력이 바뀌었어요. 대화는 유지되니 현재 화면에서 다시 질문해주세요.'
                   : error instanceof Error && ['INVALID_PICO_REPLY', 'INVALID_PICO_EVIDENCE', 'MISSING_PICO_EVIDENCE'].includes(error.message)
-                    ? '답변의 형식이나 근거를 확인하지 못했어요. 대화는 유지되니 다시 질문해주세요.'
-                    : '답변 서버에 연결하지 못했어요. 입력 내용은 유지되며 기존 업무 화면의 도움말을 사용할 수 있어요.',
+                    ? '답변 근거를 확인하지 못했어요. 대화는 유지되니 다시 질문해주세요.'
+                    : '답변을 받지 못했어요. 입력 내용은 유지되며 기존 업무 화면의 도움말을 사용할 수 있어요.',
           },
         ],
       }))
@@ -411,7 +415,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
         {
           id: previous.entries.length + 1,
           role: 'notice',
-          text: '지금은 합성 질문 시연 모드예요. 자유 질문 해석은 아직 연결하지 않았어요. 위의 시연 질문을 선택해 답변과 안내 순서를 확인해주세요.',
+          text: '지금은 합성 질문 시연 모드라 시연 질문에만 답해요. 위의 시연 질문을 선택해 답변과 안내 순서를 확인해주세요.',
         },
       ],
     }))
@@ -428,28 +432,29 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     setTab('plan')
     setPlanError('')
   }
+  const launcher = (
+    <div className="pico-launcher">
+      <button
+        id={`${panelId}-launcher`}
+        className="pico-launcher-button"
+        aria-label="업무 비서 AI 열기, 피코"
+        aria-expanded="false"
+        aria-controls={panelId}
+        onClick={() => {
+          if (guideActive) useGuideRuntime.getState().pause()
+          useWorkflowGuide.getState().requestChat()
+          if (otherGuideActive) setTab('chat')
+          setOpen(true)
+        }}
+      >
+        <img src={basic} alt="" />
+        <span className="pico-launcher-hint">업무 비서 AI</span>
+      </button>
+    </div>
+  )
   return (
-      <div className={`pico-assistant-root${otherGuideActive ? ' has-active-guide' : ''}`}>
-      {!visible && (
-        <div className="pico-launcher">
-          <button
-            id={`${panelId}-launcher`}
-            className="pico-launcher-button"
-            aria-label="업무 비서 AI 열기 · 피코"
-            aria-expanded="false"
-            aria-controls={panelId}
-            onClick={() => {
-              if (guideActive) useGuideRuntime.getState().pause()
-              useWorkflowGuide.getState().requestChat()
-              if (otherGuideActive) setTab('chat')
-              setOpen(true)
-            }}
-          >
-            <img src={basic} alt="" />
-            <span className="pico-launcher-hint">업무 비서 AI</span>
-          </button>
-        </div>
-      )}
+    <div className="pico-assistant-root">
+      {!visible && launcherSlot !== undefined && (launcherSlot ? createPortal(launcher, launcherSlot) : launcher)}
       {visible && (
         <aside id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className="pico-panel">
           <header className="pico-panel-header">
@@ -600,7 +605,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                         {entry.reply.evidenceRefs?.map((source) => (
                           <div className="pico-source" key={source.chunkId}>
                             <Symbol name="menu_book" />
-                            {source.title} · v{entry.reply.guideVersion}
+                            {source.title} (v{entry.reply.guideVersion})
                           </div>
                         ))}
                         {entry.reply.decision === 'ANSWER_ONLY' &&
@@ -609,12 +614,12 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                             .map((workflowId) => findWorkflowGuide(workflowId, '1.0') ? (
                               <button key={workflowId} type="button" className="button button-secondary" disabled={!isCurrentLiveReply(entry)}
                                 onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
-                                이 업무 안내 시작 · {findWorkflowGuide(workflowId, '1.0')?.title}
+                                이 업무 안내 시작, {findWorkflowGuide(workflowId, '1.0')?.title}
                               </button>
                             ) : !observed?.paymentId ? (
                               <button key={workflowId} type="button" className="button button-secondary" disabled={!canProcess || !isCurrentLiveReply(entry)}
                                 onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
-                                지급 작성 화면에서 안내 시작 · {findGuide(workflowId, '1.0')?.title}
+                                지급 작성 화면에서 안내 시작, {findGuide(workflowId, '1.0')?.title}
                               </button>
                             ) : (
                               <PicoGuideStartButton
@@ -627,8 +632,8 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                               />
                             ))}
                         {entry.reply.decision === 'ANSWER_ONLY' && !isCurrentLiveReply(entry) && <p className="pico-notice" role="status">질문 또는 화면이 바뀌었습니다. 현재 화면에서 다시 질문하면 안내를 시작할 수 있습니다.</p>}
-                        {entry.reply.decision === 'ANSWER_ONLY' && !canProcess && !observed?.paymentId && entry.reply.evidenceRefs?.some((ref) => ref.workflowId != null && !findWorkflowGuide(ref.workflowId, '1.0')) && <p className="pico-notice" role="status">지급 작성 화면 안내는 정산 담당자에게 요청하세요. 현재 계정은 조회 안내만 사용할 수 있습니다.</p>}
-                        <small>일반 업무 안내 · 현재 지급 처리 완료를 뜻하지 않습니다.</small>
+                        {entry.reply.decision === 'ANSWER_ONLY' && !canProcess && !observed?.paymentId && entry.reply.evidenceRefs?.some((ref) => ref.workflowId != null && !findWorkflowGuide(ref.workflowId, '1.0')) && <p className="pico-notice" role="status">지급 작성 화면 안내는 정산담당자에게 요청하세요. 현재 계정은 조회 안내만 사용할 수 있습니다.</p>}
+                        <small>일반 업무 안내입니다. 현재 지급 처리 완료를 뜻하지 않습니다.</small>
                       </article>
                     ) : (
                       <article className="pico-answer" key={entry.id}>
@@ -658,7 +663,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                         {entry.result.sources.map((source) => (
                           <div className="pico-source" key={source.sourceId}>
                             <Symbol name="menu_book" />
-                            {source.title} · v{source.version}
+                            {source.title} (v{source.version})
                           </div>
                         ))}
                         {entry.result.workflowProposal && (
@@ -675,7 +680,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                           <p className="pico-clarification">
                             {entry.result.clarification.options.length
                               ? entry.result.clarification.options.map((option) => option.label).join(' / ')
-                              : '현재 시연은 예시 데이터입니다. 실제 대상 선택은 화면 연결 단계에서 제공됩니다.'}
+                              : '현재 시연은 예시 데이터입니다. 실제 대상은 업무 화면에서 직접 선택하세요.'}
                           </p>
                         )}
                       </article>
@@ -697,11 +702,11 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                   {GUIDE_CATALOG.filter((workflow) => workflow.enabled && canProcess && workflow.roles.some((role) => role === currentRole)).map((workflow) => (
                     <button key={workflow.workflowId} type="button" className="pico-suggestion"
                       onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflow.workflowId); setOpen(false) }}>
-                      <span><b>{workflow.title}</b><small>지급 화면의 실제 입력·저장·검증 상태를 확인하며 안내합니다.</small></span><Symbol name="chevron_right" />
+                      <span><b>{workflow.title}</b><small>지급 화면의 실제 입력, 저장, 검증 상태를 확인하며 안내합니다.</small></span><Symbol name="chevron_right" />
                     </button>
                   ))}
                 </div>
-                <p className="pico-plan-boundary">화면 안내는 업무 처리 완료를 뜻하지 않아요. 저장·계산·확정은 기존 업무 화면에서 직접 진행하세요.</p>
+                <p className="pico-plan-boundary">화면 안내는 업무 처리 완료를 뜻하지 않아요. 저장, 계산, 확정은 기존 업무 화면에서 직접 진행하세요.</p>
               </div>
             ) : (
               <div className="pico-plan">
@@ -741,7 +746,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                   </>
                 )}
                 <p className="pico-plan-boundary">
-                  시연 순서와 별개로 현재 지급 화면의 고정 도움말을 시작할 수 있어요. 저장·확정은 직접 실행합니다.
+                  시연 순서와 별개로 현재 지급 화면의 고정 도움말을 시작할 수 있어요. 저장과 확정은 직접 실행합니다.
                 </p>
               </div>
             )}
@@ -800,10 +805,10 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
             </form>
             <small>
               {aiEnabled
-                ? '승인된 업무 가이드 · 실제 계산과 처리는 업무 화면에서 확인'
+                ? '승인된 업무 가이드 기준, 실제 계산과 처리는 업무 화면에서 확인'
                 : observed
-                  ? '시연 질문은 합성 자료 · 저장된 지급 계산은 별도 조회 · 실제 AI 미연결'
-                  : '합성 데이터 시연 · 실제 AI/계약/지급과 연결되지 않습니다.'}
+                  ? '시연 질문은 합성 자료, 저장된 지급 계산은 별도 조회, 실제 AI 미연결'
+                  : '합성 데이터 시연, 실제 AI/계약/지급과 연결되지 않습니다.'}
             </small>
           </div>
         </aside>

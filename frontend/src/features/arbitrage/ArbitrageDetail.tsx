@@ -3,7 +3,7 @@ import { QueryState } from '../reference/ReferenceUI'
 import { date, int } from '../../lib/format'
 import { arbitrageTimelineQuery } from './api'
 import type { ArbitrageRow } from './api'
-import { present } from './utils'
+import { decisionReasonText, present } from './utils'
 import { ArbitrageAmountSummary } from './ArbitrageAmountSummary'
 import { ArbitrageTimeline } from './ArbitrageTimeline'
 export function ArbitrageDetail({ row }: { row: ArbitrageRow }) {
@@ -33,7 +33,7 @@ export function ArbitrageDetail({ row }: { row: ArbitrageRow }) {
         </div>
         <div>
           <dt>판정 근거</dt>
-          <dd>{present(row.decisionReason)}</dd>
+          <dd>{decisionReasonText(row.decisionReason)}</dd>
         </div>
       </dl>
       <ArbitrageAmountSummary row={row} />

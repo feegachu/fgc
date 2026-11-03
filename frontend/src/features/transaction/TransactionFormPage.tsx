@@ -69,7 +69,7 @@ export default function TransactionFormPage() {
       <div className="transaction-screen-state" role={draft.error ? 'alert' : 'status'}>
         {draft.error ? (
           <>
-            {formError(draft.error, '지급 건 화면을 초기화하지 못했습니다. 화면을 새로고침하세요.')}{' '}
+            {formError(draft.error, '지급 건을 불러오지 못했습니다.')}{' '}
             <Button data-guide-feature="features.transaction.transaction-form-page.button" variant="secondary" onClick={() => void draft.refetch()}>
               다시 시도
             </Button>
@@ -408,7 +408,7 @@ function TransactionForm({
       setResult(null)
       void queryClient.invalidateQueries({ queryKey: ['transactions', 'list'] })
       queryClient.setQueryData(draftQuery(String(saved.commissionTransactionId)).queryKey, saved)
-      toast('작성중(DRAFT)으로 저장했습니다. 저장만 했을 뿐 검증은 하지 않았습니다.', 'success')
+      toast('작성중으로 저장했습니다. 검증은 하지 않았습니다.', 'success')
     } catch (error) {
       if (!observer.isSamePayment(operation)) return
       observer.fail(operation)
@@ -562,7 +562,7 @@ function TransactionForm({
         </span>
         <div>
           <h2 className="guidance-title" id="transaction-boundary-title">
-            초년도 구간은 [계약일, 1주년일)입니다
+            초년도는 계약일부터 1주년 전날까지입니다
           </h2>
           <p className="guidance-copy">
             계약일이 2026-07-18이면 귀속일 2027-07-17까지 초년도이고, 2027-07-18부터는 아닙니다. 회차 번호가 아닌
@@ -609,7 +609,7 @@ function TransactionForm({
       <ResizableSplit
         className="transaction-form-layout"
         storageKey="transaction-form-workspace"
-        label="지급 건/귀속행과 확정 게이트 카드 너비"
+        label="지급 건, 귀속행과 확정 점검 카드 너비"
         defaultRatio={61}
         id="main-grid"
       >
@@ -625,7 +625,7 @@ function TransactionForm({
               </h2>
               <span id="tx-status">
                 <StatusBadge tone={confirmed ? 'success' : 'neutral'}>
-                  {paymentId ? `${confirmed ? '확정' : '작성중'}, #${paymentId}` : '미저장'}
+                  {paymentId ? (confirmed ? '확정' : '작성중') : '미저장'}
                 </StatusBadge>
               </span>
             </header>
@@ -647,7 +647,7 @@ function TransactionForm({
                 </select>
               </Field>
               <Field
-                label="업무키"
+                label="지급 관리번호"
                 required
                 helper="같은 원천유형 안에서 중복될 수 없습니다."
                 error={fieldMessage('bizKey')}
@@ -665,7 +665,7 @@ function TransactionForm({
               <Field
                 label="정산월"
                 required
-                helper="DB에는 항상 그 달 1일로 저장됩니다."
+                helper="선택한 달의 1일 기준으로 처리합니다."
                 error={fieldMessage('settlementMonth')}
               >
                 <input data-guide-feature="features.transaction.transaction-form-page.settlement-month"
@@ -789,7 +789,7 @@ function TransactionForm({
         </div>
         <div className="transaction-form-column">
           <GatePanel result={result} />
-          <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} />
+          <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} contracts={contracts} />
           <section data-guide-feature="features.transaction.transaction-form-page.section-2" className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
             <h2 className="visually-hidden" id="transaction-actions-title">
               지급 건 작업
@@ -836,7 +836,7 @@ function TransactionForm({
                 확정
               </Button>
               <p className="field-helper" id="transaction-action-help">
-                확정은 서버가 판정한 6단계를 모두 통과해야 합니다.
+                확정하려면 6단계 점검을 모두 통과해야 합니다.
               </p>
               {needsSave && initialId && (
                 <p className="field-helper">
@@ -847,7 +847,7 @@ function TransactionForm({
               )}
               {confirmationNeedsRetry && (
                 <p className="field-helper" role="status">
-                  확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 같은 요청으로 결과를 확인하세요.
+                  확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 결과를 확인하세요.
                 </p>
               )}
               {!canProcess && (

@@ -107,7 +107,7 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.data.content[0].capResultStatus").value("NORMAL"))
                 .andExpect(jsonPath("$.data.content[0].contractStatusLabel").value("정상"))
                 .andExpect(jsonPath("$.data.content[0].capResultStatusLabel").value("정상"))
-                .andExpect(jsonPath("$.data.content[0].dataOriginLabel").value("수동 입력"))
+                .andExpect(jsonPath("$.data.content[0].dataOriginLabel").value("직접 입력"))
                 .andExpect(jsonPath("$.data.page").value(1))
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.totalElements").value(1))

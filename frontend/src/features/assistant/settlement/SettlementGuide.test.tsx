@@ -237,7 +237,7 @@ describe('unsaved input and changed targets', () => {
     await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
     await actor.type(screen.getByLabelText(/기존 지급 번호/), '3')
     await actor.click(screen.getByRole('button', { name: '안내 시작' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('인계')
+    expect(await screen.findByRole('alert')).toHaveTextContent('맡기세요')
     await act(async () => {
       await router.navigate('/contracts/new')
     })
@@ -312,7 +312,7 @@ describe('role handoff in later stages', () => {
       await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
     }
     if (handoff) {
-      expect(await screen.findByRole('alert')).toHaveTextContent('인계')
+      expect(await screen.findByRole('alert')).toHaveTextContent('맡기세요')
       expect(screen.queryByLabelText('정정 후 지급 번호')).not.toBeInTheDocument()
     } else {
       expect(await screen.findByLabelText('정정 후 지급 번호')).toBeInTheDocument()

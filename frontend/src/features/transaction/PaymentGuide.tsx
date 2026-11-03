@@ -40,7 +40,7 @@ const reasons: Record<string, string> = {
   DUPLICATE_TARGET: '안내 대상이 중복되어 멈췄습니다.',
   PREPARATION_TIMEOUT: '안내 대상을 준비하지 못했습니다. 화면을 확인하고 다시 찾으세요.',
   TARGET_CHANGED: '안내 대상이 사라지거나 바뀌었습니다.',
-  SERVER_STATE_CHANGED: '서버 저장 상태가 바뀌었습니다. 현재 내용을 다시 확인하세요.',
+  SERVER_STATE_CHANGED: '저장된 내용이 바뀌었습니다. 현재 내용을 다시 확인하세요.',
 }
 function GuideSession({
   initialWorkflowId,
@@ -263,11 +263,11 @@ function GuideSession({
   }
   const waitingInstruction =
     step?.stepId === 'payment.scope'
-      ? '① 지급 건에서 정산월·지급단계와 수령 설계사를 선택하세요. 원수사→GA는 설계사 선택이 필요 없습니다. 계약은 3단계 귀속행에서 선택합니다.'
+      ? '① 지급 건에서 정산월, 지급단계, 수령 설계사를 선택하세요. 원수사→GA는 설계사 선택이 필요 없습니다. 계약은 ② 귀속행에서 선택합니다.'
       : step?.stepId === 'payment.amount'
         ? '① 지급 건에서 수수료 항목과 0원 이상의 지급액을 입력하세요.'
         : step?.stepId === 'payment.attributions'
-          ? '② 귀속행 추가 후 계약번호·귀속일·금액을 입력하세요. 귀속금액 합계를 지급액과 맞추세요.'
+          ? '② 귀속행 추가 후 계약번호, 귀속일, 금액을 입력하세요. 귀속금액 합계를 지급액과 맞추세요.'
           : (state?.validationMessage ?? '화면의 실제 업무 버튼을 눌러 처리 결과를 확인하세요.')
   const paused = snapshot.status === 'PAUSED' || snapshot.status === 'ERROR'
   const complete = snapshot.status === 'COMPLETED'
@@ -304,7 +304,7 @@ function GuideSession({
           <div className="payment-guide-heading">
             <small>피코의 단계별 가이드
             {current && step
-              ? ` · ${current.steps.findIndex((entry) => entry.stepId === step.stepId) + 1}/${current.steps.length}`
+              ? `, ${current.steps.findIndex((entry) => entry.stepId === step.stepId) + 1}/${current.steps.length}`
               : ''}
             </small>
             <h2 ref={heading} tabIndex={-1}>{title}</h2>
@@ -327,7 +327,7 @@ function GuideSession({
               {confirmed ? (
                 <p>
                   {state?.confirmed
-                    ? '서버에서 지급 확정과 저장 결과를 확인했습니다. 목록으로 이동할 수 있습니다.'
+                    ? '지급 확정과 저장 결과를 확인했습니다. 목록으로 이동할 수 있습니다.'
                     : '지급 확정은 성공했습니다. 가이드 완료 확인은 보류되었습니다. 목록에서 처리 결과를 확인할 수 있습니다.'}
                 </p>
               ) : complete ? (
@@ -341,7 +341,7 @@ function GuideSession({
                   {(step?.stepId === 'payment.precheck.result'
                     ? '사전검증 통과 여부와 차단 사유를 확인하세요.'
                     : step?.instruction) ??
-                    '필요한 안내를 선택하세요. 저장·사전검증·확정은 화면의 실제 버튼을 직접 눌러 진행합니다.'}
+                    '필요한 안내를 선택하세요. 저장, 사전검증, 확정은 화면의 실제 버튼을 직접 눌러 진행합니다.'}
                 </p>
               )}
               {!confirmed && !complete && step && (
@@ -388,7 +388,7 @@ function GuideSession({
                         void run(() => start(PAYMENT_GUIDES.find((guide) => guide.workflowId === 'payment.confirm')!))
                       }
                     >
-                      사전검증·확정 안내
+                      사전검증/확정 안내
                     </Button>
                   )}
                 </>

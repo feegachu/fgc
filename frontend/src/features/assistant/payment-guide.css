@@ -29,14 +29,14 @@ body:has([data-guide-anchored='true']) .app-main {
   background: var(--color-bg-surface, #fff);
   color: var(--pico-guide-ink);
   border: 1px solid var(--pico-guide-line);
-  border-radius: 13px;
+  border-radius: var(--radius-12);
   box-shadow: 0 14px 50px #173b6429;
   font: inherit;
 }
 .payment-guide-card header { display: flex; align-items: center; gap: 8px; }
 .payment-guide-card header img { width: 44px; height: 44px; flex: 0 0 44px; object-fit: contain; }
 .payment-guide-card header > div { flex: 1; min-width: 0; }
-.payment-guide-card small { display: block; font-size: 11px; color: #6191b7; line-height: 1.6; }
+.payment-guide-card small { display: block; font-size: 12px; color: #6191b7; line-height: 1.6; }
 .payment-guide-card h2,
 .payment-guide-card h3 { font-size: 14px; font-weight: 700; line-height: 1.6; margin: 10px 0 6px; color: var(--pico-guide-ink); }
 .payment-guide-card header h2 { margin: 3px 0 0; outline: none; }
@@ -45,7 +45,7 @@ body:has([data-guide-anchored='true']) .app-main {
 .payment-guide-progress > span { height: 4px; flex: 1; border-radius: 5px; background: #eaf0f5; }
 .payment-guide-progress > .is-done { background: #a3c9e3; }
 .payment-guide-progress > .is-current { background: #4288be; }
-.payment-guide-card .payment-guide-condition { border-top: 1px solid #edf2f7; padding-top: 10px; font-size: 11px; color: #7a8fa3; }
+.payment-guide-card .payment-guide-condition { border-top: 1px solid #edf2f7; padding-top: 10px; font-size: 12px; color: #7a8fa3; }
 .payment-guide-card .payment-guide-condition.is-ready { color: #37805c; }
 .payment-guide-card nav,
 .payment-guide-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
@@ -56,9 +56,9 @@ body:has([data-guide-anchored='true']) .app-main {
   background: #fff; color: var(--pico-guide-accent); font: inherit; font-size: 12px; font-weight: 550; cursor: pointer;
 }
 .payment-guide-card button:hover:not(:disabled) { background: #f2f7fb; border-color: #a6c8e2; }
-.payment-guide-card header button { border-color: transparent; padding: 4px 6px; min-height: 30px; font-size: 11px; color: #7891a5; }
+.payment-guide-card header button { border-color: transparent; padding: 4px 6px; min-height: 30px; font-size: 12px; color: #7891a5; }
 .payment-guide-card button.pico-guide-back { border-color: transparent; background: transparent; padding-left: 0; order: 1; }
-.payment-guide-card button.pico-guide-pause { border-color: transparent; background: transparent; color: #7891a5; padding-inline: 4px; font-size: 11px; }
+.payment-guide-card button.pico-guide-pause { border-color: transparent; background: transparent; color: #7891a5; padding-inline: 4px; font-size: 12px; }
 .payment-guide-card button.pico-guide-next { margin-left: auto; order: 3; background: #286eaa; border-color: #286eaa; color: #fff; padding-inline: 14px; }
 .payment-guide-card button.pico-guide-next:hover:not(:disabled) { background: #205c91; border-color: #205c91; }
 .pico-guide-back::before,
@@ -74,6 +74,6 @@ body:has([data-guide-anchored='true']) .app-main {
   .payment-guide-card { padding: 13px; }
   .payment-guide-card header img { width: 38px; height: 38px; flex-basis: 38px; }
   .payment-guide-card h2, .payment-guide-card h3 { font-size: 13px; }
-  .payment-guide-card button { font-size: 11px; padding-inline: 9px; }
+  .payment-guide-card button { font-size: 12px; padding-inline: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .payment-guide-spotlight { animation: none; transition: none; } }

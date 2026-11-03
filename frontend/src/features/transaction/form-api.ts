@@ -31,7 +31,7 @@ export type PaymentPayload = Omit<NullableOptional<PaymentRequest>, 'attribution
 
 async function data<T>(path: string, options: Parameters<typeof apiClient.request>[1] = {}) {
   const response = await apiClient.request<T>(path, options)
-  if (response.data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (response.data == null) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return response.data
 }
 const path = (id: string, suffix = '') => `/api/v1/transactions/${encodeURIComponent(id)}${suffix}`

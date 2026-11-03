@@ -174,11 +174,11 @@ describe('FUN-088 server evidence decisions', () => {
     expect(decide(selection, state, 'GA_ADMIN').step).toBe('reconciliation.review')
   })
   it('hands finalization to authorized staff', () =>
-    expect(decide(selection, evidence(), 'SETTLEMENT').reason).toContain('인계'))
+    expect(decide(selection, evidence(), 'SETTLEMENT').reason).toContain('맡기세요'))
   it('requires all eight checklist items', () => {
     const state = evidence()
     state.checklist!.conditions!.pop()
-    expect(decide(selection, state, 'GA_ADMIN').reason).toContain('8개 서버 조건')
+    expect(decide(selection, state, 'GA_ADMIN').reason).toContain('확정 조건 8개')
   })
   it.each(['month', 'contract', 'stage', 'run', 'reconciliation'] as const)('rejects mismatched %s', (field) => {
     const state = evidence()
@@ -226,10 +226,10 @@ describe('correction and permission boundaries', () => {
     },
   )
   it.each(['GA_ADMIN', 'COMPLIANCE'])('hands monthly execution off for %s', (role) => {
-    expect(handoffFor('validation.execute', role, false)).toContain('SETTLEMENT 또는 SYSTEM_ADMIN')
+    expect(handoffFor('validation.execute', role, false)).toContain('정산담당자나 시스템관리자')
   })
   it('permits exception handling by GA_ADMIN but hands it off for COMPLIANCE', () => {
     expect(handoffFor('exception.resolve', 'GA_ADMIN', false)).toBeUndefined()
-    expect(handoffFor('exception.resolve', 'COMPLIANCE', false)).toContain('인계')
+    expect(handoffFor('exception.resolve', 'COMPLIANCE', false)).toContain('맡기세요')
   })
 })

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicySources } from './PolicyManagement'
-import { emptyDraft, emptyRegime, permittedActions, PolicyPreviewContext, safeSourceUrl } from './management'
+import { emptyDraft, emptyRegime, permittedActions, PolicyPreviewContext, refLabel, safeSourceUrl } from './management'
 import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
 
@@ -20,6 +20,20 @@ describe('policy UI boundaries', () => {
     expect(emptyDraft().commissionRules).toEqual([])
     expect(emptyDraft().sourceDetails).toEqual([])
     expect(emptyRegime('SEVEN_YEAR_COMMISSION').longTermMaintenanceFrom).toBe('')
+  })
+  it('근거 코드는 저장값을 두고 문서 경로와 승계 기록만 읽기 쉬운 이름으로 보인다', () => {
+    expect(refLabel('docs/05_인터페이스정의서_v2_0.md#9-5')).toBe('인터페이스정의서 9-5')
+    expect(refLabel('docs/05_인터페이스정의서_v2_0.md')).toBe('인터페이스정의서')
+    expect(refLabel('docs/FGC_가상_GA_운영정책서_v1_0.md#제46조')).toBe('가상 GA 운영정책서 제46조')
+    // 'policy:45'의 45는 내부 번호라 그대로 보이지 않고, 목록에서 찾으면 정책 코드와 판을 붙인다.
+    expect(refLabel('policy:45')).toBe('다음 정책 버전')
+    expect(refLabel('policy:45', [{ policyVersionId: 45, policyCode: 'GA-CUR-2026', versionNo: 2 }])).toBe(
+      '다음 정책 버전 GA-CUR-2026 v2',
+    )
+    expect(refLabel('policy:45', [{ policyVersionId: 46, policyCode: 'GA-CUR-2026', versionNo: 3 }])).toBe(
+      '다음 정책 버전',
+    )
+    expect(refLabel('REG-08')).toBe('REG-08')
   })
   it('does not allow unsafe source links', () => {
     expect(safeSourceUrl('javascript:alert(1)')).toBeNull()
@@ -173,7 +187,7 @@ describe('policy UI boundaries', () => {
       />,
     )
     const section = screen.getByRole('region', { name: '상품위원회 정보' })
-    expect(section).toHaveTextContent('가상 종신 · V1')
+    expect(section).toHaveTextContent('가상 종신, V1')
     expect(section).toHaveTextContent('승인문서 의결서 2025-12')
     expect(section).toHaveTextContent('판매 상태 판매보류')
     expect(section).toHaveTextContent('승인일 미등록')

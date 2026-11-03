@@ -185,7 +185,7 @@ export default function ArbitragePage() {
             </div>
           ) : (
             <DataTable
-              caption="검색 조건에 해당하는 계약별 차익거래 판정"
+              caption="조회 조건에 해당하는 계약별 차익거래 판정"
               className="arb-list-table"
               columns={columns}
               {...sortBinding(criteria.sort, ARBITRAGE_SORT_KEYS, (sort) => patch({ sort }))}
@@ -235,7 +235,7 @@ export default function ArbitragePage() {
               이 계약만 다시 검증
             </Button>
             {user.canProcess && selected?.paymentStage === 'INSURER_TO_GA' ? (
-              <p className="field-helper">단건 재검증은 GA→설계사 단계만 지원합니다.</p>
+              <p className="field-helper">이 계약만 다시 검증은 GA→설계사 단계에서만 할 수 있습니다.</p>
             ) : null}
             {!user.canProcess ? (
               <p className="field-helper">재검증은 처리 권한이 있는 계정만 실행할 수 있습니다.</p>
