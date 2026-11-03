@@ -20,14 +20,18 @@ public class PaymentHoldRepository {
 
     private final JdbcTemplate jdbc;
 
-    /** 이 계약에 귀속된 지급 건 중 아직 해제되지 않은 보류가 있는 건. 규칙 판단의 heldPaymentIds 로 쓴다. */
+    /**
+     * 이 계약의 상태 사건으로 걸린, 아직 해제되지 않은 보류가 있는 지급 건. 규칙 판단의 heldPaymentIds 로 쓴다.
+     * 한 지급 건이 여러 계약에 귀속될 수 있으므로 다른 계약의 사건으로 걸린 보류는 이 계약의 보류로 보지 않는다.
+     */
     public Set<Long> openHeldPaymentIds(Long contractId) {
         return new HashSet<>(jdbc.queryForList("""
                 SELECT DISTINCT h.commission_transaction_id
                   FROM fgc.payment_hold h
+                  JOIN fgc.contract_status_event e ON e.contract_status_event_id = h.contract_status_event_id
                   JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = h.commission_transaction_id
-                 WHERE ta.contract_id = ? AND h.released_at IS NULL
-                """, Long.class, contractId));
+                 WHERE e.contract_id = ? AND ta.contract_id = ? AND h.released_at IS NULL
+                """, Long.class, contractId, contractId));
     }
 
     /** 같은 지급 건·사건이면 아무것도 하지 않는다(멱등). */
@@ -39,11 +43,15 @@ public class PaymentHoldRepository {
                 """, paymentId, eventId, policyVersionId, reasonCode);
     }
 
-    /** 납입 재개로 이 지급 건의 보류 사유가 모두 없어졌을 때 미해제 보류를 해제한다. 이미 해제된 행은 건드리지 않는다. */
-    public int releaseOpen(Long paymentId, Long releasedByEventId) {
+    /**
+     * 재개 판단이 난 지급 건의 보류 중 이 계약의 사건으로 걸린 것만 해제한다. 다른 계약의 사건으로 걸린 보류와 이미 해제된 행은 건드리지 않는다.
+     */
+    public int releaseOpen(Long paymentId, Long contractId, Long releasedByEventId) {
         return jdbc.update("""
-                UPDATE fgc.payment_hold SET released_at = clock_timestamp(), released_by_event_id = ?
-                 WHERE commission_transaction_id = ? AND released_at IS NULL
-                """, releasedByEventId, paymentId);
+                UPDATE fgc.payment_hold h SET released_at = clock_timestamp(), released_by_event_id = ?
+                 WHERE h.commission_transaction_id = ? AND h.released_at IS NULL
+                   AND h.contract_status_event_id IN (SELECT e.contract_status_event_id FROM fgc.contract_status_event e
+                                                       WHERE e.contract_id = ?)
+                """, releasedByEventId, paymentId, contractId);
     }
 }

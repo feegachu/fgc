@@ -310,6 +310,38 @@ class PaymentHoldFollowUpIntegrationTest {
     }
 
     @Test
+    void resumingOneContractDoesNotReleaseTheHoldAnotherContractPlacedOnASharedPayment() {
+        long a = contract("2026-03-01");
+        long b = contract("2026-03-01");
+        for (long c : List.of(a, b)) {
+            statusEvent(c, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        }
+        long unpaidA = statusEvent(a, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
+        long unpaidB = statusEvent(b, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
+        long shared = payment(a, "2026-09-20", false);
+        // 같은 지급 건이 계약 B 에도 귀속된다(attribution_seq 로 구분).
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, contract_id, attribution_date,
+                    attribution_month, attributed_amount, inclusion_status_snapshot, attribution_method)
+                VALUES (?, 2, ?, DATE '2026-09-20', DATE '2026-09-01', 0, 'INCLUDED', 'DIRECT')
+                """, shared, b);
+        processor.process(events.findById(unpaidA).orElseThrow());
+        processor.process(events.findById(unpaidB).orElseThrow());
+        assertThat(openHolds(shared)).isEqualTo(2);
+
+        long resumedA = resumeEvent(a, 3, "2026-10-05T00:00:00+09:00");
+        processor.process(events.findById(resumedA).orElseThrow());
+
+        // A 의 보류만 풀리고 B 의 미납으로 걸린 보류는 남아 계속 확정할 수 없다.
+        assertThat(openHolds(shared)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT e.contract_id FROM fgc.payment_hold h JOIN fgc.contract_status_event e USING (contract_status_event_id)
+                 WHERE h.commission_transaction_id = ? AND h.released_at IS NULL
+                """, Long.class, shared)).isEqualTo(b);
+        assertThat(gate.blockers(shared)).isNotEmpty();
+    }
+
+    @Test
     void aRevivalIsNotTheProcessorsBusiness() {
         long contract = contract("2026-03-01");
         statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
