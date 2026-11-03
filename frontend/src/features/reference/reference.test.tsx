@@ -172,7 +172,7 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   await screen.findByText('규제 정책')
   expect(screen.getByLabelText(/기준일/)).toHaveValue('2026-08-01')
   expect(request.mock.calls.some(([p]) => /policies\/\d/.test(p))).toBe(false)
-  expect(screen.queryByRole('columnheader', { name: '근거' })).not.toBeInTheDocument()
+  expect(screen.getByText('근거 미기재').closest('tr')).toHaveClass('policy-row-missing-reference')
   expect(screen.getByText('프로젝트 가정')).toHaveClass('status-badge-warning')
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
   await screen.findByText('650.1')
@@ -189,7 +189,8 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   await user.click(screen.getByRole('tab', { name: '정책 버전' }))
   await user.click(screen.getByRole('radio', { name: 'POL-2 v2 선택' }))
   expect(router.state.location.search).toContain('policyVersionId=2')
-  expect(screen.queryByRole('button', { name: 'REG-08' })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'REG-08' }))
+  expect(screen.getByRole('tooltip')).toHaveTextContent('REG-08')
   expect(screen.getByRole('radio', { name: 'POL-2 v2 선택' })).toBeChecked()
 })
 it('POL restores detail tab and selected id from a shared URL', async () => {
@@ -293,7 +294,7 @@ it('500 only reveals request id, not exception detail or server text', async () 
   mount('/base', () => {
     throw new ApiError({ message: 'SQL private detail', detail: { secret: 'hidden' } }, 'trace-500', 500)
   })
-  expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
+  expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 trace-500를 담당자에게 알려주세요.')
   expect(screen.queryByText(/SQL private detail/)).not.toBeInTheDocument()
 })
 it('non-JSON 404 is not shown as a 500 request-id-only error (#466)', async () => {

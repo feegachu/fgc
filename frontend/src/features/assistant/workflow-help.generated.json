@@ -2634,6 +2634,36 @@
         "next": []
       },
       {
+        "stepId": "help.507ee300abcd57cdaafebaefa6807c9b",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-reference-info.source-link",
+        "title": "정책/룰셋 · 근거 원문 열기",
+        "instruction": "정책/룰셋 화면의 ‘근거 원문 열기’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.50e41a8dce46d7934ed24f2fc0f09745",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policies-page.button-5",
+        "title": "정책/룰셋 · 근거 상세 보기",
+        "instruction": "정책/룰셋 화면의 ‘근거 상세 보기’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.5276199353cd1f1f3ab926a4bfdf7a76",
         "screenId": "POL-W01",
         "targetId": "features.policies.policies-page.button-7",
@@ -4183,6 +4213,34 @@
         "targetId": "features.policies.policy-management.section",
         "title": "정책/룰셋 · 수수료 규칙",
         "instruction": "정책/룰셋 화면의 ‘수수료 규칙’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.507ee300abcd57cdaafebaefa6807c9b",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-reference-info.source-link",
+        "title": "정책/룰셋 · 근거 원문 열기",
+        "instruction": "정책/룰셋 화면의 ‘근거 원문 열기’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.50e41a8dce46d7934ed24f2fc0f09745",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policies-page.button-5",
+        "title": "정책/룰셋 · 근거 상세 보기",
+        "instruction": "정책/룰셋 화면의 ‘근거 상세 보기’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8896,18 +8954,6 @@
         "targetId": "agent.guide-menu.agent.contract.find",
         "title": "포트폴리오 · 본인 계약 조회",
         "instruction": "포트폴리오 화면의 ‘본인 계약 조회’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "AGENT"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.7f4a1d921b0055543b5b398c014c52ca",
-        "screenId": "AGNT-W01",
-        "targetId": "features.agent-home.agent-home-page.contracts-link",
-        "title": "포트폴리오 · 내 계약 목록",
-        "instruction": "포트폴리오 화면의 ‘내 계약 목록’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"

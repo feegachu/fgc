@@ -5,18 +5,20 @@ import { Button } from '../../components/Button'
 import { useAuth } from '../auth/useAuth'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
-import { PolicyPreviewContext } from './management'
+import { PolicyPreviewContext, sourceReferenceNotice } from './management'
 import './policies.css'
 import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import { ListHeader } from '../../components/ListHeader'
 import { Field } from '../../components/Field'
+import { EvidenceLink } from '../../components/EvidenceLink'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date } from '../../lib/format'
 import { QueryState, ReferenceTabs, ReferenceText } from '../reference/ReferenceUI'
 import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
+import { PolicyReferenceInfo } from './PolicyReferenceInfo'
 import type { Policy } from './api'
 /** 규제와 근거자료가 모두 없는 정책 행을 구분한다. */
 const policyRefs = (policy: Policy) => [...(policy.regulationRefs ?? []), ...(policy.sourceRefs ?? [])]
@@ -235,6 +237,38 @@ export function PoliciesPage() {
                       {present(r.statusLabel)}
                     </StatusBadge>
                   ),
+                },
+                {
+                  key: 'refs',
+                  label: '근거',
+                  width: '11.5rem',
+                  cellClassName: 'policy-disclosure-cell',
+                  render: (r) =>
+                    policyRefs(r).length ? (
+                      policyRefs(r).map((ref) => (
+                        <EvidenceLink key={ref} label={ref}>
+                          {r.policyName}, {ref}
+                          {r.policyVersionId != null ? (
+                            <PolicyReferenceInfo policyVersionId={r.policyVersionId} refText={ref} />
+                          ) : null}
+                          <p>{sourceReferenceNotice}</p>
+                          <Button data-guide-feature="features.policies.policies-page.button-5"
+                            variant="ghost"
+                            onClick={() =>
+                              patch({
+                                policyVersionId: String(r.policyVersionId),
+                                tab: 'management',
+                                section: 'sources',
+                              })
+                            }
+                          >
+                            근거 상세 보기
+                          </Button>
+                        </EvidenceLink>
+                      ))
+                    ) : (
+                      <StatusBadge>근거 미기재</StatusBadge>
+                    ),
                 },
               ]}
             />

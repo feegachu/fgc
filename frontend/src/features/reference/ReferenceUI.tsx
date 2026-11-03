@@ -3,13 +3,13 @@ import { guideFeatureId } from '../assistant/feature-ids'
 import type { ReactNode } from 'react'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { ApiError } from '../../lib/api/client'
-import { errorText } from '../../lib/format'
+import { errorText, internalErrorText } from '../../lib/format'
 export function QueryState({ loading, error }: { loading?: boolean; error?: Error | null }) {
   if (error)
     return (
       <p role="alert">
         {error instanceof ApiError && error.code === 'FGC-COMMON-500'
-          ? `요청 ID: ${error.requestId ?? '-'}`
+          ? internalErrorText(error.requestId)
           : errorText(error)}
       </p>
     )

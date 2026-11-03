@@ -1,4 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react'
+import { errorText } from '../../lib/format'
+import { screenMessage } from '../../lib/screenText'
 import { useQueryClient } from '@tanstack/react-query'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { Button } from '../../components/Button'
@@ -137,7 +139,7 @@ export function PolicyDraftEditor({
         `최신 정책: ${header?.policyName ?? ''}, ${statusLabels[header?.status ?? ''] ?? header?.statusLabel ?? '확인 필요'}. 입력은 보존했습니다. 최신 내용으로 편집하려면 취소 후 다시 여세요.`,
       )
     } catch (cause) {
-      setLatest(cause instanceof Error ? cause.message : '최신 정책을 조회하지 못했습니다.')
+      setLatest(errorText(cause instanceof Error ? cause : null, '최신 정책을 조회하지 못했습니다.'))
     } finally {
       saving.current = false
       setBusy(false)
@@ -182,13 +184,13 @@ export function PolicyDraftEditor({
       clearUnsaved()
       onSaved(id)
     } catch (cause) {
-      const message =
-        cause instanceof Error ? cause.message : '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'
-      setFailure(message)
+      setFailure(
+        errorText(cause instanceof Error ? cause : null, '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'),
+      )
       setConflict(cause instanceof ApiError && cause.status === 409)
       if (cause instanceof ApiError && cause.field) {
         const path = cause.field.replace(/\[(\d+)\]/g, '.$1')
-        setErrors({ [path]: message })
+        setErrors({ [path]: screenMessage(cause.message) })
         focusError(path)
       }
     } finally {

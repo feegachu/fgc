@@ -380,7 +380,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         throw new ApiError({ code: 'FGC-COMMON-500', message: 'internal database secret' }, 'trace-500', 500)
     })
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 trace-500를 담당자에게 알려주세요.')
     expect(screen.queryByText(/internal database secret/)).not.toBeInTheDocument()
   })
   it.each([null, undefined, ''])(

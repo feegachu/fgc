@@ -173,6 +173,7 @@ export function Trend({ points }: { points: { month: string; count: number; prem
   const top = Math.max(...ticks, 1)
   const step = (W - L - R) / points.length
   const y = (v: number) => T + (H - T - B) * (1 - v / top)
+  const best = points.reduce((b, p, i) => (p.count > points[b].count ? i : b), 0)
   const premiumTop = Math.max(1, ...points.map((p) => p.premium))
   const yp = (v: number) => T + (H - T - B) * (1 - v / premiumTop)
   // 처음 그릴 때는 바닥에서 올라오고, 필터를 바꾸면 새 값으로 옮겨 간다.
@@ -259,6 +260,14 @@ export function Trend({ points }: { points: { month: string; count: number; prem
           )
         })}
         <path d={path} className="ah-line" fill="none" strokeWidth="2" strokeLinejoin="round" />
+        {points[best].count > 0 && (
+          <g className="ah-best-tag">
+            <rect x={L + step * (best + 0.5) - 20} y={y(shown[best]) - 27} width="40" height="19" rx="4" />
+            <text x={L + step * (best + 0.5)} y={y(shown[best]) - 13} textAnchor="middle" className="ah-best">
+              BEST
+            </text>
+          </g>
+        )}
         {points.length <= 12 &&
           line.map(([x, v], i) => (
             <circle key={points[i].month} cx={x} cy={v} r="2.6" className="ah-line-dot" strokeWidth="1.5" />

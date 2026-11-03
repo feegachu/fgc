@@ -409,7 +409,7 @@ describe('CONT-W02 계약 상세', () => {
       if (failed) throw new ApiError({ code: 'FGC-COMMON-500', message: 'SECRET SQL detail' }, 'ledger-trace', 500)
       return []
     })
-    expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: ledger-trace')
+    expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 ledger-trace를 담당자에게 알려주세요.')
     expect(screen.queryByText(/SECRET SQL/)).not.toBeInTheDocument()
     failed = false
     await actions.click(screen.getByRole('button', { name: '다시 시도' }))
@@ -427,7 +427,7 @@ describe('CONT-W02 계약 상세', () => {
     await waitFor(() => expect(messages().some((message) => message.includes('작업 권한이 없습니다.'))).toBe(true))
     expect(router.state.location.search).toBe('')
     await actions.click(screen.getByRole('button', { name: '스케줄 재생성' }))
-    await waitFor(() => expect(messages()).toContain('요청 ID: mutation-trace'))
+    await waitFor(() => expect(messages()).toContain('처리 중 오류가 발생했습니다. 요청번호 mutation-trace를 담당자에게 알려주세요.'))
     expect(messages().some((message) => message.includes('SECRET'))).toBe(false)
     expect(messages().some((message) => message.includes('완료했습니다'))).toBe(false)
   })

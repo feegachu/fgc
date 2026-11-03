@@ -148,6 +148,14 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
               <ArbitrageAmount value={row.plannedCommissionAmount} />
             </dd>
           </div>
+          <div>
+            <dt>
+              <span className="arb-amount-reference-label">참고</span>지급예정 포함 초과액 (모니터링, 판정에 쓰지 않음)
+            </dt>
+            <dd>
+              <ArbitrageAmount value={row.projectedExcessAmount} />
+            </dd>
+          </div>
         </dl>
       </div>
     </section>

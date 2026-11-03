@@ -641,7 +641,7 @@ function Result({
       <Bot avatar={explain.failed ? 'sorry' : 'sum'}>
         <div className={`cb-card cb-summary${explain.failed ? ' err' : ''}`} role="status">
           {explain.failed ? (
-            <span>요약을 불러오지 못했어요(FGC-AI-001). 아래 카드와 표는 그대로 확인할 수 있어요.</span>
+            <span>요약을 불러오지 못했어요. 아래 카드와 표는 그대로 확인할 수 있어요.</span>
           ) : explain.pending ? (
             <span className="cb-muted">요약을 쓰고 있어요…</span>
           ) : (

@@ -8,7 +8,8 @@ import { Field } from '../../components/Field'
 import { DataTable } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { date, dateTime, rate, won, today } from '../../lib/format'
+import { date, dateTime, errorText, rate, won, today } from '../../lib/format'
+import { screenMessage } from '../../lib/screenText'
 import { ReferenceTabs } from '../reference/ReferenceUI'
 import { useAuth } from '../auth/useAuth'
 import type { Policy } from './api'
@@ -650,14 +651,14 @@ function PolicyActionDialog({
       clearUnsaved()
       onSaved(id)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 다시 시도하세요.')
+      setError(errorText(cause instanceof Error ? cause : null, '처리하지 못했습니다. 다시 시도하세요.'))
       if (
         action === 'SUBMIT' &&
         cause instanceof ApiError &&
         cause.field &&
         (cause.status === 400 || cause.status === 422)
       )
-        onInvalid(cause.field, cause.message)
+        onInvalid(cause.field, screenMessage(cause.message))
     } finally {
       saving.current = false
       setBusy(false)

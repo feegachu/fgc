@@ -565,11 +565,6 @@
     "element": "Link"
   },
   {
-    "id": "features.agent-home.agent-home-page.contracts-link",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "Link"
-  },
-  {
     "id": "features.agent-home.agent-home-page.fgc-ai",
     "file": "features/agent-home/AgentHomePage.tsx",
     "element": "button"
@@ -1676,6 +1671,11 @@
   },
   {
     "id": "features.policies.policies-page.button-4",
+    "file": "features/policies/PoliciesPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.policies.policies-page.button-5",
     "file": "features/policies/PoliciesPage.tsx",
     "element": "Button"
   },
