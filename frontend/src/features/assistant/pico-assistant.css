@@ -15,7 +15,7 @@
   padding: 0 0.625rem 0 0.375rem;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-6);
-  color: var(--color-text-primary);
+  color: var(--color-steel-700);
   background: var(--color-bg-surface);
   font: inherit;
   font-size: 0.875rem;
