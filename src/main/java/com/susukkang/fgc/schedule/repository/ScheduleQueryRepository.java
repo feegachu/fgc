@@ -28,6 +28,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -317,7 +318,35 @@ public class ScheduleQueryRepository {
                 .build();
     }
 
+    /** Actual effects only: exclusions and unrelated contracts cannot become a line's source. */
+    private Map<Long, Long> sourceStatusEvents(Long headerId) {
+        List<?> rows = entityManager.createNativeQuery("""
+                SELECT sl.schedule_line_id, latest.contract_status_event_id
+                  FROM fgc.schedule_line sl
+                  JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                  JOIN LATERAL (
+                    SELECT e.contract_status_event_id, e.next_state
+                      FROM fgc.contract_status_event_effect e
+                      JOIN fgc.contract_status_event se
+                        ON se.contract_status_event_id = e.contract_status_event_id
+                     WHERE e.entity_type = 'SCHEDULE_LINE' AND e.entity_id = sl.schedule_line_id
+                       AND se.contract_id = sh.contract_id
+                       AND e.next_state IN ('PLANNED', 'HOLD', 'CANCELLED')
+                     ORDER BY se.event_seq DESC, e.contract_status_event_effect_id DESC
+                     LIMIT 1
+                  ) latest ON latest.next_state = sl.line_status
+                 WHERE sh.schedule_header_id = :headerId
+                """).setParameter("headerId", headerId).getResultList();
+        Map<Long, Long> sources = new HashMap<>();
+        for (Object result : rows) {
+            Object[] row = (Object[]) result;
+            sources.put(((Number) row[0]).longValue(), ((Number) row[1]).longValue());
+        }
+        return sources;
+    }
+
     private ScheduleDetailResponse toDetail(ScheduleHeaderResponse header) {
+        Map<Long, Long> sources = sourceStatusEvents(header.getScheduleHeaderId());
         List<ScheduleLineResponse> lines = entityManager.createQuery("""
                 SELECT sl.lineNo, sl.installmentNo, sl.contractMonthNo, sl.dueDate, ci.itemName, a.agentName,
                        sl.basisCode, sl.basisAmount, sl.calculationType, sl.ratePct, sl.expectedAmount,
@@ -339,6 +368,7 @@ public class ScheduleQueryRepository {
                         .commissionItemId((Long) row[16])
                         .cashflowType((String) row[17])
                         .scheduleLineId((Long) row[18])
+                        .sourceStatusEventId(sources.get((Long) row[18]))
                         .feeComponentType(row[19] == null ? null : row[19].toString())
                         .fixedAmount((BigDecimal) row[20])
                         .attributionDate(((LocalDate) row[14]).plusMonths(((Integer) row[2]) - 1L))

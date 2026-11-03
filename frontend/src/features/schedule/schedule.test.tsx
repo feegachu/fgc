@@ -379,6 +379,16 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
       return undefined
     }
 
+  it('#726 서버가 제공한 원천 사건만 회차 상태 옆에 표시한다', async () => {
+    const response = detail()
+    response.lines![0].sourceStatusEventId = 901
+    response.lines![0].lineStatus = 'HOLD'
+    renderAt('/schedules/11?month=2026-07', baseHandler(response))
+    expect(await screen.findByText('원천 사건 #901')).toBeInTheDocument()
+    expect(screen.getByText('보류')).toBeInTheDocument()
+    expect(screen.getAllByText(/원천 사건 #/)).toHaveLength(1)
+  })
+
   it('#726 서버 확정 차단 사유를 버튼 설명으로 표시한다', async () => {
     renderAt('/schedules/11?month=2026-07', baseHandler(detail({ canConfirm: false, confirmBlockedReason: '미처리 보류 사건이 있습니다.' })))
     expect(await screen.findByText('미처리 보류 사건이 있습니다.')).toBeInTheDocument()

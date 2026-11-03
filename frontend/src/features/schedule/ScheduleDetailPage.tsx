@@ -576,6 +576,7 @@ function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: stri
       </td>
       <td className="is-center">
         <ScheduleStatusBadge code={line.lineStatus} label={responseLabel(null, LINE_STATUS, line.lineStatus)} />
+        {line.sourceStatusEventId != null && <small className="schedule-source-event">원천 사건 #{line.sourceStatusEventId}</small>}
       </td>
       <td className="is-left tabular-nums">{line.ruleRef == null ? EMPTY : int(line.ruleRef)}</td>
       <td>

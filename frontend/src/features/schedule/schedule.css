@@ -460,3 +460,5 @@
   margin: 0;
   min-width: 0;
 }
+
+.schedule-source-event { display: block; margin-top: 0.25rem; white-space: nowrap; }

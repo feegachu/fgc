@@ -83,6 +83,50 @@ class ScheduleRepositoryIntegrationTest {
     private Long committedContractId;
 
     @Test
+    void tracesOnlyLatestApplicableEffectFromTheSameContract() {
+        inRolledBackTransaction(() -> {
+            Long contractId = createContract(ContractStatus.ACTIVE);
+            Long headerId = activeHeaderId(contractId, PaymentStage.GA_TO_FC);
+            Long lineId = queryRepository.selectScheduleDetailById(headerId).getLines().getFirst().getScheduleLineId();
+            assertThat(sourceEvent(headerId, lineId)).isNull();
+            Long held = sourceEventFixture(contractId, lineId, "PLANNED", "HOLD");
+            jdbc.update("UPDATE fgc.schedule_line SET line_status='HOLD' WHERE schedule_line_id=?", lineId);
+            assertThat(sourceEvent(headerId, lineId)).isEqualTo(held);
+            sourceEventFixture(contractId, lineId, "HOLD", "EXCLUDED");
+            assertThat(sourceEvent(headerId, lineId)).isEqualTo(held);
+            Long resumed = sourceEventFixture(contractId, lineId, "HOLD", "PLANNED");
+            // A stale state cannot be attributed to an older matching effect.
+            assertThat(sourceEvent(headerId, lineId)).isNull();
+            jdbc.update("UPDATE fgc.schedule_line SET line_status='PLANNED' WHERE schedule_line_id=?", lineId);
+            assertThat(sourceEvent(headerId, lineId)).isEqualTo(resumed);
+            Long otherContract = createContract(ContractStatus.ACTIVE);
+            sourceEventFixture(otherContract, lineId, "PLANNED", "HOLD");
+            assertThat(sourceEvent(headerId, lineId)).isEqualTo(resumed);
+        });
+    }
+
+    private Long sourceEvent(Long headerId, Long lineId) {
+        return queryRepository.selectScheduleDetailById(headerId).getLines().stream()
+                .filter(line -> lineId.equals(line.getScheduleLineId())).findFirst().orElseThrow().getSourceStatusEventId();
+    }
+
+    private Long sourceEventFixture(Long contractId, Long lineId, String previous, String next) {
+        Long eventId = jdbc.queryForObject("""
+                INSERT INTO fgc.contract_status_event
+                  (contract_id,event_seq,new_status,effective_at,received_at,source_system,source_event_key)
+                SELECT ?, COALESCE(MAX(event_seq),0)+1, 'ACTIVE', now(), now(), 'UI726_TEST', ?
+                  FROM fgc.contract_status_event WHERE contract_id=?
+                RETURNING contract_status_event_id
+                """, Long.class, contractId, UUID.randomUUID().toString(), contractId);
+        jdbc.update("""
+                INSERT INTO fgc.contract_status_event_effect
+                  (contract_status_event_id,processing_job,entity_type,entity_id,previous_state,next_state,reason_code)
+                VALUES (?, 'UI726_TEST', 'SCHEDULE_LINE', ?, ?, ?, 'TEST')
+                """, eventId, lineId, previous, next);
+        return eventId;
+    }
+
+    @Test
     void sortsByEachAllowedColumnInBothDirectionsAcrossPagesAndRejectsOthers() {
         java.util.Map<String, String> columns = java.util.Map.of(
                 "contractNo", "c.contract_no", "version", "sh.schedule_version_no",
