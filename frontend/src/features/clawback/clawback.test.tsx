@@ -406,7 +406,7 @@ it('reloads the latest grounds when the source changed and sends the retry with 
   })
   await fillAndCalculate(user)
   expect(await screen.findByRole('alert')).toHaveTextContent(
-    '조회한 뒤 원천이나 정책이 바뀌었습니다. 최신 근거를 다시 불러왔으니 확인하고 다시 계산하세요. (요청번호: CALC-409)',
+    '조회한 뒤 후보 상태나 근거가 바뀌었습니다. 최신 내용을 다시 불러옵니다. 확인한 뒤 다시 계산하세요. (요청번호: CALC-409)',
   )
   await waitFor(() =>
     expect(request.mock.calls.filter(([p]) => String(p).endsWith('/candidates/42')).length).toBeGreaterThan(1),
@@ -442,7 +442,7 @@ it('drops a chosen policy that left the candidates after the source changed', as
   })
   await user.click(await screen.findByRole('radio', { name: /^CLAW-GA-VIRTUAL-2026 v2\b/ }))
   await fillAndCalculate(user)
-  expect(await screen.findByRole('alert')).toHaveTextContent('조회한 뒤 원천이나 정책이 바뀌었습니다.')
+  expect(await screen.findByRole('alert')).toHaveTextContent('조회한 뒤 후보 상태나 근거가 바뀌었습니다.')
   // 고른 정책이 후보에서 빠졌으니 선택이 풀리고, 다시 고르기 전에는 계산하지 않는다.
   await screen.findByRole('radio', { name: /^CLAW-GA-VIRTUAL-2026 v3\b/ })
   expect(screen.getAllByRole('radio').filter((radio) => (radio as HTMLInputElement).checked)).toHaveLength(0)
@@ -468,6 +468,21 @@ it('retries a lost response with the same key so the server keeps one calculatio
   await waitFor(() => expect(posts).toHaveLength(2))
   expect(posts[1].idempotencyKey).toBe(posts[0].idempotencyKey)
   expect(await screen.findByRole('table', { name: '환수 계산 결과' })).toBeInTheDocument()
+})
+
+it('explains an idempotency conflict without the server code', async () => {
+  const user = userEvent.setup()
+  const conflict = new ApiError(
+    { code: 'FGC-IMPL-IDEMPOTENCY_CONFLICT', message: 'Idempotency-Key conflict' },
+    'CALC-409B',
+    409,
+  )
+  const { responder } = calculationFixtures(() => conflict)
+  mount('/clawbacks', responder)
+  await fillAndCalculate(user)
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent('같은 계산 요청을 다른 내용으로 다시 보냈습니다. 화면을 새로 고친 뒤 다시 계산하세요. (요청번호: CALC-409B)')
+  expect(alert).not.toHaveTextContent(/FGC-|Idempotency/)
 })
 
 it('locks the button while a calculation is in flight', async () => {
@@ -547,6 +562,6 @@ it('marks a calculation made before the source changed as stale', async () => {
   )
   expect(await screen.findByText('계산 후 원천이 바뀌어 다시 계산 필요', { selector: 'li' })).toBeInTheDocument()
   expect(
-    screen.getByText('계산한 뒤 원천이 바뀌었습니다. 이 계산판은 지금 근거와 다르니 다시 계산하세요.'),
+    screen.getByText('계산한 뒤 원천이나 정책이 바뀌었습니다. 이 계산판은 지금 근거와 다르니 다시 계산하세요.'),
   ).toHaveAttribute('role', 'status')
 })

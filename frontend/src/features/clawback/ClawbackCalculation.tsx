@@ -35,9 +35,11 @@ function failureText(error: unknown) {
   }
   if (error.code === 'FGC-IMPL-STATE_CHANGED')
     return errorScreenMessage(
-      '조회한 뒤 원천이나 정책이 바뀌었습니다. 최신 근거를 다시 불러왔으니 확인하고 다시 계산하세요.',
+      '조회한 뒤 후보 상태나 근거가 바뀌었습니다. 최신 내용을 다시 불러옵니다. 확인한 뒤 다시 계산하세요.',
       error.requestId,
     )
+  if (error.code === 'FGC-IMPL-IDEMPOTENCY_CONFLICT')
+    return errorScreenMessage('같은 계산 요청을 다른 내용으로 다시 보냈습니다. 화면을 새로 고친 뒤 다시 계산하세요.', error.requestId)
   if (error.code === 'FGC-IMPL-REQUEST_IN_PROGRESS')
     return errorScreenMessage('같은 계산을 처리하고 있습니다. 잠시 뒤 다시 누르세요.', error.requestId)
   if (error.status === 403) return errorScreenMessage('환수액을 계산할 권한이 없습니다.', error.requestId)
@@ -228,7 +230,7 @@ function CalculationResult({
       </p>
       {stale && (
         <p className="claw-calculation-stale" role="status">
-          계산한 뒤 원천이 바뀌었습니다. 이 계산판은 지금 근거와 다르니 다시 계산하세요.
+          계산한 뒤 원천이나 정책이 바뀌었습니다. 이 계산판은 지금 근거와 다르니 다시 계산하세요.
         </p>
       )}
       {calc.lines?.length ? (
