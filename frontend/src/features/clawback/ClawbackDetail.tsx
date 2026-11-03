@@ -1,19 +1,21 @@
 import type { ReactNode } from 'react'
-import { Button } from '../../components/Button'
 import { ContextLink } from '../../components/ContextLink'
 import { DataTable } from '../../components/DataTable'
 import { CategoryBadge, StatusValue } from '../../components/StatusBadge'
 import type { TableColumn } from '../../components/DataTable'
 import { date, dateTime, int } from '../../lib/format'
 import { present } from '../arbitrage/utils'
+import { useCommissionItems } from '../base/api'
 import type { CandidateDetail } from './api'
 import { Amount } from './badges'
-import { reasonText, triggerLabels } from './labels'
+import { ClawbackCalculation } from './ClawbackCalculation'
+import { policyLabel, reasonText, triggerLabels } from './labels'
 import { guideFeatureId } from '../assistant/feature-ids'
 import {
   arbitrageStatusLabels,
   contractStatusLabels,
   paymentStatusLabels,
+  processingJobLabels,
   processingStatusLabels,
 } from '../contract/labels'
 import { LINE_STATUS } from '../schedule/labels'
@@ -75,13 +77,12 @@ const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[
       </CategoryBadge>
     ),
   },
-  { key: 'id', label: '사건/검증 ID', cellClassName: 'tabular-nums', render: (r) => present(r.sourceId) },
   {
     key: 'date',
     label: '효력일, 검증기준일',
     cellClassName: 'tabular-nums',
     // 차익거래는 effectiveAt이 없다. 검증기준일을 효력일처럼 바꿔 쓰지 않는다.
-    render: (r) => (r.effectiveAt ? `효력 ${dateTime(r.effectiveAt)}` : `검증기준 ${date(r.asOfDate)}`),
+    render: (r) => (r.effectiveAt ? `효력 ${date(r.effectiveAt)}` : `검증기준 ${date(r.asOfDate)}`),
   },
   {
     key: 'status',
@@ -96,12 +97,32 @@ const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[
     ),
   },
   { key: 'open', label: '원천 열기', render: (r) => sourceLink(c, r) },
+  { key: 'id', label: '사건/검증 번호', cellClassName: 'tabular-nums', render: (r) => present(r.sourceId) },
 ]
-const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions'][number]>[] => [
-  { key: 'id', label: '귀속 ID', cellClassName: 'tabular-nums', render: (r) => present(r.transactionAttributionId) },
+const paymentColumns = (
+  c: Candidate,
+  itemName: (commissionItemId?: number) => string,
+): TableColumn<Detail['paymentAttributions'][number]>[] => [
+  // 좁은 상세 칸에서 귀속 금액이 가로 스크롤 뒤로 숨지 않게 항목, 회차, 금액을 앞에 두고 추적용 번호는 뒤에 둔다.
+  { key: 'item', label: '수수료 항목', render: (r) => itemName(r.commissionItemId) },
+  { key: 'no', label: '회차', align: 'left', render: (r) => int(r.installmentNo) },
+  { key: 'amount', label: '귀속 금액', align: 'number', render: (r) => <Amount value={r.attributedAmount} /> },
+  { key: 'paidOn', label: '지급일', cellClassName: 'tabular-nums', render: (r) => date(r.paidOn) },
+  {
+    key: 'status',
+    label: '상태',
+    render: (r) => (
+      <StatusValue
+        value={r.status}
+        optionCount={3}
+        tablePresentation="dot"
+        label={paymentStatusLabels[r.status ?? ''] ?? '확인 필요'}
+      />
+    ),
+  },
   {
     key: 'tx',
-    label: '지급 ID',
+    label: '지급 번호',
     cellClassName: 'tabular-nums',
     // 지급 목록을 이 계약으로 거르고 해당 지급 행을 선택한 상태로 연다.
     // 지급 목록은 정산월 키가 없으면 기준 정산월로 거르므로(#752) 다른 월 지급도 보이게 전체월(빈 값)로 연다.
@@ -116,22 +137,7 @@ const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions']
         present(r.commissionTransactionId)
       ),
   },
-  { key: 'item', label: '수수료 항목', cellClassName: 'tabular-nums', render: (r) => present(r.commissionItemId) },
-  { key: 'no', label: '회차', align: 'left', render: (r) => int(r.installmentNo) },
-  { key: 'paidOn', label: '지급일', cellClassName: 'tabular-nums', render: (r) => date(r.paidOn) },
-  {
-    key: 'status',
-    label: '상태',
-    render: (r) => (
-      <StatusValue
-        value={r.status}
-        optionCount={3}
-        tablePresentation="dot"
-        label={paymentStatusLabels[r.status ?? ''] ?? '확인 필요'}
-      />
-    ),
-  },
-  { key: 'amount', label: '귀속 금액', align: 'number', render: (r) => <Amount value={r.attributedAmount} /> },
+  { key: 'id', label: '귀속 번호', cellClassName: 'tabular-nums', render: (r) => present(r.transactionAttributionId) },
 ]
 const scheduleColumns: TableColumn<Detail['scheduleLines'][number]>[] = [
   { key: 'no', label: '회차', align: 'left', render: (r) => int(r.installmentNo) },
@@ -153,7 +159,7 @@ const scheduleColumns: TableColumn<Detail['scheduleLines'][number]>[] = [
   { key: 'unpaid', label: '미지급', align: 'number', render: (r) => <Amount value={r.unpaidAmount} /> },
 ]
 const effectColumns: TableColumn<Detail['effects'][number]>[] = [
-  { key: 'job', label: '후속 작업', render: (r) => present(r.processingJob) },
+  { key: 'job', label: '후속 작업', render: (r) => processingJobLabels[r.processingJob ?? ''] ?? '처리 작업' },
   {
     key: 'status',
     label: '처리 상태',
@@ -169,16 +175,6 @@ const effectColumns: TableColumn<Detail['effects'][number]>[] = [
   { key: 'at', label: '처리 시각', cellClassName: 'tabular-nums', render: (r) => dateTime(r.processedAt) },
   { key: 'reason', label: '실패 사유', render: (r) => present(r.failureReason) },
 ]
-const policyColumns: TableColumn<Detail['policyCandidates'][number]>[] = [
-  { key: 'code', label: '정책', render: (r) => `${present(r.policyCode)}, ${present(r.policyName)}` },
-  { key: 'version', label: '판', align: 'left', render: (r) => `v${int(r.versionNo)}` },
-  {
-    key: 'period',
-    label: '유효 기간',
-    cellClassName: 'tabular-nums',
-    render: (r) => `${date(r.effectiveFrom)} ~ ${r.effectiveTo ? date(r.effectiveTo) : ''}`,
-  },
-]
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
@@ -190,11 +186,17 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
   const c = detail.candidate ?? {}
   const reasons = c.reviewReasons ?? []
-  const canCalculate = c.allowedActions?.includes('CALCULATE') ?? false
+  const policies = detail.policyCandidates ?? []
+  const items = useCommissionItems(c.eventDate ?? c.contractDate ?? '')
+  const itemName = (commissionItemId?: number) => {
+    if (commissionItemId == null) return '-'
+    const name = items.data?.find((item) => item.commissionItemId === commissionItemId)?.itemName
+    return name ?? (items.isLoading ? '…' : '항목 확인 필요')
+  }
   return (
     <>
       <dl className="claw-detail-list">
-        <Row label="후보 ID, 계약번호">
+        <Row label="후보 번호, 계약번호">
           {present(c.candidateId)},{' '}
           {c.contractId != null ? (
             <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-4" to={`/contracts/${c.contractId}`}>{present(c.contractNo)}</ContextLink>
@@ -206,9 +208,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
           {present(c.insurerName)}, {present(c.productName)}
         </Row>
         <Row label="설계사">{present(c.agentName)}</Row>
-        <Row label="발생 사유">
-          {triggerLabels[c.triggerType ?? ''] ?? present(c.triggerType)}, 원천 ID {present(c.sourceId)}
-        </Row>
+        <Row label="발생 사유">{triggerLabels[c.triggerType ?? ''] ?? '확인 필요'}</Row>
         <Row label={`${present(c.dateBasisLabel)}, 계약일`}>
           {date(c.eventDate)}, {date(c.contractDate)}
         </Row>
@@ -222,10 +222,10 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         </Row>
         {/* 서버의 policyVersionId는 후보가 하나일 때 채워 주는 값이지 적용 선택 결과가 아니다(인터페이스 §4-4-5). */}
         <Row label="정책 후보">
-          {c.policyVersionId != null
-            ? `후보 1개, 정책버전 ${c.policyVersionId} (적용 선택 전)`
-            : detail.policyCandidates?.length
-              ? `후보 ${detail.policyCandidates.length}개, 적용 선택 필요`
+          {policies.length === 1
+            ? `${policyLabel(policies[0])}, 아래 환수 계산에서 확인`
+            : policies.length
+              ? `${int(policies.length)}개, 아래 환수 계산에서 선택`
               : '유효한 환수 정책 없음'}
         </Row>
         <Row label="검토 사유">
@@ -252,7 +252,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         scope="payment"
         title="연결 지급, 귀속"
         rows={detail.paymentAttributions}
-        columns={paymentColumns(c)}
+        columns={paymentColumns(c, itemName)}
         rowKey={(r, i) => `${r.transactionAttributionId ?? 'x'}-${i}`}
         empty="연결된 기지급 내역이 없습니다."
       />
@@ -272,37 +272,8 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         rowKey={(r, i) => `${r.processingJob}-${r.validationRunId ?? 'x'}-${i}`}
         empty="기록된 후속 처리가 없습니다."
       />
-      <section data-guide-feature="features.clawback.clawback-detail.section-2" className="claw-evidence claw-calculation" aria-label="환수 계산">
-        <h3 className="claw-evidence-title">
-          환수 계산 <span className="claw-policy-badge">회사 정책</span>
-        </h3>
-        {detail.policyCandidates?.length ? (
-          <DataTable
-            viewportClassName="claw-evidence-table"
-            caption="적용 가능한 환수 정책 버전"
-            rows={detail.policyCandidates}
-            rowKey={(r) => String(r.policyVersionId)}
-            columns={policyColumns}
-          />
-        ) : (
-          <p className="claw-evidence-empty">적용 가능한 환수 정책 버전이 없습니다.</p>
-        )}
-        <p className="claw-evidence-empty">
-          {detail.latestCalculation
-            ? `최신 계산판 v${int(detail.latestCalculation.calculationVersion)}, ${dateTime(detail.latestCalculation.calculatedAt)}`
-            : '저장된 계산판이 없습니다.'}
-        </p>
-        <div className="claw-calculation-actions">
-          {/* 계산 API(IF-API-85)는 있지만 정책 선택·사유 입력·결과표 화면은 #629 후속에서 연결한다.
-              그 전에는 서버가 CALCULATE를 허용해도 눌러도 아무 일이 없는 버튼을 켜지 않는다. */}
-          <Button data-guide-feature="features.clawback.clawback-detail.button" disabled>환수액 계산</Button>
-          <p className="field-helper">
-            {canCalculate
-              ? '계산할 수 있는 후보입니다. 정책 선택·사유 입력 화면은 후속 작업에서 연결합니다.'
-              : '서버가 계산을 허용한 후보만 계산할 수 있습니다. 위 검토 사유를 확인하세요.'}
-          </p>
-        </div>
-      </section>
+      {/* 후보가 바뀌면 고른 정책과 입력한 사유를 새로 시작한다. */}
+      <ClawbackCalculation key={c.candidateId} detail={detail} itemName={itemName} />
     </>
   )
 }

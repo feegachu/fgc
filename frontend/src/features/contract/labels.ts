@@ -69,6 +69,11 @@ export const processingStatusLabels: Record<string, string> = {
   SKIPPED: '건너뜀',
 }
 
+/** 상태 사건 후속 처리 작업 이름. 배치 작업의 원문 이름은 화면에 쓰지 않는다(SRC-074). */
+export const processingJobLabels: Record<string, string> = {
+  DailyChangedContractJob: '일일 변경 계약 재검증',
+}
+
 export const paymentStatusLabels: Record<string, string> = {
   DRAFT: '작성중',
   CONFIRMED: '확정',
