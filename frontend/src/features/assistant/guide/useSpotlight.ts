@@ -74,16 +74,17 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         })
       })
     }
-    const resize = new ResizeObserver(() => {
+    // 관측 API가 없는 환경에서는 창 크기·스크롤 이벤트와 최초 측정으로 갱신한다.
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
       // A result panel can move the target without resizing the target itself.
       // Re-align on layout changes, while ordinary user scroll only updates the attachment.
       preparedWidth = null
       measure()
     })
-    if (target) resize.observe(target)
-    if (card.current) resize.observe(card.current)
+    if (target) resize?.observe(target)
+    if (card.current) resize?.observe(card.current)
     const workspace = document.getElementById('main-content')
-    if (workspace) resize.observe(workspace)
+    if (workspace) resize?.observe(workspace)
     window.addEventListener('scroll', measure, true)
     window.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('resize', measure)
@@ -91,7 +92,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     return () => {
       cancelAnimationFrame(frame)
       cancelAnimationFrame(placementFrame)
-      resize.disconnect()
+      resize?.disconnect()
       window.removeEventListener('scroll', measure, true)
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
