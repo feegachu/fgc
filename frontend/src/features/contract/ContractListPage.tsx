@@ -1,3 +1,4 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import { nameWithCode } from '../../lib/screenText'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -73,7 +74,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     cellClassName: 'contract-number-cell',
     render: (row) =>
       row.contractId ? (
-        <ContextLink to={detailHref(row, back)}>{row.contractNo || '-'}</ContextLink>
+        <ContextLink data-guide-feature="features.contract.contract-list-page.context-link" to={detailHref(row, back)}>{row.contractNo || '-'}</ContextLink>
       ) : (
         row.contractNo || '-'
       ),
@@ -163,7 +164,7 @@ export default function ContractListPage() {
       <header className="page-header contract-page-header">
         <h1 className="page-title">보험계약 목록</h1>
         <div className="page-header-actions">
-          <Button variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>
+          <Button data-guide-feature="features.contract.contract-list-page.button" variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>
             {!exporting.isPending && (
               <span className="material-symbols-rounded" aria-hidden="true">
                 download
@@ -172,7 +173,7 @@ export default function ContractListPage() {
             CSV 내보내기
           </Button>
           {canProcess && (
-            <ContextLink className="button button-primary" to={returnLink('/contracts/new', back)}>
+            <ContextLink data-guide-feature="features.contract.contract-list-page.context-link-2" className="button button-primary" to={returnLink('/contracts/new', back)}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 add
               </span>
@@ -181,7 +182,7 @@ export default function ContractListPage() {
           )}
         </div>
       </header>
-      <section className="surface contract-filter-card" aria-label="보험계약 조회 조건">
+      <section data-guide-feature="features.contract.contract-list-page.section" className="surface contract-filter-card" aria-label="보험계약 조회 조건">
         <ContractFilters
           key={JSON.stringify(criteria)}
           initial={criteria}
@@ -189,7 +190,7 @@ export default function ContractListPage() {
           onReset={() => update(FILTER_KEYS)}
         />
       </section>
-      <section className="surface contract-results-card" aria-labelledby="contract-results-title">
+      <section data-guide-feature="features.contract.contract-list-page.section-2" className="surface contract-results-card" aria-labelledby="contract-results-title">
         <ListHeader className="contract-results-header" total={list.data?.totalElements ?? 0} pageSize={PAGE_SIZE}>
           <h2 className="surface-title" id="contract-results-title">
             보험계약
@@ -197,7 +198,7 @@ export default function ContractListPage() {
         </ListHeader>
         <QueryState loading={list.isPending} error={list.error} />
         {list.isError && (
-          <Button variant="secondary" onClick={() => void list.refetch()}>
+          <Button data-guide-feature="features.contract.contract-list-page.button-2" variant="secondary" onClick={() => void list.refetch()}>
             다시 시도
           </Button>
         )}
@@ -268,7 +269,7 @@ function ContractFilters({
   }
   const input = (key: string, label: string, type = 'text', placeholder?: string) => (
     <Field key={key} label={label} className="filter-field">
-      <input
+      <input data-guide-feature={guideFeatureId('contract.filter.input', key)}
         type={type}
         placeholder={placeholder}
         value={draft[key]}
@@ -288,7 +289,7 @@ function ContractFilters({
   ) => (
     <div key={key} className="filter-field">
       <Field label={label}>
-        <select
+        <select data-guide-feature={guideFeatureId('contract.filter.select', key)}
           className="select-control"
           value={draft[key]}
           disabled={disabled || (blockWhileFetching && query?.isFetching) || Boolean(query?.error)}
@@ -310,7 +311,7 @@ function ContractFilters({
       {query?.error && (
         <>
           <QueryState error={query.error} />
-          <Button variant="ghost" onClick={() => query.refetch()} aria-label={`${label} 목록 다시 불러오기`}>
+          <Button data-guide-feature={guideFeatureId('contract.filter.retry', key)} variant="ghost" onClick={() => query.refetch()} aria-label={`${label} 목록 다시 불러오기`}>
             다시 시도
           </Button>
         </>

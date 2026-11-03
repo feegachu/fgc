@@ -58,6 +58,8 @@ class OpenApiFrontendIntegrationTest {
         assertThat(paths.has("/api/v1/auth/login")).isTrue();
         assertThat(paths.has("/api/v1/auth/refresh")).isTrue();
         assertThat(paths.has("/api/v1/contracts")).isTrue();
+        assertThat(paths.path("/api/v1/ai/compare-chat/ask").path("post").path("operationId").asText()).isEqualTo("ask");
+        assertThat(paths.path("/api/v1/ai/pico/ask").path("post").path("operationId").asText()).isEqualTo("picoAsk");
         assertThat(paths.path("/api/v1/policies").has("post")).isTrue();
         assertThat(paths.path("/api/v1/policies/{policyVersionId}").has("put")).isTrue();
         assertThat(paths.path("/api/v1/policies/{policyVersionId}/actions").has("post")).isTrue();
@@ -82,11 +84,20 @@ class OpenApiFrontendIntegrationTest {
         } else {
             assertThat(nullType.asText()).isEqualTo("null");
         }
+        JsonNode schemas = root.path("components").path("schemas");
+        String statementSourceRef = schemas.path("StatementEntry").path("properties")
+                .path("source").path("$ref").asText();
+        assertThat(statementSourceRef).startsWith("#/components/schemas/");
+        JsonNode statementSource = schemas.path(statementSourceRef.substring(statementSourceRef.lastIndexOf('/') + 1));
+        assertThat(statementSource.path("properties").has("entityType")).isTrue();
+        assertThat(statementSource.path("properties").has("id")).isTrue();
+        assertThat(statementSource.path("properties").has("sourceId")).isFalse();
+        assertThat(schemas.path("AssistantCalculationSource").path("properties").has("sourceId")).isTrue();
         // Origin is environment-specific, not part of the API type contract.
         root.putArray("servers").addObject().put("url", "/");
         Path output = Path.of("frontend/openapi/schema.json");
         Files.createDirectories(output.getParent());
-        Files.writeString(output, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(canonical(root)) + "\n");
+        Files.writeString(output, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(canonical(root)).replace("\r\n", "\n") + "\n");
 
         var tokens = tokenService.login((FgcUserDetails) userDetails.loadUserByUsername("audit01"));
         var claims = JwtClaimsSet.builder().claims(values -> values.putAll(decoder.decode(tokens.accessToken()).getClaims()))

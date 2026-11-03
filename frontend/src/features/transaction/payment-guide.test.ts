@@ -133,9 +133,11 @@ describe('payment guide server evidence', () => {
     response = { ...draft, status: 'CONFIRMED' }
     expect((await read()).confirmed).toBe(false)
   })
-  it('rejects ambiguous contracts and unsafe IDs without picking a first row', () => {
+  it('binds all attributed contracts and rejects unsafe IDs without picking a first row', () => {
     observer.update({ ...input, rows: [...input.rows, { ...input.rows[0], key: 2, contractId: '4' }] })
-    expect(() => observer.readContext()).toThrow('MULTIPLE_CONTRACTS_UNSUPPORTED')
+    expect(observer.readContext().entityRefs).toEqual([
+      { type: 'PAYMENT', id: 77 }, { type: 'CONTRACT', id: 3 }, { type: 'CONTRACT', id: 4 },
+    ])
     observer.update({ ...input, paymentId: '9007199254740993' })
     expect(() => observer.readContext()).toThrow('INVALID_ENTITY_REFS')
   })
@@ -185,4 +187,16 @@ describe('step-specific input guidance', () => {
     expect((await read()).scopeReady).toBe(true)
     expect((await read()).attributionsReady).toBe(true)
   })
+})
+
+it('selects precheck only for a valid current saved payment and otherwise requires save', async () => {
+  const context = observer.readContext()
+  const state = await read()
+  expect(paymentGuideConditions.CURRENT_DRAFT_ALREADY_SAVED(context, state)).toBe('SATISFIED')
+  expect(paymentGuideConditions.DRAFT_SAVE_REQUIRED(context, state)).toBe('WAITING_INPUT')
+  for (const changed of [{ ...state, saved: false }, { ...state, valid: false }]) {
+    expect(paymentGuideConditions.CURRENT_DRAFT_ALREADY_SAVED(context, changed)).toBe('WAITING_INPUT')
+    expect(paymentGuideConditions.DRAFT_SAVE_REQUIRED(context, changed)).toBe('SATISFIED')
+  }
+  expect(paymentGuideConditions.CURRENT_DRAFT_ALREADY_SAVED({ ...context, entityRefs: [] }, state)).toBe('WAITING_INPUT')
 })

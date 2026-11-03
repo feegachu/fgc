@@ -38,7 +38,7 @@ export function ResizeHandle({
   }
 
   return (
-    <div
+    <div data-guide-feature="components.resize-handle.div"
       role="separator"
       tabIndex={0}
       aria-label={label}
