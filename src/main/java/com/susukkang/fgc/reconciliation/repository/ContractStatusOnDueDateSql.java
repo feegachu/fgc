@@ -34,7 +34,7 @@ final class ContractStatusOnDueDateSql {
      * 상태 사건으로 확인된 "그 회차는 지급 대상이 아님". 청약철회는 처음부터 무효라 현재 상태로 본다.
      * 나머지는 계약의 현재 상태와 무관하게 지급예정일 시점 상태로 본다 — 실효 뒤 부활(REVIVED)한 계약의
      * 실효 기간 회차도 지급 대상이 아니다(REVIVAL_BACKFILL_RULE = NO_RETROACTIVE). 단 최신 상태 사건이
-     * 현재 상태와 같을 때만 이력을 믿는다. 계약 수정 화면의 상태 변경은 아직 사건을 남기지 않는다(FUN-026 2차).
+     * 현재 상태와 같을 때만 이력을 믿는다. FUN-026 이전의 계약 수정 화면 상태 변경은 사건을 남기지 않았다.
      */
     static final String NON_PAYABLE_ON_DUE_DATE = "(c.current_status = 'CANCELLED' OR ("
             + LATEST_EVENT_STATUS + " IS NOT DISTINCT FROM c.current_status AND COALESCE("

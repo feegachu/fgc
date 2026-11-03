@@ -171,6 +171,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void missingPolicyEvidenceKeepsAnActionableMessageInProduction() {
+        org.mockito.Mockito.when(environment.acceptsProfiles(org.mockito.ArgumentMatchers.any(
+                org.springframework.core.env.Profiles.class))).thenReturn(true);
+        ResponseEntity<ApiResponse<Void>> response = handler().handleBusinessException(new FgcBusinessException(
+                FgcErrorCode.POL_004, "sourceRefs", Map.of("reason", "승인된 근거를 등록하세요."), "private-detail"));
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(response.getBody().error().field()).isEqualTo("sourceRefs");
+        assertThat(response.getBody().error().message()).isEqualTo("제출 불가 — 승인된 근거를 등록하세요.");
+        assertThat(response.getBody().error().detail()).isNull();
+    }
+
+    @Test
     void jsonMappingErrorReportsNestedFieldWithoutJavaClassNames() {
         JsonMappingException mapping = JsonMappingException.from((JsonParser) null, "private-request-content");
         mapping.prependPath(Map.class, "paymentStage");

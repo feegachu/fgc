@@ -63,7 +63,7 @@ public class PolicyController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "201", description = "초안 생성 성공", useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400", description = "요청 형식 또는 입력값 오류 (FGC-COMMON-002)"),
+                    responseCode = "400", description = "입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "403", description = "정책 작성 권한 없음 (FGC-AUTH-003)"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -91,7 +91,11 @@ public class PolicyController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "초안 수정 성공", useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409", description = "정책 상태·수정 시각 또는 멱등키 충돌")
+                    responseCode = "400", description = "입력 오류 (FGC-COMMON-002) 또는 없는 환수 대상 ID (FGC-POL-005)"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "정책 상태·수정 시각 또는 멱등키 충돌"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "422", description = "정책 규칙의 적용 구간 충돌 (FGC-POL-002)")
     })
     @PutMapping("/{policyVersionId}")
     @PreAuthorize(Roles.CAN_WRITE_POLICY)
@@ -145,7 +149,7 @@ public class PolicyController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "자기 승인·정책 상태·수정 시각 또는 멱등키 충돌"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "422", description = "활성 정책의 적용기간 충돌 (FGC-POL-002)")
+                    responseCode = "422", description = "정책·규칙 적용 범위 충돌 (FGC-POL-002) 또는 제출 근거·필수 규칙 누락 (FGC-POL-004)")
     })
     @PostMapping("/{policyVersionId}/actions")
     @PreAuthorize(Roles.CAN_WRITE_POLICY)

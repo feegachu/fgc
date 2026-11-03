@@ -2,12 +2,22 @@ import type { ReactNode } from 'react'
 import { Button } from '../../components/Button'
 import { ContextLink } from '../../components/ContextLink'
 import { DataTable } from '../../components/DataTable'
+import { CategoryBadge, StatusValue } from '../../components/StatusBadge'
 import type { TableColumn } from '../../components/DataTable'
 import { date, dateTime, int } from '../../lib/format'
 import { present } from '../arbitrage/utils'
 import type { CandidateDetail } from './api'
 import { Amount } from './badges'
 import { reasonText, triggerLabels } from './labels'
+import {
+  arbitrageStatusLabels,
+  contractStatusLabels,
+  paymentStatusLabels,
+  processingStatusLabels,
+} from '../contract/labels'
+import { LINE_STATUS } from '../schedule/labels'
+
+const sourceStatusLabels: Record<string, string> = { ...contractStatusLabels, ...arbitrageStatusLabels }
 type Detail = Required<CandidateDetail>
 function Evidence<T>({
   title,
@@ -50,19 +60,38 @@ function sourceLink(c: Candidate, r: Detail['sourceRefs'][number]) {
       </ContextLink>
     )
   if (c.contractId != null) return <ContextLink to={`/contracts/${c.contractId}`}>계약 사건 이력</ContextLink>
-  return '—'
+  return '-'
 }
 const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[] => [
-  { key: 'type', label: '원천', render: (r) => triggerLabels[r.triggerType ?? ''] ?? present(r.triggerType) },
-  { key: 'id', label: '사건·검증 ID', cellClassName: 'tabular-nums', render: (r) => present(r.sourceId) },
+  {
+    key: 'type',
+    label: '원천',
+    render: (r) => (
+      <CategoryBadge value={r.triggerType} optionCount={Object.keys(triggerLabels).length}>
+        {triggerLabels[r.triggerType ?? ''] ?? present(r.triggerType)}
+      </CategoryBadge>
+    ),
+  },
+  { key: 'id', label: '사건/검증 ID', cellClassName: 'tabular-nums', render: (r) => present(r.sourceId) },
   {
     key: 'date',
-    label: '효력일 · 검증기준일',
+    label: '효력일, 검증기준일',
     cellClassName: 'tabular-nums',
     // 차익거래는 effectiveAt이 없다. 검증기준일을 효력일처럼 바꿔 쓰지 않는다.
     render: (r) => (r.effectiveAt ? `효력 ${dateTime(r.effectiveAt)}` : `검증기준 ${date(r.asOfDate)}`),
   },
-  { key: 'status', label: '상태', render: (r) => present(r.status) },
+  {
+    key: 'status',
+    label: '상태',
+    render: (r) => (
+      <StatusValue
+        value={r.status}
+        optionCount={8}
+        tablePresentation="dot"
+        label={sourceStatusLabels[r.status ?? ''] ?? '확인 필요'}
+      />
+    ),
+  },
   { key: 'open', label: '원천 열기', render: (r) => sourceLink(c, r) },
 ]
 const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions'][number]>[] => [
@@ -72,10 +101,11 @@ const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions']
     label: '지급 ID',
     cellClassName: 'tabular-nums',
     // 지급 목록을 이 계약으로 거르고 해당 지급 행을 선택한 상태로 연다.
+    // 지급 목록은 정산월 키가 없으면 기준 정산월로 거르므로(#752) 다른 월 지급도 보이게 전체월(빈 값)로 연다.
     render: (r) =>
       r.commissionTransactionId != null && c.contractNo ? (
         <ContextLink
-          to={`/transactions?${query({ contractNo: c.contractNo, selectedId: String(r.commissionTransactionId) })}`}
+          to={`/transactions?${query({ contractNo: c.contractNo, settlementMonth: '', selectedId: String(r.commissionTransactionId) })}`}
         >
           {r.commissionTransactionId}
         </ContextLink>
@@ -86,25 +116,58 @@ const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions']
   { key: 'item', label: '수수료 항목', cellClassName: 'tabular-nums', render: (r) => present(r.commissionItemId) },
   { key: 'no', label: '회차', align: 'left', render: (r) => int(r.installmentNo) },
   { key: 'paidOn', label: '지급일', cellClassName: 'tabular-nums', render: (r) => date(r.paidOn) },
-  { key: 'status', label: '상태', render: (r) => present(r.status) },
+  {
+    key: 'status',
+    label: '상태',
+    render: (r) => (
+      <StatusValue
+        value={r.status}
+        optionCount={3}
+        tablePresentation="dot"
+        label={paymentStatusLabels[r.status ?? ''] ?? '확인 필요'}
+      />
+    ),
+  },
   { key: 'amount', label: '귀속 금액', align: 'number', render: (r) => <Amount value={r.attributedAmount} /> },
 ]
 const scheduleColumns: TableColumn<Detail['scheduleLines'][number]>[] = [
   { key: 'no', label: '회차', align: 'left', render: (r) => int(r.installmentNo) },
   { key: 'due', label: '예정일', cellClassName: 'tabular-nums', render: (r) => date(r.dueDate) },
-  { key: 'status', label: '상태', render: (r) => present(r.lineStatus) },
+  {
+    key: 'status',
+    label: '상태',
+    render: (r) => (
+      <StatusValue
+        value={r.lineStatus}
+        optionCount={6}
+        tablePresentation="dot"
+        label={LINE_STATUS[r.lineStatus ?? ''] ?? '확인 필요'}
+      />
+    ),
+  },
   { key: 'expected', label: '예정액', align: 'number', render: (r) => <Amount value={r.expectedAmount} /> },
   { key: 'paid', label: '확정 지급', align: 'number', render: (r) => <Amount value={r.confirmedPaidAmount} /> },
   { key: 'unpaid', label: '미지급', align: 'number', render: (r) => <Amount value={r.unpaidAmount} /> },
 ]
 const effectColumns: TableColumn<Detail['effects'][number]>[] = [
   { key: 'job', label: '후속 작업', render: (r) => present(r.processingJob) },
-  { key: 'status', label: '처리 상태', render: (r) => present(r.processingStatus) },
+  {
+    key: 'status',
+    label: '처리 상태',
+    render: (r) => (
+      <StatusValue
+        value={r.processingStatus}
+        optionCount={7}
+        tablePresentation="dot"
+        label={processingStatusLabels[r.processingStatus ?? ''] ?? '확인 필요'}
+      />
+    ),
+  },
   { key: 'at', label: '처리 시각', cellClassName: 'tabular-nums', render: (r) => dateTime(r.processedAt) },
   { key: 'reason', label: '실패 사유', render: (r) => present(r.failureReason) },
 ]
 const policyColumns: TableColumn<Detail['policyCandidates'][number]>[] = [
-  { key: 'code', label: '정책', render: (r) => `${present(r.policyCode)} · ${present(r.policyName)}` },
+  { key: 'code', label: '정책', render: (r) => `${present(r.policyCode)}, ${present(r.policyName)}` },
   { key: 'version', label: '판', align: 'left', render: (r) => `v${int(r.versionNo)}` },
   {
     key: 'period',
@@ -128,26 +191,26 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
   return (
     <>
       <dl className="claw-detail-list">
-        <Row label="후보 ID · 계약번호">
-          {present(c.candidateId)} ·{' '}
+        <Row label="후보 ID, 계약번호">
+          {present(c.candidateId)},{' '}
           {c.contractId != null ? (
             <ContextLink to={`/contracts/${c.contractId}`}>{present(c.contractNo)}</ContextLink>
           ) : (
             present(c.contractNo)
           )}
         </Row>
-        <Row label="보험회사 · 상품">
-          {present(c.insurerName)} · {present(c.productName)}
+        <Row label="보험회사, 상품">
+          {present(c.insurerName)}, {present(c.productName)}
         </Row>
         <Row label="설계사">{present(c.agentName)}</Row>
         <Row label="발생 사유">
-          {triggerLabels[c.triggerType ?? ''] ?? present(c.triggerType)} · 원천 ID {present(c.sourceId)}
+          {triggerLabels[c.triggerType ?? ''] ?? present(c.triggerType)}, 원천 ID {present(c.sourceId)}
         </Row>
-        <Row label={`${present(c.dateBasisLabel)} · 계약일`}>
-          {date(c.eventDate)} · {date(c.contractDate)}
+        <Row label={`${present(c.dateBasisLabel)}, 계약일`}>
+          {date(c.eventDate)}, {date(c.contractDate)}
         </Row>
-        <Row label="기지급액 · 미지급액">
-          <Amount value={c.paidAmount} /> · <Amount value={c.unpaidAmount} />
+        <Row label="기지급액, 미지급액">
+          <Amount value={c.paidAmount} />, <Amount value={c.unpaidAmount} />
         </Row>
         <Row label="경과월">
           {detail.elapsedMonths == null
@@ -157,9 +220,9 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         {/* 서버의 policyVersionId는 후보가 하나일 때 채워 주는 값이지 적용 선택 결과가 아니다(인터페이스 §4-4-5). */}
         <Row label="정책 후보">
           {c.policyVersionId != null
-            ? `후보 1개 · 정책버전 ${c.policyVersionId} (적용 선택 전)`
+            ? `후보 1개, 정책버전 ${c.policyVersionId} (적용 선택 전)`
             : detail.policyCandidates?.length
-              ? `후보 ${detail.policyCandidates.length}개 · 적용 선택 필요`
+              ? `후보 ${detail.policyCandidates.length}개, 적용 선택 필요`
               : '유효한 환수 정책 없음'}
         </Row>
         <Row label="검토 사유">
@@ -170,19 +233,19 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
               ))}
             </ul>
           ) : (
-            '—'
+            '-'
           )}
         </Row>
       </dl>
       <Evidence
-        title="원천 사건 · 검증 근거"
+        title="원천 사건, 검증 근거"
         rows={detail.sourceRefs}
         columns={sourceColumns(c)}
         rowKey={(r, i) => `${r.triggerType}-${r.sourceId}-${i}`}
         empty="연결된 원천 근거가 없습니다."
       />
       <Evidence
-        title="연결 지급 · 귀속"
+        title="연결 지급, 귀속"
         rows={detail.paymentAttributions}
         columns={paymentColumns(c)}
         rowKey={(r, i) => `${r.transactionAttributionId ?? 'x'}-${i}`}
@@ -196,7 +259,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         empty="연결된 지급 스케줄이 없습니다."
       />
       <Evidence
-        title="보류 · 후속 처리 근거"
+        title="보류, 후속 처리 근거"
         rows={detail.effects}
         columns={effectColumns}
         rowKey={(r, i) => `${r.processingJob}-${r.validationRunId ?? 'x'}-${i}`}
@@ -219,7 +282,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         )}
         <p className="claw-evidence-empty">
           {detail.latestCalculation
-            ? `최신 계산판 v${int(detail.latestCalculation.calculationVersion)} · ${dateTime(detail.latestCalculation.calculatedAt)}`
+            ? `최신 계산판 v${int(detail.latestCalculation.calculationVersion)}, ${dateTime(detail.latestCalculation.calculatedAt)}`
             : '저장된 계산판이 없습니다.'}
         </p>
         <div className="claw-calculation-actions">

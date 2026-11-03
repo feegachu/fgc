@@ -62,7 +62,7 @@ export function DraftSelect({
           {placeholder}
         </option>
         {value !== '' && !options.some((option) => String(option.value) === String(value)) && (
-          <option value={value}>기존 값 · {value}</option>
+          <option value={value}>기존 값, {value}</option>
         )}
         {options.map((option) => (
           <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -130,7 +130,7 @@ export function ClawbackTargets({
       />
       <DraftSelect
         path={prefix + 'productOfferingId'}
-        label="상품 · 판매버전"
+        label="상품, 판매버전"
         errors={errors}
         value={rule.productOfferingId}
         placeholder="전체 상품"
@@ -138,7 +138,7 @@ export function ClawbackTargets({
         onChange={(v) => onChange({ productOfferingId: numberValue(v) })}
         options={(products.data ?? []).map((p) => ({
           value: p.productOfferingId!,
-          label: `${p.productName} · ${p.offeringVersion ?? '판매버전 자료 없음'} · ${p.salesStartDate ?? ''}`,
+          label: `${p.productName}, ${p.offeringVersion ?? '판매버전 자료 없음'}, ${p.salesStartDate ?? ''}`,
         }))}
       />
       <DraftSelect
@@ -206,7 +206,7 @@ export function CommissionRow({
         </Button>
       )}
       {!asOf && (
-        <p className="policy-note">기본정보의 적용 시작일을 입력하면 상품·조직·수수료 항목을 선택할 수 있습니다.</p>
+        <p className="policy-note">기본정보의 적용 시작일을 입력하면 상품/조직/수수료 항목을 선택할 수 있습니다.</p>
       )}
       <div className="policy-form-grid">
         <DraftSelect
@@ -233,7 +233,7 @@ export function CommissionRow({
         />
         <DraftSelect
           path={prefix + 'productOfferingId'}
-          label="상품 · 판매버전"
+          label="상품, 판매버전"
           errors={errors}
           value={rule.productOfferingId}
           disabled={!rule.insurerId || !asOf}
@@ -241,7 +241,7 @@ export function CommissionRow({
           onChange={(v) => set('productOfferingId', numberValue(v))}
           options={(products.data ?? []).map((p) => ({
             value: p.productOfferingId!,
-            label: `${p.productName} · ${p.offeringVersion ?? '판매버전 자료 없음'} · ${p.salesStartDate ?? ''}`,
+            label: `${p.productName}, ${p.offeringVersion ?? '판매버전 자료 없음'}, ${p.salesStartDate ?? ''}`,
           }))}
         />
         <DraftSelect
@@ -321,7 +321,7 @@ export function CommissionRow({
           errors={errors}
           value={rule.calculationType}
           onChange={(v) => onChange({ ...rule, calculationType: v as 'RATE' | 'FIXED', ratePct: '', fixedAmount: '' })}
-          options={optionsFor({ RATE: 'RATE · 요율', FIXED: 'FIXED · 고정금액' })}
+          options={optionsFor({ RATE: 'RATE, 요율', FIXED: 'FIXED, 고정금액' })}
         />
         <DraftInput
           path={prefix + 'ratePct'}

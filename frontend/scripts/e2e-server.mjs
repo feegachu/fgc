@@ -23,6 +23,7 @@ const child = spawn('java', ['-jar', resolve('../build/libs', jars[0])], {
     SPRING_DATASOURCE_PASSWORD: process.env.FGC_E2E_DB_PASSWORD ?? 'fgc_e2e_only',
     SPRING_FLYWAY_LOCATIONS: 'classpath:db/migration,classpath:db/demo',
     FGC_BATCH_DAILY_CHANGED_CONTRACT_ENABLED: 'false',
+    FGC_CONTRACT_STATUS_FOLLOW_UP_ENABLED: 'false',
   },
 })
 child.stdout.pipe(log)

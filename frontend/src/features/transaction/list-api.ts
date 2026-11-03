@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { apiClient, ApiError } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
-import { errorText } from '../../lib/format'
+import { errorText, internalErrorText } from '../../lib/format'
 import { formatSort, parseSort } from '../../lib/tableSort'
 
 export type PaymentRow = components['schemas']['CommissionPaymentListResponse']
@@ -50,6 +50,14 @@ export function readFilters(params: URLSearchParams): PaymentFilters {
     page: Number.isInteger(page) && page > 0 ? page : 1,
   }
 }
+/**
+ * 화면 표시·조회·정렬·페이지 이동이 함께 쓰는 적용 필터(#752).
+ * settlementMonth 키가 없으면 전역 기준 정산월을 쓰고, 빈 값(`settlementMonth=`)은 사용자가 비운 전체월로 보존한다.
+ */
+export function effectiveFilters(params: URLSearchParams, globalMonth: string | null): PaymentFilters {
+  const filters = readFilters(params)
+  return params.has('settlementMonth') ? filters : { ...filters, settlementMonth: globalMonth ?? '' }
+}
 export function filterParams(filters: PaymentFilters) {
   const query = new URLSearchParams()
   for (const key of filterKeys) if (filters[key]) query.set(key, filters[key])
@@ -73,6 +81,6 @@ export function transactionListQuery(filters: PaymentFilters) {
 }
 export function listError(error: Error | null) {
   if (error instanceof ApiError && (error.status >= 500 || error.code === 'FGC-COMMON-500'))
-    return `요청 ID: ${error.requestId ?? '-'}`
+    return internalErrorText(error.requestId)
   return errorText(error, '수수료 지급 건을 불러오지 못했습니다. 잠시 후 다시 시도하세요.')
 }

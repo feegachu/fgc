@@ -183,7 +183,7 @@ describe('CONT-W02 계약 상세', () => {
     expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
     expect(await screen.findByRole('cell', { name: 'GA' })).toBeInTheDocument()
     expect(screen.queryByLabelText('지급단계')).toBeNull()
-    expect(within(fc).getByText('버전 2 · 1회차')).toBeInTheDocument()
+    expect(within(fc).getByText('버전 2, 1회차')).toBeInTheDocument()
     expect(within(fc).queryByRole('link')).not.toBeInTheDocument()
     expect(within(fc).queryByText('서버 확정')).not.toBeInTheDocument()
   })
@@ -195,7 +195,7 @@ describe('CONT-W02 계약 상세', () => {
     const basic = await screen.findByRole('tab', { name: '기본정보' })
     basic.focus()
     fireEvent.keyDown(basic, { key: 'End' })
-    expect(screen.getByRole('tab', { name: '지급·대사' })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: '지급/대사' })).toHaveFocus()
     const reconciliation = await screen.findByRole('region', { name: '대사 결과' })
     expect(within(reconciliation).getByText('조회된 자료가 없습니다.')).toBeInTheDocument()
     expect(router.state.location.search).toBe('?tab=payment')
@@ -335,7 +335,7 @@ describe('CONT-W02 계약 상세', () => {
     expect(screen.getByRole('cell', { name: '역분개' })).toBeInTheDocument()
     expect(screen.queryByRole('cell', { name: 'EXPECTED_FC_PAYOUT' })).not.toBeInTheDocument()
     expect(screen.queryByRole('cell', { name: 'REVERSAL' })).not.toBeInTheDocument()
-    await actions.click(screen.getByRole('tab', { name: '지급·대사' }))
+    await actions.click(screen.getByRole('tab', { name: '지급/대사' }))
     await screen.findByRole('cell', { name: '서버 대사 결과' })
     expect(screen.getByText('3원')).toBeInTheDocument()
     expect(screen.getByText('-12원')).toBeInTheDocument()
@@ -355,7 +355,7 @@ describe('CONT-W02 계약 상세', () => {
     for (const label of ['수정', '스케줄 재생성', '한도 재검증']) {
       const button = screen.getByRole('button', { name: label })
       expect(button).toBeDisabled()
-      expect(button).toHaveAccessibleDescription('수정·스케줄 재생성·한도 재검증은 SETTLEMENT 권한이 필요합니다.')
+      expect(button).toHaveAccessibleDescription('수정/스케줄 재생성/한도 재검증은 SETTLEMENT 권한이 필요합니다.')
       await actions.click(button)
     }
     expect(requested.some(({ options }) => options?.method === 'POST')).toBe(false)
@@ -409,7 +409,7 @@ describe('CONT-W02 계약 상세', () => {
       if (failed) throw new ApiError({ code: 'FGC-COMMON-500', message: 'SECRET SQL detail' }, 'ledger-trace', 500)
       return []
     })
-    expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: ledger-trace')
+    expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 ledger-trace를 담당자에게 알려주세요.')
     expect(screen.queryByText(/SECRET SQL/)).not.toBeInTheDocument()
     failed = false
     await actions.click(screen.getByRole('button', { name: '다시 시도' }))
@@ -427,7 +427,7 @@ describe('CONT-W02 계약 상세', () => {
     await waitFor(() => expect(messages().some((message) => message.includes('작업 권한이 없습니다.'))).toBe(true))
     expect(router.state.location.search).toBe('')
     await actions.click(screen.getByRole('button', { name: '스케줄 재생성' }))
-    await waitFor(() => expect(messages()).toContain('요청 ID: mutation-trace'))
+    await waitFor(() => expect(messages()).toContain('처리 중 오류가 발생했습니다. 요청번호 mutation-trace를 담당자에게 알려주세요.'))
     expect(messages().some((message) => message.includes('SECRET'))).toBe(false)
     expect(messages().some((message) => message.includes('완료했습니다'))).toBe(false)
   })

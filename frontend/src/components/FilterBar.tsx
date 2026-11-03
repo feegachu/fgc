@@ -7,8 +7,9 @@ export function FilterBar({
   actions,
   className = '',
   wrapFields = true,
-  resetFirst = false,
-  icons = false,
+  resetFirst = true,
+  icons = true,
+  embedded = false,
   showSubmit = true,
   fieldsClassName = '',
   actionsClassName = '',
@@ -21,6 +22,7 @@ export function FilterBar({
   wrapFields?: boolean
   resetFirst?: boolean
   icons?: boolean
+  embedded?: boolean
   showSubmit?: boolean
   fieldsClassName?: string
   actionsClassName?: string
@@ -37,7 +39,11 @@ export function FilterBar({
     ) : null
   const submitButton = <Button type="submit">{icon('search')}조회</Button>
   return (
-    <form className={`filter-bar ${className}`} aria-label="조회 조건" onSubmit={submit}>
+    <form
+      className={`filter-bar search-conditions ${embedded ? 'is-embedded' : ''} ${className}`}
+      aria-label="조회 조건"
+      onSubmit={submit}
+    >
       {wrapFields ? <div className={`filter-fields ${fieldsClassName}`}>{children}</div> : children}
       <div className={`filter-actions ${actionsClassName}`}>
         {showSubmit && !resetFirst && submitButton}

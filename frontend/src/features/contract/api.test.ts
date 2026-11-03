@@ -94,7 +94,7 @@ describe('contract URL and labels', () => {
     expect(responseLabel(capStatusLabels, 'REVIEW_REQUIRED', '서버 표시명')).toBe('서버 표시명')
     expect(responseLabel(capStatusLabels, 'REVIEW_REQUIRED')).toBe('검토필요')
     expect(responseLabel(arbitrageStatusLabels, 'REVIEW_REQUIRED')).toBe('자료부족')
-    expect(responseLabel(capStatusLabels, 'FUTURE_STATUS')).toBe('FUTURE_STATUS')
+    expect(responseLabel(capStatusLabels, 'FUTURE_STATUS')).toBe('확인 필요')
   })
 })
 
@@ -145,10 +145,10 @@ describe('contract requests', () => {
       paymentTermMonths: 120,
       expectedUpdatedAt: '2026-10-12T00:00:00.123456Z',
     }
-    await updateContract('21', body)
-    expect(request).toHaveBeenCalledWith('/api/v1/contracts/21', { method: 'PUT', body })
+    await updateContract('21', body, 'request-key')
+    expect(request).toHaveBeenCalledWith('/api/v1/contracts/21', { method: 'PUT', body, idempotencyKey: 'request-key' })
     request.mockResolvedValue(envelope({}))
-    await expect(updateContract('21', body)).rejects.toThrow('수정된 계약을 확인할 수 없습니다.')
+    await expect(updateContract('21', body, 'request-key')).rejects.toThrow('수정된 계약을 확인할 수 없습니다.')
   })
 
   it('sends schedule regeneration as a POST with an encoded reason and isolates stage caches', async () => {

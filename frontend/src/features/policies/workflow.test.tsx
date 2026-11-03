@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
+import { usePolicyDetail } from './api'
 import { emptyDraft } from './management'
 import type { DraftDocument } from './management'
 import { normalizePolicyDetail } from './writeApi'
@@ -158,6 +159,107 @@ function mountManagement(
 }
 
 describe('production policy workflow', () => {
+  it('reopens with the latest token and child IDs after a conflict reload and saves successfully', async () => {
+    const latest = wireDetail()
+    const latestUpdatedAt = '2026-10-29T03:04:05.654321Z'
+    latest.header!.policyName = '다른 작성자의 최신 정책'
+    latest.editDocument!.policyName = '다른 작성자의 최신 정책'
+    latest.editDocument!.expectedUpdatedAt = latestUpdatedAt
+    latest.editDocument!.commissionRules[0].commissionRuleId = 119
+    latest.editDocument!.feeRegimeRules[0].feeRegimeRulesetId = 118
+    const request = vi
+      .spyOn(apiClient, 'request')
+      .mockRejectedValueOnce(new ApiError({ code: 'FGC-POL-003', message: '정책이 변경됐습니다.' }, 'conflict', 409))
+      .mockResolvedValueOnce({ data: latest, error: null, requestId: 'latest' })
+      .mockResolvedValueOnce(envelope({ ...result, updatedAt: latestUpdatedAt }))
+    const onSaved = vi.fn()
+    function ManagementWithQuery() {
+      const detail = usePolicyDetail(17, true)
+      return detail.data ? (
+        <PolicyManagement
+          policy={detail.data.header!}
+          detail={detail.data}
+          refreshing={detail.isFetching}
+          onSaved={onSaved}
+        />
+      ) : null
+    }
+    const cache = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+    cache.setQueryData(['policies', 'detail', 17], normalizePolicyDetail(wireDetail()))
+    render(
+      <QueryClientProvider client={cache}>
+        <ManagementWithQuery />
+      </QueryClientProvider>,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '초안 수정' }))
+    await user.clear(screen.getByLabelText(/정책명/))
+    await user.type(screen.getByLabelText(/정책명/), '저장하지 않은 내 입력')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    await user.click(await screen.findByRole('button', { name: '다시 조회' }))
+    await screen.findByText(/최신 정책:/)
+    expect(screen.getByLabelText(/정책명/)).toHaveValue('저장하지 않은 내 입력')
+    await user.click(screen.getByRole('button', { name: '취소' }))
+    await user.click(screen.getByRole('button', { name: '편집 취소' }))
+    await user.click(screen.getByRole('button', { name: '초안 수정' }))
+    expect(screen.getByLabelText(/정책명/)).toHaveValue('다른 작성자의 최신 정책')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(17))
+    expect(request.mock.calls[2][1]?.body).toMatchObject({
+      expectedUpdatedAt: latestUpdatedAt,
+      commissionRules: [{ commissionRuleId: 119 }],
+      feeRegimeRules: [{ feeRegimeRulesetId: 118 }],
+    })
+  })
+
+  it('keeps input and concurrency token after a 409 while querying the latest header', async () => {
+    const request = vi
+      .spyOn(apiClient, 'request')
+      .mockRejectedValueOnce(new ApiError({ code: 'FGC-POL-003', message: '정책이 변경됐습니다.' }, 'conflict', 409))
+      .mockResolvedValueOnce({ data: wireDetail(), error: null, requestId: 'reload' })
+    const { user } = mountEditor(normalizePolicyDetail(wireDetail()).editDocument, 17)
+    await user.clear(screen.getByLabelText(/정책명/))
+    await user.type(screen.getByLabelText(/정책명/), '내 입력 보존')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    await user.click(await screen.findByRole('button', { name: '다시 조회' }))
+    await screen.findByText(/최신 정책:/)
+    expect(screen.getByLabelText(/정책명/)).toHaveValue('내 입력 보존')
+    expect(request).toHaveBeenLastCalledWith('/api/v1/policies/17')
+    expect(request.mock.calls[0][1]?.body).toMatchObject({ expectedUpdatedAt: updatedAt })
+  })
+
+  it('정책 처리 오류는 다른 화면처럼 공통 문구 정리와 요청번호를 거친다', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(
+      new ApiError({ code: 'FGC-POL-003', message: '처리 불가 — 정책 상태가 바뀌었습니다.' }, 'req-pol-1', 409),
+    )
+    const { user } = mountManagement('DRAFT', ['EDIT', 'SUBMIT'])
+    await user.click(screen.getByRole('button', { name: '제출' }))
+    await user.type(screen.getByLabelText(/작업 사유/), '검토 요청')
+    await user.click(screen.getByRole('button', { name: '제출 확인' }))
+    expect(await screen.findByText('처리할 수 없습니다. 정책 상태가 바뀌었습니다. (요청번호: req-pol-1)')).toBeInTheDocument()
+    expect(screen.queryByText(/FGC-POL-003/)).not.toBeInTheDocument()
+  }, 15_000)
+
+  it('opens the draft evidence field when submission returns a missing-source error', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(
+      new ApiError(
+        {
+          code: 'FGC-POL-004',
+          field: 'sourceRefs',
+          message: '승인된 근거가 필요합니다.',
+        },
+        'missing-source',
+        422,
+      ),
+    )
+    const { user } = mountManagement('DRAFT', ['EDIT', 'SUBMIT'])
+    await user.click(screen.getByRole('button', { name: '제출' }))
+    await user.type(screen.getByLabelText(/작업 사유/), '검토 요청')
+    await user.click(screen.getByRole('button', { name: '제출 확인' }))
+    await waitFor(() => expect(screen.getByLabelText('출처 근거 코드')).toHaveFocus())
+    expect(screen.getByRole('heading', { name: '정책 초안 수정' })).toBeVisible()
+  })
+
   it('shows the saved offering document conditions alongside the installment limit', () => {
     const wire = wireDetail('ACTIVE', ['CLONE'])
     Object.assign(wire.editDocument!.feeRegimeRules[0], {
@@ -206,7 +308,7 @@ describe('production policy workflow', () => {
         <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
       </QueryClientProvider>,
     )
-    expect(screen.getByText('정정·승계로 계산 적용에서 제외됨')).toBeVisible()
+    expect(screen.getByText('정정/승계로 계산 적용에서 제외됨')).toBeVisible()
     expect(screen.getByText('후속 정책 #18')).toBeVisible()
   })
 
@@ -306,6 +408,15 @@ describe('production policy workflow', () => {
     )
   })
 
+  it('explains the self-approval block to an approver who edited or submitted the draft', () => {
+    // 서버는 작성·수정·제출에 참여한 승인자에게 REJECT만 준다. 이 사용자는 생성자가 아니다.
+    mountManagement('REVIEW', ['REJECT'])
+    expect(screen.queryByRole('button', { name: '승인' })).toBeNull()
+    expect(
+      screen.getByText('이 정책을 수정하거나 제출한 사용자는 승인할 수 없습니다. 다른 승인자의 검토가 필요합니다.'),
+    ).toBeVisible()
+  })
+
   it('includes optional approval evidence in the real approval request', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
     const { user, onSaved } = mountManagement('REVIEW', ['APPROVE'])
@@ -330,7 +441,7 @@ describe('production policy workflow', () => {
     const { user, onSaved } = mountManagement('ACTIVE', ['CLONE'])
     await user.click(screen.getByRole('tab', { name: '승인 이력' }))
     expect(screen.getByText('검토를 요청합니다.')).toBeVisible()
-    expect(screen.getByText(/author · policy:17/)).toBeVisible()
+    expect(screen.getByText(/author, policy:17/)).toBeVisible()
     await user.click(screen.getByRole('button', { name: '새 버전 작성' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByLabelText(/새 버전 적용 시작일/)).toHaveValue('')
@@ -472,12 +583,15 @@ describe('production policy workflow', () => {
     expect(onSaved).not.toHaveBeenCalled()
   })
 
-  it('keeps clawback rule registration disabled while D-02 is unresolved', async () => {
+  it('opens clawback inputs without guessing a rate and focuses missing fields', async () => {
     const request = vi.spyOn(apiClient, 'request')
     const { user } = mountEditor({ ...emptyDraft(), policyType: 'CLAWBACK' })
     await user.click(screen.getByRole('button', { name: /환수 규칙/ }))
-    expect(screen.getByRole('button', { name: /환수 규칙 추가/ })).toBeDisabled()
-    expect(screen.getByText(/D-02/)).toBeVisible()
+    expect(screen.getByRole('button', { name: /환수 규칙 추가/ })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: /환수 규칙 추가/ }))
+    expect(screen.getByLabelText(/환수율/)).toHaveValue(null)
+    expect(screen.getByLabelText(/기준금액/)).toHaveValue('')
+    expect(screen.getByText(/환수는 확정 지급 귀속액/)).toBeVisible()
     expect(request).not.toHaveBeenCalled()
   })
 })

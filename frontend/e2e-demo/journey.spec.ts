@@ -39,7 +39,7 @@ test('계약 등록·수정 → 스케줄 재생성·확정', async ({ page }, i
   const edited = responseFor(page, `/contracts/${contract.contractId}`, 'PUT')
   await page.locator('button[type=submit]').click()
   await successful(edited)
-  await expect(page.getByRole('status').filter({ hasText: '보험계약을 수정했습니다.' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: '계약 수정이 저장되었습니다.' })).toBeVisible()
   await expect(page.getByRole('main')).toContainText('E2E-418-CONTRACT-EDIT')
   await page.getByRole('tab', { name: '예상 스케줄', exact: true }).click()
   await page.goto('schedules?month=2026-07&contractNo=E2E-418-CONTRACT-EDIT&stage=GA_TO_FC')
@@ -105,12 +105,12 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
   const precheck = await successful(prechecked)
   expect(precheck.confirmable).toBe(expectedConfirmable)
   await expect(page.locator('#gate-list .transaction-gate-label')).toHaveText([
-    '1. 작성중(DRAFT) 저장 · 통과',
-    '2. 귀속행 입력 · 통과',
-    '3. 귀속합계 = 지급액 · 통과',
-    '4. 검토필요 귀속 해소 · 통과',
-    `5. 1,200% 사전검증 · ${expectedConfirmable ? '통과' : '차단'}`,
-    `6. 전부 통과 → 확정 · ${expectedConfirmable ? '통과' : '미확인'}`,
+    '1. 작성중(DRAFT) 저장, 통과',
+    '2. 귀속행 입력, 통과',
+    '3. 귀속합계 = 지급액, 통과',
+    '4. 검토필요 귀속 해소, 통과',
+    `5. 1,200% 사전검증, ${expectedConfirmable ? '통과' : '차단'}`,
+    `6. 전부 통과 → 확정, ${expectedConfirmable ? '통과' : '미확인'}`,
   ])
   await expect(page.locator('#btn-confirm')).toBeEnabled()
   await page.locator('#btn-confirm').click()
@@ -136,12 +136,15 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
   const contractNo = 'FGC-FGL01-202607-0005'
   const id = await payment(page, 250000, [contractNo], false)
   const rejected = responseFor(page, `/transactions/${id}/confirm`)
-  await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
+  await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
   const failure = await rejected
   expect(failure.ok()).toBe(false)
-  const error = (await failure.json()).error
+  const body = await failure.json()
+  const error = body.error
   expect(error.code).toBe('FGC-CAP-001')
-  await expect(page.locator('#transaction-confirm-blockers')).toContainText(error.code)
+  // 코드는 API 봉투에만 남기고 화면은 문구와 요청번호만 보인다(화면정의서 공통규칙 10, SIR-007).
+  await expect(page.locator('#transaction-confirm-blockers')).not.toContainText(error.code)
+  await expect(page.locator('#transaction-confirm-blockers')).toContainText(`(요청번호: ${body.requestId})`)
   // API 오류는 원본 정밀도를 유지하고 화면 문구만 한 자리로 표시한다 (#712).
   expect(error.message).toContain('사용률 104.166667%')
   await expect(page.locator('#transaction-confirm-blockers')).toContainText(rateText(error.message))

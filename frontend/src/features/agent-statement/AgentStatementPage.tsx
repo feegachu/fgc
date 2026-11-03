@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
-import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { Button } from '../../components/Button'
 import { ContextLink } from '../../components/ContextLink'
 import { DataTable } from '../../components/DataTable'
@@ -66,8 +65,10 @@ export default function AgentStatementPage() {
   const agentId = isAgent ? null : filters.agentId || null
   const entryKey = params.get('entryKey') ?? ''
   const ready = isAgent || agentId !== null
+  // 조회 조건이 같으면 입력 중인 필터를 지우지 않도록, entryKey 를 뺀 정규화한 조건을 key 로 쓴다.
+  const filterKey = filterParams(filters, !isAgent).toString()
   const list = useQuery(statementListQuery(filters, agentId, ready))
-  const detail = useQuery(statementDetailQuery(entryKey, agentId))
+  const detail = useQuery(statementDetailQuery(entryKey, agentId, ready))
   const asOf = `${filters.month || defaultMonth}-01`
   const agents = useAgentOptions(asOf, '', !isAgent)
   const items = useCommissionItems(asOf)
@@ -152,7 +153,7 @@ export default function AgentStatementPage() {
         </div>
       </header>
       <StatementFiltersBar
-        key={params.toString()}
+        key={filterKey}
         initial={filters}
         isAgent={isAgent}
         agents={(agents.data ?? []).map((row) => [String(row.agentId), `${row.agentCode} · ${row.agentName}`])}
@@ -265,12 +266,14 @@ function SummaryCards({
               <TypeLabel type={type} />
             </span>
             <strong className="ast-card-amount tabular-nums">
-              {bucket ? <AnimatedNumber value={bucket.amount} format={won} /> : failed ? '조회 실패' : loading ? '…' : '-'}
+              {bucket ? won(bucket.amount) : failed ? '조회 실패' : loading ? '…' : '-'}
             </strong>
-            <span className="ast-card-note" title={note}>
+            <span className="ast-card-note">
               {bucket ? `${int(bucket.count)}건` : ''}
               {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}
             </span>
+            {/* 해석 안내는 호버 툴팁이 아니라 화면에 보이는 문구로 둔다(터치·키보드 사용자). */}
+            <span className="ast-card-help">{note}</span>
           </article>
         )
       })}

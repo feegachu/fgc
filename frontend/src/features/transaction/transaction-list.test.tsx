@@ -82,13 +82,13 @@ function renderAt(path = '/app/transactions', canProcess = true) {
   )
   return { router, actions: userEvent.setup() }
 }
+function listRequests() {
+  return requests
+    .filter((url) => url.startsWith('/api/v1/transactions?'))
+    .map((url) => new URLSearchParams(url.split('?')[1]))
+}
 function lastRequest() {
-  return new URLSearchParams(
-    requests
-      .filter((url) => url.startsWith('/api/v1/transactions?'))
-      .at(-1)!
-      .split('?')[1],
-  )
+  return listRequests().at(-1)!
 }
 beforeAll(async () => {
   await import('./TransactionListPage')
@@ -324,6 +324,62 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     )
     expect(lastRequest().has('settlementMonth')).toBe(false)
   })
+  it('#752 정산월 없이 진입하면 첫 조회부터 표시된 기준 정산월로 조회하고 조회 버튼도 같은 조건이다', async () => {
+    const { router, actions } = renderAt('/app/transactions?month=2026-10')
+    await screen.findByText('TRAN-410')
+    expect(screen.getByLabelText('정산월')).toHaveValue('2026-10')
+    expect(listRequests().length).toBeGreaterThan(0)
+    expect(listRequests().map((query) => query.get('settlementMonth'))).toEqual(listRequests().map(() => '2026-10'))
+    const count = listRequests().length
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(listRequests().length).toBe(count + 1))
+    expect(lastRequest().get('settlementMonth')).toBe('2026-10')
+    expect(new URLSearchParams(router.state.location.search).get('settlementMonth')).toBe('2026-10')
+  })
+  it('#752 정산월 없는 URL의 페이지 이동·정렬은 기준 정산월을 유지한다', async () => {
+    const { actions } = renderAt('/app/transactions?month=2026-10&page=3')
+    await screen.findByText('3 / 7 페이지')
+    expect(lastRequest().get('settlementMonth')).toBe('2026-10')
+    const pagination = screen.getByRole('navigation', { name: '수수료 지급 건 목록 페이지 선택' })
+    await actions.click(within(pagination).getByRole('button', { name: '4' }))
+    await screen.findByText('4 / 7 페이지')
+    expect(lastRequest().get('settlementMonth')).toBe('2026-10')
+    const table = screen.getByRole('table', { name: '검색 조건에 해당하는 수수료 지급 건' })
+    await actions.click(within(table).getByRole('button', { name: '금액' }))
+    await waitFor(() => expect(lastRequest().get('sort')).toBe('amount,asc'))
+    expect(lastRequest().get('settlementMonth')).toBe('2026-10')
+    expect(lastRequest().get('page')).toBe('1')
+  })
+  it('#752 정산월 없는 URL은 기준 정산월 변경을 따라 1페이지를 조회하고 명시한 정산월은 유지한다', async () => {
+    const { router } = renderAt('/app/transactions?month=2026-10&page=3')
+    await screen.findByText('3 / 7 페이지')
+    const before = listRequests().length
+    await act(() => router.navigate('/transactions?month=2026-09'))
+    await waitFor(() => expect(lastRequest().get('settlementMonth')).toBe('2026-09'))
+    // URL의 월을 셸이 반영하기 전 렌더에서 이전 기준 정산월(2026-10) 조회가 먼저 나가지 않는다.
+    expect(
+      listRequests()
+        .slice(before)
+        .map((query) => query.get('settlementMonth')),
+    ).toEqual(['2026-09'])
+    expect(lastRequest().get('page')).toBe('1')
+    expect(screen.getByLabelText('정산월')).toHaveValue('2026-09')
+    await act(() => router.navigate('/transactions?month=2026-08&settlementMonth=2026-07'))
+    await waitFor(() => expect(lastRequest().get('settlementMonth')).toBe('2026-07'))
+    expect(screen.getByLabelText('정산월')).toHaveValue('2026-07')
+  })
+  it('#752 비운 정산월로 진입하면 처음부터 전체월로 조회하고 뒤로가기는 이전 적용 조건을 복원한다', async () => {
+    const { router } = renderAt('/app/transactions?month=2026-10&settlementMonth=')
+    await screen.findByText('TRAN-410')
+    expect(screen.getByLabelText('정산월')).toHaveValue('')
+    expect(listRequests().some((query) => query.has('settlementMonth'))).toBe(false)
+    await act(() => router.navigate('/transactions?month=2026-10'))
+    await waitFor(() => expect(lastRequest().get('settlementMonth')).toBe('2026-10'))
+    expect(screen.getByLabelText('정산월')).toHaveValue('2026-10')
+    await act(() => router.navigate(-1))
+    await waitFor(() => expect(screen.getByLabelText('정산월')).toHaveValue(''))
+    expect(lastRequest().has('settlementMonth')).toBe(false)
+  })
   it('이전 방문 결과의 설계사·항목 선택지를 보존하고 URL 재진입 값을 복원한다', async () => {
     const { router, actions } = renderAt()
     await screen.findByRole('option', { name: '홍길동' })
@@ -359,24 +415,25 @@ describe('TRAN-W01 수수료 지급 목록', () => {
   })
   it('COMPLIANCE의 등록 딥링크는 403이며 지급 API를 호출하지 않는다', async () => {
     renderAt('/app/transactions/new?id=41', false)
-    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
     expect(requests.some((path) => path.startsWith('/api/v1/transactions'))).toBe(false)
   })
   it('서버 500의 내부 문구 대신 요청 ID를 보여 주고 재조회할 수 있다', async () => {
     failure = new ApiError({ code: 'FGC-COMMON-500', message: 'private SQL detail' }, 'trace-410', 500)
     const { actions } = renderAt()
-    expect(await screen.findByText('요청 ID: trace-410')).toBeInTheDocument()
+    expect(await screen.findByText('처리 중 오류가 발생했습니다. 요청번호 trace-410를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.queryByText(/private SQL detail/)).toBeNull()
     failure = null
     await actions.click(screen.getByRole('button', { name: '다시 시도' }))
     expect(await screen.findByText('TRAN-410')).toBeInTheDocument()
   })
-  it('음수 금액은 마이너스 기호·빨강, 귀속 0건/차액은 확인필요로 표시한다', async () => {
+  it('음수 금액은 마이너스 기호와 빨강으로, 귀속 계약은 건수만 표시한다', async () => {
     resultRows = [{ ...row, amount: -1000, attributionCount: 0, differenceAmount: -1000 }]
     renderAt()
     const table = await screen.findByRole('table')
     const amounts = await within(table).findAllByText('-1,000원')
     expect(amounts.every((element) => element.classList.contains('is-negative-amount'))).toBe(true)
-    expect(within(table).getByText('0건 · 확인필요')).toBeInTheDocument()
+    expect(within(table).getByRole('button', { name: '귀속 계약' })).toBeInTheDocument()
+    expect(within(table).getByText('0건')).toBeInTheDocument()
   })
 })

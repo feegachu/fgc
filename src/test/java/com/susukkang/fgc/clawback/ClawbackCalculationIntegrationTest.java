@@ -286,9 +286,7 @@ class ClawbackCalculationIntegrationTest {
         String version = query.detail(id).candidate().sourceVersion();
         assertReasons(() -> calculation.calculate(id, request(version, ambiguous), key(), settlementUser),
                 "CLAWBACK_RULE_AMBIGUOUS");
-        long conditioned = policy(new Object[]{baseItem, 0, 1199, "100"});
-        jdbc.update("UPDATE fgc.clawback_rule SET condition_expression='{\"fault\":\"AGENT\"}'::jsonb WHERE policy_version_id=?",
-                conditioned);
+        long conditioned = policyWithCondition("{\"fault\":\"AGENT\"}", new Object[]{baseItem, 0, 1199, "100"});
         String withConditioned = query.detail(id).candidate().sourceVersion();
         assertReasons(() -> calculation.calculate(id, request(withConditioned, conditioned), key(), settlementUser),
                 "CONDITION_UNSUPPORTED");
@@ -361,6 +359,10 @@ class ClawbackCalculationIntegrationTest {
 
     /** 보험회사·판매버전을 비운 ACTIVE 환수 정책. rule = {수수료 항목, 경과월 from, to, 환수율}. */
     private long policy(Object[]... rules) {
+        return policyWithCondition("{}", rules);
+    }
+
+    private long policyWithCondition(String condition, Object[]... rules) {
         long id = jdbc.queryForObject("""
                 INSERT INTO fgc.policy_version(policy_code,policy_name,policy_type,source_class,version_no,
                     effective_from,status,created_by)
@@ -370,9 +372,9 @@ class ClawbackCalculationIntegrationTest {
         for (Object[] rule : rules) {
             jdbc.update("""
                     INSERT INTO fgc.clawback_rule(policy_version_id,commission_item_id,elapsed_month_from,
-                        elapsed_month_to,clawback_basis_code,clawback_rate_pct)
-                    VALUES (?,?,?,?,'PAID_ATTRIBUTED_AMOUNT',?)
-                    """, id, rule[0], rule[1], rule[2], new BigDecimal((String) rule[3]));
+                        elapsed_month_to,clawback_basis_code,clawback_rate_pct,condition_expression)
+                    VALUES (?,?,?,?,'PAID_ATTRIBUTED_AMOUNT',?,?::jsonb)
+                    """, id, rule[0], rule[1], rule[2], new BigDecimal((String) rule[3]), condition);
         }
         jdbc.update("""
                 UPDATE fgc.policy_version SET status='APPROVED', approved_at=now(),

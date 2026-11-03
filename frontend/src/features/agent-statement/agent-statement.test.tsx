@@ -143,6 +143,30 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     expect(router.state.location.search).not.toContain('entryKey')
   })
 
+  it('근거 보기를 눌러도 아직 조회하지 않은 필터 입력은 지워지지 않는다', async () => {
+    const row = entry()
+    handler = (path) => (path.includes('/statements/') ? detail(row) : list([row]))
+    renderAt('/app/agent/statements?month=2026-07')
+    const user = userEvent.setup()
+    const input = await screen.findByPlaceholderText('계약번호 입력')
+    await user.type(input, 'C-9999')
+    await user.click(await screen.findByRole('button', { name: 'C-0007 근거 보기' }))
+    await screen.findByRole('region', { name: '명세 근거' })
+    expect(screen.getByPlaceholderText('계약번호 입력')).toHaveValue('C-9999')
+  })
+
+  it('내부 사용자가 설계사를 고르기 전에는 근거 상세도 조회하지 않는다', async () => {
+    renderAt('/app/agent/statements?month=2026-07&entryKey=UEFZTUVOVDo5OTk', adminUser)
+    await screen.findByRole('heading', { name: '설계사 수수료 명세' })
+    expect(paths.filter((path) => path.includes('/statements'))).toEqual([])
+  })
+
+  it('환수 계산액 안내는 호버가 아니라 화면에 보이는 문구다', async () => {
+    renderAt('/app/agent/statements?month=2026-07')
+    const card = await screen.findByRole('article', { name: '환수 요약' })
+    expect(within(card).getByText('환수 계산액이며 실제 회수 완료액이 아닙니다')).toBeVisible()
+  })
+
   it('금액 자료가 없는 행은 0원이 아니라 금액 미확인으로 표시한다', async () => {
     handler = () => list([entry({ amount: null, dataStatus: 'MISSING' })])
     renderAt('/app/agent/statements?month=2026-07')
@@ -197,6 +221,8 @@ describe('RPT-W02 설계사 수수료 명세', () => {
 
   it('설계사는 수수료 지급 화면을 열 수 없다', async () => {
     renderAt('/app/transactions')
-    await waitFor(() => expect(screen.queryByRole('heading', { name: '수수료 지급' })).not.toBeInTheDocument())
+    // 접근 거부 화면이 실제로 뜬 뒤에 수수료 지급 제목이 없음을 확인한다.
+    expect(await screen.findByRole('heading', { name: /권한 없음/ })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '수수료 지급' })).not.toBeInTheDocument()
   })
 })

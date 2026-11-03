@@ -128,10 +128,11 @@ export function statementListQuery(filters: StatementFilters, agentId: string | 
   })
 }
 
-export function statementDetailQuery(entryKey: string, agentId: string | null) {
+export function statementDetailQuery(entryKey: string, agentId: string | null, ready = true) {
   return queryOptions({
     queryKey: ['agent-statements', 'detail', agentId, entryKey],
-    enabled: entryKey !== '',
+    // 내부 사용자가 설계사를 고르기 전에는 본인 전용 경로를 부르지 않는다(목록과 같은 조건).
+    enabled: ready && entryKey !== '',
     queryFn: async ({ signal }) => {
       const response = await apiClient.request<StatementDetail>(
         `${statementPath(agentId)}/${encodeURIComponent(entryKey)}`,

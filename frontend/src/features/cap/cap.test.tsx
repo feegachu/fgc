@@ -160,21 +160,21 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
       insurerId: '',
       orgId: '',
       contractNo: 'C',
-      sort: '',
+      sort: 'usagePct,desc',
     })
     expect(criteriaFromParams(new URLSearchParams(), null).month).toBe('')
   })
-  it('#604 허용된 정렬만 요청에 싣고 나머지는 서버 기본 정렬로 되돌린다', () => {
+  it('#604 허용된 정렬만 요청에 싣고 나머지는 화면 기본 정렬(사용률 높은 순)로 되돌린다', () => {
     expect(criteriaFromParams(new URLSearchParams('sort=usagePct,desc'), '2026-07').sort).toBe('usagePct,desc')
-    expect(criteriaFromParams(new URLSearchParams('sort=resultStatus,asc'), '2026-07').sort).toBe('')
-    expect(criteriaFromParams(new URLSearchParams('sort=usagePct'), '2026-07').sort).toBe('')
+    expect(criteriaFromParams(new URLSearchParams('sort=resultStatus,asc'), '2026-07').sort).toBe('usagePct,desc')
+    expect(criteriaFromParams(new URLSearchParams('sort=usagePct'), '2026-07').sort).toBe('usagePct,desc')
   })
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 유지한다', async () => {
     const { router, user } = renderAt('/cap-checks?month=2026-07&contractNo=C-1&page=2')
     const table = await screen.findByRole('table', { name: '계약별 판정 목록' })
     // 순서 기준이 없는 판정 컬럼은 정렬 버튼이 없다. 도움말 버튼은 정렬 버튼과 분리되어 있다.
     expect(within(table).queryByRole('button', { name: '판정' })).toBeNull()
-    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'none')
+    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'descending')
     await user.click(within(table).getByRole('button', { name: '사용률' }))
     await waitFor(() => expect(new URLSearchParams(listCalls().at(-1)!.split('?')[1]).get('sort')).toBe('usagePct,asc'))
     const last = new URLSearchParams(listCalls().at(-1)!.split('?')[1])
@@ -201,7 +201,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     expect(within(table).getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/contracts/3?tab=cap')
     expect(screen.getByRole('button', { name: /저장 판정 정상\s*30/ })).toBeVisible()
     expect(screen.getByText('30,000,000원')).toBeVisible() // 현재 페이지 1행으로 합산하지 않음
-    expect(screen.getByText('모니터링 지표 · 규제 판정 아님')).toBeVisible()
+    expect(screen.getByText('모니터링 지표, 규제 판정 아님')).toBeVisible()
   })
   it('필터·페이지·행 수를 URL에 유지하고 뒤로 이동 시 조건을 복원한다', async () => {
     const { router, user } = renderAt(
@@ -217,11 +217,11 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     expect(new URLSearchParams(router.state.location.search).has('page')).toBe(false)
     await user.click(screen.getByRole('button', { name: '2' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
-    await user.selectOptions(screen.getByLabelText('한 화면 행 수'), '50')
+    await user.selectOptions(screen.getByLabelText('화면 행 수'), '50')
     await waitFor(() => expect(router.state.location.search).toContain('size=50'))
     expect(new URLSearchParams(router.state.location.search).has('page')).toBe(false)
     await router.navigate(-1)
-    await waitFor(() => expect(screen.getByLabelText('한 화면 행 수')).toHaveValue('10'))
+    await waitFor(() => expect(screen.getByLabelText('화면 행 수')).toHaveValue('10'))
     expect(new URLSearchParams(router.state.location.search).get('page')).toBe('2')
     expect(screen.getByLabelText('계약번호')).toHaveValue('NEW')
   })
@@ -235,7 +235,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     await user.click(kpi)
     await waitFor(() => expect(new URLSearchParams(router.state.location.search).has('status')).toBe(false))
     await user.click(screen.getByRole('button', { name: '초기화' }))
-    await waitFor(() => expect(screen.getByLabelText('한 화면 행 수')).toHaveValue('20'))
+    await waitFor(() => expect(screen.getByLabelText('화면 행 수')).toHaveValue('20'))
     expect(screen.getByLabelText('계약번호')).toHaveValue('')
   })
   it.each(['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'])('%s 역할은 읽기만 한다', async (role) => {
@@ -291,7 +291,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText(storedReason)).toBeInTheDocument()
-    expect(screen.queryByText('적용대상 아님 — 시행 전 계약')).not.toBeInTheDocument()
+    expect(screen.queryByText('적용대상 아님, 시행 전 계약')).not.toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
@@ -326,7 +326,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('적용대상 아님 — 시행 전 계약')).toBeInTheDocument()
+    expect(await screen.findByText('적용대상 아님, 시행 전 계약')).toBeInTheDocument()
     expect(screen.getByText('CONTRACT_BEFORE_EFFECTIVE_DATE')).toBeInTheDocument()
     expect(screen.getByText('2026-06-30')).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
@@ -379,7 +379,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         throw new ApiError({ code: 'FGC-COMMON-500', message: 'internal database secret' }, 'trace-500', 500)
     })
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 trace-500를 담당자에게 알려주세요.')
     expect(screen.queryByText(/internal database secret/)).not.toBeInTheDocument()
   })
   it.each([null, undefined, ''])(

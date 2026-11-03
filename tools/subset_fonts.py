@@ -78,34 +78,63 @@ def subset_material(src: Path) -> None:
     print(f"material: {len(keep)} glyphs -> {out.stat().st_size // 1024} KB; 아이콘이 아닌 수집 단어 {len(missing)}개")
 
 
-def subset_noto(src: Path) -> None:
+def korean_unicodes() -> set[int]:
     def ksx1001(cp: int) -> bool:
         try:
             return len(chr(cp).encode("euc_kr")) == 2
         except UnicodeEncodeError:
             return False
-
     uni = {cp for cp in range(0xAC00, 0xD7A4) if ksx1001(cp)}
     for a, b in [(0x20, 0x7E), (0xA0, 0xFF), (0x2010, 0x2027), (0x2030, 0x205E), (0x20A9, 0x20A9),
                  (0x20AC, 0x20AC), (0x2100, 0x2122), (0x2190, 0x2199), (0x2200, 0x22FF), (0x2460, 0x24FF),
                  (0x2500, 0x257F), (0x25A0, 0x25FF), (0x2600, 0x26FF), (0x3000, 0x303F), (0x3131, 0x318E),
                  (0xFF01, 0xFF5E), (0xFFE6, 0xFFE6)]:
         uni.update(range(a, b + 1))
+    return uni
+
+
+def subset_text_font(src: Path, out_name: str, features: list[str], family: str | None = None) -> None:
+    uni = korean_unicodes()
     opts = subset.Options()
     opts.flavor = "woff2"
-    opts.layout_features = ["kern", "liga", "calt", "ccmp", "mark", "mkmk", "rvrn"]
+    opts.layout_features = features
     opts.notdef_outline = True
     opts.name_IDs = ["*"]
     font = subset.load_font(str(src), opts)
     s = subset.Subsetter(opts)
     s.populate(unicodes=sorted(uni))
     s.subset(font)
-    out = OUT / "noto-sans-kr-variable.woff2"
+    if family:
+        # OFL 예약 글꼴명: 수정본(서브셋)은 원래 이름을 대표 이름으로 쓸 수 없다.
+        for rec in font["name"].names:
+            if rec.nameID in (1, 16):
+                rec.string = family
+            elif rec.nameID == 4:
+                rec.string = f"{family} Variable"
+            elif rec.nameID == 6:
+                rec.string = family.replace(" ", "") + "-Variable"
+            elif rec.nameID == 3:
+                rec.string = f"{family};subset"
+    out = OUT / out_name
     subset.save_font(font, str(out), opts)
-    print(f"noto: {len(uni)} codepoints -> {out.stat().st_size // 1024} KB")
+    print(f"{out_name}: {len(uni)} codepoints -> {out.stat().st_size // 1024} KB")
+
+
+def subset_noto(src: Path) -> None:
+    subset_text_font(src, "noto-sans-kr-variable.woff2", ["kern", "liga", "calt", "ccmp", "mark", "mkmk", "rvrn"])
+
+
+def subset_pretendard(src: Path) -> None:
+    """Pretendard 가변 ttf(OFL 1.1, 예약 글꼴명 Pretendard) → 'FGC Sans'. 표의 숫자 자릿수를 맞추려고 tnum 을 남긴다."""
+    subset_text_font(src, "fgc-sans-variable.woff2",
+                     ["kern", "liga", "calt", "ccmp", "mark", "mkmk", "rvrn", "tnum"], family="FGC Sans")
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "--pretendard":
+        # python tools/subset_fonts.py --pretendard <PretendardVariable.ttf>  (npm pretendard dist/public/variable)
+        subset_pretendard(Path(sys.argv[2]))
+        sys.exit(0)
     if len(sys.argv) != 3:
         sys.exit(__doc__)
     subset_material(Path(sys.argv[1]))
