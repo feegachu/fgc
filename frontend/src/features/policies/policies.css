@@ -72,10 +72,11 @@
   gap: 20px;
   align-items: flex-start;
 }
+/* 쪽 제목(18px)과 카드 제목(14px) 사이: 상세 안의 첫 제목이되 쪽 제목과 같은 크기로 겹치지 않게 (SRC-068, SRC-074) */
 .policy-detail-hero h2 {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
-  line-height: 1.625rem;
+  line-height: 1.5rem;
 }
 .policy-detail-hero > div > p:last-child {
   color: var(--color-text-secondary);
