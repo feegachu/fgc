@@ -63,7 +63,7 @@ const columns: TableColumn<Detail>[] = [
       row.evidenceRef ? (
         <EvidenceLink label={row.evidenceRef}>{row.evidenceRef}</EvidenceLink>
       ) : (
-        '증빙 미연결 / 후속 연결 대기'
+        '증빙 없음'
       ),
   },
 ]
@@ -122,14 +122,6 @@ function BasisContent({ data }: { data: CapBasis }) {
             <dt>적용 시작 계약일</dt>
             <dd>{String(decision?.effectiveContractDate ?? '-')}</dd>
           </div>
-          <div>
-            <dt>사유 코드</dt>
-            <dd>{String(decision?.reasonCode ?? '-')}</dd>
-          </div>
-          <div>
-            <dt>판정 기준 버전</dt>
-            <dd>{String(decision?.policyVersion ?? '-')}</dd>
-          </div>
         </dl>
         <p>한도/산입금액/사용률 계산 대상이 아닙니다.</p>
       </div>
@@ -157,7 +149,7 @@ function BasisContent({ data }: { data: CapBasis }) {
     ['한도 배수', `${multiplier}배`, false],
     ['해약환급금 합산', won(item.refund12mAmount), true],
     ['준법경영비 공제', insurerStage ? won(item.complianceDeductionAmount) : '적용하지 않음', insurerStage],
-    ['적용 룰셋', item.capRuleSetId == null ? '-' : `룰셋 ID ${item.capRuleSetId}`, false],
+    ['적용 룰셋', item.capRuleSetId == null ? '-' : `룰셋 ${item.capRuleSetId}번`, false],
   ] as const
   return (
     <div className="cap-react-detail">
@@ -166,7 +158,7 @@ function BasisContent({ data }: { data: CapBasis }) {
         <span>{item.paymentStageLabel || STAGES[item.paymentStage as keyof typeof STAGES] || '-'}</span>
         <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
         <p>
-          기준일 {date(item.asOfDate)}, 룰셋 번호 {item.capRuleSetId ?? '-'}, 검증 번호 {item.capCheckId ?? '-'}
+          기준일 {date(item.asOfDate)}, 룰셋 {item.capRuleSetId == null ? '-' : `${item.capRuleSetId}번`}
         </p>
       </header>
       <div className="cap-react-detail-grid">

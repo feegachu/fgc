@@ -54,7 +54,7 @@ function ErrorCard({ title, message, help, requestId, copyRequestId }: ErrorCard
 }
 
 function CopyButton({ value }: { value: string }) {
-  const [label, setLabel] = useState('요청 ID 복사')
+  const [label, setLabel] = useState('요청번호 복사')
   // Clipboard API는 보안 컨텍스트(HTTPS·localhost)에서만 있다. 없으면 문구에서 직접 읽게 둔다.
   if (!navigator.clipboard) return null
   return (
@@ -117,18 +117,10 @@ export function ServerErrorPage({ error }: { error?: ApiError }) {
 }
 
 // 화면 분기는 오류 코드로 한다. 그 밖의 업무 오류는 1차 MpaExceptionHandler처럼 400이면 "입력 오류", 나머지는 "처리 오류".
+// 서버 detail 원문은 화면에 보이지 않는다. 사용자에게는 문구와 요청번호만 보인다.
 export function ApiErrorPage({ error }: { error: ApiError }) {
   if (error.code === 'FGC-AUTH-003') return <ForbiddenPage error={error} />
   if (error.status >= 500) return <ServerErrorPage error={error} />
   const title = error.code === 'FGC-COMMON-004' ? '찾을 수 없음' : error.status === 400 ? '입력 오류' : '처리 오류'
-  return (
-    <ErrorCard
-      status={error.status}
-      title={title}
-      message={error.message}
-      help={typeof error.detail === 'string' ? error.detail : undefined}
-      code={error.code}
-      requestId={error.requestId}
-    />
-  )
+  return <ErrorCard status={error.status} title={title} message={error.message} code={error.code} requestId={error.requestId} />
 }

@@ -9,7 +9,7 @@
   z-index: 82;
   pointer-events: none;
   border: 2px solid var(--color-primary, #2563eb);
-  border-radius: 10px;
+  border-radius: var(--radius-12);
   box-shadow: 0 0 0 9999px rgb(15 32 52 / 22%);
   animation: payment-guide-pulse 1.9s ease-in-out infinite;
   transition:
@@ -31,7 +31,7 @@
   background: var(--color-surface, #fff);
   color: var(--color-text, #18344b);
   border: 1px solid #cadbea;
-  border-radius: 16px;
+  border-radius: var(--radius-12);
   box-shadow: 0 12px 36px rgb(19 47 77 / 20%);
   font: inherit;
 }
@@ -50,7 +50,7 @@
 }
 .pico-guide-card small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: #617c95;
   line-height: 1.6;
 }
@@ -72,7 +72,7 @@
 .pico-guide-card button {
   background: #f3f7fc;
   border: 1px solid #d7e2ef;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   color: inherit;
   padding: 7px 10px;
   font: inherit;

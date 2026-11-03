@@ -91,7 +91,7 @@ class ContractDetailControllerTest {
                 .andExpect(jsonPath("$.data.productName").value("가상 건강보장보험 A"))
                 .andExpect(jsonPath("$.data.contractStatusLabel").value("정상"))
                 .andExpect(jsonPath("$.data.paymentCycleCodeLabel").value("월납"))
-                .andExpect(jsonPath("$.data.dataOriginLabel").value("수동 입력"));
+                .andExpect(jsonPath("$.data.dataOriginLabel").value("직접 입력"));
     }
 
     @Test

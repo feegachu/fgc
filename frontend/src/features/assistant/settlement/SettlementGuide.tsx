@@ -15,6 +15,7 @@ import { decide, STEPS, handoffFor, replacePayment as replacementSelection } fro
 import type { Selection, Evidence, Decision } from './state'
 import { guideGet, readEvidence } from './api'
 import { destinations, settlementCatalog, titles, FLOW_VERSION } from './catalog'
+import mascot from '../assets/pico-guide.png'
 import './settlement.css'
 
 const id = (value: string | null) =>
@@ -324,7 +325,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       aria-busy={busy}
     >
       <header>
-        <img src="/images/brand/agent-mascot.png" alt="" className="settlement-guide-mascot" width="32" height="32" />
+        <img src={mascot} alt="" className="settlement-guide-mascot" width="32" height="32" />
         <strong>전체 업무 가이드</strong>
         {selection && (
           <button type="button" onClick={() => setCollapsed((value) => !value)}>
@@ -337,7 +338,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       </header>
       {!collapsed && (
         <p>
-          {month} · {(selection?.stage ?? stage) === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'} ·{' '}
+          {month}, {(selection?.stage ?? stage) === 'GA_TO_FC' ? 'GA→설계사' : '원수사→GA'},{' '}
           {contractLabel || '새 업무'}
         </p>
       )}
@@ -350,8 +351,8 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
           <label>
             지급단계
             <select value={stage} onChange={(event) => setStage(event.target.value as Selection['stage'])}>
-              <option value="GA_TO_FC">GA → 설계사</option>
-              <option value="INSURER_TO_GA">보험사 → GA</option>
+              <option value="GA_TO_FC">GA→설계사</option>
+              <option value="INSURER_TO_GA">원수사→GA</option>
             </select>
           </label>
           <label>
@@ -368,10 +369,10 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         </>
       ) : (
         <>
-          <p>{decision ? `${STEPS.indexOf(decision.step) + 1}/9 · ${titles[STEPS.indexOf(decision.step)]}` : ''}</p>
+          <p>{decision ? `${STEPS.indexOf(decision.step) + 1}/9, ${titles[STEPS.indexOf(decision.step)]}` : ''}</p>
           <p>{decision?.reason}</p>
           {snapshot?.status === 'PAUSED' || snapshot?.status === 'ERROR' ? (
-            <p role="status">안내 대상을 확인하지 못했거나 화면·입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
+            <p role="status">안내 대상을 확인하지 못했거나 화면이나 입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
           ) : null}
           {snapshot?.status === 'COMPLETED' ? (
             <strong>전체 업무 안내 완료</strong>
@@ -415,7 +416,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
                   정정 지급으로 이어서 안내
                 </button>
                 <button onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
-                  새 월 검증 선택·생성
+                  새 월 검증 선택/생성
                 </button>
                 <button onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
                   월 검증 다시 확인
@@ -436,7 +437,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         </>
       )}
       {error && <p role="alert">{error}</p>}
-      {!collapsed && <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>}
+      {!collapsed && <small>안내는 저장, 실행, 확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>}
     </aside>
   )
 }

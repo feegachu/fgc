@@ -8,7 +8,7 @@
   overflow: auto;
   padding: 20px;
   border: 1px solid var(--color-primary, #3154ff);
-  border-radius: 16px;
+  border-radius: var(--radius-12);
   background: var(--color-surface, #fff);
   box-shadow: 0 8px 32px #10205020;
   font-size: 14px;
@@ -27,7 +27,7 @@
 .settlement-guide select {
   padding: 8px;
   border: 1px solid #bfc9d7;
-  border-radius: 6px;
+  border-radius: var(--radius-8);
   width: 100%;
 }
 .settlement-guide p {
@@ -84,7 +84,7 @@ body:has([role='dialog']) .settlement-spotlight {
 
 .settlement-guide button:not(.button) {
   border: 1px solid #c9d4e3;
-  border-radius: 6px;
+  border-radius: var(--radius-8);
   background: #f7f9fc;
   color: #163256;
   padding: 6px 9px;

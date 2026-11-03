@@ -36,7 +36,7 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
                 && !ValidationRunType.MANUAL_CONTRACT.name().equals(run.getRunType());
         if (run.getStatus() != ValidationRunStatus.CREATED && !monthlyRestart) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
-                    Map.of("from", run.getStatus(), "to", ValidationRunStatus.RUNNING.name()));
+                    Map.of("from", run.getStatus().label(), "to", ValidationRunStatus.RUNNING.label()));
         }
 
         // JobParameters의 triggeredBy는 행 생성자 값이라, 실행 버튼을 누른 사용자는
