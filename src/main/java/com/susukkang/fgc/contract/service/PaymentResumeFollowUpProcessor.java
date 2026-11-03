@@ -1,19 +1,16 @@
 package com.susukkang.fgc.contract.service;
 
 import com.susukkang.fgc.common.code.ContractStatus;
-import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.contract.dto.ContractStatusEffect;
 import com.susukkang.fgc.contract.dto.ContractStatusEffect.EntityType;
 import com.susukkang.fgc.contract.entity.ContractStatusEvent;
-import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.PaymentHoldRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -40,7 +37,6 @@ import java.util.Set;
 public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpProcessor {
 
     public static final String JOB = "PaymentResumeJob";
-    static final String NO_RETROACTIVE = "NO_RETROACTIVE";
     private static final String PLANNED = "PLANNED";
     private static final String RELEASED = "RELEASED";
     private static final String EXCLUDED = "EXCLUDED";
@@ -49,7 +45,6 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
     private final ContractStatusPaymentRule rule;
     private final PaymentHoldRepository holds;
     private final JdbcTemplate jdbc;
-    private final ContractStatusEventRepository events;
 
     @Override
     public String jobName() {
@@ -75,68 +70,20 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
                         """, effect.entityId());
                 recorded.add(effect);
             } else if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
-                holds.releaseOpen(effect.entityId(), event.getContractStatusEventId());
+                holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId());
                 recorded.add(effect);
             } else if (EXCLUDED.equals(effect.nextState())) {
                 recorded.add(effect);
             }
         }
-        recorded.addAll(notResumed(event));
-        return recorded;
-    }
-
-    /**
-     * 비대상과 그 근거: 직전 실효일부터 부활 전날까지의 중단 회차와, 처리 뒤에도 보류가 남은 지급 건.
-     * 규칙은 바뀌는 대상만 돌려주므로 "왜 되살리지 않았는지"는 여기서 따로 남겨야 영향 조회에서 보인다.
-     */
-    private List<ContractStatusEffect> notResumed(ContractStatusEvent revival) {
-        List<ContractStatusEvent> timeline = events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(revival.getContractId());
-        LocalDate revivedOn = day(revival);
-        LocalDate lapsedOn = null;
-        for (int i = timeline.indexOf(revival) - 1; i >= 0; i--) {
-            if (timeline.get(i).getNewStatus() == ContractStatus.LAPSED) {
-                lapsedOn = day(timeline.get(i));
-                break;
+        // 규칙은 바뀌는 대상만 돌려주므로 되살리지 않은 대상과 그 근거는 같은 규칙의 판단에서 따로 만들어 남긴다.
+        Set<String> already = new HashSet<>();
+        recorded.forEach(effect -> already.add(effect.entityType() + ":" + effect.entityId()));
+        for (ContractStatusEffect effect : rule.notPayable(event)) {
+            if (already.add(effect.entityType() + ":" + effect.entityId())) {
+                recorded.add(effect);
             }
         }
-        if (lapsedOn == null) {
-            return List.of();
-        }
-        Long policyVersionId = rule.policyVersionId(revival.getContractId());
-        String why = "부활은 실효 기간(" + lapsedOn + "~" + revivedOn.minusDays(1) + ")을 소급하지 않습니다(NO_RETROACTIVE). ";
-        List<ContractStatusEffect> notResumed = new ArrayList<>();
-        notResumed.addAll(jdbc.query("""
-                SELECT sl.schedule_line_id, sl.line_status, sl.expected_amount
-                  FROM fgc.schedule_line sl
-                  JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
-                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn
-                   AND sh.status NOT IN ('CONFIRMED', 'MATCHED', 'ADJUSTED', 'CANCELLED')
-                   AND sl.line_status = 'CANCELLED' AND sl.due_date >= ? AND sl.due_date < ?
-                 ORDER BY sl.schedule_line_id
-                """, (rs, row) -> new ContractStatusEffect(EntityType.SCHEDULE_LINE, rs.getLong(1), rs.getString(2), EXCLUDED,
-                rs.getBigDecimal(3), policyVersionId, NO_RETROACTIVE, why + "이 회차는 중단 상태로 둡니다."),
-                revival.getContractId(), lapsedOn, revivedOn));
-        for (ContractStatusEffect payment : stillHeld(revival.getContractId(), policyVersionId, why)) {
-            notResumed.add(payment);
-        }
-        return notResumed;
-    }
-
-    /** 부활 처리 뒤에도 미해제 보류가 남은 지급 건. 이 지급 건은 계속 확정할 수 없다. */
-    private List<ContractStatusEffect> stillHeld(Long contractId, Long policyVersionId, String why) {
-        return jdbc.query("""
-                SELECT DISTINCT ct.commission_transaction_id, ct.status, ct.amount
-                  FROM fgc.payment_hold h
-                  JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = h.commission_transaction_id
-                  JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
-                 WHERE ta.contract_id = ? AND h.released_at IS NULL AND ct.status = 'DRAFT'
-                 ORDER BY ct.commission_transaction_id
-                """, (rs, row) -> new ContractStatusEffect(EntityType.PAYMENT, rs.getLong(1), rs.getString(2), EXCLUDED,
-                (BigDecimal) rs.getBigDecimal(3), policyVersionId, NO_RETROACTIVE,
-                why + "보류가 남은 지급 건이라 계속 확정할 수 없습니다."), contractId);
-    }
-
-    private static LocalDate day(ContractStatusEvent event) {
-        return event.getEffectiveAt().atZoneSameInstant(DateUtil.SEOUL_ZONE).toLocalDate();
+        return recorded;
     }
 }

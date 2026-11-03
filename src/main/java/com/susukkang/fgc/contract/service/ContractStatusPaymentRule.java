@@ -71,12 +71,49 @@ public class ContractStatusPaymentRule {
         return judge(timeline, point(event), policyVersionId, lines(contractId), payments(contractId), heldPaymentIds);
     }
 
-    /** 처리기가 비대상의 근거에 쓸 정책 버전. 판단과 같은 방식(계약일로 선택)으로 고른다. */
+    /**
+     * 이 사건 시점에도 지급 대상이 아닌(보류·중단 판단인) 미확정 회차와 미확정 지급 건과 그 근거. 부활 처리기가 "왜 되살리지 않았는지"를
+     * 영향 조회에 남기는 데 쓴다. {@link #decide}는 바뀌는 대상만 돌려주므로 현재 상태와 무관하게 같은 판단에서 따로 만든다.
+     * 확정·기지급·월잠금 대상은 보존 대상이라 넣지 않는다. 쓰기는 하지 않는다.
+     */
     @Transactional(readOnly = true)
-    public Long policyVersionId(Long contractId) {
+    public List<ContractStatusEffect> notPayable(ContractStatusEvent event) {
+        Long contractId = event.getContractId();
         LocalDate contractDate = jdbc.queryForObject(
                 "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?", LocalDate.class, contractId);
-        return policies.resolve(contractDate);
+        Long policyVersionId = policies.resolve(contractDate);
+        List<StatusPoint> timeline = events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(contractId).stream()
+                .map(ContractStatusPaymentRule::point)
+                .toList();
+        return judgeNotPayable(timeline, point(event), policyVersionId, lines(contractId), payments(contractId));
+    }
+
+    static List<ContractStatusEffect> judgeNotPayable(List<StatusPoint> events, StatusPoint asOf, Long policyVersionId,
+                                                      List<Line> lines, List<Payment> payments) {
+        List<StatusPoint> timeline = events.stream()
+                .filter(point -> EFFECTIVE_ORDER.compare(point, asOf) <= 0)
+                .sorted(EFFECTIVE_ORDER)
+                .toList();
+        List<ContractStatusEffect> notPayable = new ArrayList<>();
+        for (Line line : lines) {
+            if (CONFIRMED_LINES.contains(line.status()) || CONFIRMED_HEADERS.contains(line.headerStatus())) {
+                continue;
+            }
+            worst(List.of(line.dueDate()), timeline).filter(verdict -> verdict.outcome() != Outcome.PAY)
+                    .ifPresent(verdict -> notPayable.add(effect(EntityType.SCHEDULE_LINE, line.lineId(), line.status().name(),
+                            EXCLUDED, line.amount(), policyVersionId, Reason.NO_RETROACTIVE,
+                            "부활은 지급 불가 기간을 소급하지 않습니다(NO_RETROACTIVE). " + verdict.explain("지급예정일"))));
+        }
+        for (Payment payment : payments) {
+            if (payment.status() != CommissionPaymentStatus.DRAFT) {
+                continue;
+            }
+            worst(payment.attributionDates(), timeline).filter(verdict -> verdict.outcome() != Outcome.PAY)
+                    .ifPresent(verdict -> notPayable.add(effect(EntityType.PAYMENT, payment.transactionId(),
+                            payment.status().name(), EXCLUDED, payment.amount(), policyVersionId, Reason.NO_RETROACTIVE,
+                            "부활은 지급 불가 기간을 소급하지 않습니다(NO_RETROACTIVE). " + verdict.explain("귀속일"))));
+        }
+        return notPayable;
     }
 
     private static StatusPoint point(ContractStatusEvent event) {
@@ -138,7 +175,7 @@ public class ContractStatusPaymentRule {
 
     private enum Reason {
         STATUS_ACTIVE, STATUS_UNPAID, UNPAID_RESUMED, UNPAID_ENDED, STATUS_INACTIVE, CONTRACT_WITHDRAWN,
-        ALREADY_CONFIRMED, MONTH_LOCKED
+        ALREADY_CONFIRMED, MONTH_LOCKED, NO_RETROACTIVE
     }
 
     /** status: 판단일의 상태. 미납이 해소된 판단(UNPAID_*)이면 해소한 상태다. */

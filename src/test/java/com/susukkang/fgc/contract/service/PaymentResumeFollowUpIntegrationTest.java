@@ -142,6 +142,78 @@ class PaymentResumeFollowUpIntegrationTest {
     }
 
     @Test
+    void revivingOneContractKeepsTheHoldAnotherContractPlacedOnASharedPayment() {
+        long a = contract("2026-03-01");
+        long b = contract("2026-03-01");
+        statusEvent(a, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        statusEvent(b, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long lapseA = statusEvent(a, 2, "LAPSED", "2026-09-01T00:00:00+09:00");
+        long lapseB = statusEvent(b, 2, "LAPSED", "2026-09-01T00:00:00+09:00");
+        // 같은 지급 건이 A(부활 뒤 10/20)와 B(실효 기간 9/20)에 귀속된다.
+        long shared = payment(a, "2026-10-20", false);
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, contract_id, attribution_date,
+                    attribution_month, attributed_amount, inclusion_status_snapshot, attribution_method)
+                VALUES (?, 2, ?, DATE '2026-09-20', DATE '2026-09-01', 0, 'INCLUDED', 'DIRECT')
+                """, shared, b);
+        holdProcessor.process(events.findById(lapseA).orElseThrow());
+        holdProcessor.process(events.findById(lapseB).orElseThrow());
+        assertThat(openHolds(shared)).isEqualTo(2);
+
+        long revivalA = statusEvent(a, 3, "REVIVED", "2026-10-15T00:00:00+09:00");
+        List<ContractStatusEffect> recorded = resumeProcessor.process(events.findById(revivalA).orElseThrow());
+
+        // A 의 판단으로는 재개 대상이라 A 의 보류만 풀리고, B 의 실효로 걸린 보류는 남는다.
+        assertThat(recorded).extracting(ContractStatusEffect::entityId, ContractStatusEffect::nextState)
+                .contains(tuple(shared, "RELEASED"));
+        assertThat(openHolds(shared)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT e.contract_id FROM fgc.payment_hold h JOIN fgc.contract_status_event e USING (contract_status_event_id)
+                 WHERE h.commission_transaction_id = ? AND h.released_at IS NULL
+                """, Long.class, shared)).isEqualTo(b);
+        assertThat(gate.blockers(shared)).isNotEmpty();
+    }
+
+    @Test
+    void theEvidenceFollowsTheRuleJudgmentSoAnUnpaidThenLapsedPeriodNamesItsOwnDateAndStatus() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long unpaid = statusEvent(contract, 2, "UNPAID", "2026-08-01T00:00:00+09:00");
+        long lapse = statusEvent(contract, 3, "LAPSED", "2026-09-01T00:00:00+09:00");
+        long unpaidPeriodPayment = payment(contract, "2026-08-20", false);
+        long revival = statusEvent(contract, 4, "REVIVED", "2026-10-15T00:00:00+09:00");
+        holdProcessor.process(events.findById(unpaid).orElseThrow());
+        holdProcessor.process(events.findById(lapse).orElseThrow());
+
+        List<ContractStatusEffect> recorded = resumeProcessor.process(events.findById(revival).orElseThrow());
+
+        ContractStatusEffect evidence = recorded.stream()
+                .filter(effect -> effect.entityId().equals(unpaidPeriodPayment) && "NO_RETROACTIVE".equals(effect.reasonCode()))
+                .findFirst().orElseThrow();
+        // 실효 기간(9/1~)이 아니라 이 지급 건의 귀속일(8/20)과 그날의 판단(미납 → 실효로 끝남)을 말한다.
+        assertThat(evidence.reason()).contains("2026-08-20").contains("미납").doesNotContain("2026-09-01");
+        assertThat(openHolds(unpaidPeriodPayment)).isEqualTo(1);
+    }
+
+    @Test
+    void notPayableTargetsWithoutAHoldOrStillPlannedAreAlsoListedWithTheirEvidence() {
+        Scenario s = lapsedThenRevived();
+        // 실효 처리 뒤에 만든 실효 기간 초안(보류 없음)과 재생성 등으로 PLANNED 가 된 실효 기간 회차
+        long lateDraft = payment(s.contract, "2026-09-28", false);
+        long header = jdbc.queryForObject("SELECT schedule_header_id FROM fgc.schedule_line WHERE schedule_line_id = ?", Long.class, s.lapsePeriodLine);
+        long replannedLine = line(header, 9, "2026-09-27", "PLANNED");
+        assertThat(openHolds(lateDraft)).isZero();
+
+        List<ContractStatusEffect> recorded = resumeProcessor.process(events.findById(s.revival).orElseThrow());
+
+        assertThat(recorded).extracting(ContractStatusEffect::entityType, ContractStatusEffect::entityId,
+                        ContractStatusEffect::nextState, ContractStatusEffect::reasonCode)
+                .contains(tuple(EntityType.PAYMENT, lateDraft, "EXCLUDED", "NO_RETROACTIVE"),
+                        tuple(EntityType.SCHEDULE_LINE, replannedLine, "EXCLUDED", "NO_RETROACTIVE"));
+        assertThat(gate.blockers(lateDraft)).isNotEmpty();
+    }
+
+    @Test
     void supportsOnlyTheRevivalEvent() {
         long contract = contract("2026-03-01");
         statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
