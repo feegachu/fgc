@@ -84,6 +84,9 @@ class ContractStatusEventIntegrationTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private PaymentHoldFollowUpProcessor paymentHoldProcessor;
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private PaymentResumeFollowUpProcessor paymentResumeProcessor;
+
 
     private static final OffsetDateTime AUG_1 = OffsetDateTime.parse("2026-08-01T00:00:00+09:00");
     private static final String CODE = "MANUAL_STATUS_CHANGE";
@@ -106,6 +109,7 @@ class ContractStatusEventIntegrationTest {
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.when(paymentHoldProcessor.jobName()).thenReturn(PaymentHoldFollowUpProcessor.JOB);
+        org.mockito.Mockito.when(paymentResumeProcessor.jobName()).thenReturn(PaymentResumeFollowUpProcessor.JOB);
         settle = (FgcUserDetails) users.loadUserByUsername("settle01");
         processor.reset();
         // 앞 테스트가 남긴 대기 작업을 비워 이 테스트가 만든 작업의 처리 순서만 본다.

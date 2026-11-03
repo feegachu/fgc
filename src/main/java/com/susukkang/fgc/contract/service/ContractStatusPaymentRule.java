@@ -71,6 +71,14 @@ public class ContractStatusPaymentRule {
         return judge(timeline, point(event), policyVersionId, lines(contractId), payments(contractId), heldPaymentIds);
     }
 
+    /** 처리기가 비대상의 근거에 쓸 정책 버전. 판단과 같은 방식(계약일로 선택)으로 고른다. */
+    @Transactional(readOnly = true)
+    public Long policyVersionId(Long contractId) {
+        LocalDate contractDate = jdbc.queryForObject(
+                "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?", LocalDate.class, contractId);
+        return policies.resolve(contractDate);
+    }
+
     private static StatusPoint point(ContractStatusEvent event) {
         return new StatusPoint(event.getEffectiveAt(), event.getEventSeq(), event.getNewStatus());
     }
