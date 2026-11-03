@@ -415,24 +415,25 @@ describe('TRAN-W01 수수료 지급 목록', () => {
   })
   it('COMPLIANCE의 등록 딥링크는 403이며 지급 API를 호출하지 않는다', async () => {
     renderAt('/app/transactions/new?id=41', false)
-    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
     expect(requests.some((path) => path.startsWith('/api/v1/transactions'))).toBe(false)
   })
   it('서버 500의 내부 문구 대신 요청 ID를 보여 주고 재조회할 수 있다', async () => {
     failure = new ApiError({ code: 'FGC-COMMON-500', message: 'private SQL detail' }, 'trace-410', 500)
     const { actions } = renderAt()
-    expect(await screen.findByText('요청 ID: trace-410')).toBeInTheDocument()
+    expect(await screen.findByText('처리 중 오류가 발생했습니다. 요청번호 trace-410를 담당자에게 알려주세요.')).toBeInTheDocument()
     expect(screen.queryByText(/private SQL detail/)).toBeNull()
     failure = null
     await actions.click(screen.getByRole('button', { name: '다시 시도' }))
     expect(await screen.findByText('TRAN-410')).toBeInTheDocument()
   })
-  it('음수 금액은 마이너스 기호·빨강, 귀속 0건/차액은 확인필요로 표시한다', async () => {
+  it('음수 금액은 마이너스 기호와 빨강으로, 귀속 계약은 건수만 표시한다', async () => {
     resultRows = [{ ...row, amount: -1000, attributionCount: 0, differenceAmount: -1000 }]
     renderAt()
     const table = await screen.findByRole('table')
     const amounts = await within(table).findAllByText('-1,000원')
     expect(amounts.every((element) => element.classList.contains('is-negative-amount'))).toBe(true)
-    expect(within(table).getByText('0건 · 확인필요')).toBeInTheDocument()
+    expect(within(table).getByRole('button', { name: '귀속 계약' })).toBeInTheDocument()
+    expect(within(table).getByText('0건')).toBeInTheDocument()
   })
 })

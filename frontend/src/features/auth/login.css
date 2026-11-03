@@ -79,7 +79,7 @@
   padding-top: 0.875rem;
   border-top: 1px solid rgb(255 255 255 / 24%);
   color: rgb(255 255 255 / 62%);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.125rem;
 }
 
@@ -118,7 +118,7 @@
 
 .auth-eyebrow {
   color: var(--color-action-primary);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1rem;
   letter-spacing: 0.072em;
@@ -297,6 +297,7 @@
     margin-bottom: 2.5rem;
     object-fit: contain;
     object-position: left center;
+    filter: brightness(0) saturate(100%) invert(24%) sepia(54%) saturate(929%) hue-rotate(174deg);
   }
 }
 

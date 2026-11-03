@@ -180,7 +180,7 @@ export function previewCommissionRules(draft: DraftDocument): ManagedPolicyDetai
     paymentStageLabel: rule.paymentStage === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA',
     insurerName: rule.insurerId ? '예시생명' : '전체',
     productName: rule.productOfferingId
-      ? `예시 종신보험 · ${rule.productOfferingId === 101 ? '2029-A' : '2029-B'}`
+      ? `예시 종신보험, ${rule.productOfferingId === 101 ? '2029-A' : '2029-B'}`
       : '전체',
     itemName: rule.commissionItemId === 1 ? '유지관리수수료' : '판매수수료',
     installmentFrom: Number(rule.installmentFrom),

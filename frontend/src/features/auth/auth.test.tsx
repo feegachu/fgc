@@ -32,7 +32,11 @@ beforeEach(() => {
   sessionStorage.clear()
   vi.spyOn(apiClient, 'request').mockImplementation(async (url) => {
     if (url.startsWith('/api/v1/base/commission-items')) return envelope([])
-    if (url.startsWith('/api/v1/base/') || url.startsWith('/api/v1/contracts?') || url.startsWith('/api/v1/transactions?'))
+    if (
+      url.startsWith('/api/v1/base/') ||
+      url.startsWith('/api/v1/contracts?') ||
+      url.startsWith('/api/v1/transactions?')
+    )
       return envelope({ content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 })
     return envelope(user)
   })
@@ -99,7 +103,7 @@ describe('AUTH-W01 로그인', () => {
     )
     const { actions } = renderAt()
     await enterCredentials(actions)
-    expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: trace-404')
+    expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 trace-404를 담당자에게 알려주세요.')
     expect(screen.queryByText(/internal details|FGC-COMMON-500/)).toBeNull()
   })
 
@@ -120,7 +124,7 @@ describe('AUTH-W01 로그인', () => {
     sessionStorage.setItem('fgc.other.preference', 'old')
     localStorage.setItem('unrelated', 'keep')
     await enterCredentials(actions)
-    await screen.findByRole('heading', { name: '지급 건 등록 · 귀속 · 확정' })
+    await screen.findByRole('heading', { name: '지급 건 등록, 귀속, 확정' })
     expect(router.state.location.pathname).toBe(`${base}/transactions/new`)
     expect(router.state.location.search).toBe('?month=2026-08&status=ACTIVE')
     expect(router.state.location.hash).toBe('#form')

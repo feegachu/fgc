@@ -53,21 +53,12 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   {
     key: 'planned',
-    label: '지급예정액',
+    label: '전체 지급예정액',
     sortKey: 'plannedCommissionAmount',
     sortable: true,
-    width: '8rem',
+    width: '8.5rem',
     align: 'number',
-    render: (r) => (
-      <>
-        <ArbitrageAmount value={r.plannedCommissionAmount} />
-        {Number(r.projectedExcessAmount) > 0 && (
-          <div>
-            지급예정 포함 시 초과 (모니터링): <ArbitrageAmount value={r.projectedExcessAmount} />
-          </div>
-        )}
-      </>
-    ),
+    render: (r) => <ArbitrageAmount value={r.plannedCommissionAmount} />,
   },
   {
     key: 'refund',

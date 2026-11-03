@@ -120,8 +120,8 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(await kpi('신규 계약 건수')).toHaveTextContent('2건')
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
     expect(screen.getByRole('article', { name: '월 환산 초회보험료' })).toHaveTextContent('200,000')
-    await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('500,000'))
-    expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('보류 70,000원 · 환수 계산 20,000원')
+    await waitFor(() => expect(screen.getByRole('link', { name: '수령 예정 수수료' })).toHaveTextContent('500,000'))
+    expect(screen.getByRole('link', { name: '수령 예정 수수료' })).toHaveTextContent('보류 70,000원 · 환수 계산 20,000원')
     expect(screen.getByRole('article', { name: '설계사 프로필' })).toHaveTextContent('김설계')
     expect(homeCalls()[0]).toContain('asOf=2026-07-31')
   })
@@ -147,11 +147,11 @@ describe('AGNT-W01 포트폴리오', () => {
   it('판매 관리 필터는 서버에 기간·보험사 구분·보험사를 보내 다시 집계한다', async () => {
     renderHome()
     const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
-    expect(within(panel).getByText('최근 12개월 · 전체 보험사')).toBeInTheDocument()
+    expect(within(panel).getByText('최근 12개월, 전체 보험사')).toBeInTheDocument()
     expect(within(panel).getByText('합계 3건')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: '손해' }))
     await waitFor(() => expect(homeCalls().some((p) => p.includes('insurerType=NON_LIFE'))).toBe(true))
-    expect(within(panel).getByText('최근 12개월 · 손해보험')).toBeInTheDocument()
+    expect(within(panel).getByText('최근 12개월, 손해보험')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: '6개월' }))
     await waitFor(() => expect(homeCalls().some((p) => p.includes('period=6') && p.includes('insurerType=NON_LIFE'))).toBe(true))
     await userEvent.click(within(panel).getAllByRole('button', { name: '전체' })[1])
@@ -182,8 +182,8 @@ describe('AGNT-W01 포트폴리오', () => {
       throw new ApiError(null, 'req-4', 500)
     }
     renderHome()
-    await waitFor(() => expect(screen.getByLabelText('확인 필요 계약')).toHaveTextContent('확인 불가'))
-    expect(within(screen.getByLabelText('확인 필요 계약')).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('article', { name: '확인 필요 계약' })).toHaveTextContent('확인 불가'))
+    expect(within(screen.getByRole('article', { name: '확인 필요 계약' })).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
   it('보험사를 고른 뒤 그 집계가 로딩 중이거나 실패하면 0건 차트로 그리지 않는다', async () => {
@@ -369,7 +369,7 @@ describe('확인할 계약', () => {
 describe('상품 추천 AI', () => {
   it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
     renderHome()
-    const launcher = await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ })
+    const launcher = await screen.findByRole('button', { name: '상품 추천 AI' })
     await userEvent.click(launcher)
     const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
     expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
@@ -382,17 +382,17 @@ describe('상품 추천 AI', () => {
     renderHome()
     const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
     await userEvent.click(within(panel).getByRole('button', { name: '6개월' }))
-    await userEvent.click(await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ }))
+    await userEvent.click(await screen.findByRole('button', { name: '상품 추천 AI' }))
     await screen.findByRole('dialog', { name: '상품 추천 AI' })
     await userEvent.keyboard('{Escape}')
-    expect(within(await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })).getByText('최근 6개월 · 전체 보험사')).toBeInTheDocument()
+    expect(within(await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })).getByText('최근 6개월, 전체 보험사')).toBeInTheDocument()
   })
 
   it('관리자 역할은 포트폴리오에 접근할 수 없다', async () => {
     vi.mocked(apiClient.request).mockImplementation((async (path: string) =>
       path.startsWith('/api/v1/agent/me/home') ? home(path) : envelope({ ...user, roleCode: 'SETTLEMENT' })) as typeof apiClient.request)
     renderHome()
-    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
     expect(homeCalls()).toHaveLength(0)
   })
 })

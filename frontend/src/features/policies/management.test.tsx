@@ -136,7 +136,7 @@ describe('policy UI boundaries', () => {
         refs={['SRC-01', 'REG-02']}
       />,
     )
-    expect(screen.getByText(/법정 심의·의결을 대체하지 않습니다/)).toBeVisible()
+    expect(screen.getByText(/법정 심의\/의결을 대체하지 않습니다/)).toBeVisible()
     expect(screen.getByText('현행규정')).toBeVisible()
     expect(screen.getByText('FAQ')).toBeVisible()
     expect(screen.getByText('상태 자료 없음')).toBeVisible()

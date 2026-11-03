@@ -8,7 +8,7 @@
   display: flex;
   gap: 16px;
   color: var(--color-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.09em;
   margin-bottom: 8px;
@@ -18,7 +18,7 @@
 }
 .policy-cell-subtitle {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   margin-top: 4px;
 }
@@ -113,7 +113,7 @@
   width: 28px;
   border: 1px solid var(--color-neutral-300);
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 12px;
 }
 .policy-workflow > .is-current {
   color: var(--color-blue-600);
@@ -144,7 +144,7 @@
 .policy-metadata dt,
 .policy-confirm-summary dt {
   color: var(--color-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 8px;
 }
 .policy-metadata dd {
@@ -155,7 +155,7 @@
 .policy-metadata small {
   display: block;
   color: var(--color-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   margin-top: 4px;
 }
@@ -314,7 +314,7 @@
 .policy-timeline time,
 .policy-timeline small {
   color: var(--color-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 .policy-timeline time {
   margin-left: auto;
@@ -374,12 +374,12 @@
   background: var(--color-neutral-100);
 }
 .policy-step-index {
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.7;
 }
 .policy-section-count {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
 }
 .policy-field-error-dot {
   color: var(--color-status-error-text);
@@ -439,7 +439,7 @@
 .policy-editor-footer-note {
   margin-right: auto;
   color: var(--color-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 .policy-rule-editor {
   padding: 20px;
@@ -461,14 +461,14 @@
   font-weight: 600;
 }
 .policy-rule-editor > header .button {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
 }
 .policy-row-number {
   background: var(--color-neutral-100);
   border-radius: 4px;
   padding: 4px 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-secondary);
 }
 .policy-checkbox {
@@ -527,7 +527,7 @@
   margin: 10px 0;
 }
 .policy-condition-card code {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   display: block;
   margin-bottom: 16px;
@@ -603,7 +603,7 @@
   }
   .policy-workflow > div {
     gap: 6px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .policy-workflow-line {
     margin: 0;

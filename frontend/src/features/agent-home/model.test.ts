@@ -62,7 +62,7 @@ describe('차트 변환', () => {
       ['정상', 2],
       ['미납', 1],
       ['실효', 0],
-      ['해지·종료', 0],
+      ['해지/종료', 0],
       ['상태 미확인', 1],
     ])
     expect(statusCounts({ portfolio: { contractCount: 1, statuses: [{ code: 'ACTIVE', count: 1 }] } }).some((s) => s.key === 'UNKNOWN')).toBe(false)

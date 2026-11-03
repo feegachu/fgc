@@ -14,7 +14,8 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
-import { StatusBadge } from '../../components/StatusBadge'
+import { ListHeader } from '../../components/ListHeader'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { errorText, int, isNegative, month as formatMonth, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { withMonth } from '../../stores/workspace'
@@ -114,14 +115,20 @@ export default function TransactionListPage() {
     {
       key: 'source',
       label: '원천유형',
-      width: '7rem',
-      render: (row) => disclosure(row.sourceTypeLabel || row.sourceType),
+      width: '6.5rem',
+      render: (row) => (
+        <CategoryBadge tablePresentation="text" value={row.sourceType} optionCount={sourceOptions.length}>
+          {disclosure(
+            row.sourceTypeLabel || sourceOptions.find(([code]) => code === row.sourceType)?.[1] || '확인 필요',
+          )}
+        </CategoryBadge>
+      ),
     },
     {
       key: 'key',
       label: '업무키',
       sortable: true,
-      width: '12rem',
+      width: '10rem',
       cellClassName: 'transaction-mono',
       render: (row) => <span title={row.sourceBusinessKey}>{row.sourceBusinessKey || '-'}</span>,
     },
@@ -136,14 +143,14 @@ export default function TransactionListPage() {
       key: 'agent',
       label: '수령 설계사',
       sortable: true,
-      width: '9rem',
+      width: '6.5rem',
       render: (row) => disclosure(row.recipientAgentName),
     },
     {
       key: 'item',
       label: '수수료 항목',
       sortable: true,
-      width: '8.5rem',
+      width: '7.5rem',
       render: (row) => disclosure(row.commissionItemName || row.commissionItemCode),
     },
     {
@@ -159,10 +166,11 @@ export default function TransactionListPage() {
     {
       key: 'flow',
       label: '흐름',
-      width: '5rem',
+      width: '4rem',
       align: 'center',
       render: (row) => (
         <StatusBadge
+          kind="category"
           tone={row.status === 'CANCELLED' ? 'neutral' : row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}
         >
           {row.status === 'CANCELLED' ? '취소' : row.cashflowTypeLabel || row.cashflowType}
@@ -172,34 +180,34 @@ export default function TransactionListPage() {
     {
       key: 'status',
       label: '상태',
-      width: '5.5rem',
+      width: '5rem',
       align: 'center',
       render: (row) => (
-        <StatusBadge tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}>
-          {row.statusLabel || row.status}
+        <StatusBadge
+          tablePresentation="dot"
+          tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}
+        >
+          {row.statusLabel || statusOptions.find(([code]) => code === row.status)?.[1] || '확인 필요'}
         </StatusBadge>
       ),
     },
     {
       key: 'attributions',
-      label: '귀속',
+      label: '귀속 계약',
       sortable: true,
-      width: '6.5rem',
+      width: '5.5rem',
       align: 'center',
-      render: (row) => {
-        const count = row.attributionCount ?? 0
-        const imbalance = count === 0 || Number(row.differenceAmount ?? 0) !== 0
-        return (
-          <StatusBadge tone={imbalance ? 'error' : 'success'}>
-            {count}건 · {imbalance ? '확인필요' : '일치'}
-          </StatusBadge>
-        )
-      },
+      render: (row) =>
+        (row.attributionCount ?? 0) === 0 ? (
+          <StatusBadge tone="error">0건</StatusBadge>
+        ) : (
+          `${int(row.attributionCount ?? 0)}건`
+        ),
     },
     {
       key: 'action',
       label: '작업',
-      width: '9rem',
+      width: '7rem',
       align: 'center',
       render: (row) =>
         row.status !== 'DRAFT' ? (
@@ -275,7 +283,7 @@ export default function TransactionListPage() {
           <strong>{deleteTarget?.sourceBusinessKey || '선택한 지급 건'}</strong> 초안을 삭제하시겠습니까?
         </p>
         <p>
-          {deleteTarget?.paymentStageLabel} · {formatMonth(deleteTarget?.settlementMonth)} · {won(deleteTarget?.amount)}
+          {deleteTarget?.paymentStageLabel}, {formatMonth(deleteTarget?.settlementMonth)}, {won(deleteTarget?.amount)}
         </p>
         <p>삭제한 초안은 복구할 수 없습니다.</p>
         {deletion.isError && (
@@ -321,17 +329,11 @@ export default function TransactionListPage() {
         aria-labelledby="transaction-list-title"
         aria-busy={search.isFetching}
       >
-        <header className="surface-header transaction-surface-header">
+        <ListHeader className="transaction-surface-header" total={total} totalId="row-count" pageSize={20}>
           <h2 className="surface-title" id="transaction-list-title">
             지급 건
           </h2>
-          <span className="transaction-result-count">
-            <span className="tabular-nums" id="row-count">
-              {int(total)}
-            </span>
-            건 · 한 화면 20행
-          </span>
-        </header>
+        </ListHeader>
         <DataTable
           className="transaction-list-table"
           viewportClassName="transaction-table-viewport"
@@ -470,7 +472,7 @@ function TransactionFilters({
           'f-insurer',
           '보험회사',
           'transaction-filter-insurer',
-          insurers.map((row) => [String(row.insurerId), `${row.insurerCode} · ${row.insurerName}`]),
+          insurers.map((row) => [String(row.insurerId), `${row.insurerCode}, ${row.insurerName}`]),
         )}
         <Field label="계약번호" className="filter-field transaction-filter-contract">
           <input
@@ -486,7 +488,7 @@ function TransactionFilters({
         {select('agentId', 'f-agent', '수령 설계사', 'transaction-filter-agent', remembered(known.agents))}
         {select('commissionItemId', 'f-item', '수수료 항목', 'transaction-filter-item', remembered(known.items))}
         {select('status', 'f-status', '상태', 'transaction-filter-status-field', statusOptions)}
-        <label className="transaction-filter-checkbox">
+        <label className="filter-checkbox">
           <input
             id="f-noattr"
             type="checkbox"

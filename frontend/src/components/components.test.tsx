@@ -233,7 +233,7 @@ it('Toast 일반 알림은 5초 후 닫고 오류·로딩은 수동으로 닫는
   fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: '알림 닫기' }))
   expect(screen.queryByText('오류')).toBeNull()
   act(() => notifyApiError(new ApiError({ code: 'FGC-COMMON-500', message: '실패' }, 'trace', 500)))
-  expect(screen.getByRole('alert')).toHaveTextContent('실패 (FGC-COMMON-500 · 요청 ID: trace)')
+  expect(screen.getByRole('alert')).toHaveTextContent('실패')
 })
 it('EvidenceLink icon 은 1차처럼 ⓘ 버튼에 접근 가능한 이름을 단다', async () => {
   const user = userEvent.setup()
@@ -274,6 +274,7 @@ it('MonthSelector는 선택 초안을 적용하기 전까지 유지하고 비활
   act(() => screen.getByRole('gridcell', { name: '1월' }).focus())
   await user.keyboard('{ArrowRight}{Enter}')
   expect(screen.getByRole('gridcell', { name: '3월' })).toHaveFocus()
+  expect(screen.getByText('기준정산월 : 2026년 3월')).toBeInTheDocument()
   expect(apply).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: '적용' }))
   expect(apply).toHaveBeenCalledWith('2026-03')
