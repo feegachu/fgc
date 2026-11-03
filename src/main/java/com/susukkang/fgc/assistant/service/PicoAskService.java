@@ -42,8 +42,8 @@ public class PicoAskService {
             + "|한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉)";
     private static final Pattern KOREAN_NUMERAL_SUFFIX = Pattern.compile("(?:^|[은는이가을를의로에]|총|약|최대|최소)" + KOREAN_NUMERAL + "$");
     private static final Pattern KOREAN_MONEY_SUFFIX = Pattern.compile(KOREAN_NUMERAL + "$");
-    private static final Pattern STEP_COUNT = Pattern.compile("(?<![\\p{N}.,+\\-])([1-9][0-9]{0,2})\\s*단계");
-    private static final Pattern LIST_MARKER = Pattern.compile("(?m)^[\\t ]*([1-9][0-9]?)[.)][\\t ]+");
+    private static final Pattern STEP_COUNT = Pattern.compile("(?<![\\p{N}.,+\\-])([1-9]\\d{0,2})\\s*단계");
+    private static final Pattern LIST_MARKER = Pattern.compile("(?m)^[\\t ]*([1-9]\\d?)[.)][\\t ]+");
 
     private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
 

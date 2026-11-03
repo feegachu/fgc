@@ -59,12 +59,15 @@ test('전체 업무 가이드를 보존하며 후속 채팅으로 전환한다',
   await expect(page.getByRole('dialog', { name: '피코 업무 비서' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '업무 튜토리얼' })).toHaveCount(0)
   await page.getByRole('button', { name: '업무 비서 AI 열기 · 피코' }).click()
-  await expect(settlement.getByRole('button', { name: '펼치기' })).toBeVisible()
   const pico = page.getByRole('dialog', { name: '피코 업무 비서' })
   await expect(pico.getByRole('tab', { name: '대화', exact: true })).toHaveAttribute('aria-selected', 'true')
   await pico.getByRole('textbox', { name: '피코에게 질문' }).fill('현재 단계의 입력 위치를 다시 알려주세요')
   await expect(pico.getByRole('textbox', { name: '피코에게 질문' })).toHaveValue('현재 단계의 입력 위치를 다시 알려주세요')
   await expect(page.getByRole('region', { name: '업무 튜토리얼' })).toHaveCount(0)
+  // The open chat deliberately hides the background guide. Inspect its preserved state after closing it.
+  await pico.getByRole('button', { name: '비서 닫기', exact: true }).click()
+  await expect(settlement.getByRole('button', { name: '펼치기' })).toBeVisible()
+  await expect(settlement.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeVisible()
 })
 
 for (const width of [1440, 390]) {
