@@ -343,7 +343,8 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     renderModal()
     await pickHealth()
     await result()
-    expect(await screen.findByText(/요약을 불러오지 못했어요\(FGC-AI-001\)/)).toBeInTheDocument()
+    expect(await screen.findByText(/요약을 불러오지 못했어요\. 아래 카드와 표는/)).toBeInTheDocument()
+    expect(screen.queryByText(/FGC-AI-001/)).not.toBeInTheDocument()
     expect(screen.getAllByRole('row')).toHaveLength(6)
   })
 

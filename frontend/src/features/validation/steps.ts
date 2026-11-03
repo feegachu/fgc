@@ -7,10 +7,10 @@ import type { StatusTone } from '../../components/StatusBadge'
 export const STEP_NAMES = [
   '실행 생성',
   '대상 선별',
-  '스케줄 생성·재검증',
+  '스케줄 생성/재검증',
   '1,200% 검증',
   '차익거래 검증',
-  '원장 기표·균형',
+  '원장 기표/균형',
   '양방향 대사',
   '예외 생성',
   '담당자 검토',

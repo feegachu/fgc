@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { apiClient, ApiError } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
-import { errorText } from '../../lib/format'
+import { errorText, internalErrorText } from '../../lib/format'
 
 type Schemas = components['schemas']
 export type Payment = Schemas['CommissionPaymentResponse']
@@ -16,7 +16,7 @@ export type PaymentRequest = Schemas['CommissionPaymentCreateRequest']
 
 export function formError(error: unknown, fallback: string) {
   if (error instanceof ApiError && (error.status >= 500 || error.code === 'FGC-COMMON-500')) {
-    return `요청을 처리하지 못했습니다.${error.requestId ? ` 요청 ID: ${error.requestId}` : ''}`
+    return internalErrorText(error.requestId)
   }
   return errorText(error instanceof Error ? error : undefined, fallback)
 }

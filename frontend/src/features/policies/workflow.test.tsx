@@ -228,6 +228,18 @@ describe('production policy workflow', () => {
     expect(request.mock.calls[0][1]?.body).toMatchObject({ expectedUpdatedAt: updatedAt })
   })
 
+  it('정책 처리 오류는 다른 화면처럼 공통 문구 정리와 요청번호를 거친다', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(
+      new ApiError({ code: 'FGC-POL-003', message: '처리 불가 — 정책 상태가 바뀌었습니다.' }, 'req-pol-1', 409),
+    )
+    const { user } = mountManagement('DRAFT', ['EDIT', 'SUBMIT'])
+    await user.click(screen.getByRole('button', { name: '제출' }))
+    await user.type(screen.getByLabelText(/작업 사유/), '검토 요청')
+    await user.click(screen.getByRole('button', { name: '제출 확인' }))
+    expect(await screen.findByText('처리할 수 없습니다. 정책 상태가 바뀌었습니다. (요청번호: req-pol-1)')).toBeInTheDocument()
+    expect(screen.queryByText(/FGC-POL-003/)).not.toBeInTheDocument()
+  }, 15_000)
+
   it('opens the draft evidence field when submission returns a missing-source error', async () => {
     vi.spyOn(apiClient, 'request').mockRejectedValue(
       new ApiError(
@@ -296,7 +308,7 @@ describe('production policy workflow', () => {
         <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
       </QueryClientProvider>,
     )
-    expect(screen.getByText('정정·승계로 계산 적용에서 제외됨')).toBeVisible()
+    expect(screen.getByText('정정/승계로 계산 적용에서 제외됨')).toBeVisible()
     expect(screen.getByText('후속 정책 #18')).toBeVisible()
   })
 
@@ -429,7 +441,7 @@ describe('production policy workflow', () => {
     const { user, onSaved } = mountManagement('ACTIVE', ['CLONE'])
     await user.click(screen.getByRole('tab', { name: '승인 이력' }))
     expect(screen.getByText('검토를 요청합니다.')).toBeVisible()
-    expect(screen.getByText(/author · policy:17/)).toBeVisible()
+    expect(screen.getByText(/author, policy:17/)).toBeVisible()
     await user.click(screen.getByRole('button', { name: '새 버전 작성' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByLabelText(/새 버전 적용 시작일/)).toHaveValue('')

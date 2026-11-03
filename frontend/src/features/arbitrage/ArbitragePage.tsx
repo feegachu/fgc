@@ -4,11 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
+import { KpiCardContent } from '../../components/KpiCard'
 import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
-import { int } from '../../lib/format'
+import { ListHeader } from '../../components/ListHeader'
 import { sortBinding } from '../../lib/tableSort'
 import { useInsurerOptions } from '../base/api'
 import { QueryState } from '../reference/ReferenceUI'
@@ -126,7 +127,7 @@ export default function ArbitragePage() {
             <option value="">{insurers.error ? '보험회사 조회 실패' : '전체'}</option>
             {insurers.data?.map((row) => (
               <option key={row.insurerId} value={row.insurerId} disabled={row.activeYn === false}>
-                {row.insurerCode} · {row.insurerName}
+                {row.insurerCode}, {row.insurerName}
               </option>
             ))}
           </select>
@@ -147,7 +148,7 @@ export default function ArbitragePage() {
         </Field>
       </FilterBar>
       <QueryState error={insurers.error} />
-      <section className="kpi-grid arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
+      <section className="kpi-grid kpi-group arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
         {summaryCards.map((card) => (
           <button
             type="button"
@@ -156,17 +157,12 @@ export default function ArbitragePage() {
             aria-pressed={criteria.status === card.status}
             onClick={() => patch({ status: card.status })}
           >
-            <span className="kpi-card-header">
-              <span className="kpi-label">{card.label}</span>
-            </span>
-            <span className="kpi-value-row">
-              <strong className="kpi-value">
-                {query.data ? `${int(query.data.summary?.[card.count] ?? 0)}건` : '—'}
-              </strong>
-            </span>
-            <span className="kpi-card-footer">
-              <span className="kpi-comparison">{card.description}</span>
-            </span>
+            <KpiCardContent
+              label={card.label}
+              value={query.data ? (query.data.summary?.[card.count] ?? 0) : '-'}
+              unit={query.data ? '건' : undefined}
+              footer={card.description}
+            />
           </button>
         ))}
       </section>
@@ -177,14 +173,11 @@ export default function ArbitragePage() {
         defaultRatio={56}
       >
         <section className="surface arb-list-panel" aria-labelledby="arb-list-title">
-          <header className="surface-header arb-panel-header">
+          <ListHeader className="arb-panel-header" total={query.data?.items?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title" id="arb-list-title">
               ③ 계약별 판정
             </h2>
-            <span className="arb-result-count">
-              <span className="tabular-nums">{int(query.data?.items?.totalElements ?? 0)}</span>건
-            </span>
-          </header>
+          </ListHeader>
           {busy || query.error ? (
             <div className="empty-state">
               <QueryState loading={busy && !query.error} error={query.error} />

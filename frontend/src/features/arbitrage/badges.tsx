@@ -5,6 +5,7 @@ import type { ArbitrageRow } from './api'
 export function ArbitrageBadge({ row }: { row: ArbitrageRow }) {
   return (
     <StatusBadge
+      optionCount={4}
       tone={
         row.resultStatus === 'CLEAR'
           ? 'success'

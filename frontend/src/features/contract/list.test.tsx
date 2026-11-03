@@ -182,13 +182,8 @@ it('#604 허용되지 않은 정렬 URL 값은 무시하고 서버 기본 정렬
 })
 
 it.each([
-  [500, 'FGC-COMMON-500', 'internal CSV SQL detail', '요청 ID: csv-request'],
-  [
-    400,
-    'FGC-COMMON-001',
-    '검색 조건을 다시 확인해 주세요.',
-    '검색 조건을 다시 확인해 주세요. (FGC-COMMON-001 · 요청 ID: csv-request)',
-  ],
+  [500, 'FGC-COMMON-500', 'internal CSV SQL detail', '처리 중 오류가 발생했습니다. 요청번호 csv-request를 담당자에게 알려주세요.'],
+  [400, 'FGC-COMMON-001', '검색 조건을 다시 확인해 주세요.', '검색 조건을 다시 확인해 주세요. (요청번호: csv-request)'],
 ] as const)(
   'CSV 오류 %i는 서버 메시지 또는 안전한 요청 ID를 한 번 표시한다',
   async (status, code, message, expected) => {
@@ -215,11 +210,11 @@ it('보험사를 바꾸면 이전 상품을 지우고 조회 시 페이지를 �
 
 it('[FGC-FUN-018] 판매 종료 버전을 이름으로 복원·선택하고 검색과 CSV 조건에 유지한다', async () => {
   const { router, user } = mount('/contracts?insurerId=1&productOfferingId=12&page=2')
-  const expired = await screen.findByRole('option', { name: '상반기 보험 · 2026-H1-B' })
+  const expired = await screen.findByRole('option', { name: '상반기 보험, 2026-H1-B' })
   const product = screen.getByLabelText('상품') as HTMLSelectElement
   await waitFor(() => expect(product).toBeEnabled())
   expect(product).toHaveValue('12')
-  expect(product.selectedOptions[0]).toHaveTextContent('상반기 보험 · 2026-H1-B')
+  expect(product.selectedOptions[0]).toHaveTextContent('상반기 보험, 2026-H1-B')
   expect(screen.queryByRole('option', { name: '선택된 ID: 12' })).toBeNull()
   const query = new URL(
     requests.find((path) => path.startsWith('/api/v1/base/products?'))!,
@@ -245,10 +240,10 @@ it('[FGC-FUN-018] 판매 종료 버전을 이름으로 복원·선택하고 검�
 
 it('과거 계약 검색에서는 해촉·비활동·사용중지 설계사 이름을 선택하고 검색 조건에 전달한다', async () => {
   const { router, user } = mount('/contracts?orgId=3', false)
-  const terminated = await screen.findByRole('option', { name: 'FC7 · 퇴사 설계사 (해촉 · 기준정보 사용중지)' })
+  const terminated = await screen.findByRole('option', { name: '퇴사 설계사 (FC7) (해촉, 기준정보 사용중지)' })
   expect(terminated).toBeEnabled()
-  expect(screen.getByRole('option', { name: 'FC5 · 비활동 설계사 (비활동)' })).toBeEnabled()
-  expect(screen.getByRole('option', { name: 'FC6 · 사용중지 설계사 (활동 · 기준정보 사용중지)' })).toBeEnabled()
+  expect(screen.getByRole('option', { name: '비활동 설계사 (FC5) (비활동)' })).toBeEnabled()
+  expect(screen.getByRole('option', { name: '사용중지 설계사 (FC6) (활동, 기준정보 사용중지)' })).toBeEnabled()
   const agentRequest = requests
     .map((path) => new URL(path, 'http://localhost'))
     .find((url) => url.pathname === '/api/v1/base/agents')!
@@ -273,10 +268,10 @@ it('과거 계약 검색에서는 해촉·비활동·사용중지 설계사 이�
 
 it('해촉 설계사 URL 검색조건을 ID 대체문구 대신 이름과 상태로 복원한다', async () => {
   const { user } = mount('/contracts?agentId=7')
-  await screen.findByRole('option', { name: 'FC7 · 퇴사 설계사 (해촉 · 기준정보 사용중지)' })
+  await screen.findByRole('option', { name: '퇴사 설계사 (FC7) (해촉, 기준정보 사용중지)' })
   const agent = screen.getByLabelText('모집 설계사') as HTMLSelectElement
   expect(agent).toHaveValue('7')
-  expect(agent.selectedOptions[0]).toHaveTextContent('퇴사 설계사 (해촉 · 기준정보 사용중지)')
+  expect(agent.selectedOptions[0]).toHaveTextContent('퇴사 설계사 (FC7) (해촉, 기준정보 사용중지)')
   expect(screen.queryByRole('option', { name: '선택된 ID: 7' })).toBeNull()
   await user.click(screen.getByRole('button', { name: 'CSV 내보내기' }))
   expect(exportCsv).toHaveBeenCalledWith('/api/v1/contracts/export.csv?agentId=7', {
@@ -292,7 +287,7 @@ it('조직·설계사 조건이 없으면 전체 설계사 이력을 미리 조�
   expect(requests.some((path) => path.startsWith('/api/v1/base/agents?'))).toBe(false)
 
   await user.click(screen.getByLabelText('모집 설계사'))
-  expect(await screen.findByRole('option', { name: 'FC7 · 퇴사 설계사 (해촉 · 기준정보 사용중지)' })).toBeEnabled()
+  expect(await screen.findByRole('option', { name: '퇴사 설계사 (FC7) (해촉, 기준정보 사용중지)' })).toBeEnabled()
   expect(requests.filter((path) => path.startsWith('/api/v1/base/agents?'))).toHaveLength(1)
 })
 
@@ -330,7 +325,7 @@ it('늦게 도착한 이전 보험사 응답을 적용하지 않는다', async (
   await waitFor(() => expect(screen.getByLabelText('상품')).toBeEnabled())
   resolveOld?.(envelope(pageData([{ productOfferingId: 11, productName: '이전 보험사 상품', offeringVersion: 'v1' }])))
   expect(screen.queryByRole('option', { name: /이전 보험사 상품/ })).toBeNull()
-  expect(screen.getByRole('option', { name: '종신보험 · v1' })).toHaveValue('22')
+  expect(screen.getByRole('option', { name: '종신보험, v1' })).toHaveValue('22')
 })
 
 it('조회 전용 권한은 신규 버튼을 숨기고 행 링크로 상세에 진입한다', async () => {
@@ -346,7 +341,7 @@ it('목록 500 오류는 내부 메시지를 노출하지 않고 재시도할 �
     if (failed) throw new ApiError({ code: 'FGC-COMMON-500', message: 'internal SQL detail' }, 'safe-id', 500)
     return pageData([row])
   })
-  expect(await screen.findByRole('alert')).toHaveTextContent('요청 ID: safe-id')
+  expect(await screen.findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 safe-id를 담당자에게 알려주세요.')
   expect(screen.queryByText(/internal SQL/)).toBeNull()
   failed = false
   await user.click(screen.getByRole('button', { name: '다시 시도' }))

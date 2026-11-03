@@ -4,7 +4,9 @@ import type { ExceptionStatus } from './api'
 // 색 분류는 templates/exception/list.html 의 th:classappend 규칙을 그대로 옮긴 것이다.
 export function severityTone(severity?: string): StatusTone {
   if (severity === 'WARNING') return 'warning'
-  if (severity === 'HIGH' || severity === 'CRITICAL') return 'error'
+  if (severity === 'INFO') return 'info'
+  if (severity === 'HIGH') return 'risk'
+  if (severity === 'CRITICAL') return 'error'
   return 'neutral'
 }
 
@@ -25,6 +27,16 @@ export function typeTone(type = ''): StatusTone {
   return 'neutral'
 }
 
+/** Category colors are separate from severity and the KPI warning colors. */
+export function typeBadgeTone(type = ''): StatusTone {
+  if (type.startsWith('RECON')) return 'info'
+  if (type.startsWith('ARBITRAGE')) return 'review'
+  if (type.startsWith('CAP')) return type.includes('WARNING') ? 'warning' : type.includes('REVIEW') ? 'review' : 'error'
+  if (type.startsWith('JOURNAL')) return 'warning'
+  if (type.startsWith('DATA') || type.startsWith('PRODUCT') || type.startsWith('REFUND')) return 'review'
+  return 'neutral'
+}
+
 export function statusTone(status?: string): StatusTone {
   if (status === 'NEW') return 'error'
   if (status === 'IN_REVIEW') return 'info'
@@ -38,7 +50,7 @@ export const statusOptions = [
   { value: 'NEW', label: '신규' },
   { value: 'IN_REVIEW', label: '검토중' },
   { value: 'RESOLVED', label: '해결' },
-  { value: 'REJECTED', label: '오탐·반려' },
+  { value: 'REJECTED', label: '오탐/반려' },
 ]
 
 export const JOURNAL_CORRECTION_TYPE = 'JOURNAL_CORRECTION_REQUIRED'

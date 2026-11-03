@@ -2,7 +2,7 @@ import { Button } from '../../components/Button'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { errorText, isNegative, usageRate, won } from '../../lib/format'
+import { errorText, internalErrorText, isNegative, usageRate, won } from '../../lib/format'
 import { ApiError } from '../../lib/api/errors'
 import { STATUS_LABELS } from './labels'
 
@@ -14,8 +14,13 @@ const tones: Record<string, StatusTone> = {
 }
 export function CapStatus({ code, label }: { code?: string; label?: string }) {
   return (
-    <StatusBadge tone={tones[code ?? ''] ?? 'neutral'}>
-      {label || STATUS_LABELS[code ?? ''] || code || '—'}
+    <StatusBadge
+      kind="category"
+      tablePresentation="badge"
+      optionCount={Object.keys(STATUS_LABELS).length}
+      tone={tones[code ?? ''] ?? 'neutral'}
+    >
+      {label || STATUS_LABELS[code ?? ''] || (code ? '확인 필요' : '-')}
     </StatusBadge>
   )
 }
@@ -24,7 +29,7 @@ export function Amount({ value }: { value?: number | null }) {
 }
 /** Number는 시각적 막대 폭에만 사용. 수치 표시와 판정은 서버 값 그대로다. */
 export function CapUsage({ value, status, warning }: { value?: string | null; status?: string; warning?: unknown }) {
-  if (status === 'NOT_APPLICABLE') return <span aria-label="적용대상 아님: 사용률 없음">—</span>
+  if (status === 'NOT_APPLICABLE') return <span aria-label="적용대상 아님: 사용률 없음">-</span>
   const width = Math.max(0, Math.min(100, Number(value) || 0))
   const warningWidth = typeof warning === 'number' || typeof warning === 'string' ? Number(warning) : NaN
   return (
@@ -47,7 +52,7 @@ export function CapUsage({ value, status, warning }: { value?: string | null; st
           />
         )}
       </span>
-      <span className="tabular-nums">{value == null || value === '' ? '—' : `${usageRate(value)}%`}</span>
+      <span className="tabular-nums">{value == null || value === '' ? '-' : `${usageRate(value)}%`}</span>
     </div>
   )
 }
@@ -55,7 +60,7 @@ export function CapUsage({ value, status, warning }: { value?: string | null; st
 export function CapError({ error, retry }: { error: Error; retry: () => void }) {
   const message =
     error instanceof ApiError && error.code === 'FGC-COMMON-500'
-      ? `요청 ID: ${error.requestId ?? '—'}`
+      ? internalErrorText(error.requestId)
       : errorText(error)
   return (
     <div role="alert" className="cap-react-error">
@@ -69,7 +74,7 @@ export function CapError({ error, retry }: { error: Error; retry: () => void }) 
 export function CapEvidence() {
   return (
     <EvidenceLink icon label="1,200% 한도 판정 근거">
-      <strong>REG-08·09·10·23 · SRC-022 제4-32조⑤·⑭</strong>
+      <strong>REG-08/09/10/23, SRC-022 제4-32조⑤/⑭</strong>
       <p>계약별 저장 판정입니다. 해약환급금은 합산하고 준법경영비 공제는 원수사 → GA 단계에만 적용합니다.</p>
     </EvidenceLink>
   )

@@ -176,7 +176,7 @@ describe('VRUN-W01 실행 목록', () => {
     const table = await screen.findByRole('table', { name: '월 통합검증 실행 목록' })
     expect(await within(table).findByText('8/10 단계 (80%)')).toBeInTheDocument()
     expect(within(table).getAllByText('배치가 실패했습니다').length).toBeGreaterThan(0)
-    expect(within(table).getAllByText('ga01 · 2026-07-11 10:00').length).toBeGreaterThan(0)
+    expect(within(table).getAllByText('ga01, 2026-07-11 10:00').length).toBeGreaterThan(0)
     expect(within(table).getByRole('link', { name: '2026-07 2회차 실행 열기' })).toHaveAttribute(
       'href',
       '/app/validation-runs/7?month=2026-07',
@@ -360,7 +360,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     for (const attempt of [1, 2]) {
       await actions.click(screen.getByRole('button', { name: '확정' }))
       const dialog = await screen.findByRole('dialog', { name: '이 검증 실행을 확정할까요?' })
-      expect(within(dialog).getByText(/실제 송금·회계 마감이 아닙니다/)).toBeInTheDocument()
+      expect(within(dialog).getByText(/실제 송금\/회계 마감이 아닙니다/)).toBeInTheDocument()
       await actions.click(within(dialog).getByRole('button', { name: '확정' }))
       if (attempt === 1) {
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

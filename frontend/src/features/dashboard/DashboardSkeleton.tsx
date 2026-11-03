@@ -3,8 +3,8 @@ export function DashboardSkeleton() {
   return (
     <div role="status" className="dashboard-skeleton">
       <span className="visually-hidden">불러오는 중입니다.</span>
-      <div className="kpi-grid" aria-hidden="true">
-        {Array.from({ length: 6 }, (_, index) => (
+      <div className="dashboard-skeleton-kpis" aria-hidden="true">
+        {Array.from({ length: 5 }, (_, index) => (
           <div key={index} className="skeleton-card">
             <span className="skeleton-line skeleton-line-short" />
             <span className="skeleton-line skeleton-line-value" />
@@ -19,8 +19,7 @@ export function DashboardSkeleton() {
           ))}
         </div>
         <div className="surface skeleton-panel">
-          <span className="skeleton-circle" />
-          {Array.from({ length: 3 }, (_, index) => (
+          {Array.from({ length: 4 }, (_, index) => (
             <span key={index} className="skeleton-line" />
           ))}
         </div>

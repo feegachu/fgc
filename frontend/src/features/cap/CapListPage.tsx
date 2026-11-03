@@ -1,12 +1,15 @@
+import { nameWithCode } from '../../lib/screenText'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
+import { KpiCardContent } from '../../components/KpiCard'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { sortBinding } from '../../lib/tableSort'
@@ -39,8 +42,8 @@ const agentColumns: TableColumn<CapAgent>[] = [
     width: '12rem',
     render: (row) => (
       <CellDisclosure
-        preview={[row.agentName, row.agentCode].filter(Boolean).join(' · ') || '—'}
-        full={[row.agentName, row.agentCode].filter(Boolean).join(' · ') || '—'}
+        preview={nameWithCode(row.agentName, row.agentCode)}
+        full={nameWithCode(row.agentName, row.agentCode)}
       />
     ),
   },
@@ -50,8 +53,8 @@ const agentColumns: TableColumn<CapAgent>[] = [
     width: '12rem',
     render: (row) => (
       <CellDisclosure
-        preview={[row.organizationCode, row.organizationName].filter(Boolean).join(' · ') || '—'}
-        full={[row.organizationCode, row.organizationName].filter(Boolean).join(' · ') || '—'}
+        preview={[row.organizationCode, row.organizationName].filter(Boolean).join(', ') || '-'}
+        full={[row.organizationCode, row.organizationName].filter(Boolean).join(', ') || '-'}
       />
     ),
   },
@@ -89,16 +92,31 @@ export default function CapListPage() {
       width: '12rem',
       render: (row) =>
         row.contractId == null ? (
-          row.contractNo || '—'
+          row.contractNo || '-'
         ) : (
-          <Link to={`/contracts/${encodeURIComponent(String(row.contractId))}?tab=cap`}>{row.contractNo || '—'}</Link>
+          <Link to={`/contracts/${encodeURIComponent(String(row.contractId))}?tab=cap`}>{row.contractNo || '-'}</Link>
         ),
     },
     {
       key: 'stage',
       label: '지급단계',
       width: '9rem',
-      render: (row) => row.paymentStageLabel || STAGES[row.paymentStage as keyof typeof STAGES] || '—',
+      render: (row) => row.paymentStageLabel || STAGES[row.paymentStage as keyof typeof STAGES] || '-',
+    },
+    {
+      key: 'status',
+      label: '판정',
+      width: '6rem',
+      align: 'center',
+      render: (row) => <CapStatus code={row.resultStatus} label={row.resultStatusLabel} />,
+    },
+    {
+      key: 'usage',
+      label: '사용률',
+      sortKey: 'usagePct',
+      sortable: true,
+      width: '12rem',
+      render: (row) => <CapUsage value={row.usagePct} status={row.resultStatus} />,
     },
     {
       key: 'date',
@@ -174,25 +192,10 @@ export default function CapListPage() {
       render: (row) => <Amount value={row.remainingAmount} />,
     },
     {
-      key: 'usage',
-      label: '사용률',
-      sortKey: 'usagePct',
-      sortable: true,
-      width: '14rem',
-      render: (row) => <CapUsage value={row.usagePct} status={row.resultStatus} />,
-    },
-    {
-      key: 'status',
-      label: '판정',
-      width: '6rem',
-      align: 'center',
-      render: (row) => <CapStatus code={row.resultStatus} label={row.resultStatusLabel} />,
-    },
-    {
       key: 'ruleset',
       label: '룰셋',
       width: '6rem',
-      render: (row) => (row.capRuleSetId == null ? '—' : `ID ${row.capRuleSetId}`),
+      render: (row) => (row.capRuleSetId == null ? '-' : `ID ${row.capRuleSetId}`),
     },
   ]
   return (
@@ -206,26 +209,24 @@ export default function CapListPage() {
         onSearch={(filters) => update({ ...filters, size: String(criteria.size), capCheckId: '' })}
         onReset={() => update({ ...FILTER_KEYS, month: workspaceMonth ?? '', size: '20' })}
       />
-      <div className="cap-react-kpis" aria-busy={list.isFetching}>
+      <div className="cap-react-kpis kpi-group" aria-busy={list.isFetching}>
         {Object.entries(STATUSES)
           .filter(([code]) => code !== 'NOT_APPLICABLE')
           .map(([code, label]) => (
             <button
               key={code}
               type="button"
-              className={`surface cap-react-kpi cap-react-kpi-${code}`}
+              className={`kpi-card cap-react-kpi cap-react-kpi-${code} kpi-card-${({ NORMAL: 'success', WARNING: 'warning', VIOLATION: 'error', REVIEW_REQUIRED: 'review' } as Record<string, string>)[code]}`}
               aria-pressed={criteria.status === code}
-              aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}`}
+              aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '-'}`}
               onClick={() => update({ status: criteria.status === code ? '' : code, capCheckId: '' })}
             >
-              <span className="kpi-label">{label}</span>
-              <span className="cap-react-kpi-value">
-                <strong>{data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '—'}</strong>
-                <small>건</small>
-              </span>
-              <span className="kpi-comparison">
-                {code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
-              </span>
+              <KpiCardContent
+                label={label}
+                value={data ? (data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '-'}
+                unit="건"
+                footer={code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
+              />
             </button>
           ))}
       </div>
@@ -249,10 +250,14 @@ export default function CapListPage() {
         </div>
       </section>
       <section className="surface">
-        <header className="surface-header">
+        <ListHeader
+          total={data ? data.totalElements ?? 0 : null}
+          pageSize={criteria.size}
+          pageSizeOptions={[10, 20, 50]}
+          onPageSizeChange={(size) => update({ size: String(size) })}
+        >
           <h2 className="surface-title">계약별 판정 목록</h2>
-          <span>총 {data ? int(data.totalElements ?? 0) : '—'}건</span>
-        </header>
+        </ListHeader>
         {list.isError ? (
           <CapError error={list.error} retry={() => void list.refetch()} />
         ) : (
@@ -272,29 +277,12 @@ export default function CapListPage() {
           page={criteria.page}
           totalPages={data?.totalPages ?? 0}
           onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
-          controls={
-            <label>
-              한 화면{' '}
-              <select
-                className="select-control"
-                aria-label="한 화면 행 수"
-                value={criteria.size}
-                onChange={(event) => update({ size: event.target.value })}
-              >
-                {[10, 20, 50].map((size) => (
-                  <option key={size} value={size}>
-                    {size}행
-                  </option>
-                ))}
-              </select>
-            </label>
-          }
         />
       </section>
       <section className="surface">
         <header className="surface-header">
           <h2 className="surface-title">설계사별 합계</h2>
-          <span>모니터링 지표 · 규제 판정 아님</span>
+          <span>모니터링 지표, 규제 판정 아님</span>
         </header>
         <DataTable
           caption="설계사별 모니터링 합계"
@@ -323,7 +311,6 @@ function StageCard({ stage }: { stage: CapStage }) {
       <header>
         <div>
           <h3>{stage.paymentStageLabel || STAGES[stage.paymentStage as keyof typeof STAGES]}</h3>
-          <p className="cap-react-stage-code">{stage.paymentStage}</p>
         </div>
         <CapStatus {...status} />
       </header>
@@ -355,7 +342,7 @@ function StageCard({ stage }: { stage: CapStage }) {
           : `준법경영비 공제 합계 ${won(stage.complianceDeductionAmountTotal)}`}
         <br />
         {stage.worstContractNo
-          ? `최고 사용률 ${stage.worstContractNo} · ${usageRate(stage.worstUsagePct)}%`
+          ? `최고 사용률 ${stage.worstContractNo}, ${usageRate(stage.worstUsagePct)}%`
           : '판정 대상 계약이 없습니다.'}
       </p>
     </article>
@@ -394,12 +381,10 @@ function CapFilter({
       </option>
     ))
   return (
-    <section className="surface">
-      <header className="surface-header">
-        <h2 className="surface-title">검색 조건</h2>
-      </header>
+    <section className="surface" aria-label="한도 검증 조회 조건">
       <FilterBar
         className="cap-react-filter"
+        embedded
         resetFirst
         icons
         onSubmit={() => onSearch({ ...filters, contractNo: filters.contractNo.trim() })}
@@ -429,7 +414,7 @@ function CapFilter({
             <option value="">{insurers.isPending ? '불러오는 중' : '전체'}</option>
             {insurers.data?.content?.map((row) => (
               <option key={row.insurerId} value={row.insurerId} disabled={row.activeYn === false}>
-                {row.insurerCode} · {row.insurerName}
+                {row.insurerCode}, {row.insurerName}
               </option>
             ))}
           </select>
@@ -440,7 +425,7 @@ function CapFilter({
             <option value="">{organizations.isPending ? '불러오는 중' : '전체'}</option>
             {organizations.data?.content?.map((row) => (
               <option key={row.organizationId} value={row.organizationId} disabled={row.activeYn === false}>
-                {row.organizationCode} · {row.organizationName}
+                {row.organizationCode}, {row.organizationName}
               </option>
             ))}
           </select>

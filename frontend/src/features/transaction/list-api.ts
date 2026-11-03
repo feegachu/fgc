@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { apiClient, ApiError } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
-import { errorText } from '../../lib/format'
+import { errorText, internalErrorText } from '../../lib/format'
 import { formatSort, parseSort } from '../../lib/tableSort'
 
 export type PaymentRow = components['schemas']['CommissionPaymentListResponse']
@@ -81,6 +81,6 @@ export function transactionListQuery(filters: PaymentFilters) {
 }
 export function listError(error: Error | null) {
   if (error instanceof ApiError && (error.status >= 500 || error.code === 'FGC-COMMON-500'))
-    return `요청 ID: ${error.requestId ?? '-'}`
+    return internalErrorText(error.requestId)
   return errorText(error, '수수료 지급 건을 불러오지 못했습니다. 잠시 후 다시 시도하세요.')
 }

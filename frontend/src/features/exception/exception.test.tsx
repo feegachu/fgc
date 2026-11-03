@@ -279,8 +279,13 @@ describe('EXCP-W01 예외함', () => {
     await screen.findByText('6 / 12 페이지')
     const params = new URLSearchParams(router.state.location.search)
     for (const [key, value] of Object.entries({
-      month: '2026-07', validationMonth: '2026-07', type: 'CAP_VIOLATION', status: 'OPEN', contractNo: 'C-0001',
-    })) expect(params.get(key)).toBe(value)
+      month: '2026-07',
+      validationMonth: '2026-07',
+      type: 'CAP_VIOLATION',
+      status: 'OPEN',
+      contractNo: 'C-0001',
+    }))
+      expect(params.get(key)).toBe(value)
     expect(params.has('selected')).toBe(false)
     await actions.click(controls().getByRole('button', { name: '이전 5페이지' }))
     await screen.findByText('5 / 12 페이지')
@@ -360,7 +365,7 @@ describe('EXCP-W01 예외함', () => {
       search([
         {
           ...baseCase,
-          title: '한도 초과 — 사용률 104.166667%',
+          title: '한도 초과, 사용률 104.166667%',
           description: '1,200% 한도 초과(사용률 104.166667%).',
           occurrences: [
             {
@@ -387,8 +392,8 @@ describe('EXCP-W01 예외함', () => {
     const { actions } = renderPage()
     await actions.click(within(await table()).getByRole('button', { name: '11' }))
     expect(await screen.findByText('1,200,000원')).toBeInTheDocument()
-    expect(within(await table()).getByText('한도 초과 — 사용률 104.1%')).toBeInTheDocument()
-    expect(screen.getByText('한도 초과 — 사용률 104.1%', { selector: 'dd' })).toBeInTheDocument()
+    expect(within(await table()).getByText('한도 초과, 사용률 104.1%')).toBeInTheDocument()
+    expect(screen.getByText('한도 초과, 사용률 104.1%', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('1,200% 한도 초과(사용률 104.1%).', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('104.1%')).toBeInTheDocument()
     expect(screen.queryByText(/104\.166667%/)).not.toBeInTheDocument()
@@ -431,7 +436,7 @@ describe('EXCP-W01 예외함', () => {
   it('서버가 처리를 거절하면 오류를 표시하고 폼을 유지한다', async () => {
     postResponse = () => {
       throw new ApiError(
-        { code: 'FGC-EXCP-003', message: '처리 불가 — 현재 상태에서는 수행할 수 없습니다.' },
+        { code: 'FGC-EXCP-003', message: '처리할 수 없습니다. 현재 상태에서는 수행할 수 없습니다.' },
         'req-9',
         409,
       )
@@ -441,7 +446,7 @@ describe('EXCP-W01 예외함', () => {
     await actions.selectOptions(await screen.findByLabelText(/조치/), 'START_REVIEW')
     await actions.type(screen.getByLabelText(/처리 사유/), '검토')
     await actions.click(screen.getByRole('button', { name: '처리 저장' }))
-    expect(await screen.findByText(/처리 불가/, { selector: '.exception-action-error' })).toBeInTheDocument()
+    expect(await screen.findByText(/처리할 수 없습니다/, { selector: '.exception-action-error' })).toBeInTheDocument()
     expect(screen.getByLabelText(/처리 사유/)).toHaveValue('검토')
   })
 
@@ -510,7 +515,7 @@ describe('EXCP-W01 예외함', () => {
     await actions.click(screen.getByRole('button', { name: '원장 정정 계속' }))
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText(/J-0070/)).toBeInTheDocument()
-    expect(within(dialog).getByText('차변·대변 검증 통과')).toBeInTheDocument()
+    expect(within(dialog).getByText('차변/대변 검증 통과')).toBeInTheDocument()
     // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
     expect(within(dialog).getAllByText('미수수수료').length).toBeGreaterThan(0)
     expect(within(dialog).queryByText(/1100|4100/)).not.toBeInTheDocument()

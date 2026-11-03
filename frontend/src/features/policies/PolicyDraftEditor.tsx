@@ -1,4 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react'
+import { errorText } from '../../lib/format'
+import { screenMessage } from '../../lib/screenText'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
@@ -18,6 +20,7 @@ import {
   regimeFor,
   sources,
   sourceStatusTags,
+  statusLabels,
 } from './management'
 import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
@@ -131,10 +134,10 @@ export function PolicyDraftEditor({
       cache.setQueryData(['policies', 'detail', policyId], normalizePolicyDetail(response.data))
       const header = response.data.header
       setLatest(
-        `최신 정책: ${header?.policyName ?? ''} · ${header?.statusLabel ?? header?.status ?? ''}. 입력은 보존했습니다. 최신 내용으로 편집하려면 취소 후 다시 여세요.`,
+        `최신 정책: ${header?.policyName ?? ''}, ${statusLabels[header?.status ?? ''] ?? header?.statusLabel ?? '확인 필요'}. 입력은 보존했습니다. 최신 내용으로 편집하려면 취소 후 다시 여세요.`,
       )
     } catch (cause) {
-      setLatest(cause instanceof Error ? cause.message : '최신 정책을 조회하지 못했습니다.')
+      setLatest(errorText(cause instanceof Error ? cause : null, '최신 정책을 조회하지 못했습니다.'))
     } finally {
       saving.current = false
       setBusy(false)
@@ -177,13 +180,13 @@ export function PolicyDraftEditor({
         : (await savePolicyDraft(document, policyId, requestKey({ policyId, document }))).policyVersionId
       onSaved(id)
     } catch (cause) {
-      const message =
-        cause instanceof Error ? cause.message : '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'
-      setFailure(message)
+      setFailure(
+        errorText(cause instanceof Error ? cause : null, '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'),
+      )
       setConflict(cause instanceof ApiError && cause.status === 409)
       if (cause instanceof ApiError && cause.field) {
         const path = cause.field.replace(/\[(\d+)\]/g, '.$1')
-        setErrors({ [path]: message })
+        setErrors({ [path]: screenMessage(cause.message) })
         focusError(path)
       }
     } finally {
@@ -222,7 +225,7 @@ export function PolicyDraftEditor({
         <>
           <span className="policy-editor-footer-note">
             {preview
-              ? '미리보기 · 변경 내용은 이 화면에서만 유지됩니다.'
+              ? '미리보기, 변경 내용은 이 화면에서만 유지됩니다.'
               : '초안으로 저장한 후 검토를 요청할 수 있습니다.'}
           </span>
           <Button variant="secondary" disabled={busy} onClick={close}>
@@ -235,7 +238,7 @@ export function PolicyDraftEditor({
       }
     >
       <div className="policy-editor-intro">
-        <StatusBadge tone="warning">DRAFT · 초안</StatusBadge>
+        <StatusBadge tone="warning">DRAFT, 초안</StatusBadge>
         <span>기본정보와 유형별 규칙을 작성한 후 검토를 요청하세요.</span>
         <span className="policy-required-note">* 필수 입력</span>
       </div>
@@ -296,7 +299,6 @@ export function PolicyDraftEditor({
         <fieldset disabled={busy} className="policy-editor-content">
           <div className="policy-section-heading">
             <div>
-              <p className="policy-eyebrow">POLICY CONFIGURATION</p>
               <h2>{sections.find((item) => item.id === section)?.label}</h2>
             </div>
           </div>
@@ -373,7 +375,7 @@ export function PolicyDraftEditor({
                 <span className="material-symbols-rounded" aria-hidden="true">
                   info
                 </span>
-                <span>종료일을 비워두면 계속 적용됩니다. 정책 버전·상태·작성자·승인 정보는 저장 시 결정됩니다.</span>
+                <span>종료일을 비워두면 계속 적용됩니다. 정책 버전/상태/작성자/승인 정보는 저장 시 결정됩니다.</span>
               </div>
             </>
           )}
@@ -382,7 +384,7 @@ export function PolicyDraftEditor({
               <p className="policy-section-description">
                 지급 대상과 회차별 계산 방식을 설정합니다. 요율은 100%를 초과해 입력할 수 있습니다.
                 {installment &&
-                  ' 상품 판매버전을 지정하면 해당 버전의 판매개시일·기초서류에 맞는 분급 룰셋을 적용합니다.'}
+                  ' 상품 판매버전을 지정하면 해당 버전의 판매개시일/기초서류에 맞는 분급 룰셋을 적용합니다.'}
               </p>
               {draft.commissionRules.map((rule, index) => (
                 <CommissionRow
@@ -429,7 +431,7 @@ export function PolicyDraftEditor({
                   : '7년 분급은 최대 84회차입니다. 장기유지 구간은 확정된 근거에 따라 직접 입력하세요.'}
               </div>
               <p className="policy-section-description">
-                최대 회차는 체계의 상한입니다. 실제 지급 회차·월 요율·월 동일 금액은 수수료 규칙에서 설정합니다. 정책
+                최대 회차는 체계의 상한입니다. 실제 지급 회차/월 요율/월 동일 금액은 수수료 규칙에서 설정합니다. 정책
                 설정과 승인은 예정 스케줄의 지급 확정을 뜻하지 않습니다.
               </p>
               {draft.feeRegimeRules.map((rule, index) => {
@@ -482,7 +484,7 @@ export function PolicyDraftEditor({
                       </Field>
                       <DraftInput
                         path={prefix + 'salesStartDateFrom'}
-                        label="판매 시작일 범위 · 시작"
+                        label="판매 시작일 범위, 시작"
                         required
                         type="date"
                         errors={errors}
@@ -491,7 +493,7 @@ export function PolicyDraftEditor({
                       />
                       <DraftInput
                         path={prefix + 'salesStartDateTo'}
-                        label="판매 시작일 범위 · 종료"
+                        label="판매 시작일 범위, 종료"
                         type="date"
                         errors={errors}
                         value={rule.salesStartDateTo}
@@ -507,7 +509,7 @@ export function PolicyDraftEditor({
                       />
                       <DraftInput
                         path={prefix + 'basicDocumentDateFrom'}
-                        label="기초서류 일자 · 시작"
+                        label="기초서류 일자, 시작"
                         type="date"
                         errors={errors}
                         value={rule.basicDocumentDateFrom}
@@ -515,7 +517,7 @@ export function PolicyDraftEditor({
                       />
                       <DraftInput
                         path={prefix + 'basicDocumentDateTo'}
-                        label="기초서류 일자 · 종료"
+                        label="기초서류 일자, 종료"
                         type="date"
                         errors={errors}
                         value={rule.basicDocumentDateTo}
@@ -584,7 +586,7 @@ export function PolicyDraftEditor({
                     <StatusBadge tone="info">지원 조건</StatusBadge>
                   </header>
                   <p>{option.description}</p>
-                  <code>{option.key}</code>
+
                   <DraftSelect
                     path={`parameters.${option.key}`}
                     label={option.label + ' 설정'}

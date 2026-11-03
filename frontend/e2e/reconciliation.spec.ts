@@ -49,7 +49,7 @@ async function historyFixture(page: import('@playwright/test').Page) {
 test('비활성 보험회사 과거 이력 조회는 가능하고 신규 대사는 차단한다', async ({ page }) => {
   await historyFixture(page)
   await page.goto('reconciliations?month=2026-07&stage=GA_TO_FC')
-  await expect(page.getByRole('option', { name: 'OLD · 과거회사' })).toBeEnabled()
+  await expect(page.getByRole('option', { name: 'OLD, 과거회사' })).toBeEnabled()
   await page.getByRole('combobox', { name: '보험회사', exact: true }).selectOption('9')
   await expect(page.getByRole('button', { name: '대사 실행', exact: true })).toBeDisabled()
   const response = page.waitForResponse((res) => new URL(res.url()).searchParams.get('insurerId') === '9')
@@ -61,7 +61,7 @@ test('비활성 보험회사 과거 이력 조회는 가능하고 신규 대사�
 test('비교 모달의 null 회차는 대시, 음수 예상·실제·차액은 마이너스와 빨간색으로 표시한다', async ({ page }) => {
   await historyFixture(page)
   await page.goto('reconciliations?month=2026-07&resultId=7')
-  await expect(page.getByRole('dialog').getByText('C-001 · 초회 수수료 · —')).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('C-001, 초회 수수료, -')).toBeVisible()
   await expect(page.getByRole('dialog')).not.toContainText('-회차')
   await expect(page.getByRole('dialog')).not.toContainText('—회차')
   for (const text of ['-12,000원', '-13,000원', '-1,000원']) {

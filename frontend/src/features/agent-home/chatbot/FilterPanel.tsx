@@ -1,5 +1,6 @@
 import { EMPTY_FILTERS, toFilters } from './filters'
 import type { FilterDraft } from './filters'
+import { Button } from '../../../components/Button'
 
 function activeCount(draft: FilterDraft) {
   const filters = toFilters(draft)
@@ -29,9 +30,10 @@ export function FilterPanel({
         <span className="cb-muted">선택 사항</span>
         {count > 0 && <span className="cb-pill">{count}개 적용</span>}
         {count > 0 && (
-          <button type="button" className="cb-filters-reset" onClick={() => onChange(EMPTY_FILTERS)}>
+          <Button variant="secondary" className="cb-filters-reset" onClick={() => onChange(EMPTY_FILTERS)}>
+            <span className="material-symbols-rounded" aria-hidden="true">restart_alt</span>
             초기화
-          </button>
+          </Button>
         )}
       </div>
       <div className="cb-filters-body">
@@ -52,7 +54,7 @@ export function FilterPanel({
             </div>
           </fieldset>
         )}
-        <label className="cb-filter-check">
+        <label className="filter-checkbox">
           <input
             type="checkbox"
             checked={value.excludeCapOverflow}

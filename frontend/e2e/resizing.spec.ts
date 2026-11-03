@@ -67,7 +67,7 @@ test('판정 태그와 헤더를 최소 너비로 보호하고 과거 저장값�
   await assertFits()
   label = '적용대상 아님 · 추가 확인 필요'
   await page.reload()
-  await expect(page.getByText(label, { exact: true })).toBeVisible()
+  await expect(page.getByText('적용대상 아님, 추가 확인 필요', { exact: true })).toBeVisible()
   await assertFits()
   expect((await header.boundingBox())!.width).toBeGreaterThan(width)
 })
@@ -98,7 +98,7 @@ test('리사이즈 후에도 예외 목록의 지정된 컬럼 정렬을 유지�
 for (const [path, label] of [
   ['journals', '분개 목록과 분개 상세 카드 너비'],
   ['arbitrage-checks', '계약별 판정과 상세 카드 너비'],
-  ['transactions/new', '지급 건·귀속행과 확정 게이트 카드 너비'],
+  ['transactions/new', '지급 건/귀속행과 확정 게이트 카드 너비'],
   ['audit-logs', '감사 기록과 변경 내용 비교 카드 너비'],
 ]) {
   test(path + ': 카드 드래그·저장·모바일 배치를 지원한다', async ({ page }, testInfo) => {
@@ -349,9 +349,9 @@ test('모바일은 카드 세로 배치와 표 스크롤을 유지하고 데스�
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(handle).toBeHidden()
   const panels = page.locator('.resizable-split-panel')
-  const left = (await panels.nth(0).boundingBox())!
-  const right = (await panels.nth(1).boundingBox())!
-  expect(right.y).toBeGreaterThanOrEqual(left.y + left.height)
+  await expect.poll(() => panels.evaluateAll(([left, right]) =>
+    right.getBoundingClientRect().top - left.getBoundingClientRect().bottom,
+  )).toBeGreaterThanOrEqual(0)
   await page.screenshot({ path: testInfo.outputPath('mobile.png'), fullPage: true })
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   const viewport = page.getByRole('table', { name: '예외 목록' }).locator('..')

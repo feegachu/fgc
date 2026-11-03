@@ -89,7 +89,7 @@ export function Donut({
                   <>
                     <b>{s.name}</b>
                     <div>
-                      계약 <b>{real.value}건</b> · 비중 <b>{share}%</b>
+                      계약 <b>{real.value}건</b>, 비중 <b>{share}%</b>
                     </div>
                     <small>월환산 {int(real.premium)}원</small>
                   </>,
@@ -154,11 +154,16 @@ export function Donut({
   )
 }
 
+/** 오른쪽 보험료 축 글자(예: 20만). */
+const compactWon = (value: number) =>
+  value ? new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 }).format(value) : '0'
+
 export function Trend({ points }: { points: { month: string; count: number; premium: number }[] }) {
   const { tip, show, hide } = useTip()
   const W = 560
   const H = 232
   const L = 30
+  const R = 40
   const T = 30
   const B = 24
   const maxCount = Math.max(1, ...points.map((p) => p.count))
@@ -166,39 +171,49 @@ export function Trend({ points }: { points: { month: string; count: number; prem
     (v, i, a) => a.indexOf(v) === i,
   )
   const top = Math.max(...ticks, 1)
-  const step = (W - L - 8) / points.length
+  const step = (W - L - R) / points.length
   const y = (v: number) => T + (H - T - B) * (1 - v / top)
   const best = points.reduce((b, p, i) => (p.count > points[b].count ? i : b), 0)
-  // 막대와 선은 같은 값으로 함께 움직인다(처음 그릴 때는 바닥에서 올라오고, 필터를 바꾸면 새 값으로 옮겨 간다).
+  const premiumTop = Math.max(1, ...points.map((p) => p.premium))
+  const yp = (v: number) => T + (H - T - B) * (1 - v / premiumTop)
+  // 처음 그릴 때는 바닥에서 올라오고, 필터를 바꾸면 새 값으로 옮겨 간다.
   const shownCounts = useTween(
     points.map((p) => p.count),
     500,
     true,
   )
   const shown = points.map((_, i) => shownCounts[i] ?? 0)
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
-  // 선의 점은 각 막대 윗면 가운데에 닿는다. 보험료는 마우스를 올리면 보인다.
-  const line = shown.map((v, i) => [L + step * (i + 0.5), y(v)])
+  const shownPremiums = useTween(
+    points.map((p) => p.premium),
+    500,
+    true,
+  )
+  const line = points.map((_, i) => [L + step * (i + 0.5), yp(shownPremiums[i] ?? 0)])
   const path = line.map(([x, v], i) => `${i ? 'L' : 'M'}${x} ${v}`).join('')
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const every = points.length > 12 ? 2 : 1
   return (
     <div className="ah-trend ah-chart">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="월별 신규 계약 건수 막대와 추이선 차트"
+        aria-label="월별 신규 계약 건수 막대와 월환산 초회보험료 선 차트"
         preserveAspectRatio="none"
       >
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#f1f5f9" />
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="#f1f5f9" />
             <text x={L - 6} y={y(t) + 3} textAnchor="end" className="ah-axis">
               {t}
             </text>
           </g>
         ))}
-        <line x1={L} x2={W - 8} y1={H - B} y2={H - B} stroke="#e2e8f0" />
-        <path d={`${path}L${line[line.length - 1][0]} ${H - B}L${line[0][0]} ${H - B}Z`} fill="rgba(132,103,165,.08)" />
+        <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#e2e8f0" />
+        {[premiumTop, 0].map((v) => (
+          <text key={v} x={W - R + 6} y={yp(v) + 3} className="ah-axis ah-axis-premium">
+            {compactWon(v)}
+          </text>
+        ))}
         {points.map((p, i) => {
           const h = (H - T - B) * (shown[i] / top)
           const x = L + step * (i + 0.5)
@@ -209,9 +224,8 @@ export function Trend({ points }: { points: { month: string; count: number; prem
                 y={H - B - h}
                 width={Math.min(18, step * 0.64)}
                 height={h}
-                rx="4"
-                fill="#7f57ac"
-                className={`ah-bar${hoverIdx === i ? ' is-hover' : ''}`}
+                rx="3"
+                className={`ah-bar${i === points.length - 1 ? ' is-current' : ''}${hoverIdx === i ? ' is-hover' : ''}`}
               />
               {i % every === 0 && (
                 <text x={x} y={H - 6} textAnchor="middle" className="ah-axis">
@@ -223,7 +237,7 @@ export function Trend({ points }: { points: { month: string; count: number; prem
                 y={T}
                 width={step}
                 height={H - T - B}
-                fill={hoverIdx === i ? 'rgba(127,87,172,.06)' : 'transparent'}
+                className={`ah-bar-hit${hoverIdx === i ? ' is-hover' : ''}`}
                 onMouseMove={(e) => {
                   setHoverIdx(i)
                   show(
@@ -245,26 +259,19 @@ export function Trend({ points }: { points: { month: string; count: number; prem
             </g>
           )
         })}
-        <path d={path} fill="none" stroke="#8467a5" strokeWidth="2" strokeLinejoin="round" />
-        {points.length <= 12 &&
-          line.map(([x, v], i) => (
-            <circle key={points[i].month} cx={x} cy={v} r="2.6" fill="#8467a5" stroke="#fff" strokeWidth="1.5" />
-          ))}
+        <path d={path} className="ah-line" fill="none" strokeWidth="2" strokeLinejoin="round" />
         {points[best].count > 0 && (
-          <g>
-            <rect
-              x={L + step * (best + 0.5) - 19}
-              y={y(shown[best]) - 24}
-              width="38"
-              height="17"
-              rx="4"
-              fill="#6a4893"
-            />
-            <text x={L + step * (best + 0.5)} y={y(shown[best]) - 12} textAnchor="middle" className="ah-best">
+          <g className="ah-best-tag">
+            <rect x={L + step * (best + 0.5) - 20} y={y(shown[best]) - 27} width="40" height="19" rx="4" />
+            <text x={L + step * (best + 0.5)} y={y(shown[best]) - 13} textAnchor="middle" className="ah-best">
               BEST
             </text>
           </g>
         )}
+        {points.length <= 12 &&
+          line.map(([x, v], i) => (
+            <circle key={points[i].month} cx={x} cy={v} r="2.6" className="ah-line-dot" strokeWidth="1.5" />
+          ))}
       </svg>
       <table className="visually-hidden">
         <caption>월별 신규 계약 건수와 월 환산 보험료</caption>
@@ -306,7 +313,7 @@ export function ProductBars({ items }: { items: { name: string; count: number; p
                 <>
                   <b>{item.name}</b>
                   <div>
-                    {item.count}건 · {item.pct.toFixed(1)}%
+                    {item.count}건, {item.pct.toFixed(1)}%
                   </div>
                 </>,
               )
@@ -321,7 +328,7 @@ export function ProductBars({ items }: { items: { name: string; count: number; p
               />
             </span>
             <b>
-              {item.count}건 · {item.pct.toFixed(1)}%
+              {item.count}건, {item.pct.toFixed(1)}%
             </b>
           </li>
         ))}

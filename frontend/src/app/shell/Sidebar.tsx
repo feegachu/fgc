@@ -14,7 +14,7 @@ import { roleLabels } from './labels'
 const groups = [
   {
     id: 'contracts',
-    title: '계약·지급',
+    title: '계약/지급',
     icon: 'payments',
     paths: ['/contracts', '/transactions', '/schedules', '/clawbacks'],
   },
@@ -24,7 +24,7 @@ const groups = [
     icon: 'fact_check',
     paths: ['/cap-checks', '/arbitrage-checks', '/validation-runs'],
   },
-  { id: 'ledger', title: '원장·대사', icon: 'menu_book', paths: ['/journals', '/reconciliations'] },
+  { id: 'ledger', title: '원장/대사', icon: 'menu_book', paths: ['/journals', '/reconciliations'] },
   { id: 'admin', title: '관리', icon: 'settings', paths: ['/base', '/policies', '/audit-logs'] },
 ]
 export function Sidebar({
@@ -80,7 +80,13 @@ export function Sidebar({
       </li>
     )
   }
-  const hasVisibleLinks = (paths: string[]) => paths.some((path) => canOpen(screens.find((screen) => screen.path === path)!, user))
+  const hasVisibleLinks = (paths: string[]) =>
+    paths.some((path) =>
+      canOpen(
+        screens.find((screen) => screen.path === path)!,
+        user,
+      ),
+    )
   return (
     <aside id="app-sidebar" className="app-sidebar">
       <div className="sidebar-brand">
@@ -120,53 +126,58 @@ export function Sidebar({
         <ul className="sidebar-nav-list">
           {link('/')}
           {link('/agent-home')}
-          {groups.slice(0, 3).filter((group) => hasVisibleLinks(group.paths)).map((group) => (
-            <li key={group.id}>
-              <details className="sidebar-nav-details" open={openSections.includes(group.id)}>
+          {groups
+            .slice(0, 3)
+            .filter((group) => hasVisibleLinks(group.paths))
+            .map((group) => (
+              <li key={group.id}>
+                <details className="sidebar-nav-details" open={openSections.includes(group.id)}>
+                  <summary
+                    className="sidebar-nav-summary"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      if (collapsed) setCollapsed(false)
+                      setSection(group.id, collapsed || !openSections.includes(group.id))
+                    }}
+                  >
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      {group.icon}
+                    </span>
+                    <span className="sidebar-nav-label">{group.title}</span>
+                    <span />
+                    <span className="material-symbols-rounded sidebar-nav-chevron" aria-hidden="true">
+                      chevron_right
+                    </span>
+                  </summary>
+                  <ul className="sidebar-subnav">{group.paths.map((path) => link(path, true))}</ul>
+                </details>
+              </li>
+            ))}
+          {link('/exceptions')}
+          {hasVisibleLinks(groups[3].paths) && (
+            <li className="sidebar-nav-section">
+              <details className="sidebar-nav-details" open={openSections.includes('admin')}>
                 <summary
                   className="sidebar-nav-summary"
                   onClick={(event) => {
                     event.preventDefault()
                     if (collapsed) setCollapsed(false)
-                    setSection(group.id, collapsed || !openSections.includes(group.id))
+                    setSection('admin', collapsed || !openSections.includes('admin'))
                   }}
                 >
                   <span className="material-symbols-rounded" aria-hidden="true">
-                    {group.icon}
+                    settings
                   </span>
-                  <span className="sidebar-nav-label">{group.title}</span>
+                  <span className="sidebar-nav-label">관리</span>
                   <span />
                   <span className="material-symbols-rounded sidebar-nav-chevron" aria-hidden="true">
                     chevron_right
                   </span>
                 </summary>
-                <ul className="sidebar-subnav">{group.paths.map((path) => link(path, true))}</ul>
+                <ul className="sidebar-subnav">{groups[3].paths.map((path) => link(path, true))}</ul>
               </details>
             </li>
-          ))}
-          {link('/exceptions')}
-          {hasVisibleLinks(groups[3].paths) && <li className="sidebar-nav-section">
-            <details className="sidebar-nav-details" open={openSections.includes('admin')}>
-              <summary
-                className="sidebar-nav-summary"
-                onClick={(event) => {
-                  event.preventDefault()
-                  if (collapsed) setCollapsed(false)
-                  setSection('admin', collapsed || !openSections.includes('admin'))
-                }}
-              >
-                <span className="material-symbols-rounded" aria-hidden="true">
-                  settings
-                </span>
-                <span className="sidebar-nav-label">관리</span>
-                <span />
-                <span className="material-symbols-rounded sidebar-nav-chevron" aria-hidden="true">
-                  chevron_right
-                </span>
-              </summary>
-              <ul className="sidebar-subnav">{groups[3].paths.map((path) => link(path, true))}</ul>
-            </details>
-          </li>}
+          )}
         </ul>
       </nav>
       <div className="sidebar-user-panel">
@@ -175,7 +186,7 @@ export function Sidebar({
         </span>
         <div className="sidebar-user-copy">
           <p className="sidebar-user-name">{user.userName}</p>
-          <p className="sidebar-user-role">{roleLabels[user.roleCode] ?? user.roleCode}</p>
+          <p className="sidebar-user-role">{roleLabels[user.roleCode] ?? '업무 사용자'}</p>
         </div>
         <button
           className="sidebar-logout-button"
