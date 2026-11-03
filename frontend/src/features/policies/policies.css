@@ -43,7 +43,7 @@
   align-items: center;
   gap: 12px;
   border: 1px solid var(--color-blue-100);
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   padding: 12px 16px;
   background: var(--color-blue-50);
   color: var(--color-text-secondary);
@@ -73,9 +73,9 @@
   align-items: flex-start;
 }
 .policy-detail-hero h2 {
-  font-size: 21px;
+  font-size: 1.125rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  line-height: 1.625rem;
 }
 .policy-detail-hero > div > p:last-child {
   color: var(--color-text-secondary);
@@ -92,7 +92,7 @@
   margin: 24px 0;
   background: var(--color-neutral-50);
   border: 1px solid var(--color-border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-8);
 }
 .policy-workflow > div {
   display: flex;
@@ -185,13 +185,11 @@
   gap: 12px;
   margin-bottom: 18px;
 }
-.policy-section-heading h2 {
-  font-size: 20px;
-  font-weight: 700;
-}
+.policy-section-heading h2,
 .policy-section-heading h3 {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
 }
 .policy-section-heading > span {
   font-size: 12px;
@@ -205,7 +203,7 @@
 }
 .policy-regime-summary {
   border: 1px solid var(--color-border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-8);
   padding: 18px 20px;
   margin-top: 16px;
 }
@@ -214,7 +212,8 @@
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 20px;
 }
 .policy-regime-summary .policy-metadata {
   margin-bottom: 0;
@@ -224,7 +223,7 @@
   gap: 16px;
   padding: 20px;
   border: 1px solid var(--color-border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-8);
   margin-top: 12px;
   align-items: flex-start;
 }
@@ -232,15 +231,16 @@
   color: var(--color-blue-600);
   background: var(--color-blue-50);
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
 }
 .policy-source-card > div {
   flex: 1;
   min-width: 0;
 }
 .policy-source-card h4 {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
   margin: 10px 0 6px;
 }
 .policy-source-card p {
@@ -422,7 +422,7 @@
   margin: 20px 0;
   background: var(--color-neutral-50);
   border: 1px solid var(--color-border-default);
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   font-size: 12px;
   color: var(--color-text-secondary);
   line-height: 1.7;
@@ -444,7 +444,7 @@
 .policy-rule-editor {
   padding: 20px;
   border: 1px solid var(--color-border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-8);
   margin-bottom: 16px;
 }
 .policy-rule-editor > header {
@@ -458,7 +458,8 @@
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 20px;
 }
 .policy-rule-editor > header .button {
   font-size: 12px;
@@ -490,7 +491,7 @@
   text-align: center;
   padding: 44px 20px;
   border: 1px dashed var(--color-neutral-300);
-  border-radius: 10px;
+  border-radius: var(--radius-8);
   background: var(--color-neutral-50);
   gap: 10px;
   margin-bottom: 20px;
@@ -508,7 +509,7 @@
 }
 .policy-condition-card {
   border: 1px solid var(--color-border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-8);
   padding: 20px;
   margin-bottom: 16px;
 }
@@ -518,8 +519,9 @@
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
 }
 .policy-condition-card p {
   font-size: 12px;
@@ -540,7 +542,7 @@
   padding: 20px;
   background: var(--color-neutral-50);
   border: 1px solid var(--color-border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-8);
   margin-bottom: 24px;
 }
 .policy-confirm-summary > div {
