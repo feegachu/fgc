@@ -57,12 +57,16 @@ test('AGENT 첫 화면은 포트폴리오이고 본인 계약 목록은 전체 �
   await page.screenshot({ path: 'e2e-artifacts/634-agent-contracts.png', fullPage: true })
 })
 
-test('1280px 화면에서도 7자리 수수료와 단위가 카드 안 한 줄에 보인다', async ({ page }) => {
+for (const { width, expand } of [{ width: 1280, expand: false }, { width: 1200, expand: true }]) {
+  test(`${width}px${expand ? '에서 사이드바를 펼쳐도' : ' 화면에서도'} 7자리 수수료와 단위가 카드 안 한 줄에 보인다`, async ({ page }) => {
   await agentFixture(page, 1_910_000)
-  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.setViewportSize({ width, height: 720 })
   await page.goto('./')
+  // 1280px 미만은 사이드바가 기본으로 접히고, 사용자가 펼치면 지표 칸이 더 좁아진다.
+  if (expand) await page.getByRole('button', { name: '사이드바 펼치기' }).click()
   const card = page.getByRole('link', { name: '수령 예정 수수료' })
   await expect(card.locator('.kpi-value')).toHaveText('1,910,000')
+  await page.evaluate(() => document.fonts.ready)
   const box = (await card.boundingBox())!
   const value = (await card.locator('.kpi-value').boundingBox())!
   const unit = (await card.locator('.kpi-unit').boundingBox())!
@@ -70,7 +74,8 @@ test('1280px 화면에서도 7자리 수수료와 단위가 카드 안 한 줄�
   expect(unit.x).toBeGreaterThanOrEqual(value.x + value.width)
   expect(unit.y).toBeLessThan(value.y + value.height)
   expect(unit.x + unit.width).toBeLessThanOrEqual(box.x + box.width)
-})
+  })
+}
 
 test('계약 상세의 저장된 내부 탭은 기본정보로 제한하고 내부 API를 호출하지 않는다', async ({ page }) => {
   const unexpected = await agentFixture(page)
