@@ -1,5 +1,7 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { SaveGuide } from '../assistant/guide/save-guide'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
@@ -127,11 +129,21 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
+  const [saveGuide] = useState(() => new SaveGuide())
+  const saved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const actions = availableActions(item.status, item.type)
+  const valid = actions.some(action => action.type === actionType) && Boolean(reason.trim()) && reason.trim().length <= 1000
+  const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, reason, evidenceRef])
+  useEffect(() => { saveGuide.update(context, valid) }, [saveGuide, context, valid])
   const mutation = useMutation({
-    mutationFn: () => postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }),
+    mutationFn: () => { saveGuide.begin(); return postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }) },
     meta: { errorToast: false },
-    onSuccess: (action) => {
+    onSuccess: async (action) => {
+      if (!mounted.current) return
+      if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '')) throw new Error('서버 처리 결과의 조치와 상태를 확인하지 못했습니다.')
+      if (!(await saveGuide.saved(Number(action.actionSeq))) || !mounted.current) return
       applyActionToCache(client, item.exceptionCaseId!, action)
       setActionType('')
       setReason('')
@@ -148,6 +160,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
     },
     onError: (caught) => {
       const message = errorText(caught as Error, '처리 내용을 저장하지 못했습니다.')
+      saveGuide.fail(message)
       setError(message)
       toast(message, 'error')
     },
@@ -155,10 +168,12 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   function submit(event: FormEvent) {
     event.preventDefault()
     setError('')
-    mutation.mutate()
+    if (valid && !mutation.isPending) mutation.mutate()
   }
   return (
-    <form className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
+    <form data-guide-scope="exception-action" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
+      <ScreenHelp screenId="EXCP-W01" variant="action" saveGuide={saveGuide} outcome="processing" />
+      <fieldset data-guide-target="exception.actionInput" disabled={mutation.isPending} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--space-3)' }}>
       <Field label="조치" required>
         <select className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
           <option value="">조치를 선택하세요</option>
@@ -186,16 +201,18 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
           onChange={(event) => setEvidenceRef(event.target.value)}
         />
       </Field>
+      </fieldset>
       {error && (
         <p className="field-error exception-action-error" role="alert">
           {error}
         </p>
       )}
       <Button
+        data-guide-target="exception.actionSave"
         type="submit"
         className="exception-action-submit"
-        loading={mutation.isPending}
-        disabled={!actionType || !reason.trim()}
+        loading={mutation.isPending && !saved}
+        disabled={!valid || mutation.isPending}
       >
         처리 저장
       </Button>

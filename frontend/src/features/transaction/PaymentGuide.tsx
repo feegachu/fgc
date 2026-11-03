@@ -33,8 +33,6 @@ const reasons: Record<string, string> = {
   PERMISSION_DENIED: '현재 권한으로 이 안내를 계속할 수 없습니다.',
   CONTEXT_CHANGED: '입력 또는 저장 상태가 바뀌었습니다. 현재 내용을 확인한 뒤 이어서 안내하세요.',
   ENTITY_CHANGED_RESTART_REQUIRED: '선택 대상이 바뀌었습니다. 현재 대상으로 안내를 다시 시작하세요.',
-  MULTIPLE_CONTRACTS_UNSUPPORTED:
-    '여러 계약을 선택한 지급 건은 아직 안내를 지원하지 않습니다. 기존 업무 버튼은 사용할 수 있습니다.',
   REQUIRED_ENTITY_MISSING: '이 안내에 필요한 계약 또는 저장된 지급 건을 먼저 선택하세요.',
   DUPLICATE_TARGET: '안내 대상이 중복되어 멈췄습니다.',
   PREPARATION_TIMEOUT: '안내 대상을 준비하지 못했습니다. 화면을 확인하고 다시 찾으세요.',
@@ -264,18 +262,13 @@ function GuideSession({
         data-guide-status={snapshot.status}
       >
         <header className="payment-guide-header">
-          <svg className="payment-guide-mascot" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="3" y="6" width="22" height="18" rx="7" fill="currentColor" opacity=".12" />
-            <path
-              d="M8 17c2 3 10 3 12 0M14 3v3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <circle cx="9" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="19" cy="12" r="1.5" fill="currentColor" />
-          </svg>
+          <img
+            className="payment-guide-mascot"
+            src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`}
+            width="40"
+            height="40"
+            alt=""
+          />
           <span>
             업무 가이드
             {current && step

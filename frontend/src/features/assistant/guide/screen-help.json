@@ -1,0 +1,395 @@
+[
+  {
+    "screenId": "CONT-W01",
+    "title": "보험계약 목록",
+    "page": "contract/ContractListPage.tsx",
+    "steps": [
+      {
+        "targetId": "contract.filters",
+        "instruction": "계약번호·보험회사·기간으로 검색하세요. 조회 결과의 계약을 선택해 상세를 확인합니다."
+      },
+      {
+        "targetId": "contract.new",
+        "instruction": "처리 권한이 있으면 신규 등록으로 이동합니다. 이 안내는 계약을 자동 등록하지 않습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "CONT-W03",
+    "title": "보험계약 입력",
+    "page": "contract/ContractFormPage.tsx",
+    "steps": [
+      {
+        "targetId": "contract.form",
+        "instruction": "보험회사·상품·계약일·설계사·보험료와 필수 항목을 입력하세요. 오류를 수정한 뒤 실제 저장 버튼을 누릅니다."
+      },
+      {
+        "targetId": "contract.save",
+        "instruction": "실제 등록 또는 수정 저장 버튼을 직접 누르세요. 서버 오류는 입력값을 정정하고, 성공 후 계약 상세에서 저장 결과를 확인합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "CONT-W02",
+    "title": "보험계약 상세",
+    "page": "contract/ContractDetailPage.tsx",
+    "steps": [
+      {
+        "targetId": "contract.statusHistory",
+        "instruction": "기본정보 탭의 상태이력에서 적용일과 수신일을 구분해 확인하세요."
+      },
+      {
+        "targetId": "contract.schedules",
+        "instruction": "스케줄 탭을 열어 계약에 연결된 실제 예정 회차를 확인하세요. 생성 실패나 빈 결과는 생성 완료가 아닙니다."
+      }
+    ]
+  },
+  {
+    "screenId": "SCHE-W01",
+    "title": "예상 스케줄 목록",
+    "page": "schedule/ScheduleListPage.tsx",
+    "steps": [
+      {
+        "targetId": "schedule.filters",
+        "instruction": "조회 조건의 정산월·지급단계·체계를 확인하고 검색하세요. 4년·7년 예정은 지급 확정 흐름과 구분합니다."
+      },
+      {
+        "targetId": "schedule.results",
+        "instruction": "스케줄을 선택하면 회차 상세로 이동합니다. 버전과 활성 상태를 함께 확인하세요."
+      }
+    ]
+  },
+  {
+    "screenId": "SCHE-W02",
+    "title": "예상 스케줄 상세",
+    "page": "schedule/ScheduleDetailPage.tsx",
+    "steps": [
+      {
+        "targetId": "schedule.lines",
+        "instruction": "회차별 귀속일·항목·금액과 합계를 확인하세요. 예상 회차 조회는 실제 지급 확정이 아닙니다."
+      },
+      {
+        "targetId": "schedule.generate",
+        "instruction": "권한과 스케줄 상태를 확인한 뒤 실제 재생성 버튼을 누르세요. 새 버전 생성 성공은 서버 결과에서 확인하고 기존 활성 버전과 비교합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "TRAN-W01",
+    "title": "수수료 지급 목록",
+    "page": "transaction/TransactionListPage.tsx",
+    "steps": [
+      {
+        "targetId": "payment.filters",
+        "instruction": "정산월·계약·설계사·상태로 조회하세요. 작성중 건의 수정에서 초안을 정정할 수 있습니다."
+      },
+      {
+        "targetId": "payment.results",
+        "instruction": "작성중·확정·취소 상태와 귀속 건수·합계를 확인하세요. 확정된 지급의 정정은 기존 취소 절차를 따릅니다."
+      }
+    ]
+  },
+  {
+    "screenId": "DASH-W01",
+    "title": "업무 대시보드",
+    "page": "dashboard/DashboardPage.tsx",
+    "steps": [
+      {
+        "targetId": "dashboard.guide",
+        "instruction": "전체 업무 가이드는 현재 정산월의 계약부터 최종 확정까지 안내합니다. 시작 대상을 선택하고 실제 업무 버튼을 직접 조작하세요."
+      }
+    ]
+  },
+  {
+    "screenId": "VRUN-W01",
+    "title": "월 통합검증 목록",
+    "page": "validation/ValidationRunListPage.tsx",
+    "steps": [
+      {
+        "targetId": "validation.create",
+        "instruction": "검증월·실행 유형을 확인하고 실제 생성 버튼을 누릅니다. 생성 성공과 실행 완료는 다르며 상세에서 실행 상태를 확인하세요."
+      },
+      {
+        "targetId": "validation.createSubmit",
+        "instruction": "실제 실행 생성을 누르고 서버의 새 실행 ID를 확인하세요. 실행 생성은 검증 계산 완료가 아닙니다."
+      }
+    ]
+  },
+  {
+    "screenId": "VRUN-W02",
+    "title": "월 통합검증 상세",
+    "page": "validation/ValidationRunDetailPage.tsx",
+    "steps": [
+      {
+        "targetId": "validation.progress",
+        "instruction": "서버의 10단계 진행 상태와 오류를 확인합니다. 실패한 실행은 같은 실행을 임의 재기동하지 말고 신규 실행 절차를 따릅니다."
+      },
+      {
+        "targetId": "validation.execute",
+        "instruction": "생성됨 상태에서는 실제 실행 버튼을 누르세요. 202 수락은 완료가 아니며 서버 진행률의 COMPLETED/FINALIZED를 확인해야 다음으로 진행할 수 있습니다. 실패 시 신규 실행 절차를 따릅니다. 계산 완료는 최종 확정과 다릅니다."
+      },
+      {
+        "targetId": "validation.restart",
+        "instruction": "실패 또는 확정된 실행을 다시 돌리지 않습니다. 신규 실행 만들기로 목록에 돌아가 검증월과 유형을 확인한 뒤 새 실행을 생성하세요."
+      },
+      {
+        "targetId": "validation.checklist",
+        "instruction": "확정 전 8개 조건을 확인하고 미충족 원천을 정정·재검증하세요."
+      },
+      {
+        "targetId": "validation.finalize",
+        "instruction": "최종 확정 권한과 서버 조건을 확인하세요. 실제 확정 성공 후 결과가 잠기며 안내 확인만으로 확정되지 않습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "RECO-W01",
+    "title": "대사 실행·결과",
+    "page": "reconciliation/ReconciliationPage.tsx",
+    "steps": [
+      {
+        "targetId": "reconciliation.filters",
+        "instruction": "정산월·보험회사·대사 범위를 확인하고 실제 실행 버튼을 누릅니다. 지급 사전검증과 대사 일치는 별도 판정입니다."
+      },
+      {
+        "targetId": "reconciliation.execute",
+        "instruction": "실제 대사 실행을 누르세요. 요청 수락은 완료가 아닙니다. 이력의 COMPLETED/FINALIZED와 선택 실행의 결과 조회 성공을 기다립니다. 불일치가 있어도 계산 완료와 구분합니다."
+      },
+      {
+        "targetId": "reconciliation.results",
+        "instruction": "실행 결과에서 불일치 유형과 계약을 확인하세요. 불일치만 보기와 서버 페이지 범위에 유의하세요."
+      },
+      {
+        "targetId": "reconciliation.history",
+        "instruction": "이전 실행 이력과 현재 결과의 실행 ID를 구분하세요. 원천 정정 후 새 대사 결과를 확인합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "EXCP-W01",
+    "title": "예외 처리",
+    "page": "exception/ExceptionPage.tsx",
+    "steps": [
+      {
+        "targetId": "exception.filters",
+        "instruction": "유형·상태·계약번호를 조회하고 처리할 예외 한 건을 선택하세요."
+      },
+      {
+        "targetId": "exception.action",
+        "instruction": "선택 예외의 원천 링크와 이력을 확인한 뒤 검토·정정·해결을 처리합니다. 처리 저장만으로 원천이 정정되거나 재검증이 끝나지 않습니다."
+      },
+      {
+        "targetId": "exception.detail",
+        "instruction": "예외 한 건을 선택한 뒤 검출 이력의 실행별 근거를 확인하세요. 원천 수정은 해당 업무 화면에서 수행합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "POL-W01",
+    "title": "정책·룰셋",
+    "page": "policies/PoliciesPage.tsx",
+    "steps": [
+      {
+        "targetId": "policy.overview",
+        "instruction": "기준일과 선택 정책 버전을 확인하세요. 탭에서 수수료·환급률·관리 상태를 조회하고 활성 정책과 초안을 구분합니다."
+      },
+      {
+        "targetId": "policy.filters",
+        "instruction": "기준일과 조회 탭을 확인하세요. 목록 행에서 정책을 선택하면 유형별 상세와 관리 탭에서 후속 작업을 할 수 있습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "BASE-W01",
+    "title": "기준정보",
+    "page": "base/BasePage.tsx",
+    "steps": [
+      {
+        "targetId": "base.overview",
+        "instruction": "정보 유형 탭과 기준일을 선택해 조회하세요. 과거 시점의 유효 정보와 현재 정보를 구분합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "CAP-W01",
+    "title": "한도 검증",
+    "page": "cap/CapListPage.tsx",
+    "steps": [
+      {
+        "targetId": "cap.overview",
+        "instruction": "선택 계약의 지급단계·귀속일과 한도 사용률을 확인하세요. 경고·위반·검토필요를 구분하며 관리자 승인으로 위반을 통과시킬 수 없습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "ARB-W01",
+    "title": "차익거래 검증",
+    "page": "arbitrage/ArbitragePage.tsx",
+    "steps": [
+      {
+        "targetId": "arbitrage.overview",
+        "instruction": "검증 조건으로 조회하고 의심 결과의 계산 근거를 확인하세요. 검토대상 표시는 최종 위반 확정과 다릅니다."
+      }
+    ]
+  },
+  {
+    "screenId": "LEDG-W01",
+    "title": "검증원장",
+    "page": "ledger/LedgerPage.tsx",
+    "steps": [
+      {
+        "targetId": "ledger.overview",
+        "instruction": "원장 목록에서 분개를 선택하고 차변·대변·원천 연결을 확인하세요. 정정·역분개는 권한과 기존 절차에 따라 직접 수행합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "AUDT-W01",
+    "title": "감사로그",
+    "page": "audit/AuditLogPage.tsx",
+    "steps": [
+      {
+        "targetId": "audit.overview",
+        "instruction": "기간·사용자·대상 조건으로 조회하고 변경 전후를 확인하세요. 감사 이력은 조회용이며 수정할 수 없습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "AGNT-W01",
+    "title": "설계사 포트폴리오",
+    "page": "agent-home/AgentHomePage.tsx",
+    "steps": [
+      {
+        "targetId": "agent.overview",
+        "instruction": "본인 계약과 판매 현황을 확인하세요. 이 도움말은 내부 정산·확정 권한을 제공하지 않습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "POL-W01",
+    "variant": "editor",
+    "title": "정책 초안 작성",
+    "page": "policies/PolicyDraftEditor.tsx",
+    "steps": [
+      {
+        "targetId": "policy.editor",
+        "instruction": "정책 종류·기본정보와 규칙을 입력하세요. 필수값 오류를 수정하고 원천 근거를 확인합니다."
+      },
+      {
+        "targetId": "policy.save",
+        "instruction": "실제 초안 저장 버튼을 직접 누르세요. 서버의 저장 결과를 확인한 뒤 검토 요청 절차로 진행합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "POL-W01",
+    "variant": "management",
+    "title": "정책 관리",
+    "page": "policies/PolicyManagement.tsx",
+    "steps": [
+      {
+        "targetId": "policy.actions",
+        "instruction": "선택 정책의 상태와 서버가 허용한 조치를 확인하세요. 검토 요청·승인·활성화는 실제 버튼으로 수행하며 권한을 우회하지 않습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "POL-W01",
+    "variant": "sources",
+    "title": "정책 근거 자료",
+    "page": "policies/PolicyManagement.tsx",
+    "steps": [
+      {
+        "targetId": "policy.sources",
+        "instruction": "근거 자료 탭에서 선택 정책의 출처·버전과 누락된 근거를 확인하세요."
+      }
+    ]
+  },
+  {
+    "screenId": "RECO-W02",
+    "variant": "detail",
+    "title": "대사 비교 상세",
+    "page": "reconciliation/CompareModal.tsx",
+    "steps": [
+      {
+        "targetId": "reconciliation.detail",
+        "instruction": "차액과 분류를 확인하고 예상 스케줄·실제 지급의 필드별 근거를 비교하세요. 상세 조회만으로 불일치가 해결되지 않습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "SCHE-W02",
+    "variant": "regenerate",
+    "title": "스케줄 새 버전 생성",
+    "page": "schedule/ScheduleDetailPage.tsx",
+    "steps": [
+      {
+        "targetId": "schedule.regenerate.reason",
+        "instruction": "기존 스케줄의 새 버전을 만들 사유를 1~40자로 입력하세요. 다음은 생성을 실행하지 않습니다."
+      },
+      {
+        "targetId": "schedule.regenerate.submit",
+        "instruction": "실제 새 버전 만들기 버튼을 누르세요. 서버가 새 스케줄 ID를 반환한 뒤에만 완료할 수 있습니다. 예정 생성은 지급 확정이 아닙니다."
+      }
+    ]
+  },
+  {
+    "screenId": "EXCP-W01",
+    "variant": "action",
+    "title": "예외 조치 저장",
+    "page": "exception/ActionPanel.tsx",
+    "steps": [
+      {
+        "targetId": "exception.actionInput",
+        "instruction": "선택한 예외의 허용 조치와 처리 사유를 입력하세요. 증빙과 원천 정정 필요 여부를 확인하세요. 조치 저장은 재검증·재대사를 대신하지 않습니다."
+      },
+      {
+        "targetId": "exception.actionSave",
+        "instruction": "실제 처리 저장을 누르세요. 서버가 선택한 예외에 반환한 조치 순번과 상태 전이를 확인해야 완료합니다. 실패하면 입력을 보존하고 사유를 확인해 재시도하세요."
+      }
+    ]
+  },
+  {
+    "screenId": "VRUN-W02",
+    "variant": "finalize",
+    "title": "검증 최종 확정",
+    "page": "validation/FinalizeDialogs.tsx",
+    "steps": [
+      {
+        "targetId": "validation.finalizeWarning",
+        "instruction": "선택한 검증월·회차와 잠금 경고를 확인하세요. 기존 권한과 서버의 8개 조건을 통과해야 확정할 수 있습니다."
+      },
+      {
+        "targetId": "validation.finalizeSubmit",
+        "instruction": "이 확인창의 실제 확정 버튼을 누르세요. 서버 FINALIZED 응답을 받아야 가이드가 완료됩니다. 실제 송금·회계 마감이 아닙니다."
+      }
+    ]
+  },
+  {
+    "screenId": "EXCP-W01",
+    "variant": "correction",
+    "title": "원장 원천 정정",
+    "page": "exception/JournalCorrectionModal.tsx",
+    "steps": [
+      {
+        "targetId": "exception.correctionInput",
+        "instruction": "신규 재기표의 분개일·설명·계정·정정 사유를 입력하세요. 각 라인의 차변 또는 대변 한쪽만 양수이며 차대 합계가 같아야 합니다. 원분개는 읽기 전용입니다."
+      },
+      {
+        "targetId": "exception.correctionSave",
+        "instruction": "실제 정정 실행 버튼을 누르세요. 서버에서 원분개에 대한 역분개·재기표가 성공해야 다음으로 진행합니다. 실패하면 입력을 보존하고 다시 확인하세요."
+      }
+    ]
+  },
+  {
+    "screenId": "CLAW-W01",
+    "title": "환수 검토·계산",
+    "page": "clawback/ClawbackPage.tsx",
+    "steps": [
+      {
+        "targetId": "clawback.filters",
+        "instruction": "기간·계약 등 조건으로 환수 검토 대상을 조회하고 한 건의 근거를 확인하세요. 검토 대상은 확정된 환수채무가 아닙니다. 계산·PDF 생성은 권한과 서버 조건을 확인한 뒤 기존 버튼으로 직접 수행합니다."
+      }
+    ]
+  }
+]

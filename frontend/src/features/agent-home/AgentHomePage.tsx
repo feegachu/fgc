@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -131,6 +132,7 @@ function AgentHomeContent({ month }: { month: string }) {
   return (
     <div className="ah">
       <h1 className="visually-hidden">포트폴리오</h1>
+      <ScreenHelp screenId="AGNT-W01" />
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error, '포트폴리오를 불러오지 못했습니다.')}</p>
@@ -199,7 +201,7 @@ function Snapshot({
   const countDelta = now.count - before.count
   const need = now.near + now.review
   return (
-    <section className="ah-snapshot" aria-label="이번 달 판매 현황">
+    <section data-guide-target="agent.overview" className="ah-snapshot" aria-label="이번 달 판매 현황">
       <article className="ah-hero" aria-label="설계사 프로필">
         <span className="ah-avatar" aria-hidden="true">
           {name.slice(0, 1) || '설'}

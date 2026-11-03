@@ -50,22 +50,14 @@
   margin-top: 12px;
   color: #526174;
 }
-.settlement-spotlight {
-  outline: 3px solid #3154ff !important;
-  outline-offset: 6px;
-  scroll-margin-block: 100px;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .settlement-spotlight {
-    transition: outline-color 0.2s;
-  }
-}
+.settlement-scroll-target { scroll-margin-block: 100px; }
+.settlement-guide-spotlight { z-index: 44; }
 body:has([role='dialog']) .settlement-guide {
   visibility: hidden;
 }
 
-body:has([role='dialog']) .settlement-spotlight {
-  outline: none !important;
+body:has([role='dialog']) .settlement-guide-spotlight {
+  visibility: hidden;
 }
 
 .settlement-guide-mascot {
@@ -77,7 +69,7 @@ body:has([role='dialog']) .settlement-spotlight {
   }
   @keyframes settlement-float {
     50% {
-      transform: translateY(-3px);
+      transform: translateY(-4px);
     }
   }
 }

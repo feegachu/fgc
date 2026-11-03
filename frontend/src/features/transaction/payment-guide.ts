@@ -116,8 +116,7 @@ export class PaymentGuideObserver {
   readContext = (): GuideContext => {
     const input = this.requireInput()
     const contracts = [...new Set(input.rows.map((row) => row.contractId).filter(Boolean))]
-    // Never silently choose the first contract of a multi-contract payment.
-    if (contracts.length > 1) throw new GuideFailure('MULTIPLE_CONTRACTS_UNSUPPORTED')
+    // Preserve every distinct contract; completion checks all attribution rows and the whole payment.
     return {
       screenId: 'TRAN-W02',
       role:

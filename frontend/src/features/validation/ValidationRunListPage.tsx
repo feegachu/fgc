@@ -1,5 +1,7 @@
+import { SaveGuide } from '../assistant/guide/save-guide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -154,6 +156,7 @@ export default function ValidationRunListPage() {
   return (
     <div className="vrun-page vrun-list-page">
       <header className="page-header">
+
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 실행 목록</h1>
         </div>
@@ -225,27 +228,34 @@ function CreateSection() {
   const active = useQuery({ ...activeMonthlyQuery(month), enabled: monthOk })
   const hasActive = active.data?.exists === true
   const blockedByActive = runType === 'MONTHLY' && hasActive
+  const [saveGuide] = useState(() => new SaveGuide())
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useEffect(() => { saveGuide.update(`${month}:${runType}`, canProcess && monthOk && !blockedByActive && !active.isError && !active.isPending) }, [saveGuide, month, runType, canProcess, monthOk, blockedByActive, active.isError, active.isPending])
   const mutation = useMutation({
-    mutationFn: () => createRun(month, runType),
+    mutationFn: () => { saveGuide.begin(); return createRun(month, runType) },
     meta: { errorToast: false },
-    onSuccess: (created) => {
+    onSuccess: async (created) => {
+      if (!mounted.current || !(await saveGuide.saved(Number(created.validationRunId))) || !mounted.current) return
       toast(`${month} 검증월 ${created.runNo}회차 실행이 생성되었습니다.`, 'success')
       void client.invalidateQueries({ queryKey: ['validation-runs'] })
       const to = `/validation-runs/${created.validationRunId}`
       void navigate(shellMonth ? withMonth(to, shellMonth) : to)
     },
     onError: (error) => {
+      saveGuide.fail(errorText(error))
       toast(errorText(error as Error, '검증월(yyyy-MM)과 실행 유형을 확인하세요.'), 'error')
       void client.invalidateQueries({ queryKey: ['validation-runs', 'active-monthly'] })
     },
   })
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (monthOk) mutation.mutate()
+    if (monthOk && canProcess && !blockedByActive && !mutation.isPending) mutation.mutate()
   }
   return (
     <section data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
       <header className="surface-header">
+        <ScreenHelp screenId="VRUN-W01" saveGuide={saveGuide} />
         <h2 className="surface-title" id="vrun-create-title">
           ① 새 실행 만들기
         </h2>
@@ -253,12 +263,12 @@ function CreateSection() {
       <form className="vrun-create-form search-conditions" onSubmit={submit}>
         <div className="vrun-create-month">
           <Field label="검증월" required>
-            <input type="month" value={month} onChange={(event) => setPicked(event.target.value)} />
+            <input type="month" disabled={mutation.isPending} value={month} onChange={(event) => setPicked(event.target.value)} />
           </Field>
         </div>
         <div className="vrun-create-type">
           <Field label="실행 유형" required>
-            <select className="select-control" value={runType} onChange={(event) => setRunType(event.target.value)}>
+            <select className="select-control" disabled={mutation.isPending} value={runType} onChange={(event) => setRunType(event.target.value)}>
               {RUN_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
@@ -270,6 +280,7 @@ function CreateSection() {
         {/* 실행 생성은 SETTLEMENT (화면정의서 :1379, IF-API-45). 해당 월에 활성 MONTHLY 가 있으면 비활성 */}
         <Button
           type="submit"
+          data-guide-target="validation.createSubmit"
           id="btn-create"
           aria-describedby="create-hint"
           loading={mutation.isPending}

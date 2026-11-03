@@ -1,4 +1,5 @@
 import { nameWithCode } from '../../lib/screenText'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation } from 'react-router'
@@ -161,6 +162,7 @@ export default function ContractListPage() {
   return (
     <div className="contract-list-page">
       <header className="page-header contract-page-header">
+        <ScreenHelp screenId="CONT-W01" />
         <h1 className="page-title">보험계약 목록</h1>
         <div className="page-header-actions">
           <Button variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>
@@ -172,7 +174,7 @@ export default function ContractListPage() {
             CSV 내보내기
           </Button>
           {canProcess && (
-            <ContextLink className="button button-primary" to={returnLink('/contracts/new', back)}>
+            <ContextLink data-guide-target="contract.new" className="button button-primary" to={returnLink('/contracts/new', back)}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 add
               </span>
@@ -181,7 +183,7 @@ export default function ContractListPage() {
           )}
         </div>
       </header>
-      <section className="surface contract-filter-card" aria-label="보험계약 조회 조건">
+      <section data-guide-target="contract.filters" className="surface contract-filter-card" aria-label="보험계약 조회 조건">
         <ContractFilters
           key={JSON.stringify(criteria)}
           initial={criteria}

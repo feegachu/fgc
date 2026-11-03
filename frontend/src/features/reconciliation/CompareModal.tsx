@@ -1,4 +1,5 @@
 import { nameWithCode } from '../../lib/screenText'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
@@ -33,6 +34,7 @@ export function CompareModal({
       }
     >
       <Failure error={detail.error} />
+      <ScreenHelp screenId="RECO-W02" variant="detail" />
       {detail.isPending ? (
         <p role="status">불러오는 중입니다.</p>
       ) : (
@@ -96,7 +98,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         <SourceSide title="예상" matches={expected} detail={detail} expected />
         <SourceSide title="실제" matches={actual} detail={detail} expected={false} />
       </div>
-      <section className="surface reco-react-note" aria-label="차액 및 분류">
+      <section data-guide-target="reconciliation.detail" className="surface reco-react-note" aria-label="차액 및 분류">
         <p>
           예상 금액 <Money value={detail.expectedTotalAmount} />, 실제 금액 <Money value={detail.actualTotalAmount} />
         </p>

@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
@@ -173,6 +174,7 @@ export default function LedgerPage() {
   return (
     <div className="ledger-react-page">
       <header className="page-header">
+        <ScreenHelp screenId="LEDG-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">검증원장 조회</h1>
           <p className="page-description">
@@ -200,7 +202,7 @@ export default function LedgerPage() {
         label="분개 목록과 분개 상세 카드 너비"
         defaultRatio={55}
       >
-        <section className="surface" aria-busy={list.isFetching}>
+        <section data-guide-target="ledger.overview" className="surface" aria-busy={list.isFetching}>
           <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">분개 목록</h2>
           </ListHeader>

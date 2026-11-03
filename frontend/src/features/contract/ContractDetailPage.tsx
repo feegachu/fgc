@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
@@ -98,6 +99,7 @@ function ContractDetailView({ id }: { id: string }) {
   return (
     <div className="contract-react-detail contract-detail-page">
       <header className="page-header contract-detail-page-header">
+        <ScreenHelp screenId="CONT-W02" />
         <div className="page-header-copy">
           <h1 className="page-title">보험계약 상세</h1>
         </div>

@@ -61,7 +61,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
-function mount(role = 'SETTLEMENT') {
+function mount(role = 'SETTLEMENT', initialEntry = '/') {
   function Shell() {
     return (
       <>
@@ -76,37 +76,39 @@ function mount(role = 'SETTLEMENT') {
       </>
     )
   }
-  const router = createMemoryRouter([
-    {
-      element: <Shell />,
-      children: [
-        { path: '/', element: <h1>대시보드</h1> },
-        {
-          path: '/contracts/new',
-          element: (
-            <form data-guide-target="contract.form">
-              <input aria-label="계약 입력" />
-            </form>
-          ),
-        },
-        { path: '/contracts/1', element: <section data-guide-target="contract.schedules">스케줄 없음</section> },
-        { path: '/contracts/9', element: <section>다른 계약</section> },
-        {
-          path: '/schedules/2',
-          element: (
-            <section data-guide-target="schedule.lines">
-              실제 스케줄
-              <form>
+  const router = createMemoryRouter(
+    [
+      {
+        element: <Shell />,
+        children: [
+          { path: '/', element: <h1>대시보드</h1> },
+          {
+            path: '/contracts/new',
+            element: (
+              <form data-guide-target="contract.form">
+                <input aria-label="계약 입력" />
+              </form>
+            ),
+          },
+          { path: '/contracts/9', element: <section>다른 계약</section> },
+          { path: '/contracts/1', element: <section data-guide-target="contract.schedules">스케줄 없음</section> },
+          {
+            path: '/schedules/2',
+            element: (
+              <form data-guide-target="schedule.lines">
+                실제 스케줄
                 <input aria-label="스케줄 메모" />
               </form>
-            </section>
-          ),
-        },
-        { path: '/exceptions', element: <section data-guide-target="exception.action">예외 처리</section> },
-        { path: '/transactions/new', element: <section data-guide-target="payment.form">지급 입력</section> },
-      ],
-    },
-  ])
+            ),
+          },
+          { path: '/schedules/99', element: <section data-guide-target="schedule.lines">다른 스케줄</section> },
+          { path: '/exceptions', element: <section data-guide-target="exception.action">예외 처리</section> },
+          { path: '/transactions/new', element: <section data-guide-target="payment.form">지급 입력</section> },
+        ],
+      },
+    ],
+    { initialEntries: [initialEntry] },
+  )
   render(<RouterProvider router={router} />)
   return { router, actor: userEvent.setup() }
 }
@@ -178,7 +180,8 @@ describe('unsaved input and changed targets', () => {
     await actor.type(screen.getByLabelText('스케줄 메모'), '저장 전 메모')
     await actor.click(screen.getByRole('button', { name: '펼치기' }))
     await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('안내 이동은 취소했습니다')
+    await screen.findByRole('dialog', { name: '미저장 입력이 있습니다' })
+    await actor.click(screen.getByRole('button', { name: '현재 화면 유지' }))
     expect(router.state.location.pathname).toBe('/schedules/2')
     expect(screen.getByLabelText('스케줄 메모')).toHaveValue('저장 전 메모')
     const card = screen.getByRole('complementary', { name: '전체 업무 가이드' })
@@ -226,7 +229,8 @@ describe('unsaved input and changed targets', () => {
     const card = screen.getByRole('complementary', { name: '전체 업무 가이드' })
     expect(card).toHaveTextContent('6/9')
     await actor.click(screen.getByRole('button', { name: '월 검증 결과 선택' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('이동을 취소했습니다')
+    await screen.findByRole('dialog', { name: '미저장 입력이 있습니다' })
+    await actor.click(screen.getByRole('button', { name: '현재 화면 유지' }))
     expect(card).toHaveTextContent('6/9')
     expect(router.state.location.pathname).toBe('/contracts/new')
     expect(screen.getByLabelText('계약 입력')).toHaveValue('저장 전 값')
@@ -302,4 +306,63 @@ describe('role handoff in later stages', () => {
       vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET'),
     ).toBe(true)
   })
+})
+
+it('moves to the correct entity even when the current screen ID already matches', async () => {
+  const { actor, router } = mount('SETTLEMENT', '/schedules/99')
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  await screen.findByText('실제 스케줄')
+  expect(router.state.location.pathname).toBe('/schedules/2')
+})
+it('defaults to keeping unsaved input and rechecks before explicitly approved navigation', async () => {
+  const { actor, router } = mount()
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  await actor.type(await screen.findByLabelText('스케줄 메모'), 'keep')
+  await actor.click(screen.getByRole('button', { name: '펼치기' }))
+  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  await screen.findByRole('dialog', { name: '미저장 입력이 있습니다' })
+  expect(screen.getByRole('button', { name: '현재 화면 유지' })).toHaveFocus()
+  await actor.click(screen.getByRole('button', { name: '현재 화면 유지' }))
+  expect(screen.getByLabelText('스케줄 메모')).toHaveValue('keep')
+  expect(router.state.location.pathname).toBe('/schedules/2')
+  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  await actor.click(await screen.findByRole('button', { name: '입력 버리고 이동' }))
+  await screen.findByText('지급 입력')
+  expect(router.state.location.pathname).toBe('/transactions/new')
+  expect(
+    vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET'),
+  ).toBe(true)
+})
+it('locks the starting selection while its server lookup is pending', async () => {
+  const { actor } = mount()
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+  pending = () => {}
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  expect(screen.getByLabelText(/기존 계약번호/)).toBeDisabled()
+  expect(screen.getByLabelText(/기존 지급 번호/)).toBeDisabled()
+  expect(screen.getByLabelText('지급단계')).toBeDisabled()
+  await actor.click(screen.getByRole('button', { name: '종료' }))
+  await act(async () => {
+    const resolve = pending
+    pending = undefined
+    resolve?.()
+  })
+})
+
+it('pauses the target when only the query selection changes on the same screen', async () => {
+  const { actor, router } = mount()
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  await screen.findByText('실제 스케줄')
+  await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
+  await act(async () => {
+    await router.navigate('/schedules/2?month=2026-07&tab=other')
+  })
+  expect(await screen.findByRole('status')).toHaveTextContent('화면·입력이 바뀌었습니다')
 })

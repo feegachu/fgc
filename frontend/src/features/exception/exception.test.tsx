@@ -478,7 +478,9 @@ describe('EXCP-W01 예외함', () => {
     expect(await table()).toBeInTheDocument()
   })
 
-  it('원장 정정 예외는 원분개를 불러와 재기표를 요청하고 결과 링크를 보여 준다', async () => {
+  it.each([false, true])('원장 정정은 실제 서버 성공 뒤 결과를 표시한다 (도움말=%s)', async (guided) => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
     searchResponse = () => search([correctionCase])
     postResponse = (path, body) => {
       expect(path).toBe('/api/v1/exceptions/12/journal-correction')
@@ -519,8 +521,25 @@ describe('EXCP-W01 예외함', () => {
     // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
     expect(within(dialog).getAllByText('미수수수료').length).toBeGreaterThan(0)
     expect(within(dialog).queryByText(/1100|4100/)).not.toBeInTheDocument()
+    if (guided) {
+      await actions.click(within(dialog).getByRole('button', { name: '도움말' }))
+      expect(within(dialog).getByRole('button', { name: '다음' })).toBeDisabled()
+    }
     await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
+    if (guided) {
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: '다음' })).toBeEnabled())
+      await actions.click(within(dialog).getByRole('button', { name: '다음' }))
+      expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
+      expect(within(dialog).getByRole('button', { name: '다음' })).toBeDisabled()
+    }
     await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
+    if (guided) {
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: '다음' })).toBeEnabled())
+      expect(within(dialog).queryByText('역분개와 재기표를 완료했습니다.')).toBeNull()
+      await actions.click(within(dialog).getByRole('button', { name: '다음' }))
+      expect(await within(dialog).findByText('서버 정정 확인 · 가이드 완료')).toBeVisible()
+      await actions.click(within(dialog).getByRole('button', { name: '안내 마치기' }))
+    }
     expect(await within(dialog).findByText('역분개와 재기표를 완료했습니다.')).toBeInTheDocument()
     expect(within(dialog).getByRole('link', { name: '재기표 #72' })).toHaveAttribute(
       'href',
@@ -568,5 +587,49 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
   await actions.type(debit, '0')
   await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
   expect(await within(dialog).findByText(/1번 라인은 차변 또는 대변 중 한쪽에만/)).toBeInTheDocument()
+  expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
+})
+
+it('action help requires a real action sequence and preserves input for a failed retry', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  let attempts = 0
+  postResponse = () => {
+    attempts++
+    if (attempts === 1) throw new ApiError({ code: 'FGC-EXCP-003', message: '상태 충돌' }, 'guide-conflict', 409)
+    return { exceptionActionId: undefined, actionSeq: 1, actionType: 'START_REVIEW', actionTypeLabel: '검토 시작', fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중', reason: '원천 확인' }
+  }
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  const form = within(await screen.findByRole('form', { name: '예외 처리' }))
+  await actions.click(form.getByRole('button', { name: '도움말' }))
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
+  await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(form.getByLabelText(/처리 사유/), '원천 확인')
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '다음' }))
+  expect(attempts).toBe(0)
+  await actions.click(form.getByRole('button', { name: '처리 저장' }))
+  await screen.findByText(/상태 충돌/, { selector: '.exception-action-error' })
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
+  expect(form.getByLabelText(/처리 사유/)).toHaveValue('원천 확인')
+  await actions.click(form.getByRole('button', { name: '처리 저장' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  expect(screen.queryByText('1. 검토 시작')).not.toBeInTheDocument()
+  await actions.click(screen.getByRole('button', { name: '다음' }))
+  expect(await screen.findByText('서버 처리 확인 · 가이드 완료')).toBeVisible()
+  await actions.click(screen.getByRole('button', { name: '안내 마치기' }))
+  expect(await screen.findByText('1. 검토 시작')).toBeVisible()
+})
+
+it('resolved journal corrections expose read-only results without a write guide', async () => {
+  searchResponse = () => search([{ ...correctionCase, status: 'RESOLVED', statusLabel: '해결' }])
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(await screen.findByRole('button', { name: '원장 정정 확인' }))
+  const dialog = await screen.findByRole('dialog')
+  await within(dialog).findByText(/J-0070/)
+  expect(within(dialog).queryByRole('button', { name: '도움말' })).not.toBeInTheDocument()
+  expect(within(dialog).queryByRole('button', { name: '정정 실행' })).not.toBeInTheDocument()
   expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
 })

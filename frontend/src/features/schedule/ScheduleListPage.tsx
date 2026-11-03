@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation } from 'react-router'
@@ -199,6 +200,7 @@ export default function ScheduleListPage() {
   return (
     <div className="schedule-list-page">
       <header className="page-header schedule-page-header">
+        <ScreenHelp screenId="SCHE-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">예상 스케줄 목록</h1>
         </div>
@@ -220,7 +222,7 @@ export default function ScheduleListPage() {
         onReset={() => search(DEFAULT_FILTERS)}
       />
 
-      <section className="surface schedule-results-card" aria-labelledby="schedule-results-title">
+      <section data-guide-target="schedule.results" className="surface schedule-results-card" aria-labelledby="schedule-results-title">
         <ListHeader
           className="schedule-results-header"
           total={data ? data.totalElements ?? 0 : null}
@@ -307,7 +309,7 @@ function ScheduleFilter({
       </option>
     ))
   return (
-    <FilterBar
+    <FilterBar data-guide-target="schedule.filters"
       className="schedule-filter-bar"
       wrapFields={false}
       resetFirst

@@ -135,6 +135,15 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
       'validation.execute',
       '현재 계약이 이 실행의 선정 대상인지 서버 결과에서 확인하지 못했습니다. 대상 범위를 확인하세요.',
     )
+  // Session progress is intentionally ephemeral; server timestamps also protect resumed corrections.
+  const paymentChangedAt = Date.parse(payment.updatedAt ?? payment.createdAt ?? '')
+  const validationStartedAt = Date.parse(run.startedAt ?? '')
+  if (
+    Number.isFinite(paymentChangedAt) &&
+    Number.isFinite(validationStartedAt) &&
+    paymentChangedAt > validationStartedAt
+  )
+    throw new Error('지급 변경 이전에 시작한 검증은 재사용할 수 없습니다. 새 월 검증을 생성·실행한 뒤 선택하세요.')
   if (run.status === 'FINALIZED')
     return { ...at('validation.finalize', '서버에서 최종 확정된 결과를 확인했습니다.'), complete: true }
   if (run.status !== 'COMPLETED')
@@ -168,7 +177,10 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     summary.resultCount <= 0 ||
     summary.exceptionCount == null ||
     summary.matchedCount == null ||
-    evidence.openExceptions == null
+    evidence.openExceptions == null ||
+    ![summary.resultCount, summary.matchedCount, summary.exceptionCount, evidence.openExceptions].every(
+      (count) => Number.isSafeInteger(count) && count >= 0,
+    )
   )
     return at(
       'reconciliation.review',

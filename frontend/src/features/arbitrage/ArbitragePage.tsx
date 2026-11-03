@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -80,6 +81,7 @@ export default function ArbitragePage() {
   return (
     <div className="arb-page">
       <header className="page-header">
+        <ScreenHelp screenId="ARB-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">차익거래 검증</h1>
         </div>
@@ -148,7 +150,7 @@ export default function ArbitragePage() {
         </Field>
       </FilterBar>
       <QueryState error={insurers.error} />
-      <section className="kpi-grid kpi-group arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
+      <section data-guide-target="arbitrage.overview" className="kpi-grid kpi-group arb-summary-grid" aria-label="차익거래 판정 요약" aria-live="polite">
         {summaryCards.map((card) => (
           <button
             type="button"

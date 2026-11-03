@@ -2,6 +2,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { Button } from './Button'
 export function FilterBar({
   children,
+  'data-guide-target': guideTarget,
   onSubmit,
   onReset,
   actions,
@@ -14,6 +15,7 @@ export function FilterBar({
   fieldsClassName = '',
   actionsClassName = '',
 }: {
+  'data-guide-target'?: string
   children: ReactNode
   onSubmit: () => void
   onReset?: () => void
@@ -39,7 +41,7 @@ export function FilterBar({
     ) : null
   const submitButton = <Button type="submit">{icon('search')}조회</Button>
   return (
-    <form
+    <form data-guide-target={guideTarget}
       className={`filter-bar search-conditions ${embedded ? 'is-embedded' : ''} ${className}`}
       aria-label="조회 조건"
       onSubmit={submit}

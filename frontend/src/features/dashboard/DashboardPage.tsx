@@ -1,4 +1,5 @@
 import { typeBadgeTone } from '../exception/rules'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { openSettlementGuide } from '../assistant/settlement/entry'
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
@@ -145,6 +146,7 @@ function DashboardContent({ month }: { month: string }) {
   return (
     <div className="dashboard-page">
       <header className="page-header">
+        <ScreenHelp screenId="DASH-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>

@@ -897,3 +897,30 @@ describe('[FGC-FUN-018·030] 보험료 파생·입력 검증', () => {
     expect(preview.queryByText('9,007,199,254,740,984')).not.toBeInTheDocument()
   })
 })
+
+it('guide waits for server success and acknowledgement after failure', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  let attempts = 0
+  const { user, router, writes } = renderAt('/contracts/21/edit', (_, options) => {
+    if (options?.method && ++attempts === 1) throw new ApiError({ code: 'FGC-CONT-001', message: '저장 거절', field: 'contractNo' }, 'guide-failure', 409)
+  })
+  document.querySelector('.contract-form-page')!.id = 'main-content'
+  await ready()
+  await user.click(screen.getByRole('button', { name: '도움말' }))
+  const next = () => screen.getByRole('button', { name: '다음' })
+  await waitFor(() => expect(next()).toBeEnabled())
+  await user.click(next())
+  expect(writes).toHaveLength(0)
+  expect(next()).toBeDisabled()
+  await user.click(save())
+  await waitFor(() => expect(writes).toHaveLength(1))
+  expect(next()).toBeDisabled()
+  await user.click(save())
+  await waitFor(() => expect(next()).toBeEnabled())
+  expect(router.state.location.pathname).toBe('/contracts/21/edit')
+  await user.click(next())
+  expect(await screen.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: '안내 마치기' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/21'))
+})

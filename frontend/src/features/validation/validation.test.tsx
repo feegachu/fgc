@@ -453,4 +453,47 @@ it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수�
   await waitFor(() => expect(restart).toBeEnabled())
   expect(message).not.toBeVisible()
   expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+  })
+
+it('finalize help rejects a non-FINALIZED response and waits for acknowledgement after retry', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  currentUser = gaAdmin
+  detailHandlers()
+  let attempts = 0
+  const keys: (string | undefined)[] = []
+  handlers['POST /api/v1/validation-runs/7/finalize'] = (_path, init) => {
+    keys.push(init?.idempotencyKey)
+    return { status: ++attempts === 1 ? 'COMPLETED' : 'FINALIZED' }
+  }
+  const { actions } = renderAt('/app/validation-runs/7')
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  const modal = within(await screen.findByRole('dialog', { name: '이 검증 실행을 확정할까요?' }))
+  await actions.click(modal.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(modal.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(modal.getByRole('button', { name: '다음' }))
+  expect(attempts).toBe(0)
+  expect(modal.getByRole('button', { name: '다음' })).toBeDisabled()
+  await actions.click(modal.getByRole('button', { name: '확정' }))
+  await modal.findByText('서버의 최종 확정 상태를 확인하지 못했습니다.')
+  expect(modal.getByRole('button', { name: '다음' })).toBeDisabled()
+  await actions.click(modal.getByRole('button', { name: '확정' }))
+  await waitFor(() => expect(modal.getByRole('button', { name: '다음' })).toBeEnabled())
+  expect(screen.queryByRole('dialog', { name: '확정했습니다' })).toBeNull()
+  await actions.click(modal.getByRole('button', { name: '다음' }))
+  expect(await modal.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+  await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
+  expect(await screen.findByRole('dialog', { name: '확정했습니다' })).toBeVisible()
+  expect(keys[0]).toBe(keys[1])
+})
+
+it('does not allow finalizing a partial contract run even with a passed checklist', async () => {
+  currentUser = gaAdmin
+  detailHandlers()
+  handlers['GET /api/v1/validation-runs/7'] = () => detail(run({ runType: 'MANUAL_CONTRACT' }))
+  renderAt('/app/validation-runs/7')
+  expect(await screen.findByText('월 전체를 계산한 월간·확정전 실행만 최종 확정할 수 있습니다.')).toBeVisible()
+  expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+  expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
 })

@@ -490,3 +490,34 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     await waitFor(() => expect(toasts()).toContain('회차 표 CSV를 내려받았습니다.'))
   })
 })
+
+it('regeneration help validates reason and waits for new server version before navigation', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  const { router, actions } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return { scheduleHeaderId: 12, versionNo: 3 }
+    if (url === '/api/v1/schedules/12') return { ...detail(), header: header(12, { scheduleVersionNo: 3 }) }
+    if (url === '/api/v1/schedules/12/versions') return [header(12, { scheduleVersionNo: 3 })]
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const modal = within(screen.getByRole('dialog', { name: '새 버전 만들기' }))
+  await actions.click(modal.getByRole('button', { name: '도움말' }))
+  const next = () => modal.getByRole('button', { name: '다음' })
+  expect(next()).toBeDisabled()
+  await actions.type(modal.getByLabelText(/생성 사유/), '가이드 재생성 검증')
+  await waitFor(() => expect(next()).toBeEnabled())
+  await actions.click(next())
+  expect(calls('/api/v1/schedules/11/regenerate')).toHaveLength(0)
+  expect(next()).toBeDisabled()
+  await actions.click(modal.getByRole('button', { name: '새 버전 만들기' }))
+  await waitFor(() => expect(next()).toBeEnabled())
+  expect(router.state.location.pathname).toBe('/schedules/11')
+  await actions.click(next())
+  expect(await modal.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/12'))
+})

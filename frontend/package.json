@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run check:guides && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -16,7 +16,8 @@
     "test:e2e:negative": "node scripts/e2e-negative.mjs",
     "check:e2e": "tsc -p tsconfig.e2e.json",
     "generate:api": "openapi-typescript openapi/schema.json -o src/lib/api/schema.d.ts",
-    "check:api": "node scripts/check-api.mjs"
+    "check:api": "node scripts/check-api.mjs",
+    "check:guides": "node scripts/check-guide-targets.mjs && node --test scripts/check-guide-targets.test.mjs && vitest run src/features/assistant/guide/ScreenHelp.test.tsx"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",

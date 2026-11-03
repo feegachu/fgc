@@ -15,7 +15,7 @@ const entityTypes = new Set(['CONTRACT', 'PAYMENT', 'SCHEDULE', 'VALIDATION_RUN'
 function entitiesKey(refs: readonly EntityRef[]): string {
   if (
     refs.some((ref) => !entityTypes.has(ref.type) || !Number.isSafeInteger(ref.id) || ref.id <= 0) ||
-    new Set(refs.map((ref) => ref.type)).size !== refs.length
+    new Set(refs.map((ref) => `${ref.type}:${ref.id}`)).size !== refs.length
   )
     throw new GuideFailure('INVALID_ENTITY_REFS')
   return refs
