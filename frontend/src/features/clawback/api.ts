@@ -6,6 +6,8 @@ type Schemas = components['schemas']
 export type CandidateRow = Schemas['ClawbackCandidateResponse']
 export type CandidateDetail = Schemas['ClawbackCandidateDetailResponse']
 export type CandidatePage = Schemas['PageResponseClawbackCandidateResponse']
+export type Calculation = Schemas['Calculation']
+export type CalculationRequest = Required<Schemas['ClawbackCalculationRequest']>
 /** 서버(ClawbackCandidateQueryRepository.SORTABLE)와 같은 정렬 key. */
 export const CLAWBACK_SORT_KEYS = [
   'candidateId',
@@ -92,3 +94,13 @@ export const candidateDetailQuery = (candidateId?: number) =>
       (await apiClient.request<CandidateDetail>(`/api/v1/clawbacks/candidates/${candidateId}`, { signal })).data!,
     meta: { errorToast: false },
   })
+/** IF-API-85. 금액과 환수율은 보내지 않고 서버가 잠근 원천, 선택한 정책판, 사유로만 계산한다. */
+export async function calculateCandidate(candidateId: number, body: CalculationRequest, idempotencyKey: string) {
+  return (
+    await apiClient.request<Calculation>(`/api/v1/clawbacks/candidates/${candidateId}/calculations`, {
+      method: 'POST',
+      body,
+      idempotencyKey,
+    })
+  ).data!
+}

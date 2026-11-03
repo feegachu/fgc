@@ -1907,7 +1907,7 @@
     "workflowId": "clawback.review",
     "guideVersion": "1.0",
     "title": "환수 후보·근거 검토",
-    "description": "환수 화면은 현재 후보 조회와 원천·지급·스케줄·정책 후보를 확인하는 기능입니다. 환수액 계산 버튼의 실행은 아직 연결되지 않았으므로 실제 계산을 수행하거나 계산 완료로 안내하지 않습니다.",
+    "description": "환수 화면은 후보를 조회하고 원천, 지급, 스케줄, 정책 근거를 확인한 뒤 적용 정책을 골라 환수액을 계산하는 기능입니다. 계산 결과는 환수 확정이나 회수 완료가 아닙니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -2023,8 +2023,8 @@
         "stepId": "clawback.review.step.6",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-detail.section-2",
-        "title": "계산 지원 범위 확인",
-        "instruction": "현재 계산 영역의 정책 후보와 저장된 계산판 존재 여부를 확인합니다. 환수액 계산 버튼의 실제 실행은 아직 연결되지 않았으므로 이 안내는 계산 완료나 환수 처리 완료를 뜻하지 않습니다.",
+        "title": "환수액 계산 확인",
+        "instruction": "계산 영역에서 적용할 정책과 최신 계산판을 확인합니다. 계산 권한이 있으면 정책을 고르고 계산 사유를 입력한 뒤 환수액 계산을 직접 누릅니다. 계산 결과는 환수 확정이나 회수 완료가 아닙니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [

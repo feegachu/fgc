@@ -37,6 +37,7 @@ import {
   arbitrageStatusLabels,
   contractStatusLabels,
   paymentCycleLabels,
+  processingJobLabels,
   processingStatusLabels,
   sourceSystemLabels,
 } from './labels'
@@ -314,7 +315,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                             <ul className="contract-processing-list" aria-label="후속 처리 작업">
                               {event.processings.map((job, jobIndex) => (
                                 <li className="contract-processing-row" key={`${job.processingJob}-${jobIndex}`}>
-                                  <strong>{job.processingJob || '처리 작업'}</strong>
+                                  <strong>{processingJobLabels[job.processingJob ?? ''] ?? '처리 작업'}</strong>
                                   <ResultStatus code={job.processingStatus} labels={processingStatusLabels} />
                                   <time dateTime={job.processedAt}>{dateTime(job.processedAt)}</time>
                                 </li>
