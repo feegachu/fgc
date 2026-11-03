@@ -187,7 +187,9 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await waitFor(() => expect(save()).toBeEnabled())
     expect(field('계약번호')).toHaveValue(contract.contractNo)
     if (kind === 'duplicate') expect(field('계약번호')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getAllByText(new RegExp(message))).not.toHaveLength(0)
+    const shown = kind === 'duplicate' ? message : '연결이 끊겨 요청을 마치지 못했습니다.'
+    expect(screen.getAllByText(new RegExp(shown))).not.toHaveLength(0)
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument()
   })
 
   it.each(['/contracts/new', '/contracts/21/edit'])('등록·수정 취소는 목록으로 이동한다: %s', async (path) => {

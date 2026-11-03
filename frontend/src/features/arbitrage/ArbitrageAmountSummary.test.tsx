@@ -37,7 +37,7 @@ it('비교형은 현재 금액을 초과액 위의 막대로 비교하고 전체
     summary.querySelector('.arb-amount-bars')!.compareDocumentPosition(summary.querySelector('.arb-amount-excess')!) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
-  expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent('전체 지급예정액850,000원')
+  expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent('지급예정액850,000원')
   expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent(
     '지급예정 포함 초과액 (모니터링, 판정에 쓰지 않음)1,390,000원',
   )
@@ -70,7 +70,7 @@ it('누락된 금액을 0원으로 바꾸지 않고 음수의 부호와 막대 �
   await user.click(screen.getByRole('button', { name: '비교형' }))
   expect(screen.getByText('-1,234원')).toHaveClass('is-negative-amount')
   expect(screen.getByText('-987원')).toHaveClass('is-negative-amount')
-  expect(document.querySelector('.arb-amount-reference')).toHaveTextContent('전체 지급예정액-')
+  expect(document.querySelector('.arb-amount-reference')).toHaveTextContent('지급예정액-')
   expect(document.querySelector('.arb-amount-fill.is-negative')).toHaveStyle({ left: '0%' })
   expect(document.querySelectorAll('.arb-amount-zero')).toHaveLength(3)
 })

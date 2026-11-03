@@ -77,7 +77,7 @@ export default function ContractFormPage() {
         <div className="surface contract-form-error" role="alert">
           <p>{contractErrorText(detail.error ?? new Error('계약을 불러오지 못했습니다.'))}</p>
           <Button data-guide-feature="features.contract.contract-form-page.button" variant="secondary" onClick={() => void detail.refetch()}>
-            다시 불러오기
+            다시 시도
           </Button>
         </div>
       ) : (
@@ -524,13 +524,13 @@ function ContractEditor({
             {statusChanged && (
               <fieldset className="contract-status-event">
                 <legend>상태 변경 사유</legend>
-                <p>상태를 바꿀 때만 입력합니다. 처리자와 처리 시각은 서버가 기록합니다.</p>
+                <p>상태를 바꿀 때만 입력합니다. 처리자와 처리 시각은 자동으로 기록됩니다.</p>
                 <div className="contract-form-fields">
                   <Field
                     label="효력일시"
                     required
                     error={eventError('effectiveAt')}
-                    helper="실제 효력 시각(서울). 최신 사건의 효력일시 이후, 접수일시 이전이어야 합니다."
+                    helper="실제 효력 시각(한국 시간). 최신 사건의 효력일시 이후, 접수일시 이전이어야 합니다."
                   >
                     <input data-guide-feature="features.contract.contract-form-page.status-event-effective-at"
                       type="datetime-local"
@@ -544,7 +544,7 @@ function ContractEditor({
                     label="접수일시"
                     required
                     error={eventError('receivedAt')}
-                    helper="실제로 접수한 시각(서울). 서버 처리 시각과 따로 기록합니다."
+                    helper="실제로 접수한 시각(한국 시간). 저장 시각과 따로 기록합니다."
                   >
                     <input data-guide-feature="features.contract.contract-form-page.status-event-received-at"
                       type="datetime-local"
@@ -643,7 +643,7 @@ function ContractEditor({
                 label="소속 조직"
                 required
                 error={errors.organizationId}
-                helper="직접 수정하지 않습니다. 계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다."
+                helper="계약일 기준 소속 조직이 자동으로 들어갑니다."
               >
                 <input data-guide-feature="features.contract.contract-form-page.organization-name"
                   name="organizationName"
@@ -694,7 +694,7 @@ function ContractEditor({
               {amountInput(
                 'monthlyEquivalentFirstPremium',
                 '월납환산 초회보험료(원)',
-                '서버의 1,200% 한도 계산 기준값입니다.',
+                '1,200% 한도 계산의 기준 금액입니다.',
               )}
               {amountInput(
                 'paymentTermMonths',
@@ -728,8 +728,7 @@ function ContractEditor({
               </div>
               <p>월납환산 초회보험료 × 12</p>
               <p>
-                참고용 기본 계산식입니다. 실제 한도는 저장 후 적용 룰셋/해약환급금 합산 등을 반영해 서버가 다시
-                계산합니다.
+                참고용 기본 계산식입니다. 실제 한도는 적용 룰셋/해약환급금 합산 등을 반영해 저장 뒤 다시 계산합니다.
               </p>
             </aside>
           </section>
@@ -828,7 +827,7 @@ function ContractEditor({
           </div>
         </dl>
         <p>
-          저장 성공은 계약과 상태 사건 기록까지입니다. 후속 처리는 저장 뒤 따로 진행되며 상세의 상태이력에서 확인합니다.
+          저장하면 상태 변경 기록이 남고 보류나 재개는 상태이력에서 확인합니다.
         </p>
       </Modal>
       <Modal

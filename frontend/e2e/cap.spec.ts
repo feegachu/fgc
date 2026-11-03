@@ -118,7 +118,7 @@ test('잘못된 상세 딥링크는 목록을 막지 않는다', async ({ page }
   await fixture(page)
   await page.goto('cap-checks?capCheckId=999')
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText('저장된 판정을 찾을 수 없습니다.')
-  await page.getByRole('button', { name: '모달 닫기' }).click()
+  await page.getByRole('button', { name: '창 닫기' }).click()
   await expect(
     page.getByRole('table', { name: '계약별 판정 목록' }).getByRole('link', { name: 'C-2026-0001' }),
   ).toBeVisible()
