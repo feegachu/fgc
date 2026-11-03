@@ -107,7 +107,7 @@ const contractPath = (id: string | number, suffix = '') =>
   `/api/v1/contracts/${encodeURIComponent(String(id))}${suffix}`
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { data } = await apiClient.request<T>(path, options)
-  if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (data == null) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
 export const contractListQuery = ({ page, ...filters }: ContractCriteria) =>

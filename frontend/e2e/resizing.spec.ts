@@ -98,7 +98,7 @@ test('리사이즈 후에도 예외 목록의 지정된 컬럼 정렬을 유지�
 for (const [path, label] of [
   ['journals', '분개 목록과 분개 상세 카드 너비'],
   ['arbitrage-checks', '계약별 판정과 상세 카드 너비'],
-  ['transactions/new', '지급 건/귀속행과 확정 게이트 카드 너비'],
+  ['transactions/new', '지급 건, 귀속행과 확정 점검 카드 너비'],
   ['audit-logs', '감사 기록과 변경 내용 비교 카드 너비'],
 ]) {
   test(path + ': 카드 드래그·저장·모바일 배치를 지원한다', async ({ page }, testInfo) => {

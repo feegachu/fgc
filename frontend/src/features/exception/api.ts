@@ -63,7 +63,7 @@ export function searchPath(filters: ExceptionFilters) {
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const { data } = await apiClient.request<T>(path, { signal })
-  if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (data == null) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
 

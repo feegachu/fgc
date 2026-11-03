@@ -9,7 +9,7 @@ export const authQueryOptions = () => queryOptions({
   queryFn: async ({ signal }): Promise<AuthUser> => {
     const { data } = await apiClient.request<MeResponse>('/api/v1/auth/me', { signal })
     if (!data?.loginId || !data.userName || !data.roleCode || !validMonth(data.demoMonth)) {
-      throw new Error('사용자 정보와 서버 기준 정산월을 확인할 수 없습니다.')
+      throw new Error('사용자 정보와 기준 정산월을 불러오지 못했습니다.')
     }
     return {
       loginId: data.loginId,
