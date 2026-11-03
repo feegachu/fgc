@@ -141,6 +141,8 @@ describe('DASH-W01 업무 대시보드', () => {
       'href',
       '/app/reconciliations?onlyMismatch=true&month=2026-07',
     )
+    // 원장은 불균형만 거르는 목록 조건이 없어 기준월 원장 목록으로 보낸다.
+    expect(within(kpis).getByRole('link', { name: '원장 불균형 0건' })).toHaveAttribute('href', '/app/journals?month=2026-07')
     await actions.click(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/app/cap-checks'))
     expect(new URLSearchParams(router.state.location.search).get('status')).toBe('VIOLATION')

@@ -36,10 +36,10 @@ describe('1위 설명은 서버가 순위를 가른 기준과 일치한다', () 
     expect(answer).toContain('2위와 순수령액은 같고')
   })
 
-  it('순수령액·환수 노출액이 모두 같으면 표시 순서 기준이라고 밝힌다', () => {
+  it('순수령액·환수 노출액이 모두 같으면 상품 등록 순서 기준이라고 밝힌다', () => {
     const items = [item(1), item(2)]
 
-    expect(heroWhy(items)).toContain('표시 순서(상품 ID) 기준')
+    expect(heroWhy(items)).toContain('상품 등록 순서로 1위')
     expect(followUpAnswer('why', items)).not.toContain('가장 높아요')
   })
 })
@@ -48,14 +48,14 @@ describe('capBadge', () => {
   it('비율은 소수 첫째 자리 절사라 99.96% 가 100.0% 로 보이지 않는다', () => {
     expect(capBadge(99.96).text).toBe('99.9% 근접')
     expect(capBadge(100.04).text).toBe('100.0% 근접')
-    expect(capBadge(100.04, 1).text).toBe('100.0% 초과·이월')
+    expect(capBadge(100.04, 1).text).toBe('100.0% 초과/이월')
     expect(capBadge(99.96, 0).text).toBe('99.9% 근접')
     expect(capBadge(89.99).text).toBe('89.9% 여유')
   })
 
   it('한도와 정확히 같아 이월이 0원이면 초과가 아니라 근접이다', () => {
-    expect(capBadge(100, 0)).toEqual({ tone: 'warn', text: '100.0% 근접' })
-    expect(capBadge(110.833333, 130_000)).toEqual({ tone: 'bad', text: '110.8% 초과·이월' })
+    expect(capBadge(100, 0)).toEqual({ tone: 'warning', text: '100.0% 근접' })
+    expect(capBadge(110.833333, 130_000)).toEqual({ tone: 'error', text: '110.8% 초과/이월' })
   })
 })
 

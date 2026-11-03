@@ -38,7 +38,7 @@ public class PaymentCalculationService {
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) requireProcessing();
         if (request.mode() != PaymentCalculationRequest.Mode.EXISTING ||
                 !Set.of(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE, PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE).contains(request.kind()))
-            return result(request, "UNSUPPORTED", null, Map.of(), List.of(), null, List.of(), List.of(), "아직 등록되지 않은 계산 범위입니다.");
+            return result(request, "UNSUPPORTED", null, Map.of(), List.of(), null, List.of(), List.of(), "이 계산은 여기서 볼 수 없어요.");
         if (request.candidate() != null && !request.candidate().isNull()) throw invalid("candidate", "EXISTING 계산에는 후보를 전달할 수 없습니다.");
         if (request.scope() == null || request.scope().paymentId() == null)
             return result(request, "INSUFFICIENT_DATA", null, Map.of(), List.of(), null, List.of(), List.of("paymentId"), "저장된 지급 건을 선택하세요.");
@@ -49,12 +49,12 @@ public class PaymentCalculationService {
         if (!Objects.equals(payment.paymentId(), id)) throw new IllegalStateException("Payment scope mismatch");
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) {
             if (payment.status() != CommissionPaymentStatus.DRAFT)
-                return result(request, "UNSUPPORTED", payment, Map.of(), List.of(), null, List.of(), List.of(), "지급 후보 검토는 DRAFT만 지원합니다.");
+                return result(request, "UNSUPPORTED", payment, Map.of(), List.of(), null, List.of(), List.of(), "지급 후보 검토는 작성중인 지급 건만 할 수 있습니다.");
             TransactionPrecheckResponse checked = payments.precheck(id);
             if (!Objects.equals(checked.paymentId(), id)) throw new IllegalStateException("Precheck scope mismatch");
             List<Map<String, Object>> previews = checked.capPreview().stream().map(this::preview).toList();
             List<PaymentCalculationSnapshot.Reason> blockers = checked.blockers().stream().map(row -> new PaymentCalculationSnapshot.Reason(row.code(), row.message(), string(row.contractId()), string(row.transactionAttributionId()))).toList();
-            return result(request, checked.confirmable() ? "CALCULATED" : "REVIEW_REQUIRED", payment, Map.of(), previews, checked.confirmable(), blockers, List.of(), "기존 계산기의 조회 결과입니다. 실제 사전검증 완료 증표나 확정 승인이 아닙니다.");
+            return result(request, checked.confirmable() ? "CALCULATED" : "REVIEW_REQUIRED", payment, Map.of(), previews, checked.confirmable(), blockers, List.of(), "저장된 자료로 계산한 결과입니다. 사전검증이나 확정을 대신하지 않습니다.");
         }
         if (payment.amount() == null || payment.attributions() == null || payment.attributions().isEmpty() || payment.attributions().stream().anyMatch(row -> row.amount() == null))
             return result(request, "INSUFFICIENT_DATA", payment, Map.of(), List.of(), null, List.of(), List.of("amount/attributions"), "지급액 또는 귀속 자료가 없습니다. 0원으로 추정하지 않습니다.");

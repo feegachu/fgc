@@ -197,7 +197,7 @@ export function MonthSelector({
             </p>
           </div>
           <div className="month-selector-footer">
-            <p className="month-selector-selection">기준정산월 : {monthText(draft)}</p>
+            <p className="month-selector-selection">기준 정산월 : {monthText(draft)}</p>
             <div className="month-selector-actions">
               <Button data-guide-feature="components.month-selector.button-5" variant="secondary" disabled={busy} onClick={close}>
                 취소

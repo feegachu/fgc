@@ -16,10 +16,10 @@ export const SOURCE_TYPE = 'GA_MANUAL_PAYMENT'
 export const RECORDABLE_CODES = ['FGC-CAP-001', 'FGC-CAP-002']
 export const METHODS: [AttributionRequest['attributionMethod'], string][] = [
   ['DIRECT', '직접 귀속'],
-  ['SETTLEMENT_SUPPORT_MONTHLY', '정착지원금 월배부'],
+  ['SETTLEMENT_SUPPORT_MONTHLY', '정착지원금 월귀속'],
   ['FIRST_CONTRACT_CARRY_FORWARD', '최초계약 이월'],
-  ['APPROVED_ALLOCATION', '승인 배부'],
-  ['MANUAL_REVIEW', '수기 검토'],
+  ['APPROVED_ALLOCATION', '승인배부'],
+  ['MANUAL_REVIEW', '수동검토'],
 ]
 export interface FormValues {
   paymentStage: PaymentRequest['paymentStage']
@@ -150,7 +150,7 @@ function requireValue(value: string, label: string, field: string, numeric = fal
     throw new FormValidationError(`필수값을 확인하세요: ${label}`, field)
 }
 export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer: boolean): PaymentPayload {
-  requireValue(form.sourceBusinessKey, '업무키', 'bizKey')
+  requireValue(form.sourceBusinessKey, '지급 관리번호', 'bizKey')
   requireValue(form.settlementMonth, '정산월', 'settlementMonth')
   const insurer = form.paymentStage === 'INSURER_TO_GA'
   if (!insurer) requireValue(form.agentId, '수령 설계사', 'recipient')
@@ -169,7 +169,7 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
     if ((status === 'EXCLUDED' || newcomer) && !blank(row.evidenceRef))
       throw new FormValidationError('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.', `attr-${row.key}-evidenceRef`)
     if (row.attributionMethod === 'APPROVED_ALLOCATION' && !blank(row.allocationBasis))
-      throw new FormValidationError('승인 배부에는 배부정책을 입력해야 합니다.', `attr-${row.key}-allocationBasis`)
+      throw new FormValidationError('승인배부에는 배부정책을 입력해야 합니다.', `attr-${row.key}-allocationBasis`)
     const exclusions = {
       NEW_AGENT_SUPPORT: '신인활동지원비',
       COMPLIANCE_3PCT: '준법경영비',
@@ -210,12 +210,12 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
   }
 }
 const GATES = [
-  { label: '작성중(DRAFT) 저장', codes: ['FGC-TRAN-005'] },
+  { label: '작성중으로 저장', codes: ['FGC-TRAN-005'] },
   { label: '귀속행 입력', codes: ['FGC-TRAN-002'] },
-  { label: '귀속합계 = 지급액', codes: ['FGC-TRAN-003'] },
+  { label: '귀속합계와 지급액 일치', codes: ['FGC-TRAN-003'] },
   { label: '검토필요 귀속 해소', codes: ['FGC-CAP-002'] },
   { label: '1,200% 사전검증', codes: ['FGC-CAP-001', 'FGC-CAP-003', 'FGC-CAP-004'] },
-  { label: '전부 통과 → 확정', codes: [] },
+  { label: '모두 통과하면 확정', codes: [] },
 ]
 export function gateStates(result: Precheck | null) {
   const matched: Blocker[][] = GATES.map(() => [])

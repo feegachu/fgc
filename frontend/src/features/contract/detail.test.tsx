@@ -126,7 +126,7 @@ describe('CONT-W02 계약 상세', () => {
     ).toEqual(['#1 최초 → 정상', '#2 정상 처리 → 미납 처리'])
     expect(within(history).getByText('실패')).toBeInTheDocument()
     expect(within(history).getByText('2026-07-02 10:00')).toBeInTheDocument()
-    await actions.click(screen.getByRole('button', { name: '도착 순' }))
+    await actions.click(screen.getByRole('button', { name: '접수 순' }))
     expect(within(history).getAllByRole('heading', { level: 4 })[0]).toHaveTextContent('#2 정상 처리 → 미납 처리')
     expect(
       requested.filter(
@@ -355,7 +355,7 @@ describe('CONT-W02 계약 상세', () => {
     for (const label of ['수정', '스케줄 재생성', '한도 재검증']) {
       const button = screen.getByRole('button', { name: label })
       expect(button).toBeDisabled()
-      expect(button).toHaveAccessibleDescription('수정/스케줄 재생성/한도 재검증은 SETTLEMENT 권한이 필요합니다.')
+      expect(button).toHaveAccessibleDescription('수정, 스케줄 재생성, 한도 재검증은 정산담당자와 시스템관리자만 할 수 있습니다.')
       await actions.click(button)
     }
     expect(requested.some(({ options }) => options?.method === 'POST')).toBe(false)
@@ -446,7 +446,7 @@ describe('CONT-W02 계약 상세', () => {
 
   it('잘못된 식별자는 계약 API를 요청하지 않는다', async () => {
     renderAt('/contracts/not-an-id')
-    expect(await screen.findByRole('alert')).toHaveTextContent('계약 식별자를 확인할 수 없습니다.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('계약을 찾을 수 없습니다. 목록에서 다시 선택하세요.')
     expect(requested.some(({ url }) => url.startsWith('/api/v1/contracts'))).toBe(false)
   })
 

@@ -10,7 +10,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { normalizeCriteria } from './api'
 import type { AuditLog } from './api'
-import { diffFieldLabel } from './labels'
+import { auditValueLabel, diffFieldLabel } from './labels'
 
 const log = (auditLogId: number, overrides: Partial<AuditLog> = {}): AuditLog => ({
   auditLogId,
@@ -104,13 +104,13 @@ describe('AUDT-W01 감사로그 조회', () => {
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'EXCEPTION_ACTION', reason })])
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     expect(
-      await within(table).findByText('지급 초안 삭제: 지급 9007199254740993의 지급 예정이 철회되어 종결'),
+      await within(table).findByText('지급 초안 삭제로 종결, 지급 건 9007199254740993'),
     ).toBeInTheDocument()
     await screen.findByText('사유 원문 보기')
     expect(document.querySelector('.audit-reason-original')).toHaveTextContent(reason)
   })
 
-  it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 BATCH 표기를 유지한다', async () => {
+  it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 행위자가 없으면 자동 처리로 보인다', async () => {
     renderAt('/audit-logs?month=2026-07&userId=12&action=PAYMENT_CONFIRMED&from=2026-08-01&to=2026-08-16&page=2')
     expect(await screen.findByRole('heading', { name: '감사로그 조회' })).toBeInTheDocument()
     expect(await screen.findAllByRole('button', { name: '2026-08-16 10:00:07' })).toHaveLength(2)
@@ -122,7 +122,7 @@ describe('AUDT-W01 감사로그 조회', () => {
       to: '2026-08-16',
       page: '2',
     })
-    expect(screen.getByText('BATCH')).toBeInTheDocument()
+    expect(screen.getByText('자동 처리')).toBeInTheDocument()
     expect(screen.getByText('2 / 3 페이지')).toBeInTheDocument()
     expect(screen.getByText('총 45건')).toBeInTheDocument()
     expect(await screen.findByRole('option', { name: 'settle01' })).toBeInTheDocument()
@@ -142,7 +142,7 @@ describe('AUDT-W01 감사로그 조회', () => {
   it('조회는 검색조건을 URL 에 남기고 page·selected 를 지운다', async () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07&page=2&selected=1')
     await screen.findByText('지급 / 금액')
-    await actions.type(screen.getByLabelText('대상 ID'), '4104')
+    await actions.type(screen.getByLabelText('대상 번호'), '4104')
     await actions.click(screen.getByRole('button', { name: '조회' }))
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&entityId=4104'))
     await actions.click(screen.getByRole('button', { name: '초기화' }))
@@ -254,7 +254,7 @@ describe('AUDT-W01 감사로그 조회', () => {
 
   it('1차처럼 행의 다른 칸을 눌러도 그 행을 선택한다', async () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07')
-    await actions.click(await screen.findByText('BATCH'))
+    await actions.click(await screen.findByText('자동 처리'))
     await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&selected=2'))
     expect(await screen.findByText('시작')).toBeInTheDocument()
   })
@@ -306,7 +306,7 @@ describe('AUDT-W01 감사로그 조회', () => {
 
   it('감사 행을 키보드 Enter·Space로 선택하고 첫 열 버튼으로도 선택한다 (#418)', async () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07')
-    const batch = await screen.findByText('BATCH')
+    const batch = await screen.findByText('자동 처리')
     const row = batch.closest('tr')!
     row.focus()
     expect(row).toHaveFocus()
@@ -344,7 +344,7 @@ describe('AUDT-W01 감사로그 조회', () => {
 
   it('시작일이 종료일보다 늦으면 1차처럼 교환해 조회한다', async () => {
     renderAt('/audit-logs?from=2026-08-16&to=2026-08-01&page=0')
-    await screen.findByText('BATCH')
+    await screen.findByText('자동 처리')
     expect(listRequest().get('from')).toBe('2026-08-01')
     expect(listRequest().get('to')).toBe('2026-08-16')
     expect(listRequest().get('page')).toBe('1')
@@ -375,5 +375,12 @@ describe('diffFieldLabel', () => {
     expect(diffFieldLabel('payment.amount')).toBe('지급 / 금액')
     expect(diffFieldLabel('[0].result.details[1].amount')).toBe('1번째 / 결과 / 상세 / 2번째 / 금액')
     expect(diffFieldLabel('value')).toBe('값')
+  })
+  it('계약 수정 항목은 한글 항목명과 항목별 값 라벨로 읽고 미등록 값은 원문을 둔다', () => {
+    expect(diffFieldLabel('paymentCycleCode')).toBe('납입주기')
+    expect(auditValueLabel('MONTHLY', 'paymentCycleCode')).toBe('월납')
+    expect(auditValueLabel('ACTIVE', 'currentStatus')).toBe('정상')
+    expect(auditValueLabel('FUTURE_ORIGIN', 'dataOrigin')).toBe('FUTURE_ORIGIN')
+    expect(auditValueLabel('POSTED', 'journal.status')).toBe('기표됨')
   })
 })

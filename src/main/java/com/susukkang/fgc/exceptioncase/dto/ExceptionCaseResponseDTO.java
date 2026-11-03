@@ -97,7 +97,7 @@ public record ExceptionCaseResponseDTO(
             case "CAP_CALCULATION_REVIEW_REQUIRED" -> "한도 계산 검토 필요";
             case "FINALIZED_RESULT_DIFF" -> "확정 결과와 다름";
             case "ARBITRAGE_LIMIT_EXCEEDED" -> "차익거래 검토대상";
-            case "FINANCIAL_SNAPSHOT_MISSING" -> "계약 금융 스냅샷 없음";
+            case "FINANCIAL_SNAPSHOT_MISSING" -> "계약 금액 자료 없음";
             case "REFUND_TABLE_MISSING" -> "환급률표 없음";
             case "PRODUCT_CODE_MISMATCH" -> "상품코드 불일치";
             case "POLICY_MISSING" -> "정책 없음";
@@ -107,13 +107,18 @@ public record ExceptionCaseResponseDTO(
             case "CONTRACT_REVALIDATION_FAILED" -> "일일 변경 계약 재검증 실패";
             case "ARBITRAGE_DATA_REVIEW_REQUIRED" -> "차익거래 자료 확인 필요";
             case "CAP_CALCULATION_FAILED" -> "1,200% 계산 실패";
-            case "ACTUAL_MISSING" -> "실제 지급 없음";
-            case "EXPECTED_MISSING" -> "예상 지급 없음";
-            case "DUPLICATE" -> "대사 대상 중복";
-            case "AMOUNT_DIFFERENCE" -> "금액 불일치";
+            // 대사 사유는 화면정의서 4-2 대사 결과 표기와 같은 이름을 쓴다(SRC-074).
+            case "ACTUAL_MISSING" -> "실제 없음(누락)";
+            case "EXPECTED_MISSING" -> "예상 금액 없음";
+            case "DUPLICATE" -> "중복 지급";
+            case "AMOUNT_DIFFERENCE" -> "금액 차이";
             case "ORGANIZATION_MISMATCH" -> "소속 조직 불일치";
             case "INSTALLMENT_MISMATCH" -> "회차 불일치";
-            case "REVIEW_REQUIRED" -> "검토 필요";
+            case "AGENT_MISMATCH" -> "설계사 불일치";
+            case "INVALID_CONTRACT_PAYMENT" -> "비유효 계약 지급";
+            case "POLICY_VERSION_ERROR" -> "정책버전 오류";
+            case "REVIEW_REQUIRED" -> "검토필요";
+            case "UNKNOWN" -> "분류 불가";
             // PRE_CONFIRM 실시간 경로는 상위 유형명을 그대로 상세 원인으로 저장한다
             // (CommissionPaymentServiceImpl.exceptionReasonCode) — 유형 한글 라벨로 보여 준다.
             default -> {
