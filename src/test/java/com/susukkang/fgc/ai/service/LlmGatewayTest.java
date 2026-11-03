@@ -118,6 +118,20 @@ class LlmGatewayTest {
     }
 
     @Test
+    void markerOrInstructionsHiddenByJsonEscapesAreStillDiscarded() {
+        // 원문에는 표식이 없지만 JSON 문자열로 풀면 표식이 된다(\u005b = '[').
+        reply = request -> "{\"label\":\"\\u005bFGC-INSTRUCTIONS] 문서\",\"rowCount\":3}";
+        LlmGateway gateway = gateway();
+        assertAi001(() -> gateway.call(request(), DocKind.class));
+        assertThat(lastLog().getErrorCode()).isEqualTo("PROMPT_ECHO");
+
+        // 지시문 첫 글자 '문'(U+BB38)만 이스케이프한 되풀이
+        reply = request -> "{\"label\":\"\\ubb38서 서식을 분류한다.\",\"rowCount\":3}";
+        assertAi001(() -> gateway.call(request(), DocKind.class));
+        assertThat(lastLog().getErrorCode()).isEqualTo("PROMPT_ECHO");
+    }
+
+    @Test
     void blankInstructionsAreNotMatchedAsAnEcho() {
         LlmGateway gateway = gateway();
         LlmGateway.LlmRequest blank = LlmGateway.LlmRequest.builder()
