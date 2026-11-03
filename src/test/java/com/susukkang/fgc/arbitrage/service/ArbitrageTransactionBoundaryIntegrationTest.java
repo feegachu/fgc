@@ -28,6 +28,8 @@ class ArbitrageTransactionBoundaryIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
     @MockitoSpyBean ExceptionCaseDetectionCommandsImpl exceptionRepository;
+    @MockitoSpyBean com.susukkang.fgc.arbitrage.repository.ArbitrageCheckQueriesImpl queries;
+
 
     @Test
     void rollsBackPartialDetectionRetriesWithoutDuplicatesAndCommitsOtherContractIndependently() {
@@ -80,6 +82,72 @@ class ArbitrageTransactionBoundaryIntegrationTest {
         assertThat(count("exception_occurrence", result.getValidationRunId())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.audit_log WHERE action_code = 'ARBITRAGE_RECHECKED' AND entity_id = ?", Long.class,
                 result.getArbitrageCheckId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void correctionCommittedBetweenSourceReadsCannotMixOldPaidWithNewRemaining() throws Exception {
+        var columns = jdbc.queryForList("""
+                SELECT column_name FROM information_schema.columns WHERE table_schema='fgc'
+                  AND table_name='insurance_contract' AND is_identity='NO' AND is_generated='NEVER'
+                ORDER BY ordinal_position
+                """, String.class);
+        String select = columns.stream().map(c -> c.equals("contract_no")
+                ? "'IT-754-SNAPSHOT-" + java.util.UUID.randomUUID() + "'" : c)
+                .collect(java.util.stream.Collectors.joining(","));
+        Long contract = jdbc.queryForObject("INSERT INTO fgc.insurance_contract (" + String.join(",", columns)
+                + ") SELECT " + select + " FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1 RETURNING contract_id", Long.class);
+        Long header = jdbc.queryForObject("""
+                INSERT INTO fgc.schedule_header(contract_id,payment_stage,policy_version_id,schedule_version_no,
+                    schedule_purpose,schedule_regime)
+                VALUES (?,'GA_TO_FC',(SELECT min(policy_version_id) FROM fgc.policy_version),1,'OPERATIONAL','CURRENT')
+                RETURNING schedule_header_id
+                """, Long.class, contract);
+        Long line = jdbc.queryForObject("""
+                INSERT INTO fgc.schedule_line(schedule_header_id,line_no,installment_no,contract_month_no,due_date,
+                    commission_item_id,beneficiary_agent_id,basis_code,basis_amount,calculation_type,fixed_amount,expected_amount)
+                SELECT ?,1,1,1,DATE '2030-08-15',(SELECT min(commission_item_id) FROM fgc.commission_item),agent_id,
+                    'TEST',100000,'FIXED',100000,100000 FROM fgc.insurance_contract WHERE contract_id=? RETURNING schedule_line_id
+                """, Long.class, header, contract);
+        Long payment = jdbc.queryForObject("""
+                INSERT INTO fgc.commission_transaction(payment_stage,source_type,source_business_key,source_contract_id,
+                    recipient_agent_id,commission_item_id,installment_no,settlement_month,due_date,amount,cashflow_type,status)
+                SELECT 'GA_TO_FC','GA_MANUAL_PAYMENT',?, ?,beneficiary_agent_id,commission_item_id,1,
+                    DATE '2030-08-01',due_date,50000,'PAYMENT','DRAFT' FROM fgc.schedule_line WHERE schedule_line_id=?
+                RETURNING commission_transaction_id
+                """, Long.class, "IT-754-SNAPSHOT:" + java.util.UUID.randomUUID(), contract, line);
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id,attribution_seq,attribution_scope,
+                    contract_id,schedule_line_id,attribution_date,attribution_month,attributed_amount,
+                    inclusion_status_snapshot,attribution_method)
+                VALUES (?,1,'CONTRACT',?,?,DATE '2030-08-15',DATE '2030-08-01',50000,'INCLUDED','DIRECT')
+                """, payment, contract, line);
+        jdbc.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", payment);
+        Long run = jdbc.queryForObject("""
+                INSERT INTO fgc.validation_run(validation_month,run_no,run_type,status)
+                VALUES (DATE '2094-03-01',1,'PRE_CONFIRM','CREATED') RETURNING validation_run_id
+                """, Long.class);
+        var target = org.springframework.test.util.AopTestUtils
+                .<com.susukkang.fgc.arbitrage.repository.ArbitrageCheckQueriesImpl>getUltimateTargetObject(queries);
+        doAnswer(invocation -> {
+            Object paid = invocation.callRealMethod();
+            assertThat(jdbc.queryForObject("SHOW transaction_isolation", String.class)).isEqualTo("repeatable read");
+            // A distinct committed transaction cancels the payment after the first read, before the planned read.
+            java.util.concurrent.CompletableFuture.runAsync(() ->
+                    new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
+                            jdbc.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?", payment)))
+                    .get(20, java.util.concurrent.TimeUnit.SECONDS);
+            return paid;
+        }).when(target).sumConfirmedCommissionAmount(eq(contract), any(), any());
+        try {
+            var before = itemService.process(run, contract, LocalDate.of(2030, 8, 31));
+            assertThat(before.getPaidCommissionAmount()).isEqualByComparingTo("50000");
+            assertThat(before.getPlannedCommissionAmount()).isEqualByComparingTo("50000");
+        } finally {
+            reset(target);
+        }
+        var after = itemService.process(run, contract, LocalDate.of(2030, 8, 31));
+        assertThat(after.getPaidCommissionAmount()).isEqualByComparingTo("0");
+        assertThat(after.getPlannedCommissionAmount()).isEqualByComparingTo("100000");
     }
 
     private long count(String table, Long runId) {

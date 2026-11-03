@@ -4,6 +4,7 @@ import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -19,7 +20,7 @@ import java.time.LocalDate;
 public class ArbitrageCheckBatchItemService {
     private final ArbitrageService arbitrageService;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)
     public ArbitrageCheckInsertDTO process(Long validationRunId, Long contractId, LocalDate asOfDate) {
         return arbitrageService.checkInExistingRun(validationRunId, contractId, asOfDate);
     }

@@ -28,6 +28,7 @@ import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -142,7 +143,7 @@ public class ArbitrageService {
      * @author hjKang
      * @since 2026-08-12
      */
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ReArbitrageCheckResponse reArbitrageCheck(
             Long contractId,
             ReArbitrageCheckRequest request,
@@ -204,7 +205,7 @@ public class ArbitrageService {
      * @author hjKang
      * @since 2026-08-12
      */
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public ArbitrageCheckInsertDTO checkInExistingRun(
             Long validationRunId,
             Long contractId,
@@ -241,8 +242,9 @@ public class ArbitrageService {
                 ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getConfirmedDeductionAmount());
         BigDecimal paidCommissionAmount = confirmedCommission == null
                 ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getPaidCommissionAmount());
-        BigDecimal plannedCommissionAmount = valueOrZero(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate()));
+        PlannedCommissionSummary planned = arbitrageCheckRepository.plannedCommissionSummary(
+                contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate());
+        BigDecimal plannedCommissionAmount = planned.remainingAmount();
 
         // 금융자료 및 해약환급금 적용 조건 확인
         var applicability = applicabilityPolicyService.resolve(request.getAsOfDate());
@@ -252,6 +254,7 @@ public class ArbitrageService {
                 plannedCommissionAmount,
                 request, applicability
         );
+        decision = withPlannedSourceReview(decision, planned);
 
         // 계산 결과와 재현 가능한 계산 근거 저장
         ArbitrageCheckInsertDTO row = ArbitrageCheckInsertDTO.builder()
@@ -272,7 +275,7 @@ public class ArbitrageService {
                 .resultStatus(decision.resultStatus())
                 .calculationSnapshot(writeCalculationSnapshot(
                         source, new CommissionAmounts(confirmedPaymentAmount, confirmedDeductionAmount,
-                        paidCommissionAmount, plannedCommissionAmount), decision, request, applicability))
+                        paidCommissionAmount, plannedCommissionAmount, planned.unresolvedAttributionIds()), decision, request, applicability))
                 .build();
         int insertedRows = arbitrageCheckRepository.insertArbitrageCheck(row);
         if (insertedRows != 1 || row.getArbitrageCheckId() == null)
@@ -290,7 +293,9 @@ public class ArbitrageService {
                     REGULATORY_PAYMENT_STAGE.name(),
                     decision.reason()
             );
-        } else if (row.getResultStatus() == ArbitrageCheckStatus.REVIEW_REQUIRED) {
+        }
+        if (row.getResultStatus() == ArbitrageCheckStatus.REVIEW_REQUIRED
+                || (row.getResultStatus() == ArbitrageCheckStatus.CANDIDATE && !planned.unresolvedAttributionIds().isEmpty())) {
             ExceptionType exceptionType = reviewExceptionType(decision.reason());
             exceptionCaseRepository.insertArbitrageReviewCase(
                     exceptionType.name(),
@@ -318,6 +323,21 @@ public class ArbitrageService {
         if (reason.contains("여러 건"))
             return ExceptionType.POLICY_DUPLICATE;
         return ExceptionType.DATA_QUALITY;
+    }
+
+    /** 현재 지급분 후보는 유지하되, 미연결 지급이 있는 사전 모니터링 값을 확정값으로 내보내지 않는다. */
+    private CalculationDecision withPlannedSourceReview(CalculationDecision decision, PlannedCommissionSummary planned) {
+        if (planned.unresolvedAttributionIds().isEmpty()
+                || "NOT_APPLICABLE".equals(decision.candidateType())) return decision;
+        boolean candidate = decision.resultStatus() == ArbitrageCheckStatus.CANDIDATE;
+        boolean existingReview = decision.resultStatus() == ArbitrageCheckStatus.REVIEW_REQUIRED;
+        return new CalculationDecision(decision.contractMonthNo(), decision.cumulativePaidPremium(),
+                decision.includedSurrenderValueAmount(), decision.refundAdditionAppliedYn(),
+                decision.surrenderValueSourceType(), decision.refundRateTableId(), decision.currentExcessAmount(), null,
+                candidate ? ArbitrageCheckStatus.CANDIDATE : ArbitrageCheckStatus.REVIEW_REQUIRED,
+                candidate || existingReview ? decision.candidateType() : "PLANNED_SOURCE_REVIEW_REQUIRED",
+                existingReview ? decision.reason() : (candidate ? decision.reason() + " " : "")
+                        + "지급예정 잔액과 확정 지급의 연결을 확인할 수 없습니다. 귀속행: " + planned.unresolvedAttributionIds());
     }
 
     private CalculationDecision calculateDecision(
@@ -522,6 +542,9 @@ public class ArbitrageService {
         snapshot.put("confirmedDeductionAmount", amounts.confirmedDeductionAmount());
         snapshot.put("paidCommissionAmount", amounts.paidCommissionAmount());
         snapshot.put("plannedCommissionAmount", amounts.plannedCommissionAmount());
+        snapshot.put("plannedCommissionBasis", amounts.unresolvedPlannedAttributionIds().isEmpty()
+                ? "REMAINING_V1" : "UNRESOLVED_UPPER_BOUND_V1");
+        snapshot.put("unresolvedPlannedAttributionIds", amounts.unresolvedPlannedAttributionIds());
         snapshot.put("includedSurrenderValueAmount", decision.includedSurrenderValueAmount());
         snapshot.put("currentExcessAmount", decision.currentExcessAmount());
         snapshot.put("projectedExcessAmount", decision.projectedExcessAmount());
@@ -574,7 +597,8 @@ public class ArbitrageService {
             BigDecimal confirmedPaymentAmount,
             BigDecimal confirmedDeductionAmount,
             BigDecimal paidCommissionAmount,
-            BigDecimal plannedCommissionAmount) { }
+            BigDecimal plannedCommissionAmount,
+            List<Long> unresolvedPlannedAttributionIds) { }
 
     private record RefundDecision(
             BigDecimal amount,

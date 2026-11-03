@@ -207,42 +207,6 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             ta.attribution_date  <=  :asOfDate
             """;
 
-    // #648: 보류(HOLD) 회차는 계약이 회복되면 지급되므로 예정액에 남기고, 상태별 지급조건으로 중단(CANCELLED)된 회차는 뺀다.
-    private static final String SUM_PLANNED_COMMISSION_AMOUNT = """
-            SELECT
-            COALESCE(SUM(ROUND(sl.expected_amount, 0)), 0)
-            FROM fgc.schedule_header sh
-            JOIN fgc.schedule_line sl
-            ON
-            sl.schedule_header_id = sh.schedule_header_id
-            WHERE
-            sh.contract_id = :contractId
-            AND
-            sh.payment_stage = :paymentStage
-            AND
-            sh.active_yn = true
-            AND
-            sh.schedule_purpose = 'OPERATIONAL'
-            AND
-            sl.line_status IN ('PLANNED', 'HOLD')
-            AND NOT EXISTS (
-                SELECT 1 FROM fgc.contract_status_event e
-                WHERE e.contract_id = sh.contract_id
-                  AND e.new_status IN ('TERMINATED', 'LAPSED', 'MATURED', 'CANCELLED')
-                  AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
-                  AND sl.due_date > (e.effective_at AT TIME ZONE 'Asia/Seoul')::date
-                  AND NOT EXISTS (
-                      SELECT 1 FROM fgc.contract_status_event resumed
-                       WHERE resumed.contract_id = e.contract_id
-                         AND resumed.new_status IN ('ACTIVE', 'REVIVED')
-                         AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
-                         AND (resumed.effective_at AT TIME ZONE 'Asia/Seoul')::date <= sl.due_date
-                         AND (resumed.effective_at, resumed.event_seq, resumed.contract_status_event_id)
-                             > (e.effective_at, e.event_seq, e.contract_status_event_id)
-                  )
-            )
-            """;
-
     // 공용 정책 엔티티를 재사용하는 일반 조인은 JPQL로 처리한다.
     private static final String SELECT_REFUND_RATE_CANDIDATES = """
             SELECT table.refundRateTableId, line.refundRatePct
@@ -421,9 +385,18 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
 
     @Override
     public BigDecimal sumPlannedCommissionAmount(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
-        return (BigDecimal) query(SUM_PLANNED_COMMISSION_AMOUNT).setParameter(CONTRACT_ID, contractId, Long.class)
-                .setParameter(PAYMENT_STAGE, paymentStage.name(), String.class)
-                .setParameter(AS_OF_DATE, asOfDate, LocalDate.class).getSingleResult();
+        return plannedCommissionSummary(contractId, paymentStage, asOfDate).remainingAmount();
+    }
+
+    @Override
+    public PlannedCommissionSummary plannedCommissionSummary(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
+        Object[] row = (Object[]) entityManager.createNativeQuery(ArbitragePlannedCommissionSql.SUMMARY)
+                .setParameter(CONTRACT_ID, contractId)
+                .setParameter(PAYMENT_STAGE, paymentStage.name())
+                .setParameter(AS_OF_DATE, asOfDate).getSingleResult();
+        String ids = (String) row[1];
+        return new PlannedCommissionSummary((BigDecimal) row[0], ids.isEmpty() ? List.of()
+                : java.util.Arrays.stream(ids.split(",")).map(Long::valueOf).toList());
     }
 
     @Override
