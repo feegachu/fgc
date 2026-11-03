@@ -699,3 +699,36 @@ describe('RECO-W01·W02 React 전환', () => {
     await waitFor(() => expect(calls.some((call) => call.url.includes('/42/results'))).toBe(true))
   })
 })
+
+it('execution help survives run selection and waits for the completed result query', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  let created = false
+  let finishResult: ((value: unknown) => void) | undefined
+  let reads = 0
+  const { user } = renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=1', (url, options) => {
+    if (url === '/api/v1/reconciliations' && options?.method === 'POST') {
+      created = true
+      return { reconciliationRunId: 42, status: 'RUNNING' }
+    }
+    if (url.startsWith('/api/v1/reconciliations?')) return { ...history, content: created ? [{ ...run, reconciliationRunId: 42 }] : [] }
+    if (url.includes('/42/results')) {
+      if (++reads === 1) return new Promise(resolve => { finishResult = resolve })
+      return results
+    }
+  })
+  await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
+  await user.click(screen.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: '다음' }))
+  expect(bodyPosts()).toHaveLength(0)
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: '대사 실행' }))
+  await waitFor(() => expect(finishResult).toBeDefined())
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
+  finishResult!(results)
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  expect(screen.getByText(/서버 실행 성공 · ID 42/)).toBeVisible()
+  await user.selectOptions(screen.getByLabelText(/지급단계/, { selector: 'select' }), 'INSURER_TO_GA')
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeDisabled())
+})

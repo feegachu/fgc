@@ -1,4 +1,5 @@
 import { nameWithCode } from '../../lib/screenText'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
@@ -201,6 +202,7 @@ export default function CapListPage() {
   return (
     <div className="cap-react-page">
       <header className="page-header">
+        <ScreenHelp screenId="CAP-W01" />
         <h1 className="page-title">1,200% 한도 검증 현황</h1>
       </header>
       <CapFilter
@@ -230,7 +232,7 @@ export default function CapListPage() {
             </button>
           ))}
       </div>
-      <section data-guide-feature="features.cap.cap-list-page.section" className="surface cap-react-stage-panel">
+      <section data-guide-feature="features.cap.cap-list-page.section" data-guide-target="cap.overview" className="surface cap-react-stage-panel">
         <header className="surface-header">
           <h2 className="surface-title">지급단계별 한도 게이지</h2>
           <StatusBadge>전체 검색범위 집계</StatusBadge>

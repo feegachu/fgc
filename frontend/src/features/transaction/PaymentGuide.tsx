@@ -287,18 +287,13 @@ function GuideSession({
         data-guide-status={snapshot.status}
       >
         <header className="payment-guide-header">
-          <svg className="payment-guide-mascot" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-            <rect x="3" y="6" width="22" height="18" rx="7" fill="currentColor" opacity=".12" />
-            <path
-              d="M8 17c2 3 10 3 12 0M14 3v3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <circle cx="9" cy="12" r="1.5" fill="currentColor" />
-            <circle cx="19" cy="12" r="1.5" fill="currentColor" />
-          </svg>
+          <img
+            className="payment-guide-mascot"
+            src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`}
+            width="40"
+            height="40"
+            alt=""
+          />
           <span>
             업무 가이드
             {current && step

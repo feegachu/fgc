@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { present, useReferenceDate } from '../reference/utils'
 import { useContext, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -75,11 +76,12 @@ export function PoliciesPage() {
   return (
     <div className="policy-page">
       <header className="page-header policy-page-header">
+        <ScreenHelp screenId="POL-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">정책/룰셋 관리</h1>
           <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
-        <div className="policy-header-actions">
+        <div data-guide-target="policy.filters" className="policy-header-actions">
           <Field className="policy-date-field" variant="filter" label="적용 기준일">
             <input data-guide-feature="features.policies.policies-page.input" type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
           </Field>
@@ -112,7 +114,7 @@ export function PoliciesPage() {
           </Button>
         </p>
       )}
-      <div className="policy-tabs">
+      <div data-guide-target="policy.overview" className="policy-tabs">
         <ReferenceTabs
           panelClassName="surface policy-tab-panel"
           label="정책 상세 구분"

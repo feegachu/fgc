@@ -3268,5 +3268,10 @@
     "id": "schedule.preview.submit",
     "file": "features/schedule/SchedulePreviewForm.tsx",
     "element": "Button"
+  },
+  {
+    "id": "validation.restart",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Link"
   }
 ]

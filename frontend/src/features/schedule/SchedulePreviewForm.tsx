@@ -103,7 +103,9 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
   return (
     <section data-guide-feature="schedule.preview.region" data-guide-scope className="surface schedule-detail-card" aria-label={`${stage} ${years} 예정 생성`}>
       <h3 className="surface-title">{unresolvedRegime && !uncertain ? '적용 체계·정책 검토 필요' : `${years} 예정 스케줄`}</h3>
-      {canProcess && <ScreenHelp screenId={scheduleId ? 'SCHE-W02' : 'CONT-W02'} variant="preview" saveGuide={saveGuide} />}
+      {canProcess && (scheduleId
+        ? <ScreenHelp screenId="SCHE-W02" variant="preview" saveGuide={saveGuide} />
+        : <ScreenHelp screenId="CONT-W02" variant="preview" saveGuide={saveGuide} />)}
       <p>정책에 정의된 회차와 금액으로 생성합니다. 지급 확정 대상이 아닙니다.</p>
       {uncertain ? <p>요청한 정책 #{mutation.variables?.body.policyVersionId}의 생성 결과를 확인합니다.</p> : ready ? (
         <p>선택 정책 #{policyId} · v{policy?.versionNo} · 최대 {policy?.selection?.ruleset?.maxInstallments}회차 · 근거 {policy?.sourceRefs?.join(', ')}</p>

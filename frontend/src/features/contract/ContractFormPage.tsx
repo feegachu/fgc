@@ -1,6 +1,8 @@
+import { SaveGuide } from '../assistant/guide/save-guide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
-import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { returnLink, safeReturnTo } from '../transaction/payment-entry'
@@ -46,6 +48,7 @@ export default function ContractFormPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const returnTo = safeReturnTo(params.get('returnTo'), '/contracts')
+  const [saveGuide] = useState(() => new SaveGuide())
   const [revision, setRevision] = useState(0)
   const detail = useQuery({
     ...contractDetailQuery(id ?? ''),
@@ -63,6 +66,7 @@ export default function ContractFormPage() {
   return (
     <div className="contract-form-page">
       <header className="page-header contract-form-page-header">
+        <ScreenHelp screenId="CONT-W03" saveGuide={saveGuide} />
         <h1 className="page-title">보험계약 {id ? '수정' : '등록'}</h1>
         <Link data-guide-feature="features.contract.contract-form-page.link" className="button button-secondary" to={returnTo}>
           <span className="material-symbols-rounded" aria-hidden="true">
@@ -86,6 +90,7 @@ export default function ContractFormPage() {
           id={id}
           contract={id ? detail.data : undefined}
           onReload={reload}
+          saveGuide={saveGuide}
         />
       )}
     </div>
@@ -96,10 +101,12 @@ function ContractEditor({
   id,
   contract,
   onReload,
+  saveGuide,
 }: {
   id?: string
   contract?: ContractDetail
   onReload: () => Promise<void>
+  saveGuide: SaveGuide
 }) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -112,6 +119,7 @@ function ContractEditor({
   const [errors, setErrors] = useState<ContractFieldErrors>({})
   const [saveError, setSaveError] = useState('')
   const [conflict, setConflict] = useState(false)
+  const serverSaved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
   const [saving, setSaving] = useState(false)
   const [confirmReload, setConfirmReload] = useState(false)
   const [reloading, setReloading] = useState(false)
@@ -177,6 +185,7 @@ function ContractEditor({
     original && changesSchedule(createRequest(form), original) && '산정정보 변경에 따른 스케줄 새 버전',
   ].filter(Boolean)
   const changeSummary = changes.length ? changes.join(', ') : '계약 정보만 저장(상태 사건, 스케줄 새 버전 없음)'
+  useEffect(() => { saveGuide.update(draft, valid && !loadingReferences && !referenceError && !conflict && !missingToken) }, [saveGuide, draft, valid, loadingReferences, referenceError, conflict, missingToken])
   const productTerm = product?.paymentTermMonths
   const hasProductTerm = productTerm != null && Number.isInteger(productTerm) && productTerm > 0
   const missingRefundTable = product?.standardDeduction80Yn && product.paymentTermMonths == null
@@ -248,6 +257,7 @@ function ContractEditor({
     if (submitting.current) return
     submitting.current = true
     setSaving(true)
+    saveGuide.begin()
     try {
       const body = createRequest(form)
       const request: ContractUpdateRequest | undefined = id
@@ -280,6 +290,7 @@ function ContractEditor({
           'warning',
           6000,
         )
+      if (!(await saveGuide.saved(savedId)) || !mounted.current) return
       // Keep the synchronous guard closed through navigation, including repeated submit events.
       await navigate(returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId)), {
         state: { message },
@@ -297,6 +308,7 @@ function ContractEditor({
         )
           setErrors({ [error.field]: message })
       }
+      saveGuide.fail(message)
       setSaveError(message)
       setConfirmSave(false)
       submitting.current = false
@@ -736,7 +748,7 @@ function ContractEditor({
         </fieldset>
         <div className="surface contract-form-actions">
           <p id="contract-save-hint" className="contract-save-hint" role="status">
-            {saving
+            {serverSaved ? '서버에 저장되었습니다. 가이드 완료를 확인해 주세요.' : saving
               ? id
                 ? '계약 수정을 저장하고 있습니다.'
                 : '계약과 스케줄을 저장하고 있습니다.'
@@ -765,12 +777,12 @@ function ContractEditor({
             </Link>
             <Button data-guide-feature="features.contract.contract-form-page.button-4"
               className="contract-save-button"
-              type="submit"
-              loading={saving}
+              data-guide-target="contract.save" type="submit"
+              loading={saving && !serverSaved}
               disabled={disabled}
               aria-describedby="contract-save-hint"
             >
-              {!saving && (
+              {(!saving || serverSaved) && (
                 <span className="material-symbols-rounded" aria-hidden="true">
                   save
                 </span>

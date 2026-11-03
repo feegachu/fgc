@@ -1,7 +1,9 @@
 import { invalidateJournalCorrectionQueries } from '../ledger/correction-cache'
 import { accountDisplayName } from '../ledger/accountName'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { SaveGuide } from '../assistant/guide/save-guide'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
@@ -188,10 +190,19 @@ function CorrectionBody({
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
+  const [needsRefresh, setNeedsRefresh] = useState(false)
   const [result, setResult] = useState<JournalCorrectionResult | null>(null)
   const draftKey = JSON.stringify([journalDate, description, lines, reason, evidenceRef])
   const [initialDraftKey] = useState(draftKey)
   const clearUnsaved = useUnsavedWork(editable && result === null && draftKey !== initialDraftKey, draftKey)
+
+  const [saveGuide] = useState(() => new SaveGuide())
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; saveGuide.deactivate(false) } }, [saveGuide])
+  const saved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
+  const input = JSON.stringify([item.exceptionCaseId, item.status, journalDate, description, lines, reason, evidenceRef])
+  const valid = editable && Boolean(journalDate && description.trim() && reason.trim() && lines.length && lines.every(line => line.accountCode)) && !validateCorrectionLines(lines)
+  useEffect(() => { saveGuide.update(input, valid) }, [saveGuide, input, valid])
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -209,8 +220,21 @@ function CorrectionBody({
         })),
       }),
     meta: { errorToast: false },
-    onSuccess: (done) => {
+    onSuccess: async (done) => {
       clearUnsaved()
+      try {
+        if (done.actionType !== 'CORRECT' || done.originalJournalHeaderId !== journal.journalHeaderId || done.toStatus !== 'RESOLVED' || !Number.isSafeInteger(done.reversalJournalHeaderId) || Number(done.reversalJournalHeaderId) <= 0) throw new Error('서버 원장 정정 결과를 확인하지 못했습니다.')
+        await saveGuide.saved(Number(done.repostedJournalHeaderId))
+      } catch {
+        const message = '서버 정정 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 실행하지 말고 정정 이력을 확인한 뒤 화면을 다시 여세요.'
+        setNeedsRefresh(true)
+        saveGuide.fail(message)
+        setError(message)
+        toast(message, 'warning')
+        void invalidateJournalCorrectionQueries(client)
+        return
+      }
+      if (!mounted.current) return
       applyActionToCache(client, item.exceptionCaseId!, toAction(item, done))
       void invalidateJournalCorrectionQueries(client)
       setResult(done)
@@ -218,6 +242,7 @@ function CorrectionBody({
     },
     onError: (caught) => {
       const message = errorText(caught as Error, '원장 정정을 완료하지 못했습니다.')
+      saveGuide.fail(message)
       setError(message)
       toast(message, 'error')
     },
@@ -228,14 +253,17 @@ function CorrectionBody({
   }
   function submit(event: FormEvent) {
     event.preventDefault()
+    if (!editable || result || needsRefresh || mutation.isPending) return
     const invalid = validateCorrectionLines(lines)
     setError(invalid ?? '')
-    if (!invalid) mutation.mutate()
+    if (!invalid && !mutation.isPending) { saveGuide.begin(); mutation.mutate() }
   }
 
   const readOnly = !editable || result !== null
   return (
-    <form data-guide-feature="features.exception.journal-correction-modal.form" className="journal-correction-form journal-correction-modal-form" onSubmit={submit}>
+    <form data-guide-feature="features.exception.journal-correction-modal.form" className="journal-correction-form journal-correction-modal-form" data-guide-scope="journal-correction" data-guide-target="exception.correctionInput" onSubmit={submit}>
+      {editable && !result && <ScreenHelp screenId="EXCP-W01" variant="correction" saveGuide={saveGuide} outcome="correction" />}
+      <fieldset disabled={mutation.isPending || needsRefresh} style={{ display: 'contents' }}>
       <div className="journal-correction-guidance">
         원분개는 직접 수정하지 않습니다. 아래 신규 분개가 검증을 통과하면 역분개와 재기표를 한 번에 처리합니다.
       </div>
@@ -397,13 +425,15 @@ function CorrectionBody({
           <Button data-guide-feature="features.exception.journal-correction-modal.button-4"
             type="submit"
             className="exception-action-submit"
-            loading={mutation.isPending}
-            disabled={!lines.length || !journalDate || !description.trim() || !reason.trim()}
+            data-guide-target="exception.correctionSave"
+            loading={mutation.isPending && !saved}
+            disabled={needsRefresh || !lines.length || !journalDate || !description.trim() || !reason.trim()}
           >
             정정 실행
           </Button>
         </div>
       )}
+      </fieldset>
     </form>
   )
 }

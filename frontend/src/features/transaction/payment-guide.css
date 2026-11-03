@@ -56,7 +56,8 @@
   margin-top: 16px;
 }
 .payment-guide-mascot {
-  flex: 0 0 28px;
+  flex: 0 0 40px;
+  object-fit: contain;
   color: var(--color-action-primary);
   animation: payment-guide-float 3s ease-in-out infinite;
 }
@@ -76,7 +77,6 @@
     transition: none;
   }
   .payment-guide-mascot {
-    flex: 0 0 28px;
     animation: none;
   }
 }

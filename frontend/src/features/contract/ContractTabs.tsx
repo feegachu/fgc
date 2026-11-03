@@ -251,7 +251,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
           />
         </section>
         <div className="contract-side-panels">
-          <section data-guide-feature="features.contract.contract-tabs.section-3" className="contract-history-panel" aria-labelledby="contract-history-title">
+          <section data-guide-feature="features.contract.contract-tabs.section-3" data-guide-target="contract.statusHistory" className="contract-history-panel" aria-labelledby="contract-history-title">
             <header className="contract-history-panel-header">
               <div>
                 <h3 id="contract-history-title">상태이력</h3>

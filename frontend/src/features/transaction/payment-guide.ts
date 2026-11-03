@@ -118,7 +118,7 @@ export class PaymentGuideObserver {
   readContext = (): GuideContext => {
     const input = this.requireInput()
     const contracts = [...new Set(input.rows.map((row) => row.contractId).filter(Boolean))]
-    // Bind every attributed contract, never silently choose the first contract.
+    // Preserve every distinct contract; completion checks all attribution rows and the whole payment.
     return {
       screenId: 'TRAN-W02',
       role:

@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { nameWithCode } from '../../lib/screenText'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -77,11 +78,12 @@ export default function ClawbackPage() {
   return (
     <div className="claw-page">
       <header className="page-header">
+        <ScreenHelp screenId="CLAW-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">환수</h1>
         </div>
       </header>
-      <FilterBar
+      <FilterBar data-guide-target="clawback.filters"
         className="claw-filter-bar"
         fieldsClassName="claw-filter-fields"
         icons

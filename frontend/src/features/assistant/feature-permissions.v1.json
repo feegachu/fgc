@@ -704,6 +704,7 @@
     "schedule.preview.reason": "CAN_PROCESS",
     "schedule.preview.refresh": "CAN_PROCESS",
     "schedule.preview.region": "INTERNAL_READ",
-    "schedule.preview.submit": "CAN_PROCESS"
+    "schedule.preview.submit": "CAN_PROCESS",
+    "validation.restart": "INTERNAL_READ"
   }
 }

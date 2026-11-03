@@ -8047,6 +8047,21 @@
         "next": []
       },
       {
+        "stepId": "help.189f45094e9742225d58b0aaed11f730",
+        "screenId": "VRUN-W02",
+        "targetId": "validation.restart",
+        "title": "월 통합검증 상세 · 신규 실행 만들기",
+        "instruction": "월 통합검증 상세 화면의 ‘신규 실행 만들기’ 버튼·메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.3c11c70b7f7815f502c40c1b66878368",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.link-3",

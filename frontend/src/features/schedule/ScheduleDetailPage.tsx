@@ -1,6 +1,8 @@
 import { policyCodeLabel } from '../policies/labels'
 import { SchedulePreviewForm } from './SchedulePreviewForm'
-import { useRef, useState } from 'react'
+import { SaveGuide } from '../assistant/guide/save-guide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -125,6 +127,7 @@ function ScheduleDetailView({ id }: { id: string }) {
   return (
     <div className="schedule-detail-page">
       <header className="page-header schedule-page-header">
+        <ScreenHelp screenId="SCHE-W02" />
         <div className="page-header-copy">
           <h1 className="page-title">예상 스케줄 상세</h1>
         </div>
@@ -148,7 +151,7 @@ function ScheduleDetailView({ id }: { id: string }) {
           </Button>
           <Button data-guide-feature="features.schedule.schedule-detail-page.button-3"
             variant="secondary"
-            disabled={regenerateDisabled}
+            data-guide-target="schedule.generate" disabled={regenerateDisabled}
             aria-describedby={showNote ? 'schedule-action-note' : undefined}
             onClick={() => setRegenerateOpen(true)}
           >
@@ -447,18 +450,22 @@ function ScheduleDetailView({ id }: { id: string }) {
           }}
         />
       )}
-      <RegenerateModal
+      {regenerateOpen && <RegenerateModal
         open={regenerateOpen}
         onClose={() => setRegenerateOpen(false)}
         onSubmit={async (reason, committed) => {
           const result = await regenerateSchedule(id, reason)
           committed()
+          if (Number(result.scheduleHeaderId) === Number(id) || !Number.isSafeInteger(result.versionNo) || result.versionNo! <= (header?.scheduleVersionNo ?? 0)) throw new Error('서버 응답에서 새 스케줄 버전을 확인하지 못했습니다. 목록을 새로 조회하세요.')
           void client.invalidateQueries({ queryKey: ['schedules'] })
+          return result.scheduleHeaderId!
+        }}
+        onComplete={(newId) => {
           setRegenerateOpen(false)
           toast('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.', 'success', 3500)
-          void navigate(`/schedules/${encodeURIComponent(String(result.scheduleHeaderId))}`)
+          void navigate(`/schedules/${encodeURIComponent(String(newId))}`)
         }}
-      />
+      />}
     </div>
   )
 }
@@ -682,19 +689,32 @@ function RegenerateModal({
   open,
   onClose,
   onSubmit,
+  onComplete,
 }: {
   open: boolean
   onClose: () => void
-  onSubmit: (reason: string, committed: () => void) => Promise<void>
+  onSubmit: (reason: string, committed: () => void) => Promise<number>
+  onComplete: (id: number) => void
 }) {
+  const [saveGuide] = useState(() => new SaveGuide())
+  const saved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const input = useRef<HTMLTextAreaElement>(null)
   const [reason, setReason] = useState('')
   const clearUnsaved = useUnsavedWork(open && Boolean(reason), reason)
   const [error, setError] = useState('')
+  useEffect(() => { saveGuide.update(reason, Boolean(reason.trim()) && reason.trim().length <= REASON_MAX) }, [saveGuide, reason])
   const mutation = useMutation({
-    mutationFn: (reason: string) => onSubmit(reason, clearUnsaved),
+    mutationFn: async (value: string) => {
+      saveGuide.begin()
+      const newId = await onSubmit(value, clearUnsaved)
+      if (!mounted.current) return
+      if (await saveGuide.saved(newId)) { if (mounted.current) onComplete(newId) }
+    },
     meta: { errorToast: false },
     onError: (caught) => {
+      saveGuide.fail(errorText(caught, '새 스케줄 버전을 만들지 못했습니다.'))
       // 서버 검증(@NotBlank·@Size)이 사유 필드를 지목하면 Toast 가 아니라 필드 옆에 둔다(가이드 §11).
       if (caught instanceof ApiError && caught.field === 'reason') setError(caught.message)
       else toast(errorText(caught, '새 스케줄 버전을 만들지 못했습니다.'), 'error', 5000)
@@ -718,27 +738,30 @@ function RegenerateModal({
       input.current?.focus()
       return
     }
-    mutation.mutate(trimmed)
+    if (!mutation.isPending) mutation.mutate(trimmed)
   }
   return (
     <Modal
       open={open}
       title="새 버전 만들기"
       className="schedule-modal"
-      closeOnBackdrop
+      closeOnBackdrop={!mutation.isPending}
+      closeOnEscape={!mutation.isPending}
       initialFocusRef={input}
       onClose={close}
       footer={
         <>
-          <button data-guide-feature="features.schedule.schedule-detail-page.button-7" type="button" className="button button-secondary" onClick={close}>
+          <button data-guide-feature="features.schedule.schedule-detail-page.button-7" type="button" className="button button-secondary" disabled={mutation.isPending} onClick={close}>
             취소
           </button>
-          <Button data-guide-feature="features.schedule.schedule-detail-page.button-8" loading={mutation.isPending} onClick={submit}>
+          <Button data-guide-feature="features.schedule.schedule-detail-page.button-8" data-guide-target="schedule.regenerate.submit" loading={mutation.isPending && !saved} disabled={mutation.isPending} onClick={submit}>
             새 버전 만들기
           </Button>
         </>
       }
     >
+      <ScreenHelp screenId="SCHE-W02" variant="regenerate" saveGuide={saveGuide} />
+      {saved && <p role="status">서버에서 새 스케줄 버전을 생성했습니다. 가이드 완료를 확인하세요.</p>}
       <p className="schedule-modal-description">
         기존 스케줄은 그대로 두고 버전 번호를 올린 새 스케줄을 만듭니다. 지난 버전을 지우지 않으므로 당시 금액의 근거도
         계속 확인할 수 있습니다.
@@ -753,6 +776,8 @@ function RegenerateModal({
         </label>
         <textarea data-guide-feature="features.schedule.schedule-detail-page.regenerate-reason"
           ref={input}
+          data-guide-target="schedule.regenerate.reason"
+          disabled={mutation.isPending}
           className="textarea-control"
           id="regenerate-reason"
           maxLength={REASON_MAX}

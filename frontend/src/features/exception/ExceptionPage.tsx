@@ -1,5 +1,6 @@
 import { guideFeatureId } from '../assistant/feature-ids'
 import { typeBadgeTone } from '../exception/rules'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery } from '@tanstack/react-query'
 import { type CSSProperties, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
@@ -215,6 +216,7 @@ export function ExceptionPage() {
   return (
     <div className="exception-page">
       <header className="page-header">
+        <ScreenHelp screenId="EXCP-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">예외함</h1>
         </div>
@@ -316,7 +318,7 @@ export function ExceptionPage() {
                 </div>
                 <div className="surface-body">
                   {selected ? (
-                    <Occurrences item={selected} />
+                    <div data-guide-target="exception.detail"><Occurrences item={selected} /></div>
                   ) : (
                     <p className="text-secondary exception-placeholder">-</p>
                   )}
@@ -458,7 +460,7 @@ function FilterForm({
     </div>
   )
   return (
-    <FilterBar
+    <FilterBar data-guide-target="exception.filters"
       className="exception-filter-bar"
       wrapFields={false}
       resetFirst

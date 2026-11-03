@@ -7,7 +7,7 @@
     "generate:guide-features": "node scripts/guide-features.mjs --write",
     "check:guide-features": "node scripts/guide-features.mjs",
     "dev": "vite",
-    "build": "node scripts/check-preview-guide.mjs && tsc -b && vite build",
+    "build": "npm run check:guides && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -19,6 +19,7 @@
     "check:e2e": "tsc -p tsconfig.e2e.json",
     "generate:api": "openapi-typescript openapi/schema.json -o src/lib/api/schema.d.ts",
     "check:api": "node scripts/check-api.mjs",
+    "check:guides": "node scripts/check-preview-guide.mjs && node scripts/check-guide-targets.mjs && node --test scripts/check-guide-targets.test.mjs && vitest run src/features/assistant/guide/ScreenHelp.test.tsx",
     "generate:guide-knowledge": "node scripts/workflow-knowledge.mjs --write",
     "check:guide-knowledge": "node scripts/workflow-knowledge.mjs"
   },

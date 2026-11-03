@@ -82,6 +82,23 @@ describe('FUN-088 server evidence decisions', () => {
     state.validation = undefined
     expect(() => decide(replacePayment(selection, 30), state, 'GA_ADMIN')).toThrow('현재 안내 대상')
   })
+
+  it.each(['COMPLETED', 'FINALIZED'] as const)(
+    'rejects stale %s results after a fresh session without local invalidation IDs',
+    (status) => {
+      const state = evidence()
+      state.payment!.updatedAt = '2026-10-30T15:00:00'
+      state.validation!.header!.startedAt = '2026-10-29T14:00:00'
+      state.validation!.header!.status = status
+      expect(() => decide(selection, state, 'GA_ADMIN')).toThrow('지급 변경 이전')
+    },
+  )
+  it('accepts a new validation started after the payment change', () => {
+    const state = evidence()
+    state.payment!.createdAt = '2026-10-30T15:00:00'
+    state.validation!.header!.startedAt = '2026-10-30T15:01:00'
+    expect(decide(selection, state, 'GA_ADMIN').step).toBe('validation.finalize')
+  })
   it('starts a new contract without synthetic IDs', () =>
     expect(decide({ month: '2026-07', stage: 'GA_TO_FC' }, { scheduleAcknowledged: false }, 'SETTLEMENT').step).toBe(
       'contract.create',
@@ -232,4 +249,10 @@ describe('correction and permission boundaries', () => {
     expect(handoffFor('exception.resolve', 'GA_ADMIN', false)).toBeUndefined()
     expect(handoffFor('exception.resolve', 'COMPLIANCE', false)).toContain('인계')
   })
+})
+
+it.each([-1, 0.5, NaN])('rejects invalid exception counts %s instead of advancing to finalization', (count) => {
+  const state = evidence()
+  state.openExceptions = count
+  expect(decide(selection, state, 'GA_ADMIN').step).toBe('reconciliation.review')
 })
