@@ -67,6 +67,8 @@ for (const { width, expand } of [{ width: 1280, expand: false }, { width: 1200, 
   const card = page.getByRole('link', { name: '수령 예정 수수료' })
   await expect(card.locator('.kpi-value')).toHaveText('1,910,000')
   await page.evaluate(() => document.fonts.ready)
+  // 펼친 직후에는 셸 그리드 열 전환이 진행 중이라 카드 폭이 최종값보다 넓다.
+  await page.locator('.app-shell-layout').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)))
   const box = (await card.boundingBox())!
   const value = (await card.locator('.kpi-value').boundingBox())!
   const unit = (await card.locator('.kpi-unit').boundingBox())!
