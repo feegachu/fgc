@@ -17,6 +17,7 @@ it('attaches below the real target and keeps the opposite inset clear on repeate
   vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback } observe() {} disconnect() {} })
   vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
   vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
   vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(430)
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
     // A fixed auto-height card is stretched by top + the stylesheet bottom:22px.
@@ -30,6 +31,7 @@ it('attaches below the real target and keeps the opposite inset clear on repeate
     render(<Card target={target} />)
     act(() => { vi.advanceTimersByTime(20) })
     const card = screen.getByRole('region', { name: 'Guide card' })
+    expect(window.scrollBy).toHaveBeenCalledWith({ top: 180, behavior: 'instant' })
     expect(card).toHaveStyle({ top: '524px', bottom: 'auto', right: 'auto', left: '270px', width: '360px' })
     const stable = card.getAttribute('style')
     for (let index = 0; index < 5; index++) {
@@ -37,5 +39,9 @@ it('attaches below the real target and keeps the opposite inset clear on repeate
       expect(card.getAttribute('style')).toBe(stable)
       expect(card.offsetHeight).toBe(228)
     }
+    act(() => { vi.advanceTimersByTime(40) })
+    vi.mocked(window.scrollBy).mockClear()
+    act(() => { window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(40) })
+    expect(window.scrollBy).not.toHaveBeenCalled()
   } finally { target.remove() }
 })

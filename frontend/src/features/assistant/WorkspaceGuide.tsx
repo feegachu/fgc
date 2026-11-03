@@ -16,7 +16,6 @@ import { findGuide } from './catalog'
 import { launchPaymentGuide } from '../transaction/payment-guide-launch'
 import { toast } from '../../stores/toasts'
 import { useUnsavedWorkStore } from '../../stores/unsavedWork'
-import { openSettlementGuide } from './settlement/entry'
 
 const messages: Record<string, string> = {
   SELECT_TARGET: '목록에서 안내받을 대상을 직접 선택한 뒤 현재 대상에서 다시 시작하세요.',
@@ -164,13 +163,6 @@ function WorkspaceGuideSession({ user: currentUser }: { user: ShellUser }) {
   useEffect(() => {
     if (!request) { runtime.engine.stop(); return }
     if (useWorkflowGuide.getState().settlementActive) { useWorkflowGuide.getState().clear(); return }
-    if (request.id === 'settlement.journey') {
-      runtime.engine.stop()
-      useWorkflowGuide.getState().clear()
-      const guide = findWorkflowGuide(request.id, '1.0')
-      if (guide?.roles.includes(user.roleCode)) openSettlementGuide()
-      return
-    }
     const payment = findGuide(request.id, '1.0')
     if (payment) {
       const controller = new AbortController()

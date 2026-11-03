@@ -82,9 +82,8 @@ function GuideSession({
       setCollapsed(true)
     }
   }), [runtime])
-  useEffect(() => {
-    useWorkflowGuide.setState({ paymentActive: !collapsed && !['PAUSED', 'ERROR'].includes(snapshot.status) })
-  }, [collapsed, snapshot.status])
+  // TransactionFormPage owns paymentActive for the whole open guide lifetime.
+  // Folding for chat must not release that ownership and admit a second guide.
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState(false)
   const [refresh, setRefresh] = useState(0)

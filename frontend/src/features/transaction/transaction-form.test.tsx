@@ -1,6 +1,7 @@
 import { getPaymentGuideObserver, paymentGuideConditions } from './payment-guide'
 import { selectOption } from '../../test/selectOption'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useWorkflowGuide } from '../assistant/workflow-state'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, Outlet } from 'react-router'
@@ -1034,6 +1035,21 @@ describe('FUN-087 guide card and spotlight', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
   const panel = () => screen.getByRole('region', { name: '지급 업무 가이드' })
+  it('keeps the payment guide owned while folded for chat and releases it only on close', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    await user.click(within(panel()).getByRole('button', { name: '지급 초안 저장' }))
+    await waitFor(() => expect(useWorkflowGuide.getState().guideContext?.workflowId).toBe('payment.draft'))
+    act(() => useWorkflowGuide.getState().requestChat())
+    expect(within(panel()).getByRole('button', { name: '펼치기' })).toBeVisible()
+    expect(useWorkflowGuide.getState().paymentActive).toBe(true)
+    act(() => useWorkflowGuide.getState().start('contract.register'))
+    expect(useWorkflowGuide.getState().request).toBeNull()
+    expect(writes()).toHaveLength(0)
+    await user.click(within(panel()).getByRole('button', { name: '가이드 종료' }))
+    await waitFor(() => expect(useWorkflowGuide.getState().paymentActive).toBe(false))
+  })
   const next = async (user: ReturnType<typeof userEvent.setup>, acknowledgement = false) => {
     const control = within(panel()).getByRole('button', {
       name: acknowledgement ? '확인하고 다음' : '다음',

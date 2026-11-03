@@ -11,7 +11,6 @@ import { DraftNavigationGuard } from '../../app/shell/DraftNavigationGuard'
 import { useUnsavedWork, useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { screenFor } from '../../app/screens'
 import { Modal } from '../../components/Modal'
-import { closeSettlementGuide, settlementEntry } from './settlement/entry'
 
 const user = { loginId: 'test', userName: '담당자', roleCode: 'SETTLEMENT', canProcess: true, canViewAuditLog: false }
 function ContractFields() {
@@ -76,7 +75,6 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} unobserve() {} })
 })
 afterEach(async () => {
-  closeSettlementGuide()
   cleanup()
   await Promise.resolve()
   useWorkflowGuide.getState().clear()
@@ -84,13 +82,6 @@ afterEach(async () => {
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
-})
-it('opens the canonical full flow from the AI journey instead of a parallel page tour', async () => {
-  setup()
-  act(() => useWorkflowGuide.getState().start('settlement.journey'))
-  await waitFor(() => expect(settlementEntry()).toBe(true))
-  expect(useWorkflowGuide.getState().request).toBeNull()
-  expect(screen.queryByRole('region', { name: '업무 튜토리얼' })).not.toBeInTheDocument()
 })
 it('pauses at the current step for follow-up chat without navigation or business writes', async () => {
   const router = setup()
