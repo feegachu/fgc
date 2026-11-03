@@ -56,7 +56,11 @@ export function ClawbackCalculation({
   const policies = detail.policyCandidates ?? []
   const canCalculate = c.allowedActions?.includes('CALCULATE') ?? false
   // 정책 후보가 하나면 미리 고르고, 여럿이면 사용자가 고른다. 계산 버튼을 누르는 것이 선택 확인이다.
-  const [policyId, setPolicyId] = useState<number | null>(policies.length === 1 ? (policies[0].policyVersionId ?? null) : null)
+  // 고른 값은 지금 후보에 있을 때만 쓴다(409 뒤 다시 불러온 후보에서 빠질 수 있다).
+  const [pickedPolicyId, setPickedPolicyId] = useState<number | null>(null)
+  const policyId =
+    policies.find((p) => p.policyVersionId === pickedPolicyId)?.policyVersionId ??
+    (policies.length === 1 ? (policies[0].policyVersionId ?? null) : null)
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const keyFor = usePolicyRequest()
@@ -130,7 +134,11 @@ export function ClawbackCalculation({
                   className="claw-policy-select"
                   name={`claw-policy-${c.candidateId}`}
                   checked={policyId === r.policyVersionId}
-                  onChange={() => setPolicyId(r.policyVersionId ?? null)}
+                  onChange={() => {
+                    // 입력이 바뀌면 이전 오류는 맞지 않는다(멱등키도 바뀐다). 다음 계산에서 다시 판정한다.
+                    setError('')
+                    setPickedPolicyId(r.policyVersionId ?? null)
+                  }}
                 />
                 <span className="claw-policy-option-text">
                   <strong>{policyLabel(r)}</strong>{' '}
@@ -152,7 +160,10 @@ export function ClawbackCalculation({
             placeholder="예: 등록된 환수 정책으로 계산"
             value={reason}
             disabled={!canCalculate || mutation.isPending}
-            onChange={(event) => setReason(event.target.value)}
+            onChange={(event) => {
+              setError('')
+              setReason(event.target.value)
+            }}
           />
         </Field>
         {error && (

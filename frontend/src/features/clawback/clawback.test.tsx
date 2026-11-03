@@ -385,6 +385,9 @@ it('stops on missing grounds with plain reasons and never shows the failure as 0
   expect(screen.getByText('저장된 계산판이 없습니다.')).toBeInTheDocument()
   // 입력은 지우지 않아 근거를 보완한 뒤 다시 누를 수 있다.
   expect(screen.getByLabelText(/계산 사유/)).toHaveValue('등록된 환수 정책으로 계산')
+  // 입력을 고치면 이전 오류는 지운다. 다음 계산에서 다시 판정한다.
+  await user.type(screen.getByLabelText(/계산 사유/), ' 보완')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
 
 it('reloads the latest grounds when the source changed and sends the retry with a new key', async () => {
@@ -412,6 +415,40 @@ it('reloads the latest grounds when the source changed and sends the retry with 
   await waitFor(() => expect(posts).toHaveLength(2))
   expect((posts[1].body as { expectedSourceVersion: string }).expectedSourceVersion).toBe('claw-v2-def')
   expect(posts[1].idempotencyKey).not.toBe(posts[0].idempotencyKey)
+})
+
+it('drops a chosen policy that left the candidates after the source changed', async () => {
+  const user = userEvent.setup()
+  const second = { ...policy, policyVersionId: 16, versionNo: 2 }
+  const third = { ...policy, policyVersionId: 17, versionNo: 3 }
+  let changed = false
+  const posts: RequestOptions[] = []
+  mount('/clawbacks', (p, options) => {
+    if (p === CALC_PATH) {
+      posts.push(options ?? {})
+      changed = true
+      return new ApiError({ code: 'FGC-IMPL-STATE_CHANGED', message: 'changed' }, 'CALC-409', 409)
+    }
+    if (p.endsWith('/candidates/42'))
+      return envelope({
+        ...calculable,
+        candidate: changed
+          ? { ...calculable.candidate, policyVersionId: null, sourceVersion: 'claw-v2-def' }
+          : { ...calculable.candidate, policyVersionId: null },
+        // 다시 불러온 후보에서 고른 v2가 빠지고 v3가 들어왔다.
+        policyCandidates: changed ? [policy, third] : [policy, second],
+      })
+    return fixtures(p)
+  })
+  await user.click(await screen.findByRole('radio', { name: /^CLAW-GA-VIRTUAL-2026 v2\b/ }))
+  await fillAndCalculate(user)
+  expect(await screen.findByRole('alert')).toHaveTextContent('조회한 뒤 원천이나 정책이 바뀌었습니다.')
+  // 고른 정책이 후보에서 빠졌으니 선택이 풀리고, 다시 고르기 전에는 계산하지 않는다.
+  await screen.findByRole('radio', { name: /^CLAW-GA-VIRTUAL-2026 v3\b/ })
+  expect(screen.getAllByRole('radio').filter((radio) => (radio as HTMLInputElement).checked)).toHaveLength(0)
+  expect(screen.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
+  expect(screen.getByText('적용할 정책을 고르세요.')).toBeInTheDocument()
+  expect(posts).toHaveLength(1)
 })
 
 it('retries a lost response with the same key so the server keeps one calculation', async () => {
