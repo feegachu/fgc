@@ -1,0 +1,3794 @@
+{
+  "agent/OFF/1920": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1536": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1440": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1420": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1366": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 1,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1280": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 1,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 159,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 2,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1263": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1200": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 1,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/OFF/1024": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    }
+  },
+  "agent/OFF/768": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    }
+  },
+  "agent/OFF/390": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 122,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 122,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 2,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 604,
+      "panelTop": 688
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 122,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 122,
+          "fontPx": 28,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 2,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 604,
+      "panelTop": 688
+    }
+  },
+  "agent/ON/1920": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 322,
+          "content": 286,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 322,
+          "content": 286,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1536": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 242,
+          "content": 206,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 242,
+          "content": 206,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1440": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 218,
+          "content": 182,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 218,
+          "content": 182,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1420": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 213,
+          "content": 177,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 213,
+          "content": 177,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1366": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 107,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 127,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 127,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 200,
+          "content": 164,
+          "need": 141,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 200,
+          "content": 164,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1280": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 107,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 127,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 127,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 178,
+          "content": 142,
+          "need": 141,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 178,
+          "content": 142,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1263": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 220,
+          "content": 184,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 220,
+          "content": 184,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1200": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 107,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 127,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 127,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 204,
+          "content": 168,
+          "need": 141,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 204,
+          "content": 168,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 250,
+      "panelTop": 334
+    }
+  },
+  "agent/ON/1024": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 353,
+          "content": 317,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    }
+  },
+  "agent/ON/768": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 131,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 156,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 225,
+          "content": 189,
+          "need": 174,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 225,
+          "content": 189,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 303,
+      "panelTop": 387
+    }
+  },
+  "agent/ON/390": {
+    "demo": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "200,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 107,
+          "fontPx": 22,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "1,910,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 122,
+          "fontPx": 22,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 2,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 589,
+      "panelTop": 673
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "신규 계약 건수",
+          "value": "2",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "월 환산 초회보험료",
+          "value": "2,000,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 122,
+          "fontPx": 22,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "수령 예정 수수료",
+          "value": "19,100,000",
+          "unit": "원",
+          "cardW": 141,
+          "content": 105,
+          "need": 122,
+          "fontPx": 22,
+          "wrapped": true,
+          "overflowPx": 0
+        },
+        {
+          "label": "확인 필요 계약",
+          "value": "0",
+          "unit": "건",
+          "cardW": 141,
+          "content": 105,
+          "need": 31,
+          "fontPx": 22,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 2,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 589,
+      "panelTop": 673
+    }
+  },
+  "dashboard/C0/1440": {
+    "demo": {
+      "rows": [
+        {
+          "label": "1,200% 위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "1,200% 주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차익거래 검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "대사 불일치",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "원장 불균형",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "1,200% 위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "1,200% 주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차익거래 검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "대사 불일치",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "원장 불균형",
+          "value": "0",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "dashboard/C0/1366": {
+    "demo": {
+      "rows": [
+        {
+          "label": "1,200% 위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "1,200% 주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차익거래 검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "대사 불일치",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "원장 불균형",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "1,200% 위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "1,200% 주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차익거래 검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "대사 불일치",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "원장 불균형",
+          "value": "0",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "dashboard/C0/1280": {
+    "demo": {
+      "rows": [
+        {
+          "label": "1,200% 위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "1,200% 주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차익거래 검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "대사 불일치",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "원장 불균형",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "1,200% 위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "1,200% 주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차익거래 검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "대사 불일치",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "원장 불균형",
+          "value": "0",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "cap/C0/1440": {
+    "demo": {
+      "rows": [
+        {
+          "label": "정상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토필요",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "정상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토필요",
+          "value": "0",
+          "unit": "건",
+          "cardW": 284,
+          "content": 248,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "cap/C0/1366": {
+    "demo": {
+      "rows": [
+        {
+          "label": "정상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토필요",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "정상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토필요",
+          "value": "0",
+          "unit": "건",
+          "cardW": 265,
+          "content": 229,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "cap/C0/1280": {
+    "demo": {
+      "rows": [
+        {
+          "label": "정상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토필요",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "정상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "주의",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "위반",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토필요",
+          "value": "0",
+          "unit": "건",
+          "cardW": 244,
+          "content": 208,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "arbitrage/C0/1440": {
+    "demo": {
+      "rows": [
+        {
+          "label": "이상없음",
+          "value": "0",
+          "unit": "건",
+          "cardW": 378,
+          "content": 342,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 378,
+          "content": 342,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "자료부족",
+          "value": "0",
+          "unit": "건",
+          "cardW": 378,
+          "content": 342,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "이상없음",
+          "value": "0",
+          "unit": "건",
+          "cardW": 378,
+          "content": 342,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 378,
+          "content": 342,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "자료부족",
+          "value": "0",
+          "unit": "건",
+          "cardW": 378,
+          "content": 342,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "arbitrage/C0/1366": {
+    "demo": {
+      "rows": [
+        {
+          "label": "이상없음",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "자료부족",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "이상없음",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "자료부족",
+          "value": "0",
+          "unit": "건",
+          "cardW": 353,
+          "content": 317,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "arbitrage/C0/1280": {
+    "demo": {
+      "rows": [
+        {
+          "label": "이상없음",
+          "value": "0",
+          "unit": "건",
+          "cardW": 325,
+          "content": 289,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 325,
+          "content": 289,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "자료부족",
+          "value": "0",
+          "unit": "건",
+          "cardW": 325,
+          "content": 289,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "이상없음",
+          "value": "0",
+          "unit": "건",
+          "cardW": 325,
+          "content": 289,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "검토대상",
+          "value": "0",
+          "unit": "건",
+          "cardW": 325,
+          "content": 289,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "자료부족",
+          "value": "0",
+          "unit": "건",
+          "cardW": 325,
+          "content": 289,
+          "need": 35,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "reconciliation/C0/1440": {
+    "demo": {
+      "rows": [
+        {
+          "label": "대상",
+          "value": "-",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "불일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치율",
+          "value": "-",
+          "unit": "%",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차액 합계",
+          "value": "-",
+          "unit": "원",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "대상",
+          "value": "-",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "불일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치율",
+          "value": "-",
+          "unit": "%",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차액 합계",
+          "value": "-",
+          "unit": "원",
+          "cardW": 227,
+          "content": 191,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "reconciliation/C0/1366": {
+    "demo": {
+      "rows": [
+        {
+          "label": "대상",
+          "value": "-",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "불일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치율",
+          "value": "-",
+          "unit": "%",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차액 합계",
+          "value": "-",
+          "unit": "원",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "대상",
+          "value": "-",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "불일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치율",
+          "value": "-",
+          "unit": "%",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차액 합계",
+          "value": "-",
+          "unit": "원",
+          "cardW": 212,
+          "content": 176,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "reconciliation/C0/1280": {
+    "demo": {
+      "rows": [
+        {
+          "label": "대상",
+          "value": "-",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "불일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치율",
+          "value": "-",
+          "unit": "%",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차액 합계",
+          "value": "-",
+          "unit": "원",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [
+        {
+          "label": "대상",
+          "value": "-",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "불일치",
+          "value": "-",
+          "unit": "건",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "일치율",
+          "value": "-",
+          "unit": "%",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        },
+        {
+          "label": "차액 합계",
+          "value": "-",
+          "unit": "원",
+          "cardW": 195,
+          "content": 159,
+          "need": 29,
+          "fontPx": 28,
+          "wrapped": false,
+          "overflowPx": 0
+        }
+      ],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "exception/C0/1440": {
+    "demo": {
+      "rows": [],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "exception/C0/1366": {
+    "demo": {
+      "rows": [],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  },
+  "exception/C0/1280": {
+    "demo": {
+      "rows": [],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    },
+    "long": {
+      "rows": [],
+      "wrapped": 0,
+      "overflow": 0,
+      "hScroll": false,
+      "snapshotH": 0,
+      "panelTop": null
+    }
+  }
+}
