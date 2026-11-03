@@ -11,6 +11,34 @@ function Card({ target }: { target: HTMLElement | null }) {
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
+it.each([
+  { initialTop: 8, height: 32, cardTop: '124px' },
+  { initialTop: 400, height: 200, cardTop: '344px' },
+  { initialTop: 100, height: 500, cardTop: '344px' },
+])('keeps the target below the fixed header when reserving coach space ($initialTop, $height)', ({ initialTop, height, cardTop }) => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  const header = document.createElement('header')
+  header.className = 'app-header'
+  const target = document.createElement('button')
+  document.body.append(header, target)
+  vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(new DOMRect(255, 0, 1025, 52))
+  let top = initialTop
+  vi.spyOn(target, 'getBoundingClientRect').mockImplementation(() => new DOMRect(356, top, 100, height))
+  vi.spyOn(window, 'scrollBy').mockImplementation((options) => {
+    top -= (options as ScrollToOptions).top ?? 0
+  })
+  try {
+    render(<Card target={target} />)
+    act(() => { vi.advanceTimersByTime(80) })
+    if (height <= 252) expect(target.getBoundingClientRect().top).toBeGreaterThanOrEqual(68)
+    else expect(target.getBoundingClientRect().bottom).toBe(320)
+    expect(screen.getByRole('region', { name: 'Guide card' })).toHaveStyle({ top: cardTop })
+  } finally { header.remove(); target.remove() }
+})
+
 it('attaches below the real target and keeps the opposite inset clear on repeated resizes', () => {
   vi.useFakeTimers()
   let resize: (() => void) | undefined

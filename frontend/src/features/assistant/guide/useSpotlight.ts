@@ -14,13 +14,23 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       if (!target?.isConnected) return
       target.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
       const room = Math.min(460, window.innerHeight / 2) + 40
-      const overflow = target.getBoundingClientRect().bottom - (window.innerHeight - room)
-      if (overflow <= 0) return
+      const rect = target.getBoundingClientRect()
+      const modalBody = target.closest<HTMLElement>('.modal-body')
+      const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0
+      const topBoundary = Math.max(0, headerBottom, modalBody?.getBoundingClientRect().top ?? 0) + 16
+      const topGap = rect.top - topBoundary
+      // Native nearest scrolling ignores the fixed header. Restore small targets hidden
+      // behind it, and keep them visible when reserving coach space.
+      const overflow = rect.bottom - (window.innerHeight - room)
+      // Large evidence panels must scroll partly above the viewport to expose their coach.
+      const fitsAboveCoach = rect.height <= window.innerHeight - room - topBoundary
+      let offset = Math.max(0, overflow)
+      if (fitsAboveCoach) offset = topGap < 0 ? topGap : Math.min(offset, topGap)
+      if (offset === 0) return
       // scroll-margin can be consumed by an overflow-hidden card before the page scrolls.
       // Move the actual page (or modal body) so the real target has room for its coach.
-      const modalBody = target.closest<HTMLElement>('.modal-body')
-      if (modalBody) modalBody.scrollBy?.({ top: overflow, behavior: 'instant' })
-      else window.scrollBy?.({ top: overflow, behavior: 'instant' })
+      if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
+      else window.scrollBy?.({ top: offset, behavior: 'instant' })
     }
     const measure = () => {
       cancelAnimationFrame(frame)
