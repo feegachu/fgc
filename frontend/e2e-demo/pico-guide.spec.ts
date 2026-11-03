@@ -16,6 +16,8 @@ for (const width of [1440, 390]) {
     await login(page, 'audit01', '/contracts?month=2026-07')
     const launcher = page.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })
     await expect(launcher).toBeInViewport()
+    // 진입 버튼은 앱 머리 안에 있어 본문의 표와 안내를 가리지 않는다(화면정의서 CMN-C04, SRC-068).
+    await expect(page.locator('.app-header').getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toBeVisible()
     await launcher.click()
     const pico = page.getByRole('dialog', { name: '피코 업무 비서' })
     await expect(pico).toBeVisible()

@@ -1,7 +1,8 @@
 /* FUN-079 상품 추천 AI 챗봇 모달 — 목업(chatbot-fun079-modal.html)의 채팅형 디자인을 옮긴다. 모든 규칙은 .cb 아래에만 적용한다. */
 .cb {
   --cb-brand: var(--color-action-primary);
-  --cb-brand-dark: var(--color-action-primary-hover);
+  /* 글자용 진한 파랑. 테마의 hover 토큰은 옅은 배경색(#dfeaff)이라 글자에 쓰면 흰 바탕에서 보이지 않는다(app-theme.css 보조 버튼 글자와 같은 값). */
+  --cb-brand-dark: #1d4ed8;
   --cb-brand-100: var(--color-blue-100);
   --cb-brand-50: var(--color-blue-50);
   --cb-line: var(--color-border-default);
@@ -63,10 +64,10 @@
 .cb .cb-step { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .cb .cb-step-num {
   width: 28px; height: 28px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
-  border: 2px solid var(--cb-line); border-radius: 50%; background: #fff; font-size: 13px; font-weight: 700; color: var(--cb-t400);
+  border: 2px solid var(--cb-line); border-radius: 50%; background: #fff; font-size: 13px; font-weight: 700; color: var(--cb-t500);
   transition: background 0.3s, border-color 0.3s, color 0.3s, box-shadow 0.3s;
 }
-.cb .cb-step-txt { font-size: 14.5px; font-weight: 500; color: var(--cb-t400); white-space: nowrap; transition: color 0.3s; }
+.cb .cb-step-txt { font-size: 14.5px; font-weight: 500; color: var(--cb-t500); white-space: nowrap; transition: color 0.3s; }
 .cb .cb-step.active .cb-step-num { border-color: var(--cb-brand); background: var(--cb-brand); color: #fff; box-shadow: none; }
 .cb .cb-step.active .cb-step-txt { color: var(--cb-brand-dark); font-weight: 700; }
 .cb .cb-step.done .cb-step-num { border-color: var(--cb-brand); background: var(--cb-brand); }

@@ -72,7 +72,7 @@ describe('오류 화면 (#417)', () => {
     renderAt('/no-such')
     expect(await screen.findByRole('heading', { name: '찾을 수 없음' })).toBeInTheDocument()
     expect(screen.getByText('요청한 화면이 없습니다.')).toBeInTheDocument()
-    expect(screen.getByText(/2차 범위라 아직 만들어지지 않았습니다/)).toBeInTheDocument()
+    expect(screen.getByText('주소를 다시 확인하거나 왼쪽 메뉴에서 화면을 고르세요.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '대시보드로' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('navigation', { name: '주요 업무 메뉴' })).toBeInTheDocument()
     await waitFor(() => expect(document.title).toBe('찾을 수 없음 | FGC'))

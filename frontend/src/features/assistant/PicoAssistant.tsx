@@ -1,6 +1,7 @@
 import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import type { ShellUser } from '../../app/shell/Sidebar'
 import { findGuide, GUIDE_CATALOG } from './catalog'
 import type { AssistantContext, CalculationResult, MessageResult } from './contracts'
@@ -225,6 +226,9 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     stream = useRef<HTMLDivElement>(null)
   const panelId = useId(),
     titleId = useId()
+  // 진입 버튼은 앱 머리의 자리(AppShell #app-header-assistant)에 그린다. 셸 밖(단위 시험)에서는 제자리에 그린다.
+  const [launcherSlot, setLauncherSlot] = useState<HTMLElement | null | undefined>(undefined)
+  useEffect(() => setLauncherSlot(document.getElementById('app-header-assistant')), [])
   useEffect(() => {
     if (!visible) return
     textarea.current?.focus()
@@ -425,26 +429,27 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     setTab('plan')
     setPlanError('')
   }
+  const launcher = (
+    <div className="pico-launcher">
+      <button
+        id={`${panelId}-launcher`}
+        className="pico-launcher-button"
+        aria-label="업무 비서 AI 열기 · 피코"
+        aria-expanded="false"
+        aria-controls={panelId}
+        onClick={() => {
+          if (guideActive) useGuideRuntime.getState().pause()
+          setOpen(true)
+        }}
+      >
+        <img src={basic} alt="" />
+        <span className="pico-launcher-hint">업무 비서 AI</span>
+      </button>
+    </div>
+  )
   return (
     <div className="pico-assistant-root">
-      {!visible && !otherGuideActive && (
-        <div className="pico-launcher">
-          <button
-            id={`${panelId}-launcher`}
-            className="pico-launcher-button"
-            aria-label="업무 비서 AI 열기 · 피코"
-            aria-expanded="false"
-            aria-controls={panelId}
-            onClick={() => {
-              if (guideActive) useGuideRuntime.getState().pause()
-              setOpen(true)
-            }}
-          >
-            <img src={basic} alt="" />
-            <span className="pico-launcher-hint">업무 비서 AI</span>
-          </button>
-        </div>
-      )}
+      {!visible && !otherGuideActive && launcherSlot !== undefined && (launcherSlot ? createPortal(launcher, launcherSlot) : launcher)}
       {visible && (
         <aside id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className="pico-panel">
           <header className="pico-panel-header">
