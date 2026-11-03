@@ -90,27 +90,78 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
         return recorded;
     }
 
-    /** 납입 재개: 미납 때문에 보류됐던 대상만 풀고, 부활·다른 사유의 판단은 건드리지 않는다. */
+    /**
+     * 납입 재개: 미납으로 보류됐던 회차(HOLD)와 지급 건을 푼다. 재개일 당일과 그 이후 회차도 정상 상태라 PLANNED 로 돌린다.
+     * 지급예정일은 재개 전에 있던 회차(UNPAID_RESUMED)만 재개일로 다시 잡는다. 다른 사유로 중단된(CANCELLED) 회차는 소급하지 않는다.
+     */
     private Optional<ContractStatusEffect> resume(ContractStatusEvent event, ContractStatusEffect effect) {
-        if (!UNPAID_RESUMED.equals(effect.reasonCode())) {
-            return Optional.empty();
-        }
-        if (effect.entityType() == EntityType.SCHEDULE_LINE && PLANNED.equals(effect.nextState())) {
+        if (effect.entityType() == EntityType.SCHEDULE_LINE && PLANNED.equals(effect.nextState())
+                && "HOLD".equals(effect.previousState())) {
+            boolean dueBeforeResume = UNPAID_RESUMED.equals(effect.reasonCode());
+            LocalDate resumedOn = resumeDate(event);
             // 원래 날짜로 되돌리면 원래 달에는 실제 지급이 없고 재개한 달에는 예상이 없어 대사가 갈라진다(2026-10-13 PL 결정).
-            LocalDate resumedOn = event.getEffectiveAt().atZoneSameInstant(DateUtil.SEOUL_ZONE).toLocalDate();
             jdbc.update("""
-                    UPDATE fgc.schedule_line SET line_status = 'PLANNED', due_date = ?
+                    UPDATE fgc.schedule_line SET line_status = 'PLANNED', due_date = CASE WHEN ? THEN ?::date ELSE due_date END
                      WHERE schedule_line_id = ? AND line_status = 'HOLD'
-                    """, resumedOn, effect.entityId());
-            return Optional.of(new ContractStatusEffect(effect.entityType(), effect.entityId(), effect.previousState(),
-                    effect.nextState(), effect.amount(), effect.policyVersionId(), effect.reasonCode(),
-                    effect.reason() + " 지급예정일을 재개일 " + resumedOn + "로 다시 잡았습니다."));
+                    """, dueBeforeResume, resumedOn, effect.entityId());
+            return Optional.of(dueBeforeResume ? withDueDateNote(effect, resumedOn) : effect);
         }
         if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
             holds.releaseOpen(effect.entityId(), event.getContractStatusEventId());
             return Optional.of(effect);
         }
         return Optional.empty();
+    }
+
+    private static LocalDate resumeDate(ContractStatusEvent event) {
+        return event.getEffectiveAt().atZoneSameInstant(DateUtil.SEOUL_ZONE).toLocalDate();
+    }
+
+    private static ContractStatusEffect withDueDateNote(ContractStatusEffect effect, LocalDate resumedOn) {
+        return new ContractStatusEffect(effect.entityType(), effect.entityId(), effect.previousState(), effect.nextState(),
+                effect.amount(), effect.policyVersionId(), effect.reasonCode(),
+                effect.reason() + " 지급예정일을 재개일 " + resumedOn + "로 다시 잡았습니다.");
+    }
+
+    /**
+     * 새 스케줄 버전은 원래 지급예정일로 회차를 다시 만든다. 최신 사건이 납입 재개이면 재개 전(미납일~재개 전날)에 있던
+     * PLANNED 회차의 지급예정일을 재개일로 다시 잡는다. 이미 재개일이면 범위 밖이라 되풀이해도 바뀌지 않는다.
+     */
+    private List<ContractStatusEffect> resetResumedDueDates(Long contractId, List<ContractStatusEvent> timeline,
+                                                            ContractStatusEvent latest) {
+        if (!isPaymentResumed(latest)) {
+            return List.of();
+        }
+        LocalDate resumedOn = resumeDate(latest);
+        LocalDate unpaidOn = null;
+        for (int i = timeline.indexOf(latest) - 1; i >= 0; i--) {
+            if (timeline.get(i).getNewStatus() == ContractStatus.UNPAID) {
+                unpaidOn = resumeDate(timeline.get(i));
+                break;
+            }
+        }
+        if (unpaidOn == null) {
+            return List.of();
+        }
+        List<ContractStatusEffect> changed = new ArrayList<>();
+        List<Object[]> lines = jdbc.query("""
+                SELECT sl.schedule_line_id, sl.expected_amount, sh.policy_version_id
+                  FROM fgc.schedule_line sl
+                  JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn
+                   AND sh.status NOT IN ('CONFIRMED', 'MATCHED', 'ADJUSTED', 'CANCELLED')
+                   AND sl.line_status = 'PLANNED' AND sl.due_date >= ? AND sl.due_date < ?
+                   AND NOT EXISTS (SELECT 1 FROM fgc.validation_run vr
+                                    WHERE vr.status = 'FINALIZED' AND vr.validation_month = sl.due_month)
+                 ORDER BY sl.schedule_line_id
+                """, (rs, row) -> new Object[]{rs.getLong(1), rs.getBigDecimal(2), rs.getObject(3)}, contractId, unpaidOn, resumedOn);
+        for (Object[] line : lines) {
+            jdbc.update("UPDATE fgc.schedule_line SET due_date = ? WHERE schedule_line_id = ?", resumedOn, (Long) line[0]);
+            changed.add(new ContractStatusEffect(EntityType.SCHEDULE_LINE, (Long) line[0], PLANNED, PLANNED,
+                    (java.math.BigDecimal) line[1], line[2] == null ? null : ((Number) line[2]).longValue(), UNPAID_RESUMED,
+                    "새 스케줄 버전에서도 납입 재개로 지급예정일을 재개일 " + resumedOn + "로 다시 잡았습니다."));
+        }
+        return changed;
     }
 
     /**
@@ -131,6 +182,7 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
                 applied.add(effect);
             }
         }
+        applied.addAll(resetResumedDueDates(contractId, timeline, latest));
         if (!applied.isEmpty()) {
             jobs.insertEffects(new ContractEventJobRepository.JobKey(latest.getContractStatusEventId(), JOB), applied);
         }

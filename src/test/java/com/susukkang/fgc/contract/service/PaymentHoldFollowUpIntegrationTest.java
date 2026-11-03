@@ -15,6 +15,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,6 +39,7 @@ class PaymentHoldFollowUpIntegrationTest {
     @Autowired private CommissionPaymentService payments;
     @Autowired private ContractStatusEffectQueryService effectQuery;
     @Autowired private PaymentHoldGate gate;
+    @Autowired private com.susukkang.fgc.schedule.service.ScheduleService scheduleService;
 
     @Test
     void lapseHoldsOnlyUnconfirmedTargetsAndKeepsConfirmedOnesUntouched() {
@@ -135,15 +137,21 @@ class PaymentHoldFollowUpIntegrationTest {
     }
 
     @Test
-    void resumingFromUnpaidReleasesTheHoldsAndResetsTheDueDateToTheResumeDate() {
+    void resumingFromUnpaidFreesEveryHeldLineAndPaymentButOnlyResetsTheDatesDueBeforeTheResume() {
         long contract = contract("2026-03-01");
         statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
         long unpaid = statusEvent(contract, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
-        long line = line(header(contract), 1, "2026-09-25", "PLANNED");
+        long header = header(contract);
+        long beforeResume = line(header, 1, "2026-09-25", "PLANNED");
+        long afterResume = line(header, 2, "2026-10-25", "PLANNED");
+        long laterStill = line(header, 3, "2026-11-25", "PLANNED");
         long payment = payment(contract, "2026-09-20", false);
+        long paymentAfter = payment(contract, "2026-10-20", false);
         processor.process(events.findById(unpaid).orElseThrow());
-        assertThat(lineStatus(line)).isEqualTo("HOLD");
+        assertThat(lineStatus(beforeResume)).isEqualTo("HOLD");
+        assertThat(lineStatus(afterResume)).isEqualTo("HOLD");
         assertThat(openHolds(payment)).isEqualTo(1);
+        assertThat(openHolds(paymentAfter)).isEqualTo(1);
 
         long resumed = resumeEvent(contract, 3, "2026-10-05T00:00:00+09:00");
         var event = events.findById(resumed).orElseThrow();
@@ -152,15 +160,95 @@ class PaymentHoldFollowUpIntegrationTest {
 
         assertThat(recorded).extracting(ContractStatusEffect::entityType, ContractStatusEffect::entityId,
                         ContractStatusEffect::nextState)
-                .containsExactlyInAnyOrder(tuple(ContractStatusEffect.EntityType.SCHEDULE_LINE, line, "PLANNED"),
-                        tuple(ContractStatusEffect.EntityType.PAYMENT, payment, "RELEASED"));
-        assertThat(lineStatus(line)).isEqualTo("PLANNED");
-        assertThat(jdbc.queryForObject("SELECT due_date::text FROM fgc.schedule_line WHERE schedule_line_id = ?", String.class, line))
-                .isEqualTo("2026-10-05");
+                .containsExactlyInAnyOrder(
+                        tuple(ContractStatusEffect.EntityType.SCHEDULE_LINE, beforeResume, "PLANNED"),
+                        tuple(ContractStatusEffect.EntityType.SCHEDULE_LINE, afterResume, "PLANNED"),
+                        tuple(ContractStatusEffect.EntityType.SCHEDULE_LINE, laterStill, "PLANNED"),
+                        tuple(ContractStatusEffect.EntityType.PAYMENT, payment, "RELEASED"),
+                        tuple(ContractStatusEffect.EntityType.PAYMENT, paymentAfter, "RELEASED"));
+        for (long line : List.of(beforeResume, afterResume, laterStill)) {
+            assertThat(lineStatus(line)).isEqualTo("PLANNED");
+        }
+        // 재개 전에 있던 회차만 재개일로 다시 잡고, 재개일 당일·이후 회차의 날짜는 그대로다.
+        assertThat(dueDate(beforeResume)).isEqualTo("2026-10-05");
+        assertThat(dueDate(afterResume)).isEqualTo("2026-10-25");
+        assertThat(dueDate(laterStill)).isEqualTo("2026-11-25");
         assertThat(openHolds(payment)).isZero();
+        assertThat(openHolds(paymentAfter)).isZero();
         assertThat(gate.blockers(payment)).isEmpty();
+        assertThat(gate.blockers(paymentAfter)).isEmpty();
         // 다시 처리해도 같은 결과로 수렴한다.
         assertThat(processor.process(event)).isEmpty();
+    }
+
+    @Test
+    void aNewScheduleVersionAfterTheResumeKeepsTheResumeDateForLinesDueBeforeIt() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long unpaid = statusEvent(contract, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
+        long oldHeader = header(contract);
+        line(oldHeader, 1, "2026-09-25", "PLANNED");
+        processor.process(events.findById(unpaid).orElseThrow());
+        long resumed = resumeEvent(contract, 3, "2026-10-05T00:00:00+09:00");
+        processor.process(events.findById(resumed).orElseThrow());
+
+        // 수동 재생성: 이전 버전을 끄고 원래 지급예정일로 새 버전 회차를 만든다.
+        jdbc.update("UPDATE fgc.schedule_header SET active_yn = false WHERE schedule_header_id = ?", oldHeader);
+        long newHeader = jdbc.queryForObject("""
+                INSERT INTO fgc.schedule_header(contract_id, payment_stage, policy_version_id, schedule_version_no,
+                    schedule_purpose, schedule_regime)
+                VALUES (?, 'GA_TO_FC', (SELECT min(policy_version_id) FROM fgc.policy_version), 2, 'OPERATIONAL', 'CURRENT')
+                RETURNING schedule_header_id
+                """, Long.class, contract);
+        long rebuiltBefore = line(newHeader, 1, "2026-09-25", "PLANNED");
+        long rebuiltAfter = line(newHeader, 2, "2026-10-25", "PLANNED");
+
+        processor.reapplyLatest(contract);
+
+        assertThat(dueDate(rebuiltBefore)).isEqualTo("2026-10-05");
+        assertThat(dueDate(rebuiltAfter)).isEqualTo("2026-10-25");
+        assertThat(lineStatus(rebuiltBefore)).isEqualTo("PLANNED");
+        // 다시 불러도 바뀌지 않는다.
+        processor.reapplyLatest(contract);
+        assertThat(dueDate(rebuiltBefore)).isEqualTo("2026-10-05");
+    }
+
+    @Test
+    void manualRegenerationThroughTheScheduleServiceKeepsTheResumeDate() {
+        // 시드 계약에 ScheduleService 로 실제 운영 스케줄을 만들고, 새 버전을 만드는 경로 전체를 지난다.
+        Long contract = jdbc.queryForObject("SELECT min(contract_id) FROM fgc.insurance_contract", Long.class);
+        scheduleService.generateSchedulesByContractId(contract);
+        org.junit.jupiter.api.Assumptions.assumeTrue(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn AND sl.line_status = 'PLANNED'
+                """, Long.class, contract) > 0, "시드 계약에 운영 스케줄이 만들어지지 않았다");
+        LocalDate firstDue = jdbc.queryForObject("""
+                SELECT min(sl.due_date) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn AND sl.line_status = 'PLANNED'
+                """, LocalDate.class, contract);
+        int seq = seq(contract);
+        long unpaid = statusEvent(contract, seq, "UNPAID", firstDue + "T12:00:00+09:00");
+        processor.process(events.findById(unpaid).orElseThrow());
+        LocalDate resumeOn = firstDue.plusDays(3);
+        long resumed = resumeEvent(contract, seq + 1, resumeOn + "T00:00:00+09:00");
+        processor.process(events.findById(resumed).orElseThrow());
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.active_yn AND sl.due_date = ?
+                """, Long.class, contract, resumeOn)).isPositive();
+
+        scheduleService.regenerateContractSchedules(contract, "재개 뒤 수동 재생성");
+
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn
+                   AND sl.line_status = 'PLANNED' AND sl.due_date = ?
+                """, Long.class, contract, resumeOn)).as("새 버전에 재개일 기준 회차가 남아 있다").isPositive();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.schedule_line sl JOIN fgc.schedule_header sh ON sh.schedule_header_id = sl.schedule_header_id
+                 WHERE sh.contract_id = ? AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn
+                   AND sl.line_status = 'PLANNED' AND sl.due_date = ?
+                """, Long.class, contract, firstDue)).as("원래 날짜로 돌아간 회차가 없다").isZero();
     }
 
     @Test
@@ -325,6 +413,10 @@ class PaymentHoldFollowUpIntegrationTest {
     private long openHolds(long paymentId) {
         return jdbc.queryForObject("SELECT count(*) FROM fgc.payment_hold WHERE commission_transaction_id = ? AND released_at IS NULL",
                 Long.class, paymentId);
+    }
+
+    private String dueDate(long lineId) {
+        return jdbc.queryForObject("SELECT due_date::text FROM fgc.schedule_line WHERE schedule_line_id = ?", String.class, lineId);
     }
 
     private String lineStatus(long lineId) {
