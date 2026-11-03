@@ -4,6 +4,7 @@ import { readPayment } from './form-api'
 import type { Payment, Precheck } from './form-api'
 import { draftRows, initialForm } from './form-model'
 import type { AttributionRow, FormValues } from './form-model'
+import { isWonAmount } from '../assistant/guards'
 
 export interface PaymentGuideInput {
   role: string
@@ -29,7 +30,7 @@ export interface PaymentGuideState {
   acknowledged: readonly string[]
 }
 const readers = ['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE']
-const processors = ['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT']
+const processors = ['SYSTEM_ADMIN', 'SETTLEMENT']
 const positiveId = (id: string | number) => {
   const value = Number(id)
   if (!/^\d+$/.test(String(id)) || !Number.isSafeInteger(value) || value <= 0)
@@ -42,6 +43,7 @@ const EVIDENCE_READ_TIMEOUT_MS = 5000
 const inputKey = (form: FormValues, rows: AttributionRow[]) =>
   JSON.stringify([form, rows.map((row) => ({ ...row, key: undefined }))])
 const serverKey = (payment: Payment) => JSON.stringify(payment)
+const validWon = (value: string) => isWonAmount(value) && BigInt(value) >= 0n && BigInt(value) <= BigInt(Number.MAX_SAFE_INTEGER)
 const sameInput = (input: PaymentGuideInput, payment: Payment) =>
   inputKey(input.form, input.rows) ===
   inputKey(initialForm(input.form.settlementMonth, payment), draftRows(payment))
@@ -116,8 +118,7 @@ export class PaymentGuideObserver {
   readContext = (): GuideContext => {
     const input = this.requireInput()
     const contracts = [...new Set(input.rows.map((row) => row.contractId).filter(Boolean))]
-    // Never silently choose the first contract of a multi-contract payment.
-    if (contracts.length > 1) throw new GuideFailure('MULTIPLE_CONTRACTS_UNSUPPORTED')
+    // Bind every attributed contract, never silently choose the first contract.
     return {
       screenId: 'TRAN-W02',
       role:
@@ -246,26 +247,23 @@ export class PaymentGuideObserver {
       this.emit()
       throw new GuideFailure('SERVER_STATE_CHANGED')
     }
+    const amountsValid = validWon(input.form.amount) && input.rows.every((row) => validWon(row.amount))
     return {
       available: input.ready && readers.includes(input.role),
       valid: input.valid,
       scopeReady: !!input.form.settlementMonth && (input.form.paymentStage === 'INSURER_TO_GA' || !!input.form.agentId),
       amountReady:
         !!input.form.commissionItemId &&
-        input.form.amount.trim() !== '' &&
-        Number.isFinite(Number(input.form.amount)) &&
-        Number(input.form.amount) >= 0,
+        validWon(input.form.amount),
       attributionsReady:
         input.rows.length > 0 &&
         input.rows.every(
           (row) =>
             (row.attributionMethod === 'NEWCOMER_NON_CONTRACT' || !!row.contractId) &&
             !!row.attributionDate &&
-            row.amount.trim() !== '' &&
-            Number.isFinite(Number(row.amount)) &&
-            Number(row.amount) >= 0,
+            validWon(row.amount),
         ) &&
-        input.rows.reduce((total, row) => total + Number(row.amount), 0) === Number(input.form.amount),
+        amountsValid && input.rows.reduce((total, row) => total + BigInt(row.amount), 0n) === BigInt(input.form.amount),
       validationMessage: input.validationMessage,
       saved: matches && !input.dirty && payment?.status === 'DRAFT',
       prechecked:
@@ -314,6 +312,8 @@ const inputCondition =
   ): GuideCondition<PaymentGuideState> =>
   (_context, state) =>
     state.available && state[field] && state.acknowledged.includes(rule) ? 'SATISFIED' : 'WAITING_INPUT'
+const savedDraft = (context: GuideContext, state: PaymentGuideState) =>
+  state.available && state.saved && state.valid && context.entityRefs.some((ref) => ref.type === 'PAYMENT')
 export const paymentGuideConditions: Readonly<Record<string, GuideCondition<PaymentGuideState>>> = {
   ALWAYS: () => 'SATISFIED',
   CONTEXT_AVAILABLE: (_context, state) => (state.available ? 'SATISFIED' : 'WAITING_INPUT'),
@@ -321,6 +321,8 @@ export const paymentGuideConditions: Readonly<Record<string, GuideCondition<Paym
   AMOUNT_REVIEW_ACKNOWLEDGED: inputCondition('AMOUNT_REVIEW_ACKNOWLEDGED', 'amountReady'),
   ATTRIBUTIONS_REVIEWED: inputCondition('ATTRIBUTIONS_REVIEWED', 'attributionsReady'),
   EVIDENCE_FIELDS_VALID: (_context, state) => (state.valid ? 'SATISFIED' : 'WAITING_INPUT'),
+  CURRENT_DRAFT_ALREADY_SAVED: (context, state) => savedDraft(context, state) ? 'SATISFIED' : 'WAITING_INPUT',
+  DRAFT_SAVE_REQUIRED: (context, state) => state.available && !savedDraft(context, state) ? 'SATISFIED' : 'WAITING_INPUT',
   CURRENT_DRAFT_SAVED: (_context, state) => (state.saved ? 'SATISFIED' : 'WAITING_RESULT'),
   CURRENT_PRECHECK_PASSED: (_context, state) => (state.prechecked ? 'SATISFIED' : 'WAITING_RESULT'),
   PRECHECK_RESULT_ACKNOWLEDGED: (context, state) =>

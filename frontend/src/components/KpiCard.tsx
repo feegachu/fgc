@@ -37,6 +37,7 @@ export function KpiCardContent({
   )
 }
 export function KpiCard({
+  guideId,
   label,
   value,
   unit,
@@ -45,6 +46,7 @@ export function KpiCard({
   zero,
   format,
 }: {
+  guideId: string | undefined
   label: string
   value: ReactNode
   unit?: string
@@ -54,7 +56,7 @@ export function KpiCard({
   format?: (value: number) => string
 }) {
   return (
-    <section className={`kpi-card kpi-card-${tone}`} aria-label={label}>
+    <section data-guide-feature={guideId} className={`kpi-card kpi-card-${tone}`} aria-label={label}>
       <KpiCardContent label={label} value={value} unit={unit} footer={footer} zero={zero} format={format} heading />
     </section>
   )

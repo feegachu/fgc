@@ -1,0 +1,479 @@
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { apiClient, ApiError } from '../../lib/api/client'
+import { AssistantDemoMount, PicoAssistant } from './PicoAssistant'
+import { useGuideRuntime } from './guide-runtime'
+import type { ShellUser } from '../../app/shell/Sidebar'
+import { workflowHelpSteps } from './workflow-catalog'
+import { useWorkflowGuide } from './workflow-state'
+import { connectPaymentGuideLaunch } from '../transaction/payment-guide-launch'
+let disconnectPayment = () => {}
+const reply = {
+  decision: 'ANSWER_ONLY',
+  message: '초안 저장은 지급 확정과 구분됩니다.',
+  guideVersion: '1.0',
+  contextRevision: 'REV',
+  evidenceRefs: [
+    { chunkId: 'payment.draft:overview', workflowId: 'payment.draft', stepId: null, title: '지급 초안 저장' },
+  ],
+  validatedGuide: null,
+  source: 'AI',
+  fallbackReason: null,
+}
+const envelope = (data: unknown) => ({ data, error: null, requestId: 'QA' })
+const user: ShellUser = {
+  loginId: 'reader',
+  userName: '담당자',
+  roleCode: 'SETTLEMENT',
+  canProcess: true,
+  canViewAuditLog: false,
+}
+beforeEach(() => {
+  useWorkflowGuide.getState().clear()
+  vi.stubEnv('VITE_ASSISTANT_AI', 'true')
+  vi.stubEnv('VITE_ASSISTANT_DEMO', '')
+  useGuideRuntime.setState({ session: null, observation: null })
+})
+afterEach(() => {
+  disconnectPayment()
+  useWorkflowGuide.setState({ paymentActive: false, settlementActive: false })
+  useWorkflowGuide.getState().clear()
+  cleanup()
+  useGuideRuntime.setState({ session: null, observation: null })
+  vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+})
+async function open() {
+  await userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' }))
+}
+async function send() {
+  await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '초안 저장하면 지급 끝인가요?')
+  await userEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+}
+function mockResponse(source = 'AI') {
+  return vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) =>
+    envelope({
+      ...reply,
+      source,
+      contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+    })) as typeof apiClient.request)
+}
+it('mounts with AI opt-in, calls the server and renders AI evidence distinct from synthetic buttons', async () => {
+  const request = mockResponse()
+  render(<AssistantDemoMount user={user} />)
+  await open()
+  await send()
+  expect(await screen.findByText(reply.message)).toBeInTheDocument()
+  expect(screen.getByText('AI 가이드 답변')).toBeInTheDocument()
+  expect(screen.getByText('지급 초안 저장 · v1.0')).toBeInTheDocument()
+  expect(screen.queryByText('시연 질문 바꾸기')).not.toBeInTheDocument()
+  expect(request).toHaveBeenCalledTimes(1)
+  expect(request).toHaveBeenCalledWith(
+    '/api/v1/ai/pico/ask',
+    expect.objectContaining({
+      method: 'POST',
+      body: expect.objectContaining({
+        question: '초안 저장하면 지급 끝인가요?',
+        entityRefs: [],
+        conversation: [],
+        guideVersion: '1.0',
+      }),
+    }),
+  )
+})
+it('shows fixed source explicitly when model is unavailable', async () => {
+  mockResponse('FIXED')
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText('시스템 안내')).toBeInTheDocument()
+  expect(screen.queryByText('AI 가이드 답변')).not.toBeInTheDocument()
+})
+it('sends the previous question and AI answer when a follow-up asks where to select', async () => {
+  const request = mockResponse()
+  render(<AssistantDemoMount user={user} />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '선택 어디서 해?')
+  await userEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+  await waitFor(() => expect(request).toHaveBeenCalledTimes(2))
+  expect(request.mock.calls[1][1]?.body).toMatchObject({
+    question: '선택 어디서 해?',
+    conversation: [
+      { role: 'USER', text: '초안 저장하면 지급 끝인가요?' },
+      { role: 'ASSISTANT', text: reply.message },
+    ],
+  })
+})
+it('locks duplicate sends and aborts/discards old response after reset', async () => {
+  let finish!: (value: ReturnType<typeof envelope>) => void
+  const request = vi.spyOn(apiClient, 'request').mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve
+    }),
+  )
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '다음')
+  expect(screen.getByRole('button', { name: '질문 보내기' })).toBeDisabled()
+  await userEvent.keyboard('{Enter}')
+  expect(request).toHaveBeenCalledTimes(1)
+  const options = request.mock.calls[0][1]!,
+    revision = (options.body as { clientContextRevision: string }).clientContextRevision
+  await userEvent.click(screen.getByRole('button', { name: '새 대화' }))
+  expect(options.signal?.aborted).toBe(true)
+  await act(async () => finish(envelope({ ...reply, contextRevision: revision })))
+  expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+  expect(screen.queryByText('초안 저장하면 지급 끝인가요?')).not.toBeInTheDocument()
+})
+it('rejects executable guide and unknown evidence instead of rendering or navigating', async () => {
+  vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) =>
+    envelope({
+      ...reply,
+      contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+      validatedGuide: { workflowId: 'evil' },
+    })) as typeof apiClient.request)
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText(/답변의 형식이나 근거를 확인하지 못했어요/)).toBeInTheDocument()
+  expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+})
+it('closes safely and clears account conversation without keeping late replies', async () => {
+  let finish!: (value: ReturnType<typeof envelope>) => void
+  const request = vi.spyOn(apiClient, 'request').mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve
+    }),
+  )
+  const view = render(<AssistantDemoMount user={user} />)
+  await open()
+  await send()
+  const options = request.mock.calls[0][1]!,
+    revision = (options.body as { clientContextRevision: string }).clientContextRevision
+  await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
+  expect(options.signal?.aborted).toBe(true)
+  await act(async () => finish(envelope({ ...reply, contextRevision: revision })))
+  view.rerender(<AssistantDemoMount user={{ ...user, loginId: 'other' }} />)
+  await open()
+  expect(screen.queryByText('초안 저장하면 지급 끝인가요?')).not.toBeInTheDocument()
+  expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+})
+it('rejects stale response revisions even when transport ignores abort', async () => {
+  vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({ ...reply, contextRevision: 'older' }))
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await waitFor(() => expect(screen.getByText(/질문 이후 화면이나 입력이 바뀌었어요/)).toBeInTheDocument())
+  expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+})
+
+it('distinguishes stale guide conflicts from connection failures without executing a guide', async () => {
+  vi.spyOn(apiClient, 'request').mockRejectedValue(
+    new ApiError({ code: 'FGC-IMPL-GUIDE_VERSION_MISMATCH', message: 'stale' }, 'qa', 409),
+  )
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
+  expect(useGuideRuntime.getState().session).toBeNull()
+})
+
+function observePayment(
+  overrides: Partial<NonNullable<ReturnType<typeof useGuideRuntime.getState>['observation']>> = {},
+) {
+  useGuideRuntime.getState().publish({
+    owner: 'payment-page',
+    paymentId: '77',
+    scopeKey: 'scope-77',
+    revision: 0,
+    canProcess: true,
+    ready: true,
+    amountValid: true,
+    attributionsValid: true,
+    formValid: true,
+    saved: true,
+    busy: false,
+    precheck: 'NONE',
+    modalOpen: false,
+    ...overrides,
+  })
+}
+it('sends only the current saved payment reference without form values or local status claims', async () => {
+  observePayment()
+  const request = mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText(reply.message)).toBeInTheDocument()
+  const body = request.mock.calls[0][1]!.body as Record<string, unknown>
+  expect(body).toMatchObject({ screenId: 'TRAN-W02', entityRefs: [{ type: 'PAYMENT', id: 77 }], conversation: [] })
+  expect(body).not.toHaveProperty('amount')
+  expect(body).not.toHaveProperty('paymentStatus')
+  expect(body).not.toHaveProperty('formDirty')
+  expect(screen.queryByText('현재 보고 있는 업무')).not.toBeInTheDocument()
+})
+it.each([{ saved: false }, { ready: false }, { busy: true }, { paymentId: '9007199254740993' }])(
+  'uses a general question instead of sending an unsafe or unsaved payment context %j',
+  async (overrides) => {
+    observePayment(overrides)
+    const request = mockResponse()
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    expect(await screen.findByText(reply.message)).toBeInTheDocument()
+    expect((request.mock.calls[0][1]!.body as { entityRefs: unknown[] }).entityRefs).toEqual([])
+  },
+)
+it('aborts and discards a state-aware reply when only the payment id changes', async () => {
+  observePayment()
+  let finish!: (value: ReturnType<typeof envelope>) => void
+  const request = vi.spyOn(apiClient, 'request').mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve
+    }),
+  )
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  const options = request.mock.calls[0][1]!
+  const revision = (options.body as { clientContextRevision: string }).clientContextRevision
+  act(() => observePayment({ paymentId: '88' }))
+  expect(options.signal?.aborted).toBe(true)
+  await act(async () => finish(envelope({ ...reply, contextRevision: revision })))
+  expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+  expect(useGuideRuntime.getState().session).toBeNull()
+})
+
+it('connects the latest answer evidence to an explicitly selected and server-revalidated current guide', async () => {
+  observePayment()
+  const launch = vi.fn()
+  disconnectPayment = connectPaymentGuideLaunch(launch)
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (path, options) => {
+    const body = options!.body as Record<string, unknown>
+    if (path.endsWith('/ask')) return envelope({ ...reply, contextRevision: body.clientContextRevision })
+    return envelope({
+      status: path.endsWith('/prepare') ? 'PREPARED' : 'STARTED',
+      workflowId: body.workflowId,
+      stepId: 'payment.scope',
+      guideVersion: '1.0',
+      paymentId: body.paymentId,
+      clientContextRevision: body.clientContextRevision,
+      expiresAt: '2099-01-01T00:00:00Z',
+      prepareToken: path.endsWith('/prepare') ? 'x'.repeat(43) : null,
+    })
+  }) as typeof apiClient.request)
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  const button = await screen.findByRole('button', { name: /이 업무 안내 시작/ })
+  expect(request).toHaveBeenCalledTimes(1)
+  await userEvent.click(button)
+  await waitFor(() => expect(launch).toHaveBeenCalledWith('payment.draft'))
+  expect(useGuideRuntime.getState().session).toBeNull()
+  expect(request.mock.calls.map(([path]) => path)).toEqual([
+    '/api/v1/ai/pico/ask',
+    '/api/v1/ai/pico/guides/prepare',
+    '/api/v1/ai/pico/guides/start',
+  ])
+  expect(screen.queryByRole('textbox', { name: '피코에게 질문' })).not.toBeInTheDocument()
+})
+
+it('keeps a completed answer actionable after a temporary ready refresh finishes', async () => {
+  observePayment()
+  mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeEnabled()
+  act(() => observePayment({ ready: false }))
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
+  expect(screen.getByRole('status')).toHaveTextContent('기준정보')
+  act(() => observePayment({ ready: true }))
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeEnabled()
+})
+
+it('keeps a completed guide offer after closing and reopening the assistant', async () => {
+  observePayment()
+  const request = mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
+  await open()
+  expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeEnabled()
+  expect(request).toHaveBeenCalledTimes(1)
+})
+it.each([
+  { paymentId: '88' },
+  { revision: 1 },
+  { scopeKey: 'other-scope' },
+  { saved: false },
+  { precheck: 'PASSED_WITHOUT_TOKEN' as const },
+  { precheck: 'REJECTED' as const },
+  { modalOpen: true },
+])(
+  'invalidates completed guide offers after an actual context change, including return to the old context %j',
+  async (changed) => {
+    observePayment()
+    const request = mockResponse()
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    await screen.findByText(reply.message)
+    act(() => observePayment(changed))
+    expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toHaveAccessibleDescription(/다시 질문/)
+    act(() => observePayment())
+    expect(screen.getByRole('button', { name: /이 업무 안내 시작/ })).toBeDisabled()
+    expect(request).toHaveBeenCalledTimes(1)
+    await send()
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /이 업무 안내 시작/ }).at(-1)).toBeEnabled())
+    expect(screen.getAllByRole('button', { name: /이 업무 안내 시작/ })[0]).toBeDisabled()
+  },
+)
+it('offers registered payment-screen guidance before a draft exists without requesting a financial action', async () => {
+  const request = mockResponse()
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  await userEvent.click(screen.getByRole('button', { name: /지급 작성 화면에서 안내 시작/ }))
+  expect(useWorkflowGuide.getState().request?.id).toBe('payment.draft')
+  expect(request).toHaveBeenCalledTimes(1)
+})
+
+it.each([{ ready: false }, { busy: true }, { paymentId: '9007199254740993' }])(
+  'never upgrades an answer sent without a payment reference when the screen becomes ready %j',
+  async (initialState) => {
+    observePayment(initialState)
+    const request = mockResponse()
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    await screen.findByText(reply.message)
+    expect((request.mock.calls[0][1]!.body as { entityRefs: unknown[] }).entityRefs).toEqual([])
+    act(() => observePayment({ ...initialState, ready: true, busy: false }))
+    const button = screen.getByRole('button', { name: /이 업무 안내 시작/ })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAccessibleDescription(/질문 당시 저장된 지급 상태를 확인하지 못했습니다/)
+    expect(request).toHaveBeenCalledTimes(1)
+  },
+)
+
+it.each([{ precheck: 'PASSED_WITHOUT_TOKEN' as const }, { modalOpen: true }])(
+  'aborts an in-flight answer when validation or confirmation state changes %j',
+  async (changed) => {
+    observePayment()
+    let finish!: (value: ReturnType<typeof envelope>) => void
+    const request = vi.spyOn(apiClient, 'request').mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    render(<PicoAssistant canProcess />)
+    await open()
+    await send()
+    const options = request.mock.calls[0][1]!
+    const revision = (options.body as { clientContextRevision: string }).clientContextRevision
+    act(() => observePayment(changed))
+    expect(options.signal?.aborted).toBe(true)
+    await act(async () => finish(envelope({ ...reply, contextRevision: revision })))
+    expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
+    expect(useGuideRuntime.getState().session).toBeNull()
+  },
+)
+
+it('validates a source citation and starts that location instead of a hardcoded question route', async () => {
+  const help = workflowHelpSteps('contract.register').find((step) => step.targetId === 'features.contract.contract-form-page.contract-no')!
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) => envelope({
+    ...reply, message: '계약 등록 화면의 계약번호 입력 항목에서 입력하세요.',
+    contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+    evidenceRefs: [{ workflowId: 'contract.register', stepId: help.stepId, chunkId: `contract.register:${help.stepId}`, title: help.title }],
+  })) as typeof apiClient.request)
+  render(<AssistantDemoMount user={user} />)
+  await open()
+  await send()
+  await screen.findByText('계약 등록 화면의 계약번호 입력 항목에서 입력하세요.')
+  await userEvent.click(screen.getByRole('button', { name: /이 업무 안내 시작/ }))
+  expect(useWorkflowGuide.getState().request).toMatchObject({ id: 'contract.register', stepId: help.stepId })
+  expect(request).toHaveBeenCalledTimes(1)
+})
+
+it('lists role-permitted registered tutorials in the guide tab without an API or canned scenario', async () => {
+  const request = vi.spyOn(apiClient, 'request')
+  render(<AssistantDemoMount user={user} />)
+  await open()
+  await userEvent.click(screen.getByRole('tab', { name: '업무 안내' }))
+  await userEvent.click(screen.getByRole('button', { name: /보험계약 등록/ }))
+  expect(useWorkflowGuide.getState().request?.id).toBe('contract.register')
+  expect(request).not.toHaveBeenCalled()
+})
+
+it('keeps actual version mismatch separate from stale context and invalid evidence', async () => {
+  vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) => envelope({ ...reply,
+    guideVersion: '2.0', contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+  })) as typeof apiClient.request)
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
+  expect(screen.queryByText(/답변의 형식이나 근거/)).not.toBeInTheDocument()
+})
+it.each(['general', 'before-draft'] as const)('invalidates %s answer actions on navigation, return and a pending question', async (kind) => {
+  const help = workflowHelpSteps('contract.register').find((step) => step.targetId === 'features.contract.contract-form-page.contract-no')!
+  const response = kind === 'general' ? { ...reply, evidenceRefs: [{ workflowId: 'contract.register', stepId: help.stepId, chunkId: `contract.register:${help.stepId}`, title: help.title }] } : reply
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) => envelope({ ...response,
+    contextRevision: (options?.body as { clientContextRevision: string }).clientContextRevision,
+  })) as typeof apiClient.request)
+  const initial = <PicoAssistant canProcess screenId="TRAN-W02" screenContext="/transactions/new?month=2026-07" />
+  const view = render(initial)
+  await open()
+  await send()
+  await screen.findByText(reply.message)
+  const name = kind === 'general' ? /이 업무 안내 시작/ : /지급 작성 화면에서 안내 시작/
+  expect(screen.getByRole('button', { name })).toBeEnabled()
+  view.rerender(<PicoAssistant canProcess screenId="CONT-W01" screenContext="/contracts?month=2026-07" />)
+  expect(screen.getByRole('button', { name })).toBeDisabled()
+  view.rerender(initial)
+  expect(screen.getByRole('button', { name })).toBeDisabled()
+  await send()
+  await waitFor(() => expect(screen.getAllByRole('button', { name }).at(-1)).toBeEnabled())
+  let finish!: (value: ReturnType<typeof envelope>) => void
+  request.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+  await send()
+  expect(screen.getAllByRole('button', { name }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true)
+  const revision = (request.mock.calls.at(-1)![1]!.body as { clientContextRevision: string }).clientContextRevision
+  await act(async () => finish(envelope({ ...response, contextRevision: revision })))
+  await waitFor(() => expect(screen.getAllByRole('button', { name }).at(-1)).toBeEnabled())
+  expect(useWorkflowGuide.getState().request).toBeNull()
+})
+
+it.each(['active', 'paymentActive', 'settlementActive'] as const)('does not queue a launcher click during another guide: %s', async (state) => {
+  render(<PicoAssistant canProcess />)
+  act(() => useWorkflowGuide.setState({ [state]: true }))
+  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
+  act(() => useWorkflowGuide.setState({ [state]: false }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toHaveTextContent('업무 비서 AI')
+})
+it('does not offer payment form tutorials to a read-only role', async () => {
+  render(<PicoAssistant canProcess={false} roleCode="COMPLIANCE" />)
+  await open()
+  await userEvent.click(screen.getByRole('tab', { name: '업무 안내' }))
+  expect(screen.queryByRole('button', { name: /지급 금액 확인/ })).not.toBeInTheDocument()
+})
+
+it('closes the panel when another guide opens without unexpectedly reopening afterward', async () => {
+  render(<PicoAssistant canProcess />)
+  await open()
+  act(() => useWorkflowGuide.setState({ settlementActive: true }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  act(() => useWorkflowGuide.setState({ settlementActive: false }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
