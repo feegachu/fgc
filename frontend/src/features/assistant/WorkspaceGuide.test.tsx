@@ -83,6 +83,14 @@ afterEach(async () => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
 })
+it('pauses at the current step for follow-up chat without navigation or business writes', async () => {
+  const router = setup()
+  act(() => useWorkflowGuide.getState().start('contract.register'))
+  await screen.findByRole('textbox', { name: '보험회사' })
+  act(() => useWorkflowGuide.getState().requestChat())
+  expect(await screen.findByRole('button', { name: '돌아와 이어가기' })).toBeVisible()
+  expect(router.state.location.pathname).toBe('/contracts/new')
+})
 it('uses the registered route and targets, survives StrictMode and never performs business writes', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch')
   const router = setup()

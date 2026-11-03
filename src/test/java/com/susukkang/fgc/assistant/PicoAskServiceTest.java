@@ -266,13 +266,17 @@ class PicoAskServiceTest {
         assertThat(service.ask(request("한도 결과는 어디서 보나요")).source()).isEqualTo(Source.AI);
         var prompt=ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
         verify(gateway).call(prompt.capture(),eq(PicoAskService.ModelAnswer.class));
-        assertThat(prompt.getValue().instructions()).contains("화면 이름은 숫자까지 그대로 쓰세요").contains("'수치' 같은 대체어");
+        assertThat(prompt.getValue().instructions()).contains("화면 이름을 숫자까지 그대로 쓰세요").contains("'수치' 같은 대체어");
     }
     @Test void approvedScreenTitleWithDigitsIsNotAGeneratedNumber() {
         assertThat(catalog.numericScreenTitles()).containsExactly("1,200% 한도 검증");
-        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("1,200% 한도 검증 화면에서 결과를 확인하세요.","payment.draft:overview"));
-        assertThat(service.ask(request("한도 결과는 어디서 보나요")).source()).isEqualTo(Source.AI);
-        for (var message : List.of("1,200%를 넘으면 확정할 수 없습니다.", "1,200% 한도 검증 화면에서 사용률 1,350%를 확인하세요.", "1,200% 한도입니다.", "1,200% 한도 검증의 2단계를 보세요.")) {
+        // 화면을 가리킬 때만 이름으로 본다(뒤에 화면, 메뉴). 한도나 요율 판단 문장 속 제목은 숫자 검사를 그대로 받는다(#833 리뷰).
+        for (var message : List.of("1,200% 한도 검증 화면에서 결과를 확인하세요.", "'1,200% 한도 검증' 화면에서 결과를 확인하세요.", "1,200% 한도 검증 메뉴를 여세요.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("한도 결과는 어디서 보나요")).source()).as(message).isEqualTo(Source.AI);
+        }
+        for (var message : List.of("1,200% 한도 검증을 한도로 적용하세요.", "1,200% 한도 검증 기준을 넘는 지급은 확정하지 마세요.", "1,200%를 넘으면 확정할 수 없습니다.",
+                "1,200% 한도 검증 화면에서 사용률 1,350%를 확인하세요.", "1,200% 한도입니다.", "1,200% 한도 검증의 2단계를 보세요.")) {
             when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
             assertThat(service.ask(request("한도 결과는 어디서 보나요")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
         }
@@ -315,6 +319,37 @@ class PicoAskServiceTest {
             }
         }
         verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
+    }
+    @Test void acceptsOnlyRegisteredGuideStageCountsWithoutAllowingFinancialNumbers() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+            .thenReturn(new PicoAskService.GuideSelection(List.of("settlement.journey"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+            .thenReturn(answer("전체 9단계 안내에서 계약부터 최종 확정까지 확인하세요.","settlement.journey:overview"));
+        assertThat(service.ask(request("전체 흐름을 안내해주세요")).source()).isEqualTo(Source.AI);
+        for (var message : List.of("전체 8단계 안내입니다.", "전체 9단계이며 지급액은 9원입니다.",
+                "전체 9,000단계입니다.", "전체 -9단계입니다.", "전체 9.0단계입니다.", "전체 9단계이며 천만 원씩 지급합니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer(message,"settlement.journey:overview"));
+            assertThat(service.ask(request("전체 흐름을 안내해주세요")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+            .thenReturn(new PicoAskService.GuideSelection(List.of("payment.amount.review"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+            .thenReturn(answer("전체 9단계입니다.","payment.amount.review:overview"));
+        assertThat(service.ask(request("금액 확인 안내")).fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
+    }
+    @Test void normalizesOnlyConsecutiveProcedureListMarkersAndStillRejectsFinancialValues() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+            .thenReturn(answer("1. 지급 대상을 확인하세요.\n2. 근거를 확인하세요.","payment.draft:overview"));
+        var reply = service.ask(request("초안 저장 방법"));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        assertThat(reply.message()).isEqualTo("지급 대상을 확인하세요.\n근거를 확인하세요.");
+        for (var message : List.of("1. 지급액은 50000원입니다.\n2. 저장하세요.",
+                "1. 지급액은 오만원입니다.\n2. 저장하세요.", "1. 확인하세요.\n3. 저장하세요.",
+                "1. 확인하세요.", "1.25원입니다.\n2.5원입니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("초안 저장 방법")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
     }
     @Test void sharedCatalogRegistersBothApprovedSavedDraftBranches() {
         var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("payment.confirm")).findFirst().orElseThrow();

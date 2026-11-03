@@ -13,6 +13,20 @@ const user: ShellUser = {
 afterEach(() => vi.unstubAllEnvs())
 const open = () => userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' }))
 
+it('keeps the launcher in the app header and opens chat from that slot', async () => {
+  const headerSlot = document.createElement('div')
+  headerSlot.id = 'app-header-assistant'
+  document.body.append(headerSlot)
+  const view = render(<PicoAssistant canProcess />)
+  try {
+    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toBeInTheDocument()
+    await open()
+    expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveFocus()
+    await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
+    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveFocus()
+  } finally { view.unmount(); headerSlot.remove() }
+})
+
 it('requires explicit demo opt-in and hides for AGENT, unknown roles and logout', () => {
   vi.stubEnv('VITE_ASSISTANT_DEMO', '')
   const view = render(<AssistantDemoMount user={user} />)

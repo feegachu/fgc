@@ -1,3 +1,4 @@
+import { useWorkflowGuide } from '../workflow-state'
 import { useState } from 'react'
 import { useUnsavedWork, useUnsavedWorkStore } from '../../../stores/unsavedWork'
 import { act, render, screen, waitFor } from '@testing-library/react'
@@ -119,6 +120,17 @@ function mount(role = 'SETTLEMENT') {
   return { router, actor: userEvent.setup() }
 }
 describe('FUN-088 shell guide', () => {
+  it('pauses and folds for chat without discarding the selected flow', async () => {
+    const { actor } = mount()
+    await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+    await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    await screen.findByLabelText('계약 입력')
+    act(() => useWorkflowGuide.getState().requestChat())
+    expect(await screen.findByRole('button', { name: '펼치기' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeVisible()
+    expect(apiClient.request).not.toHaveBeenCalled()
+  })
+
   it('opens a registered contract form without writing, preserves input on exit and restores focus', async () => {
     const { actor } = mount()
     const launch = screen.getByRole('button', { name: '전체 업무 가이드' })
