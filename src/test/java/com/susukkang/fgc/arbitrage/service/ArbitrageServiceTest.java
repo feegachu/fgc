@@ -6,7 +6,6 @@ import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSearchCondition;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSummary;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
-import com.susukkang.fgc.arbitrage.dto.ConfirmedCommissionSummary;
 import com.susukkang.fgc.arbitrage.dto.PlannedCommissionSummary;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
@@ -466,11 +465,5 @@ class ArbitrageServiceTest {
         return row;
     }
 
-    private ConfirmedCommissionSummary confirmed(String payment, String deduction) {
-        ConfirmedCommissionSummary summary = new ConfirmedCommissionSummary();
-        summary.setConfirmedPaymentAmount(new BigDecimal(payment));
-        summary.setConfirmedDeductionAmount(new BigDecimal(deduction));
-        summary.setPaidCommissionAmount(new BigDecimal(payment).subtract(new BigDecimal(deduction)));
-        return summary;
-    }
+
 }
