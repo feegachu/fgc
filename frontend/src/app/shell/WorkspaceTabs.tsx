@@ -30,7 +30,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
             className={`workspace-tab ${tab.id === activeId ? 'is-active' : ''} ${tab.modified ? 'is-modified' : ''}`}
             key={tab.id}
           >
-            <Link className="workspace-tab-link" to={tab.href} aria-current={tab.id === activeId ? 'page' : undefined}>
+            <Link data-guide-feature="app.shell.workspace-tabs.link" className="workspace-tab-link" to={tab.href} aria-current={tab.id === activeId ? 'page' : undefined}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 {tab.icon}
               </span>
@@ -38,7 +38,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
             </Link>
             {tab.modified && <span className="workspace-tab-modified" role="img" aria-label="수정됨" />}
             {index !== 0 && (
-              <button
+              <button data-guide-feature="app.shell.workspace-tabs.button"
                 className="workspace-tab-close"
                 type="button"
                 aria-label={`${tab.title} 탭 닫기`}
@@ -55,7 +55,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
           </div>
         ))}
       </div>
-      <button
+      <button data-guide-feature="app.shell.workspace-tabs.button-2"
         type="button"
         className="workspace-tab-overflow"
         aria-label="열린 화면 더 보기"

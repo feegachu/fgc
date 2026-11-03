@@ -181,6 +181,11 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await expect(page.getByPlaceholder('계약번호 입력')).toHaveValue('CONT-UI-EDIT')
   await expect(save).toBeDisabled()
   await page.getByRole('link', { name: '취소', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '저장하지 않은 입력이 있어요' })).toBeVisible()
+  await page.getByRole('button', { name: '현재 입력 유지 · 돌아가기' }).click()
+  await expect(page.getByPlaceholder('계약번호 입력')).toHaveValue('CONT-UI-EDIT')
+  await page.getByRole('link', { name: '취소', exact: true }).click()
+  await page.getByRole('button', { name: '입력을 버리고 이동' }).click()
   await expect(page.getByRole('heading', { name: '보험계약 목록' })).toBeVisible()
 })
 

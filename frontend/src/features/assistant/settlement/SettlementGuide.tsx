@@ -1,3 +1,4 @@
+import { useUnsavedWorkStore } from '../../../stores/unsavedWork'
 import { useSpotlight } from '../guide/useSpotlight'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -43,9 +44,8 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   const runtime = useRef<GuideRuntime<Evidence> | null>(null)
   const request = useRef<AbortController | null>(null)
   const epoch = useRef(0)
-  const dirtyForm = useRef<Element | null>(null)
   const acknowledged = useRef('')
-  const current = useRef({ location, user, selection, dirty: false })
+  const current = useRef({ location, user, selection })
   useLayoutEffect(() => {
     current.current = { ...current.current, location, user, selection }
   })
@@ -62,8 +62,6 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         request.current?.abort()
         setBusy(false)
         setCollapsed(true)
-        current.current.dirty = true
-        dirtyForm.current = (event.target as HTMLElement).closest('form, [data-transaction-form]')
         runtime.current?.pause('INPUT_CHANGED')
       }
     }
@@ -82,7 +80,6 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     }
   }, []) // Shell-owned lifetime, no persisted progress.
   useEffect(() => {
-    current.current.dirty = false
     runtime.current?.contextChanged()
   }, [location.pathname, location.search, user.roleCode])
   useEffect(() => {
@@ -170,7 +167,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       const routes = destinations(next)
       const destination = routes[result.step]
       const paymentContext = getPaymentGuideObserver()?.readContext()
-      const dirty = paymentContext?.dirty ?? (current.current.dirty && !!dirtyForm.current?.isConnected)
+      const dirty = Boolean(paymentContext?.dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
       const pathNow = current.current.location.pathname
       if (pathNow !== destination.path.split('?')[0] && dirty) {
         throw new Error(
@@ -309,7 +306,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   }
   function revisit(path: string) {
     const dirty =
-      getPaymentGuideObserver()?.readContext().dirty ?? (current.current.dirty && !!dirtyForm.current?.isConnected)
+      Boolean(getPaymentGuideObserver()?.readContext().dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
     if (dirty) {
       setError('미저장 입력이 있어 이동을 취소했습니다. 먼저 현재 화면에서 저장하세요.')
       return
@@ -321,13 +318,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   return (
     <aside
       ref={card}
-      style={{
-        left: 'auto',
-        right: 'auto',
-        top: 'auto',
-        bottom: 'auto',
-        ...(collapsed ? { top: 80, right: 16 } : position.card),
-      }}
+      style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
       className="settlement-guide"
       aria-label="전체 업무 가이드"
       aria-busy={busy}

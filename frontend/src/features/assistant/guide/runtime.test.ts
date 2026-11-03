@@ -320,7 +320,7 @@ describe('FUN-087 execution boundary', () => {
     const targets = new GuideTargets()
     const conditions: GuideEnvironment<State>['conditions'] = Object.fromEntries(
       PAYMENT_GUIDES.flatMap((g) =>
-        g.steps.flatMap((s) => [s.entryConditionId, s.completionConditionId, 'ALWAYS']),
+        g.steps.flatMap((s) => [s.entryConditionId, s.completionConditionId, ...s.next.map((edge) => edge.conditionId)]),
       ).map((id) => [id, () => 'SATISFIED']),
     )
     const registered = new Set<string>()
@@ -475,4 +475,17 @@ describe('screen lifecycle binding', () => {
     expect(s.runtime.getSnapshot().status).toBe('IDLE')
     cleanup()
   })
+})
+
+it('highlights a known location while entry waits but never bypasses entry on next', async () => {
+  const s = setup()
+  s.updateState({ saved: true })
+  await s.runtime.start({ ...s.request(), stepId: 'save' })
+  expect(s.runtime.getSnapshot()).toMatchObject({ status: 'WAITING_INPUT', target: s.save, reasonCode: 'ENTRY_NOT_READY' })
+  await s.runtime.next()
+  expect(s.runtime.getSnapshot().status).toBe('WAITING_INPUT')
+  expect(s.click).not.toHaveBeenCalled()
+  s.updateState({ valid: true, saved: true })
+  await s.runtime.next()
+  expect(s.runtime.getSnapshot().status).toBe('COMPLETED')
 })

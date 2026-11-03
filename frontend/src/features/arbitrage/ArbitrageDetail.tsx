@@ -37,7 +37,7 @@ export function ArbitrageDetail({ row }: { row: ArbitrageRow }) {
         </div>
       </dl>
       <ArbitrageAmountSummary row={row} />
-      <section className="arb-timeline-panel" aria-label="기준일별 초과액 추이">
+      <section data-guide-feature="features.arbitrage.arbitrage-detail.section" className="arb-timeline-panel" aria-label="기준일별 초과액 추이">
         {timeline.isLoading || timeline.error ? (
           <div className="empty-state arb-timeline-state">
             <QueryState loading={timeline.isLoading} error={timeline.error} />
