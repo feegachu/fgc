@@ -49,6 +49,7 @@ public class AgentHomeController {
     @PreAuthorize(Roles.IS_AGENT)
     public ApiResponse<ContractCheckResponse> record(
             @Valid @RequestBody ContractCheckRequest request,
+            @Parameter(description = "멱등키(1~160자). 없으면 서비스가 400 으로 거절한다", required = true)
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
         return ApiResponse.success(service.recordCheck(request, idempotencyKey));
     }
