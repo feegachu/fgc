@@ -5,17 +5,19 @@ final class ArbitragePlannedCommissionSql {
     private ArbitragePlannedCommissionSql() { }
 
     static final String SUMMARY = """
-            WITH eligible_lines AS (
-                SELECT sl.schedule_line_id, sl.commission_item_id, sl.beneficiary_agent_id,
-                       sl.installment_no, sl.due_month, ROUND(sl.expected_amount, 0) AS expected_amount
+            WITH operational_lines AS (
+                SELECT sh.contract_id, sl.schedule_line_id, sl.commission_item_id, sl.beneficiary_agent_id,
+                       sl.installment_no, sl.due_date, sl.due_month, sl.line_status,
+                       ROUND(sl.expected_amount, 0) AS expected_amount
                   FROM fgc.schedule_header sh
                   JOIN fgc.schedule_line sl ON sl.schedule_header_id = sh.schedule_header_id
                  WHERE sh.contract_id = :contractId AND sh.payment_stage = :paymentStage
                    AND sh.active_yn AND sh.schedule_purpose = 'OPERATIONAL'
-                   AND sl.line_status IN ('PLANNED', 'HOLD')
+            ), eligible_lines AS (
+                SELECT sl.* FROM operational_lines sl WHERE sl.line_status IN ('PLANNED', 'HOLD')
                    AND NOT EXISTS (
                        SELECT 1 FROM fgc.contract_status_event e
-                       WHERE e.contract_id = sh.contract_id
+                       WHERE e.contract_id = sl.contract_id
                          AND e.new_status IN ('TERMINATED', 'LAPSED', 'MATURED', 'CANCELLED')
                          AND (e.effective_at AT TIME ZONE 'Asia/Seoul')::date <= :asOfDate
                          AND sl.due_date > (e.effective_at AT TIME ZONE 'Asia/Seoul')::date
@@ -30,16 +32,18 @@ final class ArbitragePlannedCommissionSql {
                          )
                    )
 
-            ), payments AS (
+            ), confirmed AS (
                 SELECT ta.transaction_attribution_id, ta.schedule_line_id, ta.attribution_month,
                        ct.commission_item_id, ct.recipient_agent_id, ct.installment_no,
-                       ROUND(ta.attributed_amount, 0) AS amount
+                       ROUND(ta.attributed_amount, 0) AS amount, ct.cashflow_type
                   FROM fgc.transaction_attribution ta
                   JOIN fgc.commission_transaction ct
                     ON ct.commission_transaction_id = ta.commission_transaction_id
                  WHERE ta.contract_id = :contractId AND ct.payment_stage = :paymentStage
-                   AND ct.status = 'CONFIRMED' AND ct.cashflow_type = 'PAYMENT'
+                   AND ct.status = 'CONFIRMED'
                    AND ta.attribution_date <= :asOfDate
+            ), payments AS (
+                SELECT * FROM confirmed WHERE cashflow_type = 'PAYMENT'
             ), reconciled_pairs AS (
                 SELECT MIN(m.schedule_line_id) AS schedule_line_id,
                        MIN(m.transaction_attribution_id) AS transaction_attribution_id
@@ -56,7 +60,7 @@ final class ArbitragePlannedCommissionSql {
                    AND COUNT(DISTINCT m.transaction_attribution_id) = 1
             ), evidence AS (
                 SELECT p.transaction_attribution_id, sl.schedule_line_id
-                  FROM payments p JOIN eligible_lines sl ON sl.schedule_line_id = p.schedule_line_id
+                  FROM payments p JOIN operational_lines sl ON sl.schedule_line_id = p.schedule_line_id
                  WHERE sl.commission_item_id = p.commission_item_id
                    AND sl.beneficiary_agent_id IS NOT DISTINCT FROM p.recipient_agent_id
                    AND (p.installment_no IS NULL OR sl.installment_no = p.installment_no)
@@ -64,7 +68,7 @@ final class ArbitragePlannedCommissionSql {
                 SELECT p.transaction_attribution_id, sl.schedule_line_id
                   FROM payments p
                   JOIN reconciled_pairs pair ON pair.transaction_attribution_id = p.transaction_attribution_id
-                  JOIN eligible_lines sl ON sl.schedule_line_id = pair.schedule_line_id
+                  JOIN operational_lines sl ON sl.schedule_line_id = pair.schedule_line_id
                  WHERE sl.commission_item_id = p.commission_item_id
                    AND sl.beneficiary_agent_id IS NOT DISTINCT FROM p.recipient_agent_id
                    AND (p.installment_no IS NULL OR sl.installment_no = p.installment_no)
@@ -95,6 +99,8 @@ final class ArbitragePlannedCommissionSql {
             SELECT COALESCE((SELECT SUM(GREATEST(sl.expected_amount - COALESCE(c.amount, 0), 0))
                                FROM eligible_lines sl LEFT JOIN consumed c USING (schedule_line_id)), 0),
                    COALESCE((SELECT string_agg(CAST(transaction_attribution_id AS text), ','
-                                              ORDER BY transaction_attribution_id) FROM unresolved), '')
+                                              ORDER BY transaction_attribution_id) FROM unresolved), ''),
+                   COALESCE((SELECT SUM(amount) FROM confirmed WHERE cashflow_type = 'PAYMENT'), 0),
+                   COALESCE((SELECT SUM(amount) FROM confirmed WHERE cashflow_type = 'DEDUCTION'), 0)
             """;
 }

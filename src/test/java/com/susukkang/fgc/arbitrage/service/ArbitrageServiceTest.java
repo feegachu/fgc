@@ -90,10 +90,10 @@ class ArbitrageServiceTest {
         ArbitrageCalculationSource source = calculationSource(
                 new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
         given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
-        given(arbitrageCheckRepository.plannedCommissionSummary(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(new PlannedCommissionSummary(new BigDecimal("400000"), List.of()));
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal("900000"), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(new BigDecimal("400000"), List.of())));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
         given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -132,10 +132,10 @@ class ArbitrageServiceTest {
         ArbitrageCalculationSource source = calculationSource(
                 new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
         given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
-        given(arbitrageCheckRepository.plannedCommissionSummary(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(new PlannedCommissionSummary(new BigDecimal("400000"), List.of()));
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal("900000"), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(new BigDecimal("400000"), List.of())));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
         given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -202,10 +202,10 @@ class ArbitrageServiceTest {
         LocalDate asOfDate = LocalDate.of(2026, 7, 31);
         ArbitrageCalculationSource source = calculationSource(null, null, false, null);
         given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("0", "0"));
-        given(arbitrageCheckRepository.plannedCommissionSummary(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(new PlannedCommissionSummary(BigDecimal.ZERO, List.of()));
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal("0"), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(BigDecimal.ZERO, List.of())));
         given(validationRunCreateService.create(any())).willReturn(validationRun(101L));
         given(validationRunRepository.transitionToRunning(101L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(101L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -428,8 +428,9 @@ class ArbitrageServiceTest {
     private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(
             ArbitrageCalculationSource source, String paid, String planned, LocalDate date, List<Long> unresolved) {
         given(arbitrageCheckRepository.selectCalculationSource(10L, date)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(confirmed(paid, "0"));
-        given(arbitrageCheckRepository.plannedCommissionSummary(10L, PaymentStage.GA_TO_FC, date)).willReturn(new PlannedCommissionSummary(new BigDecimal(planned), unresolved));
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(10L, PaymentStage.GA_TO_FC, date)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal(paid), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(new BigDecimal(planned), unresolved)));
         given(arbitrageCheckRepository.insertArbitrageCheck(any())).willAnswer(invocation -> {
             invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0).setArbitrageCheckId(200L);
             return 1;

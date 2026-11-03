@@ -41,6 +41,7 @@ import java.util.Map;
  */
 @RequiredArgsConstructor
 public class ArbitrageBaselineService {
+    private static final String NOT_APPLICABLE_TYPE = "NOT_APPLICABLE";
     private static final PaymentStage REGULATORY_PAYMENT_STAGE = PaymentStage.GA_TO_FC;
 
     // FUN-061 — 수동 재검증은 사용자가 촉발하는 상태 변경이라 같은 트랜잭션에서 감사행을 남긴다.
@@ -223,15 +224,11 @@ public class ArbitrageBaselineService {
             throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", contractId));
 
         // 확정 지급·차감 순액과 활성 스케줄의 남은 지급예정액 조회
-        ConfirmedCommissionSummary confirmedCommission = arbitrageMapper.sumConfirmedCommissionAmount(
-                contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate());
-        BigDecimal confirmedPaymentAmount = confirmedCommission == null
-                ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getConfirmedPaymentAmount());
-        BigDecimal confirmedDeductionAmount = confirmedCommission == null
-                ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getConfirmedDeductionAmount());
-        BigDecimal paidCommissionAmount = confirmedCommission == null
-                ? BigDecimal.ZERO : valueOrZero(confirmedCommission.getPaidCommissionAmount());
-        var planned = arbitrageMapper.plannedCommissionSummary(contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate());
+        var balance = arbitrageMapper.commissionBalanceSnapshot(contractId, REGULATORY_PAYMENT_STAGE, request.getAsOfDate());
+        BigDecimal confirmedPaymentAmount = balance.confirmedPaymentAmount();
+        BigDecimal confirmedDeductionAmount = balance.confirmedDeductionAmount();
+        BigDecimal paidCommissionAmount = balance.paidCommissionAmount();
+        var planned = balance.planned();
         BigDecimal plannedCommissionAmount = planned.remainingAmount();
 
         // 금융자료 및 해약환급금 적용 조건 확인
@@ -313,16 +310,21 @@ public class ArbitrageBaselineService {
     /** 현재 지급분 후보는 유지하되, 미연결 지급이 있는 사전 모니터링 값을 확정값으로 내보내지 않는다. */
     private CalculationDecision withPlannedSourceReview(CalculationDecision decision, PlannedCommissionSummary planned) {
         if (planned.unresolvedAttributionIds().isEmpty()
-                || "NOT_APPLICABLE".equals(decision.candidateType())) return decision;
+                || NOT_APPLICABLE_TYPE.equals(decision.candidateType())) return decision;
         boolean candidate = decision.resultStatus() == ArbitrageCheckStatus.CANDIDATE;
         boolean existingReview = decision.resultStatus() == ArbitrageCheckStatus.REVIEW_REQUIRED;
+        String candidateType = decision.candidateType();
+        String reason = decision.reason();
+        if (!existingReview) {
+            if (!candidate) candidateType = "PLANNED_SOURCE_REVIEW_REQUIRED";
+            String monitoringReason = "지급예정액은 미차감 상한입니다. 잔액과 확정 지급의 연결을 확인할 수 없습니다. 귀속행: "
+                    + planned.unresolvedAttributionIds();
+            reason = candidate ? reason + " " + monitoringReason : monitoringReason;
+        }
         return new CalculationDecision(decision.contractMonthNo(), decision.cumulativePaidPremium(),
                 decision.includedSurrenderValueAmount(), decision.refundAdditionAppliedYn(),
                 decision.surrenderValueSourceType(), decision.refundRateTableId(), decision.currentExcessAmount(), null,
-                candidate ? ArbitrageCheckStatus.CANDIDATE : ArbitrageCheckStatus.REVIEW_REQUIRED,
-                candidate || existingReview ? decision.candidateType() : "PLANNED_SOURCE_REVIEW_REQUIRED",
-                existingReview ? decision.reason() : (candidate ? decision.reason() + " " : "")
-                        + "지급예정 잔액과 확정 지급의 연결을 확인할 수 없습니다. 귀속행: " + planned.unresolvedAttributionIds());
+                candidate ? ArbitrageCheckStatus.CANDIDATE : ArbitrageCheckStatus.REVIEW_REQUIRED, candidateType, reason);
     }
 
     private CalculationDecision calculateDecision(

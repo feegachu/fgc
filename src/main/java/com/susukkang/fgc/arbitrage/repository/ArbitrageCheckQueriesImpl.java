@@ -390,13 +390,19 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
 
     @Override
     public PlannedCommissionSummary plannedCommissionSummary(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
+        return commissionBalanceSnapshot(contractId, paymentStage, asOfDate).planned();
+    }
+
+    @Override
+    public CommissionBalanceSnapshot commissionBalanceSnapshot(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
         Object[] row = (Object[]) entityManager.createNativeQuery(ArbitragePlannedCommissionSql.SUMMARY)
                 .setParameter(CONTRACT_ID, contractId)
                 .setParameter(PAYMENT_STAGE, paymentStage.name())
                 .setParameter(AS_OF_DATE, asOfDate).getSingleResult();
         String ids = (String) row[1];
-        return new PlannedCommissionSummary((BigDecimal) row[0], ids.isEmpty() ? List.of()
+        var planned = new PlannedCommissionSummary((BigDecimal) row[0], ids.isEmpty() ? List.of()
                 : java.util.Arrays.stream(ids.split(",")).map(Long::valueOf).toList());
+        return new CommissionBalanceSnapshot((BigDecimal) row[2], (BigDecimal) row[3], planned);
     }
 
     @Override

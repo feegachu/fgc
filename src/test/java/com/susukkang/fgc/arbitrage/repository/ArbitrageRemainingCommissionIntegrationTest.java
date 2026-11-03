@@ -156,6 +156,19 @@ class ArbitrageRemainingCommissionIntegrationTest {
     }
 
     @Test
+    void knownConfirmedScheduleIsNotMisclassifiedAsUnlinkedToAnotherInstallment() {
+        Long attribution = payment(line, "50000", "DRAFT", true);
+        jdbc.update("UPDATE fgc.commission_transaction SET installment_no=NULL WHERE commission_transaction_id="
+                + "(SELECT commission_transaction_id FROM fgc.transaction_attribution WHERE transaction_attribution_id=?)", attribution);
+        confirm(attribution);
+        jdbc.update("UPDATE fgc.schedule_line SET line_status='CONFIRMED' WHERE schedule_line_id=?", line);
+        line(agent, 2);
+        var summary = repository.plannedCommissionSummary(contract, PaymentStage.GA_TO_FC, AS_OF);
+        assertThat(summary.remainingAmount()).isEqualByComparingTo("100000");
+        assertThat(summary.unresolvedAttributionIds()).isEmpty();
+    }
+
+    @Test
     void completedOneToOneReconciliationResolvesUnlinkedPaymentWithoutMultiplyingIt() {
         Long attribution = payment(line, "50000", "CONFIRMED", false);
         reconciliation(line, attribution, false);

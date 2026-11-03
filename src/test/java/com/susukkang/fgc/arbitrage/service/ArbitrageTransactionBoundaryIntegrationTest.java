@@ -85,7 +85,7 @@ class ArbitrageTransactionBoundaryIntegrationTest {
     }
 
     @Test
-    void correctionCommittedBetweenSourceReadsCannotMixOldPaidWithNewRemaining() throws Exception {
+    void correctionCommittedAfterBalanceReadCannotMixOldPaidWithNewRemaining() throws Exception {
         var columns = jdbc.queryForList("""
                 SELECT column_name FROM information_schema.columns WHERE table_schema='fgc'
                   AND table_name='insurance_contract' AND is_identity='NO' AND is_generated='NEVER'
@@ -130,14 +130,14 @@ class ArbitrageTransactionBoundaryIntegrationTest {
                 .<com.susukkang.fgc.arbitrage.repository.ArbitrageCheckQueriesImpl>getUltimateTargetObject(queries);
         doAnswer(invocation -> {
             Object paid = invocation.callRealMethod();
-            assertThat(jdbc.queryForObject("SHOW transaction_isolation", String.class)).isEqualTo("repeatable read");
-            // A distinct committed transaction cancels the payment after the first read, before the planned read.
+            assertThat(jdbc.queryForObject("SHOW transaction_isolation", String.class)).isEqualTo("read committed");
+            // A distinct transaction commits cancellation after the atomic balance read, before persistence.
             java.util.concurrent.CompletableFuture.runAsync(() ->
                     new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
                             jdbc.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?", payment)))
                     .get(20, java.util.concurrent.TimeUnit.SECONDS);
             return paid;
-        }).when(target).sumConfirmedCommissionAmount(eq(contract), any(), any());
+        }).when(target).commissionBalanceSnapshot(eq(contract), any(), any());
         try {
             var before = itemService.process(run, contract, LocalDate.of(2030, 8, 31));
             assertThat(before.getPaidCommissionAmount()).isEqualByComparingTo("50000");
