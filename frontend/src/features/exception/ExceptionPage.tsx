@@ -26,7 +26,8 @@ import {
 } from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
 import { severityTone, statusOptions, statusTone, typeTone } from './rules'
-import { exceptionSummaryDescription } from './labels'
+import { exceptionSummaryDescription, sourceReference } from './labels'
+import { paymentDeletedReason } from '../audit/labels'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
 const cardTone = (type: string) => {
@@ -194,14 +195,14 @@ export function ExceptionPage() {
       width: '8rem',
       cellClassName: 'tabular-nums exception-disclosure-cell',
       render: (row) => {
-        const reference = `${row.sourceEntityType}:${row.sourceEntityId}`
+        const reference = sourceReference(row.sourceEntityType, row.sourceEntityId, row.contractNo)
         return row.sourceLink ? (
           <Disclosure
             singleLine
             preview={<Link data-guide-feature="features.exception.exception-page.link" to={row.sourceLink}>{reference}</Link>}
             full={
               <Link data-guide-feature="features.exception.exception-page.link-2" className="button button-secondary" to={row.sourceLink}>
-                {reference}
+                {reference} 열기
               </Link>
             }
           />
@@ -363,9 +364,9 @@ function Occurrences({ item }: { item: ExceptionCase }) {
             {(occurrence.validationMonth ?? '').slice(0, 7)}, {occurrence.runNo}회차, {occurrence.detectionLabel}
           </strong>
           <p className="text-secondary exception-occurrence-meta">
-            실행 <span className="tabular-nums">{occurrence.validationRunId}</span>,{' '}
+            검증 실행 <span className="tabular-nums">{occurrence.validationRunId}</span>,{' '}
             <span className="tabular-nums">
-              {occurrence.sourceEntityType}:{occurrence.sourceEntityId}
+              {sourceReference(occurrence.sourceEntityType, occurrence.sourceEntityId, item.contractNo)}
             </span>
           </p>
           {!!occurrence.evidenceItems?.length && (
@@ -406,7 +407,7 @@ function History({ item }: { item: ExceptionCase }) {
             {' '}
             , {action.fromStatusLabel} → {action.toStatusLabel}
           </span>
-          <p className="exception-history-reason">{action.reason}</p>
+          <p className="exception-history-reason">{paymentDeletedReason(action.reason) ?? action.reason}</p>
           {action.evidenceRef && <p className="text-secondary exception-occurrence-meta">증빙: {action.evidenceRef}</p>}
           <small className="text-secondary">
             {action.actionByLoginId}, {dateTime(action.actionAt)}

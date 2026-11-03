@@ -83,6 +83,20 @@ test('서버 오류 문구는 화면에서 정리하고 오류 코드 대신 요
   assert.strictEqual(format.errorText(null, '요청을 처리하지 못했습니다.'), '요청을 처리하지 못했습니다.')
 })
 
+test('연결이 끊긴 요청은 브라우저 영어 문구 대신 다시 시도 안내를 보인다', () => {
+  const offline = '연결이 끊겨 요청을 마치지 못했습니다. 잠시 뒤 다시 시도하세요.'
+  for (const message of ['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed']) {
+    assert.strictEqual(format.errorText(new TypeError(message), '저장하지 못했습니다.'), offline)
+  }
+  assert.strictEqual(format.errorText(new Error('저장 불가')), '저장 불가')
+})
+
+test('연결 문제가 아닌 TypeError는 영어 원문 대신 기본 문구를 보인다', () => {
+  const bug = new TypeError("Cannot read properties of undefined (reading 'amount')")
+  assert.strictEqual(format.errorText(bug, '저장하지 못했습니다.'), '저장하지 못했습니다.')
+  assert.strictEqual(format.errorText(bug), '요청을 처리하지 못했습니다.')
+})
+
 test('본문에 이미 요청 ID 가 있으면 뒤에 다시 붙이지 않는다 (FGC-COMMON-500)', () => {
   const requestId = '20260803-7f3a1c'
   // messages_ko.properties:50 의 {requestId} 가 서버에서 치환되어 내려오는 형태.

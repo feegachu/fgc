@@ -8,6 +8,12 @@ import { date, int, isNegative, rate, won } from '../../lib/format'
 import type { PolicyDetail } from './api'
 import { policyAgentRankLabel, policyCodeLabel } from './labels'
 import { screenMessage } from '../../lib/screenText'
+import { channelLabels } from '../base/columns'
+
+const refundConditions: Record<string, string> = {
+  NONE: '없음',
+  STANDARD_DEDUCTION_80: '표준해약공제액 80% 이상 상품',
+}
 export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['commissionRules']> }) {
   if (!rows.length)
     return (
@@ -71,7 +77,7 @@ export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['comm
           cellClassName: 'policy-disclosure-cell',
           render: (r) => (
             <CategoryBadge value={r.basisCode} optionCount={1}>
-              <ReferenceText value={present(r.basisCode)} limit={20} singleLine />
+              <ReferenceText value={policyCodeLabel(r.basisCode)} limit={20} singleLine />
             </CategoryBadge>
           ),
         },
@@ -125,7 +131,12 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
             key: 'refund',
             label: '환급금 가산 조건',
             cellClassName: 'policy-disclosure-cell',
-            render: (r) => <ReferenceText value={r.refundAdditionCondition} limit={28} />,
+            render: (r) => (
+              <ReferenceText
+                value={refundConditions[r.refundAdditionCondition ?? ''] ?? r.refundAdditionCondition}
+                limit={28}
+              />
+            ),
           },
         ]}
       />
@@ -166,7 +177,7 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
                         : r.inclusionStatus === 'EXCLUDED'
                           ? '제외'
                           : r.inclusionStatus === 'REVIEW_REQUIRED'
-                            ? '검토 필요'
+                            ? '검토필요'
                             : '-'}
                     </StatusBadge>
                   ),
@@ -187,13 +198,13 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
                   cellClassName: 'policy-disclosure-cell',
                   render: (r) => (
                     <CategoryBadge value={r.attributionMethod} optionCount={5}>
-                      <ReferenceText value={r.attributionMethod} limit={24} singleLine />
+                      <ReferenceText value={policyCodeLabel(r.attributionMethod)} limit={24} singleLine />
                     </CategoryBadge>
                   ),
                 },
                 {
                   key: 'reason',
-                  label: '판단 이유 (필수 저장값)',
+                  label: '판단 이유',
                   cellClassName: 'policy-disclosure-cell',
                   render: (r) => <ReferenceText value={screenMessage(r.decisionReason)} limit={36} />,
                 },
@@ -214,7 +225,8 @@ export function RefundTables({ rows }: { rows: NonNullable<PolicyDetail['refundR
   return rows.map((table) => (
     <Fragment key={table.refundRateTableId}>
       <h3 className="policy-detail-title">
-        {table.insurerName}, {table.productName}, 납입 {table.paymentTermMonths}개월, 채널 {table.channelCode}
+        {table.insurerName}, {table.productName}, 납입 {table.paymentTermMonths}개월, 채널{' '}
+        {channelLabels[table.channelCode ?? ''] ?? table.channelCode}
       </h3>
       <dl className="policy-refund-metadata">
         <div>

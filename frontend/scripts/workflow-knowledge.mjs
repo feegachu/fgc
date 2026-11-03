@@ -209,9 +209,9 @@ for (const guide of workflows) {
       if (!roles.length) continue
       const key = `${screen.id}:${targetId}`
       const stepId = 'help.' + createHash('sha256').update(key).digest('hex').slice(0, 32)
-      const kind = ['input', 'textarea', 'select', 'SearchSelect'].includes(tag) ? '입력 항목' : ['button', 'Button', 'a', 'Link', 'ContextLink', 'summary'].includes(tag) ? '버튼·메뉴' : '영역'
-      locations.set(key, { stepId, screenId: screen.id, targetId, title: `${screen.title} · ${label}`,
-        instruction: `${screen.title} 화면의 ‘${label}’ ${kind} 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭·상세·확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장·계산·처리 완료를 뜻하지 않습니다.`,
+      const kind = ['input', 'textarea', 'select', 'SearchSelect'].includes(tag) ? '입력 항목' : ['button', 'Button', 'a', 'Link', 'ContextLink', 'summary'].includes(tag) ? '버튼이나 메뉴' : '영역'
+      locations.set(key, { stepId, screenId: screen.id, targetId, title: `${screen.title}, ${label}`,
+        instruction: `${screen.title} 화면의 ‘${label}’ ${kind} 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.`,
         completionRuleId: 'USER_REVIEWED', roles, next: [] })
     }
     }

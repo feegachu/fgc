@@ -99,14 +99,14 @@ export const newsHeadlinesQuery = () =>
 
 export async function rankCompare(request: { categoryCode: string; filters?: CompareFilters }) {
   const { data } = await apiClient.request<CompareRanking>(`${BASE}/rank`, { method: 'POST', body: request })
-  if (!data) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (!data) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
 
 /** 자연어 질문. 서버가 보관한 순위 결과(rankResultId)와 기본 용어 설명만 근거로 답한다. */
 export async function askCompare(request: { rankResultId: string | null; question: string }) {
   const { data } = await apiClient.request<CompareAsk>(`${BASE}/ask`, { method: 'POST', body: request })
-  if (!data) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (!data) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
 

@@ -29,7 +29,7 @@ export async function readEvidence(selection: Selection, signal: AbortSignal): P
       : schedules.headers?.find(
           (item) => item.activeYn && item.scheduleRegime === 'CURRENT' && item.schedulePurpose === 'OPERATIONAL',
         )
-    if (selection.scheduleId && !header) throw new Error('선택한 스케줄이 계약·지급단계에 속하지 않습니다.')
+    if (selection.scheduleId && !header) throw new Error('선택한 스케줄이 계약과 지급단계에 속하지 않습니다.')
     if (header?.scheduleHeaderId)
       state.schedule = await guideGet<ScheduleDetail>(`/schedules/${header.scheduleHeaderId}`, signal)
   }
@@ -78,7 +78,7 @@ export async function readEvidence(selection: Selection, signal: AbortSignal): P
         break
       }
       if (history.totalPages == null || page >= history.totalPages)
-        throw new Error('선택한 대사 실행을 현재 월·지급단계에서 찾을 수 없습니다.')
+        throw new Error('선택한 대사 실행을 현재 월과 지급단계에서 찾을 수 없습니다.')
     }
     state.results = await guideGet<Results>(
       `/reconciliations/${selection.reconciliationRunId}/results?page=1&size=20`,
