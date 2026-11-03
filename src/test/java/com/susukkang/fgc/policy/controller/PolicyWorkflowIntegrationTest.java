@@ -1402,7 +1402,6 @@ class PolicyWorkflowIntegrationTest {
     @CsvSource({"false, 67", "true, 67", "true, 61"})
     void previewPersistsPolicyInstallmentsAndPreservesVersionsWithIdempotency(boolean seven, int longTermFrom) throws Exception {
         String regime = seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027";
-        int lineCount = seven ? 84 + (85 - longTermFrom) : 96;
         String start = seven ? "2029-01-01" : "2027-01-01";
         String document = "BD-" + UUID.randomUUID();
         long offering = insertOffering(seven, start, document);
@@ -1442,6 +1441,14 @@ class PolicyWorkflowIntegrationTest {
         assertThat(write(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, requestKey, 200)).isEqualTo(generated);
         JsonNode detail = scheduleRead("/api/v1/schedules/" + header);
         assertPreviewPolicyLines(detail, seven, longTermFrom, regime, header, policy);
+        assertPreviewVersionLifecycle(contract, header, operational, payload, requestKey, detail);
+
+    }
+
+    private void assertPreviewVersionLifecycle(long contract, long header, long operational,
+            ObjectNode payload, String requestKey, JsonNode detail) throws Exception {
+        String contractPath = "/api/v1/contracts/" + contract + "/schedules";
+        int lineCount = detail.path("lines").size();
         assertThat(writeError(HttpMethod.POST, "/api/v1/schedules/" + header + "/confirm", mapper.createObjectNode(), writer, key(), 409).path("code").asText())
                 .isEqualTo("FGC-IMPL-SCHEDULE_PREVIEW_ONLY");
         assertThat(writeError(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, key(), 409).path("code").asText())
@@ -1464,7 +1471,6 @@ class PolicyWorkflowIntegrationTest {
                 .isEqualTo("FGC-IMPL-SCHEDULE_SOURCE_CHANGED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION'", Integer.class, contract)).isEqualTo(2);
         assertPreviewRollbackAndConcurrency(contract, current, payload);
-
     }
 
     private void assertPreviewRollbackAndConcurrency(long contract, long current, ObjectNode payload) throws Exception {

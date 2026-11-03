@@ -62,6 +62,7 @@ public class ScheduleService {
     private static final String REASON = "reason";
     private static final String POLICY_MISSING = "POLICY_MISSING";
     private static final String CONTRACT_NOT_FOUND = "존재하지 않는 계약입니다.";
+    private static final String SCHEDULE_NOT_FOUND = "존재하지 않는 스케줄입니다.";
     private static final String CONTRACT_ID = "contractId";
 
     private final CommissionPolicyService commissionPolicyService;
@@ -374,7 +375,7 @@ public class ScheduleService {
 
         ScheduleHeaderInsertDTO current = scheduleQueryRepository.selectScheduleHeaderById(scheduleHeaderId);
         if (current == null) {
-            throw validationException(SCHEDULE_HEADER_ID, "존재하지 않는 스케줄입니다.");
+            throw validationException(SCHEDULE_HEADER_ID, SCHEDULE_NOT_FOUND);
         }
         ScheduleDetailResponse target = scheduleQueryRepository.selectByContractIdAndPaymentStage(
                 current.getContractId(), paymentStage);
@@ -1320,14 +1321,14 @@ public class ScheduleService {
         // 기존 스케줄 헤더 조회 및 존재 여부 검증
         ScheduleHeaderInsertDTO oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (oldHeader == null)
-            throw validationException(SCHEDULE_ID, "존재하지 않는 스케줄입니다.");
+            throw validationException(SCHEDULE_ID, SCHEDULE_NOT_FOUND);
         // 동일 계약의 스케줄 생성 및 재생성을 직렬화
         scheduleWriteRepository.lockContractForScheduleGeneration(oldHeader.getContractId());
 
         // 락 대기 중 변경됐을 가능성이 있으므로 최신 헤더 재조회
         oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (oldHeader == null)
-            throw validationException(SCHEDULE_ID, "존재하지 않는 스케줄입니다.");
+            throw validationException(SCHEDULE_ID, SCHEDULE_NOT_FOUND);
         if (oldHeader.getScheduleRegime() == ScheduleRegime.FOUR_YEAR_2027 || oldHeader.getScheduleRegime() == ScheduleRegime.SEVEN_YEAR_2029)
             throw validationException("regime", "예정 재생성은 체계·정책·원천 버전과 멱등키를 함께 보내야 합니다.");
         if (!Boolean.TRUE.equals(oldHeader.getActiveYn()))
@@ -1439,13 +1440,13 @@ public class ScheduleService {
     public ScheduleDetailResponse confirmSchedule(Long scheduleId) {
         ScheduleHeaderInsertDTO header = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (header == null) {
-            throw validationException(SCHEDULE_ID, "존재하지 않는 스케줄입니다.");
+            throw validationException(SCHEDULE_ID, SCHEDULE_NOT_FOUND);
         }
 
         scheduleWriteRepository.lockContractForScheduleGeneration(header.getContractId());
         header = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (header == null) {
-            throw validationException(SCHEDULE_ID, "존재하지 않는 스케줄입니다.");
+            throw validationException(SCHEDULE_ID, SCHEDULE_NOT_FOUND);
         }
         if (header.getScheduleRegime() == ScheduleRegime.FOUR_YEAR_2027 || header.getScheduleRegime() == ScheduleRegime.SEVEN_YEAR_2029)
             throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_PREVIEW_ONLY);
