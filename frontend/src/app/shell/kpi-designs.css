@@ -150,6 +150,18 @@
     --kpi-columns: 2;
   }
 }
+/* 1280px 미만은 사이드바가 기본으로 접힌다. 사용자가 펼치면 설계사 지표 칸이 너무 좁아져 2열로 둔다. */
+@media (max-width: 79.9375rem) {
+  .app-shell:not(.is-sidebar-collapsed) .page-content .ah-kpis {
+    --kpi-columns: 2;
+  }
+}
+/* 설계사 홈은 프로필 칸과 폭을 나눠 1200~1366px에서 지표 칸이 좁다. 칸 안쪽이 좁을 때만 값을 모바일 크기로 줄여 금액과 단위를 한 줄에 둔다. */
+@container (max-width: 11rem) {
+  .app-shell .page-content .ah-kpis .kpi-value {
+    font-size: 1.375rem;
+  }
+}
 .app-shell[data-kpi-style='summary'] .page-content .kpi-group > :is(.kpi-card, .kpi-card-link, .reco-react-rate) {
   min-width: 0;
   box-shadow:

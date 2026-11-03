@@ -223,7 +223,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
               {ranking ? `자료 기준일 ${ranking.asOf}` : ''}
             </p>
           </div>
-          <button type="button" className="cb-close" aria-label="닫기" onClick={onClose}>
+          <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.close" type="button" className="cb-close" aria-label="닫기" onClick={onClose}>
             ×
           </button>
         </header>
@@ -267,10 +267,10 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                         잠시 뒤 다시 시도해 주세요. 계산은 서버에서 하며 입력하신 내용은 저장되지 않아요.
                       </p>
                       <div className="cb-row">
-                        <button type="button" className="cb-btn primary" onClick={() => pick(category)}>
+                        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.retry-category" type="button" className="cb-btn primary" onClick={() => pick(category)}>
                           다시 시도
                         </button>
-                        <button type="button" className="cb-btn" onClick={restart}>
+                        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.restart" type="button" className="cb-btn" onClick={restart}>
                           처음으로
                         </button>
                       </div>
@@ -357,7 +357,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                   (['why', 'limit'] as const).map((kind) => {
                     const text = followUpQuestion(kind, ranking.items[0])
                     return (
-                      <button
+                      <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.follow-up"
                         key={kind}
                         type="button"
                         className={`cb-suggest-btn${draft?.kind === kind ? ' on' : ''}`}
@@ -372,7 +372,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                       </button>
                     )
                   })}
-                <button
+                <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.suggest-restart"
                   type="button"
                   className={`cb-suggest-btn${draft?.kind === 'restart' ? ' on' : ''}`}
                   aria-pressed={draft?.kind === 'restart'}
@@ -385,7 +385,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                 </button>
               </div>
               <div className="cb-composer">
-                <input
+                <input data-guide-feature="features.agent-home.chatbot.chatbot-modal.question-input"
                   className={`cb-composer-field${input ? ' ready' : ''}`}
                   aria-label="질문 입력"
                   placeholder="궁금한 점을 입력하거나 위 질문을 골라 보세요(고객 개인정보는 입력하지 마세요)"
@@ -402,7 +402,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                     }
                   }}
                 />
-                <button type="button" className={`cb-send${canSend ? ' on' : ''}`} aria-label="보내기" disabled={!canSend} onClick={send}>
+                <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.send" type="button" className={`cb-send${canSend ? ' on' : ''}`} aria-label="보내기" disabled={!canSend} onClick={send}>
                   ➤
                 </button>
               </div>
@@ -462,7 +462,7 @@ function StepOne({
           ) : failed ? (
             <div role="alert">
               <p className="cb-muted">카테고리를 불러오지 못했어요.</p>
-              <button type="button" className="cb-btn" onClick={onRetry}>
+              <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.retry-categories" type="button" className="cb-btn" onClick={onRetry}>
                 다시 시도
               </button>
             </div>
@@ -475,7 +475,7 @@ function StepOne({
             <FilterPanel insurers={insurers} value={filters} onChange={onFilters} />
             <div className="cb-cats" role="group" aria-label="카테고리 선택">
               {(categories ?? []).map((c) => (
-                <button
+                <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.category"
                   key={c.code}
                   type="button"
                   className="cb-cat"
@@ -493,7 +493,7 @@ function StepOne({
       <div className="cb-quick-label">자주 묻는 질문</div>
       <div className="cb-quick" role="group" aria-label="자주 묻는 질문">
         {FAQ.map((f) => (
-          <button
+          <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.faq"
             key={f.key}
             type="button"
             className={`cb-faq${faq === f.key ? ' on' : ''}`}
@@ -529,7 +529,7 @@ function NewsSection() {
   const list = Array.isArray(news.data) ? news.data : []
   return (
     <div className="cb-info">
-      <section className="cb-info-card cb-news" aria-labelledby="cb-news-title">
+      <section data-guide-feature="features.agent-home.chatbot.chatbot-modal.news" className="cb-info-card cb-news" aria-labelledby="cb-news-title">
         <h4 id="cb-news-title">보험 업계 최신 뉴스</h4>
         {news.isLoading ? (
           <p className="cb-muted" aria-busy="true">
@@ -541,7 +541,7 @@ function NewsSection() {
           <ul className="cb-news-list">
             {list.map((n) => (
               <li key={n.link}>
-                <a href={n.link} target="_blank" rel="noopener noreferrer">
+                <a data-guide-feature="features.agent-home.chatbot.chatbot-modal.news-link" href={n.link} target="_blank" rel="noopener noreferrer">
                   {n.title}
                 </a>
                 {n.publishedAt && <time>{n.publishedAt.slice(0, 10)}</time>}
@@ -660,7 +660,7 @@ function Result({
         </div>
       ))}
       <ExcludedList items={ranking.excludedItems} />
-      <section className="cb-hero" aria-label="참고 순위 1위">
+      <section data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-rank" className="cb-hero" aria-label="참고 순위 1위">
         <div className="cb-hero-main">
           <span className="cb-rank-pill">1위</span>
           <div className="cb-muted">{top.insurer}</div>
@@ -674,13 +674,13 @@ function Result({
           <Stat k="한도 영향" v={top.capImpactPct == null ? '자료 없음' : `${rate(top.capImpactPct)}%`} />
           <Stat k="협회 등급" v={gradeLabel(top.associationGrade)} />
         </dl>
-        <button type="button" className="cb-btn primary" onClick={() => onEvidence(top)}>
+        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-evidence" type="button" className="cb-btn primary" onClick={() => onEvidence(top)}>
           근거 보기
         </button>
         {why && <div className="cb-hero-why">{why}</div>}
       </section>
       <div className="cb-table-wrap">
-        <table className="cb-table">
+        <table data-guide-feature="features.agent-home.chatbot.chatbot-modal.compare-table" className="cb-table">
           <caption className="visually-hidden">보험사별 비교 표</caption>
           <thead>
             <tr>
@@ -730,7 +730,7 @@ function Result({
                     </span>
                   </td>
                   <td>
-                    <button
+                    <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.row-evidence"
                       type="button"
                       className="cb-btn small"
                       aria-label={`${item.insurer} ${item.product} 근거 보기`}
@@ -797,7 +797,7 @@ function Drawer({
             {item.rank}위 / {total}개 · 자료 기준 {ranking.asOf}
           </div>
         </div>
-        <button ref={close} type="button" className="cb-close" aria-label="근거 닫기" onClick={onClose}>
+        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.evidence-close" ref={close} type="button" className="cb-close" aria-label="근거 닫기" onClick={onClose}>
           ×
         </button>
       </div>
@@ -836,7 +836,7 @@ function Drawer({
           </div>
         </div>
         {[...groups.entries()].map(([label, lines]) => (
-          <section key={label} className="cb-calc">
+          <section data-guide-feature="features.agent-home.chatbot.chatbot-modal.calc-section" key={label} className="cb-calc">
             <h4>{label}</h4>
             {lines.map((line, index) => (
               <div key={index} className="cb-calc-line">

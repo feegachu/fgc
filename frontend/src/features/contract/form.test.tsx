@@ -9,6 +9,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import type { RequestOptions } from '../../lib/api/client'
 import { useToastStore } from '../../stores/toasts'
 import ContractFormPage from './ContractFormPage'
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 import type { ContractDetail, ContractUpdateRequest } from './api'
 import {
   changesSchedule,
@@ -896,4 +897,16 @@ describe('[FGC-FUN-018·030] 보험료 파생·입력 검증', () => {
     expect(preview.getByText('-')).toBeInTheDocument()
     expect(preview.queryByText('9,007,199,254,740,984')).not.toBeInTheDocument()
   })
+})
+
+
+it('points the edit tutorial at the actual read-only agent and premium card', async () => {
+  renderAt()
+  await ready()
+  const steps = findWorkflowGuide('contract.edit', '1.0')!.steps
+  const agent = document.querySelector(`[data-guide-feature="${steps[3].targetId}"]`)
+  expect(agent).toBe(field('모집 설계사'))
+  expect(agent).toHaveAttribute('readonly')
+  expect(steps[3].completionRuleId).toBe('USER_REVIEWED')
+  expect(document.querySelector(`[data-guide-feature="${steps[4].targetId}"]`)).toContainElement(screen.getByRole('heading', { name: '보험료, 납입 조건' }))
 })
