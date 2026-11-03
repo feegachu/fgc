@@ -15,7 +15,7 @@ async function allPages<T>(path: string, signal?: AbortSignal) {
       `${path}${path.includes('?') ? '&' : '?'}page=${page}&size=${PAGE}`,
       { signal },
     )
-    if (!data || !Array.isArray(data.content)) throw new Error('응답 데이터를 확인할 수 없습니다.')
+    if (!data || !Array.isArray(data.content)) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
     rows.push(...data.content)
     if (page >= (data.totalPages ?? 1)) return rows
   }

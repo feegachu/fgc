@@ -76,7 +76,7 @@
   flex-shrink: 0;
   background: #edf5fa;
   border: 1px solid #e1edf4;
-  border-radius: 12px;
+  border-radius: var(--radius-12);
 }
 .pico-avatar img {
   width: 49px;
@@ -92,14 +92,14 @@
   line-height: 1.5;
 }
 .pico-panel-header h2 span {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 450;
   color: var(--color-text-tertiary);
   letter-spacing: 0;
   margin-left: 5px;
 }
 .pico-panel-header p {
-  font-size: 9px;
+  font-size: 12px;
   color: #7a90a5;
   margin: 2px 0 0;
 }
@@ -110,7 +110,7 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   background: transparent;
   color: #72899d;
   cursor: pointer;
@@ -137,7 +137,7 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   cursor: pointer;
 }
@@ -162,7 +162,7 @@
   margin: -8px 0 6px -12px;
 }
 .pico-welcome h3 {
-  font-size: 25px;
+  font-size: 28px;
   line-height: 1.45;
   font-weight: 700;
   letter-spacing: -1.1px;
@@ -170,7 +170,7 @@
   margin: 8px 0 11px;
 }
 .pico-welcome > p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.85;
   color: #718398;
   margin: 0;
@@ -189,7 +189,7 @@
   text-align: left;
   border: 1px solid var(--color-border-default);
   background: var(--color-bg-surface);
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   cursor: pointer;
 }
 .pico-suggestions button:hover {
@@ -202,7 +202,7 @@
   width: 31px;
   height: 31px;
   flex-shrink: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-8);
   color: var(--color-steel-500);
   background: #f0f6fa;
 }
@@ -210,14 +210,14 @@
   font-size: 18px;
 }
 .pico-suggestions button > span:not(.pico-suggestion-icon):not(.material-symbols-rounded) {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.7;
 }
 .pico-suggestions small {
   display: block;
   color: #7b8da1;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   margin-top: 2px;
 }
@@ -230,7 +230,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 12px;
   color: #7b8da1;
 }
 .pico-welcome-foot .material-symbols-rounded {
@@ -240,7 +240,7 @@
   padding: 11px 13px;
   margin: 20px 0 18px 36px;
   border: 1px solid #dce8f4;
-  border-radius: 11px 11px 3px 11px;
+  border-radius: var(--radius-16) var(--radius-16) 6px var(--radius-16);
   background: #edf4fb;
   color: #23435f;
   font-size: 12px;
@@ -255,7 +255,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-steel-700);
   margin-bottom: 9px;
 }
@@ -266,7 +266,7 @@
   margin: -4px;
 }
 .pico-answer-author span {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   margin-left: 3px;
 }
@@ -284,9 +284,9 @@
   background: #f3f7fa;
   border: 1px solid #e8eff5;
   padding: 7px 8px;
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   color: var(--color-steel-500);
-  font-size: 9px;
+  font-size: 12px;
   margin: 13px 0 12px;
 }
 .pico-source .material-symbols-rounded {
@@ -303,8 +303,8 @@
   border: 1px solid var(--color-action-primary);
   width: 100%;
   height: 36px;
-  border-radius: 6px;
-  font-size: 11px;
+  border-radius: var(--radius-8);
+  font-size: 12px;
   cursor: pointer;
 }
 .pico-primary:disabled {
@@ -319,7 +319,7 @@
 .pico-calculation {
   padding: 12px;
   border: 1px solid #dce8f4;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   background: #f8fbff;
   margin: 12px 0;
 }
@@ -327,7 +327,7 @@
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--color-steel-700);
 }
 .pico-calculation-heading strong {
@@ -342,7 +342,7 @@
   gap: 10px;
   padding: 6px 0;
   border-bottom: 1px solid #e6eef6;
-  font-size: 11px;
+  font-size: 12px;
 }
 .pico-calculation dt {
   color: var(--color-text-tertiary);
@@ -356,7 +356,7 @@
 .pico-calculation p,
 .pico-calculation small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
   color: var(--color-text-tertiary);
   margin: 7px 0;
@@ -366,20 +366,20 @@
   padding: 12px;
   background: #f7faff;
   border: 1px solid #dfe8f2;
-  border-radius: 7px;
-  font-size: 11px;
+  border-radius: var(--radius-8);
+  font-size: 12px;
   line-height: 1.9;
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 .pico-answer > .pico-stale,
 .pico-stale {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-status-warning-text);
   line-height: 1.7;
 }
 .pico-answer > .pico-clarification {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
 }
 .pico-plan > img {
@@ -390,12 +390,12 @@
 }
 .pico-plan h3 {
   margin: 8px 0;
-  font-size: 15px;
+  font-size: 16px;
   color: #274c6b;
   line-height: 1.6;
 }
 .pico-plan > p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   line-height: 1.9;
 }
@@ -409,11 +409,11 @@
   font-size: 12px;
 }
 .pico-plan li b {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .pico-plan li p {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   line-height: 1.8;
   margin: 7px 0 0;
@@ -424,7 +424,7 @@
   border-top: 1px solid var(--color-border-default);
 }
 .pico-demo-picker {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   margin-bottom: 9px;
 }
@@ -442,9 +442,9 @@
   width: 100%;
   height: 32px;
   border: 1px solid var(--color-border-default);
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   background: var(--color-bg-surface);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 5px;
   padding: 0 6px;
 }
@@ -452,15 +452,15 @@
   width: 100%;
   padding: 7px;
   border: 1px solid var(--color-border-default);
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   background: var(--color-bg-surface);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-steel-700);
   cursor: pointer;
 }
 .pico-context {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--color-steel-700);
   overflow-wrap: anywhere;
@@ -475,7 +475,7 @@
   min-height: 0;
   resize: none;
   border: 1px solid #d7e1ed;
-  border-radius: 9px;
+  border-radius: var(--radius-8);
   padding: 12px 43px 10px 12px;
   font: inherit;
   font-size: 12px;
@@ -499,7 +499,7 @@
   height: 27px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-8);
   background: var(--color-steel-500);
   color: white;
   cursor: pointer;
@@ -515,7 +515,7 @@
 .pico-compose-region > small {
   display: block;
   text-align: center;
-  font-size: 8px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   margin-top: 7px;
   line-height: 1.8;
@@ -539,9 +539,6 @@
     height: 100px;
     margin-top: -8px;
     margin-bottom: 4px;
-  }
-  .pico-welcome h3 {
-    font-size: 23px;
   }
   .pico-suggestions {
     margin-top: 18px;

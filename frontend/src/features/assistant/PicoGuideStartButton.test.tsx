@@ -164,7 +164,7 @@ it('uses the real payment help launcher in AI mode and never falls back to the s
   disconnect()
   useWorkflowGuide.setState({ paymentActive: false })
   await userEvent.click(screen.getByRole('button'))
-  expect(await screen.findByRole('status')).toHaveTextContent('시작 허가를 다시 확인')
+  expect(await screen.findByRole('status')).toHaveTextContent('지급 상태와 권한을 다시 확인')
   expect(useGuideRuntime.getState().session).toBeNull()
 })
 it('does not start payment help during the whole settlement guide', () => {

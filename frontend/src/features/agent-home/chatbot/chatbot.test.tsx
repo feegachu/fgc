@@ -23,7 +23,7 @@ const item = (rank: number, patch: Partial<CompareItem> = {}): CompareItem => ({
   capImpactPct: 67.083333,
   associationGrade: null,
   evidence: [
-    { label: '수령 예상액', rule: '현행수수료 1~1회차 · 기준 보험료 × 650%', value: 650_000, source: '수수료 규칙', policyVersion: 'GA-CUR-2026-V1 v1', asOf: '2026-07-31' },
+    { label: '수령 예상액', rule: '현행수수료 1~1회차, 기준 보험료 × 650%', value: 650_000, source: '수수료 규칙', policyVersion: 'GA-CUR-2026-V1 v1', asOf: '2026-07-31' },
     { label: '환수 노출액', rule: '현행수수료 1~1회차 · 한도 반영 지급액 × 환수율 34.8%', value: 226_200, source: '환수 규칙', policyVersion: 'CLAW-GA-VIRTUAL-2026 v1', asOf: '2026-07-31' },
   ],
   ...patch,
@@ -123,13 +123,14 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(screen.getAllByText('자료 없음').length).toBeGreaterThan(0)
   })
 
-  it('결과 화면에 순위 기준이 D-01 가정이고 환수 노출액은 환수 규칙으로 계산했다는 안내를 규칙 버전과 함께 보여 준다', async () => {
+  it('결과 화면에 순위 기준이 회사가 정한 가정이고 환수 노출액은 환수 규칙으로 계산했다는 안내를 개발용 산식 코드 없이 보여 준다', async () => {
     renderModal()
     await pickHealth()
     await result()
     const note = await screen.findByTestId('assumption-note')
-    expect(note).toHaveTextContent('D-01에서 정한 가정(PROJECT_ASSUMPTION, 규칙 TEST-RULE)')
-    expect(note).toHaveTextContent('1,200% 한도 공통 배수 근사')
+    expect(note).toHaveTextContent('이 순위 기준은 회사가 정한 계산 가정이에요.')
+    expect(note).not.toHaveTextContent('PROJECT_ASSUMPTION')
+    expect(note).not.toHaveTextContent('TEST-RULE')
     expect(note).toHaveTextContent('12개월차에 해지된다고 보고 환수 규칙의 환수율로 계산했어요')
     expect(note).not.toHaveTextContent('해약환급률')
   })
@@ -159,14 +160,16 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
       categoryCode: 'HEALTH_PROTECTION',
       filters: { insurerIds: [2], excludeCapOverflow: true },
     })
-    expect(screen.getByRole('note')).toHaveTextContent('보험사 1곳 · 한도 초과 상품 제외')
+    expect(screen.getByRole('note')).toHaveTextContent('보험사 1곳, 한도 초과 상품 제외')
   })
 
   it('조건에 맞는 상품이 없으면 안내한다', async () => {
     onRank = async () => envelope(ranking({ status: 'INSUFFICIENT_DATA', items: [], rankResultId: null, warnings: ['FILTER_NO_MATCH'] }))
     renderModal()
     await pickHealth()
-    expect(await screen.findByText(/선택한 세부 조건에 맞는 상품이 없어요/, undefined, { timeout: 9000 })).toBeInTheDocument()
+    expect(await screen.findByText(/선택한 세부 조건에 맞는 상품이 없어요/, undefined, { timeout: 9000 })).toHaveTextContent(
+      '선택한 세부 조건에 맞는 상품이 없어요. 다른 카테고리를 골라 보세요.',
+    )
   })
 
   it('판매 중인 상품이 없는 카테고리는 선택할 수 없다', async () => {
@@ -180,8 +183,8 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     await result()
     await userEvent.click(screen.getByRole('button', { name: '1번보험 상품1 근거 보기' }))
     const drawer = screen.getByRole('complementary', { name: '산출 근거' })
-    expect(within(drawer).getByText('현행수수료 1~1회차 · 기준 보험료 × 650%')).toBeInTheDocument()
-    expect(within(drawer).getByText(/GA-CUR-2026-V1 v1 · 기준일 2026-07-31/)).toBeInTheDocument()
+    expect(within(drawer).getByText('현행수수료 1~1회차, 기준 보험료 × 650%')).toBeInTheDocument()
+    expect(within(drawer).getByText(/GA-CUR-2026-V1 v1, 기준일 2026-07-31/)).toBeInTheDocument()
     // 보수적 순수령액(650,000원)과 수령 예상 근거 줄(650,000원)에 같은 금액이 함께 나온다
     expect(within(drawer).getAllByText('650,000원')).toHaveLength(2)
   })
@@ -195,7 +198,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     const drawer = screen.getByRole('complementary', { name: '산출 근거' })
     expect(within(drawer).getByText('한도 초과로 이월되는 예정액')).toBeInTheDocument()
     expect(within(drawer).getByText('130,000원')).toBeInTheDocument()
-    expect(within(drawer).getByText('110.8% 초과·이월')).toBeInTheDocument()
+    expect(within(drawer).getByText('110.8% 초과/이월')).toBeInTheDocument()
   })
 
   it('Esc는 서랍을 먼저 닫고 그다음에 모달을 닫는다', async () => {
@@ -287,11 +290,13 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(await screen.findByText('답변을 찾지 못했어요', undefined, { timeout: 9000 })).toBeInTheDocument()
   })
 
-  it('계산 기준이 확정되지 않았으면 순위 대신 안내를 보여 준다', async () => {
+  it('계산 기준이 설정되지 않았으면 관리자에게 알리라고 하고 다른 카테고리는 권하지 않는다', async () => {
     onRank = async () => envelope(ranking({ status: 'RULE_NOT_CONFIGURED', items: [], rankResultId: null, ruleVersion: null, warnings: ['RULE_NOT_CONFIGURED'] }))
     renderModal()
     await pickHealth()
-    expect(await screen.findByText(/계산 기준이 아직 확정되지 않아/, undefined, { timeout: 9000 })).toBeInTheDocument()
+    const notice = await screen.findByText(/순위 계산 기준이 설정되지 않았어요/, undefined, { timeout: 9000 })
+    expect(notice).toHaveTextContent(/^순위 계산 기준이 설정되지 않았어요\. 관리자에게 알려 주세요\.$/)
+    expect(screen.queryByText(/다른 카테고리를 골라 보세요/)).not.toBeInTheDocument()
   })
 
   it('자료가 부족해 제외된 상품이 있으면 개수를 알린다', async () => {
@@ -309,7 +314,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     renderModal()
     await pickHealth()
     await result()
-    expect(screen.getByRole('list', { name: '비교에서 제외된 상품' })).toHaveTextContent('다보험 제외상품 — 환수 규칙 없음, 한도 규칙 없음')
+    expect(screen.getByRole('list', { name: '비교에서 제외된 상품' })).toHaveTextContent('다보험 제외상품 (환수 규칙 없음, 한도 규칙 없음)')
   })
 
   it('모든 상품이 제외돼 순위가 비어도 제외 상품과 사유를 보여 준다', async () => {
@@ -325,7 +330,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
       )
     renderModal()
     await pickHealth()
-    expect(await screen.findByRole('list', { name: '비교에서 제외된 상품' }, { timeout: 9000 })).toHaveTextContent('다보험 제외상품 — 수수료 규칙 없음')
+    expect(await screen.findByRole('list', { name: '비교에서 제외된 상품' }, { timeout: 9000 })).toHaveTextContent('다보험 제외상품 (수수료 규칙 없음)')
   })
 
   it('보험사가 3곳 미만이면 경고를 표시한다', async () => {
@@ -364,7 +369,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
   it('자주 묻는 질문은 고정 문구를 보여 주고 서버를 호출하지 않는다', async () => {
     renderModal()
     await userEvent.click(await screen.findByRole('button', { name: '개인정보 안내' }))
-    expect(screen.getByText(/고객 이름·주민번호·연락처는 입력하지 마세요/)).toBeInTheDocument()
+    expect(screen.getByText(/고객 이름, 주민번호, 연락처는 입력하지 마세요/)).toBeInTheDocument()
     expect(vi.mocked(apiClient.request).mock.calls.some(([path]) => String(path).endsWith('/rank'))).toBe(false)
   })
 })

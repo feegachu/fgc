@@ -46,13 +46,13 @@ it('does not auto-fetch or query an unsaved form and hides candidate action for 
   expect(screen.queryByRole('button', { name: '지급 후보 검토 조회' })).not.toBeInTheDocument()
   expect(request).not.toHaveBeenCalled()
 })
-it('requests only the selected stored payment and displays exact server strings with DRAFT label', async () => {
+it('requests only the selected stored payment and displays exact server strings with the DRAFT status label', async () => {
   const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope(snapshot))
   render(<PaymentCalculationPanel observation={observation} canProcess />)
   await userEvent.click(screen.getByRole('button', { name: '귀속 차액 조회' }))
   expect(await screen.findByText('10,000원')).toBeInTheDocument()
-  expect(screen.getByText(/저장 상태: DRAFT/)).toBeInTheDocument()
-  expect(screen.getByText(/추천값 반영·가이드 통과에 사용할 수 없으며/)).toBeInTheDocument()
+  expect(screen.getByText(/저장 상태: 작성중/)).toBeInTheDocument()
+  expect(screen.getByText(/추천값 반영이나 가이드 통과에 사용할 수 없으며/)).toBeInTheDocument()
   expect(request).toHaveBeenCalledWith(
     '/api/v1/assistant/calculations',
     expect.objectContaining({
@@ -79,7 +79,7 @@ it('lists amounts in a fixed order whatever key order the server JSON has', asyn
   expect(screen.getAllByRole('term').slice(0, 3).map((term) => term.textContent)).toEqual([
     '저장된 지급액',
     '귀속 합계',
-    '지급액 − 귀속 합계',
+    '지급액과 귀속 합계의 차이',
   ])
 })
 it('preserves null amounts and candidate blockers and never treats confirmable as completed precheck', async () => {
@@ -108,7 +108,7 @@ it('preserves null amounts and candidate blockers and never treats confirmable a
   expect(await screen.findByText('근거 확인')).toBeInTheDocument()
   expect(screen.queryByText(/FGC-CAP-002/)).not.toBeInTheDocument()
   expect(screen.getAllByText('확인 전')).toHaveLength(2)
-  expect(screen.getByText(/실제 사전검증 완료 증표가 아닙니다/)).toBeInTheDocument()
+  expect(screen.getByText(/사전검증을 대신하지 않습니다/)).toBeInTheDocument()
 })
 it('rejects other payment/revision/synthetic responses and invalid money instead of showing them', async () => {
   const request = vi
@@ -120,7 +120,7 @@ it('rejects other payment/revision/synthetic responses and invalid money instead
   request.mockResolvedValue(envelope({ ...snapshot, amounts: { amount: 100000 } }))
   await userEvent.click(screen.getByRole('button', { name: '귀속 차액 조회' }))
   expect(await screen.findByRole('alert')).toBeInTheDocument()
-  expect(screen.queryByRole('region', { name: '서버 계산 조회 결과' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: '계산 조회 결과' })).not.toBeInTheDocument()
 })
 it('aborts on form identity/revision remount and discards late results', async () => {
   let resolve!: (value: ReturnType<typeof envelope>) => void
