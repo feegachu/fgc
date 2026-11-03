@@ -105,7 +105,7 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
             return Optional.of(dueBeforeResume ? withDueDateNote(effect, resumedOn) : effect);
         }
         if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
-            holds.releaseOpen(effect.entityId(), event.getContractStatusEventId());
+            holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId());
             return Optional.of(effect);
         }
         return Optional.empty();
