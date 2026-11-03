@@ -470,11 +470,28 @@ it('asks for a policy choice when several policies apply', async () => {
       : fixtures(p),
   )
   expect(await screen.findByText('2개, 아래 환수 계산에서 선택')).toBeInTheDocument()
-  expect(screen.getByText('적용할 정책을 표에서 고르세요.')).toBeInTheDocument()
+  expect(screen.getByText('적용할 정책을 고르세요.')).toBeInTheDocument()
   await user.type(screen.getByLabelText(/계산 사유/), '정책 확인 후 계산')
   expect(screen.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
   await user.click(screen.getByRole('radio', { name: /^CLAW-GA-VIRTUAL-2026 v2\b/ }))
   expect(screen.getByRole('button', { name: '환수액 계산' })).toBeEnabled()
+})
+
+it('names the policy of a calculation whose policy version left the candidates', async () => {
+  // 정책 v1로 계산한 뒤 v2만 후보로 남은 경우. 계산판 응답에는 정책판 번호만 있어 정책 상세에서 코드와 판을 찾는다.
+  mount('/clawbacks', (p) =>
+    p.endsWith('/candidates/42')
+      ? envelope({
+          ...calculable,
+          policyCandidates: [{ ...policy, policyVersionId: 16, versionNo: 2 }],
+          latestCalculation: calculation,
+        })
+      : p.endsWith('/api/v1/policies/15')
+        ? envelope({ header: { policyVersionId: 15, policyCode: 'CLAW-GA-VIRTUAL-2026', versionNo: 1 } })
+        : fixtures(p),
+  )
+  expect(await screen.findByText(/최신 계산판 v1, .*CLAW-GA-VIRTUAL-2026 v1, 경과월 18개월/)).toBeInTheDocument()
+  expect(screen.queryByText(/적용 정책 확인/)).not.toBeInTheDocument()
 })
 
 it('marks a calculation made before the source changed as stale', async () => {

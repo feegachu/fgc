@@ -1,9 +1,8 @@
 import type { StatusTone } from '../../components/StatusBadge'
 import { int } from '../../lib/format'
-import type { CandidateDetail } from './api'
-type Policy = NonNullable<CandidateDetail['policyCandidates']>[number]
-/** 정책 후보를 내부 번호 대신 정책 코드와 판으로 보인다. */
-export const policyLabel = (policy?: Policy) => (policy ? `${policy.policyCode} v${int(policy.versionNo)}` : '선택한 정책')
+/** 정책 후보와 정책 상세 머리 모두 내부 번호 대신 정책 코드와 판으로 보인다. */
+type PolicyName = { policyCode?: string; versionNo?: number }
+export const policyLabel = (policy?: PolicyName) => (policy ? `${policy.policyCode} v${int(policy.versionNo)}` : '선택한 정책')
 export const triggerLabels: Record<string, string> = {
   STATUS_EVENT: '상태 사건',
   ARBITRAGE: '차익거래',

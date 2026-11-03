@@ -12,6 +12,7 @@ import { errorScreenMessage } from '../../lib/screenText'
 import { toast } from '../../stores/toasts'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { present } from '../arbitrage/utils'
+import { usePolicyDetail } from '../policies/api'
 import { usePolicyRequest } from '../policies/usePolicyRequest'
 import { calculateCandidate } from './api'
 import type { Calculation, CandidateDetail } from './api'
@@ -93,7 +94,7 @@ export function ClawbackCalculation({
     : !policies.length
       ? '적용할 환수 정책이 없어 계산할 수 없습니다.'
       : policyId == null
-        ? '적용할 정책을 표에서 고르세요.'
+        ? '적용할 정책을 고르세요.'
         : '선택한 정책과 기지급 내역으로 계산합니다. 금액과 환수율은 직접 입력하지 않습니다.'
   return (
     <section
@@ -184,8 +185,16 @@ function CalculationResult({
   itemName: (commissionItemId?: number) => string
 }) {
   const calc = detail.latestCalculation
+  const candidatePolicy = detail.policyCandidates?.find((p) => p.policyVersionId === calc?.policyVersionId)
+  // 계산판 응답에는 정책판 번호만 있다. 그 정책이 지금 후보에서 빠졌으면(새 판 승인 등) 정책 상세에서 코드와 판을 찾는다.
+  const usedPolicy = usePolicyDetail(calc?.policyVersionId, Boolean(calc) && !candidatePolicy)
   if (!calc) return <p className="claw-evidence-empty">저장된 계산판이 없습니다.</p>
-  const policy = detail.policyCandidates?.find((p) => p.policyVersionId === calc.policyVersionId)
+  const policy = candidatePolicy ?? usedPolicy.data?.header
+  const policyText = policy?.policyCode
+    ? policyLabel(policy)
+    : usedPolicy.isLoading
+      ? '적용 정책 확인 중'
+      : '적용 정책 확인 필요'
   const basis = (calc.basis ?? {}) as Record<string, unknown>
   const excluded = Array.isArray(basis.excluded) ? (basis.excluded as Excluded[]) : []
   const stale = calc.sourceVersion !== detail.candidate?.sourceVersion
@@ -203,7 +212,7 @@ function CalculationResult({
   return (
     <div className="claw-calculation-result">
       <p className="claw-calculation-summary">
-        최신 계산판 v{int(calc.calculationVersion)}, {dateTime(calc.calculatedAt)}, {policyLabel(policy)}
+        최신 계산판 v{int(calc.calculationVersion)}, {dateTime(calc.calculatedAt)}, {policyText}
         {elapsed}
       </p>
       {stale && (
