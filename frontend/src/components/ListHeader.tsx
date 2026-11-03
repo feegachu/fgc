@@ -37,6 +37,7 @@ export function ListHeader({
               <label className="list-header-page-size">
                 화면
                 <select
+                  data-guide-feature="components.list-header.select"
                   className="select-control"
                   aria-label="화면 행 수"
                   value={pageSize}

@@ -1,5 +1,5 @@
 import { SettlementGuide } from '../../features/assistant/settlement/SettlementGuide'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
@@ -12,10 +12,14 @@ import { WorkspaceTabs } from './WorkspaceTabs'
 import { useAuth } from '../../features/auth/useAuth'
 import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
+import { DraftNavigationGuard } from './DraftNavigationGuard'
 import { AgentTopbar } from './AgentTopbar'
 import './kpi-designs.css'
 import './agent-theme.css'
 import './app-theme.css'
+const AssistantDemoMount = lazy(() => import('../../features/assistant/PicoAssistant').then((module) => ({ default: module.AssistantDemoMount })))
+const WorkspaceGuide = lazy(() => import('../../features/assistant/WorkspaceGuide').then((module) => ({ default: module.WorkspaceGuide })))
+
 export interface ShellContext {
   user: ShellUser
   month: string | null
@@ -74,7 +78,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       className={`app-shell app-theme is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
       data-kpi-style="summary"
     >
-      <a className="skip-link" href="#main-content">
+      <a data-guide-feature="app.shell.app-shell.a" className="skip-link" href="#main-content">
         본문으로 건너뛰기
       </a>
       <div className="app-shell-layout">
@@ -99,7 +103,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
                   value={month}
                   openTabCount={tabs.length}
                   onApply={(next) => {
-                    useWorkspaceStore.getState().applyMonth(next)
                     return navigate(withMonth(location.pathname + location.search + location.hash, next))
                   }}
                 />
@@ -107,7 +110,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             </div>
           </div>
         </header>
-        <main id="main-content" className="app-main" tabIndex={-1}>
+        <main id="main-content" data-guide-page={current?.id} data-guide-pathname={location.pathname} className="app-main" tabIndex={-1}>
           <div className="page-content">
             <Outlet context={{ user, month } satisfies ShellContext} />
           </div>
@@ -117,6 +120,13 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
         )}
       </div>
+      {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (
+        <Suspense fallback={null}>
+          <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} />
+          {!loggingOut && import.meta.env.VITE_ASSISTANT_AI === 'true' && <WorkspaceGuide user={user} />}
+        </Suspense>
+      )}
+      <DraftNavigationGuard />
     </div>
   )
 }

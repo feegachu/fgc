@@ -964,6 +964,48 @@
         },
         "type" : "object"
       },
+      "ApiResponsePaymentCalculationSnapshot" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PaymentCalculationSnapshot"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePicoAskResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PicoAskResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePicoGuideResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PicoGuideResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponsePolicyDetailResponse" : {
         "properties" : {
           "data" : {
@@ -1387,6 +1429,46 @@
         },
         "type" : "object"
       },
+      "AssistantAttributionLine" : {
+        "properties" : {
+          "attributionDate" : {
+            "type" : "string"
+          },
+          "attributionSequence" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "originalAmount" : {
+            "type" : "string"
+          },
+          "roundedAmount" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AssistantCalculationSource" : {
+        "properties" : {
+          "entityId" : {
+            "type" : "string"
+          },
+          "sourceId" : {
+            "type" : "string"
+          },
+          "sourceType" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AuditDiffEntry" : {
         "description" : "변경 내용 비교 행 — before/after JSON 의 리프 경로 하나",
         "properties" : {
@@ -1531,6 +1613,41 @@
           "userId" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Basis" : {
+        "properties" : {
+          "asOfDate" : {
+            "type" : "string"
+          },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantAttributionLine"
+            },
+            "type" : "array"
+          },
+          "policyVersionIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "rounding" : {
+            "$ref" : "#/components/schemas/Rounding"
+          },
+          "ruleIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantCalculationSource"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -6229,6 +6346,121 @@
         "required" : [ "key", "value" ],
         "type" : "object"
       },
+      "PaymentCalculationRequest" : {
+        "properties" : {
+          "candidate" : {
+            "$ref" : "#/components/schemas/JsonNode"
+          },
+          "clientRevision" : {
+            "format" : "int64",
+            "maximum" : 9007199254740991,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "contractVersion" : {
+            "minLength" : 1,
+            "pattern" : "assistant\\.v1",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ],
+            "type" : "string"
+          },
+          "mode" : {
+            "enum" : [ "EXISTING", "HYPOTHETICAL" ],
+            "type" : "string"
+          },
+          "scope" : {
+            "$ref" : "#/components/schemas/Scope"
+          }
+        },
+        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ],
+        "type" : "object"
+      },
+      "PaymentCalculationSnapshot" : {
+        "properties" : {
+          "amounts" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "basis" : {
+            "$ref" : "#/components/schemas/Basis"
+          },
+          "blockers" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Reason"
+            },
+            "type" : "array"
+          },
+          "calculatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "calculationId" : {
+            "type" : "string"
+          },
+          "capPreview" : {
+            "items" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "array"
+          },
+          "clientRevision" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "confirmable" : {
+            "type" : "boolean"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "evidenceKind" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "missingInputs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "paymentStatus" : {
+            "type" : "string"
+          },
+          "recommendation" : {
+            "$ref" : "#/components/schemas/Recommendation"
+          },
+          "resolvedScope" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "snapshotOnly" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "synthetic" : {
+            "type" : "boolean"
+          },
+          "validity" : {
+            "description" : "Always null in snapshot-only phase; not a server proof",
+            "type" : [ "object", "null" ]
+          }
+        },
+        "type" : "object"
+      },
       "PaymentEvidence" : {
         "properties" : {
           "attributedAmount" : {
@@ -6267,6 +6499,191 @@
           "transactionAttributionId" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PicoAskRequest" : {
+        "properties" : {
+          "clientContextRevision" : {
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "conversation" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PicoConversationTurn"
+            },
+            "maxItems" : 6,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "entityRefs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PicoEntityRef"
+            },
+            "maxItems" : 6,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "guideVersion" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "question" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "screenId" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "clientContextRevision", "entityRefs", "guideVersion", "question", "screenId" ],
+        "type" : "object"
+      },
+      "PicoAskResponse" : {
+        "properties" : {
+          "contextRevision" : {
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "ANSWER_ONLY", "ASK_CLARIFICATION", "UNSUPPORTED" ],
+            "type" : "string"
+          },
+          "evidenceRefs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PicoEvidenceRef"
+            },
+            "type" : "array"
+          },
+          "fallbackReason" : {
+            "type" : "string"
+          },
+          "guideVersion" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "AI", "FIXED" ],
+            "type" : "string"
+          },
+          "validatedGuide" : {
+            "description" : "Always null for the first read-only guide-answer scope",
+            "type" : [ "object", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "PicoConversationTurn" : {
+        "properties" : {
+          "role" : {
+            "enum" : [ "USER", "ASSISTANT" ],
+            "type" : "string"
+          },
+          "text" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "role", "text" ],
+        "type" : "object"
+      },
+      "PicoEntityRef" : {
+        "properties" : {
+          "id" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "enum" : [ "CONTRACT", "PAYMENT", "SCHEDULE", "VALIDATION_RUN", "RECONCILIATION_RUN", "EXCEPTION" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "type" ],
+        "type" : "object"
+      },
+      "PicoEvidenceRef" : {
+        "properties" : {
+          "chunkId" : {
+            "type" : "string"
+          },
+          "stepId" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "workflowId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PicoGuideRequest" : {
+        "properties" : {
+          "clientContextRevision" : {
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "guideVersion" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "paymentId" : {
+            "minLength" : 1,
+            "pattern" : "[1-9][0-9]{0,18}",
+            "type" : "string"
+          },
+          "prepareToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
+          "workflowId" : {
+            "maxLength" : 60,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "clientContextRevision", "guideVersion", "paymentId", "workflowId" ],
+        "type" : "object"
+      },
+      "PicoGuideResponse" : {
+        "properties" : {
+          "clientContextRevision" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "guideVersion" : {
+            "type" : "string"
+          },
+          "paymentId" : {
+            "type" : "string"
+          },
+          "prepareToken" : {
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "stepId" : {
+            "type" : "string"
+          },
+          "workflowId" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -6934,6 +7351,23 @@
         },
         "type" : "object"
       },
+      "Reason" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "transactionAttributionId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "RecentExceptionResponse" : {
         "properties" : {
           "contractNo" : {
@@ -7018,6 +7452,29 @@
           "validationRunId" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Recommendation" : {
+        "properties" : {
+          "allowed" : {
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "requiredChecks" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "suggestedAmount" : {
+            "type" : "string"
+          },
+          "targetId" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -7601,6 +8058,21 @@
         },
         "type" : "object"
       },
+      "Rounding" : {
+        "properties" : {
+          "aggregation" : {
+            "type" : "string"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "scale" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "Ruleset" : {
         "properties" : {
           "basicDocumentDateFrom" : {
@@ -7976,6 +8448,15 @@
           },
           "status" : {
             "enum" : [ "PLANNED", "CONFIRMED", "MATCHED", "ADJUSTED", "HOLD", "CANCELLED", "RESTARTED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Scope" : {
+        "properties" : {
+          "paymentId" : {
+            "pattern" : "[1-9][0-9]{0,18}",
             "type" : "string"
           }
         },
@@ -8676,6 +9157,112 @@
         "tags" : [ "상품 비교 챗봇" ]
       }
     },
+    "/api/v1/ai/pico/ask" : {
+      "post" : {
+        "description" : "비식별 질문·최근 대화와 역할별 업무 자료로 의미 검색 후 근거를 인용합니다. validatedGuide=null. 금융 계산·업무 쓰기는 기존 프로그램에서 수행합니다.",
+        "operationId" : "picoAsk",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PicoAskRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePicoAskResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "승인된 업무 가이드의 대화형 질문 답변",
+        "tags" : [ "pico-ask-controller" ]
+      }
+    },
+    "/api/v1/ai/pico/guides/prepare" : {
+      "post" : {
+        "description" : "첫 scope 강조 전용. 금융 승인/진도 저장/외부 모델 호출 없음.",
+        "operationId" : "prepare",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Authorization",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PicoGuideRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePicoGuideResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "현재 저장 지급 가이드의 일회성 시작 준비",
+        "tags" : [ "pico-guide-controller" ]
+      }
+    },
+    "/api/v1/ai/pico/guides/start" : {
+      "post" : {
+        "description" : "동일 사용자·Bearer·역할·저장본·카탈로그·revision·5분 만료 및 일회성 검증.",
+        "operationId" : "start",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Authorization",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PicoGuideRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePicoGuideResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "사용자 선택 후 지급 저장본을 재검증해 가이드 시작",
+        "tags" : [ "pico-guide-controller" ]
+      }
+    },
     "/api/v1/arbitrage-checks" : {
       "get" : {
         "operationId" : "getArbitrageChecks_1",
@@ -8718,6 +9305,36 @@
           }
         },
         "tags" : [ "arbitrage-controller" ]
+      }
+    },
+    "/api/v1/assistant/calculations" : {
+      "post" : {
+        "description" : "ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.",
+        "operationId" : "calculate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PaymentCalculationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
+        "tags" : [ "payment-calculation-controller" ]
       }
     },
     "/api/v1/audit-logs" : {

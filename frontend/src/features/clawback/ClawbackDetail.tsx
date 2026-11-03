@@ -9,6 +9,7 @@ import { present } from '../arbitrage/utils'
 import type { CandidateDetail } from './api'
 import { Amount } from './badges'
 import { reasonText, triggerLabels } from './labels'
+import { guideFeatureId } from '../assistant/feature-ids'
 import {
   arbitrageStatusLabels,
   contractStatusLabels,
@@ -20,12 +21,14 @@ import { LINE_STATUS } from '../schedule/labels'
 const sourceStatusLabels: Record<string, string> = { ...contractStatusLabels, ...arbitrageStatusLabels }
 type Detail = Required<CandidateDetail>
 function Evidence<T>({
+  scope,
   title,
   rows,
   columns,
   rowKey,
   empty,
 }: {
+  scope: 'source' | 'payment' | 'schedule' | 'effects'
   title: string
   rows: T[] | undefined
   columns: TableColumn<T>[]
@@ -33,7 +36,7 @@ function Evidence<T>({
   empty: string
 }) {
   return (
-    <section className="claw-evidence" aria-label={title}>
+    <section data-guide-feature={guideFeatureId('clawback.evidence', scope)} className="claw-evidence" aria-label={title}>
       <h3 className="claw-evidence-title">{title}</h3>
       {rows?.length ? (
         <DataTable
@@ -55,11 +58,11 @@ const query = (values: Record<string, string>) => new URLSearchParams(values).to
 function sourceLink(c: Candidate, r: Detail['sourceRefs'][number]) {
   if (r.triggerType === 'ARBITRAGE' && r.asOfDate && c.contractNo)
     return (
-      <ContextLink to={`/arbitrage-checks?${query({ month: r.asOfDate.slice(0, 7), contractNo: c.contractNo })}`}>
+      <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink" to={`/arbitrage-checks?${query({ month: r.asOfDate.slice(0, 7), contractNo: c.contractNo })}`}>
         차익거래 검증
       </ContextLink>
     )
-  if (c.contractId != null) return <ContextLink to={`/contracts/${c.contractId}`}>계약 사건 이력</ContextLink>
+  if (c.contractId != null) return <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-2" to={`/contracts/${c.contractId}`}>계약 사건 이력</ContextLink>
   return '-'
 }
 const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[] => [
@@ -104,7 +107,7 @@ const paymentColumns = (c: Candidate): TableColumn<Detail['paymentAttributions']
     // 지급 목록은 정산월 키가 없으면 기준 정산월로 거르므로(#752) 다른 월 지급도 보이게 전체월(빈 값)로 연다.
     render: (r) =>
       r.commissionTransactionId != null && c.contractNo ? (
-        <ContextLink
+        <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-3"
           to={`/transactions?${query({ contractNo: c.contractNo, settlementMonth: '', selectedId: String(r.commissionTransactionId) })}`}
         >
           {r.commissionTransactionId}
@@ -194,7 +197,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         <Row label="후보 ID, 계약번호">
           {present(c.candidateId)},{' '}
           {c.contractId != null ? (
-            <ContextLink to={`/contracts/${c.contractId}`}>{present(c.contractNo)}</ContextLink>
+            <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-4" to={`/contracts/${c.contractId}`}>{present(c.contractNo)}</ContextLink>
           ) : (
             present(c.contractNo)
           )}
@@ -238,6 +241,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         </Row>
       </dl>
       <Evidence
+        scope="source"
         title="원천 사건, 검증 근거"
         rows={detail.sourceRefs}
         columns={sourceColumns(c)}
@@ -245,6 +249,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         empty="연결된 원천 근거가 없습니다."
       />
       <Evidence
+        scope="payment"
         title="연결 지급, 귀속"
         rows={detail.paymentAttributions}
         columns={paymentColumns(c)}
@@ -252,6 +257,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         empty="연결된 기지급 내역이 없습니다."
       />
       <Evidence
+        scope="schedule"
         title="지급 스케줄"
         rows={detail.scheduleLines}
         columns={scheduleColumns}
@@ -259,13 +265,14 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         empty="연결된 지급 스케줄이 없습니다."
       />
       <Evidence
+        scope="effects"
         title="보류, 후속 처리 근거"
         rows={detail.effects}
         columns={effectColumns}
         rowKey={(r, i) => `${r.processingJob}-${r.validationRunId ?? 'x'}-${i}`}
         empty="기록된 후속 처리가 없습니다."
       />
-      <section className="claw-evidence claw-calculation" aria-label="환수 계산">
+      <section data-guide-feature="features.clawback.clawback-detail.section-2" className="claw-evidence claw-calculation" aria-label="환수 계산">
         <h3 className="claw-evidence-title">
           환수 계산 <span className="claw-policy-badge">회사 정책</span>
         </h3>
@@ -288,7 +295,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         <div className="claw-calculation-actions">
           {/* 계산 API(IF-API-85)는 있지만 정책 선택·사유 입력·결과표 화면은 #629 후속에서 연결한다.
               그 전에는 서버가 CALCULATE를 허용해도 눌러도 아무 일이 없는 버튼을 켜지 않는다. */}
-          <Button disabled>환수액 계산</Button>
+          <Button data-guide-feature="features.clawback.clawback-detail.button" disabled>환수액 계산</Button>
           <p className="field-helper">
             {canCalculate
               ? '계산할 수 있는 후보입니다. 정책 선택·사유 입력 화면은 후속 작업에서 연결합니다.'

@@ -71,7 +71,7 @@ async function fixture(page: Page, canProcess = true, totalPages = 1) {
     if (path.endsWith('/schedules'))
       return route.fulfill({
         json: envelope({
-          headers: [{ scheduleHeaderId: 10, scheduleVersionNo: 1, lineCount: 1, status: 'EXPECTED' }],
+          headers: [{ scheduleHeaderId: 10, scheduleVersionNo: 1, installmentCount: 1, lineCount: 1, status: 'EXPECTED' }],
           lines: [
             {
               lineNo: 1,
@@ -165,7 +165,7 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await expect(page.getByRole('tab', { name: '예상 스케줄' })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('table', { name: '원수사→GA 예상 스케줄' })).toBeVisible()
   await expect(page.getByRole('table', { name: 'GA→설계사 예상 스케줄' })).toBeVisible()
-  await expect(page.getByText('버전 1, 1회차', { exact: true })).toHaveCount(2)
+  await expect(page.getByText('버전 1, 1회차, 1행', { exact: true })).toHaveCount(2)
   await expect(page.getByRole('link', { name: /버전.*상세/ })).toHaveCount(0)
   await expect(page.locator('.contract-detail-schedule-stages header .status-badge')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('contract-schedule-summary.png'), fullPage: true })
@@ -181,6 +181,11 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await expect(page.getByPlaceholder('계약번호 입력')).toHaveValue('CONT-UI-EDIT')
   await expect(save).toBeDisabled()
   await page.getByRole('link', { name: '취소', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '저장하지 않은 입력이 있어요' })).toBeVisible()
+  await page.getByRole('button', { name: '현재 입력 유지 · 돌아가기' }).click()
+  await expect(page.getByPlaceholder('계약번호 입력')).toHaveValue('CONT-UI-EDIT')
+  await page.getByRole('link', { name: '취소', exact: true }).click()
+  await page.getByRole('button', { name: '입력을 버리고 이동' }).click()
   await expect(page.getByRole('heading', { name: '보험계약 목록' })).toBeVisible()
 })
 

@@ -3,3 +3,8 @@
 *.jar binary
 *.sh text eol=lf
 *.ttf binary
+
+# Generated guide catalogs are compared byte-for-byte on Windows and CI.
+/frontend/src/features/assistant/*.json text eol=lf
+
+/frontend/openapi/schema.json text eol=lf

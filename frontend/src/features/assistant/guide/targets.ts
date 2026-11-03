@@ -13,6 +13,7 @@ export interface GuideTargetRegistration {
   screenId: string
   guideVersion: string
   targetId: string
+  attribute?: 'data-guide-target' | 'data-guide-feature'
   root(): HTMLElement | null
   prepare?(signal: AbortSignal): Promise<void>
 }
@@ -45,11 +46,13 @@ export class GuideTargets {
   }
 
   find(screen: string, version: string, target: string): HTMLElement | null {
-    const root = this.registration(screen, version, target).root()
+    const registration = this.registration(screen, version, target)
+    const attribute = registration.attribute ?? 'data-guide-target'
+    const root = registration.root()
     if (!root?.isConnected) return null
     // target passed the ID grammar at registration, and selection is scoped to the active screen root.
-    const nodes = [...root.querySelectorAll<HTMLElement>(`[data-guide-target="${target}"]`)]
-    if (root.dataset.guideTarget === target) nodes.unshift(root)
+    const nodes = [...root.querySelectorAll<HTMLElement>(`[${attribute}="${target}"]`)]
+    if (root.getAttribute(attribute) === target) nodes.unshift(root)
     if (nodes.length > 1) throw new GuideFailure('DUPLICATE_TARGET')
     const node = nodes[0]
     if (!node || node.closest('[hidden], [inert], [aria-hidden="true"]')) return null

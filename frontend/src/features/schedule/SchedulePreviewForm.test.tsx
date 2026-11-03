@@ -1,3 +1,4 @@
+import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Link, MemoryRouter, useLocation } from 'react-router'
@@ -93,4 +94,16 @@ it('read-only roles have no generation controls', () => {
   access.allowed = false; mount()
   expect(screen.queryByLabelText('생성 사유')).not.toBeInTheDocument()
   expect(generatePreview).not.toHaveBeenCalled()
+})
+
+it('keeps unsaved state after failure and clears it only after real server success', async () => {
+  vi.mocked(generatePreview).mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(11)
+  mount(); enterReason()
+  expect(Object.keys(useUnsavedWorkStore.getState().owners)).toHaveLength(1)
+  submit()
+  await screen.findByRole('button', { name: '생성 결과 다시 확인' })
+  expect(Object.keys(useUnsavedWorkStore.getState().owners)).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '생성 결과 다시 확인' }))
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/schedules/11'))
+  expect(Object.keys(useUnsavedWorkStore.getState().owners)).toHaveLength(0)
 })

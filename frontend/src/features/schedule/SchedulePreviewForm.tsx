@@ -1,3 +1,4 @@
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
@@ -27,6 +28,8 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
   const canProcess = usePermission('canProcess')
   const [reason, setReason] = useState('')
   const [uncertain, setUncertain] = useState(false)
+  const [serverSaved, setServerSaved] = useState(false)
+  const clearUnsaved = useUnsavedWork(canProcess && Boolean(reason) && !serverSaved, reason)
   const request = useRef<Attempt | null>(null)
   const submitting = useRef(false)
   const mounted = useRef(true)
@@ -46,6 +49,8 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
     mutationFn: (attempt: Attempt) => generatePreview(contractId, stage, attempt.body, attempt.key, scheduleId),
     meta: { errorToast: false },
     onSuccess: async (id, attempt) => {
+      clearUnsaved()
+      if (mounted.current) setServerSaved(true)
       // Move before refetch deactivates the old header and unmounts this form.
       if (mounted.current && locationKey.current === attempt.locationKey)
         void navigate(returnLink(`/schedules/${id}`, attempt.back, attempt.back.split('?')[0] === '/schedules' ? String(id) : undefined))
@@ -80,25 +85,25 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
   }
 
   return (
-    <section className="surface schedule-detail-card" aria-label={`${stage} 4년 예정 생성`}>
+    <section data-guide-feature="schedule.preview.region" className="surface schedule-detail-card" aria-label={`${stage} 4년 예정 생성`}>
       <h3 className="surface-title">{unresolvedRegime ? '적용 체계·정책 검토 필요' : '4년 예정 스케줄'}</h3>
       <p>정책에 정의된 회차와 금액으로 생성합니다. 지급 확정 대상이 아닙니다.</p>
       {ready ? (
         <p>선택 정책 #{policyId} · v{policy?.versionNo} · 최대 {policy?.selection?.ruleset?.maxInstallments}회차 · 근거 {policy?.sourceRefs?.join(', ')}</p>
       ) : <p role="status">정책 검토 필요: {resolution?.reasonCode ?? '적용 근거 없음'}</p>}
       {canProcess && (
-        <form onSubmit={(event) => { event.preventDefault(); submit() }}>
+        <form data-guide-feature="schedule.preview.form" onSubmit={(event) => { event.preventDefault(); submit() }}>
           <label>
             생성 사유
-            <input className="field-control" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={REASON_MAX} required disabled={mutation.isPending || uncertain} />
+            <input data-guide-feature="schedule.preview.reason" className="field-control" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={REASON_MAX} required disabled={mutation.isPending || uncertain} />
           </label>
-          <Button type="submit" disabled={!uncertain && (!ready || !validReason)} loading={mutation.isPending}>
+          <Button data-guide-feature="schedule.preview.submit" type="submit" disabled={!uncertain && (!ready || !validReason)} loading={mutation.isPending}>
             {uncertain ? '생성 결과 다시 확인' : `4년 예정 ${scheduleId ? '새 버전 만들기' : '생성'}`}
           </Button>
           {mutation.isError && (
             <p role="alert">
               {uncertain ? '생성 여부를 확인하지 못했습니다. 같은 요청으로 결과를 다시 확인하세요. 새 버전은 중복 생성하지 않습니다.' : errorText(mutation.error)}{' '}
-              {!uncertain && <Button type="button" variant="secondary" onClick={() => {
+              {!uncertain && <Button data-guide-feature="schedule.preview.refresh" type="button" variant="secondary" onClick={() => {
                 void client.invalidateQueries({ queryKey: ['contracts'] })
                 void client.invalidateQueries({ queryKey: ['schedules'] })
               }}>최신 입력 다시 조회</Button>}

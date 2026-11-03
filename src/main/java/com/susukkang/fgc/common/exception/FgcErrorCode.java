@@ -247,6 +247,11 @@ public enum FgcErrorCode {
             "error.ai.unavailable"
     ),
 
+    IMPL_GUIDE_STATE_STALE("FGC-IMPL-GUIDE_STATE_STALE", HttpStatus.CONFLICT, "error.ai.guideStateStale"),
+
+    IMPL_GUIDE_VERSION_MISMATCH("FGC-IMPL-GUIDE_VERSION_MISMATCH", HttpStatus.CONFLICT,
+            "error.ai.guideVersionMismatch"),
+
     // IF-API-73 환수 통지서: 계산판(FUN-055)이 없는 case는 통지서를 만들 수 없다.
     CLAW_001("FGC-CLAW-001", HttpStatus.UNPROCESSABLE_ENTITY, "error.clawback.notCalculated"),
     POL_001("FGC-POL-001", HttpStatus.CONFLICT, "error.policy.selfApproval"),
