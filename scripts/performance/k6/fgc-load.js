@@ -7,12 +7,14 @@ import { Rate } from 'k6/metrics';
 const BASE = 'http://fgc-perf-app:8080';
 const SCENARIO = __ENV.SCENARIO;
 const MONTH = __ENV.MONTH;
+const AS_OF = `${MONTH}-28`;
 const SCHEDULE_ROWS = Number(__ENV.SCHEDULE_ROWS);
 const PER_004_ROWS = 100000; // PER-004 원문 "100,000건 기준"
 const P95_PER_004_005 = 3000; // PER-004, PER-005 원문
 const P95_PER_001 = 2000; // PER-001 원문
 
 const kpiConsistent = new Rate('kpi_consistent');
+const agentSearchable = new Rate('agent_searchable');
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
@@ -32,10 +34,19 @@ const INTERNAL_APIS = {
   recon_results: (d) => `/api/v1/reconciliations/${d.reconRunId}/results?page=1&size=20`,
 };
 const AGENT_APIS = {
-  agent_home: () => `/api/v1/agent/me/home?asOf=${MONTH}-28&period=12&insurerType=ALL`,
+  agent_home: () => `/api/v1/agent/me/home?asOf=${AS_OF}&period=12&insurerType=ALL`,
   agent_statements: () => `/api/v1/agent/me/statements?month=${MONTH}&page=1&size=20`,
 };
 const ALL_APIS = [...Object.keys(INTERNAL_APIS), ...Object.keys(AGENT_APIS)];
+// 화면과 같은 조건의 설계사 검색(IF-API-07). 해촉 설계사까지 찾는다.
+const agentSearch = (keyword, size, page = 1) =>
+  `/api/v1/base/agents?asOf=${AS_OF}&keyword=${encodeURIComponent(keyword)}&includeTerminated=true&page=${page}&size=${size}`;
+// FUN-080 관리자 홈(IF-API-68, 69, 07). dashboard 시나리오에서만 부른다. 설계사에게 열려 있지 않아 내부 계정으로 부른다.
+const HOME_APIS = {
+  home_summary: () => `/api/v1/home/summary?asOf=${AS_OF}`,
+  exception_counts: () => '/api/v1/exceptions/counts?status=OPEN',
+  agent_search: (d) => agentSearch(pick(d.agents).agentName, 10),
+};
 const perApi = (names, limits) => Object.fromEntries(names.map((n) => [`http_req_duration{name:${n}}`, limits]));
 
 const SCENARIOS = {
@@ -43,13 +54,14 @@ const SCENARIOS = {
     scenario: { executor: 'per-vu-iterations', vus: 1, iterations: 1, maxDuration: '5m' },
     thresholds: { http_req_failed: ['rate==0'], checks: ['rate==1'], ...perApi(ALL_APIS, ['max>=0']) },
   },
-  // PER-004. 원문에 동시성 기준이 없어 VU 5, 300회로 재고 조건으로 기록한다.
+  // PER-004, FUN-080. 원문에 동시성 기준이 없어 VU 5, 300회로 재고 조건으로 기록한다.
   dashboard: {
     scenario: { executor: 'shared-iterations', vus: 5, iterations: 300, maxDuration: '30m' },
     thresholds: {
       'http_req_failed{scenario:dashboard}': ['rate<0.01'],
       kpi_consistent: ['rate==1'],
-      ...perApi(['dashboard_summary'], [`p(95)<${P95_PER_004_005}`]),
+      agent_searchable: ['rate==1'],
+      ...perApi(['dashboard_summary', ...Object.keys(HOME_APIS)], [`p(95)<${P95_PER_004_005}`]),
     },
   },
   // PER-005 동시 50명 10분, PER-001 API별 p95. 생각 시간 1~3초.
@@ -115,6 +127,32 @@ function checkKpis(token, runId) {
     console.log(`KPI ${key}: 홈 ${kpi[key]}, 상세 ${value}`);
     kpiConsistent.add(kpi[key] === value);
   }
+  // FUN-080 "홈의 예외 건수와 같은 조건의 예외함 건수가 같다"
+  const counts = get('setup', HOME_APIS.exception_counts(), token).json('data.total');
+  console.log(`IF-API-69 합계 ${counts}, 예외함 ${detail.openException}`);
+  kpiConsistent.add(counts === detail.openException);
+}
+
+function listAgents(token) {
+  const agents = [];
+  for (let page = 1; ; page++) {
+    const res = get('setup', agentSearch('D12-A-', 100, page), token);
+    res.json('data.content').forEach((a) => agents.push({ agentCode: a.agentCode, agentName: a.agentName }));
+    if (page >= res.json('data.totalPages')) return agents;
+  }
+}
+
+// FUN-080 "600명 모두 검색으로 찾을 수 있다": 전원을 이름으로 찾아 그 코드가 나오는지 본다.
+function checkAgentSearch(token, agents) {
+  agentSearchable.add(agents.length === 600);
+  let found = 0;
+  for (const a of agents) {
+    const codes = get('setup', agentSearch(a.agentName, 100), token).json('data.content.#.agentCode');
+    const ok = codes.includes(a.agentCode);
+    agentSearchable.add(ok);
+    if (ok) found++;
+  }
+  console.log(`설계사 이름 검색: ${agents.length}명 중 ${found}명을 찾음`);
 }
 
 // 계정당 한 번 로그인하고 VU가 토큰을 나눠 쓴다. access TTL 30분이라 10분 시나리오에는 충분하다.
@@ -133,7 +171,11 @@ export function setup() {
   if (!data.contractIds.length || !data.paymentIds.length || !data.runId || !data.reconRunId) {
     fail(`시나리오에 쓸 데이터가 없다. ${MONTH} 월 통합검증을 먼저 끝낸다.`);
   }
-  if (SCENARIO === 'dashboard') checkKpis(user, data.runId);
+  if (SCENARIO === 'dashboard') {
+    checkKpis(user, data.runId);
+    data.agents = listAgents(user);
+    checkAgentSearch(user, data.agents);
+  }
   return data;
 }
 
@@ -144,6 +186,7 @@ export function smoke(d) {
 
 export function dashboard(d) {
   get('dashboard_summary', INTERNAL_APIS.dashboard_summary(d), d.user);
+  for (const [name, path] of Object.entries(HOME_APIS)) get(name, path(d), d.user);
 }
 
 export function concurrent(d) {
@@ -182,7 +225,9 @@ export function rerun(d) {
 }
 
 function apiTable(metrics) {
-  const rows = ALL_APIS.map((name) => [name, metrics[`http_req_duration{name:${name}}`]]).filter(([, m]) => m);
+  const rows = [...ALL_APIS, ...Object.keys(HOME_APIS)]
+    .map((name) => [name, metrics[`http_req_duration{name:${name}}`]])
+    .filter(([, m]) => m);
   const lines = rows.map(([name, m]) => {
     const v = m.values;
     return `${name.padEnd(20)} ${String(v.count).padStart(7)} ${v.avg.toFixed(0).padStart(7)} ${v['p(95)'].toFixed(0).padStart(7)} ${v.max.toFixed(0).padStart(7)}`;
@@ -191,16 +236,22 @@ function apiTable(metrics) {
 }
 
 function verdicts(metrics) {
-  const p95s = ALL_APIS.map((n) => metrics[`http_req_duration{name:${n}}`]).filter(Boolean).map((m) => m.values['p(95)']);
-  const worst = p95s.length ? Math.max(...p95s) : NaN;
+  const p95 = (name) => metrics[`http_req_duration{name:${name}}`].values['p(95)'];
   const failed = (key) => metrics[key] && metrics[key].values.rate;
   const data = `스케줄 ${SCHEDULE_ROWS}행`;
   if (SCENARIO === 'dashboard') {
-    const ok = worst < P95_PER_004_005 && failed('http_req_failed{scenario:dashboard}') < 0.01 && metrics.kpi_consistent.values.rate === 1;
-    const result = SCHEDULE_ROWS < PER_004_ROWS ? '미검증(10만 건 미만, 외삽하지 않음)' : ok ? '충족' : '미충족';
-    return [`PER-004: ${result}. ${data}, p95 ${worst.toFixed(0)}ms, KPI 일치율 ${metrics.kpi_consistent.values.rate}`];
+    const verdict = (ok) => (SCHEDULE_ROWS < PER_004_ROWS ? '미검증(10만 건 미만, 외삽하지 않음)' : ok ? '충족' : '미충족');
+    const home = Object.keys(HOME_APIS);
+    const kpi = metrics.kpi_consistent.values.rate;
+    const searched = metrics.agent_searchable.values.rate;
+    const errorsOk = failed('http_req_failed{scenario:dashboard}') < 0.01;
+    return [
+      `PER-004: ${verdict(p95('dashboard_summary') < P95_PER_004_005 && errorsOk && kpi === 1)}. ${data}, p95 ${p95('dashboard_summary').toFixed(0)}ms, KPI 일치율 ${kpi}`,
+      `FUN-080: ${verdict(home.every((n) => p95(n) < P95_PER_004_005) && errorsOk && kpi === 1 && searched === 1)}. ${data}, p95 ${home.map((n) => `${n} ${p95(n).toFixed(0)}ms`).join(', ')}, 설계사 검색 일치율 ${searched}`,
+    ];
   }
   if (SCENARIO === 'concurrent') {
+    const worst = Math.max(...ALL_APIS.map(p95));
     const rate = failed('http_req_failed{scenario:concurrent}');
     const ok005 = rate < 0.01 && worst < P95_PER_004_005;
     return [

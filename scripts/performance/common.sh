@@ -15,6 +15,8 @@ JRE_IMAGE=eclipse-temurin:21-jre@sha256:0b99b3376fbb50dbf9c0af8535fdd5b8eb0d3fdf
 K6_IMAGE=grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6
 JAR=build/libs/fgc-0.0.1-SNAPSHOT.jar
 JVM_OPTS="-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=384m" # infra/shinhan/compose.yaml의 api와 같은 값
+# compose db의 shm_size와 맞춘다. Docker 기본 64MB면 1만2천 계약에서 병렬 쿼리가 SQLState 53100으로 실패했다(결과서 4-2).
+DB_SHM=256m
 # PER-007 "지급 건, 정산, 스케줄"의 업무 키 표. 같은 월을 다시 돌려도 늘면 안 된다.
 PER007_KEYED_TABLES="schedule_header schedule_line journal_header journal_line commission_transaction exception_case"
 
@@ -40,7 +42,7 @@ record_conditions() {
     echo "시각: $(date '+%F %T %z')"
     echo "커밋: $(git rev-parse HEAD)$(git diff --quiet HEAD || echo ' (커밋 안 된 수정 있음)')"
     echo "앱: ${API_IMAGE:-$JAR (현재 커밋 bootJar)}"
-    echo "API: $JVM_OPTS, 메모리 2g. DB: $PG_IMAGE, 메모리 1g"
+    echo "API: $JVM_OPTS, 메모리 2g. DB: $PG_IMAGE, 메모리 1g, /dev/shm $(docker exec "$DB" df -h /dev/shm | awk 'END{print $2}')"
     docker info --format 'Docker: CPU {{.NCPU}}개, 메모리 {{.MemTotal}} 바이트, 서버 {{.ServerVersion}}'
     echo "시작 시 호스트 사용 가능 메모리 MB, CPU %: $(host_sample)"
     echo "시작 시 떠 있는 컨테이너:"
@@ -62,7 +64,7 @@ build_app() {
 fresh_db() {
   docker rm -fv "$APP" "$DB" "$K6" >/dev/null 2>&1 || true
   docker network inspect "$NET" >/dev/null 2>&1 || docker network create "$NET" >/dev/null
-  docker run -d --name "$DB" --network "$NET" --memory 1g \
+  docker run -d --name "$DB" --network "$NET" --memory 1g --shm-size "$DB_SHM" \
     -e POSTGRES_DB=fgc -e POSTGRES_USER=fgc -e POSTGRES_HOST_AUTH_METHOD=trust -e TZ=Asia/Seoul \
     "$PG_IMAGE" -c shared_preload_libraries=pg_stat_statements -c track_io_timing=on -c track_wal_io_timing=on >/dev/null
   local _
@@ -155,17 +157,24 @@ collect_app() {
   } | tee "$RUN_DIR/resources.txt"
 }
 
-# per003_verdict <스케줄 행> <처리 계약> <배치 초> <배치 상태>. 부족하면 외삽하지 않고 미검증으로 적는다(PER-003, #673).
+# per003_verdict <스케줄 행> <처리 계약> <배치 초> <배치 상태>. 판정 단위는 스케줄 행이다(결과서 3절).
+# 계약 10만 건은 재지 않았고 외삽하지 않는다. PER003_MAX_ROWS 이상인 단계(DAR-012 1만2천)는 측정값만 남긴다.
+PER003_MIN_ROWS=100000
+PER003_MAX_ROWS=150000
+PER003_SECONDS=600
 per003_verdict() {
   local rows=$1 contracts=$2 seconds=$3 status=$4
+  local measured="스케줄 $rows행, 계약 $contracts건, ${seconds}초"
   if [ "$status" != COMPLETED ]; then
-    echo "PER-003: 실패 (배치 $status, 스케줄 $rows행, 계약 $contracts건, ${seconds}초)"
-  elif [ "$rows" -lt 100000 ] && [ "$contracts" -lt 100000 ]; then
-    echo "PER-003: 미검증 (스케줄 $rows행, 계약 $contracts건으로 10만 건 미만, ${seconds}초. 외삽하지 않음)"
-  elif [ "$seconds" -le 600 ]; then
-    echo "PER-003: 충족 (스케줄 $rows행, 계약 $contracts건, ${seconds}초 <= 600초)"
+    echo "PER-003: 실패 (배치 $status, $measured)"
+  elif [ "$rows" -lt "$PER003_MIN_ROWS" ]; then
+    echo "PER-003: 미검증 ($measured. 스케줄 $PER003_MIN_ROWS행 미만, 외삽하지 않음)"
+  elif [ "$rows" -ge "$PER003_MAX_ROWS" ]; then
+    echo "PER-003: 판정 대상 아님 ($measured. 측정값만 남긴다)"
+  elif [ "$seconds" -le "$PER003_SECONDS" ]; then
+    echo "PER-003: 충족 ($measured <= ${PER003_SECONDS}초)"
   else
-    echo "PER-003: 미충족 (스케줄 $rows행, 계약 $contracts건, ${seconds}초 > 600초)"
+    echo "PER-003: 미충족 ($measured > ${PER003_SECONDS}초)"
   fi
 }
 

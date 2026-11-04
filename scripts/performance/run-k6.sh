@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PER-001, 004, 005, 007 측정. run-batch.sh가 만든 격리 DB에 API를 띄워 k6를 같은 Docker 네트워크에서 돌린다.
+# PER-001, 004, 005, 007, FUN-080 측정. run-batch.sh가 만든 격리 DB에 API를 띄워 k6를 같은 Docker 네트워크에서 돌린다.
 # 터널이나 외부 네트워크를 지나지 않으므로 응답시간은 서버 처리 시간과 컨테이너 사이 통신만 담는다.
 # 사용: run-k6.sh <smoke|dashboard|concurrent|rerun> [검증월 yyyy-MM, 기본 2026-08]. README.md 참고.
 source "$(dirname "$0")/common.sh"

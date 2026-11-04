@@ -15,9 +15,11 @@ expect() { # expect <기대 문자열> <실제>
 # PER-003 경계: 10만 건과 600초
 expect 'PER-003: 미검증' "$(per003_verdict 99999 3000 100 COMPLETED)"
 expect 'PER-003: 충족' "$(per003_verdict 100000 3000 600 COMPLETED)"
-expect 'PER-003: 충족' "$(per003_verdict 90000 100000 600 COMPLETED)"
+expect 'PER-003: 미검증' "$(per003_verdict 90000 100000 600 COMPLETED)"
 expect 'PER-003: 미충족' "$(per003_verdict 100000 3000 601 COMPLETED)"
 expect 'PER-003: 실패' "$(per003_verdict 500000 12000 10 FAILED)"
+expect 'PER-003: 미충족' "$(per003_verdict 149999 5000 601 COMPLETED)"
+expect 'PER-003: 판정 대상 아님' "$(per003_verdict 150000 5000 601 COMPLETED)"
 
 cat >"$tmp/stats.csv" <<'CSV'
 10:00:00,fgc-perf-app,392.96%,1.5GiB / 2GiB

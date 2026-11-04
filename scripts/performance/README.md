@@ -14,7 +14,7 @@ export FGC_PERF_USER=settle01 FGC_PERF_AGENT=agent01
 export FGC_PERF_PASSWORD='<시드 비밀번호>'
 ```
 
-스크립트가 `OPENAI_API_KEY`를 지우고 컨테이너에는 필요한 값만 넘긴다. 필요한 생성기(`dataset` 패키지)는 PR #872, 분개 상한과 채번 인덱스는 `fix/673-journal-monthly-capacity`에 있으므로 **둘이 들어간 커밋에서** 돌린다.
+DB와 API 컨테이너는 `infra/shinhan/compose.yaml`과 같은 힙, 메모리 한도를 쓴다. DB `/dev/shm`은 256MB다(`common.sh`의 `DB_SHM`, 신한 compose는 별도 PR). 스크립트가 `OPENAI_API_KEY`를 지우고 컨테이너에는 필요한 값만 넘긴다. 필요한 생성기(`dataset` 패키지)는 PR #872, 분개 상한과 채번 인덱스는 PR #873, `dashboard` 시나리오의 관리자 홈 API(IF-API-68, 69)는 PR #877에 있으므로 **셋이 들어간 커밋에서** 돌린다.
 
 ## RC 실행 순서 (11/6~11/10)
 
@@ -36,10 +36,12 @@ export FGC_PERF_PASSWORD='<시드 비밀번호>'
    ```bash
    scripts/performance/run-batch.sh 1000            # 데이터 적재 + 월 통합검증. PER-003 판정, PER-007 EXPLAIN
    scripts/performance/run-k6.sh smoke              # 14개 API 한 번씩
-   scripts/performance/run-k6.sh dashboard          # PER-004
+   scripts/performance/run-k6.sh dashboard          # PER-004, FUN-080
    scripts/performance/run-k6.sh concurrent         # PER-005, PER-001. 50명 10분
    scripts/performance/run-k6.sh rerun              # PER-007. 같은 월 재실행. 마지막에 돌린다
    ```
+
+   배치 시간은 사전 측정 기준 1천 3분, 3천 6분, 3,600 6~9분, 1만2천 33분이고 적재와 기동에 1~2분이 더 든다. `concurrent`는 12분이다.
 
    `run-k6.sh`는 재기 전에 smoke로 한 바퀴 예열한다. 시나리오를 돌릴 때마다 API를 새로 띄우고 끝나면 내린다. DB는 남긴다. 임계값을 넘으면 k6가 종료 코드 99로 끝난다. `run-batch.sh`는 PER-003 미충족이면 99, 생성기나 배치가 실패하면 1이다. `rerun`은 업무 키 표가 늘면 1이다.
 
@@ -70,8 +72,9 @@ export FGC_PERF_PASSWORD='<시드 비밀번호>'
 
 | 요구사항 | 기준 | 스크립트가 내는 판정 |
 |---|---|---|
-| PER-003 | 계약 또는 스케줄 10만 건 이상, 10분 이내 | 10만 건 미만이면 "미검증"(외삽하지 않음), 그 이상이면 600초로 판정 |
+| PER-003 | 계약 또는 스케줄 10만 건 이상, 10분 이내 | 판정 단위는 스케줄 행. 10만 행 미만이면 "미검증"(외삽하지 않음), 10만 행 이상 15만 행 미만(3,600계약)은 600초로 판정, 더 큰 단계(1만2천)는 측정값만. 상수는 `common.sh`의 `PER003_*`. 계약 10만 건은 재지 않는다 |
 | PER-004 | 10만 건 기준, 대시보드 p95 3초, 집계값과 상세 합계 일치 | 10만 건 미만이면 "미검증". KPI 6종을 목록 API 건수와 비교 |
+| FUN-080 | DAR-012에서 PER-004 기준(p95 3초)으로 관리자 홈 조회 측정, 홈과 예외함 건수 일치, 600명 모두 검색 | IF-API-68, 69, 07의 p95. 10만 건 미만이면 "미검증". 600명 전원을 이름으로 검색해 코드가 나오는지 확인 |
 | PER-005 | 동시 50명 10분, 오류율 1% 미만, API p95 3초 | 임계값과 판정 줄 |
 | PER-001 | 주요 API p95 2초 | 같은 실행의 API별 p95. 읽기 API만 잰다 |
 | PER-007 | 재실행 신규 생성 0건, 인덱스 사용 | 업무 키 표 증가 건수와 조회별 실행 계획. 성능 저하 "합의 기준"은 원문에 값이 없어 측정값만 남긴다 |
