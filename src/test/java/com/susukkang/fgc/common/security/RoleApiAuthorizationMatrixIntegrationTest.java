@@ -100,6 +100,11 @@ class RoleApiAuthorizationMatrixIntegrationTest {
             {"sourceType":"GA_MANUAL_PAYMENT","sourceBusinessKey":"AUTHZ-MATRIX","commissionItemId":999999999,"amount":1000,
              "settlementMonth":"2026-01-01","cashflowType":"PAYMENT","scheduledPaymentDate":"2026-01-25",
              "paymentStage":"GA_TO_FC","attributions":[]}""";
+    /** 수정은 expectedUpdatedAt이 필수다(#857). 본문 검증이 @PreAuthorize 보다 먼저 돌아 형식이 맞아야 역할 판정까지 닿는다. */
+    private static final String PAYMENT_UPDATE = """
+            {"expectedUpdatedAt":"2026-01-01T00:00:00Z","sourceType":"GA_MANUAL_PAYMENT","sourceBusinessKey":"AUTHZ-MATRIX",
+             "commissionItemId":999999999,"amount":1000,"settlementMonth":"2026-01-01","cashflowType":"PAYMENT",
+             "scheduledPaymentDate":"2026-01-25","paymentStage":"GA_TO_FC","attributions":[]}""";
     private static final String POLICY = """
             {"policyCode":"AUTHZ-MATRIX","policyName":"권한 시험","policyType":"ALLOCATION","sourceClass":"PROJECT_ASSUMPTION",
              "effectiveFrom":"2099-01-01","regulationRefs":[],"sourceRefs":[],"commissionRules":[],"feeRegimeRules":[],
@@ -159,7 +164,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                         "{\"eventType\":\"LAPSED\",\"effectiveAt\":\"2026-01-01T00:00:00+09:00\"}", PROCESS_OR_GA),
                 // 지급 — IF-22·23·23D·24·25
                 row("IF-22", POST, "/api/v1/transactions", PAYMENT, PROCESS),
-                row("IF-23", PUT, "/api/v1/transactions/{}", PAYMENT, PROCESS),
+                row("IF-23", PUT, "/api/v1/transactions/{}", PAYMENT_UPDATE, PROCESS),
                 row("IF-23D", DELETE, "/api/v1/transactions/{}", null, PROCESS),
                 row("IF-24", POST, "/api/v1/transactions/{}/precheck", null, PROCESS),
                 row("IF-25", POST, "/api/v1/transactions/{}/confirm", null, PROCESS),
