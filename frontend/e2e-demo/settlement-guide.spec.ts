@@ -95,6 +95,7 @@ for (const startMode of ['existing', 'new'] as const) {
     const creating = responseFor(page, '/validation-runs')
     await page.getByRole('button', { name: '실행 생성' }).click()
     const run = await successful(creating)
+    await expect(page).toHaveURL(new RegExp(`/validation-runs/${run.validationRunId}\\b`))
     await continueFlow(page)
     await readFlowExplanations(page)
     await expect(guide).toContainText('월 통합검증 계산이 끝나지 않았습니다')

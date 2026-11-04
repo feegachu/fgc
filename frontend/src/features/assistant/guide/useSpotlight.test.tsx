@@ -150,3 +150,51 @@ it('follows viewport events and panel layout without ResizeObserver, then cleans
     expect(cancel).toHaveBeenCalled()
   } finally { target.remove() }
 })
+
+it.each([-300, 900])('keeps guide controls reachable after the user scrolls the target to %ipx', (top) => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(300)
+  const header = document.createElement('header')
+  header.className = 'app-header'
+  const target = document.createElement('button')
+  document.body.append(header, target)
+  vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1280, 64))
+  const rect = vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 100, 40))
+  try {
+    render(<Card target={target} />)
+    act(() => { vi.advanceTimersByTime(80) })
+    vi.mocked(window.scrollBy).mockClear()
+    rect.mockReturnValue(new DOMRect(100, top, 100, 40))
+    fireEvent.scroll(window)
+    act(() => { vi.advanceTimersByTime(80) })
+    const card = screen.getByRole('region', { name: 'Guide card' })
+    expect(Number.parseFloat(card.style.top)).toBeGreaterThanOrEqual(72)
+    expect(Number.parseFloat(card.style.top) + Math.min(300, Number.parseFloat(card.style.maxHeight))).toBeLessThanOrEqual(708)
+    expect(card).toHaveAttribute('data-box', 'null')
+    expect(window.scrollBy).not.toHaveBeenCalled()
+  } finally { header.remove(); target.remove() }
+})
+
+
+it('uses a scrollable bottom card when a full-width target leaves no usable vertical slot', () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(300)
+  const target = document.createElement('div')
+  document.body.append(target)
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1280, 720))
+  try {
+    render(<Card target={target} />)
+    act(() => { vi.advanceTimersByTime(80) })
+    expect(screen.getByRole('region', { name: 'Guide card' })).toHaveStyle({
+      top: '408px', maxHeight: '360px', overflowY: 'auto', bottom: 'auto',
+    })
+  } finally { target.remove() }
+})

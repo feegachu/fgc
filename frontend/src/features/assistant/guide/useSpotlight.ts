@@ -92,6 +92,16 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
             cardTop = above > below ? topBoundary : rect.bottom + 24
           }
         }
+        // A fixed card cannot be scrolled back into view. Keep its controls reachable
+        // even when ordinary user scrolling moves the highlighted target offscreen.
+        const availableHeight = Math.max(0, height - topBoundary - 12)
+        if (maxHeight < Math.min(160, availableHeight)) {
+          // An oversized target leaves no usable slot: use the documented bottom card.
+          maxHeight = Math.min(460, height / 2, availableHeight)
+          cardTop = height - Math.min(cardHeight, maxHeight) - 12
+        }
+        maxHeight = Math.min(maxHeight, availableHeight)
+        cardTop = Math.max(topBoundary, Math.min(cardTop, height - Math.min(cardHeight, maxHeight) - 12))
         const box = rect ? {
           left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
           top: Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING),

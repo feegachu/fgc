@@ -1,5 +1,5 @@
 import { selectEntity } from '../e2e/selectEntity'
-import { test, expect, login, api, responseFor, successful, sql } from './fixtures'
+import { continueFlow, readFlowExplanations, test, expect, login, api, responseFor, successful, sql } from './fixtures'
 
 test.use({ video: 'off' })
 // One guide session passes all nine logical steps on the normal path: reconciliation matches, so step 8 is skipped.
@@ -23,7 +23,6 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   await login(page, 'admin', '/?month=2026-07')
   await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
   const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
-  const next = guide.getByRole('button', { name: '현재 결과로 이어서 안내' })
   await guide.getByRole('button', { name: '안내 시작', exact: true }).click()
   await expect(page).toHaveURL(/\/contracts\/new/)
   await expect(guide).toContainText('1/9')
@@ -63,9 +62,10 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
     UPDATE fgc.schedule_line SET expected_amount=40 WHERE schedule_line_id=${source.schedule_line_id};`)
   const amount = 40
 
-  await next.click()
+  await continueFlow(page)
   await expect(page).toHaveURL(new RegExp(`/schedules/${source.header_id}(?:\\?|$)`))
   await expect(guide).toContainText('2/9')
+  await readFlowExplanations(page)
   await guide.getByRole('button', { name: '스케줄 확인 완료' }).click()
   await expect(page).toHaveURL(/\/transactions\/new/)
   await expect(guide).toContainText('3/9')
@@ -81,12 +81,12 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   const saving = responseFor(page, '/transactions')
   await page.locator('#btn-save').click()
   const pid = (await successful(saving)).commissionTransactionId
-  await next.click()
+  await continueFlow(page)
   await expect(guide).toContainText('4/9')
   const checking = responseFor(page, `/transactions/${pid}/precheck`)
   await page.locator('#btn-precheck').click()
   expect((await successful(checking)).confirmable).toBe(true)
-  await next.click()
+  await continueFlow(page)
   await expect(guide).toContainText('5/9')
   await page.locator('#btn-confirm').click()
   const confirming = responseFor(page, `/transactions/${pid}/confirm`)
@@ -94,19 +94,20 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   expect((await successful(confirming)).status).toBe('CONFIRMED')
   await expect(page).toHaveURL(/\/transactions\?/)
 
-  await next.click()
+  await continueFlow(page)
   await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
   const creating = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성' }).click()
   const rid = Number((await successful(creating)).validationRunId)
-  await next.click()
+  await expect(page).toHaveURL(new RegExp(`/validation-runs/${rid}\\b`))
+  await continueFlow(page)
   await expect(guide).toContainText('6/9')
   await expect(guide).toContainText('월 통합검증 계산이 끝나지 않았습니다')
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await expect
     .poll(() => sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${rid}`), { timeout: 120000 })
     .toBe('COMPLETED')
-  await next.click()
+  await continueFlow(page)
   await expect(page).toHaveURL(/\/reconciliations\?/)
 
   const reconId = Number(
@@ -137,7 +138,7 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
       url.searchParams.get('validationRunId') === String(rid)
     )
   })
-  await next.click()
+  await continueFlow(page)
   const results = (await (await resultsRead).json()).data
   const open = (await (await openRead).json()).data
   expect(results.summary.exceptionCount).toBe(0)
@@ -145,6 +146,7 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   expect(open.totalElements).toBe(0)
   // A matched reconciliation without open exceptions goes from step 7 straight to step 9.
   await expect(guide).toContainText('9/9')
+  await readFlowExplanations(page)
   await expect(guide).toContainText('8개 조건을 통과했습니다')
   await expect(page).toHaveURL(new RegExp(`/validation-runs/${rid}(?:\\?|$)`))
   await expect(guide).not.toContainText('전체 업무 안내 완료')
@@ -154,7 +156,7 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   await page.getByRole('dialog').getByRole('button', { name: '확정', exact: true }).click()
   expect((await successful(finalized)).status).toBe('FINALIZED')
   await page.getByRole('dialog', { name: '확정했습니다' }).getByRole('button', { name: '확인', exact: true }).click()
-  await next.click()
+  await continueFlow(page)
   await expect(guide).toContainText('전체 업무 안내 완료')
   expect(sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${rid}`)).toBe('FINALIZED')
   expect(errors).toEqual([])
