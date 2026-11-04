@@ -799,6 +799,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/status-events/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewContractStatusEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/status-events/{eventId}/effects": {
         parameters: {
             query?: never;
@@ -1922,6 +1938,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseContractStatusPreviewResponse: {
+            data?: components["schemas"]["ContractStatusPreviewResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseContractTransactionTabResponse: {
             data?: components["schemas"]["ContractTransactionTabResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2859,6 +2880,16 @@ export interface components {
             triggerType?: "STATUS_EVENT" | "ARBITRAGE";
             unpaidAmount?: number | null;
         };
+        ClawbackLine: {
+            appliedRatePct?: number;
+            basisAmount?: number;
+            clawbackAmount?: number;
+            commissionItemName?: string;
+            /** Format: int32 */
+            installmentNo?: number | null;
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
         ClawbackNoticeDocumentRequest: {
             /**
              * Format: int32
@@ -2881,6 +2912,20 @@ export interface components {
             sha256?: string;
             /** Format: int32 */
             version?: number;
+        };
+        ClawbackReview: {
+            amount?: number | null;
+            candidate?: boolean;
+            /** Format: int32 */
+            elapsedMonths?: number | null;
+            lines?: components["schemas"]["ClawbackLine"][];
+            policyCode?: string | null;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            /** Format: int32 */
+            policyVersionNo?: number | null;
+            reason?: string;
+            reasonCodes?: string[];
         };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
@@ -3548,6 +3593,33 @@ export interface components {
             sourceEventKey?: string;
             sourceSystem?: string;
         };
+        ContractStatusPreviewRequest: {
+            /** Format: date-time */
+            effectiveAt: string;
+            /** @enum {string} */
+            eventType: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+        };
+        ContractStatusPreviewResponse: {
+            clawbackReview?: components["schemas"]["ClawbackReview"];
+            /** Format: int64 */
+            contractId?: number;
+            /** @enum {string} */
+            currentStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            /** Format: date-time */
+            effectiveAt?: string;
+            /** @enum {string} */
+            eventType?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            excludedLines?: components["schemas"]["PreviewLine"][];
+            heldAmount?: components["schemas"]["HeldAmount"];
+            paidAmount?: components["schemas"]["PaidAmount"][];
+            payments?: components["schemas"]["PreviewPayment"][];
+            /** Format: int64 */
+            pendingFollowUps?: number;
+            resumedLines?: components["schemas"]["PreviewLine"][];
+            /** Format: date-time */
+            snapshotAt?: string;
+            stoppedLines?: components["schemas"]["PreviewLine"][];
+        };
         ContractTransactionAttributionResponse: {
             agentCode?: string;
             /** Format: int64 */
@@ -3915,6 +3987,10 @@ export interface components {
             nextRetryAt?: string | null;
             /** @enum {string} */
             status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
+        };
+        HeldAmount: {
+            after?: number;
+            before?: number;
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -4454,6 +4530,11 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PaidAmount: {
+            amount?: number | null;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+        };
         ParameterDraft: {
             description?: string;
             key: string;
@@ -4827,6 +4908,33 @@ export interface components {
             updatedAt?: string;
             /** Format: int32 */
             versionNo?: number;
+        };
+        PreviewLine: {
+            amount?: number | null;
+            commissionItemName?: string;
+            /** Format: date */
+            dueDate?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            /** Format: date */
+            nextDueDate?: string | null;
+            nextState?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
+            /** Format: int64 */
+            scheduleLineId?: number;
+        };
+        PreviewPayment: {
+            amount?: number | null;
+            /** Format: int64 */
+            commissionTransactionId?: number;
+            nextState?: string;
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
         };
         ProcessingEffect: {
             failureReason?: string | null;
@@ -6867,6 +6975,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListContractStatusEventResponse"];
+                };
+            };
+        };
+    };
+    previewContractStatusEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractStatusPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractStatusPreviewResponse"];
                 };
             };
         };

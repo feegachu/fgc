@@ -682,6 +682,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseContractStatusPreviewResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ContractStatusPreviewResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseContractTransactionTabResponse" : {
         "properties" : {
           "data" : {
@@ -2895,6 +2909,31 @@
         },
         "type" : "object"
       },
+      "ClawbackLine" : {
+        "properties" : {
+          "appliedRatePct" : {
+            "type" : "number"
+          },
+          "basisAmount" : {
+            "type" : "number"
+          },
+          "clawbackAmount" : {
+            "type" : "number"
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "transactionAttributionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ClawbackNoticeDocumentRequest" : {
         "properties" : {
           "calculationVersion" : {
@@ -2940,6 +2979,47 @@
           "version" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ClawbackReview" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "candidate" : {
+            "type" : "boolean"
+          },
+          "elapsedMonths" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ClawbackLine"
+            },
+            "type" : "array"
+          },
+          "policyCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "policyVersionNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -4532,6 +4612,85 @@
         },
         "type" : "object"
       },
+      "ContractStatusPreviewRequest" : {
+        "properties" : {
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "effectiveAt", "eventType" ],
+        "type" : "object"
+      },
+      "ContractStatusPreviewResponse" : {
+        "properties" : {
+          "clawbackReview" : {
+            "$ref" : "#/components/schemas/ClawbackReview"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "currentStatus" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "excludedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
+          },
+          "heldAmount" : {
+            "$ref" : "#/components/schemas/HeldAmount"
+          },
+          "paidAmount" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PaidAmount"
+            },
+            "type" : "array"
+          },
+          "payments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewPayment"
+            },
+            "type" : "array"
+          },
+          "pendingFollowUps" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "resumedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
+          },
+          "snapshotAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "stoppedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
       "ContractTransactionAttributionResponse" : {
         "properties" : {
           "agentCode" : {
@@ -5497,6 +5656,17 @@
           "status" : {
             "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HeldAmount" : {
+        "properties" : {
+          "after" : {
+            "type" : "number"
+          },
+          "before" : {
+            "type" : "number"
           }
         },
         "type" : "object"
@@ -6720,6 +6890,18 @@
         },
         "type" : "object"
       },
+      "PaidAmount" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ParameterDraft" : {
         "properties" : {
           "description" : {
@@ -7592,6 +7774,73 @@
           "versionNo" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PreviewLine" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "dueDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextDueDate" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "previousState" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PreviewPayment" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "commissionTransactionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "previousState" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -11231,6 +11480,43 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseListContractStatusEventResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "계약" ]
+      }
+    },
+    "/api/v1/contracts/{id}/status-events/preview" : {
+      "post" : {
+        "operationId" : "previewContractStatusEvent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ContractStatusPreviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractStatusPreviewResponse"
                 }
               }
             },
