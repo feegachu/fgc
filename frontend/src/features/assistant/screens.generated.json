@@ -114,6 +114,14 @@
     "icon": "fact_check"
   },
   {
+    "id": "ACQC-W01",
+    "path": "/acquisition-cost-checks",
+    "title": "계약체결비용 한도",
+    "menu": "/acquisition-cost-checks",
+    "section": "compliance",
+    "icon": "fact_check"
+  },
+  {
     "id": "LEDG-W01",
     "path": "/journals",
     "title": "검증원장",

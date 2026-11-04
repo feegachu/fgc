@@ -7,6 +7,7 @@ export const contractTabs = [
   ['schedules', '예상 스케줄'],
   ['cap', '1,200%'],
   ['arbitrage', '차익거래'],
+  ['acquisition', '계약체결비용'],
   ['ledger', '원장'],
   ['payment', '지급/대사'],
 ] as const

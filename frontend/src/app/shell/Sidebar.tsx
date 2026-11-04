@@ -22,7 +22,7 @@ const groups = [
     id: 'compliance',
     title: '규제 검증',
     icon: 'fact_check',
-    paths: ['/cap-checks', '/arbitrage-checks', '/validation-runs'],
+    paths: ['/cap-checks', '/arbitrage-checks', '/acquisition-cost-checks', '/validation-runs'],
   },
   { id: 'ledger', title: '원장/대사', icon: 'menu_book', paths: ['/journals', '/reconciliations'] },
   { id: 'admin', title: '관리', icon: 'settings', paths: ['/base', '/policies', '/audit-logs'] },

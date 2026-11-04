@@ -193,7 +193,7 @@ FGC는 다음 제품으로 정의한다.
 | REG | FGC 운영통제 | 주요 저장구조 | 현재 제공수준 |
 |---|---|---|---|
 | REG-01 | 선지급·유지관리 구조를 상품 판매버전별로 판정 | `product_offering`, `policy_version`, `commission_rule` | `미구현/향후` — 2차 Must FUN-014·037·038. 현재 분급 판매버전 계약은 `POLICY_MISSING` 검토로 빠진다(#484) |
-| REG-02 | 선지급 예정총액을 계약체결비용과 비교 | `acquisition_cost_check`, `acquisition_cost_check_detail(UPFRONT_TOTAL)` | `미구현/향후` — 2차 Must FUN-062 |
+| REG-02 | 선지급 예정총액을 계약체결비용과 비교 | `acquisition_cost_check`, `acquisition_cost_check_detail(UPFRONT_TOTAL)` | 요청 검증 구현(#651). 월 검증 Step은 미연결, 계약체결비용 기준 값 시드 없음 |
 | REG-03 | 유지기간·동일 월액·월 0.8%·84개월·총액한도 검증 | `commission_rule`, `maintenance_check`, 계약체결비용 상세검증 | `미구현/향후` — 2차 Must FUN-038·064 |
 | REG-04 | 2027~2028의 1.5%·48개월 특례 (TM·방송 특례기간은 FGC 범위 밖, SRC-036) | `product_offering.fee_regime_code`, 규칙버전 | `미구현/향후` — 2차 Must FUN-037 |
 | REG-05 | 5년 이상 유지 후 월 0.4% 장기유지 검증 | `commission_rule`, `maintenance_check`, 계약체결비용 상세검증 | `미구현/향후` — 2차 Must FUN-038·064 |
@@ -507,7 +507,7 @@ FUN-026(#625) 이전 구현(fe6d0e6c)은 계약을 처음 저장할 때 `NEW_CON
 
 항목명만으로 1,200% 포함·제외를 결정하지 않는다. `cap_rule_item`의 정책버전별 판정결과를 사용한다.
 
-- 2027년 이후 분급의 수수료는 **항목코드 + 수수료 구성(`fee_component_type`)** 으로 구분한다. 선지급수수료 = `BASE_COMMISSION` + `UPFRONT`, 유지관리수수료 = `MAINTENANCE_COMMISSION` + `MAINTENANCE`(`equal_monthly_yn=true`), 장기유지수수료 = `LONG_TERM_MAINTENANCE` + `LONG_TERM_MAINTENANCE`(`equal_monthly_yn=true`). 현행 회사별 지급의 계약관리수수료는 `MAINTENANCE_COMMISSION` + `CURRENT`다. 이 매핑은 **업무 규칙 아님 — 가상 GA 정책으로 정함**(구현 설계 규칙, 팀 확정 필요). 실제 보험사 지급기준이 별도 항목을 요구하면 새 항목코드를 추가한다.
+- 2027년 이후 분급의 수수료는 **항목코드 + 수수료 구성(`fee_component_type`)** 으로 구분한다. 선지급수수료 = `BASE_COMMISSION` + `UPFRONT`, 유지관리수수료 = `MAINTENANCE_COMMISSION` + `MAINTENANCE`(`equal_monthly_yn=true`), 장기유지수수료 = `LONG_TERM_MAINTENANCE` + `LONG_TERM_MAINTENANCE`(`equal_monthly_yn=true`). 현행 회사별 지급의 계약관리수수료는 `MAINTENANCE_COMMISSION` + `CURRENT`다. 이 매핑은 **업무 규칙 아님 — 가상 GA 정책으로 정함**(구현 설계 규칙, 팀 확정 필요). 실제 보험사 지급기준이 별도 항목을 요구하면 새 항목코드를 추가한다. 분급 스케줄의 `COMMON_COST`(항목 또는 수수료 구성)는 간접지원경비로 보아 유지관리 총액에 넣고 따로 표시한다(FUN-062, REG-06B, SRC-001). 이 대응도 가상 GA 정책이며 제3차 FAQ 원문이 공개되면 다시 본다(SRC-061, SRC-078, SRC-079).
 - `ADJUSTMENT`는 시드에서 `PAYMENT` 항목이다(항목당 현금흐름은 하나). 수기 API는 항목의 지급·차감 구분과 요청 `cashflowType`이 다르면 거절하므로, 기존 `PAYMENT` 항목을 그대로 `DEDUCTION`으로 보내지 않는다(`CommissionPaymentServiceImpl.validateCashflowType`, SRC-064). 확정 지급의 금액 정정은 제40조의 지원 조건에 맞는 역분개·재기표 경로를 쓴다. 환수·회수는 해당 차감 항목과 회사 약정으로 별도 처리하며 임의의 원 항목 차감으로 대체하지 않는다(REG-14, SRC-019·020).
 - 대여금·교육비(SRC-029 실질 판단 사례)용 항목코드는 아직 없다. 들어오면 `REVIEW_REQUIRED`로 두고, SRC-029 원천 공문 또는 제3차 FAQ가 확보되면 항목코드 신설을 결정한다(근거 없음 — 확인 필요).
 
@@ -1296,6 +1296,8 @@ LONG_TERM_MONTHLY      (대상월 필수)
 
 각 상세행은 `actual_amount`, `limit_amount`, `usage_pct`, `result_status`, `decision_reason`, `calculation_snapshot`을 보존하며 하나라도 100%를 넘으면 부모를 `VIOLATION`으로 판정한다. 초년도 1,200% 사용률은 이 네 유형에 포함하지 않고 별도 `cap_check`에 저장한다.
 
+FUN-062 구현(#651, 인터페이스정의서 §4-4-12)은 `UPFRONT_TOTAL`과 `MAINTENANCE_TOTAL`만 저장한다. 월액 두 유형은 FUN-064 범위이고 미진행이다(v3.0 FUN-037 규칙, 화면정의서 ACQC-W01 범위 경계). 그래서 `NORMAL`은 두 총액 한도 이내라는 뜻이다. FUN-064를 다시 진행하면 월액 행을 더한다. (`REG-02`, `REG-03`, `REG-05`, `SRC-022`)
+
 ---
 
 ## 제46조 4년 분급 시드정책
@@ -1322,7 +1324,7 @@ LONG_TERM_MONTHLY      (대상월 필수)
 | 지급기간 | 1~48차월 | `PROJECT_ASSUMPTION` — 최대 48개월만 규제상 한도이며 최초 지급회차는 근거 없음 — 확인 필요 (`REG-04`, `SRC-003·022`) |
 | 동일금액 | 매월 동일 | `REGULATORY` 요건을 준수하는 시드 설계 (`REG-03`, `SRC-022`) |
 
-- 저장 위치: 계약체결비용은 분급 정책버전(`FOUR_YEAR_COMMISSION`·`SEVEN_YEAR_COMMISSION`)의 `policy_parameter`에 판매버전별 값으로 둔다 — 키 `ACQUISITION_COST_BASIS`(기준: 월납환산 초회보험료), `ACQUISITION_COST_RATE_PCT`(시드 3000). 현재 스키마에 전용 컬럼이 없어 정한 **구현 규칙(업무 규칙 아님 — 가상 GA 정책으로 정함, 팀 확정 필요)** 이다. 실제 보험사 기초서류 값이 들어오면 `INSURER_RULE` 정책버전으로 대체한다. 판정 결과에는 사용한 값을 `acquisition_cost_check.calculation_snapshot`에 남긴다.
+- 저장 위치: 계약체결비용은 계약과 지급단계로 고른 분급 지급 정책버전(`FOUR_YEAR_COMMISSION`·`SEVEN_YEAR_COMMISSION`)의 `policy_parameter`에 둔다 — 키 `ACQUISITION_COST_BASIS`(기준: 월납환산 초회보험료, `MONTHLY_EQUIVALENT_FIRST_PREMIUM`만 구현), `ACQUISITION_COST_RATE_PCT`(양수, 값의 출처를 `description`에 필수로 적는다). 정책버전 하나에 값 하나이므로 판매버전마다 값이 다르면 판매버전을 지정한 정책으로 나눈다. 현재 스키마에 전용 컬럼이 없어 정한 **구현 규칙(업무 규칙 아님 — 가상 GA 정책으로 정함, 팀 확정 필요)** 이다(#651). 위 표의 3,000%는 검산용 가정이고 **시드에 넣지 않았다**. 값이 없으면 한도 검증은 금액 null과 `REVIEW_REQUIRED`로 남고 예정 스케줄 생성에는 영향이 없다. 실제 보험사 기초서류 값이 들어오면 `INSURER_RULE` 정책버전으로 대체한다. 판정 결과에는 사용한 값을 `acquisition_cost_check.calculation_snapshot`에 남긴다. 제3차 FAQ(SRC-061, SRC-079)가 기준액을 선지급과 유지관리로 나누면 키를 나눈다. (`REG-02`, `SRC-022`; 값이 상품별로 다르다는 보도는 `SRC-016`, `SRC-078`)
 - 지급단계: 위 시드 요율은 **GA→설계사** 규칙이다. 보험회사→GA 시드는 별도 정책버전으로 만들며 두 단계의 한도 검증을 합치지 않는다(제17조, REG-09).
 - 매월 동일 금액은 `commission_rule.equal_monthly_yn=true`로 표시하고 스케줄 생성 시 회차 금액이 모두 같은지 검사한다(REG-03).
 

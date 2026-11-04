@@ -715,6 +715,27 @@
     "reference.tab.refund": "INTERNAL_READ",
     "reference.tab.rules": "INTERNAL_READ",
     "reference.tab.sources": "INTERNAL_READ",
-    "reference.tab.versions": "INTERNAL_READ"
+    "reference.tab.versions": "INTERNAL_READ",
+    "contract.panel.acquisition": "INTERNAL_READ",
+    "contract.tab.acquisition": "INTERNAL_READ",
+    "navigation.menu.acqc-w01": "INTERNAL_READ",
+    "policy.draft-input.parameters.acquisition_cost_rate_pct": "CAN_WRITE_POLICY",
+    "policy.draft-input.parameters.acquisition_cost_source": "CAN_WRITE_POLICY",
+    "features.acquisition-cost.acquisition-cost-page.button": "CAN_PROCESS",
+    "features.acquisition-cost.acquisition-cost-page.button-2": "CAN_PROCESS",
+    "features.acquisition-cost.acquisition-cost-page.button-3": "CAN_PROCESS",
+    "features.acquisition-cost.acquisition-cost-page.search-select": "CAN_PROCESS",
+    "features.acquisition-cost.acquisition-cost-page.select": "CAN_PROCESS",
+    "features.acquisition-cost.acquisition-cost-page.select-2": "INTERNAL_READ",
+    "features.acquisition-cost.acquisition-cost-page.select-3": "INTERNAL_READ",
+    "features.acquisition-cost.acquisition-cost-page.select-4": "INTERNAL_READ",
+    "features.acquisition-cost.acquisition-cost-page.input": "INTERNAL_READ",
+    "features.acquisition-cost.acquisition-cost-page.section": "INTERNAL_READ",
+    "features.acquisition-cost.acquisition-cost-page.section-2": "INTERNAL_READ",
+    "features.acquisition-cost.acquisition-cost-result.section": "INTERNAL_READ",
+    "features.acquisition-cost.acquisition-cost-result.button": "INTERNAL_READ",
+    "features.acquisition-cost.contract-acquisition-cost.select": "INTERNAL_READ",
+    "features.acquisition-cost.contract-acquisition-cost.button": "CAN_PROCESS",
+    "features.acquisition-cost.contract-acquisition-cost.link": "INTERNAL_READ"
   }
 }

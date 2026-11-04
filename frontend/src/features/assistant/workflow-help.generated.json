@@ -706,6 +706,21 @@
         "next": []
       },
       {
+        "stepId": "help.238bdef3e5e6258a0bcd5ccebb43cc8a",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.acquisition-cost-result.section",
+        "title": "보험계약 상세, 계산 근거",
+        "instruction": "보험계약 상세 화면의 ‘계산 근거’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.4c691ea754c8b6bb9d656a537b4165af",
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-detail-page.button-3",
@@ -715,6 +730,21 @@
         "roles": [
           "SYSTEM_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.4dd62046ec1a00a75773b0eaf47fc379",
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.acquisition",
+        "title": "보험계약 상세, 계약체결비용",
+        "instruction": "보험계약 상세 화면의 ‘계약체결비용’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -794,11 +824,41 @@
         "next": []
       },
       {
+        "stepId": "help.682085dd2cbb413ec8c498f8610e3c80",
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.acquisition",
+        "title": "보험계약 상세, 계약체결비용",
+        "instruction": "보험계약 상세 화면의 ‘계약체결비용’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.7d59e5a37a11227b69a873858fd02d19",
         "screenId": "CONT-W02",
         "targetId": "features.cap.cap-detail-modal.section-5",
         "title": "보험계약 상세, ③ 항목별 산입 내역 개 항목",
         "instruction": "보험계약 상세 화면의 ‘③ 항목별 산입 내역 개 항목’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.92a30c52e377623c36c07803cbe1aff4",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.contract-acquisition-cost.select",
+        "title": "보험계약 상세, 지급단계",
+        "instruction": "보험계약 상세 화면의 ‘지급단계’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -829,6 +889,21 @@
         "targetId": "features.cap.cap-detail-modal.section-3",
         "title": "보험계약 상세, ② 계산식",
         "instruction": "보험계약 상세 화면의 ‘② 계산식’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.a57006a92416b21836b7cfd8f08a742a",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.contract-acquisition-cost.link",
+        "title": "보험계약 상세, 전체 결과 보기",
+        "instruction": "보험계약 상세 화면의 ‘전체 결과 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -912,6 +987,19 @@
         "next": []
       },
       {
+        "stepId": "help.c70672fb93325fc959306b256c9d1156",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.contract-acquisition-cost.button",
+        "title": "보험계약 상세, 검증 요청",
+        "instruction": "보험계약 상세 화면의 ‘검증 요청’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.c84c10a1f65d4f6172c09e0e45daf217",
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-tabs.section-2",
@@ -973,6 +1061,21 @@
         "targetId": "features.contract.contract-tabs.section-3",
         "title": "보험계약 상세, 상태이력",
         "instruction": "보험계약 상세 화면의 ‘상태이력’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f76c6d5c7af5b8f6dd16401ac13f96f0",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.acquisition-cost-result.button",
+        "title": "보험계약 상세, 다시 조회 / 다시 시도",
+        "instruction": "보험계약 상세 화면의 ‘다시 조회 / 다시 시도’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

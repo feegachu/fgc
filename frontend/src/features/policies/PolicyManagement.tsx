@@ -14,6 +14,8 @@ import { ReferenceTabs } from '../reference/ReferenceUI'
 import { useAuth } from '../auth/useAuth'
 import type { Policy } from './api'
 import {
+  MONTHLY_EQUIVALENT_FIRST_PREMIUM,
+  acquisitionCostLabels,
   actionLabels,
   conditionOptions,
   permittedActions,
@@ -551,15 +553,17 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
         return (
           <article className="policy-condition-card" key={parameter.key}>
             <header>
-              <h4>{option?.label ?? parameter.key}</h4>
-              <StatusBadge tone="info">지급조건</StatusBadge>
+              <h4>{option?.label ?? acquisitionCostLabels[parameter.key] ?? parameter.key}</h4>
+              <StatusBadge tone="info">{acquisitionCostLabels[parameter.key] ? '계약체결비용 기준' : '지급조건'}</StatusBadge>
             </header>
             <strong>
               {parameter.value == null || parameter.value === ''
                 ? '설정 필요'
                 : option?.value === parameter.value
                   ? option.valueLabel
-                  : String(parameter.value)}
+                  : parameter.value === MONTHLY_EQUIVALENT_FIRST_PREMIUM
+                    ? '월납환산 초회보험료'
+                    : String(parameter.value)}
             </strong>
             <p>{parameter.description}</p>
           </article>

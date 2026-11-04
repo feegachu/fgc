@@ -4,6 +4,47 @@
  */
 
 export interface paths {
+    "/api/v1/acquisition-cost-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * FUN-062 계약체결비용 한도 검증 결과 목록
+         * @description 저장한 결과를 최신순으로 돌려줍니다. 조회만으로 검증을 만들지 않습니다.
+         */
+        get: operations["searchAcquisitionCostChecks"];
+        put?: never;
+        /**
+         * FUN-062 계약체결비용 한도 검증 요청
+         * @description 계약의 활성 예정 스케줄을 정책 기준으로 판정해 결과를 저장합니다. 자료가 부족하면 오류가 아니라 금액 null과 REVIEW_REQUIRED로 저장합니다. 같은 Idempotency-Key 재요청은 최초 결과를 돌려줍니다.
+         */
+        post: operations["requestAcquisitionCostCheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/acquisition-cost-checks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FUN-062 계약체결비용 한도 검증 결과 상세 */
+        get: operations["getAcquisitionCostCheck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/me/contract-checks": {
         parameters: {
             query?: never;
@@ -1605,6 +1646,139 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcquisitionCostBasis: {
+            /** @description 기준액(원). 입력이 부족하면 null */
+            amount?: number | null;
+            basisCode?: string | null;
+            /** @description 정책에 등록한 값의 출처 설명 */
+            description?: string | null;
+            premiumAmount?: number | null;
+            ratePct?: number | null;
+        };
+        AcquisitionCostCheckRequest: {
+            /** Format: int64 */
+            contractId: number;
+            /**
+             * @description 검증할 지급단계. 두 단계의 한도 검증을 합치지 않는다.
+             * @enum {string}
+             */
+            paymentStage: "INSURER_TO_GA" | "GA_TO_FC";
+        };
+        AcquisitionCostCheckResponse: {
+            acquisitionCost?: components["schemas"]["AcquisitionCostBasis"] | null;
+            /** Format: int64 */
+            acquisitionCostCheckId?: number;
+            /** Format: date */
+            basicDocumentDate?: string;
+            basicDocumentVersion?: string;
+            calcRuleVersion?: string;
+            /** Format: date-time */
+            checkedAt?: string;
+            /** Format: date */
+            contractDate?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            exclusions?: components["schemas"]["AcquisitionCostExclusionLine"][];
+            feeRegimeCode?: string;
+            /** @description 유지관리 총액에 포함된 간접지원경비. 별도 한도를 두지 않는다 */
+            indirectSupportAmount?: number | null;
+            insurerName?: string;
+            limitPolicy?: components["schemas"]["AcquisitionCostPolicyRef"] | null;
+            lineGroups?: components["schemas"]["AcquisitionCostLineGroup"][];
+            maintenance?: components["schemas"]["AcquisitionCostItem"] | null;
+            offeringVersion?: string;
+            paymentPolicy?: components["schemas"]["AcquisitionCostPolicyRef"] | null;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            paymentStageLabel?: string;
+            productName?: string;
+            reasons?: components["schemas"]["AcquisitionCostReason"][];
+            /** @enum {string} */
+            resultStatus?: "NORMAL" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            resultStatusLabel?: string;
+            /** Format: date */
+            salesStartDate?: string;
+            /** Format: int64 */
+            scheduleHeaderId?: number | null;
+            /** Format: int32 */
+            scheduleVersionNo?: number | null;
+            /** @description 분류하지 못해 판정에 넣지 않은 금액 */
+            unclassifiedAmount?: number | null;
+            upfront?: components["schemas"]["AcquisitionCostItem"] | null;
+        };
+        AcquisitionCostCheckSearchCondition: {
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            /** Format: int64 */
+            insurerId?: number;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            /** @enum {string} */
+            resultStatus?: "NORMAL" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            sort?: string;
+        };
+        AcquisitionCostExclusionLine: {
+            amount?: number;
+            evidenceRef?: string | null;
+            excluded?: boolean;
+            /** Format: int32 */
+            installmentNo?: number;
+            itemCode?: string;
+            itemName?: string;
+            reason?: string;
+            /** Format: int64 */
+            scheduleLineId?: number;
+        };
+        AcquisitionCostItem: {
+            baseAmount?: number | null;
+            calculatedAmount?: number | null;
+            /**
+             * Format: int32
+             * @description 누적이 처음 한도를 넘는 회차
+             */
+            exceededFromInstallmentNo?: number | null;
+            label?: string;
+            limitAmount?: number | null;
+            limitCode?: string;
+            limitPct?: number | null;
+            reason?: string;
+            /** @enum {string} */
+            status?: "NORMAL" | "VIOLATION" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            statusLabel?: string;
+            usagePct?: number | null;
+        };
+        AcquisitionCostLineGroup: {
+            amount?: number;
+            bucket?: string;
+            bucketLabel?: string;
+            feeComponentType?: string | null;
+            /** Format: int32 */
+            installmentFrom?: number;
+            /** Format: int32 */
+            installmentTo?: number;
+            itemCode?: string;
+            itemName?: string;
+            /** Format: int32 */
+            lineCount?: number;
+        };
+        AcquisitionCostPolicyRef: {
+            policyCode?: string;
+            policyName?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
+            regulationRefs?: string[];
+            sourceClass?: string;
+            sourceClassLabel?: string;
+            sourceRefs?: string[];
+            /** Format: int32 */
+            versionNo?: number;
+        };
+        AcquisitionCostReason: {
+            code?: string;
+            message?: string;
+        };
         ActiveMonthlyRunResponse: {
             exists?: boolean;
         };
@@ -1815,6 +1989,11 @@ export interface components {
             data: null;
             error: components["schemas"]["ApiError"];
             requestId: string;
+        };
+        ApiResponseAcquisitionCostCheckResponse: {
+            data?: components["schemas"]["AcquisitionCostCheckResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
         };
         ApiResponseActiveMonthlyRunResponse: {
             data?: components["schemas"]["ActiveMonthlyRunResponse"];
@@ -2044,6 +2223,11 @@ export interface components {
         };
         ApiResponseMeResponse: {
             data?: components["schemas"]["MeResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseAcquisitionCostCheckResponse: {
+            data?: components["schemas"]["PageResponseAcquisitionCostCheckResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -4214,6 +4398,18 @@ export interface components {
              */
             parentName?: string | null;
         };
+        PageResponseAcquisitionCostCheckResponse: {
+            content?: components["schemas"]["AcquisitionCostCheckResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseAgentResponse: {
             content?: components["schemas"]["AgentResponse"][];
             /** Format: int32 */
@@ -5428,6 +5624,88 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    searchAcquisitionCostChecks: {
+        parameters: {
+            query: {
+                condition: components["schemas"]["AcquisitionCostCheckSearchCondition"];
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseAcquisitionCostCheckResponse"];
+                };
+            };
+        };
+    };
+    requestAcquisitionCostCheck: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 검증 요청의 멱등키 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcquisitionCostCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description 검증 결과 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAcquisitionCostCheckResponse"];
+                };
+            };
+            /** @description 멱등키 충돌 또는 같은 요청 처리 중 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    getAcquisitionCostCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAcquisitionCostCheckResponse"];
+                };
+            };
+        };
+    };
     record: {
         parameters: {
             query?: never;

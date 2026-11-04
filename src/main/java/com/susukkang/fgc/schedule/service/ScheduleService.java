@@ -1216,6 +1216,8 @@ public class ScheduleService {
         if (header == null) {
             throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
         }
+        if (header.getScheduleRegime() == ScheduleRegime.FOUR_YEAR_2027 || header.getScheduleRegime() == ScheduleRegime.SEVEN_YEAR_2029)
+            throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_PREVIEW_ONLY);
         if (header.getStatus() == ScheduleHeaderStatus.CONFIRMED) {
             return selectScheduleDetailById(scheduleId);
         }

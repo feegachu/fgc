@@ -1,6 +1,359 @@
 {
   "components" : {
     "schemas" : {
+      "AcquisitionCostBasis" : {
+        "properties" : {
+          "amount" : {
+            "description" : "기준액(원). 입력이 부족하면 null",
+            "type" : [ "number", "null" ]
+          },
+          "basisCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "description" : {
+            "description" : "정책에 등록한 값의 출처 설명",
+            "type" : [ "string", "null" ]
+          },
+          "premiumAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "ratePct" : {
+            "type" : [ "number", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostCheckRequest" : {
+        "properties" : {
+          "contractId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "paymentStage" : {
+            "description" : "검증할 지급단계. 두 단계의 한도 검증을 합치지 않는다.",
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "contractId", "paymentStage" ],
+        "type" : "object"
+      },
+      "AcquisitionCostCheckResponse" : {
+        "properties" : {
+          "acquisitionCost" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostBasis"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "acquisitionCostCheckId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "basicDocumentDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentVersion" : {
+            "type" : "string"
+          },
+          "calcRuleVersion" : {
+            "type" : "string"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "contractDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "exclusions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostExclusionLine"
+            },
+            "type" : "array"
+          },
+          "feeRegimeCode" : {
+            "type" : "string"
+          },
+          "indirectSupportAmount" : {
+            "description" : "유지관리 총액에 포함된 간접지원경비. 별도 한도를 두지 않는다",
+            "type" : [ "number", "null" ]
+          },
+          "insurerName" : {
+            "type" : "string"
+          },
+          "limitPolicy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostPolicyRef"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "lineGroups" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostLineGroup"
+            },
+            "type" : "array"
+          },
+          "maintenance" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostItem"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "offeringVersion" : {
+            "type" : "string"
+          },
+          "paymentPolicy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostPolicyRef"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "paymentStageLabel" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostReason"
+            },
+            "type" : "array"
+          },
+          "resultStatus" : {
+            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+            "type" : "string"
+          },
+          "resultStatusLabel" : {
+            "type" : "string"
+          },
+          "salesStartDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "scheduleHeaderId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "scheduleVersionNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "unclassifiedAmount" : {
+            "description" : "분류하지 못해 판정에 넣지 않은 금액",
+            "type" : [ "number", "null" ]
+          },
+          "upfront" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostItem"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostCheckSearchCondition" : {
+        "properties" : {
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "insurerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "resultStatus" : {
+            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+            "type" : "string"
+          },
+          "sort" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostExclusionLine" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "evidenceRef" : {
+            "type" : [ "string", "null" ]
+          },
+          "excluded" : {
+            "type" : "boolean"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "itemCode" : {
+            "type" : "string"
+          },
+          "itemName" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostItem" : {
+        "properties" : {
+          "baseAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "calculatedAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "exceededFromInstallmentNo" : {
+            "description" : "누적이 처음 한도를 넘는 회차",
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "limitAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "limitCode" : {
+            "type" : "string"
+          },
+          "limitPct" : {
+            "type" : [ "number", "null" ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+            "type" : "string"
+          },
+          "statusLabel" : {
+            "type" : "string"
+          },
+          "usagePct" : {
+            "type" : [ "number", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostLineGroup" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "bucket" : {
+            "type" : "string"
+          },
+          "bucketLabel" : {
+            "type" : "string"
+          },
+          "feeComponentType" : {
+            "type" : [ "string", "null" ]
+          },
+          "installmentFrom" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "installmentTo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "itemCode" : {
+            "type" : "string"
+          },
+          "itemName" : {
+            "type" : "string"
+          },
+          "lineCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostPolicyRef" : {
+        "properties" : {
+          "policyCode" : {
+            "type" : "string"
+          },
+          "policyName" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "regulationRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "sourceClass" : {
+            "type" : "string"
+          },
+          "sourceClassLabel" : {
+            "type" : "string"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "versionNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostReason" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ActiveMonthlyRunResponse" : {
         "properties" : {
           "exists" : {
@@ -428,6 +781,20 @@
           }
         },
         "required" : [ "data", "error", "requestId" ],
+        "type" : "object"
+      },
+      "ApiResponseAcquisitionCostCheckResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AcquisitionCostCheckResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "ApiResponseActiveMonthlyRunResponse" : {
@@ -1099,6 +1466,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/MeResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePageResponseAcquisitionCostCheckResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseAcquisitionCostCheckResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -3635,6 +4016,8 @@
             "type" : "string"
           },
           "rankResultId" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3738,7 +4121,8 @@
       "CompareExplainRequest" : {
         "properties" : {
           "rankResultId" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3849,7 +4233,8 @@
       "CompareRankingRequest" : {
         "properties" : {
           "categoryCode" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           },
           "filters" : {
@@ -6145,6 +6530,36 @@
             "description" : "상위 조직명",
             "example" : "FGC 대표 GA",
             "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "PageResponseAcquisitionCostCheckResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostCheckResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -8948,6 +9363,127 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/acquisition-cost-checks" : {
+      "get" : {
+        "description" : "저장한 결과를 최신순으로 돌려줍니다. 조회만으로 검증을 만들지 않습니다.",
+        "operationId" : "searchAcquisitionCostChecks",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "condition",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/AcquisitionCostCheckSearchCondition"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseAcquisitionCostCheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "FUN-062 계약체결비용 한도 검증 결과 목록",
+        "tags" : [ "acquisition-cost-check-controller" ]
+      },
+      "post" : {
+        "description" : "계약의 활성 예정 스케줄을 정책 기준으로 판정해 결과를 저장합니다. 자료가 부족하면 오류가 아니라 금액 null과 REVIEW_REQUIRED로 저장합니다. 같은 Idempotency-Key 재요청은 최초 결과를 돌려줍니다.",
+        "operationId" : "requestAcquisitionCostCheck",
+        "parameters" : [ {
+          "description" : "검증 요청의 멱등키",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AcquisitionCostCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAcquisitionCostCheckResponse"
+                }
+              }
+            },
+            "description" : "검증 결과"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
+                }
+              }
+            },
+            "description" : "멱등키 충돌 또는 같은 요청 처리 중"
+          }
+        },
+        "summary" : "FUN-062 계약체결비용 한도 검증 요청",
+        "tags" : [ "acquisition-cost-check-controller" ]
+      }
+    },
+    "/api/v1/acquisition-cost-checks/{id}" : {
+      "get" : {
+        "operationId" : "getAcquisitionCostCheck",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAcquisitionCostCheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "FUN-062 계약체결비용 한도 검증 결과 상세",
+        "tags" : [ "acquisition-cost-check-controller" ]
+      }
+    },
     "/api/v1/agent/me/contract-checks" : {
       "post" : {
         "description" : "종결 또는 후속 확인을 기록합니다. Idempotency-Key 와 expectedContextVersion 이 필요합니다.",
