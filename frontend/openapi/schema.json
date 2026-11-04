@@ -5824,6 +5824,9 @@
       },
       "HomeAttentionAgent" : {
         "properties" : {
+          "activeYn" : {
+            "type" : "boolean"
+          },
           "agentId" : {
             "format" : "int64",
             "type" : "integer"

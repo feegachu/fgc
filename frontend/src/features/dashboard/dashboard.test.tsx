@@ -93,6 +93,17 @@ const home: HomeSummary = {
       contractCount: 3,
       reasons: [{ code: 'RECENT_STATUS_CHANGE', label: '최근 상태 변화', count: 1 }],
     },
+    {
+      agentId: 9,
+      name: '박중지',
+      code: 'A-FC-009',
+      branch: '강동지사',
+      status: 'ACTIVE',
+      statusLabel: '활동',
+      activeYn: false,
+      contractCount: 1,
+      reasons: [{ code: 'NEAR_LIMIT', label: '한도 근접', count: 1 }],
+    },
   ],
   basis: '유효 계약은 기준일 상태가 정상, 미납, 부활인 계약입니다.',
 }
@@ -385,11 +396,12 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(gangdong).toHaveTextContent('300명')
     expect(gangdong).toHaveTextContent('6,200건')
     expect(gangdong).toHaveTextContent('12명')
-    expect(within(region).getByText('전체 12명 중 상위 2명')).toBeInTheDocument()
+    expect(within(region).getByText('전체 12명 중 상위 3명')).toBeInTheDocument()
     const first = within(attention).getByRole('row', { name: /A-FC-001/ })
     expect(first).toHaveTextContent('7건')
     expect(first).toHaveTextContent('미처리 예외 2건, 한도 근접 1건')
     expect(within(attention).getByRole('link', { name: '최해촉 (A-FC-004) 계약 목록 열기' })).toHaveTextContent('최해촉 (해촉)')
+    expect(within(attention).getByRole('link', { name: '박중지 (A-FC-009) 계약 목록 열기' })).toHaveTextContent('박중지 (사용 중지)')
     expect(within(region).getByText(home.basis!)).toBeInTheDocument()
     await actions.click(within(attention).getByRole('link', { name: '김정산 (A-FC-001) 계약 목록 열기' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/app/contracts'))

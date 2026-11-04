@@ -87,7 +87,7 @@ export function AgentOverview({ month }: { month: string }) {
           id={agent.agentId}
           name={agent.name}
           code={agent.code}
-          statusNote={agent.status === 'ACTIVE' ? undefined : agent.statusLabel}
+          statusNote={agent.status !== 'ACTIVE' ? agent.statusLabel : agent.activeYn === false ? '사용 중지' : undefined}
           asOf={asOf}
           month={month}
         />

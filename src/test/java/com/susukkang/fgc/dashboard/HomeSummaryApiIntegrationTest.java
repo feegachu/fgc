@@ -67,7 +67,7 @@ class HomeSummaryApiIntegrationTest {
         long agent4 = agent("IT-H-A4", "시험당일해촉", branchA, "1999-01-01", AS_OF, "TERMINATED", true);
         agent("IT-H-A5", "시험위촉전", teamA, "1999-07-01", null, "ACTIVE", true);
         long agent6 = agent("IT-H-A6", "시험본부장", division, "1999-01-01", null, "ACTIVE", true);
-        agent("IT-H-A7", "시험사용중지", teamA, "1999-01-01", null, "ACTIVE", false);
+        long agent7 = agent("IT-H-A7", "시험사용중지", teamA, "1999-01-01", null, "ACTIVE", false);
         long agent8 = agent("IT-H-A8", "시험당일위촉", branchB, AS_OF, null, "ACTIVE", true);
 
         long c1 = contract("IT-H-C1", agent1, teamA, "1999-02-01", "ACTIVE");
@@ -103,6 +103,7 @@ class HomeSummaryApiIntegrationTest {
         exception("X4", "NEW", c4, null, "1999-07-01 00:00:00+09");
         exception("X5", "NEW", c6, null, "1999-06-30 23:59:59+09");
         exception("X6", "NEW", null, null, "1999-03-01 09:00:00+09");
+        exception("X7", "NEW", null, agent7, "1999-03-01 09:00:00+09");
 
         // 같은 계약의 두 지급단계가 모두 주의여도 계약 1건이다.
         cap(c1, "GA_TO_FC", AS_OF, "WARNING", "1999-06-30 09:00:00+09", "{}");
@@ -133,7 +134,7 @@ class HomeSummaryApiIntegrationTest {
                 .andExpect(jsonPath("$.data.branches[0].organizationId").value(branchA))
                 .andExpect(jsonPath("$.data.branches[0].agentCount").value(4))
                 .andExpect(jsonPath("$.data.branches[0].activeContractCount").value(6))
-                .andExpect(jsonPath("$.data.branches[0].attentionCount").value(3))
+                .andExpect(jsonPath("$.data.branches[0].attentionCount").value(4))
                 .andExpect(jsonPath("$.data.branches[1].agentCount").value(1))
                 .andExpect(jsonPath("$.data.branches[1].activeContractCount").value(1))
                 .andExpect(jsonPath("$.data.branches[1].attentionCount").value(0))
@@ -151,12 +152,13 @@ class HomeSummaryApiIntegrationTest {
     @Test
     void 확인할_설계사는_사유별로_세고_계약별_판정을_금액으로_합치지_않는다() throws Exception {
         summary(AS_OF)
-                .andExpect(jsonPath("$.data.attentionTotal").value(3))
-                .andExpect(jsonPath("$.data.attentionAgents[*].code").value(contains("IT-H-A1", "IT-H-A3", "IT-H-A4")))
+                .andExpect(jsonPath("$.data.attentionTotal").value(4))
+                .andExpect(jsonPath("$.data.attentionAgents[*].code").value(contains("IT-H-A1", "IT-H-A3", "IT-H-A7", "IT-H-A4")))
                 .andExpect(jsonPath("$.data.attentionAgents[0].agentId").value(agent1))
                 .andExpect(jsonPath("$.data.attentionAgents[0].name").value("시험활동"))
                 .andExpect(jsonPath("$.data.attentionAgents[0].branch").value("시험A지점"))
                 .andExpect(jsonPath("$.data.attentionAgents[0].statusLabel").value("활동"))
+                .andExpect(jsonPath("$.data.attentionAgents[0].activeYn").value(true))
                 .andExpect(jsonPath("$.data.attentionAgents[0].contractCount").value(4))
                 .andExpect(jsonPath("$.data.attentionAgents[0].reasons[*].label")
                         .value(contains("미처리 예외", "한도 근접", "최근 상태 변화")))
@@ -168,8 +170,11 @@ class HomeSummaryApiIntegrationTest {
                 .andExpect(jsonPath("$.data.attentionAgents[1].reasons[*].code")
                         .value(contains("OPEN_EXCEPTION", "RECENT_STATUS_CHANGE")))
                 .andExpect(jsonPath("$.data.attentionAgents[1].reasons[*].count").value(contains(1, 1)))
-                .andExpect(jsonPath("$.data.attentionAgents[2].reasons[*].code").value(contains("NEAR_LIMIT")))
-                .andExpect(jsonPath("$.data.attentionAgents[2].reasons[*].count").value(contains(1)))
+                // 상태는 활동이어도 기준정보 사용 중지는 활동 수에서 빠지므로 목록에서도 구분할 수 있어야 한다.
+                .andExpect(jsonPath("$.data.attentionAgents[2].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.attentionAgents[2].activeYn").value(false))
+                .andExpect(jsonPath("$.data.attentionAgents[3].reasons[*].code").value(contains("NEAR_LIMIT")))
+                .andExpect(jsonPath("$.data.attentionAgents[3].reasons[*].count").value(contains(1)))
                 .andExpect(jsonPath("$.data.basis").value(containsString("최근 30일")));
     }
 

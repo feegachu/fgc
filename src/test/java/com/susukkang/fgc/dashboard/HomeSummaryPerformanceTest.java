@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,7 +51,7 @@ class HomeSummaryPerformanceTest {
             summary = home.summarize(AS_OF);
             samples.add(Duration.ofNanos(System.nanoTime() - start).toMillis());
         }
-        Collections.sort(samples);
+        samples.sort(Comparator.naturalOrder());
         long start = System.nanoTime();
         exceptions.counts("OPEN", null);
         long countsMillis = Duration.ofNanos(System.nanoTime() - start).toMillis();

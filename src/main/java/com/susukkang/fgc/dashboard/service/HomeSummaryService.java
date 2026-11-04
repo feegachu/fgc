@@ -76,7 +76,7 @@ public class HomeSummaryService {
                 asOf,
                 new HomeAgentCounts(registered.size(),
                         registered.stream().filter(agent -> "ACTIVE".equals(agent.status()) && agent.activeYn()).count(),
-                        agents.size() - registered.size()),
+                        (long) agents.size() - registered.size()),
                 branchRows(branches, registered, attention),
                 attention.size(),
                 attention.stream().limit(ATTENTION_LIMIT).map(HomeSummaryService::attentionAgent).toList(),
@@ -120,7 +120,7 @@ public class HomeSummaryService {
         addReason(reasons, "NEAR_LIMIT", "한도 근접", agent.nearLimitCount());
         addReason(reasons, "RECENT_STATUS_CHANGE", "최근 상태 변화", agent.recentChangeCount());
         return new HomeAttentionAgent(agent.agentId(), agent.name(), agent.code(), agent.branchName(), agent.status(),
-                AgentResponse.statusLabel(agent.status()), agent.contractCount(), reasons);
+                AgentResponse.statusLabel(agent.status()), agent.activeYn(), agent.contractCount(), reasons);
     }
 
     private static void addReason(List<HomeAttentionReason> reasons, String code, String label, long count) {

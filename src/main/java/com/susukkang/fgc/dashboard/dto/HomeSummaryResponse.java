@@ -34,6 +34,7 @@ public record HomeSummaryResponse(
             String branch,
             String status,
             String statusLabel,
+            boolean activeYn,
             long contractCount,
             List<HomeAttentionReason> reasons
     ) {

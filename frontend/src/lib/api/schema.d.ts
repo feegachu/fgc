@@ -4134,6 +4134,7 @@ export interface components {
             terminated?: number;
         };
         HomeAttentionAgent: {
+            activeYn?: boolean;
             /** Format: int64 */
             agentId?: number;
             branch?: string;
