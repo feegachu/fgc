@@ -20,6 +20,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ContractScheduleResponse {
+    @lombok.Setter
+    private com.susukkang.fgc.schedule.dto.SchedulePreviewContext previewContext;
     private List<ScheduleHeaderResponse> headers; //헤더 스케줄
     private List<ScheduleLineResponse> lines;    //상세 스케줄
 }

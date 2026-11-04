@@ -32,6 +32,7 @@ const header = (scheduleHeaderId: number, overrides: Partial<ScheduleHeader> = {
   statusLabel: '예정',
   activeYn: true,
   lineCount: 2,
+  installmentCount: 2,
   expectedTotal: 1500000,
   policyVersionLabel: 'POL-2026-07 v3',
   generationReason: '최초 생성',
@@ -221,10 +222,9 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
 
     await actions.type(screen.getByLabelText('계약번호'), '  C-9 ')
     await actions.selectOptions(screen.getByLabelText('적용 체계'), 'FOUR_YEAR_2027')
-    await actions.click(screen.getByRole('button', { name: /조회/ }))
     await waitFor(() =>
       expect(router.state.location.search).toBe(
-        '?month=2026-07&stage=GA_TO_FC&status=PLANNED&contractNo=C-9&regime=FOUR_YEAR_2027&purpose=OPERATIONAL',
+        '?month=2026-07&stage=GA_TO_FC&status=PLANNED&contractNo=C-9&regime=FOUR_YEAR_2027&purpose=SIMULATION',
       ),
     )
 
@@ -490,6 +490,78 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     await waitFor(() => expect(blob).toHaveBeenCalledWith('/api/v1/schedules/11/export.csv', expect.anything()))
     await waitFor(() => expect(toasts()).toContain('회차 표 CSV를 내려받았습니다.'))
   })
+})
+
+describe('FUN-037 4년 예정', () => {
+  it('확정·지급을 막고 서버 정책으로 재생성하며 재시도 멱등키를 유지한다', async () => {
+    const current: ScheduleDetail = {
+      ...detail({
+        contractId: 600,
+        scheduleRegime: 'FOUR_YEAR_2027',
+        schedulePurpose: 'SIMULATION',
+        canConfirm: false,
+        installmentCount: 48,
+      }),
+      previewContext: {
+        expectedSourceVersion: 'source-1',
+        policy: {
+          versionNo: 3,
+          sourceRefs: ['REG-03'],
+          commissionPolicy: { policyVersionId: 70 },
+          selection: {
+            resolution: { status: 'SELECTED', declaredFeeRegimeCode: 'FOUR_YEAR_2027' },
+            ruleset: { maxInstallments: 48 },
+          },
+        },
+      },
+    }
+    let attempts = 0
+    const { actions, router } = renderAt(
+      '/schedules/11?returnTo=%2Fschedules%3Fregime%3DFOUR_YEAR_2027%26purpose%3DSIMULATION',
+      (url, options) => {
+        if (url.endsWith('/versions')) return [current.header]
+        if (url === '/api/v1/schedules/11/regenerate' && options?.method === 'POST') {
+          if (++attempts === 1) throw new Error('일시적인 연결 오류')
+          return { scheduleHeaderId: 12, versionNo: 2 }
+        }
+        if (url === '/api/v1/schedules/11' || url === '/api/v1/schedules/12') return current
+      },
+    )
+    await screen.findByText('4년 예정 스케줄')
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+    expect(
+      screen.queryAllByRole('link').filter((link) => link.getAttribute('href')?.includes('/transactions/new')),
+    ).toHaveLength(0)
+    await actions.type(screen.getByLabelText('생성 사유'), '승인 정책 반영')
+    await actions.click(screen.getByRole('button', { name: '4년 예정 새 버전 만들기' }))
+    await screen.findByRole('alert')
+    await actions.click(screen.getByRole('button', { name: '생성 결과 다시 확인' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/12'))
+    expect(new URLSearchParams(router.state.location.search).get('returnTo')).toBe(
+      '/schedules?regime=FOUR_YEAR_2027&purpose=SIMULATION&selectedId=12',
+    )
+    const requests = calls('/api/v1/schedules/11/regenerate')
+    expect(requests).toHaveLength(2)
+    expect(requests[0].options?.body).toEqual({
+      reason: '승인 정책 반영',
+      regime: 'FOUR_YEAR_2027',
+      policyVersionId: 70,
+      expectedSourceVersion: 'source-1',
+    })
+    expect(requests[0].options?.idempotencyKey).toBeTruthy()
+    expect(requests[1].options?.idempotencyKey).toBe(requests[0].options?.idempotencyKey)
+  })
+})
+
+
+it('4년 정액 정책은 실제 정액·정책 회차 수를 표시하고 취소판은 재생성을 제공하지 않는다', async () => {
+  const data = detail({ contractId: 600, scheduleRegime: 'FOUR_YEAR_2027', schedulePurpose: 'SIMULATION', status: 'CANCELLED', installmentCount: 12, lineCount: 24 })
+  data.lines = [{ ...data.lines![0], calculationType: 'FIXED', ratePct: undefined, fixedAmount: 12345 }]
+  renderAt('/schedules/11', url => url === '/api/v1/schedules/11' ? data : [])
+  await screen.findByText('스케줄 번호 11')
+  expect(screen.getByRole('cell', { name: '12,345원' })).toBeVisible()
+  expect(screen.getByText(/정책 정의 12회차 · 24행/)).toBeVisible()
+  expect(screen.queryByRole('button', { name: '4년 예정 새 버전 만들기' })).not.toBeInTheDocument()
 })
 
 it('regeneration help validates reason and waits for new server version before navigation', async () => {
