@@ -66,7 +66,7 @@ test('CONT-W03 상태 변경 뒤 CONT-W02 이력과 후속 상태, 영향을 실
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
   await expect(second).toHaveClass(/is-selected/)
   await expect(second).toContainText('지급 보류 1건, 회차 변경 2건, 처리 제외 1건')
-  await page.screenshot({ path: testInfo.outputPath('real-status-history-done.png'), fullPage: true })
+  await page.locator('.contract-history-panel').screenshot({ path: testInfo.outputPath('real-status-history-done.png') })
 
   // 시드에서 이 계약은 agent01의 본인 계약이다. V64가 꺼 둔 계정이라 시험 뒤 되돌아가는 DB에서만 켠다.
   sql(
