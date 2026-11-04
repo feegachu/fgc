@@ -799,6 +799,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/status-events/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewContractStatusEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/status-events/{eventId}/effects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getContractStatusEventEffects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/transactions": {
         parameters: {
             query?: never;
@@ -1906,6 +1938,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseContractStatusPreviewResponse: {
+            data?: components["schemas"]["ContractStatusPreviewResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseContractTransactionTabResponse: {
             data?: components["schemas"]["ContractTransactionTabResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2074,6 +2111,11 @@ export interface components {
         };
         ApiResponsePageResponseCommissionPaymentListResponse: {
             data?: components["schemas"]["PageResponseCommissionPaymentListResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseContractStatusEffectResponse: {
+            data?: components["schemas"]["PageResponseContractStatusEffectResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2838,6 +2880,16 @@ export interface components {
             triggerType?: "STATUS_EVENT" | "ARBITRAGE";
             unpaidAmount?: number | null;
         };
+        ClawbackLine: {
+            appliedRatePct?: number;
+            basisAmount?: number;
+            clawbackAmount?: number;
+            commissionItemName?: string;
+            /** Format: int32 */
+            installmentNo?: number | null;
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
         ClawbackNoticeDocumentRequest: {
             /**
              * Format: int32
@@ -2860,6 +2912,20 @@ export interface components {
             sha256?: string;
             /** Format: int32 */
             version?: number;
+        };
+        ClawbackReview: {
+            amount?: number | null;
+            candidate?: boolean;
+            /** Format: int32 */
+            elapsedMonths?: number | null;
+            lines?: components["schemas"]["ClawbackLine"][];
+            policyCode?: string | null;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            /** Format: int32 */
+            policyVersionNo?: number | null;
+            reason?: string;
+            reasonCodes?: string[];
         };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
@@ -3470,11 +3536,28 @@ export interface components {
             productOfferingId?: number;
             sort?: string;
         };
+        ContractStatusEffectResponse: {
+            amount?: number | null;
+            /** Format: int64 */
+            entityId?: number;
+            entityType?: string;
+            nextState?: string;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            previousState?: string | null;
+            processingJob?: string;
+            reason?: string | null;
+            reasonCode?: string;
+        };
         ContractStatusEventProcessingResponse: {
+            errorCode?: string | null;
+            job?: string;
             /** Format: date-time */
             processedAt?: string;
             processingJob?: string;
             processingStatus?: string;
+            status?: string;
+            summary?: components["schemas"]["ProcessingSummary"] | null;
         };
         ContractStatusEventRequest: {
             /** Format: date-time */
@@ -3492,6 +3575,7 @@ export interface components {
             eventId?: number;
             /** Format: int32 */
             eventSeq?: number;
+            followUp?: components["schemas"]["EventFollowUp"];
             /** @enum {string} */
             newStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             newStatusLabel?: string;
@@ -3503,9 +3587,38 @@ export interface components {
             reasonCode?: string | null;
             /** Format: date-time */
             receivedAt?: string;
+            /** Format: date-time */
+            recordedAt?: string;
             registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
+        };
+        ContractStatusPreviewRequest: {
+            /** Format: date-time */
+            effectiveAt: string;
+            /** @enum {string} */
+            eventType: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+        };
+        ContractStatusPreviewResponse: {
+            clawbackReview?: components["schemas"]["ClawbackReview"];
+            /** Format: int64 */
+            contractId?: number;
+            /** @enum {string} */
+            currentStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            /** Format: date-time */
+            effectiveAt?: string;
+            /** @enum {string} */
+            eventType?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            excludedLines?: components["schemas"]["PreviewLine"][];
+            heldAmount?: components["schemas"]["HeldAmount"];
+            paidAmount?: components["schemas"]["PaidAmount"][];
+            payments?: components["schemas"]["PreviewPayment"][];
+            /** Format: int64 */
+            pendingFollowUps?: number;
+            resumedLines?: components["schemas"]["PreviewLine"][];
+            /** Format: date-time */
+            snapshotAt?: string;
+            stoppedLines?: components["schemas"]["PreviewLine"][];
         };
         ContractTransactionAttributionResponse: {
             agentCode?: string;
@@ -3637,6 +3750,11 @@ export interface components {
             recentRuns?: components["schemas"]["RecentValidationRunResponse"][];
             /** Format: int64 */
             reconMismatch?: number;
+        };
+        EventFollowUp: {
+            jobs?: components["schemas"]["FollowUpJob"][];
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
         };
         EvidenceItem: {
             label?: string;
@@ -3855,6 +3973,24 @@ export interface components {
             eventId?: number | null;
             /** @enum {string} */
             status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
+        };
+        FollowUpJob: {
+            /** Format: int32 */
+            attemptCount?: number;
+            errorCode?: string | null;
+            job?: string;
+            /** Format: date-time */
+            lastAttemptAt?: string | null;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: date-time */
+            nextRetryAt?: string | null;
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
+        };
+        HeldAmount: {
+            after?: number;
+            before?: number;
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -4298,6 +4434,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseContractStatusEffectResponse: {
+            content?: components["schemas"]["ContractStatusEffectResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseContractView: {
             content?: components["schemas"]["ContractView"][];
             /** Format: int32 */
@@ -4381,6 +4529,11 @@ export interface components {
             totalElements?: number;
             /** Format: int32 */
             totalPages?: number;
+        };
+        PaidAmount: {
+            amount?: number | null;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
         };
         ParameterDraft: {
             description?: string;
@@ -4756,6 +4909,33 @@ export interface components {
             /** Format: int32 */
             versionNo?: number;
         };
+        PreviewLine: {
+            amount?: number | null;
+            commissionItemName?: string;
+            /** Format: date */
+            dueDate?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            /** Format: date */
+            nextDueDate?: string | null;
+            nextState?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
+            /** Format: int64 */
+            scheduleLineId?: number;
+        };
+        PreviewPayment: {
+            amount?: number | null;
+            /** Format: int64 */
+            commissionTransactionId?: number;
+            nextState?: string;
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
+        };
         ProcessingEffect: {
             failureReason?: string | null;
             /** Format: date-time */
@@ -4764,6 +4944,16 @@ export interface components {
             processingStatus?: string;
             /** Format: int64 */
             validationRunId?: number | null;
+        };
+        ProcessingSummary: {
+            /** Format: int32 */
+            changedScheduleLines?: number;
+            /** Format: int32 */
+            excludedCount?: number;
+            /** Format: int32 */
+            heldPayments?: number;
+            /** Format: int32 */
+            resumedPayments?: number;
         };
         /** @description 보험상품 판매버전 기준정보 */
         ProductResponse: {
@@ -6785,6 +6975,58 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListContractStatusEventResponse"];
+                };
+            };
+        };
+    };
+    previewContractStatusEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractStatusPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractStatusPreviewResponse"];
+                };
+            };
+        };
+    };
+    getContractStatusEventEffects: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseContractStatusEffectResponse"];
                 };
             };
         };

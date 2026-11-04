@@ -4,6 +4,7 @@ import com.susukkang.fgc.contract.dto.ContractStatusEffect;
 import com.susukkang.fgc.contract.entity.ContractStatusEvent;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * 설명 : 계약 상태 사건의 후속 처리기. FUN-028(미확정 지급 보류)·FUN-029(부활 시 재개)가 구현한다.
@@ -25,4 +26,15 @@ public interface ContractStatusFollowUpProcessor {
 
     /** 영향과 처리하지 않은 대상의 이유를 돌려준다. 확정·기지급·월잠금 결과는 바꾸지 않는다. */
     List<ContractStatusEffect> process(ContractStatusEvent event);
+
+    /**
+     * {@link #process}가 남길 영향을 아무것도 쓰지 않고 돌려준다. 미리보기(FUN-077, IF-API-64)가 같은 입력과 규칙으로 부르며
+     * 저장 전 사건이면 사건 ID가 없다. process는 이 결과를 반영해야 미리보기와 실제 결과가 어긋나지 않는다.
+     */
+    List<ContractStatusEffect> plan(ContractStatusEvent event);
+
+    /** RELEASED 판단에서 이 처리기가 푸는 보류 사유. 미리보기가 다른 사유의 보류가 남는지 보는 데 쓴다. */
+    default Set<String> releasedHoldReasons() {
+        return Set.of();
+    }
 }
