@@ -90,6 +90,26 @@
     "element": "button"
   },
   {
+    "id": "clawback.documents",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "section"
+  },
+  {
+    "id": "clawback.documents.download",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "clawback.documents.issue",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "clawback.documents.refresh",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
+  },
+  {
     "id": "clawback.evidence.effects",
     "file": "features/clawback/ClawbackDetail.tsx",
     "element": "section"
