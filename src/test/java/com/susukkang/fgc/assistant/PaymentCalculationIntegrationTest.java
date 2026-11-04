@@ -156,11 +156,14 @@ class PaymentCalculationIntegrationTest {
             } finally { writerDone.countDown(); }
         });
         try {
-            var result = calculations.calculate(request(PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE));
+            var result = calculations.calculateVerified(request(PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE));
             writer.get(20, TimeUnit.SECONDS);
             assertThat(result.basis().lines()).singleElement().satisfies(line -> assertThat(line.originalAmount()).isEqualTo("100000.00"));
             assertThat(result.capPreview()).isNotEmpty();
             assertThat(result.capPreview().getFirst()).containsEntry("candidateAmount", "100000");
+            assertThat(result.validity()).isNotNull();
+            var stale=calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),request(PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE)));
+            assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.amounts()).isEmpty();assertThat(stale.basis().lines()).isEmpty();
             assertThat(jdbc.queryForObject("SELECT amount FROM fgc.commission_transaction WHERE commission_transaction_id=?", BigDecimal.class, paymentId)).isEqualByComparingTo("900000");
             assertThat(jdbc.queryForObject("SELECT attributed_amount FROM fgc.transaction_attribution WHERE commission_transaction_id=?", BigDecimal.class, paymentId)).isEqualByComparingTo("900000");
         } finally {
@@ -264,6 +267,45 @@ class PaymentCalculationIntegrationTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(()->calculations.calculate(candidateRequest("REPLACE_DRAFT","100000"))).isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
             status.setRollbackOnly();
         });
+    }
+
+    @Test void hypotheticalCandidateIncludesOtherConfirmedPaymentsExactlyOnce() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(transaction -> {
+            try {
+                var original=payments.get(paymentId);var date=LocalDate.of(2026,7,31);
+                var actual=payments.create(new CommissionPaymentCreateRequest("GA_MANUAL_PAYMENT","IT-733-CONFIRMED-"+UUID.randomUUID(),contractId,6L,original.commissionItemId(),new BigDecimal("40000"),date.withDayOfMonth(1),"PAYMENT",date,PaymentStage.GA_TO_FC,original.allocationPolicyVersion(),List.of(new CommissionPaymentAttributionRequest(contractId,date,new BigDecimal("40000"),InclusionDecisionStatus.INCLUDED,ExclusionType.NONE,"IT-confirmed","DIRECT","IT-EVIDENCE",AttributionMethod.DIRECT)),"IT-EVIDENCE","IT"));
+                payments.confirm(actual.paymentId(),"IT-733-"+UUID.randomUUID());
+                var before=counts();var real=payments.precheck(paymentId);
+                var replacement=calculations.calculate(candidateRequest("REPLACE_DRAFT","100000"));
+                var fresh=calculations.calculate(candidateRequest("NEW_PAYMENT","100000"));
+                assertThat(real.capPreview()).anySatisfy(row->assertThat(row.existingIncludedAmount()).isEqualTo(40000L));
+                for(var candidate:List.of(replacement,fresh)) {
+                    assertThat(candidate.capPreview()).anySatisfy(row->assertThat(row).containsEntry("existingIncludedAmount","40000").containsEntry("candidateAmount","100000"));
+                    assertThat(candidate.confirmable()).isEqualTo(real.confirmable());
+                }
+                assertThat(counts()).isEqualTo(before);
+            } finally {transaction.setRollbackOnly();}
+        });
+    }
+
+    @Test void candidateQueryPlansInlineBothSourcesInsteadOfMaterializingWholeTables() throws Exception {
+        var mapper=new com.fasterxml.jackson.databind.ObjectMapper();
+        var candidate=new com.susukkang.fgc.transaction.domain.PaymentCandidateProjection(paymentId,paymentRow(),attributionRows());
+        var parameters=new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+                .addValue("candidatePaymentId",paymentId).addValue("candidatePayment",candidate.paymentJson())
+                .addValue("candidateAttributions",candidate.attributionJson()).addValue("paymentId",paymentId)
+                .addValue("transactionAttributionId",jdbc.queryForObject("SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id=?",Long.class,paymentId));
+        var named=new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc);
+        Class<?> sqlType=Class.forName("com.susukkang.fgc.transaction.repository.CommissionPaymentSql");
+        for(String name:List.of("FIND_CONFIRMATION_DATA","FIND_CAP_RULE_SNAPSHOT")) {
+            String original=(String)org.springframework.test.util.ReflectionTestUtils.getField(sqlType,name);
+            String projected=candidate.sql(original);
+            var before=mapper.readTree(named.queryForObject("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) "+projected.replace("AS NOT MATERIALIZED (","AS MATERIALIZED ("),parameters,String.class));
+            var after=mapper.readTree(named.queryForObject("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) "+projected,parameters,String.class));
+            assertThat(before.findValuesAsText("Node Type")).contains("CTE Scan");
+            assertThat(after.findValuesAsText("Node Type")).doesNotContain("CTE Scan");
+            System.out.println("#848 "+name+" materialized(ms)="+before.get(0).get("Execution Time")+", inlined(ms)="+after.get(0).get("Execution Time")+", node types="+after.findValuesAsText("Node Type")+", index predicates="+after.findValuesAsText("Index Cond"));
+        }
     }
 
     private PaymentCalculationRequest request(PaymentCalculationRequest.Kind kind) {

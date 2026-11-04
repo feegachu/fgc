@@ -126,6 +126,22 @@ export function createApiClient(env: ClientEnvironment) {
     }
     return { blob: await response.blob(), disposition: response.headers.get('Content-Disposition') }
   }
+  async function requestPdf(path: string, options: RequestOptions = {}) {
+    const response = await responseFor(path, options, 'application/pdf')
+    const contentType = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase()
+    if (!response.ok || contentType?.includes('json')) {
+      const envelope = await readEnvelope(response)
+      throw new ApiError(null, envelope.requestId, response.status)
+    }
+    if (contentType !== 'application/pdf') {
+      throw new ApiError({ message: 'PDF 파일 응답이 아닙니다. 다시 다운로드해 주세요.' }, response.headers.get('X-Request-Id'), response.status)
+    }
+    const blob = await response.blob()
+    if (await blob.slice(0, 5).text() !== '%PDF-') {
+      throw new ApiError({ message: 'PDF 파일 내용을 확인할 수 없습니다. 다시 다운로드해 주세요.' }, response.headers.get('X-Request-Id'), response.status)
+    }
+    return { blob, disposition: response.headers.get('Content-Disposition') }
+  }
   function restoreSession({ redirectOnFailure = true }: { redirectOnFailure?: boolean } = {}): Promise<void> {
     // StrictMode and callers share one startup attempt; an existing login needn't be rotated.
     startupPromise ??= env.getToken() ? Promise.resolve() : refresh(redirectOnFailure)
@@ -150,7 +166,7 @@ export function createApiClient(env: ClientEnvironment) {
   }
   // Don't redirect the login page back to itself on a missing refresh cookie.
   function isLoginPage() { return routerPath(env.location, env.base).split(/[?#]/)[0] === '/login' }
-  return { request, requestBlob, restoreSession, login, logout, isLoginPage }
+  return { request, requestBlob, requestPdf, restoreSession, login, logout, isLoginPage }
 }
 export const apiClient = createApiClient({
   fetch: (...args) => globalThis.fetch(...args),

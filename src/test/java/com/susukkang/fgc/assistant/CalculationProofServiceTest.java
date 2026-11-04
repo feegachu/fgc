@@ -52,5 +52,20 @@ class CalculationProofServiceTest {
         var stale=proofs.revalidate(new CalculationRevalidationRequest("calc",issued.validity().stateToken(),input(1)));
         assertThat(stale.basis().lines()).isEmpty();assertThat(stale.blockers()).isEmpty();assertThat(stale.amounts()).isEmpty();
     }
+    @Test void onlyExplicitSingleLineExpectedAmountCanBecomeARecommendation() {
+        var basis=new PaymentCalculationSnapshot.Basis(List.of(),result().basis().rounding(),"2026-10-01",List.of("9"),List.of("8"),List.of());
+        var line=new PaymentCalculationSnapshot.CalculationLine("7:1","3","4","5",1,"2026-10-01","2026-10-31","FIXED","100000","FIXED",null,"100000","8","PLANNED","PAYMENT");
+        for(var aggregation:PaymentCalculationRequest.Scope.Aggregation.values()) {
+            var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.EXPECTED_COMMISSION,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,"3","2026-10",com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC,1,"4","5",null,null,aggregation),null,1L);
+            var expected=new PaymentCalculationSnapshot("expected-"+aggregation,"EXPECTED_COMMISSION","EXISTING","CALCULATED",1,false,true,"EXPECTED","KRW",null,Map.of("policyVersionId","9","aggregation",aggregation.name()),Map.of("expectedAmount","100000"),List.of(),null,List.of(),List.of(),basis,result().recommendation(),OffsetDateTime.now(clock),null,List.of(line));
+            var issued=proofs.issue(request,expected);
+            assertThat(issued.recommendation().allowed()).isEqualTo(aggregation==PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE);
+            if(aggregation==PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE)assertThat(issued.recommendation().suggestedAmount()).isEqualTo("100000");
+            when(dependencies.current()).thenReturn("changed-"+aggregation);
+            var stale=proofs.revalidate(new CalculationRevalidationRequest(issued.calculationId(),issued.validity().stateToken(),request));
+            assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.recommendation().allowed()).isFalse();
+            when(dependencies.current()).thenReturn("source-v1");
+        }
+    }
     static class MutableClock extends Clock {Instant now=Instant.parse("2026-11-04T00:00:00Z");public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId zone){return this;}public Instant instant(){return now;}}
 }

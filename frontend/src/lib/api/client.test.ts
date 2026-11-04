@@ -41,6 +41,31 @@ function deferred<T>() {
   })
   return { promise, resolve }
 }
+
+it('requests a PDF with authentication and preserves the requested edition through 401 refresh', async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(fail()).mockResolvedValueOnce(ok({ accessToken: 'fresh' }))
+    .mockResolvedValueOnce(new Response('%PDF-1.7', { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="notice.pdf"' } }))
+  const { client } = setup(fetcher)
+  const result = await client.requestPdf('/api/v1/documents/CLN-7.pdf?version=1')
+  expect(await result.blob.text()).toBe('%PDF-1.7')
+  expect(result.disposition).toContain('notice.pdf')
+  expect(fetcher.mock.calls.map(([path]) => path)).toEqual(['/api/v1/documents/CLN-7.pdf?version=1', '/api/v1/auth/refresh', '/api/v1/documents/CLN-7.pdf?version=1'])
+  const headers = new Headers(fetcher.mock.calls[2][1].headers)
+  expect(headers.get('Accept')).toBe('application/pdf')
+  expect(headers.get('Authorization')).toBe('Bearer fresh')
+})
+it.each([200, 403, 404, 500])('rejects a JSON PDF response (HTTP %i) with its error envelope', async (status) => {
+  const { client } = setup(vi.fn().mockResolvedValue(fail(status, 'FGC-COMMON-004')))
+  await expect(client.requestPdf('/api/v1/documents/CLN-7.pdf?version=1')).rejects.toMatchObject({ status, requestId: 'error-1', code: 'FGC-COMMON-004' })
+})
+it.each(['text/html', 'application/octet-stream', ''])('rejects a successful PDF response with content type %s', async (contentType) => {
+  const { client } = setup(vi.fn().mockResolvedValue(new Response('not a pdf', { headers: { 'Content-Type': contentType } })))
+  await expect(client.requestPdf('/api/v1/documents/CLN-7.pdf?version=1')).rejects.toThrow('PDF 파일 응답이 아닙니다')
+})
+it.each(['', '{"error":"failed"}'])('rejects an empty or JSON body even when served as application/pdf: %s', async (body) => {
+  const { client } = setup(vi.fn().mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'application/pdf' } })))
+  await expect(client.requestPdf('/api/v1/documents/CLN-7.pdf?version=1')).rejects.toThrow('PDF 파일 내용을 확인할 수 없습니다')
+})
 describe('API 계약', () => {
   it('봉투·페이지를 유지하고 Bearer, JSON, 멱등성 키, signal을 보낸다', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(ok({ content: [], page: 1 }))

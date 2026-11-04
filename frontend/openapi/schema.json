@@ -27,6 +27,277 @@
         },
         "type" : "object"
       },
+      "AgentHomeAmountBucket" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeBasis" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "range" : {
+            "$ref" : "#/components/schemas/AgentHomeRange"
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeCodeCount" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeCommission" : {
+        "properties" : {
+          "clawback" : {
+            "$ref" : "#/components/schemas/AgentHomeAmountBucket"
+          },
+          "dataStatus" : {
+            "type" : "string"
+          },
+          "expected" : {
+            "$ref" : "#/components/schemas/AgentHomeAmountBucket"
+          },
+          "held" : {
+            "$ref" : "#/components/schemas/AgentHomeAmountBucket"
+          },
+          "month" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeFilters" : {
+        "properties" : {
+          "insurerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurerType" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeInsurerCount" : {
+        "properties" : {
+          "contractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "monthlyEquivalentFirstPremiumSum" : {
+            "type" : "number"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeLastCheck" : {
+        "properties" : {
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "nextCheckDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "result" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeMonthlyCount" : {
+        "properties" : {
+          "month" : {
+            "type" : "string"
+          },
+          "monthlyEquivalentFirstPremiumSum" : {
+            "type" : "number"
+          },
+          "newContractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomePortfolio" : {
+        "properties" : {
+          "categories" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AgentHomeCodeCount"
+            },
+            "type" : "array"
+          },
+          "contractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurers" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AgentHomeInsurerCount"
+            },
+            "type" : "array"
+          },
+          "monthly" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AgentHomeMonthlyCount"
+            },
+            "type" : "array"
+          },
+          "statuses" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AgentHomeCodeCount"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomePriorityContract" : {
+        "properties" : {
+          "contextVersion" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "currentStatus" : {
+            "type" : "string"
+          },
+          "currentStatusCode" : {
+            "type" : "string"
+          },
+          "elapsedDays" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedAmount" : {
+            "type" : "number"
+          },
+          "heldAmount" : {
+            "type" : "number"
+          },
+          "heldCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "insurerName" : {
+            "type" : "string"
+          },
+          "lastCheck" : {
+            "$ref" : "#/components/schemas/AgentHomeLastCheck"
+          },
+          "lastEventEffectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "nextCheckDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "reasonCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeRange" : {
+        "properties" : {
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "to" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AgentHomeResponse" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basis" : {
+            "$ref" : "#/components/schemas/AgentHomeBasis"
+          },
+          "dataStatus" : {
+            "type" : "string"
+          },
+          "filters" : {
+            "$ref" : "#/components/schemas/AgentHomeFilters"
+          },
+          "myCommission" : {
+            "$ref" : "#/components/schemas/AgentHomeCommission"
+          },
+          "period" : {
+            "type" : "string"
+          },
+          "portfolio" : {
+            "$ref" : "#/components/schemas/AgentHomePortfolio"
+          },
+          "priorityContractTotal" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "priorityContracts" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AgentHomePriorityContract"
+            },
+            "type" : "array"
+          },
+          "range" : {
+            "$ref" : "#/components/schemas/AgentHomeRange"
+          }
+        },
+        "type" : "object"
+      },
       "AgentResponse" : {
         "description" : "보험설계사 기준정보",
         "properties" : {
@@ -163,6 +434,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/ActiveMonthlyRunResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseAgentHomeResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AgentHomeResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -331,6 +616,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/CompareRankingResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseContractCheckResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ContractCheckResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -3615,6 +3914,55 @@
               "type" : "string"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ContractCheckRequest" : {
+        "properties" : {
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedContextVersion" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "memo" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "nextCheckDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "result" : {
+            "minLength" : 1,
+            "pattern" : "CLOSED|FOLLOW_UP",
+            "type" : "string"
+          }
+        },
+        "required" : [ "contractId", "expectedContextVersion", "result" ],
+        "type" : "object"
+      },
+      "ContractCheckResponse" : {
+        "properties" : {
+          "checkId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "contextVersion" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -8779,6 +9127,100 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/agent/me/contract-checks" : {
+      "post" : {
+        "description" : "종결 또는 후속 확인을 기록합니다. Idempotency-Key 와 expectedContextVersion 이 필요합니다.",
+        "operationId" : "record",
+        "parameters" : [ {
+          "description" : "멱등키(1~160자). 없으면 서비스가 400 으로 거절한다",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ContractCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractCheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "계약 확인 기록",
+        "tags" : [ "설계사 홈" ]
+      }
+    },
+    "/api/v1/agent/me/home" : {
+      "get" : {
+        "description" : "기간·보험사 필터를 적용한 포트폴리오와 asOf 월 수수료, 확인할 계약을 돌려줍니다.",
+        "operationId" : "home",
+        "parameters" : [ {
+          "description" : "기준일(기본 서울 오늘)",
+          "in" : "query",
+          "name" : "asOf",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "description" : "6|12|ALL (기본 12)",
+          "in" : "query",
+          "name" : "period",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "ALL|LIFE|NON_LIFE (기본 ALL)",
+          "in" : "query",
+          "name" : "insurerType",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "보험사 ID",
+          "in" : "query",
+          "name" : "insurerId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAgentHomeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "설계사 홈",
+        "tags" : [ "설계사 홈" ]
+      }
+    },
     "/api/v1/agent/me/statements" : {
       "get" : {
         "description" : "지급·보류·조정·환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.",
@@ -13272,6 +13714,9 @@
   }, {
     "description" : "계약 상세 통합조회 및 재검증 API",
     "name" : "계약"
+  }, {
+    "description" : "FUN-086 포트폴리오·이번 달 수수료·확인할 계약",
+    "name" : "설계사 홈"
   }, {
     "description" : "FGC 기준정보 조회 API",
     "name" : "기준정보"
