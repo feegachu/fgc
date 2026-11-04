@@ -84,6 +84,7 @@ class AnswerEvalRegressionTest {
             Map<String, String> verdicts = results.stream().collect(Collectors.toMap(CaseResult::id, CaseResult::verdict));
             AnswerEvalHarness.MAPPER.writerWithDefaultPrettyPrinter().writeValue(out.resolve("recorded-answers.json").toFile(),
                     new Recorded(recorded.model(), recorded.promptVersion(), AnswerEvalHarness.guideFingerprint(), recorded.baseCommit(), recorded.answers(), verdicts));
+            assertThat(out.resolve("result.md")).exists();
         }
     }
 
@@ -161,8 +162,8 @@ class AnswerEvalRegressionTest {
         RunResult next = replay("next", "other-model", changed);
         String table = AnswerEvaluator.compare(base, next);
 
-        assertThat(table).contains("| 모델 | " + RECORDED.model() + " | other-model |", "프롬프트 버전", "입력 토큰", "비용(USD)", "p95(ms)", "FUN-079 정확도", "무수정 처리율");
-        assertThat(table).contains("| C-N2 | 정상 | " + result(base.results(), "C-N2").verdict());
+        assertThat(table).contains("| 모델 | " + RECORDED.model() + " | other-model |", "프롬프트 버전", "입력 토큰", "비용(USD)", "p95(ms)", "FUN-079 정확도", "무수정 처리율",
+                "| C-N2 | 정상 | " + result(base.results(), "C-N2").verdict());
         assertThat(result(next.results(), "C-N2").path()).isEqualTo(AnswerEvaluator.PATH_GUARD);
         assertThat(result(next.results(), "C-N2").verdict()).isEqualTo(AnswerEvaluator.FAIL);
     }

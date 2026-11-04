@@ -33,10 +33,10 @@ public class CompareSummaryService {
 
     private static final int MAX_LENGTH = 400;
     /**
-     * AI 문장에 있으면 버리는 말: 단정 표현, 환급금을 내세운 추천(REG-18, SRC-025 2차 FAQ Q24), 하지 않은 처리의 성공 주장(COR-007), 링크와 태그(SER-013).
-     * 입력 근거에 환급금이나 처리 도구가 없어 정상 답에는 나오지 않고, 걸려도 서버 문장으로 대체될 뿐이다.
+     * AI 문장에 있으면 버리는 말: 단정 표현, 환급을 내세운 추천(REG-18, SRC-025 2차 FAQ Q24), 하지 않은 처리의 성공 주장(COR-007), 링크와 태그(SER-013).
+     * 입력 근거에 환급 자료나 처리 도구가 없어 정상 답에는 나오지 않고, 걸려도 서버 문장으로 대체될 뿐이다.
      */
-    static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다", "환급금",
+    static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다", "환급",
             "완료했", "등록했", "확정했", "처리했", "저장했", "지급했", "<", ">", "http://", "https://", "www.");
 
     private final LlmGateway llmGateway;

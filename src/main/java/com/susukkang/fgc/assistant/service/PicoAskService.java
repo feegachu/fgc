@@ -47,7 +47,7 @@ public class PicoAskService {
     private static final int NUMERAL_TAIL = 32;
     private static final Pattern STEP_COUNT = Pattern.compile("(?<![\\p{N}.,+\\-])([1-9]\\d{0,2})\\s*단계");
     /** 줄 앞이나 문장 안의 '1. ', '2) ' 순번. 실제 답은 한 줄에 이어 쓰는 경우가 많다(TER-011 실측). 1부터 이어질 때만 지운다. */
-    private static final Pattern LIST_MARKER = Pattern.compile("(?m)(?:^[\\t ]*|(?<=\\s))([1-9]\\d?)[.)][\\t ]+");
+    private static final Pattern LIST_MARKER = Pattern.compile("(?<!\\S)([1-9]\\d?)[.)][\\t ]+");
 
     private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
 
