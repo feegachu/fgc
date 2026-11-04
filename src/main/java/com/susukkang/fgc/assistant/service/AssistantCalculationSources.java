@@ -1,0 +1,173 @@
+package com.susukkang.fgc.assistant.service;
+
+
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+import com.susukkang.fgc.assistant.dto.*;
+
+import com.susukkang.fgc.common.util.MoneyUtil;
+
+import com.susukkang.fgc.common.security.AgentDataScopeService;
+
+import com.susukkang.fgc.common.code.CapResultStatus;
+
+import com.susukkang.fgc.cap.service.CapCalculator;
+
+import com.susukkang.fgc.cap.dto.CapCalculationCommand;
+
+import com.susukkang.fgc.schedule.repository.ScheduleQueryRepository;
+
+import com.susukkang.fgc.schedule.dto.ScheduleLineResponse;
+
+import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
+
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+
+import java.time.*;
+
+import java.util.*;
+
+import static com.susukkang.fgc.assistant.service.CalculationAmounts.*;
+
+
+
+@Component
+
+@RequiredArgsConstructor
+
+public class AssistantCalculationSources {
+
+    private final ScheduleQueryRepository schedules;
+
+    private final CapCalculator caps;
+
+    private final ReconciliationResultQueryService reconciliations;
+
+    private final AgentDataScopeService scopeAccess;
+
+    public PaymentCalculationSnapshot calculate(PaymentCalculationRequest request) {
+
+        if(request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL && request.kind()==PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE) return balance(request);
+
+        if(request.mode()!=PaymentCalculationRequest.Mode.EXISTING) return result(request,"UNSUPPORTED","HYPOTHETICAL",Map.of(),Map.of(),List.of(),List.of(),null,null,false);
+
+        if(request.candidate()!=null && !request.candidate().isNull()) throw invalid("candidate");
+
+        var scope=request.scope();
+
+        if(request.kind()==PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE) {
+
+            if(scope==null || scope.reconciliationResultId()==null) return missing(request,"reconciliationResultId");
+
+            var detail=reconciliations.get(id(scope.reconciliationResultId(),"reconciliationResultId"));
+
+            scopeAccess.requireContract(detail.contractId());
+
+            var amounts=new LinkedHashMap<String,String>();
+
+            amounts.put("expectedAmount",won(detail.expectedTotalAmount()));amounts.put("actualAmount",won(detail.actualTotalAmount()));amounts.put("differenceAmount",won(detail.differenceAmount()));
+
+            String status=amounts.values().stream().anyMatch(Objects::isNull)?"INSUFFICIENT_DATA":"CALCULATED";
+
+            return result(request,status,"ACTUAL",Map.of("reconciliationResultId",scope.reconciliationResultId()),amounts,List.of(),List.of(),new PaymentCalculationSnapshot.Source("reconciliation:"+scope.reconciliationResultId(),"RECONCILIATION","저장된 대사 결과",str(detail.createdAt()),scope.reconciliationResultId()),null,false);
+
+        }
+
+        if(scope==null || scope.contractId()==null || scope.paymentStage()==null) return missing(request,"contractId","paymentStage");
+
+        long contract=id(scope.contractId(),"contractId");scopeAccess.requireContract(contract);
+
+        if(request.kind()==PaymentCalculationRequest.Kind.CAP_STATUS) {
+
+            if(scope.asOfDate()==null) return missing(request,"asOfDate");
+
+            var cap=caps.calculate(CapCalculationCommand.realtime(contract,scope.paymentStage(),scope.asOfDate(),null));
+
+            var amounts=new LinkedHashMap<String,String>();amounts.put("limitAmount",won(cap.limitAmount()));amounts.put("includedAmount",won(cap.includedAmount()));amounts.put("remainingAmount",won(cap.remainingAmount()));
+
+            return result(request,cap.resultStatus()==CapResultStatus.REVIEW_REQUIRED?"REVIEW_REQUIRED":"CALCULATED","ACTUAL",Map.of("contractId",scope.contractId(),"paymentStage",scope.paymentStage().name()),amounts,List.of(),List.of(),new PaymentCalculationSnapshot.Source("cap:"+contract,"POLICY","기존 한도 계산 조회",str(cap.capRuleSetId()),scope.contractId()),scope.asOfDate().toString(),false);
+
+        }
+
+        if(request.kind()!=PaymentCalculationRequest.Kind.EXPECTED_COMMISSION) return result(request,"UNSUPPORTED","ACTUAL",Map.of(),Map.of(),List.of(),List.of(),null,null,false);
+
+        if(scope.settlementMonth()==null || scope.aggregation()==null) return missing(request,"settlementMonth","aggregation");
+
+        YearMonth month;try {month=YearMonth.parse(scope.settlementMonth());}catch(java.time.DateTimeException e){throw invalid("settlementMonth");}
+
+        if(scope.aggregation()==PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE && (scope.commissionItemId()==null || scope.installmentNo()==null || (scope.paymentStage()==com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC && scope.beneficiaryAgentId()==null))) return missing(request,"commissionItemId","installmentNo","beneficiaryAgentId");
+
+        var detail=schedules.selectByContractIdAndPaymentStage(contract,scope.paymentStage());
+
+        if(detail==null || detail.getLines()==null) return missing(request,"activeSchedule");
+
+        var selected=detail.getLines().stream().filter(line-> line.getDueDate()!=null && YearMonth.from(line.getDueDate()).equals(month))
+
+            .filter(line->!"CANCELLED".equals(line.getLineStatus()))
+
+            .filter(line->scope.commissionItemId()==null || Objects.equals(str(line.getCommissionItemId()),scope.commissionItemId()))
+
+            .filter(line->scope.beneficiaryAgentId()==null || Objects.equals(str(line.getBeneficiaryAgentId()),scope.beneficiaryAgentId()))
+
+            .filter(line->scope.installmentNo()==null || Objects.equals(line.getInstallmentNo(),scope.installmentNo())).toList();
+
+        if(selected.isEmpty() || (scope.aggregation()==PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE && selected.size()!=1)) return missing(request,"scheduleLineSelection");
+
+        if(selected.stream().anyMatch(line->line.getExpectedAmount()==null)) return missing(request,"expectedAmount");
+
+        var lines=selected.stream().map(line->new PaymentCalculationSnapshot.CalculationLine(str(detail.getScheduleHeaderId())+":"+line.getLineNo(),str(line.getContractId()),str(line.getCommissionItemId()),str(line.getBeneficiaryAgentId()),line.getInstallmentNo(),str(line.getAttributionDate()),str(line.getDueDate()),line.getBasisCode(),str(line.getBasisAmount()),line.getCalculationType(),str(line.getRatePct()),won(line.getExpectedAmount()),str(line.getRuleRef()),line.getLineStatus())).toList();
+
+        boolean held=selected.stream().anyMatch(line->"HOLD".equals(line.getLineStatus()));
+
+        var total=MoneyUtil.sumRounded(selected.stream().map(ScheduleLineResponse::getExpectedAmount).toList());
+
+        var resolved=new LinkedHashMap<String,String>();resolved.put("contractId",scope.contractId());resolved.put("settlementMonth",scope.settlementMonth());resolved.put("paymentStage",scope.paymentStage().name());resolved.put("aggregation",scope.aggregation().name());
+        Long policy=schedules.selectActiveOperationalPolicyVersionId(contract,scope.paymentStage());if(policy!=null)resolved.put("policyVersionId",policy.toString());
+        var dates=selected.stream().map(ScheduleLineResponse::getDueDate).distinct().toList();
+        return result(request,held?"REVIEW_REQUIRED":"CALCULATED","EXPECTED",resolved,Map.of("expectedAmount",total.toPlainString()),lines,List.of(),new PaymentCalculationSnapshot.Source("schedule:"+detail.getScheduleHeaderId(),"SCHEDULE","활성 운영 스케줄",str(detail.getHeader().getGeneratedAt()),str(detail.getScheduleHeaderId())),dates.size()==1?dates.getFirst().toString():null,!held && policy!=null && selected.size()==1);
+
+    }
+
+    private PaymentCalculationSnapshot balance(PaymentCalculationRequest request) {
+
+        if(request.scope()!=null) throw invalid("scope");
+
+        JsonNode candidate=request.candidate();if(candidate==null || !candidate.isObject() || candidate.size()!=1 || !candidate.has("balance"))throw invalid("candidate.balance");
+
+        JsonNode balance=candidate.get("balance");if(!balance.isObject() || balance.size()!=2)throw invalid("candidate.balance");
+
+        BigDecimal amount=input(balance.get("amount"),"candidate.balance.amount");JsonNode rows=balance.get("attributionAmounts");
+
+        if(rows==null || !rows.isArray() || rows.isEmpty() || rows.size()>1000)throw invalid("candidate.balance.attributionAmounts");
+
+        var values=new ArrayList<BigDecimal>();for(JsonNode row:rows)values.add(input(row,"candidate.balance.attributionAmounts"));
+
+        BigDecimal total=MoneyUtil.sumRounded(values);BigDecimal difference=MoneyUtil.roundWon(amount).subtract(total);
+
+        return result(request,difference.signum()==0?"CALCULATED":"REVIEW_REQUIRED","HYPOTHETICAL",Map.of(),Map.of("amount",won(amount),"attributedTotal",total.toPlainString(),"differenceAmount",difference.toPlainString()),List.of(),List.of(),null,null,false);
+
+    }
+
+    private PaymentCalculationSnapshot missing(PaymentCalculationRequest request,String... fields) {return result(request,"INSUFFICIENT_DATA","ACTUAL",Map.of(),Map.of(),List.of(),List.of(fields),null,null,false);}
+
+    private PaymentCalculationSnapshot result(PaymentCalculationRequest r,String status,String evidence,Map<String,String> scope,Map<String,String> amounts,List<PaymentCalculationSnapshot.CalculationLine> lines,List<String> missing,PaymentCalculationSnapshot.Source source,String asOfDate,boolean recommend) {
+
+        var sources=source==null?List.<PaymentCalculationSnapshot.Source>of():List.of(source);
+
+        var basis=new PaymentCalculationSnapshot.Basis(sources,new PaymentCalculationSnapshot.Rounding(0,"HALF_UP","ROUND_EACH_LINE_THEN_SUM"),asOfDate,scope.get("policyVersionId")==null?List.of():List.of(scope.get("policyVersionId")),lines.stream().map(PaymentCalculationSnapshot.CalculationLine::ruleId).filter(Objects::nonNull).distinct().toList(),List.of());
+
+        return new PaymentCalculationSnapshot(UUID.randomUUID().toString(),r.kind().name(),r.mode().name(),status,r.clientRevision(),false,true,evidence,"KRW",null,scope,amounts,List.of(),null,List.of(),missing,basis,new PaymentCalculationSnapshot.Recommendation(false,recommend?"payment.amount":null,recommend?amounts.get("expectedAmount"):null,recommend?"예상액입니다. 실제 명세와 대조하고 사용 직전 재검증하세요.":"읽기 전용 계산입니다. 실제 지급 처리 완료를 뜻하지 않습니다.",List.of("SERVER_REVALIDATION_REQUIRED")),OffsetDateTime.now(),null,lines);
+
+    }
+
+    private static String won(BigDecimal value){return value==null?null:MoneyUtil.roundWon(value).toPlainString();}
+
+    private static String str(Object value){return value==null?null:value.toString();}
+
+}
+
