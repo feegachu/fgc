@@ -67,50 +67,72 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
 
     @Override
     public List<ContractStatusEffect> process(ContractStatusEvent event) {
+        List<ContractStatusEffect> planned = plan(event);
+        planned.forEach(effect -> apply(event, effect));
+        return planned;
+    }
+
+    @Override
+    public List<ContractStatusEffect> plan(ContractStatusEvent event) {
         boolean resumed = isPaymentResumed(event);
-        List<ContractStatusEffect> recorded = new ArrayList<>();
+        List<ContractStatusEffect> planned = new ArrayList<>();
         for (ContractStatusEffect effect : rule.decide(event, holds.openHeldPaymentIds(event.getContractId()))) {
             if (resumed) {
-                resume(event, effect).ifPresent(recorded::add);
-            } else if (effect.entityType() == EntityType.SCHEDULE_LINE) {
-                if (APPLIED_LINE_STATES.contains(effect.nextState())) {
-                    applyLine(effect);
-                    recorded.add(effect);
-                } else if (EXCLUDED.equals(effect.nextState())) {
-                    recorded.add(effect);
-                }
-            } else if (HELD.equals(effect.nextState())) {
-                holds.insert(effect.entityId(), event.getContractStatusEventId(), effect.policyVersionId(), effect.reasonCode());
-                recorded.add(effect);
-            } else if (EXCLUDED.equals(effect.nextState())) {
-                recorded.add(effect);
+                planResume(event, effect).ifPresent(planned::add);
+            } else if (EXCLUDED.equals(effect.nextState()) || (effect.entityType() == EntityType.SCHEDULE_LINE
+                    ? APPLIED_LINE_STATES.contains(effect.nextState()) : HELD.equals(effect.nextState()))) {
+                planned.add(effect);
             }
         }
-        return recorded;
+        return planned;
+    }
+
+    @Override
+    public Set<String> releasedHoldReasons() {
+        return UNPAID_HOLD_REASONS;
+    }
+
+    private void apply(ContractStatusEvent event, ContractStatusEffect effect) {
+        if (effect.entityType() == EntityType.PAYMENT) {
+            if (HELD.equals(effect.nextState())) {
+                holds.insert(effect.entityId(), event.getContractStatusEventId(), effect.policyVersionId(), effect.reasonCode());
+            } else if (RELEASED.equals(effect.nextState())) {
+                // 납입 재개는 미납으로 건 보류만 푼다. 실효·해지 등 다른 사유의 보류는 이 재개로 풀리지 않는다.
+                holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), UNPAID_HOLD_REASONS);
+            }
+        } else if (PLANNED.equals(effect.nextState())) {
+            boolean dueBeforeResume = UNPAID_RESUMED.equals(effect.reasonCode());
+            // 원래 날짜로 되돌리면 원래 달에는 실제 지급이 없고 재개한 달에는 예상이 없어 대사가 갈라진다(2026-10-13 PL 결정).
+            jdbc.update("""
+                    UPDATE fgc.schedule_line SET line_status = 'PLANNED', due_date = CASE WHEN ? THEN ?::date ELSE due_date END
+                     WHERE schedule_line_id = ? AND line_status = 'HOLD'
+                    """, dueBeforeResume, resumeDate(event), effect.entityId());
+        } else if (APPLIED_LINE_STATES.contains(effect.nextState())) {
+            applyLine(effect);
+        }
     }
 
     /**
      * 납입 재개: 미납으로 보류됐던 회차(HOLD)와 지급 건을 푼다. 재개일 당일과 그 이후 회차도 정상 상태라 PLANNED 로 돌린다.
      * 지급예정일은 재개 전에 있던 회차(UNPAID_RESUMED)만 재개일로 다시 잡는다. 다른 사유로 중단된(CANCELLED) 회차는 소급하지 않는다.
      */
-    private Optional<ContractStatusEffect> resume(ContractStatusEvent event, ContractStatusEffect effect) {
+    private Optional<ContractStatusEffect> planResume(ContractStatusEvent event, ContractStatusEffect effect) {
         if (effect.entityType() == EntityType.SCHEDULE_LINE && PLANNED.equals(effect.nextState())
                 && "HOLD".equals(effect.previousState())) {
-            boolean dueBeforeResume = UNPAID_RESUMED.equals(effect.reasonCode());
-            LocalDate resumedOn = resumeDate(event);
-            // 원래 날짜로 되돌리면 원래 달에는 실제 지급이 없고 재개한 달에는 예상이 없어 대사가 갈라진다(2026-10-13 PL 결정).
-            jdbc.update("""
-                    UPDATE fgc.schedule_line SET line_status = 'PLANNED', due_date = CASE WHEN ? THEN ?::date ELSE due_date END
-                     WHERE schedule_line_id = ? AND line_status = 'HOLD'
-                    """, dueBeforeResume, resumedOn, effect.entityId());
-            return Optional.of(dueBeforeResume ? withDueDateNote(effect, resumedOn) : effect);
+            return Optional.of(UNPAID_RESUMED.equals(effect.reasonCode()) ? withDueDateNote(effect, resumeDate(event)) : effect);
         }
-        if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
-            // 납입 재개는 미납으로 건 보류만 푼다. 실효·해지 등 다른 사유의 보류는 이 재개로 풀리지 않는다.
-            int released = holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), UNPAID_HOLD_REASONS);
-            return released > 0 ? Optional.of(effect) : Optional.empty();
+        if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())
+                && holds.hasOpenHold(effect.entityId(), event.getContractId(), UNPAID_HOLD_REASONS)) {
+            return Optional.of(effect);
         }
         return Optional.empty();
+    }
+
+    /** 납입 재개로 지급예정일을 다시 잡는 회차면 그 날짜. 미리보기가 변경 후 지급예정일을 보여 줄 때 쓴다. */
+    static Optional<LocalDate> resumedDueDate(ContractStatusEvent event, ContractStatusEffect effect) {
+        return isPaymentResumed(event) && effect.entityType() == EntityType.SCHEDULE_LINE
+                && PLANNED.equals(effect.nextState()) && UNPAID_RESUMED.equals(effect.reasonCode())
+                ? Optional.of(resumeDate(event)) : Optional.empty();
     }
 
     private static LocalDate resumeDate(ContractStatusEvent event) {

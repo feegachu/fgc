@@ -13,6 +13,8 @@ export type ContractCreateRequest = Schema['ContractCreateRequest']
 export type ContractUpdateRequest = Schema['ContractUpdateRequest']
 export type ContractSaveRequest = ContractCreateRequest
 export type ContractStatusEvent = Schema['ContractStatusEventResponse']
+export type ContractStatusPreviewRequest = Schema['ContractStatusPreviewRequest']
+export type ContractStatusPreview = Schema['ContractStatusPreviewResponse']
 export type ContractSchedule = Schema['ContractScheduleResponse']
 export type ContractCapCheck = Schema['CapCheckSaveResult']
 export type ContractArbitrageCheck = Schema['ArbitrageCheckView']
@@ -171,6 +173,9 @@ export async function updateContract(id: string | number, body: ContractUpdateRe
   if (data.contractId == null) throw new Error('수정된 계약을 확인할 수 없습니다.')
   return data
 }
+/** IF-API-64 저장 전 상태 사건의 영향. 조회 성격이라 멱등키가 없고 아무것도 저장하지 않는다. */
+export const previewContractStatusEvent = (id: string, body: ContractStatusPreviewRequest, signal?: AbortSignal) =>
+  request<ContractStatusPreview>(contractPath(id, '/status-events/preview'), { method: 'POST', body, signal })
 export const recheckContractCap = (id: string) =>
   request<ContractCapCheck[]>(contractPath(id, '/cap-check'), { method: 'POST' })
 export const recheckContractArbitrage = (id: string, body: ReArbitrageCheckRequest) =>
