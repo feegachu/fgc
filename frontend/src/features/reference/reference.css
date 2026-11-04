@@ -4,10 +4,6 @@
   gap: var(--space-3);
 }
 
-.base-page-header {
-  align-items: flex-end;
-}
-
 .base-as-of-summary {
   flex: 0 0 auto;
   color: var(--color-text-secondary);
@@ -35,7 +31,6 @@
 .base-filter-form {
   flex-wrap: wrap;
   padding: var(--space-5);
-  border-radius: var(--radius-12);
   box-shadow: var(--shadow-xs);
 }
 
@@ -60,7 +55,6 @@
   display: grid;
   min-width: 0;
   overflow: hidden;
-  border-radius: var(--radius-12);
 }
 
 .base-result-header {
@@ -224,10 +218,6 @@
   gap: var(--space-3);
 }
 
-.policy-page-header {
-  align-items: flex-end;
-}
-
 .policy-date-field {
   width: 11rem;
   flex: 0 0 auto;
@@ -247,7 +237,7 @@
 .policy-tab-panel {
   margin-top: var(--space-5);
   border-top: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-12);
+  border-radius: var(--radius-8);
 }
 
 .policy-panel-header {
