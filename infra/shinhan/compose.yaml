@@ -72,6 +72,7 @@ services:
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ./nginx/guard.conf:/etc/nginx/fgc.d/guard.conf:ro
+      - ./nginx/http.conf:/etc/nginx/conf.d/fgc-http.conf:ro
     mem_limit: 256m
     logging: *logging
 
