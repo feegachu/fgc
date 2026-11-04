@@ -16,16 +16,17 @@
 | 질문 | 답 |
 |---|---|
 | 무슨 도구로 | CodeQL(정적), Dependabot, npm audit, Trivy(의존성, 이미지), gitleaks, GitHub Secret scanning(비밀값), 역할 × API 행렬 통합 시험(인가), 공격 입력 통합 시험(입력), OWASP ZAP(동적) |
-| 어디까지 | 코드 전체 이력, 쓰기 API 38개 전수 대조(역할 시험 35개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 138건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
+| 어디까지 | 코드 전체 이력, 쓰기 API 38개 전수 대조(역할 시험 35개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 139건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
 | High/Critical 건수 | 탐지 15건 → 오탐 3, 이 PR로 조치 10, **예외 2(`.trivyignore` 승인 기재, Dependabot 해제는 PM 승인 대기)**. ZAP High 0 |
-| 조치 | 빌드 도구 classpath의 jackson, commons-lang3 올림. 개발 도구 zod 올림. API 이미지에서 쓰지 않는 pebble 제거. nginx 버전 노출 끄기. ZAP이 찾은 500 응답 2종을 400으로. 정적 화면 응답에 빠져 있던 보안 헤더(CSP 등)는 #782로 넣었고 신한 경로까지 확인 |
-| 남은 일 | RC에서 ZAP, Trivy, TLS, 롤백 실측. 시연 서버의 계정 보호 상태 확인(3절 층 3) |
+| 조치 | 빌드 도구 classpath의 jackson, commons-lang3 올림. 개발 도구 zod 올림. API 이미지에서 쓰지 않는 pebble 제거. nginx 버전 노출 끄기. ZAP이 찾은 500 응답 3종을 400으로. 정적 화면 응답에 빠져 있던 보안 헤더(CSP 등)는 #782로 넣었고 신한 경로까지 확인 |
+| 남은 일 | RC에서 ZAP, Trivy, TLS, 롤백 실측. 시연 서버의 계정 보호 상태 확인(3절 층 3). SER-004 요구사항 해석 PM 확인(4-5) |
 
 ## 2. 대상
 
 | 항목 | 값 |
 |---|---|
-| 코드 기준 | develop `9a0a37ca` (이 PR 기준 커밋) |
+| 코드 기준 | develop `eb2a37a5` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
+| 이미지 기준 | 게시 이미지 `sha-69f77eff` (api `sha256:beaf2532…`, web `sha256:1cef1ee3…`). 이 PR의 조치 전 상태다. 그 뒤 develop의 #773(화면), #831(지급 보류, V79)은 이미지에 없고 의존성, `Containerfile`, nginx 변경은 없다 |
 | RC | `r2.0.0-rc1` 미발행. 미확인 |
 | 시험 환경 | Testcontainers PostgreSQL 17, Windows 11 로컬 / GitHub Actions |
 | 시험 실행 | PR #858의 CI `build`(Gradle 전체 스위트), `frontend`, `ui`, `real-server`. 로컬: `test_zap_isolated_scan.py`, `test_shinhan_cd.py`, vitest 3개 파일 |
@@ -35,15 +36,15 @@
 
 | # | 층 | 도구, 버전 | 대상 | 범위 | 발견 | 조치, 판정 | 상태 |
 |---|---|---|---|---|---|---|---|
-| 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `5be9285f` | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
+| 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `747bc68d` | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
 | 2 | 의존성, 이미지 | Dependabot, npm audit, Trivy 0.70.0 | 4-2 | 운영 jar, 빌드 classpath, npm, API/WEB 이미지 | Critical 2, High 10 | High 10 조치(jackson 5, zod 1, pebble 4). Critical 2는 예외(4-2, 7절) | 병합 뒤 재확인, 예외 승인 대기 |
-| 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
+| 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조. 그 뒤 develop과 이 PR 커밋 16개는 같은 도구로 추가 1회, 0건 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
 | 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 38개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
-| 5 | 입력 | `InputAttackIntegrationTest`, `PrivateVolumeFileStorageTest`, `CsvExportWriterTest`, `exception.test.tsx`, `noRawHtml.test.ts` | 대표 검색, 정렬, 저장 후 응답, 다운로드 | 4-5 | 저장 후 실행, SQL 실행, 경로 탈출 0 | 4-5 | 충족 |
+| 5 | 입력 | `InputAttackIntegrationTest`, `PrivateVolumeFileStorageTest`, `CsvExportWriterTest`, `exception.test.tsx`, `noRawHtml.test.ts` | 대표 검색, 정렬, 저장 후 응답, 다운로드 | 4-5 | 저장 후 실행, SQL 실행, 경로 탈출 0 | 4-5 | 시험 통과. 요구사항 해석은 PM 확인 대기(4-5) |
 | 5-2 | 업로드 | `noHandlerAcceptsFileUpload` | 앱 전체 매핑 | 해당 기능 없음 | 0 | #637 not planned, PR #707 닫힘 (트래커 #755 4번 11/2 결정). 업로드가 돌아오면 이 시험이 깨진다 | 해당 없음 |
-| 6 | AI(LLM) 주입 | #639 평가셋 | #639 | 프롬프트 주입, 다른 설계사 자료, 업무 쓰기 유도 | #639로 연결 | CT-G04, CT-G05는 #639가 판정 | #639 |
-| 7 | 동적 스캔 | OWASP ZAP, `infra/scripts/zap-isolated-scan.sh` | 격리 로컬 스택, 이미지 `sha-5be9285f` | baseline 1회(수동 관찰), API scan 3분 제한 1회. 전체 API scan, 개발계 baseline은 RC | High 0, Medium 0. Low 1, Info 1(baseline) / Low 4, Info 3(API 3분) | 4-6 | 격리 사전 실행 완료, RC 미확인 |
-| 8 | 응답 헤더, TLS | 게시 이미지를 띄워 응답 헤더 수집 | web 이미지 `sha-185dc854`, `sha-5be9285f` | 일반 구성, 신한 구성, 브라우저 | CSP 없음 지적 해소 | 4-7. TLS 실측은 RC | CSP 충족, TLS 미확인 |
+| 6 | AI(LLM) 주입 | #639 평가셋 | #639 | 프롬프트 주입, 다른 설계사 자료, 업무 쓰기 유도 | #639로 연결 | CT-G04, CT-G05는 #639가 판정. 서버 쪽 통제는 #833으로 병합: 사용자별 호출 한도(분당 12회), 범위 밖 질문 고정 안내, 지시문 노출 차단, 시간 제한 20초 | #639 |
+| 7 | 동적 스캔 | OWASP ZAP, `infra/scripts/zap-isolated-scan.sh` | 격리 로컬 스택, 이미지 `sha-69f77eff` | baseline 1회(수동 관찰), API scan 1회(능동, 7분, 제한 25분 안에 끝남). RC 이미지 재실행과 개발계 baseline은 RC | High 0, Medium 0. Low 1, Info 1(baseline) / Low 4, Info 3(API) | 4-6 | 격리 사전 실행 완료, RC 미확인 |
+| 8 | 응답 헤더, TLS | 게시 이미지를 띄워 응답 헤더 수집 | web 이미지 `sha-185dc854`, `sha-5be9285f`, `sha-69f77eff` | 일반 구성, 신한 구성, 브라우저 | CSP 없음 지적 해소 | 4-7. TLS 실측은 RC | CSP 충족, TLS 미확인 |
 
 ## 4. 세부
 
@@ -80,8 +81,8 @@
 
 | 대상 | 기준 | 결과 |
 |---|---|---|
-| CI publish 관문, API/WEB 이미지 | develop `5be9285f` (`severity: CRITICAL`, `.trivyignore` 적용) | CRITICAL 0. 예외 2건(CVE-2026-47884, CVE-2026-47890, 만료 2026-11-30) |
-| HIGH 포함 로컬 1회 | 게시 이미지 `sha-5be9285f`, Trivy 0.70.0, `--severity HIGH,CRITICAL`, `.trivyignore` 적용 | WEB(alpine 3.24.3) 0건. API: OS 패키지 0, 운영 jar 0, **HIGH 4건은 전부 `/usr/bin/pebble`**(베이스 이미지의 Go 프로세스 관리자, Go stdlib). 실행 명령이 `catalina.sh`이고 쓰는 곳이 없어 `Containerfile.api`에서 지웠다. 새 이미지 재스캔은 RC |
+| CI publish 관문, API/WEB 이미지 | develop `69f77eff` (`severity: CRITICAL`, `.trivyignore` 적용, Scan API, Scan WEB 성공) | CRITICAL 0. 예외 2건(CVE-2026-47884, CVE-2026-47890, 만료 2026-11-30) |
+| HIGH 포함 로컬 2회 | 게시 이미지 `sha-5be9285f`, `sha-69f77eff`, Trivy 0.70.0, `--severity HIGH,CRITICAL`, `.trivyignore` 적용 | 두 번 같다. WEB(alpine 3.24.3) 0건. API: OS 패키지 0, 운영 jar 0, **HIGH 4건은 전부 `/usr/bin/pebble`**(베이스 이미지의 Go 프로세스 관리자, Go stdlib). 실행 명령이 `catalina.sh`이고 쓰는 곳이 없어 `Containerfile.api`에서 지웠다. 새 이미지 재스캔은 RC |
 | RC 이미지 | `r2.0.0-rc1` | 미확인, RC 미발행 |
 
 CI 관문은 CRITICAL만 막는다. SER-010의 "High는 조치 또는 위험수용 근거"는 RC에서 HIGH까지 캡처해 판정한다(6절 명령).
@@ -99,9 +100,11 @@ CI 관문은 CRITICAL만 막는다. SER-010의 "High는 조치 또는 위험수�
 | 1 | generic-api-key | `AuthTokenApiIntegrationTest` | 오탐. 쿠키 속성 단언 문자열 |
 | 1 | generic-api-key | `JournalCorrectionExceptionRepositoryIntegrationTest` `keyPrefix` | 오탐. 시험 키 접두어 |
 
+전체 이력 스캔 뒤의 커밋(develop `eb2a37a5`까지와 이 PR, 16개)은 같은 도구로 한 번 더 돌려 0건이었다.
+
 GitHub 설정(2026-11-04 `gh api repos/feegachu/fgc`): `secret_scanning` enabled, `secret_scanning_push_protection` enabled. Secret scanning 경고 0건(전체 상태).
 
-**도구로 판정할 수 없는 항목:** 시연 계정 보호(시드 명세 §5, SRC-065)는 저장소가 아니라 서버 상태를 봐야 한다. 신한 서버 배포 게이트는 PR #836(병합)이 다룬다. 서버 접근이 없어 실제 상태는 **미확인**이고, 그래서 SER-008은 충족으로 적지 않는다. RC 전에 Runbook(`docs/FGC_운영_장애대응_Runbook_v1_0.md`, #676) 절차로 확인한다.
+**도구로 판정할 수 없는 항목:** 시연 계정 보호(시드 명세 §5, SRC-065)는 저장소가 아니라 서버 상태를 봐야 한다. 신한 서버는 배포 스크립트가 배포 전후로 계정 보호 상태를 검사해 맞지 않으면 멈춘다(`infra/scripts/deploy-shinhan.sh`, #836 병합). 다만 서버 접근이 없어 그 배포가 돌았는지와 실제 상태는 **미확인**이고, 그래서 SER-008은 충족으로 적지 않는다. RC 전에 Runbook(`docs/FGC_운영_장애대응_Runbook_v1_0.md`, #676) 절차로 확인한다.
 
 ### 4-4. 인가 행렬 (SER-002)
 
@@ -144,41 +147,39 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 | 숫자, 날짜 칸에 공격 문자 | `typedParametersRejectAttackTextWithoutEchoingIt` | 전부 400 JSON, 입력 문자 미반사 |
 | 저장 후 응답 XSS | `storedScriptComesBackAsInertJsonText` | `application/json` + `nosniff`, 값은 글자 그대로(변조 없음). 서버가 HTML을 만드는 경로 없음 |
 | 화면 출력 XSS | `exception.test.tsx` "저장된 설명과 처리 사유의 스크립트", `noRawHtml.test.ts` | 글자로 표시, `img`, `script` 요소 생성 안 됨. HTML 해석 경로 0건 |
-| 스캔이 찾은 입력 오류 | `typedParametersRejectAttackTextWithoutEchoingIt`의 잘못된 `month`, NUL 문자 | 500 대신 400 (`CapCheckController`, `ConstraintErrorCodeResolver`). 저장, 실행은 조치 전에도 없었다 |
+| 스캔이 찾은 입력 오류 | `typedParametersRejectAttackTextWithoutEchoingIt`의 잘못된 `month`, NUL 문자, `csvDownloadErrorStillReturnsTheJsonEnvelope` | 500 대신 400 표준 봉투 (`CapCheckController`, `ConstraintErrorCodeResolver`, `GlobalExceptionHandler`). 저장, 실행은 조치 전에도 없었다 |
 | 다운로드 경로 조작 | `documentDownloadRejectsPathManipulation` | 6종 전부 400, 파일 응답과 `Content-Disposition` 없음 |
 | 다운로드 파일명 헤더 분리 | `downloadFilenameEncodesHostileContractNumber` | CR, LF, 따옴표가 헤더로 새지 않고 `filename*`에서 `..%2F` 등으로 인코딩 |
 | 저장소 키 경로 조작 | 기존 `PrivateVolumeFileStorageTest.rejectsArbitraryStorageKeys` 외 | 키 형식(`[a-f0-9]{32}`) 밖은 거부, 링크 거부 |
 | CSV 수식 | 기존 `CsvExportWriterTest` | 수식 시작 문자 무력화 |
 | CSRF | 기존 `tokenEndpointsRejectMissingClientHeaderOrForeignOrigin`, `originCheckFollowsHttpsBehindTlsTerminatingProxy` | Refresh 쿠키 경로는 Origin, X-FGC-Client가 맞지 않으면 거부. 나머지 API는 쿠키로 인증하지 않아 해당 없음(CodeQL #2 참고) |
 
-**요구사항 해석:** 자유 입력 칸의 `<script>` 문자열은 입력에서 막지 않고 글자 그대로 보관한다. 세부내용("출력 이스케이프와 허용목록")과 OWASP XSS Prevention Cheat Sheet(SRC-028, 출력 인코딩이 1차 방어)에 맞춘 판단이다. "저장·실행되지 않는다"를 "저장되어 실행되는 일이 없다"로 읽었다. 저장 자체를 막아야 한다는 뜻이면 다시 연다. 근거 없음, 확인 필요: 원문 출처 SRC-006이 누락이라 대조하지 못했다.
+**요구사항 해석:** 자유 입력 칸의 `<script>` 문자열은 입력에서 막지 않고 글자 그대로 보관한다. 세부내용("출력 이스케이프와 허용목록")과 OWASP XSS Prevention Cheat Sheet(SRC-028, 출력 인코딩이 1차 방어)에 맞춘 판단이다. "저장·실행되지 않는다"를 "저장되어 실행되는 일이 없다"로 읽었다. 저장 자체를 막아야 한다는 뜻이면 다시 연다. **PM 확인 대기.** 근거 없음, 확인 필요: 원문 출처 SRC-006이 누락이라 대조하지 못했다.
 
 ### 4-6. 동적 스캔
 
 | 항목 | 값 |
 |---|---|
-| 도구 | OWASP ZAP 2.17.0 (`ghcr.io/zaproxy/zaproxy:stable`, `sha256:9624669d…`), `zap-baseline.py` |
-| 대상 | 격리 로컬 스택: 자체 PostgreSQL + 게시 이미지 `sha-5be9285f`(api, web) + 신한 guard. 외부 LLM 키 없음 |
-| 범위 | 수동 관찰, 스파이더 2분. 스파이더는 JS를 실행하지 않아 SPA 시작 경로와 정적 자산까지만 본다 |
-| 결과 | FAIL 0, WARN 2, PASS 60 / High 0, Medium 0, Low 1, Informational 1 |
+| 항목 | baseline | API scan |
+|---|---|---|
+| 도구 | OWASP ZAP 2.17.0 (`ghcr.io/zaproxy/zaproxy:stable`, `sha256:9624669d…`), `zap-baseline.py` | 같은 이미지, `zap-api-scan.py` |
+| 대상 | 격리 로컬 스택: 자체 PostgreSQL + 게시 이미지 `sha-69f77eff`(api, web, 이 PR의 조치 전 상태) + 신한 guard. 외부 LLM 키 없음 | 같은 스택 |
+| 범위 | 수동 관찰, 스파이더 2분. 스파이더는 JS를 실행하지 않아 SPA 시작 경로와 정적 자산까지만 본다 | OpenAPI 경로 129개(요청 경로 326개), 로그인 토큰 사용, 능동 스캔. 제한 25분 안에 7분 만에 끝났다 |
+| 결과 (2026-11-04) | FAIL 0, WARN 2, PASS 60 / High 0, Medium 0, Low 1, Informational 1 | FAIL 0, WARN 4, PASS 112 / High 0, Medium 0, Low 4, Informational 3 |
 
 | 경고 | 등급 | 판단 |
 |---|---|---|
-| 10036 Server 헤더 버전 노출 (4곳) | Low | 조치: `nginx/default.conf.template` `server_tokens off`. 같은 이미지에 새 템플릿을 붙여 `Server: nginx`로 줄어든 것을 확인했다. 새 이미지로 RC에서 다시 확인 |
+| 10036 Server 헤더 버전 노출 | Low | 조치: `nginx/default.conf.template` `server_tokens off`. 앞선 이미지에 새 템플릿을 붙여 `Server: nginx`로 줄어든 것을 확인했다. 새 이미지로 RC에서 다시 확인 |
+| 100000 서버 오류 응답 | Low | 조치: 잘못된 `month`, 없는 스케줄의 CSV(이번 실행), NUL 문자(앞선 `sha-5be9285f` 실행)를 이 PR에서 400 표준 봉투로 고쳤다(4-5). 스캔한 이미지에는 없는 수정이라 통합 시험으로 확인했고 새 이미지 재실행은 RC. 저장, 노출은 조치 전에도 없었다 |
+| 90022 Application Error Disclosure 1곳 | Low | 위 CSV 500과 같은 응답, 조치. 본문이 비어 내부 정보 노출도 없었다(재현 확인) |
+| 100001 Unexpected Content-Type | Low | 오탐. CSV 내려받기와 SPA 경로의 정상 응답 |
 | 10109 Modern Web Application | Informational | 결함 아님. AJAX 스파이더를 권하는 안내 |
+| 4xx 응답, 인증 요청 식별, URL의 `userId` 필터 | Informational | 결함 아님 |
 
 | 남은 실행 | 상태 |
 |---|---|
-| API scan, 격리 | 전체 실행은 미확인, 사유: RC 미발행. 스크립트 확인으로 같은 격리 스택에 능동 스캔 3분 제한 1회, 대상 고정(`-O`) 확인 1분 제한 1회를 돌렸다(`sha-5be9285f`, OpenAPI 경로 129개, 요청 경로 약 330개, 로그인 토큰 사용, 조치 전 이미지). 두 번 모두 FAIL 0, PASS 112 / High 0, Medium 0, Low 4, Informational 3. 시간 제한으로 끊긴 규칙이 있어 합격 판정에 쓰지 않는다 |
+| API scan, RC 이미지 | 미확인, 사유: RC 미발행 |
 | baseline, 개발계 RC | 미확인, 사유: RC 미발행. #677 표대로 수동 관찰만, 공유 서버라 사용자 승인 뒤 실행 |
-
-| 경고 (API scan 3분) | 등급 | 판단 |
-|---|---|---|
-| 100000 서버 오류 응답 3곳 | Low | 2곳 조치: 잘못된 `month`, NUL 문자 입력을 400으로(결과서 4-5). 1곳 남음: 없는 스케줄의 CSV를 `Accept: text/csv`로 요청하면 오류 봉투를 쓰지 못해 본문 없는 500이다. 저장, 노출은 없다 |
-| 90022 Application Error Disclosure 1곳 | Low | 위 CSV 500과 같은 응답. 본문이 비어 내부 정보 노출 없음(재현 확인) |
-| 100001 Unexpected Content-Type | Low | 오탐. CSV 내려받기와 SPA 경로의 정상 응답 |
-| 10036 Server 헤더 버전 노출 | Low | 위와 같음, 조치 |
-| 4xx 응답, 인증 요청 식별, URL의 `userId` 필터 | Informational | 결함 아님 |
 
 스크립트 `infra/scripts/zap-isolated-scan.sh`는 대상이 `http://127.0.0.1:<포트>` 또는 `http://localhost:<포트>`가 아니면 docker를 부르기 전에 거부한다(`test_zap_isolated_scan.py`, 사용자 정보와 접두어 우회 포함). API scan은 문서의 `servers`가 무엇이든 대상에 고정한다(`-O`). 실제 LLM을 부르지 않게 키 변수를 지우고 시작하며, 스캔 중 격리 DB의 `ai_call_log`는 0건이었다. 원본 보고서는 `build/zap/`(gitignore)에만 둔다.
 
@@ -186,7 +187,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 
 적용 위치: `nginx/security-headers.conf`, `nginx/default.conf.template`(#782). web 이미지에 들어가며 `infra/scripts/deploy-host.sh`, `infra/shinhan/nginx-guard.conf`에는 HSTS 값 외에 별도 설정이 없다. 그래서 두 파일을 grep 해서는 나오지 않는다.
 
-게시 이미지 `ghcr.io/feegachu/fgc/web:sha-185dc854`(`sha256:58978f38…`)를 격리 포트로 띄워 응답 헤더를 받았다. 신한 구성은 `deploy-shinhan.sh`와 같은 방식으로 이미지에서 템플릿을 꺼내 `adapt_nginx`를 거치고 `nginx-guard.conf`를 붙였다.
+게시 이미지 `ghcr.io/feegachu/fgc/web:sha-185dc854`(`sha256:58978f38…`)를 격리 포트로 띄워 응답 헤더를 받았다. 신한 구성은 `deploy-shinhan.sh`와 같은 방식으로 이미지에서 템플릿을 꺼내 `adapt_nginx`를 거치고 `nginx-guard.conf`를 붙였다. `sha-69f77eff` 격리 스택의 `/login`에서도 같은 헤더를 받았다.
 
 | 경로 | 일반 구성 | 신한 구성 |
 |---|---|---|
@@ -195,7 +196,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 
 정책: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`
 
-이미지의 산출물에 인라인 스크립트, 외부 연결, 외부 글꼴이 없음을 grep으로 확인했다. `<style>` 생성은 React DOM 내부 경로 한 곳뿐이고 앱 코드는 쓰지 않는다(`style` 속성은 React가 CSSOM으로 넣으므로 막히지 않는다). PDF, CSV 내려받기는 `blob:` 앵커 다운로드라 CSP 대상이 아니다. 게시 이미지 `sha-5be9285f`를 격리 스택으로 띄워 Chromium으로 내부 화면 16개, 설계사 화면 3개, 도움말, 상품 추천 AI 대화창, CSV 내려받기를 지났고 CSP 위반 콘솔 메시지 0건, 글꼴 2종 로드를 확인했다(2026-11-04). 환수 PDF 내려받기는 발행 자료가 없어 열지 못했고 CSV와 같은 방식이다.
+이미지의 산출물에 인라인 스크립트, 외부 연결, 외부 글꼴이 없음을 grep으로 확인했다. `<style>` 생성은 React DOM 내부 경로 한 곳뿐이고 앱 코드는 쓰지 않는다(`style` 속성은 React가 CSSOM으로 넣으므로 막히지 않는다). PDF, CSV 내려받기는 `blob:` 앵커 다운로드라 CSP 대상이 아니다. 게시 이미지 `sha-5be9285f`를 격리 스택으로 띄워 Chromium으로 내부 화면 16개, 설계사 화면 3개, 도움말, 상품 추천 AI 대화창, CSV 내려받기를 지났고 CSP 위반 콘솔 메시지 0건, 글꼴 2종 로드를 확인했다(2026-11-04). 환수 PDF 내려받기는 발행 자료가 없어 열지 못했고 CSV와 같은 방식이다. 그 뒤의 화면 변경(#834, #856, #773)은 소스 차이에 `<style>` 삽입, 외부 주소, 글꼴 추가가 없음을 grep으로만 봤고, 브라우저 확인은 RC 이미지로 다시 한다(6절).
 
 API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)와 nginx 헤더가 겹쳐 나간다. 브라우저는 더 엄격한 쪽으로 처리하고 API 응답은 프레임에 넣지 않으므로 결함으로 세지 않는다.
 
@@ -216,7 +217,7 @@ API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)
 
 | 요구사항 | 인수조건 (v3.0 원문) | 결과 | 증거, 재확인 |
 |---|---|---|---|
-| SIR-001 | 전체 공개 API가 표준 응답구조와 상태코드를 준수한다 | 통과 | `/api/v1/` 전수 `everyApplicationMappingIsVersionedUnderApiV1`, 403 봉투 전 행 단언, `ApiResponseTest`, `PageResponseTest`, `GlobalExceptionHandlerTest`, `OpenApiFailureResponseTest`, `npm run check:api` 통과 |
+| SIR-001 | 전체 공개 API가 표준 응답구조와 상태코드를 준수한다 | 통과 | `/api/v1/` 전수 `everyApplicationMappingIsVersionedUnderApiV1`, 403 봉투 전 행 단언, `ApiResponseTest`, `PageResponseTest`, `GlobalExceptionHandlerTest`, `OpenApiFailureResponseTest`, `npm run check:api` 통과. ZAP이 찾은 본문 없는 CSV 500은 오류 응답의 형식을 JSON으로 고정해 고쳤다(`csvDownloadErrorStillReturnsTheJsonEnvelope`) |
 | SER-007 | HTTP 접근이 HTTPS로 전환되고 유효한 인증서로 접속된다 | **미확인** | 사유: 실 도메인 시험은 RC. 정적: AWS는 `deploy-host.sh` `00-tls.conf`(TLS 1.2, 1.3, 301), 신한은 앞단이 TLS를 끝내고 nginx가 `X-Forwarded-Proto: https`를 넘긴다(`adapt_nginx`, 시험 `test_https_headers_and_spa_paths_preserved`) |
 | SAR-003 | 마감 건 수정 시도가 차단되고 정정거래만 생성 가능하다 | 통과 (실행 잠금, 정정 경로) | 시나리오 3, V7, V30, V31 트리거. 정정: `correctionForSameMonthCreatesNextRunNumberWithoutChangingFinalizedRun`, `reverseSwapsDebitAndCreditAndKeepsOriginalImmutable`, `finalizedValidationRunRejectsCorrectionBeforeWritingGroupOrReversal`. 2차 "마감, 승인 절차"는 RTM 기록대로 별도 기능이 없다 |
 | SAR-004 | Stage에서 실패 배포 후 이전 버전 복구와 핵심 조회 정상화를 시연한다 | **미확인** | 사유: 실 서버 시연은 RC. 재확인 절차는 Runbook(`docs/FGC_운영_장애대응_Runbook_v1_0.md`, #676). 정적: 배포 전 백업과 실패 시 비기록 `test_backup_failure_aborts_before_config_or_container_changes`, `test_api_failure_does_not_upgrade_web_or_mark_success` |
@@ -232,12 +233,13 @@ API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)
 | 항목 | 방법 |
 |---|---|
 | CodeQL | RC 커밋의 Security → Code scanning 열린 경고 수, 분석 커밋 기록 |
-| Trivy | `trivy image --severity HIGH,CRITICAL --ignorefile .trivyignore ghcr.io/feegachu/fgc/{api,web}:sha-<RC SHA>` 결과 건수 |
+| Trivy | 이미지마다 한 번씩: `trivy image --severity HIGH,CRITICAL --ignorefile .trivyignore ghcr.io/feegachu/fgc/api:sha-<RC SHA>`, 같은 명령을 `web`으로. 결과 건수 기록 |
 | npm audit, Dependabot | `npm audit --package-lock-only`, `gh api repos/feegachu/fgc/dependabot/alerts?state=open` 건수. 병합 뒤 Maven 경고가 #26만 남는지 확인 |
-| ZAP baseline | 격리: `bash infra/scripts/zap-isolated-scan.sh up`, `baseline`, `down`. 개발계 baseline은 #677 표대로 수동 관찰만, 승인 뒤 |
-| ZAP API scan | 격리에서만: `bash infra/scripts/zap-isolated-scan.sh api` (기본 능동 스캔 30분 제한, 문서의 주소와 무관하게 대상 고정) |
+| ZAP baseline | 격리: `API_IMAGE=... WEB_IMAGE=... bash infra/scripts/zap-isolated-scan.sh up` 뒤 `baseline`. 스택은 아래 API scan까지 유지. 개발계 baseline은 #677 표대로 수동 관찰만, 승인 뒤 |
+| ZAP API scan | 격리에서만, 같은 스택에서: `ZAP_LOGIN_PASSWORD=<시드 계정 비밀번호> bash infra/scripts/zap-isolated-scan.sh api` 뒤 `down`. 기본 능동 스캔 25분 제한(Access 토큰 수명 30분 안), 문서의 주소와 무관하게 대상 고정 |
 | TLS | `curl -I http://<도메인>/` 301, `curl -vI https://<도메인>/` 인증서 유효, `curl -I https://<도메인>/`에서 CSP, nosniff, HSTS 확인. 신한은 edge가 HSTS를 주는지 본다 |
 | 롤백 | Runbook 절차로 이전 digest 재배포 후 핵심 조회 확인, 배포 전 백업 파일 기록 |
+| CSP | RC 이미지를 격리 스택으로 띄워 화면을 지나며 콘솔의 CSP 위반 0건 확인 |
 | 시연 계정 | Runbook 절차로 서버의 계정 보호 상태 확인 |
 
 ## 7. 예외 승인
