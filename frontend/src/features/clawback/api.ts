@@ -8,6 +8,67 @@ export type CandidateDetail = Schemas['ClawbackCandidateDetailResponse']
 export type CandidatePage = Schemas['PageResponseClawbackCandidateResponse']
 export type Calculation = Schemas['Calculation']
 export type CalculationRequest = Required<Schemas['ClawbackCalculationRequest']>
+export type NoticeDocument = Schemas['ClawbackNoticeDocumentResponse']
+export type NoticeRequest = Schemas['ClawbackNoticeDocumentRequest']
+export const noticeHistoryKey = (caseId: number) => ['clawback', 'notice-documents', caseId] as const
+export const noticeHistoryQuery = (caseId: number, page: number) =>
+  queryOptions({
+    queryKey: [...noticeHistoryKey(caseId), page],
+    queryFn: async ({ signal }) => {
+      const { data } = await apiClient.request<Schemas['PageResponseClawbackNoticeDocumentResponse']>(
+        `/api/v1/clawbacks/${caseId}/notice-documents?page=${page}&size=20`,
+        { signal },
+      )
+      if (
+        !data ||
+        !Array.isArray(data.content) ||
+        data.totalElements == null ||
+        data.totalPages == null ||
+        data.page == null
+      ) {
+        throw new Error('발행 이력 응답을 확인할 수 없습니다. 다시 조회해 주세요.')
+      }
+      return data
+    },
+    meta: { errorToast: false },
+  })
+export async function issueNotice(caseId: number, body: NoticeRequest, idempotencyKey: string) {
+  const { data } = await apiClient.request<NoticeDocument>(`/api/v1/clawbacks/${caseId}/notice-documents`, {
+    method: 'POST',
+    body,
+    idempotencyKey,
+  })
+  if (
+    !data?.documentNo ||
+    !Number.isSafeInteger(data.version) ||
+    data.version! < 1 ||
+    data.calculationVersion !== body.calculationVersion ||
+    !data.downloadPath
+  ) {
+    throw new Error('PDF 발행 응답을 확인할 수 없습니다. 같은 요청으로 재시도해 주세요.')
+  }
+  return data
+}
+export async function downloadNotice(edition: NoticeDocument) {
+  const { documentNo, version, downloadPath } = edition
+  if (!documentNo || !/^[A-Za-z0-9_-]+$/.test(documentNo) || !Number.isSafeInteger(version) || version! < 1) {
+    throw new Error('다운로드할 문서번호와 발행판을 확인할 수 없습니다.')
+  }
+  const expectedPath = `/api/v1/documents/${encodeURIComponent(documentNo)}.pdf?version=${version}`
+  if (downloadPath !== expectedPath) throw new Error('문서의 다운로드 경로와 발행판이 일치하지 않습니다.')
+  const { blob } = await apiClient.requestPdf(expectedPath)
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  try {
+    anchor.href = url
+    anchor.download = `${documentNo}-v${version}.pdf`
+    document.body.append(anchor)
+    anchor.click()
+  } finally {
+    anchor.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+}
 /** 서버(ClawbackCandidateQueryRepository.SORTABLE)와 같은 정렬 key. */
 export const CLAWBACK_SORT_KEYS = [
   'candidateId',

@@ -33,7 +33,7 @@ jobs:
       - name: Download JUnit XML
         id: download
         if: ${{ steps.pr.outputs.author == 'dependabot[bot]' || github.event.workflow_run.head_repository.full_name != github.repository }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         continue-on-error: true
         with:
           name: junit-test-results
@@ -45,7 +45,7 @@ jobs:
       # 컴파일 단계에서 실패해 XML이 생성되지 않은 경우 build 체크만 실패 상태로 남는다.
       - name: Publish test report
         if: ${{ steps.download.outcome == 'success' }}
-        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6
         with:
           commit: ${{ github.event.workflow_run.head_sha }}
           report_paths: 'junit-results/**/TEST-*.xml'
