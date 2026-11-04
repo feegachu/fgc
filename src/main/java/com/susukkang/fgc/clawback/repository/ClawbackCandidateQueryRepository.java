@@ -33,7 +33,7 @@ public class ClawbackCandidateQueryRepository {
             "paidAmount", "paid_amount", "unpaidAmount", "unpaid_amount");
     public static final ListSort DEFAULT_SORT = new ListSort("candidateId", false);
 
-    private static final String BASIS = """
+    private static final String BASIS_HEAD = """
             WITH evidence AS (
               SELECT cc.candidate_id, cc.contract_id, cc.trigger_type, cc.source_id, cc.event_date, cc.status_event_id,
                      c.contract_no, c.contract_date, c.insurer_id, i.insurer_name,
@@ -62,7 +62,9 @@ public class ClawbackCandidateQueryRepository {
                      policies.rows AS policies, policies.policy_count,
                      CASE WHEN policies.policy_count = 1 THEN policies.policy_id ELSE NULL END AS policy_id,
                      effects.rows AS effects, arbitrage_sources.rows AS arbitrage_source_refs
-                FROM fgc.clawback_candidate cc
+            """;
+
+    private static final String BASIS_TAIL = """
                 JOIN fgc.insurance_contract c ON c.contract_id = cc.contract_id
                 JOIN fgc.insurer i ON i.insurer_id = c.insurer_id
                 JOIN fgc.product_offering po ON po.product_offering_id = c.product_offering_id
@@ -215,6 +217,18 @@ public class ClawbackCandidateQueryRepository {
             )
             """;
 
+    private static final String BASIS = BASIS_HEAD + """
+            FROM fgc.clawback_candidate cc
+            """ + BASIS_TAIL;
+
+    /** 저장 전 상태 사건(FUN-077). 후보 행을 만들지 않고 같은 근거 SQL에 가상 행을 넣는다. */
+    private static final String UNSAVED_STATUS_EVENT_BASIS = BASIS_HEAD + """
+            FROM (SELECT CAST(NULL AS bigint) AS candidate_id, CAST(:contractId AS bigint) AS contract_id,
+                         CAST('STATUS_EVENT' AS varchar) AS trigger_type, CAST(NULL AS bigint) AS source_id,
+                         CAST(:eventDate AS date) AS event_date, CAST(NULL AS bigint) AS status_event_id,
+                         CAST(NULL AS bigint) AS arbitrage_check_id) cc
+            """ + BASIS_TAIL;
+
     private static final String DETAIL = """
             SELECT CAST(jsonb_build_object(
               'candidate', jsonb_build_object(
@@ -286,6 +300,13 @@ public class ClawbackCandidateQueryRepository {
     public Optional<ClawbackCandidateDetailResponse> findById(long candidateId) {
         List<?> rows = entityManager.createNativeQuery(BASIS + DETAIL + " WHERE candidate_id = :id")
                 .setParameter("id", candidateId).getResultList();
+        return rows.stream().findFirst().map(row -> decode((String) row));
+    }
+
+    /** 저장 전 상태 사건의 근거(FUN-077 미리보기). 저장 뒤 후보와 같은 기지급·정책 후보·경과월·검토 사유를 읽는다. */
+    public Optional<ClawbackCandidateDetailResponse> findUnsavedStatusEvent(long contractId, java.time.LocalDate eventDate) {
+        List<?> rows = entityManager.createNativeQuery(UNSAVED_STATUS_EVENT_BASIS + DETAIL)
+                .setParameter("contractId", contractId).setParameter("eventDate", eventDate).getResultList();
         return rows.stream().findFirst().map(row -> decode((String) row));
     }
 
