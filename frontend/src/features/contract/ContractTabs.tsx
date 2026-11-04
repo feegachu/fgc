@@ -1,9 +1,8 @@
 import { returnLink } from '../transaction/payment-entry'
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { UseQueryResult } from '@tanstack/react-query'
 import { Link, useLocation, useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
@@ -11,7 +10,7 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
-import { date, dateTime, int, month, won } from '../../lib/format'
+import { date, int, month, won } from '../../lib/format'
 import { CapDetailModal } from '../cap/CapDetailModal'
 import { Amount, CapStatus, CapUsage } from '../cap/badges'
 import { JOURNAL_TYPE } from '../ledger/labels'
@@ -21,7 +20,6 @@ import { LINE_STATUS, PAYMENT_STAGE, responseLabel } from '../schedule/labels'
 import {
   contractArbitrageChecksQuery,
   contractCapChecksQuery,
-  contractEventsQuery,
   contractJournalsQuery,
   contractSchedulesQuery,
   contractTransactionsQuery,
@@ -35,68 +33,15 @@ import type {
   ContractTransactions,
 } from './api'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
-import {
-  arbitrageStatusLabels,
-  contractStatusLabels,
-  paymentCycleLabels,
-  processingJobLabels,
-  processingStatusLabels,
-  sourceSystemLabels,
-} from './labels'
-import { contractErrorText, contractTabs as tabs, sortStatusEvents } from './detailState'
-import type { ContractTab, StatusSort } from './detailState'
+import { ContractStatusHistory } from './ContractStatusHistory'
+import { ContractFacts, QueryContent } from './detailParts'
+import { arbitrageStatusLabels, paymentCycleLabels } from './labels'
+import { contractTabs as tabs } from './detailState'
+import type { ContractTab } from './detailState'
 
 const text = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const stageLabel = (code?: string, label?: string) => responseLabel(label, PAYMENT_STAGE, code)
 const Text = ({ value }: { value: unknown }) => <CellDisclosure singleLine preview={text(value)} />
-
-export function ContractLoadState({ message, error, retry }: { message: string; error?: boolean; retry?: () => void }) {
-  return (
-    <div className={`contract-detail-state ${error ? 'is-error' : ''}`} role={error ? 'alert' : 'status'}>
-      <p>{message}</p>
-      {retry && (
-        <Button data-guide-feature="features.contract.contract-tabs.button" variant="secondary" onClick={retry}>
-          다시 시도
-        </Button>
-      )}
-    </div>
-  )
-}
-
-export function ContractFacts({ items, className = '' }: { items: [string, ReactNode][]; className?: string }) {
-  return (
-    <dl className={className || 'contract-detail-facts'}>
-      {items.map(([label, value]) => (
-        <div
-          key={label}
-          className={
-            className === 'contract-information-grid'
-              ? 'contract-information-item'
-              : className === 'contract-summary-grid'
-                ? 'contract-summary-item'
-                : undefined
-          }
-        >
-          <dt>{label}</dt>
-          <dd>{value ?? '-'}</dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
-
-function QueryContent<T>({ query, children }: { query: UseQueryResult<T, Error>; children: (data: T) => ReactNode }) {
-  if (query.isError)
-    return (
-      <ContractLoadState
-        message={contractErrorText(query.error, '자료를 불러오지 못했습니다.')}
-        error
-        retry={() => void query.refetch()}
-      />
-    )
-  if (!query.isSuccess) return <ContractLoadState message="불러오는 중입니다." />
-  return children(query.data)
-}
 
 const transactionLabels: Record<string, string> = { DRAFT: '작성중', CONFIRMED: '확정', CANCELLED: '취소' }
 const statusTones: Record<string, StatusTone> = {
@@ -223,8 +168,6 @@ function PanelHeading({ title, children, legacy = false }: { title: string; chil
 }
 
 function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
-  const history = useQuery(contractEventsQuery(id))
-  const [sort, setSort] = useState<StatusSort>('effectiveAt')
   return (
     <>
       <header className="surface-header contract-basic-header">
@@ -257,83 +200,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
           />
         </section>
         <div className="contract-side-panels">
-          <section data-guide-feature="features.contract.contract-tabs.section-3" className="contract-history-panel" aria-labelledby="contract-history-title">
-            <header className="contract-history-panel-header">
-              <div>
-                <h3 id="contract-history-title">상태이력</h3>
-                <p>상태 변경과 그 처리 결과를 보여 줍니다.</p>
-              </div>
-              <div className="contract-history-sort" role="group" aria-label="상태이력 정렬 기준">
-                <Button data-guide-feature="features.contract.contract-tabs.button-3"
-                  className={`contract-history-sort-button ${sort === 'effectiveAt' ? 'is-active' : ''}`}
-                  variant="secondary"
-                  aria-pressed={sort === 'effectiveAt'}
-                  onClick={() => setSort('effectiveAt')}
-                >
-                  효력 순
-                </Button>
-                <Button data-guide-feature="features.contract.contract-tabs.button-4"
-                  className={`contract-history-sort-button ${sort === 'receivedAt' ? 'is-active' : ''}`}
-                  variant="secondary"
-                  aria-pressed={sort === 'receivedAt'}
-                  onClick={() => setSort('receivedAt')}
-                >
-                  접수 순
-                </Button>
-              </div>
-            </header>
-            <QueryContent query={history}>
-              {(events) =>
-                events.length ? (
-                  <ol className="contract-history-list" aria-label="상태 사건" aria-live="polite">
-                    {sortStatusEvents(events, sort).map((event, index) => (
-                      <li
-                        className="contract-history-event"
-                        key={`${event.sourceSystem ?? ''}-${event.sourceEventKey ?? event.eventSeq ?? index}`}
-                      >
-                        <span className="contract-history-marker" aria-hidden="true" />
-                        <article className="contract-history-event-card">
-                          <header>
-                            <h4>
-                              #{event.eventSeq ?? '-'}{' '}
-                              {event.previousStatus
-                                ? responseLabel(event.previousStatusLabel, contractStatusLabels, event.previousStatus)
-                                : '최초'}{' '}
-                              → {responseLabel(event.newStatusLabel, contractStatusLabels, event.newStatus)}
-                            </h4>
-                            <span>
-                              {sourceSystemLabels[event.sourceSystem ?? ''] ?? '계약 상태 사건'}
-                              {!event.processings?.length ? ', 처리 대기' : ''}
-                            </span>
-                          </header>
-                          <ContractFacts
-                            className="contract-history-times"
-                            items={[
-                              ['효력', dateTime(event.effectiveAt)],
-                              ['접수', dateTime(event.receivedAt)],
-                            ]}
-                          />
-                          {!!event.processings?.length && (
-                            <ul className="contract-processing-list" aria-label="후속 처리 작업">
-                              {event.processings.map((job, jobIndex) => (
-                                <li className="contract-processing-row" key={`${job.processingJob}-${jobIndex}`}>
-                                  <strong>{processingJobLabels[job.processingJob ?? ''] ?? '처리 작업'}</strong>
-                                  <ResultStatus code={job.processingStatus} labels={processingStatusLabels} />
-                                  <time dateTime={job.processedAt}>{dateTime(job.processedAt)}</time>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </article>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="contract-detail-state">등록된 상태이력이 없습니다.</p>
-                )
-              }
-            </QueryContent>
-          </section>
+          <ContractStatusHistory id={id} />
         </div>
       </div>
     </>

@@ -1375,6 +1375,27 @@ class PolicyWorkflowIntegrationTest {
         assertThat(review.selection().resolution().candidateRulesetIds()).hasSize(1);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029"})
+    void contractRegenerationRejectsInvalidReasonBeforeAnyWrites(String regime) throws Exception {
+        boolean seven = regime.equals("SEVEN_YEAR_2029");
+        long offering = insertOffering(seven, seven ? "2029-01-01" : "2027-01-01", "REASON-" + UUID.randomUUID());
+        jdbc.update("UPDATE fgc.product_offering SET fee_regime_code=? WHERE product_offering_id=?", regime, offering);
+        long contract = insertContract(offering, seven ? "2029-03-02" : "2027-03-02");
+        long audits = jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log", Long.class);
+        String path = "/api/v1/contracts/" + contract + "/schedules/regenerate";
+        for (String reason : new String[]{null, "", "   ", "가".repeat(41)}) {
+            var legacy = request(HttpMethod.POST, path).with(user(writer)).with(csrf());
+            if (reason != null) legacy.param("reason", reason);
+            mvc.perform(legacy).andExpect(status().isBadRequest());
+            ObjectNode body = mapper.createObjectNode();
+            if (reason != null) body.put("reason", reason);
+            writeError(HttpMethod.POST, path, body, writer, key(), 400);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=?", Long.class, contract)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log", Long.class)).isEqualTo(audits);
+    }
+
     @Test
     void fourYearPreviewPersists48InstallmentsAndPreservesVersionsWithIdempotency() throws Exception {
         String document = "BD-" + UUID.randomUUID();

@@ -63,6 +63,8 @@ public class ScheduleService {
     private final ScheduleWriteRepository scheduleWriteRepository;
     private final AgentRepository agentRepository;
     private final CapCheckService capCheckService;
+    private final com.susukkang.fgc.contract.service.PaymentHoldFollowUpProcessor paymentHoldFollowUpProcessor;
+    private final com.susukkang.fgc.contract.service.PaymentHoldGate paymentHoldGate;
     private final CapCheckQueryRepository capCheckQueryRepository;
     private final AuditLogService auditLogService;
     private final ScheduleReviewService scheduleReviewService;
@@ -365,6 +367,7 @@ public class ScheduleService {
      */
     @Transactional
     public List<Long> regenerateContractSchedules(Long contractId, String reason) {
+        validateRegenerationReason(reason);
         if (contractId == null) {
             throw validationException("contractId", "계약 ID가 존재하지 않습니다.");
         }
@@ -515,6 +518,10 @@ public class ScheduleService {
         // 새로운 스케줄 라인 일괄 저장 및 저장 건수 검증
         int lineRows = scheduleWriteRepository.insertAllScheduleLines(lines);
         if (lineRows != lines.size()) throw new FgcBusinessException(FgcErrorCode.COMMON_500);
+        // FUN-028: 새 운영 버전은 보류·중단 회차를 PLANNED 로 다시 만들므로 같은 트랜잭션에서 최신 상태 사건으로 다시 맞춘다.
+        if (header.getSchedulePurpose() == SchedulePurpose.OPERATIONAL) {
+            paymentHoldFollowUpProcessor.reapplyLatest(contract.getContractId());
+        }
         // 생성한 스케줄 헤더 ID와 라인 수 반환
         return new CreatedSchedule(header.getScheduleHeaderId(), lineRows);
     }
@@ -1165,6 +1172,13 @@ public class ScheduleService {
         return policyRegime;
     }
 
+    private void validateRegenerationReason(String reason) {
+        if (reason == null || reason.isBlank())
+            throw validationException("reason", "재생성 사유는 필수입니다.");
+        if (reason.length() > 40)
+            throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
+    }
+
     /**
      * 설명 : FUN-039 새 스케줄 생성 , 기존 스케줄은 유지하고 상태,활성화 여부만 변경하고 새 스케줄 헤더와 라인을 생성한다.
      *
@@ -1176,11 +1190,7 @@ public class ScheduleService {
      */
     @Transactional
     public ScheduleRegenResponse regenerateSchedules(Long scheduleId, String reason) {
-        // 서비스 직접 호출에서도 재생성 사유의 필수값과 DB 최대 길이를 검증
-        if (reason == null || reason.isBlank())
-            throw validationException("reason", "재생성 사유는 필수입니다.");
-        if (reason.length() > 40)
-            throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
+        validateRegenerationReason(reason);
 
         // 기존 스케줄 헤더 조회 및 존재 여부 검증
         ScheduleHeaderInsertDTO oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
@@ -1329,6 +1339,10 @@ public class ScheduleService {
             );
         }
 
+        // FUN-028: 보류 회차가 남았거나 상태 사건 후속 작업이 끝나지 않았으면 확정하지 않는다(계약 잠금 안에서 검사).
+        if (!paymentHoldGate.scheduleBlockers(scheduleId, header.getContractId()).isEmpty()) {
+            throw new ScheduleConfirmationRejectedException(FgcErrorCode.IMPL_PAYMENT_HELD);
+        }
         BigDecimal evidenceAmount = header.getPaymentStage() == PaymentStage.INSURER_TO_GA
                 ? capCheckQueryRepository.selectComplianceEvidenceAmount(header.getContractId(), header.getPaymentStage())
                 : null;

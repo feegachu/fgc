@@ -477,6 +477,20 @@ describe('screen lifecycle binding', () => {
   })
 })
 
+it('accepts several distinct contracts but rejects duplicate entity pairs', async () => {
+  const s = setup()
+  s.updateContext({ entityRefs: [{ type: 'PAYMENT', id: 1 }, { type: 'CONTRACT', id: 3 }, { type: 'CONTRACT', id: 4 }] })
+  await s.runtime.start(s.request())
+  expect(s.read).toHaveBeenCalled()
+  expect(s.runtime.getSnapshot().reasonCode).toBeNull()
+  s.runtime.stop()
+  s.read.mockClear()
+  s.updateContext({ entityRefs: [{ type: 'PAYMENT', id: 1 }, { type: 'CONTRACT', id: 3 }, { type: 'CONTRACT', id: 3 }] })
+  await s.runtime.start(s.request())
+  expect(s.runtime.getSnapshot().reasonCode).toBe('INVALID_ENTITY_REFS')
+  expect(s.read).not.toHaveBeenCalled()
+})
+
 it('highlights a known location while entry waits but never bypasses entry on next', async () => {
   const s = setup()
   s.updateState({ saved: true })

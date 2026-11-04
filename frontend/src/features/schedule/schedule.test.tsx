@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -98,12 +98,13 @@ function renderAt(path: string, handler: Handler, roleCode = 'SETTLEMENT') {
     return envelope(result)
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, client, actions: userEvent.setup() }
 }
 const calls = (prefix: string) => requested.filter(({ url }) => url.startsWith(prefix))
 const query = (url: string) => Object.fromEntries(new URLSearchParams(url.split('?')[1]))
@@ -561,4 +562,89 @@ it('4년 정액 정책은 실제 정액·정책 회차 수를 표시하고 취�
   expect(screen.getByRole('cell', { name: '12,345원' })).toBeVisible()
   expect(screen.getByText(/정책 정의 12회차 · 24행/)).toBeVisible()
   expect(screen.queryByRole('button', { name: '4년 예정 새 버전 만들기' })).not.toBeInTheDocument()
+})
+
+it('regeneration help validates reason and waits for new server version before navigation', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  const { router, actions } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return { scheduleHeaderId: 12, versionNo: 3 }
+    if (url === '/api/v1/schedules/12') return { ...detail(), header: header(12, { scheduleVersionNo: 3 }) }
+    if (url === '/api/v1/schedules/12/versions') return [header(12, { scheduleVersionNo: 3 })]
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const modal = within(screen.getByRole('dialog', { name: '새 버전 만들기' }))
+  await actions.click(modal.getByRole('button', { name: '도움말' }))
+  const next = () => modal.getByRole('button', { name: '다음' })
+  expect(next()).toBeDisabled()
+  await actions.type(modal.getByLabelText(/생성 사유/), '가이드 재생성 검증')
+  await waitFor(() => expect(next()).toBeEnabled())
+  await actions.click(next())
+  expect(calls('/api/v1/schedules/11/regenerate')).toHaveLength(0)
+  expect(next()).toBeDisabled()
+  await actions.click(modal.getByRole('button', { name: '새 버전 만들기' }))
+  await waitFor(() => expect(next()).toBeEnabled())
+  expect(router.state.location.pathname).toBe('/schedules/11')
+  await actions.click(next())
+  expect(await modal.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/12'))
+})
+
+it.each([
+  {},
+  { scheduleHeaderId: 0, versionNo: 3 },
+  { scheduleHeaderId: 11, versionNo: 3 },
+  { scheduleHeaderId: 12, versionNo: 2 },
+])('locks a committed regeneration with an invalid receipt %j but permits closing', async (receipt) => {
+  const { actions, client } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return receipt
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  client.setQueryData(['schedules', 'receipt-check'], [])
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
+  const submit = within(dialog).getByRole('button', { name: '새 버전 만들기' })
+  await actions.type(within(dialog).getByLabelText(/생성 사유/), '원천 변경')
+  await actions.click(submit)
+  expect(await within(dialog).findByText(/다시 생성하지 말고 목록에서/)).toBeVisible()
+  expect(submit).toBeDisabled()
+  expect(within(dialog).getByLabelText(/생성 사유/)).toBeDisabled()
+  expect(client.getQueryState(['schedules', 'receipt-check'])?.isInvalidated).toBe(true)
+  await actions.click(submit)
+  expect(calls('/api/v1/schedules/11/regenerate')).toHaveLength(1)
+  await actions.click(within(dialog).getByRole('button', { name: '취소' }))
+  expect(dialog).not.toBeInTheDocument()
+})
+
+it('blocks every close path while the new schedule version is being created', async () => {
+  let finish!: (value: unknown) => void
+  const { actions } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return new Promise(resolve => { finish = resolve })
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
+  await actions.type(within(dialog).getByLabelText(/생성 사유/), '원천 변경')
+  await actions.click(within(dialog).getByRole('button', { name: '새 버전 만들기' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  await actions.click(within(dialog).getByRole('button', { name: '창 닫기' }))
+  await actions.keyboard('{Escape}')
+  expect(dialog).toBeVisible()
+  expect(within(dialog).getByRole('button', { name: '취소' })).toBeDisabled()
+  // Reject the request to restore the ordinary close/retry flow without creating a new version.
+  await act(async () => finish({ scheduleHeaderId: 0 }))
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: '취소' })).toBeEnabled())
+  await actions.click(within(dialog).getByRole('button', { name: '취소' }))
+  expect(dialog).not.toBeInTheDocument()
 })
