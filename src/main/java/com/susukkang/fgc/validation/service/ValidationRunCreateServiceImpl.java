@@ -72,6 +72,12 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
     }
 
     @Override
+    public void discardIfStillCreated(Long validationRunId) {
+        requiresNewTransactionTemplate.executeWithoutResult(status ->
+                validationRunRepository.deleteIfStatus(validationRunId, ValidationRunStatus.CREATED));
+    }
+
+    @Override
     public ValidationRunRow create(CreateValidationRunCommand command) {
         if (command.runNo() != null) {
             return createWithExplicitRunNo(command);
