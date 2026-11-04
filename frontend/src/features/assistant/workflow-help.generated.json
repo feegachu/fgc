@@ -13138,6 +13138,20 @@
         "next": []
       },
       {
+        "stepId": "help.127ee48068f0f3ef473f653062f834ce",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents.issue",
+        "title": "환수, PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성",
+        "instruction": "환수 화면의 ‘PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1318f3d9644e289b559276c142fd7f51",
         "screenId": "CLAW-W01",
         "targetId": "components.filter-bar.button",
@@ -13287,6 +13301,21 @@
         "next": []
       },
       {
+        "stepId": "help.656e0be9784a1064d7e34d0b7e998bf1",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents",
+        "title": "환수, 환수 PDF·발행 이력",
+        "instruction": "환수 화면의 ‘환수 PDF·발행 이력’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.72a8955bc7142cd0e6096ad5cdec97de",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-detail.contextlink-2",
@@ -13375,6 +13404,21 @@
         "next": []
       },
       {
+        "stepId": "help.aaf232c751d95f121b9d97f4b39f32a9",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents.download",
+        "title": "환수, 발행판 v 다운로드",
+        "instruction": "환수 화면의 ‘발행판 v 다운로드’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.bee2fb86fec01c97509a183b7242f391",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-calculation.form",
@@ -13409,6 +13453,21 @@
         "targetId": "components.pagination.button-5",
         "title": "환수, 마지막",
         "instruction": "환수 화면의 ‘마지막’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cf5e5b3a76b9fdeb939c437e0c7a2f53",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents.refresh",
+        "title": "환수, 다시 조회",
+        "instruction": "환수 화면의 ‘다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
