@@ -91,9 +91,8 @@ html:root {
   width: auto;
   min-width: 6.5rem;
   max-width: 16rem;
-  height: 2rem;
+  height: var(--control-height-sm);
   flex: 0 0 auto;
-  margin-bottom: 0.25rem;
   border: 0;
   border-radius: 6px;
   background: transparent;

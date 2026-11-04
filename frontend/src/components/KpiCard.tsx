@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { int } from '../lib/format'
+import { AnimatedNumber } from './AnimatedNumber'
 import type { StatusTone } from './StatusBadge'
 export function KpiCardContent({
   label,
@@ -28,7 +28,7 @@ export function KpiCardContent({
           className="kpi-value tabular-nums"
           data-zero={zero ?? (value === 0 || (typeof value === 'string' && /^0(?:\.0+)?$/.test(value)))}
         >
-          {typeof value === 'number' ? (format ?? int)(value) : value}
+          {typeof value === 'number' ? <AnimatedNumber value={value} format={format} /> : value}
         </strong>
         {unit && <span className="kpi-unit">{unit}</span>}
       </div>
