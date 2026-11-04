@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { errorText } from '../../lib/format'
 import { screenMessage } from '../../lib/screenText'
 import { useQueryClient } from '@tanstack/react-query'
@@ -132,7 +133,11 @@ export function PolicyDraftEditor({
   }
   function focusError(path: string) {
     const group = sectionFor(path)
-    setSection(sections.some((item) => item.id === group) ? group : 'basic')
+    // 저장 중 잠긴 fieldset 안의 입력과 아직 그리지 않은 구역의 입력에는 focus가 먹지 않으므로 먼저 화면에 반영한다.
+    flushSync(() => {
+      setBusy(false)
+      setSection(sections.some((item) => item.id === group) ? group : 'basic')
+    })
     const parameter = /^parameters\.(\d+)\./.exec(path)
     const focusPath = parameter ? `parameters.${draft.parameters[Number(parameter[1])]?.key}` : path
     requestAnimationFrame(() => focusPolicyField(focusPath))

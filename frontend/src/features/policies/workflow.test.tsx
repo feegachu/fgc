@@ -576,6 +576,30 @@ describe('production policy workflow', () => {
     expect(screen.getByLabelText(/정책명/)).toHaveValue('아직 저장하지 않은 이름')
   })
 
+  it('still focuses the rejected field when the next frame comes before the form is unlocked', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(
+      new ApiError(
+        {
+          code: 'FGC-COMMON-002',
+          field: 'feeRegimeRules[0].maxInstallments',
+          message: '서버에서 허용하지 않는 회차입니다.',
+        },
+        'server-validation',
+        400,
+      ),
+    )
+    const { user } = mountEditor(normalizePolicyDetail(wireDetail()).editDocument, 17)
+    // 저장 중에는 fieldset이 잠겨 있어 그 안의 입력에 focus가 먹지 않는다. 부하가 큰 CI에서 프레임이 먼저 온 경우다.
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0)
+      return 0
+    })
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    const limit = await screen.findByLabelText(/최대 회차/)
+    await waitFor(() => expect(limit).toHaveFocus())
+    frame.mockRestore()
+  }, 20_000)
+
   it('unlinks a deleted source detail while preserving other references and rule-specific evidence', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
     const draft = normalizePolicyDetail(wireDetail()).editDocument!
