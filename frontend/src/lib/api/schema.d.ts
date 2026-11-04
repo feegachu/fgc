@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/api/v1/agent/me/contract-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계약 확인 기록
+         * @description 종결 또는 후속 확인을 기록합니다. Idempotency-Key 와 expectedContextVersion 이 필요합니다.
+         */
+        post: operations["record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/me/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 설계사 홈
+         * @description 기간·보험사 필터를 적용한 포트폴리오와 asOf 월 수수료, 확인할 계약을 돌려줍니다.
+         */
+        get: operations["home"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/me/statements": {
         parameters: {
             query?: never;
@@ -1575,6 +1615,106 @@ export interface components {
             agentName?: string;
             organizationName?: string;
         };
+        AgentHomeAmountBucket: {
+            amount?: number;
+            /** Format: int64 */
+            count?: number;
+        };
+        AgentHomeBasis: {
+            /** Format: date */
+            asOf?: string;
+            range?: components["schemas"]["AgentHomeRange"];
+            warnings?: string[];
+        };
+        AgentHomeCodeCount: {
+            code?: string;
+            /** Format: int64 */
+            count?: number;
+            label?: string;
+        };
+        AgentHomeCommission: {
+            clawback?: components["schemas"]["AgentHomeAmountBucket"];
+            dataStatus?: string;
+            expected?: components["schemas"]["AgentHomeAmountBucket"];
+            held?: components["schemas"]["AgentHomeAmountBucket"];
+            month?: string;
+        };
+        AgentHomeFilters: {
+            /** Format: int64 */
+            insurerId?: number;
+            insurerType?: string;
+        };
+        AgentHomeInsurerCount: {
+            /** Format: int64 */
+            contractCount?: number;
+            /** Format: int64 */
+            insurerId?: number;
+            monthlyEquivalentFirstPremiumSum?: number;
+            name?: string;
+        };
+        AgentHomeLastCheck: {
+            /** Format: date-time */
+            checkedAt?: string;
+            /** Format: date */
+            nextCheckDate?: string;
+            result?: string;
+        };
+        AgentHomeMonthlyCount: {
+            month?: string;
+            monthlyEquivalentFirstPremiumSum?: number;
+            /** Format: int64 */
+            newContractCount?: number;
+        };
+        AgentHomePortfolio: {
+            categories?: components["schemas"]["AgentHomeCodeCount"][];
+            /** Format: int64 */
+            contractCount?: number;
+            insurers?: components["schemas"]["AgentHomeInsurerCount"][];
+            monthly?: components["schemas"]["AgentHomeMonthlyCount"][];
+            statuses?: components["schemas"]["AgentHomeCodeCount"][];
+        };
+        AgentHomePriorityContract: {
+            contextVersion?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            currentStatus?: string;
+            currentStatusCode?: string;
+            /** Format: int64 */
+            elapsedDays?: number;
+            expectedAmount?: number;
+            heldAmount?: number;
+            /** Format: int64 */
+            heldCount?: number;
+            insurerName?: string;
+            lastCheck?: components["schemas"]["AgentHomeLastCheck"];
+            /** Format: date-time */
+            lastEventEffectiveAt?: string;
+            /** Format: date */
+            nextCheckDate?: string;
+            productName?: string;
+            reasonCodes?: string[];
+        };
+        AgentHomeRange: {
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+        };
+        AgentHomeResponse: {
+            /** Format: date */
+            asOf?: string;
+            basis?: components["schemas"]["AgentHomeBasis"];
+            dataStatus?: string;
+            filters?: components["schemas"]["AgentHomeFilters"];
+            myCommission?: components["schemas"]["AgentHomeCommission"];
+            period?: string;
+            portfolio?: components["schemas"]["AgentHomePortfolio"];
+            /** Format: int32 */
+            priorityContractTotal?: number;
+            priorityContracts?: components["schemas"]["AgentHomePriorityContract"][];
+            range?: components["schemas"]["AgentHomeRange"];
+        };
         /** @description 보험설계사 기준정보 */
         AgentResponse: {
             /** @description 기준정보 활성 여부. false이면 신규 입력에서 선택할 수 없음 */
@@ -1681,6 +1821,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseAgentHomeResponse: {
+            data?: components["schemas"]["AgentHomeResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseArbitrageSearchResponse: {
             data?: components["schemas"]["ArbitrageSearchResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1738,6 +1883,11 @@ export interface components {
         };
         ApiResponseCompareRankingResponse: {
             data?: components["schemas"]["CompareRankingResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseContractCheckResponse: {
+            data?: components["schemas"]["ContractCheckResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3153,6 +3303,24 @@ export interface components {
             ruleVersion?: string | null;
             status?: string;
             warnings?: string[];
+        };
+        ContractCheckRequest: {
+            /** Format: int64 */
+            contractId: number;
+            expectedContextVersion: string;
+            memo?: string;
+            /** Format: date */
+            nextCheckDate?: string;
+            result: string;
+        };
+        ContractCheckResponse: {
+            /** Format: int64 */
+            checkId?: number;
+            /** Format: date-time */
+            checkedAt?: string;
+            contextVersion?: string;
+            /** Format: int64 */
+            contractId?: number;
         };
         ContractCreateRequest: {
             /** Format: int64 */
@@ -5260,6 +5428,62 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    record: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 멱등키(1~160자). 없으면 서비스가 400 으로 거절한다 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractCheckResponse"];
+                };
+            };
+        };
+    };
+    home: {
+        parameters: {
+            query?: {
+                /** @description 기준일(기본 서울 오늘) */
+                asOf?: string;
+                /** @description 6|12|ALL (기본 12) */
+                period?: string;
+                /** @description ALL|LIFE|NON_LIFE (기본 ALL) */
+                insurerType?: string;
+                /** @description 보험사 ID */
+                insurerId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAgentHomeResponse"];
+                };
+            };
+        };
+    };
     mine: {
         parameters: {
             query?: {
