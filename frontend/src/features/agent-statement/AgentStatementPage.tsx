@@ -16,6 +16,7 @@ import { policyCodeLabel } from '../policies/labels'
 import { sourceOptions } from '../transaction/list-api'
 import {
   ENTRY_TYPE_OPTIONS,
+  InvalidStatementAgentIdError,
   entryTypeLabel,
   filterParams,
   readFilters,
@@ -81,6 +82,7 @@ export default function AgentStatementPage() {
   const ready = isAgent || agentId !== null
   // 조회 조건이 같으면 입력 중인 필터를 지우지 않도록, entryKey 를 뺀 정규화한 조건을 key 로 쓴다.
   const filterKey = filterParams(filters, !isAgent).toString()
+  const [resetCount, setResetCount] = useState(0)
   const list = useQuery(statementListQuery(filters, agentId, ready))
   const detail = useQuery(statementDetailQuery(entryKey, agentId, ready))
   const asOf = `${filters.month || defaultMonth}-01`
@@ -167,13 +169,16 @@ export default function AgentStatementPage() {
         </div>
       </header>
       <StatementFiltersBar
-        key={filterKey}
+        key={`${filterKey}:${resetCount}`}
         initial={filters}
         isAgent={isAgent}
         agents={(agents.data ?? []).map((row) => [String(row.agentId), `${row.agentCode} · ${row.agentName}`])}
         items={(items.data ?? []).map((row) => [String(row.commissionItemId), row.itemName ?? '-'])}
         onSearch={(next) => apply({ ...next, contractNo: next.contractNo.trim(), page: 1 })}
-        onReset={() => apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: filters.agentId })}
+        onReset={() => {
+          setResetCount((count) => count + 1)
+          apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: filters.agentId })
+        }}
       />
       {!ready ? (
         <p className="ast-state" role="status">
@@ -212,7 +217,7 @@ export default function AgentStatementPage() {
                         ? '수수료 명세를 불러오는 중입니다.'
                         : '기준월이나 조회 조건을 바꿔 다시 조회해 보세요.'}
                   </span>
-                  {list.isError && (
+                  {list.isError && !(list.error instanceof InvalidStatementAgentIdError) && (
                     <Button data-guide-feature="features.agent-statement.agent-statement-page.list-retry-button" variant="secondary" onClick={() => void list.refetch()}>
                       다시 시도
                     </Button>
@@ -339,7 +344,7 @@ function DetailPanel({
             <div className="ast-hero">
               <TypeLabel type={entry.entryType} />
               <strong className="ast-hero-amount tabular-nums">
-                {entry.amount == null ? '금액 미확인' : won(entry.amount)}
+                {entry.amount == null || entry.dataStatus === 'MISSING' ? '금액 미확인' : won(entry.amount)}
               </strong>
               <span className="ast-muted">
                 {entry.statusLabel} · {date(entry.basisDate)}

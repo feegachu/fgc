@@ -168,9 +168,9 @@ async function fixture(
     if (path === '/api/v1/contracts/1/status-events') return answer(route, events())
     if (effectPath) return answer(route, effects(effectPath[1], Number(url.searchParams.get('page'))))
     if (path === '/api/v1/contracts/2/status-events')
-      return answer(route, failure(403, 'FGC-AUTH-005', '본인 담당 자료만 조회·처리할 수 있습니다.'))
+      return answer(route, failure(403, 'FGC-AUTH-005', '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.'))
     if (path === '/api/v1/contracts/2')
-      return answer(route, failure(403, 'FGC-AUTH-005', '본인 담당 자료만 조회·처리할 수 있습니다.'))
+      return answer(route, failure(403, 'FGC-AUTH-005', '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.'))
     if (path.endsWith('/base/insurers') || path.endsWith('/base/products'))
       return route.fulfill({ json: envelope(pageOf([])) })
     unexpected.push(path)
@@ -413,7 +413,7 @@ test('영향 조회 401은 기존 인증 복구로 다시 받고 403과 서버 �
     effects: () => {
       calls += 1
       if (mode === 'auth' && calls === 1) return failure(401, 'FGC-AUTH-002', '다시 로그인해 주세요.')
-      if (mode === 'denied') return failure(403, 'FGC-AUTH-005', '본인 담당 자료만 조회·처리할 수 있습니다.')
+      if (mode === 'denied') return failure(403, 'FGC-AUTH-005', '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.')
       if (mode === 'broken') return failure(500, 'FGC-COMMON-500', 'SQL 내부 상세', 'req-500')
       return pageOf([effect(501)])
     },
@@ -426,7 +426,7 @@ test('영향 조회 401은 기존 인증 복구로 다시 받고 403과 서버 �
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
 
   for (const [next, message] of [
-    ['denied', '본인 담당 자료만 조회/처리할 수 있습니다.'],
+    ['denied', '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.'],
     ['broken', '요청번호 req-500'],
   ] as const) {
     mode = next
@@ -469,7 +469,7 @@ test('AGENT는 본인 계약의 영향을 보고 다른 계약 직접 접근은 
   await page.screenshot({ path: testInfo.outputPath('status-history-agent.png') })
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
   await page.goto('contracts/2')
-  await expect(page.getByRole('alert')).toContainText('본인 담당 자료만 조회/처리할 수 있습니다.')
+  await expect(page.getByRole('alert')).toContainText('본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.')
   await expect(page.getByRole('table', { name: '상태 사건' })).toHaveCount(0)
   expect(unexpected).toEqual([])
 })

@@ -14687,6 +14687,19 @@
         "next": []
       },
       {
+        "stepId": "help.1243a963ce40a8b0939509ca0bb1b408",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-keep",
+        "title": "수수료 지급 등록, 입력 유지",
+        "instruction": "수수료 지급 등록 화면의 ‘입력 유지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1444d47ea0e956e0261267998d052765",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.link-2",
@@ -15095,6 +15108,32 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "수수료 지급 등록 화면의 ‘GA 수기지급’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cb3fcc3ea67660d37237d20c6ca2eba6",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload",
+        "title": "수수료 지급 등록, 최신 지급 건 다시 불러오기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 지급 건 다시 불러오기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d15f0ec3b6b4a0005848533aed794662",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-apply",
+        "title": "수수료 지급 등록, 최신 정보로 바꾸기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 정보로 바꾸기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15251,6 +15290,19 @@
         "next": []
       },
       {
+        "stepId": "help.1243a963ce40a8b0939509ca0bb1b408",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-keep",
+        "title": "수수료 지급 등록, 입력 유지",
+        "instruction": "수수료 지급 등록 화면의 ‘입력 유지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1444d47ea0e956e0261267998d052765",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.link-2",
@@ -15659,6 +15711,32 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "수수료 지급 등록 화면의 ‘GA 수기지급’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cb3fcc3ea67660d37237d20c6ca2eba6",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload",
+        "title": "수수료 지급 등록, 최신 지급 건 다시 불러오기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 지급 건 다시 불러오기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d15f0ec3b6b4a0005848533aed794662",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-apply",
+        "title": "수수료 지급 등록, 최신 정보로 바꾸기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 정보로 바꾸기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15815,6 +15893,19 @@
         "next": []
       },
       {
+        "stepId": "help.1243a963ce40a8b0939509ca0bb1b408",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-keep",
+        "title": "수수료 지급 등록, 입력 유지",
+        "instruction": "수수료 지급 등록 화면의 ‘입력 유지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1444d47ea0e956e0261267998d052765",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.link-2",
@@ -16223,6 +16314,32 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "수수료 지급 등록 화면의 ‘GA 수기지급’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cb3fcc3ea67660d37237d20c6ca2eba6",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload",
+        "title": "수수료 지급 등록, 최신 지급 건 다시 불러오기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 지급 건 다시 불러오기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d15f0ec3b6b4a0005848533aed794662",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-apply",
+        "title": "수수료 지급 등록, 최신 정보로 바꾸기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 정보로 바꾸기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

@@ -186,10 +186,74 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     expect(await screen.findByText('금액 미확인')).toBeInTheDocument()
   })
 
-  it('0건과 조회 실패를 다른 문장으로 보여 주고 실패는 다시 시도할 수 있다', async () => {
+  it('0건은 빈 결과 문구로 보여 준다', async () => {
     handler = () => list([])
     renderAt('/app/agent/statements?month=2026-07')
     expect(await screen.findByText('해당 조건의 명세가 없습니다')).toBeInTheDocument()
+  })
+
+  it('조회 전 입력도 초기화하고 반복 초기화 시 기준월과 내부 설계사 선택을 유지한다', async () => {
+    const router = renderAt('/app/agent/statements?month=2026-07&agentId=9&page=1', adminUser)
+    const user = userEvent.setup()
+    await screen.findByText('C-0007')
+    for (const value of ['C-9999', 'C-8888']) {
+      await user.type(screen.getByPlaceholderText('계약번호 입력'), value)
+      await user.selectOptions(screen.getByLabelText('수수료 항목'), '5')
+      await user.selectOptions(screen.getByLabelText('내역 구분'), 'HELD')
+      await user.clear(screen.getByLabelText(/기준월/))
+      await user.type(screen.getByLabelText(/기준월/), '2026-08')
+      await user.click(screen.getByRole('button', { name: '초기화' }))
+      expect(screen.getByPlaceholderText('계약번호 입력')).toHaveValue('')
+      expect(screen.getByLabelText(/기준월/)).toHaveValue('2026-07')
+      expect(screen.getByRole('combobox', { name: /설계사/ })).toHaveValue('9')
+      expect(screen.getByLabelText('수수료 항목')).toHaveValue('')
+      expect(screen.getByLabelText('내역 구분')).toHaveValue('')
+      expect(router.state.location.search).toBe('?month=2026-07&agentId=9&page=1')
+    }
+  })
+
+  it('조회 실패 후 다시 시도하면 목록과 요약을 복구한다', async () => {
+    let fail = true
+    handler = () => {
+      if (fail) throw new ApiError(null, 'req-retry', 500)
+      return list([entry()])
+    }
+    renderAt('/app/agent/statements?month=2026-07')
+    const user = userEvent.setup()
+    const retry = await screen.findByRole('button', { name: '다시 시도' })
+    expect(within(screen.getByRole('article', { name: '지급 요약' })).getByText('조회 실패')).toBeInTheDocument()
+    fail = false
+    await user.click(retry)
+    expect(await screen.findByText('C-0007')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: '지급 요약' })).toHaveTextContent('123,456')
+    expect(screen.queryByText(/req-retry/)).not.toBeInTheDocument()
+    expect(paths.filter((path) => path.includes('/statements'))).toHaveLength(2)
+  })
+
+  it('상세 서버 오류는 실패 안내와 요청 ID를 함께 보여 준다', async () => {
+    handler = (path) => {
+      if (path.includes('/statements/')) throw new ApiError(null, 'detail-500', 500)
+      return list([entry()])
+    }
+    renderAt('/app/agent/statements?month=2026-07&entryKey=UEFZTUVOVDoxOjE')
+    const panel = await screen.findByRole('region', { name: '명세 근거' })
+    expect(await within(panel).findByText(/수수료 명세를 불러오지 못했습니다.*detail-500/)).toBeInTheDocument()
+  })
+
+  it('상세도 MISSING 상태의 금액을 확인된 값으로 표시하지 않는다', async () => {
+    const row = entry({ dataStatus: 'MISSING' })
+    handler = (path) => path.includes('/statements/') ? detail(row) : list([row])
+    renderAt('/app/agent/statements?month=2026-07&entryKey=UEFZTUVOVDoxOjE')
+    const panel = await screen.findByRole('region', { name: '명세 근거' })
+    expect(await within(panel).findByText('금액 미확인')).toBeInTheDocument()
+    expect(within(panel).queryByText(/123,456/)).not.toBeInTheDocument()
+  })
+
+  it('URL의 잘못된 설계사 ID는 목록과 상세의 HTTP 요청 전에 차단한다', async () => {
+    renderAt('/app/agent/statements?month=2026-07&agentId=..%2F..%2Ftransactions&entryKey=test', adminUser)
+    expect(await screen.findAllByText('설계사 ID를 확인한 뒤 다시 조회하세요.')).not.toHaveLength(0)
+    expect(paths).toEqual([])
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
   })
 
   it('403 은 권한 문구로 구별한다', async () => {

@@ -11,6 +11,7 @@ import { Modal } from '../../components/Modal'
 import { ApiError } from '../../lib/api/client'
 import { int, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
+import { validMonth, withMonth } from '../../stores/workspace'
 import { useInsurerOptions } from '../base/api'
 import type { Agent, Product } from '../base/api'
 import { useEntityChoices } from '../base/selection'
@@ -291,7 +292,10 @@ function ContractEditor({
           6000,
         )
       // Keep the synchronous guard closed through navigation, including repeated submit events.
-      await navigate(returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId)), {
+      // 첫 이동에 기준월을 포함해 Shell의 URL 보정과 후속 가이드 조회가 경합하지 않게 한다.
+      const detailPath = returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId))
+      const month = params.get('month')
+      await navigate(validMonth(month) ? withMonth(detailPath, month, false) : detailPath, {
         state: { message },
       })
     } catch (error) {
