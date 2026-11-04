@@ -44,5 +44,13 @@ class CalculationProofServiceTest {
         assertThat(proofs.verifyPrecheck(77,actual)).isNotNull();
         assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc",oldest.validity().stateToken(),input(1)))).isInstanceOf(FgcBusinessException.class);
     }
+    @Test void staleResponseAlsoRemovesBasisAmountsAndOldBlockerMessages() {
+        var original=result();
+        var basis=new PaymentCalculationSnapshot.Basis(List.of(),original.basis().rounding(),"2026-10-01",List.of(),List.of(),List.of(new PaymentCalculationSnapshot.AttributionLine("1","3","2026-10-01","100000","100000")));
+        var withLines=new PaymentCalculationSnapshot(original.calculationId(),original.kind(),original.mode(),original.status(),1,false,true,"ACTUAL","KRW","DRAFT",original.resolvedScope(),original.amounts(),List.of(),false,List.of(new PaymentCalculationSnapshot.Reason("CAP","기존 100000원",null,null)),List.of(),basis,original.recommendation(),original.calculatedAt(),null);
+        var issued=proofs.issue(input(1),withLines);when(dependencies.current()).thenReturn("changed");
+        var stale=proofs.revalidate(new CalculationRevalidationRequest("calc",issued.validity().stateToken(),input(1)));
+        assertThat(stale.basis().lines()).isEmpty();assertThat(stale.blockers()).isEmpty();assertThat(stale.amounts()).isEmpty();
+    }
     static class MutableClock extends Clock {Instant now=Instant.parse("2026-11-04T00:00:00Z");public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId zone){return this;}public Instant instant(){return now;}}
 }

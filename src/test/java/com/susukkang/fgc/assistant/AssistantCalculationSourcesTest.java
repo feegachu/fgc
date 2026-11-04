@@ -19,7 +19,8 @@ class AssistantCalculationSourcesTest {
     CapCalculator caps=mock(CapCalculator.class);
     ReconciliationResultQueryService reconciliations=mock(ReconciliationResultQueryService.class);
     AgentDataScopeService access=mock(AgentDataScopeService.class);
-    AssistantCalculationSources service=new AssistantCalculationSources(schedules,caps,reconciliations,access);
+    com.susukkang.fgc.cap.repository.CapContractQueryRepository contracts=mock(com.susukkang.fgc.cap.repository.CapContractQueryRepository.class);
+    AssistantCalculationSources service=new AssistantCalculationSources(schedules,caps,reconciliations,access,contracts);
     ObjectMapper mapper=new ObjectMapper().findAndRegisterModules();
     @Test void hypotheticalBalanceRoundsEachLineWithoutAnySourceRead() throws Exception {
         var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE,PaymentCalculationRequest.Mode.HYPOTHETICAL,null,mapper.readTree("{\"balance\":{\"amount\":\"100000\",\"attributionAmounts\":[\"60000\",\"30000\"]}}"),4L);
@@ -38,7 +39,7 @@ class AssistantCalculationSourcesTest {
     }
     void schedule(String... amounts) {
         var lines=new ArrayList<ScheduleLineResponse>();int seq=0;
-        for(String amount:amounts) lines.add(ScheduleLineResponse.builder().contractId(3L).commissionItemId(4L).beneficiaryAgentId(5L).lineNo(++seq).installmentNo(seq).dueDate(LocalDate.of(2026,10,9)).attributionDate(LocalDate.of(2026,10,8)).expectedAmount(new BigDecimal(amount)).lineStatus("PLANNED").ruleRef(6L).build());
+        for(String amount:amounts) lines.add(ScheduleLineResponse.builder().contractId(3L).commissionItemId(4L).beneficiaryAgentId(5L).lineNo(++seq).installmentNo(seq).dueDate(LocalDate.of(2026,10,9)).attributionDate(LocalDate.of(2026,10,8)).expectedAmount(new BigDecimal(amount)).lineStatus("PLANNED").cashflowType("PAYMENT").ruleRef(6L).build());
         when(schedules.selectByContractIdAndPaymentStage(3L,PaymentStage.GA_TO_FC)).thenReturn(new ScheduleDetailResponse(7L,ScheduleHeaderResponse.builder().generatedAt(OffsetDateTime.now()).build(),lines));
     }
     @Test void explicitMonthAggregationAndExactInstallmentUseStoredLinesOnly() {
@@ -51,6 +52,7 @@ class AssistantCalculationSourcesTest {
         assertThat(service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL,null)).missingInputs()).contains("activeSchedule");
     }
     @Test void capForwardsEngineAmountsUsageAndRuleWithoutRecomputing() {
+        when(contracts.findCapViewByContractId(3L)).thenReturn(mock(com.susukkang.fgc.cap.dto.CapContractView.class));
         var cap=mock(com.susukkang.fgc.cap.dto.CapCalculationResult.class);
         when(cap.resultStatus()).thenReturn(com.susukkang.fgc.common.code.CapResultStatus.WARNING);when(cap.capRuleSetId()).thenReturn(9L);when(cap.limitAmount()).thenReturn(new BigDecimal("1000"));when(cap.includedAmount()).thenReturn(new BigDecimal("900"));when(cap.remainingAmount()).thenReturn(new BigDecimal("100"));when(cap.usagePct()).thenReturn(new BigDecimal("90.000000"));when(caps.calculate(any())).thenReturn(cap);
         var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.CAP_STATUS,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,"3",null,PaymentStage.GA_TO_FC,null,null,null,LocalDate.of(2026,10,8),null,null),null,1L);
@@ -62,5 +64,16 @@ class AssistantCalculationSourcesTest {
         when(detail.contractId()).thenReturn(3L);when(detail.expectedTotalAmount()).thenReturn(new BigDecimal("100000"));when(detail.actualTotalAmount()).thenReturn(new BigDecimal("50000"));when(detail.differenceAmount()).thenReturn(new BigDecimal("50000"));when(reconciliations.get(99L)).thenReturn(detail);
         var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,null,null,null,null,null,null,null,"99",null),null,1L);
         var result=service.calculate(request);assertThat(result.amounts()).containsEntry("differenceAmount","50000").containsEntry("actualAmount","50000");assertThat(result.recommendation().allowed()).isFalse();verify(access).requireContract(3L);verifyNoInteractions(caps,schedules);
+    }
+    @Test void mixedDeductionRowsNeverBecomePositivePaymentRecommendation() {
+        schedule("100000","10000");schedules.selectByContractIdAndPaymentStage(3L,PaymentStage.GA_TO_FC).getLines().set(1,ScheduleLineResponse.builder().contractId(3L).commissionItemId(4L).beneficiaryAgentId(5L).lineNo(2).installmentNo(2).dueDate(LocalDate.of(2026,10,9)).attributionDate(LocalDate.of(2026,10,8)).expectedAmount(new BigDecimal("10000")).lineStatus("PLANNED").ruleRef(6L).cashflowType("DEDUCTION").build());
+        var result=service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL,null));
+        assertThat(result.status()).isEqualTo("REVIEW_REQUIRED");assertThat(result.amounts()).isEmpty();assertThat(result.lines().get(1).cashflowType()).isEqualTo("DEDUCTION");assertThat(result.recommendation().allowed()).isFalse();
+    }
+    @Test void missingCapContractAndRuleProduceInsufficientDataWithoutFakeZero() {
+        var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.CAP_STATUS,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,"3",null,PaymentStage.GA_TO_FC,null,null,null,LocalDate.of(2026,10,8),null,null),null,1L);
+        assertThat(service.calculate(request).missingInputs()).contains("contractId");verifyNoInteractions(caps);
+        when(contracts.findCapViewByContractId(3L)).thenReturn(mock(com.susukkang.fgc.cap.dto.CapContractView.class));when(caps.calculate(any())).thenThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(com.susukkang.fgc.common.exception.FgcErrorCode.CAP_004));
+        var missing=service.calculate(request);assertThat(missing.status()).isEqualTo("INSUFFICIENT_DATA");assertThat(missing.amounts()).isEmpty();assertThat(missing.missingInputs()).contains("applicableCapRuleSet");
     }
 }

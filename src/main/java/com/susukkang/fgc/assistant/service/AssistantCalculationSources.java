@@ -24,6 +24,7 @@ public class AssistantCalculationSources {
     private final CapCalculator caps;
     private final ReconciliationResultQueryService reconciliations;
     private final AgentDataScopeService scopeAccess;
+    private final com.susukkang.fgc.cap.repository.CapContractQueryRepository contracts;
     public PaymentCalculationSnapshot calculate(PaymentCalculationRequest request) {
         if(request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL && request.kind()==PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE) return balance(request);
         if(request.mode()!=PaymentCalculationRequest.Mode.EXISTING) return result(request,"UNSUPPORTED","HYPOTHETICAL",Map.of(),Map.of(),List.of(),List.of(),null,null,false);
@@ -42,9 +43,15 @@ public class AssistantCalculationSources {
         long contract=id(scope.contractId(),"contractId");scopeAccess.requireContract(contract);
         if(request.kind()==PaymentCalculationRequest.Kind.CAP_STATUS) {
             if(scope.asOfDate()==null) return missing(request,"asOfDate");
-            var cap=caps.calculate(CapCalculationCommand.realtime(contract,scope.paymentStage(),scope.asOfDate(),null));
+            if(contracts.findCapViewByContractId(contract)==null)return missing(request,"contractId");
+            com.susukkang.fgc.cap.dto.CapCalculationResult cap;
+            try {cap=caps.calculate(CapCalculationCommand.realtime(contract,scope.paymentStage(),scope.asOfDate(),null));}
+            catch(com.susukkang.fgc.common.exception.FgcBusinessException error) {
+                if(error.getErrorCode()==com.susukkang.fgc.common.exception.FgcErrorCode.CAP_004)return missing(request,"applicableCapRuleSet");
+                throw error;
+            }
             var amounts=new LinkedHashMap<String,String>();amounts.put("limitAmount",won(cap.limitAmount()));amounts.put("includedAmount",won(cap.includedAmount()));amounts.put("remainingAmount",won(cap.remainingAmount()));
-            var snapshot=result(request,cap.resultStatus()==CapResultStatus.REVIEW_REQUIRED?"REVIEW_REQUIRED":"CALCULATED","ACTUAL",Map.of("contractId",scope.contractId(),"paymentStage",scope.paymentStage().name()),amounts,List.of(),List.of(),new PaymentCalculationSnapshot.Source("cap:"+contract,"POLICY","기존 한도 계산 조회",str(cap.capRuleSetId()),scope.contractId()),scope.asOfDate().toString(),false);
+            var snapshot=result(request,cap.resultStatus()==CapResultStatus.NOT_APPLICABLE?"UNSUPPORTED":cap.resultStatus()==CapResultStatus.REVIEW_REQUIRED?"REVIEW_REQUIRED":"CALCULATED","ACTUAL",Map.of("contractId",scope.contractId(),"paymentStage",scope.paymentStage().name()),amounts,List.of(),List.of(),new PaymentCalculationSnapshot.Source("cap:"+contract,"POLICY","기존 한도 계산 조회",str(cap.capRuleSetId()),scope.contractId()),scope.asOfDate().toString(),false);
             var preview=new LinkedHashMap<String,Object>();preview.put("contractId",scope.contractId());preview.put("paymentStage",scope.paymentStage().name());preview.put("asOfDate",scope.asOfDate().toString());preview.put("capRuleSetId",str(cap.capRuleSetId()));preview.put("resultStatus",cap.resultStatus().name());preview.put("resultStatusLabel",cap.resultStatus().label());preview.put("usagePct",str(cap.usagePct()));preview.putAll(amounts);
             var basis=new PaymentCalculationSnapshot.Basis(snapshot.basis().sourceRefs(),snapshot.basis().rounding(),snapshot.basis().asOfDate(),List.of(),cap.capRuleSetId()==null?List.of():List.of(cap.capRuleSetId().toString()),List.of());
             return new PaymentCalculationSnapshot(snapshot.calculationId(),snapshot.kind(),snapshot.mode(),snapshot.status(),snapshot.clientRevision(),false,true,snapshot.evidenceKind(),"KRW",null,snapshot.resolvedScope(),snapshot.amounts(),List.of(preview),null,List.of(),snapshot.missingInputs(),basis,snapshot.recommendation(),snapshot.calculatedAt(),null,List.of());
@@ -62,13 +69,14 @@ public class AssistantCalculationSources {
             .filter(line->scope.installmentNo()==null || Objects.equals(line.getInstallmentNo(),scope.installmentNo())).toList();
         if(selected.isEmpty() || (scope.aggregation()==PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE && selected.size()!=1)) return missing(request,"scheduleLineSelection");
         if(selected.stream().anyMatch(line->line.getExpectedAmount()==null)) return missing(request,"expectedAmount");
-        var lines=selected.stream().map(line->new PaymentCalculationSnapshot.CalculationLine(str(detail.getScheduleHeaderId())+":"+line.getLineNo(),str(line.getContractId()),str(line.getCommissionItemId()),str(line.getBeneficiaryAgentId()),line.getInstallmentNo(),str(line.getAttributionDate()),str(line.getDueDate()),line.getBasisCode(),str(line.getBasisAmount()),line.getCalculationType(),str(line.getRatePct()),won(line.getExpectedAmount()),str(line.getRuleRef()),line.getLineStatus())).toList();
-        boolean held=selected.stream().anyMatch(line->"HOLD".equals(line.getLineStatus()));
+        var lines=selected.stream().map(line->new PaymentCalculationSnapshot.CalculationLine(str(detail.getScheduleHeaderId())+":"+line.getLineNo(),str(line.getContractId()),str(line.getCommissionItemId()),str(line.getBeneficiaryAgentId()),line.getInstallmentNo(),str(line.getAttributionDate()),str(line.getDueDate()),line.getBasisCode(),str(line.getBasisAmount()),line.getCalculationType(),str(line.getRatePct()),won(line.getExpectedAmount()),str(line.getRuleRef()),line.getLineStatus(),line.getCashflowType())).toList();
+        boolean nonPayment=selected.stream().anyMatch(line->!"PAYMENT".equals(line.getCashflowType()));
+        boolean held=nonPayment || selected.stream().anyMatch(line->"HOLD".equals(line.getLineStatus()));
         var total=MoneyUtil.sumRounded(selected.stream().map(ScheduleLineResponse::getExpectedAmount).toList());
         var resolved=new LinkedHashMap<String,String>();resolved.put("contractId",scope.contractId());resolved.put("settlementMonth",scope.settlementMonth());resolved.put("paymentStage",scope.paymentStage().name());resolved.put("aggregation",scope.aggregation().name());
         Long policy=schedules.selectActiveOperationalPolicyVersionId(contract,scope.paymentStage());if(policy!=null)resolved.put("policyVersionId",policy.toString());
         var dates=selected.stream().map(ScheduleLineResponse::getDueDate).distinct().toList();
-        return result(request,held?"REVIEW_REQUIRED":"CALCULATED","EXPECTED",resolved,Map.of("expectedAmount",total.toPlainString()),lines,List.of(),new PaymentCalculationSnapshot.Source("schedule:"+detail.getScheduleHeaderId(),"SCHEDULE","활성 운영 스케줄",str(detail.getHeader().getGeneratedAt()),str(detail.getScheduleHeaderId())),dates.size()==1?dates.getFirst().toString():null,!held && policy!=null && selected.size()==1);
+        return result(request,held?"REVIEW_REQUIRED":"CALCULATED","EXPECTED",resolved,nonPayment?Map.of():Map.of("expectedAmount",total.toPlainString()),lines,List.of(),new PaymentCalculationSnapshot.Source("schedule:"+detail.getScheduleHeaderId(),"SCHEDULE","활성 운영 스케줄",str(detail.getHeader().getGeneratedAt()),str(detail.getScheduleHeaderId())),dates.size()==1?dates.getFirst().toString():null,!held && policy!=null && selected.size()==1);
     }
     private PaymentCalculationSnapshot balance(PaymentCalculationRequest request) {
         if(request.scope()!=null) throw invalid("scope");

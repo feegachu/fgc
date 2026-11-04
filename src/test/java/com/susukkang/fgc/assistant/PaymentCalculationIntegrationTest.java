@@ -49,6 +49,21 @@ class PaymentCalculationIntegrationTest {
         assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.amounts()).isEmpty();assertThat(stale.recommendation().allowed()).isFalse();
     }
 
+    @Autowired com.susukkang.fgc.assistant.service.CalculationDependencyFingerprint fingerprints;
+    @Test void dependencyQueryIsRepeatableAndMeasuresSeedCost() {
+        var transaction=new TransactionTemplate(transactionManager);
+        transaction.setReadOnly(true);transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var durations=new ArrayList<Long>();
+        transaction.executeWithoutResult(status->{
+            String expected=null;
+            for(int i=0;i<5;i++) {
+                long started=System.nanoTime();String actual=fingerprints.current();durations.add(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
+                assertThat(actual).matches("[0-9a-f]{64}");if(expected!=null)assertThat(actual).isEqualTo(expected);expected=actual;
+            }
+        });
+        System.out.println("#733 dependency SHA256 query seed timings(ms): "+durations);
+    }
+
     @BeforeEach void createOwnedCommittedDraft() {
         AppUserView view = jdbc.queryForObject("SELECT user_id, login_id FROM fgc.app_user ORDER BY user_id LIMIT 1", (rs, row) -> {
             var value = new AppUserView();
@@ -57,7 +72,9 @@ class PaymentCalculationIntegrationTest {
             return value;
         });
         var principal = new FgcUserDetails(view, true, true);
-        SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+        var authentication=UsernamePasswordAuthenticationToken.authenticated(principal,null,principal.getAuthorities());
+        authentication.setDetails(new com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter.SessionIdentity("integration-session-"+UUID.randomUUID()));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
         contractId = jdbc.queryForObject("""
                 INSERT INTO fgc.insurance_contract(insurer_id,product_offering_id,contract_no,contract_date,
                     agent_id,organization_id,premium_per_cycle_amount,first_premium_amount,

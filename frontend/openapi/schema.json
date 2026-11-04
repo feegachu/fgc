@@ -8676,6 +8676,9 @@
           },
           "status" : {
             "type" : "string"
+          },
+          "cashflowType" : {
+            "type" : "string"
           }
         }
       },

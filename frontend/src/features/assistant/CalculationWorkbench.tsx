@@ -347,7 +347,7 @@ export function CalculationWorkbench({
               {result.lines?.map((line) => (
                 <p key={line.sourceId}>
                   계약 #{line.contractId} · 항목 #{line.commissionItemId} · {line.installmentNo}회차 · 귀속일{' '}
-                  {line.attributionDate} · 지급예정일 {line.dueDate} · 예상 {won(line.expectedAmount)} · 기준{' '}
+                  {line.attributionDate} · 지급예정일 {line.dueDate} · {line.cashflowType === 'DEDUCTION' ? '공제 예정' : '예상'} {won(line.expectedAmount)} · 기준{' '}
                   {line.basisCode} {line.basisAmount} · 요율 {line.ratePct}% · 규칙 #{line.ruleId}
                 </p>
               ))}

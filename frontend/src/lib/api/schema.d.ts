@@ -5320,6 +5320,7 @@ export interface components {
             expectedAmount?: string;
             ruleId?: string;
             status?: string;
+            cashflowType?: string;
         };
         AssistantCalculationValidity: {
             stateToken?: string;
