@@ -255,7 +255,7 @@ export default function TransactionListPage() {
     },
   ]
   return (
-    <div className="transaction-page transaction-list-page">
+    <div className="transaction-page transaction-list-page list-page">
       <Modal
         open={deleteTarget !== null}
         title="지급 초안 삭제"
@@ -447,7 +447,7 @@ function TransactionFilters({
   )
   return (
     <FilterBar
-      className="transaction-filter-bar"
+      className="transaction-filter-bar list-filter-bar"
       wrapFields={false}
       icons
       resetFirst

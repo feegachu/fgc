@@ -13,11 +13,6 @@
   gap: var(--space-3);
 }
 
-.contract-form-page-header {
-  min-height: 4rem;
-  align-items: center;
-}
-
 .contract-form-page .form-error-summary {
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-status-error-border);
@@ -51,7 +46,6 @@
 .contract-form-card {
   overflow: clip;
   overflow-clip-margin: 4px;
-  border-radius: var(--radius-12);
 }
 
 .contract-basic-form-card {
@@ -71,12 +65,6 @@
   margin-inline: var(--space-5);
   padding-top: var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.contract-form-card-header h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.5rem;
 }
 
 .contract-form-card-header p {
@@ -144,7 +132,7 @@
   margin: 0 var(--space-5);
   padding: var(--space-5);
   border: 1px solid var(--color-border-focus);
-  border-radius: var(--radius-12);
+  border-radius: var(--radius-8);
   background: var(--color-bg-surface);
 }
 
@@ -183,7 +171,6 @@
   justify-content: space-between;
   gap: var(--space-6);
   padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
-  border-radius: var(--radius-12);
 }
 
 .contract-action-buttons {
@@ -245,11 +232,6 @@
   .contract-save-button {
     min-width: 0;
   }
-}
-
-.contract-detail-page-header {
-  min-height: 2.75rem;
-  align-items: center;
 }
 
 .contract-summary-card {
@@ -656,11 +638,6 @@
   }
 }
 
-.contract-page-header {
-  min-height: 2.75rem;
-  align-items: center;
-}
-
 .contract-filter-card,
 .contract-results-card {
   overflow: clip;
@@ -721,16 +698,6 @@
 .contract-col-status { width: 5.25rem; }
 .contract-col-cap { width: 7rem; }
 .contract-col-origin { width: 5.5rem; }
-
-.contract-table th,
-.contract-table td {
-  height: 2.5rem;
-  font-size: 0.75rem;
-}
-
-.contract-table th {
-  height: 2.5rem;
-}
 
 .contract-premium-heading {
   line-height: 1rem;
