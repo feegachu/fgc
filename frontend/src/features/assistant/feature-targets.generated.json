@@ -1175,6 +1175,11 @@
     "element": "section"
   },
   {
+    "id": "features.contract.contract-detail-page.status-preview",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.contract.contract-form-page.agent-id",
     "file": "features/contract/ContractFormPage.tsx",
     "element": "SearchSelect"
@@ -1348,6 +1353,51 @@
     "id": "features.contract.contract-list-page.section-2",
     "file": "features/contract/ContractListPage.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.contract.contract-status-preview.close",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.edit",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.effective-at",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-status-preview.event-type",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-status-preview.form",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.contract.contract-status-preview.reload",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.reset",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.retry",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.submit",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
   },
   {
     "id": "features.contract.contract-tabs.button",

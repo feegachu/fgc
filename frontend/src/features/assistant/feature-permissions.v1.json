@@ -38,6 +38,11 @@
       "GA_ADMIN",
       "SETTLEMENT"
     ],
+    "CAN_PREVIEW_STATUS_EVENT": [
+      "SYSTEM_ADMIN",
+      "GA_ADMIN",
+      "SETTLEMENT"
+    ],
     "CAN_FINALIZE_VALIDATION": [
       "SYSTEM_ADMIN",
       "GA_ADMIN"
@@ -286,6 +291,16 @@
     "features.contract.contract-detail-page.link": "OWN_OR_INTERNAL_READ",
     "features.contract.contract-detail-page.link-2": "CAN_PROCESS",
     "features.contract.contract-detail-page.section": "OWN_OR_INTERNAL_READ",
+    "features.contract.contract-detail-page.status-preview": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.close": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.edit": "CAN_PROCESS",
+    "features.contract.contract-status-preview.effective-at": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.event-type": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.form": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.reload": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.reset": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.retry": "CAN_PREVIEW_STATUS_EVENT",
+    "features.contract.contract-status-preview.submit": "CAN_PREVIEW_STATUS_EVENT",
     "features.contract.contract-form-page.agent-id": "CAN_PROCESS",
     "features.contract.contract-form-page.agent-name": "CAN_PROCESS",
     "features.contract.contract-form-page.button": "CAN_PROCESS",
