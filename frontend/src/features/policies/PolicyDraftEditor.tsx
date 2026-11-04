@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { errorText } from '../../lib/format'
 import { screenMessage } from '../../lib/screenText'
 import { useQueryClient } from '@tanstack/react-query'
@@ -67,6 +67,8 @@ export function PolicyDraftEditor({
     initialPath && initialProblem ? { [initialPath]: initialProblem.message } : {},
   )
   const [busy, setBusy] = useState(false)
+  const [focusRequest, setFocusRequest] = useState<{ path: string } | null>(null)
+  const handledFocus = useRef<typeof focusRequest>(null)
   const [failure, setFailure] = useState(initialProblem?.message ?? '')
   const [conflict, setConflict] = useState(false)
   const [latest, setLatest] = useState('')
@@ -119,8 +121,13 @@ export function PolicyDraftEditor({
     setSection(sections.some((item) => item.id === group) ? group : 'basic')
     const parameter = /^parameters\.(\d+)\./.exec(path)
     const focusPath = parameter ? `parameters.${draft.parameters[Number(parameter[1])]?.key}` : path
-    requestAnimationFrame(() => focusPolicyField(focusPath))
+    setFocusRequest({ path: focusPath })
   }
+  useLayoutEffect(() => {
+    if (busy || !focusRequest || handledFocus.current === focusRequest) return
+    focusPolicyField(focusRequest.path)
+    handledFocus.current = focusRequest
+  }, [busy, section, focusRequest])
   useEffect(() => {
     if (!initialPath) return
     const frame = requestAnimationFrame(() => focusPolicyField(initialPath))
