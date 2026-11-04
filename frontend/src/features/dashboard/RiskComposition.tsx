@@ -1,5 +1,4 @@
-import { useId, useState } from 'react'
-import type { CSSProperties } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 import { int, rate } from '../../lib/format'
 import { useDrawn } from '../../lib/motion'
@@ -19,21 +18,36 @@ export type CompositionItem = {
  * 각 줄은 해당 목록 화면으로 이동하는 링크다. 조각이나 범례에 올리면 중앙에 항목·건수·비중을 보여 준다.
  */
 export function RiskComposition({ items }: { items: CompositionItem[] }) {
-  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null)
+  const [focusedKey, setFocusedKey] = useState<string | null>(null)
+  const [dismissed, setDismissed] = useState(false)
+  const activeKey = dismissed ? null : hoveredKey ?? focusedKey
   const tooltipId = useId()
   const drawn = useDrawn()
   const total = items.reduce((sum, item) => sum + item.value, 0)
   const segments = new Map(donutSegments(items).map((segment) => [segment.key, segment]))
   const active = items.find((item) => item.key === activeKey)
 
+  useEffect(() => {
+    if (activeKey === null) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDismissed(true)
+    }
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  }, [activeKey])
+
+  function hover(key: string | null) {
+    setHoveredKey(key)
+    if (key !== null) setDismissed(false)
+  }
+
   if (total === 0) {
     return <div className="empty-state">이번 달 표시할 위험 건이 없습니다.</div>
   }
 
   return (
-    <div className="risk-composition" onKeyDown={(event) => {
-      if (event.key === 'Escape') setActiveKey(null)
-    }}>
+    <div className="risk-composition">
       <div className="risk-donut">
         <svg viewBox="0 0 100 100" className="risk-donut-svg" aria-hidden="true">
           <circle className="risk-donut-track" cx="50" cy="50" r={RADIUS} />
@@ -51,8 +65,8 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
                 r={RADIUS}
                 strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
                 strokeDashoffset={-segment.offset}
-                onMouseEnter={() => setActiveKey(item.key)}
-                onMouseLeave={() => setActiveKey(null)}
+                onMouseEnter={() => hover(item.key)}
+                onMouseLeave={() => hover(null)}
               />
             )
           })}
@@ -68,21 +82,24 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
         )}
       </div>
       <ul className="risk-legend">
-        {items.map((item, index) => {
+        {items.map((item) => {
           const share = total > 0 ? item.value / total : 0
           // 화면정의서 공통 규칙 3: 소수점 첫째 자리까지 절사. (value*100)/total이라야 0.29*100 같은 곱셈 오차가 없다
           const sharePct = `${rate(total > 0 ? String((item.value * 100) / total) : '0')}%`
           return (
-            <li key={item.key} style={{ '--i': index } as CSSProperties}>
+            <li key={item.key}>
               <Link data-guide-feature="features.dashboard.risk-composition.link"
                 to={item.to}
                 className={`risk-legend-row${activeKey === item.key ? ' is-active' : ''}`}
                 aria-label={`${item.label} ${int(item.value)}건, 비중 ${sharePct}`}
                 aria-describedby={activeKey === item.key ? tooltipId : undefined}
-                onMouseEnter={() => setActiveKey(item.key)}
-                onMouseLeave={() => setActiveKey(null)}
-                onFocus={() => setActiveKey(item.key)}
-                onBlur={() => setActiveKey(null)}
+                onMouseEnter={() => hover(item.key)}
+                onMouseLeave={() => hover(null)}
+                onFocus={() => {
+                  setFocusedKey(item.key)
+                  setDismissed(false)
+                }}
+                onBlur={() => setFocusedKey(null)}
               >
                 <span className={`risk-swatch risk-color-${item.color}`} aria-hidden="true" />
                 <span className="risk-legend-label">{item.label}</span>

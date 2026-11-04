@@ -13,7 +13,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
     const bar = element?.parentElement
     if (!element || !bar) return
     const update = () => {
-      // Compare against the space before the buttons take up any width.
+      // 이동 버튼이 생기기 전의 가용 폭으로 넘침을 판단한다.
       const { paddingLeft, paddingRight } = getComputedStyle(bar)
       const available = bar.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight)
       const overflow = element.scrollWidth > available + 1

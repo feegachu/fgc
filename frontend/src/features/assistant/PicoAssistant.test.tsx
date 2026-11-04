@@ -13,7 +13,6 @@ const user: ShellUser = {
 afterEach(() => vi.unstubAllEnvs())
 const open = () => userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' }))
 
-
 it('requires explicit demo opt-in and hides for AGENT, unknown roles and logout', () => {
   vi.stubEnv('VITE_ASSISTANT_DEMO', '')
   const view = render(<AssistantDemoMount user={user} />)
