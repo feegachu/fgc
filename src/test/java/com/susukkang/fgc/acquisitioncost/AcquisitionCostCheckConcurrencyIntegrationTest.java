@@ -40,6 +40,10 @@ class AcquisitionCostCheckConcurrencyIntegrationTest {
         return jdbc.queryForObject("SELECT count(*) FROM fgc.acquisition_cost_check WHERE contract_id = ?", Long.class, contractId);
     }
 
+    private long audits() {
+        return jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log WHERE action_code = 'ACQUISITION_COST_CHECKED'", Long.class);
+    }
+
     @Test
     @Timeout(30)
     void sameKeyWhileProcessingIsRejectedAndAfterCommitReplaysOneRow() throws Exception {
@@ -71,6 +75,25 @@ class AcquisitionCostCheckConcurrencyIntegrationTest {
                     .isEqualTo(committed.acquisitionCostCheckId());
         }
         assertThat(stored(contract)).isEqualTo(before + 1);
+    }
+
+    @Test
+    @Timeout(30)
+    void rollbackLeavesNoResultOrAuditAndTheKeyStaysUsable() {
+        long contract = contractId();
+        long before = stored(contract);
+        long auditBefore = audits();
+        var request = new AcquisitionCostCheckRequest(contract, PaymentStage.GA_TO_FC);
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            service.request(request, "rollback-key-651", userId());
+            status.setRollbackOnly();
+        });
+        assertThat(stored(contract)).isEqualTo(before);
+        assertThat(audits()).isEqualTo(auditBefore);
+
+        service.request(request, "rollback-key-651", userId());
+        assertThat(stored(contract)).isEqualTo(before + 1);
+        assertThat(audits()).isEqualTo(auditBefore + 1);
     }
 
     @Test
