@@ -4,6 +4,7 @@ import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEffect;
+import com.susukkang.fgc.contract.dto.ContractStatusEffect.EntityType;
 import com.susukkang.fgc.contract.dto.ContractStatusEffectResponse;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.transaction.service.CommissionPaymentService;
@@ -39,6 +40,7 @@ class PaymentHoldFollowUpIntegrationTest {
     @Autowired private CommissionPaymentService payments;
     @Autowired private ContractStatusEffectQueryService effectQuery;
     @Autowired private PaymentHoldGate gate;
+    @Autowired private com.susukkang.fgc.contract.repository.PaymentHoldRepository holds;
     @Autowired private com.susukkang.fgc.schedule.service.ScheduleService scheduleService;
 
     @Test
@@ -363,6 +365,47 @@ class PaymentHoldFollowUpIntegrationTest {
                  WHERE h.commission_transaction_id = ? AND h.released_at IS NULL
                 """, Long.class, shared)).isEqualTo(b);
         assertThat(gate.blockers(shared)).isNotEmpty();
+    }
+
+    @Test
+    void anEffectOnASharedPaymentCarriesTheContractsAttributedAmountNotTheWholeTransaction() {
+        long a = contract("2026-03-01");
+        long b = contract("2026-03-01");
+        statusEvent(a, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long unpaidA = statusEvent(a, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
+        long shared = payment(a, "2026-09-20", false);
+        // 거래 전체 5000 중 A 에 2000, B 에 3000 이 귀속된다.
+        jdbc.update("UPDATE fgc.transaction_attribution SET attributed_amount = 2000 WHERE commission_transaction_id = ?", shared);
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, contract_id, attribution_date,
+                    attribution_month, attributed_amount, inclusion_status_snapshot, attribution_method)
+                VALUES (?, 2, ?, DATE '2026-09-20', DATE '2026-09-01', 3000, 'INCLUDED', 'DIRECT')
+                """, shared, b);
+
+        List<ContractStatusEffect> recorded = processor.process(events.findById(unpaidA).orElseThrow());
+
+        assertThat(recorded).filteredOn(effect -> effect.entityType() == EntityType.PAYMENT && effect.entityId().equals(shared))
+                .singleElement()
+                .satisfies(effect -> assertThat(effect.amount()).isEqualByComparingTo("2000"));
+    }
+
+    @Test
+    void releasingForAResumeLeavesHoldsOfOtherReasonsOnTheSamePaymentOpen() {
+        long contract = contract("2026-03-01");
+        long active = statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long unpaid = statusEvent(contract, 2, "UNPAID", "2026-09-01T00:00:00+09:00");
+        long lapse = statusEvent(contract, 3, "LAPSED", "2026-09-10T00:00:00+09:00");
+        long payment = payment(contract, "2026-09-20", false);
+        holds.insert(payment, unpaid, null, "STATUS_UNPAID");
+        holds.insert(payment, lapse, null, "STATUS_INACTIVE");
+        assertThat(openHolds(payment)).isEqualTo(2);
+
+        holds.releaseOpen(payment, contract, active, java.util.Set.of("STATUS_UNPAID"));
+
+        assertThat(openHolds(payment)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT reason_code FROM fgc.payment_hold WHERE commission_transaction_id = ? AND released_at IS NULL
+                """, String.class, payment)).isEqualTo("STATUS_INACTIVE");
     }
 
     @Test

@@ -43,6 +43,7 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
     private static final String PLANNED = "PLANNED";
     private static final String RELEASED = "RELEASED";
     private static final String UNPAID_RESUMED = "UNPAID_RESUMED";
+    private static final Set<String> UNPAID_HOLD_REASONS = Set.of("STATUS_UNPAID");
 
     private final ContractStatusPaymentRule rule;
     private final PaymentHoldRepository holds;
@@ -105,7 +106,8 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
             return Optional.of(dueBeforeResume ? withDueDateNote(effect, resumedOn) : effect);
         }
         if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
-            holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId());
+            // 납입 재개는 미납으로 건 보류만 푼다. 실효·해지 등 다른 사유의 보류는 이 재개로 풀리지 않는다.
+            holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), UNPAID_HOLD_REASONS);
             return Optional.of(effect);
         }
         return Optional.empty();
