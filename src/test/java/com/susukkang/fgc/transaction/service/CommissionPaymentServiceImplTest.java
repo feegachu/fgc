@@ -842,6 +842,46 @@ class CommissionPaymentServiceImplTest {
         verify(writeRepository, never()).insertAttributions(anyList());
     }
 
+    // #753: 잠금 뒤 최신 행과 비교해 거절하면 참조 조회, 원천, 귀속, 검증 연결, 감사에 닿지 않는다.
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void rejectsStaleOrMissingTokenBeforeAnyPaymentSideEffects(boolean missing) {
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        )));
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        CommissionPaymentUpdateRequest request = withToken(updateRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        )), missing ? null : row(CommissionPaymentStatus.DRAFT).updatedAt().minusNanos(1000));
+
+        assertThatThrownBy(() -> service.update(101L, request))
+                .isInstanceOfSatisfying(FgcBusinessException.class, failure -> assertThat(failure.getErrorCode())
+                        .isEqualTo(missing ? FgcErrorCode.COMMON_002 : FgcErrorCode.TRAN_010));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(queryRepository);
+        order.verify(queryRepository).findConfirmationDataForUpdate(101L);
+        order.verify(queryRepository).findById(101L);
+        org.mockito.Mockito.verifyNoInteractions(writeRepository, capCheckWriteRepository, auditLogService);
+    }
+
+    @Test
+    void acceptsSameInstantTokenInAnotherOffset() {
+        stubReferences(3L);
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        )));
+        given(writeRepository.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of());
+
+        service.update(101L, withToken(updateRequest(List.of()),
+                row(CommissionPaymentStatus.DRAFT).updatedAt().withOffsetSameInstant(java.time.ZoneOffset.UTC)));
+
+        verify(writeRepository).updateTransaction(any(CommissionPaymentCommand.class));
+    }
+
     @Test
     void rejectsUpdateWhenPaymentIsNotDraft() {
         given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(withStatus(confirmation(
@@ -2087,7 +2127,28 @@ class CommissionPaymentServiceImplTest {
                 request.allocationPolicyVersion(),
                 request.attributions(),
                 request.evidenceRef(),
-                request.note()
+                request.note(),
+                row(CommissionPaymentStatus.DRAFT).updatedAt()
+        );
+    }
+
+    private CommissionPaymentUpdateRequest withToken(CommissionPaymentUpdateRequest source, OffsetDateTime token) {
+        return new CommissionPaymentUpdateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                source.amount(),
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                source.allocationPolicyVersion(),
+                source.attributions(),
+                source.evidenceRef(),
+                source.note(),
+                token
         );
     }
 

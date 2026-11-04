@@ -139,6 +139,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // DTO(Row)로 확보한다. 두 스냅샷이 같은 스키마여야 diff 화면이 필드 단위로 비교된다.
         CommissionPaymentRow beforeRow = requireRow(paymentId);
         List<CommissionPaymentAttributionRow> beforeAttributions = queryRepository.findAttributions(paymentId);
+        // #753: 전체 교체 PUT의 옛 입력값은 행 잠금만으로 식별할 수 없다. 변경 전에 조회 토큰을 비교한다.
+        if (request.expectedUpdatedAt() == null) {
+            invalid("expectedUpdatedAt", "지급 건을 다시 조회한 뒤 수정해 주세요.");
+        }
+        if (!request.expectedUpdatedAt().toInstant().equals(beforeRow.updatedAt().toInstant())) {
+            throw new FgcBusinessException(FgcErrorCode.TRAN_010);
+        }
 
         PreparedPayment prepared = commandFrom(paymentId, request);
         if (writeRepository.updateTransaction(prepared.payment()) != 1) {
