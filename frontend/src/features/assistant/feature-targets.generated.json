@@ -1526,17 +1526,17 @@
   },
   {
     "id": "features.contract.contract-tabs.button",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/detailParts.tsx",
     "element": "Button"
   },
   {
     "id": "features.contract.contract-tabs.button-3",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "Button"
   },
   {
     "id": "features.contract.contract-tabs.button-4",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "Button"
   },
   {
@@ -1551,13 +1551,23 @@
   },
   {
     "id": "features.contract.contract-tabs.section-3",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "section"
   },
   {
     "id": "features.contract.contract-tabs.section-5",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.contract.status-history.effects",
+    "file": "features/contract/ContractStatusHistory.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.status-history.effects-close",
+    "file": "features/contract/ContractStatusHistory.tsx",
+    "element": "Button"
   },
   {
     "id": "features.dashboard.dashboard-page.button",
