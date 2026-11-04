@@ -174,7 +174,10 @@ class InputAttackIntegrationTest {
             "/api/v1/contracts?insurerId=1%20OR%201%3D1",
             "/api/v1/contracts/1%20OR%201%3D1",
             "/api/v1/transactions/1%20DROP",
-            "/api/v1/contracts?contractDateFrom=%3Cscript%3Ealert(1)%3C%2Fscript%3E"})
+            "/api/v1/contracts?contractDateFrom=%3Cscript%3Ealert(1)%3C%2Fscript%3E",
+            // ZAP API scan 이 500 으로 찾은 입력. 월 형식과 NUL 문자는 입력 오류여야 한다.
+            "/api/v1/cap-checks?month=http%3A%2F%2Fexample.com%2F",
+            "/api/v1/contracts?contractNo=%00"})
     void typedParametersRejectAttackTextWithoutEchoingIt(String url) throws Exception {
         mvc.perform(get(URI.create(url)).header(HttpHeaders.AUTHORIZATION, bearer))
                 .andExpect(status().isBadRequest())

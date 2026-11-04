@@ -10,6 +10,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -24,7 +25,6 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
@@ -49,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 설명 : TER-009·SER-002 역할 × API 행렬(#677). 실제 로그인 토큰과 PostgreSQL 로 URL 규칙과 @PreAuthorize 를 함께 지난다.
+ * 설명 : TER-009, SER-002, FUN-002 역할 × API 행렬(#677). 실제 로그인 토큰과 PostgreSQL 로 URL 규칙과 @PreAuthorize 를 함께 지난다.
  *
  * <p>기대 역할은 Roles 상수를 쓰지 않고 인터페이스정의서 v3.0 §4-2 역할 열을 옮겨 적었다. 상수가 넓어지면 여기서 깨져야 한다.
  * 역할 열은 SYSTEM_ADMIN 을 생략하는 표기 규칙이라(§2-1 역할 표 아래) 아래 묶음에 더해 두었다.
@@ -276,7 +276,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
 
     @Test
     void everyWriteMappingHasAMatrixRow() {
-        Set<String> mapped = applicationMappings().keySet().stream()
+        Set<String> mapped = applicationMappings()
                 .flatMap(info -> keys(info).stream())
                 .filter(key -> !key.startsWith("GET "))
                 .collect(Collectors.toCollection(TreeSet::new));
@@ -290,7 +290,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
     @Test
     void anonymousIsRejectedOnEveryReadMapping() throws Exception {
         List<String> opened = new ArrayList<>();
-        for (RequestMappingInfo info : applicationMappings().keySet()) {
+        for (RequestMappingInfo info : applicationMappings().toList()) {
             for (String key : keys(info)) {
                 if (key.startsWith("GET ")) {
                     String url = key.substring(4).replace("{}", NO_SUCH_ID);
@@ -304,7 +304,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
     }
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {
+    @ValueSource(strings = {
             "/api/v1/audit-logs/options", "/api/v1/base/agents", "/api/v1/base/organizations", "/api/v1/cap-checks",
             "/api/v1/clawbacks/candidates/1", "/api/v1/contracts/1/journals", "/api/v1/contracts/1/schedules",
             "/api/v1/contracts/1/transactions", "/api/v1/dashboard/summary", "/api/v1/exceptions", "/api/v1/journals",
@@ -319,7 +319,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
     /** SIR-001 버전 정책: 앱이 여는 경로는 모두 /api/v1 아래다. */
     @Test
     void everyApplicationMappingIsVersionedUnderApiV1() {
-        List<String> outside = applicationMappings().keySet().stream()
+        List<String> outside = applicationMappings()
                 .flatMap(info -> info.getPatternValues().stream())
                 .filter(pattern -> !pattern.startsWith("/api/v1/"))
                 .toList();
@@ -336,10 +336,10 @@ class RoleApiAuthorizationMatrixIntegrationTest {
         return actor == Actor.ANONYMOUS ? builder : builder.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokens.get(actor));
     }
 
-    private Map<RequestMappingInfo, HandlerMethod> applicationMappings() {
+    private Stream<RequestMappingInfo> applicationMappings() {
         return handlers.getHandlerMethods().entrySet().stream()
                 .filter(entry -> entry.getValue().getBeanType().getPackageName().startsWith("com.susukkang.fgc"))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                .map(Map.Entry::getKey);
     }
 
     /** 메서드 조건 없는 매핑은 모든 메서드를 받는 쓰기 경로이므로 ANY 로 드러내 행렬에서 걸리게 한다. */

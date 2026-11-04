@@ -433,6 +433,7 @@ describe('EXCP-W01 예외함', () => {
     const { actions } = renderPage()
     await actions.click(within(await table()).getByRole('button', { name: '11' }))
     expect(await screen.findByText(payload, { selector: '.exception-history-reason' })).toBeInTheDocument()
+    expect(screen.getByText(payload, { selector: 'dd' })).toBeInTheDocument()
     expect(document.querySelector('img[src="x"]')).toBeNull()
     expect(document.querySelector('#root script, main script, [onerror]')).toBeNull()
   })

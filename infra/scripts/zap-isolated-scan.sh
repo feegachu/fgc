@@ -90,25 +90,28 @@ scan() {
     local name=$1 status=0
     shift
     mkdir -p "$out"
-    chmod a+rwx "$out"
     # Docker Desktop 컨테이너의 127.0.0.1 은 컨테이너 자신이라 호스트 loopback 으로 가는 이름을 쓴다.
     local zap_network=(--network host) zap_url=$target
     if [[ "$(docker info --format '{{.OperatingSystem}}')" == *"Docker Desktop"* ]]; then
         zap_network=()
         zap_url=$(sed -E 's#//(127\.0\.0\.1|localhost):#//host.docker.internal:#' <<<"$target")
     fi
+    # API scan 은 문서의 servers 주소로 공격 요청을 보낸다. 문서가 무엇을 적든 대상에 고정한다.
+    [[ "$name" == zap-api-scan ]] && set -- "$@" -O "${zap_url#http://}"
+    chmod a+rwx "$out" # 컨테이너의 zap 사용자가 보고서를 쓰는 동안만 연다
     docker run --rm ${zap_network[@]+"${zap_network[@]}"} --memory=1500m -v "$out:/zap/wrk:rw" \
         -e "ZAP_AUTH_HEADER_VALUE=${ZAP_AUTH_HEADER_VALUE:-}" "$zap_image" \
         "$name.py" -t "$zap_url${SCAN_PATH:-}" -I -J "$name.json" -r "$name.html" "$@" || status=$?
+    chmod go-rwx "$out"
     summarize "$name"
     return "$status"
 }
 
 login_token() {
     : "${ZAP_LOGIN_PASSWORD:?ZAP_LOGIN_PASSWORD 를 지정하세요}"
-    curl -fsS -X POST "$target/api/v1/auth/login" -H "Origin: $target" -H 'X-FGC-Client: web' \
-        -H 'Content-Type: application/json' \
-        -d "{\"loginId\":\"${ZAP_LOGIN_ID:-settle01}\",\"password\":\"$ZAP_LOGIN_PASSWORD\"}" |
+    "$python" -c 'import json, os; print(json.dumps({"loginId": os.environ.get("ZAP_LOGIN_ID", "settle01"), "password": os.environ["ZAP_LOGIN_PASSWORD"]}))' |
+        curl -fsS -X POST "$target/api/v1/auth/login" -H "Origin: $target" -H 'X-FGC-Client: web' \
+            -H 'Content-Type: application/json' --data-binary @- |
         "$python" -c 'import json, sys; print(json.load(sys.stdin)["data"]["accessToken"])'
 }
 

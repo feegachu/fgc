@@ -78,7 +78,11 @@ class FinalizedRunWriteConflictIntegrationTest {
         // guard_run_lifecycle 이 허용하는 전이만 밟는다.
         jdbc.update("UPDATE fgc.validation_run SET status = 'RUNNING' WHERE validation_run_id = ?", finalizedRunId);
         jdbc.update("UPDATE fgc.validation_run SET status = 'COMPLETED', current_step = 8, completed_at = now() WHERE validation_run_id = ?", finalizedRunId);
-        jdbc.update("UPDATE fgc.validation_run SET status = 'FINALIZED', current_step = 10, finalized_at = now() WHERE validation_run_id = ?", finalizedRunId);
+        jdbc.update("""
+                UPDATE fgc.validation_run
+                   SET status = 'FINALIZED', current_step = 10, finalized_at = now(), finalize_idempotency_key = ?
+                 WHERE validation_run_id = ?
+                """, UUID.randomUUID().toString(), finalizedRunId);
     }
 
     @Test
@@ -95,7 +99,8 @@ class FinalizedRunWriteConflictIntegrationTest {
         mvc.perform(post("/api/v1/validation-runs/{id}/finalize", finalizedRunId)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .header(HttpHeaders.AUTHORIZATION, gaAdmin))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("FGC-VRUN-003"));
         assertThat(runStatus()).isEqualTo("FINALIZED");
     }
 
