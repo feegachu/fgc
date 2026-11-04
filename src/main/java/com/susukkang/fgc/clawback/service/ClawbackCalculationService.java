@@ -5,6 +5,7 @@ import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse;
 import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse.Calculation;
 import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse.CalculationLine;
 import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse.PaymentEvidence;
+import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse.PolicyCandidate;
 import com.susukkang.fgc.clawback.dto.ClawbackCandidateResponse;
 import com.susukkang.fgc.clawback.repository.ClawbackCalculationRepository;
 import com.susukkang.fgc.clawback.repository.ClawbackCalculationRepository.Rule;
@@ -91,45 +92,24 @@ public class ClawbackCalculationService {
             return stored.calculation();
         }
 
-        List<PaymentEvidence> paid = detail.paymentAttributions().stream()
-                .filter(p -> "CONFIRMED".equals(p.status()) && "PAYMENT".equals(p.cashflowType())).toList();
-        if (paid.isEmpty()) throw missing("paymentAttributions", List.of("PAID_ATTRIBUTION_MISSING"));
+        Computation computed = compute(detail, request.policyVersionId());
+        List<CalculationLine> lines = computed.lines();
+        List<Map<String, Object>> excluded = computed.excluded();
+        BigDecimal total = computed.total();
         int elapsed = detail.elapsedMonths();
-        List<Rule> rules = store.findRules(request.policyVersionId()).stream()
-                .filter(r -> r.insurerId() == null || r.insurerId().equals(candidate.insurerId()))
-                .filter(r -> r.productOfferingId() == null || r.productOfferingId().equals(candidate.productOfferingId()))
-                .toList();
-
-        List<CalculationLine> lines = new ArrayList<>();
         List<Map<String, Object>> lineRows = new ArrayList<>();
-        List<Map<String, Object>> excluded = new ArrayList<>();
-        for (PaymentEvidence payment : paid) {
-            List<Rule> forItem = rules.stream()
-                    .filter(r -> r.commissionItemId() == null || r.commissionItemId().equals(payment.commissionItemId()))
-                    .toList();
-            if (forItem.isEmpty()) {
-                // 정책이 이 수수료 항목을 환수 대상으로 두지 않았다. 0원 행을 만들지 않고 근거에만 남긴다.
-                excluded.add(Map.of("transactionAttributionId", payment.transactionAttributionId(),
-                        "commissionItemId", payment.commissionItemId(), "reason", "NO_CLAWBACK_RULE"));
-                continue;
-            }
-            Rule rule = select(forItem, elapsed);
-            BigDecimal basis = payment.attributedAmount().setScale(0, RoundingMode.HALF_UP);
-            BigDecimal amount = basis.multiply(rule.ratePct()).divide(HUNDRED, 0, RoundingMode.HALF_UP);
-            lines.add(new CalculationLine(payment.transactionAttributionId(), payment.commissionItemId(),
-                    payment.installmentNo(), elapsed, BASIS_CODE, basis, rule.ratePct(), amount, rule.ruleId()));
+        for (CalculationLine line : lines) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("transactionAttributionId", payment.transactionAttributionId());
-            row.put("clawbackRuleId", rule.ruleId());
-            row.put("basisAmount", basis);
-            row.put("appliedRatePct", rule.ratePct());
-            row.put("clawbackAmount", amount);
-            row.put("commissionItemId", payment.commissionItemId());
-            row.put("installmentNo", payment.installmentNo());
+            row.put("transactionAttributionId", line.transactionAttributionId());
+            row.put("clawbackRuleId", line.clawbackRuleId());
+            row.put("basisAmount", line.basisAmount());
+            row.put("appliedRatePct", line.appliedRatePct());
+            row.put("clawbackAmount", line.clawbackAmount());
+            row.put("commissionItemId", line.commissionItemId());
+            row.put("installmentNo", line.installmentNo());
             row.put("elapsedMonths", elapsed);
             lineRows.add(row);
         }
-        BigDecimal total = lines.stream().map(CalculationLine::clawbackAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         var clawbackCase = store.lockOrCreateCase(candidateId, candidate.contractId(),
                 "STATUS_EVENT".equals(candidate.triggerType().name()) ? candidate.sourceId() : null,
@@ -164,6 +144,67 @@ public class ClawbackCalculationService {
         store.saveRequest(idempotencyKey, userId, candidateId, hash, calculationId);
         // 재요청·수렴 응답과 같은 값이 되도록 저장된 snapshot을 그대로 돌려준다.
         return store.findCalculation(calculationId).orElseThrow().calculation();
+    }
+
+    /**
+     * FUN-077 미리보기의 예상 환수액. {@link #calculate}와 같은 입력 검사·계산부를 쓰고 아무것도 저장하지 않는다.
+     * 정책 없음·근거 부족과 정책 선택 필요는 금액 없이(null) 사유만 돌려준다. 실제 0%면 0원이다(제48조의3 4·5·8항).
+     * 저장 뒤 계산은 사용자가 확인한 정책으로 하므로 이 값은 확정액이 아니다.
+     */
+    public Estimate estimate(ClawbackCandidateDetailResponse detail) {
+        ClawbackCandidateResponse candidate = detail.candidate();
+        List<String> reasons = candidate.reviewReasons();
+        if (!candidate.allowedActions().contains("CALCULATE") || detail.policyCandidates().size() != 1) {
+            return new Estimate(null, reasons, null, List.of());
+        }
+        PolicyCandidate policy = detail.policyCandidates().get(0);
+        try {
+            Computation computed = compute(detail, policy.policyVersionId());
+            return new Estimate(computed.total(), reasons, policy, computed.lines());
+        } catch (FgcBusinessException insufficient) {
+            if (insufficient.getErrorCode() != FgcErrorCode.IMPL_POLICY_MISSING) throw insufficient;
+            List<String> combined = new ArrayList<>(reasons);
+            ((List<?>) insufficient.getParams().get("reasons")).forEach(reason -> combined.add(String.valueOf(reason)));
+            return new Estimate(null, combined, policy, List.of());
+        }
+    }
+
+    /** amount가 null이면 계산하지 않았다는 뜻이다. 실제 0원과 구분한다. */
+    public record Estimate(BigDecimal amount, List<String> reasons, PolicyCandidate policy, List<CalculationLine> lines) { }
+
+    private record Computation(List<CalculationLine> lines, List<Map<String, Object>> excluded, BigDecimal total) { }
+
+    /** 쓰기 없는 계산부. 저장 경로와 미리보기가 같은 기준금액·규칙 선택·반올림을 쓰게 한다. */
+    private Computation compute(ClawbackCandidateDetailResponse detail, long policyVersionId) {
+        ClawbackCandidateResponse candidate = detail.candidate();
+        List<PaymentEvidence> paid = detail.paymentAttributions().stream()
+                .filter(p -> "CONFIRMED".equals(p.status()) && "PAYMENT".equals(p.cashflowType())).toList();
+        if (paid.isEmpty()) throw missing("paymentAttributions", List.of("PAID_ATTRIBUTION_MISSING"));
+        int elapsed = detail.elapsedMonths();
+        List<Rule> rules = store.findRules(policyVersionId).stream()
+                .filter(r -> r.insurerId() == null || r.insurerId().equals(candidate.insurerId()))
+                .filter(r -> r.productOfferingId() == null || r.productOfferingId().equals(candidate.productOfferingId()))
+                .toList();
+        List<CalculationLine> lines = new ArrayList<>();
+        List<Map<String, Object>> excluded = new ArrayList<>();
+        for (PaymentEvidence payment : paid) {
+            List<Rule> forItem = rules.stream()
+                    .filter(r -> r.commissionItemId() == null || r.commissionItemId().equals(payment.commissionItemId()))
+                    .toList();
+            if (forItem.isEmpty()) {
+                // 정책이 이 수수료 항목을 환수 대상으로 두지 않았다. 0원 행을 만들지 않고 근거에만 남긴다.
+                excluded.add(Map.of("transactionAttributionId", payment.transactionAttributionId(),
+                        "commissionItemId", payment.commissionItemId(), "reason", "NO_CLAWBACK_RULE"));
+                continue;
+            }
+            Rule rule = select(forItem, elapsed);
+            BigDecimal basis = payment.attributedAmount().setScale(0, RoundingMode.HALF_UP);
+            BigDecimal amount = basis.multiply(rule.ratePct()).divide(HUNDRED, 0, RoundingMode.HALF_UP);
+            lines.add(new CalculationLine(payment.transactionAttributionId(), payment.commissionItemId(),
+                    payment.installmentNo(), elapsed, BASIS_CODE, basis, rule.ratePct(), amount, rule.ruleId()));
+        }
+        BigDecimal total = lines.stream().map(CalculationLine::clawbackAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new Computation(lines, excluded, total);
     }
 
     /**
