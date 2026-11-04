@@ -71,6 +71,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.transaction.deleteLinked"
     ),
+    TRAN_010(
+            "FGC-TRAN-010",
+            HttpStatus.CONFLICT,
+            "error.transaction.concurrentUpdate"
+    ),
 
     CONT_001(
             "FGC-CONT-001",
@@ -129,6 +134,7 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.validationRun.invalidTransition"
     ),
+    VRUN_008("FGC-VRUN-008", HttpStatus.SERVICE_UNAVAILABLE, "error.validationRun.launchUnavailable"),
     VRUN_005(
             "FGC-VRUN-005",
             HttpStatus.CONFLICT,

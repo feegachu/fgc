@@ -1,6 +1,30 @@
 {
   "components" : {
     "schemas" : {
+      "Accepted" : {
+        "properties" : {
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "previousBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "validationRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ActiveMonthlyRunResponse" : {
         "properties" : {
           "exists" : {
@@ -428,6 +452,20 @@
           }
         },
         "required" : [ "data", "error", "requestId" ],
+        "type" : "object"
+      },
+      "ApiResponseAccepted" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Accepted"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "ApiResponseActiveMonthlyRunResponse" : {
@@ -1077,6 +1115,23 @@
         },
         "type" : "object"
       },
+      "ApiResponseListRetry" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Retry"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseListScheduleHeaderResponse" : {
         "properties" : {
           "data" : {
@@ -1421,6 +1476,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/ReconciliationRunSearchResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseRestartability" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Restartability"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -3518,6 +3587,10 @@
             "minLength" : 0,
             "type" : "string"
           },
+          "expectedUpdatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "note" : {
             "maxLength" : 1000,
             "minLength" : 0,
@@ -3546,7 +3619,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "amount", "attributions", "cashflowType", "commissionItemId", "paymentStage", "scheduledPaymentDate", "settlementMonth", "sourceBusinessKey", "sourceType" ],
+        "required" : [ "amount", "attributions", "cashflowType", "commissionItemId", "expectedUpdatedAt", "paymentStage", "scheduledPaymentDate", "settlementMonth", "sourceBusinessKey", "sourceType" ],
         "type" : "object"
       },
       "CommissionRuleDraft" : {
@@ -3729,6 +3802,8 @@
             "type" : "string"
           },
           "rankResultId" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3832,7 +3907,8 @@
       "CompareExplainRequest" : {
         "properties" : {
           "rankResultId" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3943,7 +4019,8 @@
       "CompareRankingRequest" : {
         "properties" : {
           "categoryCode" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           },
           "filters" : {
@@ -4454,7 +4531,7 @@
       "ContractStatusEffectResponse" : {
         "properties" : {
           "amount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "entityId" : {
             "format" : "int64",
@@ -4468,16 +4545,16 @@
           },
           "policyVersionId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "previousState" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "processingJob" : {
             "type" : "string"
           },
           "reason" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "reasonCode" : {
             "type" : "string"
@@ -4487,6 +4564,12 @@
       },
       "ContractStatusEventProcessingResponse" : {
         "properties" : {
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
           "processedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -4496,6 +4579,16 @@
           },
           "processingStatus" : {
             "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ProcessingSummary"
+            }, {
+              "type" : "null"
+            } ]
           }
         },
         "type" : "object"
@@ -4539,6 +4632,9 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "followUp" : {
+            "$ref" : "#/components/schemas/EventFollowUp"
+          },
           "newStatus" : {
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
@@ -4566,6 +4662,10 @@
             "type" : [ "string", "null" ]
           },
           "receivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "recordedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
@@ -5010,6 +5110,21 @@
           "reconMismatch" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventFollowUp" : {
+        "properties" : {
+          "jobs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FollowUpJob"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -5582,6 +5697,37 @@
           },
           "status" : {
             "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FollowUpJob" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
+          "lastAttemptAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextRetryAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
             "type" : "string"
           }
         },
@@ -7794,6 +7940,27 @@
         },
         "type" : "object"
       },
+      "ProcessingSummary" : {
+        "properties" : {
+          "changedScheduleLines" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excludedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "heldPayments" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "resumedPayments" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ProductResponse" : {
         "description" : "보험상품 판매버전 기준정보",
         "properties" : {
@@ -8499,6 +8666,92 @@
         },
         "type" : "object"
       },
+      "Restartability" : {
+        "properties" : {
+          "allowed" : {
+            "type" : "boolean"
+          },
+          "checkpointAvailable" : {
+            "type" : "boolean"
+          },
+          "completedCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedStateVersion" : {
+            "type" : "string"
+          },
+          "failedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedStep" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lastFailedBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "remainingCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Retry" : {
+        "properties" : {
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : "string"
+          },
+          "failedStep" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "finishedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "previousBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "requestedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "requestedBy" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ReverseJournalRequest" : {
         "properties" : {
           "evidenceRef" : {
@@ -9055,6 +9308,27 @@
         },
         "type" : "object"
       },
+      "ValidationRestartRequest" : {
+        "properties" : {
+          "expectedBatchExecutionId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedStateVersion" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedBatchExecutionId", "expectedStateVersion", "reason" ],
+        "type" : "object"
+      },
       "ValidationRunDetailResponse" : {
         "properties" : {
           "arbitrageSummary" : {
@@ -9074,6 +9348,15 @@
           },
           "reconciliationSummary" : {
             "$ref" : "#/components/schemas/ReconciliationSummary"
+          },
+          "restartability" : {
+            "$ref" : "#/components/schemas/Restartability"
+          },
+          "retries" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Retry"
+            },
+            "type" : "array"
           },
           "targetSummary" : {
             "$ref" : "#/components/schemas/TargetSummary"
@@ -9172,6 +9455,10 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "currentStep" : {
             "format" : "int32",
             "type" : "integer"
@@ -9189,6 +9476,10 @@
           },
           "requestId" : {
             "type" : "string"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "status" : {
             "type" : "string"
@@ -13178,7 +13469,7 @@
         "tags" : [ "수수료 지급 건" ]
       },
       "put" : {
-        "description" : "DRAFT 지급 건의 필수값과 참조 정보를 검증한 후 변경 내용을 저장합니다.",
+        "description" : "expectedUpdatedAt으로 동시 수정을 검사한 뒤 DRAFT 지급 건의 필수값과 참조 정보를 검증해 변경 내용을 저장합니다.",
         "operationId" : "update",
         "parameters" : [ {
           "description" : "지급 건 ID",
@@ -13219,7 +13510,7 @@
                 }
               }
             },
-            "description" : "필수값·귀속·증빙 검증 실패"
+            "description" : "필수값·귀속·증빙·expectedUpdatedAt 검증 실패"
           },
           "403" : {
             "content" : {
@@ -13239,7 +13530,7 @@
                 }
               }
             },
-            "description" : "DRAFT가 아니거나 자연키 중복"
+            "description" : "DRAFT가 아니거나 자연키 중복, 수정 시각 충돌(FGC-TRAN-010)"
           }
         },
         "summary" : "DRAFT 수수료 지급 건 수정",
@@ -13612,7 +13903,7 @@
     },
     "/api/v1/validation-runs/{id}/execute" : {
       "post" : {
-        "description" : "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.",
+        "description" : "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED 재시작은 IF-API-82 /restart를 사용한다. MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.",
         "operationId" : "execute",
         "parameters" : [ {
           "description" : "validation_run_id",
@@ -13835,6 +14126,104 @@
         },
         "summary" : "검증 실행 진행률 조회 (IF-API-49)",
         "tags" : [ "검증 실행" ]
+      }
+    },
+    "/api/v1/validation-runs/{id}/restart" : {
+      "post" : {
+        "operationId" : "restart",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ValidationRestartRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAccepted"
+                }
+              }
+            },
+            "description" : "Accepted"
+          }
+        },
+        "tags" : [ "validation-restart-controller" ]
+      }
+    },
+    "/api/v1/validation-runs/{id}/restartability" : {
+      "get" : {
+        "operationId" : "eligibility",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseRestartability"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "validation-restart-controller" ]
+      }
+    },
+    "/api/v1/validation-runs/{id}/retries" : {
+      "get" : {
+        "operationId" : "history",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRetry"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "validation-restart-controller" ]
       }
     }
   },

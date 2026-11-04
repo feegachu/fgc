@@ -1435,7 +1435,7 @@ export interface paths {
         get: operations["get"];
         /**
          * DRAFT 수수료 지급 건 수정
-         * @description DRAFT 지급 건의 필수값과 참조 정보를 검증한 후 변경 내용을 저장합니다.
+         * @description expectedUpdatedAt으로 동시 수정을 검사한 뒤 DRAFT 지급 건의 필수값과 참조 정보를 검증해 변경 내용을 저장합니다.
          */
         put: operations["update"];
         post?: never;
@@ -1564,7 +1564,7 @@ export interface paths {
         put?: never;
         /**
          * 검증 실행 기동 (IF-API-48)
-         * @description CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.
+         * @description CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED 재시작은 IF-API-82 /restart를 사용한다. MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.
          */
         post: operations["execute"];
         delete?: never;
@@ -1633,10 +1633,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation-runs/{id}/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation-runs/{id}/restartability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["eligibility"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation-runs/{id}/retries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Accepted: {
+            /** Format: int64 */
+            batchExecutionId?: number;
+            /** Format: int64 */
+            previousBatchExecutionId?: number;
+            /** Format: int64 */
+            retryId?: number;
+            status?: string;
+            /** Format: int64 */
+            validationRunId?: number;
+        };
         ActiveMonthlyRunResponse: {
             exists?: boolean;
         };
@@ -1847,6 +1906,11 @@ export interface components {
             data: null;
             error: components["schemas"]["ApiError"];
             requestId: string;
+        };
+        ApiResponseAccepted: {
+            data?: components["schemas"]["Accepted"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
         };
         ApiResponseActiveMonthlyRunResponse: {
             data?: components["schemas"]["ActiveMonthlyRunResponse"];
@@ -2068,6 +2132,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseListRetry: {
+            data?: components["schemas"]["Retry"][];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseListScheduleHeaderResponse: {
             data?: components["schemas"]["ScheduleHeaderResponse"][];
             error?: components["schemas"]["ApiError"];
@@ -2191,6 +2260,11 @@ export interface components {
         };
         ApiResponseReconciliationRunSearchResponse: {
             data?: components["schemas"]["ReconciliationRunSearchResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseRestartability: {
+            data?: components["schemas"]["Restartability"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3143,6 +3217,8 @@ export interface components {
             /** Format: int64 */
             contractId?: number;
             evidenceRef?: string;
+            /** Format: date-time */
+            expectedUpdatedAt: string;
             note?: string;
             /** @enum {string} */
             paymentStage: "INSURER_TO_GA" | "GA_TO_FC";
@@ -3537,23 +3613,27 @@ export interface components {
             sort?: string;
         };
         ContractStatusEffectResponse: {
-            amount?: number;
+            amount?: number | null;
             /** Format: int64 */
             entityId?: number;
             entityType?: string;
             nextState?: string;
             /** Format: int64 */
-            policyVersionId?: number;
-            previousState?: string;
+            policyVersionId?: number | null;
+            previousState?: string | null;
             processingJob?: string;
-            reason?: string;
+            reason?: string | null;
             reasonCode?: string;
         };
         ContractStatusEventProcessingResponse: {
+            errorCode?: string | null;
+            job?: string;
             /** Format: date-time */
             processedAt?: string;
             processingJob?: string;
             processingStatus?: string;
+            status?: string;
+            summary?: components["schemas"]["ProcessingSummary"] | null;
         };
         ContractStatusEventRequest: {
             /** Format: date-time */
@@ -3571,6 +3651,7 @@ export interface components {
             eventId?: number;
             /** Format: int32 */
             eventSeq?: number;
+            followUp?: components["schemas"]["EventFollowUp"];
             /** @enum {string} */
             newStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             newStatusLabel?: string;
@@ -3582,6 +3663,8 @@ export interface components {
             reasonCode?: string | null;
             /** Format: date-time */
             receivedAt?: string;
+            /** Format: date-time */
+            recordedAt?: string;
             registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
@@ -3743,6 +3826,11 @@ export interface components {
             recentRuns?: components["schemas"]["RecentValidationRunResponse"][];
             /** Format: int64 */
             reconMismatch?: number;
+        };
+        EventFollowUp: {
+            jobs?: components["schemas"]["FollowUpJob"][];
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
         };
         EvidenceItem: {
             label?: string;
@@ -3961,6 +4049,20 @@ export interface components {
             eventId?: number | null;
             /** @enum {string} */
             status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
+        };
+        FollowUpJob: {
+            /** Format: int32 */
+            attemptCount?: number;
+            errorCode?: string | null;
+            job?: string;
+            /** Format: date-time */
+            lastAttemptAt?: string | null;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: date-time */
+            nextRetryAt?: string | null;
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
         };
         HeldAmount: {
             after?: number;
@@ -4919,6 +5021,16 @@ export interface components {
             /** Format: int64 */
             validationRunId?: number | null;
         };
+        ProcessingSummary: {
+            /** Format: int32 */
+            changedScheduleLines?: number;
+            /** Format: int32 */
+            excludedCount?: number;
+            /** Format: int32 */
+            heldPayments?: number;
+            /** Format: int32 */
+            resumedPayments?: number;
+        };
         /** @description 보험상품 판매버전 기준정보 */
         ProductResponse: {
             /**
@@ -5273,6 +5385,44 @@ export interface components {
             userId?: number;
             userName?: string;
         };
+        Restartability: {
+            allowed?: boolean;
+            checkpointAvailable?: boolean;
+            /** Format: int64 */
+            completedCount?: number;
+            expectedStateVersion?: string;
+            /** Format: date-time */
+            failedAt?: string;
+            /** Format: int32 */
+            failedStep?: number;
+            /** Format: int64 */
+            lastFailedBatchExecutionId?: number;
+            reason?: string;
+            reasonCode?: string;
+            /** Format: int64 */
+            remainingCount?: number;
+        };
+        Retry: {
+            /** Format: int64 */
+            batchExecutionId?: number;
+            errorCode?: string;
+            /** Format: int32 */
+            failedStep?: number;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: int64 */
+            previousBatchExecutionId?: number;
+            reason?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            /** Format: int64 */
+            requestedBy?: number;
+            /** Format: int64 */
+            retryId?: number;
+            /** Format: date-time */
+            startedAt?: string;
+            state?: string;
+        };
         ReverseJournalRequest: {
             evidenceRef?: string;
             reason: string;
@@ -5488,6 +5638,12 @@ export interface components {
             /** Format: int64 */
             paymentId?: number;
         };
+        ValidationRestartRequest: {
+            /** Format: int64 */
+            expectedBatchExecutionId: number;
+            expectedStateVersion: string;
+            reason: string;
+        };
         ValidationRunDetailResponse: {
             arbitrageSummary?: components["schemas"]["ArbitrageSummary"];
             capSummary?: components["schemas"]["CapSummary"];
@@ -5495,6 +5651,8 @@ export interface components {
             header?: components["schemas"]["ValidationRunItemResponse"];
             ledgerSummary?: components["schemas"]["LedgerSummary"];
             reconciliationSummary?: components["schemas"]["ReconciliationSummary"];
+            restartability?: components["schemas"]["Restartability"];
+            retries?: components["schemas"]["Retry"][];
             targetSummary?: components["schemas"]["TargetSummary"];
             targets?: components["schemas"]["ValidationTargetItemResponse"][];
         };
@@ -5536,6 +5694,8 @@ export interface components {
         ValidationRunProgressResponse: {
             /** Format: int64 */
             attemptId?: number;
+            /** Format: int64 */
+            batchExecutionId?: number;
             /** Format: int32 */
             currentStep?: number;
             /** Format: int32 */
@@ -5544,6 +5704,8 @@ export interface components {
             /** Format: int32 */
             progressPct?: number;
             requestId?: string;
+            /** Format: int64 */
+            retryId?: number;
             status?: string;
             statusLabel?: string;
             /** Format: int32 */
@@ -8142,7 +8304,7 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
                 };
             };
-            /** @description 필수값·귀속·증빙 검증 실패 */
+            /** @description 필수값·귀속·증빙·expectedUpdatedAt 검증 실패 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -8160,7 +8322,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description DRAFT가 아니거나 자연키 중복 */
+            /** @description DRAFT가 아니거나 자연키 중복, 수정 시각 충돌(FGC-TRAN-010) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8718,6 +8880,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    restart: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidationRestartRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccepted"];
+                };
+            };
+        };
+    };
+    eligibility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRestartability"];
+                };
+            };
+        };
+    };
+    history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListRetry"];
                 };
             };
         };

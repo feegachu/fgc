@@ -587,6 +587,9 @@ class ContractConsistencyIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.error.code").value("FGC-CONT-003"));
         ContractUpdateRequest fresh = update(contractRepository.findById(id).orElseThrow(), "200000");
+        // mvc.perform이 요청 끝에 인증 문맥을 비운다. 범위 조회는 문맥이 없으면 거절하므로(FUN-085) 시험의 내부 역할을 되살린다.
+        org.springframework.security.core.context.SecurityContextHolder.setContext(
+                org.springframework.security.test.context.TestSecurityContextHolder.getContext());
         fresh.setExpectedUpdatedAt(contractQueries.findDetailById(id).orElseThrow().getUpdatedAt()
                 .withOffsetSameInstant(java.time.ZoneOffset.ofHours(9)));
         fresh.setContractNo(fresh.getContractNo() + "-FRESH");
