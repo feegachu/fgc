@@ -109,7 +109,11 @@ export function filterParams(filters: StatementFilters, keepAgent: boolean) {
 
 /** 본인 경로(agentId 없음)와 내부 경로를 한곳에서 정한다. 본인 화면은 설계사 ID 를 보내지 않는다. */
 export function statementPath(agentId: string | null) {
-  return agentId ? `/api/v1/reports/agents/${agentId}/statements` : '/api/v1/agent/me/statements'
+  if (agentId === null) return '/api/v1/agent/me/statements'
+  // URL 입력도 서버의 양의 Long 범위로 제한한다. 잘못된 ID를 본인 경로로 대체하지 않는다.
+  if (!/^[1-9][0-9]{0,18}$/.test(agentId) || BigInt(agentId) > 9223372036854775807n)
+    throw new Error('설계사 ID를 확인한 뒤 다시 조회하세요.')
+  return `/api/v1/reports/agents/${agentId}/statements`
 }
 
 export function statementListQuery(filters: StatementFilters, agentId: string | null, enabled: boolean) {
@@ -150,7 +154,7 @@ export function statementError(error: Error | null, fallback = '수수료 명세
   if (error instanceof ApiError) {
     if (error.status === 403) return '이 명세를 조회할 권한이 없습니다.'
     if (error.status === 404) return '요청한 명세를 찾을 수 없습니다.'
-    if (error.status >= 500) return `요청 ID: ${error.requestId ?? '-'}`
+    if (error.status >= 500) return `${fallback} (요청 ID: ${error.requestId ?? '-'})`
   }
   return errorText(error, fallback)
 }
