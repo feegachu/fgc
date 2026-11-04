@@ -60,6 +60,10 @@ public final class ContractAcquisitionCostValidator {
                          List<AcquisitionCostLineGroup> lineGroups, List<AcquisitionCostReason> reasons) {
     }
 
+    /** 한 한도의 코드, 표시 이름, 룰셋 한도율. */
+    private record Limit(String code, String label, BigDecimal pct) {
+    }
+
     private ContractAcquisitionCostValidator() {
     }
 
@@ -85,12 +89,8 @@ public final class ContractAcquisitionCostValidator {
                     indirect = indirect.add(amount);
                 }
                 case EXCLUSION_CANDIDATE -> {
-                    boolean excluded = line.evidenceRef() != null;
-                    exclusions.add(new AcquisitionCostExclusionLine(line.scheduleLineId(), line.installmentNo(), line.itemCode(),
-                            line.itemName(), amount, excluded, line.evidenceRef(), excluded
-                            ? "요건과 증빙을 갖춰 계산에서 제외했습니다."
-                            : "제외 요건의 증빙이 없어 선지급 총액에 넣었습니다."));
-                    if (!excluded) {
+                    exclusions.add(exclusionLine(line, amount));
+                    if (line.evidenceRef() == null) {
                         upfront.add(line);
                         unproven = unproven.add(amount);
                     }
@@ -109,17 +109,13 @@ public final class ContractAcquisitionCostValidator {
             reasons.add(new AcquisitionCostReason("EXCLUSION_EVIDENCE_MISSING",
                     "제외 요건의 증빙이 없는 금액 " + won(unproven) + "을 선지급 총액에 넣었습니다."));
         }
-        AcquisitionCostItem upfrontItem = item("UPFRONT_TOTAL", "선지급 총액", input.acquisitionCostAmount(), input.upfrontLimitPct(),
-                upfront, scheduleKnown, unclassified.signum() > 0 || unproven.signum() > 0, reasons);
-        AcquisitionCostItem maintenanceItem = item("MAINTENANCE_TOTAL", "유지관리 총액", input.acquisitionCostAmount(),
-                input.maintenanceLimitPct(), maintenance, scheduleKnown, unclassified.signum() > 0, reasons);
+        AcquisitionCostItem upfrontItem = item(new Limit("UPFRONT_TOTAL", "선지급 총액", input.upfrontLimitPct()),
+                input.acquisitionCostAmount(), upfront, scheduleKnown, unclassified.signum() > 0 || unproven.signum() > 0, reasons);
+        AcquisitionCostItem maintenanceItem = item(new Limit("MAINTENANCE_TOTAL", "유지관리 총액", input.maintenanceLimitPct()),
+                input.acquisitionCostAmount(), maintenance, scheduleKnown, unclassified.signum() > 0, reasons);
 
-        AcquisitionCostResultStatus status = upfrontItem.status() == VIOLATION || maintenanceItem.status() == VIOLATION
-                ? VIOLATION
-                : upfrontItem.status() == REVIEW_REQUIRED || maintenanceItem.status() == REVIEW_REQUIRED
-                ? REVIEW_REQUIRED : NORMAL;
         List<AcquisitionCostLineGroup> lineGroups = groups.values().stream().map(ContractAcquisitionCostValidator::group).toList();
-        return new Result(status, upfrontItem, maintenanceItem, scheduleKnown ? indirect : null,
+        return new Result(overall(upfrontItem, maintenanceItem), upfrontItem, maintenanceItem, scheduleKnown ? indirect : null,
                 scheduleKnown ? unclassified : null, exclusions, lineGroups, reasons);
     }
 
@@ -143,36 +139,61 @@ public final class ContractAcquisitionCostValidator {
         return Bucket.UNCLASSIFIED;
     }
 
-    private static AcquisitionCostItem item(String code, String label, BigDecimal base, BigDecimal limitPct, List<Line> counted,
-                             boolean scheduleKnown, boolean needsReview, List<AcquisitionCostReason> reasons) {
-        BigDecimal limit = base == null || limitPct == null
-                ? null : base.multiply(limitPct).divide(HUNDRED, 0, RoundingMode.HALF_UP);
+    private static AcquisitionCostExclusionLine exclusionLine(Line line, BigDecimal amount) {
+        boolean excluded = line.evidenceRef() != null;
+        return new AcquisitionCostExclusionLine(line.scheduleLineId(), line.installmentNo(), line.itemCode(),
+                line.itemName(), amount, excluded, line.evidenceRef(), excluded
+                ? "요건과 증빙을 갖춰 계산에서 제외했습니다."
+                : "제외 요건의 증빙이 없어 선지급 총액에 넣었습니다.");
+    }
+
+    private static AcquisitionCostResultStatus overall(AcquisitionCostItem upfront, AcquisitionCostItem maintenance) {
+        if (upfront.status() == VIOLATION || maintenance.status() == VIOLATION) return VIOLATION;
+        if (upfront.status() == REVIEW_REQUIRED || maintenance.status() == REVIEW_REQUIRED) return REVIEW_REQUIRED;
+        return NORMAL;
+    }
+
+    private static AcquisitionCostItem item(Limit rule, BigDecimal base, List<Line> counted, boolean scheduleKnown,
+                                            boolean needsReview, List<AcquisitionCostReason> reasons) {
+        String label = rule.label();
+        BigDecimal limit = limitAmount(base, rule.pct());
         BigDecimal calculated = scheduleKnown ? MoneyUtil.sumRounded(counted.stream().map(Line::amount).toList()) : null;
-        BigDecimal usage = limit == null || calculated == null || limit.signum() == 0
-                ? null : calculated.multiply(HUNDRED).divide(limit, 6, RoundingMode.HALF_UP);
-        if (usage != null && usage.compareTo(MAX_USAGE_PCT) > 0) usage = null;
+        BigDecimal usage = usagePct(calculated, limit);
 
         if (limit != null && calculated != null && calculated.compareTo(limit) > 0) {
             Integer exceededFrom = firstExceeded(counted, limit);
             String reason = label + " " + won(calculated) + "이 한도 " + won(limit) + "을 "
                     + won(calculated.subtract(limit)) + " 초과합니다. " + exceededFrom + "회차부터 초과합니다.";
             reasons.add(new AcquisitionCostReason("LIMIT_EXCEEDED", reason));
-            return new AcquisitionCostItem(code, label, base, limitPct, calculated, limit, usage, VIOLATION, VIOLATION.label(),
-                    exceededFrom, reason);
+            return new AcquisitionCostItem(rule.code(), label, base, rule.pct(), calculated, limit, usage, VIOLATION,
+                    VIOLATION.label(), exceededFrom, reason);
         }
-        if (limitPct == null) {
+        if (rule.pct() == null) {
             reasons.add(new AcquisitionCostReason("LIMIT_RATE_MISSING", "룰셋에 " + label + " 한도율이 없습니다."));
         }
         if (limit == null || calculated == null || needsReview) {
-            String reason = base == null ? "계약체결비용 기준액이 없어 한도를 계산하지 못했습니다."
-                    : limitPct == null ? "룰셋에 한도율이 없어 한도를 계산하지 못했습니다."
-                    : calculated == null ? "예정 스케줄을 특정하지 못해 계산액을 구하지 못했습니다."
-                    : "금액을 확정할 수 없는 항목이 있어 검토가 필요합니다.";
-            return new AcquisitionCostItem(code, label, base, limitPct, calculated, limit, usage, REVIEW_REQUIRED,
-                    REVIEW_REQUIRED.label(), null, reason);
+            return new AcquisitionCostItem(rule.code(), label, base, rule.pct(), calculated, limit, usage, REVIEW_REQUIRED,
+                    REVIEW_REQUIRED.label(), null, reviewReason(base, rule.pct(), calculated));
         }
-        return new AcquisitionCostItem(code, label, base, limitPct, calculated, limit, usage, NORMAL, NORMAL.label(), null,
-                label + " " + won(calculated) + "이 한도 " + won(limit) + " 이내입니다.");
+        return new AcquisitionCostItem(rule.code(), label, base, rule.pct(), calculated, limit, usage, NORMAL, NORMAL.label(),
+                null, label + " " + won(calculated) + "이 한도 " + won(limit) + " 이내입니다.");
+    }
+
+    private static BigDecimal limitAmount(BigDecimal base, BigDecimal limitPct) {
+        return base == null || limitPct == null ? null : base.multiply(limitPct).divide(HUNDRED, 0, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal usagePct(BigDecimal calculated, BigDecimal limit) {
+        if (limit == null || calculated == null || limit.signum() == 0) return null;
+        BigDecimal usage = calculated.multiply(HUNDRED).divide(limit, 6, RoundingMode.HALF_UP);
+        return usage.compareTo(MAX_USAGE_PCT) > 0 ? null : usage;
+    }
+
+    private static String reviewReason(BigDecimal base, BigDecimal limitPct, BigDecimal calculated) {
+        if (base == null) return "계약체결비용 기준액이 없어 한도를 계산하지 못했습니다.";
+        if (limitPct == null) return "룰셋에 한도율이 없어 한도를 계산하지 못했습니다.";
+        if (calculated == null) return "예정 스케줄을 특정하지 못해 계산액을 구하지 못했습니다.";
+        return "금액을 확정할 수 없는 항목이 있어 검토가 필요합니다.";
     }
 
     private static Integer firstExceeded(List<Line> counted, BigDecimal limit) {

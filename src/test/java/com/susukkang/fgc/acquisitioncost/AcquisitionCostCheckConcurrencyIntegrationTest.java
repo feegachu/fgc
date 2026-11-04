@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -94,8 +95,7 @@ class AcquisitionCostCheckConcurrencyIntegrationTest {
             assertThat(entered.await(15, TimeUnit.SECONDS)).isTrue();
             var second = workers.submit(() -> service.request(request, "key-b-651", userId()));
             // 앞 요청이 커밋하기 전에는 계약 잠금에서 기다린다.
-            Thread.sleep(300);
-            assertThat(second.isDone()).isFalse();
+            assertThatThrownBy(() -> second.get(300, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
             release.countDown();
             assertThat(second.get(15, TimeUnit.SECONDS).acquisitionCostCheckId())
                     .isNotEqualTo(first.get(15, TimeUnit.SECONDS).acquisitionCostCheckId());

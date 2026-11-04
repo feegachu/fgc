@@ -196,6 +196,8 @@ public class AcquisitionCostCheckRepository {
                 """, stored(), id).stream().findFirst();
     }
 
+    // S2077: 코드에 정의한 조건식과 SORTABLE의 정렬식만 조립하고 사용자 입력은 모두 바인딩한다.
+    @SuppressWarnings("java:S2077")
     public SearchResult search(AcquisitionCostCheckSearchCondition condition, ListSort sort, int page, int size) {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
         List<Object> params = new ArrayList<>();

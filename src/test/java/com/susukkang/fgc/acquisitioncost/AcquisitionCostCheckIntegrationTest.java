@@ -98,20 +98,20 @@ class AcquisitionCostCheckIntegrationTest {
         long id = data.path("acquisitionCostCheckId").asLong();
         var parent = jdbc.queryForMap("SELECT * FROM fgc.acquisition_cost_check WHERE acquisition_cost_check_id = ?", id);
         assertThat(parent.get("validation_run_id")).isNull();
-        assertThat(parent.get("payment_stage")).isEqualTo(STAGE);
+        assertThat(parent).containsEntry("payment_stage", STAGE);
         assertThat((BigDecimal) parent.get("upfront_limit_amount")).isEqualByComparingTo("3000000");
         assertThat((BigDecimal) parent.get("maintenance_total_amount")).isEqualByComparingTo("2160000");
-        assertThat(parent.get("requested_by")).isEqualTo(settlement.getUserId());
+        assertThat(parent).containsEntry("requested_by", settlement.getUserId());
         assertThat(jdbc.queryForList("""
                 SELECT check_type, usage_pct, result_status FROM fgc.acquisition_cost_check_detail
                  WHERE acquisition_cost_check_id = ? ORDER BY check_type
                 """, id)).hasSize(2).satisfiesExactly(
                 row -> {
-                    assertThat(row.get("check_type")).isEqualTo("MAINTENANCE_TOTAL");
+                    assertThat(row).containsEntry("check_type", "MAINTENANCE_TOTAL");
                     assertThat((BigDecimal) row.get("usage_pct")).isEqualByComparingTo("72");
                 },
                 row -> {
-                    assertThat(row.get("check_type")).isEqualTo("UPFRONT_TOTAL");
+                    assertThat(row).containsEntry("check_type", "UPFRONT_TOTAL");
                     assertThat((BigDecimal) row.get("usage_pct")).isEqualByComparingTo("20");
                 });
         // 저장한 입력을 그대로 다시 읽는다. 뒤에 파라미터가 사라져도 결과는 바뀌지 않는다.
