@@ -31,7 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.flyway.locations=classpath:db/migration,classpath:db/demo"
 })
 class Dar012MonthlyValidationIntegrationTest {
-    private static final LocalDate MONTH = LocalDate.of(2026, 8, 1);
+    /** 대표 설계사 사례의 계약일이 모두 7월이라 7월을 본다. 비교 대상은 계약일이 검증월인 계약이다. */
+    private static final LocalDate MONTH = LocalDate.of(2026, 7, 1);
 
     @Autowired private ValidationRunCreateService createService;
     @Autowired private MonthlyValidationJobTrigger trigger;
@@ -58,7 +59,9 @@ class Dar012MonthlyValidationIntegrationTest {
                    AND c.agent_id IN (SELECT agent_id FROM agent WHERE starts_with(agent_code, 'D12-A-'))
                 """, Long.class, batch.validationRunId())).isZero();
         List<Dar012Verifier.ScenarioResult> comparison = verifier.compareWithAnswerKey(plan, MONTH, batch.validationRunId());
-        assertThat(comparison).isNotEmpty().allSatisfy(r -> assertThat(r.matched()).as(r.scenario() + " " + r.divergences()).isEqualTo(r.inScope()));
+        assertThat(comparison).extracting(Dar012Verifier.ScenarioResult::scenario)
+                .contains("REP_AMOUNT_UNCONFIRMED", "STATUS_LAPSED", "STATUS_REVIVED", "STATUS_TERMINATED");
+        assertThat(comparison).allSatisfy(r -> assertThat(r.matched()).as(r.scenario() + " " + r.divergences()).isEqualTo(r.inScope()));
         assertThat(verifier.checkAggregateConsistency(MONTH, batch.validationRunId()))
                 .allSatisfy(c -> assertThat(c.consistent()).as(c.name()).isTrue());
     }
