@@ -43,7 +43,7 @@ export FGC_PERF_PASSWORD='<시드 비밀번호>'
 
    `run-k6.sh`는 재기 전에 smoke로 한 바퀴 예열한다. 시나리오를 돌릴 때마다 API를 새로 띄우고 끝나면 내린다. DB는 남긴다. 임계값을 넘으면 k6가 종료 코드 99로 끝난다.
 
-4. **결과서를 갱신한다.** `build/performance/<시각>-<종류>/`의 값을 옮기고, 표의 "RC 전 사전 측정"을 "RC"로 바꾼다. `conditions.txt`의 커밋, 이미지, 다른 컨테이너, 사용 가능 메모리를 조건 칸에 적는다.
+4. **결과서를 갱신한다.** `build/performance/<시각>-<종류>/`의 값을 옮기고, 표의 "RC 전 사전 측정"을 "RC"로 바꾼다. `conditions.txt`의 커밋, 이미지, 다른 컨테이너와 `resources.txt`의 호스트 CPU, 메모리를 조건 칸에 적는다. 다른 작업과 겹치면 값이 크게 흔들리므로 RC는 PC에서 다른 작업을 멈추고 잰다.
 
 5. **정리한다.**
 
@@ -58,7 +58,7 @@ export FGC_PERF_PASSWORD='<시드 비밀번호>'
 |---|---|
 | `conditions.txt` | 커밋, 앱, 힙, 메모리 한도, Docker 자원, 시작 시 다른 컨테이너와 사용 가능 메모리 |
 | `report.txt` | 전체와 Step별 시간, 처리 행 수, `pg_stat_statements` 상위, 커밋과 WAL, 캐시 적중률, 순차 스캔 상위 |
-| `resources.txt`, `stats.csv`, `gc.log` | `docker stats` 5초 표본 요약, 메모리 초과 여부, JVM GC 요약 |
+| `resources.txt`, `stats.csv`, `host.csv`, `gc.log` | `docker stats` 5초 표본 요약, 호스트 CPU와 사용 가능 메모리 30초 표본, 메모리 초과 여부, JVM GC 요약 |
 | `verdict.txt` | PER-003 판정, PER-007 인덱스 사용과 신규 생성 건수 |
 | `summary.json`, `k6.log` | k6 요약과 API별 p95, PER-001, 004, 005 판정 |
 | `D12-*.json`, `D12-*-answers.csv`, `D12-*-verification.json` | 생성기 메타데이터, 정답표, 정답표 비교와 집계 일치 |

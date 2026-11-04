@@ -20,11 +20,12 @@ PER007_KEYED_TABLES="schedule_header schedule_line journal_header journal_line c
 
 psql_db() { docker exec -i "$DB" psql -h 127.0.0.1 -U fgc -d fgc -v ON_ERROR_STOP=1 "$@"; }
 
-host_memory() {
+# 호스트 사용 가능 메모리(MB),CPU 사용률(%). 다른 작업이 겹치면 값이 크게 흔들리므로 조건으로 남긴다.
+host_sample() {
   if command -v powershell.exe >/dev/null; then
-    powershell.exe -NoProfile -Command "[int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024)" | tr -d '\r'
+    powershell.exe -NoProfile -Command "'' + [int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024) + ',' + [int]((Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average)" | tr -d '\r'
   else
-    free -m | awk '/^Mem:/{print $7}'
+    echo "$(free -m | awk '/^Mem:/{print $7}'),$(awk -v n="$(nproc)" '{printf "%.0f", $1 / n * 100}' /proc/loadavg)"
   fi
 }
 
@@ -41,7 +42,7 @@ record_conditions() {
     echo "앱: ${API_IMAGE:-$JAR (현재 커밋 bootJar)}"
     echo "API: $JVM_OPTS, 메모리 2g. DB: $PG_IMAGE, 메모리 1g"
     docker info --format 'Docker: CPU {{.NCPU}}개, 메모리 {{.MemTotal}} 바이트, 서버 {{.ServerVersion}}'
-    echo "시작 시 호스트 사용 가능 메모리: $(host_memory) MB"
+    echo "시작 시 호스트 사용 가능 메모리 MB, CPU %: $(host_sample)"
     echo "시작 시 떠 있는 컨테이너:"
     docker stats --no-stream --format '  {{.Name}} CPU {{.CPUPerc}} 메모리 {{.MemUsage}}'
   } >"$RUN_DIR/conditions.txt"
@@ -88,10 +89,15 @@ start_app() {
 }
 
 start_stats() {
-  (while :; do
-    docker stats --no-stream --format "$(date +%T),{{.Name}},{{.CPUPerc}},{{.MemUsage}}" "$APP" "$DB" 2>/dev/null || true
-    sleep 5
-  done) >"$RUN_DIR/stats.csv" &
+  : >"$RUN_DIR/stats.csv"
+  : >"$RUN_DIR/host.csv"
+  (
+    while :; do
+      docker stats --no-stream --format "$(date +%T),{{.Name}},{{.CPUPerc}},{{.MemUsage}}" "$APP" "$DB" 2>/dev/null >>"$RUN_DIR/stats.csv" || true
+      sleep 5
+      [ "$((SECONDS / 30))" = "${last:-}" ] || { last=$((SECONDS / 30)); echo "$(date +%T),$(host_sample)" >>"$RUN_DIR/host.csv"; }
+    done
+  ) &
   STATS_PID=$!
 }
 
@@ -113,6 +119,12 @@ stats_summary() {
   }' "$1" | sort
 }
 
+# host.csv(시각,사용 가능 MB,CPU%)를 요약한다.
+host_summary() {
+  awk -F, '$2 != "" { n++; c += $3; if (min == "" || $2 + 0 < min) min = $2 + 0 }
+    END { if (n) printf "호스트: 표본 %d개, CPU 평균 %.0f%%, 사용 가능 메모리 최소 %d MB\n", n, c / n, min }' "$1"
+}
+
 # -Xlog:gc 줄의 "123M->45M(256M) 5.1ms"를 요약한다.
 gc_summary() {
   awk 'match($0, /[0-9]+M->[0-9]+M\([0-9]+M\) [0-9.]+ms/) {
@@ -129,9 +141,10 @@ collect_app() {
   docker cp -q "$APP:/tmp/gc.log" "$RUN_DIR/gc.log" 2>/dev/null || : >"$RUN_DIR/gc.log"
   {
     stats_summary "$RUN_DIR/stats.csv"
+    host_summary "$RUN_DIR/host.csv"
     gc_summary "$RUN_DIR/gc.log"
     echo "메모리 초과: 컨테이너 OOMKilled=$(docker inspect -f '{{.State.OOMKilled}}' "$APP"), 로그 OutOfMemoryError $(grep -c OutOfMemoryError "$RUN_DIR/app.log" || true)건"
-    echo "끝날 때 호스트 사용 가능 메모리: $(host_memory) MB"
+    echo "끝날 때 호스트 사용 가능 메모리 MB, CPU %: $(host_sample)"
   } | tee "$RUN_DIR/resources.txt"
 }
 

@@ -72,6 +72,7 @@ if (!SCENARIOS[SCENARIO]) fail(`SCENARIO는 ${Object.keys(SCENARIOS)} 중 하나
 export const options = {
   scenarios: { [SCENARIO]: { ...SCENARIOS[SCENARIO].scenario, exec: SCENARIO } },
   thresholds: SCENARIOS[SCENARIO].thresholds,
+  setupTimeout: '5m', // 큰 데이터에서 setup의 목록 조회가 기본 60초를 넘을 수 있다
   summaryTrendStats: ['count', 'avg', 'med', 'p(95)', 'max'],
 };
 

@@ -27,6 +27,9 @@ CSV
 expect 'fgc-perf-app: 표본 2개, CPU 평균 200%, 최대 393%, 메모리 최대 1536 MiB' "$(stats_summary "$tmp/stats.csv")"
 expect 'fgc-perf-db: 표본 1개, CPU 평균 12%, 최대 12%, 메모리 최대 100 MiB' "$(stats_summary "$tmp/stats.csv")"
 
+printf '10:00:00,3000,40\n10:00:30,1200,60\n' >"$tmp/host.csv"
+expect '호스트: 표본 2개, CPU 평균 50%, 사용 가능 메모리 최소 1200 MB' "$(host_summary "$tmp/host.csv")"
+
 cat >"$tmp/gc.log" <<'LOG'
 [0.026s][info][gc] Using G1
 [0.485s][info][gc] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 23M->3M(257M) 3.5ms
