@@ -113,7 +113,13 @@ function ScheduleDetailView({ id }: { id: string }) {
   const regenerateDisabled = unavailable || previewOnly || !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
   const reasons: string[] = []
   if (header) {
-    if (header.canConfirm === false) reasons.push(header.confirmBlockedReason || '서버에서 확정할 수 없는 상태로 확인했습니다.')
+    if (header.canConfirm === false && !previewOnly && header.activeYn === true && header.status === 'PLANNED') {
+      reasons.push(header.confirmBlockedReason === 'SCHEDULE_NOT_ACTIVE_PLANNED'
+        ? '사용 중인 예정 상태의 스케줄만 확정할 수 있습니다.'
+        : header.confirmBlockedReason === 'FGC-IMPL-SCHEDULE_PREVIEW_ONLY'
+          ? '4년·7년 예정판은 지급 확정 대상이 아닙니다.'
+          : '서버에서 확정할 수 없는 상태로 확인했습니다.')
+    }
     if (previewOnly) reasons.push('4년·7년 예정판은 지급 확정 대상이 아닙니다.')
     if (!canProcess) reasons.push('확정과 재생성은 정산담당자와 시스템관리자만 할 수 있습니다.')
     if (header.activeYn !== true) reasons.push('사용 중인 버전이 아닙니다.')

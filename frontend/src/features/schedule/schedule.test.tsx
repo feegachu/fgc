@@ -390,10 +390,21 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
   })
 
   it('#726 서버 확정 차단 사유를 버튼 설명으로 표시한다', async () => {
-    renderAt('/schedules/11?month=2026-07', baseHandler(detail({ canConfirm: false, confirmBlockedReason: '미처리 보류 사건이 있습니다.' })))
-    expect(await screen.findByText('미처리 보류 사건이 있습니다.')).toBeInTheDocument()
+    renderAt('/schedules/11?month=2026-07', baseHandler(detail({ canConfirm: false, confirmBlockedReason: 'SCHEDULE_NOT_ACTIVE_PLANNED' })))
+    expect(await screen.findByText('사용 중인 예정 상태의 스케줄만 확정할 수 있습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '확정' })).toHaveAccessibleDescription('미처리 보류 사건이 있습니다.')
+    expect(screen.getByRole('button', { name: '확정' })).toHaveAccessibleDescription('사용 중인 예정 상태의 스케줄만 확정할 수 있습니다.')
+  })
+
+  it.each([
+    { scheduleRegime: 'FOUR_YEAR_2027' as const, status: 'PLANNED' as const, code: 'FGC-IMPL-SCHEDULE_PREVIEW_ONLY', message: '4년·7년 예정판은 지급 확정 대상이 아닙니다.' },
+    { scheduleRegime: 'CURRENT' as const, status: 'CONFIRMED' as const, code: 'SCHEDULE_NOT_ACTIVE_PLANNED', message: '이미 확정된 스케줄입니다.' },
+  ])('확정 차단 코드를 숨기고 상태 사유를 한 번 표시한다: $status', async ({ scheduleRegime, status, code, message }) => {
+    renderAt('/schedules/11?month=2026-07', baseHandler(detail({ canConfirm: false, confirmBlockedReason: code, scheduleRegime, status })))
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.getAllByText(message)).toHaveLength(1)
+    expect(screen.queryByText(code, { exact: false })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
   })
 
   it('#726 상세 조회 실패를 0원 합계로 표시하지 않고 작업을 차단한다', async () => {

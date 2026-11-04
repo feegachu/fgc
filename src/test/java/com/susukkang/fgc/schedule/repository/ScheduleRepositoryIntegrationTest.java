@@ -434,12 +434,36 @@ class ScheduleRepositoryIntegrationTest {
         });
     }
 
+    @Test
+    void baselineComparisonStillDetectsLineContractMismatch() {
+        var expected = com.susukkang.fgc.schedule.dto.ScheduleLineResponse.builder().contractId(1L).build();
+        var actual = com.susukkang.fgc.schedule.dto.ScheduleLineResponse.builder().contractId(2L).build();
+        assertThatThrownBy(() -> assertSame(List.of(expected), List.of(actual)))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("contractId");
+        assertThatThrownBy(() -> assertSame(
+                ScheduleDetailResponse.builder().lines(List.of(expected)).build(),
+                ScheduleDetailResponse.builder().lines(List.of(actual)).build()))
+                .isInstanceOf(AssertionError.class).hasMessageContaining("contractId");
+    }
+
     private void assertSame(Object expected, Object actual) {
         // OffsetDateTime의 오프셋·BigDecimal의 scale까지 같아야 한다(CSV는 toString으로 출력).
         // JDBC 기준본은 이전 응답 계약을 고정한다. FUN-037 추가 필드는 48회차 HTTP 통합 테스트에서 검증한다.
-        assertThat(actual).usingRecursiveComparison().ignoringFieldsMatchingRegexes(
-                "(?:.*\\.)?(contractId|policyVersionId|installmentCount|maxInstallmentNo|scheduleLineId|feeComponentType|fixedAmount)")
-                .isEqualTo(expected);
+        if (expected instanceof List<?> expectedList && actual instanceof List<?> actualList) {
+            assertThat(actualList).hasSameSizeAs(expectedList);
+            for (int index = 0; index < expectedList.size(); index++) {
+                assertSame(expectedList.get(index), actualList.get(index));
+            }
+            return;
+        }
+        String headerPrefix = expected instanceof ScheduleDetailResponse ? "header." : "";
+        var comparison = assertThat(actual).usingRecursiveComparison()
+                .ignoringFieldsMatchingRegexes("(?:.*\\.)?(scheduleLineId|feeComponentType|fixedAmount)");
+        if (expected instanceof ScheduleHeaderResponse || expected instanceof ScheduleDetailResponse) {
+            comparison.ignoringFields(headerPrefix + "contractId", headerPrefix + "policyVersionId",
+                    headerPrefix + "installmentCount", headerPrefix + "maxInstallmentNo");
+        }
+        comparison.isEqualTo(expected);
     }
 
     private void inRolledBackTransaction(Runnable body) {
