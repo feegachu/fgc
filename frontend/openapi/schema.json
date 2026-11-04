@@ -3649,6 +3649,8 @@
             "type" : "string"
           },
           "rankResultId" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3752,7 +3754,8 @@
       "CompareExplainRequest" : {
         "properties" : {
           "rankResultId" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3863,7 +3866,8 @@
       "CompareRankingRequest" : {
         "properties" : {
           "categoryCode" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           },
           "filters" : {
