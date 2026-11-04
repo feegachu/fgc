@@ -13,6 +13,9 @@ export type ContractCreateRequest = Schema['ContractCreateRequest']
 export type ContractUpdateRequest = Schema['ContractUpdateRequest']
 export type ContractSaveRequest = ContractCreateRequest
 export type ContractStatusEvent = Schema['ContractStatusEventResponse']
+export type ContractStatusEffect = Schema['ContractStatusEffectResponse']
+export type ContractStatusPreviewRequest = Schema['ContractStatusPreviewRequest']
+export type ContractStatusPreview = Schema['ContractStatusPreviewResponse']
 export type ContractSchedule = Schema['ContractScheduleResponse']
 export type ContractCapCheck = Schema['CapCheckSaveResult']
 export type ContractArbitrageCheck = Schema['ArbitrageCheckView']
@@ -143,6 +146,18 @@ const contractTabQuery = <T>(id: string, tab: string, suffix = `/${tab}`, extraK
     meta: { errorToast: false },
   })
 export const contractEventsQuery = (id: string) => contractTabQuery<ContractStatusEvent[]>(id, 'status-events')
+/** 영향은 후속 처리가 끝날 때 함께 기록되므로 후속 상태가 바뀌면 다시 조회한다. */
+export const contractStatusEffectsQuery = (id: string, eventId: number, page: number, followUpStatus?: string) =>
+  queryOptions({
+    queryKey: ['contracts', 'detail', id, 'status-events', eventId, 'effects', page, followUpStatus],
+    queryFn: ({ signal }) =>
+      request<Schema['PageResponseContractStatusEffectResponse']>(
+        contractPath(id, `/status-events/${eventId}/effects?page=${page}&size=${PAGE_SIZE}`),
+        { signal },
+      ),
+    placeholderData: keepPreviousData,
+    meta: { errorToast: false },
+  })
 export const contractSchedulesQuery = (id: string, paymentStage: string) =>
   contractTabQuery<ContractSchedule>(
     id,
@@ -156,9 +171,10 @@ export const contractArbitrageChecksQuery = (id: string) =>
 export const contractJournalsQuery = (id: string) => contractTabQuery<ContractJournal[]>(id, 'journals')
 export const contractTransactionsQuery = (id: string) => contractTabQuery<ContractTransactions>(id, 'transactions')
 
+export class ContractSaveReceiptError extends Error {}
 export async function createContract(body: ContractCreateRequest) {
   const data = await request<Schema['ContractCreateResponse']>('/api/v1/contracts', { method: 'POST', body })
-  if (data.contractId == null) throw new Error('등록된 계약을 확인할 수 없습니다.')
+  if (data.contractId == null) throw new ContractSaveReceiptError('등록된 계약을 확인할 수 없습니다.')
   return data
 }
 /** 같은 본문은 같은 멱등키로 다시 보낸다. 상태 변경에는 서버가 멱등키를 요구한다(IF-API-19). */
@@ -168,9 +184,12 @@ export async function updateContract(id: string | number, body: ContractUpdateRe
     body,
     idempotencyKey,
   })
-  if (data.contractId == null) throw new Error('수정된 계약을 확인할 수 없습니다.')
+  if (data.contractId == null) throw new ContractSaveReceiptError('수정된 계약을 확인할 수 없습니다.')
   return data
 }
+/** IF-API-64 저장 전 상태 사건의 영향. 조회 성격이라 멱등키가 없고 아무것도 저장하지 않는다. */
+export const previewContractStatusEvent = (id: string, body: ContractStatusPreviewRequest, signal?: AbortSignal) =>
+  request<ContractStatusPreview>(contractPath(id, '/status-events/preview'), { method: 'POST', body, signal })
 export const recheckContractCap = (id: string) =>
   request<ContractCapCheck[]>(contractPath(id, '/cap-check'), { method: 'POST' })
 export const recheckContractArbitrage = (id: string, body: ReArbitrageCheckRequest) =>

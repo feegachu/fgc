@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { returnLink, safeReturnTo } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { EvidenceLink } from '../../components/EvidenceLink'
@@ -13,12 +13,13 @@ import { Modal } from '../../components/Modal'
 import { ApiError } from '../../lib/api/client'
 import { int, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
+import { validMonth, withMonth } from '../../stores/workspace'
 import { useInsurerOptions } from '../base/api'
 import type { Agent, Product } from '../base/api'
 import { useEntityChoices } from '../base/selection'
 import { usePolicyRequest } from '../policies/usePolicyRequest'
 import { SearchSelect } from '../../components/SearchSelect'
-import { contractDetailQuery, createContract, updateContract } from './api'
+import { ContractSaveReceiptError, contractDetailQuery, createContract, updateContract } from './api'
 import type { ContractDetail, ContractUpdateRequest } from './api'
 import { ContractStatusBadge } from './badges'
 import {
@@ -36,6 +37,7 @@ import {
   initialDraft,
   initialStatusEvent,
   seoulNow,
+  statusDraftFrom,
   statusEventRequest,
   validateDraft,
   validateStatusEvent,
@@ -115,7 +117,13 @@ function ContractEditor({
   const currentDate = today()
   // Keep the original read token and values until the user explicitly reloads the editor.
   const [original] = useState(contract)
-  const [draft, setDraft] = useState(() => initialDraft(currentDate, contract))
+  const location = useLocation()
+  // 영향 미리보기에서 넘긴 상태·효력일시 초안. 이동만으로 저장하지 않는다(화면정의서 CONT-W02).
+  const [previewDraft] = useState(() => statusDraftFrom(location.state, contract?.allowedNextStatuses ?? []))
+  const [draft, setDraft] = useState(() => ({
+    ...initialDraft(currentDate, contract),
+    ...(previewDraft && { contractStatus: previewDraft.contractStatus }),
+  }))
   const [errors, setErrors] = useState<ContractFieldErrors>({})
   const [saveError, setSaveError] = useState('')
   const [conflict, setConflict] = useState(false)
@@ -124,7 +132,10 @@ function ContractEditor({
   const [confirmReload, setConfirmReload] = useState(false)
   const [reloading, setReloading] = useState(false)
   // 접수일시 기본값은 화면을 연 시각으로 한 번만 정한다. 다시 보내도 본문·멱등키가 같아야 한다.
-  const [statusEvent, setStatusEvent] = useState(() => initialStatusEvent(seoulNow()))
+  const [statusEvent, setStatusEvent] = useState(() => ({
+    ...initialStatusEvent(seoulNow()),
+    effectiveAt: previewDraft?.effectiveAt ?? '',
+  }))
   const [confirmSave, setConfirmSave] = useState(false)
   const requestKey = usePolicyRequest()
   const submitting = useRef(false)
@@ -179,7 +190,7 @@ function ContractEditor({
   // 무효면 저장 버튼이 잠겨 submit이 오류를 그리지 못하므로, 값을 넣은 사건 필드는 규칙 위반을 바로 보여 준다.
   const eventError = (field: keyof StatusEventDraft) =>
     errors[`statusEvent.${field}`] ?? (statusEvent[field] ? eventErrors[`statusEvent.${field}`] : undefined)
-  const disabled = !valid || saving || loadingReferences || Boolean(referenceError) || conflict || missingToken
+  const disabled = !valid || saving || savedSuccessfully || loadingReferences || Boolean(referenceError) || conflict || missingToken
   const changes = [
     statusChanged && '상태 사건 기록, 해당 미확정 대상 처리',
     original && changesSchedule(createRequest(form), original) && '산정정보 변경에 따른 스케줄 새 버전',
@@ -258,6 +269,7 @@ function ContractEditor({
     submitting.current = true
     setSaving(true)
     saveGuide.begin()
+    let committed = false
     try {
       const body = createRequest(form)
       const request: ContractUpdateRequest | undefined = id
@@ -269,14 +281,16 @@ function ContractEditor({
         : undefined
       const updated = request ? await updateContract(id!, request, requestKey(request)) : undefined
       const saved = updated ?? (await createContract(body))
-      const savedId = saved.contractId ?? id
-      if (!savedId) throw new Error('저장 결과의 계약 번호를 확인하지 못했습니다. 목록에서 저장 여부를 확인해 주세요.')
+      committed = true
       setSavedSuccessfully(true)
       clearUnsaved()
+      setConfirmSave(false)
+      const savedId = saved.contractId ?? id
       // Invalidate inactive projections too: an update can regenerate schedules and financial snapshots.
       await queryClient.invalidateQueries({ queryKey: ['contracts'], refetchType: 'none' })
       await queryClient.invalidateQueries({ queryKey: ['schedules'], refetchType: 'none' })
       await queryClient.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
+      if (!savedId) throw new Error('저장 결과의 계약 번호를 확인하지 못했습니다.')
       // The save still updates caches after leaving, but must not navigate away from the user's new screen.
       if (!mounted.current) return
       const count = saved.scheduleHeaderIds?.length ?? 0
@@ -292,10 +306,28 @@ function ContractEditor({
         )
       if (!(await saveGuide.saved(savedId)) || !mounted.current) return
       // Keep the synchronous guard closed through navigation, including repeated submit events.
-      await navigate(returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId)), {
+      // 첫 이동에 기준월을 포함해 Shell의 URL 보정과 후속 가이드 조회가 경합하지 않게 한다.
+      const detailPath = returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId))
+      const month = params.get('month')
+      await navigate(validMonth(month) ? withMonth(detailPath, month, false) : detailPath, {
         state: { message },
       })
     } catch (error) {
+      if (committed || error instanceof ContractSaveReceiptError) {
+        void queryClient.invalidateQueries({ queryKey: ['contracts'], refetchType: 'none' })
+        void queryClient.invalidateQueries({ queryKey: ['schedules'], refetchType: 'none' })
+        void queryClient.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
+        if (!mounted.current) return
+        setSavedSuccessfully(true)
+        clearUnsaved()
+        setConfirmSave(false)
+        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 목록에서 저장 결과를 확인하세요.'
+        saveGuide.fail(message)
+        setSaveError(message)
+        setSaving(false)
+        toast(message, 'warning')
+        return
+      }
       if (!mounted.current) return
       const message = contractErrorText(error instanceof Error ? error : new Error('보험계약을 저장하지 못했습니다.'))
       if (error instanceof ApiError) {
@@ -364,7 +396,7 @@ function ContractEditor({
     <>
       {saveError && (
         <div className="surface contract-form-error" role="alert">
-          <strong>입력 내용을 확인해 주세요.</strong>
+          <strong>{savedSuccessfully ? '저장 결과를 확인해 주세요.' : '입력 내용을 확인해 주세요.'}</strong>
           <p>{saveError}</p>
         </div>
       )}
@@ -391,7 +423,7 @@ function ContractEditor({
         noValidate
         aria-label={`보험계약 ${id ? '수정' : '등록'} 입력`}
       >
-        <fieldset className="contract-editor-fields contract-form-layout" disabled={saving || reloading}>
+        <fieldset className="contract-editor-fields contract-form-layout" disabled={saving || savedSuccessfully || reloading}>
           <section data-guide-feature="features.contract.contract-form-page.section"
             className="surface contract-form-card contract-basic-form-card contract-editor-basic"
             aria-labelledby="contract-basic-heading"

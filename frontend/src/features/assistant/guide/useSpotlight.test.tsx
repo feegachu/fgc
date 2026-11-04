@@ -1,12 +1,12 @@
 import { useRef } from 'react'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useSpotlight } from './useSpotlight'
 
 function Card({ target }: { target: HTMLElement | null }) {
   const card = useRef<HTMLElement>(null)
   const position = useSpotlight(target, card)
-  return <section ref={card} aria-label="Guide card" style={position.card}>Next</section>
+  return <section ref={card} aria-label="Guide card" data-box={JSON.stringify(position.box)} style={position.card}>Next</section>
 }
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
@@ -72,5 +72,53 @@ it('keeps the whole card in the viewport when page scrolling cannot expose it, i
     vi.mocked(window.scrollBy).mockClear()
     act(() => { window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(40) })
     expect(window.scrollBy).not.toHaveBeenCalled()
+  } finally { target.remove() }
+})
+
+it('follows viewport events and panel layout without ResizeObserver, then cleans up', () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', undefined)
+  vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  const remove = vi.spyOn(window, 'removeEventListener')
+  const cancel = vi.spyOn(window, 'cancelAnimationFrame')
+  const target = document.createElement('div')
+  document.body.append(target)
+  const rect = vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 300, 100))
+  try {
+    const { unmount } = render(<Card target={target} />)
+    act(() => { vi.advanceTimersByTime(80) })
+    const card = screen.getByRole('region', { name: 'Guide card' })
+    expect(JSON.parse(card.dataset.box!)).toEqual({ left: 90, top: 90, width: 320, height: 120 })
+    rect.mockReturnValue(new DOMRect(200, 120, 300, 100))
+    fireEvent.resize(window)
+    act(() => { vi.advanceTimersByTime(80) })
+    expect(JSON.parse(card.dataset.box!).left).toBe(190)
+    vi.mocked(window.scrollBy).mockClear()
+    rect.mockReturnValue(new DOMRect(300, 120, 300, 100))
+    fireEvent.scroll(window)
+    act(() => { vi.advanceTimersByTime(80) })
+    expect(JSON.parse(card.dataset.box!).left).toBe(290)
+    expect(window.scrollBy).not.toHaveBeenCalled()
+    rect.mockReturnValue(new DOMRect(300, 140, 240, 260))
+    vi.mocked(window.scrollBy).mockImplementation(() => {
+      rect.mockReturnValue(new DOMRect(300, 60, 240, 260))
+    })
+    act(() => { vi.advanceTimersByTime(120) })
+    expect(window.scrollBy).toHaveBeenCalledWith({ top: 80, behavior: 'instant' })
+    expect(JSON.parse(card.dataset.box!)).toEqual({ left: 290, top: 50, width: 260, height: 280 })
+    expect(card).toHaveStyle({ top: '344px' })
+    target.remove()
+    act(() => { vi.advanceTimersByTime(120) })
+    expect(card).toHaveAttribute('data-box', 'null')
+    document.body.append(target)
+    unmount()
+    rect.mockClear()
+    act(() => { vi.advanceTimersByTime(200) })
+    expect(rect).not.toHaveBeenCalled()
+    expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function), true)
+    expect(remove).toHaveBeenCalledWith('resize', expect.any(Function))
+    expect(cancel).toHaveBeenCalled()
   } finally { target.remove() }
 })

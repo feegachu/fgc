@@ -23,6 +23,8 @@ public final class AgentRequestAuthorization {
 
     private static final Set<String> COMPARE_CHAT_POSTS = Set.of("/api/v1/ai/compare-chat/rank",
             "/api/v1/ai/compare-chat/explain", "/api/v1/ai/compare-chat/ask");
+    /** FUN-086: 본인 계약 확인 기록. 설계사 ID는 세션에서만 얻고 계약마다 본인 범위를 검사한다. */
+    private static final String CONTRACT_CHECKS = "/api/v1/agent/me/contract-checks";
 
     /** 객체 검사된 기존 API만 개방한다. 후속 쓰기 API는 공통 범위 검증을 연결한 PR에서 연다. */
     public static final AuthorizationManager<RequestAuthorizationContext> SCOPED_READS = (authentication, context) -> {
@@ -30,12 +32,13 @@ public final class AgentRequestAuthorization {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         if (HttpMethod.POST.matches(request.getMethod())) {
             // FUN-079: 설계사 ID를 세션에서만 얻고 서버가 보관한 본인 결과만 쓰는 조회성 계산·질문 답변만 POST를 연다.
-            return new AuthorizationDecision(COMPARE_CHAT_POSTS.contains(path));
+            return new AuthorizationDecision(COMPARE_CHAT_POSTS.contains(path) || CONTRACT_CHECKS.equals(path));
         }
         return new AuthorizationDecision(HttpMethod.GET.matches(request.getMethod()) && (
                 PUBLIC_READS.contains(path)
-                || path.matches("/api/v1/contracts(?:/export\\.csv|/[1-9]\\d*(?:/status-events)?)?")
+                || path.matches("/api/v1/contracts(?:/export\\.csv|/[1-9]\\d*(?:/status-events(?:/[1-9]\\d*/effects)?)?)?")
                 || path.matches("/api/v1/transactions(?:/[1-9]\\d*)?")
+                || path.equals("/api/v1/agent/me/home")
                 || path.matches("/api/v1/agent/me/statements(?:/[A-Za-z0-9_-]{1,128})?")));
     };
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, RefObject } from 'react'
 
+const HIGHLIGHT_PADDING = 10
+
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>) {
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
@@ -10,6 +12,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     let frame = 0
     let placementFrame = 0
     let preparedWidth: number | null = null
+    let measuredTarget: DOMRect | null = null
     const alignTarget = () => {
       if (!target?.isConnected) return
       target.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
@@ -42,10 +45,17 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const workspaceRight = Math.min(width, workspace?.right || width)
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
         const cardWidth = Math.min(360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+        let rect = target?.isConnected ? target.getBoundingClientRect() : null
+        // A resize can push the coach offscreen. A position-only change can be user scroll.
+        if (!resize && rect && measuredTarget
+          && (rect.width !== measuredTarget.width || rect.height !== measuredTarget.height)) {
+          preparedWidth = null
+        }
         if (target?.isConnected && preparedWidth !== workspaceRight - workspaceLeft) {
           preparedWidth = workspaceRight - workspaceLeft
           // Leave room below the real target for the coach, including at the end of a page.
           alignTarget()
+          rect = target.getBoundingClientRect()
           // The anchored card adds page scroll room in this render. Re-align once after
           // its layout commits; browser scroll anchoring can otherwise undo the first move.
           cancelAnimationFrame(placementFrame)
@@ -56,17 +66,17 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
             }
           })
         }
-        const rect = target?.isConnected ? target.getBoundingClientRect() : null
+        measuredTarget = rect
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
         const cardHeight = card.current?.offsetHeight || Math.min(460, height / 2)
         // A fixed card cannot be scrolled into view by the browser. Keep its controls
         // reachable even when the page cannot scroll enough to fit below the target.
         const cardTop = rect ? Math.max(headerBottom + 8, Math.min(rect.bottom + 24, height - cardHeight - 12)) : null
         const box = rect ? {
-          left: Math.max(workspaceLeft, rect.left - 8),
-          top: Math.max(headerBottom + 8, rect.top - 8),
-          width: Math.max(0, Math.min(workspaceRight, rect.right + 8) - Math.max(workspaceLeft, rect.left - 8)),
-          height: Math.max(0, Math.min(height, rect.bottom + 8) - Math.max(headerBottom + 8, rect.top - 8)),
+          left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
+          top: Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
+          width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
+          height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
         } : null
         setPosition({
           box: box?.width && box.height ? box : null,
@@ -88,6 +98,14 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     if (card.current) resize?.observe(card.current)
     const workspace = document.getElementById('main-content')
     if (workspace) resize?.observe(workspace)
+    // A split pane can move or resize the target without a viewport event.
+    const layoutPoll = !resize && target ? window.setInterval(() => {
+      const rect = target.isConnected ? target.getBoundingClientRect() : null
+      if (rect?.left !== measuredTarget?.left || rect?.top !== measuredTarget?.top
+        || rect?.width !== measuredTarget?.width || rect?.height !== measuredTarget?.height) {
+        measure()
+      }
+    }, 100) : undefined
     window.addEventListener('scroll', measure, true)
     window.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('resize', measure)
@@ -96,6 +114,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       cancelAnimationFrame(frame)
       cancelAnimationFrame(placementFrame)
       resize?.disconnect()
+      window.clearInterval(layoutPoll)
       window.removeEventListener('scroll', measure, true)
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)

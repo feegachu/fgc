@@ -64,10 +64,13 @@ export function validateTargets(required, declarations) {
 function files(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? files(resolve(dir, entry.name)) : [resolve(dir, entry.name)])
 }
-export function check() {
-  const catalog = JSON.parse(readFileSync(resolve(root, 'src/features/assistant/guide/screen-help.json'), 'utf8'))
-  const declarations = files(resolve(root, 'src')).filter((f) => f.endsWith('.tsx') && !/test|spec/.test(f)).flatMap((file) => inspectTargets(readFileSync(file, 'utf8'), file).map((id) => ({ id, file: relative(root, file) })))
+export function isScreenSource(file) {
+  return file.endsWith('.tsx') && !/\.(test|spec)\.tsx$/.test(file)
+}
+export function catalogTargets(catalog) {
   const required = catalog.flatMap((entry) => entry.steps.map((step) => step.targetId))
+  const payment = JSON.parse(readFileSync(resolve(root, 'src/features/assistant/payment-guides.v1.json'), 'utf8'))
+  required.push(...payment.flatMap((entry) => entry.steps.map((step) => step.targetId)))
   // Parse the existing payment and settlement catalogs, not a manually copied target list.
   for (const path of ['src/features/assistant/catalog.ts', 'src/features/assistant/settlement/catalog.ts']) {
     const ast = ts.createSourceFile(path, readFileSync(resolve(root, path), 'utf8'), ts.ScriptTarget.Latest, true)
@@ -78,6 +81,12 @@ export function check() {
     }
     visit(ast)
   }
+  return required
+}
+export function check() {
+  const catalog = JSON.parse(readFileSync(resolve(root, 'src/features/assistant/guide/screen-help.json'), 'utf8'))
+  const declarations = files(resolve(root, 'src')).filter(isScreenSource).flatMap((file) => inspectTargets(readFileSync(file, 'utf8'), file).map((id) => ({ id, file: relative(root, file) })))
+  const required = catalogTargets(catalog)
   const errors = [...validateTargets(required, declarations), ...validateHelpCatalog(catalog)]
   const routedIds = [...readFileSync(resolve(root, 'src/app/screens.ts'), 'utf8').matchAll(/id: '([^']+)'/g)].map((match) => match[1])
   for (const id of new Set(routedIds)) {

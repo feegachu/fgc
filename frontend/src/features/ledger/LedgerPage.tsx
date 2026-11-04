@@ -174,14 +174,11 @@ export default function LedgerPage() {
   const select = (row: Journal) =>
     row.journalHeaderId != null && update({ selected: String(row.journalHeaderId) }, { resetPage: false })
   return (
-    <div className="ledger-react-page">
+    <div className="ledger-react-page list-page">
       <header className="page-header">
         <ScreenHelp screenId="LEDG-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">검증원장 조회</h1>
-          <p className="page-description">
-            이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.
-          </p>
         </div>
       </header>
       <LedgerFilters

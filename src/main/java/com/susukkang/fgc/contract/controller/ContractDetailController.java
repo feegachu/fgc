@@ -14,9 +14,15 @@ import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractJournalResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEventResponse;
+import com.susukkang.fgc.contract.dto.ContractStatusPreviewRequest;
+import com.susukkang.fgc.contract.dto.ContractStatusPreviewResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import com.susukkang.fgc.contract.service.ContractJournalProjectionService;
+import com.susukkang.fgc.contract.dto.ContractStatusEffectResponse;
 import com.susukkang.fgc.contract.service.ContractService;
+import com.susukkang.fgc.contract.service.ContractStatusEffectQueryService;
+import com.susukkang.fgc.contract.service.ContractStatusPreviewService;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.service.ContractTransactionProjectionService;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +49,8 @@ import java.util.List;
 public class ContractDetailController {
 
     private final ContractService contractService;
+    private final ContractStatusEffectQueryService effectQueryService;
+    private final ContractStatusPreviewService statusPreviewService;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
     private final ArbitrageService arbitrageService;
@@ -57,6 +65,24 @@ public class ContractDetailController {
     @GetMapping("/{id}/status-events")
     public ApiResponse<List<ContractStatusEventResponse>> getContractStatusEvents(@PathVariable Long id) {
         return ApiResponse.success(contractService.selectStatusEventsByContractId(id));
+    }
+
+    @GetMapping("/{id}/status-events/{eventId}/effects")
+    public ApiResponse<PageResponse<ContractStatusEffectResponse>> getContractStatusEventEffects(
+            @PathVariable Long id,
+            @PathVariable Long eventId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(effectQueryService.effects(id, eventId, page, size));
+    }
+
+    /** IF-API-64 저장 전 상태 사건의 영향 미리보기. 아무것도 저장하지 않으며 저장은 IF-API-19 로만 한다. */
+    @PostMapping("/{id}/status-events/preview")
+    @PreAuthorize(Roles.CAN_PREVIEW_STATUS_EVENT)
+    public ApiResponse<ContractStatusPreviewResponse> previewContractStatusEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody ContractStatusPreviewRequest request) {
+        return ApiResponse.success(statusPreviewService.preview(id, request));
     }
 
     @GetMapping("/{id}/schedules")

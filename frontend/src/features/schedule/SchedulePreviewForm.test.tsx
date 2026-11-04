@@ -26,7 +26,7 @@ function mount() {
     <SchedulePreviewForm context={value} contractId={id} stage="GA_TO_FC" /><Location />
   </MemoryRouter></QueryClientProvider>
   const result = render(view())
-  return { update: (value = context, id = '600') => result.rerender(view(value, id)) }
+  return { client, update: (value = context, id = '600') => result.rerender(view(value, id)) }
 }
 const enterReason = (value = '예정 생성 검증') => fireEvent.change(screen.getByLabelText('생성 사유'), { target: { value } })
 const submit = () => fireEvent.submit(screen.getByLabelText('생성 사유').closest('form')!)
@@ -70,12 +70,16 @@ it('definitive stale-source rejection preserves reason and uses a new key after 
 it.each(['route', 'target'])('late success cannot navigate after %s changes', async mode => {
   let finish: ((value: number) => void) | undefined
   vi.mocked(generatePreview).mockImplementation(() => new Promise(resolve => { finish = resolve }))
-  const { update } = mount(); enterReason(); submit()
+  const { update, client } = mount(); enterReason(); submit()
+  client.setQueryData(['schedules', 'receipt-test'], { activeYn: true })
+  client.setQueryData(['contracts', 'receipt-test'], { scheduleHeaderId: 10 })
   await waitFor(() => expect(finish).toBeDefined())
   if (mode === 'route') fireEvent.click(screen.getByRole('link', { name: '다른 화면' }))
   else { update(context, '601'); expect(screen.getByLabelText('생성 사유')).toHaveValue('') }
   await act(async () => { finish!(11) })
   expect(screen.getByTestId('location')).not.toHaveTextContent('/schedules/11')
+  expect(client.getQueryState(['schedules', 'receipt-test'])?.isInvalidated).toBe(true)
+  expect(client.getQueryState(['contracts', 'receipt-test'])?.isInvalidated).toBe(true)
 })
 
 it('unknown regime stays visible as REVIEW_REQUIRED and does not allow generation', () => {

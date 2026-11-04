@@ -1,5 +1,32 @@
 [
   {
+    "screenId": "CONT-W02",
+    "variant": "agent",
+    "title": "보험계약 상세",
+    "page": "contract/ContractDetailPage.tsx",
+    "steps": [
+      {
+        "targetId": "contract.statusHistory",
+        "instruction": "본인 계약의 기본정보와 상태이력을 확인하세요. 효력일과 접수일을 구분하고 상태 변경의 처리 결과를 확인합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "RPT-W02",
+    "title": "설계사 수수료 명세",
+    "page": "agent-statement/AgentStatementPage.tsx",
+    "steps": [
+      {
+        "targetId": "statement.filters",
+        "instruction": "기준월과 조회 조건을 선택하세요. 내부 사용자는 설계사를 선택하고, 설계사는 본인 귀속 내역을 조회합니다."
+      },
+      {
+        "targetId": "statement.results",
+        "instruction": "조회 후 지급·보류·조정·환수 내역과 금액을 확인하세요. 근거 보기에서 계산 근거를 확인하며, 금액 미확인은 0원과 구분합니다."
+      }
+    ]
+  },
+  {
     "screenId": "CONT-W01",
     "title": "보험계약 목록",
     "page": "contract/ContractListPage.tsx",
@@ -122,15 +149,15 @@
     "steps": [
       {
         "targetId": "validation.progress",
-        "instruction": "서버의 10단계 진행 상태와 오류를 확인합니다. 실패한 실행은 같은 실행을 임의 재기동하지 말고 신규 실행 절차를 따릅니다."
+        "instruction": "서버의 10단계 진행 상태와 오류를 확인합니다. 실패한 실행은 실패 지점 재시작 영역에서 서버가 안내하는 가능 여부와 사유를 확인하세요."
       },
       {
         "targetId": "validation.execute",
-        "instruction": "생성됨 상태에서는 실제 실행 버튼을 누르세요. 202 수락은 완료가 아니며 서버 진행률의 COMPLETED/FINALIZED를 확인해야 다음으로 진행할 수 있습니다. 실패 시 신규 실행 절차를 따릅니다. 계산 완료는 최종 확정과 다릅니다."
+        "instruction": "생성됨 상태에서는 실제 실행 버튼을 누르세요. 202 수락은 완료가 아니며 서버 진행률의 COMPLETED/FINALIZED를 확인해야 다음으로 진행할 수 있습니다. 실패 시 재시작 가능 여부를 확인합니다. 계산 완료는 최종 확정과 다릅니다."
       },
       {
         "targetId": "validation.restart",
-        "instruction": "실패 또는 확정된 실행을 다시 돌리지 않습니다. 신규 실행 만들기로 목록에 돌아가 검증월과 유형을 확인한 뒤 새 실행을 생성하세요."
+        "instruction": "실패 지점 재시작은 서버가 허용한 경우에만 사유를 입력해 요청하세요. 수락 후 새 시도의 진행 결과를 확인합니다. 재시작이 불가능하면 신규 실행 만들기로 목록에 돌아가 검증월과 유형을 확인하세요. 확정된 실행은 다시 실행하지 않습니다."
       },
       {
         "targetId": "validation.checklist",

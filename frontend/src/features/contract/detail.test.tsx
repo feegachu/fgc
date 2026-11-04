@@ -39,7 +39,7 @@ let requested: { url: string; options?: RequestOptions }[]
 const calls = (suffix: string) => requested.filter(({ url }) => url === `/api/v1/contracts/1${suffix}`)
 const messages = () => useToastStore.getState().messages.map(({ message }) => message)
 
-function renderAt(path: string, handler: Handler = () => undefined, canProcess = true, state?: object) {
+function renderAt(path: string, handler: Handler = () => undefined, canProcess = true, state?: object, roleCode = 'ADMIN') {
   requested = []
   vi.spyOn(apiClient, 'request').mockImplementation(async (url, options) => {
     requested.push({ url, options })
@@ -47,7 +47,7 @@ function renderAt(path: string, handler: Handler = () => undefined, canProcess =
       return envelope({
         loginId: 'operator',
         userName: '정산 담당자',
-        roleCode: 'ADMIN',
+        roleCode,
         demoMonth: '2026-07',
         canProcess,
       })
@@ -61,7 +61,7 @@ function renderAt(path: string, handler: Handler = () => undefined, canProcess =
   const initial = new URL(path, 'http://localhost')
   const router = createMemoryRouter(
     [
-      { path: '/contracts/:id', element: <ContractDetailPage /> },
+      { path: '/contracts/:id', element: <main id="main-content"><ContractDetailPage /></main> },
       { path: '/contracts/:id/edit', element: <h1>계약 수정 화면</h1> },
       { path: '/contracts', element: <h1>계약 목록 화면</h1> },
       { path: '/schedules/:id', element: <h1>스케줄 상세 화면</h1> },
@@ -118,16 +118,16 @@ describe('CONT-W02 계약 상세', () => {
     await screen.findByRole('heading', { name: 'CONT-0001' })
     expect(screen.getAllByText('서버 정상')).toHaveLength(2)
     expect(screen.getByText('서버 월납')).toBeInTheDocument()
-    const history = await screen.findByRole('list', { name: '상태 사건' })
-    expect(
-      within(history)
-        .getAllByRole('heading', { level: 4 })
-        .map((item) => item.textContent),
-    ).toEqual(['#1 최초 → 정상', '#2 정상 처리 → 미납 처리'])
+    const history = await screen.findByRole('table', { name: '상태 사건' })
+    const row = (index: number) => within(within(history).getAllByRole('row')[index + 1]).getAllByRole('cell')
+    expect(row(0)[0]).toHaveTextContent('1')
+    expect(row(0)[1]).toHaveTextContent('최초 → 정상')
+    expect(row(1)[0]).toHaveTextContent('2')
+    expect(row(1)[1]).toHaveTextContent('정상 처리 → 미납 처리')
     expect(within(history).getByText('실패')).toBeInTheDocument()
     expect(within(history).getByText('2026-07-02 10:00')).toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '접수 순' }))
-    expect(within(history).getAllByRole('heading', { level: 4 })[0]).toHaveTextContent('#2 정상 처리 → 미납 처리')
+    expect(row(0)[1]).toHaveTextContent('정상 처리 → 미납 처리')
     expect(
       requested.filter(
         ({ url }) => !['/api/v1/auth/me', '/api/v1/contracts/1', '/api/v1/contracts/1/status-events'].includes(url),
@@ -145,6 +145,15 @@ describe('CONT-W02 계약 상세', () => {
     ]
     expect(sortStatusEvents(events, 'effectiveAt').map((row) => row.eventSeq)).toEqual([2, 3, 9])
     expect(events.map((row) => row.eventSeq)).toEqual([9, 3, 2])
+  })
+
+  it('운영판 없이 예정판만 있으면 계약 탭에서도 지급 확정 제외를 표시한다', async () => {
+    renderAt('/contracts/1?tab=schedules', (url) => {
+      if (!url.includes('/schedules?')) return
+      return { headers: [{ scheduleHeaderId: 10, schedulePurpose: 'SIMULATION', scheduleVersionNo: 1, installmentCount: 48, lineCount: 48 }], lines: [] }
+    })
+    await waitFor(() => expect(screen.getAllByText('예정 결과 · 지급 확정 대상이 아닙니다.')).toHaveLength(2))
+    expect(screen.getAllByText('버전 1, 48회차, 48행')).toHaveLength(2)
   })
 
   it('스케줄 deep link에서도 두 지급단계를 함께 표시하고 기존 읽기 전용 버전 요약을 유지한다', async () => {
@@ -502,4 +511,21 @@ it('registers each fixed contract tab and panel as a distinct guide target', asy
   const panelIds = panels.map((panel) => panel.getAttribute('data-guide-feature'))
   expect(panelIds).toContain('contract.panel.schedules')
   expect(new Set(panelIds).size).toBe(panels.length)
+})
+
+
+it('finishes AGENT detail help using only visible basic information', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  const { actions } = renderAt('/contracts/1', undefined, false, undefined, 'AGENT')
+  await screen.findByRole('tab', { name: '기본정보' })
+  await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1))
+  await actions.click(screen.getByRole('button', { name: '도움말' }))
+  const next = await screen.findByRole('button', { name: '설명 확인 · 다음' })
+  await waitFor(() => expect(next).toBeEnabled())
+  expect(screen.getByText('화면 사용법 · 1/1')).toBeVisible()
+  await actions.click(next)
+  expect(await screen.findByText('화면 사용법 안내 완료')).toBeVisible()
+  expect(screen.queryByRole('tab', { name: /스케줄/ })).toBeNull()
+  expect(calls('/schedules')).toHaveLength(0)
 })

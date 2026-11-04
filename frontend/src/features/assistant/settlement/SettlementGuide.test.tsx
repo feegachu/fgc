@@ -135,6 +135,14 @@ async function reviewSchedule(actor: ReturnType<typeof userEvent.setup>) {
   }
 }
 describe('FUN-088 shell guide', () => {
+  it('translates the start lookup timeout into the same Korean guidance', async () => {
+    vi.mocked(apiClient.request).mockRejectedValue(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+    const { actor } = mount()
+    await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+    await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+    await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('최신 상태 조회가 5초 안에 끝나지 않았습니다.')
+  })
   it('pauses and folds for chat without discarding the selected flow', async () => {
     const { actor } = mount()
     await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))

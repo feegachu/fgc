@@ -13,20 +13,6 @@ const user: ShellUser = {
 afterEach(() => vi.unstubAllEnvs())
 const open = () => userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' }))
 
-it('keeps the launcher in the app header and opens chat from that slot', async () => {
-  const headerSlot = document.createElement('div')
-  headerSlot.id = 'app-header-assistant'
-  document.body.append(headerSlot)
-  const view = render(<PicoAssistant canProcess />)
-  try {
-    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toBeInTheDocument()
-    await open()
-    expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveFocus()
-    await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
-    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveFocus()
-  } finally { view.unmount(); headerSlot.remove() }
-})
-
 it('requires explicit demo opt-in and hides for AGENT, unknown roles and logout', () => {
   vi.stubEnv('VITE_ASSISTANT_DEMO', '')
   const view = render(<AssistantDemoMount user={user} />)
@@ -43,8 +29,11 @@ it('requires explicit demo opt-in and hides for AGENT, unknown roles and logout'
 it('opens closed-by-default chat, preserves the four removals and restores keyboard focus', async () => {
   render(<PicoAssistant canProcess />)
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '피코를 상단 버튼으로 접기' })).not.toBeInTheDocument()
   await open()
   expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveFocus()
+  expect(screen.queryByRole('button', { name: '피코를 오른쪽 아래에 표시' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: /버튼 색상|버튼 표시 방식/ })).not.toBeInTheDocument()
   expect(screen.queryByText('현재 보고 있는 업무')).not.toBeInTheDocument()
   // CMN-C04 (화면정의서 v3.0 :3267): one context line above the question box, not a card.
   expect(screen.getByText(/^현재 화면 .+, 대상 선택 없음, 기준월 /)).toBeInTheDocument()

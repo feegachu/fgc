@@ -31,6 +31,7 @@ import type { DraftErrors } from './draftValidation'
 import { normalizePolicyDetail, savePolicyDraft } from './writeApi'
 import type { PolicyDetailResponse } from './writeApi'
 import { usePolicyRequest } from './usePolicyRequest'
+import { toast } from '../../stores/toasts'
 
 type Section = 'basic' | 'commissionRules' | 'feeRegimeRules' | 'parameters' | 'clawbackRules' | 'sourceDetails'
 function sectionFor(path: string): Section {
@@ -74,6 +75,7 @@ export function PolicyDraftEditor({
   useEffect(() => { saveGuide.update(draft, !preview && Object.keys(validateDraft(draft)).length === 0) }, [saveGuide, draft, preview])
   const serverSaved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
   const [busy, setBusy] = useState(false)
+  const [committed, setCommitted] = useState(false)
   const [failure, setFailure] = useState(initialProblem?.message ?? '')
   const [conflict, setConflict] = useState(false)
   const [latest, setLatest] = useState('')
@@ -81,6 +83,7 @@ export function PolicyDraftEditor({
   const [dirty, setDirty] = useState(false)
   const clearUnsaved = useUnsavedWork(dirty)
   const saving = useRef(false)
+  const storedRef = useRef(false)
   const requestKey = usePolicyRequest()
   const titleFocus = useRef<HTMLInputElement>(null)
   const set = <K extends keyof DraftDocument>(key: K, value: DraftDocument[K]) => {
@@ -153,7 +156,7 @@ export function PolicyDraftEditor({
     }
   }
   async function save() {
-    if (saving.current) return
+    if (saving.current || storedRef.current) return
     const nextErrors = validateDraft(draft)
     setErrors(nextErrors)
     const first = Object.keys(nextErrors)[0]
@@ -165,6 +168,7 @@ export function PolicyDraftEditor({
     setBusy(true)
     saveGuide.begin()
     setFailure('')
+    let stored = false
     try {
       const document = {
         ...draft,
@@ -188,11 +192,24 @@ export function PolicyDraftEditor({
       const id = preview
         ? await preview.save(document, policyId)
         : (await savePolicyDraft(document, policyId, requestKey({ policyId, document }))).policyVersionId
+      stored = true
+      storedRef.current = true
+      setCommitted(true)
       setDirty(false)
       clearUnsaved()
+      void cache.invalidateQueries({ queryKey: ['policies'], refetchType: 'none' })
       if (!mounted.current) return
       if (preview || (await saveGuide.saved(id))) { if (mounted.current) onSaved(id) }
     } catch (cause) {
+      if (!mounted.current) return
+      if (stored) {
+        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 목록에서 저장 결과를 확인하세요.'
+        saveGuide.fail(message)
+        setFailure(message)
+        void cache.invalidateQueries({ queryKey: ['policies'] })
+        toast(message, 'warning')
+        return
+      }
       const message = errorText(cause instanceof Error ? cause : null, '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.')
       saveGuide.fail(message)
       setFailure(message)
@@ -204,7 +221,7 @@ export function PolicyDraftEditor({
       }
     } finally {
       saving.current = false
-      setBusy(false)
+      if (mounted.current) setBusy(false)
     }
   }
   const field = (
@@ -244,7 +261,7 @@ export function PolicyDraftEditor({
           <Button data-guide-feature="features.policies.policy-draft-editor.button" variant="secondary" disabled={busy} onClick={close}>
             취소
           </Button>
-          <Button data-guide-feature="features.policies.policy-draft-editor.button-2" data-guide-target="policy.save" loading={busy && !serverSaved} disabled={discard || busy} onClick={() => void save()}>
+          <Button data-guide-feature="features.policies.policy-draft-editor.button-2" data-guide-target="policy.save" loading={busy && !serverSaved} disabled={discard || busy || committed} onClick={() => void save()}>
             초안 저장
           </Button>
         </>
@@ -310,7 +327,7 @@ export function PolicyDraftEditor({
             </button>
           ))}
         </nav>
-        <fieldset disabled={busy} className="policy-editor-content">
+        <fieldset disabled={busy || committed} className="policy-editor-content">
           <div className="policy-section-heading">
             <div>
               <h2>{sections.find((item) => item.id === section)?.label}</h2>

@@ -50,6 +50,7 @@ for (const startMode of ['existing', 'new'] as const) {
       await page.getByRole('button', { name: '스케줄 재생성', exact: true }).click()
       await successful(regenerated)
     }
+    await expect(page.getByRole('main').getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
     await continueFlow(page)
     await expect(page).toHaveURL(/\/schedules\/\d+/)
     await expect(guide).toContainText('2/9')
@@ -86,6 +87,7 @@ for (const startMode of ['existing', 'new'] as const) {
     await page.getByRole('dialog').getByRole('button', { name: '확정 실행' }).click()
     expect((await successful(confirming)).status).toBe('CONFIRMED')
     await expect(page).toHaveURL(/\/transactions\?/)
+    await expect(page.getByRole('main').getByRole('heading', { name: '수수료 지급 건 목록', exact: true })).toBeVisible()
     await expect(guide.getByRole('heading', { name: '확정된 지급을 확인하세요' })).toBeVisible()
     await continueFlow(page)
     await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)

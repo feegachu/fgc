@@ -13,6 +13,7 @@ import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-rout
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
+import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/client'
 import { today } from '../../lib/format'
@@ -24,7 +25,7 @@ import type { PaymentEntry } from './payment-entry'
 import { useEntityChoices } from '../base/selection'
 import { AttributionEditor } from './AttributionEditor'
 import { CapPanel, ConfirmationModal, GatePanel } from './ConfirmationPanels'
-import { confirmPayment, contractQuery, draftQuery, formError, precheckPayment, saveDraft } from './form-api'
+import { confirmPayment, contractQuery, draftQuery, formError, precheckPayment, readPayment, saveDraft } from './form-api'
 import type { Payment, Precheck } from './form-api'
 import {
   availableItems,
@@ -54,6 +55,8 @@ export default function TransactionFormPage() {
   const { user, month } = useOutletContext<ShellContext>()
   const [params] = useSearchParams()
   const id = params.get('id')
+  const [revision, setRevision] = useState(0)
+  const queryClient = useQueryClient()
   const draft = useQuery({
     ...draftQuery(id),
     retry: false,
@@ -62,6 +65,11 @@ export default function TransactionFormPage() {
     refetchOnReconnect: false,
   })
   const activeMonth = month ?? today().slice(0, 7)
+  // A failed reload must keep the editor and its input, so it stays out of the query's error state.
+  async function reload() {
+    queryClient.setQueryData(draftQuery(id).queryKey, await readPayment(id!))
+    setRevision((current) => current + 1)
+  }
   // A cached draft is only a lookup hint. Hydrate the editable snapshot from this
   // opening's GET; subsequent focus/reconnect must not overwrite unsaved edits.
   if (id && (draft.error || !draft.isFetchedAfterMount || !draft.data))
@@ -87,7 +95,7 @@ export default function TransactionFormPage() {
     )
   return (
     <TransactionForm
-      key={`${id ?? 'new'}:${activeMonth}:${id ? '' : params.toString()}`}
+      key={`${id ?? 'new'}:${activeMonth}:${id ? revision : params.toString()}`}
       entry={id ? {} : readPaymentEntry(params)}
       returnTo={safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))}
       initialId={id}
@@ -95,6 +103,7 @@ export default function TransactionFormPage() {
       month={activeMonth}
       canProcess={user.canProcess}
       role={user.roleCode}
+      onReload={reload}
     />
   )
 }
@@ -107,6 +116,7 @@ function TransactionForm({
   month,
   canProcess,
   role,
+  onReload,
 }: {
   entry: PaymentEntry
   returnTo: string
@@ -115,6 +125,7 @@ function TransactionForm({
   month: string
   canProcess: boolean
   role: string
+  onReload: () => Promise<void>
 }) {
   const navigate = useNavigate()
   const root = useRef<HTMLDivElement>(null)
@@ -169,10 +180,15 @@ function TransactionForm({
   const [locked, setLocked] = useState(false)
   const [dirty, setDirty] = useState(!initialId)
   const [inputEdited, setInputEdited] = useState(false)
-  const [busy, setBusy] = useState<'save' | 'precheck' | 'confirm' | null>(null)
+  const [busy, setBusy] = useState<'save' | 'precheck' | 'confirm' | 'reload' | null>(null)
   const actionLock = useRef(false)
   const [fieldError, setFieldError] = useState<{ field: string; message: string }>()
   const [saveError, setSaveError] = useState('')
+  // #753: 이 화면을 연 조회의 수정 시각. 사용자가 다시 불러오기 전까지 입력값과 함께 유지한다.
+  const [expectedUpdatedAt] = useState(draft?.updatedAt)
+  const [conflict, setConflict] = useState(false)
+  const [confirmReload, setConfirmReload] = useState(false)
+  const stale = conflict || (Boolean(initialId) && !expectedUpdatedAt)
   const [result, setResult] = useState<Precheck | null>(null)
   const [precheckError, setPrecheckError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -228,7 +244,7 @@ function TransactionForm({
     !canProcess || confirmed || locked || busy !== null || loading || Boolean(referenceError) || confirmationNeedsRetry
   const selectedAgent = agents.find((agent) => String(agent.agentId) === form.agentId)
   const agentLabel = selectedAgent ? nameWithCode(selectedAgent.agentName, selectedAgent.agentCode) : '-'
-  const ready = canProcess && !loading && !referenceError && busy == null && !confirmed
+  const ready = canProcess && !loading && !referenceError && busy == null && !confirmed && !stale
   const fieldMessage = (field: string) => (fieldError?.field === field ? fieldError.message : undefined)
   useEffect(() => {
     if (fieldError && busy == null) document.getElementById(fieldError.field)?.focus()
@@ -389,7 +405,7 @@ function TransactionForm({
     const observer = guide.current!
     const operation = observer.begin('save')
     try {
-      const saved = await saveDraft(paymentId, payload)
+      const saved = await saveDraft(paymentId, payload, expectedUpdatedAt)
       if (!observer.isSamePayment(operation)) return
       if (
         saved.status !== 'DRAFT' ||
@@ -417,6 +433,8 @@ function TransactionForm({
       observer.fail(operation)
       const message = showError(error, '수수료 지급 건을 저장하지 못했습니다.')
       setSaveError(message)
+      // 수정 시각 충돌과 그사이 확정된 초안은 최신 지급 건을 다시 불러와야 판단할 수 있다.
+      if (initialId && error instanceof ApiError && ['FGC-TRAN-010', 'FGC-TRAN-005'].includes(error.code)) setConflict(true)
       const fields: Record<string, string> = {
         sourceType: 'sourceType',
         sourceBusinessKey: 'bizKey',
@@ -430,6 +448,19 @@ function TransactionForm({
       if (error instanceof ApiError && error.field && fields[error.field])
         showFieldError({ field: fields[error.field], message })
     } finally {
+      actionLock.current = false
+      setBusy(null)
+    }
+  }
+  async function reload() {
+    if (actionLock.current) return
+    actionLock.current = true
+    setBusy('reload')
+    try {
+      await onReload()
+    } catch (error) {
+      setSaveError(showError(error, '최신 지급 건을 불러오지 못했습니다.'))
+      setConfirmReload(false)
       actionLock.current = false
       setBusy(null)
     }
@@ -599,7 +630,7 @@ function TransactionForm({
         </div>
       )}
       {missingEvidence && (
-        <p role="status">제외 귀속행은 제외유형과 증빙을 입력해야 합니다.</p>
+        <p role="status">{newcomer ? '신규 설계사 지원 건은 모든 귀속행에 증빙을 입력해야 합니다.' : '제외 귀속행은 제외유형과 증빙을 입력해야 합니다.'}</p>
       )}
       {locked && !confirmed && (
         <div id="draft-lock-notice" className="guidance guidance-neutral transaction-lock-notice" role="status">
@@ -844,7 +875,7 @@ function TransactionForm({
               <p className="field-helper" id="transaction-action-help">
                 확정하려면 6단계 점검을 모두 통과해야 합니다.
               </p>
-              {needsSave && initialId && (
+              {needsSave && initialId && !stale && (
                 <p className="field-helper">
                   {normalized
                     ? '현재 지급 단계/항목에 맞춰 귀속 입력을 조정했습니다. 먼저 저장한 뒤 사전검증하세요.'
@@ -865,6 +896,21 @@ function TransactionForm({
                 <p className="field-error" role="alert">
                   {saveError}
                 </p>
+              )}
+              {canProcess && stale && (
+                <>
+                  <p className="field-helper" role="status">
+                    {conflict
+                      ? '최신 지급 건을 다시 불러온 뒤 수정하세요.'
+                      : '수정 시각을 확인할 수 없습니다. 최신 지급 건을 다시 불러오세요.'}
+                  </p>
+                  <Button data-guide-feature="features.transaction.transaction-form-page.btn-reload"
+                    variant="secondary"
+                    onClick={() => setConfirmReload(true)}
+                  >
+                    최신 지급 건 다시 불러오기
+                  </Button>
+                </>
               )}
             </div>
           </section>
@@ -893,6 +939,26 @@ function TransactionForm({
         onClose={() => setModalOpen(false)}
         onConfirm={() => void confirm()}
       />
+      <Modal
+        open={confirmReload}
+        title="최신 지급 건 다시 불러오기"
+        onClose={() => {
+          if (busy !== 'reload') setConfirmReload(false)
+        }}
+        closeOnEscape={busy !== 'reload'}
+        footer={
+          <>
+            <Button data-guide-feature="features.transaction.transaction-form-page.btn-reload-keep" variant="secondary" disabled={busy === 'reload'} onClick={() => setConfirmReload(false)}>
+              입력 유지
+            </Button>
+            <Button data-guide-feature="features.transaction.transaction-form-page.btn-reload-apply" loading={busy === 'reload'} onClick={() => void reload()}>
+              최신 정보로 바꾸기
+            </Button>
+          </>
+        }
+      >
+        <p>현재 입력 내용을 최신 지급 건 정보로 바꿉니다. 입력한 변경 내용을 확인한 뒤 다시 불러오세요.</p>
+      </Modal>
     </div>
   )
 }

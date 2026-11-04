@@ -25,6 +25,11 @@ import { useWorkflowWalkthrough } from './useWorkflowWalkthrough'
 
 const id = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
+function failureText(failure: unknown, fallback: string) {
+  return failure instanceof DOMException && failure.name === 'TimeoutError'
+    ? '최신 상태 조회가 5초 안에 끝나지 않았습니다. 잠시 후 다시 확인하세요.'
+    : failure instanceof Error ? failure.message : fallback
+}
 export function SettlementGuide({ user, month }: { user: ShellUser; month: string | null }) {
   const open = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   useEffect(() => () => closeSettlementGuide(), [user.loginId])
@@ -333,13 +338,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       if (result.complete) await runner.next()
     } catch (failure) {
       if (!controller.signal.aborted && token === epoch.current)
-        setError(
-          failure instanceof DOMException && failure.name === 'TimeoutError'
-            ? '최신 상태 조회가 5초 안에 끝나지 않았습니다. 잠시 후 다시 확인하세요.'
-            : failure instanceof Error
-              ? failure.message
-              : '최신 상태를 확인하지 못했습니다.',
-        )
+        setError(failureText(failure, '최신 상태를 확인하지 못했습니다.'))
     } finally {
       if (token === epoch.current) setBusy(false)
     }
@@ -376,7 +375,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         throw new Error('조회 중 화면이 바뀌었습니다. 현재 대상으로 다시 시작하세요.')
       await show(base, true)
     } catch (failure) {
-      if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : '시작할 수 없습니다.')
+      if (!controller.signal.aborted) setError(failureText(failure, '시작할 수 없습니다.'))
     } finally {
       setBusy(false)
     }

@@ -111,9 +111,6 @@
 .reco-react-result-table {
   min-width: 78rem;
 }
-.reco-react-history-table {
-  min-width: 72rem;
-}
 .reco-react-result-table th,
 .reco-react-result-table td {
   padding-inline: 0.5rem;

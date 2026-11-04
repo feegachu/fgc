@@ -30,7 +30,8 @@ public class OpenApiConfig {
     // 응답 스키마 → null이 올 수 있는 $ref 속성. 3.1에서는 @Schema(nullable = true)가 $ref 옆에서 사라진다.
     private static final Map<String, String> NULLABLE_REFERENCES = Map.of(
             "ClawbackCandidateDetailResponse", "latestCalculation",
-            "ContractStatusEventResponse", "registeredBy");
+            "ContractStatusEventResponse", "registeredBy",
+            "ContractStatusEventProcessingResponse", "summary");
 
     // 실패 응답 봉투. springdoc은 단순 클래스명을 스키마 이름으로 쓰므로 Java 클래스명과 겹치지 않게 둔다.
     private static final String FAILURE_RESPONSE = "ApiFailureResponse";

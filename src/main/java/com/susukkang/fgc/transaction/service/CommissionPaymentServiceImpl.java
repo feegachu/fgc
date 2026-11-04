@@ -107,6 +107,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private final AuditLogService auditLogService;
     private final CommissionPolicyService commissionPolicyService;
     private final ExceptionCaseService exceptionCaseService;
+    private final com.susukkang.fgc.contract.service.PaymentHoldGate paymentHoldGate;
 
     @Override
     @Transactional
@@ -139,6 +140,13 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         // DTO(Row)로 확보한다. 두 스냅샷이 같은 스키마여야 diff 화면이 필드 단위로 비교된다.
         CommissionPaymentRow beforeRow = requireRow(paymentId);
         List<CommissionPaymentAttributionRow> beforeAttributions = queryRepository.findAttributions(paymentId);
+        // #753: 전체 교체 PUT의 옛 입력값은 행 잠금만으로 식별할 수 없다. 변경 전에 조회 토큰을 비교한다.
+        if (request.expectedUpdatedAt() == null) {
+            invalid("expectedUpdatedAt", "지급 건을 다시 조회한 뒤 수정해 주세요.");
+        }
+        if (!request.expectedUpdatedAt().toInstant().equals(beforeRow.updatedAt().toInstant())) {
+            throw new FgcBusinessException(FgcErrorCode.TRAN_010);
+        }
 
         PreparedPayment prepared = commandFrom(paymentId, request);
         if (writeRepository.updateTransaction(prepared.payment()) != 1) {
@@ -251,6 +259,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         queryRepository.lockAttributedContracts(paymentId);
         // #433: 최초 지급 조회의 계약일은 잠금 대기 중 변경될 수 있다.
         attributions = requireConfirmationData(paymentId);
+        // FUN-028: 계약 잠금 안에서 상태 사건 보류·후속 작업 대기를 확인해 worker 처리 전 확정이 우회되지 않게 한다.
+        failFirst(statusHoldFailure(paymentId, attributions.get(0)));
         if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failFirst(unresolvedViolationFailure(attributions.get(0)));
         }
@@ -380,6 +390,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         List<GateFailure> failures = new ArrayList<>();
         if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
             failures.add(unresolvedViolationFailure(first));
+        }
+        GateFailure statusHold = statusHoldFailure(paymentId, first);
+        if (statusHold != null) {
+            failures.add(statusHold);
         }
         failures.addAll(requiredValueFailures(attributions));
 
@@ -533,10 +547,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private List<TransactionPrecheckResponse.Blocker> toBlockers(List<GateFailure> failures) {
         return failures.stream()
                 .map(failure -> {
-                    // CAP_003(미해결 위반)은 hasBlockingUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
-                    // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 예외 건을
+                    // CAP_003(미해결 위반)과 IMPL_PAYMENT_HELD(상태 사건 보류)는 지급 건 단위 판정이라 어느 귀속행이
+                    // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 계약을
                     // 찾게 되므로 계약·귀속행 ID를 비운다
-                    boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
+                    boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003
+                            || failure.errorCode() == FgcErrorCode.IMPL_PAYMENT_HELD;
                     return new TransactionPrecheckResponse.Blocker(
                             failure.errorCode().getCode(),
                             CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE.equals(failure.reasonCode())
@@ -1227,6 +1242,19 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 failure.errorCode(),
                 failure.params()
         );
+    }
+
+    /** FUN-028: 환수(차감) 건은 대상이 아니다. 저장하는 예외 이력은 없고 409 로만 차단한다. */
+    private GateFailure statusHoldFailure(Long paymentId, ConfirmationData first) {
+        if (isClawback(first)) {
+            return null;
+        }
+        List<com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker> blockers = paymentHoldGate.blockers(paymentId);
+        if (blockers == null || blockers.isEmpty()) {
+            return null;
+        }
+        return new GateFailure(first, null, null, null, null, FgcErrorCode.IMPL_PAYMENT_HELD,
+                Map.of("blockers", blockers.stream().map(com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker::label).toList()));
     }
 
     private GateFailure unresolvedViolationFailure(ConfirmationData first) {

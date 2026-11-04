@@ -14,6 +14,19 @@ async function agentFixture(page: Page, commission = 300000) {
       canUseAgentWorkspace: true, canProcess: false, canViewAuditLog: false,
       canHandleException: false, canReverseJournal: false, canFinalizeValidation: false, demoMonth: '2026-07',
     })
+    if (path === '/api/v1/agent/me/home') return fulfill({
+      asOf: '2026-07-31', period: '12', range: { from: '2025-08-01', to: '2026-07-31' }, filters: { insurerType: 'ALL' },
+      priorityContracts: [], priorityContractTotal: 0, dataStatus: 'AVAILABLE',
+      myCommission: { month: '2026-07', expected: { amount: commission, count: 1 }, held: { amount: 0, count: 0 },
+        clawback: { amount: 0, count: 0 }, dataStatus: 'AVAILABLE' },
+      portfolio: { contractCount: 1,
+        insurers: [{ insurerId: 1, name: '가상생명', contractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 }],
+        monthly: [{ month: '2026-06', newContractCount: 0, monthlyEquivalentFirstPremiumSum: 0 },
+          { month: '2026-07', newContractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 }],
+        categories: [{ code: 'HEALTH_PROTECTION', label: '건강보장', count: 1 }],
+        statuses: [{ code: 'ACTIVE', label: '정상', count: 1 }] },
+      basis: { asOf: '2026-07-31', warnings: [] },
+    })
     if (path === '/api/v1/base/insurers') return fulfill({ content: [], totalPages: 0, totalElements: 0 })
     if (path === '/api/v1/base/products') return fulfill({ content: [], totalPages: 0, totalElements: 0 })
     const contract = {
@@ -30,7 +43,7 @@ async function agentFixture(page: Page, commission = 300000) {
     if (path === '/api/v1/contracts/1/status-events') return fulfill([])
     unexpected.push(path)
     return route.fulfill({ status: 403, json: { data: null, error: {
-      code: 'FGC-AUTH-005', message: '본인 담당 자료만 조회·처리할 수 있습니다.',
+      code: 'FGC-AUTH-005', message: '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.',
     }, requestId: 'agent-ui-fixture' } })
   })
   return unexpected
