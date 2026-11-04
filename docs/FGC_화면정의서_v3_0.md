@@ -1033,7 +1033,7 @@ FGC — 설계사
 | 버전      | `schedule_version_no`                                                                            |
 | 상태      | 예정 / 확정 / 대사일치 / 조정                                                                    |
 | 사용중    | `active_yn` — 지금 쓰는 버전이면 체크                                                            |
-| 회차 수   | 상세행 개수                                                                                      |
+| 회차 수   | 중복을 제외한 installment_no 개수. 같은 회차의 여러 항목은 행 수로 별도 표시                                                                                      |
 | 예상 총액 | 상세행 `expected_amount` 합계                                                                    |
 | 정책버전  | 어떤 정책으로 만들었는지                                                                         |
 
@@ -1082,7 +1082,7 @@ FGC — 설계사
 | 기준코드    | `basis_code` — 무엇에 요율을 곱했는지        |
 | 기준금액    | `basis_amount`                               |
 | 계산방식    | 요율 / 정액                                  |
-| 요율        | `rate_pct` (%)                               |
+| 요율 / 정액 | RATE는 `rate_pct` (%), FIXED는 `fixed_amount` (원)                               |
 | 예상금액    | `expected_amount`                            |
 | 상태        | 예정 / 확정 / 대사일치 / 조정                |
 

@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
@@ -214,6 +215,7 @@ export default function AcquisitionCostPage() {
   return (
     <div className="acq-page">
       <header className="page-header">
+        <ScreenHelp screenId="ACQC-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">계약체결비용 한도 검증</h1>
           <p className="page-description">
@@ -295,6 +297,7 @@ export default function AcquisitionCostPage() {
         defaultRatio={58}
       >
         <section
+          data-guide-target="acquisition.overview"
           data-guide-feature="features.acquisition-cost.acquisition-cost-page.section"
           className="surface acq-panel"
           aria-labelledby="acq-list-title"

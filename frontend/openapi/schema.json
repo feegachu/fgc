@@ -4859,6 +4859,9 @@
               "$ref" : "#/components/schemas/ScheduleLineResponse"
             },
             "type" : "array"
+          },
+          "previewContext" : {
+            "$ref" : "#/components/schemas/SchedulePreviewContext"
           }
         },
         "type" : "object"
@@ -5952,6 +5955,65 @@
         },
         "type" : "object"
       },
+      "FeeRegimeResolution" : {
+        "properties" : {
+          "basicDocumentDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentVersion" : {
+            "type" : "string"
+          },
+          "candidateOfferingIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "candidateRulesetIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "contractDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "declaredFeeRegimeCode" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reasonCode" : {
+            "enum" : [ "UNKNOWN_REGIME", "CONTRACT_OUTSIDE_SALES_PERIOD", "OFFERING_NOT_UNIQUE", "NOT_APPLICABLE", "CURRENT_BUT_ELIGIBLE", "REGIME_NOT_ELIGIBLE", "FOUR_YEAR_AFTER_SPECIAL_PERIOD", "SEVEN_YEAR_IN_SPECIAL_PERIOD", "RULESET_MISSING", "RULESET_AMBIGUOUS", "RULESET_FLAGGED", "RULESET_LIMIT_MISSING", "COMMISSION_RULE_INVALID", "RULESET_SELECTED" ],
+            "type" : "string"
+          },
+          "regRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "rulesetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesStartDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "SELECTED", "NOT_APPLICABLE", "REVIEW_REQUIRED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "FeeRegimeRuleDraft" : {
         "properties" : {
           "basicDocumentDateFrom" : {
@@ -6013,6 +6075,50 @@
           }
         },
         "required" : [ "feeRegimeCode", "maxInstallments", "salesStartDateFrom", "sourceRefs" ],
+        "type" : "object"
+      },
+      "FeeRegimeRulesetSelection" : {
+        "properties" : {
+          "limits" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RulesetLimit"
+            },
+            "type" : "array"
+          },
+          "resolution" : {
+            "$ref" : "#/components/schemas/FeeRegimeResolution"
+          },
+          "ruleset" : {
+            "$ref" : "#/components/schemas/Ruleset"
+          },
+          "selected" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "FeeRegimeSchedulePolicy" : {
+        "properties" : {
+          "commissionPolicy" : {
+            "$ref" : "#/components/schemas/ResolvedCommissionPolicy"
+          },
+          "selected" : {
+            "type" : "boolean"
+          },
+          "selection" : {
+            "$ref" : "#/components/schemas/FeeRegimeRulesetSelection"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "versionNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
         "type" : "object"
       },
       "FinalizeChecklistConditionResponse" : {
@@ -9077,6 +9183,105 @@
         },
         "type" : "object"
       },
+      "ResolvedCommissionPolicy" : {
+        "properties" : {
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "policyType" : {
+            "enum" : [ "CURRENT_COMMISSION", "FOUR_YEAR_COMMISSION", "SEVEN_YEAR_COMMISSION", "CAP_1200", "ALLOCATION", "REFUND_RATE", "CLAWBACK", "RECONCILIATION_TOLERANCE", "SCHEDULE_ELIGIBILITY", "ARBITRAGE" ],
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "rules" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ResolvedCommissionRule"
+            },
+            "type" : "array"
+          },
+          "scheduleRegime" : {
+            "enum" : [ "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ResolvedCommissionRule" : {
+        "properties" : {
+          "agentRankCode" : {
+            "enum" : [ "FC", "TEAM_LEADER", "BRANCH_MANAGER", "DIVISION_HEAD" ],
+            "type" : "string"
+          },
+          "basisCode" : {
+            "type" : "string"
+          },
+          "calculationType" : {
+            "enum" : [ "FIXED", "RATE" ],
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "commissionRuleId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "equalMonthlyYn" : {
+            "type" : "boolean"
+          },
+          "feeComponentType" : {
+            "enum" : [ "CURRENT", "UPFRONT", "MAINTENANCE", "LONG_TERM_MAINTENANCE", "INCENTIVE", "SETTLEMENT_SUPPORT", "NEWCOMER_SUPPORT", "COMMON_COST", "OTHER" ],
+            "type" : "string"
+          },
+          "fixedAmount" : {
+            "type" : "number"
+          },
+          "installmentFrom" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "installmentTo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "insurerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "organizationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "paymentConditionCode" : {
+            "type" : "string"
+          },
+          "priorityNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "productOfferingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ratePct" : {
+            "type" : "number"
+          },
+          "roundingMode" : {
+            "enum" : [ "UP", "DOWN", "CEILING", "FLOOR", "HALF_UP", "HALF_DOWN", "HALF_EVEN", "UNNECESSARY" ],
+            "type" : "string"
+          },
+          "roundingScale" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "Restartability" : {
         "properties" : {
           "allowed" : {
@@ -9207,6 +9412,73 @@
         },
         "type" : "object"
       },
+      "Ruleset" : {
+        "properties" : {
+          "basicDocumentDateFrom" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentDateTo" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentVersion" : {
+            "type" : "string"
+          },
+          "feeRegimeCode" : {
+            "type" : "string"
+          },
+          "longTermMaintenanceFrom" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "longTermMaintenanceTo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxInstallments" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "rulesetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesStartDateFrom" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "salesStartDateTo" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RulesetLimit" : {
+        "properties" : {
+          "includesIndirectExpense" : {
+            "type" : "boolean"
+          },
+          "limitCode" : {
+            "type" : "string"
+          },
+          "limitPct" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
       "ScheduleDetailResponse" : {
         "properties" : {
           "header" : {
@@ -9217,6 +9489,9 @@
               "$ref" : "#/components/schemas/ScheduleLineResponse"
             },
             "type" : "array"
+          },
+          "previewContext" : {
+            "$ref" : "#/components/schemas/SchedulePreviewContext"
           }
         },
         "type" : "object"
@@ -9274,6 +9549,16 @@
           "activeYn" : {
             "type" : "boolean"
           },
+          "canConfirm" : {
+            "type" : "boolean"
+          },
+          "confirmBlockedReason" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "contractNo" : {
             "type" : "string"
           },
@@ -9287,10 +9572,18 @@
           "generationReason" : {
             "type" : "string"
           },
+          "installmentCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
           "insurerName" : {
             "type" : "string"
           },
           "lineCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxInstallmentNo" : {
             "format" : "int32",
             "type" : "integer"
           },
@@ -9300,6 +9593,10 @@
           },
           "paymentStageLabel" : {
             "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "policyVersionLabel" : {
             "type" : "string"
@@ -9381,6 +9678,12 @@
           "expectedAmount" : {
             "type" : "number"
           },
+          "feeComponentType" : {
+            "type" : "string"
+          },
+          "fixedAmount" : {
+            "type" : "number"
+          },
           "installmentNo" : {
             "format" : "int32",
             "type" : "integer"
@@ -9401,15 +9704,48 @@
           "ruleRef" : {
             "format" : "int64",
             "type" : "integer"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sourceStatusEventId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "SchedulePreviewContext" : {
+        "properties" : {
+          "expectedSourceVersion" : {
+            "type" : "string"
+          },
+          "policy" : {
+            "$ref" : "#/components/schemas/FeeRegimeSchedulePolicy"
           }
         },
         "type" : "object"
       },
       "ScheduleRegenRequest" : {
         "properties" : {
+          "expectedSourceVersion" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
           "reason" : {
             "maxLength" : 40,
             "minLength" : 0,
+            "type" : "string"
+          },
+          "regime" : {
+            "enum" : [ "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029" ],
             "type" : "string"
           }
         },
@@ -12171,11 +12507,36 @@
         }, {
           "in" : "query",
           "name" : "reason",
-          "required" : true,
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "paymentStage",
+          "required" : false,
+          "schema" : {
+            "default" : "GA_TO_FC",
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
           "schema" : {
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ScheduleRegenRequest"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -13671,6 +14032,13 @@
           "schema" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "requestBody" : {

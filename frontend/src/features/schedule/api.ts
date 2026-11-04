@@ -1,4 +1,4 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import { queryOptions } from '@tanstack/react-query'
 import { apiClient } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
 import { PAYMENT_STAGE, SCHEDULE_PURPOSE, SCHEDULE_REGIME, SCHEDULE_STATUS } from './labels'
@@ -53,7 +53,11 @@ export function criteriaFromParams(params: URLSearchParams): ScheduleCriteria {
     contractNo: params.get('contractNo')?.trim() ?? '',
     stage: allowed(PAYMENT_STAGE, params.get('stage'), ''),
     regime: allowed(SCHEDULE_REGIME, params.get('regime'), ''),
-    purpose: allowed(SCHEDULE_PURPOSE, params.get('purpose'), DEFAULT_PURPOSE),
+    purpose: allowed(
+      SCHEDULE_PURPOSE,
+      params.get('purpose'),
+      ['FOUR_YEAR_2027', 'SEVEN_YEAR_2029'].includes(params.get('regime') ?? '') ? 'SIMULATION' : DEFAULT_PURPOSE,
+    ),
     status: allowed(SCHEDULE_STATUS, params.get('status'), ''),
     page: positivePage(params.get('page')),
     sort: formatSort(parseSort(params.get('sort'), SCHEDULE_SORT_KEYS)),
@@ -93,7 +97,8 @@ export const scheduleListQuery = ({ page, ...filters }: ScheduleCriteria) =>
       return get<SchedulePage>(`/api/v1/schedules?${query}`, signal)
     },
     // 페이지를 넘길 때 표가 비었다가 다시 차지 않게 이전 결과를 유지한다.
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) =>
+      JSON.stringify(query?.queryKey[2]) === JSON.stringify(filters) ? previous : undefined,
     meta: { errorToast: false },
   })
 
@@ -140,3 +145,32 @@ export const listCsvPath = (filters: ScheduleFilters) => {
   return `/api/v1/schedules/export.csv${query ? `?${query}` : ''}`
 }
 export const detailCsvPath = (id: string) => schedulePath(id, '/export.csv')
+
+export type PreviewContext = Schemas['SchedulePreviewContext']
+export async function generatePreview(
+  contractId: string,
+  stage: PaymentStage,
+  body: Schemas['ScheduleRegenRequest'],
+  key: string,
+  scheduleId?: string,
+) {
+  if (scheduleId) {
+    const { data } = await apiClient.request<ScheduleRegenResult>(schedulePath(scheduleId, '/regenerate'), {
+      method: 'POST',
+      body,
+      idempotencyKey: key,
+    })
+    if (!Number.isSafeInteger(data?.scheduleHeaderId) || Number(data?.scheduleHeaderId) <= 0) throw new Error('생성 결과를 확인할 수 없습니다.')
+    return data!.scheduleHeaderId!
+  }
+  const { data } = await apiClient.request<number[]>(
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/schedules/regenerate?paymentStage=${stage}`,
+    {
+      method: 'POST',
+      body,
+      idempotencyKey: key,
+    },
+  )
+  if (!Array.isArray(data) || data.length !== 1 || !Number.isSafeInteger(data[0]) || data[0] <= 0) throw new Error('생성 결과를 확인할 수 없습니다.')
+  return data[0]
+}
