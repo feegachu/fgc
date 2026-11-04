@@ -20,6 +20,10 @@ export const contractErrorText = (error: Error, fallback?: string) =>
     ? internalErrorText(error.requestId)
     : errorText(error, fallback)
 
+/** IF-API-64 역할(인터페이스정의서 §4-4-8). 서버가 다시 검사하므로 화면은 버튼만 가린다. */
+export const canPreviewStatusEvent = (roleCode?: string) =>
+  ['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(roleCode ?? '')
+
 export type StatusSort = 'effectiveAt' | 'receivedAt'
 /** 유효한 일시 오름차순 → 사건 순번. 잘못된 일시는 끝에 둔다. 원본 캐시는 정렬하지 않는다. */
 export function sortStatusEvents(events: ContractStatusEvent[], sort: StatusSort) {
@@ -31,3 +35,12 @@ export function sortStatusEvents(events: ContractStatusEvent[], sort: StatusSort
     return (left.eventSeq ?? 0) - (right.eventSeq ?? 0)
   })
 }
+
+/** 후속 작업은 worker가 10초마다 처리하므로 같은 주기로 다시 조회한다. */
+export const FOLLOW_UP_REFETCH_MS = 10_000
+export const hasExhaustedFollowUp = (events?: ContractStatusEvent[]) =>
+  Boolean(events?.some((event) => event.followUp?.status === 'EXHAUSTED'))
+/** 소진된 작업이 있으면 같은 계약의 뒤 사건도 멈추므로 다시 조회해도 바뀌지 않는다. */
+export const followUpRunning = (events?: ContractStatusEvent[]) =>
+  !hasExhaustedFollowUp(events) &&
+  Boolean(events?.some((event) => ['PENDING', 'PROCESSING', 'FAILED'].includes(event.followUp?.status ?? '')))
