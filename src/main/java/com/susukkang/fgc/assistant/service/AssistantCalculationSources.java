@@ -53,8 +53,12 @@ public class AssistantCalculationSources {
             scopeAccess.requireContract(detail.contractId());
             var amounts=new LinkedHashMap<String,String>();
             amounts.put(EXPECTED_AMOUNT,won(detail.expectedTotalAmount()));amounts.put("actualAmount",won(detail.actualTotalAmount()));amounts.put("differenceAmount",won(detail.differenceAmount()));
-            String status=amounts.values().stream().anyMatch(Objects::isNull)?"INSUFFICIENT_DATA":CALCULATED;
-            return result(request,status,ACTUAL,Map.of(RECONCILIATION_RESULT_ID,scope.reconciliationResultId()),amounts,List.of(),List.of(),new PaymentCalculationSnapshot.Source("reconciliation:"+scope.reconciliationResultId(),"RECONCILIATION","저장된 대사 결과",str(detail.createdAt()),scope.reconciliationResultId()),null,false);
+            String status=REVIEW_REQUIRED.equals(detail.resultType())?REVIEW_REQUIRED:
+                    amounts.values().stream().anyMatch(Objects::isNull)?"INSUFFICIENT_DATA":CALCULATED;
+            var resolved=new LinkedHashMap<String,String>();
+            resolved.put(RECONCILIATION_RESULT_ID,scope.reconciliationResultId());
+            resolved.put("resultType",detail.resultType());
+            return result(request,status,ACTUAL,resolved,amounts,List.of(),List.of(),new PaymentCalculationSnapshot.Source("reconciliation:"+scope.reconciliationResultId(),"RECONCILIATION","저장된 대사 결과",str(detail.createdAt()),scope.reconciliationResultId()),null,false);
     }
     private PaymentCalculationSnapshot cap(PaymentCalculationRequest request,PaymentCalculationRequest.Scope scope,long contract) {
             if(scope.asOfDate()==null) return missing(request,"asOfDate");
