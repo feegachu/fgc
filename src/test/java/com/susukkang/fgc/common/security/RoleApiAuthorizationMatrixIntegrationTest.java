@@ -280,6 +280,11 @@ class RoleApiAuthorizationMatrixIntegrationTest {
             MockHttpServletResponse response = result.andReturn().getResponse();
             assertThat(response.getStatus()).as(row + " / " + actor).isNotEqualTo(401).isLessThan(500);
             assertThat(response.getContentAsString()).as(row + " / " + actor).doesNotContain("FGC-AUTH-003");
+            // 허용된 역할의 403 은 회귀다. 예외는 AGENT 의 본인 범위 검사(FGC-AUTH-005)뿐이다.
+            if (response.getStatus() == 403) {
+                assertThat(actor).as(row + " / " + actor).isEqualTo(Actor.AGENT);
+                assertThat(response.getContentAsString()).as(row + " / " + actor).contains("FGC-AUTH-005");
+            }
         } else {
             result.andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
         }

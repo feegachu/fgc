@@ -49,6 +49,32 @@ class ZapTargetGuard(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stderr)
         self.assertFalse(docker_called)
 
+    def run_up(self, failing_call):
+        """docker 호출을 기록하고 failing_call 로 시작하는 호출만 실패시킨다."""
+        with tempfile.TemporaryDirectory() as stub_dir:
+            calls = pathlib.Path(stub_dir) / "calls"
+            stub = pathlib.Path(stub_dir) / "docker"
+            stub.write_text(
+                f"#!/bin/sh\necho \"$*\" >> '{calls.as_posix()}'\n"
+                f"case \"$*\" in {failing_call}*) exit 1;; esac\n", encoding="utf-8")
+            stub.chmod(0o755)
+            env = {**os.environ, "API_IMAGE": "api", "WEB_IMAGE": "web",
+                   "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}"}
+            result = subprocess.run([BASH, str(SCRIPT), "up"], env=env, capture_output=True,
+                                    text=True, encoding="utf-8", stdin=subprocess.DEVNULL, timeout=60)
+            return result, calls.read_text(encoding="utf-8")
+
+    def test_up_removes_what_it_made_when_a_container_fails_to_start(self):
+        result, calls = self.run_up("run")
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn("rm -fv fgc-zap-web", calls)
+        self.assertIn("network rm", calls)
+
+    def test_up_leaves_a_running_stack_alone_when_the_network_already_exists(self):
+        result, calls = self.run_up("network create")
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("rm -fv", calls)
+
 
 if __name__ == "__main__":
     unittest.main()

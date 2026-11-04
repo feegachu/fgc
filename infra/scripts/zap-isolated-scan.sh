@@ -42,6 +42,8 @@ up() {
     db_password=$(openssl rand -hex 16)
     jwt_secret=$(openssl rand -hex 32)
     docker network create "$network" >/dev/null
+    # 뜨다 실패하면 남은 자원을 지운다. 네트워크를 만든 뒤에 걸어 이미 떠 있는 스택을 지우지 않는다.
+    trap down ERR
     docker run -d --name fgc-zap-db --network "$network" --memory=512m \
         -e POSTGRES_DB=fgc -e POSTGRES_USER=fgc -e "POSTGRES_PASSWORD=$db_password" postgres:17-alpine >/dev/null
     for _ in $(seq 1 30); do
@@ -63,6 +65,7 @@ up() {
     for _ in $(seq 1 90); do
         # 미인증 401 이 API 까지 연결됐다는 뜻이다. 뜨는 중에는 nginx 가 502 를 준다.
         if [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$target/api/v1/auth/me" || true)" == 401 ]]; then
+            trap - ERR
             echo "준비됨: $target"
             return 0
         fi
@@ -100,10 +103,12 @@ scan() {
     fi
     # API scan 은 문서의 servers 주소로 공격 요청을 보낸다. 문서가 무엇을 적든 대상에 고정한다.
     [[ "$name" == zap-api-scan ]] && set -- "$@" -O "$zap_url"
+    trap "chmod go-rwx '$out'; exit 130" INT TERM # 중단돼도 보고서 폴더를 열어 두지 않는다
     chmod a+rwx "$out" # 컨테이너의 zap 사용자가 보고서를 쓰는 동안만 연다
     docker run --rm ${zap_network[@]+"${zap_network[@]}"} --memory=1500m -v "$out:/zap/wrk:rw" \
         -e "ZAP_AUTH_HEADER_VALUE=${ZAP_AUTH_HEADER_VALUE:-}" "$zap_image" \
         "$name.py" -t "$zap_url${SCAN_PATH:-}" -I -J "$name.json" -r "$name.html" "$@" || status=$?
+    trap - INT TERM
     chmod go-rwx "$out"
     summarize "$name"
     return "$status"

@@ -25,7 +25,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 코드 기준 | develop `dd1ba27b` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
+| 코드 기준 | develop `df13a4f2` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
 | 이미지 기준 | 게시 이미지 `sha-69f77eff` (api `sha256:beaf2532…`, web `sha256:1cef1ee3…`). 이 PR의 조치 전 상태다. 그 뒤 develop의 #773(화면), #831(지급 보류, V79), #835(지급 재개, 상태 미리보기)는 이미지에 없고 의존성, `Containerfile`, nginx 변경은 없다 |
 | RC | `r2.0.0-rc1` 미발행. 미확인 |
 | 시험 환경 | Testcontainers PostgreSQL 17, Windows 11 로컬 / GitHub Actions |
@@ -36,7 +36,7 @@
 
 | # | 층 | 도구, 버전 | 대상 | 범위 | 발견 | 조치, 판정 | 상태 |
 |---|---|---|---|---|---|---|---|
-| 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `747bc68d` | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
+| 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `df13a4f2`(2026-11-04 분석, RC에서 다시 확인) | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
 | 2 | 의존성, 이미지 | Dependabot, npm audit, Trivy 0.70.0 | 4-2 | 운영 jar, 빌드 classpath, npm, API/WEB 이미지 | Critical 2, High 10 | High 10 조치(jackson 5, zod 1, pebble 4). Critical 2는 예외(4-2, 7절) | 병합 뒤 재확인 |
 | 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조. 그 뒤 develop과 이 PR 커밋 20개는 같은 도구로 추가 1회, 0건 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
 | 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 40개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
@@ -65,7 +65,7 @@
 |---|---|---|---|---|
 | 17, 19, 20 | jackson-databind | High | 운영 jar는 이미 2.21.7. 경고는 **Boot Gradle 플러그인의 빌드 전용 classpath**(2.21.4)에서 온다 | 이 PR에서 올림(`build.gradle` buildscript). 병합 뒤 dependency-submission이 새 그래프를 내면 닫히는지 확인 |
 | 21, 22 | jackson-core | High | 같음 | 같음 |
-| 26 | spring-webmvc 6.2.19 | Critical(GitHub CVSS 9.8, Trivy) / 낮음(Spring 공지 벡터 `AC:H/PR:L/UI:R`, 영향 `I:L`) | **운영 jar에 포함.** Boot 3.5.16(3.5 최신)이 쓰는 6.2.19가 Maven Central 마지막 판이고, Spring 공지(spring.io/security/cve-2026-47890) 기준 6.2.20은 Enterprise 전용, OSS 수정본은 7.0.9(Boot 4) | **승인 예외 후보.** 발동 조건인 SSE 뷰 프래그먼트 전송이 없다: `SseEmitter`, `FragmentsRendering`, `text/event-stream`, `ServerSentEvent`, `ResponseBodyEmitter`, webflux 0건(`src/main`, `build.gradle`). `.trivyignore`에 같은 CVE 예외가 있다(기재: HyunJuneKang 2026-10-11, PR #460 리뷰 승인 yslee4601, 만료 2026-11-30). Dependabot 경고 자체의 해제는 **PM 승인 대기** |
+| 26 | spring-webmvc 6.2.19 | Critical(GitHub CVSS 9.8, Trivy) / 낮음(Spring 공지 벡터 `AC:H/PR:L/UI:R`, 영향 `I:L`) | **운영 jar에 포함.** Boot 3.5.16(3.5 최신)이 쓰는 6.2.19가 Maven Central 마지막 판이고, Spring 공지(spring.io/security/cve-2026-47890) 기준 6.2.20은 Enterprise 전용, OSS 수정본은 7.0.9(Boot 4) | **승인 예외.** 발동 조건인 SSE 뷰 프래그먼트 전송이 없다: `SseEmitter`, `FragmentsRendering`, `text/event-stream`, `ServerSentEvent`, `ResponseBodyEmitter`, webflux 0건(`src/main`, `build.gradle`). `.trivyignore`에 같은 CVE 예외가 있다(기재: HyunJuneKang 2026-10-11, PR #460 리뷰 승인 yslee4601, 만료 2026-11-30). Dependabot 경고는 2026-11-04 해제했다(사유 `not_used`, 실행과 승인 yslee4601(PM), [#677 기록](https://github.com/feegachu/fgc/issues/677#issuecomment-6631123278)) |
 
 같은 원인(빌드 classpath)으로 Medium 7건(#1, #2, #4, #15, #16, #18, #27)도 함께 닫힐 것으로 본다. 병합 전에는 `buildEnvironment`로 `classpath`의 jackson 2.21.7, commons-lang3 3.20.0까지만 확인했다. npm 쪽 #30 minimatch(Medium)는 eslint, openapi-typescript 아래 개발 도구이고 수정본이 메이저 변경이라 이번에 올리지 않았다.
 
@@ -116,7 +116,7 @@ GitHub 설정(2026-11-04 `gh api repos/feegachu/fgc`): `secret_scanning` enabled
 
 | API 묶음 (인터페이스정의서 §4-2) | SYSTEM_ADMIN | GA_ADMIN | SETTLEMENT | COMPLIANCE | AGENT | 미인증 |
 |---|---|---|---|---|---|---|
-| 계약 IF-18, 19, 19A, 19B, 33 / 지급 IF-22, 23, 23D, 24, 25 / 스케줄 IF-29, 29A / 대사 IF-38, 42 / 검증 실행 IF-45, 48 | 허용 | 403 | 허용 | 403 | 403 | 401 |
+| 계약 IF-18, 19, 19A, 19B, 33 / 지급 IF-22, 23, 23D, 24, 25 / 스케줄 IF-29, 29A / 대사 IF-38, 42 / 검증 실행 IF-45, 48, 82 | 허용 | 403 | 허용 | 403 | 403 | 401 |
 | 검증 확정 IF-51 | 허용 | 허용 | 403 | 403 | 403 | 401 |
 | 원장 정정 IF-36, 36A / 예외 처리 IF-44, 44A / 환수 IF-85, 73 / 계약 상태 미리보기 IF-64 | 허용 | 허용 | 허용 | 403 | 403 | 401 |
 | 정책 작성 IF-79, 80, 81, IF-75 SUBMIT | 허용 | 허용 | 허용 | 403 | 403 | 401 |
@@ -154,7 +154,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 | CSV 수식 | 기존 `CsvExportWriterTest` | 수식 시작 문자 무력화 |
 | CSRF | 기존 `tokenEndpointsRejectMissingClientHeaderOrForeignOrigin`, `originCheckFollowsHttpsBehindTlsTerminatingProxy` | Refresh 쿠키 경로는 Origin, X-FGC-Client가 맞지 않으면 거부. 나머지 API는 쿠키로 인증하지 않아 해당 없음(CodeQL #2 참고) |
 
-**요구사항 해석:** 자유 입력 칸의 `<script>` 문자열은 입력에서 막지 않고 글자 그대로 보관한다. 세부내용("출력 이스케이프와 허용목록")과 OWASP XSS Prevention Cheat Sheet(SRC-028, 출력 인코딩이 1차 방어)에 맞춘 판단이다. "저장·실행되지 않는다"를 "저장되어 실행되는 일이 없다"로 읽는다. **확정 (2026-11-04, PM 위임 판단).** 이유: 처리규칙이 출력 이스케이프를 수단으로 명시하고, 위 시험에서 저장 후 실행 경로와 HTML 해석 경로가 0건이며, 입력에서 막으면 `A<B` 같은 정상 입력까지 거절한다. 업무 규칙이 아니라 구현 기술 판단이다. 다시 열 조건: SRC-006 원문 확보(지금은 근거대장에 누락) 또는 저장 자체를 막으라는 요구.
+**요구사항 해석:** 자유 입력 칸의 `<script>` 문자열은 입력에서 막지 않고 글자 그대로 보관한다. 세부내용("출력 이스케이프와 허용목록")과 OWASP XSS Prevention Cheat Sheet(SRC-028, 출력 인코딩이 1차 방어)에 맞춘 판단이다. "저장·실행되지 않는다"를 "저장되어 실행되는 일이 없다"로 읽는다. **확정 (2026-11-04, PM 결정, [#677 기록](https://github.com/feegachu/fgc/issues/677#issuecomment-6631123278)).** 이유: 처리규칙이 출력 이스케이프를 수단으로 명시하고, 위 시험에서 저장 후 실행 경로와 HTML 해석 경로가 0건이며, 입력에서 막으면 `A<B` 같은 정상 입력까지 거절한다. 업무 규칙이 아니라 구현 기술 판단이다. 다시 열 조건: SRC-006 원문 확보(지금은 근거대장에 누락) 또는 저장 자체를 막으라는 요구.
 
 ### 4-6. 동적 스캔
 
@@ -183,7 +183,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 
 ### 4-7. CSP, 보안 헤더
 
-적용 위치: `nginx/security-headers.conf`, `nginx/default.conf.template`(#782). web 이미지에 들어가며 `infra/scripts/deploy-host.sh`, `infra/shinhan/nginx-guard.conf`에는 HSTS 값 외에 별도 설정이 없다. 그래서 두 파일을 grep 해서는 나오지 않는다.
+적용 위치: `nginx/security-headers.conf`, `nginx/default.conf.template`(#782). web 이미지에 들어가며 `infra/scripts/deploy-host.sh`, `infra/shinhan/nginx-guard.conf`에는 HSTS 값 외에 별도 보안 헤더 설정이 없다(`nginx-guard.conf`의 로그인 시도 제한은 #870). 그래서 두 파일을 grep 해서는 나오지 않는다.
 
 게시 이미지 `ghcr.io/feegachu/fgc/web:sha-185dc854`(`sha256:58978f38…`)를 격리 포트로 띄워 응답 헤더를 받았다. 신한 구성은 `deploy-shinhan.sh`와 같은 방식으로 이미지에서 템플릿을 꺼내 `adapt_nginx`를 거치고 `nginx-guard.conf`를 붙였다. `sha-69f77eff` 격리 스택의 `/login`에서도 같은 헤더를 받았다.
 
@@ -245,5 +245,5 @@ API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)
 
 | 대상 | 내용 | 승인자 | 만료 |
 |---|---|---|---|
-| CVE-2026-47890 (Dependabot #26, `.trivyignore`) | SSE 뷰 프래그먼트 미사용, OSS 6.2 수정본 없음 | `.trivyignore`: HyunJuneKang 기재, PR #460 리뷰 승인 yslee4601. Dependabot 해제: yslee4601, 2026-11-04(사유 `not_used`) | 2026-11-30 |
+| CVE-2026-47890 (Dependabot #26, `.trivyignore`) | SSE 뷰 프래그먼트 미사용, OSS 6.2 수정본 없음 | `.trivyignore`: HyunJuneKang 기재, PR #460 리뷰 승인 yslee4601. Dependabot 해제: yslee4601(PM), 2026-11-04(사유 `not_used`, [#677 기록](https://github.com/feegachu/fgc/issues/677#issuecomment-6631123278)) | 2026-11-30 |
 | CVE-2026-47884 (`.trivyignore`) | `XsltView`, xslt 미사용 (`src/main` 0건 재확인) | `.trivyignore`: HyunJuneKang 기재, PR #458 리뷰 승인 yslee4601 | 2026-11-30 |
