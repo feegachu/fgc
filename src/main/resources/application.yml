@@ -41,7 +41,8 @@ springdoc:
 fgc:
   demo-month: 2026-07
   # 상품 비교 순위 산식(FUN-079 D-01, PROJECT_ASSUMPTION)을 켜는 스위치. 값이 구현 버전 compare-net-v1 과 같을 때만
-  # 순위를 만들고, 비어 있거나 다르면 RULE_NOT_CONFIGURED 다. 시연 Pod(podman/fgc-app-*.yaml)만 켜고 신한 prd 는 비워 둔다.
+  # 순위를 만들고, 비어 있거나 다르면 RULE_NOT_CONFIGURED 다. 시연 Pod(podman/fgc-app-*.yaml)와 신한 서버(infra/shinhan/compose.yaml,
+  # 2026-11-18 최종 시연, SRC-076)에서 켠다.
   # clawback-month 는 환수 노출액을 가정한 해지 차월(n차월, 경과 n−1개월)이다.
   compare:
     rule-version: ${FGC_COMPARE_RULE_VERSION:}
@@ -60,7 +61,7 @@ fgc:
     api-key: ${OPENAI_API_KEY:${SPRING_AI_OPENAI_API_KEY:}}
     base-url: https://api.openai.com/v1
     model: gpt-4o-mini           # 주최 측 제공 키(SRC-060). 모델 교체는 이 값만 바꾼다
-    timeout: 30s
+    timeout: 20s                 # 피코는 질문 하나에 최대 두 번 부른다. 두 번 다 느려도 웹 프록시 제한(60초) 안에 끝나고, 시간 초과 한 번이 AI 전체를 cooldown 시키니 너무 짧게 두지 않는다
     max-input-chars: 20000       # 요청당 입력 상한 — 예산 10달러(SRC-060) 보호. 팀 운영 정책
     max-output-tokens: 1024
     cooldown: 10m                # 시간 초과·401·403·404·429 뒤 AI 를 끄는 시간 — 재시도 폭주 방지. 팀 운영 정책

@@ -30,6 +30,10 @@ public final class Roles {
     public static final String CAN_VIEW_PUBLIC_PRODUCTS = HAS_ANY_ROLE + SYSTEM_ADMIN + "','" + GA_ADMIN
             + "','" + SETTLEMENT + "','" + COMPLIANCE + "','" + AGENT + "')";
 
+    /** FUN-077 상태 사건 영향 미리보기(IF-API-64). 인터페이스정의서 §4-4-8의 역할 표. 저장은 CAN_PROCESS 인 IF-API-19 로만 한다. */
+    public static final String CAN_PREVIEW_STATUS_EVENT =
+            HAS_ANY_ROLE + SETTLEMENT + "','" + GA_ADMIN + "','" + SYSTEM_ADMIN + "')";
+
     /** 계약·지급·스케줄·검증실행 생성 등 "처리" 화면 공통 역할. 화면정의서 v2.0 §4-1/각 화면 권한 줄. */
     public static final String CAN_PROCESS =
             HAS_ANY_ROLE + SETTLEMENT + "','" + SYSTEM_ADMIN + "')";
