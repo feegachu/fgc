@@ -3,71 +3,42 @@
   font-family: inherit;
   color: var(--color-text-primary);
 }
+/* 앱 머리(기준 정산월 옆)의 진입 버튼. 본문 위에 떠서 표나 안내를 가리지 않는다(SRC-068). 크기와 선은 기준 정산월 버튼과 같다. */
 .pico-launcher {
-  position: fixed;
-  right: 28px;
-  bottom: 26px;
-  z-index: calc(var(--z-overlay) - 1);
-}
-/* #808 review · design :131 — the last business buttons must scroll clear of the fixed launcher. */
-.app-shell:has(.pico-assistant-root) .page-content {
-  padding-bottom: calc(var(--space-8) + 120px);
-}
-/* Adopt the agent-home AI launcher treatment without coupling page styles. */
-@property --pico-launcher-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-@keyframes pico-launcher-border-spin {
-  to { --pico-launcher-angle: 360deg; }
-}
-.pico-launcher-hint {
-  /* The decorative label may extend over business controls; only the mascot button captures clicks. */
-  pointer-events: none;
-  position: absolute;
-  right: 136px;
-  bottom: 46px;
-  padding: 7px 11px;
-  border: 1.5px solid transparent;
-  border-radius: 16px;
-  background: linear-gradient(#fff, #fff) padding-box,
-    conic-gradient(from var(--pico-launcher-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box;
-  animation: pico-launcher-border-spin 3.4s linear infinite;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
-  font-size: 12px;
-  font-weight: 600;
-  color: #382450;
-  white-space: nowrap;
+  display: flex;
 }
 .pico-launcher-button {
-  display: grid;
-  place-items: center;
-  position: relative;
-  width: 132px;
-  height: 132px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  display: inline-flex;
+  height: var(--control-height-sm);
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 0.625rem 0 0.375rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-6);
+  color: var(--color-steel-700);
+  background: var(--color-bg-surface);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  white-space: nowrap;
   cursor: pointer;
-  border-radius: 50%;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.pico-launcher-button:hover {
+  border-color: var(--color-border-strong);
+}
+.pico-launcher-button:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
 .pico-launcher-button img {
   display: block;
-  width: 128px;
-  height: 128px;
-  max-width: none;
+  width: 1.5rem;
+  height: 1.5rem;
   object-fit: contain;
-  filter: drop-shadow(0 6px 10px rgb(15 23 42 / 22%));
-  animation: pico-assistant-float 3.2s ease-in-out infinite;
 }
-.pico-launcher-button:hover img,
-.pico-launcher-button:focus-visible img {
-  animation-play-state: paused;
-}
-.pico-launcher-button:focus-visible .pico-launcher-hint {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 3px;
+.pico-launcher-hint {
+  font-weight: 500;
 }
 .pico-assistant-root button:focus-visible,
 .pico-assistant-root select:focus-visible,
@@ -105,7 +76,7 @@
   flex-shrink: 0;
   background: #edf5fa;
   border: 1px solid #e1edf4;
-  border-radius: 12px;
+  border-radius: var(--radius-12);
 }
 .pico-avatar img {
   width: 49px;
@@ -121,14 +92,14 @@
   line-height: 1.5;
 }
 .pico-panel-header h2 span {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 450;
   color: var(--color-text-tertiary);
   letter-spacing: 0;
   margin-left: 5px;
 }
 .pico-panel-header p {
-  font-size: 9px;
+  font-size: 12px;
   color: #7a90a5;
   margin: 2px 0 0;
 }
@@ -139,7 +110,7 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   background: transparent;
   color: #72899d;
   cursor: pointer;
@@ -166,7 +137,7 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   cursor: pointer;
 }
@@ -191,7 +162,7 @@
   margin: -8px 0 6px -12px;
 }
 .pico-welcome h3 {
-  font-size: 25px;
+  font-size: 28px;
   line-height: 1.45;
   font-weight: 700;
   letter-spacing: -1.1px;
@@ -199,7 +170,7 @@
   margin: 8px 0 11px;
 }
 .pico-welcome > p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.85;
   color: #718398;
   margin: 0;
@@ -218,7 +189,7 @@
   text-align: left;
   border: 1px solid var(--color-border-default);
   background: var(--color-bg-surface);
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   cursor: pointer;
 }
 .pico-suggestions button:hover {
@@ -231,7 +202,7 @@
   width: 31px;
   height: 31px;
   flex-shrink: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-8);
   color: var(--color-steel-500);
   background: #f0f6fa;
 }
@@ -239,14 +210,14 @@
   font-size: 18px;
 }
 .pico-suggestions button > span:not(.pico-suggestion-icon):not(.material-symbols-rounded) {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.7;
 }
 .pico-suggestions small {
   display: block;
   color: #7b8da1;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   margin-top: 2px;
 }
@@ -259,7 +230,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 12px;
   color: #7b8da1;
 }
 .pico-welcome-foot .material-symbols-rounded {
@@ -269,7 +240,7 @@
   padding: 11px 13px;
   margin: 20px 0 18px 36px;
   border: 1px solid #dce8f4;
-  border-radius: 11px 11px 3px 11px;
+  border-radius: var(--radius-16) var(--radius-16) 6px var(--radius-16);
   background: #edf4fb;
   color: #23435f;
   font-size: 12px;
@@ -284,7 +255,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-steel-700);
   margin-bottom: 9px;
 }
@@ -295,7 +266,7 @@
   margin: -4px;
 }
 .pico-answer-author span {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   margin-left: 3px;
 }
@@ -313,9 +284,9 @@
   background: #f3f7fa;
   border: 1px solid #e8eff5;
   padding: 7px 8px;
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   color: var(--color-steel-500);
-  font-size: 9px;
+  font-size: 12px;
   margin: 13px 0 12px;
 }
 .pico-source .material-symbols-rounded {
@@ -332,8 +303,8 @@
   border: 1px solid var(--color-action-primary);
   width: 100%;
   height: 36px;
-  border-radius: 6px;
-  font-size: 11px;
+  border-radius: var(--radius-8);
+  font-size: 12px;
   cursor: pointer;
 }
 .pico-primary:disabled {
@@ -348,7 +319,7 @@
 .pico-calculation {
   padding: 12px;
   border: 1px solid #dce8f4;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   background: #f8fbff;
   margin: 12px 0;
 }
@@ -356,7 +327,7 @@
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--color-steel-700);
 }
 .pico-calculation-heading strong {
@@ -371,7 +342,7 @@
   gap: 10px;
   padding: 6px 0;
   border-bottom: 1px solid #e6eef6;
-  font-size: 11px;
+  font-size: 12px;
 }
 .pico-calculation dt {
   color: var(--color-text-tertiary);
@@ -385,7 +356,7 @@
 .pico-calculation p,
 .pico-calculation small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
   color: var(--color-text-tertiary);
   margin: 7px 0;
@@ -395,20 +366,20 @@
   padding: 12px;
   background: #f7faff;
   border: 1px solid #dfe8f2;
-  border-radius: 7px;
-  font-size: 11px;
+  border-radius: var(--radius-8);
+  font-size: 12px;
   line-height: 1.9;
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 .pico-answer > .pico-stale,
 .pico-stale {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-status-warning-text);
   line-height: 1.7;
 }
 .pico-answer > .pico-clarification {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
 }
 .pico-plan > img {
@@ -419,12 +390,12 @@
 }
 .pico-plan h3 {
   margin: 8px 0;
-  font-size: 15px;
+  font-size: 16px;
   color: #274c6b;
   line-height: 1.6;
 }
 .pico-plan > p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   line-height: 1.9;
 }
@@ -438,11 +409,11 @@
   font-size: 12px;
 }
 .pico-plan li b {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .pico-plan li p {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   line-height: 1.8;
   margin: 7px 0 0;
@@ -453,7 +424,7 @@
   border-top: 1px solid var(--color-border-default);
 }
 .pico-demo-picker {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   margin-bottom: 9px;
 }
@@ -471,9 +442,9 @@
   width: 100%;
   height: 32px;
   border: 1px solid var(--color-border-default);
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   background: var(--color-bg-surface);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 5px;
   padding: 0 6px;
 }
@@ -481,15 +452,15 @@
   width: 100%;
   padding: 7px;
   border: 1px solid var(--color-border-default);
-  border-radius: 5px;
+  border-radius: var(--radius-8);
   background: var(--color-bg-surface);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-steel-700);
   cursor: pointer;
 }
 .pico-context {
   margin: 0 0 6px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--color-steel-700);
   overflow-wrap: anywhere;
@@ -504,7 +475,7 @@
   min-height: 0;
   resize: none;
   border: 1px solid #d7e1ed;
-  border-radius: 9px;
+  border-radius: var(--radius-8);
   padding: 12px 43px 10px 12px;
   font: inherit;
   font-size: 12px;
@@ -528,7 +499,7 @@
   height: 27px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-8);
   background: var(--color-steel-500);
   color: white;
   cursor: pointer;
@@ -544,19 +515,10 @@
 .pico-compose-region > small {
   display: block;
   text-align: center;
-  font-size: 8px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   margin-top: 7px;
   line-height: 1.8;
-}
-@keyframes pico-assistant-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-2deg);
-  }
-  50% {
-    transform: translateY(-11px) rotate(2deg);
-  }
 }
 @keyframes pico-assistant-enter {
   from {
@@ -569,26 +531,6 @@
   }
 }
 @media (max-width: 760px) {
-  .pico-launcher {
-    right: 16px;
-    bottom: 78px;
-  }
-  .app-shell:has(.pico-assistant-root) .page-content {
-    padding-bottom: calc(var(--space-8) + 160px);
-  }
-  .pico-launcher-button {
-    width: 104px;
-    height: 104px;
-  }
-  .pico-launcher-button img {
-    width: 100px;
-    height: 100px;
-  }
-  .pico-launcher-hint {
-    right: 108px;
-    bottom: 34px;
-    font-size: 11px;
-  }
   .pico-panel-header {
     padding: 14px 17px 12px;
   }
@@ -597,9 +539,6 @@
     height: 100px;
     margin-top: -8px;
     margin-bottom: 4px;
-  }
-  .pico-welcome h3 {
-    font-size: 23px;
   }
   .pico-suggestions {
     margin-top: 18px;
@@ -615,5 +554,10 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+@media (max-width: 47.9375rem) {
+  .pico-launcher-hint {
+    display: none;
   }
 }

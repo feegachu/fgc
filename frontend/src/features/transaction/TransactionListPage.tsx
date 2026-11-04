@@ -127,7 +127,7 @@ export default function TransactionListPage() {
     },
     {
       key: 'key',
-      label: '업무키',
+      label: '지급 관리번호',
       sortable: true,
       width: '10rem',
       cellClassName: 'transaction-mono',
@@ -340,7 +340,7 @@ export default function TransactionListPage() {
           className="transaction-list-table"
           viewportClassName="transaction-table-viewport"
           bodyId="list-body"
-          caption="검색 조건에 해당하는 수수료 지급 건"
+          caption="조회 조건에 해당하는 수수료 지급 건"
           columns={columns}
           {...sortBinding(filters.sort, TRANSACTION_SORT_KEYS, (sort) => apply({ ...filters, sort, page: 1 }))}
           rows={rows}
@@ -363,7 +363,7 @@ export default function TransactionListPage() {
                   ? listError(search.error)
                   : search.isPending
                     ? '수수료 지급 건을 불러오는 중입니다.'
-                    : '검색 조건을 바꾸어 다시 조회하세요.'}
+                    : '조건을 바꾸어 다시 조회하세요.'}
               </span>
               {search.isError && (
                 <Button data-guide-feature="features.transaction.transaction-list-page.button-6" variant="secondary" onClick={() => void search.refetch()}>
@@ -374,7 +374,7 @@ export default function TransactionListPage() {
           }
           footer={
             <tr>
-              <td colSpan={6}>금액 절대값 합계</td>
+              <td colSpan={6}>금액 합계</td>
               <td className="is-number">
                 <span id="sum-amount" className={`tabular-nums ${isNegative(sum) ? 'is-negative-amount' : ''}`}>
                   {won(sum)}
@@ -418,7 +418,7 @@ function TransactionFilters({
   const options = (values: readonly (readonly [string, string])[], selected: string) => (
     <>
       <option value="">전체</option>
-      {selected && !values.some(([id]) => id === selected) && <option value={selected}>{selected}</option>}
+      {selected && !values.some(([id]) => id === selected) && <option value={selected}>선택한 항목(목록에 없음)</option>}
       {values.map(([id, label]) => (
         <option key={id} value={id}>
           {label}

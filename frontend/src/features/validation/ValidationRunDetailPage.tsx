@@ -29,7 +29,7 @@ import {
 import type { FinalizeChecklist, ValidationRunDetail, ValidationTarget } from './api'
 import { FinalizeDialogs } from './FinalizeDialogs'
 import { RunStatusBadge } from './RunStatusBadge'
-import { MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
+import { failureText, MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
 import { useRestartAttemptDeadline } from './useRestartAttemptDeadline'
 import './validation.css'
 
@@ -201,7 +201,7 @@ function DetailBody({
       <section data-guide-feature="features.validation.validation-run-detail-page.section-2" className="surface" aria-labelledby="vrun-header-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-header-title">
-            실행 <span className="tabular-nums">{header.validationRunId}</span>
+            <span className="tabular-nums">{formatMonth(header.validationMonth)}</span> {header.runNo}회차 실행
           </h2>
           <RunStatusBadge status={status} label={live?.statusLabel ?? header.statusLabel} />
         </header>
@@ -240,7 +240,7 @@ function DetailBody({
           </dl>
           {status === 'FAILED' && (
             <p className="vrun-inline-state is-error" role="alert">
-              {failureMessage}
+              {failureText(failureMessage, currentStep)}
             </p>
           )}
         </div>
@@ -293,12 +293,12 @@ function DetailBody({
             {status === 'FINALIZED'
               ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.'
               : !canProcess
-                ? '실행 기동은 정산 담당자만 할 수 있습니다.'
+                ? '실행은 정산담당자와 시스템관리자만 할 수 있습니다.'
                 : startUnconfirmed
                   ? '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.'
                   : executed && !finished
                     ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
-                    : '생성됨 또는 실패한 월 실행만 기동할 수 있습니다.'}
+                    : '생성됨이나 실패 상태의 월 실행만 실행할 수 있습니다.'}
           </p>
           <p className="vrun-progress-line">
             <span>진행률</span>
@@ -691,7 +691,7 @@ function FinalizeSection({
   const passed = checklist?.passed === true
   const enabled = finalizable && !mutation.isPending
   let reason = ''
-  if (!canFinalize) reason = '확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.'
+  if (!canFinalize) reason = '확정은 GA관리자와 시스템관리자만 할 수 있습니다.'
   else if (status === 'FINALIZED') reason = '이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.'
   else if (!supportedType) reason = '월 전체를 계산한 월간·확정전 실행만 최종 확정할 수 있습니다.'
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
@@ -701,7 +701,7 @@ function FinalizeSection({
       <div className="vrun-finalize-row">
         <div className="vrun-finalize-copy">
           <p className="vrun-finalize-title" id="vrun-finalize-section-title">
-            ⑥ 확정 (FINALIZED)
+            ⑥ 확정
           </p>
           <p className="field-helper vrun-finalize-guide" id="finalize-action-guide">
             위 8개 조건이 모두 통과한 실행만 확정할 수 있습니다.
@@ -709,9 +709,8 @@ function FinalizeSection({
             확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 <strong>잠깁니다</strong>.{' '}
             <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
             <br />
-            <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요. 확정 권한은{' '}
-            <span className="tabular-nums">GA_ADMIN</span>, <span className="tabular-nums">SYSTEM_ADMIN</span> 에게만
-            있습니다.
+            <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요. 확정은 GA관리자와 시스템관리자만 할
+            수 있습니다.
           </p>
           {/* 비활성 사유는 title 이 아니라 가시 텍스트로 전한다 — disabled 버튼은 포커스가 가지 않는다. */}
           <p className="vrun-action-note" id="finalize-action-note" role="status" hidden={!reason}>
@@ -728,7 +727,7 @@ function FinalizeSection({
           <span className="material-symbols-rounded" aria-hidden="true">
             lock
           </span>
-          <span>{status === 'FINALIZED' ? '확정됨' : '확정'}</span>
+          <span>{status === 'FINALIZED' ? '확정(잠김)' : '확정'}</span>
         </Button>
       </div>
       <FinalizeDialogs

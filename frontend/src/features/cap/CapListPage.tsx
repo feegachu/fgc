@@ -194,9 +194,9 @@ export default function CapListPage() {
     },
     {
       key: 'ruleset',
-      label: '룰셋',
+      label: '룰셋 버전',
       width: '6rem',
-      render: (row) => (row.capRuleSetId == null ? '-' : `ID ${row.capRuleSetId}`),
+      render: (row) => (row.capRuleSetId == null ? '-' : `${row.capRuleSetId}번`),
     },
   ]
   return (
@@ -220,14 +220,14 @@ export default function CapListPage() {
               type="button"
               className={`kpi-card cap-react-kpi cap-react-kpi-${code} kpi-card-${({ NORMAL: 'success', WARNING: 'warning', VIOLATION: 'error', REVIEW_REQUIRED: 'review' } as Record<string, string>)[code]}`}
               aria-pressed={criteria.status === code}
-              aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '-'}`}
+              aria-label={`${code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `판정 결과 ${label}`} ${data ? int(data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '-'}`}
               onClick={() => update({ status: criteria.status === code ? '' : code, capCheckId: '' })}
             >
               <KpiCardContent
                 label={label}
                 value={data ? (data.summary?.[summaryKeys[code as keyof typeof summaryKeys]] ?? 0) : '-'}
                 unit="건"
-                footer={code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `저장 판정 ${label}`}
+                footer={code === 'REVIEW_REQUIRED' ? '추가 확인 필요' : `판정 결과 ${label}`}
               />
             </button>
           ))}
@@ -235,7 +235,7 @@ export default function CapListPage() {
       <section data-guide-feature="features.cap.cap-list-page.section" data-guide-target="cap.overview" className="surface cap-react-stage-panel">
         <header className="surface-header">
           <h2 className="surface-title">지급단계별 한도 게이지</h2>
-          <StatusBadge>전체 검색범위 집계</StatusBadge>
+          <StatusBadge>조회 조건 전체 합계</StatusBadge>
         </header>
         <div className="cap-react-stages">
           {data?.stageSummary?.length ? (
@@ -296,7 +296,7 @@ export default function CapListPage() {
               ? '설계사별 모니터링 지표를 불러오는 중입니다.'
               : list.isError
                 ? '설계사별 모니터링 지표를 불러오지 못했습니다.'
-                : '조건에 맞는 GA → 설계사 단계 모니터링 대상이 없습니다.'
+                : '조건에 맞는 GA→설계사 단계 모니터링 대상이 없습니다.'
           }
         />
       </section>
@@ -393,7 +393,7 @@ function CapFilter({
         onReset={onReset}
       >
         <div className="filter-field">
-          <label htmlFor="cap-filter-month">기준월</label>
+          <label htmlFor="cap-filter-month">정산월</label>
           <input data-guide-feature="features.cap.cap-list-page.input" className="field-control" type="month" required {...bind('month')} />
         </div>
         <div className="filter-field">

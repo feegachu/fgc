@@ -105,12 +105,12 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
   const precheck = await successful(prechecked)
   expect(precheck.confirmable).toBe(expectedConfirmable)
   await expect(page.locator('#gate-list .transaction-gate-label')).toHaveText([
-    '1. 작성중(DRAFT) 저장, 통과',
+    '1. 작성중으로 저장, 통과',
     '2. 귀속행 입력, 통과',
-    '3. 귀속합계 = 지급액, 통과',
+    '3. 귀속합계와 지급액 일치, 통과',
     '4. 검토필요 귀속 해소, 통과',
     `5. 1,200% 사전검증, ${expectedConfirmable ? '통과' : '차단'}`,
-    `6. 전부 통과 → 확정, ${expectedConfirmable ? '통과' : '미확인'}`,
+    `6. 모두 통과하면 확정, ${expectedConfirmable ? '통과' : '미확인'}`,
   ])
   await expect(page.locator('#btn-confirm')).toBeEnabled()
   await page.locator('#btn-confirm').click()
@@ -176,7 +176,7 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
     })
   await exceptionRow.getByRole('button', { name: String(exception.exceptionCaseId), exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`selected=${exception.exceptionCaseId}(?:&|$)`))
-  await expect(page.locator('.exception-detail-grid')).toContainText(`COMMISSION_TRANSACTION:${id}`)
+  await expect(page.locator('.exception-detail-grid')).toContainText(`지급 건 ${id}`)
   await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
   await page.getByLabel('처리 사유').fill('418 한도 초과 검토 시작')
   const action = responseFor(page, `/exceptions/${exception.exceptionCaseId}/actions`)

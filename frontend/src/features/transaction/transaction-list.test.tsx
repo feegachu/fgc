@@ -203,7 +203,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     renderAt(
       '/app/transactions?settlementMonth=2026-08&paymentStage=GA_TO_FC&insurerId=8&contractNo=POL-001&sourceType=GA_MANUAL_PAYMENT&agentId=3&commissionItemId=2&status=DRAFT&noAttributionOnly=true&attributionImbalanceOnly=true&page=2',
     )
-    const table = await screen.findByRole('table', { name: '검색 조건에 해당하는 수수료 지급 건' })
+    const table = await screen.findByRole('table', { name: '조회 조건에 해당하는 수수료 지급 건' })
     expect(await within(table).findByText('TRAN-410')).toHaveAttribute('title', 'TRAN-410')
     expect(Object.fromEntries(lastRequest())).toMatchObject({
       settlementMonth: '2026-08',
@@ -233,7 +233,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
   })
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 다음 검색에 유지한다', async () => {
     const { router, actions } = renderAt('/app/transactions?month=2026-07&contractNo=POL-2&page=3')
-    const table = await screen.findByRole('table', { name: '검색 조건에 해당하는 수수료 지급 건' })
+    const table = await screen.findByRole('table', { name: '조회 조건에 해당하는 수수료 지급 건' })
     expect(within(table).queryByRole('button', { name: '상태' })).toBeNull()
     expect(within(table).getByRole('columnheader', { name: /^금액/ })).toHaveAttribute('aria-sort', 'none')
     await actions.click(within(table).getByRole('button', { name: '금액' }))
@@ -344,7 +344,7 @@ describe('TRAN-W01 수수료 지급 목록', () => {
     await actions.click(within(pagination).getByRole('button', { name: '4' }))
     await screen.findByText('4 / 7 페이지')
     expect(lastRequest().get('settlementMonth')).toBe('2026-10')
-    const table = screen.getByRole('table', { name: '검색 조건에 해당하는 수수료 지급 건' })
+    const table = screen.getByRole('table', { name: '조회 조건에 해당하는 수수료 지급 건' })
     await actions.click(within(table).getByRole('button', { name: '금액' }))
     await waitFor(() => expect(lastRequest().get('sort')).toBe('amount,asc'))
     expect(lastRequest().get('settlementMonth')).toBe('2026-10')

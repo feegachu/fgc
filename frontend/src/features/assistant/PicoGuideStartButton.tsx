@@ -39,9 +39,9 @@ export function PicoGuideStartButton({
   const unavailable =
     settlementActive ? '전체 업무 가이드를 닫은 뒤 지급 안내를 시작해주세요.' :
     !canProcess && definition.capability === 'PROCESS'
-      ? '현재 계정은 조회 안내만 사용할 수 있습니다. 지급 처리 안내는 정산 담당자에게 요청하세요.'
+      ? '현재 계정은 조회 안내만 사용할 수 있습니다. 지급 처리 안내는 정산담당자에게 요청하세요.'
       : !contextValid
-        ? '질문 또는 지급 대상·입력이 변경됐습니다. 현재 화면에서 다시 질문해주세요.'
+        ? '질문, 지급 대상 또는 입력이 변경됐습니다. 현재 화면에서 다시 질문해주세요.'
         : !observation || !isEntityId(observation.paymentId)
           ? '저장된 지급 초안을 선택해야 화면 안내를 시작할 수 있습니다.'
           : observation.busy
@@ -74,7 +74,7 @@ export function PicoGuideStartButton({
       if (!launchPaymentGuide(definition.workflowId) && (import.meta.env.VITE_ASSISTANT_AI === 'true' || !useGuideRuntime.getState().start(definition.workflowId))) throw new Error('GUIDE_NOT_READY')
     } catch {
       if (!abort.signal.aborted)
-        setNotice('지급 상태나 시작 허가를 다시 확인해야 합니다. 현재 화면에서 안내 시작을 다시 선택해주세요.')
+        setNotice('지급 상태와 권한을 다시 확인해야 합니다. 현재 화면에서 안내 시작을 다시 선택해주세요.')
     } finally {
       if (controller.current === abort) {
         lock.current = false
@@ -91,7 +91,7 @@ export function PicoGuideStartButton({
         aria-describedby={message ? statusId : undefined}
         onClick={() => void start()}
       >
-        {busy ? '현재 지급 확인 중…' : `이 업무 안내 시작 · ${definition.title}`}
+        {busy ? '현재 지급 확인 중…' : `이 업무 안내 시작, ${definition.title}`}
       </button>
       {message && (
         <p className="pico-notice" role="status" id={statusId}>

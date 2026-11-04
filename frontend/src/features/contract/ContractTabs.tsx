@@ -35,7 +35,14 @@ import type {
   ContractTransactions,
 } from './api'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
-import { arbitrageStatusLabels, contractStatusLabels, paymentCycleLabels, processingStatusLabels } from './labels'
+import {
+  arbitrageStatusLabels,
+  contractStatusLabels,
+  paymentCycleLabels,
+  processingJobLabels,
+  processingStatusLabels,
+  sourceSystemLabels,
+} from './labels'
 import { contractErrorText, contractTabs as tabs, sortStatusEvents } from './detailState'
 import type { ContractTab, StatusSort } from './detailState'
 
@@ -246,7 +253,6 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
               ['납입기간', contract.paymentTermMonths == null ? '-' : `${int(contract.paymentTermMonths)}개월`],
               ['표준해약공제액', won(contract.standardSurrenderDeductionAmount)],
               ['데이터 출처', <DataOriginBadge code={contract.dataOrigin} label={contract.dataOriginLabel} />],
-              ['통화 단위', 'KRW (원)'],
             ]}
           />
         </section>
@@ -255,7 +261,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
             <header className="contract-history-panel-header">
               <div>
                 <h3 id="contract-history-title">상태이력</h3>
-                <p>사건 발생과 후속 처리 작업을 분리해 표시합니다.</p>
+                <p>상태 변경과 그 처리 결과를 보여 줍니다.</p>
               </div>
               <div className="contract-history-sort" role="group" aria-label="상태이력 정렬 기준">
                 <Button data-guide-feature="features.contract.contract-tabs.button-3"
@@ -272,7 +278,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                   aria-pressed={sort === 'receivedAt'}
                   onClick={() => setSort('receivedAt')}
                 >
-                  도착 순
+                  접수 순
                 </Button>
               </div>
             </header>
@@ -296,7 +302,7 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                               → {responseLabel(event.newStatusLabel, contractStatusLabels, event.newStatus)}
                             </h4>
                             <span>
-                              {event.sourceSystem || '계약 상태 사건'}
+                              {sourceSystemLabels[event.sourceSystem ?? ''] ?? '계약 상태 사건'}
                               {!event.processings?.length ? ', 처리 대기' : ''}
                             </span>
                           </header>
@@ -304,14 +310,14 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
                             className="contract-history-times"
                             items={[
                               ['효력', dateTime(event.effectiveAt)],
-                              ['수신', dateTime(event.receivedAt)],
+                              ['접수', dateTime(event.receivedAt)],
                             ]}
                           />
                           {!!event.processings?.length && (
                             <ul className="contract-processing-list" aria-label="후속 처리 작업">
                               {event.processings.map((job, jobIndex) => (
                                 <li className="contract-processing-row" key={`${job.processingJob}-${jobIndex}`}>
-                                  <strong>{job.processingJob || '처리 작업'}</strong>
+                                  <strong>{processingJobLabels[job.processingJob ?? ''] ?? '처리 작업'}</strong>
                                   <ResultStatus code={job.processingStatus} labels={processingStatusLabels} />
                                   <time dateTime={job.processedAt}>{dateTime(job.processedAt)}</time>
                                 </li>
@@ -505,24 +511,29 @@ const arbitrageColumns: TableColumn<ContractArbitrageCheck>[] = [
   { key: 'month', label: '계약차월', render: (row) => int(row.contractMonthNo) },
   {
     key: 'premium',
-    label: '납입보험료',
+    label: '누적 납입보험료',
     align: 'number',
     render: (row) => <Amount value={row.cumulativePaidPremium} />,
   },
-  { key: 'paid', label: '기지급', align: 'number', render: (row) => <Amount value={row.paidCommissionAmount} /> },
+  {
+    key: 'paid',
+    label: '확정 수수료 순액',
+    align: 'number',
+    render: (row) => <Amount value={row.paidCommissionAmount} />,
+  },
   {
     key: 'planned',
-    label: '지급예정',
+    label: '지급예정액',
     align: 'number',
     render: (row) => <Amount value={row.plannedCommissionAmount} />,
   },
   {
     key: 'surrender',
-    label: '해약환급금',
+    label: '합산 해약환급금',
     align: 'number',
     render: (row) => <Amount value={row.includedSurrenderValueAmount} />,
   },
-  { key: 'difference', label: '차액', align: 'number', render: (row) => <Amount value={row.netDifferenceAmount} /> },
+  { key: 'difference', label: '초과액', align: 'number', render: (row) => <Amount value={row.netDifferenceAmount} /> },
   {
     key: 'status',
     label: '판정',

@@ -16,9 +16,9 @@ public enum DataOrigin {
 
     public String label() {
         return switch (this) {
-            case SEED -> "시드";
-            case NORMALIZED_DB -> "정규화 DB";
-            case MANUAL -> "수동 입력";
+            case SEED -> "초기 자료";
+            case NORMALIZED_DB -> "보험사 자료";
+            case MANUAL -> "직접 입력";
         };
     }
 }
