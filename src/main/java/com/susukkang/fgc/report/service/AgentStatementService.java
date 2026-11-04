@@ -94,8 +94,10 @@ public class AgentStatementService {
         StatementSummary summary = repository.summary(filter);
         long total = summary.payment().count() + summary.held().count()
                 + summary.adjustment().count() + summary.clawback().count();
-        List<StatementEntry> items = repository.search(filter, listSort, (page - 1) * size, size).stream()
-                .map(AgentStatementService::entry).toList();
+        // 아주 큰 page 로 offset 이 int 범위를 넘어도 음수가 되지 않게 long 으로 계산하고, 범위 밖 페이지는 DB 를 부르지 않는다.
+        long offset = (long) (page - 1) * size;
+        List<StatementEntry> items = offset >= total ? List.of()
+                : repository.search(filter, listSort, offset, size).stream().map(AgentStatementService::entry).toList();
         return new StatementListResponse(PageResponse.of(items, page, size, total, listSort.value()), summary,
                 basis(yearMonth));
     }
@@ -109,7 +111,7 @@ public class AgentStatementService {
         // 남의 원천이거나 없는 키는 같은 404 로 답해 존재 여부가 드러나지 않게 한다.
         Row row = repository.find(agentId, entryType, Long.parseLong(key.group(2)), Long.parseLong(key.group(3)))
                 .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004));
-        return new StatementDetail(entry(row), evidence(row), basis(YearMonth.from(row.basisDate())));
+        return new StatementDetail(entry(row), evidence(row), basis(YearMonth.from(row.basisMonth())));
     }
 
     private long mineAgentId() {

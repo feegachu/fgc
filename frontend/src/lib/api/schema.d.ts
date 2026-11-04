@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/api/v1/agent/me/contract-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계약 확인 기록
+         * @description 종결 또는 후속 확인을 기록합니다. Idempotency-Key 와 expectedContextVersion 이 필요합니다.
+         */
+        post: operations["record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/me/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 설계사 홈
+         * @description 기간·보험사 필터를 적용한 포트폴리오와 asOf 월 수수료, 확인할 계약을 돌려줍니다.
+         */
+        get: operations["home"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/me/statements": {
         parameters: {
             query?: never;
@@ -751,6 +791,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getContractStatusEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/status-events/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewContractStatusEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/status-events/{eventId}/effects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getContractStatusEventEffects"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1575,6 +1647,106 @@ export interface components {
             agentName?: string;
             organizationName?: string;
         };
+        AgentHomeAmountBucket: {
+            amount?: number;
+            /** Format: int64 */
+            count?: number;
+        };
+        AgentHomeBasis: {
+            /** Format: date */
+            asOf?: string;
+            range?: components["schemas"]["AgentHomeRange"];
+            warnings?: string[];
+        };
+        AgentHomeCodeCount: {
+            code?: string;
+            /** Format: int64 */
+            count?: number;
+            label?: string;
+        };
+        AgentHomeCommission: {
+            clawback?: components["schemas"]["AgentHomeAmountBucket"];
+            dataStatus?: string;
+            expected?: components["schemas"]["AgentHomeAmountBucket"];
+            held?: components["schemas"]["AgentHomeAmountBucket"];
+            month?: string;
+        };
+        AgentHomeFilters: {
+            /** Format: int64 */
+            insurerId?: number;
+            insurerType?: string;
+        };
+        AgentHomeInsurerCount: {
+            /** Format: int64 */
+            contractCount?: number;
+            /** Format: int64 */
+            insurerId?: number;
+            monthlyEquivalentFirstPremiumSum?: number;
+            name?: string;
+        };
+        AgentHomeLastCheck: {
+            /** Format: date-time */
+            checkedAt?: string;
+            /** Format: date */
+            nextCheckDate?: string;
+            result?: string;
+        };
+        AgentHomeMonthlyCount: {
+            month?: string;
+            monthlyEquivalentFirstPremiumSum?: number;
+            /** Format: int64 */
+            newContractCount?: number;
+        };
+        AgentHomePortfolio: {
+            categories?: components["schemas"]["AgentHomeCodeCount"][];
+            /** Format: int64 */
+            contractCount?: number;
+            insurers?: components["schemas"]["AgentHomeInsurerCount"][];
+            monthly?: components["schemas"]["AgentHomeMonthlyCount"][];
+            statuses?: components["schemas"]["AgentHomeCodeCount"][];
+        };
+        AgentHomePriorityContract: {
+            contextVersion?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            currentStatus?: string;
+            currentStatusCode?: string;
+            /** Format: int64 */
+            elapsedDays?: number;
+            expectedAmount?: number;
+            heldAmount?: number;
+            /** Format: int64 */
+            heldCount?: number;
+            insurerName?: string;
+            lastCheck?: components["schemas"]["AgentHomeLastCheck"];
+            /** Format: date-time */
+            lastEventEffectiveAt?: string;
+            /** Format: date */
+            nextCheckDate?: string;
+            productName?: string;
+            reasonCodes?: string[];
+        };
+        AgentHomeRange: {
+            /** Format: date */
+            from?: string;
+            /** Format: date */
+            to?: string;
+        };
+        AgentHomeResponse: {
+            /** Format: date */
+            asOf?: string;
+            basis?: components["schemas"]["AgentHomeBasis"];
+            dataStatus?: string;
+            filters?: components["schemas"]["AgentHomeFilters"];
+            myCommission?: components["schemas"]["AgentHomeCommission"];
+            period?: string;
+            portfolio?: components["schemas"]["AgentHomePortfolio"];
+            /** Format: int32 */
+            priorityContractTotal?: number;
+            priorityContracts?: components["schemas"]["AgentHomePriorityContract"][];
+            range?: components["schemas"]["AgentHomeRange"];
+        };
         /** @description 보험설계사 기준정보 */
         AgentResponse: {
             /** @description 기준정보 활성 여부. false이면 신규 입력에서 선택할 수 없음 */
@@ -1681,6 +1853,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseAgentHomeResponse: {
+            data?: components["schemas"]["AgentHomeResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseArbitrageSearchResponse: {
             data?: components["schemas"]["ArbitrageSearchResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1741,6 +1918,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseContractCheckResponse: {
+            data?: components["schemas"]["ContractCheckResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseContractCreateResponse: {
             data?: components["schemas"]["ContractCreateResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1753,6 +1935,11 @@ export interface components {
         };
         ApiResponseContractScheduleResponse: {
             data?: components["schemas"]["ContractScheduleResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseContractStatusPreviewResponse: {
+            data?: components["schemas"]["ContractStatusPreviewResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -1924,6 +2111,11 @@ export interface components {
         };
         ApiResponsePageResponseCommissionPaymentListResponse: {
             data?: components["schemas"]["PageResponseCommissionPaymentListResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseContractStatusEffectResponse: {
+            data?: components["schemas"]["PageResponseContractStatusEffectResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2688,6 +2880,16 @@ export interface components {
             triggerType?: "STATUS_EVENT" | "ARBITRAGE";
             unpaidAmount?: number | null;
         };
+        ClawbackLine: {
+            appliedRatePct?: number;
+            basisAmount?: number;
+            clawbackAmount?: number;
+            commissionItemName?: string;
+            /** Format: int32 */
+            installmentNo?: number | null;
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
         ClawbackNoticeDocumentRequest: {
             /**
              * Format: int32
@@ -2710,6 +2912,20 @@ export interface components {
             sha256?: string;
             /** Format: int32 */
             version?: number;
+        };
+        ClawbackReview: {
+            amount?: number | null;
+            candidate?: boolean;
+            /** Format: int32 */
+            elapsedMonths?: number | null;
+            lines?: components["schemas"]["ClawbackLine"][];
+            policyCode?: string | null;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            /** Format: int32 */
+            policyVersionNo?: number | null;
+            reason?: string;
+            reasonCodes?: string[];
         };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
@@ -3154,6 +3370,24 @@ export interface components {
             status?: string;
             warnings?: string[];
         };
+        ContractCheckRequest: {
+            /** Format: int64 */
+            contractId: number;
+            expectedContextVersion: string;
+            memo?: string;
+            /** Format: date */
+            nextCheckDate?: string;
+            result: string;
+        };
+        ContractCheckResponse: {
+            /** Format: int64 */
+            checkId?: number;
+            /** Format: date-time */
+            checkedAt?: string;
+            contextVersion?: string;
+            /** Format: int64 */
+            contractId?: number;
+        };
         ContractCreateRequest: {
             /** Format: int64 */
             agentId: number;
@@ -3302,6 +3536,19 @@ export interface components {
             productOfferingId?: number;
             sort?: string;
         };
+        ContractStatusEffectResponse: {
+            amount?: number;
+            /** Format: int64 */
+            entityId?: number;
+            entityType?: string;
+            nextState?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
+            previousState?: string;
+            processingJob?: string;
+            reason?: string;
+            reasonCode?: string;
+        };
         ContractStatusEventProcessingResponse: {
             /** Format: date-time */
             processedAt?: string;
@@ -3338,6 +3585,33 @@ export interface components {
             registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
+        };
+        ContractStatusPreviewRequest: {
+            /** Format: date-time */
+            effectiveAt: string;
+            /** @enum {string} */
+            eventType: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+        };
+        ContractStatusPreviewResponse: {
+            clawbackReview?: components["schemas"]["ClawbackReview"];
+            /** Format: int64 */
+            contractId?: number;
+            /** @enum {string} */
+            currentStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            /** Format: date-time */
+            effectiveAt?: string;
+            /** @enum {string} */
+            eventType?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            excludedLines?: components["schemas"]["PreviewLine"][];
+            heldAmount?: components["schemas"]["HeldAmount"];
+            paidAmount?: components["schemas"]["PaidAmount"][];
+            payments?: components["schemas"]["PreviewPayment"][];
+            /** Format: int64 */
+            pendingFollowUps?: number;
+            resumedLines?: components["schemas"]["PreviewLine"][];
+            /** Format: date-time */
+            snapshotAt?: string;
+            stoppedLines?: components["schemas"]["PreviewLine"][];
         };
         ContractTransactionAttributionResponse: {
             agentCode?: string;
@@ -3687,6 +3961,10 @@ export interface components {
             eventId?: number | null;
             /** @enum {string} */
             status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
+        };
+        HeldAmount: {
+            after?: number;
+            before?: number;
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -4130,6 +4408,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseContractStatusEffectResponse: {
+            content?: components["schemas"]["ContractStatusEffectResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseContractView: {
             content?: components["schemas"]["ContractView"][];
             /** Format: int32 */
@@ -4213,6 +4503,11 @@ export interface components {
             totalElements?: number;
             /** Format: int32 */
             totalPages?: number;
+        };
+        PaidAmount: {
+            amount?: number | null;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
         };
         ParameterDraft: {
             description?: string;
@@ -4587,6 +4882,33 @@ export interface components {
             updatedAt?: string;
             /** Format: int32 */
             versionNo?: number;
+        };
+        PreviewLine: {
+            amount?: number | null;
+            commissionItemName?: string;
+            /** Format: date */
+            dueDate?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            /** Format: date */
+            nextDueDate?: string | null;
+            nextState?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
+            /** Format: int64 */
+            scheduleLineId?: number;
+        };
+        PreviewPayment: {
+            amount?: number | null;
+            /** Format: int64 */
+            commissionTransactionId?: number;
+            nextState?: string;
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
         };
         ProcessingEffect: {
             failureReason?: string | null;
@@ -5260,6 +5582,62 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    record: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 멱등키(1~160자). 없으면 서비스가 400 으로 거절한다 */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractCheckResponse"];
+                };
+            };
+        };
+    };
+    home: {
+        parameters: {
+            query?: {
+                /** @description 기준일(기본 서울 오늘) */
+                asOf?: string;
+                /** @description 6|12|ALL (기본 12) */
+                period?: string;
+                /** @description ALL|LIFE|NON_LIFE (기본 ALL) */
+                insurerType?: string;
+                /** @description 보험사 ID */
+                insurerId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAgentHomeResponse"];
+                };
+            };
+        };
+    };
     mine: {
         parameters: {
             query?: {
@@ -6561,6 +6939,58 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListContractStatusEventResponse"];
+                };
+            };
+        };
+    };
+    previewContractStatusEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractStatusPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractStatusPreviewResponse"];
+                };
+            };
+        };
+    };
+    getContractStatusEventEffects: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseContractStatusEffectResponse"];
                 };
             };
         };

@@ -1,23 +1,10 @@
-import type { components } from '../../lib/api/schema'
-
-type Schema = components['schemas']
-export type AgentContract = Schema['ContractView']
-export type Insurer = Schema['InsurerResponse']
-export type Product = Schema['ProductResponse']
+import type { AgentHome, HomeParams } from './api'
 
 export type Period = 6 | 12 | 'all'
 export type InsurerKind = 'all' | 'LIFE' | 'NON_LIFE'
 
-/** 상품군 코드 → 목업의 보장 유형 이름. */
-export const CATEGORY_LABEL: Record<string, string> = {
-  HEALTH_PROTECTION: '건강보장',
-  TERM_PROTECTION: '정기보장',
-  LONG_TERM_NONLIFE: '장기손해',
-  SAVINGS: '연금/저축',
-}
-export const CATEGORIES = ['건강보장', '정기보장', '장기손해', '연금/저축'] as const
-// 그래프 색은 개편 전(#739)의 채도 낮은 팔레트다(#839).
-export const CATEGORY_COLORS = ['#9a82b5', '#a493b8', '#86a89c', '#c9ae8f']
+// 그래프 색은 개편 전(#739)의 채도 낮은 팔레트다(#839). 다섯째는 분류 밖(기타)용 회색이다.
+export const CATEGORY_COLORS = ['#9a82b5', '#a493b8', '#86a89c', '#c9ae8f', '#94a3b8']
 export const INSURER_COLORS = ['#7f9fba', '#84ada3', '#caae7e', '#c492a0', '#a0b388', '#c99d88', '#8bb0bc', '#bbb589']
 
 /** 계약 상태 4종의 순서와 색. 청약, 부활 등은 가까운 상태로 묶는다. */
@@ -27,7 +14,8 @@ export const STATUS_DEFS = [
   { key: 'LAPSED', label: '실효', color: '#c98a8a' },
   { key: 'END', label: '해지/종료', color: '#b8c0cc' },
 ] as const
-const STATUS_GROUP: Record<string, (typeof STATUS_DEFS)[number]['key']> = {
+/** 서버 상태 코드를 목업의 4종으로 묶는다. 상태 이력이 없어 서버가 UNKNOWN 으로 센 계약은 끝(해지·종료)에 섞지 않고 따로 둔다. */
+export const STATUS_GROUP: Record<string, (typeof STATUS_DEFS)[number]['key']> = {
   APPLIED: 'ACTIVE',
   ACTIVE: 'ACTIVE',
   REVIVED: 'ACTIVE',
@@ -38,43 +26,8 @@ const STATUS_GROUP: Record<string, (typeof STATUS_DEFS)[number]['key']> = {
   MATURED: 'END',
 }
 
-export interface Row {
-  id: string
-  contractId: number
-  month: string
-  date: string
-  insurerName: string
-  insurerKind: 'LIFE' | 'NON_LIFE' | 'UNKNOWN'
-  product: string
-  category: string
-  status: (typeof STATUS_DEFS)[number]['key']
-  premium: number
-  /** 1,200% 한도 경고·위반 */
-  near: boolean
-  /** 검증 자료가 부족해 확인이 필요한 계약 */
-  review: boolean
-  capLabel: string
-}
-
-export function buildRows(contracts: AgentContract[], insurers: Insurer[], products: Product[]): Row[] {
-  const kind = new Map(insurers.map((i) => [i.insurerName, i.insurerType]))
-  const group = new Map(products.map((p) => [p.productName, p.productGroupCode]))
-  return contracts.map((c) => ({
-    id: c.contractNo ?? String(c.contractId),
-    contractId: c.contractId ?? 0,
-    month: c.contractDate?.slice(0, 7) ?? '',
-    date: c.contractDate ?? '',
-    insurerName: c.insurerName ?? '-',
-    insurerKind: kind.get(c.insurerName) ?? 'UNKNOWN',
-    product: c.productName ?? '-',
-    category: CATEGORY_LABEL[group.get(c.productName) ?? ''] ?? '기타',
-    status: STATUS_GROUP[c.contractStatus ?? ''] ?? 'END',
-    premium: c.monthlyEquivalentFirstPremium ?? 0,
-    near: c.capResultStatus === 'WARNING' || c.capResultStatus === 'VIOLATION',
-    review: c.capResultStatus === 'REVIEW_REQUIRED',
-    capLabel: c.capResultStatusLabel ?? '',
-  }))
-}
+export const periodParam = (period: Period): HomeParams['period'] => (period === 'all' ? 'ALL' : period === 6 ? '6' : '12')
+export const kindParam = (kind: InsurerKind): HomeParams['insurerType'] => (kind === 'all' ? 'ALL' : kind)
 
 export function shiftMonth(month: string, delta: number) {
   const [year, mon] = month.split('-').map(Number)
@@ -82,36 +35,14 @@ export function shiftMonth(month: string, delta: number) {
   return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`
 }
 
-/** 기준월 포함 최근 n개월. 전체는 계약이 있는 가장 이른 달부터 기준월까지. */
-export function periodMonths(rows: Row[], month: string, period: Period) {
-  let count = period === 'all' ? 0 : period
-  if (period === 'all') {
-    const first =
-      rows
-        .map((r) => r.month)
-        .filter((m) => m && m <= month)
-        .sort()[0] ?? month
-    const [fy, fm] = first.split('-').map(Number)
-    const [ty, tm] = month.split('-').map(Number)
-    count = Math.max(1, (ty - fy) * 12 + (tm - fm) + 1)
-  }
-  return Array.from({ length: count }, (_, i) => shiftMonth(month, i - count + 1))
-}
+/** 서울 기준 오늘(yyyy-MM-dd). */
+export const seoulToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
 
-export interface MonthStats {
-  count: number
-  premium: number
-  near: number
-  review: number
-}
-export function monthStats(rows: Row[], month: string): MonthStats {
-  const list = rows.filter((r) => r.month === month)
-  return {
-    count: list.length,
-    premium: list.reduce((sum, r) => sum + r.premium, 0),
-    near: list.filter((r) => r.near).length,
-    review: list.filter((r) => r.review).length,
-  }
+/** 선택한 월의 기준일: 월말, 아직 끝나지 않은 달이면 오늘. */
+export function asOfForMonth(month: string, today = seoulToday()) {
+  const [year, mon] = month.split('-').map(Number)
+  const last = `${month}-${String(new Date(year, mon, 0).getDate()).padStart(2, '0')}`
+  return last > today ? today : last
 }
 
 /** 비율을 소수점 첫째 자리까지 절사한다(화면정의서 공통규칙 3). 먼저 1e-6에서 맞춰 28.999… 같은 곱셈 오차를 없앤다. */
@@ -120,22 +51,14 @@ export const oneDecimal = (value: number) => Math.trunc(Math.round(value * 1e6) 
 /** 전월 대비 증감률(%, 소수점 한 자리). 전월 값이 0이면 비교할 수 없어 0으로 둔다. */
 export const deltaPercent = (now: number, before: number) => (before ? oneDecimal(((now - before) / before) * 100) : 0)
 
-export interface Aggregate {
-  base: Row[]
-  focus: Row[]
-  months: string[]
+export interface MonthStats {
+  count: number
+  premium: number
 }
-export function aggregate(
-  rows: Row[],
-  month: string,
-  period: Period,
-  kind: InsurerKind,
-  insurer: string | null,
-): Aggregate {
-  const months = periodMonths(rows, month, period)
-  const set = new Set(months)
-  const base = rows.filter((r) => set.has(r.month) && (kind === 'all' || r.insurerKind === kind))
-  return { base, focus: insurer ? base.filter((r) => r.insurerName === insurer) : base, months }
+/** 서버 월별 집계에서 한 달 값을 읽는다. 범위 밖이거나 계약이 없는 달은 0이다. */
+export function monthStats(home: AgentHome | undefined, month: string): MonthStats {
+  const found = home?.portfolio?.monthly?.find((m) => m.month === month)
+  return { count: found?.newContractCount ?? 0, premium: found?.monthlyEquivalentFirstPremiumSum ?? 0 }
 }
 
 export interface Slice {
@@ -143,40 +66,48 @@ export interface Slice {
   value: number
   premium: number
   color: string
+  insurerId: number
 }
-export function insurerSlices(base: Row[], insurers: Insurer[], kind: InsurerKind): Slice[] {
-  const pool = insurers.filter((i) => kind === 'all' || i.insurerType === kind)
-  const names = pool.length ? pool.map((i) => i.insurerName ?? '') : [...new Set(base.map((r) => r.insurerName))]
-  return names.map((name, index) => {
-    const list = base.filter((r) => r.insurerName === name)
-    return {
-      name,
-      value: list.length,
-      premium: list.reduce((s, r) => s + r.premium, 0),
-      color: INSURER_COLORS[index % INSURER_COLORS.length],
-    }
-  })
+export function insurerSlices(home: AgentHome | undefined): Slice[] {
+  return (home?.portfolio?.insurers ?? []).map((insurer, index) => ({
+    name: insurer.name ?? '-',
+    value: insurer.contractCount ?? 0,
+    premium: insurer.monthlyEquivalentFirstPremiumSum ?? 0,
+    color: INSURER_COLORS[index % INSURER_COLORS.length],
+    insurerId: insurer.insurerId ?? 0,
+  }))
 }
 
-export function trendSeries(focus: Row[], months: string[]) {
-  return months.map((month) => {
-    const list = focus.filter((r) => r.month === month)
-    return { month, count: list.length, premium: list.reduce((s, r) => s + r.premium, 0) }
-  })
+export function trendSeries(home: AgentHome | undefined) {
+  return (home?.portfolio?.monthly ?? []).map((m) => ({
+    month: m.month ?? '',
+    count: m.newContractCount ?? 0,
+    premium: m.monthlyEquivalentFirstPremiumSum ?? 0,
+  }))
 }
 
-export function categoryCounts(focus: Row[]) {
-  const total = focus.length || 1
-  return CATEGORIES.map((name, i) => {
-    const count = focus.filter((r) => r.category === name).length
-    return { name, count, pct: oneDecimal((count / total) * 100), color: CATEGORY_COLORS[i] }
-  })
+export function categoryCounts(home: AgentHome | undefined) {
+  const list = home?.portfolio?.categories ?? []
+  const total = home?.portfolio?.contractCount || 1
+  return list.map((c, i) => ({
+    name: c.label ?? c.code ?? '-',
+    count: c.count ?? 0,
+    pct: oneDecimal(((c.count ?? 0) / total) * 100),
+    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+  }))
 }
 
-export function statusCounts(focus: Row[]) {
-  const total = focus.length || 1
-  return STATUS_DEFS.map((def) => {
-    const count = focus.filter((r) => r.status === def.key).length
-    return { ...def, count, pct: oneDecimal((count / total) * 100) }
-  })
+/** 상태 분포: 정상·미납·실효·해지종료 4종에 서버 UNKNOWN(상태 이력 없음)을 더해 분모를 보존한다. */
+export function statusCounts(home: AgentHome | undefined) {
+  const list = home?.portfolio?.statuses ?? []
+  const total = home?.portfolio?.contractCount || 1
+  const sums = new Map<string, number>()
+  for (const s of list) {
+    const key = s.code === 'UNKNOWN' ? 'UNKNOWN' : (STATUS_GROUP[s.code ?? ''] ?? 'END')
+    sums.set(key, (sums.get(key) ?? 0) + (s.count ?? 0))
+  }
+  const defs = [...STATUS_DEFS, { key: 'UNKNOWN', label: '상태 미확인', color: '#d9dde3' }]
+  return defs
+    .map((def) => ({ ...def, count: sums.get(def.key) ?? 0, pct: oneDecimal(((sums.get(def.key) ?? 0) / total) * 100) }))
+    .filter((def) => def.key !== 'UNKNOWN' || def.count > 0)
 }
