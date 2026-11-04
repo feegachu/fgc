@@ -158,6 +158,8 @@ tasks.register('generateDar012', org.springframework.boot.gradle.tasks.run.BootR
     classpath = sourceSets.main.runtimeClasspath
     systemProperty 'spring.profiles.active', 'dar012'
     systemProperty 'spring.flyway.locations', 'classpath:db/migration,classpath:db/demo'
+    // devtools 재시작 스레드에서는 기동 실패가 종료 코드 0으로 끝날 수 있다. 게이트가 멈춘 실행이 BUILD SUCCESSFUL로 보이면 안 된다.
+    systemProperty 'spring.devtools.restart.enabled', 'false'
     doFirst {
         args = project.properties.findAll { k, v -> k.startsWith('dar012.') }
                 .collect { k, v -> "--fgc.${k}=${v}".toString() }
