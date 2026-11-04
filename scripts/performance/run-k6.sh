@@ -5,6 +5,7 @@
 source "$(dirname "$0")/common.sh"
 
 SCENARIO=${1:?사용: run-k6.sh <smoke|dashboard|concurrent|rerun> [검증월 yyyy-MM]}
+case "$SCENARIO" in smoke | dashboard | concurrent | rerun) ;; *) echo "알 수 없는 시나리오: $SCENARIO" >&2; exit 2 ;; esac
 export SCENARIO MONTH=${2:-2026-08}
 export FGC_PERF_USER=${FGC_PERF_USER:?내부 계정을 FGC_PERF_USER로 준다}
 export FGC_PERF_AGENT=${FGC_PERF_AGENT:?설계사 계정을 FGC_PERF_AGENT로 준다}
