@@ -65,10 +65,7 @@ public class ContractStatusPaymentRule {
         LocalDate contractDate = jdbc.queryForObject(
                 "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?", LocalDate.class, contractId);
         Long policyVersionId = policies.resolve(contractDate);
-        List<StatusPoint> timeline = events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(contractId).stream()
-                .map(ContractStatusPaymentRule::point)
-                .toList();
-        return judge(timeline, point(event), policyVersionId, lines(contractId), payments(contractId), heldPaymentIds);
+        return judge(timeline(event), point(event), policyVersionId, lines(contractId), payments(contractId), heldPaymentIds);
     }
 
     /**
@@ -82,10 +79,19 @@ public class ContractStatusPaymentRule {
         LocalDate contractDate = jdbc.queryForObject(
                 "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?", LocalDate.class, contractId);
         Long policyVersionId = policies.resolve(contractDate);
-        List<StatusPoint> timeline = events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(contractId).stream()
-                .map(ContractStatusPaymentRule::point)
-                .toList();
-        return judgeNotPayable(timeline, point(event), policyVersionId, lines(contractId), payments(contractId));
+        return judgeNotPayable(timeline(event), point(event), policyVersionId, lines(contractId), payments(contractId));
+    }
+
+    /** 저장 전 사건(미리보기, FUN-077)은 이력에 없으므로 저장한 것처럼 더해 저장 뒤 판단과 같은 입력으로 만든다. */
+    private List<StatusPoint> timeline(ContractStatusEvent event) {
+        List<StatusPoint> timeline = new ArrayList<>(
+                events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(event.getContractId()).stream()
+                        .map(ContractStatusPaymentRule::point)
+                        .toList());
+        if (event.getContractStatusEventId() == null) {
+            timeline.add(point(event));
+        }
+        return timeline;
     }
 
     static List<ContractStatusEffect> judgeNotPayable(List<StatusPoint> events, StatusPoint asOf, Long policyVersionId,
@@ -141,7 +147,7 @@ public class ContractStatusPaymentRule {
      * 이 계약에 귀속된 지급(PAYMENT) 건과 귀속일. 금액은 거래 전체가 아니라 이 계약의 귀속액 합이다(여러 계약에 나뉜 지급 건).
      * 차감 건과 설계사 단위 귀속은 판단하지 않는다.
      */
-    private List<Payment> payments(Long contractId) {
+    List<Payment> payments(Long contractId) {
         Map<Long, Payment> payments = new LinkedHashMap<>();
         Map<Long, BigDecimal> attributed = new LinkedHashMap<>();
         jdbc.query("""

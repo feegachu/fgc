@@ -21,6 +21,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class PaymentHoldRepository {
 
+    private static final String OPEN_HOLD_OF_CONTRACT = """
+            h.commission_transaction_id = :paymentId AND h.released_at IS NULL
+               AND h.contract_status_event_id IN (SELECT e.contract_status_event_id FROM fgc.contract_status_event e
+                                                   WHERE e.contract_id = :contractId)
+            """;
+
     private final JdbcTemplate jdbc;
     private final NamedParameterJdbcTemplate namedJdbc;
 
@@ -57,14 +63,29 @@ public class PaymentHoldRepository {
         }
         return namedJdbc.update("""
                 UPDATE fgc.payment_hold h SET released_at = clock_timestamp(), released_by_event_id = :releasedByEventId
-                 WHERE h.commission_transaction_id = :paymentId AND h.released_at IS NULL
-                   AND h.reason_code IN (:reasonCodes)
-                   AND h.contract_status_event_id IN (SELECT e.contract_status_event_id FROM fgc.contract_status_event e
-                                                       WHERE e.contract_id = :contractId)
-                """, new MapSqlParameterSource()
-                .addValue("releasedByEventId", releasedByEventId)
+                 WHERE h.reason_code IN (:reasonCodes) AND
+                """ + OPEN_HOLD_OF_CONTRACT, openHolds(paymentId, contractId, reasonCodes)
+                .addValue("releasedByEventId", releasedByEventId));
+    }
+
+    /** {@link #releaseOpen}이 풀 보류가 있는가. 쓰지 않으므로 처리 계획과 미리보기가 같은 범위로 판단한다. */
+    public boolean hasOpenHold(Long paymentId, Long contractId, Collection<String> reasonCodes) {
+        return !reasonCodes.isEmpty() && namedJdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM fgc.payment_hold h WHERE h.reason_code IN (:reasonCodes) AND
+                """ + OPEN_HOLD_OF_CONTRACT + ")", openHolds(paymentId, contractId, reasonCodes), Boolean.class);
+    }
+
+    /** 이 사유들을 풀어도 이 계약의 사건으로 걸린 다른 사유의 보류가 남는가(미리보기의 변경 후 보류 금액). */
+    public boolean hasOtherOpenHold(Long paymentId, Long contractId, Collection<String> reasonCodes) {
+        return namedJdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM fgc.payment_hold h WHERE h.reason_code NOT IN (:reasonCodes) AND
+                """ + OPEN_HOLD_OF_CONTRACT + ")", openHolds(paymentId, contractId, reasonCodes), Boolean.class);
+    }
+
+    private static MapSqlParameterSource openHolds(Long paymentId, Long contractId, Collection<String> reasonCodes) {
+        return new MapSqlParameterSource()
                 .addValue("paymentId", paymentId)
                 .addValue("reasonCodes", reasonCodes)
-                .addValue("contractId", contractId));
+                .addValue("contractId", contractId);
     }
 }

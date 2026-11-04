@@ -642,5 +642,10 @@ class ContractStatusEventIntegrationTest {
                     event.getContractStatusEventId() * 10, "PLANNED", "HOLD", new BigDecimal("1000"), null,
                     "TEST_HOLD", "테스트 보류"));
         }
+
+        @Override
+        public List<ContractStatusEffect> plan(ContractStatusEvent event) {
+            return List.of();
+        }
     }
 }
