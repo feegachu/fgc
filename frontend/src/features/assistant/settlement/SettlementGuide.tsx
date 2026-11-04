@@ -1,4 +1,3 @@
-import { errorText } from '../../../lib/format'
 import { useUnsavedWorkStore } from '../../../stores/unsavedWork'
 import { useSpotlight } from '../guide/useSpotlight'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -274,7 +273,9 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         setError(
           failure instanceof DOMException && failure.name === 'TimeoutError'
             ? '최신 상태 조회가 5초 안에 끝나지 않았습니다. 잠시 후 다시 확인하세요.'
-            : errorText(failure as Error, '최신 상태를 확인하지 못했습니다.'),
+            : failure instanceof Error
+              ? failure.message
+              : '최신 상태를 확인하지 못했습니다.',
         )
     } finally {
       if (token === epoch.current) setBusy(false)
@@ -308,7 +309,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       controller.signal.throwIfAborted()
       await show(base, true)
     } catch (failure) {
-      if (!controller.signal.aborted) setError(errorText(failure as Error, '시작할 수 없습니다.'))
+      if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : '시작할 수 없습니다.')
     } finally {
       setBusy(false)
     }
