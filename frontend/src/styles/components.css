@@ -421,7 +421,7 @@
   min-width: 0;
   overflow: hidden;
   border-top: 0;
-  border-radius: 0 0 var(--radius-12) var(--radius-12);
+  border-radius: 0 0 var(--radius-8) var(--radius-8);
 }
 
 .filter-bar {
@@ -652,6 +652,24 @@ a.kpi-card:active {
   width: 100%;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
+}
+
+/* 가로로 넘치는 표는 가려진 쪽 가장자리만 흐리게 보인다. data-scroll 은 DataTable 이 단다. */
+.data-table-viewport[data-scroll='start'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+}
+
+.data-table-viewport[data-scroll='middle'] {
+  mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent);
+}
+
+.data-table-viewport[data-scroll='end'] {
+  mask-image: linear-gradient(to right, transparent, #000 2rem);
+}
+
+/* 키보드 포커스 표시는 흐리지 않는다. */
+.data-table-viewport:is(:focus-visible, :has(:focus-visible)) {
+  mask-image: none;
 }
 
 .data-table {
