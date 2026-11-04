@@ -667,9 +667,12 @@ it.each(['status', 'sequence', 'pending refresh'])('committed action with %s mis
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
 })
 
-it('committed correction with an invalid receipt refreshes and cannot be posted twice', async () => {
+it.each([
+  { actionSeq: 2, repostedJournalHeaderId: 0 },
+  ...[undefined, null, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '2'].map(actionSeq => ({ actionSeq, repostedJournalHeaderId: 72 })),
+])('committed correction with an invalid receipt %j refreshes and cannot be posted twice', async (receipt) => {
   searchResponse = () => search([correctionCase])
-  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 0, toStatus: 'RESOLVED' })
+  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, toStatus: 'RESOLVED', ...receipt })
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
