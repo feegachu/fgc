@@ -125,7 +125,7 @@ case "$command" in
         # 대입을 나눠야 set -e 가 로그인 실패에서 멈춘다. 빈 토큰으로 스캔하면 인증 API 를 못 본 채 통과로 보인다.
         token=$(login_token)
         [[ -n "$token" ]] || { echo "로그인 토큰을 받지 못했습니다." >&2; exit 1; }
-        # Access 토큰 수명이 30분이라 능동 스캔을 그 안에서 끝낸다.
+        # shortcut: 토큰을 갱신하지 않고 수명(30분)에 5분 여유만 둔다. 기동과 문서 가져오기는 제한 밖이고 측정한 전체 시간은 7분이다. 30분에 닿는 규모가 되면 갱신을 넣는다.
         ZAP_AUTH_HEADER_VALUE="Bearer $token" SCAN_PATH=/v3/api-docs \
             scan zap-api-scan -f openapi -z "-Xmx1g -silent -config scanner.maxScanDurationInMins=${ZAP_ACTIVE_MINUTES:-25}"
         ;;
