@@ -28,6 +28,7 @@ import {
 } from './api'
 import type { FinalizeChecklist, ValidationRunDetail, ValidationTarget } from './api'
 import { FinalizeDialogs } from './FinalizeDialogs'
+import { ValidationRestartPanel } from './ValidationRestartPanel'
 import { RunStatusBadge } from './RunStatusBadge'
 import { failureText, MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
 import { useRestartAttemptDeadline } from './useRestartAttemptDeadline'
@@ -121,8 +122,7 @@ function DetailBody({
   const checklist = useQuery(finalizeChecklistQuery(id, status === 'COMPLETED'))
   const canProcess = user?.canProcess === true
   const canFinalize = user?.canFinalizeValidation === true
-  const canRestart = status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT'
-  const canExecute = (status === 'CREATED' || canRestart) && !startUnconfirmed
+  const canExecute = (status === 'CREATED') && !startUnconfirmed
 
   // 폴링이 종료 상태에 닿으면 헤더·결과 요약·확정 조건을 다시 불러온다(1차는 전체 리로드였다).
   const finished = (executed || header.status === 'RUNNING') && live && !isRunning(live.status)
@@ -168,7 +168,7 @@ function DetailBody({
   const execute = useMutation({
     mutationFn: () => { executionGuide.begin(); return executeRun(id) },
     meta: { errorToast: false },
-    onMutate: () => ({ restarting: canRestart, attemptId: progress.data?.attemptId ?? 0 }),
+    onMutate: () => ({ restarting: false, attemptId: progress.data?.attemptId ?? 0 }),
     onSuccess: (_response, _variables, before) => {
       announced.current = false
       setPreviousAttemptId(before?.restarting ? before.attemptId : null)
@@ -280,13 +280,13 @@ function DetailBody({
               className="vrun-row-button"
               data-guide-target="validation.execute" aria-describedby="execute-action-note"
               loading={execute.isPending}
-              disabled={!canProcess || !canExecute || (canRestart && !progress.isSuccess) || (executed && !finished)}
+              disabled={!canProcess || !canExecute || (executed && !finished)}
               onClick={() => execute.mutate()}
             >
               <span className="material-symbols-rounded" aria-hidden="true">
                 play_arrow
               </span>
-              {canRestart ? '실패 지점부터 재시작' : '실행'}
+              실행
             </Button>
           </div>
         </header>
@@ -295,7 +295,7 @@ function DetailBody({
             className="vrun-action-note"
             id="execute-action-note"
             role={startUnconfirmed ? 'alert' : 'status'}
-            hidden={canProcess && canExecute && (!executed || finished)}
+            hidden={canProcess && !startUnconfirmed && (canExecute || status === 'FAILED') && (!executed || finished)}
           >
             {status === 'FINALIZED'
               ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.'
@@ -305,8 +305,15 @@ function DetailBody({
                   ? '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.'
                   : executed && !finished
                     ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
-                    : '생성됨이나 실패 상태의 월 실행만 실행할 수 있습니다.'}
+                    : '새 실행은 생성됨 상태에서만 시작할 수 있습니다.'}
           </p>
+          {header.runType !== 'MANUAL_CONTRACT' && <ValidationRestartPanel key={id} id={id} month={header.validationMonth ?? ""} runNo={header.runNo ?? 0} status={status ?? 'CREATED'} waiting={!progress.isSuccess || !!(executed && !finished)} canProcess={canProcess} onAccepted={() => {
+            announced.current = false
+            setPreviousAttemptId(progress.data?.attemptId ?? 0)
+            setExecuted(true)
+            setAttemptWaitGeneration(value => value + 1)
+            toast('재시작 요청을 접수했습니다. 실제 진행 상태를 확인합니다.', 'info')
+          }} />}
           <p className="vrun-progress-line">
             <span>진행률</span>
             <span className="vrun-progress-value" role="status" aria-live="polite">

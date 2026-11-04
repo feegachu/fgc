@@ -6,6 +6,7 @@ import { ApiError } from '../../lib/api/client'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { Field } from '../../components/Field'
+import { EvidenceLink } from '../../components/EvidenceLink'
 import { DataTable } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
@@ -32,6 +33,7 @@ import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
 import { performPolicyAction } from './writeApi'
 import { usePolicyRequest } from './usePolicyRequest'
+import { PolicyReferenceInfo } from './PolicyReferenceInfo'
 import type { components } from '../../lib/api/schema'
 type OfferingGovernance = components['schemas']['PolicyOfferingGovernanceResponse']
 
@@ -218,7 +220,7 @@ export function PolicyManagement({
         {panel === 'rules' &&
           (draft ? <DraftRuleSummary draft={draft} detail={detail} /> : <ReadOnlyRuleSummary detail={detail} />)}
         {panel === 'sources' && (
-          <PolicySources sources={sources} refs={refs} offerings={detail.productOfferings ?? []} />
+          <PolicySources sources={sources} refs={refs} offerings={detail.productOfferings ?? []} policyVersionId={policy.policyVersionId} />
         )}
         {panel === 'history' && (
           <>
@@ -302,12 +304,19 @@ export function PolicySources({
   sources,
   refs,
   offerings = [],
+  policyVersionId,
 }: {
   sources: SourceDetail[]
   refs: string[]
   offerings?: OfferingGovernance[]
+  policyVersionId?: number
 }) {
   const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref))
+  const referenceInfo = (ref: string) => policyVersionId != null && (
+    <EvidenceLink icon label={`${refLabel(ref)} 근거 정보`}>
+      <PolicyReferenceInfo policyVersionId={policyVersionId} refText={ref} />
+    </EvidenceLink>
+  )
   return (
     <div data-guide-target="policy.sources" className="policy-sources">
       <ScreenHelp screenId="POL-W01" variant="sources" />
@@ -318,6 +327,7 @@ export function PolicySources({
       <p className="policy-notice">{sourceReferenceNotice}</p>
       {!sources.length && !missing.length && (
         <div className="policy-editor-empty">
+          <StatusBadge>근거 미기재</StatusBadge>
           <strong>연결된 근거 자료가 없습니다.</strong>
           <p>정책에 연결한 근거의 제목/설명/링크를 확인할 수 있습니다.</p>
         </div>
@@ -329,6 +339,7 @@ export function PolicySources({
           </span>
           <div>
             <StatusBadge tone={source.ref.startsWith('REG-') ? 'info' : 'neutral'}>{refLabel(source.ref)}</StatusBadge>
+            {referenceInfo(source.ref)}
             <SourceStatusTags tags={source.statusTags} />
             <h4>{source.title}</h4>
             <p>{source.explanation || '설명 자료 없음'}</p>
@@ -344,6 +355,7 @@ export function PolicySources({
         <article className="policy-source-card" key={ref}>
           <div>
             <StatusBadge>{refLabel(ref)}</StatusBadge>
+            {referenceInfo(ref)}
             <SourceStatusTags />
             <p>등록된 제목, 설명, 링크가 없습니다.</p>
           </div>

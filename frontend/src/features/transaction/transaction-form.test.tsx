@@ -39,6 +39,7 @@ const saved: Payment = {
   settlementMonth: '2026-07-01',
   cashflowType: 'PAYMENT',
   amount: 250000,
+  updatedAt: '2026-07-31T09:00:00.123456+09:00',
   attributions: [
     {
       contractId: 3,
@@ -728,6 +729,140 @@ describe('TRAN-W02 legacy defect regressions (#410)', () => {
       attributions: [{ inclusionDecisionStatus: 'INCLUDED', attributionMethod: 'DIRECT' }],
     })
     expect(screen.queryByText(/귀속 입력을 조정/)).not.toBeInTheDocument()
+  })
+})
+
+describe('오래된 지급 초안 저장 (#753)', () => {
+  const latest = '2026-07-31T09:05:00.654321+09:00'
+  const amount = () => screen.getByLabelText(/금액 \(원\)/)
+  const staleSave = () => {
+    throw new ApiError(
+      { code: 'FGC-TRAN-010', message: '다른 요청에서 지급 건을 수정했습니다. 현재 입력은 유지됩니다.' },
+      'conflict-trace',
+      409,
+    )
+  }
+  const reloadButton = () => screen.getByRole('button', { name: '최신 지급 건 다시 불러오기' })
+  const detailReads = () =>
+    vi.mocked(apiClient.request).mock.calls.filter(([path, options]) => path === '/api/v1/transactions/77' && !options?.method)
+
+  it('수정 저장은 상세의 수정 시각을 원문 그대로 보낸다', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    await user.click(button('btn-save'))
+    await screen.findByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')
+    expect(writes()[0][1]).toMatchObject({ method: 'PUT', body: { expectedUpdatedAt: saved.updatedAt } })
+  })
+
+  it('신규 저장에는 수정 시각을 보내지 않는다', async () => {
+    const { user } = mount()
+    await fillNew(user)
+    await user.click(button('btn-save'))
+    await screen.findByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')
+    expect(writes()[0][1]?.method).toBe('POST')
+    expect(writes()[0][1]?.body).not.toHaveProperty('expectedUpdatedAt')
+  })
+
+  it('409 충돌 후 입력과 토큰을 유지하고, 명시적인 재조회 후에만 저장한다', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    fireEvent.change(amount(), { target: { value: '999000' } })
+    mutation = staleSave
+    await user.click(button('btn-save'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('현재 입력은 유지됩니다')
+    expect(screen.queryByText(/FGC-TRAN-010/)).not.toBeInTheDocument()
+    expect(amount()).toHaveValue(999000)
+    expect(button('btn-save')).toBeDisabled()
+    expect(button('btn-precheck')).toBeDisabled()
+    expect(screen.queryByText('변경한 내용을 먼저 저장한 뒤 사전검증하세요.')).not.toBeInTheDocument()
+    expect(writes()).toHaveLength(1)
+    expect(writes()[0][1]?.body).toMatchObject({ amount: 999000, expectedUpdatedAt: saved.updatedAt })
+
+    draftResponse = { ...saved, amount: 300000, updatedAt: latest }
+    const readsBefore = detailReads().length
+    await user.click(reloadButton())
+    await user.click(screen.getByRole('button', { name: '입력 유지' }))
+    expect(detailReads()).toHaveLength(readsBefore)
+    expect(amount()).toHaveValue(999000)
+    expect(button('btn-save')).toBeDisabled()
+
+    await user.click(reloadButton())
+    await user.click(screen.getByRole('button', { name: '최신 정보로 바꾸기' }))
+    await waitFor(() => expect(amount()).toHaveValue(300000))
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    expect(screen.queryByRole('button', { name: '최신 지급 건 다시 불러오기' })).not.toBeInTheDocument()
+
+    mutation = (_path, options) => ({ ...draftResponse, ...(options.body as object) })
+    await user.click(button('btn-save'))
+    await screen.findByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')
+    expect(writes()).toHaveLength(2)
+    expect(writes()[1][1]?.body).toMatchObject({ amount: 300000, expectedUpdatedAt: latest })
+  })
+
+  it('재조회가 실패하면 입력을 보존하고 서버 내부 정보를 숨긴 채 다시 시도할 수 있다', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    fireEvent.change(amount(), { target: { value: '999000' } })
+    mutation = staleSave
+    await user.click(button('btn-save'))
+    await user.click(await screen.findByRole('button', { name: '최신 지급 건 다시 불러오기' }))
+
+    referenceFailure = new ApiError({ code: 'FGC-COMMON-500', message: '재조회 내부 오류' }, 'reload-500', 500)
+    await user.click(screen.getByRole('button', { name: '최신 정보로 바꾸기' }))
+    expect(await screen.findByText('처리 중 오류가 발생했습니다. 요청번호 reload-500를 담당자에게 알려주세요.', { selector: '.field-error' })).toBeVisible()
+    expect(screen.queryByText(/재조회 내부 오류/)).not.toBeInTheDocument()
+    expect(amount()).toHaveValue(999000)
+    expect(button('btn-save')).toBeDisabled()
+
+    referenceFailure = null
+    draftResponse = { ...saved, amount: 300000, updatedAt: latest }
+    await user.click(reloadButton())
+    await user.click(screen.getByRole('button', { name: '최신 정보로 바꾸기' }))
+    await waitFor(() => expect(amount()).toHaveValue(300000))
+  })
+
+  it('편집 중 확정된 초안의 저장 거절은 재조회 뒤 수정 불가 안내로 끝난다', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    mutation = () => {
+      throw new ApiError({ code: 'FGC-TRAN-005', message: '작성중인 지급 건에만 가능한 작업입니다.' }, 'DRAFT-ONLY', 409)
+    }
+    await user.click(button('btn-save'))
+    await user.click(await screen.findByRole('button', { name: '최신 지급 건 다시 불러오기' }))
+    draftResponse = { ...saved, status: 'CONFIRMED', updatedAt: latest }
+    await user.click(screen.getByRole('button', { name: '최신 정보로 바꾸기' }))
+    expect(await screen.findByText(/수정 가능한 지급 초안이 아닙니다/)).toBeVisible()
+    expect(writes()).toHaveLength(1)
+  })
+
+  it('중복 관리번호 같은 다른 409는 재조회를 강요하지 않고 다시 저장할 수 있다', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    mutation = () => {
+      throw new ApiError({ code: 'FGC-TRAN-001', message: '이미 등록된 지급 건입니다.' }, 'DUP', 409)
+    }
+    await user.click(button('btn-save'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('이미 등록된 지급 건입니다.')
+    expect(screen.queryByRole('button', { name: '최신 지급 건 다시 불러오기' })).not.toBeInTheDocument()
+    expect(button('btn-save')).toBeEnabled()
+  })
+
+  it('상세에 수정 시각이 없으면 PUT을 보내지 않는다', async () => {
+    draftResponse = { ...saved, updatedAt: undefined }
+    mount('/app/transactions/new?id=77&month=2026-07')
+    await screen.findByText(/수정 시각을 확인할 수 없습니다/)
+    expect(button('btn-save')).toBeDisabled()
+    fireEvent.click(button('btn-save'))
+    expect(writes()).toHaveLength(0)
+    expect(reloadButton()).toBeEnabled()
+  })
+
+  it('조회 역할에는 다시 불러오기 안내를 보이지 않는다', async () => {
+    draftResponse = { ...saved, updatedAt: undefined }
+    mount('/app/transactions/new?id=77&month=2026-07', false)
+    await screen.findByText(/현재 계정은 조회만 가능하며/)
+    expect(screen.queryByRole('button', { name: '최신 지급 건 다시 불러오기' })).not.toBeInTheDocument()
   })
 })
 

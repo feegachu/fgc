@@ -28,6 +28,8 @@ import com.susukkang.fgc.validation.service.ValidationRunCreateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -149,6 +151,9 @@ public class ArbitrageService {
             Long triggeredBy) {
         // 서비스 직접 호출에서도 필수 입력값을 검증
         validateManualCheckInput(contractId, request, triggeredBy);
+        // 실행 행은 별도 트랜잭션으로 먼저 커밋되므로 없는 계약은 실행을 만들기 전에 거절한다.
+        if (arbitrageCheckRepository.selectCalculationSource(contractId, request.getAsOfDate()) == null)
+            throw new FgcBusinessException(FgcErrorCode.COMMON_004, Map.of("id", contractId));
 
         // 수동 계약 검증 실행 생성 및 차익거래 단계로 진행
         ValidationRunRow run = validationRunCreateService.create(new CreateValidationRunCommand(
@@ -156,6 +161,7 @@ public class ArbitrageService {
                 ValidationRunType.MANUAL_CONTRACT,
                 triggeredBy
         ));
+        discardRunOnRollback(run.getValidationRunId());
         if (validationRunRepository.transitionToRunning(
                 run.getValidationRunId(), ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING) != 1)
             throw new FgcBusinessException(FgcErrorCode.VRUN_005, Map.of());
@@ -533,6 +539,20 @@ public class ArbitrageService {
         } catch (JsonProcessingException e) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_500, Map.of());
         }
+    }
+
+    /**
+     * 활성 수동 실행은 전역 1건이다(V13). 이 트랜잭션이 롤백돼 실행 행이 CREATED로 남으면 다른 계약의 수동 검증과
+     * 다음 날 일 배치까지 막히므로, 롤백이 끝난 뒤 호출 전 상태로 되돌린다. 롤백 전에는 이 트랜잭션이 행을 잠그고 있어 지울 수 없다.
+     */
+    private void discardRunOnRollback(Long validationRunId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) validationRunCreateService.discardIfStillCreated(validationRunId);
+            }
+        });
     }
 
     private void validateManualCheckInput(

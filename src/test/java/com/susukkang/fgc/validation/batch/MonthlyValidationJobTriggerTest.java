@@ -52,6 +52,9 @@ class MonthlyValidationJobTriggerTest {
     private Job monthlyValidationJob;
 
     @Mock
+    private org.springframework.jdbc.core.JdbcTemplate retryJdbc;
+
+    @Mock
     private JobLauncher jobLauncher;
 
     @Mock

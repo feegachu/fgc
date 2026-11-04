@@ -154,7 +154,7 @@ export default function ValidationRunListPage() {
   ]
 
   return (
-    <div className="vrun-page vrun-list-page">
+    <div className="vrun-page vrun-list-page list-page">
       <header className="page-header">
 
         <div className="page-header-copy">

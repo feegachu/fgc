@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { returnLink, safeReturnTo } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { EvidenceLink } from '../../components/EvidenceLink'
@@ -13,6 +13,7 @@ import { Modal } from '../../components/Modal'
 import { ApiError } from '../../lib/api/client'
 import { int, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
+import { validMonth, withMonth } from '../../stores/workspace'
 import { useInsurerOptions } from '../base/api'
 import type { Agent, Product } from '../base/api'
 import { useEntityChoices } from '../base/selection'
@@ -36,6 +37,7 @@ import {
   initialDraft,
   initialStatusEvent,
   seoulNow,
+  statusDraftFrom,
   statusEventRequest,
   validateDraft,
   validateStatusEvent,
@@ -115,7 +117,13 @@ function ContractEditor({
   const currentDate = today()
   // Keep the original read token and values until the user explicitly reloads the editor.
   const [original] = useState(contract)
-  const [draft, setDraft] = useState(() => initialDraft(currentDate, contract))
+  const location = useLocation()
+  // 영향 미리보기에서 넘긴 상태·효력일시 초안. 이동만으로 저장하지 않는다(화면정의서 CONT-W02).
+  const [previewDraft] = useState(() => statusDraftFrom(location.state, contract?.allowedNextStatuses ?? []))
+  const [draft, setDraft] = useState(() => ({
+    ...initialDraft(currentDate, contract),
+    ...(previewDraft && { contractStatus: previewDraft.contractStatus }),
+  }))
   const [errors, setErrors] = useState<ContractFieldErrors>({})
   const [saveError, setSaveError] = useState('')
   const [conflict, setConflict] = useState(false)
@@ -124,7 +132,10 @@ function ContractEditor({
   const [confirmReload, setConfirmReload] = useState(false)
   const [reloading, setReloading] = useState(false)
   // 접수일시 기본값은 화면을 연 시각으로 한 번만 정한다. 다시 보내도 본문·멱등키가 같아야 한다.
-  const [statusEvent, setStatusEvent] = useState(() => initialStatusEvent(seoulNow()))
+  const [statusEvent, setStatusEvent] = useState(() => ({
+    ...initialStatusEvent(seoulNow()),
+    effectiveAt: previewDraft?.effectiveAt ?? '',
+  }))
   const [confirmSave, setConfirmSave] = useState(false)
   const requestKey = usePolicyRequest()
   const submitting = useRef(false)
@@ -295,7 +306,10 @@ function ContractEditor({
         )
       if (!(await saveGuide.saved(savedId)) || !mounted.current) return
       // Keep the synchronous guard closed through navigation, including repeated submit events.
-      await navigate(returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId)), {
+      // 첫 이동에 기준월을 포함해 Shell의 URL 보정과 후속 가이드 조회가 경합하지 않게 한다.
+      const detailPath = returnLink(`/contracts/${encodeURIComponent(savedId)}`, returnTo, String(savedId))
+      const month = params.get('month')
+      await navigate(validMonth(month) ? withMonth(detailPath, month, false) : detailPath, {
         state: { message },
       })
     } catch (error) {

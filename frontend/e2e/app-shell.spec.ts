@@ -53,6 +53,7 @@ for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
 }
 
 test('eleventh tab is bounded and restored; month updates every tab and removes page', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 850 })
   await session(page)
   await page.goto('contracts?month=2026-07&page=3&status=ACTIVE')
   await expect(page.locator('.workspace-tab.is-active .workspace-tab-link')).toHaveAttribute(
@@ -85,23 +86,31 @@ test('eleventh tab is bounded and restored; month updates every tab and removes 
   await expect(page.locator('.workspace-tab')).toHaveCount(10)
   await page.reload()
   await expect(page.locator('.workspace-tab')).toHaveCount(10)
+  const firstTab = page.getByRole('button', { name: '첫 번째 업무 탭으로 이동' })
+  const lastTab = page.getByRole('button', { name: '마지막 업무 탭으로 이동' })
+  await firstTab.click()
+  await expect(firstTab).toBeDisabled()
+  await expect(lastTab).toBeEnabled()
+  await lastTab.click()
+  await expect(lastTab).toBeDisabled()
+  await expect(firstTab).toBeEnabled()
+
+  const tab = await page.locator('.workspace-tab.is-active').boundingBox()
+  const month = await page.getByRole('button', { name: '기준 정산월 2026-07' }).boundingBox()
+  expect(tab?.height).toBe(month?.height)
+  expect(tab?.y).toBe(month?.y)
+
   await page.getByRole('button', { name: '기준 정산월 2026-07' }).click()
   await page.getByRole('gridcell', { name: '8월', exact: true }).click()
   await page.getByRole('button', { name: '적용', exact: true }).click()
   await expect(page).toHaveURL(/month=2026-08/)
-  // URL navigation commits before AppShell's effect updates every stored tab.
-  // Wait for that rendered result while retaining all month/page assertions.
-  await expect(async () => {
-    const hrefs = await page
-      .locator('.workspace-tab-link')
-      .evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-    expect(hrefs).toHaveLength(10)
-    for (const href of hrefs) {
-      expect(href).toContain('month=2026-08')
-      expect(href).not.toContain('page=')
-    }
-  }).toPass({ timeout: 5000 })
-
+  const links = page.locator('.workspace-tab-link')
+  await expect(links).toHaveCount(10)
+  // URL 변경 후 셸의 effect가 모든 탭에 기준월을 반영할 때까지 기다린다.
+  for (let index = 0; index < 10; index += 1) {
+    await expect(links.nth(index)).toHaveAttribute('href', /[?&]month=2026-08(?:&|$)/)
+    await expect(links.nth(index)).not.toHaveAttribute('href', /[?&]page=/)
+  }
 })
 
 test('unknown route and keyboard month cancellation', async ({ page }) => {

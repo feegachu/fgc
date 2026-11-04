@@ -80,7 +80,7 @@ export default function ArbitragePage() {
   const busy = query.isLoading || query.isFetching
   const canRecheck = user.canProcess && selected?.paymentStage === 'GA_TO_FC'
   return (
-    <div className="arb-page">
+    <div className="arb-page list-page">
       <header className="page-header">
         <ScreenHelp screenId="ARB-W01" />
         <div className="page-header-copy">
