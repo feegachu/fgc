@@ -56,7 +56,14 @@ const list = (content: StatementEntry[]): StatementList => ({
 })
 const detail = (row: StatementEntry): StatementDetail => ({
   entry: row,
-  evidence: { ratePct: 12.34, basisAmount: 1000000, internalKey: '내부 키' },
+  evidence: {
+    ratePct: 12.34,
+    basisAmount: 1000000,
+    internalKey: '내부 키',
+    sourceType: 'GA_CONFIRMED_PAYMENT',
+    attributionMethod: 'DIRECT',
+    commissionTransactionId: 7,
+  },
   basis: list([row]).basis,
 })
 
@@ -136,6 +143,11 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     expect(within(panel).getByText('지급 귀속월')).toBeInTheDocument()
     expect(within(panel).getByText('12.3%')).toBeInTheDocument()
     expect(within(panel).queryByText('내부 키')).not.toBeInTheDocument()
+    // 저장 코드와 내부 이름 대신 화면 이름을 보인다(SRC-074).
+    expect(within(panel).getByText('GA 확정지급')).toBeInTheDocument()
+    expect(within(panel).getByText('직접 귀속')).toBeInTheDocument()
+    expect(within(panel).getByText('지급 건 번호')).toBeInTheDocument()
+    expect(panel).not.toHaveTextContent(/FIRST_YEAR|TRANSACTION_ATTRIBUTION|GA_CONFIRMED_PAYMENT|DIRECT/)
     expect(within(panel).getByRole('link', { name: '계약 상세 보기' })).toBeInTheDocument()
     expect(router.state.location.search).toContain('entryKey=')
     await user.click(within(panel).getByRole('button', { name: '닫기' }))

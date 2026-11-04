@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
-import { policyParameterLabel, policyParameterValue } from './labels'
+import { policyParameterLabel, policyParameterValue, policySeedText } from './labels'
 import { PolicySources } from './PolicyManagement'
 import { emptyDraft, emptyRegime, permittedActions, PolicyPreviewContext, refLabel, safeSourceUrl } from './management'
 import type { DraftDocument } from './management'
@@ -44,6 +44,19 @@ describe('policy UI boundaries', () => {
     expect(policyParameterValue(36)).toBe('36')
     expect(policyParameterValue('2026-03-01')).toBe('2026-03-01')
     expect(policyParameterValue('NEW_VALUE_FROM_SERVER')).toBe('확인 필요')
+  })
+
+  it('시드가 남긴 승인 근거와 출처 문구의 개발 용어를 화면에서만 바꾼다', () => {
+    expect(policySeedText('시드 승인 (GOLDEN 프로파일·#332)')).toBe('시연 자료 승인, 운영 정책 승인을 대체하지 않음')
+    expect(policySeedText('데모 승인 — #475, 운영 정책 승인을 대체하지 않음')).toBe('시연 자료 승인, 운영 정책 승인을 대체하지 않음')
+    expect(policySeedText('PROJECT_ASSUMPTION — 합성값, #332 시연 커버리지 보강')).toBe('프로젝트 가정 — 합성값 시연 커버리지 보강')
+    expect(policySeedText('REG-10 시행일 보정 (코드리뷰 PR #18 반영)')).toBe('REG-10 시행일 보정')
+    expect(policySeedText('원수사 예상 해약환급률표 2026 (합성값·#332 보강)')).toBe('원수사 예상 해약환급률표 2026 (합성값 보강)')
+    expect(policySeedText('의결서-HTTP-001')).toBe('의결서-HTTP-001')
+    expect(policySeedText(null)).toBe('-')
+    expect(refLabel('운영정책서 제47조: 장기유지 61~84차월은 PROJECT_ASSUMPTION(시드값)')).toBe(
+      '운영정책서 제47조: 장기유지 61~84차월은 프로젝트 가정(가정값)',
+    )
   })
 
   it('does not allow unsafe source links', () => {

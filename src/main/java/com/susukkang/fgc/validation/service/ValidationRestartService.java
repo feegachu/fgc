@@ -76,9 +76,9 @@ public class ValidationRestartService {
             id.equals(
                 com.susukkang.fgc.validation.batch.ValidationRunBatchContext.getValidationRunId(
                     previous.getExecutionContext()));
-        if (!checkpoint) reason = "이어서 처리할 체크포인트가 없습니다.";
+        if (!checkpoint) reason = "이어서 처리할 지점이 없습니다.";
       } catch (IllegalStateException e) {
-        reason = "실패한 배치 실행과 체크포인트를 확인할 수 없습니다.";
+        reason = "실패한 실행 기록을 확인할 수 없습니다.";
       }
     version += ":" + executionId;
     if (active(id)) reason = "이미 재시작 요청이 진행 중입니다.";

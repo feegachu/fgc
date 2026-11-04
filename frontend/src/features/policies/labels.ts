@@ -35,6 +35,20 @@ export function policyParameterValue(value: unknown) {
   return parameterValueLabels[text] ?? (isDeveloperText(text) ? '확인 필요' : text)
 }
 
+/**
+ * 시드가 남긴 승인 근거, 출처 문구의 개발 용어와 이슈 번호를 화면에서만 바꾼다.
+ * 이미 적용된 Flyway 파일은 고칠 수 없다. 저장값은 그대로다.
+ */
+export function policySeedText(value?: string | null) {
+  if (!value) return '-'
+  if (/^(?:시드|데모) 승인/.test(value)) return '시연 자료 승인, 운영 정책 승인을 대체하지 않음'
+  return value
+    .replaceAll('PROJECT_ASSUMPTION', '프로젝트 가정')
+    .replaceAll('시드값', '가정값')
+    .replace(/\s*\(코드리뷰 PR #\d+ 반영\)/, '')
+    .replace(/(?:,\s*|·)#\d+/, '')
+}
+
 const policyCodeLabels: Record<string, string> = {
   RATE: '요율',
   FIXED: '정액',
@@ -47,6 +61,7 @@ const policyCodeLabels: Record<string, string> = {
   FIRST_CONTRACT_CARRY_FORWARD: '최초계약 이월',
   APPROVED_ALLOCATION: '승인배부',
   MANUAL_REVIEW: '수동검토',
+  NEWCOMER_NON_CONTRACT: '신인 지원 제외',
   NOT_APPLICABLE: '해당 없음',
   TOTAL_PAID: '총 지급액',
   CONFIRMED_PAID: '확정 지급액',

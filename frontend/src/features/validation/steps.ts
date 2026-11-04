@@ -1,5 +1,5 @@
 import type { StatusTone } from '../../components/StatusBadge'
-import { isDeveloperText } from '../../lib/screenText'
+import { isDeveloperText, screenMessage } from '../../lib/screenText'
 
 /**
  * 운영정책서 제43조 10단계 이름 — DB 가 아니라 화면 상수다(화면정의서 :1400~1409).
@@ -76,7 +76,7 @@ export function failureText(message?: string | null, failedStep?: number | null)
     .split('|')
     .map((part) => part.trim())
     .filter((part) => part && !isDeveloperText(part))
-  if (sentences.length) return sentences.join(' | ')
+  if (sentences.length) return sentences.map(screenMessage).join(' | ')
   return failedStep && failedStep >= 1 && failedStep <= STEP_NAMES.length
     ? `${failedStep}단계에서 실패했습니다.`
     : '처리 중 오류로 실패했습니다.'

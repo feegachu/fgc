@@ -25,6 +25,7 @@ const forbidden = [
   { label: '변수 이름', pattern: /\b[a-z]+_[a-z0-9_]+\b/g },
   { label: '빈 값', pattern: /\b(?:null|undefined|NaN)\b|\[object Object\]/g },
   { label: '개발 용어', pattern: /\w*Exception\b|\bSQL\b|jdbc|Flyway|watermark|tasklet|\bchunk\b/gi },
+  { label: '개발 용어', pattern: /체크포인트|스냅샷|멱등|트랜잭션|쿼리|워터마크|파라미터|페이로드|배치|시드/g },
   { label: '스택 추적', pattern: /\bat [\w$.]+\([\w$.]+:\d+\)|\b(?:Type|Reference|Syntax)Error\b/g },
   { label: '내부 번호', pattern: /\b(?:FUN|IF-API|SRC|REG|TER|PER|DAR)-\d+/g },
   { label: '화면 ID', pattern: /\b[A-Z]{2,}-W\d\d\b/g },
@@ -36,11 +37,14 @@ const businessWords = new Map([
   ['CSV', '내보내기 파일 형식'],
   ['PDF', '환수 통지서 파일 형식'],
   ['BEST', '포트폴리오 막대 표시, 누구나 읽는 말'],
+  ['FAQ', '금융당국 최종 FAQ를 가리키는 정책 근거 문구'],
 ])
-/** 연도가 든 하이픈 코드: 정책코드(화면정의서 :2027 필수 업무 코드, 사용자가 입력한다)와 판매버전(:612). */
-const businessCode = /\b(?:[A-Z][A-Z0-9]*-)+20\d\d(?:-[A-Z0-9]+)*\b|\b20\d\d(?:-[A-Z0-9]+)+\b/g
+/** 업무 식별자: 정책코드(화면정의서 :2027 필수 업무 코드, 사용자가 입력한다), 판매버전(:614), 표준상품코드(:614). */
+const businessCode = /\b(?:[A-Z][A-Z0-9]*-)+20\d\d(?:-[A-Z0-9]+)*\b|\b20\d\d(?:-[A-Z0-9]+)+\b|\bSTD-[A-Z]+-[A-Z0-9]+\b/g
 /** 코드 열을 요구하는 화면. 기준정보는 조직코드, 항목코드 등을 보여 주는 화면이다(화면정의서 :612~:616). */
 const codeScreens = new Set(['/base'])
+/** 정책 화면은 "이 요율은 어디서 나왔나"에 답하므로 근거 번호를 보인다(화면정의서 :336, :2001). 다른 화면에는 없어야 한다. */
+const evidenceRef = /\b(?:REG|SRC)-\d+[A-Z]?/g
 
 interface Finding {
   role: string
@@ -67,7 +71,7 @@ const routePattern = (pathname: string) =>
   screens.find((screen) => matchPath({ path: screen.path, end: true }, pathname))?.path ?? pathname
 
 function scan(text: string, role: string, route: string, findings: Finding[]) {
-  const shown = text.replace(businessCode, ' ')
+  const shown = (route.startsWith('/policies') ? text.replace(evidenceRef, ' ') : text).replace(businessCode, ' ')
   for (const { label, pattern } of forbidden) {
     for (const hit of shown.matchAll(pattern)) {
       const match = hit[0]
@@ -97,14 +101,15 @@ async function settle(page: Page) {
   }
 }
 
-/** 눈에 보이는 글자 전부: 접힌 영역을 펼치고, 글자로 보이지 않는 아이콘 글꼴 이름은 뺀다. */
+/** 눈에 보이는 글자 전부: 접힌 영역을 펼치고 입력 안내와 말풍선 글도 함께 읽는다. */
 const visibleText = (page: Page) =>
   page.evaluate(() => {
     for (const details of document.querySelectorAll('details')) details.open = true
-    const icons = [...document.querySelectorAll<HTMLElement>('.material-symbols-rounded, .material-symbols-outlined')]
-    for (const icon of icons) icon.style.display = 'none'
+    // 아이콘 글꼴 이름과 외부 기사 제목(보험저널)은 우리 문구가 아니다.
+    const skipped = [...document.querySelectorAll<HTMLElement>('.material-symbols-rounded, .material-symbols-outlined, .cb-news-list')]
+    for (const element of skipped) element.style.display = 'none'
     const text = document.body.innerText
-    for (const icon of icons) icon.style.display = ''
+    for (const element of skipped) element.style.display = ''
     const hints = [...document.querySelectorAll('[placeholder], [title]')].flatMap((element) => [
       element.getAttribute('placeholder') ?? '',
       element.getAttribute('title') ?? '',
@@ -158,7 +163,9 @@ async function walkRole(
   let current: Visit | null = null
   const sizes: Promise<unknown>[] = []
   page.on('console', (message) => {
-    if (message.type() === 'error') current?.consoleErrors.push(message.text())
+    // 로그인 전 갱신 토큰 확인은 401이 정상이다.
+    if (message.type() === 'error' && !(current?.route === '/login' && message.text().includes('status of 401')))
+      current?.consoleErrors.push(message.text())
   })
   page.on('pageerror', (error) => current?.consoleErrors.push(error.message))
   page.on('response', (response) => {
@@ -321,7 +328,7 @@ test('실사용자 화면에 개발 용어와 코드가 보이지 않고 콘솔 
 
   await login(page)
   // 실패한 실행: 대상 선별 단계에 실제 DB 오류를 넣어 서버 실패 경로 전체를 지난다.
-  sql(`CREATE FUNCTION fgc.e2e_fail_target() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'e2e forced failure'; END $$ LANGUAGE plpgsql;
+  sql(`CREATE OR REPLACE FUNCTION fgc.e2e_fail_target() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'e2e forced failure'; END $$ LANGUAGE plpgsql;
        CREATE TRIGGER e2e_fail_target BEFORE INSERT ON fgc.validation_target FOR EACH ROW EXECUTE FUNCTION fgc.e2e_fail_target();`)
   const failedRun = (await api(page, '/validation-runs', { validationMonth: month, runType: 'MONTHLY' })).validationRunId
   await api(page, `/validation-runs/${failedRun}/execute`, {})

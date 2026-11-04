@@ -10,7 +10,7 @@ import { DataTable } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date, dateTime, errorText, rate, won, today } from '../../lib/format'
-import { policyParameterLabel, policyParameterValue } from './labels'
+import { policyParameterLabel, policyParameterValue, policySeedText } from './labels'
 import { screenMessage } from '../../lib/screenText'
 import { ReferenceTabs } from '../reference/ReferenceUI'
 import { useAuth } from '../auth/useAuth'
@@ -165,7 +165,7 @@ export function PolicyManagement({
         </div>
         <div>
           <dt>승인 근거 문서</dt>
-          <dd>{detail.approvalEvidenceRef || '-'}</dd>
+          <dd>{policySeedText(detail.approvalEvidenceRef)}</dd>
         </div>
       </dl>
       <div className="policy-action-bar">
