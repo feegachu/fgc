@@ -1,17 +1,23 @@
 package com.susukkang.fgc.clawback.repository;
 
+import com.susukkang.fgc.common.code.ContractStatus;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Set;
 
 /** 원천을 직접 읽는 UPSERT. 전달받은 계약/날짜/정책을 신뢰해 가짜 후보를 만들지 않는다. */
 @Repository
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class ClawbackCandidateWriteRepository {
+    /** 환수 검토 후보가 되는 상태 사건(FUN-054). 미리보기(FUN-077)도 이 목록으로 후보 여부를 판단한다. */
+    public static final Set<ContractStatus> STATUS_EVENT_TRIGGERS =
+            Set.of(ContractStatus.TERMINATED, ContractStatus.LAPSED, ContractStatus.CANCELLED);
+
     private final EntityManager entityManager;
 
     /** 실제 적격 사건을 해당 사건의 유일 인덱스로 UPSERT하며 동일 재관측은 변경하지 않는다. */
@@ -25,12 +31,14 @@ public class ClawbackCandidateWriteRepository {
                        CAST(e.effective_at AT TIME ZONE 'Asia/Seoul' AS date)
                   FROM fgc.contract_status_event e
                  WHERE e.contract_status_event_id IN (:eventIds)
-                   AND e.new_status IN ('TERMINATED', 'LAPSED', 'CANCELLED')
+                   AND e.new_status IN (:triggers)
                 ON CONFLICT (status_event_id) DO UPDATE
                     SET source_version = EXCLUDED.source_version, event_date = EXCLUDED.event_date
                   WHERE candidate.source_version IS DISTINCT FROM EXCLUDED.source_version
                      OR candidate.event_date IS DISTINCT FROM EXCLUDED.event_date
-                """).setParameter("eventIds", eventIds).executeUpdate();
+                """).setParameter("eventIds", eventIds)
+                .setParameter("triggers", STATUS_EVENT_TRIGGERS.stream().map(Enum::name).toList())
+                .executeUpdate();
     }
 
     /** 계약·기준일 잠금 후 최신 GA_TO_FC 원천을 같은 후보에 연결하며 과거 관측은 되돌리지 않는다. */

@@ -1,15 +1,18 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { paymentEntryHref, safeReturnTo, returnLink } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { date, int, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
+import { withMonth } from '../../stores/workspace'
 import { useAuth, usePermission } from '../auth/useAuth'
 import { contractDetailQuery, recheckContractCap, regenerateContractSchedules } from './api'
 import { ContractStatusBadge, DataOriginBadge } from './badges'
-import { ContractFacts, ContractLoadState, ContractTabs } from './ContractTabs'
-import { contractErrorText, contractTab } from './detailState'
+import { ContractStatusPreviewModal } from './ContractStatusPreview'
+import { ContractTabs } from './ContractTabs'
+import { ContractFacts, ContractLoadState } from './detailParts'
+import { canPreviewStatusEvent, contractErrorText, contractTab } from './detailState'
 import type { ContractTab } from './detailState'
 import './legacy.css'
 import './detail.css'
@@ -24,7 +27,9 @@ function ContractDetailView({ id }: { id: string }) {
   const detail = useQuery({ ...contractDetailQuery(id), enabled: validId })
   const client = useQueryClient()
   const canProcess = usePermission('canProcess')
-  const isAgent = useAuth().user?.roleCode === 'AGENT'
+  const roleCode = useAuth().user?.roleCode
+  const isAgent = roleCode === 'AGENT'
+  const [previewOpen, setPreviewOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
@@ -94,6 +99,9 @@ function ContractDetailView({ id }: { id: string }) {
   const busy = recheck.isPending || regenerate.isPending
   const actionDisabled = !canProcess || !detail.isSuccess || busy
   const contract = detail.data
+  const editLink = returnLink(`/contracts/${id}/edit`, safeReturnTo(params.get('returnTo'), '/contracts'))
+  // AppShell 은 월 없는 주소를 정규화하며 router state 를 버린다. 미리보기 초안이 살아남도록 지금 월을 싣는다.
+  const month = params.get('month')
 
   return (
     <div className="contract-react-detail contract-detail-page">
@@ -144,6 +152,17 @@ function ContractDetailView({ id }: { id: string }) {
                   >
                     지급 등록
                   </Link>
+                )}
+                {canPreviewStatusEvent(roleCode) && (
+                  <Button data-guide-feature="features.contract.contract-detail-page.status-preview"
+                    variant="secondary"
+                    onClick={() => setPreviewOpen(true)}
+                  >
+                    <span className="material-symbols-rounded" aria-hidden="true">
+                      search
+                    </span>
+                    영향 미리보기
+                  </Button>
                 )}
                 <Button data-guide-feature="features.contract.contract-detail-page.button"
                   variant="secondary"
@@ -212,6 +231,14 @@ function ContractDetailView({ id }: { id: string }) {
             />
           </section>
           <ContractTabs id={id} contract={contract} active={active} onSelect={selectTab} agentOnly={isAgent} />
+          <ContractStatusPreviewModal
+            id={id}
+            contract={contract}
+            open={previewOpen}
+            editPath={month ? withMonth(editLink, month, false) : editLink}
+            onClose={() => setPreviewOpen(false)}
+            onReload={() => detail.refetch({ throwOnError: true })}
+          />
         </>
       )}
     </div>

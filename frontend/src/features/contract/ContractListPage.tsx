@@ -161,7 +161,7 @@ export default function ContractListPage() {
     if (page !== criteria.page) update({ page: String(page) }, { resetPage: false, replace: true })
   }, [page, criteria.page, update])
   return (
-    <div className="contract-list-page">
+    <div className="contract-list-page list-page">
       <header className="page-header contract-page-header">
         <h1 className="page-title">보험계약 목록</h1>
         <div className="page-header-actions">
@@ -322,7 +322,7 @@ function ContractFilters({
   return (
     <>
       <FilterBar
-        className="contract-filter-bar"
+        className="contract-filter-bar list-filter-bar"
         embedded
         wrapFields={false}
         icons
