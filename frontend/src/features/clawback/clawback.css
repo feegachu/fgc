@@ -277,3 +277,14 @@
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
 }
+.claw-document-message {
+  padding: var(--space-3);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.claw-document-message p {
+  margin: 0 0 var(--space-2);
+}
+.claw-documents .list-pagination {
+  padding: var(--space-2) var(--space-3);
+}

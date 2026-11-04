@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
+import java.text.Normalizer;
 import java.util.*;
 
 @Component
@@ -19,6 +20,7 @@ public class PicoGuideCatalog {
     private static final Set<String> ROLES = Set.of("SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE", "AGENT");
     private final List<Definition> definitions;
     private final Set<String> screenIds;
+    private final List<String> numericScreenTitles;
     private final Set<String> paymentWorkflowIds;
     private final Map<String, List<Step>> help;
     public record HelpDefinition(String workflowId, List<Step> steps) {}
@@ -26,9 +28,15 @@ public class PicoGuideCatalog {
         try(var stream=new ClassPathResource("ai/pico/screens.generated.json").getInputStream()) {
             List<Map<String,Object>> screens = mapper.readValue(stream,new TypeReference<>(){});
             var ids = new HashSet<String>();
-            for (var screen : screens) ids.add((String) screen.get("id"));
+            var numeric = new ArrayList<String>();
+            for (var screen : screens) {
+                ids.add((String) screen.get("id"));
+                if (screen.get("title") instanceof String title && title.codePoints().anyMatch(Character::isDigit))
+                    numeric.add(Normalizer.normalize(title, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT));
+            }
             ids.add("CMN-C04");
             screenIds = Set.copyOf(ids);
+            numericScreenTitles = List.copyOf(numeric);
         }
         Set<String> featureIds;
         try(var stream=new ClassPathResource("ai/pico/feature-targets.generated.json").getInputStream()) {
@@ -82,6 +90,8 @@ public class PicoGuideCatalog {
     public List<Definition> definitions() { return definitions; }
     public List<Definition> paymentDefinitions() { return definitions.stream().filter(guide -> paymentWorkflowIds.contains(guide.workflowId())).toList(); }
     public boolean supportsScreen(String screenId) { return screenIds.contains(screenId); }
+    /** Approved screen titles that contain digits, such as "1,200% 한도 검증". Naming the screen is not a generated number. */
+    public List<String> numericScreenTitles() { return numericScreenTitles; }
     /** Corpus-derived n-grams rank source labels; no fixed vocabulary or question dispatch. */
     private static Set<String> grams(String text) {
         String normalized = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]", "");

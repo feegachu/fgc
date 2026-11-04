@@ -3,6 +3,7 @@ package com.susukkang.fgc.common.security;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -12,6 +13,19 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AgentRequestAuthorizationTest {
+    @ParameterizedTest
+    @CsvSource({
+            "GET,/api/v1/agent/me/home,true", "POST,/api/v1/agent/me/home,false",
+            "GET,/api/v1/agent/me/home/extra,false", "POST,/api/v1/agent/me/contract-checks,true",
+            "GET,/api/v1/agent/me/contract-checks,false", "PUT,/api/v1/agent/me/contract-checks,false",
+            "DELETE,/api/v1/agent/me/contract-checks,false", "POST,/api/v1/agent/me/contract-checks/1,false"
+    })
+    void homeAndCheckRoutesOnlyPermitTheirExactMethodAndPath(String method, String path, boolean granted) {
+        // FUN-085·086: 본인 홈 조회와 확인 기록 생성 외의 메서드·하위 경로는 열지 않는다.
+        assertThat(AgentRequestAuthorization.SCOPED_READS.check(() -> null,
+                new RequestAuthorizationContext(new MockHttpServletRequest(method, path))).isGranted()).isEqualTo(granted);
+    }
+
     @AfterEach
     void clear() { SecurityContextHolder.clearContext(); }
 
