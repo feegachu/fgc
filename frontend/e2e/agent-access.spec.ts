@@ -43,7 +43,7 @@ async function agentFixture(page: Page, commission = 300000) {
     if (path === '/api/v1/contracts/1/status-events') return fulfill([])
     unexpected.push(path)
     return route.fulfill({ status: 403, json: { data: null, error: {
-      code: 'FGC-AUTH-005', message: '본인 담당 자료만 조회·처리할 수 있습니다.',
+      code: 'FGC-AUTH-005', message: '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.',
     }, requestId: 'agent-ui-fixture' } })
   })
   return unexpected
