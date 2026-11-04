@@ -82,7 +82,17 @@ async function installApi(
         })
       data = { contractId: 103, contractNo: 'OUTSIDE-CONTRACT-103' }
     } else if (path === '/api/v1/transactions/101' && request.method() === 'PUT') {
-      payment = { ...payment, ...request.postDataJSON() }
+      const { expectedUpdatedAt, ...body } = request.postDataJSON()
+      if (expectedUpdatedAt !== payment.updatedAt)
+        return route.fulfill({
+          status: 409,
+          json: {
+            data: null,
+            error: { code: 'FGC-TRAN-010', message: '다른 요청에서 지급 건을 수정했습니다. 현재 입력은 유지됩니다.' },
+            requestId: 'stale-save',
+          },
+        })
+      payment = { ...payment, ...body, updatedAt: '2026-07-31T10:00:00.000001+09:00' }
       data = payment
     } else if (path === '/api/v1/transactions' && request.method() === 'POST') {
       payment = { ...request.postDataJSON(), commissionTransactionId: 101, status: 'DRAFT' }
@@ -214,7 +224,13 @@ async function installApi(
       })
     return route.fulfill({ json: envelope(data) })
   })
-  return { requests, payment: () => payment }
+  return {
+    requests,
+    payment: () => payment,
+    changeOnServer: (change: Record<string, unknown>) => {
+      payment = { ...payment, ...change }
+    },
+  }
 }
 
 test('초안 삭제는 확인 후 실행하며 취소 시 목록을 유지한다', async ({ page }) => {
@@ -481,6 +497,7 @@ const storedDraft = (attributions: unknown[]) => ({
   amount: 250000,
   cashflowType: 'PAYMENT',
   settlementMonth: '2026-07-01',
+  updatedAt: '2026-07-31T09:00:00.123456+09:00',
   attributions,
 })
 const storedRow = {
@@ -537,6 +554,33 @@ test('초안의 자동 보정된 귀속값은 수정 저장 후에만 검증한�
   expect((fixture.payment().attributions as Record<string, unknown>[])[0].inclusionDecisionStatus).toBe('INCLUDED')
   expect(fixture.requests.filter((request) => request.method === 'PUT')).toHaveLength(1)
 })
+test('다른 사람이 먼저 저장한 초안은 409 안내 후 입력을 유지하고 재조회 뒤에만 저장한다 (#753)', async ({ page }) => {
+  const fixture = await installApi(page, { initialDraft: storedDraft([storedRow]) })
+  await page.goto('transactions/new?id=101&month=2026-07')
+  await expect(page.locator('#btn-save')).toBeEnabled()
+  fixture.changeOnServer({ amount: 300000, updatedAt: '2026-07-31T09:05:00.654321+09:00' })
+  await page.locator('#amount').fill('999000')
+  await page.locator('#btn-save').click()
+  await expect(page.locator('.transaction-action-list .field-error')).toContainText('현재 입력은 유지됩니다')
+  await expect(page.locator('#amount')).toHaveValue('999000')
+  await expect(page.locator('#btn-save')).toBeDisabled()
+  await expect(page.locator('#btn-precheck')).toBeDisabled()
+  expect(fixture.payment().amount).toBe(300000)
+  const reload = page.getByRole('button', { name: '최신 지급 건 다시 불러오기', exact: true })
+  const dialog = page.getByRole('dialog', { name: '최신 지급 건 다시 불러오기' })
+  await reload.click()
+  await dialog.getByRole('button', { name: '입력 유지', exact: true }).click()
+  await expect(page.locator('#amount')).toHaveValue('999000')
+  await reload.click()
+  await dialog.getByRole('button', { name: '최신 정보로 바꾸기', exact: true }).click()
+  await expect(page.locator('#amount')).toHaveValue('300000')
+  await expect(page.locator('#btn-save')).toBeEnabled()
+  await page.locator('#amount').fill('310000')
+  await page.locator('#btn-save').click()
+  await expect(page.locator('#amount')).toBeDisabled()
+  expect(fixture.payment().amount).toBe(310000)
+  expect(fixture.requests.filter((request) => request.method === 'PUT')).toHaveLength(2)
+})
 test('빈 저장 초안은 빈 귀속표로 보여 주고 서버 입력 오류로 확정을 차단한다', async ({ page }) => {
   await installApi(page, { initialDraft: storedDraft([]), emptyAttributions: true })
   await page.goto('transactions/new?id=101&month=2026-07')
@@ -589,6 +633,7 @@ for (const viewport of [
         commissionItemId: 1,
         amount: 20,
         cashflowType: 'PAYMENT',
+        updatedAt: '2026-07-31T09:00:00.123456+09:00',
         attributions: [
           {
             contractId: 1,

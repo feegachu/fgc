@@ -1,5 +1,6 @@
 package com.susukkang.fgc.report.repository;
 
+import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.SqlSort;
 import com.susukkang.fgc.report.dto.StatementSummary;
@@ -76,7 +77,7 @@ public class AgentStatementRepository {
                      AND sl.beneficiary_agent_id = ta.agent_id
                      AND EXISTS (SELECT 1 FROM fgc.schedule_header sh WHERE sh.schedule_header_id = sl.schedule_header_id
                                   AND sh.contract_id = ta.contract_id)
-               WHERE ct.recipient_agent_id = :agentId AND ta.agent_id = :agentId AND ct.payment_stage = 'GA_TO_FC'
+               WHERE ct.recipient_agent_id = :agentId AND __OWN_TA__ AND ct.payment_stage = 'GA_TO_FC'
                  AND ct.status = 'CONFIRMED' AND ct.cashflow_type = 'PAYMENT'
                  AND ct.source_type NOT IN ('ADJUSTMENT', 'CLAWBACK', 'RECOVERY')
                  AND NOT EXISTS (SELECT 1 FROM fgc.payment_journal_correction pc
@@ -90,7 +91,8 @@ public class AgentStatementRepository {
                           ELSE COALESCE(ta.attributed_amount, ct.amount) END,
                      ct.policy_version_id, 'COMMISSION_TRANSACTION',
                      jsonb_build_object('commissionTransactionId', ct.commission_transaction_id,
-                                        'cashflowType', ct.cashflow_type, 'note', ct.note,
+                                        'cashflowType', ct.cashflow_type,
+                                        'note', CASE WHEN __MIXED__ THEN NULL ELSE ct.note END,
                                         'replacesPaymentId', (SELECT p.original_payment_id
                                             FROM fgc.payment_journal_correction p
                                            WHERE p.replacement_payment_id = ct.commission_transaction_id),
@@ -99,7 +101,7 @@ public class AgentStatementRepository {
                                            WHERE p.original_payment_id = ct.commission_transaction_id))
                 FROM fgc.commission_transaction ct
                 LEFT JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
-                                                        AND ta.agent_id = :agentId
+                                                        AND __OWN_TA__
                WHERE ct.recipient_agent_id = :agentId AND ct.payment_stage = 'GA_TO_FC'
                  AND ct.status = 'CONFIRMED'
                  AND (ct.source_type = 'ADJUSTMENT'
@@ -138,10 +140,11 @@ public class AgentStatementRepository {
                 JOIN fgc.clawback_case cc ON cc.clawback_case_id = cl.clawback_case_id
                 JOIN fgc.transaction_attribution ta ON ta.transaction_attribution_id = cl.transaction_attribution_id
                 JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
-               WHERE ct.recipient_agent_id = :agentId AND ta.agent_id = :agentId
+               WHERE ct.recipient_agent_id = :agentId AND __OWN_TA__
                  AND cc.status IN ('CALCULATED', 'NOTIFIED', 'OBJECTED', 'CONFIRMED', 'RECOVERING', 'CLOSED')
             )
-            """;
+            """.replace("__OWN_TA__", AgentDataScopeService.ownAttribution("ta"))
+            .replace("__MIXED__", AgentDataScopeService.MIXED_PAYMENT);
 
     private static final String JOINS = """
               FROM entries e
@@ -206,8 +209,9 @@ public class AgentStatementRepository {
 
     /** 상세: 목록과 같은 본인 범위 안에서만 찾는다. 남의 원천이거나 없으면 비어 있다. */
     public Optional<Row> find(long agentId, String entryType, long sourceId, long subId) {
-        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(ENTRIES_CTE + SELECT_ROWS + JOINS
-                + " WHERE e.entry_type = :entryType AND e.source_id = :sourceId AND e.sub_id = :subId");
+        StringBuilder sql = new StringBuilder(ENTRIES_CTE).append(SELECT_ROWS).append(JOINS)
+                .append(" WHERE e.entry_type = :entryType AND e.source_id = :sourceId AND e.sub_id = :subId");
+        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(sql.toString());
         query.setParameter(AGENT_ID, agentId).setParameter(ENTRY_TYPE_PARAM, entryType)
                 .setParameter("sourceId", sourceId).setParameter("subId", subId);
         return rows(query.getResultList()).stream().findFirst();
