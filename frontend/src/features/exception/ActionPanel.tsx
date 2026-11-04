@@ -148,23 +148,24 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
     meta: { errorToast: false },
     onSuccess: async (action) => {
       clearUnsaved()
-      if (!mounted.current) return
       let continueGuide: boolean
       try {
-        if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '')) throw new Error('서버 처리 결과의 조치와 상태를 확인하지 못했습니다.')
-        continueGuide = await saveGuide.saved(Number(action.actionSeq))
+        if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('서버 처리 결과의 조치와 상태를 확인하지 못했습니다.')
+        continueGuide = mounted.current ? await saveGuide.saved(Number(action.actionSeq)) : false
       } catch {
         // The POST already succeeded: never expose a retry for an unverified receipt.
         const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 처리 이력을 확인한 뒤 화면을 다시 여세요.'
-        setNeedsRefresh(true)
-        saveGuide.fail(message)
-        setError(message)
-        toast(message, 'warning')
+        if (mounted.current) {
+          setNeedsRefresh(true)
+          saveGuide.fail(message)
+          setError(message)
+          toast(message, 'warning')
+        }
         void client.invalidateQueries({ queryKey: ['exceptions', 'search'] })
         return
       }
-      if (!mounted.current) return
       applyActionToCache(client, item.exceptionCaseId!, action)
+      if (!mounted.current) return
       setActionType('')
       setReason('')
       setEvidenceRef('')

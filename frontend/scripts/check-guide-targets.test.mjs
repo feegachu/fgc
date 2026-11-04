@@ -1,6 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { inspectTargets, inspectHelpEntries, validateHelpCatalog, validateTargets, check } from './check-guide-targets.mjs'
+import { inspectTargets, inspectHelpEntries, validateHelpCatalog, validateTargets, catalogTargets, check } from './check-guide-targets.mjs'
+test('a target used only by the imported payment JSON is required', () => {
+  const required = catalogTargets([])
+  const declarations = [...new Set(required)].filter(id => id !== 'payment.evidence').map(id => ({ id }))
+  assert.match(validateTargets(required, declarations).join('\n'), /payment.evidence:.*found 0/)
+})
 test('missing and duplicate native or forwarded targets fail', () => {
   const source = '<><section data-guide-target="a"/><Button data-guide-target="a"/></>'
   const declarations = inspectTargets(source).map(id => ({ id }))

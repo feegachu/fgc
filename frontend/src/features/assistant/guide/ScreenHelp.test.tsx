@@ -140,3 +140,74 @@ it('does not run an unregistered screen variant', () => {
   render(<ScreenHelp screenId="CONT-W01" variant="unknown" />)
   expect(screen.getByRole('button', { name: '도움말' })).toBeDisabled()
 })
+
+it('keeps read-only help on row selection, but resets it when the month changes', async () => {
+  function Page() {
+    const [params, setParams] = useSearchParams()
+    return <main id="main-content"><ScreenHelp screenId="EXCP-W01" />
+      {definitions.find(entry => entry.screenId === 'EXCP-W01' && !entry.variant)!.steps.map(step => <section key={step.targetId} data-guide-target={step.targetId} />)}
+      <button onClick={() => setParams({ month: params.get('month')!, selected: '11' })}>예외 선택</button>
+      <button onClick={() => setParams({ month: '2026-08', selected: '11' })}>월 변경</button>
+    </main>
+  }
+  render(<MemoryRouter initialEntries={['/?month=2026-07']}><Page /></MemoryRouter>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await userEvent.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
+  const step = screen.getByText(/화면 사용법 · 2\//).textContent
+  await userEvent.click(screen.getByRole('button', { name: '예외 선택' }))
+  expect(screen.getByText(step!)).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: '월 변경' }))
+  expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()
+})
+
+it('resets reconciliation completion when a different run is selected in the same month', async () => {
+  const guide = new SaveGuide()
+  guide.update('run1', true); guide.begin(); await guide.saved(1)
+  function Page() {
+    const [, setParams] = useSearchParams()
+    return <main id="main-content"><ScreenHelp screenId="RECO-W01" saveGuide={guide} outcome="execution" />
+      {definitions.find(entry => entry.screenId === 'RECO-W01')!.steps.map(step => <section key={step.targetId} data-guide-target={step.targetId} />)}
+      <button onClick={() => setParams({ month: '2026-07', runId: '2' })}>다른 실행</button>
+    </main>
+  }
+  render(<MemoryRouter initialEntries={['/?month=2026-07&runId=1']}><Page /></MemoryRouter>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  const steps = definitions.find(entry => entry.screenId === 'RECO-W01')!.steps
+  for (let i = 0; i < steps.length; i++) {
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: '다음' }))
+  }
+  expect(await screen.findByText('서버 실행 확인 · 가이드 완료')).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: '다른 실행' }))
+  expect(screen.queryByText('서버 실행 확인 · 가이드 완료')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '도움말' })).toHaveAttribute('aria-expanded', 'false')
+})
+
+it.each(['COMPLETED', 'FAILED'])('validation %s follows the right branch and never implies premature finalization', async (status) => {
+  const execution = new SaveGuide(), finalization = new SaveGuide()
+  execution.update('7', true)
+  if (status === 'COMPLETED') { execution.begin(); await execution.saved(7) }
+  else execution.fail('검증 실패')
+  render(<main id="main-content"><ScreenHelp screenId="VRUN-W02" saveGuide={execution} finalizeGuide={finalization} runStatus={status} outcome="execution" />
+    {definitions.find(entry => entry.screenId === 'VRUN-W02' && !entry.variant)!.steps.map(step => <section key={step.targetId} data-guide-target={step.targetId} />)}
+  </main>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  const next = () => screen.getByRole('button', { name: '다음' })
+  for (let i = 0; i < 2; i++) { await waitFor(() => expect(next()).toBeEnabled()); await userEvent.click(next()) }
+  if (status === 'FAILED') {
+    expect(screen.getByText('실행 가이드 · 3/5')).toBeVisible()
+    await userEvent.click(next())
+    expect(await screen.findByText('신규 실행 절차 안내 완료')).toBeVisible()
+    expect(screen.queryByText('서버 확정 확인 · 가이드 완료')).not.toBeInTheDocument()
+  } else {
+    expect(screen.getByText('실행 가이드 · 4/5')).toBeVisible()
+    await userEvent.click(next())
+    expect(next()).toBeDisabled()
+    expect(screen.queryByText('서버 확정 확인 · 가이드 완료')).not.toBeInTheDocument()
+    act(() => { finalization.begin(); void finalization.saved(7) })
+    await waitFor(() => expect(next()).toBeEnabled())
+    await userEvent.click(next())
+    expect(await screen.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+  }
+})

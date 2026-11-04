@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -113,12 +113,12 @@ function renderAt(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   clients.push(client)
   const router = createMemoryRouter(routes, { basename: '/app/', initialEntries: [path] })
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, actions: userEvent.setup(), client, unmount: view.unmount }
 }
 const calls = (key: string) =>
   vi
@@ -533,6 +533,59 @@ it('finalize help rejects a non-FINALIZED response and waits for acknowledgement
   await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
   expect(await screen.findByRole('dialog', { name: '확정했습니다' })).toBeVisible()
   expect(keys[0]).toBe(keys[1])
+})
+
+it('invalidates a finalized run even if its page unmounts before the response', async () => {
+  currentUser = gaAdmin
+  detailHandlers()
+  let finish!: (value: unknown) => void
+  handlers['POST /api/v1/validation-runs/7/finalize'] = () => new Promise(resolve => { finish = resolve })
+  const { actions, client, unmount } = renderAt('/app/validation-runs/7')
+  client.setQueryData(['validation-runs', 'receipt-test'], { status: 'COMPLETED' })
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  await actions.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  unmount()
+  await act(async () => finish({ status: 'FINALIZED' }))
+  await waitFor(() => expect(client.getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
+})
+
+it('the detail help waits for the real finalization result before completing', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  currentUser = gaAdmin
+  detailHandlers()
+  handlers['POST /api/v1/validation-runs/7/finalize'] = () => ({ status: 'FINALIZED' })
+  const { actions } = renderAt('/app/validation-runs/7?month=2026-07')
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(await screen.findByRole('button', { name: '도움말' }))
+  const next = () => screen.getByRole('button', { name: '다음' })
+  for (let i = 0; i < 3; i++) { await waitFor(() => expect(next()).toBeEnabled()); await actions.click(next()) }
+  expect(next()).toBeDisabled()
+  expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  await actions.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }))
+  const done = await screen.findByRole('dialog', { name: '확정했습니다' })
+  await actions.click(within(done).getByRole('button', { name: '확인' }))
+  await waitFor(() => expect(next()).toBeEnabled())
+  await actions.click(next())
+  expect(await screen.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+}, 10000)
+
+it('invalidates a created run even if its page unmounts before the response', async () => {
+  handlers['GET /api/v1/validation-runs'] = () => listPage([])
+  handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+  let finish!: (value: unknown) => void
+  handlers['POST /api/v1/validation-runs'] = () => new Promise(resolve => { finish = resolve })
+  const { actions, client, unmount } = renderAt('/app/validation-runs')
+  const create = await screen.findByRole('button', { name: /실행 생성/ })
+  await waitFor(() => expect(create).toBeEnabled())
+  client.setQueryData(['validation-runs', 'receipt-test'], [])
+  await actions.click(create)
+  await waitFor(() => expect(finish).toBeDefined())
+  unmount()
+  await act(async () => finish({ validationRunId: 7, runNo: 2, status: 'CREATED' }))
+  await waitFor(() => expect(client.getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
 })
 
 it('does not allow finalizing a partial contract run even with a passed checklist', async () => {

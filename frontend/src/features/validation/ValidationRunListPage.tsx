@@ -236,9 +236,9 @@ function CreateSection() {
     mutationFn: () => { saveGuide.begin(); return createRun(month, runType) },
     meta: { errorToast: false },
     onSuccess: async (created) => {
+      void client.invalidateQueries({ queryKey: ['validation-runs'] })
       if (!mounted.current || !(await saveGuide.saved(Number(created.validationRunId))) || !mounted.current) return
       toast(`${month} 검증월 ${created.runNo}회차 실행이 생성되었습니다.`, 'success')
-      void client.invalidateQueries({ queryKey: ['validation-runs'] })
       const to = `/validation-runs/${created.validationRunId}`
       void navigate(shellMonth ? withMonth(to, shellMonth) : to)
     },

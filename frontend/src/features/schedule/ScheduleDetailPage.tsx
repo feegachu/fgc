@@ -705,6 +705,7 @@ function RegenerateModal({
     },
   })
   const close = () => {
+    if (mutation.isPending) return
     setReason('')
     setError('')
     mutation.reset()

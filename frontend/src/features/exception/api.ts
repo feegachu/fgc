@@ -139,7 +139,7 @@ export function applyActionToCache(
     return {
       ...current,
       content: current.content?.map((item) =>
-        item.exceptionCaseId === exceptionCaseId
+        item.exceptionCaseId === exceptionCaseId && !item.actions?.some((existing) => existing.actionSeq === action.actionSeq)
           ? {
               ...item,
               status: action.toStatus,

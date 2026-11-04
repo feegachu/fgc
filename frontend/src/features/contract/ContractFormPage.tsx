@@ -18,7 +18,7 @@ import type { Agent, Product } from '../base/api'
 import { useEntityChoices } from '../base/selection'
 import { usePolicyRequest } from '../policies/usePolicyRequest'
 import { SearchSelect } from '../../components/SearchSelect'
-import { contractDetailQuery, createContract, updateContract } from './api'
+import { ContractSaveReceiptError, contractDetailQuery, createContract, updateContract } from './api'
 import type { ContractDetail, ContractUpdateRequest } from './api'
 import { ContractStatusBadge } from './badges'
 import {
@@ -179,7 +179,7 @@ function ContractEditor({
   // 무효면 저장 버튼이 잠겨 submit이 오류를 그리지 못하므로, 값을 넣은 사건 필드는 규칙 위반을 바로 보여 준다.
   const eventError = (field: keyof StatusEventDraft) =>
     errors[`statusEvent.${field}`] ?? (statusEvent[field] ? eventErrors[`statusEvent.${field}`] : undefined)
-  const disabled = !valid || saving || loadingReferences || Boolean(referenceError) || conflict || missingToken
+  const disabled = !valid || saving || savedSuccessfully || loadingReferences || Boolean(referenceError) || conflict || missingToken
   const changes = [
     statusChanged && '상태 사건 기록, 해당 미확정 대상 처리',
     original && changesSchedule(createRequest(form), original) && '산정정보 변경에 따른 스케줄 새 버전',
@@ -258,6 +258,7 @@ function ContractEditor({
     submitting.current = true
     setSaving(true)
     saveGuide.begin()
+    let committed = false
     try {
       const body = createRequest(form)
       const request: ContractUpdateRequest | undefined = id
@@ -269,14 +270,16 @@ function ContractEditor({
         : undefined
       const updated = request ? await updateContract(id!, request, requestKey(request)) : undefined
       const saved = updated ?? (await createContract(body))
-      const savedId = saved.contractId ?? id
-      if (!savedId) throw new Error('저장 결과의 계약 번호를 확인하지 못했습니다. 목록에서 저장 여부를 확인해 주세요.')
+      committed = true
       setSavedSuccessfully(true)
       clearUnsaved()
+      setConfirmSave(false)
+      const savedId = saved.contractId ?? id
       // Invalidate inactive projections too: an update can regenerate schedules and financial snapshots.
       await queryClient.invalidateQueries({ queryKey: ['contracts'], refetchType: 'none' })
       await queryClient.invalidateQueries({ queryKey: ['schedules'], refetchType: 'none' })
       await queryClient.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
+      if (!savedId) throw new Error('저장 결과의 계약 번호를 확인하지 못했습니다.')
       // The save still updates caches after leaving, but must not navigate away from the user's new screen.
       if (!mounted.current) return
       const count = saved.scheduleHeaderIds?.length ?? 0
@@ -296,6 +299,21 @@ function ContractEditor({
         state: { message },
       })
     } catch (error) {
+      if (committed || error instanceof ContractSaveReceiptError) {
+        void queryClient.invalidateQueries({ queryKey: ['contracts'], refetchType: 'none' })
+        void queryClient.invalidateQueries({ queryKey: ['schedules'], refetchType: 'none' })
+        void queryClient.invalidateQueries({ queryKey: ['cap-checks'], refetchType: 'none' })
+        if (!mounted.current) return
+        setSavedSuccessfully(true)
+        clearUnsaved()
+        setConfirmSave(false)
+        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 목록에서 저장 결과를 확인하세요.'
+        saveGuide.fail(message)
+        setSaveError(message)
+        setSaving(false)
+        toast(message, 'warning')
+        return
+      }
       if (!mounted.current) return
       const message = contractErrorText(error instanceof Error ? error : new Error('보험계약을 저장하지 못했습니다.'))
       if (error instanceof ApiError) {
@@ -364,7 +382,7 @@ function ContractEditor({
     <>
       {saveError && (
         <div className="surface contract-form-error" role="alert">
-          <strong>입력 내용을 확인해 주세요.</strong>
+          <strong>{savedSuccessfully ? '저장 결과를 확인해 주세요.' : '입력 내용을 확인해 주세요.'}</strong>
           <p>{saveError}</p>
         </div>
       )}
@@ -391,7 +409,7 @@ function ContractEditor({
         noValidate
         aria-label={`보험계약 ${id ? '수정' : '등록'} 입력`}
       >
-        <fieldset className="contract-editor-fields contract-form-layout" disabled={saving || reloading}>
+        <fieldset className="contract-editor-fields contract-form-layout" disabled={saving || savedSuccessfully || reloading}>
           <section data-guide-feature="features.contract.contract-form-page.section"
             className="surface contract-form-card contract-basic-form-card contract-editor-basic"
             aria-labelledby="contract-basic-heading"

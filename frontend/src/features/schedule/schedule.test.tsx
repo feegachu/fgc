@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -520,4 +520,29 @@ it('regeneration help validates reason and waits for new server version before n
   expect(await modal.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
   await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/12'))
+})
+
+it('blocks every close path while the new schedule version is being created', async () => {
+  let finish!: (value: unknown) => void
+  const { actions } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return new Promise(resolve => { finish = resolve })
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
+  await actions.type(within(dialog).getByLabelText(/생성 사유/), '원천 변경')
+  await actions.click(within(dialog).getByRole('button', { name: '새 버전 만들기' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  await actions.click(within(dialog).getByRole('button', { name: '창 닫기' }))
+  await actions.keyboard('{Escape}')
+  expect(dialog).toBeVisible()
+  expect(within(dialog).getByRole('button', { name: '취소' })).toBeDisabled()
+  // Reject the request to restore the ordinary close/retry flow without creating a new version.
+  await act(async () => finish({ scheduleHeaderId: 0 }))
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: '취소' })).toBeEnabled())
+  await actions.click(within(dialog).getByRole('button', { name: '취소' }))
+  expect(dialog).not.toBeInTheDocument()
 })

@@ -156,7 +156,14 @@ function DetailBody({
   }, [progress.errorUpdateCount, progress.dataUpdatedAt, progress.error, progress.isSuccess, progress.isError])
 
   const [executionGuide] = useState(() => new SaveGuide())
+  const [finalizeGuide] = useState(() => new SaveGuide())
   useRunGuide(executionGuide, id, Boolean(status), id, status, progress.isError ? '진행률 조회에 실패했습니다. 서버 결과를 다시 확인하세요.' : status === 'FAILED' ? failureMessage || '검증 실행 실패' : '')
+  useEffect(() => {
+    if (status === 'FINALIZED' && finalizeGuide.getSnapshot().savedId === null) {
+      finalizeGuide.begin()
+      void finalizeGuide.saved(id).catch(error => finalizeGuide.fail(String(error)))
+    }
+  }, [finalizeGuide, id, status])
 
   const execute = useMutation({
     mutationFn: () => { executionGuide.begin(); return executeRun(id) },
@@ -177,7 +184,7 @@ function DetailBody({
   return (
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
-        <ScreenHelp screenId="VRUN-W02" saveGuide={executionGuide} outcome="execution" />
+        <ScreenHelp screenId="VRUN-W02" saveGuide={executionGuide} finalizeGuide={finalizeGuide} runStatus={status} outcome="execution" />
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
@@ -339,6 +346,7 @@ function DetailBody({
       <ChecklistSection status={status} checklist={checklist} />
 
       <FinalizeSection
+        finalizeGuide={finalizeGuide}
         id={id}
         status={status}
         canFinalize={canFinalize}
@@ -636,6 +644,7 @@ function newKey(id: string) {
 }
 
 function FinalizeSection({
+  finalizeGuide,
   runType,
   id,
   status,
@@ -646,6 +655,7 @@ function FinalizeSection({
   onDone,
   onFailed,
 }: {
+  finalizeGuide: SaveGuide
   id: string
   runType?: string
   status?: string
@@ -658,7 +668,6 @@ function FinalizeSection({
 }) {
   const [confirming, setConfirming] = useState(false)
   const [finalized, setFinalized] = useState(false)
-  const [finalizeGuide] = useState(() => new SaveGuide())
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const supportedType = runType === 'MONTHLY' || runType === 'PRE_CONFIRM'
@@ -674,6 +683,7 @@ function FinalizeSection({
     },
     meta: { errorToast: false },
     onSuccess: async (result) => {
+      if (result.status === 'FINALIZED') onDone()
       if (!mounted.current) return
       if (result.status !== 'FINALIZED') throw new Error('서버의 최종 확정 상태를 확인하지 못했습니다.')
       if (!(await finalizeGuide.saved(id)) || !mounted.current) return
