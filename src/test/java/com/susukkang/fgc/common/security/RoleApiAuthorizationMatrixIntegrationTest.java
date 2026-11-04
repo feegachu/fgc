@@ -180,6 +180,9 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 row("IF-42", POST, "/api/v1/reconciliations/{}/exceptions", null, PROCESS),
                 row("IF-45", POST, "/api/v1/validation-runs", "{\"validationMonth\":\"없는달\",\"runType\":\"없는유형\"}", PROCESS),
                 row("IF-48", POST, "/api/v1/validation-runs/{}/execute", null, PROCESS),
+                // 본문 검증이 @PreAuthorize 보다 먼저 돌아 형식이 맞는 본문이 있어야 역할 판정까지 닿는다.
+                row("IF-82", POST, "/api/v1/validation-runs/{}/restart", """
+                        {"expectedBatchExecutionId":999999999,"expectedStateVersion":"role-matrix","reason":"역할 행렬 시험"}""", PROCESS),
                 row("IF-51", POST, "/api/v1/validation-runs/{}/finalize", null, APPROVER),
                 // 정책 #747 — IF-79·80·81·75. 동작별 역할은 §4-2 IF-75 와 화면정의서 정책 절이 나눈다
                 row("IF-79", POST, "/api/v1/policies", POLICY, PROCESS_OR_GA),

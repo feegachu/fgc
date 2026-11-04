@@ -17,7 +17,7 @@
 |---|---|
 | 무슨 도구로 | CodeQL(정적), Dependabot, npm audit, Trivy(의존성, 이미지), gitleaks, GitHub Secret scanning(비밀값), 역할 × API 행렬 통합 시험(인가), 공격 입력 통합 시험(입력), OWASP ZAP(동적) |
 | 어디까지 | 코드 전체 이력, 쓰기 API 39개 전수 대조(역할 시험 36개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 139건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
-| High/Critical 건수 | 탐지 15건 → 오탐 3, 이 PR로 조치 10, **예외 2(`.trivyignore` 승인 기재, Dependabot 해제는 PM 승인 대기)**. ZAP High 0 |
+| High/Critical 건수 | 탐지 15건 → 오탐 3, 이 PR로 조치 10, **예외 2(`.trivyignore` 승인 기재, Dependabot #26은 PM이 해제)**. ZAP High 0 |
 | 조치 | 빌드 도구 classpath의 jackson, commons-lang3 올림. 개발 도구 zod 올림. API 이미지에서 쓰지 않는 pebble 제거. nginx 버전 노출 끄기. ZAP이 찾은 500 응답 3종을 400으로. 정적 화면 응답에 빠져 있던 보안 헤더(CSP 등)는 #782로 넣었고 신한 경로까지 확인 |
 | 남은 일 | RC에서 ZAP, Trivy, TLS, 롤백 실측. 시연 서버의 계정 보호 상태 확인(3절 층 3) |
 
@@ -37,7 +37,7 @@
 | # | 층 | 도구, 버전 | 대상 | 범위 | 발견 | 조치, 판정 | 상태 |
 |---|---|---|---|---|---|---|---|
 | 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `747bc68d` | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
-| 2 | 의존성, 이미지 | Dependabot, npm audit, Trivy 0.70.0 | 4-2 | 운영 jar, 빌드 classpath, npm, API/WEB 이미지 | Critical 2, High 10 | High 10 조치(jackson 5, zod 1, pebble 4). Critical 2는 예외(4-2, 7절) | 병합 뒤 재확인, 예외 승인 대기 |
+| 2 | 의존성, 이미지 | Dependabot, npm audit, Trivy 0.70.0 | 4-2 | 운영 jar, 빌드 classpath, npm, API/WEB 이미지 | Critical 2, High 10 | High 10 조치(jackson 5, zod 1, pebble 4). Critical 2는 예외(4-2, 7절) | 병합 뒤 재확인 |
 | 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조. 그 뒤 develop과 이 PR 커밋 20개는 같은 도구로 추가 1회, 0건 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
 | 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 39개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
 | 5 | 입력 | `InputAttackIntegrationTest`, `PrivateVolumeFileStorageTest`, `CsvExportWriterTest`, `exception.test.tsx`, `noRawHtml.test.ts` | 대표 검색, 정렬, 저장 후 응답, 다운로드 | 4-5 | 저장 후 실행, SQL 실행, 경로 탈출 0 | 4-5 | 통과. 요구사항 해석은 4-5에서 확정 |
@@ -244,5 +244,5 @@ API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)
 
 | 대상 | 내용 | 승인자 | 만료 |
 |---|---|---|---|
-| CVE-2026-47890 (Dependabot #26, `.trivyignore`) | SSE 뷰 프래그먼트 미사용, OSS 6.2 수정본 없음 | `.trivyignore`: HyunJuneKang 기재, PR #460 리뷰 승인 yslee4601. Dependabot 해제: **PM 승인 대기** | 2026-11-30 |
+| CVE-2026-47890 (Dependabot #26, `.trivyignore`) | SSE 뷰 프래그먼트 미사용, OSS 6.2 수정본 없음 | `.trivyignore`: HyunJuneKang 기재, PR #460 리뷰 승인 yslee4601. Dependabot 해제: yslee4601, 2026-11-04(사유 `not_used`) | 2026-11-30 |
 | CVE-2026-47884 (`.trivyignore`) | `XsltView`, xslt 미사용 (`src/main` 0건 재확인) | `.trivyignore`: HyunJuneKang 기재, PR #458 리뷰 승인 yslee4601 | 2026-11-30 |
