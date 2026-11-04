@@ -19,7 +19,7 @@
 | 어디까지 | 코드 전체 이력, 쓰기 API 39개 전수 대조(역할 시험 36개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 139건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
 | High/Critical 건수 | 탐지 15건 → 오탐 3, 이 PR로 조치 10, **예외 2(`.trivyignore` 승인 기재, Dependabot 해제는 PM 승인 대기)**. ZAP High 0 |
 | 조치 | 빌드 도구 classpath의 jackson, commons-lang3 올림. 개발 도구 zod 올림. API 이미지에서 쓰지 않는 pebble 제거. nginx 버전 노출 끄기. ZAP이 찾은 500 응답 3종을 400으로. 정적 화면 응답에 빠져 있던 보안 헤더(CSP 등)는 #782로 넣었고 신한 경로까지 확인 |
-| 남은 일 | RC에서 ZAP, Trivy, TLS, 롤백 실측. 시연 서버의 계정 보호 상태 확인(3절 층 3). SER-004 요구사항 해석 PM 확인(4-5) |
+| 남은 일 | RC에서 ZAP, Trivy, TLS, 롤백 실측. 시연 서버의 계정 보호 상태 확인(3절 층 3) |
 
 ## 2. 대상
 
@@ -40,7 +40,7 @@
 | 2 | 의존성, 이미지 | Dependabot, npm audit, Trivy 0.70.0 | 4-2 | 운영 jar, 빌드 classpath, npm, API/WEB 이미지 | Critical 2, High 10 | High 10 조치(jackson 5, zod 1, pebble 4). Critical 2는 예외(4-2, 7절) | 병합 뒤 재확인, 예외 승인 대기 |
 | 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조. 그 뒤 develop과 이 PR 커밋 20개는 같은 도구로 추가 1회, 0건 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
 | 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 39개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
-| 5 | 입력 | `InputAttackIntegrationTest`, `PrivateVolumeFileStorageTest`, `CsvExportWriterTest`, `exception.test.tsx`, `noRawHtml.test.ts` | 대표 검색, 정렬, 저장 후 응답, 다운로드 | 4-5 | 저장 후 실행, SQL 실행, 경로 탈출 0 | 4-5 | 시험 통과. 요구사항 해석은 PM 확인 대기(4-5) |
+| 5 | 입력 | `InputAttackIntegrationTest`, `PrivateVolumeFileStorageTest`, `CsvExportWriterTest`, `exception.test.tsx`, `noRawHtml.test.ts` | 대표 검색, 정렬, 저장 후 응답, 다운로드 | 4-5 | 저장 후 실행, SQL 실행, 경로 탈출 0 | 4-5 | 통과. 요구사항 해석은 4-5에서 확정 |
 | 5-2 | 업로드 | `noHandlerAcceptsFileUpload` | 앱 전체 매핑 | 해당 기능 없음 | 0 | #637 not planned, PR #707 닫힘 (트래커 #755 4번 11/2 결정). 업로드가 돌아오면 이 시험이 깨진다 | 해당 없음 |
 | 6 | AI(LLM) 주입 | #639 평가셋 | #639 | 프롬프트 주입, 다른 설계사 자료, 업무 쓰기 유도 | #639로 연결 | CT-G04, CT-G05는 #639가 판정. 서버 쪽 통제는 #833으로 병합: 사용자별 호출 한도(분당 12회), 범위 밖 질문 고정 안내, 지시문 노출 차단, 시간 제한 20초 | #639 |
 | 7 | 동적 스캔 | OWASP ZAP, `infra/scripts/zap-isolated-scan.sh` | 격리 로컬 스택, 이미지 `sha-69f77eff` | baseline 1회(수동 관찰), API scan 1회(능동, 7분, 제한 25분 안에 끝남). RC 이미지 재실행과 개발계 baseline은 RC | High 0, Medium 0. Low 1, Info 1(baseline) / Low 4, Info 3(API) | 4-6 | 격리 사전 실행 완료, RC 미확인 |
@@ -154,7 +154,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 | CSV 수식 | 기존 `CsvExportWriterTest` | 수식 시작 문자 무력화 |
 | CSRF | 기존 `tokenEndpointsRejectMissingClientHeaderOrForeignOrigin`, `originCheckFollowsHttpsBehindTlsTerminatingProxy` | Refresh 쿠키 경로는 Origin, X-FGC-Client가 맞지 않으면 거부. 나머지 API는 쿠키로 인증하지 않아 해당 없음(CodeQL #2 참고) |
 
-**요구사항 해석:** 자유 입력 칸의 `<script>` 문자열은 입력에서 막지 않고 글자 그대로 보관한다. 세부내용("출력 이스케이프와 허용목록")과 OWASP XSS Prevention Cheat Sheet(SRC-028, 출력 인코딩이 1차 방어)에 맞춘 판단이다. "저장·실행되지 않는다"를 "저장되어 실행되는 일이 없다"로 읽었다. 저장 자체를 막아야 한다는 뜻이면 다시 연다. **PM 확인 대기.** 근거 없음, 확인 필요: 원문 출처 SRC-006이 누락이라 대조하지 못했다.
+**요구사항 해석:** 자유 입력 칸의 `<script>` 문자열은 입력에서 막지 않고 글자 그대로 보관한다. 세부내용("출력 이스케이프와 허용목록")과 OWASP XSS Prevention Cheat Sheet(SRC-028, 출력 인코딩이 1차 방어)에 맞춘 판단이다. "저장·실행되지 않는다"를 "저장되어 실행되는 일이 없다"로 읽는다. **확정 (2026-11-04, PM 위임 판단).** 이유: 처리규칙이 출력 이스케이프를 수단으로 명시하고, 위 시험에서 저장 후 실행 경로와 HTML 해석 경로가 0건이며, 입력에서 막으면 `A<B` 같은 정상 입력까지 거절한다. 업무 규칙이 아니라 구현 기술 판단이다. 다시 열 조건: SRC-006 원문 확보(지금은 근거대장에 누락) 또는 저장 자체를 막으라는 요구.
 
 ### 4-6. 동적 스캔
 
