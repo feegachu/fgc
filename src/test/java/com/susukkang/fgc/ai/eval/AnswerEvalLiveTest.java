@@ -76,7 +76,7 @@ class AnswerEvalLiveTest {
                 mini ? GPT_4O_MINI_INPUT_USD_PER_MTOK : null, mini ? GPT_4O_MINI_OUTPUT_USD_PER_MTOK : null, results);
         AnswerEvaluator.write(run, dir);
         AnswerEvalHarness.MAPPER.writerWithDefaultPrettyPrinter().writeValue(dir.resolve("recorded-answers.json").toFile(),
-                new Recorded(model, run.promptVersion(), System.getenv("FGC_EVAL_BASE_COMMIT"), answers, verdicts));
+                new Recorded(model, run.promptVersion(), AnswerEvalHarness.guideFingerprint(), System.getenv("FGC_EVAL_BASE_COMMIT"), answers, verdicts));
         String base = System.getenv("FGC_EVAL_BASE");
         if (base != null && !base.isBlank()) {
             RunResult previous = AnswerEvalHarness.MAPPER.readValue(Path.of(base).toFile(), RunResult.class);

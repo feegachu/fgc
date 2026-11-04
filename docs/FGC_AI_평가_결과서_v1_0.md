@@ -307,7 +307,8 @@ FGC_LLM_LIVE=true FGC_EVAL_BASE_COMMIT=$(git rev-parse --short HEAD) ./gradlew t
 - 반복: `FGC_EVAL_REPEAT=3`. 모델 답이 매번 달라 차단 결함은 반복해서 본다
 - 호출 상한: `FGC_EVAL_MAX_CALLS`(기본 120, 반복까지 합친 값). 넘으면 남은 사례를 '미실행'으로 남긴다. 최대 입력 2만 자, 출력 1,024토큰이면 호출당 0.0036달러이므로 120회는 0.43달러를 넘지 않는다
 - 다시 판정: 판정기나 서버 검사를 고치면 `FGC_EVAL_REPLAY=<실행 폴더,...>`로 호출 없이 다시 판정한다. 폴더의 `rejudged/`에 결과가 남는다
-- 재생 기록 갱신: 프롬프트 버전이 달라졌거나 판정이 바뀌면 실제 호출 후 `rejudged/recorded-answers.json`을 `src/test/resources/ai-eval/answers/recorded-answers.json`으로 복사하고 이 문서의 실측을 고친다
+- 재생 기록 갱신: 프롬프트 버전이 달라졌거나 판정이 나빠지면 실제 호출 후 `recorded-answers.json`(재판정했으면 `rejudged/` 안의 것)을 `src/test/resources/ai-eval/answers/recorded-answers.json`으로 복사하고 이 문서의 실측을 고친다
+- 화면 문구를 고쳐 안내가 다시 생성되면 근거 ID가 바뀐다. 회귀는 안내 자료 지문이 기록과 다르면 피코 재생 판정을 비교하지 않고 안내만 출력한다. 저장 악성 답변과 FUN-079 재생은 그대로 본다. 이때 대표 세트는 리허설 전에 실제 호출로 다시 기록한다
 
 운영, 개발계의 실제 사용량은 `ai_call_log`로 같은 값을 읽는다(읽기 전용).
 

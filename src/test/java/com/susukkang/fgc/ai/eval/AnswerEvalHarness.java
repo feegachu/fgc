@@ -38,8 +38,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,9 +79,25 @@ final class AnswerEvalHarness implements AutoCloseable {
     record CaseFile(List<EvalCase> cases, Map<String, CompareRankingResponse> rankings) {
     }
 
-    /** 실제 호출 결과를 재생용으로 남기는 파일. verdicts 는 기록 당시 판정이다. */
-    record Recorded(String model, String promptVersion, String baseCommit, Map<String, Map<String, JsonNode>> answers,
-                    Map<String, String> verdicts) {
+    /** 실제 호출 결과를 재생용으로 남기는 파일. verdicts 는 기록 당시 판정, guideFingerprint 는 기록 당시 안내 자료의 지문이다. */
+    record Recorded(String model, String promptVersion, String guideFingerprint, String baseCommit,
+                    Map<String, Map<String, JsonNode>> answers, Map<String, String> verdicts) {
+    }
+
+    /** 피코 근거의 원본 파일 지문(SHA-256 앞 12자리, 줄바꿈 통일). */
+    static String guideFingerprint() {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (String file : List.of("payment-guides.v1.json", "workflow-guides.v1.json", "workflow-help.generated.json")) {
+                String text = new ClassPathResource("ai/pico/" + file).getContentAsString(StandardCharsets.UTF_8);
+                digest.update(text.replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8));
+            }
+            return HexFormat.of().formatHex(digest.digest()).substring(0, 12);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private AnswerEvalHarness(LlmProperties properties) throws IOException {
