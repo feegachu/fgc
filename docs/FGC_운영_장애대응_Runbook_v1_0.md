@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | FGC-PSR-005 운영, 장애대응 Runbook (요구사항명세서 v3.0 PSR 시트. 원 근거 SRC-005, SRC-006. SRC-006은 근거대장에 "누락"으로 원문이 없다) |
 | 인수조건 | 장애 모의훈련에서 Runbook을 따라 탐지, 조치, 복구, 기록을 완료한다 |
-| 기준 코드 | develop `9a0a37ca` (2026-11-04, #836 병합, Flyway V78). 열린 PR을 인용할 때는 번호와 커밋을 적었다. "지금"은 이 커밋을 뜻한다 |
+| 기준 코드 | develop `25626562` (2026-11-04, #871 병합, Flyway V80). 열린 PR을 인용할 때는 번호와 커밋을 적었다. "지금"은 이 커밋을 뜻한다 |
 | 모의훈련 | 부록 A. 격리 환경에서 돌린 것과 돌리지 못한 것을 나눠 적었다. 훈련 이미지는 `185dc854`이고 그 뒤 병합분은 부록 A에 구분했다 |
 | 짝 문서 | `docs/FGC_사용자_관리자_매뉴얼_v1_0.md` |
 
@@ -12,17 +12,18 @@
 
 **공개 저장소다.** 주소, 계정 비밀번호, SSH 별칭, 키 값은 `<자리표시자>`로 적었다. 실제 값은 저장소 밖에서 받는다. 명령을 실행하며 비밀값을 화면, 로그, 이슈에 남기지 않는다.
 
-**근거 표기.** `[SRC-xx]`는 근거대장 ID다. `[T번호]`는 부록 A의 훈련 기록이고 근거대장 ID는 SRC-077이다. 어느 자료에도 없는 운영 규칙은 "가상 GA 정책으로 정함"이라고 적고 다시 열 조건을 함께 적었다. 이 문서는 수수료, 한도, 규제 판정 규칙을 새로 정하지 않는다.
+**근거 표기.** `[SRC-xx]`는 근거대장 ID다. `[T번호]`는 부록 A의 훈련 기록이고 근거대장 ID는 SRC-077이다. 코드만 읽어 확인한 내용은 `코드 대조`라고 적었고 [T번호]를 붙이지 않았다. 어느 자료에도 없는 운영 규칙은 "가상 GA 정책으로 정함"이라고 적고 다시 열 조건을 함께 적었다. 이 문서는 수수료, 한도, 규제 판정 규칙을 새로 정하지 않는다.
 
 | 장 | 근거 |
 |---|---|
 | 0 | 팀 10차 회의, 트래커 #755 4번 [SRC-067]. 발표 서버 [SRC-076]. 담당 배정은 제안 |
-| 2 | `Jenkinsfile.*`, `infra/scripts/*`, PR #836 [SRC-076], 훈련 T1~T3, T7, T22~T24 |
+| 1-6 | PR #870 [SRC-028], 훈련 T30. 앞단 동작은 미측정 |
+| 2 | `Jenkinsfile.*`, `infra/scripts/*`, PR #836 [SRC-076], PR #870 6절 [SRC-028], 훈련 T1~T3, T7, T22~T24 |
 | 3 | 운영정책서 '일일 변경분 처리', 인터페이스정의서 §7-5, [SRC-065], 훈련 T8~T12 |
 | 4 | 시드 명세서 §5, [SRC-065], [SRC-076], [SRC-027 D-04], 훈련 T4~T7, T27, T28 |
 | 5 | [SRC-060], [SRC-075], 인터페이스정의서 IF-EXT-03, 훈련 T16~T19, T26. 예산 임계값은 가상 GA 정책 |
-| 6 | 인터페이스정의서 §4-4-4, §7-6, FUN-045 (#672), 훈련 T13, T14. 6-3절은 PM 결정, 팀 공유 전 |
-| 7 | V74, #719 코멘트, 훈련 T15. PM 결정, 팀 공유 전 |
+| 6 | 인터페이스정의서 §4-4-4, §7-6, FUN-045 (#672, PR #844), V80, 코드 대조 [SRC-028]. 훈련 T13, T14는 #844 전 이미지. 6-3절은 PM 결정, 팀 공유 전 |
+| 7 | V74, V79, #719 코멘트, 인터페이스정의서 §4-4-2, PR #831, #835, 코드 대조 [SRC-028]. 훈련 T15는 처리기가 없던 이미지. PM 결정, 팀 공유 전 |
 | 8 | PR #812, 트래커 4번 [SRC-067], 훈련 T21 |
 | 9 | 트래커 4번, PMR-007, TER-010 [SRC-067], 훈련 T20 |
 
@@ -56,6 +57,14 @@
 | GA관리자 역할 승인 | 근거 없음, 확인 필요 | 3장, 6-3절, 7장 복구 승인. 리허설 전 지정 |
 
 전화번호와 메신저 주소는 저장소에 적지 않는다. 실제 연락 수단은 리허설 전에 팀 공간에 모은다(근거 없음, 확인 필요).
+
+**세 시나리오 밖의 증상**
+
+| 증상 | 원인 | 절 |
+|---|---|---|
+| 로그인 화면에 `'로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.'` (HTTP 429) | 로그인 시도 제한. 서버 장애가 아니다 | 1-6절 |
+| 월 통합검증 실패, 배치가 멈춤 | 6-1절 표로 가른다 | 6장 |
+| 계약 상세에 `'자동 재시도를 모두 쓴 후속 처리가 있습니다.'`, 그 계약의 지급 확정이나 스케줄 확정이 막힘 | 상태 사건 후속 작업 소진 | 7장 |
 
 ---
 
@@ -94,6 +103,7 @@ SQL은 표준 입력으로 넘긴다. 값이 프로세스 목록에 보이지 �
 | 디스크 | `df -h`, `docker system df` | `df -h`, `podman system df` | 8장. 파일 볼륨 가득 참은 health에 드러나지 않는다 [T21] |
 | DB | `"${compose[@]}" exec -T db pg_isready -U fgc -d fgc` | DB 컨테이너에서 같은 명령 | |
 | 배치 | 아래 SQL | 같은 SQL | `RUNNING`이 오래 남으면 6-3절, `계약수동`이 `CREATED`로 오래 남으면 6-5절 |
+| 로그인 | `"${compose[@]}" logs --tail=200 web` | web 컨테이너의 `podman logs` | `limiting requests`가 보이면 1-6절 |
 
 ```sql
 SELECT validation_run_id, run_type, status, current_step, started_at, left(failure_message, 120)
@@ -126,6 +136,40 @@ SELECT validation_run_id, run_type, status, current_step, started_at, left(failu
 - `ticket`: RFC나 이슈 댓글 번호. 승인 원문은 거기에 남긴다.
 - 근거: 일 배치 복구는 SRC-065. 나머지 수동 절차(6-3절, 7장)는 같은 통제를 따르며 **PM 결정, 팀 공유 전**이다.
 
+### 1-6. 로그인 시도 제한 (429)
+
+서버 장애가 아니다. nginx가 로그인 요청(`/api/v1/auth/login`)만 세어 넘치면 API로 보내지 않고 429를 돌려준다. 성공과 실패를 가리지 않고 세며, 비밀번호나 계정 상태를 보지 않고 계정을 잠그지도 않는다(PR #870). 값은 업무 규칙이 아니라 AWS 경로와 맞춘 운영 설정이다 [SRC-028]. 다시 열 조건: 시연이나 부스에서 정상 로그인이 막힐 때, 앞단 헤더 동작을 측정했을 때(2-4절).
+
+| 단계 | 내용 |
+|---|---|
+| 탐지 | 로그인 화면의 `'로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.'`. web 로그의 `limiting requests` |
+| 초기 판단 | 다른 회선에서 로그인되면 서버는 정상이다. `'아이디 또는 비밀번호가 맞지 않습니다.'`는 이 제한이 아니다 |
+| 담당 | DevOps 확인. 값을 바꾸면 배포와 같이 PL 승인 |
+| 조치 | 기다렸다가 한 명씩 다시 시도한다. 정상 사용이 반복해서 막히면 값을 올린다 |
+| 검증 | 같은 위치에서 로그인 성공, web 로그에 새 `limiting requests` 없음 |
+| 사후 기록 | 1-4절. 값을 바꿨으면 전후 값과 이유 |
+
+**값과 대기 시간 [T30]**
+
+| 항목 | 값 |
+|---|---|
+| 제한 | 분당 30회(2초에 1회)에 순간 10회를 더 허용. `rate=30r/m`, `burst=10` |
+| 연속 시도 | 11번까지 통과, 12번째부터 429 |
+| 막힌 뒤 | 2초마다 1번씩 풀린다. 22초 쉬면 다시 11번 된다 |
+| 세는 기준 (신한) | `X-Forwarded-For`의 마지막 값. 앞쪽 값은 위조할 수 있어 보지 않는다. 헤더가 없으면 세지 않는다. 앞단 동작은 미측정이다(2-4절) |
+| 세는 기준 (AWS) | 접속 주소(`$binary_remote_addr`). 코드 대조 |
+
+**같은 공유기에서 여러 명이 로그인할 때 (시연장, 부스).** 밖에서 보면 주소가 하나이므로 앞단이 같은 값을 붙이면 **한 사용자로 세어진다.** 20명이 거의 동시에 누르면 11명이 통과하고 9명이 안내를 본다 [T30]. 막힌 사람은 몇 초 뒤 다시 누르면 되고, 한 명씩 로그인하면 분당 30명까지 막히지 않는다. 다른 사용자로 세어지는 사람에게는 영향이 없다 [T30].
+
+**값을 올리는 곳 (코드 대조)**
+
+| 경로 | 파일 | 재배포 |
+|---|---|---|
+| 신한 | `infra/shinhan/nginx-http.conf`의 `rate=30r/m`, `infra/shinhan/nginx-guard.conf`의 `burst=10` | PR 병합 뒤 `release-shinhan-fgc`를 같은 `SOURCE_BUILD`로 다시 돌린다(2-2절). 이미지는 그 빌드의 digest 그대로이고, 설정은 작업이 체크아웃한 저장소의 `infra/shinhan/`을 `deploy-shinhan.sh`가 복사한다(`Jenkinsfile.shinhan`의 `checkout scm`). 병합 위치는 이 작업이 체크아웃하는 브랜치다(Jenkins 작업 설정, 저장소 밖) |
+| AWS | `infra/scripts/deploy-host.sh`가 만드는 `fgc-http.conf`의 `rate=30r/m`, `10-guard.conf`의 `burst=10` | 이 스크립트는 `bundle.tgz`에 들어가므로 develop 병합 뒤 `dev-fgc`, `stage-fgc`, `release-fgc` 전체 경로다(2-1절) |
+
+신한 재배포는 공개 웹을 멈췄다가 다시 올리고 DB 백업도 받으므로 **시연 중에는 돌리지 않는다.** Jenkins가 없으면 2-3절로 하되 그 체크아웃에 같은 변경이 있어야 한다. 서버에서 `$state/nginx/`를 직접 고쳐도 다음 배포가 저장소 값으로 덮어쓴다. 2-6절의 `previous/` 복원으로 #870 전 릴리스로 돌아가면 제한도 함께 빠진다. 실제 서버에서 돌린 기록은 없다.
+
 ---
 
 ## 2. 배포 재현과 롤백
@@ -150,7 +194,7 @@ develop 병합 → CI build, frontend → publish: ghcr.io/feegachu/fgc/{api,web
 2. 데모 계정 보호를 먼저 끝낸다(4장). 안 하면 스크립트가 멈춘다.
 3. Jenkins `release-shinhan-fgc`: `SOURCE_BUILD`, `PRD_URL=<PRD_URL>`, `RFC_URL`. 승인자는 PL.
 
-스크립트 동작(`infra/scripts/deploy-shinhan.sh`): 이미지 pull → 라벨과 digest 검증 → nginx 템플릿 추출, 적응 → `compose config` → 현재 설정 보관(`$release/previous/`) → `pg_dump`(`$state/backups/`, 경로는 `$release/db-backup-path.txt`) → `up -d db api` → health 대기 → `nginx -t` → 웹 교체 → 로컬과 공개 주소의 `/login` 200, 로그인 경로 401 확인 → `current.json` 기록. API가 뜨지 않으면 웹을 올리지 않고 멈춘다. DB는 자동으로 되돌리지 않는다. 배포 전 백업은 **DB만** 받는다. 파일 볼륨은 받지 않는다(9장).
+스크립트 동작(`infra/scripts/deploy-shinhan.sh`): 이미지 pull → 라벨과 digest 검증 → nginx 템플릿 추출, 적응, `infra/shinhan/`의 `compose.yaml`, `nginx-guard.conf`, `nginx-http.conf` 복사 → `compose config` → 데모 계정 검사(4-4절) → 현재 설정 보관(`$release/previous/`) → `pg_dump`(`$state/backups/`, 경로는 `$release/db-backup-path.txt`) → 웹 중지 → `up -d db api` → health 대기 → 데모 계정 재검사 → `nginx -t` → 웹 교체 → 로컬과 공개 주소의 `/login` 200, 로그인 경로 401 확인 → `current.json` 기록. API가 뜨지 않으면 웹을 올리지 않고 멈춘다. DB는 자동으로 되돌리지 않는다. 배포 전 백업은 **DB만** 받는다. 파일 볼륨은 받지 않는다(9장).
 
 ### 2-3. Jenkins 없이 배포 (CI/CD 서버 다운)
 
@@ -175,6 +219,32 @@ bash infra/scripts/deploy-host.sh release.json
 | Flyway | `SELECT version, success FROM fgc.flyway_schema_history ORDER BY installed_rank DESC LIMIT 3;` | 실패 행 없음. 순서 밖 적용 뒤에는 마지막 행이 최대 버전이 아닐 수 있다 |
 | 차단 경로 | 공개 주소 `/actuator/health` | 404 [T1] |
 | 업무 | 로그인(전 역할), 대시보드, 파일 다운로드, 배치 상태 | 트래커 7번 |
+| 로그인 제한 앞단 경계 (신한) | 아래 측정 | 뒤쪽 요청이 429, VM 80번 직접 접속 불가. **미측정** |
+
+**앞단 경계 측정 (PR #870 6절, 미측정).** 신한의 로그인 제한(1-6절)은 앞단이 `X-Forwarded-For`를 덧붙이거나 덮어쓰고, VM 80번이 앞단에서만 열려 있다고 가정한다. 저장소 밖 사실인데 접속 권한이 없어 아직 보지 못했다. 가정이 틀리면 제한이 꺼질 뿐 로그인은 막히지 않는다 [T30]. 배포 뒤 한 번 잰다. 잰 PC는 잠시 429를 볼 수 있으므로 시연 중에는 하지 않는다.
+
+1. 외부 PC에서 없는 계정으로 15회 로그인하되 요청마다 `X-Forwarded-For`를 다른 값으로 보낸다.
+
+```bash
+base=<PRD_URL>
+for n in $(seq 1 15); do
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST "$base/api/v1/auth/login" \
+    -H 'Content-Type: application/json' -H "Origin: $base" -H 'X-FGC-Client: web' \
+    -H "X-Forwarded-For: 198.51.100.$n" -d '{"loginId":"__edge_probe__","password":"x"}'
+done | tr '\n' ' '; echo
+```
+
+2. 서버의 web 로그 마지막 칸으로도 본다: `"${compose[@]}" logs --tail=20 web | grep auth/login`
+
+| 응답 | web 로그 마지막 칸 | 뜻 |
+|---|---|---|
+| 뒤쪽 요청이 429 | `"198.51.100.15, <접속 주소>"` 또는 `"<접속 주소>"` | 앞단이 덧붙이거나 덮어쓴다. 가정대로다 |
+| 전부 401 | `"-"` | 앞단이 헤더를 붙이지 않는다. **제한이 꺼진 상태다** |
+| 전부 401 | `"198.51.100.15"` | 앞단이 보낸 값을 그대로 넘긴다. **제한이 꺼진 상태다** |
+
+3. 앞단을 거치지 않고 외부에서 VM 80번에 접속되는지 본다(`curl -m 5 -I http://<VM 공인 주소>/login`). 접속되면 안 된다. compose는 80번을 모든 인터페이스에 연다(`infra/shinhan/compose.yaml`의 `"80:80"`).
+4. 다른 PC에서 정상 로그인이 되는지 본다.
+5. 어긋나면 앞단 주소를 받아 `set_real_ip_from`으로 신뢰 경계를 넣거나, 보안시험 결과서(`docs/FGC_보안시험_결과서_v1_0.md`, PR #858, 아직 미병합) 7절에 위험 수용 사유와 승인자를 적는다.
 
 ### 2-5. 롤백 판단
 
@@ -527,7 +597,7 @@ unset OLD_PW
 
 ### 4-4. 배포 단계 검사
 
-#836(`9a0a37ca`)이 넣었다. 행 존재 검사는 PR #862(아직 미병합)가 더한다. **같은 검사를 다시 만들지 않는다.**
+#836(`9a0a37ca`)이 넣었고 행 존재 검사는 #862(`1b70467d`)가 더했다. **같은 검사를 다시 만들지 않는다.**
 
 | 시점 | 검사 | 걸리면 |
 |---|---|---|
@@ -538,8 +608,6 @@ unset OLD_PW
 | API 기동 뒤, 웹 교체 전 | 공개 시드 비밀번호로 5개 계정에 실제 로그인, 모두 401인가 | 공개 웹을 멈추고 실패한다. 요청 본문은 표준 입력으로만 보내 명령 인자와 로그에 비밀번호가 남지 않는다 |
 
 격리 DB에서 SQL을 직접 돌려 보호 전 `admin,audit01,gaadmin,settle01`과 `agent01` 차단, 보호 뒤 빈 결과를 확인했다 [T4, T5]. 해시 검사만으로는 새 salt로 다시 해시한 공개 비밀번호를 잡지 못해 [T6] 로그인 거절을 함께 본다. 스크립트 시험과 행 존재 SQL 실행은 [T28].
-
-#862 병합 전에는 행이 없는 계정의 401이 통과하므로 4-1절로 5개 행을 직접 확인한다.
 
 ### 4-5. 신한 서버의 agent01과 설계사 시연 (#836)
 
@@ -682,28 +750,31 @@ SELECT (requested_at AT TIME ZONE 'Asia/Seoul')::date AS day, purpose,
 |---|---|---|
 | 월 실행 상태가 `FAILED` | Step 실패 | 6-2절 |
 | `RUNNING`인데 진행하지 않음, 실행 번호가 늘지 않음 | 프로세스가 중간에 죽음 | 6-3절 |
+| `[실패 지점부터 재시작]`이 꺼지고 `'이미 재시작 요청이 진행 중입니다.'` 또는 `'같은 월에 다른 실행이 진행 중입니다.'`가 오래 남음 | 재시작 접수 행이 활성으로 남음 | 6-3절 |
 | 수동 차익 검증이나 일 배치가 `FGC-VRUN-001`로 막힘, `계약수동` 실행이 `CREATED`로 오래 남음 | 실패한 수동 차익 검증이 남긴 행 | 6-5절 |
 | `계약수동` 실행 `FAILED` | 일 배치 Step 실패. 워터마크는 전진하지 않음 | 6-4절 |
 | `계약수동` 실행 `COMPLETED`인데 예외가 생김 | 계약 단위 실패 | 3장 |
 
-**탐지:** VRUN-W02 빨간 단계와 `'실패 사유'`, 1-3절 SQL. **담당:** 강호원, 정산담당자가 화면 실행. **FUN-045 담당 이슈:** #672.
+**탐지:** VRUN-W02 빨간 단계와 `'실패 사유'`, 1-3절 SQL. **담당:** 강호원, 정산담당자가 화면 실행. **FUN-045:** #844로 구현했고 #672는 닫혔다.
 
 ### 6-2. 월 실행 재시작
 
-| | 지금 (PR #688 병합, 과도기) | #844 병합 뒤 (초안, `25ba6b72` 기준) |
-|---|---|---|
-| 경로 | `POST /api/v1/validation-runs/{id}/execute`가 `FAILED`인 `MONTHLY`, `PRE_CONFIRM`을 받는다 | `POST /api/v1/validation-runs/{id}/restart` (IF-API-82). `execute`는 `CREATED`만, `FAILED`는 409 |
-| 화면 | VRUN-W02 `[실패 지점부터 재시작]` | 사유 확인창, 서버 판정(`restartability`), 재시도 이력 |
-| 입력 | 없음 | 사유, 멱등키, 상태 버전 |
-| 재사용 | 같은 JobInstance. 완료 Step은 건너뜀 | 같다 |
-| 동시 요청 | 조건부 점유로 하나만, 진 쪽은 `FGC-VRUN-005` | 월, 실행 잠금과 활성 요청 UNIQUE (V80) |
-| 프로세스 중단 뒤 | 6-3절 | `LAUNCHING`이나 배치 `RUNNING`은 자동 실패로 추정하지 않는다. 6-3절을 리허설 때 #844 기준으로 다시 확인 |
+| 항목 | 지금 (코드 대조) |
+|---|---|
+| 경로 | `POST /api/v1/validation-runs/{id}/restart` (IF-API-82). `SETTLEMENT`, `SYSTEM_ADMIN`. 202는 접수이고 완료가 아니다. `execute`는 `CREATED`만 받고 `FAILED`는 409 `FGC-VRUN-004`다 (`ValidationRunExecuteServiceImpl`) |
+| 화면 | VRUN-W02 `[실패 지점부터 재시작]` → 창 `'실패 지점 재시작 확인'` → `'재시작 사유'` 입력 → `[재시작 요청]`. 버튼은 서버 판정(`restartability`)이 허용할 때만 켜지고, 막힌 이유를 문구로 보인다. 결과는 `'재시도 이력'` 표에 남는다 |
+| 입력 | 사유(1~500자), `Idempotency-Key`, 실패한 배치 실행 번호(`expectedBatchExecutionId`), 상태 버전(`expectedStateVersion`). 사유 말고는 화면이 채운다. 같은 키에 같은 내용이면 같은 접수를 돌려주고, 내용이 다르면 409다 |
+| 재사용 | 같은 실행 번호, 같은 JobInstance의 새 JobExecution. 완료 Step은 건너뜀 |
+| 동시 요청 | 월, 실행 잠금과 활성 요청 UNIQUE(`uq_validation_retry_active`, V80)로 하나만. 진 쪽은 `FGC-VRUN-005` |
+| 접수 상태 | `validation_run_retry.state`: `ACCEPTED` → `LAUNCHING`(기동 스레드가 잡음) → `RUNNING`(JobExecution 시작, `batch_execution_id` 기록) → `SUCCEEDED` 또는 `FAILED`(`BATCH_FAILED`) |
+| 기동 실패 | 대기열 포화 등은 503 `FGC-VRUN-008`, `FAILED`, `LAUNCH_FAILED`. 기동되지 않은 `ACCEPTED`는 5분 뒤 `FAILED`, `LAUNCH_TIMEOUT` (30초 주기 스케줄러) |
+| 프로세스 중단 뒤 | `LAUNCHING`이나 `RUNNING`은 자동 실패로 추정하지 않는다. 6-3절 |
 
-인터페이스정의서 §4-4-4의 표가 정본이다. `MANUAL_CONTRACT`는 두 경우 모두 월 재시작으로 보내지 않는다.
+인터페이스정의서 §4-4-4가 정본이다. 그 절의 "PR #688 과도기" 표는 오른쪽 칸(정식 계약)이 지금 동작이다. `MANUAL_CONTRACT`는 월 재시작으로 보내지 않는다(6-4절).
 
-**조치:** 실패 사유를 읽고 원인을 고친 뒤 재시작한다. 고치지 않으면 같은 곳에서 다시 실패한다 [T13].
+**조치:** 실패 사유를 읽고 원인을 고친 뒤 재시작한다. 고치지 않으면 같은 곳에서 다시 실패한다 [T13]. 성공해도 자동으로 확정되지 않는다.
 
-**검증 [T13]:**
+**검증 (앞의 두 SQL은 [T13], 마지막 SQL은 코드 대조):**
 
 ```sql
 SELECT x.job_execution_id, x.status, i.job_instance_id
@@ -711,9 +782,11 @@ SELECT x.job_execution_id, x.status, i.job_instance_id
  WHERE i.job_name = 'MonthlyValidationJob' ORDER BY 1 DESC LIMIT 5;
 SELECT step_name, status, job_execution_id FROM fgc.batch_step_execution
  WHERE job_execution_id = (SELECT max(job_execution_id) FROM fgc.batch_job_execution) ORDER BY step_execution_id;
+SELECT retry_id, state, previous_batch_execution_id, batch_execution_id, failed_step, error_code, requested_at, finished_at
+  FROM fgc.validation_run_retry WHERE validation_run_id = <실행 번호> ORDER BY retry_id DESC;
 ```
 
-같은 `job_instance_id`에 새 실행이 생기고 실패한 Step부터만 있어야 한다. `validation_run`은 `COMPLETED`, 8이다. 감사에 `VALIDATION_RUN_RETRIED`가 남는다. 11/2 감사가 지적한 "정식 재시작 없음"은 #844 병합 전까지 그대로다(#672).
+같은 `job_instance_id`에 새 실행이 생기고 실패한 Step부터만 있어야 한다. `validation_run`은 `COMPLETED`, 8이다. 접수 행은 `SUCCEEDED`다. 감사에 `VALIDATION_RUN_RETRIED`가 남고 재시작 사유는 `validation_run_retry.reason`에 있다. T13은 #844 전 이미지의 `execute` 경로로 돌린 기록이다. `/restart` 경로는 `MonthlyJournalRestartIntegrationTest`(30건 중 25번째 실패 뒤 재시작), `ValidationRestartIntegrationTest`(동시 요청, 멱등, 기동 실패)가 PostgreSQL로 보고, 앱을 띄워 돌린 기록은 없다. 리허설 때 확인한다. 11/2 감사가 지적한 "정식 재시작 없음"은 #844로 해소됐다.
 
 ### 6-3. RUNNING 고착
 
@@ -785,13 +858,28 @@ COMMIT;
 SQL
 ```
 
-**검증 [T14]:** 상태 `FAILED`, 배치 실행 `FAILED`. 월 실행은 `[실패 지점부터 재시작]`을 눌러 실패 Step부터 이어 간다. `계약수동`은 새 실행을 만든다. 감사 행위 `VALIDATION_RUN_FORCED_FAILED`.
+**검증 [T14]:** 상태 `FAILED`, 배치 실행 `FAILED`. `계약수동`은 새 실행을 만든다. 감사 행위 `VALIDATION_RUN_FORCED_FAILED`. 월 실행은 `[실패 지점부터 재시작]`으로 실패 Step부터 이어 간다(6-2절). T14는 #844 전 이미지라 재시작을 `execute`로 돌렸다. 이 SQL 뒤의 `/restart`는 코드 대조만 했고 리허설(11/10) 때 확인한다.
+
+**재시작 도중에 죽었을 때 (코드 대조, 미시험).** `validation_run_retry`에 활성 행이 남을 수 있다.
+
+```sql
+SELECT retry_id, validation_run_id, state, previous_batch_execution_id, batch_execution_id, requested_at, started_at
+  FROM fgc.validation_run_retry WHERE state IN ('ACCEPTED', 'LAUNCHING', 'RUNNING');
+```
+
+| 남은 `state` | 실행 상태 | 어떻게 되나 |
+|---|---|---|
+| `ACCEPTED` | `FAILED` | API가 다시 뜨면 스케줄러가 접수 5분 뒤 `FAILED`, `LAUNCH_TIMEOUT`으로 닫는다. 기다린다 |
+| `LAUNCHING` | `FAILED` | 자동으로 닫히지 않는다(`ValidationRestartService.expireUnstartedRequests`는 `ACCEPTED`만 본다). 위 SQL은 `RUNNING` 실행만 받으므로 거절된다 |
+| `RUNNING` | `RUNNING` | 자동으로 닫히지 않는다. 위 SQL로 실행은 `FAILED`가 되지만 이 행은 그대로다 |
+
+활성 행이 남아 있으면 그 실행의 버튼은 `'이미 재시작 요청이 진행 중입니다.'`로, 같은 달 다른 실행의 버튼은 `'같은 월에 다른 실행이 진행 중입니다.'`로 꺼진다. 같은 달의 새 `월간` 실행은 `FGC-VRUN-001`, 확정은 `FGC-VRUN-005`로 막힌다(`hasActiveRetryForMonth`). **이 행을 푸는 승인 절차는 아직 없다(근거 없음, 확인 필요).** 손으로 고치지 않고 PM에게 올린다(1-5절). 다시 열 조건: 리허설에서 재현하거나 이 상태가 실제로 생겼을 때.
 
 스냅샷 전에는 활성 실행이 없는지 먼저 본다(9-1절). 활성 실행이 든 스냅샷을 복원하면 같은 고착이 생긴다.
 
 ### 6-4. 일 배치 Step 실패
 
-Step이 `FAILED`면 워터마크는 전진하지 않아 다음 실행이 같은 구간을 다시 읽는다(`WatermarkAdvanceStepListener`). `계약수동` 실행은 재시작 대상이 아니다(`FGC-VRUN-004`). 원인을 고치고 새 실행을 만들거나 다음 02:00을 기다린다. 이 경로는 코드 대조만 했다. Step 실패 주입은 월 실행으로 시험했다 [T13].
+Step이 `FAILED`면 워터마크는 전진하지 않아 다음 실행이 같은 구간을 다시 읽는다(`WatermarkAdvanceStepListener`). `계약수동` 실행은 재시작 대상이 아니다. 화면에 재시작 버튼이 없고 서버도 거절한다(`execute`는 `FGC-VRUN-004`, `/restart`는 `FGC-VRUN-005`). 원인을 고치고 새 실행을 만들거나 다음 02:00을 기다린다. 이 경로는 코드 대조만 했다. Step 실패 주입은 월 실행으로 시험했다 [T13].
 
 자동 실행을 끄는 설정 `fgc.batch.daily-changed-contract.enabled`가 있지만 compose에 넘기는 변수가 없다. 배치를 멈춰야 하면 API를 멈춘다.
 
@@ -801,7 +889,7 @@ Step이 `FAILED`면 워터마크는 전진하지 않아 다음 실행이 같은 
 
 활성 `계약수동` 실행은 전역 1건이라(V13) 이 행이 있으면 모든 수동 차익 검증이 `FGC-VRUN-001`로 막힌다. 02:00 일 배치도 막힌다. 일 배치는 그날 만든 행만 이어받고, 그 전 행이 남아 있으면 새 실행을 만들다 같은 오류로 실패한다 [코드 대조, `CreateDailyRunTasklet`].
 
-**탐지:** 화면의 `실행 생성 불가` 안내, 일 배치 실패 로그, 아래 SQL. **#871을 배포한 뒤 한 번 확인한다.** 그 전에 남은 행은 배포해도 사라지지 않는다.
+**탐지:** 화면의 `실행을 만들 수 없습니다.` 안내, 일 배치 실패 로그, 아래 SQL. **#871을 배포한 뒤 한 번 확인한다.** 그 전에 남은 행은 배포해도 사라지지 않는다.
 
 ```sql
 SELECT validation_run_id, status, triggered_by, created_at FROM fgc.validation_run
@@ -820,16 +908,25 @@ SELECT validation_run_id, status, triggered_by, created_at FROM fgc.validation_r
 
 `contract_event_job.attempt_count`가 `ContractStatusFollowUpService.MAX_ATTEMPTS`(5)에 닿으면 자동으로 잡히지 않고, **같은 계약의 뒤 사건도 함께 멈춘다** (`ContractEventJobRepository.claimNext`). 처리 중단으로 실패 기록 없이 끝나면 상태만으로 소진을 알 수 없으므로 시도 횟수로 판단한다(#719 코멘트).
 
-새 API를 만들지 않고 이 절차로 다룬다. **PM 결정, 팀 공유 전.** 다시 열 조건: 수동 재시도 화면이 생길 때(서비스 코드 주석의 `shortcut`, #719).
+새 API를 만들지 않고 이 절차로 다룬다. **PM 결정, 팀 공유 전.** 다시 열 조건: 운영에서 소진이 반복되거나 운영 담당이 DB 접근 없이 재시도해야 할 때(인터페이스정의서 §4-4-2).
 
-**지금 상태:** develop에는 처리기가 없어 실제 행이 생기지 않는다. PR #831(`PaymentHoldJob`), #835(`PaymentResumeJob`)가 병합되면 쓰인다. 상태 사건 등록 자체는 지금도 된다.
+**처리기 (#831, #835, 코드 대조).** 사건을 저장하는 트랜잭션에서 아래 조건에 맞는 처리기마다 작업 1행이 생긴다. 스케줄러가 10초마다 잡아 실패하면 1, 2, 4, 8분 뒤 다시 시도하고, 5번째 시도가 끝나면 소진이다(첫 시도부터 약 15분).
+
+| 작업 (`processing_job`) | 화면 이름 | 작업이 생기는 사건 | 하는 일 |
+|---|---|---|---|
+| `PaymentHoldJob` (`PaymentHoldFollowUpProcessor`) | `지급 보류 처리` | 새 상태가 `UNPAID`, `LAPSED`, `TERMINATED`, `MATURED`, `CANCELLED`, 또는 `UNPAID` → `ACTIVE` | 미확정 지급 건에 `payment_hold`, 회차를 `HOLD`나 `CANCELLED`로. `UNPAID` → `ACTIVE`면 미납으로 건 보류와 회차를 푼다 |
+| `PaymentResumeJob` (`PaymentResumeFollowUpProcessor`) | `부활 재개 처리` | 새 상태가 `REVIVED` | 정책이 허용한 회차를 `PLANNED`로, 그 지급 건 보류를 해제. 자동으로 확정하지 않는다 |
+
+그 밖의 사건은 작업이 없다(화면 `대상 없음`).
+
+**소진하면 막히는 것.** 그 사건의 보류나 재개가 반영되지 않고, **그 계약에 끝나지 않은 작업이 있는 동안 지급 확정과 스케줄 확정이 `FGC-IMPL-PAYMENT_HELD`로 거절된다** (`PaymentHoldGate`의 `FOLLOW_UP_PENDING`, `PaymentHoldFollowUpIntegrationTest`). 환수(차감) 건은 대상이 아니다.
 
 | 단계 | 내용 |
 |---|---|
-| 탐지 | 아래 SQL. 계약 상세 `기본정보` 탭의 `'후속 처리 작업'`에서 실패가 멈춰 있음 |
-| 초기 판단 | 실패 사유를 읽는다. 뒤에 기다리는 사건이 있는지 본다 |
+| 탐지 | 아래 SQL. 계약 상세 `기본정보` 탭 `'상태이력'` 표의 `'후속 상태'`가 `자동 재시도 소진`이고 표 위에 `'자동 재시도를 모두 쓴 후속 처리가 있습니다. 이 계약의 뒤 사건도 함께 멈춥니다. 운영 담당 확인이 필요합니다.'`. 확정 화면의 `'확정할 수 없습니다. 계약 상태 사건으로 보류된 지급 건이거나 후속 처리가 끝나지 않았습니다.'`로 먼저 드러나기도 한다 |
+| 초기 판단 | 실패 사유를 읽는다. 뒤에 기다리는 사건이 있는지 본다. 화면이 `처리 중`이면 마지막 시도가 끝나지 않은 것이니 기다린다. `FGC-IMPL-POLICY_MISSING`이면 계약일에 적용할 상태별 지급조건 정책을 찾지 못한 것이다 |
 | 담당 | 실행 시스템 관리자, 승인 GA관리자, 원인은 해당 처리기 담당 |
-| 조치 | 원인을 고치고 아래 SQL |
+| 조치 | 원인을 고치고 아래 SQL. 정책 누락은 정책 절차로 고친다 |
 | 검증 | 아래 표 |
 | 사후 기록 | 1-4절, 감사 행위 `CONTRACT_EVENT_JOB_MANUAL_RETRY` |
 
@@ -847,14 +944,14 @@ SELECT j.contract_status_event_id, j.processing_job, j.state, j.attempt_count, j
  ORDER BY e.contract_id, e.event_seq;
 ```
 
-**트리거 제약:** `contract_event_job`에는 트리거가 없어 갱신할 수 있다(#831, #835도 추가하지 않는다). `contract_status_event_processing`, `contract_status_event_effect`, `audit_log`는 append-only라 고치거나 지우지 않는다. 처리기 결과, 영향 기록, 성공 이력, 완료 표시는 한 트랜잭션이라(`ContractStatusFollowUpService.process`) 실패한 시도의 영향은 남지 않고, 성공은 작업당 1행이다(`uq_cse_processing_succeeded`).
+**트리거 제약:** `contract_event_job`에는 트리거가 없어 갱신할 수 있다(#831, #835도 추가하지 않았다). `contract_status_event_processing`, `contract_status_event_effect`, `audit_log`는 append-only라 고치거나 지우지 않는다. `payment_hold`는 해제 1회 말고는 바꾸거나 지울 수 없다(`trg_payment_hold_change`, V79). 보류는 처리기로만 풀고 손으로 풀지 않는다. 처리기 결과, 영향 기록, 성공 이력, 완료 표시는 한 트랜잭션이라(`ContractStatusFollowUpService.process`) 실패한 시도의 영향은 남지 않고, 성공은 작업당 1행이다(`uq_cse_processing_succeeded`).
 
 **재시도.** 시도 횟수를 한도 바로 아래(4)로 내려 **자동 재시도를 정확히 1번** 더 허용한다. 처리는 10초 주기 스케줄러가 한다. API 호출이 필요 없다.
 
 ```bash
 psql_fgc <<'SQL'
 \set event_id '<사건 번호>'
-\set job '<처리 작업 이름>'
+\set job '<PaymentHoldJob 또는 PaymentResumeJob>'
 \set approver_login '<GA_ADMIN 로그인 ID>'
 \set executor_login '<실행자 로그인 ID>'
 \set ticket '<티켓>'
@@ -927,6 +1024,8 @@ SQL
 | `state=FAILED`, `attempt_count=5`, 처리 이력에 `FAILED` 추가 | 다시 소진 | 미해결로 남긴다. 원인을 다시 본다 |
 | 앞선 사건이 있다는 오류 | 순서 위반 | 앞선 작업부터 한다 |
 
+T15는 처리기가 없던 이미지에서 시험 처리기로 돌린 기록이다. `PaymentHoldJob`, `PaymentResumeJob`의 소진과 재시도는 코드 대조만 했고 리허설 때 확인한다. 성공한 뒤에는 `[영향 보기]`로 바뀐 대상을 본다. `PaymentHoldJob`이 성공해 보류가 걸린 지급 건은 계속 확정할 수 없다. 이것은 정상이다.
+
 ---
 
 ## 8. 파일 볼륨 가득 참
@@ -983,6 +1082,7 @@ DB까지 쓰기 실패하는 단계는 격리 환경에서 시험하지 않았�
 ```bash
 snap=~/fgc-stg/snapshots/rc-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$snap"
 psql_fgc -At -c "SELECT count(*) FROM fgc.validation_run WHERE status IN ('CREATED', 'RUNNING');" </dev/null   # 0 이어야 한다
+psql_fgc -At -c "SELECT count(*) FROM fgc.validation_run_retry WHERE state IN ('ACCEPTED', 'LAUNCHING', 'RUNNING');" </dev/null   # 0 이어야 한다 (#844 뒤 추가, 코드 대조)
 "${compose[@]}" stop web api
 "${compose[@]}" exec -T db pg_dump -U fgc -d fgc -Fc > "$snap/db.dump"
 docker run --rm -v fgc-shinhan_files:/data:ro -v "$snap:/snap" alpine tar -C /data -czf /snap/files.tgz .
@@ -1069,7 +1169,7 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 
 - **일시:** 2026-11-04, KST
 - **기준:** 훈련 이미지 develop `185dc854dc2f037a93a1fe2ad7717a8929a3196e`(Flyway V77). 이전 이미지 `991d8c44`(V76). #836은 `8f685374`. 화면 대조와 코드 대조는 문서 확정 시점의 `274477d6`
-- **훈련 뒤 병합:** #774(V78, 데이터 변경 없는 컬럼 추가)와 #833(`LlmGateway` 호출 한도, 지시문 검사, 시간 제한). 이 둘은 T1~T24의 이미지에 없다. 그래서 head 이미지로 T25, T26, T27을 따로 돌렸다.
+- **훈련 뒤 병합:** #774(V78, 데이터 변경 없는 컬럼 추가)와 #833(`LlmGateway` 호출 한도, 지시문 검사, 시간 제한). 이 둘은 T1~T24의 이미지에 없다. 그래서 head 이미지로 T25, T26, T27을 따로 돌렸다. 그 뒤 병합된 #773(RPT-W02), #831(V79, `PaymentHoldJob`), #835(`PaymentResumeJob`, 영향 미리보기), #859(상태 이력), #844(V80, `/restart`)는 어느 훈련 이미지에도 없다. 해당 절은 코드 대조이고 리허설에서 확인한다(부록 C). #862, #871, #870은 T28, T29, T30으로 따로 확인했다.
 - **격리:** 로컬 Docker. 프로젝트 이름 `fgc676drill`, 포트 18676, 18677. 저장소 공개 이미지를 digest로 받아 `infra/shinhan/compose.yaml`로 띄웠다(`SPRING_PROFILES_ACTIVE=prod`, PostgreSQL 17). 덮어쓴 값은 포트, 메모리, LLM 주소뿐이다. 개발계, 운영, 신한 서버에 접속하지 않았다
 - **이미지:** api `sha256:1553efdf…`, web `sha256:58978f38…` / 이전 api `sha256:da9d21e3…`, web `sha256:ede81bf2…`
 - **장애 주입:** 격리 DB에서만 했다. 룰셋 시작일을 임시로 미래로 옮김(`trg_cap_rule_set_policy_lock`을 그 트랜잭션에서 끄고 복구), `journal_header` 삽입 차단 트리거, `docker kill`, 429를 돌려주는 nginx 모의 서버, 1MB tmpfs
@@ -1106,6 +1206,7 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 | T27 | 설계사 범위 | `agent01`로 계약 목록과 남의 계약 조회, 감사 옵션 조회 | 본인 13건. 남의 계약 403 `FGC-AUTH-005`. 감사 `'행위 종류'` 목록에 수동 절차 행위 코드 4개가 나온다 | 통과 |
 | T28 | 행 존재 검사 | PR #862 `55469651`에서 `PYTHONUTF8=1 python -m unittest discover -s infra/scripts/tests`. 임시 PostgreSQL 17에서 `missing-accounts-sql` 실행 | 시험 26개 통과. `agent01` 없음 → `agent01`, 모두 있음 → 빈 값, 두 개 없음 → `admin,settle01` | 통과 |
 | T29 | `CREATED` 잔존 | `ArbitrageTransactionBoundaryIntegrationTest.rowLeftBeforeThisFixIsClearedByExecuteSoTheNextCheckIsNotBlocked` (PR #871, Testcontainers PostgreSQL 17). 3일 전 `CREATED` 행 → 수동 검증 → `FAILED`로 UPDATE → `execute` → 수동 검증 | `FGC-VRUN-001`. 트리거 거절. 실행 `COMPLETED`. 수동 검증 성공. 화면 버튼과 일 배치 경로는 코드 대조만 | 통과 |
+| T30 | 로그인 시도 제한 | `nginx:stable-alpine`에 `25626562`의 실제 템플릿(`adapt_nginx` 적용), `nginx-guard.conf`, `nginx-http.conf`, 401을 돌려주는 모의 API. 앞단은 없고 헤더를 직접 넣음 | 같은 마지막 값 15회(앞 값은 매번 다름): 401 11건, 429 4건. 요청마다 다른 값 15회: 401 15건. 헤더 없음 15회: 401 15건. 막힌 동안 다른 값: 401. 막힌 뒤 첫 통과 1.2초. 소진 뒤 2, 6, 10, 22초 쉬고 연속 14회: 통과 2, 4, 6, 11건. 같은 값 20건 병렬: 401 11건, 429 9건. web 로그 마지막 칸 `"-"`, `"앞 값, 마지막 값"`. 2-4절 측정 명령 실행 | 통과. 실제 앞단은 미확인 |
 
 **돌리지 못한 것**
 
@@ -1136,12 +1237,14 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 ## 부록 C. 리허설(11/10)에서 확인할 것
 
 1. 신한 서버 실제 배포 1회, 2-4절 검증, RC가 코드 커밋인지(2-1절).
-2. 공개 전 4-1~4-3절, 이어서 4-5절.
-3. 9장 스냅샷, 복원. 시간을 9-3절에 적는다.
-4. 실제 키로 지문 확인과 질문 1건, 사용액 기록.
-5. 담당과 연락망 확정(0장).
-6. 팀원 1명이 매뉴얼 8장을 수행.
-7. #844, #831, #835, #862 병합 상태에 맞춰 이 문서의 "지금" 표시를 고친다.
+2. 2-4절 앞단 경계 측정(#870, 미측정). 결과를 보안시험 결과서에 적는다.
+3. 공개 전 4-1~4-3절, 이어서 4-5절.
+4. #871을 배포한 뒤 6-5절 SQL로 남은 `CREATED` 행을 본다.
+5. 9장 스냅샷, 복원. 시간을 9-3절에 적는다.
+6. 실제 키로 지문 확인과 질문 1건, 사용액 기록.
+7. 담당과 연락망 확정(0장).
+8. 팀원 1명이 매뉴얼 8장을 수행.
+9. 코드 대조만 한 절을 RC 이미지로 1회: 6-2절 재시작, 6-3절 재시작 도중 중단, 7장 실제 처리기 소진과 재시도.
 
 ## 개정 이력
 
@@ -1149,3 +1252,4 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 |---|---|---|---|
 | v1.0 | 2026-11-04 | 최초 작성, #676 | FGC-PSR-005, SRC-060, SRC-065, SRC-067, SRC-075, SRC-076, SRC-077, 운영정책서 '일일 변경분 처리' |
 | v1.0 | 2026-11-04 | 6-5절 추가: 수동 차익 검증이 남긴 `CREATED` 행, #871 | 코드 대조, T29, V13, V7 `guard_run_lifecycle` |
+| v1.0 | 2026-11-04 | 병합분 반영: 머리 표(`25626562`, V80), 0장 증상 표, 1-6절 로그인 시도 제한, 2-2절 스크립트 동작, 2-4절 앞단 경계 측정, 4-4절, 6-1~6-4절 재시작, 7장 처리기, 9-1절, 부록 A, C. T30 추가 | #831, #835, #844, #859, #862, #870 코드 대조, PR #870 6절, T30, 인터페이스정의서 §4-4-2, §4-4-4, SRC-028, SRC-065 |
