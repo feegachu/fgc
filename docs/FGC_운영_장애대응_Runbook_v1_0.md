@@ -22,7 +22,7 @@
 | 3 | 운영정책서 '일일 변경분 처리', 인터페이스정의서 §7-5, [SRC-065], 훈련 T8~T12 |
 | 4 | 시드 명세서 §5, [SRC-065], [SRC-076], [SRC-027 D-04], 훈련 T4~T7, T27, T28 |
 | 5 | [SRC-060], [SRC-075], 인터페이스정의서 IF-EXT-03, 훈련 T16~T19, T26. 예산 임계값은 가상 GA 정책 |
-| 6 | 인터페이스정의서 §4-4-4, §7-6, FUN-045 (#672, PR #844), V80, 코드 대조 [SRC-028]. 훈련 T13, T14는 #844 전 이미지. 6-3절은 PM 결정, 팀 공유 전 |
+| 6 | 인터페이스정의서 §4-4-4, §7-6, FUN-045 (#672, PR #844), V80, 코드 대조 [SRC-028]. 훈련 T13, T14는 #844 전 이미지, T31은 #844 뒤 이미지. 6-3절은 PM 결정, 팀 공유 전 |
 | 7 | V74, V79, #719 코멘트, 인터페이스정의서 §4-4-2, PR #831, #835, 코드 대조 [SRC-028]. 훈련 T15는 처리기가 없던 이미지. PM 결정, 팀 공유 전 |
 | 8 | PR #812, 트래커 4번 [SRC-067], 훈련 T21 |
 | 9 | 트래커 4번, PMR-007, TER-010 [SRC-067], 훈련 T20 |
@@ -793,7 +793,7 @@ SELECT retry_id, state, previous_batch_execution_id, batch_execution_id, failed_
   FROM fgc.validation_run_retry WHERE validation_run_id = <실행 번호> ORDER BY retry_id DESC;
 ```
 
-같은 `job_instance_id`에 새 실행이 생기고 실패한 Step부터만 있어야 한다. `validation_run`은 `COMPLETED`, 8이다. 접수 행은 `SUCCEEDED`다. 감사에 `VALIDATION_RUN_RETRIED`가 남고 재시작 사유는 `validation_run_retry.reason`에 있다. T13은 #844 전 이미지의 `execute` 경로로 돌린 기록이다. `/restart` 경로는 `MonthlyJournalRestartIntegrationTest`(30건 중 25번째 실패 뒤 재시작), `ValidationRestartIntegrationTest`(동시 요청, 멱등, 기동 실패)가 PostgreSQL로 보고, 앱을 띄워 돌린 기록은 없다. 리허설 때 확인한다. 11/2 감사가 지적한 "정식 재시작 없음"은 #844로 해소됐다.
+같은 `job_instance_id`에 새 실행이 생기고 실패한 Step부터만 있어야 한다. `validation_run`은 `COMPLETED`, 8이다. 접수 행은 `SUCCEEDED`다. 감사에 `VALIDATION_RUN_RETRIED`가 남고 재시작 사유는 `validation_run_retry.reason`에 있다. T13은 #844 전 이미지의 `execute` 경로로 돌린 기록이다. `/restart` 경로는 `MonthlyJournalRestartIntegrationTest`(30건 중 25번째 실패 뒤 재시작), `ValidationRestartIntegrationTest`(동시 요청, 멱등, 기동 실패)가 PostgreSQL로 보고, 격리 환경에서 앱을 띄워 돌린 기록은 [T31]이다. 실제 서버는 리허설 때 확인한다. 11/2 감사가 지적한 "정식 재시작 없음"은 #844로 해소됐다.
 
 ### 6-3. RUNNING 고착
 
@@ -865,22 +865,88 @@ COMMIT;
 SQL
 ```
 
-**검증 [T14]:** 상태 `FAILED`, 배치 실행 `FAILED`. `계약수동`은 새 실행을 만든다. 감사 행위 `VALIDATION_RUN_FORCED_FAILED`. 월 실행은 `[실패 지점부터 재시작]`으로 실패 Step부터 이어 간다(6-2절). T14는 #844 전 이미지라 재시작을 `execute`로 돌렸다. 이 SQL 뒤의 `/restart`는 코드 대조만 했고 리허설(11/10) 때 확인한다.
+**검증 [T14]:** 상태 `FAILED`, 배치 실행 `FAILED`. `계약수동`은 새 실행을 만든다. 감사 행위 `VALIDATION_RUN_FORCED_FAILED`. 월 실행은 `[실패 지점부터 재시작]`으로 실패 Step부터 이어 간다(6-2절). T14는 #844 전 이미지라 재시작을 `execute`로 돌렸다. 이 SQL 뒤의 `/restart`는 [T31]로 확인했다.
 
-**재시작 도중에 죽었을 때 (코드 대조, 미시험).** `validation_run_retry`에 활성 행이 남을 수 있다.
+**재시작 도중에 죽었을 때 [T31].** `validation_run_retry`에 활성 행이 남는다. 남아 있으면 그 실행의 버튼은 `'이미 재시작 요청이 진행 중입니다.'`로, 같은 달 다른 실행의 버튼은 `'같은 월에 다른 실행이 진행 중입니다.'`로 꺼진다. 같은 달의 새 `월간` 실행은 `FGC-VRUN-001`, 확정은 `FGC-VRUN-005`로 막힌다(`hasActiveRetryForMonth`).
 
 ```sql
-SELECT retry_id, validation_run_id, state, previous_batch_execution_id, batch_execution_id, requested_at, started_at
-  FROM fgc.validation_run_retry WHERE state IN ('ACCEPTED', 'LAUNCHING', 'RUNNING');
+SELECT r.retry_id, r.validation_run_id, r.state, v.status AS run_status, r.previous_batch_execution_id, r.batch_execution_id, r.requested_at, r.started_at
+  FROM fgc.validation_run_retry r JOIN fgc.validation_run v USING (validation_run_id)
+ WHERE r.state IN ('ACCEPTED', 'LAUNCHING', 'RUNNING');
 ```
 
-| 남은 `state` | 실행 상태 | 어떻게 되나 |
+| 접수 `state` | 실행 `run_status` | 조치 |
 |---|---|---|
 | `ACCEPTED` | `FAILED` | API가 다시 뜨면 스케줄러가 접수 5분 뒤 `FAILED`, `LAUNCH_TIMEOUT`으로 닫는다. 기다린다 |
-| `LAUNCHING` | `FAILED` | 자동으로 닫히지 않는다(`ValidationRestartService.expireUnstartedRequests`는 `ACCEPTED`만 본다). 위 SQL은 `RUNNING` 실행만 받으므로 거절된다 |
-| `RUNNING` | `RUNNING` | 자동으로 닫히지 않는다. 위 SQL로 실행은 `FAILED`가 되지만 이 행은 그대로다 |
+| `LAUNCHING` | `FAILED` | 아래 SQL |
+| `RUNNING` | `RUNNING` | 위 SQL로 실행을 `FAILED`로 표시한 **뒤에** 아래 SQL. 위 SQL은 이 행을 고치지 않고, 아래 SQL은 `RUNNING` 실행을 거절한다 |
+| `RUNNING` | `FAILED` | 아래 SQL. 위 SQL은 `RUNNING` 실행만 받는다 |
+| `RUNNING` | `COMPLETED` | 아래 SQL. 처리는 끝났고 마지막 기록만 못 한 경우라 접수를 `SUCCEEDED`로 닫는다 |
 
-활성 행이 남아 있으면 그 실행의 버튼은 `'이미 재시작 요청이 진행 중입니다.'`로, 같은 달 다른 실행의 버튼은 `'같은 월에 다른 실행이 진행 중입니다.'`로 꺼진다. 같은 달의 새 `월간` 실행은 `FGC-VRUN-001`, 확정은 `FGC-VRUN-005`로 막힌다(`hasActiveRetryForMonth`). **이 행을 푸는 승인 절차는 아직 없다(근거 없음, 확인 필요).** 손으로 고치지 않고 PM에게 올린다(1-5절). 다시 열 조건: 리허설에서 재현하거나 이 상태가 실제로 생겼을 때.
+**담당:** 실행 시스템 관리자, 승인 GA관리자. **조치:** PM 결정, 팀 공유 전 (1-5절). 다시 열 조건: 기동 시 자동 정리를 도입할 때. 위 초기 판단대로 API 시작 시각이 `requested_at`보다 늦은지 먼저 본다. 이 SQL은 접수 행과 그 실행에 남은 활성 배치 실행을 함께 닫는다. 배치 실행이 `STARTING`이나 `STARTED`로 남으면 서버가 재시작을 허용하지 않기 때문이다(`MonthlyJobExecutionLookup`).
+
+```bash
+psql_fgc <<'SQL'
+\set retry_id '<접수 번호>'
+\set approver_login '<GA_ADMIN 로그인 ID>'
+\set executor_login '<실행자 로그인 ID>'
+\set ticket '<티켓>'
+\set reason '<사유>'
+\set ON_ERROR_STOP on
+BEGIN;
+SELECT set_config('recovery.retry_id', :'retry_id', true), set_config('recovery.approver', :'approver_login', true),
+       set_config('recovery.executor', :'executor_login', true), set_config('recovery.ticket', :'ticket', true),
+       set_config('recovery.reason', :'reason', true) \g /dev/null
+DO $recovery$
+DECLARE
+  v_retry bigint := current_setting('recovery.retry_id')::bigint;
+  v_state text; v_run bigint; v_type text; v_month date; v_no int; v_by bigint; v_status text; v_executor bigint; v_exec bigint[];
+  v_done boolean; v_next text; v_batch text;
+BEGIN
+  SELECT state, validation_run_id INTO STRICT v_state, v_run FROM fgc.validation_run_retry WHERE retry_id = v_retry FOR UPDATE;
+  IF v_state NOT IN ('LAUNCHING', 'RUNNING') THEN RAISE EXCEPTION 'LAUNCHING, RUNNING 접수만 대상이다 (현재 %)', v_state; END IF;
+  SELECT run_type, validation_month, run_no, triggered_by, status INTO STRICT v_type, v_month, v_no, v_by, v_status
+    FROM fgc.validation_run WHERE validation_run_id = v_run FOR UPDATE;
+  IF v_status NOT IN ('FAILED', 'COMPLETED') THEN
+    RAISE EXCEPTION '실행이 % 상태다. RUNNING이면 멈춘 실행 SQL로 먼저 FAILED로 표시한다', v_status;
+  END IF;
+  SELECT user_id INTO v_executor FROM fgc.app_user WHERE login_id = current_setting('recovery.executor');
+  IF v_executor IS NULL OR NOT EXISTS (SELECT 1 FROM fgc.app_user u JOIN fgc.app_role r USING (role_id)
+       WHERE u.login_id = current_setting('recovery.approver') AND r.role_code = 'GA_ADMIN')
+     OR current_setting('recovery.approver') = current_setting('recovery.executor') THEN
+    RAISE EXCEPTION '승인자는 GA_ADMIN, 실행자는 승인자와 다른 등록 계정이어야 한다';
+  END IF;
+  -- 이 실행의 JobInstance에 남은 활성 배치 실행. 파라미터 네 개로 찾는다(MonthlyJobExecutionLookup과 같다).
+  SELECT coalesce(array_agg(x.job_execution_id), '{}') INTO v_exec
+    FROM fgc.batch_job_execution x JOIN fgc.batch_job_instance i USING (job_instance_id)
+   WHERE i.job_name = 'MonthlyValidationJob' AND x.status IN ('STARTING', 'STARTED', 'STOPPING')
+     AND (SELECT count(*) FROM fgc.batch_job_execution_params p WHERE p.job_execution_id = x.job_execution_id
+           AND (p.parameter_name, p.parameter_value) IN (('validationMonth', to_char(v_month, 'YYYY-MM')), ('runNo', v_no::text),
+                                                         ('runType', v_type), ('triggeredBy', v_by::text))) = 4;
+  v_done := v_status = 'COMPLETED';
+  v_next := CASE WHEN v_done THEN 'SUCCEEDED' ELSE 'FAILED' END;
+  v_batch := CASE WHEN v_done THEN 'COMPLETED' ELSE 'FAILED' END;
+  UPDATE fgc.batch_step_execution SET status = 'FAILED', exit_code = 'FAILED', end_time = clock_timestamp(), last_updated = clock_timestamp()
+   WHERE job_execution_id = ANY (v_exec) AND status IN ('STARTING', 'STARTED', 'STOPPING');
+  UPDATE fgc.batch_job_execution SET status = v_batch, exit_code = v_batch, end_time = clock_timestamp(), last_updated = clock_timestamp(),
+         exit_message = 'Runbook: 재시작 접수 강제 종료'
+   WHERE job_execution_id = ANY (v_exec);
+  UPDATE fgc.validation_run_retry SET state = v_next, finished_at = clock_timestamp(),
+         error_code = CASE WHEN v_done THEN NULL ELSE 'RUNBOOK_FORCED_FAILED' END
+   WHERE retry_id = v_retry;
+  INSERT INTO fgc.audit_log (user_id, action_code, entity_type, entity_id, before_value, after_value, reason, request_id)
+  VALUES (v_executor, 'VALIDATION_RUN_RETRY_FORCED_CLOSED', 'VALIDATION_RUN_RETRY', v_retry::text,
+          jsonb_build_object('state', v_state, 'validation_run_id', v_run, 'run_status', v_status),
+          jsonb_build_object('state', v_next, 'job_execution_ids', to_jsonb(v_exec),
+                             'approved_by', current_setting('recovery.approver'), 'executed_by', current_setting('recovery.executor')),
+          current_setting('recovery.reason'), current_setting('recovery.ticket'));
+END
+$recovery$;
+COMMIT;
+SQL
+```
+
+**검증 [T31]:** 접수 행이 `FAILED`와 `RUNBOOK_FORCED_FAILED`로 닫힌다(`COMPLETED` 실행이면 `SUCCEEDED`). 감사에 `VALIDATION_RUN_RETRY_FORCED_CLOSED`가 남는다. 위 조회 SQL이 0행이다. `[실패 지점부터 재시작]`이 켜지고, 재시작하면 닫은 배치 실행을 기준으로 같은 JobInstance에서 이어 간다. 같은 달의 새 실행과 확정이 `FGC-VRUN-001`, `FGC-VRUN-005`로 막히지 않는다. `validation_run`은 이 SQL이 고치지 않는다. 격리 환경 기록이고 실제 서버에서 돌린 기록은 없다.
 
 스냅샷 전에는 활성 실행이 없는지 먼저 본다(9-1절). 활성 실행이 든 스냅샷을 복원하면 같은 고착이 생긴다.
 
@@ -1181,7 +1247,7 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 
 - **일시:** 2026-11-04, KST
 - **기준:** 훈련 이미지 develop `185dc854dc2f037a93a1fe2ad7717a8929a3196e`(Flyway V77). 이전 이미지 `991d8c44`(V76). #836은 `8f685374`. 화면 대조와 코드 대조는 문서 확정 시점의 `274477d6`
-- **훈련 뒤 병합:** #774(V78, 데이터 변경 없는 컬럼 추가)와 #833(`LlmGateway` 호출 한도, 지시문 검사, 시간 제한). 이 둘은 T1~T24의 이미지에 없다. 그래서 head 이미지로 T25, T26, T27을 따로 돌렸다. 그 뒤 병합된 #773(RPT-W02), #831(V79, `PaymentHoldJob`), #835(`PaymentResumeJob`, 영향 미리보기), #859(상태 이력), #844(V80, `/restart`)는 어느 훈련 이미지에도 없다. 해당 절은 코드 대조이고 리허설에서 확인한다(부록 C). #862, #871, #870은 T28, T29, T30으로 따로 확인했다.
+- **훈련 뒤 병합:** #774(V78, 데이터 변경 없는 컬럼 추가)와 #833(`LlmGateway` 호출 한도, 지시문 검사, 시간 제한). 이 둘은 T1~T24의 이미지에 없다. 그래서 head 이미지로 T25, T26, T27을 따로 돌렸다. 그 뒤 병합된 #773(RPT-W02), #831(V79, `PaymentHoldJob`), #835(`PaymentResumeJob`, 영향 미리보기), #859(상태 이력)는 어느 훈련 이미지에도 없다. 해당 절은 코드 대조이고 리허설에서 확인한다(부록 C). #862, #871, #870, #844(V80, `/restart`)는 T28, T29, T30, T31로 따로 확인했다.
 - **격리:** 로컬 Docker. 프로젝트 이름 `fgc676drill`, 포트 18676, 18677. 저장소 공개 이미지를 digest로 받아 `infra/shinhan/compose.yaml`로 띄웠다(`SPRING_PROFILES_ACTIVE=prod`, PostgreSQL 17). 덮어쓴 값은 포트, 메모리, LLM 주소뿐이다. 개발계, 운영, 신한 서버에 접속하지 않았다
 - **이미지:** api `sha256:1553efdf…`, web `sha256:58978f38…` / 이전 api `sha256:da9d21e3…`, web `sha256:ede81bf2…`
 - **장애 주입:** 격리 DB에서만 했다. 룰셋 시작일을 임시로 미래로 옮김(`trg_cap_rule_set_policy_lock`을 그 트랜잭션에서 끄고 복구), `journal_header` 삽입 차단 트리거, `docker kill`, 429를 돌려주는 nginx 모의 서버, 1MB tmpfs
@@ -1219,6 +1285,7 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 | T28 | 행 존재 검사 | PR #862 `55469651`에서 `PYTHONUTF8=1 python -m unittest discover -s infra/scripts/tests`. 임시 PostgreSQL 17에서 `missing-accounts-sql` 실행 | 시험 26개 통과. `agent01` 없음 → `agent01`, 모두 있음 → 빈 값, 두 개 없음 → `admin,settle01` | 통과 |
 | T29 | `CREATED` 잔존 | `ArbitrageTransactionBoundaryIntegrationTest.rowLeftBeforeThisFixIsClearedByExecuteSoTheNextCheckIsNotBlocked` (PR #871, Testcontainers PostgreSQL 17). 3일 전 `CREATED` 행 → 수동 검증 → `FAILED`로 UPDATE → `execute` → 수동 검증 | `FGC-VRUN-001`. 트리거 거절. 실행 `COMPLETED`. 수동 검증 성공. 화면 버튼과 일 배치 경로는 코드 대조만 | 통과 |
 | T30 | 로그인 시도 제한 | `nginx:stable-alpine`에 `25626562`의 실제 템플릿(`adapt_nginx` 적용), `nginx-guard.conf`, `nginx-http.conf`, 401을 돌려주는 모의 API. 앞단은 없고 헤더를 직접 넣음 | 같은 마지막 값 15회(앞 값은 매번 다름): 401 11건, 429 4건. 요청마다 다른 값 15회: 401 15건. 헤더 없음 15회: 401 15건. 막힌 동안 다른 값: 401. 막힌 뒤 첫 통과 1.2초. 소진 뒤 2, 6, 10, 22초 쉬고 연속 14회: 통과 2, 4, 6, 11건. 같은 값 20건 병렬: 401 11건, 429 9건. web 로그 마지막 칸 `"-"`, `"앞 값, 마지막 값"`. 2-4절 측정 명령 실행 | 통과. 실제 앞단은 미확인 |
+| T31 | 재시작 고착 복구 | `sha-2c460fd3` api 이미지(V80, 재시작 코드는 `5f21741a`와 같음), 빈 PostgreSQL 17, 시드. 6-3절의 두 SQL을 문서에서 뽑아 그대로 `psql`로 실행. 격리 DB에 `pg_sleep` 트리거를 걸어 멈춘 뒤 `docker kill`로 다섯 상태를 만듦: `LAUNCHING`과 새 배치 실행 없음, `LAUNCHING`과 배치 `STARTED`, `RUNNING`과 실행 `FAILED`, `RUNNING`과 실행 `RUNNING`, `RUNNING`과 실행 `COMPLETED` | 다섯 상태 모두 재기동 뒤에도 접수 행이 남음. 닫기 전: 그 실행과 같은 달 다른 실행의 재시작 불가, 새 월간 실행 409 `FGC-VRUN-001`, 확정 409 `FGC-VRUN-005`. 닫은 뒤: 재시작 허용, 새 월간 실행 201, 확정은 422 `FGC-VRUN-002`(확정 조건 판단으로 넘어감). `RUNNING` 실행은 멈춘 실행 SQL을 먼저 돌려야 하고, 그 SQL만으로는 막힌 그대로임을 확인. 거절: `SUCCEEDED`, `FAILED`, `ACCEPTED`, 없는 접수, 승인자 역할 틀림, 승인자와 실행자 같음, 없는 실행자. 모두 변경 0, 감사 0. 트리거 오류 없음. 복구를 거친 재시작은 같은 JobInstance의 실행 2, 5, 6, 7, 8로 이어져 실행 8이 `journalPostingStep`부터 `COMPLETED`. 감사 5건. 확인 37개 | 통과. 실제 서버는 미확인 |
 
 **돌리지 못한 것**
 
@@ -1256,7 +1323,7 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 6. 실제 키로 지문 확인과 질문 1건, 사용액 기록.
 7. 담당과 연락망 확정(0장).
 8. 팀원 1명이 매뉴얼 8장을 수행.
-9. 코드 대조만 한 절을 RC 이미지로 1회: 6-2절 재시작, 6-3절 재시작 도중 중단, 7장 실제 처리기 소진과 재시도.
+9. RC 이미지로 1회: 6-2절 재시작과 6-3절 재시작 도중 중단(격리 환경은 T31), 7장 실제 처리기 소진과 재시도(코드 대조만).
 
 ## 개정 이력
 
@@ -1264,4 +1331,4 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 |---|---|---|---|
 | v1.0 | 2026-11-04 | 최초 작성, #676 | FGC-PSR-005, SRC-060, SRC-065, SRC-067, SRC-075, SRC-076, SRC-077, 운영정책서 '일일 변경분 처리' |
 | v1.0 | 2026-11-04 | 6-5절 추가: 수동 차익 검증이 남긴 `CREATED` 행, #871 | 코드 대조, T29, V13, V7 `guard_run_lifecycle` |
-| v1.0 | 2026-11-04 | 병합분 반영: 머리 표(`5f21741a`, V80), 0장 증상 표, 1-6절 로그인 시도 제한, 2-2절 스크립트 동작, 2-4절 앞단 경계 측정, 4-4절, 6-1~6-4절 재시작, 7장 처리기와 소진 조회식(처리 중 제외, 임시 표 5행으로 확인), 9-1절, 부록 A, C. T30 추가 | #831, #835, #844, #859, #862, #870 코드 대조, PR #870 6절, T30, 인터페이스정의서 §4-4-2, §4-4-4, SRC-028, SRC-065 |
+| v1.0 | 2026-11-04 | 병합분 반영: 머리 표(`5f21741a`, V80), 0장 증상 표, 1-6절 로그인 시도 제한, 2-2절 스크립트 동작, 2-4절 앞단 경계 측정, 4-4절, 6-1~6-4절 재시작, 6-3절 재시작 고착 복구 절차(PM 결정, 팀 공유 전), 7장 처리기와 소진 조회식(처리 중 제외, 임시 표 5행으로 확인), 9-1절, 부록 A, C. T30, T31 추가 | #831, #835, #844, #859, #862, #870 코드 대조, PR #870 6절, T30, 인터페이스정의서 §4-4-2, §4-4-4, SRC-028, SRC-065 |
