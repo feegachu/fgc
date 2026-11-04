@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { KpiCardContent } from '../../components/KpiCard'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -171,7 +170,6 @@ function AgentHomeContent({ month }: { month: string }) {
             month={month}
             rows={rows}
             name={user?.userName ?? ''}
-            launcher={<ChatbotLauncher open={chatOpen} onOpen={() => setChatOpen(true)} onClose={closeChat} />}
             commission={commission}
             previousCommission={previousCommission.data}
           />
@@ -192,6 +190,7 @@ function AgentHomeContent({ month }: { month: string }) {
             }}
             onInsurer={(name) => setInsurer((current) => (current === name ? null : name))}
           />
+          <ChatbotLauncher open={chatOpen} onOpen={() => setChatOpen(true)} onClose={closeChat} />
         </>
       )}
     </div>
@@ -202,14 +201,12 @@ function Snapshot({
   month,
   rows,
   name,
-  launcher,
   commission,
   previousCommission,
 }: {
   month: string
   rows: Row[]
   name: string
-  launcher: ReactNode
   commission: { data?: number; isError: boolean; refetch: () => unknown }
   previousCommission?: number
 }) {
@@ -227,7 +224,6 @@ function Snapshot({
           <p className="ah-profile-role">안녕하세요</p>
           <p className="ah-profile-name">{name ? `${name}님` : '설계사님'}</p>
         </div>
-        {launcher}
       </article>
       <h2 className="ah-heading">이번달 현황</h2>
       <div className="ah-kpis kpi-group" role="region" aria-label="이번 달 현황">
@@ -401,7 +397,7 @@ function Charts({
   )
 }
 
-/** 상품 추천 AI(FUN-079). 버튼을 누르면 채팅형 모달이 열리고, 닫으면 포커스가 버튼으로 돌아온다. */
+/** 상품 추천 AI(FUN-079). 오른쪽 아래 떠 있는 런처를 누르면 채팅형 모달이 열리고, 닫으면 포커스가 런처로 돌아온다. */
 function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
   const launcher = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -414,12 +410,13 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
       <button data-guide-feature="features.agent-home.agent-home-page.fgc-ai"
         ref={launcher}
         type="button"
-        className="button button-primary ah-ai-button"
+        className="ah-launcher"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={onOpen}
       >
-        상품 추천 AI
+        <img src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`} alt="" width={128} height={128} />
+        <span className="ah-launcher-label">상품 추천 AI</span>
       </button>
       {open && <ChatbotModal onClose={onClose} />}
     </>

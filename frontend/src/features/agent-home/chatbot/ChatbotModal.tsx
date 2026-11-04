@@ -4,9 +4,6 @@ import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { rate } from '../../../lib/format'
-import picoBasic from '../../assistant/assets/pico-basic.png'
-import picoDetective from '../../assistant/assets/pico-detective.png'
-import picoGuide from '../../assistant/assets/pico-guide.png'
 import { askCompare, compareCategoriesQuery, compareExplainQuery, newsHeadlinesQuery, rankCompare } from './api'
 import type { CompareCategory, CompareEvidence, CompareExcluded, CompareItem, CompareRanking } from './api'
 import { FilterPanel } from './FilterPanel'
@@ -21,14 +18,24 @@ const CHECKS = ['내 한도 확인', '정책 수수료율 확인', '환수 규�
 /** 계산이 빨라도 화면이 깜빡이지 않도록 2단계는 캐릭터가 한 바퀴 도는 시간 동안 보여 준다. chatbot.css 의 cb-turn 주기(5.5s)와 같아야 한다. */
 const SPIN_MS = 5500
 const CHECK_MS = SPIN_MS / CHECKS.length
-// 업무 비서 AI와 같은 파랑 피코 그림을 쓴다. 사과하는 파랑 그림이 없어 기본 그림으로 대신한다.
-const MASCOTS = { base: picoBasic, search: picoDetective, sum: picoGuide, sorry: picoBasic }
+// 설계사 화면의 보라 캐릭터를 쓴다(#839).
+const IMG = (name: string) => `${import.meta.env.BASE_URL}images/brand/chatbot-${name}.png`
+type MascotName = 'base' | 'search' | 'sum' | 'sorry'
 
-function Mascot({ name, size = 101 }: { name: keyof typeof MASCOTS; size?: number }) {
+function Mascot({ name, size = 101 }: { name: MascotName; size?: number }) {
+  // 답변(3단계)은 들고 있는 막대만 따로 움직이도록 몸통과 막대를 두 겹으로 그린다.
+  if (name === 'sum') {
+    return (
+      <span className="cb-mascot cb-pointer" style={{ width: size, height: size }} aria-hidden="true">
+        <img src={IMG('sum-base')} alt="" width={size} height={size} />
+        <img className="cb-stick" src={IMG('sum-stick')} alt="" width={size} height={size} />
+      </span>
+    )
+  }
   return (
     <img
       className={`cb-mascot${name === 'search' ? ' cb-spin' : ''}`}
-      src={MASCOTS[name]}
+      src={IMG(name)}
       alt=""
       width={size}
       height={size}
@@ -42,7 +49,7 @@ function Bot({
   name = '피코 AI',
   children,
 }: {
-  avatar?: keyof typeof MASCOTS
+  avatar?: MascotName
   name?: string
   children: ReactNode
 }) {

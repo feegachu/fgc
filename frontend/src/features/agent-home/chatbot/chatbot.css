@@ -1,8 +1,17 @@
 /* FUN-079 상품 추천 AI 챗봇 모달 — 목업(chatbot-fun079-modal.html)의 채팅형 디자인을 옮긴다. 모든 규칙은 .cb 아래에만 적용한다. */
 .cb {
+  /*
+   * 설계사 화면 보라 포인트(agent-theme.css)와 같은 값이다(#839). 모달은 body 로 포털되어
+   * .app-shell.is-agent 범위 밖이라 여기서 다시 지정한다.
+   */
+  --color-action-primary: #7500ff;
+  --color-blue-50: #f4eeff;
+  --color-blue-100: #e7d9ff;
+  --color-border-focus: #8c2fff;
+  --color-text-link: #513a95;
   --cb-brand: var(--color-action-primary);
-  /* 글자용 진한 파랑. 테마의 hover 토큰은 옅은 배경색(#dfeaff)이라 글자에 쓰면 흰 바탕에서 보이지 않는다(app-theme.css 보조 버튼 글자와 같은 값). */
-  --cb-brand-dark: #1d4ed8;
+  /* 글자용 보라. 사이드바 로고와 같은 값이다(agent-theme.css 버튼 글자와 같음). */
+  --cb-brand-dark: #513a95;
   --cb-brand-100: var(--color-blue-100);
   --cb-brand-50: var(--color-blue-50);
   --cb-line: var(--color-border-default);
@@ -83,6 +92,10 @@
 /* 선별 중 말풍선은 길어서 캐릭터가 맨 아래로 처지므로, 이때만 말풍선 세로 가운데에 맞춘다 */
 .cb .cb-bot:has(.cb-spin) { align-items: center; }
 @keyframes cb-turn { to { transform: rotate(360deg); } }
+.cb .cb-bot .cb-mascot.cb-pointer { position: relative; display: block; animation: none; }
+.cb .cb-pointer img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cb .cb-pointer .cb-stick { transform-origin: 85% 43%; animation: cb-tap 6s ease-in-out 0.3s infinite; }
+@keyframes cb-tap { 0%, 18.3%, 100% { transform: rotate(0); } 2.2%, 8.8% { transform: rotate(-16deg); } 4.4%, 11% { transform: rotate(6deg); } 6.6%, 13.2% { transform: rotate(-16deg); } 15.4% { transform: rotate(4deg); } }
 @keyframes cb-bob { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-5px) rotate(-3deg); } 75% { transform: translateY(-3px) rotate(3deg); } }
 .cb .cb-bot-msg { flex: 1; min-width: 0; max-width: calc(100% - 113px); }
 @keyframes cb-in {
@@ -103,7 +116,7 @@
 /* 1단계 */
 .cb .cb-replies { margin: 2px 0 14px; align-items: stretch; }
 .cb .cb-replies .cb-replies-bubble { align-self: flex-end; width: min(100%, 880px); box-sizing: border-box; }
-.cb .cb-logo { flex: 0 0 auto; width: 108px; height: 44px; background: #1e3f5a; -webkit-mask: var(--cb-logo) center / contain no-repeat; mask: var(--cb-logo) center / contain no-repeat; }
+.cb .cb-logo { flex: 0 0 auto; width: 108px; height: 44px; background: #291e5a; -webkit-mask: var(--cb-logo) center / contain no-repeat; mask: var(--cb-logo) center / contain no-repeat; }
 .cb .cb-replies-bubble { padding: 14px; border-radius: var(--radius-16) var(--radius-16) 6px var(--radius-16); background: var(--cb-brand-50); }
 .cb .cb-cats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
 .cb .cb-cat {
@@ -155,7 +168,7 @@
 .cb .cb-check.active b { color: var(--cb-brand-dark); }
 .cb .cb-check.pending b { color: var(--cb-t400); }
 .cb .cb-skeleton { margin: 0 0 0 90px; overflow: hidden; border-radius: 6px var(--radius-16) var(--radius-16) var(--radius-16); background: #fff; box-shadow: var(--cb-shadow); }
-.cb .cb-skeleton-head { padding: 15px 22px; border-bottom: 1px solid var(--cb-line); background: #fafbff; font-size: 14px; font-weight: 700; }
+.cb .cb-skeleton-head { padding: 15px 22px; border-bottom: 1px solid var(--cb-line); background: #fdfaff; font-size: 14px; font-weight: 700; }
 .cb .cb-skeleton-row { display: grid; grid-template-columns: 50px 1.8fr 1fr 1fr; gap: 14px; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--cb-line-light); }
 .cb .cb-skeleton-row i { display: block; height: 17px; border-radius: var(--radius-4); background: #edf2f7; }
 
@@ -255,6 +268,7 @@
 @media (prefers-reduced-motion: reduce) {
   .cb .cb-modal, .cb .cb-bot, .cb .cb-user, .cb .cb-faq-card, .cb .cb-drawer, .cb .cb-bot .cb-mascot { animation: none; }
   .cb .cb-dots i { animation: none; }
+  .cb .cb-pointer .cb-stick { animation: none; }
 }
 
 /* 1단계 보험 업계 최신 뉴스 */
@@ -296,3 +310,5 @@
   .cb .cb-suggest { grid-template-columns: 1fr; padding: 8px 14px 0; }
 }
 .cb .cb-asked { margin-top: 32px; }
+/* 협회 등급 배지(info)도 설계사 화면의 보라 포인트를 따른다(#839). */
+.cb .status-badge.status-badge-info { --badge-ink: #513a95; }
