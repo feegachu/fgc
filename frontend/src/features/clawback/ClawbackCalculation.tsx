@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
@@ -57,6 +57,7 @@ export function ClawbackCalculation({
   const c = detail.candidate ?? {}
   const policies = detail.policyCandidates ?? []
   const canCalculate = c.allowedActions?.includes('CALCULATE') ?? false
+  const issuingNotice = useIsMutating({ mutationKey: ['clawback', 'issue-notice', c.clawbackCaseId] }) > 0
   // 정책 후보가 하나면 미리 고르고, 여럿이면 사용자가 고른다. 계산 버튼을 누르는 것이 선택 확인이다.
   // 고른 값은 지금 후보에 있을 때만 쓴다(409 뒤 다시 불러온 후보에서 빠질 수 있다).
   const [pickedPolicyId, setPickedPolicyId] = useState<number | null>(null)
@@ -68,8 +69,9 @@ export function ClawbackCalculation({
   const keyFor = usePolicyRequest()
   const clearUnsaved = useUnsavedWork(Boolean(reason.trim()), reason)
   const trimmed = reason.trim()
-  const ready = canCalculate && policyId != null && trimmed.length > 0 && Boolean(c.sourceVersion)
+  const ready = canCalculate && !issuingNotice && policyId != null && trimmed.length > 0 && Boolean(c.sourceVersion)
   const mutation = useMutation({
+    mutationKey: ['clawback', 'calculate', c.candidateId],
     mutationFn: () => {
       const body = { expectedSourceVersion: c.sourceVersion!, policyVersionId: policyId!, reason: trimmed }
       // 응답을 못 받은 재시도는 같은 키로 보내 계산판이 두 번 생기지 않게 한다. 입력이 바뀌면 새 키다.
@@ -120,7 +122,7 @@ export function ClawbackCalculation({
       >
         {policies.length > 0 && (
           // 좁은 상세 칸에서도 정책 이름과 유효 기간이 잘리지 않게 표 대신 선택지로 늘어놓는다.
-          <fieldset className="claw-policy-options" disabled={!canCalculate || mutation.isPending}>
+          <fieldset className="claw-policy-options" disabled={!canCalculate || mutation.isPending || issuingNotice}>
             <legend className="field-label">
               적용할 정책
               <span className="field-required" aria-hidden="true">
@@ -161,7 +163,7 @@ export function ClawbackCalculation({
             maxLength={REASON_MAX}
             placeholder="예: 등록된 환수 정책으로 계산"
             value={reason}
-            disabled={!canCalculate || mutation.isPending}
+            disabled={!canCalculate || mutation.isPending || issuingNotice}
             onChange={(event) => {
               setError('')
               setReason(event.target.value)
