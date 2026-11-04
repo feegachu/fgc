@@ -108,6 +108,27 @@ class AgentDataScopeIntegrationTest {
                 .andExpect(jsonPath("$.error.message").value("본인 담당 자료만 조회·처리할 수 있습니다."));
         read("/api/v1/contracts/" + otherContract + "/status-events").andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FGC-AUTH-005"));
+        // IF-API-89 영향 조회도 남의 계약이면 객체 범위 검사(FGC-AUTH-005)로 막힌다. 경로 자체가 막힌 403 과 구별한다.
+        read("/api/v1/contracts/" + otherContract + "/status-events/1/effects").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-005"));
+    }
+
+    @Test
+    void ownContractHistoryAndEffectsAreReadableButAnotherContractsEventIsNotFound() throws Exception {
+        read("/api/v1/contracts/" + ownContract + "/status-events").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].followUp.status").exists());
+        long ownEvent = id("SELECT min(contract_status_event_id) FROM fgc.contract_status_event WHERE contract_id = ?", ownContract);
+        long otherEvent = id("SELECT min(contract_status_event_id) FROM fgc.contract_status_event WHERE contract_id = ?", otherContract);
+        read("/api/v1/contracts/" + ownContract + "/status-events/" + ownEvent + "/effects").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.content").isArray());
+        // 본인 계약 ID에 남의 사건 ID를 붙여도 그 사건의 영향을 읽을 수 없다.
+        read("/api/v1/contracts/" + ownContract + "/status-events/" + otherEvent + "/effects").andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-004"));
+        // 남의 계약 ID에 남의 사건 ID를 맞춰 붙여도 객체 범위 검사가 먼저 막는다.
+        read("/api/v1/contracts/" + otherContract + "/status-events/" + otherEvent + "/effects").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-005"));
     }
 
     @Test
