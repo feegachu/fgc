@@ -236,6 +236,30 @@ class CompareAskServiceTest {
         assertThat(service.ask("1000000000원이면 2순위는?", twoItems()).answer()).doesNotContain(CompareAskService.PERSONAL_INFO);
     }
 
+    @ParameterizedTest
+    @DisplayName("모델이 거절해도 용어 질문은 용어 설명으로 답한다")
+    @ValueSource(strings = {"협회등급이 뭐야?", "순수령액이 어떻게 되는거지", "이월이 뭐예요"})
+    void glossaryQuestionIsAnsweredEvenWhenModelRefuses(String question) {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask(question, null);
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).doesNotContain(CompareAskService.OUT_OF_SCOPE);
+    }
+
+    @ParameterizedTest
+    @DisplayName("모델이 거절해도 챗봇 소개 질문은 소개 문장으로 답한다")
+    @ValueSource(strings = {"너는 뭘 알려주는거야", "니 역할은 뭐니", "너는 누구야"})
+    void introQuestionIsAnsweredEvenWhenModelRefuses(String question) {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask(question, ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).isEqualTo(CompareAskService.INTRO);
+    }
+
     @Test
     @DisplayName("범위 밖 질문은 고정 안내 문장으로 답한다")
     void outOfScope() {

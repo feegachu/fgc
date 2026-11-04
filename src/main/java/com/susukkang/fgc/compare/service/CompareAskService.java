@@ -48,6 +48,8 @@ public class CompareAskService {
             상품은 보험사·상품 이름으로 부르고, 어느 쪽이 더 크거나 작은지와 그 이유(한도·이월·환수)를 말로 풀어 쓴다.
             다음 질문은 모두 범위 안이다(inScope=true): 몇 위인 이유, 1위와 다른 순위의 차이, 한도·이월·환수가 순위에 준 영향,
             상품 간 비교, 순위 계산 기준, 위 용어의 뜻. 순위 결과가 있으면 '순위별 비교 근거'의 차이를 풀어서 이유를 설명한다.
+            용어 뜻을 묻는 질문('협회등급이 뭐야?', '순수령액이 어떻게 되는거지')과 이 챗봇이 무엇을 알려 주는지 묻는 질문('너는 뭘 알려주는거야', '역할이 뭐야')은
+            순위 결과가 없어도 범위 안(inScope=true)이다. '용어 설명'을 근거로 풀어서 답한다.
             범위 밖(inScope=false)은 상품과 무관한 질문(날씨 등 일반 상식), 계약자 정보, 법률·세무 조언, data 에 없는 다른 상품의 추천·가입 권유뿐이다.
             질문이 두 상품이나 특정 순위를 가리키면 그 상품들 사이의 차이와 이유를 먼저 말한다. 1위와의 비교로 바꿔 답하지 않는다. data 에 '질문이 가리킨 비교'가 있으면 그것을 근거로 쓴다.
             순위 결과가 '없음'인데 특정 순위·상품을 묻는다면 inScope 를 false 로 하고 answer 는 비운다.
@@ -57,6 +59,7 @@ public class CompareAskService {
             """;
 
     static final String OUT_OF_SCOPE = "이 챗봇은 비교 결과와 수수료 기본 용어(1,200% 룰, 이월, 환수, 순수령액, 협회 등급)만 안내해 드려요. 다른 질문은 담당자에게 문의해 주세요.";
+    static final String INTRO = "저는 상품 비교 결과(참고 순위)와 수수료 기본 용어(1,200% 룰, 이월, 환수, 순수령액, 협회 등급)를 설명해 드리는 피코 AI예요. 순위가 왜 그렇게 나왔는지, 두 상품의 차이가 무엇인지 물어보세요.";
     static final String FALLBACK = "지금은 질문에 맞는 답변을 만들지 못했어요. 아래 연관 질문 버튼이나 근거 보기를 이용해 주세요.";
     static final String PERSONAL_INFO = "주민등록번호·연락처·이메일 같은 고객 개인정보는 입력하지 말아 주세요. 상품 비교 결과와 수수료 용어만 답해 드려요.";
 
@@ -67,6 +70,8 @@ public class CompareAskService {
             Pattern.compile("(?<!\\d)0\\d{1,2}[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}(?!\\d)"),
             Pattern.compile("[\\w.+-]++@[\\w-]++\\.\\w"));
     private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)", Pattern.CANON_EQ);
+    /** 챗봇 자체를 묻는 질문(역할·소개·무엇을 알려 주는지). */
+    private static final Pattern INTRO_QUESTION = Pattern.compile("역할|뭘 알려|무엇을 알려|뭐 하는|뭐하는|누구|소개|무슨 기능|AI야|ai야", Pattern.CANON_EQ);
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
 
@@ -94,7 +99,8 @@ public class CompareAskService {
         if (Boolean.FALSE.equals(output.inScope)) {
             log.info("LLM 이 질문을 범위 밖(inScope=false)으로 판단했습니다. rankQuestion={}", hasItems(ranking) && isRankQuestion(q));
             // 순위 결과가 있는 상태의 순위·이유 질문은 범위 안이다. 모델이 거절해도 서버 값으로 풀어 답한다.
-            return hasItems(ranking) && isRankQuestion(q)
+            // 모델이 거절해도 서버가 아는 질문(순위·용어·챗봇 소개)은 서버 문장으로 답한다.
+            return (hasItems(ranking) && isRankQuestion(q)) || isGlossaryQuestion(q) || INTRO_QUESTION.matcher(q).find()
                     ? fallbackAnswer(q, ranking)
                     : new CompareAskResponse(OUT_OF_SCOPE, CompareAskResponse.OUT_OF_SCOPE);
         }
@@ -143,6 +149,9 @@ public class CompareAskService {
         if (hasItems(ranking) && isRankQuestion(question)) {
             return new CompareAskResponse(rankAnswer(ranking.items(), question), CompareAskResponse.RULE);
         }
+        if (INTRO_QUESTION.matcher(question).find() && !isGlossaryQuestion(question)) {
+            return new CompareAskResponse(INTRO, CompareAskResponse.RULE);
+        }
         Optional<Term> term = GLOSSARY.stream().filter(t -> t.keywords().stream().anyMatch(question::contains)).findFirst();
         return term.map(t -> new CompareAskResponse(t.name() + ": " + t.body(), CompareAskResponse.RULE))
                 .orElseGet(() -> new CompareAskResponse(FALLBACK, CompareAskResponse.RULE));
@@ -150,6 +159,10 @@ public class CompareAskService {
 
     private static boolean hasItems(CompareRankingResponse ranking) {
         return ranking != null && !ranking.items().isEmpty();
+    }
+
+    static boolean isGlossaryQuestion(String question) {
+        return GLOSSARY.stream().anyMatch(t -> t.keywords().stream().anyMatch(question::contains));
     }
 
     static boolean isRankQuestion(String question) {
