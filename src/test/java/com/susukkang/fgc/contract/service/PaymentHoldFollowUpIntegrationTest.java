@@ -419,6 +419,27 @@ class PaymentHoldFollowUpIntegrationTest {
     }
 
     @Test
+    void paymentResumeDoesNotClaimToReleaseAnInactiveHoldItDidNotChange() {
+        // FUN-028: 부활 처리가 아직 실효 보류를 풀지 않은 상태에서 납입 재개를 처리해도 허위 RELEASED를 남기지 않는다.
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long lapse = statusEvent(contract, 2, "LAPSED", "2026-09-01T00:00:00+09:00");
+        long payment = payment(contract, "2026-11-20", false);
+        processor.process(events.findById(lapse).orElseThrow());
+        statusEvent(contract, 3, "REVIVED", "2026-10-01T00:00:00+09:00");
+        long unpaid = statusEvent(contract, 4, "UNPAID", "2026-10-10T00:00:00+09:00");
+        processor.process(events.findById(unpaid).orElseThrow());
+        long resumed = resumeEvent(contract, 5, "2026-11-01T00:00:00+09:00");
+
+        List<ContractStatusEffect> recorded = processor.process(events.findById(resumed).orElseThrow());
+
+        assertThat(recorded).noneMatch(effect -> effect.entityType() == EntityType.PAYMENT
+                && effect.entityId().equals(payment) && "RELEASED".equals(effect.nextState()));
+        assertThat(openHolds(payment)).isEqualTo(1);
+        assertThat(gate.blockers(payment)).isNotEmpty();
+    }
+
+    @Test
     void aDraftCreatedAfterTheLapseWasProcessedIsStillBlockedByTheCurrentStatus() {
         Fixture f = fixture();
         processor.process(events.findById(f.lapse).orElseThrow());

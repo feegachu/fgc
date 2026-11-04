@@ -107,8 +107,8 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
         }
         if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
             // 납입 재개는 미납으로 건 보류만 푼다. 실효·해지 등 다른 사유의 보류는 이 재개로 풀리지 않는다.
-            holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), UNPAID_HOLD_REASONS);
-            return Optional.of(effect);
+            int released = holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), UNPAID_HOLD_REASONS);
+            return released > 0 ? Optional.of(effect) : Optional.empty();
         }
         return Optional.empty();
     }

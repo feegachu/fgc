@@ -2,13 +2,12 @@ package com.susukkang.fgc.contract.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -23,6 +22,7 @@ import java.util.Set;
 public class PaymentHoldRepository {
 
     private final JdbcTemplate jdbc;
+    private final NamedParameterJdbcTemplate namedJdbc;
 
     /**
      * 이 계약의 상태 사건으로 걸린, 아직 해제되지 않은 보류가 있는 지급 건. 규칙 판단의 heldPaymentIds 로 쓴다.
@@ -49,23 +49,22 @@ public class PaymentHoldRepository {
 
     /**
      * 재개 판단이 난 지급 건의 보류 중 이 계약의 사건으로 걸렸고 이 재개가 푸는 사유인 것만 해제한다.
-     * 다른 계약의 사건으로 걸린 보류, 다른 사유의 보류, 이미 해제된 행은 건드리지 않는다(납입 재개는 미납 보류만, 부활은 실효 보류만 푼다).
+     * 다른 계약의 사건으로 걸린 보류, 호출자가 허용하지 않은 사유, 이미 해제된 행은 건드리지 않는다.
      */
     public int releaseOpen(Long paymentId, Long contractId, Long releasedByEventId, Collection<String> reasonCodes) {
         if (reasonCodes.isEmpty()) {
             return 0;
         }
-        String marks = String.join(", ", Collections.nCopies(reasonCodes.size(), "?"));
-        List<Object> args = new ArrayList<>(List.of(releasedByEventId, paymentId));
-        args.addAll(reasonCodes);
-        args.add(contractId);
-        return jdbc.update("""
-                UPDATE fgc.payment_hold h SET released_at = clock_timestamp(), released_by_event_id = ?
-                 WHERE h.commission_transaction_id = ? AND h.released_at IS NULL
-                   AND h.reason_code IN (""" + marks + """
-                )
+        return namedJdbc.update("""
+                UPDATE fgc.payment_hold h SET released_at = clock_timestamp(), released_by_event_id = :releasedByEventId
+                 WHERE h.commission_transaction_id = :paymentId AND h.released_at IS NULL
+                   AND h.reason_code IN (:reasonCodes)
                    AND h.contract_status_event_id IN (SELECT e.contract_status_event_id FROM fgc.contract_status_event e
-                                                       WHERE e.contract_id = ?)
-                """, args.toArray());
+                                                       WHERE e.contract_id = :contractId)
+                """, new MapSqlParameterSource()
+                .addValue("releasedByEventId", releasedByEventId)
+                .addValue("paymentId", paymentId)
+                .addValue("reasonCodes", reasonCodes)
+                .addValue("contractId", contractId));
     }
 }
