@@ -8112,6 +8112,19 @@
         "next": []
       },
       {
+        "stepId": "help.0af2e2ee0f040cfadea26041ee289403",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-restart-panel.button-1",
+        "title": "월 통합검증 상세, 실패 지점부터 재시작",
+        "instruction": "월 통합검증 상세 화면의 ‘실패 지점부터 재시작’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.10a4299e60f30e8fcc4f0e21a7a4bcee",
         "screenId": "VRUN-W02",
         "targetId": "components.modal.button",
@@ -8215,6 +8228,19 @@
         "next": []
       },
       {
+        "stepId": "help.997fc94001a247931e21ab22eefd2114",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-restart-panel.button-3",
+        "title": "월 통합검증 상세, 재시작 요청",
+        "instruction": "월 통합검증 상세 화면의 ‘재시작 요청’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.a33f9db38a54f017cdd50d5234967d73",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.section-5",
@@ -8278,8 +8304,8 @@
         "stepId": "help.b04365cbd3a180ee8c23e755a3fd5e03",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.button-3",
-        "title": "월 통합검증 상세, 실패 지점부터 재시작 / 실행",
-        "instruction": "월 통합검증 상세 화면의 ‘실패 지점부터 재시작 / 실행’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "월 통합검증 상세, 실행",
+        "instruction": "월 통합검증 상세 화면의 ‘실행’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8299,6 +8325,47 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ba71c55bf69d30171afcb4ad60a9bc88",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-restart-panel.section-1",
+        "title": "월 통합검증 상세, 실패 지점 재시작",
+        "instruction": "월 통합검증 상세 화면의 ‘실패 지점 재시작’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.bd2f6bd7410c88360316576d786d75a3",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-restart-panel.button-2",
+        "title": "월 통합검증 상세, 취소",
+        "instruction": "월 통합검증 상세 화면의 ‘취소’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c720cea10fd8c3347e5eaa3df0919624",
+        "screenId": "VRUN-W02",
+        "targetId": "features.validation.validation-restart-panel.textarea-1",
+        "title": "월 통합검증 상세, 재시작 사유",
+        "instruction": "월 통합검증 상세 화면의 ‘재시작 사유’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },

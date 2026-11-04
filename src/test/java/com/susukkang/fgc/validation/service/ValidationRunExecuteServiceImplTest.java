@@ -123,9 +123,11 @@ class ValidationRunExecuteServiceImplTest {
     @Test
     void failedMonthlyRunUsesMonthlyRestartPath() {
         given(validationRunRepository.findById(100L)).willReturn(Optional.of(run(ValidationRunStatus.FAILED)));
-        assertThat(service.execute(100L, 9L, "retry-request").getStatus()).isEqualTo("FAILED");
-        verify(monthlyValidationJobTrigger).launch(any(), eq("retry-request"));
-        verify(dailyChangedContractJobTrigger, never()).runManual(any(), anyLong(), anyString());
+        assertThatThrownBy(() -> service.execute(100L, 9L, "retry-request"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_004));
+        verify(monthlyValidationJobTrigger, never()).launch(any(), anyString());
+
     }
 
     @Test
