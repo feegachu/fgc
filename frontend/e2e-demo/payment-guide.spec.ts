@@ -67,7 +67,7 @@ for (const multi of [false, true]) {
     await card.getByRole('button', { name: '다음', exact: true }).click()
     await expect(card.getByRole('heading', { name: '안내 완료' })).toBeVisible()
     await info.attach('draft-guide-completed', { body: await page.screenshot(), contentType: 'image/png' })
-    await card.getByRole('button', { name: '사전검증·확정 안내' }).click()
+    await card.getByRole('button', { name: '사전검증/확정 안내' }).click()
     await card.getByRole('button', { name: '확인하고 다음', exact: true }).click()
     await expect(card.getByRole('heading', { name: '사전검증을 실행하세요' })).toBeVisible()
     const checking = responseFor(page, `/transactions/${id}/precheck`)

@@ -1,65 +1,96 @@
 import { useEffect, useState } from 'react'
-import type { RefObject } from 'react'
-
-type CardPosition = { left: number | 'auto'; top: number | 'auto'; right: number | 'auto'; bottom: number | 'auto' }
-const bottomRight: CardPosition = { left: 'auto', top: 'auto', right: 16, bottom: 16 }
+import type { CSSProperties, RefObject } from 'react'
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>) {
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
-    card: CardPosition
-  }>({ box: null, card: bottomRight })
+    card: CSSProperties
+  }>({ box: null, card: { right: 16, bottom: 16 } })
   useEffect(() => {
     let frame = 0
+    let placementFrame = 0
+    let preparedWidth: number | null = null
+    const alignTarget = () => {
+      if (!target?.isConnected) return
+      target.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
+      const room = Math.min(460, window.innerHeight / 2) + 40
+      const rect = target.getBoundingClientRect()
+      const modalBody = target.closest<HTMLElement>('.modal-body')
+      const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0
+      const topBoundary = Math.max(0, headerBottom, modalBody?.getBoundingClientRect().top ?? 0) + 16
+      const topGap = rect.top - topBoundary
+      // Native nearest scrolling ignores the fixed header. Restore small targets hidden
+      // behind it, and keep them visible when reserving coach space.
+      const overflow = rect.bottom - (window.innerHeight - room)
+      // Large evidence panels must scroll partly above the viewport to expose their coach.
+      const fitsAboveCoach = rect.height <= window.innerHeight - room - topBoundary
+      let offset = Math.max(0, overflow)
+      if (fitsAboveCoach) offset = topGap < 0 ? topGap : Math.min(offset, topGap)
+      if (offset === 0) return
+      // scroll-margin can be consumed by an overflow-hidden card before the page scrolls.
+      // Move the actual page (or modal body) so the real target has room for its coach.
+      if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
+      else window.scrollBy?.({ top: offset, behavior: 'instant' })
+    }
     const measure = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        const width = document.documentElement.clientWidth,
-          height = window.innerHeight
-        const rect = target?.isConnected ? target.getBoundingClientRect() : null
-        const box = rect
-          ? {
-              left: Math.max(0, rect.left - 10),
-              top: Math.max(0, rect.top - 10),
-              width: Math.max(0, Math.min(width, rect.right + 10) - Math.max(0, rect.left - 10)),
-              height: Math.max(0, Math.min(height, rect.bottom + 10) - Math.max(0, rect.top - 10)),
+        const width = document.documentElement.clientWidth || window.innerWidth
+        const height = window.innerHeight
+        const workspace = document.getElementById('main-content')?.getBoundingClientRect()
+        const workspaceLeft = Math.max(0, workspace?.left ?? 0)
+        const workspaceRight = Math.min(width, workspace?.right || width)
+        const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
+        const cardWidth = Math.min(360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+        if (target?.isConnected && preparedWidth !== workspaceRight - workspaceLeft) {
+          preparedWidth = workspaceRight - workspaceLeft
+          // Leave room below the real target for the coach, including at the end of a page.
+          alignTarget()
+          // The anchored card adds page scroll room in this render. Re-align once after
+          // its layout commits; browser scroll anchoring can otherwise undo the first move.
+          cancelAnimationFrame(placementFrame)
+          placementFrame = requestAnimationFrame(() => {
+            if (target.isConnected) {
+              alignTarget()
+              measure()
             }
-          : null
-        const cw = card.current?.offsetWidth ?? 360,
-          ch = card.current?.offsetHeight ?? 300
-        // Reset opposite insets: CSS bottom defaults must not stretch a top-anchored card (SRC-028).
-        const corners: { left: number; top: number; anchor: CardPosition }[] = [
-          { left: width - cw - 16, top: height - ch - 16, anchor: bottomRight },
-          { left: 16, top: height - ch - 16, anchor: { left: 16, top: 'auto', right: 'auto', bottom: 16 } },
-          { left: width - cw - 16, top: 16, anchor: { left: 'auto', top: 16, right: 16, bottom: 'auto' } },
-          { left: 16, top: 16, anchor: { left: 16, top: 16, right: 'auto', bottom: 'auto' } },
-        ]
-        const free =
-          box &&
-          corners.find(
-            (point) =>
-              point.left >= 0 &&
-              point.top >= 0 &&
-              (point.left + cw + 12 < box.left ||
-                point.left > box.left + box.width + 12 ||
-                point.top + ch + 12 < box.top ||
-                point.top > box.top + box.height + 12),
-          )
+          })
+        }
+        const rect = target?.isConnected ? target.getBoundingClientRect() : null
+        const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+        const box = rect ? {
+          left: Math.max(workspaceLeft, rect.left - 8),
+          top: Math.max(headerBottom + 8, rect.top - 8),
+          width: Math.max(0, Math.min(workspaceRight, rect.right + 8) - Math.max(workspaceLeft, rect.left - 8)),
+          height: Math.max(0, Math.min(height, rect.bottom + 8) - Math.max(headerBottom + 8, rect.top - 8)),
+        } : null
         setPosition({
           box: box?.width && box.height ? box : null,
-          card: free ? free.anchor : bottomRight,
+          card: rect ? {
+            left: Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)),
+            top: rect.bottom + 24,
+            right: 'auto', bottom: 'auto', width: cardWidth,
+          } : { left: 'auto', top: 'auto', right: 16, bottom: 16, width: cardWidth },
         })
       })
     }
-    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      // A result panel can move the target without resizing the target itself.
+      // Re-align on layout changes, while ordinary user scroll only updates the attachment.
+      preparedWidth = null
+      measure()
+    })
     if (target) resize?.observe(target)
     if (card.current) resize?.observe(card.current)
+    const workspace = document.getElementById('main-content')
+    if (workspace) resize?.observe(workspace)
     window.addEventListener('scroll', measure, true)
     window.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('resize', measure)
     measure()
     return () => {
       cancelAnimationFrame(frame)
+      cancelAnimationFrame(placementFrame)
       resize?.disconnect()
       window.removeEventListener('scroll', measure, true)
       window.removeEventListener('resize', measure)

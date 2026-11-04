@@ -43,7 +43,7 @@ import './reconciliation.css'
 const historyColumns: TableColumn<Run>[] = [
   {
     key: 'id',
-    label: '실행 ID',
+    label: '실행 번호',
     sortKey: 'reconciliationRunId',
     sortable: true,
     width: '5rem',
@@ -384,7 +384,7 @@ export default function ReconciliationPage() {
         />
         {!canProcess && (
           <p className="reco-react-note">
-            대사 실행과 불일치 예외 일괄 생성은 SETTLEMENT/SYSTEM_ADMIN 권한이 필요합니다.
+            대사 실행과 불일치 예외 일괄 생성은 정산담당자와 시스템관리자만 할 수 있습니다.
           </p>
         )}
         <Failure error={execution.error || bulk.error} />
@@ -452,8 +452,7 @@ export default function ReconciliationPage() {
           </ListHeader>
           {onlyMismatch && (
             <p className="reco-react-note" role="status">
-              불일치만은 현재 서버 페이지에서 일치 행을 숨깁니다. 전체 불일치 건수는 실행 요약이며, 다음 페이지에도
-              결과가 있을 수 있습니다.
+              불일치만 보기는 지금 페이지의 일치 행만 숨깁니다. 전체 불일치 건수는 실행 요약에서 확인하세요.
             </p>
           )}
           <Failure error={results.error} />
@@ -721,7 +720,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
             format={(value) => value.toFixed(1)}
             unit="%"
             tone={summary && summary.resultCount === summary.matchedCount ? 'success' : 'warning'}
-            footer="일치 건수 / 대상 건수"
+            footer="대상 건수 중 일치 비율"
           />
           <details className="reco-react-rate-help">
             <summary data-guide-feature="features.reconciliation.reconciliation-page.summary" aria-label="일치율 계산 안내">
@@ -730,8 +729,8 @@ function RunSummary({ summary }: { summary?: Summary }) {
               </span>
             </summary>
             <p>
-              일치 건수 ÷ 대상 건수 × 100을 소수점 한 자리로 표시합니다. 이력은 서버 반올림 값이므로 차이가 있을 수
-              있습니다.
+              일치 건수를 대상 건수로 나눈 비율을 소수점 한 자리로 표시합니다. 실행 이력의 일치율은 반올림한 값이라
+              조금 다를 수 있습니다.
             </p>
           </details>
         </div>
@@ -742,7 +741,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
           value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
           unit="원"
           tone={summary?.differenceTotal === 0 ? 'success' : 'error'}
-          footer="실제 지급액 - 예상 지급액 합계"
+          footer="실제 지급액에서 예상 지급액을 뺀 합계"
         />
       </div>
     </section>

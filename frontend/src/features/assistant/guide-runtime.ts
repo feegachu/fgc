@@ -63,7 +63,7 @@ export function completion(session: LocalGuide, observation: PaymentObservation)
   if (observation.busy) return { ok: false, reason: '실제 업무 요청 결과를 기다리고 있어요.' }
   switch (step.completionRuleId) {
     case 'SCOPE_ACKNOWLEDGED':
-      return { ok: true, reason: '월·지급단계·수취인과 귀속 계약을 직접 확인한 뒤 다음을 누르세요.' }
+      return { ok: true, reason: '월, 지급단계, 수취인과 귀속 계약을 직접 확인한 뒤 다음을 누르세요.' }
     case 'AMOUNT_REVIEW_ACKNOWLEDGED':
       return {
         ok: observation.amountValid,
@@ -76,21 +76,21 @@ export function completion(session: LocalGuide, observation: PaymentObservation)
         ok: observation.attributionsValid,
         reason: observation.attributionsValid
           ? '계약별 귀속과 배부 근거를 확인한 뒤 다음을 누르세요.'
-          : '귀속행의 계약·날짜·금액·배부 근거를 확인하세요.',
+          : '귀속행의 계약, 날짜, 금액, 배부 근거를 확인하세요.',
       }
     case 'EVIDENCE_FIELDS_VALID':
       return {
         ok: observation.formValid,
         reason: observation.formValid
           ? '입력과 근거를 직접 확인한 뒤 다음을 누르세요.'
-          : '필수 입력·귀속·증빙과 기준정보 선택을 먼저 확인하세요.',
+          : '필수 입력, 귀속, 증빙과 기준정보 선택을 먼저 확인하세요.',
       }
     case 'CURRENT_DRAFT_SAVED':
       return {
         ok: observation.saved && observation.formValid,
         reason:
           observation.saved && observation.formValid
-            ? '현재 입력과 일치하는 DRAFT 응답을 확인했어요.'
+            ? '현재 입력대로 초안이 저장됐어요.'
             : '기존 저장 버튼을 직접 눌러 성공 응답을 확인하세요.',
       }
     case 'CURRENT_PRECHECK_PASSED':
@@ -98,14 +98,14 @@ export function completion(session: LocalGuide, observation: PaymentObservation)
         ok: false,
         reason:
           observation.precheck === 'REJECTED'
-            ? '서버가 검증을 차단했습니다. 기존 결과에서 사유를 확인하세요.'
+            ? '사전검증에서 확정이 막혔습니다. 기존 결과에서 사유를 확인하세요.'
             : observation.precheck === 'PASSED_WITHOUT_TOKEN'
-              ? '현재 저장본의 검증 증표가 없는 API입니다. 가이드 통과 판정은 서버 연계 후 지원합니다.'
+              ? '사전검증 결과는 화면에서 직접 확인하고, 확정은 확정 버튼으로 직접 진행하세요.'
               : '기존 사전검증 버튼으로 결과를 확인하세요. 가이드는 검증을 실행하지 않아요.',
       }
     case 'PRECHECK_RESULT_ACKNOWLEDGED':
     case 'PAYMENT_CONFIRMED':
-      return { ok: false, reason: '현재 저장본의 서버 검증 증표·확정 상태 연계가 필요합니다.' }
+      return { ok: false, reason: '검증 결과와 확정 상태는 화면에서 직접 확인하세요.' }
   }
 }
 export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
@@ -126,7 +126,7 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
           session: {
             ...old,
             status: 'PAUSED',
-            reason: '화면·지급 범위 또는 권한이 변경됐어요. 현재 대상에서 도움말을 새로 시작하세요.',
+            reason: '화면, 지급 범위 또는 권한이 변경됐어요. 현재 대상에서 도움말을 새로 시작하세요.',
             acknowledgements: [],
             restartRequired: true,
           },
@@ -150,7 +150,7 @@ export const useGuideRuntime = create<RuntimeStore>((set, get) => ({
             revision: value.revision,
             status: old.status === 'PAUSED' ? 'PAUSED' : 'PREPARING',
             acknowledgements: [],
-            reason: '입력이 변경되어 이전 확인·저장·검증 근거를 다시 확인합니다.',
+            reason: '입력이 변경되어 이전 확인, 저장, 검증 근거를 다시 확인합니다.',
           },
         }
       return { observation: value }

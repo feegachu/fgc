@@ -191,7 +191,8 @@ describe('EXCP-W01 예외함', () => {
     await userEvent.setup().click(within(await table()).getAllByRole('row')[1])
     expect(screen.queryByRole('option', { name: '재검토 시작' })).not.toBeInTheDocument()
     expect(document.querySelector('a[href*="transactions/new?id=41"]')).toBeNull()
-    expect(screen.getAllByText('COMMISSION_TRANSACTION:41')).not.toHaveLength(0)
+    expect(screen.getAllByText('지급 건 41')).not.toHaveLength(0)
+    expect(screen.queryByText(/COMMISSION_TRANSACTION/)).not.toBeInTheDocument()
   })
 
   it('미처리 기본값으로 요약 카드와 목록을 보여 준다', async () => {
@@ -400,8 +401,13 @@ describe('EXCP-W01 예외함', () => {
     expect(screen.queryByText(/104\.166667%/)).not.toBeInTheDocument()
     expect(screen.getByText('1,200% 한도 초과', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('배정합니다')).toBeInTheDocument()
-    for (const link of screen.getAllByRole('link', { name: /INSURANCE_CONTRACT:3/ }))
-      expect(link).toHaveAttribute('href', '/app/contracts/3')
+    // 계약 원천은 내부 번호 대신 계약번호로 읽는다.
+    const references = screen.getAllByRole('link', { name: /^계약 C-0001/ })
+    expect(references.length).toBeGreaterThan(0)
+    for (const link of references) expect(link).toHaveAttribute('href', '/app/contracts/3')
+    expect(screen.getByText('검증 실행', { exact: false, selector: '.exception-occurrence-meta' })).toHaveTextContent(
+      '검증 실행 44, 1,200% 판정 9',
+    )
   })
 
   it('사유 없이는 저장할 수 없고, 저장하면 이력과 상태가 갱신된다', async () => {
@@ -542,10 +548,9 @@ describe('EXCP-W01 예외함', () => {
       await actions.click(within(dialog).getByRole('button', { name: '안내 마치기' }))
     }
     expect(await within(dialog).findByText('역분개와 재기표를 완료했습니다.')).toBeInTheDocument()
-    expect(within(dialog).getByRole('link', { name: '재기표 #72' })).toHaveAttribute(
-      'href',
-      '/app/journals?selected=72',
-    )
+    expect(within(dialog).getByText('정정 묶음으로 연결했습니다.')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/CG-1|#72/)).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: /^재기표/ })).toHaveAttribute('href', '/app/journals?selected=72')
   })
 })
 
@@ -564,8 +569,8 @@ describe('원장 정정 입력 검증', () => {
       ]),
     ).toBeNull()
   })
-  it('양쪽이 모두 0 이거나 모두 양수인 라인을 거부한다', () => {
-    expect(validateCorrectionLines([{ debitAmount: '', creditAmount: '' }])).toContain('1번 라인')
+  it('양쪽이 모두 0 이거나 모두 양수인 줄을 거부한다', () => {
+    expect(validateCorrectionLines([{ debitAmount: '', creditAmount: '' }])).toContain('1번 줄')
     expect(validateCorrectionLines([{ debitAmount: '10', creditAmount: '10' }])).toContain('한쪽에만')
   })
   it('음수·소수·차대 불균형·0원 합계를 거부한다', () => {
@@ -587,7 +592,7 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
   await actions.clear(debit)
   await actions.type(debit, '0')
   await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
-  expect(await within(dialog).findByText(/1번 라인은 차변 또는 대변 중 한쪽에만/)).toBeInTheDocument()
+  expect(await within(dialog).findByText(/1번 줄은 차변 또는 대변 중 한쪽에만/)).toBeInTheDocument()
   expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
 })
 
@@ -677,6 +682,29 @@ it('committed correction with an invalid receipt refreshes and cannot be posted 
   expect(within(dialog).getByRole('button', { name: '정정 실행' })).toBeDisabled()
   fireEvent.submit(dialog.querySelector('form')!)
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+})
+
+it('차익거래 판정 사유로 저장된 예외 설명의 개발 용어는 쉬운 말로 보이고 다른 설명은 그대로 둔다', async () => {
+  searchResponse = () =>
+    search([
+      {
+        ...baseCase,
+        type: 'DATA_QUALITY',
+        typeLabel: '데이터 품질',
+        title: '차익거래 검증 자료 확인 필요',
+        description: '기준일 이하 계약 금융 스냅샷이 없습니다.',
+        sourceEntityType: 'ARBITRAGE_CHECK',
+        sourceEntityId: '5',
+        sourceLink: '/arbitrage-checks',
+      },
+      { ...baseCase, exceptionCaseId: 13, description: '한도를 넘었습니다.' },
+    ])
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  expect(await screen.findByText('기준일 이전 계약 금액 자료가 없습니다.', { selector: 'dd' })).toBeInTheDocument()
+  expect(screen.queryByText(/스냅샷/)).not.toBeInTheDocument()
+  await actions.click(within(await table()).getByRole('button', { name: '13' }))
+  expect(await screen.findByText('한도를 넘었습니다.', { selector: 'dd' })).toBeInTheDocument()
 })
 
 

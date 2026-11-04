@@ -24,10 +24,16 @@ export const paymentCycleLabels = {
 } satisfies Record<Schema['ContractCreateRequest']['paymentCycleCode'], string>
 
 export const dataOriginLabels = {
-  SEED: '시드',
-  NORMALIZED_DB: '정규화 DB',
-  MANUAL: '수동 입력',
+  SEED: '초기 자료',
+  NORMALIZED_DB: '보험사 자료',
+  MANUAL: '직접 입력',
 } satisfies Record<NonNullable<Schema['ContractView']['dataOrigin']>, string>
+
+/** 상태 사건 출처(source_system). 서버가 라벨을 주지 않는다. FGC_MANUAL은 화면 등록과 수정 모두에 쓴다. */
+export const sourceSystemLabels: Record<string, string> = {
+  INSURER_FEED: '보험사 자료',
+  FGC_MANUAL: '직접 입력',
+}
 
 export const capStatusLabels = {
   NORMAL: '정상',

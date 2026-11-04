@@ -172,7 +172,7 @@ it('keeps a folded card away from a top-left target and preserves input through 
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
   await userEvent.click(screen.getByRole('button', { name: '접기' }))
   const card = screen.getByRole('region', { name: '보험계약 목록 도움말' })
-  await waitFor(() => expect(card).toHaveStyle({ top: 'auto', bottom: '16px' }))
+  await waitFor(() => expect(card).toHaveStyle({ top: '140px', bottom: 'auto' }))
   expect(document.querySelector('.payment-guide-spotlight')).toBeNull()
   await userEvent.click(screen.getByRole('button', { name: '펼치기' }))
   expect(screen.getByLabelText('접기 입력')).toHaveValue('draft')

@@ -574,7 +574,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('#6 COMPLIANCE 는 확정·재생성 버튼이 비활성이고 권한 안내를 본다', async () => {
     renderAt('/schedules/11', baseHandler(), 'COMPLIANCE')
-    expect(await screen.findByText('확정/재생성은 정산 담당자만 할 수 있습니다.')).toBeInTheDocument()
+    expect(await screen.findByText('확정과 재생성은 정산담당자와 시스템관리자만 할 수 있습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /새 버전 만들기/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '확정' })).toHaveAttribute('aria-describedby', 'schedule-action-note')
@@ -584,7 +584,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
 
   it('숫자가 아닌 id 는 API 를 부르지 않고, 조회 실패는 다시 시도할 수 있다', async () => {
     renderAt('/schedules/abc', () => undefined)
-    expect((await screen.findAllByText('스케줄 ID를 확인할 수 없습니다.')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('스케줄을 찾을 수 없습니다.')).length).toBeGreaterThan(0)
     expect(calls('/api/v1/schedules')).toHaveLength(0)
   })
 

@@ -12,6 +12,7 @@ import type { GuideDefinition } from '../assistant/guide/types'
 import { getPaymentGuideObserver, subscribePaymentGuide, paymentGuideConditions } from './payment-guide'
 import type { PaymentGuideObserver, PaymentGuideState } from './payment-guide'
 import './payment-guide.css'
+import guideMascot from '../assistant/assets/pico-guide.png'
 
 interface Props {
   initialWorkflowId?: string | null
@@ -39,7 +40,7 @@ const reasons: Record<string, string> = {
   DUPLICATE_TARGET: '안내 대상이 중복되어 멈췄습니다.',
   PREPARATION_TIMEOUT: '안내 대상을 준비하지 못했습니다. 화면을 확인하고 다시 찾으세요.',
   TARGET_CHANGED: '안내 대상이 사라지거나 바뀌었습니다.',
-  SERVER_STATE_CHANGED: '서버 저장 상태가 바뀌었습니다. 현재 내용을 다시 확인하세요.',
+  SERVER_STATE_CHANGED: '저장된 내용이 바뀌었습니다. 현재 내용을 다시 확인하세요.',
 }
 function GuideSession({
   initialWorkflowId,
@@ -75,9 +76,14 @@ function GuideSession({
   }, [snapshot.workflowId, snapshot.step])
   const revision = useSyncExternalStore(observer.subscribe, observer.getViewRevision)
   const [collapsed, setCollapsed] = useState(false)
-  useEffect(() => {
-    useWorkflowGuide.setState({ paymentActive: !collapsed && !['PAUSED', 'ERROR'].includes(snapshot.status) })
-  }, [collapsed, snapshot.status])
+  useEffect(() => useWorkflowGuide.subscribe((state, previous) => {
+    if (state.chatSequence !== previous.chatSequence) {
+      runtime.pause('USER_PAUSED')
+      setCollapsed(true)
+    }
+  }), [runtime])
+  // TransactionFormPage owns paymentActive for the whole open guide lifetime.
+  // Folding for chat must not release that ownership and admit a second guide.
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState(false)
   const [refresh, setRefresh] = useState(0)
@@ -216,9 +222,15 @@ function GuideSession({
     await runtime.resume()
     if (runtime.getSnapshot().reasonCode === 'ENTITY_CHANGED_RESTART_REQUIRED' && current) {
       // A newly issued payment ID can be revalidated at the saved-result step; other selections restart at scope.
+      let saved = false
+      if (snapshot.step?.stepId === 'payment.save') {
+        const latest = await observer.readBusinessState(observer.readContext(), AbortSignal.timeout(5000))
+        saved = latest.saved
+        setAssessment({ key, state: latest })
+      }
       await start(
         current,
-        snapshot.step?.stepId === 'payment.save' && state?.saved ? 'payment.save' : current.steps[0].stepId,
+        snapshot.step?.stepId === 'payment.save' && saved ? 'payment.save' : current.steps[0].stepId,
       )
     }
   }
@@ -251,11 +263,11 @@ function GuideSession({
   }
   const waitingInstruction =
     step?.stepId === 'payment.scope'
-      ? '① 지급 건에서 정산월·지급단계와 수령 설계사를 선택하세요. 원수사→GA는 설계사 선택이 필요 없습니다. 계약은 3단계 귀속행에서 선택합니다.'
+      ? '① 지급 건에서 정산월, 지급단계, 수령 설계사를 선택하세요. 원수사→GA는 설계사 선택이 필요 없습니다. 계약은 ② 귀속행에서 선택합니다.'
       : step?.stepId === 'payment.amount'
         ? '① 지급 건에서 수수료 항목과 0원 이상의 지급액을 입력하세요.'
         : step?.stepId === 'payment.attributions'
-          ? '② 귀속행 추가 후 계약번호·귀속일·금액을 입력하세요. 귀속금액 합계를 지급액과 맞추세요.'
+          ? '② 귀속행 추가 후 계약번호, 귀속일, 금액을 입력하세요. 귀속금액 합계를 지급액과 맞추세요.'
           : (state?.validationMessage ?? '화면의 실제 업무 버튼을 눌러 처리 결과를 확인하세요.')
   const paused = snapshot.status === 'PAUSED' || snapshot.status === 'ERROR'
   const complete = snapshot.status === 'COMPLETED'
@@ -285,21 +297,18 @@ function GuideSession({
         style={{ ...position.card, left: position.card.left ?? 'auto', transform: 'none' }}
         aria-label="지급 업무 가이드"
         data-guide-status={snapshot.status}
+        data-guide-anchored={Boolean(snapshot.target && !folded && !paused && !modalOpen)}
       >
         <header className="payment-guide-header">
-          <img
-            className="payment-guide-mascot"
-            src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`}
-            width="40"
-            height="40"
-            alt=""
-          />
-          <span>
-            업무 가이드
+          <img className="payment-guide-mascot" src={guideMascot} alt="" />
+          <div className="payment-guide-heading">
+            <small>피코의 단계별 가이드
             {current && step
-              ? ` · ${current.steps.findIndex((entry) => entry.stepId === step.stepId) + 1}/${current.steps.length}`
+              ? `, ${current.steps.findIndex((entry) => entry.stepId === step.stepId) + 1}/${current.steps.length}`
               : ''}
-          </span>
+            </small>
+            <h2 ref={heading} tabIndex={-1}>{title}</h2>
+          </div>
           {!confirmed && (
             <Button data-guide-feature="features.transaction.payment-guide.button" variant="ghost" onClick={() => setCollapsed(!collapsed)}>
               {folded ? '펼치기' : '접기'}
@@ -311,14 +320,14 @@ function GuideSession({
         </header>
         {!folded && (
           <>
-            <h2 ref={heading} tabIndex={-1}>
-              {title}
-            </h2>
+            {current && step && <div className="payment-guide-progress" aria-hidden="true">
+              {current.steps.map((entry, index) => <span key={entry.stepId} className={index < current.steps.findIndex((candidate) => candidate.stepId === step.stepId) ? 'is-done' : entry.stepId === step.stepId ? 'is-current' : ''} />)}
+            </div>}
             <div aria-live="polite" aria-atomic="true">
               {confirmed ? (
                 <p>
                   {state?.confirmed
-                    ? '서버에서 지급 확정과 저장 결과를 확인했습니다. 목록으로 이동할 수 있습니다.'
+                    ? '지급 확정과 저장 결과를 확인했습니다. 목록으로 이동할 수 있습니다.'
                     : '지급 확정은 성공했습니다. 가이드 완료 확인은 보류되었습니다. 목록에서 처리 결과를 확인할 수 있습니다.'}
                 </p>
               ) : complete ? (
@@ -332,11 +341,11 @@ function GuideSession({
                   {(step?.stepId === 'payment.precheck.result'
                     ? '사전검증 통과 여부와 차단 사유를 확인하세요.'
                     : step?.instruction) ??
-                    '필요한 안내를 선택하세요. 저장·사전검증·확정은 화면의 실제 버튼을 직접 눌러 진행합니다.'}
+                    '필요한 안내를 선택하세요. 저장, 사전검증, 확정은 화면의 실제 버튼을 직접 눌러 진행합니다.'}
                 </p>
               )}
               {!confirmed && !complete && step && (
-                <p className="payment-guide-condition">
+                <p className={`payment-guide-condition${canNext && !paused ? ' is-ready' : ''}`}>
                   {paused
                     ? (reasons[snapshot.reasonCode ?? ''] ??
                       '안내가 중단되었습니다. 현재 화면을 확인하고 다시 찾으세요.')
@@ -379,7 +388,7 @@ function GuideSession({
                         void run(() => start(PAYMENT_GUIDES.find((guide) => guide.workflowId === 'payment.confirm')!))
                       }
                     >
-                      사전검증·확정 안내
+                      사전검증/확정 안내
                     </Button>
                   )}
                 </>
@@ -404,6 +413,7 @@ function GuideSession({
               ) : (
                 <>
                   <Button data-guide-feature="features.transaction.payment-guide.button-9"
+                    className="pico-guide-back"
                     variant="secondary"
                     disabled={working || snapshot.status === 'PREPARING' || !runtime.canGoBack()}
                     onClick={() => void run(() => runtime.previous())}
@@ -411,6 +421,7 @@ function GuideSession({
                     이전
                   </Button>
                   <Button data-guide-feature="features.transaction.payment-guide.button-10"
+                    className="pico-guide-next"
                     disabled={!canNext || working || snapshot.status === 'PREPARING'}
                     onClick={() => void run(next)}
                   >
