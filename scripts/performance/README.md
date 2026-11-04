@@ -41,7 +41,7 @@ export FGC_PERF_PASSWORD='<시드 비밀번호>'
    scripts/performance/run-k6.sh rerun              # PER-007. 같은 월 재실행. 마지막에 돌린다
    ```
 
-   `run-k6.sh`는 재기 전에 smoke로 한 바퀴 예열한다. 시나리오를 돌릴 때마다 API를 새로 띄우고 끝나면 내린다. DB는 남긴다. 임계값을 넘으면 k6가 종료 코드 99로 끝난다.
+   `run-k6.sh`는 재기 전에 smoke로 한 바퀴 예열한다. 시나리오를 돌릴 때마다 API를 새로 띄우고 끝나면 내린다. DB는 남긴다. 임계값을 넘으면 k6가 종료 코드 99로 끝난다. `run-batch.sh`는 PER-003 미충족이면 99, 생성기나 배치가 실패하면 1이다. `rerun`은 업무 키 표가 늘면 1이다.
 
 4. **결과서를 갱신한다.** `build/performance/<시각>-<종류>/`의 값을 옮기고, 표의 "RC 전 사전 측정"을 "RC"로 바꾼다. `conditions.txt`의 커밋, 이미지, 다른 컨테이너와 `resources.txt`의 호스트 CPU, 메모리를 조건 칸에 적는다. 다른 작업과 겹치면 값이 크게 흔들리므로 RC는 PC에서 다른 작업을 멈추고 잰다.
 

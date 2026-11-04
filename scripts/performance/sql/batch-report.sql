@@ -33,6 +33,17 @@ SELECT round((total_exec_time / 1000)::numeric, 1) AS total_s, calls, round(mean
  ORDER BY total_exec_time DESC
  LIMIT 15;
 
+\echo == SQL 합계 (전체 시간과 비교한다) ==
+SELECT count(*) AS statements, sum(calls) AS calls, round((sum(total_exec_time) / 1000)::numeric, 1) AS total_s
+  FROM pg_stat_statements;
+
+\echo == 블록을 많이 읽는 SQL 상위 5 (건별 순차 스캔 찾기) ==
+SELECT shared_blks_hit AS blks_hit, calls, round((total_exec_time / 1000)::numeric, 1) AS total_s,
+       left(regexp_replace(query, '\s+', ' ', 'g'), 120) AS query
+  FROM pg_stat_statements
+ ORDER BY shared_blks_hit DESC
+ LIMIT 5;
+
 \echo == 커밋, WAL (DB 생성부터 누계) ==
 SELECT d.xact_commit, d.xact_rollback, d.tup_inserted, d.tup_updated, w.wal_records, pg_size_pretty(w.wal_bytes) AS wal,
        w.wal_write, w.wal_sync, round((w.wal_sync_time / 1000)::numeric, 1) AS wal_sync_s

@@ -65,6 +65,7 @@ if [ "$SCENARIO" = rerun ]; then
   psql_db -At -f - <scripts/performance/sql/table-counts.sql >"$RUN_DIR/counts-after.csv"
   rerun_verdict "$RUN_DIR/counts-before.csv" "$RUN_DIR/counts-after.csv" | tee "$RUN_DIR/verdict.txt"
   psql_db -f - <scripts/performance/sql/batch-report.sql >"$RUN_DIR/report.txt"
+  if grep -q '(미충족)' "$RUN_DIR/verdict.txt"; then code=1; fi
 else
   psql_db -f - <<'SQL' >"$RUN_DIR/report.txt"
 SELECT round((total_exec_time / 1000)::numeric, 1) AS total_s, calls, round(mean_exec_time::numeric, 2) AS mean_ms,

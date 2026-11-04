@@ -32,5 +32,6 @@ per003_verdict "${rows:-0}" "${contracts:-0}" "${seconds:-0}" "${status:-NONE}" 
 if [ "$code" -eq 0 ]; then
   psql_db -f - <scripts/performance/sql/per007-explain.sql >"$RUN_DIR/per007-explain.txt"
   per007_explain_verdict "$RUN_DIR/per007-explain.txt" | tee -a "$RUN_DIR/verdict.txt"
+  grep -q 'PER-003: 미충족' "$RUN_DIR/verdict.txt" && code=99 # 목표 초과는 k6 임계값 초과와 같은 코드로 알린다
 fi
 exit "$code"
