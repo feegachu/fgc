@@ -4527,7 +4527,7 @@
       "ContractStatusEffectResponse" : {
         "properties" : {
           "amount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "entityId" : {
             "format" : "int64",
@@ -4541,16 +4541,16 @@
           },
           "policyVersionId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "previousState" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "processingJob" : {
             "type" : "string"
           },
           "reason" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "reasonCode" : {
             "type" : "string"
@@ -4560,6 +4560,12 @@
       },
       "ContractStatusEventProcessingResponse" : {
         "properties" : {
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
           "processedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -4569,6 +4575,16 @@
           },
           "processingStatus" : {
             "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ProcessingSummary"
+            }, {
+              "type" : "null"
+            } ]
           }
         },
         "type" : "object"
@@ -4612,6 +4628,9 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "followUp" : {
+            "$ref" : "#/components/schemas/EventFollowUp"
+          },
           "newStatus" : {
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
@@ -4639,6 +4658,10 @@
             "type" : [ "string", "null" ]
           },
           "receivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "recordedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
@@ -5083,6 +5106,21 @@
           "reconMismatch" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventFollowUp" : {
+        "properties" : {
+          "jobs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FollowUpJob"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -5655,6 +5693,37 @@
           },
           "status" : {
             "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FollowUpJob" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
+          "lastAttemptAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextRetryAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
             "type" : "string"
           }
         },
@@ -7863,6 +7932,27 @@
           "validationRunId" : {
             "format" : "int64",
             "type" : [ "integer", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "ProcessingSummary" : {
+        "properties" : {
+          "changedScheduleLines" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excludedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "heldPayments" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "resumedPayments" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"

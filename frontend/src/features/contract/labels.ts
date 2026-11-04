@@ -1,4 +1,5 @@
 import type { components } from '../../lib/api/schema'
+import { LINE_STATUS } from '../schedule/labels'
 
 type Schema = components['schemas']
 
@@ -64,6 +65,42 @@ export const followUpStatusLabels = {
   NOT_REQUIRED: '대상 없음',
 } satisfies Record<NonNullable<Schema['FollowUp']['status']>, string>
 
+/** IF-API-16 followUp.status. 계약 저장 성공과 별개인 후속 처리의 현재 상태다. */
+export const eventFollowUpLabels = {
+  NOT_REQUIRED: '대상 없음',
+  PENDING: '처리 대기',
+  PROCESSING: '처리 중',
+  FAILED: '실패, 재시도 대기',
+  EXHAUSTED: '자동 재시도 소진',
+  SUCCEEDED: '완료',
+} satisfies Record<NonNullable<Schema['EventFollowUp']['status']>, string>
+
+/** 영향이 0건일 때 그 이유. 조회 오류나 아직 끝나지 않은 처리를 0건으로 읽지 않게 후속 상태별로 다르게 쓴다. */
+export const followUpEmptyEffects = {
+  NOT_REQUIRED: '이 사건은 후속 처리 대상이 아니라 영향이 없습니다.',
+  PENDING: '후속 처리 대기 중입니다. 처리가 끝나면 영향이 표시됩니다.',
+  PROCESSING: '후속 처리 중입니다. 처리가 끝나면 영향이 표시됩니다.',
+  FAILED: '후속 처리에 실패해 영향이 기록되지 않았습니다. 자동 재시도를 기다립니다.',
+  EXHAUSTED: '자동 재시도를 모두 써서 영향이 기록되지 않았습니다. 운영 담당 확인이 필요합니다.',
+  SUCCEEDED: '후속 처리를 마쳤고 바뀐 대상이 없습니다.',
+} satisfies Record<keyof typeof eventFollowUpLabels, string>
+
+const followUpFailures: Record<string, string> = {
+  'FGC-IMPL-POLICY_MISSING': '적용할 정책을 찾지 못했습니다',
+}
+/** errorCode는 서버 오류 코드 또는 예외 이름이다. 코드는 운영 담당이 찾을 수 있게 함께 보인다. */
+export const followUpFailureText = (code?: string | null) =>
+  !code ? '기록 없이 중단됨' : `${followUpFailures[code] ?? '시스템 오류'} (${code})`
+
+/** 상태 사건 사유코드. 자유 사유가 없는 사건(계약 등록, 보험사 자료)에 대신 보인다. */
+export const eventReasonLabels: Record<string, string> = {
+  ...statusReasonLabels,
+  NEW_CONTRACT: '신규 계약',
+  PREMIUM_UNPAID: '보험료 미납',
+  LAPSE_BY_UNPAID: '미납 실효',
+  SURRENDER: '해지 신청',
+}
+
 /** 처리 결과는 서버 문자열 코드다. 1차 상세 화면의 표시 규칙을 유지한다. */
 export const processingStatusLabels: Record<string, string> = {
   PENDING: '처리 대기',
@@ -78,12 +115,34 @@ export const processingStatusLabels: Record<string, string> = {
 /** 상태 사건 후속 처리 작업 이름. 배치 작업의 원문 이름은 화면에 쓰지 않는다(SRC-074). */
 export const processingJobLabels: Record<string, string> = {
   DailyChangedContractJob: '일일 변경 계약 재검증',
+  PaymentHoldJob: '지급 보류 처리',
+  PaymentResumeJob: '부활 재개 처리',
 }
 
 export const paymentStatusLabels: Record<string, string> = {
   DRAFT: '작성중',
   CONFIRMED: '확정',
   CANCELLED: '취소',
+}
+
+export const effectEntityLabels: Record<string, string> = { PAYMENT: '지급 건', SCHEDULE_LINE: '스케줄 회차' }
+/** IF-API-89 상태. 지급 보류(payment_hold)와 회차 보류, 회차 중단은 다른 일이라 같은 말로 쓰지 않는다. */
+const effectStates: Record<string, Record<string, string>> = {
+  PAYMENT: { ...paymentStatusLabels, HELD: '지급 보류', RELEASED: '보류 해제' },
+  SCHEDULE_LINE: { ...LINE_STATUS, PLANNED: '지급 예정', HOLD: '회차 보류', CANCELLED: '지급 예정 중단' },
+}
+const effectExclusions: Record<string, string> = {
+  ALREADY_CONFIRMED: '이력 보존, 처리 제외',
+  MONTH_LOCKED: '이력 보존, 처리 제외',
+  NO_RETROACTIVE: '소급 제외',
+}
+export function effectStateLabel(
+  effect: Pick<Schema['ContractStatusEffectResponse'], 'entityType' | 'reasonCode'>,
+  state?: string | null,
+) {
+  if (!state) return '자료 없음'
+  if (state === 'EXCLUDED') return effectExclusions[effect.reasonCode ?? ''] ?? '처리 제외'
+  return effectStates[effect.entityType ?? '']?.[state] ?? '확인 필요'
 }
 
 export function responseLabel(labels: Record<string, string>, code: string | null | undefined, label?: string | null) {
