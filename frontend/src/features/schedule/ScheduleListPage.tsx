@@ -78,6 +78,7 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
     key: 'regime',
     // 태그 컬럼은 머리글과 값을 함께 가운데 정렬한다.
     label: <RegimeEvidence />,
+    labelText: '적용 체계',
     width: '7.75rem',
     align: 'center',
     render: (row) => (
@@ -227,7 +228,7 @@ export default function ScheduleListPage() {
           pageSize={data?.size ?? PAGE_SIZE}
         >
           <h2 id="schedule-results-title" className="surface-title">
-            예상스케줄
+            예상 스케줄
           </h2>
         </ListHeader>
 

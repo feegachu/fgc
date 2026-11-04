@@ -151,19 +151,19 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
         for (ValidationScheduleState state : states) {
             int activeHeaderCount = valueOrZero(state.getActiveHeaderCount());
             if (activeHeaderCount > 1) {
-                return state.getPaymentStage() + " 활성 OPERATIONAL 스케줄 헤더가 중복되었습니다.";
+                return state.getPaymentStage().label() + ": 사용 중인 운영 스케줄이 두 개 이상입니다.";
             }
             if (activeHeaderCount == 0) {
                 continue;
             }
             if (state.getScheduleStatus() == ScheduleHeaderStatus.CANCELLED) {
-                return state.getPaymentStage() + " 활성 스케줄 상태가 CANCELLED입니다.";
+                return state.getPaymentStage().label() + ": 사용 중인 스케줄이 취소 상태입니다.";
             }
             if (valueOrZero(state.getLineCount()) == 0) {
-                return state.getPaymentStage() + " 활성 스케줄에 회차 라인이 없습니다.";
+                return state.getPaymentStage().label() + ": 사용 중인 스케줄에 회차가 없습니다.";
             }
             if (valueOrZero(state.getLineCount()) != valueOrZero(state.getDistinctLineCount())) {
-                return state.getPaymentStage() + " 스케줄 회차 업무키가 중복되었습니다.";
+                return state.getPaymentStage().label() + ": 스케줄 회차가 중복되었습니다.";
             }
         }
         return null;

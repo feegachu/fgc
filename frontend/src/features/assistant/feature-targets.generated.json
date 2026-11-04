@@ -1020,8 +1020,23 @@
     "element": "select"
   },
   {
+    "id": "features.clawback.clawback-calculation.form",
+    "file": "features/clawback/ClawbackCalculation.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.clawback.clawback-calculation.policy",
+    "file": "features/clawback/ClawbackCalculation.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.clawback.clawback-calculation.reason",
+    "file": "features/clawback/ClawbackCalculation.tsx",
+    "element": "textarea"
+  },
+  {
     "id": "features.clawback.clawback-detail.button",
-    "file": "features/clawback/ClawbackDetail.tsx",
+    "file": "features/clawback/ClawbackCalculation.tsx",
     "element": "Button"
   },
   {
@@ -1046,7 +1061,7 @@
   },
   {
     "id": "features.clawback.clawback-detail.section-2",
-    "file": "features/clawback/ClawbackDetail.tsx",
+    "file": "features/clawback/ClawbackCalculation.tsx",
     "element": "section"
   },
   {

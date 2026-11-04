@@ -11,7 +11,7 @@ type Guide = (typeof guides)[number]
 type Step = Guide['steps'][number]
 const partial: Record<string, { count: number; reason: string }> = {}
 const feature = (page: Page, id: string) => page.locator(`[data-guide-feature="${id}"]`)
-const tutorial = (page: Page) => page.getByRole('region', { name: '업무 튜토리얼', exact: true })
+const tutorial = (page: Page) => page.getByRole('region', { name: '업무 안내', exact: true })
 
 async function seedContract(page: Page) {
   await page.goto('login')
@@ -92,7 +92,7 @@ async function prepare(page: Page, guide: Guide, account: string): Promise<Prepa
 async function start(page: Page, guide: Guide, role: string) {
   if (role === 'AGENT') {
     await feature(page, 'agent.guide-menu.open').click()
-    await page.getByRole('navigation', { name: '본인 업무 튜토리얼' }).getByRole('button', { name: guide.title, exact: true }).click()
+    await page.getByRole('navigation', { name: '본인 업무 안내' }).getByRole('button', { name: guide.title, exact: true }).click()
     if (guide.workflowId === 'agent.contract.detail') {
       // The agent menu lives on AgentHome. The real SELECT_TARGET flow must select an owned row.
       await expect(tutorial(page).getByText('목록에서 안내받을 대상을 직접 선택한 뒤 현재 대상에서 다시 시작하세요.', { exact: true })).toBeVisible()
@@ -101,7 +101,7 @@ async function start(page: Page, guide: Guide, role: string) {
       await tutorial(page).getByRole('button', { name: '현재 대상에서 다시 시작', exact: true }).click()
     }
   } else {
-    await page.getByRole('button', { name: '업무 비서 AI 열기 · 피코', exact: true }).click()
+    await page.getByRole('button', { name: '업무 비서 AI 열기, 피코', exact: true }).click()
     const pico = page.getByRole('dialog', { name: '피코 업무 비서' })
     await pico.getByRole('tab', { name: '업무 안내', exact: true }).click()
     // The menu also contains a description. Scope by its exact title element, not a fuzzy prefix.
@@ -113,7 +113,7 @@ async function activateTutorialControl(page: Page, name: string) {
   const button = tutorial(page).getByRole('button', { name, exact: true })
   const dialog = page.locator('[role="dialog"][aria-modal="true"]').last()
   if (await dialog.count()) {
-    await expect(dialog.getByRole('region', { name: '업무 튜토리얼', exact: true })).toBeVisible()
+    await expect(dialog.getByRole('region', { name: '업무 안내', exact: true })).toBeVisible()
     await button.focus()
     await expect(button).toBeFocused()
     await button.press('Enter')
@@ -123,7 +123,7 @@ async function activateTutorialControl(page: Page, name: string) {
 async function expectHighlight(page: Page, step: Step, target: Locator) {
   const card = tutorial(page)
   await expect(card.getByRole('heading', { name: step.title, exact: true })).toBeVisible()
-  await expect(card.getByRole('button', { name: '확인했어요 · 다음 안내', exact: true })).toBeEnabled()
+  await expect(card.getByRole('button', { name: '확인했어요, 다음 안내', exact: true })).toBeEnabled()
   await expect(card.getByRole('button', { name: '현재 대상에서 다시 시작', exact: true })).toHaveCount(0)
   await expect(target).toBeVisible()
   await expect(target).toBeInViewport()
@@ -134,8 +134,13 @@ async function expectHighlight(page: Page, step: Step, target: Locator) {
     const actual = await spotlight.boundingBox()
     const expected = await target.evaluate((element) => {
       const box = element.getBoundingClientRect()
-      const left = Math.max(0, box.left - 10), top = Math.max(0, box.top - 10)
-      return { x: left, y: top, width: Math.max(0, Math.min(document.documentElement.clientWidth, box.right + 10) - left), height: Math.max(0, Math.min(window.innerHeight, box.bottom + 10) - top) }
+      // The approved coach design uses an 8px halo clipped to the workspace below its header.
+      const workspace = document.getElementById('main-content')?.getBoundingClientRect()
+      const leftBoundary = Math.max(0, workspace?.left ?? 0)
+      const rightBoundary = Math.min(document.documentElement.clientWidth, workspace?.right || document.documentElement.clientWidth)
+      const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+      const left = Math.max(leftBoundary, box.left - 8), top = Math.max(headerBottom + 8, box.top - 8)
+      return { x: left, y: top, width: Math.max(0, Math.min(rightBoundary, box.right + 8) - left), height: Math.max(0, Math.min(window.innerHeight, box.bottom + 8) - top) }
     })
     return actual ? Math.max(...(['x', 'y', 'width', 'height'] as const).map((key) => Math.abs(actual[key] - expected[key]))) : Infinity
   }, { message: `${step.stepId} must highlight ${step.targetId}` }).toBeLessThan(3)
@@ -202,14 +207,14 @@ for (const guide of guides) {
         }
         checked.push(step.stepId)
         if (index + 1 < planned.length || limit === allowed.length) {
-          await activateTutorialControl(page, '확인했어요 · 다음 안내')
+          await activateTutorialControl(page, '확인했어요, 다음 안내')
         }
       }
       if (limit === allowed.length) {
         await expect(tutorial(page).getByRole('heading', { name: '안내를 마쳤어요', exact: true })).toBeVisible()
         await activateTutorialControl(page, '안내 닫기')
       } else {
-        await tutorial(page).getByRole('button', { name: '업무 튜토리얼 종료', exact: true }).click()
+        await tutorial(page).getByRole('button', { name: '업무 안내 종료', exact: true }).click()
       }
       if (guide.workflowId === 'policy.lifecycle') {
         await page.getByRole('dialog', { name: '정책 새 버전 작성', exact: true }).getByRole('button', { name: '취소', exact: true }).click()
@@ -241,12 +246,12 @@ test('정책 튜토리얼: 실행할 상태 동작이 없는 정책에서는 사
   await expectHighlight(page, guide.steps[0], tab)
   await tab.click()
   await expect(tab).toHaveAttribute('aria-selected', 'true')
-  await activateTutorialControl(page, '확인했어요 · 다음 안내')
+  await activateTutorialControl(page, '확인했어요, 다음 안내')
   await expectHighlight(page, guide.steps[1], feature(page, guide.steps[1].targetId))
   await expect(feature(page, 'features.policies.policy-management.actions').locator('button')).toHaveCount(0)
-  await activateTutorialControl(page, '확인했어요 · 다음 안내')
+  await activateTutorialControl(page, '확인했어요, 다음 안내')
   await expect(tutorial(page).getByText('현재 선택한 정책과 계정에 실행 가능한 상태 동작이 없습니다. 정책의 상태와 권한을 확인하고 다른 정책을 선택한 뒤 다시 시작하세요.', { exact: true })).toBeVisible({ timeout: 2_000 })
-  await expect(tutorial(page).getByRole('button', { name: '확인했어요 · 다음 안내', exact: true })).toHaveCount(0)
+  await expect(tutorial(page).getByRole('button', { name: '확인했어요, 다음 안내', exact: true })).toHaveCount(0)
   await expect(page.locator('.pico-guide-spotlight')).toHaveCount(0)
   await expect(feature(page, 'features.policies.policy-management.textarea')).toHaveCount(0)
 })

@@ -29,7 +29,7 @@ import {
 } from './api'
 import type { ValidationRun } from './api'
 import { RunStatusBadge } from './RunStatusBadge'
-import { progressText } from './steps'
+import { failureText, progressText } from './steps'
 import './validation.css'
 
 /*
@@ -134,8 +134,8 @@ export default function ValidationRunListPage() {
         r.status === 'FAILED' ? (
           <CellDisclosure
             singleLine
-            preview={<span className="vrun-failure-text">{dash(r.failureMessage)}</span>}
-            full={dash(r.failureMessage)}
+            preview={<span className="vrun-failure-text">{failureText(r.failureMessage, r.currentStep)}</span>}
+            full={failureText(r.failureMessage, r.currentStep)}
           />
         ) : (
           '-'
@@ -235,7 +235,7 @@ function CreateSection() {
       void navigate(shellMonth ? withMonth(to, shellMonth) : to)
     },
     onError: (error) => {
-      toast(errorText(error as Error, '검증월(yyyy-MM)과 실행 유형을 확인하세요.'), 'error')
+      toast(errorText(error as Error, '검증월과 실행 유형을 확인하세요.'), 'error')
       void client.invalidateQueries({ queryKey: ['validation-runs', 'active-monthly'] })
     },
   })
@@ -282,7 +282,7 @@ function CreateSection() {
         </Button>
         <p className="field-helper vrun-create-hint" id="create-hint">
           {!canProcess
-            ? '실행 생성은 정산 담당자만 할 수 있습니다.'
+            ? '실행 생성은 정산담당자와 시스템관리자만 할 수 있습니다.'
             : blockedByActive
               ? '선택한 검증월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.'
               : '같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.'}

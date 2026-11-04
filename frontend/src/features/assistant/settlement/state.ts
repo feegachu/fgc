@@ -49,9 +49,9 @@ export function handoffFor(step: SettlementStep, role: string, canProcess: boole
     !canProcess &&
     ['contract.create', 'payment.draft', 'payment.precheck', 'payment.confirm', 'validation.execute'].includes(step)
   )
-    return '현재 역할은 조회 안내만 가능합니다. 생성·실행은 SETTLEMENT 또는 SYSTEM_ADMIN에게 인계하세요.'
+    return '현재 역할은 조회 안내만 가능합니다. 생성과 실행은 정산담당자나 시스템관리자에게 맡기세요.'
   if (step === 'exception.resolve' && !['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(role))
-    return '예외 조치·원천 정정은 SETTLEMENT, GA_ADMIN 또는 SYSTEM_ADMIN에게 인계하세요. 현재 역할은 조회 안내만 가능합니다.'
+    return '예외 조치와 원천 정정은 정산담당자, GA관리자, 시스템관리자에게 맡기세요. 현재 역할은 조회 안내만 가능합니다.'
 }
 export interface Evidence {
   contract?: ContractDetail
@@ -76,7 +76,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
   if (evidence.contract.contractId !== selection.contractId) throw new Error('선택한 계약과 조회 결과가 다릅니다.')
   const header = evidence.schedule?.header
   if (!header || !evidence.schedule?.lines?.length)
-    return at('schedule.review', '선택한 계약·지급단계의 실제 스케줄을 조회하세요.')
+    return at('schedule.review', '선택한 계약과 지급단계의 실제 스케줄을 조회하세요.')
   if (
     (selection.scheduleId != null && header.scheduleHeaderId !== selection.scheduleId) ||
     header.paymentStage !== selection.stage ||
@@ -84,14 +84,14 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
   )
     throw new Error('스케줄의 계약 또는 지급단계가 다릅니다.')
   if (header.scheduleRegime !== 'CURRENT' || header.schedulePurpose !== 'OPERATIONAL')
-    return at('schedule.review', '4년·7년 예정 스케줄은 조회까지만 안내합니다. 현행 지급 흐름으로 이어갈 수 없습니다.')
+    return at('schedule.review', '4년/7년 예정 스케줄은 조회까지만 안내합니다. 현행 지급 흐름으로 이어갈 수 없습니다.')
   if (header.activeYn !== true || ['CANCELLED', 'HOLD'].includes(header.status ?? ''))
     return at(
       'schedule.review',
-      '현재 사용 가능한 스케줄을 선택하세요. 중단·지난 버전은 지급 흐름에 연결하지 않습니다.',
+      '현재 사용 가능한 스케줄을 선택하세요. 중단되었거나 지난 버전은 지급 흐름에 연결하지 않습니다.',
     )
   if (!evidence.scheduleAcknowledged)
-    return at('schedule.review', '회차와 지급단계·금액을 확인한 뒤 확인 버튼을 누르세요.')
+    return at('schedule.review', '회차, 지급단계, 금액을 확인한 뒤 확인 버튼을 누르세요.')
   const payment = evidence.payment
   if (!payment) return at('payment.draft', '직접 지급 내용을 입력하고 초안을 저장하세요.')
   if (
@@ -101,7 +101,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     !payment.attributions?.length ||
     payment.attributions.some((row) => row.contractId !== selection.contractId)
   )
-    throw new Error('지급의 계약·기준월·지급단계가 현재 안내 대상과 다릅니다.')
+    throw new Error('지급의 계약, 기준월, 지급단계가 현재 안내 대상과 다릅니다.')
   if (payment.status !== 'CONFIRMED') {
     if (payment.status === 'CANCELLED')
       return at(
@@ -112,11 +112,11 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     if (evidence.paymentGuide && !evidence.paymentGuide.saved)
       return at('payment.draft', '변경된 입력을 실제 저장한 뒤 이어가세요.')
     if (!evidence.paymentGuide?.prechecked)
-      return at('payment.precheck', '현재 저장본의 사전검증을 직접 실행하세요. 이전 세션의 검증은 재사용하지 않습니다.')
+      return at('payment.precheck', '현재 저장본의 사전검증을 직접 실행하세요. 이전에 한 검증은 다시 쓰지 않습니다.')
     return at('payment.confirm', '실제 확정 버튼으로 지급을 확정하세요.')
   }
   if (selection.validationRunId && selection.invalidatedValidationRunIds?.includes(selection.validationRunId))
-    throw new Error('정정 전 검증 실행은 재사용할 수 없습니다. 새 월 검증을 생성·실행한 뒤 선택하세요.')
+    throw new Error('정정 전 검증 실행은 재사용할 수 없습니다. 새 월 검증을 생성하고 실행한 뒤 선택하세요.')
   const run = evidence.validation?.header
   if (!run) return at('validation.execute', '기준월의 월 통합검증을 선택하거나 생성하고 실행하세요.')
   if (
@@ -133,16 +133,16 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
   )
     return at(
       'validation.execute',
-      '현재 계약이 이 실행의 선정 대상인지 서버 결과에서 확인하지 못했습니다. 대상 범위를 확인하세요.',
+      '현재 계약이 이 실행의 대상인지 확인하지 못했습니다. 대상 범위를 확인하세요.',
     )
   if (run.status === 'FINALIZED')
-    return { ...at('validation.finalize', '서버에서 최종 확정된 결과를 확인했습니다.'), complete: true }
+    return { ...at('validation.finalize', '최종 확정된 결과를 확인했습니다.'), complete: true }
   if (run.status !== 'COMPLETED')
     return at(
       'validation.execute',
       run.status === 'FAILED'
         ? '월 통합검증이 실패했습니다. 실패 원인과 기존 재시작 기능을 확인하세요.'
-        : '202 수락은 완료가 아닙니다. 서버 계산 완료 후 다시 확인하세요.',
+        : '월 통합검증 계산이 끝나지 않았습니다. 실행 전이면 실행을 누르고, 계산이 끝나면 다시 확인하세요.',
     )
   const recon = evidence.reconciliation
   if (!recon)
@@ -158,7 +158,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     recon.settlementMonth?.slice(0, 7) !== selection.month ||
     recon.reconciliationRunId !== selection.reconciliationRunId
   )
-    throw new Error('대사 결과의 검증 실행·기준월·지급단계가 다릅니다.')
+    throw new Error('대사 결과의 검증 실행, 기준월, 지급단계가 다릅니다.')
   if (!['COMPLETED', 'FINALIZED'].includes(recon.status ?? ''))
     return at('reconciliation.review', '대사 완료를 기다리거나 실패 원인을 확인하세요.')
   const summary = evidence.results?.summary
@@ -177,12 +177,12 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
   if (summary.exceptionCount > 0 || summary.matchedCount !== summary.resultCount || evidence.openExceptions > 0)
     return at(
       'exception.resolve',
-      '불일치·미해결 예외가 있습니다. 원천을 정정하고 필요한 재검증·재대사를 직접 수행한 뒤 새 결과를 선택하세요.',
+      '불일치나 미해결 예외가 있습니다. 원천을 정정하고 필요한 재검증과 재대사를 직접 수행한 뒤 새 결과를 선택하세요.',
     )
   if (!['GA_ADMIN', 'SYSTEM_ADMIN'].includes(role))
     return at(
       'validation.finalize',
-      '최종 확정은 GA_ADMIN 또는 SYSTEM_ADMIN에게 인계하세요. 역할을 자동 전환하지 않습니다.',
+      '최종 확정은 GA관리자나 시스템관리자에게 맡기세요. 역할을 자동 전환하지 않습니다.',
     )
   const checklist = evidence.checklist
   if (
@@ -192,6 +192,6 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     !checklist.passed ||
     checklist.conditions.some((condition) => condition.passed !== true)
   )
-    return at('validation.finalize', '최종 확정의 8개 서버 조건을 확인하고 차단 사유를 처리하세요.')
+    return at('validation.finalize', '최종 확정 조건 8개를 확인하고 차단 사유를 처리하세요.')
   return at('validation.finalize', '8개 조건을 통과했습니다. 기존 최종 확정 버튼으로 직접 확정하세요.')
 }

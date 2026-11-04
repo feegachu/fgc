@@ -111,8 +111,8 @@ export function ArbitrageTimeline({ rows }: { rows: ArbitrageRow[] }) {
         columns={[
           { key: 'date', label: '기준일', render: (row) => date(row.asOfDate) },
           { key: 'month', label: '차월', align: 'left', render: (row) => int(row.contractMonthNo) },
-          { key: 'premium', label: '누적 보험료', align: 'number', render: (row) => <ArbitrageAmount value={row.cumulativePaidPremium} /> },
-          { key: 'paid', label: '지급수수료', align: 'number', render: (row) => <ArbitrageAmount value={row.paidCommissionAmount} /> },
+          { key: 'premium', label: '누적 납입보험료', align: 'number', render: (row) => <ArbitrageAmount value={row.cumulativePaidPremium} /> },
+          { key: 'paid', label: '확정 수수료 순액', align: 'number', render: (row) => <ArbitrageAmount value={row.paidCommissionAmount} /> },
           { key: 'excess', label: '초과액', align: 'number', render: (row) => <ArbitrageAmount value={row.netDifferenceAmount} excess /> },
         ]}
       />
