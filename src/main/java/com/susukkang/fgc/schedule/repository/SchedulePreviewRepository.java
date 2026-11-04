@@ -20,7 +20,7 @@ public class SchedulePreviewRepository {
     /** 헤더 생성 자체는 계산 원천 변경이 아니다. */
     public String calculationVersion(Long contract) {
         return jdbc.queryForObject("""
-            SELECT md5(row_to_json(c)::text || ':' || row_to_json(po)::text)
+            SELECT md5((to_jsonb(c) - 'updated_at')::text || ':' || (to_jsonb(po) - 'updated_at')::text)
             FROM fgc.insurance_contract c JOIN fgc.product_offering po USING(product_offering_id)
             WHERE c.contract_id=?
             """, String.class, contract);

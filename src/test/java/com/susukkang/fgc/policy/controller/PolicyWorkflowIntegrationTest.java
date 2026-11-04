@@ -1400,6 +1400,7 @@ class PolicyWorkflowIntegrationTest {
 
     @ParameterizedTest
     @CsvSource({"false, 67", "true, 67", "true, 61"})
+    // FGC-FUN-037 / FGC-FUN-038: 정책 회차 및 예정판 멱등성.
     void previewPersistsPolicyInstallmentsAndPreservesVersionsWithIdempotency(boolean seven, int longTermFrom) throws Exception {
         String regime = seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027";
         String start = seven ? "2029-01-01" : "2027-01-01";
@@ -1536,6 +1537,7 @@ class PolicyWorkflowIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    // FGC-FUN-037 / FGC-FUN-038: 실제 정책 회차만 저장하고 동일 계산을 재사용한다.
     void previewStoresOnlyActualFixedPolicyInstallments(boolean seven) throws Exception {
         String document = "BD-" + UUID.randomUUID();
         long offering = insertOffering(seven, seven ? "2029-01-01" : "2027-01-01", document);
@@ -1557,6 +1559,7 @@ class PolicyWorkflowIntegrationTest {
         assertFixedPolicyLines(detail);
         // 같은 원천·승인 정책이면 자동 생성은 수동 결과를 재사용한다.
         assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        assertTimestampOnlyUpdatesReusePreview(contract, offering, header);
         jdbc.update("UPDATE fgc.insurance_contract SET monthly_equivalent_first_premium=200000 WHERE contract_id=?", contract);
         var automatic = scheduleGenerator.generateSchedulesByContractId(contract);
         assertThat(automatic.scheduleHeaderIds()).hasSize(1);
@@ -1576,6 +1579,19 @@ class PolicyWorkflowIntegrationTest {
                 .isEqualByComparingTo("100000");
         assertFixedPreviewCsv(header);
 
+    }
+
+    private void assertTimestampOnlyUpdatesReusePreview(long contract, long offering, long header) {
+        var contractUpdated = jdbc.queryForObject("SELECT updated_at FROM fgc.insurance_contract WHERE contract_id=?", java.sql.Timestamp.class, contract);
+        jdbc.update("UPDATE fgc.insurance_contract SET monthly_equivalent_first_premium=monthly_equivalent_first_premium WHERE contract_id=?", contract);
+        assertThat(jdbc.queryForObject("SELECT updated_at FROM fgc.insurance_contract WHERE contract_id=?", java.sql.Timestamp.class, contract)).isAfter(contractUpdated);
+        assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        var offeringUpdated = jdbc.queryForObject("SELECT updated_at FROM fgc.product_offering WHERE product_offering_id=?", java.sql.Timestamp.class, offering);
+        jdbc.update("UPDATE fgc.product_offering SET fee_regime_code=fee_regime_code WHERE product_offering_id=?", offering);
+        assertThat(jdbc.queryForObject("SELECT updated_at FROM fgc.product_offering WHERE product_offering_id=?", java.sql.Timestamp.class, offering)).isAfter(offeringUpdated);
+        assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION'", Integer.class, contract)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT active_yn FROM fgc.schedule_header WHERE schedule_header_id=?", Boolean.class, header)).isTrue();
     }
 
     private void assertFixedPolicyLines(JsonNode detail) {
