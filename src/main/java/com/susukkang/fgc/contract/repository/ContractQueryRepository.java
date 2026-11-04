@@ -89,7 +89,7 @@ public class ContractQueryRepository {
     public List<ContractStatusEventProcessingRow> findStatusEventProcessingsByContractId(Long contractId) {
         return entityManager.createQuery("""
                 SELECT new com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow(
-                    p.contractStatusEventId, p.processingJob, p.processingStatus, p.processedAt)
+                    p.contractStatusEventId, p.processingJob, p.processingStatus, p.processedAt, p.failureReason)
                   FROM ContractStatusEventProcessing p
                   JOIN ContractStatusEvent e ON e.contractStatusEventId = p.contractStatusEventId
                  WHERE e.contractId = :contractId
