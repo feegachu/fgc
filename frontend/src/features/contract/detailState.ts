@@ -31,3 +31,12 @@ export function sortStatusEvents(events: ContractStatusEvent[], sort: StatusSort
     return (left.eventSeq ?? 0) - (right.eventSeq ?? 0)
   })
 }
+
+/** 후속 작업은 worker가 10초마다 처리하므로 같은 주기로 다시 조회한다. */
+export const FOLLOW_UP_REFETCH_MS = 10_000
+export const hasExhaustedFollowUp = (events?: ContractStatusEvent[]) =>
+  Boolean(events?.some((event) => event.followUp?.status === 'EXHAUSTED'))
+/** 소진된 작업이 있으면 같은 계약의 뒤 사건도 멈추므로 다시 조회해도 바뀌지 않는다. */
+export const followUpRunning = (events?: ContractStatusEvent[]) =>
+  !hasExhaustedFollowUp(events) &&
+  Boolean(events?.some((event) => ['PENDING', 'PROCESSING', 'FAILED'].includes(event.followUp?.status ?? '')))

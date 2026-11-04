@@ -177,25 +177,61 @@
   min-width: 3.25rem;
   border: 0;
 }
-.contract-history-event-card h4 {
-  margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  line-height: 1.25rem;
-}
 .contract-information-grid,
-.contract-summary-grid,
-.contract-history-times {
+.contract-summary-grid {
   margin-block: 1em;
 }
 .contract-information-grid dd,
-.contract-summary-grid dd,
-.contract-history-times dd {
+.contract-summary-grid dd {
   margin-left: 0;
 }
-.contract-history-list {
+.contract-history-note {
   margin: 0;
-  list-style: none;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.contract-history-guidance {
+  margin: var(--space-3) var(--space-4);
+}
+.contract-history-panel .data-table-viewport {
+  margin-top: 0;
+}
+/* 사이드바를 편 1280px 화면에서 영향 보기까지 가로 스크롤 없이 보이는 폭. */
+.contract-detail-panel .contract-history-table {
+  min-width: 56.5rem;
+}
+.contract-history-table td,
+.contract-effects-table td {
+  height: auto;
+  padding-block: var(--space-2);
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  white-space: normal;
+}
+.contract-follow-up {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  min-width: 0;
+}
+.contract-follow-up-note {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1rem;
+}
+.contract-processing-row .contract-follow-up-note {
+  flex-basis: 100%;
+}
+.contract-effects-heading {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
 }
 @media (max-width: 767px) {
   .contract-information-grid > div:nth-child(odd) {

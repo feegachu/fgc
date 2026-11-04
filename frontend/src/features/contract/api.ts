@@ -13,6 +13,7 @@ export type ContractCreateRequest = Schema['ContractCreateRequest']
 export type ContractUpdateRequest = Schema['ContractUpdateRequest']
 export type ContractSaveRequest = ContractCreateRequest
 export type ContractStatusEvent = Schema['ContractStatusEventResponse']
+export type ContractStatusEffect = Schema['ContractStatusEffectResponse']
 export type ContractSchedule = Schema['ContractScheduleResponse']
 export type ContractCapCheck = Schema['CapCheckSaveResult']
 export type ContractArbitrageCheck = Schema['ArbitrageCheckView']
@@ -143,6 +144,18 @@ const contractTabQuery = <T>(id: string, tab: string, suffix = `/${tab}`, extraK
     meta: { errorToast: false },
   })
 export const contractEventsQuery = (id: string) => contractTabQuery<ContractStatusEvent[]>(id, 'status-events')
+/** 영향은 후속 처리가 끝날 때 함께 기록되므로 후속 상태가 바뀌면 다시 조회한다. */
+export const contractStatusEffectsQuery = (id: string, eventId: number, page: number, followUpStatus?: string) =>
+  queryOptions({
+    queryKey: ['contracts', 'detail', id, 'status-events', eventId, 'effects', page, followUpStatus],
+    queryFn: ({ signal }) =>
+      request<Schema['PageResponseContractStatusEffectResponse']>(
+        contractPath(id, `/status-events/${eventId}/effects?page=${page}&size=${PAGE_SIZE}`),
+        { signal },
+      ),
+    placeholderData: keepPreviousData,
+    meta: { errorToast: false },
+  })
 export const contractSchedulesQuery = (id: string, paymentStage: string) =>
   contractTabQuery<ContractSchedule>(
     id,
