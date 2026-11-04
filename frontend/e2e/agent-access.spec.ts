@@ -17,7 +17,7 @@ async function agentFixture(page: Page, commission = 300000) {
     if (path === '/api/v1/agent/me/home') return fulfill({
       asOf: '2026-07-31', period: '12', range: { from: '2025-08-01', to: '2026-07-31' }, filters: { insurerType: 'ALL' },
       priorityContracts: [], priorityContractTotal: 0, dataStatus: 'AVAILABLE',
-      myCommission: { month: '2026-07', expected: { amount: 300000, count: 1 }, held: { amount: 0, count: 0 },
+      myCommission: { month: '2026-07', expected: { amount: commission, count: 1 }, held: { amount: 0, count: 0 },
         clawback: { amount: 0, count: 0 }, dataStatus: 'AVAILABLE' },
       portfolio: { contractCount: 1,
         insurers: [{ insurerId: 1, name: '가상생명', contractCount: 1, monthlyEquivalentFirstPremiumSum: 100000 }],

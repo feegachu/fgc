@@ -248,15 +248,60 @@ class AgentStatementIntegrationTest {
         assertThat(plainEvidence.path("calculationType").asText()).isEqualTo("RATE");
         assertThat(plainEvidence.path("ratePct").decimalValue()).isEqualByComparingTo("10");
 
-        // 회차의 수혜자가 본인이 아니면(잘못 연결된 자료) 다른 설계사의 계산 근거를 응답에 싣지 않는다.
+    }
+
+    @Test
+    void paymentEvidenceOmitsEveryScheduleFieldForAnotherBeneficiaryOrContract() throws Exception {
+        // FUN-060·085: 잘못 연결된 회차도 지급 명세는 유지하되 계산 근거는 모두 숨긴다.
+        Long header = scheduleHeader();
+        Long scheduled = scheduleLine(header, 1, 6, "PLANNED");
+        Long payment = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, scheduled, header, 9000);
+        Long attribution = id("SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id = ?", payment);
+        String key = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                ("PAYMENT:" + attribution + ":0").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        jdbc.update("UPDATE fgc.schedule_line SET beneficiary_agent_id = ? WHERE schedule_line_id = ?", otherAgent, scheduled);
+        assertScheduleEvidenceHidden(key, payment);
         jdbc.update("UPDATE fgc.schedule_line SET beneficiary_agent_id = NULL WHERE schedule_line_id = ?", scheduled);
-        for (JsonNode entry : data(mine("month=" + MONTH + "&entryType=PAYMENT&size=100")).path("items").path("content")) {
-            JsonNode evidence = data(mine("/" + entry.path("entryKey").asText())).path("evidence");
-            if (evidence.path("commissionTransactionId").asLong() == plain) {
-                assertThat(evidence.path("scheduleLineId").isMissingNode() || evidence.path("scheduleLineId").isNull()).isTrue();
-                assertThat(evidence.path("basisCode").isMissingNode() || evidence.path("basisCode").isNull()).isTrue();
-            }
+        assertScheduleEvidenceHidden(key, payment);
+
+        // 수혜자는 본인이어도 회차의 계약이 귀속 계약과 다르면 근거를 숨긴다.
+        jdbc.update("UPDATE fgc.schedule_line SET beneficiary_agent_id = ? WHERE schedule_line_id = ?", ownAgent, scheduled);
+        Long otherContract = id("""
+                SELECT min(contract_id) FROM fgc.insurance_contract
+                WHERE contract_id <> (SELECT contract_id FROM fgc.schedule_header WHERE schedule_header_id = ?)
+                """, header);
+        assertThat(otherContract).isNotNull();
+        jdbc.update("UPDATE fgc.schedule_header SET contract_id = ? WHERE schedule_header_id = ?", otherContract, header);
+        assertScheduleEvidenceHidden(key, payment);
+    }
+
+    private void assertScheduleEvidenceHidden(String key, Long payment) throws Exception {
+        JsonNode detail = data(mine("/" + key).andExpect(status().isOk()));
+        assertThat(detail.path("entry").path("amount").decimalValue()).isEqualByComparingTo("9000");
+        JsonNode evidence = detail.path("evidence");
+        assertThat(evidence.path("commissionTransactionId").asLong()).isEqualTo(payment);
+        for (String field : new String[]{"scheduleLineId", "scheduleHeaderId", "paymentConditionCode", "basisCode",
+                "basisAmount", "calculationType", "ratePct", "fixedAmount"}) {
+            assertThat(evidence.path(field).isMissingNode() || evidence.path(field).isNull()).as(field).isTrue();
         }
+    }
+
+    @Test
+    void adjustmentDetailUsesTheListedSettlementMonthWhenTheDueDateIsInAnotherMonth() throws Exception {
+        // FUN-060 / IF-API-88: 정산월은 7월, 기준일은 8월이어도 목록·상세의 기준월은 같아야 한다.
+        Long header = scheduleHeader();
+        Long line = scheduleLine(header, 1, 6, "PLANNED");
+        Long original = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, line, header, 7000);
+        Long replacement = confirmedPayment("GA_MANUAL_PAYMENT", ownAgent, ownAgent, line, header, 7500, "2026-08-03");
+        linkCorrection(original, replacement);
+        JsonNode list = data(mine("month=" + MONTH + "&entryType=ADJUSTMENT").andExpect(status().isOk()));
+        assertThat(list.path("items").path("content").size()).isEqualTo(1);
+        JsonNode entry = list.path("items").path("content").get(0);
+        assertThat(entry.path("basisDate").asText()).isEqualTo("2026-08-03");
+        JsonNode detail = data(mine("/" + entry.path("entryKey").asText()).andExpect(status().isOk()));
+        assertThat(detail.path("basis").path("month").asText()).isEqualTo(MONTH);
+        assertThat(detail.path("basis")).isEqualTo(list.path("basis"));
     }
 
     @Test
@@ -404,13 +449,18 @@ class AgentStatementIntegrationTest {
 
     /** 원장 가드 때문에 DRAFT 로 넣고 귀속을 붙인 뒤 UPDATE 로 확정한다. 귀속 설계사를 수취인과 다르게 줄 수 있다. */
     private Long confirmedPayment(String sourceType, Long recipient, Long attributedAgent, Long line, Long header, int amount) {
+        return confirmedPayment(sourceType, recipient, attributedAgent, line, header, amount, "2026-07-25");
+    }
+
+    private Long confirmedPayment(String sourceType, Long recipient, Long attributedAgent, Long line, Long header,
+                                  int amount, String dueDate) {
         Long item = id("SELECT min(commission_item_id) FROM fgc.commission_transaction WHERE recipient_agent_id = ?", ownAgent);
         Long payment = id("""
                 INSERT INTO fgc.commission_transaction(payment_stage, source_type, source_business_key, recipient_agent_id,
                     commission_item_id, settlement_month, due_date, amount, cashflow_type, status)
-                VALUES ('GA_TO_FC', ?, ?, ?, ?, DATE '2026-07-01', DATE '2026-07-25', ?, 'PAYMENT', 'DRAFT')
+                VALUES ('GA_TO_FC', ?, ?, ?, ?, DATE '2026-07-01', ?::date, ?, 'PAYMENT', 'DRAFT')
                 RETURNING commission_transaction_id
-                """, sourceType, "STMT-PAY-" + UUID.randomUUID(), recipient, item, amount);
+                """, sourceType, "STMT-PAY-" + UUID.randomUUID(), recipient, item, dueDate, amount);
         jdbc.update("""
                 INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, attribution_scope,
                     contract_id, agent_id, schedule_line_id, attribution_date, attribution_month, attributed_amount,
