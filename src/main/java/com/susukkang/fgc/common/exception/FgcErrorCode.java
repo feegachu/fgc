@@ -266,6 +266,7 @@ public enum FgcErrorCode {
     IMPL_AGENT_FIXED("FGC-IMPL-AGENT_FIXED", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.agentFixed"),
     IMPL_EVENT_ORDER("FGC-IMPL-EVENT_ORDER", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.eventOrder"),
     IMPL_TRANSITION_DENIED("FGC-IMPL-TRANSITION_DENIED", HttpStatus.CONFLICT, "error.contract.transitionDenied"),
+    IMPL_PAYMENT_HELD("FGC-IMPL-PAYMENT_HELD", HttpStatus.CONFLICT, "error.payment.onHold"),
 
     COMMON_002(
             "FGC-COMMON-002",

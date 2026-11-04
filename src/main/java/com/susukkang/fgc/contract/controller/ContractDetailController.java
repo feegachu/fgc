@@ -16,7 +16,10 @@ import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEventResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import com.susukkang.fgc.contract.service.ContractJournalProjectionService;
+import com.susukkang.fgc.contract.dto.ContractStatusEffectResponse;
 import com.susukkang.fgc.contract.service.ContractService;
+import com.susukkang.fgc.contract.service.ContractStatusEffectQueryService;
+import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.service.ContractTransactionProjectionService;
 import com.susukkang.fgc.schedule.service.ScheduleService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +46,7 @@ import java.util.List;
 public class ContractDetailController {
 
     private final ContractService contractService;
+    private final ContractStatusEffectQueryService effectQueryService;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
     private final ArbitrageService arbitrageService;
@@ -57,6 +61,15 @@ public class ContractDetailController {
     @GetMapping("/{id}/status-events")
     public ApiResponse<List<ContractStatusEventResponse>> getContractStatusEvents(@PathVariable Long id) {
         return ApiResponse.success(contractService.selectStatusEventsByContractId(id));
+    }
+
+    @GetMapping("/{id}/status-events/{eventId}/effects")
+    public ApiResponse<PageResponse<ContractStatusEffectResponse>> getContractStatusEventEffects(
+            @PathVariable Long id,
+            @PathVariable Long eventId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(effectQueryService.effects(id, eventId, page, size));
     }
 
     @GetMapping("/{id}/schedules")
