@@ -37,7 +37,6 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
     private int calls;
     private int caseCalls;
     private int caseFailures;
-    private long sentChars;
 
     public EvalLlmGateway(LlmProperties properties, AiCallLogRepository logs, PlatformTransactionManager transactions,
                           ObjectMapper mapper) {
@@ -58,7 +57,6 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
         calls++;
         caseCalls++;
         instructions.add(request.purpose() + "\n" + request.instructions());
-        sentChars += request.instructions().length() + request.data().length();
         try {
             T output = saved == null ? super.call(request, outputType) : replay(outputType);
             outputs.put(outputType.getSimpleName(), mapper.valueToTree(output));
@@ -115,11 +113,6 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
 
     public int caseFailures() {
         return caseFailures;
-    }
-
-    /** 지시문과 입력을 합한 글자 수. 호출 전 비용 상한을 어림할 때 쓴다(글자마다 1토큰이라고 봐도 넘지 않는다). */
-    public long sentChars() {
-        return sentChars;
     }
 
     @Override
