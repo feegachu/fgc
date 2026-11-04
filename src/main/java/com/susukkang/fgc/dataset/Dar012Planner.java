@@ -50,7 +50,8 @@ public final class Dar012Planner {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     /** DB의 승인된 정책에서 읽은 값. */
-    public record PolicyInputs(BigDecimal insurerBaseRatePct, BigDecimal capPremiumMultiplier) {}
+    public record PolicyInputs(BigDecimal insurerBaseRatePct, BigDecimal capPremiumMultiplier,
+                               Map<String, Integer> paymentTermMonthsByInsurer) {}
 
     private Dar012Planner() {}
 
@@ -70,7 +71,8 @@ public final class Dar012Planner {
         LocalDate windowEnd = baseDate.withDayOfMonth(1).minusDays(1);
         int scenarioDayLimit = (int) Math.max(0, Math.min(40, ChronoUnit.DAYS.between(windowStart, baseDate) - 31));
 
-        List<AgentRow> activeAgents = agents.stream().filter(a -> "ACTIVE".equals(a.status())).toList();
+        List<AgentRow> activeAgents = agents.stream()
+                .filter(a -> "ACTIVE".equals(a.status()) && "FC".equals(a.rankCode())).toList();
 
         List<ContractRow> contracts = new ArrayList<>();
         List<EventRow> events = new ArrayList<>();
@@ -90,7 +92,8 @@ public final class Dar012Planner {
                     : windowStart.plusDays(contractRng.nextInt(dayLimit + 1));
             BigDecimal monthly = BigDecimal.valueOf((30L + contractRng.nextInt(270)) * 1000L).setScale(2);
             int cycleRoll = contractRng.nextInt(100);
-            int termMonths = TERMS[contractRng.nextInt(TERMS.length)];
+            contractRng.nextInt(TERMS.length); // 난수열 위치를 유지한다
+            int termMonths = policy.paymentTermMonthsByInsurer().get(insurer);
             int deltaSign = contractRng.nextBoolean() ? 1 : -1;
             int deltaSteps = 1 + contractRng.nextInt(9);
 
@@ -257,7 +260,8 @@ public final class Dar012Planner {
         List<OrgRow> list = new ArrayList<>();
         for (int b = 1; b <= BRANCH_COUNT; b++) {
             String code = "D12-B%02d".formatted(b);
-            list.add(new OrgRow(code, "가상지점 %02d".formatted(b), "BRANCH", b <= BRANCH_COUNT / 2 ? "FGC-D01" : "FGC-D02"));
+            // 본부장이 있는 FGC-D01 아래에 둔다. 관리자 수수료 수취인(본부장)을 계층에서 찾기 때문이다.
+            list.add(new OrgRow(code, "가상지점 %02d".formatted(b), "BRANCH", "FGC-D01"));
             for (int t = 1; t <= TEAMS_PER_BRANCH; t++) {
                 list.add(new OrgRow("%s-T%d".formatted(code, t), "가상지점 %02d %d팀".formatted(b, t), "TEAM", code));
             }
@@ -286,7 +290,23 @@ public final class Dar012Planner {
                     termination = appointment;
                 }
             }
-            list.add(new AgentRow("D12-A-%04d".formatted(n), name, orgCode, status, appointment, termination));
+            String rank = "FC";
+            if (n >= 2 && n <= 1 + BRANCH_COUNT) {
+                // 지점마다 지사장 1명: 지점 조직에 배치해 팀 계층에서 위로 올라가며 찾는다.
+                rank = "BRANCH_MANAGER";
+                orgCode = "D12-B%02d".formatted(n - 1);
+            } else if (n > 1 + BRANCH_COUNT && n <= 1 + BRANCH_COUNT + teams) {
+                // 팀마다 팀장 1명: 관리자수수료 수취인이 정해져야 계약 스케줄이 만들어진다(V34).
+                rank = "TEAM_LEADER";
+                int t = n - 2 - BRANCH_COUNT;
+                orgCode = "D12-B%02d-T%d".formatted(t / TEAMS_PER_BRANCH + 1, t % TEAMS_PER_BRANCH + 1);
+            }
+            if (!"FC".equals(rank)) {
+                status = "ACTIVE";
+                termination = null;
+                appointment = LocalDate.of(2024, 1, 1);
+            }
+            list.add(new AgentRow("D12-A-%04d".formatted(n), name, orgCode, rank, status, appointment, termination));
         }
         return list;
     }
