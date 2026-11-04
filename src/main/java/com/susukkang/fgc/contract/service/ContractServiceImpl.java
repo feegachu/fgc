@@ -770,12 +770,7 @@ public class ContractServiceImpl implements ContractService {
             return;
         }
         // 2. 허용 전이 표에 없는 전이는 거절한다(enum 전체를 허용하지 않는다)
-        ContractStatus from = current.getCurrentStatus();
-        ContractStatus to = request.getContractStatus();
-        if (!from.nextStatuses().contains(to)) {
-            throw new FgcBusinessException(FgcErrorCode.IMPL_TRANSITION_DENIED, "contractStatus",
-                    Map.of("from", from.label(), "to", to.label()), from + " → " + to + " 전이는 허용되지 않습니다.");
-        }
+        requireAllowedTransition(current.getCurrentStatus(), request.getContractStatus(), "contractStatus");
         // 3. 사건 입력·멱등키(사건 원천키)·사유코드 확인
         if (event == null) {
             throw validationException("statusEvent", "상태를 바꾸려면 효력일시·접수일시·사유를 입력하세요.");
@@ -787,13 +782,8 @@ public class ContractServiceImpl implements ContractService {
             throw validationException("statusEvent.reasonCode", "허용되지 않은 사유코드입니다.");
         }
         // 4. 최신 사건 효력일시(사건이 없으면 계약일 서울 자정) ≤ 효력일시 ≤ 접수일시 ≤ 현재
-        OffsetDateTime earliest = contractStatusEventRepository
-                .findFirstByContractIdOrderByEffectiveAtDescEventSeqDesc(current.getContractId())
-                .map(ContractStatusEvent::getEffectiveAt)
-                .orElseGet(() -> request.getContractDate().atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
-        if (event.effectiveAt().isBefore(earliest)) {
-            throw eventOrder("statusEvent.effectiveAt", "효력일시는 최신 사건의 효력일시 " + earliest + " 이후여야 합니다.");
-        }
+        requireLatestEffectiveAt(contractStatusEventRepository, current.getContractId(), request.getContractDate(),
+                event.effectiveAt(), "statusEvent.effectiveAt");
         if (event.effectiveAt().isAfter(event.receivedAt())) {
             throw eventOrder("statusEvent.effectiveAt", "효력일시는 접수일시보다 늦을 수 없습니다.");
         }
@@ -802,8 +792,32 @@ public class ContractServiceImpl implements ContractService {
         }
     }
 
-    private FgcBusinessException eventOrder(String field, String detail) {
-        return fieldError(FgcErrorCode.IMPL_EVENT_ORDER, field, detail);
+    /** 허용 전이 표(운영정책서 제13조의2 1항). 저장(IF-API-19)과 미리보기(IF-API-64)가 같은 판정으로 거절한다. */
+    static void requireAllowedTransition(ContractStatus from, ContractStatus to, String field) {
+        if (!from.nextStatuses().contains(to)) {
+            throw new FgcBusinessException(FgcErrorCode.IMPL_TRANSITION_DENIED, field,
+                    Map.of("from", from.label(), "to", to.label()), from + " → " + to + " 전이는 허용되지 않습니다.");
+        }
+    }
+
+    /** 효력일시 하한(같은 조 3항): 최신 사건의 효력일시, 사건이 없으면 계약일 서울 자정. 저장과 미리보기가 함께 쓴다. */
+    static void requireLatestEffectiveAt(
+            ContractStatusEventRepository events,
+            Long contractId,
+            LocalDate contractDate,
+            OffsetDateTime effectiveAt,
+            String field
+    ) {
+        OffsetDateTime earliest = events.findFirstByContractIdOrderByEffectiveAtDescEventSeqDesc(contractId)
+                .map(ContractStatusEvent::getEffectiveAt)
+                .orElseGet(() -> contractDate.atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
+        if (effectiveAt.isBefore(earliest)) {
+            throw eventOrder(field, "효력일시는 최신 사건의 효력일시 " + earliest + " 이후여야 합니다.");
+        }
+    }
+
+    static FgcBusinessException eventOrder(String field, String detail) {
+        return new FgcBusinessException(FgcErrorCode.IMPL_EVENT_ORDER, field, Map.of("field", field), detail);
     }
 
     /**

@@ -289,6 +289,21 @@ public class ClawbackCandidateQueryRepository {
         return rows.stream().findFirst().map(row -> decode((String) row));
     }
 
+    /**
+     * 저장 전 상태 사건의 근거(FUN-077 미리보기). 후보 행을 만들지 않고 같은 근거 SQL에 가상 행을 넣어
+     * 저장 뒤 후보와 같은 기지급·정책 후보·경과월·검토 사유를 읽는다.
+     */
+    public Optional<ClawbackCandidateDetailResponse> findUnsavedStatusEvent(long contractId, java.time.LocalDate eventDate) {
+        List<?> rows = entityManager.createNativeQuery(BASIS.replace("FROM fgc.clawback_candidate cc", """
+                FROM (SELECT CAST(NULL AS bigint) AS candidate_id, CAST(:contractId AS bigint) AS contract_id,
+                             CAST('STATUS_EVENT' AS varchar) AS trigger_type, CAST(NULL AS bigint) AS source_id,
+                             CAST(:eventDate AS date) AS event_date, CAST(NULL AS bigint) AS status_event_id,
+                             CAST(NULL AS bigint) AS arbitrage_check_id) cc
+                """) + DETAIL)
+                .setParameter("contractId", contractId).setParameter("eventDate", eventDate).getResultList();
+        return rows.stream().findFirst().map(row -> decode((String) row));
+    }
+
     /** null의 JDBC 타입을 지정하고 LIKE 메타문자를 문자로 검색하도록 이스케이프한다. */
     private static NativeQuery<?> bindFilters(Query query, ClawbackCandidateSearchCondition condition) {
         String contractPattern = null;
