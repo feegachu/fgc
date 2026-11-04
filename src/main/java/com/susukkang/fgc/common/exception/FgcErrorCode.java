@@ -71,6 +71,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.transaction.deleteLinked"
     ),
+    TRAN_010(
+            "FGC-TRAN-010",
+            HttpStatus.CONFLICT,
+            "error.transaction.concurrentUpdate"
+    ),
 
     CONT_001(
             "FGC-CONT-001",

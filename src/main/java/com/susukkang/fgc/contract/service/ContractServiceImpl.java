@@ -168,6 +168,9 @@ public class ContractServiceImpl implements ContractService {
             return List.of();
         }
 
+        // FUN-085: 영향 건수는 다른 수혜자 회차와 남의 지급 건까지 센다. AGENT에게는 싣지 않고 본인 범위는 IF-API-89로 본다.
+        boolean withSummary = agentScope.currentAgentId() == null;
+
         // 4. 후속 작업의 현재 상태와 Job별 처리 이력을 한 번에 조회하고 상태사건 ID별로 묶기
         Map<Long, List<ContractEventJobRow>> jobsByEvent = contractEventJobRepository
                 .findByContract(contractId, ContractStatusFollowUpService.MAX_ATTEMPTS).stream()
@@ -178,7 +181,7 @@ public class ContractServiceImpl implements ContractService {
             processingsByEvent
                     .computeIfAbsent(processing.contractStatusEventId(), ignored -> new ArrayList<>())
                     .add(toProcessingResponse(processing,
-                            jobsByEvent.getOrDefault(processing.contractStatusEventId(), List.of())));
+                            jobsByEvent.getOrDefault(processing.contractStatusEventId(), List.of()), withSummary));
         }
 
         // 5. 등록자가 남은 사건만 사용자 정보를 붙인다(원천에 등록자가 없으면 null)
@@ -210,7 +213,7 @@ public class ContractServiceImpl implements ContractService {
 
     /** 요약과 오류 코드는 후속 작업의 행에만 있다. 배치 행은 영향을 남기지 않고 실패 사유도 코드가 아닌 자유 문구다. */
     private static ContractStatusEventProcessingResponse toProcessingResponse(
-            ContractStatusEventProcessingRow row, List<ContractEventJobRow> jobs) {
+            ContractStatusEventProcessingRow row, List<ContractEventJobRow> jobs, boolean withSummary) {
         ContractEventJobRow followUp = jobs.stream()
                 .filter(job -> job.job().job().equals(row.processingJob()))
                 .findFirst().orElse(null);
@@ -218,7 +221,7 @@ public class ContractServiceImpl implements ContractService {
         return new ContractStatusEventProcessingResponse(
                 row.processingJob(), row.processingStatus(), row.processedAt(),
                 row.processingJob(), row.processingStatus(),
-                followUp == null || failed ? null : followUp.summary(),
+                followUp == null || failed || !withSummary ? null : followUp.summary(),
                 followUp != null && failed ? ContractStatusFollowUpService.errorCodeOf(row.failureReason()) : null);
     }
 

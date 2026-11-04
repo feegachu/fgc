@@ -2660,6 +2660,21 @@
     "element": "Button"
   },
   {
+    "id": "features.transaction.transaction-form-page.btn-reload",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-reload-apply",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-reload-keep",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.transaction.transaction-form-page.btn-save",
     "file": "features/transaction/TransactionFormPage.tsx",
     "element": "Button"
