@@ -61,8 +61,9 @@ public class ContractStatusEffectQueryService {
         String ownEffect = scopeAgentId == null ? "" : OWN_EFFECT;
         var params = new MapSqlParameterSource("eventId", eventId).addValue("agentId", scopeAgentId)
                 .addValue("size", size).addValue("offset", (long) (page - 1) * size);
-        long total = namedJdbc.queryForObject("SELECT count(*) FROM fgc.contract_status_event_effect e"
-                + " WHERE e.contract_status_event_id = :eventId " + ownEffect, params, Long.class);
+        StringBuilder count = new StringBuilder("SELECT count(*) FROM fgc.contract_status_event_effect e")
+                .append(" WHERE e.contract_status_event_id = :eventId ").append(ownEffect);
+        long total = namedJdbc.queryForObject(count.toString(), params, Long.class);
         List<ContractStatusEffectResponse> rows = namedJdbc.query("""
                 SELECT e.entity_type, e.entity_id, e.processing_job, e.previous_state, e.next_state,
                        __AMOUNT__ AS amount, e.policy_version_id, e.reason_code, e.reason

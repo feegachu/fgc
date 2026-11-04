@@ -209,8 +209,9 @@ public class AgentStatementRepository {
 
     /** 상세: 목록과 같은 본인 범위 안에서만 찾는다. 남의 원천이거나 없으면 비어 있다. */
     public Optional<Row> find(long agentId, String entryType, long sourceId, long subId) {
-        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(ENTRIES_CTE + SELECT_ROWS + JOINS
-                + " WHERE e.entry_type = :entryType AND e.source_id = :sourceId AND e.sub_id = :subId");
+        StringBuilder sql = new StringBuilder(ENTRIES_CTE).append(SELECT_ROWS).append(JOINS)
+                .append(" WHERE e.entry_type = :entryType AND e.source_id = :sourceId AND e.sub_id = :subId");
+        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(sql.toString());
         query.setParameter(AGENT_ID, agentId).setParameter(ENTRY_TYPE_PARAM, entryType)
                 .setParameter("sourceId", sourceId).setParameter("subId", subId);
         return rows(query.getResultList()).stream().findFirst();

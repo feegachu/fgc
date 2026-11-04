@@ -23,6 +23,7 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class AgentHomeRepository {
 
+    private static final String AGENT_ID = "agentId";
     private static final String SCOPED = "c.agent_id = :agentId\n";
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -46,7 +47,7 @@ public class AgentHomeRepository {
 
     public Optional<LocalDate> firstContractDate(long agentId) {
         return jdbc.query("SELECT min(c.contract_date) FROM fgc.insurance_contract c WHERE " + SCOPED,
-                new MapSqlParameterSource("agentId", agentId),
+                new MapSqlParameterSource(AGENT_ID, agentId),
                 (rs, row) -> rs.getObject(1, LocalDate.class)).stream().filter(java.util.Objects::nonNull).findFirst();
     }
 
@@ -64,7 +65,7 @@ public class AgentHomeRepository {
                   LEFT JOIN fgc.product p ON p.product_id = o.product_id
                  WHERE c.contract_date BETWEEN :from AND :to AND
                 """).append(SCOPED);
-        MapSqlParameterSource params = new MapSqlParameterSource("agentId", agentId)
+        MapSqlParameterSource params = new MapSqlParameterSource(AGENT_ID, agentId)
                 .addValue("from", from).addValue("to", to).addValue("asOfEnd", asOfEnd);
         if (insurerType != null) {
             sql.append(" AND i.insurer_type = :insurerType");
@@ -89,7 +90,7 @@ public class AgentHomeRepository {
                  WHERE sl.beneficiary_agent_id = :agentId AND sh.payment_stage = 'GA_TO_FC'
                    AND sh.schedule_purpose = 'OPERATIONAL' AND sh.active_yn
                    AND sl.line_status = 'PLANNED' AND sl.due_month = :month
-                """, new MapSqlParameterSource("agentId", agentId).addValue("month", month),
+                """, new MapSqlParameterSource(AGENT_ID, agentId).addValue("month", month),
                 (rs, row) -> new ExpectedSum(rs.getBigDecimal(1), rs.getLong(2)));
     }
 
@@ -167,7 +168,7 @@ public class AgentHomeRepository {
                           last_effective_at DESC NULLS LAST, contract_id ASC
                  LIMIT :limit
                 """;
-        MapSqlParameterSource params = new MapSqlParameterSource("agentId", agentId)
+        MapSqlParameterSource params = new MapSqlParameterSource(AGENT_ID, agentId)
                 .addValue("asOf", asOf).addValue("asOfEnd", asOfEnd).addValue("recentFrom", recentFrom)
                 .addValue("eventStatuses", eventStatuses).addValue("limit", limit)
                 .addValue("month", asOf.withDayOfMonth(1));
@@ -192,7 +193,7 @@ public class AgentHomeRepository {
         return jdbc.query("""
                 SELECT agent_contract_check_id, checked_at, contract_id, context_version, request_hash
                   FROM fgc.agent_contract_check WHERE agent_id = :agentId AND idempotency_key = :key
-                """, new MapSqlParameterSource("agentId", agentId).addValue("key", key),
+                """, new MapSqlParameterSource(AGENT_ID, agentId).addValue("key", key),
                 AgentHomeRepository::stored).stream().findFirst();
     }
 
@@ -211,7 +212,7 @@ public class AgentHomeRepository {
                      checked_event_seq)
                 VALUES (:agentId, :contractId, :result, :next, :memo, :key, :hash, :version, :seq)
                 RETURNING agent_contract_check_id, checked_at, contract_id, context_version, request_hash
-                """, new MapSqlParameterSource("agentId", agentId).addValue("contractId", contractId)
+                """, new MapSqlParameterSource(AGENT_ID, agentId).addValue("contractId", contractId)
                         .addValue("result", result).addValue("next", nextCheckDate).addValue("memo", memo)
                         .addValue("key", key).addValue("hash", hash).addValue("version", contextVersion)
                         .addValue("seq", checkedEventSeq),
