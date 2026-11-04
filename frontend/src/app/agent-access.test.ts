@@ -3,7 +3,7 @@ import { canOpen, screens } from './screens'
 import { createWorkspaceStore } from '../stores/workspace'
 
 describe('FUN-085 설계사 화면 범위', () => {
-  it('포트폴리오·본인 계약 목록·상세와 지급 목록만 열고 내부 화면·수정 화면을 막는다', () => {
+  it('포트폴리오·본인 계약·지급 목록·수수료 명세를 열고 내부 화면·수정 화면을 막는다', () => {
     const agent = { roleCode: 'AGENT', canProcess: false, canViewAuditLog: false }
     expect(screens.filter((screen) => canOpen(screen, agent)).map((screen) => screen.path)).toEqual([
       '/agent-home', '/contracts/:id', '/contracts', '/transactions', '/agent/statements',
