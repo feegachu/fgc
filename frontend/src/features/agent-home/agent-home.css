@@ -193,7 +193,7 @@
   .ah .ah-donut-canvas { align-self: center; }
   .ah .ah-donut-legend { flex: none; width: 100%; }
   .ah .ah-launcher { width: 104px; height: 104px; right: 16px; bottom: 78px; }
-  .ah .ah-launcher .ah-launcher-mascot { --pico-size: 100px; }
+  .ah .ah-launcher .ah-launcher-mascot { --pico-size: 100px !important; } /* PicoMotion 이 인라인으로 준 크기보다 우선 */
   .ah .ah-launcher-label { right: 108px; bottom: 32px; padding: 8px 13px; border-width: 2px; font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {

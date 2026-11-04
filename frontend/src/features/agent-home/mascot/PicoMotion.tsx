@@ -1,4 +1,5 @@
-import { Suspense, lazy, useState } from 'react'
+import { Component, Suspense, lazy, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { CSSProperties } from 'react'
 import { canAnimate } from '../../../lib/motion'
 import './pico-motion.css'
@@ -35,8 +36,35 @@ const STILLS: Record<PicoMotionName, string> = {
 // Rive 런타임(WASM 포함)은 모션을 실제로 그릴 때만 내려받는다.
 const PicoRive = lazy(() => import('./PicoRive'))
 
+/** lazy 청크(Rive·WASM) 로딩이 실패하면 렌더 에러가 되므로, 이 칸 안에서 받아 정지 그림으로 돌린다. */
+class RiveBoundary extends Component<{ fallback: ReactNode; onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  componentDidCatch() {
+    this.props.onError()
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children
+  }
+}
+
+/** 동작 줄이기 설정을 마운트 시점뿐 아니라 바뀔 때도 따라간다. */
+function useCanAnimate(): boolean {
+  const [animate, setAnimate] = useState(canAnimate)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const sync = () => setAnimate(canAnimate())
+    query.addEventListener?.('change', sync)
+    return () => query.removeEventListener?.('change', sync)
+  }, [])
+  return animate
+}
+
 export function PicoMotion({ motion, size, className }: { motion: PicoMotionName; size: number; className?: string }) {
-  const [animate] = useState(canAnimate)
+  const animate = useCanAnimate()
   const [failed, setFailed] = useState(false)
   const still = <img src={STILLS[motion]} alt="" width={size} height={size} draggable={false} />
   return (
@@ -47,9 +75,11 @@ export function PicoMotion({ motion, size, className }: { motion: PicoMotionName
       aria-hidden="true"
     >
       {animate && !failed ? (
-        <Suspense fallback={still}>
-          <PicoRive artboard={ARTBOARDS[motion]} fallback={still} onError={() => setFailed(true)} />
-        </Suspense>
+        <RiveBoundary fallback={still} onError={() => setFailed(true)}>
+          <Suspense fallback={still}>
+            <PicoRive key={motion} artboard={ARTBOARDS[motion]} fallback={still} onError={() => setFailed(true)} />
+          </Suspense>
+        </RiveBoundary>
       ) : (
         still
       )}
