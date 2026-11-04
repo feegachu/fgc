@@ -12,7 +12,7 @@
 #   ZAP_LOGIN_PASSWORD=<시드 계정 비밀번호> bash infra/scripts/zap-isolated-scan.sh api
 #   bash infra/scripts/zap-isolated-scan.sh down
 #
-# 환경변수: ZAP_TARGET(이미 띄운 로컬 서버를 볼 때), ZAP_PORT(기본 18770), ZAP_IMAGE, ZAP_LOGIN_ID(기본 settle01), ZAP_ACTIVE_MINUTES(기본 30)
+# 환경변수: ZAP_TARGET(이미 띄운 로컬 서버를 볼 때), ZAP_PORT(기본 18770), ZAP_IMAGE, ZAP_LOGIN_ID(기본 settle01), ZAP_ACTIVE_MINUTES(기본 25)
 # 보고서는 build/zap/ 에 쌓인다(gitignore). 공개 PR, 이슈에는 결과서의 요약만 옮기고 원본은 올리지 않는다.
 set -Eeuo pipefail
 
@@ -122,8 +122,12 @@ case "$command" in
     down) down ;;
     baseline) scan zap-baseline -m 2 -z "-Xmx768m -silent" ;;
     api)
-        ZAP_AUTH_HEADER_VALUE="Bearer $(login_token)" SCAN_PATH=/v3/api-docs \
-            scan zap-api-scan -f openapi -z "-Xmx1g -silent -config ascan.maxScanDurationInMins=${ZAP_ACTIVE_MINUTES:-30}"
+        # 대입을 나눠야 set -e 가 로그인 실패에서 멈춘다. 빈 토큰으로 스캔하면 인증 API 를 못 본 채 통과로 보인다.
+        token=$(login_token)
+        [[ -n "$token" ]] || { echo "로그인 토큰을 받지 못했습니다." >&2; exit 1; }
+        # Access 토큰 수명이 30분이라 능동 스캔을 그 안에서 끝낸다.
+        ZAP_AUTH_HEADER_VALUE="Bearer $token" SCAN_PATH=/v3/api-docs \
+            scan zap-api-scan -f openapi -z "-Xmx1g -silent -config scanner.maxScanDurationInMins=${ZAP_ACTIVE_MINUTES:-25}"
         ;;
     *)
         echo "사용법: $0 up|baseline|api|down" >&2

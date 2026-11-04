@@ -182,7 +182,18 @@ class InputAttackIntegrationTest {
         mvc.perform(get(URI.create(url)).header(HttpHeaders.AUTHORIZATION, bearer))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
                 .andExpect(content().string(not(containsString("<script"))));
+    }
+
+    /** 화면은 CSV 를 Accept: text/csv 로 부른다(client.ts). 그래도 오류는 표준 봉투여야 한다(SIR-001). ZAP API scan 이 본문 없는 500 으로 찾았다. */
+    @Test
+    void csvDownloadErrorStillReturnsTheJsonEnvelope() throws Exception {
+        mvc.perform(get("/api/v1/schedules/999999999/export.csv").accept("text/csv")
+                        .header(HttpHeaders.AUTHORIZATION, bearer))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
     }
 
     /** 응답이 JSON + nosniff 이면 브라우저가 HTML 로 해석하지 않는다. 글자 그대로 돌려주는지까지 봐서 입력 변조도 없음을 확인한다. */

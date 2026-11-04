@@ -6,8 +6,8 @@ import tempfile
 import unittest
 
 SCRIPT = pathlib.Path(__file__).resolve().parents[1] / "zap-isolated-scan.sh"
-# Windows 의 subprocess 는 PATH 보다 System32 를 먼저 찾아 WSL bash 에 걸린다. PATH 순서로 찾은 절대 경로를 쓴다.
-BASH = shutil.which("bash")
+# Windows 의 subprocess 는 PATH 보다 System32 를 먼저 찾아 WSL bash 에 걸린다. test_shinhan_cd.py 와 같이 Git Bash 를 지정한다.
+BASH = r"C:/Program Files/Git/bin/bash.exe" if os.name == "nt" else shutil.which("bash")
 
 
 class ZapTargetGuard(unittest.TestCase):

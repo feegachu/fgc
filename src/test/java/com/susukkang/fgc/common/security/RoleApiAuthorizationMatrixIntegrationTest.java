@@ -286,6 +286,13 @@ class RoleApiAuthorizationMatrixIntegrationTest {
         assertThat(mapped).as("새 쓰기 API 는 인터페이스정의서 역할 열을 보고 rows() 에 행을 더한다").isEqualTo(covered);
     }
 
+    /** 허용 역할은 없는 ID 의 404 도 통과로 보므로, 행이 가리키는 API 가 실제로 있는지 따로 본다. */
+    @Test
+    void everyMatrixRowPointsAtARealMapping() {
+        Set<String> mapped = applicationMappings().flatMap(info -> keys(info).stream()).collect(Collectors.toSet());
+        assertThat(mapped).containsAll(rows().stream().map(Row::mappingKey).toList());
+    }
+
     /** 굵은 URL 규칙(anyRequest authenticated)이 빠지면 @PreAuthorize 없는 읽기가 그대로 열린다. */
     @Test
     void anonymousIsRejectedOnEveryReadMapping() throws Exception {
