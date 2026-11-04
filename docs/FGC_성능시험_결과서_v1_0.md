@@ -27,7 +27,7 @@
 | PER-004 | `GET /api/v1/dashboard/summary?month=2026-08` | 위와 같음 | VU 5, 예열 뒤 | 300회 | p95 328ms, KPI 6종 홈과 상세 일치 | 10만 건 기준 p95 3초, 집계 일치 | **미검증** (10만 건 미만). 집계 일치는 1,000계약에서 확인 |
 | PER-005 | 주요 API 14개 | 대기 | VU 50, 10분, 생각 시간 1~3초 | 미실행 | 대기 | 오류율 1% 미만, API별 p95 3초 | **미확인** (큰 데이터로 실행 예정) |
 | PER-001 | PER-005와 같은 실행의 API별 p95 | 대기 | 위와 같음 | 미실행 | 대기 | API별 p95 2초 | **미확인** |
-| PER-007 | 같은 월 재실행 (IF-API-45, 48), 멱등 조회 10종 EXPLAIN | 60계약(재실행), 1,000계약(EXPLAIN) | API 경유 | 1회 | 업무 키 표 신규 0건. Seq Scan 0건 | 신규 0건, 저하는 합의 기준(값 없음) | 신규 0건 **충족**, 저하는 측정값만. 큰 데이터 재실행 대기 |
+| PER-007 | 같은 월 재실행 (IF-API-45, 48), 멱등 조회 10종 EXPLAIN | 1,000계약 | API 경유 | 재실행 1회 | 업무 키 표 신규 0건. Seq Scan 0건. 첫 실행 184.6초, 재실행 45.7초 | 신규 0건, 저하는 합의 기준(값 없음) | 신규 0건 **충족**, 저하는 측정값만 |
 
 이 결과서는 "600명 동시 접속 가능"을 주장하지 않는다. 600은 설계사 레코드 수이고(DAR-012, OI-024 프로젝트 가정) 동시 사용자는 데이터 규모와 분리해 50 VU로만 잰다(#673 시나리오 6).
 
@@ -116,10 +116,10 @@
 
 `run-k6.sh rerun`이 같은 월 통합검증을 실제 API(IF-API-45 생성, IF-API-48 기동)로 한 번 더 돌리고 fgc 스키마 모든 표의 행 수를 전후로 비교한다. 저장소 계층 멱등은 `BatchWriterIdempotencyIntegrationTest`(같은 실행, 같은 계약의 예외 중복 0)가 지킨다.
 
-| 표 구분 | 표 | 60계약 재실행 증가 | 판정 |
+| 표 구분 | 표 | 1,000계약 재실행 증가 | 판정 |
 |---|---|---:|---|
 | 업무 키 (스케줄, 정산, 지급 건) | `schedule_header`, `schedule_line`, `journal_header`, `journal_line`, `commission_transaction`, `exception_case` | 0 | 충족 |
-| 실행 이력 (실행마다 쌓이는 것이 설계) | `cap_check` +148, `cap_check_detail` +1,502, `arbitrage_check` +74, `reconciliation_run` +10, `reconciliation_result` +263, `reconciliation_match` +310, `exception_occurrence` +278, `validation_target` +75, `validation_run` +1, `audit_log` +14, `batch_*` | 있음 | 해당 없음. 유니크 키에 `validation_run_id`, `reconciliation_run_id`가 들어 있다 |
+| 실행 이력 (실행마다 쌓이는 것이 설계) | `cap_check` +2,012, `cap_check_detail` +21,950, `arbitrage_check` +1,006, `reconciliation_run` +10, `reconciliation_result` +3,871, `reconciliation_match` +4,380, `exception_occurrence` +4,228, `validation_target` +1,007, `validation_run` +1, `audit_log` +14, `batch_*` | 있음 | 해당 없음. 유니크 키에 `validation_run_id`, `reconciliation_run_id`가 들어 있다 |
 
 멱등 조회 실행 계획 (1,000계약, `per007-explain.txt`): 10개 중 Seq Scan 0건.
 
@@ -136,7 +136,7 @@
 | 대사 결과 키 | Index Scan `uq_reconciliation_result` |
 | 예외 업무키 | Index Scan `uq_exception_key` |
 
-성능 저하는 "합의 기준"의 값이 원문에 없어 판정하지 않는다. 첫 실행과 재실행 시간을 나란히 기록한다(큰 데이터 대기).
+성능 저하는 "합의 기준"의 값이 원문에 없어 판정하지 않는다. 1,000계약 측정값: 첫 실행 184.6초, 재실행 45.7초. 재실행에서 분개 Step은 61.4초에서 0.8초(이미 기표된 원천을 건너뜀), 예외 Step은 5.7초에서 2.0초(새 예외 0건)다. 재실행은 JVM이 예열된 뒤라 직접 비율로 쓰지 않는다.
 
 ## 6. 목표 초과 항목, 원인, 개선안
 
