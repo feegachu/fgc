@@ -26,6 +26,7 @@ export const PAYMENT_GUIDES: readonly GuideDefinition[] = GUIDE_CATALOG.map((gui
   })),
 }))
 
+export const TARGET_ID = /^[a-z][a-zA-Z0-9._-]{0,79}$/
 export const GUIDE_ID = /^[a-z][a-z0-9._-]{0,79}$/
 
 /** Fail at registration rather than evaluating arbitrary condition expressions at runtime. */
@@ -53,7 +54,7 @@ export function validateCatalog(
     for (const step of guide.steps) {
       if (
         !GUIDE_ID.test(step.stepId) ||
-        !GUIDE_ID.test(step.targetId) ||
+        !TARGET_ID.test(step.targetId) ||
         !targets.has(step.screenId, guide.guideVersion, step.targetId)
       )
         throw new Error('UNREGISTERED_GUIDE_TARGET')

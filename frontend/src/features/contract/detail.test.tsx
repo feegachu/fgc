@@ -39,7 +39,7 @@ let requested: { url: string; options?: RequestOptions }[]
 const calls = (suffix: string) => requested.filter(({ url }) => url === `/api/v1/contracts/1${suffix}`)
 const messages = () => useToastStore.getState().messages.map(({ message }) => message)
 
-function renderAt(path: string, handler: Handler = () => undefined, canProcess = true, state?: object) {
+function renderAt(path: string, handler: Handler = () => undefined, canProcess = true, state?: object, roleCode = 'ADMIN') {
   requested = []
   vi.spyOn(apiClient, 'request').mockImplementation(async (url, options) => {
     requested.push({ url, options })
@@ -47,7 +47,7 @@ function renderAt(path: string, handler: Handler = () => undefined, canProcess =
       return envelope({
         loginId: 'operator',
         userName: '정산 담당자',
-        roleCode: 'ADMIN',
+        roleCode,
         demoMonth: '2026-07',
         canProcess,
       })
@@ -61,7 +61,7 @@ function renderAt(path: string, handler: Handler = () => undefined, canProcess =
   const initial = new URL(path, 'http://localhost')
   const router = createMemoryRouter(
     [
-      { path: '/contracts/:id', element: <ContractDetailPage /> },
+      { path: '/contracts/:id', element: <main id="main-content"><ContractDetailPage /></main> },
       { path: '/contracts/:id/edit', element: <h1>계약 수정 화면</h1> },
       { path: '/contracts', element: <h1>계약 목록 화면</h1> },
       { path: '/schedules/:id', element: <h1>스케줄 상세 화면</h1> },
@@ -501,4 +501,21 @@ it('registers each fixed contract tab and panel as a distinct guide target', asy
   const panelIds = panels.map((panel) => panel.getAttribute('data-guide-feature'))
   expect(panelIds).toContain('contract.panel.schedules')
   expect(new Set(panelIds).size).toBe(panels.length)
+})
+
+
+it('finishes AGENT detail help using only visible basic information', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  const { actions } = renderAt('/contracts/1', undefined, false, undefined, 'AGENT')
+  await screen.findByRole('tab', { name: '기본정보' })
+  await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1))
+  await actions.click(screen.getByRole('button', { name: '도움말' }))
+  const next = await screen.findByRole('button', { name: '설명 확인 · 다음' })
+  await waitFor(() => expect(next).toBeEnabled())
+  expect(screen.getByText('화면 사용법 · 1/1')).toBeVisible()
+  await actions.click(next)
+  expect(await screen.findByText('화면 사용법 안내 완료')).toBeVisible()
+  expect(screen.queryByRole('tab', { name: /스케줄/ })).toBeNull()
+  expect(calls('/schedules')).toHaveLength(0)
 })

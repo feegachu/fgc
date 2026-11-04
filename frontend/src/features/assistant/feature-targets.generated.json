@@ -3563,5 +3563,10 @@
     "id": "reference.tab.versions",
     "file": "features/reference/ReferenceUI.tsx",
     "element": "button"
+  },
+  {
+    "id": "validation.restart",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Link"
   }
 ]
