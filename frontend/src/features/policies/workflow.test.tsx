@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
 import { usePolicyDetail } from './api'
-import { emptyDraft } from './management'
+import { emptyDraft, emptyCommission, emptyRegime, policyTypes } from './management'
+import featureInstances from '../assistant/feature-instances.v1.json'
 import type { DraftDocument } from './management'
 import { normalizePolicyDetail } from './writeApi'
 import type { PolicyDetailResponse, PolicyWriteResult } from './writeApi'
@@ -282,11 +283,37 @@ describe('production policy workflow', () => {
     expect(summary.getByText('최대 회차').parentElement).toHaveTextContent('48회차')
   })
 
+  it('환수 규칙 요약은 저장된 번호 대신 수수료 항목 이름을 보인다', () => {
+    const wire = wireDetail('ACTIVE', ['CLONE'])
+    wire.editDocument!.clawbackRules = [
+      {
+        clawbackRuleId: 1,
+        insurerId: null,
+        productOfferingId: null,
+        commissionItemId: 3,
+        elapsedMonthFrom: 0,
+        elapsedMonthTo: 11,
+        clawbackBasisCode: 'PAID_ATTRIBUTED_AMOUNT',
+        clawbackRatePct: '100',
+      },
+    ]
+    const detail = normalizePolicyDetail(wire)
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    const table = screen.getByRole('table', { name: '환수 규칙' })
+    expect(within(table).getByText('유지 수수료')).toBeVisible()
+    expect(within(table).getAllByText('전체')).toHaveLength(2)
+    expect(within(table).queryByRole('columnheader', { name: /ID/ })).toBeNull()
+  })
+
   it('shows the historical contract-date window separately from the immutable approval period', () => {
     mountManagement('RETIRED', ['CLONE'], { from: '2027-01-01', to: '2027-12-31', successorPolicyVersionId: 18 })
     const period = screen.getByText('계약일 적용 기간').parentElement!
     expect(period).toHaveTextContent('2027-12-31')
-    expect(within(period).getByText('이후 계약은 후속 버전 적용')).toBeVisible()
+    expect(within(period).getByText('이후 계약은 다음 버전 적용')).toBeVisible()
   })
 
   it('identifies a superseded future version with an empty application window', () => {
@@ -303,13 +330,27 @@ describe('production policy workflow', () => {
       },
     ]
     const detail = normalizePolicyDetail(wire)
-    render(
+    const { rerender } = render(
       <QueryClientProvider client={new QueryClient()}>
         <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
       </QueryClientProvider>,
     )
     expect(screen.getByText('정정/승계로 계산 적용에서 제외됨')).toBeVisible()
-    expect(screen.getByText('후속 정책 #18')).toBeVisible()
+    // 18은 내부 번호라 그대로 보이지 않는다. 조회 목록에 다음 버전이 있으면 정책 코드와 판으로 보인다.
+    expect(screen.getByText('다음 정책 버전')).toBeVisible()
+    expect(screen.queryByText(/다음 정책 버전 18/)).not.toBeInTheDocument()
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <PolicyManagement
+          policy={detail.header!}
+          detail={detail}
+          refreshing={false}
+          onSaved={vi.fn()}
+          versions={[{ policyVersionId: 18, policyCode: 'WORKFLOW-TEST', versionNo: 2 }]}
+        />
+      </QueryClientProvider>,
+    )
+    expect(screen.getByText('다음 정책 버전 WORKFLOW-TEST v2')).toBeVisible()
   })
 
   it('creates a real draft from the production form and returns its server ID', async () => {
@@ -441,7 +482,7 @@ describe('production policy workflow', () => {
     const { user, onSaved } = mountManagement('ACTIVE', ['CLONE'])
     await user.click(screen.getByRole('tab', { name: '승인 이력' }))
     expect(screen.getByText('검토를 요청합니다.')).toBeVisible()
-    expect(screen.getByText(/author, policy:17/)).toBeVisible()
+    expect(screen.getByText('author, 다음 정책 버전')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '새 버전 작성' }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByLabelText(/새 버전 적용 시작일/)).toHaveValue('')
@@ -594,4 +635,36 @@ describe('production policy workflow', () => {
     expect(screen.getByText(/환수는 확정 지급 귀속액/)).toBeVisible()
     expect(request).not.toHaveBeenCalled()
   })
+})
+
+
+it('registers exactly the draft field targets rendered by all five policy types', async () => {
+  const seen = new Set<string>()
+  const registered = new Set(['policy.draft-input', 'policy.draft-select'].flatMap((group) =>
+    featureInstances[group as 'policy.draft-input' | 'policy.draft-select'].map((value) => `${group}.${value}`)))
+  for (const policyType of Object.keys(policyTypes)) {
+    const initial: DraftDocument = {
+      ...emptyDraft(), policyType, effectiveFrom: '2027-01-01',
+      commissionRules: [emptyCommission()], feeRegimeRules: [emptyRegime(policyType)],
+      sourceDetails: [{ ref: 'SRC-022', title: '승인 근거', explanation: '', url: null }],
+      clawbackRules: [{ insurerId: '', productOfferingId: '', commissionItemId: '', elapsedMonthFrom: '', elapsedMonthTo: '', clawbackBasisCode: '', clawbackRatePct: '' }],
+    }
+    const { user } = mountEditor(initial)
+    const collect = () => {
+      const fields = [...document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[id^="policy-"], select[id^="policy-"]')]
+      for (const field of fields) {
+        // Only the shared DraftInput/DraftSelect contract uses the finite groups.
+        if (field.id === 'policy-policyName' || !field.closest('.field')) continue
+        const id = `policy.draft-${field.tagName.toLowerCase()}.${field.id.slice('policy-'.length).replace(/\.\d+(?=\.|$)/g, '').toLowerCase()}`
+        expect(field.getAttribute('data-guide-feature'), `${policyType}: ${field.id}`).toBe(id)
+        expect(registered.has(id), `${policyType}: ${id}`).toBe(true)
+        seen.add(id)
+      }
+    }
+    collect()
+    const tabs = within(screen.getByRole('navigation', { name: '정책 작성 단계' })).getAllByRole('button')
+    for (const tab of tabs) { await user.click(tab); collect() }
+    cleanup()
+  }
+  expect([...seen].sort()).toEqual([...registered].sort())
 })

@@ -7,16 +7,20 @@ import type { StatusTone } from '../../components/StatusBadge'
 import { isNegative, rateText, usageRate, won } from '../../lib/format'
 import { withMonth } from '../../stores/workspace'
 import type { ApiError } from '../../lib/api/client'
-import type { CapPreview, Precheck } from './form-api'
+import type { CapPreview, Contract, Precheck } from './form-api'
 import { gateStates, hasRecordableBlocker, isRetryableConfirmation, RECORDABLE_CODES } from './form-model'
 import type { FormValues } from './form-model'
 
 export function GatePanel({ result }: { result: Precheck | null }) {
   return (
-    <section className="surface transaction-gate-panel" aria-labelledby="transaction-gate-title">
+    <section data-guide-feature="features.transaction.confirmation-panels.section"
+      data-guide-target="payment.precheck.result"
+      className="surface transaction-gate-panel"
+      aria-labelledby="transaction-gate-title"
+    >
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-gate-title">
-          ③ 확정 게이트 6단계
+          ③ 확정 전 6단계 점검
         </h2>
         <span className="transaction-panel-meta">운영정책서 제31조</span>
       </header>
@@ -34,10 +38,10 @@ export function GatePanel({ result }: { result: Precheck | null }) {
                 {gate.failures.length
                   ? gate.failures.map((blocker) => rateText(blocker.message || '확정 차단 사유를 확인하세요.')).join(' / ')
                   : gate.state === 'pass'
-                    ? '서버 사전검증 결과 통과했습니다.'
+                    ? '사전검증을 통과했습니다.'
                     : result
                       ? '앞 단계가 막혀 아직 판정하지 않았습니다.'
-                      : '사전검증 후 서버 판정이 표시됩니다.'}
+                      : '사전검증을 하면 결과가 표시됩니다.'}
               </div>
             </div>
           </div>
@@ -104,9 +108,19 @@ function CapCard({ preview }: { preview: CapPreview }) {
     </div>
   )
 }
-export function CapPanel({ result, pending, error }: { result: Precheck | null; pending: boolean; error: string }) {
+export function CapPanel({
+  result,
+  pending,
+  error,
+  contracts,
+}: {
+  result: Precheck | null
+  pending: boolean
+  error: string
+  contracts: Contract[]
+}) {
   return (
-    <section className="surface transaction-cap-panel" id="cap-panel" aria-labelledby="transaction-cap-title">
+    <section data-guide-feature="features.transaction.confirmation-panels.cap-panel" className="surface transaction-cap-panel" id="cap-panel" aria-labelledby="transaction-cap-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-cap-title">
           1,200% 사전검증
@@ -136,7 +150,7 @@ export function CapPanel({ result, pending, error }: { result: Precheck | null; 
                 <div className="transaction-cap-card" key={`excluded-${excluded.transactionAttributionId}-${index}`}>
                   <div className="transaction-cap-heading">
                     <span>
-                      계약 {excluded.contractId}, 귀속 {excluded.transactionAttributionId}
+                      계약 {contracts.find((contract) => contract.contractId === excluded.contractId)?.contractNo ?? '-'}
                     </span>
                     <StatusBadge tone="neutral">적용대상 아님</StatusBadge>
                   </div>
@@ -220,7 +234,7 @@ export function ConfirmationModal({
       initialFocusRef={cancelRef}
       footer={
         <>
-          <button
+          <button data-guide-feature="features.transaction.confirmation-panels.button"
             type="button"
             ref={cancelRef}
             className="button button-secondary"
@@ -230,14 +244,14 @@ export function ConfirmationModal({
             취소
           </button>
           {canSubmit && (
-            <Button id="btn-confirm-submit" loading={pending} onClick={onConfirm}>
+            <Button data-guide-feature="features.transaction.confirmation-panels.btn-confirm-submit" id="btn-confirm-submit" loading={pending} onClick={onConfirm}>
               {pending ? '확정 중' : recordable ? '확정 시도, 예외 등록' : '확정 실행'}
             </Button>
           )}
         </>
       }
     >
-      <div className="transaction-confirm-body">
+      <div data-guide-target="payment.confirm.dialog" className="transaction-confirm-body">
         <div className="guidance guidance-warning">
           <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
             warning
@@ -245,16 +259,16 @@ export function ConfirmationModal({
           <div>
             <strong className="guidance-title">확정 후에는 이 화면에서 되돌릴 수 없습니다</strong>
             <p className="guidance-copy">
-              취소가 필요하면 별도의 IF-API-26 절차로 처리해야 합니다. 현재 내용을 확인한 뒤 확정하세요.
+              확정 뒤 취소는 별도 취소 절차로 처리합니다. 현재 내용을 확인한 뒤 확정하세요.
             </p>
           </div>
         </div>
         <div id="transaction-confirm-summary" className="transaction-confirm-summary">
           {[
-            ['업무키', form.sourceBusinessKey || '-'],
+            ['지급 관리번호', form.sourceBusinessKey || '-'],
             ['지급액', won(form.amount)],
             ['흐름', form.cashflowType === 'PAYMENT' ? '지급' : '차감'],
-            ['서버 판정', !failureText && result?.confirmable ? '확정 가능' : '확정 차단'],
+            ['판정 결과', !failureText && result?.confirmable ? '확정 가능' : '확정 차단'],
           ].map(([label, value]) => (
             <div className="transaction-cap-amount-line" key={label}>
               <span>{label}</span>
@@ -277,13 +291,12 @@ export function ConfirmationModal({
           <div id="transaction-confirm-followup" className="transaction-confirm-followup">
             {recordable && !hasException && (
               <p className="transaction-confirm-notice">
-                확정되지 않습니다. 서버가 이 판정을 기록하고 예외함에 등록한 뒤 확정을 거부합니다. 지급 건은 작성중으로
-                남습니다.
+                이 건은 확정되지 않고 예외함에 등록됩니다. 지급 건은 작성중으로 남습니다.
               </p>
             )}
             <div className="transaction-confirm-followup-actions">
               {recorded && reviewRequired && (
-                <Link
+                <Link data-guide-feature="features.transaction.confirmation-panels.link"
                   className="button button-secondary"
                   reloadDocument
                   to={withMonth(`/transactions/new?id=${encodeURIComponent(paymentId ?? '')}`, month)}
@@ -292,12 +305,12 @@ export function ConfirmationModal({
                 </Link>
               )}
               {hasException && (
-                <Link className="button button-secondary" to={withMonth(`/exceptions?${exceptionParams}`, month)}>
+                <Link data-guide-feature="features.transaction.confirmation-panels.link-2" className="button button-secondary" to={withMonth(`/exceptions?${exceptionParams}`, month)}>
                   예외함에서 처리하기
                 </Link>
               )}
               {capCheckId && (
-                <Link
+                <Link data-guide-feature="features.transaction.confirmation-panels.link-3"
                   className="button button-secondary"
                   to={withMonth(`/cap-checks?capCheckId=${encodeURIComponent(capCheckId)}`, month)}
                 >

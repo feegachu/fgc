@@ -5,7 +5,7 @@ import { Button } from '../../components/Button'
 import { useAuth } from '../auth/useAuth'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
-import { PolicyPreviewContext, sourceReferenceNotice } from './management'
+import { PolicyPreviewContext, refLabel, sourceReferenceNotice } from './management'
 import './policies.css'
 import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
@@ -81,16 +81,16 @@ export function PoliciesPage() {
         </div>
         <div className="policy-header-actions">
           <Field className="policy-date-field" variant="filter" label="적용 기준일">
-            <input type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
+            <input data-guide-feature="features.policies.policies-page.input" type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
           </Field>
-          <Button variant="secondary" onClick={() => patch({ asOf: defaultDate, policyVersionId: null })}>
+          <Button data-guide-feature="features.policies.policies-page.button" variant="secondary" onClick={() => patch({ asOf: defaultDate, policyVersionId: null })}>
             <span className="material-symbols-rounded" aria-hidden="true">
               restart_alt
             </span>
             초기화
           </Button>
           {['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
-            <Button onClick={() => setCreating(true)}>
+            <Button data-guide-feature="features.policies.policies-page.button-2" onClick={() => setCreating(true)}>
               <span aria-hidden="true">＋</span> 정책 등록
             </Button>
           )}
@@ -107,7 +107,7 @@ export function PoliciesPage() {
       {message && (
         <p className="policy-notice" role="status">
           {message}
-          <Button variant="ghost" aria-label="안내 닫기" onClick={() => setMessage('')}>
+          <Button data-guide-feature="features.policies.policies-page.button-3" variant="ghost" aria-label="안내 닫기" onClick={() => setMessage('')}>
             닫기
           </Button>
         </p>
@@ -129,8 +129,8 @@ export function PoliciesPage() {
           </ListHeader>
           <QueryState loading={policies.isLoading} error={policies.error} />
           {policies.error && (
-            <Button variant="secondary" onClick={() => void policies.refetch()}>
-              다시 조회
+            <Button data-guide-feature="features.policies.policies-page.button-4" variant="secondary" onClick={() => void policies.refetch()}>
+              다시 시도
             </Button>
           )}
           {policies.isFetching && !policies.isLoading && (
@@ -157,7 +157,7 @@ export function PoliciesPage() {
                   align: 'center',
                   cellClassName: 'policy-select-cell',
                   render: (r) => (
-                    <input
+                    <input data-guide-feature="features.policies.policies-page.policy-version"
                       className="policy-row-select"
                       type="radio"
                       name="policy-version"
@@ -246,13 +246,13 @@ export function PoliciesPage() {
                   render: (r) =>
                     policyRefs(r).length ? (
                       policyRefs(r).map((ref) => (
-                        <EvidenceLink key={ref} label={ref}>
-                          {r.policyName}, {ref}
+                        <EvidenceLink key={ref} label={refLabel(ref)}>
+                          {r.policyName}, {refLabel(ref)}
                           {r.policyVersionId != null ? (
                             <PolicyReferenceInfo policyVersionId={r.policyVersionId} refText={ref} />
                           ) : null}
                           <p>{sourceReferenceNotice}</p>
-                          <Button
+                          <Button data-guide-feature="features.policies.policies-page.button-5"
                             variant="ghost"
                             onClick={() =>
                               patch({
@@ -280,7 +280,7 @@ export function PoliciesPage() {
                     {selected.policyCode}, v{selected.versionNo}
                   </strong>
                 </span>
-                <Button variant="secondary" onClick={() => patch({ tab: 'management', policyVersionId: String(id) })}>
+                <Button data-guide-feature="features.policies.policies-page.button-6" variant="secondary" onClick={() => patch({ tab: 'management', policyVersionId: String(id) })}>
                   선택 정책 관리 <span aria-hidden="true">→</span>
                 </Button>
               </div>
@@ -296,8 +296,8 @@ export function PoliciesPage() {
                 <>
                   <QueryState loading={detail.isLoading} error={detail.error} />
                   {detail.error && (
-                    <Button variant="secondary" onClick={() => void detail.refetch()}>
-                      상세 다시 조회
+                    <Button data-guide-feature="features.policies.policies-page.button-7" variant="secondary" onClick={() => void detail.refetch()}>
+                      다시 시도
                     </Button>
                   )}
                   {detail.data && !detail.error && (
@@ -310,6 +310,7 @@ export function PoliciesPage() {
                           detail={detail.data}
                           refreshing={detail.isFetching || policies.isFetching}
                           onSaved={saved}
+                          versions={policies.data}
                         />
                       )}
                       {active === 'commission' && <CommissionRules rows={detail.data.commissionRules ?? []} />}

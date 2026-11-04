@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
@@ -63,7 +64,7 @@ export default function ContractFormPage() {
     <div className="contract-form-page">
       <header className="page-header contract-form-page-header">
         <h1 className="page-title">보험계약 {id ? '수정' : '등록'}</h1>
-        <Link className="button button-secondary" to={returnTo}>
+        <Link data-guide-feature="features.contract.contract-form-page.link" className="button button-secondary" to={returnTo}>
           <span className="material-symbols-rounded" aria-hidden="true">
             arrow_back
           </span>
@@ -75,8 +76,8 @@ export default function ContractFormPage() {
       ) : id && !detail.data ? (
         <div className="surface contract-form-error" role="alert">
           <p>{contractErrorText(detail.error ?? new Error('계약을 불러오지 못했습니다.'))}</p>
-          <Button variant="secondary" onClick={() => void detail.refetch()}>
-            다시 불러오기
+          <Button data-guide-feature="features.contract.contract-form-page.button" variant="secondary" onClick={() => void detail.refetch()}>
+            다시 시도
           </Button>
         </div>
       ) : (
@@ -119,6 +120,9 @@ function ContractEditor({
   const [confirmSave, setConfirmSave] = useState(false)
   const requestKey = usePolicyRequest()
   const submitting = useRef(false)
+  const [savedSuccessfully, setSavedSuccessfully] = useState(false)
+  const [initialInput] = useState(() => JSON.stringify(initialDraft(currentDate, contract)))
+  const clearUnsaved = useUnsavedWork(!savedSuccessfully && JSON.stringify(draft) !== initialInput)
   const mounted = useRef(true)
   const insurers = useInsurerOptions()
   const products = useEntityChoices(
@@ -257,6 +261,8 @@ function ContractEditor({
       const saved = updated ?? (await createContract(body))
       const savedId = saved.contractId ?? id
       if (!savedId) throw new Error('저장 결과의 계약 번호를 확인하지 못했습니다. 목록에서 저장 여부를 확인해 주세요.')
+      setSavedSuccessfully(true)
+      clearUnsaved()
       // Invalidate inactive projections too: an update can regenerate schedules and financial snapshots.
       await queryClient.invalidateQueries({ queryKey: ['contracts'], refetchType: 'none' })
       await queryClient.invalidateQueries({ queryKey: ['schedules'], refetchType: 'none' })
@@ -326,7 +332,7 @@ function ContractEditor({
         ) : undefined
       }
     >
-      <input
+      <input data-guide-feature="features.contract.contract-form-page.input"
         type="number"
         name={field}
         min={field === 'paymentTermMonths' ? 1 : 0}
@@ -353,7 +359,7 @@ function ContractEditor({
       {referenceError && (
         <div className="surface contract-form-error">
           <p>기준정보를 불러오지 못했습니다. 다시 불러온 뒤 저장해 주세요.</p>
-          <Button
+          <Button data-guide-feature="features.contract.contract-form-page.button-2"
             variant="secondary"
             disabled={loadingReferences}
             onClick={() => {
@@ -366,7 +372,7 @@ function ContractEditor({
           </Button>
         </div>
       )}
-      <form
+      <form data-guide-feature="features.contract.contract-form-page.form"
         data-guide-target="contract.form"
         className="contract-editor"
         onSubmit={(event) => void submit(event)}
@@ -374,7 +380,7 @@ function ContractEditor({
         aria-label={`보험계약 ${id ? '수정' : '등록'} 입력`}
       >
         <fieldset className="contract-editor-fields contract-form-layout" disabled={saving || reloading}>
-          <section
+          <section data-guide-feature="features.contract.contract-form-page.section"
             className="surface contract-form-card contract-basic-form-card contract-editor-basic"
             aria-labelledby="contract-basic-heading"
           >
@@ -388,7 +394,7 @@ function ContractEditor({
             </header>
             <div className="contract-form-fields">
               <Field label="보험회사" required error={errors.insurerId}>
-                <select
+                <select data-guide-feature="features.contract.contract-form-page.insurer-id"
                   name="insurerId"
                   className="select-control"
                   value={draft.insurerId}
@@ -423,7 +429,7 @@ function ContractEditor({
                     </EvidenceLink>
                   }
                 >
-                  <SearchSelect
+                  <SearchSelect data-guide-feature="features.contract.contract-form-page.product-offering-id"
                     name="productOfferingId"
                     value={draft.productOfferingId}
                     source={products.source}
@@ -446,7 +452,7 @@ function ContractEditor({
                 error={errors.contractNo}
                 helper="같은 보험회사 안에서는 중복될 수 없습니다."
               >
-                <input
+                <input data-guide-feature="features.contract.contract-form-page.contract-no"
                   name="contractNo"
                   placeholder="계약번호 입력"
                   maxLength={80}
@@ -456,7 +462,7 @@ function ContractEditor({
                 />
               </Field>
               <Field label="계약일" required error={errors.contractDate} helper="미래 날짜는 선택할 수 없습니다.">
-                <input
+                <input data-guide-feature="features.contract.contract-form-page.contract-date"
                   name="contractDate"
                   type="date"
                   max={currentDate}
@@ -482,7 +488,7 @@ function ContractEditor({
                         : '이 상태에서는 바꿀 수 있는 상태가 없습니다.'
                     }
                   >
-                    <select
+                    <select data-guide-feature="features.contract.contract-form-page.next-contract-status"
                       name="contractStatus"
                       className="select-control"
                       value={draft.contractStatus}
@@ -500,7 +506,7 @@ function ContractEditor({
                 </>
               ) : (
                 <Field label="계약상태" required error={errors.contractStatus}>
-                  <select
+                  <select data-guide-feature="features.contract.contract-form-page.contract-status"
                     name="contractStatus"
                     className="select-control"
                     value={draft.contractStatus}
@@ -518,15 +524,15 @@ function ContractEditor({
             {statusChanged && (
               <fieldset className="contract-status-event">
                 <legend>상태 변경 사유</legend>
-                <p>상태를 바꿀 때만 입력합니다. 처리자와 처리 시각은 서버가 기록합니다.</p>
+                <p>상태를 바꿀 때만 입력합니다. 처리자와 처리 시각은 자동으로 기록됩니다.</p>
                 <div className="contract-form-fields">
                   <Field
                     label="효력일시"
                     required
                     error={eventError('effectiveAt')}
-                    helper="실제 효력 시각(서울). 최신 사건의 효력일시 이후, 접수일시 이전이어야 합니다."
+                    helper="실제 효력 시각(한국 시간). 최신 사건의 효력일시 이후, 접수일시 이전이어야 합니다."
                   >
-                    <input
+                    <input data-guide-feature="features.contract.contract-form-page.status-event-effective-at"
                       type="datetime-local"
                       name="statusEvent.effectiveAt"
                       max={statusEvent.receivedAt || undefined}
@@ -538,9 +544,9 @@ function ContractEditor({
                     label="접수일시"
                     required
                     error={eventError('receivedAt')}
-                    helper="실제로 접수한 시각(서울). 서버 처리 시각과 따로 기록합니다."
+                    helper="실제로 접수한 시각(한국 시간). 저장 시각과 따로 기록합니다."
                   >
-                    <input
+                    <input data-guide-feature="features.contract.contract-form-page.status-event-received-at"
                       type="datetime-local"
                       name="statusEvent.receivedAt"
                       value={statusEvent.receivedAt}
@@ -548,7 +554,7 @@ function ContractEditor({
                     />
                   </Field>
                   <Field label="사유코드" required error={eventError('reasonCode')}>
-                    <select
+                    <select data-guide-feature="features.contract.contract-form-page.status-event-reason-code"
                       name="statusEvent.reasonCode"
                       className="select-control"
                       value={statusEvent.reasonCode}
@@ -569,7 +575,7 @@ function ContractEditor({
                     error={eventError('reason')}
                     helper="1~2,000자"
                   >
-                    <textarea
+                    <textarea data-guide-feature="features.contract.contract-form-page.status-event-reason"
                       name="statusEvent.reason"
                       className="textarea-control"
                       maxLength={2000}
@@ -582,7 +588,7 @@ function ContractEditor({
               </fieldset>
             )}
           </section>
-          <section
+          <section data-guide-feature="features.contract.contract-form-page.section-2"
             className="surface contract-form-card contract-agent-card contract-editor-agent"
             aria-labelledby="contract-agent-heading"
           >
@@ -610,15 +616,15 @@ function ContractEditor({
                     <EvidenceLink label="모집 설계사 근거" icon="help">
                       REG-07, 제4-32조제12항제1/2호 [현행규정]. 유지관리수수료/장기유지수수료의 지급 대상은 최초
                       모집자로 고정되지 않고 계약을 유지관리하는 모집종사자입니다. 이 화면이 저장하는 값은 계약에 처음
-                      연결한 모집 설계사이며, 2차 범위에서는 이 설계사를 고정하고 유지관리 담당 변경/승계는 지원하지
-                      않습니다.
+                      연결한 모집 설계사이며 등록 뒤에는 바꿀 수 없습니다. 유지관리 담당 변경과 승계는 이 시스템에서
+                      처리하지 않습니다.
                     </EvidenceLink>
                   }
                 >
                   {original ? (
-                    <input name="agentName" value={original.agentName ?? ''} readOnly />
+                    <input data-guide-feature="features.contract.contract-form-page.agent-name" name="agentName" value={original.agentName ?? ''} readOnly />
                   ) : (
-                    <SearchSelect
+                    <SearchSelect data-guide-feature="features.contract.contract-form-page.agent-id"
                       name="agentId"
                       value={draft.agentId}
                       source={agents.source}
@@ -637,9 +643,9 @@ function ContractEditor({
                 label="소속 조직"
                 required
                 error={errors.organizationId}
-                helper="직접 수정하지 않습니다. 계약일에 유효한 설계사 기준정보의 조직 ID를 계약에 함께 저장합니다."
+                helper="계약일 기준 소속 조직이 자동으로 들어갑니다."
               >
-                <input
+                <input data-guide-feature="features.contract.contract-form-page.organization-name"
                   name="organizationName"
                   value={form.organizationName}
                   readOnly
@@ -648,7 +654,7 @@ function ContractEditor({
               </Field>
             </div>
           </section>
-          <section
+          <section data-guide-feature="features.contract.contract-form-page.section-3"
             className="surface contract-form-card contract-premium-card contract-editor-premium"
             aria-labelledby="contract-premium-heading"
           >
@@ -662,7 +668,7 @@ function ContractEditor({
             </header>
             <div className="contract-form-fields contract-premium-fields">
               <Field label="납입주기" required error={errors.paymentCycleCode}>
-                <select
+                <select data-guide-feature="features.contract.contract-form-page.payment-cycle-code"
                   name="paymentCycleCode"
                   className="select-control"
                   value={draft.paymentCycleCode}
@@ -688,7 +694,7 @@ function ContractEditor({
               {amountInput(
                 'monthlyEquivalentFirstPremium',
                 '월납환산 초회보험료(원)',
-                '서버의 1,200% 한도 계산 기준값입니다.',
+                '1,200% 한도 계산의 기준 금액입니다.',
               )}
               {amountInput(
                 'paymentTermMonths',
@@ -722,8 +728,7 @@ function ContractEditor({
               </div>
               <p>월납환산 초회보험료 × 12</p>
               <p>
-                참고용 기본 계산식입니다. 실제 한도는 저장 후 적용 룰셋/해약환급금 합산 등을 반영해 서버가 다시
-                계산합니다.
+                참고용 기본 계산식입니다. 실제 한도는 적용 룰셋/해약환급금 합산 등을 반영해 저장 뒤 다시 계산합니다.
               </p>
             </aside>
           </section>
@@ -750,14 +755,14 @@ function ContractEditor({
           </p>
           <div className="contract-action-buttons">
             {(conflict || missingToken) && (
-              <Button variant="secondary" onClick={() => setConfirmReload(true)}>
+              <Button data-guide-feature="features.contract.contract-form-page.button-3" variant="secondary" onClick={() => setConfirmReload(true)}>
                 최신 계약 다시 불러오기
               </Button>
             )}
-            <Link className="button button-secondary" to={returnTo}>
+            <Link data-guide-feature="features.contract.contract-form-page.link-2" className="button button-secondary" to={returnTo}>
               취소
             </Link>
-            <Button
+            <Button data-guide-feature="features.contract.contract-form-page.button-4"
               className="contract-save-button"
               type="submit"
               loading={saving}
@@ -783,10 +788,10 @@ function ContractEditor({
         closeOnEscape={!saving}
         footer={
           <>
-            <Button variant="secondary" disabled={saving} onClick={() => setConfirmSave(false)}>
+            <Button data-guide-feature="features.contract.contract-form-page.confirm-save-back" variant="secondary" disabled={saving} onClick={() => setConfirmSave(false)}>
               다시 확인
             </Button>
-            <Button loading={saving} disabled={disabled} onClick={() => void save()}>
+            <Button data-guide-feature="features.contract.contract-form-page.confirm-save" loading={saving} disabled={disabled} onClick={() => void save()}>
               확인하고 저장
             </Button>
           </>
@@ -822,7 +827,7 @@ function ContractEditor({
           </div>
         </dl>
         <p>
-          저장 성공은 계약과 상태 사건 기록까지입니다. 후속 처리는 저장 뒤 따로 진행되며 상세의 상태이력에서 확인합니다.
+          저장하면 상태 변경 기록이 남고 보류나 재개는 상태이력에서 확인합니다.
         </p>
       </Modal>
       <Modal
@@ -834,10 +839,10 @@ function ContractEditor({
         closeOnEscape={!reloading}
         footer={
           <>
-            <Button variant="secondary" disabled={reloading} onClick={() => setConfirmReload(false)}>
+            <Button data-guide-feature="features.contract.contract-form-page.button-5" variant="secondary" disabled={reloading} onClick={() => setConfirmReload(false)}>
               입력 유지
             </Button>
-            <Button loading={reloading} onClick={() => void reload()}>
+            <Button data-guide-feature="features.contract.contract-form-page.button-6" loading={reloading} onClick={() => void reload()}>
               최신 정보로 바꾸기
             </Button>
           </>

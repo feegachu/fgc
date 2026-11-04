@@ -22,7 +22,7 @@ export function PreviewNavigation() {
         ['/validation-runs/1', '통합검증'],
         ['/agent-home', '설계사'],
       ].map(([to, name]) => (
-        <Link key={to} to={to}>
+        <Link data-guide-feature="previews.design-preview-shell.link" key={to} to={to}>
           {name}
         </Link>
       ))}

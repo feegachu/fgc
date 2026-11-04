@@ -6,6 +6,8 @@ import './resize.css'
 export interface TableColumn<T> {
   key: string
   label: ReactNode
+  /** label이 글자가 아닐 때 열 너비 조절 손잡이에 붙일 이름. */
+  labelText?: string
   render: (row: T) => ReactNode
   width?: string
   cellClassName?: string
@@ -169,7 +171,7 @@ function TableContents<T>({
   }
   return (
     <div className={`data-table-viewport ${resizable ? 'resizable-table-viewport' : ''} ${viewportClassName}`}>
-      <table
+      <table data-guide-feature="components.data-table.table"
         ref={tableRef}
         className={`data-table ${resizable ? 'data-table-resizable' : ''} ${className}`}
         style={
@@ -208,7 +210,7 @@ function TableContents<T>({
           <tr>
             {onSelectionChange && (
               <th scope="col">
-                <input
+                <input data-guide-feature="components.data-table.input"
                   type="checkbox"
                   aria-label="현재 페이지 전체 선택"
                   checked={allSelected}
@@ -242,7 +244,7 @@ function TableContents<T>({
                 >
                   {column.sortable && onSort ? (
                     <>
-                      <button
+                      <button data-guide-feature="components.data-table.button"
                         type="button"
                         className={`table-sort-button ${active ? 'is-active' : ''}`}
                         onClick={() =>
@@ -270,7 +272,7 @@ function TableContents<T>({
         <tbody id={bodyId}>
           {rows.length ? (
             rows.map((row) => (
-              <tr
+              <tr data-guide-feature="components.data-table.tr"
                 key={rowKey(row)}
                 tabIndex={onRowActivate ? 0 : undefined}
                 aria-label={rowLabel?.(row)}
@@ -298,7 +300,7 @@ function TableContents<T>({
               >
                 {onSelectionChange && (
                   <td>
-                    <input
+                    <input data-guide-feature="components.data-table.input-2"
                       type="checkbox"
                       aria-label={`${rowKey(row)} 선택`}
                       checked={selectedKeys.includes(rowKey(row))}
@@ -310,7 +312,7 @@ function TableContents<T>({
                   <td key={column.key} className={`is-${column.align ?? 'left'} ${column.cellClassName ?? ''}`}>
                     <Fragment>
                       {index === 0 && onRowClick ? (
-                        <button type="button" className="table-row-link" onClick={() => onRowClick(row)}>
+                        <button data-guide-feature="components.data-table.button-2" type="button" className="table-row-link" onClick={() => onRowClick(row)}>
                           {column.render(row)}
                         </button>
                       ) : (
@@ -341,7 +343,7 @@ function TableContents<T>({
                 key={column.key}
                 className="column-resize-handle"
                 style={{ left: handle.left, top: handle.top, height: handle.height }}
-                label={`${typeof column.label === 'string' ? column.label : column.key} 열 너비`}
+                label={`${typeof column.label === 'string' ? column.label : (column.labelText ?? column.key)} 열 너비`}
                 value={handle.width}
                 min={minimumWidths[cellIndex] ?? MIN_COLUMN_WIDTH}
                 max={Math.max(MAX_COLUMN_WIDTH, handle.width)}

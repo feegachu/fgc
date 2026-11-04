@@ -9,7 +9,8 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
-import { stepState } from './steps'
+import { failureText, stepState } from './steps'
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 
 const baseUser = {
   loginId: 'settle01',
@@ -150,6 +151,13 @@ describe('스텝 규칙', () => {
     expect(stepState(5, 'FAILED', 5)).toBe('failed')
     expect(stepState(10, 'FINALIZED', 10)).toBe('done')
     expect(stepState(2, 'CREATED', 1)).toBe('pending')
+  })
+  it('실패 사유의 오류코드는 화면에 보이지 않고, 읽을 문장이 없으면 실패한 단계로 안내한다', () => {
+    expect(failureText('FGC-VRUN-003', 5)).toBe('5단계에서 실패했습니다.')
+    expect(failureText('FGC-VRUN-003 | FGC-COMMON-500', 0)).toBe('처리 중 오류로 실패했습니다.')
+    expect(failureText('FGC-VRUN-003 | 스케줄 회차가 중복되었습니다.', 3)).toBe('스케줄 회차가 중복되었습니다.')
+    expect(failureText('배치가 실패했습니다', 8)).toBe('배치가 실패했습니다')
+    expect(failureText(null, 4)).toBe('4단계에서 실패했습니다.')
   })
 })
 
@@ -345,6 +353,45 @@ describe('VRUN-W02 상세·실행·확정', () => {
     expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(0)
   })
 
+  it('실패 사유가 오류코드뿐이면 상세에 코드 대신 실패한 단계를 보인다', async () => {
+    currentUser = gaAdmin
+    detailHandlers(run({ status: 'FAILED', statusLabel: '실패', currentStep: 5, failureMessage: 'FGC-VRUN-003' }))
+    renderAt('/app/validation-runs/7')
+    expect(await screen.findByText('5단계에서 실패했습니다.')).toHaveAttribute('role', 'alert')
+    expect(screen.queryByText(/FGC-VRUN-003/)).not.toBeInTheDocument()
+  })
+
+  it('다른 실행에 쓴 멱등키라는 거절(FGC-VRUN-006) 뒤에는 새 멱등키로 다시 확정한다', async () => {
+    currentUser = gaAdmin
+    detailHandlers()
+    const keys: (string | undefined)[] = []
+    handlers['POST /api/v1/validation-runs/7/finalize'] = (_path, init) => {
+      keys.push(init?.idempotencyKey)
+      if (keys.length === 1)
+        throw new ApiError(
+          { code: 'FGC-VRUN-006', message: '확정 불가 — 다른 확정 요청과 겹쳤습니다. 화면을 새로 열고 다시 확정하세요.' },
+          'req-006',
+          409,
+        )
+      return { status: 'FINALIZED', finalizedAt: '2026-07-11T10:00:00+09:00', finalizedBy: 'ga01' }
+    }
+    const { actions } = renderAt('/app/validation-runs/7')
+    await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+    for (const attempt of [1, 2]) {
+      await actions.click(screen.getByRole('button', { name: '확정' }))
+      const dialog = await screen.findByRole('dialog', { name: '이 검증 실행을 확정할까요?' })
+      await actions.click(within(dialog).getByRole('button', { name: '확정' }))
+      if (attempt === 1) {
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+        await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+      }
+    }
+    expect(await screen.findByRole('dialog', { name: '확정했습니다' })).toBeInTheDocument()
+    expect(keys).toHaveLength(2)
+    expect(keys[1]).toMatch(/^vrun-finalize-7-/)
+    expect(keys[1]).not.toBe(keys[0])
+  })
+
   it('GA_ADMIN 은 8개 조건 통과 후 확정하고 완료 모달을 본다 — 실패 후 재시도는 같은 멱등키를 쓴다', async () => {
     currentUser = gaAdmin
     detailHandlers()
@@ -391,7 +438,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     renderAt('/app/validation-runs/7')
     // Wait for the passing server checklist, so loading state cannot hide a permission regression.
     expect(await screen.findByText('8. 조건 8', { selector: '.table-cell-preview' })).toBeInTheDocument()
-    expect(await screen.findByText('확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.')).toBeInTheDocument()
+    expect(await screen.findByText('확정은 GA관리자와 시스템관리자만 할 수 있습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
     expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
   })
@@ -453,4 +500,16 @@ it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수�
   await waitFor(() => expect(restart).toBeEnabled())
   expect(message).not.toBeVisible()
   expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+})
+
+
+it('resolves tutorial overview and progress targets on a successful detail response', async () => {
+  detailHandlers()
+  renderAt('/app/validation-runs/7?month=2026-07')
+  await screen.findByRole('heading', { name: /진행 단계/ })
+  const [overview, progress] = findWorkflowGuide('validation.detail', '1.0')!.steps
+  const overviewElement = document.querySelector(`[data-guide-feature="${overview.targetId}"]`)
+  expect(overviewElement).toBeVisible()
+  expect(overviewElement).toHaveTextContent('검증월')
+  expect(document.querySelector(`[data-guide-feature="${progress.targetId}"]`)).toContainElement(screen.getByRole('heading', { name: /진행 단계/ }))
 })

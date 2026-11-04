@@ -101,12 +101,12 @@ function ContractDetailView({ id }: { id: string }) {
         <div className="page-header-copy">
           <h1 className="page-title">보험계약 상세</h1>
         </div>
-        <Link className="button button-secondary" to={safeReturnTo(params.get('returnTo'), '/contracts')}>
+        <Link data-guide-feature="features.contract.contract-detail-page.link" className="button button-secondary" to={safeReturnTo(params.get('returnTo'), '/contracts')}>
           목록으로
         </Link>
       </header>
       {!validId ? (
-        <ContractLoadState message="계약 식별자를 확인할 수 없습니다." error />
+        <ContractLoadState message="계약을 찾을 수 없습니다. 목록에서 다시 선택하세요." error />
       ) : detail.isError ? (
         <ContractLoadState
           message={contractErrorText(detail.error, '계약 정보를 불러오지 못했습니다.')}
@@ -117,7 +117,7 @@ function ContractDetailView({ id }: { id: string }) {
         <ContractLoadState message="계약 정보를 불러오는 중입니다." />
       ) : (
         <>
-          <section className="surface contract-summary-card" aria-labelledby="contract-summary-title">
+          <section data-guide-feature="features.contract.contract-detail-page.section" className="surface contract-summary-card" aria-labelledby="contract-summary-title">
             <div className="contract-summary-primary">
               <div className="contract-summary-identity">
                 <p className="contract-summary-label">계약번호</p>
@@ -131,7 +131,7 @@ function ContractDetailView({ id }: { id: string }) {
               </div>
               <div className="contract-summary-actions" aria-label="계약 작업">
                 {canProcess && (
-                  <Link
+                  <Link data-guide-feature="features.contract.contract-detail-page.link-2"
                     className="button button-primary"
                     to={paymentEntryHref(
                       {
@@ -145,7 +145,7 @@ function ContractDetailView({ id }: { id: string }) {
                     지급 등록
                   </Link>
                 )}
-                <Button
+                <Button data-guide-feature="features.contract.contract-detail-page.button"
                   variant="secondary"
                   disabled={actionDisabled}
                   aria-describedby={!canProcess ? 'contract-action-note' : undefined}
@@ -160,7 +160,7 @@ function ContractDetailView({ id }: { id: string }) {
                   </span>
                   수정
                 </Button>
-                <Button
+                <Button data-guide-feature="features.contract.contract-detail-page.button-2"
                   variant="secondary"
                   disabled={actionDisabled}
                   loading={regenerate.isPending}
@@ -176,7 +176,7 @@ function ContractDetailView({ id }: { id: string }) {
                   )}
                   스케줄 재생성
                 </Button>
-                <Button
+                <Button data-guide-feature="features.contract.contract-detail-page.button-3"
                   disabled={actionDisabled}
                   loading={recheck.isPending}
                   aria-describedby={!canProcess ? 'contract-action-note' : undefined}
@@ -195,7 +195,7 @@ function ContractDetailView({ id }: { id: string }) {
             </div>
             {!canProcess && (
               <p id="contract-action-note" className="contract-permission-note">
-                수정/스케줄 재생성/한도 재검증은 SETTLEMENT 권한이 필요합니다.
+                수정, 스케줄 재생성, 한도 재검증은 정산담당자와 시스템관리자만 할 수 있습니다.
               </p>
             )}
             <ContractFacts

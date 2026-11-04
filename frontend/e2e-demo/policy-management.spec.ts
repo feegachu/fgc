@@ -179,12 +179,12 @@ test('POL-W01 조회 로딩·0건·403·서버 실패·재시도 표시 (응답 
     else {
       await expect(page.getByRole('alert').first()).toBeVisible()
       await expect(page.getByText(/기준일에 적용되는 정책 버전이 없습니다/)).not.toBeVisible()
-      await expect(page.getByRole('button', { name: '다시 조회', exact: true })).toBeEnabled()
+      await expect(page.getByRole('button', { name: '다시 시도', exact: true })).toBeEnabled()
     }
     await page.screenshot({ path: info.outputPath(`06-query-${status}.png`), fullPage: true })
     await page.unroute('**/api/v1/policies?*')
   }
-  await page.getByRole('button', { name: '다시 조회', exact: true }).click()
+  await page.getByRole('button', { name: '다시 시도', exact: true }).click()
   await expect(page.getByRole('table', { name: '정책 버전', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '초기화', exact: true }).click()
   await expect(page.getByLabel('적용 기준일')).not.toHaveValue('2000-07-01')

@@ -91,8 +91,8 @@ class CompareRankingCalculatorTest {
         assertThat(result.clawbackExposure()).isEqualTo(650_000 + 50_000);
         assertThat(result.evidence()).filteredOn(e -> e.label().equals("환수 노출액"))
                 .extracting(e -> e.rule() + "=" + e.value())
-                .containsExactly("현행수수료 1~1회차 · 한도 반영 지급액 × 환수율 100%=650000",
-                        "현행수수료 1~1회차 · 한도 반영 지급액 × 환수율 50%=50000");
+                .containsExactly("현행수수료 1~1회차, 한도 반영 지급액 × 환수율 100%=650000",
+                        "현행수수료 1~1회차, 한도 반영 지급액 × 환수율 50%=50000");
     }
 
     @Test

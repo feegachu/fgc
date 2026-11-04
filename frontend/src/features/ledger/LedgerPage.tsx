@@ -1,6 +1,8 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { Button } from '../../components/Button'
@@ -100,7 +102,7 @@ const columns: TableColumn<Journal>[] = [
     label: '원천',
     width: '10rem',
     render: (row) =>
-      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} #${row.sourceEntityId ?? EMPTY}`),
+      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} ${row.sourceEntityId ?? EMPTY}`),
   },
   {
     key: 'contract',
@@ -138,7 +140,7 @@ const columns: TableColumn<Journal>[] = [
   { key: 'reversal', label: '역분개 표시', width: '12rem', render: (row) => disclose(row.reversalOfJournalNo) },
 ]
 const lineColumns: TableColumn<JournalLine>[] = [
-  { key: 'no', label: '번호', width: '4rem', render: (row) => int(row.lineNo) },
+  { key: 'no', label: '줄', width: '4rem', render: (row) => int(row.lineNo) },
   {
     key: 'account',
     label: '계정과목',
@@ -180,12 +182,6 @@ export default function LedgerPage() {
           </p>
         </div>
       </header>
-      {params.get('imbalanceOnly') === 'true' && (
-        <p className="guidance guidance-neutral" role="status">
-          불균형만 조회하는 목록 필터는 지원하지 않습니다. 분개를 선택하면 연결된 검증 실행의 불균형을 확인할 수
-          있습니다.
-        </p>
-      )}
       <LedgerFilters
         key={JSON.stringify({ ...criteria, sort: '' }) + month + searched}
         criteria={criteria}
@@ -200,7 +196,7 @@ export default function LedgerPage() {
         label="분개 목록과 분개 상세 카드 너비"
         defaultRatio={55}
       >
-        <section className="surface" aria-busy={list.isFetching}>
+        <section data-guide-feature="features.ledger.ledger-page.section" className="surface" aria-busy={list.isFetching}>
           <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">분개 목록</h2>
           </ListHeader>
@@ -225,7 +221,7 @@ export default function LedgerPage() {
             onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
           />
         </section>
-        <section className="surface" aria-label="분개 상세" aria-busy={!!selected && detail.isFetching}>
+        <section data-guide-feature="features.ledger.ledger-page.section-2" className="surface" aria-label="분개 상세" aria-busy={!!selected && detail.isFetching}>
           <header className="surface-header">
             <h2 className="surface-title">분개 상세</h2>
             {detail.data && <Badge status={detail.data.status} label={detail.data.statusLabel} />}
@@ -273,16 +269,16 @@ export default function LedgerPage() {
                 <div className="ledger-react-actions">
                   {eligible ? (
                     <>
-                      <Button disabled={!canReverse} onClick={() => setAction('reverse')}>
+                      <Button data-guide-feature="features.ledger.ledger-page.button" disabled={!canReverse} onClick={() => setAction('reverse')}>
                         역분개
                       </Button>
-                      <Button variant="secondary" disabled={!canReverse} onClick={() => setAction('correction')}>
+                      <Button data-guide-feature="features.ledger.ledger-page.button-2" variant="secondary" disabled={!canReverse} onClick={() => setAction('correction')}>
                         역분개 + 재기표
                       </Button>
-                      {!canReverse && <p>역분개는 SETTLEMENT/GA_ADMIN/SYSTEM_ADMIN 권한이 필요합니다.</p>}
+                      {!canReverse && <p>역분개는 정산담당자, GA관리자, 시스템관리자만 할 수 있습니다.</p>}
                     </>
                   ) : (
-                    <p>POSTED 상태이고 아직 역분개되지 않은 원분개만 처리할 수 있습니다.</p>
+                    <p>기표됨 상태이고 역분개하지 않은 분개만 처리할 수 있습니다.</p>
                   )}
                 </div>
               </>
@@ -337,7 +333,7 @@ function LedgerFilters({
   const field = (key: keyof typeof fields, label: string, options?: Record<string, string>, type = 'text') => (
     <Field label={label}>
       {options ? (
-        <select value={fields[key]} onChange={(e) => setFields({ ...fields, [key]: e.target.value })}>
+        <select data-guide-feature={guideFeatureId('ledger.filter.select', key)} value={fields[key]} onChange={(e) => setFields({ ...fields, [key]: e.target.value })}>
           <option value="">전체</option>
           {Object.entries(options).map(([value, name]) => (
             <option key={value} value={value}>
@@ -346,7 +342,7 @@ function LedgerFilters({
           ))}
         </select>
       ) : (
-        <input
+        <input data-guide-feature={guideFeatureId('ledger.filter.input', key)}
           type={type}
           maxLength={key === 'contractNo' ? 80 : undefined}
           value={fields[key]}
@@ -390,7 +386,7 @@ function DetailSummary({ detail }: { detail: JournalDetail }) {
     ['원분개', disclose(detail.reversalOfJournalNo)],
     ['역분개', disclose(detail.reversedByJournalNo)],
     ['재기표', disclose(detail.repostedJournalNo)],
-    ['정정그룹', disclose(detail.correctionGroupKey)],
+    ['정정 묶음', detail.correctionGroupKey ? '있음' : EMPTY],
     ['적요', disclose(detail.description)],
   ] as const
   return (
@@ -420,6 +416,7 @@ function JournalActionModal({
 }) {
   const [reason, setReason] = useState('')
   const [evidence, setEvidence] = useState('')
+  const clearUnsaved = useUnsavedWork(Boolean(reason || evidence), JSON.stringify([reason, evidence]))
   const [reasonError, setReasonError] = useState(false)
   const reasonRef = useRef<HTMLTextAreaElement>(null)
   const client = useQueryClient()
@@ -437,12 +434,13 @@ function JournalActionModal({
     },
     meta: { errorToast: false },
     onSuccess: async (result) => {
+      clearUnsaved()
       if ('target' in result) {
         void client.invalidateQueries({ queryKey: ['exceptions'] })
         onClose()
         navigate(month ? withMonth(result.target, month) : result.target)
       } else {
-        toast(`역분개 ${result.journalHeaderId}을 생성했습니다.`, 'success')
+        toast('역분개를 생성했습니다.', 'success')
         await invalidateJournalCorrectionQueries(client)
         onClose()
       }
@@ -469,10 +467,10 @@ function JournalActionModal({
       initialFocusRef={reasonRef}
       footer={
         <>
-          <Button variant="secondary" disabled={mutation.isPending} onClick={close}>
+          <Button data-guide-feature="features.ledger.ledger-page.button-3" variant="secondary" disabled={mutation.isPending} onClick={close}>
             취소
           </Button>
-          <Button loading={mutation.isPending} disabled={!allowed} onClick={submit}>
+          <Button data-guide-feature="features.ledger.ledger-page.button-4" loading={mutation.isPending} disabled={!allowed} onClick={submit}>
             {isReverse ? '역분개 생성' : '예외함에서 정정 계속'}
           </Button>
         </>
@@ -492,7 +490,7 @@ function JournalActionModal({
         required
         error={reasonError ? (isReverse ? '역분개 사유를 입력하세요.' : '정정 요청 사유를 입력하세요.') : undefined}
       >
-        <textarea
+        <textarea data-guide-feature="features.ledger.ledger-page.textarea"
           ref={reasonRef}
           rows={5}
           maxLength={1000}
@@ -505,7 +503,7 @@ function JournalActionModal({
         />
       </Field>
       <Field label="증빙 참조">
-        <input
+        <input data-guide-feature="features.ledger.ledger-page.input-2"
           maxLength={500}
           value={evidence}
           disabled={mutation.isPending}

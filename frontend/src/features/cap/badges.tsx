@@ -65,7 +65,7 @@ export function CapError({ error, retry }: { error: Error; retry: () => void }) 
   return (
     <div role="alert" className="cap-react-error">
       <p>{message}</p>
-      <Button variant="secondary" onClick={retry}>
+      <Button data-guide-feature="features.cap.badges.button" variant="secondary" onClick={retry}>
         다시 시도
       </Button>
     </div>
@@ -75,7 +75,7 @@ export function CapEvidence() {
   return (
     <EvidenceLink icon label="1,200% 한도 판정 근거">
       <strong>REG-08/09/10/23, SRC-022 제4-32조⑤/⑭</strong>
-      <p>계약별 저장 판정입니다. 해약환급금은 합산하고 준법경영비 공제는 원수사 → GA 단계에만 적용합니다.</p>
+      <p>계약별 저장 판정입니다. 해약환급금은 합산하고 준법경영비 공제는 원수사→GA 단계에만 적용합니다.</p>
     </EvidenceLink>
   )
 }

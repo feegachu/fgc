@@ -164,6 +164,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/pico/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 승인된 업무 가이드의 대화형 질문 답변
+         * @description 비식별 질문·최근 대화와 역할별 업무 자료로 의미 검색 후 근거를 인용합니다. validatedGuide=null. 금융 계산·업무 쓰기는 기존 프로그램에서 수행합니다.
+         */
+        post: operations["picoAsk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/pico/guides/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 현재 저장 지급 가이드의 일회성 시작 준비
+         * @description 첫 scope 강조 전용. 금융 승인/진도 저장/외부 모델 호출 없음.
+         */
+        post: operations["prepare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/pico/guides/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 사용자 선택 후 지급 저장본을 재검증해 가이드 시작
+         * @description 동일 사용자·Bearer·역할·저장본·카탈로그·revision·5분 만료 및 일회성 검증.
+         */
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/arbitrage-checks": {
         parameters: {
             query?: never;
@@ -174,6 +234,26 @@ export interface paths {
         get: operations["getArbitrageChecks_1"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/calculations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 저장된 지급의 읽기 전용 계산 스냅샷
+         * @description ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.
+         */
+        post: operations["calculate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2022,6 +2102,21 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponsePaymentCalculationSnapshot: {
+            data?: components["schemas"]["PaymentCalculationSnapshot"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePicoAskResponse: {
+            data?: components["schemas"]["PicoAskResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePicoGuideResponse: {
+            data?: components["schemas"]["PicoGuideResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponsePolicyDetailResponse: {
             data?: components["schemas"]["PolicyDetailResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2185,6 +2280,20 @@ export interface components {
             /** Format: int64 */
             reviewRequiredCount?: number;
         };
+        AssistantAttributionLine: {
+            attributionDate?: string;
+            attributionSequence?: string;
+            contractId?: string;
+            originalAmount?: string;
+            roundedAmount?: string;
+        };
+        AssistantCalculationSource: {
+            entityId?: string;
+            sourceId?: string;
+            sourceType?: string;
+            title?: string;
+            version?: string;
+        };
         /** @description 변경 내용 비교 행 — before/after JSON 의 리프 경로 하나 */
         AuditDiffEntry: {
             /**
@@ -2285,6 +2394,14 @@ export interface components {
             loginId?: string;
             /** Format: int64 */
             userId?: number;
+        };
+        Basis: {
+            asOfDate?: string;
+            lines?: components["schemas"]["AssistantAttributionLine"][];
+            policyVersionIds?: string[];
+            rounding?: components["schemas"]["Rounding"];
+            ruleIds?: string[];
+            sourceRefs?: components["schemas"]["AssistantCalculationSource"][];
         };
         Blocker: {
             code?: string;
@@ -4270,6 +4387,48 @@ export interface components {
             key: string;
             value: components["schemas"]["JsonNode"];
         };
+        PaymentCalculationRequest: {
+            candidate?: components["schemas"]["JsonNode"];
+            /** Format: int64 */
+            clientRevision: number;
+            contractVersion: string;
+            /** @enum {string} */
+            kind: "EXPECTED_COMMISSION" | "ATTRIBUTION_BALANCE" | "CAP_STATUS" | "PAYMENT_CANDIDATE" | "RECONCILIATION_DIFFERENCE" | "ARBITRAGE_EXCESS" | "JOURNAL_CORRECTION_REVIEW";
+            /** @enum {string} */
+            mode: "EXISTING" | "HYPOTHETICAL";
+            scope?: components["schemas"]["Scope"];
+        };
+        PaymentCalculationSnapshot: {
+            amounts?: {
+                [key: string]: string;
+            };
+            basis?: components["schemas"]["Basis"];
+            blockers?: components["schemas"]["Reason"][];
+            /** Format: date-time */
+            calculatedAt?: string;
+            calculationId?: string;
+            capPreview?: {
+                [key: string]: unknown;
+            }[];
+            /** Format: int64 */
+            clientRevision?: number;
+            confirmable?: boolean;
+            currency?: string;
+            evidenceKind?: string;
+            kind?: string;
+            missingInputs?: string[];
+            mode?: string;
+            paymentStatus?: string;
+            recommendation?: components["schemas"]["Recommendation"];
+            resolvedScope?: {
+                [key: string]: string;
+            };
+            snapshotOnly?: boolean;
+            status?: string;
+            synthetic?: boolean;
+            /** @description Always null in snapshot-only phase; not a server proof */
+            validity?: Record<string, never> | null;
+        };
         PaymentEvidence: {
             attributedAmount?: number;
             cashflowType?: string;
@@ -4288,6 +4447,62 @@ export interface components {
             status?: string;
             /** Format: int64 */
             transactionAttributionId?: number;
+        };
+        PicoAskRequest: {
+            clientContextRevision: string;
+            conversation?: components["schemas"]["PicoConversationTurn"][];
+            entityRefs: components["schemas"]["PicoEntityRef"][];
+            guideVersion: string;
+            question: string;
+            screenId: string;
+        };
+        PicoAskResponse: {
+            contextRevision?: string;
+            /** @enum {string} */
+            decision?: "ANSWER_ONLY" | "ASK_CLARIFICATION" | "UNSUPPORTED";
+            evidenceRefs?: components["schemas"]["PicoEvidenceRef"][];
+            fallbackReason?: string;
+            guideVersion?: string;
+            message?: string;
+            /** @enum {string} */
+            source?: "AI" | "FIXED";
+            /** @description Always null for the first read-only guide-answer scope */
+            validatedGuide?: Record<string, never> | null;
+        };
+        PicoConversationTurn: {
+            /** @enum {string} */
+            role: "USER" | "ASSISTANT";
+            text: string;
+        };
+        PicoEntityRef: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            type: "CONTRACT" | "PAYMENT" | "SCHEDULE" | "VALIDATION_RUN" | "RECONCILIATION_RUN" | "EXCEPTION";
+        };
+        PicoEvidenceRef: {
+            chunkId?: string;
+            stepId?: string;
+            title?: string;
+            workflowId?: string;
+        };
+        PicoGuideRequest: {
+            clientContextRevision: string;
+            guideVersion: string;
+            paymentId: string;
+            prepareToken?: string | null;
+            workflowId: string;
+        };
+        PicoGuideResponse: {
+            clientContextRevision?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            guideVersion?: string;
+            paymentId?: string;
+            prepareToken?: string | null;
+            status?: string;
+            stepId?: string;
+            workflowId?: string;
         };
         /** @description 정책 제출·승인·반려·활성화 요청 */
         PolicyActionRequest: {
@@ -4647,6 +4862,12 @@ export interface components {
             /** Format: int64 */
             validationRunId?: number;
         };
+        Reason: {
+            code?: string;
+            contractId?: string;
+            message?: string;
+            transactionAttributionId?: string;
+        };
         RecentExceptionResponse: {
             contractNo?: string;
             /** Format: date-time */
@@ -4682,6 +4903,13 @@ export interface components {
             validationMonth?: string;
             /** Format: int64 */
             validationRunId?: number;
+        };
+        Recommendation: {
+            allowed?: boolean;
+            reason?: string;
+            requiredChecks?: string[];
+            suggestedAmount?: string;
+            targetId?: string;
         };
         ReconciliationExceptionBulkCreateResponse: {
             /** Format: int64 */
@@ -4901,6 +5129,12 @@ export interface components {
             /** Format: int64 */
             reversalOfId?: number;
         };
+        Rounding: {
+            aggregation?: string;
+            mode?: string;
+            /** Format: int32 */
+            scale?: number;
+        };
         ScheduleDetailResponse: {
             header?: components["schemas"]["ScheduleHeaderResponse"];
             lines?: components["schemas"]["ScheduleLineResponse"][];
@@ -5002,6 +5236,9 @@ export interface components {
             stage?: "INSURER_TO_GA" | "GA_TO_FC";
             /** @enum {string} */
             status?: "PLANNED" | "CONFIRMED" | "MATCHED" | "ADJUSTED" | "HOLD" | "CANCELLED" | "RESTARTED";
+        };
+        Scope: {
+            paymentId?: string;
         };
         Source: {
             entityType?: string;
@@ -5399,6 +5636,82 @@ export interface operations {
             };
         };
     };
+    picoAsk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PicoAskRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePicoAskResponse"];
+                };
+            };
+        };
+    };
+    prepare: {
+        parameters: {
+            query?: never;
+            header: {
+                Authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PicoGuideRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePicoGuideResponse"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header: {
+                Authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PicoGuideRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePicoGuideResponse"];
+                };
+            };
+        };
+    };
     getArbitrageChecks_1: {
         parameters: {
             query: {
@@ -5419,6 +5732,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseArbitrageSearchResponse"];
+                };
+            };
+        };
+    };
+    calculate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentCalculationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePaymentCalculationSnapshot"];
                 };
             };
         };

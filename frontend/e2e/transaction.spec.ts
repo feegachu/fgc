@@ -605,11 +605,11 @@ for (const viewport of [
     const help = page.getByRole('button', { name: '도움말', exact: true })
     await help.click()
     const card = page.getByRole('region', { name: '지급 업무 가이드' })
-    await card.getByRole('button', { name: '지급 사전검증·확정' }).click()
+    await card.getByRole('button', { name: '지급 사전검증/확정' }).click()
     await expect(page.getByTestId('payment-guide-spotlight')).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('guide-scope.png') })
     await card.getByRole('button', { name: '확인하고 다음' }).click()
-    await card.getByRole('button', { name: '다음', exact: true }).click()
+    await expect(card.getByRole('heading', { name: '사전검증을 실행하세요' })).toBeVisible()
     expect(
       fixture.requests.filter((request) => request.method === 'POST' && request.path.includes('/transactions')),
     ).toHaveLength(0)

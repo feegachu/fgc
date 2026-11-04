@@ -22,8 +22,8 @@ function initialView(): View {
 export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
   const [view, setView] = useState(initialView)
   const metrics = [
-    { key: 'paid', label: '확정 수수료', value: row.paidCommissionAmount },
-    { key: 'refund', label: '가산 해약환급금', value: row.includedSurrenderValueAmount },
+    { key: 'paid', label: '확정 수수료 순액', value: row.paidCommissionAmount },
+    { key: 'refund', label: '합산 해약환급금', value: row.includedSurrenderValueAmount },
     { key: 'premium', label: '누적 납입보험료', value: row.cumulativePaidPremium },
   ]
   const values = metrics.flatMap(({ value }) => (typeof value === 'number' && Number.isFinite(value) ? [value] : []))
@@ -42,12 +42,13 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
   }
 
   return (
-    <section className={`arb-calculation arb-amount-summary is-${view}`} aria-label="차익거래 금액 요약">
+    <section data-guide-feature="features.arbitrage.arbitrage-amount-summary.section" className={`arb-calculation arb-amount-summary is-${view}`} aria-label="차익거래 금액 요약">
       <header className="arb-amount-header">
         <h3>금액 요약</h3>
         <div className="arb-amount-views" role="group" aria-label="금액 표시 방식">
           {views.map((option) => (
             <button
+              data-guide-feature="features.arbitrage.arbitrage-amount-summary.button"
               key={option.key}
               type="button"
               className="arb-amount-view-button"
@@ -141,7 +142,7 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
         <dl className="arb-amount-reference">
           <div>
             <dt>
-              <span className="arb-amount-reference-label">참고</span>전체 지급예정액
+              <span className="arb-amount-reference-label">참고</span>지급예정액
             </dt>
             <dd>
               <ArbitrageAmount value={row.plannedCommissionAmount} />

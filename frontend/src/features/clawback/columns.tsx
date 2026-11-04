@@ -8,7 +8,7 @@ import { triggerLabels } from './labels'
 export const columns: TableColumn<CandidateRow>[] = [
   {
     key: 'candidateId',
-    label: '후보 ID',
+    label: '후보 번호',
     sortable: true,
     width: '6rem',
     cellClassName: 'tabular-nums',

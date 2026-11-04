@@ -78,7 +78,7 @@ function DashboardContent({ month }: { month: string }) {
       render: (e) => (
         <CellDisclosure
           singleLine
-          preview={<Link to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{screenMessage(e.title)}</Link>}
+          preview={<Link data-guide-feature="features.dashboard.dashboard-page.link" to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{screenMessage(e.title)}</Link>}
           full={screenMessage(e.title)}
         />
       ),
@@ -138,7 +138,7 @@ function DashboardContent({ month }: { month: string }) {
         value: data.journalImbalance,
         footer: '기표 전 0건 필수',
         tone: data.journalImbalance === 0 ? 'success' : 'error',
-        to: href('/journals', { imbalanceOnly: 'true' }),
+        to: href('/journals'),
       },
     ] as const)
 
@@ -148,7 +148,7 @@ function DashboardContent({ month }: { month: string }) {
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>
-        <button
+        <button data-guide-feature="features.dashboard.dashboard-page.settlement-guide"
           type="button"
           className="button button-secondary"
           data-guide-target="dashboard.guide"
@@ -160,7 +160,7 @@ function DashboardContent({ month }: { month: string }) {
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error as Error, '대시보드를 불러오지 못했습니다.')}</p>
-          <button type="button" className="button button-secondary" onClick={() => void refetch()}>
+          <button data-guide-feature="features.dashboard.dashboard-page.button" type="button" className="button button-secondary" onClick={() => void refetch()}>
             다시 시도
           </button>
         </div>
@@ -168,9 +168,9 @@ function DashboardContent({ month }: { month: string }) {
         <DashboardSkeleton />
       ) : (
         <>
-          <section className="kpi-grid kpi-group" aria-label="주요 검증 지표">
+          <section data-guide-feature="features.dashboard.dashboard-page.section" className="kpi-grid kpi-group" aria-label="주요 검증 지표">
             {kpis?.map((kpi) => (
-              <Link
+              <Link data-guide-feature={guideFeatureId('dashboard.kpi-link', kpi.id)}
                 key={kpi.label}
                 to={kpi.to}
                 className="kpi-card-link"
@@ -180,6 +180,7 @@ function DashboardContent({ month }: { month: string }) {
                 aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}
               >
                 <KpiCard
+                  guideId={guideFeatureId('dashboard.kpi', kpi.id)}
                   label={kpi.label}
                   value={kpi.value ?? 0}
                   unit="건"
@@ -191,12 +192,12 @@ function DashboardContent({ month }: { month: string }) {
             ))}
           </section>
           <div className="dashboard-main-grid">
-            <section className="surface" aria-labelledby="priority-title">
+            <section data-guide-feature="features.dashboard.dashboard-page.section-2" className="surface" aria-labelledby="priority-title">
               <header className="surface-header">
                 <h2 id="priority-title" className="surface-title">
                   최근 예외
                 </h2>
-                <Link className="run-list-link" to={href('/exceptions')}>
+                <Link data-guide-feature="features.dashboard.dashboard-page.link-3" className="run-list-link" to={href('/exceptions')}>
                   예외함 전체 보기
                 </Link>
               </header>
@@ -212,12 +213,12 @@ function DashboardContent({ month }: { month: string }) {
             </section>
             <div className="dashboard-side-column">
               <OpenExceptions total={data?.openException ?? 0} href={href} />
-              <section className="surface run-list-card" aria-labelledby="run-list-title">
+              <section data-guide-feature="features.dashboard.dashboard-page.section-3" className="surface run-list-card" aria-labelledby="run-list-title">
                 <div className="run-list-header">
                   <h2 id="run-list-title" className="run-list-title">
                     최근 통합검증 실행
                   </h2>
-                  <Link className="run-list-link" to={href('/validation-runs')}>
+                  <Link data-guide-feature="features.dashboard.dashboard-page.link-4" className="run-list-link" to={href('/validation-runs')}>
                     실행 목록
                   </Link>
                 </div>
@@ -256,12 +257,12 @@ function OpenExceptions({
     .filter((item) => (item.count ?? 0) > 0)
     .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
   return (
-    <section className="surface dashboard-open" aria-labelledby="open-title">
+    <section data-guide-feature="dashboard.kpi.open" className="surface dashboard-open" aria-labelledby="open-title">
       <header className="surface-header">
         <h2 id="open-title" className="surface-title">
           처리할 예외 <span className="dashboard-open-total tabular-nums">{int(total)}건</span>
         </h2>
-        <Link className="run-list-link" to={href('/exceptions', { status: OPEN_STATUS })}>
+        <Link data-guide-feature="dashboard.kpi-link.open" className="run-list-link" to={href('/exceptions', { status: OPEN_STATUS })}>
           예외함에서 처리
         </Link>
       </header>
@@ -270,6 +271,7 @@ function OpenExceptions({
           {types.map((item) => (
             <li key={item.type}>
               <Link
+                data-guide-feature="features.dashboard.dashboard-page.open-exception-type"
                 to={href('/exceptions', { type: item.type ?? '', status: OPEN_STATUS })}
                 className={item.type === 'CAP_VIOLATION' ? 'is-danger' : undefined}
               >
@@ -293,7 +295,7 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const progress = Math.max(0, Math.min(100, step * 10))
   const drawn = useDrawn()
   return (
-    <Link className="run-row" to={to}>
+    <Link data-guide-feature="features.dashboard.dashboard-page.link-5" className="run-row" to={to}>
       <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}회차`}</strong>
       <span className="run-meta">{`${step}/${RUN_STEPS} 단계, 실행 ${run.triggeredBy ?? '-'}`}</span>
       <StatusBadge tone={runStatusTone(run.status)}>{run.statusLabel ?? '-'}</StatusBadge>
@@ -316,3 +318,4 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
     </Link>
   )
 }
+import { guideFeatureId } from '../assistant/feature-ids'

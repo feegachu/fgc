@@ -91,7 +91,7 @@ export function Donut({
                     <div>
                       계약 <b>{real.value}건</b>, 비중 <b>{share}%</b>
                     </div>
-                    <small>월환산 {int(real.premium)}원</small>
+                    <small>월납환산 초회보험료 {int(real.premium)}원</small>
                   </>,
                 )
               },
@@ -104,7 +104,7 @@ export function Donut({
             return d ? (
               <path key={s.name} d={d} {...common} />
             ) : (
-              <circle
+              <circle data-guide-feature="features.agent-home.charts.circle"
                 key={s.name}
                 cx="50"
                 cy="50"
@@ -132,7 +132,7 @@ export function Donut({
           const cls = selected ? (selected === s.name ? 'sel' : 'dim') : ''
           return (
             <li key={s.name} className={cls}>
-              <button
+              <button data-guide-feature="features.agent-home.charts.button"
                 type="button"
                 aria-pressed={selected === s.name}
                 onClick={() => onSelect(s.name)}
@@ -197,7 +197,7 @@ export function Trend({ points }: { points: { month: string; count: number; prem
       <svg
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="월별 신규 계약 건수 막대와 월환산 초회보험료 선 차트"
+        aria-label="월별 신규 계약 건수 막대와 월납환산 초회보험료 선 차트"
         preserveAspectRatio="none"
       >
         {ticks.map((t) => (
@@ -247,7 +247,7 @@ export function Trend({ points }: { points: { month: string; count: number; prem
                       <div>
                         신규 계약 <b>{p.count}건</b>
                       </div>
-                      <small>월환산 {won(p.premium)}</small>
+                      <small>월납환산 초회보험료 {won(p.premium)}</small>
                     </>,
                   )
                 }}
@@ -273,13 +273,13 @@ export function Trend({ points }: { points: { month: string; count: number; prem
             <circle key={points[i].month} cx={x} cy={v} r="2.6" className="ah-line-dot" strokeWidth="1.5" />
           ))}
       </svg>
-      <table className="visually-hidden">
-        <caption>월별 신규 계약 건수와 월 환산 보험료</caption>
+      <table data-guide-feature="features.agent-home.charts.table" className="visually-hidden">
+        <caption>월별 신규 계약 건수와 월납환산 초회보험료</caption>
         <thead>
           <tr>
             <th scope="col">월</th>
             <th scope="col">신규 계약</th>
-            <th scope="col">월 환산 보험료</th>
+            <th scope="col">월납환산 초회보험료</th>
           </tr>
         </thead>
         <tbody>

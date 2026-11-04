@@ -26,6 +26,12 @@ export type CompletionRuleId =
   | 'CURRENT_PRECHECK_PASSED'
   | 'PRECHECK_RESULT_ACKNOWLEDGED'
   | 'PAYMENT_CONFIRMED'
+export type GuideTransitionConditionId = CompletionRuleId | 'CURRENT_DRAFT_ALREADY_SAVED' | 'DRAFT_SAVE_REQUIRED'
+export interface GuideBranchContext {
+  paymentId: EntityId | null
+  saved: boolean
+  formValid: boolean
+}
 export type CalculationKind =
   | 'EXPECTED_COMMISSION'
   | 'ATTRIBUTION_BALANCE'
@@ -55,17 +61,21 @@ export interface AssistantContext {
   formDirty: boolean
   clientRevision: number
 }
-export interface GuideStep {
+/** assistant.v1 local catalog, not the server GuideStep wire DTO in interface §14-2. */
+export interface LocalGuideStep {
   stepId: TargetId
   screenId: 'TRAN-W02'
   targetId: TargetId
   title: string
   instruction: string
+  roles: readonly string[]
   entryRuleId: 'CONTEXT_AVAILABLE'
   completionRuleId: CompletionRuleId
   missingTargetBehavior: 'PAUSE'
+  next: readonly { conditionId: GuideTransitionConditionId; stepId: TargetId }[]
 }
-export interface GuideDefinition {
+/** Local catalog fields intentionally differ from the future server proof/GuideStart contract. */
+export interface LocalGuideDefinition {
   workflowId: WorkflowId
   guideVersion: '1.0'
   title: string
@@ -73,8 +83,9 @@ export interface GuideDefinition {
   utterances: readonly string[]
   requiredSlots: readonly (keyof AssistantContext)[]
   capability: 'READ' | 'PROCESS'
+  roles: readonly ('SYSTEM_ADMIN' | 'GA_ADMIN' | 'SETTLEMENT' | 'COMPLIANCE')[]
   availableCalculationKinds: readonly CalculationKind[]
-  steps: readonly Readonly<GuideStep>[]
+  steps: readonly Readonly<LocalGuideStep>[]
   enabled: boolean
 }
 export interface SourceRef {
@@ -254,7 +265,7 @@ export interface GuideSession {
   planVersion: number
   state: GuideState
   resolvedContext: AssistantContext
-  steps: GuideStep[]
+  steps: LocalGuideStep[]
   currentStepId: TargetId
   stepResult: {
     status: 'WAITING' | 'SATISFIED' | 'BLOCKED'

@@ -2,37 +2,33 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { StatusBadge } from '../../../components/StatusBadge'
 import { rate } from '../../../lib/format'
+import picoBasic from '../../assistant/assets/pico-basic.png'
+import picoDetective from '../../assistant/assets/pico-detective.png'
+import picoGuide from '../../assistant/assets/pico-guide.png'
 import { askCompare, compareCategoriesQuery, compareExplainQuery, newsHeadlinesQuery, rankCompare } from './api'
 import type { CompareCategory, CompareEvidence, CompareExcluded, CompareItem, CompareRanking } from './api'
 import { FilterPanel } from './FilterPanel'
 import { EMPTY_FILTERS, toFilters } from './filters'
 import type { FilterDraft } from './filters'
-import { FAQ, capBadge, followUpAnswer, followUpQuestion, gradeLabel, heroWhy, won } from './format'
+import { FAQ, capBadge, followUpAnswer, followUpQuestion, gradeLabel, gradeTone, heroWhy, won } from './format'
 import type { FollowUpKind } from './format'
 import './chatbot.css'
 
-const STEPS = ['카테고리 선택', '상품 선별', '비교 결과·근거']
+const STEPS = ['카테고리 선택', '상품 선별', '비교 결과와 근거']
 const CHECKS = ['내 한도 확인', '정책 수수료율 확인', '환수 규칙 확인', '협회 등급 확인']
 /** 계산이 빨라도 화면이 깜빡이지 않도록 2단계는 캐릭터가 한 바퀴 도는 시간 동안 보여 준다. chatbot.css 의 cb-turn 주기(5.5s)와 같아야 한다. */
 const SPIN_MS = 5500
 const CHECK_MS = SPIN_MS / CHECKS.length
-const IMG = (name: string) => `${import.meta.env.BASE_URL}images/brand/chatbot-${name}.png`
+// 업무 비서 AI와 같은 파랑 피코 그림을 쓴다. 사과하는 파랑 그림이 없어 기본 그림으로 대신한다.
+const MASCOTS = { base: picoBasic, search: picoDetective, sum: picoGuide, sorry: picoBasic }
 
-function Mascot({ name, size = 101 }: { name: 'base' | 'search' | 'sum' | 'sorry'; size?: number }) {
-  // 답변(3단계)은 들고 있는 막대만 따로 움직이도록 몸통과 막대를 두 겹으로 그린다.
-  if (name === 'sum') {
-    return (
-      <span className="cb-mascot cb-pointer" style={{ width: size, height: size }} aria-hidden="true">
-        <img src={IMG('sum-base')} alt="" width={size} height={size} />
-        <img className="cb-stick" src={IMG('sum-stick')} alt="" width={size} height={size} />
-      </span>
-    )
-  }
+function Mascot({ name, size = 101 }: { name: keyof typeof MASCOTS; size?: number }) {
   return (
     <img
       className={`cb-mascot${name === 'search' ? ' cb-spin' : ''}`}
-      src={IMG(name)}
+      src={MASCOTS[name]}
       alt=""
       width={size}
       height={size}
@@ -46,7 +42,7 @@ function Bot({
   name = '피코 AI',
   children,
 }: {
-  avatar?: 'base' | 'search' | 'sum' | 'sorry'
+  avatar?: keyof typeof MASCOTS
   name?: string
   children: ReactNode
 }) {
@@ -219,11 +215,11 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
           <div className="cb-head-text">
             <h2 id="cb-title">상품 추천 AI</h2>
             <p>
-              {category && view > 1 ? `${category.label} · ` : ''}
+              {category && view > 1 ? `${category.label}, ` : ''}
               {ranking ? `자료 기준일 ${ranking.asOf}` : ''}
             </p>
           </div>
-          <button type="button" className="cb-close" aria-label="닫기" onClick={onClose}>
+          <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.close" type="button" className="cb-close" aria-label="닫기" onClick={onClose}>
             ×
           </button>
         </header>
@@ -264,13 +260,13 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                     <div className="cb-card" role="alert">
                       <b>순위를 불러오지 못했어요.</b>
                       <p className="cb-muted">
-                        잠시 뒤 다시 시도해 주세요. 계산은 서버에서 하며 입력하신 내용은 저장되지 않아요.
+                        잠시 뒤 다시 시도해 주세요. 입력하신 내용은 저장되지 않아요.
                       </p>
                       <div className="cb-row">
-                        <button type="button" className="cb-btn primary" onClick={() => pick(category)}>
+                        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.retry-category" type="button" className="cb-btn primary" onClick={() => pick(category)}>
                           다시 시도
                         </button>
-                        <button type="button" className="cb-btn" onClick={restart}>
+                        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.restart" type="button" className="cb-btn" onClick={restart}>
                           처음으로
                         </button>
                       </div>
@@ -357,7 +353,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                   (['why', 'limit'] as const).map((kind) => {
                     const text = followUpQuestion(kind, ranking.items[0])
                     return (
-                      <button
+                      <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.follow-up"
                         key={kind}
                         type="button"
                         className={`cb-suggest-btn${draft?.kind === kind ? ' on' : ''}`}
@@ -372,7 +368,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                       </button>
                     )
                   })}
-                <button
+                <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.suggest-restart"
                   type="button"
                   className={`cb-suggest-btn${draft?.kind === 'restart' ? ' on' : ''}`}
                   aria-pressed={draft?.kind === 'restart'}
@@ -385,7 +381,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                 </button>
               </div>
               <div className="cb-composer">
-                <input
+                <input data-guide-feature="features.agent-home.chatbot.chatbot-modal.question-input"
                   className={`cb-composer-field${input ? ' ready' : ''}`}
                   aria-label="질문 입력"
                   placeholder="궁금한 점을 입력하거나 위 질문을 골라 보세요(고객 개인정보는 입력하지 마세요)"
@@ -402,7 +398,7 @@ export function ChatbotModal({ onClose }: { onClose: () => void }) {
                     }
                   }}
                 />
-                <button type="button" className={`cb-send${canSend ? ' on' : ''}`} aria-label="보내기" disabled={!canSend} onClick={send}>
+                <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.send" type="button" className={`cb-send${canSend ? ' on' : ''}`} aria-label="보내기" disabled={!canSend} onClick={send}>
                   ➤
                 </button>
               </div>
@@ -462,7 +458,7 @@ function StepOne({
           ) : failed ? (
             <div role="alert">
               <p className="cb-muted">카테고리를 불러오지 못했어요.</p>
-              <button type="button" className="cb-btn" onClick={onRetry}>
+              <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.retry-categories" type="button" className="cb-btn" onClick={onRetry}>
                 다시 시도
               </button>
             </div>
@@ -475,7 +471,7 @@ function StepOne({
             <FilterPanel insurers={insurers} value={filters} onChange={onFilters} />
             <div className="cb-cats" role="group" aria-label="카테고리 선택">
               {(categories ?? []).map((c) => (
-                <button
+                <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.category"
                   key={c.code}
                   type="button"
                   className="cb-cat"
@@ -493,7 +489,7 @@ function StepOne({
       <div className="cb-quick-label">자주 묻는 질문</div>
       <div className="cb-quick" role="group" aria-label="자주 묻는 질문">
         {FAQ.map((f) => (
-          <button
+          <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.faq"
             key={f.key}
             type="button"
             className={`cb-faq${faq === f.key ? ' on' : ''}`}
@@ -529,7 +525,7 @@ function NewsSection() {
   const list = Array.isArray(news.data) ? news.data : []
   return (
     <div className="cb-info">
-      <section className="cb-info-card cb-news" aria-labelledby="cb-news-title">
+      <section data-guide-feature="features.agent-home.chatbot.chatbot-modal.news" className="cb-info-card cb-news" aria-labelledby="cb-news-title">
         <h4 id="cb-news-title">보험 업계 최신 뉴스</h4>
         {news.isLoading ? (
           <p className="cb-muted" aria-busy="true">
@@ -541,7 +537,7 @@ function NewsSection() {
           <ul className="cb-news-list">
             {list.map((n) => (
               <li key={n.link}>
-                <a href={n.link} target="_blank" rel="noopener noreferrer">
+                <a data-guide-feature="features.agent-home.chatbot.chatbot-modal.news-link" href={n.link} target="_blank" rel="noopener noreferrer">
                   {n.title}
                 </a>
                 {n.publishedAt && <time>{n.publishedAt.slice(0, 10)}</time>}
@@ -566,7 +562,7 @@ const EXCLUDE_REASON: Record<string, string> = {
   RULE_DUPLICATE: '수수료 규칙이 중복됨',
   CLAWBACK_RATE_MISSING: '환수 규칙 없음',
   CLAWBACK_RULE_AMBIGUOUS: '적용할 환수 규칙이 둘 이상임',
-  CLAWBACK_RULE_UNSUPPORTED: '계산할 수 없는 환수 규칙(기준·조건)',
+  CLAWBACK_RULE_UNSUPPORTED: '계산할 수 없는 환수 규칙(기준, 조건)',
   CAP_RULE_MISSING: '한도 규칙 없음',
   CAP_ITEM_REVIEW_REQUIRED: '한도 포함 여부 검토 필요',
 }
@@ -578,7 +574,7 @@ function ExcludedList({ items }: { items: CompareExcluded[] }) {
     <ul className="cb-muted cb-excluded" aria-label="비교에서 제외된 상품">
       {items.map((e) => (
         <li key={e.offeringId}>
-          {e.insurer} {e.product} — {e.reasonCodes.map((code) => EXCLUDE_REASON[code] ?? code).join(', ')}
+          {e.insurer} {e.product} ({e.reasonCodes.map((code) => EXCLUDE_REASON[code] ?? code).join(', ')})
         </li>
       ))}
     </ul>
@@ -587,7 +583,7 @@ function ExcludedList({ items }: { items: CompareExcluded[] }) {
 
 /** 순위가 비었을 때 서버 상태·경고 코드에 맞는 안내 문구. */
 function emptyReason(ranking: CompareRanking, category: CompareCategory) {
-  if (ranking.status === 'RULE_NOT_CONFIGURED') return '상품 순위 계산 기준이 아직 확정되지 않아 순위를 보여 드릴 수 없어요.'
+  if (ranking.status === 'RULE_NOT_CONFIGURED') return '순위 계산 기준이 설정되지 않았어요. 관리자에게 알려 주세요.'
   if (ranking.warnings.includes('FILTER_NO_MATCH')) return '선택한 세부 조건에 맞는 상품이 없어요.'
   if (ranking.warnings.includes('NO_BASE_PREMIUM')) return '본인 계약이 없어 기준 보험료를 정할 수 없어요.'
   if (ranking.warnings.includes('ALL_EXCLUDED')) return '비교에 필요한 자료가 부족해 순위를 만들 수 없어요.'
@@ -624,7 +620,10 @@ function Result({
         <Bot avatar="sorry">
           <div className="cb-card" role="status">
             <b>답변을 찾지 못했어요</b>
-            <p className="cb-muted">{reason} 다른 카테고리를 골라 보세요.</p>
+            <p className="cb-muted">
+              {/* 계산 기준은 모든 카테고리에 공통이라 이때는 다른 카테고리를 권하지 않는다. */}
+              {ranking.status === 'RULE_NOT_CONFIGURED' ? reason : `${reason} 다른 카테고리를 골라 보세요.`}
+            </p>
             <ExcludedList items={ranking.excludedItems} />
           </div>
         </Bot>
@@ -651,7 +650,7 @@ function Result({
       </Bot>
       {appliedFilters(ranking).length > 0 && (
         <div className="cb-muted" role="note">
-          적용한 조건: {appliedFilters(ranking).join(' · ')}
+          적용한 조건: {appliedFilters(ranking).join(', ')}
         </div>
       )}
       {warnings.map((w) => (
@@ -660,7 +659,7 @@ function Result({
         </div>
       ))}
       <ExcludedList items={ranking.excludedItems} />
-      <section className="cb-hero" aria-label="참고 순위 1위">
+      <section data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-rank" className="cb-hero" aria-label="참고 순위 1위">
         <div className="cb-hero-main">
           <span className="cb-rank-pill">1위</span>
           <div className="cb-muted">{top.insurer}</div>
@@ -674,18 +673,18 @@ function Result({
           <Stat k="한도 영향" v={top.capImpactPct == null ? '자료 없음' : `${rate(top.capImpactPct)}%`} />
           <Stat k="협회 등급" v={gradeLabel(top.associationGrade)} />
         </dl>
-        <button type="button" className="cb-btn primary" onClick={() => onEvidence(top)}>
+        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.top-evidence" type="button" className="cb-btn primary" onClick={() => onEvidence(top)}>
           근거 보기
         </button>
         {why && <div className="cb-hero-why">{why}</div>}
       </section>
       <div className="cb-table-wrap">
-        <table className="cb-table">
+        <table data-guide-feature="features.agent-home.chatbot.chatbot-modal.compare-table" className="cb-table">
           <caption className="visually-hidden">보험사별 비교 표</caption>
           <thead>
             <tr>
               <th scope="col">순위</th>
-              <th scope="col">보험사 · 상품</th>
+              <th scope="col">보험사/상품</th>
               <th scope="col" className="r">
                 보수적 순수령액
               </th>
@@ -722,15 +721,15 @@ function Result({
                   <td className="r">{won(item.cappedReceipt)}</td>
                   <td className="r neg">−{won(item.clawbackExposure)}</td>
                   <td className="c">
-                    <span className={`cb-badge ${badge.tone}`}>{badge.text}</span>
+                    <StatusBadge tone={badge.tone} tablePresentation="badge">{badge.text}</StatusBadge>
                   </td>
                   <td className="c">
-                    <span className={`cb-badge ${item.associationGrade ? 'grade' : 'none'}`}>
+                    <StatusBadge tone={gradeTone(item.associationGrade)} tablePresentation="badge">
                       {gradeLabel(item.associationGrade)}
-                    </span>
+                    </StatusBadge>
                   </td>
                   <td>
-                    <button
+                    <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.row-evidence"
                       type="button"
                       className="cb-btn small"
                       aria-label={`${item.insurer} ${item.product} 근거 보기`}
@@ -747,12 +746,11 @@ function Result({
       </div>
       <p className="cb-note">
         보수적 순수령액 = 한도 반영 수령 예상액 − 환수 노출액(해지 시나리오 가정). 협회 등급은 표시만 하며 순위에
-        반영하지 않아요. 기준 보험료는 내 계약의 평균 월 환산 보험료({won(ranking.basePremium ?? 0)})예요. 가상 데이터.
+        반영하지 않아요. 기준 보험료는 내 계약의 평균 월납환산 초회보험료({won(ranking.basePremium ?? 0)})예요.
       </p>
       <p className="cb-note" data-testid="assumption-note">
-        이 순위 기준(보수적 순수령액·동점 기준·1,200% 한도 공통 배수 근사)은 D-01에서 정한 가정(PROJECT_ASSUMPTION
-        {ranking.ruleVersion ? `, 규칙 ${ranking.ruleVersion}` : ''})이에요. 환수 노출액은 {ranking.clawbackMonth}개월차에 해지된다고
-        보고 환수 규칙의 환수율로 계산했어요.
+        이 순위 기준은 회사가 정한 계산 가정이에요. 환수 노출액은 {ranking.clawbackMonth}개월차에 해지된다고 보고 환수 규칙의
+        환수율로 계산했어요.
       </p>
     </>
   )
@@ -791,13 +789,13 @@ function Drawer({
       <div className="cb-drawer-head">
         <div>
           <div className="cb-drawer-title">
-            {item.insurer} · {item.product}
+            {item.insurer} {item.product}
           </div>
           <div className="cb-muted">
-            {item.rank}위 / {total}개 · 자료 기준 {ranking.asOf}
+            {item.rank}위 / {total}개, 자료 기준 {ranking.asOf}
           </div>
         </div>
-        <button ref={close} type="button" className="cb-close" aria-label="근거 닫기" onClick={onClose}>
+        <button data-guide-feature="features.agent-home.chatbot.chatbot-modal.evidence-close" ref={close} type="button" className="cb-close" aria-label="근거 닫기" onClick={onClose}>
           ×
         </button>
       </div>
@@ -825,18 +823,16 @@ function Drawer({
         <div className="cb-rows">
           <div>
             <span className="k">1,200% 한도</span>
-            <span className={`cb-badge ${badge.tone}`}>{badge.text}</span>
+            <StatusBadge tone={badge.tone}>{badge.text}</StatusBadge>
           </div>
           <div>
             <span className="k">협회 등급</span>
-            <span className={`cb-badge ${item.associationGrade ? 'grade' : 'none'}`}>
-              {gradeLabel(item.associationGrade)}
-            </span>
-            <small>{item.associationGrade ? '참고용 · 순위 미반영' : '순위에는 영향 없어요'}</small>
+            <StatusBadge tone={gradeTone(item.associationGrade)}>{gradeLabel(item.associationGrade)}</StatusBadge>
+            <small>{item.associationGrade ? '참고용, 순위 미반영' : '순위에는 영향 없어요'}</small>
           </div>
         </div>
         {[...groups.entries()].map(([label, lines]) => (
-          <section key={label} className="cb-calc">
+          <section data-guide-feature="features.agent-home.chatbot.chatbot-modal.calc-section" key={label} className="cb-calc">
             <h4>{label}</h4>
             {lines.map((line, index) => (
               <div key={index} className="cb-calc-line">
@@ -846,7 +842,7 @@ function Drawer({
             ))}
             <div className="cb-calc-src">
               {lines[0].source}
-              {lines[0].policyVersion ? ` · ${lines[0].policyVersion}` : ''} · 기준일 {lines[0].asOf}
+              {lines[0].policyVersion ? `, ${lines[0].policyVersion}` : ''}, 기준일 {lines[0].asOf}
             </div>
           </section>
         ))}

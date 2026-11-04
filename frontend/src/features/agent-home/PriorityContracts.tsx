@@ -19,7 +19,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
   const [open, setOpen] = useState<number | null>(null)
   const month = home.myCommission?.month ?? home.asOf?.slice(0, 7) ?? ''
   return (
-    <section className="ah-panel ah-priority" aria-label="확인할 계약">
+    <section data-guide-feature="features.agent-home.priority-contracts.section" className="ah-panel ah-priority" aria-label="확인할 계약">
       <div className="ah-panel-head">
         <div>
           <h2 className="ah-panel-title">확인할 계약</h2>
@@ -33,7 +33,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
           {items.map((item) => (
             <li key={item.contractId} className="ah-priority-item">
               <div className="ah-priority-main">
-                <Link to={`/contracts/${item.contractId}`}>{item.contractNo}</Link>
+                <Link data-guide-feature="features.agent-home.priority-contracts.contract-link" to={`/contracts/${item.contractId}`}>{item.contractNo}</Link>
                 <span className="ah-priority-meta">
                   {item.insurerName} · {item.productName} · {item.currentStatus}
                   {item.elapsedDays != null && ` · 마지막 사건 ${item.elapsedDays}일 경과`}
@@ -56,6 +56,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
                 </span>
               </div>
               <button
+                data-guide-feature="features.agent-home.priority-contracts.button"
                 type="button"
                 className="button button-secondary"
                 aria-expanded={open === item.contractId}
@@ -118,6 +119,7 @@ function CheckForm({ item, onDone }: { item: PriorityContract; onDone: () => voi
   const invalid = result === 'FOLLOW_UP' && !next
   return (
     <form
+      data-guide-feature="features.agent-home.priority-contracts.form"
       className="ah-check-form"
       aria-label={`${item.contractNo} 확인 기록`}
       onSubmit={(event) => {
@@ -127,28 +129,28 @@ function CheckForm({ item, onDone }: { item: PriorityContract; onDone: () => voi
     >
       <div role="group" aria-label="확인 결과" className="ah-check-result">
         <label>
-          <input type="radio" name={`r-${item.contractId}`} checked={result === 'CLOSED'} onChange={() => setResult('CLOSED')} /> 종결
+          <input data-guide-feature="features.agent-home.priority-contracts.input" type="radio" name={`r-${item.contractId}`} checked={result === 'CLOSED'} onChange={() => setResult('CLOSED')} /> 종결
         </label>
         <label>
-          <input type="radio" name={`r-${item.contractId}`} checked={result === 'FOLLOW_UP'} onChange={() => setResult('FOLLOW_UP')} /> 후속 확인 필요
+          <input data-guide-feature="features.agent-home.priority-contracts.input-2" type="radio" name={`r-${item.contractId}`} checked={result === 'FOLLOW_UP'} onChange={() => setResult('FOLLOW_UP')} /> 후속 확인 필요
         </label>
       </div>
       {result === 'FOLLOW_UP' && (
         <label className="ah-check-field">
           다음 확인일
-          <input type="date" value={next} onChange={(event) => setNext(event.target.value)} required />
+          <input data-guide-feature="features.agent-home.priority-contracts.input-3" type="date" value={next} onChange={(event) => setNext(event.target.value)} required />
         </label>
       )}
       <label className="ah-check-field">
         메모
-        <textarea value={memo} maxLength={1000} rows={2} onChange={(event) => setMemo(event.target.value)} />
+        <textarea data-guide-feature="features.agent-home.priority-contracts.textarea" value={memo} maxLength={1000} rows={2} onChange={(event) => setMemo(event.target.value)} />
       </label>
       {save.isError && (
         <p role="alert" className="ah-check-error">
           {conflictText(save.error) ?? errorText(save.error as Error, '확인 기록을 저장하지 못했습니다.')}
         </p>
       )}
-      <button type="submit" className="button" disabled={save.isPending || invalid}>
+      <button data-guide-feature="features.agent-home.priority-contracts.button-2" type="submit" className="button" disabled={save.isPending || invalid}>
         기록
       </button>
     </form>

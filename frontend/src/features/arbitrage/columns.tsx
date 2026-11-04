@@ -44,7 +44,7 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   {
     key: 'paid',
-    label: '확정 수수료',
+    label: '확정 수수료 순액',
     sortKey: 'paidCommissionAmount',
     sortable: true,
     width: '8rem',
@@ -53,7 +53,7 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   {
     key: 'planned',
-    label: '전체 지급예정액',
+    label: '지급예정액',
     sortKey: 'plannedCommissionAmount',
     sortable: true,
     width: '8.5rem',
@@ -62,7 +62,7 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   {
     key: 'refund',
-    label: '해약환급금',
+    label: '합산 해약환급금',
     sortKey: 'includedSurrenderValueAmount',
     sortable: true,
     width: '8rem',

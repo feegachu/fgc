@@ -3,7 +3,7 @@ import { QueryState } from '../reference/ReferenceUI'
 import { date, int } from '../../lib/format'
 import { arbitrageTimelineQuery } from './api'
 import type { ArbitrageRow } from './api'
-import { present } from './utils'
+import { decisionReasonText, present } from './utils'
 import { ArbitrageAmountSummary } from './ArbitrageAmountSummary'
 import { ArbitrageTimeline } from './ArbitrageTimeline'
 export function ArbitrageDetail({ row }: { row: ArbitrageRow }) {
@@ -33,11 +33,11 @@ export function ArbitrageDetail({ row }: { row: ArbitrageRow }) {
         </div>
         <div>
           <dt>판정 근거</dt>
-          <dd>{present(row.decisionReason)}</dd>
+          <dd>{decisionReasonText(row.decisionReason)}</dd>
         </div>
       </dl>
       <ArbitrageAmountSummary row={row} />
-      <section className="arb-timeline-panel" aria-label="기준일별 초과액 추이">
+      <section data-guide-feature="features.arbitrage.arbitrage-detail.section" className="arb-timeline-panel" aria-label="기준일별 초과액 추이">
         {timeline.isLoading || timeline.error ? (
           <div className="empty-state arb-timeline-state">
             <QueryState loading={timeline.isLoading} error={timeline.error} />

@@ -9,6 +9,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import type { RequestOptions } from '../../lib/api/client'
 import { useToastStore } from '../../stores/toasts'
 import ContractFormPage from './ContractFormPage'
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 import type { ContractDetail, ContractUpdateRequest } from './api'
 import {
   changesSchedule,
@@ -161,7 +162,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     )
     // 2차는 최초 연결 설계사를 고정하므로 담당 분리 관리를 전제로 한 안내를 하지 않는다(화면정의서 CONT-W03).
     expect(screen.getByRole('tooltip')).toHaveTextContent(
-      '2차 범위에서는 이 설계사를 고정하고 유지관리 담당 변경/승계는 지원하지 않습니다',
+      '등록 뒤에는 바꿀 수 없습니다. 유지관리 담당 변경과 승계는 이 시스템에서 처리하지 않습니다',
     )
     expect(screen.getByRole('tooltip')).not.toHaveTextContent('별도로 관리')
     await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
@@ -186,7 +187,9 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await waitFor(() => expect(save()).toBeEnabled())
     expect(field('계약번호')).toHaveValue(contract.contractNo)
     if (kind === 'duplicate') expect(field('계약번호')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getAllByText(new RegExp(message))).not.toHaveLength(0)
+    const shown = kind === 'duplicate' ? message : '연결이 끊겨 요청을 마치지 못했습니다.'
+    expect(screen.getAllByText(new RegExp(shown))).not.toHaveLength(0)
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument()
   })
 
   it.each(['/contracts/new', '/contracts/21/edit'])('등록·수정 취소는 목록으로 이동한다: %s', async (path) => {
@@ -896,4 +899,16 @@ describe('[FGC-FUN-018·030] 보험료 파생·입력 검증', () => {
     expect(preview.getByText('-')).toBeInTheDocument()
     expect(preview.queryByText('9,007,199,254,740,984')).not.toBeInTheDocument()
   })
+})
+
+
+it('points the edit tutorial at the actual read-only agent and premium card', async () => {
+  renderAt()
+  await ready()
+  const steps = findWorkflowGuide('contract.edit', '1.0')!.steps
+  const agent = document.querySelector(`[data-guide-feature="${steps[3].targetId}"]`)
+  expect(agent).toBe(field('모집 설계사'))
+  expect(agent).toHaveAttribute('readonly')
+  expect(steps[3].completionRuleId).toBe('USER_REVIEWED')
+  expect(document.querySelector(`[data-guide-feature="${steps[4].targetId}"]`)).toContainElement(screen.getByRole('heading', { name: '보험료, 납입 조건' }))
 })

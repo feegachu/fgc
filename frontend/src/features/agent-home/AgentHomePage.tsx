@@ -26,6 +26,9 @@ import type { InsurerKind, Period } from './model'
 import { PriorityContracts } from './PriorityContracts'
 import { ChatbotModal } from './chatbot/ChatbotModal'
 import './agent-home.css'
+import workflowGuides from '../assistant/workflow-guides.v1.json'
+import { useWorkflowGuide } from '../assistant/workflow-state'
+import { guideFeatureId } from '../assistant/feature-ids'
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: 6, label: '6개월' },
@@ -69,7 +72,7 @@ function Segmented<T extends string | number>({
     <div className="ah-seg" role="group" aria-label={label} ref={rail}>
       <span className="ah-seg-thumb" style={{ left: thumb.left, width: thumb.width }} />
       {options.map((option) => (
-        <button
+        <button data-guide-feature="features.agent-home.agent-home-page.button"
           key={String(option.value)}
           type="button"
           aria-pressed={value === option.value}
@@ -135,10 +138,25 @@ function AgentHomeContent({ month }: { month: string }) {
   return (
     <div className="ah">
       <h1 className="visually-hidden">포트폴리오</h1>
+      {import.meta.env.VITE_ASSISTANT_AI === 'true' && (
+        <details className="surface" style={{ padding: 12, marginBottom: 12 }}>
+          <summary data-guide-feature="agent.guide-menu.open" style={{ cursor: 'pointer' }}>업무 안내</summary>
+          <nav aria-label="본인 업무 안내" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+            {workflowGuides.filter((guide) => guide.enabled && guide.roles.includes('AGENT')).map((guide) => (
+              <button data-guide-feature={guideFeatureId('agent.guide-menu', guide.workflowId)} key={guide.workflowId} type="button" className="button button-secondary"
+                onClick={(event) => {
+                  const menu = event.currentTarget.closest('details')
+                  if (menu) menu.open = false
+                  useWorkflowGuide.getState().start(guide.workflowId)
+                }}>{guide.title}</button>
+            ))}
+          </nav>
+        </details>
+      )}
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error, '포트폴리오를 불러오지 못했습니다.')}</p>
-          <button
+          <button data-guide-feature="features.agent-home.agent-home-page.button-2"
             type="button"
             className="button button-secondary"
             onClick={() => void Promise.all([summary.refetch(), chart.refetch()])}
@@ -209,7 +227,7 @@ function Snapshot({
   const needFailed = near.isError || review.isError
   const need = (near.data ?? 0) + (review.data ?? 0)
   return (
-    <section className="ah-snapshot" aria-label="이번 달 판매 현황">
+    <section data-guide-feature="features.agent-home.agent-home-page.section" className="ah-snapshot" aria-label="이번 달 판매 현황">
       <article className="ah-hero" aria-label="설계사 프로필">
         <span className="ah-avatar" aria-hidden="true">
           {name.slice(0, 1) || '설'}
@@ -242,16 +260,21 @@ function Snapshot({
             }
           />
         </article>
-        <article className="ah-kpi kpi-card kpi-card-info" aria-label="월 환산 초회보험료">
+        <article className="ah-kpi kpi-card kpi-card-info" aria-label="월납환산 초회보험료">
           <KpiCardContent
-            label="월 환산 초회보험료"
+            label="월납환산 초회보험료"
             value={int(now.premium)}
             zero={now.premium === 0}
             unit="원"
             footer={<Delta now={now.premium} before={before.premium} />}
           />
         </article>
-        <Link className="ah-kpi ah-kpi-link kpi-card kpi-card-info" to="/transactions" aria-label="수령 예정 수수료">
+        <Link
+          data-guide-feature="features.agent-home.agent-home-page.commission-link"
+          className="ah-kpi ah-kpi-link kpi-card kpi-card-info"
+          to="/transactions"
+          aria-label="수령 예정 수수료"
+        >
           <KpiCardContent
             label="수령 예정 수수료"
             value={int(expected)}
@@ -269,6 +292,7 @@ function Snapshot({
               value="확인 불가"
               footer={
                 <button
+                  data-guide-feature="features.agent-home.agent-home-page.button-3"
                   type="button"
                   className="ah-retry"
                   onClick={() => void Promise.all([near.refetch?.(), review.refetch?.()])}
@@ -280,6 +304,7 @@ function Snapshot({
           </article>
         ) : (
           <Link
+            data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
             className="ah-kpi ah-kpi-link ah-kpi-alert kpi-card kpi-card-warning"
             to={needContractsHref(month, asOf)}
             aria-label="확인 필요 계약"
@@ -339,7 +364,7 @@ function Charts({
   const warnings = focusState === 'ready' ? (shown.basis?.warnings ?? []) : []
   const range = shown.range
   return (
-    <section className="ah-panel" aria-label="설계사 판매 관리 그래프">
+    <section data-guide-feature="features.agent-home.agent-home-page.section-2" className="ah-panel" aria-label="설계사 판매 관리 그래프">
       <div className="ah-panel-head">
         <div>
           <h2 className="ah-panel-title">설계사 판매 관리</h2>
@@ -356,7 +381,12 @@ function Charts({
           <div className="ah-chip">
             <span className="ah-chip-dot" />
             {selected.name} 필터 적용 중
-            <button type="button" aria-label="보험사 필터 해제" onClick={() => onInsurer(selected.insurerId)}>
+            <button
+              data-guide-feature="features.agent-home.agent-home-page.button-5"
+              type="button"
+              aria-label="보험사 필터 해제"
+              onClick={() => onInsurer(selected.insurerId)}
+            >
               ✕
             </button>
           </div>
@@ -371,7 +401,12 @@ function Charts({
       {focusState === 'error' ? (
         <div role="alert" className="empty-state">
           <p>선택한 보험사의 집계를 불러오지 못했습니다.</p>
-          <button type="button" className="button button-secondary" onClick={onRetryFocus}>
+          <button
+            data-guide-feature="features.agent-home.agent-home-page.button-4"
+            type="button"
+            className="button button-secondary"
+            onClick={onRetryFocus}
+          >
             다시 시도
           </button>
         </div>
@@ -401,7 +436,7 @@ function Charts({
         </div>
         <div className="ah-box ah-trend-box">
           <h3>
-            월별 신규 계약 추이 <span className="ah-sub">막대 건수, 선 월환산 보험료(오른쪽 축)</span>
+            월별 신규 계약 추이 <span className="ah-sub">막대 건수, 선 월납환산 초회보험료(오른쪽 축)</span>
           </h3>
           <Trend points={trendSeries(focusHome)} />
         </div>
@@ -433,7 +468,7 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
   }, [open])
   return (
     <>
-      <button
+      <button data-guide-feature="features.agent-home.agent-home-page.fgc-ai"
         ref={launcher}
         type="button"
         className="button button-primary ah-ai-button"

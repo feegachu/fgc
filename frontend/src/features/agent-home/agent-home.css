@@ -4,10 +4,7 @@
   --brand-100: var(--color-blue-100);
   --brand-600: var(--color-action-primary);
   --ok: var(--color-status-success-text);
-  --warn: var(--color-status-warning-text);
-  --warn-bg: var(--color-status-warning-bg);
   --bad: var(--color-status-error-text);
-  --bad-bg: var(--color-status-error-bg);
   --border: var(--color-border-default);
   --ink: var(--color-text-primary);
   --body: var(--color-text-secondary);
@@ -89,15 +86,12 @@
   & .ah-delta.up { color: var(--ok); }
   & .ah-delta.down { color: var(--bad); }
   & .ah-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-  & .ah-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 6px; font-size: 12px; font-weight: 500; white-space: nowrap; }
-  & .ah-badge.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--color-status-warning-border); }
-  & .ah-badge.danger { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--color-status-error-border); }
   & .ah-retry { font-size: 0.75rem; color: var(--color-text-link); text-decoration: underline; }
 
   /* 설계사 판매 관리 */
-  & .ah-panel { padding: var(--space-5) var(--space-6); background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-12); }
+  & .ah-panel { padding: var(--space-5) var(--space-6); background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-8); }
   & .ah-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-  & .ah-panel-title { font-size: 1rem; font-weight: 700; }
+  & .ah-panel-title { font-size: 0.875rem; font-weight: 700; }
   & .ah-panel-sub { margin-top: 2px; font-size: 0.8125rem; color: var(--muted); }
   & .ah-controls { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   & .ah-seg { position: relative; display: inline-flex; padding: 2px; background: var(--color-bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-8); }
@@ -110,10 +104,10 @@
   & .ah-chip button { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--brand-100); color: var(--brand-600); font-size: 0.75rem; }
   & .ah-note { margin-left: auto; font-size: 0.8125rem; color: var(--muted); }
   & .ah-chart-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-2); }
-  & .ah-box { grid-column: span 6; min-width: 0; padding: var(--space-3) var(--space-4) var(--space-2); background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-12); }
+  & .ah-box { grid-column: span 6; min-width: 0; padding: var(--space-3) var(--space-4) var(--space-2); background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-8); }
   & .ah-donut-box, & .ah-product-box { grid-column: span 5; }
   & .ah-trend-box, & .ah-status-box { grid-column: span 7; }
-  & .ah-box h3 { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.875rem; font-weight: 700; color: var(--ink); }
+  & .ah-box h3 { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: 0.8125rem; font-weight: 700; line-height: 1.25rem; color: var(--ink); }
   & .ah-sub { font-size: 0.75rem; font-weight: 400; color: var(--muted); }
   & .ah-chart { position: relative; }
   & .ah-tip { position: absolute; z-index: 5; pointer-events: none; padding: 8px 10px; background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-8); box-shadow: var(--shadow-md); font-size: 0.75rem; white-space: nowrap; }

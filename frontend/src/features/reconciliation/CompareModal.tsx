@@ -7,7 +7,7 @@ import { date, int, month as formatMonth, rate } from '../../lib/format'
 import { withMonth } from '../../stores/workspace'
 import { detailQuery } from './api'
 import type { Detail, Match } from './api'
-import { Disclosure, Failure, Money, ResultBadge } from './display'
+import { Failure, Money, ResultBadge } from './display'
 import { EMPTY, PAYMENT_STAGE, text } from './labels'
 
 export function CompareModal({
@@ -27,7 +27,7 @@ export function CompareModal({
       className="modal-large reco-react-modal"
       onClose={onClose}
       footer={
-        <Button variant="secondary" onClick={onClose}>
+        <Button data-guide-feature="features.reconciliation.compare-modal.button" variant="secondary" onClick={onClose}>
           닫기
         </Button>
       }
@@ -58,10 +58,9 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
   return (
     <>
       <p>
-        대사 결과 #{detail.reconciliationResultId},{' '}
-        {PAYMENT_STAGE[stage as keyof typeof PAYMENT_STAGE] || stage || '지급단계 미확인'}
+        대사 결과, {PAYMENT_STAGE[stage as keyof typeof PAYMENT_STAGE] || stage || '지급단계 미확인'}
       </p>
-      <p>예상 스케줄과 실제 지급 건을 필드별로 비교합니다.</p>
+      <p>예상 스케줄과 실제 지급 건을 항목별로 비교합니다.</p>
       <ResultBadge type={detail.resultType} label={detail.resultTypeLabel} />
       <dl className="reco-react-compare-summary">
         <div>
@@ -72,7 +71,7 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
           </dd>
         </div>
         <div>
-          <dt>결과 ID</dt>
+          <dt>대사 결과 번호</dt>
           <dd>{detail.reconciliationResultId}</dd>
         </div>
         <div>
@@ -87,16 +86,15 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         </div>
         <div>
           <dt>매칭키</dt>
-          <dd>
-            <Disclosure value={detail.matchGroupKey} />
-          </dd>
+          {/* 내부 키 원문은 숨기고 맞춰 보는 기준만 보인다(RECO-W01 매칭키). */}
+          <dd>계약번호, 지급단계, 설계사, 수수료 항목, 회차</dd>
         </div>
       </dl>
       <div className="reco-react-compare-grid">
         <SourceSide title="예상" matches={expected} detail={detail} expected />
         <SourceSide title="실제" matches={actual} detail={detail} expected={false} />
       </div>
-      <section className="surface reco-react-note" aria-label="차액 및 분류">
+      <section data-guide-feature="features.reconciliation.compare-modal.section" className="surface reco-react-note" aria-label="차액 및 분류">
         <p>
           예상 금액 <Money value={detail.expectedTotalAmount} />, 실제 금액 <Money value={detail.actualTotalAmount} />
         </p>
@@ -106,24 +104,23 @@ function CompareContent({ detail, month }: { detail: Detail; month: string | nul
         <p>주 원인 {detail.primaryReason?.label || text(detail.primaryReasonCode)}</p>
         <p>보조 원인 {detail.secondaryReasons?.map((reason) => reason.label || reason.code).join(', ') || EMPTY}</p>
         <p>
-          차액 = 실제 <Money value={detail.actualTotalAmount} /> − 예상 <Money value={detail.expectedTotalAmount} /> ={' '}
-          <Money value={detail.differenceAmount} difference />
+          차액 <Money value={detail.differenceAmount} difference /> (실제에서 예상을 뺀 금액)
         </p>
         <p>허용오차 0원, 시스템 계산 결과</p>
       </section>
       <nav className="reco-react-links" aria-label="관련 화면">
         {scheduleId != null && (
-          <Link className="button button-secondary" to={href(`/schedules/${scheduleId}`)}>
+          <Link data-guide-feature="features.reconciliation.compare-modal.link" className="button button-secondary" to={href(`/schedules/${scheduleId}`)}>
             스케줄 상세
           </Link>
         )}
-        <Link className="button button-secondary" to={href('/transactions')}>
+        <Link data-guide-feature="features.reconciliation.compare-modal.link-2" className="button button-secondary" to={href('/transactions')}>
           지급 건 목록
         </Link>
-        <Link className="button button-secondary" to={href('/journals')}>
+        <Link data-guide-feature="features.reconciliation.compare-modal.link-3" className="button button-secondary" to={href('/journals')}>
           관련 분개
         </Link>
-        <Link className="button button-secondary" to={href('/exceptions')}>
+        <Link data-guide-feature="features.reconciliation.compare-modal.link-4" className="button button-secondary" to={href('/exceptions')}>
           예외 건
         </Link>
       </nav>
@@ -144,7 +141,7 @@ function SourceSide({
   const agent = expected ? detail.expectedAgent : detail.actualAgent
   const agentLabel = agent?.agentName ? nameWithCode(agent.agentName, agent.agentCode) : '없음'
   return (
-    <section className="surface">
+    <section data-guide-feature="features.reconciliation.compare-modal.section-2" className="surface">
       <header className="surface-header">
         <h3 className="surface-title">{title}</h3>
         <span>{matches.length}개 원천</span>
@@ -157,7 +154,7 @@ function SourceSide({
             <h4>
               {title} 원천 {index + 1},{' '}
               {expected
-                ? `schedule_line #${match.scheduleLineId ?? EMPTY}`
+                ? `스케줄행 번호 ${match.scheduleLineId ?? EMPTY}`
                 : `수수료 지급 번호 ${match.commissionTransactionId ?? EMPTY}`}
             </h4>
             <dl>
@@ -189,12 +186,8 @@ function SourceSide({
               ) : (
                 <>
                   <div>
-                    <dt>귀속 ID</dt>
-                    <dd>
-                      {match.transactionAttributionId == null
-                        ? EMPTY
-                        : `attribution #${match.transactionAttributionId}`}
-                    </dd>
+                    <dt>귀속 번호</dt>
+                    <dd>{match.transactionAttributionId ?? EMPTY}</dd>
                   </div>
                   <div>
                     <dt>지급일</dt>

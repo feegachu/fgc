@@ -1,3 +1,4 @@
+import { findWorkflowGuide } from '../assistant/workflow-catalog'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -227,6 +228,26 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await screen.findByRole('button', { name: 'JRN-001' })
     expect(calls.some((call) => call.url.startsWith('/api/v1/journals?') && call.url.includes('sort='))).toBe(false)
   })
+  it('원천은 예외함 참조와 같이 원천 이름과 번호로 보인다', async () => {
+    renderAt('/journals?searched=true', (url) =>
+      url.startsWith('/api/v1/journals?')
+        ? {
+            ...page,
+            content: [
+              {
+                ...original,
+                sourceEntityType: 'COMMISSION_TRANSACTION',
+                sourceEntityTypeLabel: '지급 건',
+                sourceEntityId: '4104',
+              },
+            ],
+          }
+        : undefined,
+    )
+    const table = await screen.findByRole('table', { name: '조회 조건에 해당하는 검증원장 분개 목록' })
+    expect((await within(table).findAllByText('지급 건 4104')).length).toBeGreaterThan(0)
+    expect(within(table).queryByText(/#4104/)).not.toBeInTheDocument()
+  })
   it('selected 딥링크는 기준 월 목록과 함께 상세와 검증 실행별 불균형을 조회한다', async () => {
     renderAt('/journals?selected=11', (url) =>
       url.startsWith('/api/v1/journals/imbalances') ? { totalCount: 2, content: [] } : undefined,
@@ -294,7 +315,7 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     renderAt('/journals?selected=11', (url) =>
       url === '/api/v1/journals/11' ? { ...original, journalType: 'REVERSAL' } : undefined,
     )
-    expect(await screen.findByText('POSTED 상태이고 아직 역분개되지 않은 원분개만 처리할 수 있습니다.')).toBeVisible()
+    expect(await screen.findByText('기표됨 상태이고 역분개하지 않은 분개만 처리할 수 있습니다.')).toBeVisible()
     expect(screen.queryByRole('button', { name: '역분개' })).not.toBeInTheDocument()
   })
   it('500 오류는 서버 상세 대신 requestId만 표시한다', async () => {
@@ -314,9 +335,9 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     expect(screen.getByLabelText('분개일 (시작)')).toHaveValue('')
     expect(screen.getByLabelText('분개일 (끝)')).toHaveValue('')
   })
-  it('불균형 필터 미지원 안내를 표시하고 초기화하면 기준 월 기본 조건으로 돌아간다', async () => {
-    const { router, user } = renderAt('/journals?searched=true&imbalanceOnly=true&from=2026-06-01&to=2026-06-30')
-    expect(await screen.findByText(/불균형만 조회하는 목록 필터는 지원하지/)).toBeVisible()
+  it('초기화하면 기준 월 기본 조건으로 돌아간다', async () => {
+    const { router, user } = renderAt('/journals?searched=true&from=2026-06-01&to=2026-06-30')
+    await screen.findByRole('button', { name: 'JRN-001' })
     await user.click(screen.getByRole('button', { name: '초기화' }))
     await waitFor(() => {
       const last = calls.filter((call) => call.url.startsWith('/api/v1/journals?')).at(-1)!
@@ -356,4 +377,16 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     ])
       expect(correctionTarget(url)).toBeNull()
   })
+})
+
+
+it('targets the unique start date field in the ledger tutorial', async () => {
+  renderAt()
+  await screen.findByRole('button', { name: 'JRN-001' })
+  const target = findWorkflowGuide('ledger.review', '1.0')!.steps[0].targetId
+  const matches = document.querySelectorAll(`[data-guide-feature="${target}"]`)
+  expect(matches).toHaveLength(1)
+  expect(matches[0]).toBe(screen.getByLabelText('분개일 (시작)'))
+  const ids = [...document.querySelectorAll('[data-guide-feature^="ledger.filter."]')].map((el) => el.getAttribute('data-guide-feature'))
+  expect(new Set(ids).size).toBe(ids.length)
 })
