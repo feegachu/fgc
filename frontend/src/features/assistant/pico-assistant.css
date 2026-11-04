@@ -576,15 +576,15 @@
     bottom: 78px;
   }
   .app-shell:has(.pico-assistant-root) .page-content {
-    padding-bottom: calc(var(--space-8) + 160px);
+    padding-bottom: calc(var(--space-8) + 184px);
   }
   .pico-launcher .pico-launcher-button img {
     width: 100px;
     height: 100px;
   }
   .pico-launcher .pico-launcher-hint {
-    right: 108px;
-    bottom: 34px;
+    right: 0;
+    bottom: -24px;
     font-size: 11px;
   }
   .pico-panel-header {
