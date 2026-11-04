@@ -272,7 +272,7 @@ function Snapshot({
         <Link
           data-guide-feature="features.agent-home.agent-home-page.commission-link"
           className="ah-kpi ah-kpi-link kpi-card kpi-card-info"
-          to={`/agent/statements?month=${commission?.month ?? month}`}
+          to="/transactions"
           aria-label="수령 예정 수수료"
         >
           <KpiCardContent
