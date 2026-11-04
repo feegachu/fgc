@@ -68,7 +68,7 @@
 | 실패 JSON 저장 방지 | PDF Accept·MIME·`%PDF-` 헤더 검사, 실패 시 object URL/다운로드 생성 없음 | 공통 클라이언트 + UI + 브라우저 검증 |
 | 늦은 응답·조회 중 잠금 | 다른 후보에 이전 발행 성공 결과 노출 없음, 상세 갱신 중 발행/다운로드 잠금 | 컴포넌트 검증 |
 | 입력·페이지 | PDF 409 재조회 후 검색 초안 보존, 발행 이력 페이지 독립 조회 | 브라우저 + 컴포넌트 검증 |
-| 실제 금액·합계·판·원천·해시·환수 상태 불변 | PostgreSQL 통합 49개 + 실제 서버 브라우저 2개, PDF 바이트 SHA256·DB snapshot·case 전후 대조 | **통과** |
+| 실제 금액·합계·판·원천·해시·환수 상태 불변 | PostgreSQL 통합 49개 + 실제 서버 브라우저(초기 기준 2개), PDF 바이트 SHA256·DB snapshot·case 전후 대조 | **통과** |
 | 직접 URL/ID 서버 범위·AGENT 403 | 실제 API의 AGENT 이력/발행/다운로드/후보 상세 모두 403, COMPLIANCE 발행 403·다운로드 200·없는 판 404 | **통과** |
 
 ## 실행 명령
@@ -110,7 +110,7 @@ npx playwright test --workers=2
 | ClawbackCalculationIntegrationTest | 12 | 모두 0 |
 | ClawbackNoticeDocumentIntegrationTest (CT-W02) | 16 | 모두 0 |
 
-실제 브라우저 검증은 `frontend/e2e-demo/clawback-documents.spec.ts`에서 추가했고 **2개 모두 통과**했다(2.8분). Java 21·Node 22.22.2, 실제 Spring Boot 서버(18081)·Vite(15173)·별도 PostgreSQL 17(`fgc-e2e-727`, 55427, `com.fgc.e2e=418`)을 사용했다. 원천 데이터만 해당 일회성 DB에 준비하고 계산·발행·이력·다운로드는 모두 실제 API로 요청했다. 응답 fixture를 사용하지 않았으며, 응답 유실 시험은 실제 발행 커밋 후 브라우저 응답만 끊었다.
+초기 실제 브라우저 검증은 `frontend/e2e-demo/clawback-documents.spec.ts`에서 추가했고 **2개 모두 통과**했다(2.8분). Java 21·Node 22.22.2, 실제 Spring Boot 서버(18081)·Vite(15173)·별도 PostgreSQL 17(`fgc-e2e-727`, 55427, `com.fgc.e2e=418`)을 사용했다. 원천 데이터만 해당 일회성 DB에 준비하고 계산·발행·이력·다운로드는 모두 실제 API로 요청했다. 응답 fixture를 사용하지 않았으며, 응답 유실 시험은 실제 발행 커밋 후 브라우저 응답만 끊었다.
 
 ```powershell
 $env:FGC_E2E_DB_CONTAINER='fgc-e2e-727'
@@ -137,7 +137,7 @@ $env:FGC_NODE_BIN=(Get-Command node).Source # Node 22
 
 ## ResizeObserver 수정
 
-`useSpotlight.ts`가 `ResizeObserver`를 무조건 생성해 jsdom·미지원 환경에서 가이드 마운트가 실패했다. API가 있으면 기존 관측을 유지하고, 없으면 최초 측정·창 크기·스크롤 이벤트로 계속 갱신하도록 수정했다. 이벤트 리스너와 animation frame 정리는 두 환경에서 동일하게 수행한다. 미지원 상태의 최초 측정·창 크기/스크롤 갱신·대상 제거·언마운트 정리와 기존 지원 환경의 카드 위치 고정을 검증했다. 가이드·검증 화면 관련 시험 **22개 통과**.
+`useSpotlight.ts`가 `ResizeObserver`를 무조건 생성해 jsdom·미지원 환경에서 가이드 마운트가 실패했다. API가 있으면 기존 관측을 유지하고, 없으면 최초 측정·창 크기·스크롤 이벤트로 계속 갱신하도록 수정했다. 이벤트 리스너와 animation frame 정리는 두 환경에서 동일하게 수행한다. 미지원 상태의 최초 측정·창 크기/스크롤 갱신·대상 제거·언마운트 정리와 기존 지원 환경의 카드 위치 고정을 검증했다. 가이드·검증 화면 관련 초기 시험 **22개 통과**. PR 리뷰 반영 후에는 관측 API가 없을 때도 대상 위치와 크기를 100ms 간격으로 확인한다. 창 크기 변경이나 스크롤 없이 패널 크기가 바뀌어도 강조 영역과 안내 카드 위치를 갱신하고, 안내가 닫히면 주기 확인을 종료한다.
 
 전체 시험에서 추가로 드러난 피코 시연 시험 실패는 개인 `.env.local`의 `VITE_ASSISTANT_AI=true`가 시험에 유입된 것이 원인이었다. `vite.config.ts`의 `test.env`에서 AI/시연 opt-in의 기본값만 false로 고정해 시험을 개발자 설정과 분리했다. 개별 실제 AI 모드 시험의 `vi.stubEnv`는 유지되며 제품의 개발·배포 설정은 변경하지 않았다. 해당 피코·안내 시작 시험 **22개 통과**.
 
@@ -156,7 +156,7 @@ $env:FGC_NODE_BIN=(Get-Command node).Source # Node 22
 | 전체 브라우저 회귀 (초기 기준) | **101개 통과** (`--workers=2`, 4.3분), 새 #727 시험 4개 포함 |
 | Java 소스·테스트 소스 컴파일 | 통과 |
 | 실제 PostgreSQL 통합 시험 | **49개 통과**, 실패·오류·건너뜀 0 |
-| 실제 서버 브라우저 시험 | **2개 통과**, API·DB snapshot·PDF 해시·권한·상태 불변 대조 |
+| 실제 서버 브라우저 시험 (초기 기준) | **2개 통과**, API·DB snapshot·PDF 해시·권한·상태 불변 대조 |
 | ResizeObserver·검증 화면 회귀 | **22개 통과** |
 
 최초 전체 Vitest 실행의 시간 초과와 `ResizeObserver is not defined`는 후속 검증에서 원인을 구분했다. Node 22 환경에서 가이드의 API 부재 처리와 시험 모드 격리를 수정한 뒤 전체 커버리지 검사가 통과했다. 테스트 본문의 제한 시간·업무 기대값은 변경하지 않았다.

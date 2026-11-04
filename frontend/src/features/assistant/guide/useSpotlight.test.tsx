@@ -74,7 +74,7 @@ it('attaches below the real target and keeps the opposite inset clear on repeate
   } finally { target.remove() }
 })
 
-it('measures and follows resize/scroll without ResizeObserver, then removes its listeners', () => {
+it('follows viewport events and panel layout without ResizeObserver, then cleans up', () => {
   vi.useFakeTimers()
   vi.stubGlobal('ResizeObserver', undefined)
   vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
@@ -98,11 +98,18 @@ it('measures and follows resize/scroll without ResizeObserver, then removes its 
     fireEvent.scroll(window)
     act(() => { vi.advanceTimersByTime(80) })
     expect(JSON.parse(card.dataset.box!).left).toBe(292)
+    rect.mockReturnValue(new DOMRect(300, 140, 240, 120))
+    act(() => { vi.advanceTimersByTime(120) })
+    expect(JSON.parse(card.dataset.box!)).toEqual({ left: 292, top: 132, width: 256, height: 136 })
+    expect(card).toHaveStyle({ top: '284px' })
     target.remove()
-    fireEvent.scroll(window)
-    act(() => { vi.advanceTimersByTime(80) })
+    act(() => { vi.advanceTimersByTime(120) })
     expect(card).toHaveAttribute('data-box', 'null')
+    document.body.append(target)
     unmount()
+    rect.mockClear()
+    act(() => { vi.advanceTimersByTime(200) })
+    expect(rect).not.toHaveBeenCalled()
     expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function), true)
     expect(remove).toHaveBeenCalledWith('resize', expect.any(Function))
     expect(cancel).toHaveBeenCalled()

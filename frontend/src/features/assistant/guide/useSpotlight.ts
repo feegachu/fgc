@@ -10,6 +10,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     let frame = 0
     let placementFrame = 0
     let preparedWidth: number | null = null
+    let measuredTarget: DOMRect | null = null
     const alignTarget = () => {
       if (!target?.isConnected) return
       target.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
@@ -57,6 +58,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           })
         }
         const rect = target?.isConnected ? target.getBoundingClientRect() : null
+        measuredTarget = rect
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
         const box = rect ? {
           left: Math.max(workspaceLeft, rect.left - 8),
@@ -74,7 +76,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         })
       })
     }
-    // 관측 API가 없는 환경에서는 창 크기·스크롤 이벤트와 최초 측정으로 갱신한다.
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
       // A result panel can move the target without resizing the target itself.
       // Re-align on layout changes, while ordinary user scroll only updates the attachment.
@@ -85,6 +86,14 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     if (card.current) resize?.observe(card.current)
     const workspace = document.getElementById('main-content')
     if (workspace) resize?.observe(workspace)
+    // A split pane can move or resize the target without a viewport event.
+    const layoutPoll = !resize && target ? window.setInterval(() => {
+      const rect = target.isConnected ? target.getBoundingClientRect() : null
+      if (rect?.left !== measuredTarget?.left || rect?.top !== measuredTarget?.top
+        || rect?.width !== measuredTarget?.width || rect?.height !== measuredTarget?.height) {
+        measure()
+      }
+    }, 100) : undefined
     window.addEventListener('scroll', measure, true)
     window.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('resize', measure)
@@ -93,6 +102,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       cancelAnimationFrame(frame)
       cancelAnimationFrame(placementFrame)
       resize?.disconnect()
+      window.clearInterval(layoutPoll)
       window.removeEventListener('scroll', measure, true)
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
