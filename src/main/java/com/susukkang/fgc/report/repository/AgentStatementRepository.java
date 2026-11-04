@@ -63,7 +63,7 @@ public class AgentStatementRepository {
                      jsonb_build_object('commissionTransactionId', ct.commission_transaction_id,
                                         'sourceType', ct.source_type, 'attributionMethod', ta.attribution_method,
                                         'settlementMonth', ct.settlement_month, 'paidOn', ct.paid_on,
-                                        'scheduleLineId', ta.schedule_line_id,
+                                        'scheduleLineId', sl.schedule_line_id,
                                         'scheduleHeaderId', sl.schedule_header_id,
                                         'paymentConditionCode', sl.payment_condition_code,
                                         'basisCode', sl.basis_code, 'basisAmount', sl.basis_amount,
@@ -71,7 +71,11 @@ public class AgentStatementRepository {
                                         'ratePct', sl.rate_pct, 'fixedAmount', sl.fixed_amount) AS detail
                 FROM fgc.commission_transaction ct
                 JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
+                -- 스케줄 근거는 같은 계약의 회차이고 수혜자가 본인일 때만 붙인다(잘못 연결된 자료로 남의 계산 근거가 나가지 않게).
                 LEFT JOIN fgc.schedule_line sl ON sl.schedule_line_id = ta.schedule_line_id
+                     AND sl.beneficiary_agent_id = ta.agent_id
+                     AND EXISTS (SELECT 1 FROM fgc.schedule_header sh WHERE sh.schedule_header_id = sl.schedule_header_id
+                                  AND sh.contract_id = ta.contract_id)
                WHERE ct.recipient_agent_id = :agentId AND ta.agent_id = :agentId AND ct.payment_stage = 'GA_TO_FC'
                  AND ct.status = 'CONFIRMED' AND ct.cashflow_type = 'PAYMENT'
                  AND ct.source_type NOT IN ('ADJUSTMENT', 'CLAWBACK', 'RECOVERY')

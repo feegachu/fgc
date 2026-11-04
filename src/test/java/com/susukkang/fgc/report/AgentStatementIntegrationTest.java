@@ -247,6 +247,16 @@ class AgentStatementIntegrationTest {
         assertThat(plainEvidence.path("basisCode").asText()).isEqualTo("FIRST_YEAR_PREMIUM");
         assertThat(plainEvidence.path("calculationType").asText()).isEqualTo("RATE");
         assertThat(plainEvidence.path("ratePct").decimalValue()).isEqualByComparingTo("10");
+
+        // 회차의 수혜자가 본인이 아니면(잘못 연결된 자료) 다른 설계사의 계산 근거를 응답에 싣지 않는다.
+        jdbc.update("UPDATE fgc.schedule_line SET beneficiary_agent_id = NULL WHERE schedule_line_id = ?", scheduled);
+        for (JsonNode entry : data(mine("month=" + MONTH + "&entryType=PAYMENT&size=100")).path("items").path("content")) {
+            JsonNode evidence = data(mine("/" + entry.path("entryKey").asText())).path("evidence");
+            if (evidence.path("commissionTransactionId").asLong() == plain) {
+                assertThat(evidence.path("scheduleLineId").isMissingNode() || evidence.path("scheduleLineId").isNull()).isTrue();
+                assertThat(evidence.path("basisCode").isMissingNode() || evidence.path("basisCode").isNull()).isTrue();
+            }
+        }
     }
 
     @Test
