@@ -1,6 +1,7 @@
 package com.susukkang.fgc.arbitrage.service;
 
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
+import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseDetectionCommandsImpl;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
@@ -28,6 +29,7 @@ class ArbitrageTransactionBoundaryIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
     @MockitoSpyBean ExceptionCaseDetectionCommandsImpl exceptionRepository;
+    @MockitoSpyBean AuditLogService auditLogService;
 
     @Test
     void rollsBackPartialDetectionRetriesWithoutDuplicatesAndCommitsOtherContractIndependently() {
@@ -80,6 +82,34 @@ class ArbitrageTransactionBoundaryIntegrationTest {
         assertThat(count("exception_occurrence", result.getValidationRunId())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.audit_log WHERE action_code = 'ARBITRAGE_RECHECKED' AND entity_id = ?", Long.class,
                 result.getArbitrageCheckId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void unknownContractIsRejectedWithoutCreatingARun() {
+        Long userId = jdbc.queryForObject("SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1", Long.class);
+        long before = jdbc.queryForObject("SELECT COUNT(*) FROM fgc.validation_run", Long.class);
+        assertThatThrownBy(() -> service.reArbitrageCheck(999_999_999L, new ReArbitrageCheckRequest(LocalDate.of(1900, 1, 1), "없는 계약"), userId))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.COMMON_004));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.validation_run", Long.class)).isEqualTo(before);
+    }
+
+    /** 활성 수동 실행은 전역 1건이다(V13). 실패가 실행을 남기면 다른 계약의 수동 검증과 다음 날 일 배치까지 막힌다. */
+    @Test
+    void failedManualCheckRemovesItsRunSoTheNextCheckIsNotBlocked() {
+        Reference reference = jdbc.queryForObject("SELECT contract_id, contract_date FROM fgc.insurance_contract ORDER BY contract_id LIMIT 1",
+                (rs, i) -> new Reference(rs.getLong(1), LocalDate.of(1900, 1, 1)));
+        Long userId = jdbc.queryForObject("SELECT user_id FROM fgc.app_user ORDER BY user_id LIMIT 1", Long.class);
+        long before = jdbc.queryForObject("SELECT COUNT(*) FROM fgc.validation_run", Long.class);
+        var request = new ReArbitrageCheckRequest(reference.date(), "실패 뒤 다시 검증");
+        doThrow(new FgcBusinessException(FgcErrorCode.COMMON_500, Map.of())).when(auditLogService).record(any());
+        try {
+            assertThatThrownBy(() -> service.reArbitrageCheck(reference.id(), request, userId)).isInstanceOf(FgcBusinessException.class);
+        } finally {
+            reset(auditLogService);
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.validation_run", Long.class)).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.validation_run WHERE run_type = 'MANUAL_CONTRACT' AND status IN ('CREATED', 'RUNNING')", Long.class)).isZero();
+        assertThat(service.reArbitrageCheck(reference.id(), request, userId).getResultStatus()).isNotNull();
     }
 
     private long count(String table, Long runId) {
