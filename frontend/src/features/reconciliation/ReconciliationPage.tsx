@@ -569,6 +569,13 @@ function RunFilters({
   const insurers = useInsurerOptions()
   const insurer = insurers.data?.find((row) => String(row.insurerId) === fields.insurer)
   const inputValid = Boolean(canProcess && fields.month && fields.stage && fields.insurer && insurer && insurer.activeYn !== false)
+  const missing = [!fields.month && '정산월', !fields.stage && '지급단계', !fields.insurer && '보험회사'].filter(Boolean).join(', ')
+  // 꺼진 버튼은 포커스가 가지 않으므로 이유를 글자로 둔다. 권한이 없는 역할의 안내는 부모가 보인다.
+  const runHint = !canProcess
+    ? ''
+    : insurer?.activeYn === false
+      ? '사용하지 않는 보험회사는 대사를 실행할 수 없습니다.'
+      : missing && `${missing} 선택 후 실행할 수 있습니다.`
   const matches = fields.month === criteria.month && fields.stage === criteria.stage && fields.insurer === criteria.insurer
   useRunGuide(guide, JSON.stringify(fields), inputValid, matches ? observedId : '', matches ? ((observedStatus === 'COMPLETED' || observedStatus === 'FINALIZED') && !resultReady ? 'RUNNING' : observedStatus) : undefined, queryError)
   const tabCount = useWorkspaceStore((state) => state.tabs.length)
@@ -595,6 +602,7 @@ function RunFilters({
             </Button>
             <Button data-guide-feature="features.reconciliation.reconciliation-page.button-3"
               data-guide-target="reconciliation.execute"
+              aria-describedby={runHint ? 'reco-run-hint' : undefined}
               loading={pending}
               disabled={
                 !canProcess ||
@@ -664,6 +672,11 @@ function RunFilters({
           </select>
         </Field>
       </FilterBar>
+      {runHint && (
+        <p className="reco-run-hint" id="reco-run-hint">
+          {runHint}
+        </p>
+      )}
       <Failure error={insurers.error} />
       {monthAction && (
         <Modal

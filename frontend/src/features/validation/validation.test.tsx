@@ -370,6 +370,40 @@ describe('VRUN-W02 상세·실행·확정', () => {
     expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(0)
   })
 
+  it('계산을 마친 실행에는 그 상태의 안내만 보이고 재시작 안내는 보이지 않는다', async () => {
+    detailHandlers(run({ status: 'COMPLETED' }))
+    handlers['GET /api/v1/validation-runs/7/restartability'] = () => ({
+      allowed: false,
+      reason: '실패한 월 검증만 재시작할 수 있습니다.',
+      checkpointAvailable: false,
+    })
+    renderAt('/app/validation-runs/7')
+    expect(await screen.findByText('계산을 마친 실행입니다. 다시 계산하려면 새 실행을 만드세요.')).toBeVisible()
+    await waitFor(() => expect(calls('GET /api/v1/validation-runs/7/restartability').length).toBeGreaterThan(0))
+    expect(screen.queryByText('실패한 월 검증만 재시작할 수 있습니다.')).not.toBeInTheDocument()
+    expect(screen.queryByText('새 실행은 생성됨 상태에서만 시작할 수 있습니다.')).not.toBeInTheDocument()
+    expect(screen.queryByText(/이어서 처리할 지점/)).not.toBeInTheDocument()
+  })
+
+  it('완료, 남은 대상은 서버 값이 있을 때만 보인다', async () => {
+    detailHandlers(run({ status: 'FAILED', statusLabel: '실패', currentStep: 2 }))
+    let counts: { completedCount?: number; remainingCount?: number } = {}
+    handlers['GET /api/v1/validation-runs/7/restartability'] = () => ({
+      allowed: true,
+      checkpointAvailable: true,
+      failedAt: '2026-07-31T01:00:00Z',
+      ...counts,
+    })
+    renderAt('/app/validation-runs/7')
+    const line = await screen.findByText(/이어서 처리할 지점: 있음/)
+    await waitFor(() => expect(line).toHaveTextContent('실패 시각: 2026. 7. 31.'))
+    expect(line).not.toHaveTextContent('완료 대상')
+    expect(line).not.toHaveTextContent('남은 대상')
+    expect(line).not.toHaveTextContent('자료 없음')
+    counts = { completedCount: 3, remainingCount: 0 }
+    await waitFor(() => expect(line).toHaveTextContent('완료 대상: 3 · 남은 대상: 0'), { timeout: 4000 })
+  })
+
   it('실패 사유가 오류코드뿐이면 상세에 코드 대신 실패한 단계를 보인다', async () => {
     currentUser = gaAdmin
     detailHandlers(run({ status: 'FAILED', statusLabel: '실패', currentStep: 5, failureMessage: 'FGC-VRUN-003' }))
@@ -456,6 +490,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     // Wait for the passing server checklist, so loading state cannot hide a permission regression.
     expect(await screen.findByText('8. 조건 8', { selector: '.table-cell-preview' })).toBeInTheDocument()
     expect(await screen.findByText('확정은 GA관리자와 시스템관리자만 할 수 있습니다.')).toBeInTheDocument()
+    expect(document.body.textContent?.match(/확정은 GA관리자와 시스템관리자만/g)).toHaveLength(1)
     expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
     expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
   })

@@ -139,82 +139,84 @@ function ContractDetailView({ id }: { id: string }) {
                   <DataOriginBadge code={contract.dataOrigin} label={contract.dataOriginLabel} />
                 </div>
               </div>
-              <div className="contract-summary-actions" aria-label="계약 작업">
-                {canProcess && (
-                  <Link data-guide-feature="features.contract.contract-detail-page.link-2"
-                    className="button button-primary"
-                    to={paymentEntryHref(
-                      {
-                        contractId: id,
-                        agentId: contract.agentId == null ? undefined : String(contract.agentId),
-                      },
-                      location.pathname + location.search,
-                      params.get('month') ?? undefined,
-                    )}
-                  >
-                    지급 등록
-                  </Link>
-                )}
-                {canPreviewStatusEvent(roleCode) && (
-                  <Button data-guide-feature="features.contract.contract-detail-page.status-preview"
+              {!isAgent && (
+                <div className="contract-summary-actions" aria-label="계약 작업">
+                  {canProcess && (
+                    <Link data-guide-feature="features.contract.contract-detail-page.link-2"
+                      className="button button-primary"
+                      to={paymentEntryHref(
+                        {
+                          contractId: id,
+                          agentId: contract.agentId == null ? undefined : String(contract.agentId),
+                        },
+                        location.pathname + location.search,
+                        params.get('month') ?? undefined,
+                      )}
+                    >
+                      지급 등록
+                    </Link>
+                  )}
+                  {canPreviewStatusEvent(roleCode) && (
+                    <Button data-guide-feature="features.contract.contract-detail-page.status-preview"
+                      variant="secondary"
+                      onClick={() => setPreviewOpen(true)}
+                    >
+                      <span className="material-symbols-rounded" aria-hidden="true">
+                        search
+                      </span>
+                      영향 미리보기
+                    </Button>
+                  )}
+                  <Button data-guide-feature="features.contract.contract-detail-page.button"
                     variant="secondary"
-                    onClick={() => setPreviewOpen(true)}
+                    disabled={actionDisabled}
+                    aria-describedby={!canProcess ? 'contract-action-note' : undefined}
+                    onClick={() =>
+                      void navigate(
+                        returnLink(`/contracts/${id}/edit`, safeReturnTo(params.get('returnTo'), '/contracts')),
+                      )
+                    }
                   >
                     <span className="material-symbols-rounded" aria-hidden="true">
-                      search
+                      edit
                     </span>
-                    영향 미리보기
+                    수정
                   </Button>
-                )}
-                <Button data-guide-feature="features.contract.contract-detail-page.button"
-                  variant="secondary"
-                  disabled={actionDisabled}
-                  aria-describedby={!canProcess ? 'contract-action-note' : undefined}
-                  onClick={() =>
-                    void navigate(
-                      returnLink(`/contracts/${id}/edit`, safeReturnTo(params.get('returnTo'), '/contracts')),
-                    )
-                  }
-                >
-                  <span className="material-symbols-rounded" aria-hidden="true">
-                    edit
-                  </span>
-                  수정
-                </Button>
-                <Button data-guide-feature="features.contract.contract-detail-page.button-2"
-                  variant="secondary"
-                  disabled={actionDisabled}
-                  loading={regenerate.isPending}
-                  aria-describedby={!canProcess ? 'contract-action-note' : undefined}
-                  onClick={() => {
-                    if (!actionDisabled) regenerate.mutate()
-                  }}
-                >
-                  {!regenerate.isPending && (
-                    <span className="material-symbols-rounded" aria-hidden="true">
-                      restart_alt
-                    </span>
-                  )}
-                  스케줄 재생성
-                </Button>
-                <Button data-guide-feature="features.contract.contract-detail-page.button-3"
-                  disabled={actionDisabled}
-                  loading={recheck.isPending}
-                  aria-describedby={!canProcess ? 'contract-action-note' : undefined}
-                  onClick={() => {
-                    if (!actionDisabled) recheck.mutate()
-                  }}
-                >
-                  {!recheck.isPending && (
-                    <span className="material-symbols-rounded" aria-hidden="true">
-                      speed
-                    </span>
-                  )}
-                  한도 재검증
-                </Button>
-              </div>
+                  <Button data-guide-feature="features.contract.contract-detail-page.button-2"
+                    variant="secondary"
+                    disabled={actionDisabled}
+                    loading={regenerate.isPending}
+                    aria-describedby={!canProcess ? 'contract-action-note' : undefined}
+                    onClick={() => {
+                      if (!actionDisabled) regenerate.mutate()
+                    }}
+                  >
+                    {!regenerate.isPending && (
+                      <span className="material-symbols-rounded" aria-hidden="true">
+                        restart_alt
+                      </span>
+                    )}
+                    스케줄 재생성
+                  </Button>
+                  <Button data-guide-feature="features.contract.contract-detail-page.button-3"
+                    disabled={actionDisabled}
+                    loading={recheck.isPending}
+                    aria-describedby={!canProcess ? 'contract-action-note' : undefined}
+                    onClick={() => {
+                      if (!actionDisabled) recheck.mutate()
+                    }}
+                  >
+                    {!recheck.isPending && (
+                      <span className="material-symbols-rounded" aria-hidden="true">
+                        speed
+                      </span>
+                    )}
+                    한도 재검증
+                  </Button>
+                </div>
+              )}
             </div>
-            {!canProcess && (
+            {!canProcess && !isAgent && (
               <p id="contract-action-note" className="contract-permission-note">
                 수정, 스케줄 재생성, 한도 재검증은 정산담당자와 시스템관리자만 할 수 있습니다.
               </p>

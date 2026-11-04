@@ -240,8 +240,8 @@ function Snapshot({
         </div>
         {launcher}
       </article>
-      <h2 className="ah-heading">이번달 현황</h2>
-      <div className="ah-kpis kpi-group" role="region" aria-label="이번 달 현황">
+      <h2 className="ah-heading">{month} 현황</h2>
+      <div className="ah-kpis kpi-group" role="region" aria-label={`${month} 현황`}>
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="신규 계약 건수">
           <KpiCardContent
             label="신규 계약 건수"
@@ -288,9 +288,9 @@ function Snapshot({
           />
         </Link>
         {needFailed ? (
-          <article className="ah-kpi ah-kpi-alert kpi-card kpi-card-warning" aria-label="확인 필요 계약">
+          <article className="ah-kpi ah-kpi-alert kpi-card kpi-card-warning" aria-label="한도 확인 계약">
             <KpiCardContent
-              label="확인 필요 계약"
+              label="한도 확인 계약"
               value="확인 불가"
               footer={
                 <button
@@ -309,10 +309,10 @@ function Snapshot({
             data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
             className="ah-kpi ah-kpi-link ah-kpi-alert kpi-card kpi-card-warning"
             to={needContractsHref(month, asOf)}
-            aria-label="확인 필요 계약"
+            aria-label="한도 확인 계약"
           >
             <KpiCardContent
-              label="확인 필요 계약"
+              label="한도 확인 계약"
               value={needReady ? need : '…'}
               zero={needReady && need === 0}
               unit="건"

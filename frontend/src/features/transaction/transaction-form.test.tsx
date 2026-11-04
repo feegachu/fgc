@@ -374,7 +374,8 @@ describe('TRAN-W02 React form workflow', () => {
     await user.click(button('btn-precheck'))
     expect(await screen.findByRole('alert')).toHaveTextContent('연결이 끊겨 요청을 마치지 못했습니다.')
     expect(button('btn-confirm')).toBeDisabled()
-    expect(screen.getAllByText('사전검증을 하면 결과가 표시됩니다.')).toHaveLength(6)
+    expect(screen.getByText('사전검증을 하면 결과가 표시됩니다.')).toBeVisible()
+    expect(screen.getAllByText(/, 미확인$/)).toHaveLength(6)
     mutation = () => precheckResult
     await user.click(button('btn-precheck'))
     await waitFor(() => expect(button('btn-confirm')).toBeEnabled())

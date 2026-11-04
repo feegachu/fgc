@@ -54,7 +54,7 @@ test('AGENT 첫 화면은 포트폴리오이고 본인 계약 목록은 전체 �
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('./')
   await expect(page.getByRole('heading', { name: '포트폴리오' })).toBeVisible()
-  await expect(page.getByRole('region', { name: '이번 달 현황' })).toBeVisible()
+  await expect(page.getByRole('region', { name: /^\d{4}-\d{2} 현황$/ })).toBeVisible()
   await expect(page.getByRole('region', { name: '설계사 판매 관리 그래프' })).toBeVisible()
   await page.screenshot({ path: 'e2e-artifacts/714-agent-home.png', fullPage: true })
   await page.goto('contracts')

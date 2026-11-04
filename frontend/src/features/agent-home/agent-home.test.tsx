@@ -115,9 +115,11 @@ const homeCalls = () =>
   vi.mocked(apiClient.request).mock.calls.map(([path]) => String(path)).filter((path) => path.startsWith('/api/v1/agent/me/home'))
 
 describe('AGNT-W01 포트폴리오', () => {
-  it('프로필·이번달 현황 지표를 서버 집계에서 만든다', async () => {
+  it('프로필과 기준 정산월 현황 지표를 서버 집계에서 만든다', async () => {
     renderHome()
     expect(await kpi('신규 계약 건수')).toHaveTextContent('2건')
+    expect(screen.getByRole('heading', { name: '2026-07 현황' })).toBeVisible()
+    expect(screen.getByRole('region', { name: '2026-07 현황' })).toBeVisible()
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
     expect(screen.getByRole('article', { name: '월납환산 초회보험료' })).toHaveTextContent('200,000')
     await waitFor(() => expect(screen.getByRole('link', { name: '수령 예정 수수료' })).toHaveTextContent('500,000'))
@@ -126,10 +128,10 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(homeCalls()[0]).toContain('asOf=2026-07-31')
   })
 
-  it('확인 필요 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
+  it('한도 확인 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
     capCount = (status) => (status === 'WARNING,VIOLATION' ? 1 : status === 'REVIEW_REQUIRED' ? 1 : 0)
     renderHome()
-    const card = await screen.findByRole('link', { name: '확인 필요 계약' })
+    const card = await screen.findByRole('link', { name: '한도 확인 계약' })
     await waitFor(() => expect(card).toHaveTextContent('2건'))
     expect(card).toHaveAttribute(
       'href',
@@ -171,7 +173,7 @@ describe('AGNT-W01 포트폴리오', () => {
 
   it('한도 건수 조회도 기준일까지로 맞춘다', async () => {
     renderHome()
-    const card = await screen.findByRole('link', { name: '확인 필요 계약' })
+    const card = await screen.findByRole('link', { name: '한도 확인 계약' })
     expect(card.getAttribute('href')).toContain('contractDateTo=2026-07-31')
     const calls = vi.mocked(apiClient.request).mock.calls.map(([path]) => String(path)).filter((p) => p.includes('capResultStatus'))
     expect(calls.every((p) => p.includes('contractDateTo=2026-07-31'))).toBe(true)
@@ -182,8 +184,8 @@ describe('AGNT-W01 포트폴리오', () => {
       throw new ApiError(null, 'req-4', 500)
     }
     renderHome()
-    await waitFor(() => expect(screen.getByRole('article', { name: '확인 필요 계약' })).toHaveTextContent('확인 불가'))
-    expect(within(screen.getByRole('article', { name: '확인 필요 계약' })).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('article', { name: '한도 확인 계약' })).toHaveTextContent('확인 불가'))
+    expect(within(screen.getByRole('article', { name: '한도 확인 계약' })).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
   it('보험사를 고른 뒤 그 집계가 로딩 중이거나 실패하면 0건 차트로 그리지 않는다', async () => {
@@ -274,7 +276,7 @@ describe('확인할 계약', () => {
     expect(within(panel).getByRole('link', { name: 'C-0091' })).toHaveAttribute('href', '/app/contracts/91')
     expect(panel).toHaveTextContent('후속 확인일 도래 (2026-07-30)')
     expect(panel).toHaveTextContent('보류 미해결')
-    expect(panel).toHaveTextContent('마지막 사건 3일 경과')
+    expect(panel).toHaveTextContent('상태 변화 후 3일 경과')
     expect(panel).toHaveTextContent('2026-07 예정 100,000원 · 보류 1건 70,000원')
   })
 

@@ -1,0 +1,75 @@
+// 실제 자료로 표를 그렸을 때 읽어야 할 열과 값이 가려지지 않는지 잰다. 글자 내용은 vitest와 screen-language.spec.ts가 본다.
+import type { Page } from '@playwright/test'
+import { test, expect, login, completeMonthly } from './fixtures'
+
+const month = '2026-07'
+// 1440폭 화면에서 세로 스크롤바(17px)를 뺀 실제 본문 폭. 시험 브라우저는 스크롤바를 그리지 않는다.
+const viewport = { width: 1423, height: 1000 }
+
+/** 머리글이 표 보기 영역 밖으로 나간 픽셀 수. 0이면 가로 스크롤 없이 보인다. */
+const hiddenPixels = (page: Page, labels: string[]) =>
+  page.evaluate((names) => {
+    const table = document.querySelector<HTMLTableElement>('table.data-table')!
+    const edge = table.closest('.data-table-viewport')!.getBoundingClientRect().right
+    const headers = [...table.tHead!.rows[0].cells]
+    return Object.fromEntries(
+      names.map((name) => {
+        const header = headers.find((cell) => cell.textContent?.startsWith(name))!
+        return [name, Math.max(0, Math.round(header.getBoundingClientRect().right - edge))]
+      }),
+    )
+  }, labels)
+
+/** 끝까지 내렸을 때 떠 있는 업무 비서에 가려지는 본문 글자. */
+async function coveredAtScrollEnd(page: Page) {
+  await expect(page.locator('.pico-launcher')).toBeVisible() // 지연 로딩이라 새 화면마다 기다린다.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  return page.evaluate(() => {
+    const launcher = document.querySelector('.pico-launcher')!
+    const boxes = [launcher, ...launcher.querySelectorAll('*')].map((element) => element.getBoundingClientRect())
+    const walker = document.createTreeWalker(document.querySelector('.page-content')!, NodeFilter.SHOW_TEXT)
+    const range = document.createRange()
+    const covered: string[] = []
+    while (walker.nextNode()) {
+      const text = walker.currentNode.textContent?.trim()
+      if (!text) continue
+      range.selectNodeContents(walker.currentNode)
+      const hit = [...range.getClientRects()].some((line) =>
+        boxes.some(
+          (box) =>
+            box.width > 0 && line.right > box.left && line.left < box.right && line.bottom > box.top && line.top < box.bottom,
+        ),
+      )
+      if (hit) covered.push(text)
+    }
+    return covered
+  })
+}
+
+test('1440폭에서 읽어야 할 열이 가로 스크롤 뒤로 가지 않고 업무 비서가 끝의 값을 가리지 않는다', async ({ page }) => {
+  await page.setViewportSize(viewport)
+  await login(page)
+  const run = await completeMonthly(page, month)
+
+  // VRUN-W01: 상세로 가는 길인 열기와 실패 사유
+  await page.goto(`validation-runs?month=${month}`)
+  await expect(page.getByRole('link', { name: /회차 실행 열기$/ }).first()).toBeVisible()
+  await expect.poll(() => hiddenPixels(page, ['상세', '실패 사유'])).toEqual({ 상세: 0, '실패 사유': 0 })
+
+  // EXCP-W01: 오른쪽 패널을 연 기본 분할에서 내용, 상태, 담당자
+  await page.goto(`exceptions?month=${month}`)
+  await page.locator('.exception-row').first().click()
+  await expect(page.getByRole('button', { name: '처리 저장' })).toBeVisible()
+  await expect.poll(() => hiddenPixels(page, ['내용', '상태', '담당자'])).toEqual({ 내용: 0, 상태: 0, 담당자: 0 })
+  const content = page.getByRole('columnheader', { name: /^내용/ })
+  expect((await content.boundingBox())!.width, '내용 열이 한 줄에 몇 글자는 읽히는 폭').toBeGreaterThan(160)
+
+  // 끝까지 내리면 표의 마지막 행까지 업무 비서에 가려지지 않는다.
+  await expect.poll(() => coveredAtScrollEnd(page), { message: 'EXCP-W01' }).toEqual([])
+  await page.goto(`reconciliations?month=${month}`)
+  await expect(page.getByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' }).locator('tbody tr').first()).toBeVisible()
+  await expect.poll(() => coveredAtScrollEnd(page), { message: 'RECO-W01' }).toEqual([])
+  await page.goto(`validation-runs/${run}?month=${month}`)
+  await expect(page.getByRole('button', { name: '확정' })).toBeVisible()
+  await expect.poll(() => coveredAtScrollEnd(page), { message: 'VRUN-W02' }).toEqual([])
+})

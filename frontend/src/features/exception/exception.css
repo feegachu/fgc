@@ -33,9 +33,10 @@
   margin-top: var(--space-4);
 }
 
+/* 내용 열은 폭을 지정하지 않아 나머지를 받는다. 앞쪽 6열이 기본 분할(60%)의 왼쪽 패널에 들어가는 폭이다. */
 .exception-table {
   width: 100%;
-  min-width: 75rem;
+  min-width: 82.25rem;
   table-layout: fixed;
 }
 

@@ -283,6 +283,27 @@ describe('RECO-W01·W02 React 전환', () => {
       expect(useWorkspaceStore.getState().month).toBe('2026-07')
       expect(bodyPosts()).toHaveLength(0)
     })
+  it('대사 실행이 꺼진 이유를 버튼 아래에 짧게 보이고 조건을 채우면 지운다', async () => {
+    const { user } = renderAt('/reconciliations?month=2026-07', (url) =>
+      url.startsWith('/api/v1/base/insurers')
+        ? { content: [{ insurerId: 1, insurerCode: 'FGL01', insurerName: '미래가상생명', activeYn: true }], totalPages: 1 }
+        : undefined,
+    )
+    const run = await screen.findByRole('button', { name: '대사 실행' })
+    expect(run).toBeDisabled()
+    expect(run).toHaveAccessibleDescription('지급단계, 보험회사 선택 후 실행할 수 있습니다.')
+    await user.selectOptions(screen.getByLabelText(/지급단계/), 'GA_TO_FC')
+    expect(run).toHaveAccessibleDescription('보험회사 선택 후 실행할 수 있습니다.')
+    await screen.findByRole('option', { name: 'FGL01, 미래가상생명' })
+    await user.selectOptions(screen.getByLabelText('보험회사'), '1')
+    expect(run).toBeEnabled()
+    expect(screen.queryByText(/선택 후 실행할 수 있습니다/)).not.toBeInTheDocument()
+  })
+  it('대사 실행 권한이 없는 역할에는 조건 안내 대신 권한 안내만 보인다', async () => {
+    renderAt('/reconciliations?month=2026-07', undefined, 'COMPLIANCE')
+    expect(await screen.findByText(/정산담당자와 시스템관리자만 할 수 있습니다/)).toBeVisible()
+    expect(screen.queryByText(/선택 후 실행할 수 있습니다/)).not.toBeInTheDocument()
+  })
   it('비활성 보험회사도 과거 이력을 조회할 수 있지만 새 실행은 차단한다', async () => {
     const { router, user } = renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC', (url) =>
       url.startsWith('/api/v1/base/insurers')
@@ -292,6 +313,9 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(await screen.findByRole('option', { name: 'OLD, 과거회사' })).toBeEnabled()
     await user.selectOptions(screen.getByLabelText('보험회사'), '9')
     expect(screen.getByRole('button', { name: '대사 실행' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '대사 실행' })).toHaveAccessibleDescription(
+      '사용하지 않는 보험회사는 대사를 실행할 수 없습니다.',
+    )
     await user.click(screen.getByRole('button', { name: '조회' }))
     expect(router.state.location.search).toContain('insurer=9')
     await waitFor(() => expect(calls.some((call) => call.url.includes('insurerId=9'))).toBe(true))

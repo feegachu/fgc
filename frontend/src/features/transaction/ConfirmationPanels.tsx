@@ -25,6 +25,7 @@ export function GatePanel({ result }: { result: Precheck | null }) {
         <span className="transaction-panel-meta">운영정책서 제31조</span>
       </header>
       <div className="surface-body transaction-gate-list" id="gate-list" aria-live="polite">
+        {!result && <p className="transaction-gate-detail">사전검증을 하면 결과가 표시됩니다.</p>}
         {gateStates(result).map((gate, index) => (
           <div key={gate.label} className={`transaction-gate-step transaction-gate-${gate.state}`}>
             <span className="material-symbols-rounded transaction-gate-icon" aria-hidden="true">
@@ -34,15 +35,15 @@ export function GatePanel({ result }: { result: Precheck | null }) {
               <div className="transaction-gate-label">
                 {index + 1}. {gate.label}, {gate.state === 'pass' ? '통과' : gate.state === 'fail' ? '차단' : '미확인'}
               </div>
-              <div className="transaction-gate-detail">
-                {gate.failures.length
-                  ? gate.failures.map((blocker) => rateText(blocker.message || '확정 차단 사유를 확인하세요.')).join(' / ')
-                  : gate.state === 'pass'
-                    ? '사전검증을 통과했습니다.'
-                    : result
-                      ? '앞 단계가 막혀 아직 판정하지 않았습니다.'
-                      : '사전검증을 하면 결과가 표시됩니다.'}
-              </div>
+              {result && (
+                <div className="transaction-gate-detail">
+                  {gate.failures.length
+                    ? gate.failures.map((blocker) => rateText(blocker.message || '확정 차단 사유를 확인하세요.')).join(' / ')
+                    : gate.state === 'pass'
+                      ? '사전검증을 통과했습니다.'
+                      : '앞 단계가 막혀 아직 판정하지 않았습니다.'}
+                </div>
+              )}
             </div>
           </div>
         ))}

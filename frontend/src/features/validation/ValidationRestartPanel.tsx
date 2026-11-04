@@ -129,13 +129,15 @@ export function ValidationRestartPanel({
           실패 지점부터 재시작
         </Button>
       )}
-      <p role="status">
-        {!canProcess
-          ? '재시작은 정산담당자와 시스템관리자만 할 수 있습니다.'
-          : state.isError
-            ? '재시작 가능 여부 조회에 실패했습니다.'
-            : state.data?.reason}
-      </p>
+      {status === 'FAILED' && (
+        <p role="status">
+          {!canProcess
+            ? '재시작은 정산담당자와 시스템관리자만 할 수 있습니다.'
+            : state.isError
+              ? '재시작 가능 여부 조회에 실패했습니다.'
+              : state.data?.reason}
+        </p>
+      )}
       {mutation.isError && !open && (
         <p role="alert">
           {errorText(mutation.error, '최신 상태를 확인한 뒤 다시 시도하세요. 입력한 사유는 보존했습니다.')}
@@ -190,9 +192,10 @@ export function ValidationRestartPanel({
       )}
       {status === 'FAILED' && (
         <p>
-          이어서 처리할 지점: {state.data?.checkpointAvailable ? '있음' : '확인 필요'} · 완료 대상:{' '}
-          {state.data?.completedCount ?? '자료 없음'} · 남은 대상: {state.data?.remainingCount ?? '자료 없음'} · 실패
-          시각:{' '}
+          이어서 처리할 지점: {state.data?.checkpointAvailable ? '있음' : '확인 필요'}
+          {state.data?.completedCount != null && ` · 완료 대상: ${state.data.completedCount}`}
+          {state.data?.remainingCount != null && ` · 남은 대상: ${state.data.remainingCount}`}
+          {' · 실패 시각: '}
           {state.data?.failedAt
             ? new Date(state.data.failedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
             : '자료 없음'}
