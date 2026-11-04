@@ -49,11 +49,11 @@ export const acquisitionListQuery = (criteria: Criteria) =>
     queryFn: ({ signal }) => search({ ...criteria }, signal),
     meta: { errorToast: false },
   })
-/** 계약 상세의 최근 결과. 조회만으로 검증을 만들지 않는다. */
-export const contractAcquisitionQuery = (contractId: string) =>
+/** 계약 상세의 지급단계별 최근 결과. 조회만으로 검증을 만들지 않는다. */
+export const contractAcquisitionQuery = (contractId: string, paymentStage: AcquisitionRequest['paymentStage']) =>
   queryOptions({
-    queryKey: ['acquisition-cost', 'contract', contractId],
-    queryFn: ({ signal }) => search({ contractId }, signal),
+    queryKey: ['acquisition-cost', 'contract', contractId, paymentStage],
+    queryFn: ({ signal }) => search({ contractId, paymentStage }, signal),
     meta: { errorToast: false },
   })
 export function useRequestAcquisitionCheck() {

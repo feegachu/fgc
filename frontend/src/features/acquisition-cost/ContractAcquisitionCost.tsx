@@ -13,7 +13,7 @@ import { AcquisitionCostResult, AcquisitionFailure } from './AcquisitionCostResu
 export function ContractAcquisitionCost({ contractId, contractNo }: { contractId: string; contractNo?: string }) {
   const canProcess = usePermission('canProcess')
   const [stage, setStage] = useState<AcquisitionRequest['paymentStage']>('GA_TO_FC')
-  const query = useQuery(contractAcquisitionQuery(contractId))
+  const query = useQuery(contractAcquisitionQuery(contractId, stage))
   const mutation = useRequestAcquisitionCheck()
   const latest = query.data?.content?.find((row) => row.paymentStage === stage)
   return (

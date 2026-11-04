@@ -134,6 +134,13 @@ test('실제 서버에서 두 한도를 따로 판정하고 자료 부족과 적
   await expect(maintenance).toContainText('2,660,000원')
   await expect(maintenance).toContainText('500,000원')
   await expect(page.getByRole('article', { name: '선지급 총액 한도 결과' })).toContainText('600,000원')
+  // 화면의 판과 정책 근거는 API가 준 값이다.
+  const basis = page.getByRole('heading', { name: '계산 근거' }).locator('..')
+  await expect(basis).toContainText(`#${normal.scheduleHeaderId} v${normal.scheduleVersionNo}`)
+  await expect(basis).toContainText(`${normal.paymentPolicy.policyCode} v${normal.paymentPolicy.versionNo}`)
+  await expect(basis).toContainText(`${normal.limitPolicy.policyCode} v${normal.limitPolicy.versionNo}`)
+  expect(normal.limitPolicy.regulationRefs).toContain('REG-02')
+  await expect(basis).toContainText('REG-02')
   await page.getByRole('region', { name: '알림' }).getByRole('button').first().click()
   await page.screenshot({ path: 'e2e-artifacts/729-normal.png', fullPage: true })
 

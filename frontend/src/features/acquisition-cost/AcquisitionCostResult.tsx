@@ -55,25 +55,41 @@ function LimitResult({ item, indirect }: { item: AcquisitionItem; indirect?: { a
 }
 
 type LineGroup = NonNullable<AcquisitionCheck['lineGroups']>[number]
+// 분할 화면의 좁은 상세에서도 금액 칸이 보이게 항목과 회차를 한 칸에 둔다.
 const groupColumns: TableColumn<LineGroup>[] = [
-  { key: 'bucket', label: '산입 위치', width: '7rem', render: (row) => row.bucketLabel },
-  { key: 'item', label: '수수료 항목', width: '8rem', render: (row) => row.itemName },
+  { key: 'bucket', label: '산입 위치', width: '6.5rem', render: (row) => row.bucketLabel },
   {
-    key: 'installments',
-    label: '회차(건수)',
-    width: '6rem',
-    render: (row) =>
-      `${row.installmentFrom === row.installmentTo ? row.installmentFrom : `${row.installmentFrom}~${row.installmentTo}`} (${int(row.lineCount)})`,
+    key: 'item',
+    label: '수수료 항목과 회차',
+    width: '9rem',
+    render: (row) => (
+      <>
+        {row.itemName}
+        <span className="acq-cell-sub">
+          {row.installmentFrom === row.installmentTo ? row.installmentFrom : `${row.installmentFrom}~${row.installmentTo}`}회차,{' '}
+          {int(row.lineCount)}건
+        </span>
+      </>
+    ),
   },
-  { key: 'amount', label: '금액', width: '6rem', align: 'number', render: (row) => won(row.amount) },
+  { key: 'amount', label: '금액', width: '6.5rem', align: 'number', render: (row) => won(row.amount) },
 ]
 type ExclusionLine = NonNullable<AcquisitionCheck['exclusions']>[number]
 const exclusionColumns: TableColumn<ExclusionLine>[] = [
-  { key: 'item', label: '항목', width: '7rem', render: (row) => row.itemName },
-  { key: 'installment', label: '회차', width: '3.5rem', align: 'number', render: (row) => row.installmentNo },
-  { key: 'amount', label: '금액', width: '5.5rem', align: 'number', render: (row) => won(row.amount) },
-  { key: 'decision', label: '계산 반영', width: '4.5rem', render: (row) => (row.excluded ? '제외' : '포함') },
-  { key: 'evidence', label: '증빙', width: '6.5rem', render: (row) => row.evidenceRef ?? '증빙 없음' },
+  {
+    key: 'item',
+    label: '항목과 회차',
+    width: '6.5rem',
+    render: (row) => (
+      <>
+        {row.itemName}
+        <span className="acq-cell-sub">{row.installmentNo}회차</span>
+      </>
+    ),
+  },
+  { key: 'amount', label: '금액', width: '6.5rem', align: 'number', render: (row) => won(row.amount) },
+  { key: 'decision', label: '계산 반영', width: '5rem', render: (row) => (row.excluded ? '제외' : '포함') },
+  { key: 'evidence', label: '증빙', width: '5rem', render: (row) => row.evidenceRef ?? '증빙 없음' },
 ]
 
 export function AcquisitionCostResult({ check }: { check: AcquisitionCheck }) {

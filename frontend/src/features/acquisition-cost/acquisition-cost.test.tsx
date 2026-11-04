@@ -504,11 +504,13 @@ describe('CONT-W02 계약체결비용 영역', () => {
   it('지급단계별 최근 결과만 보이고 결과가 없으면 예정 생성과 별개임을 안내한다', async () => {
     const { request, user } = mountContract((path) => {
       expect(path).toContain('contractId=10')
-      return page([violation])
+      return page(path.includes('paymentStage=GA_TO_FC') ? [violation] : [])
     })
     expect(await screen.findByRole('article', { name: '선지급 총액 한도 결과' })).toBeInTheDocument()
     await user.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
     expect(await screen.findByText(/이 검증이 없어도 예정 스케줄 생성과 조회는 할 수 있습니다/)).toBeInTheDocument()
+    // 다른 단계의 결과가 많아도 묻히지 않게 지급단계별로 조회한다.
+    expect(request).toHaveBeenCalledWith(expect.stringContaining('paymentStage=INSURER_TO_GA'), expect.anything())
     expect(screen.queryByText('0원')).not.toBeInTheDocument()
     expect(posts(request as never)).toHaveLength(0)
   })

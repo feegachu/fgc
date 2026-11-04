@@ -102,6 +102,11 @@
 .acq-basis .data-table {
   min-width: 0;
 }
+.acq-cell-sub {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
 .acq-failure {
   display: grid;
   justify-items: start;
