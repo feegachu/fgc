@@ -45,7 +45,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 async function open() {
-  await userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' }))
+  await userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' }))
 }
 async function send() {
   await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '초안 저장하면 지급 끝인가요?')
@@ -66,7 +66,7 @@ it('mounts with AI opt-in, calls the server and renders AI evidence distinct fro
   await send()
   expect(await screen.findByText(reply.message)).toBeInTheDocument()
   expect(screen.getByText('AI 가이드 답변')).toBeInTheDocument()
-  expect(screen.getByText('지급 초안 저장 · v1.0')).toBeInTheDocument()
+  expect(screen.getByText('지급 초안 저장 (v1.0)')).toBeInTheDocument()
   expect(screen.queryByText('시연 질문 바꾸기')).not.toBeInTheDocument()
   expect(request).toHaveBeenCalledTimes(1)
   expect(request).toHaveBeenCalledWith(
@@ -139,7 +139,7 @@ it('rejects executable guide and unknown evidence instead of rendering or naviga
   render(<PicoAssistant canProcess />)
   await open()
   await send()
-  expect(await screen.findByText(/답변의 형식이나 근거를 확인하지 못했어요/)).toBeInTheDocument()
+  expect(await screen.findByText(/답변 근거를 확인하지 못했어요/)).toBeInTheDocument()
   expect(screen.queryByText(reply.message)).not.toBeInTheDocument()
 })
 it('closes safely and clears account conversation without keeping late replies', async () => {
@@ -423,7 +423,7 @@ it('keeps actual version mismatch separate from stale context and invalid eviden
   await open()
   await send()
   expect(await screen.findByText(/가이드 버전이 변경됐어요/)).toBeInTheDocument()
-  expect(screen.queryByText(/답변의 형식이나 근거/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/답변 근거를 확인하지 못했어요/)).not.toBeInTheDocument()
 })
 it.each(['general', 'before-draft'] as const)('invalidates %s answer actions on navigation, return and a pending question', async (kind) => {
   const help = workflowHelpSteps('contract.register').find((step) => step.targetId === 'features.contract.contract-form-page.contract-no')!
@@ -454,13 +454,17 @@ it.each(['general', 'before-draft'] as const)('invalidates %s answer actions on 
   expect(useWorkflowGuide.getState().request).toBeNull()
 })
 
-it.each(['active', 'paymentActive', 'settlementActive'] as const)('does not queue a launcher click during another guide: %s', async (state) => {
+it.each(['active', 'paymentActive', 'settlementActive'] as const)('explicitly opens follow-up chat during a guide and sends a pause signal: %s', async (state) => {
   render(<PicoAssistant canProcess />)
   act(() => useWorkflowGuide.setState({ [state]: true }))
-  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
+  const sequence = useWorkflowGuide.getState().chatSequence
+  await open()
+  expect(useWorkflowGuide.getState().chatSequence).toBe(sequence + 1)
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
   act(() => useWorkflowGuide.setState({ [state]: false }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toHaveTextContent('업무 비서 AI')
+  expect(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveTextContent('업무 비서 AI')
 })
 it('does not offer payment form tutorials to a read-only role', async () => {
   render(<PicoAssistant canProcess={false} roleCode="COMPLIANCE" />)

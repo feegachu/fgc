@@ -182,7 +182,7 @@ describe('RECO-W01·W02 React 전환', () => {
         : undefined,
     )
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByText('예상 원천 1, schedule_line #12')).toBeVisible()
+    expect(await within(dialog).findByText('예상 원천 1, 스케줄행 번호 12')).toBeVisible()
     expect(within(dialog).getByText('실제 원천 1, 수수료 지급 번호 8')).toBeVisible()
     expect(within(dialog).getAllByText('1개 원천')).toHaveLength(2)
     expect(within(dialog).queryByText('예상 없음')).not.toBeInTheDocument()
@@ -490,7 +490,7 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(screen.getByRole('region', { name: '차액 합계' })).toHaveTextContent('-1,000원')
     await user.click(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' }))
     const dialog = screen.getByRole('dialog')
-    expect(await within(dialog).findByText('예상 원천 1, schedule_line #12')).toBeVisible()
+    expect(await within(dialog).findByText('예상 원천 1, 스케줄행 번호 12')).toBeVisible()
     expect(within(dialog).getByText('실제 원천 1, 수수료 지급 번호 8')).toBeVisible()
     expect(within(dialog).getByText('123.1%')).toBeVisible()
     for (const difference of within(dialog).getAllByText('-1,000원'))
@@ -565,7 +565,7 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(await screen.findByRole('button', { name: '대사 결과 7 비교 보기' })).toBeVisible()
     expect(screen.queryByRole('button', { name: '대사 결과 8 비교 보기' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('불일치만')).toBeChecked()
-    expect(screen.getByText(/불일치만은 현재 서버 페이지/)).toBeVisible()
+    expect(screen.getByText(/불일치만 보기는 지금 페이지의 일치 행만 숨깁니다/)).toBeVisible()
     const footer = screen.getByRole('region', { name: '대사 결과' }).querySelector('tfoot')!
     expect(footer).toHaveTextContent('이 페이지 합계')
     expect(within(footer).getByText('12,000')).toBeVisible()

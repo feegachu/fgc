@@ -98,7 +98,7 @@ class ValidationRunExecuteServiceImplTest {
         assertThatThrownBy(() -> service.execute(100L, 1L, "req-1"))
                 .isInstanceOfSatisfying(FgcBusinessException.class, e -> {
                     assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.VRUN_004);
-                    assertThat(e.getParams()).containsEntry("from", target).containsEntry("to", "RUNNING");
+                    assertThat(e.getParams()).containsEntry("from", target.label()).containsEntry("to", "실행중");
                 });
 
         verify(monthlyValidationJobTrigger, never()).launch(any(), anyString());

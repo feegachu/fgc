@@ -106,7 +106,7 @@ function ContractDetailView({ id }: { id: string }) {
         </Link>
       </header>
       {!validId ? (
-        <ContractLoadState message="계약 식별자를 확인할 수 없습니다." error />
+        <ContractLoadState message="계약을 찾을 수 없습니다. 목록에서 다시 선택하세요." error />
       ) : detail.isError ? (
         <ContractLoadState
           message={contractErrorText(detail.error, '계약 정보를 불러오지 못했습니다.')}
@@ -195,7 +195,7 @@ function ContractDetailView({ id }: { id: string }) {
             </div>
             {!canProcess && (
               <p id="contract-action-note" className="contract-permission-note">
-                수정/스케줄 재생성/한도 재검증은 SETTLEMENT 권한이 필요합니다.
+                수정, 스케줄 재생성, 한도 재검증은 정산담당자와 시스템관리자만 할 수 있습니다.
               </p>
             )}
             <ContractFacts

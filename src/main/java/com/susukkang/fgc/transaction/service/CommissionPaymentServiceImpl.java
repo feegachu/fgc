@@ -540,10 +540,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private List<TransactionPrecheckResponse.Blocker> toBlockers(List<GateFailure> failures) {
         return failures.stream()
                 .map(failure -> {
-                    // CAP_003(미해결 위반)은 hasBlockingUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
-                    // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 예외 건을
+                    // CAP_003(미해결 위반)과 IMPL_PAYMENT_HELD(상태 사건 보류)는 지급 건 단위 판정이라 어느 귀속행이
+                    // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 계약을
                     // 찾게 되므로 계약·귀속행 ID를 비운다
-                    boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
+                    boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003
+                            || failure.errorCode() == FgcErrorCode.IMPL_PAYMENT_HELD;
                     return new TransactionPrecheckResponse.Blocker(
                             failure.errorCode().getCode(),
                             CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE.equals(failure.reasonCode())
@@ -1908,9 +1909,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "CAP_RULE_MISMATCH",
                     "HIGH",
                     "한도 정책 불일치",
-                    "지급 적용 한도정책 ID=" + rule.capRuleSetId()
-                            + ", 계산 적용 한도정책 ID=" + calculation.capRuleSetId()
-                            + "로 서로 다릅니다. 정책 버전과 적용 기준일을 정정한 뒤 재검증하세요.",
+                    "지급과 계산에 쓴 한도 정책이 다릅니다(지급 룰셋 " + rule.capRuleSetId()
+                            + "번, 계산 룰셋 " + calculation.capRuleSetId()
+                            + "번). 정책 버전과 기준일을 고친 뒤 다시 검증하세요.",
                     FgcErrorCode.CAP_002,
                     Map.of()
             );

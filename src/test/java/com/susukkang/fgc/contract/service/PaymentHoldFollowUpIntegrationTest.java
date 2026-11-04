@@ -214,6 +214,30 @@ class PaymentHoldFollowUpIntegrationTest {
     }
 
     @Test
+    void aNewScheduleVersionKeepsTheResumeDateOfEveryEarlierResume() {
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        statusEvent(contract, 2, "UNPAID", "2026-05-01T00:00:00+09:00");
+        resumeEvent(contract, 3, "2026-06-05T00:00:00+09:00");
+        statusEvent(contract, 4, "UNPAID", "2026-09-01T00:00:00+09:00");
+        resumeEvent(contract, 5, "2026-10-05T00:00:00+09:00");
+
+        long header = jdbc.queryForObject("""
+                INSERT INTO fgc.schedule_header(contract_id, payment_stage, policy_version_id, schedule_version_no,
+                    schedule_purpose, schedule_regime)
+                VALUES (?, 'GA_TO_FC', (SELECT min(policy_version_id) FROM fgc.policy_version), 2, 'OPERATIONAL', 'CURRENT')
+                RETURNING schedule_header_id
+                """, Long.class, contract);
+        long firstCycle = line(header, 1, "2026-05-25", "PLANNED");
+        long secondCycle = line(header, 2, "2026-09-25", "PLANNED");
+
+        processor.reapplyLatest(contract);
+
+        assertThat(dueDate(firstCycle)).isEqualTo("2026-06-05");
+        assertThat(dueDate(secondCycle)).isEqualTo("2026-10-05");
+    }
+
+    @Test
     void manualRegenerationThroughTheScheduleServiceKeepsTheResumeDate() {
         // 시드 계약에 ScheduleService 로 실제 운영 스케줄을 만들고, 새 버전을 만드는 경로 전체를 지난다.
         Long contract = jdbc.queryForObject("SELECT min(contract_id) FROM fgc.insurance_contract", Long.class);

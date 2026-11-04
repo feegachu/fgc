@@ -63,7 +63,7 @@ export function DraftSelect({
           {placeholder}
         </option>
         {value !== '' && !options.some((option) => String(option.value) === String(value)) && (
-          <option value={value}>기존 값, {value}</option>
+          <option value={value}>저장된 값(목록에 없음)</option>
         )}
         {options.map((option) => (
           <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -217,7 +217,7 @@ export function CommissionRow({
           errors={errors}
           value={rule.paymentStage}
           onChange={(v) => set('paymentStage', v)}
-          options={optionsFor({ INSURER_TO_GA: '보험사 → GA', GA_TO_FC: 'GA → 설계사' })}
+          options={optionsFor({ INSURER_TO_GA: '원수사→GA', GA_TO_FC: 'GA→설계사' })}
         />
         <DraftSelect
           path={prefix + 'insurerId'}
@@ -322,7 +322,7 @@ export function CommissionRow({
           errors={errors}
           value={rule.calculationType}
           onChange={(v) => onChange({ ...rule, calculationType: v as 'RATE' | 'FIXED', ratePct: '', fixedAmount: '' })}
-          options={optionsFor({ RATE: 'RATE, 요율', FIXED: 'FIXED, 고정금액' })}
+          options={optionsFor({ RATE: '요율', FIXED: '정액' })}
         />
         <DraftInput
           path={prefix + 'ratePct'}
@@ -338,7 +338,7 @@ export function CommissionRow({
         />
         <DraftInput
           path={prefix + 'fixedAmount'}
-          label="고정금액 (원)"
+          label="정액 (원)"
           required={rule.calculationType === 'FIXED'}
           disabled={rule.calculationType !== 'FIXED'}
           type="number"
@@ -374,7 +374,7 @@ export function CommissionRow({
           value={rule.agentRankCode}
           placeholder="전체 직급"
           onChange={(v) => set('agentRankCode', v)}
-          options={optionsFor({ FC: 'FC', TEAM_LEADER: '팀장', BRANCH_MANAGER: '지점장', DIVISION_HEAD: '본부장' })}
+          options={optionsFor({ FC: '설계사', TEAM_LEADER: '팀장', BRANCH_MANAGER: '지사장', DIVISION_HEAD: '본부장' })}
         />
         <label className="policy-checkbox">
           <input data-guide-feature="features.policies.policy-draft-fields.input-2"

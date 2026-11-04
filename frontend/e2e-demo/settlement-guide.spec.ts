@@ -89,7 +89,7 @@ for (const startMode of ['existing', 'new'] as const) {
     await page.getByRole('button', { name: '실행 생성' }).click()
     const run = await successful(creating)
     await next.click()
-    await expect(guide).toContainText('202 수락은 완료가 아닙니다')
+    await expect(guide).toContainText('월 통합검증 계산이 끝나지 않았습니다')
     await page.getByRole('button', { name: '실행', exact: true }).click()
     await expect
       .poll(async () => (await api(page, `/validation-runs/${run.validationRunId}/progress`)).status, {

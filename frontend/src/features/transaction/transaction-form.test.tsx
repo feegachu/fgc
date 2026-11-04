@@ -1,6 +1,7 @@
 import { getPaymentGuideObserver, paymentGuideConditions } from './payment-guide'
 import { selectOption } from '../../test/selectOption'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useWorkflowGuide } from '../assistant/workflow-state'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, Outlet } from 'react-router'
@@ -321,6 +322,8 @@ describe('TRAN-W02 React form workflow', () => {
     const panel = screen.getByRole('region', { name: '1,200% 사전검증' })
     expect(await within(panel).findByText('초년도 밖, 판정 대상 아님')).toBeVisible()
     expect(within(panel).queryByText('사유 코드: OUTSIDE_FIRST_YEAR')).not.toBeInTheDocument()
+    expect(within(panel).getByText('계약 C-003')).toBeVisible()
+    expect(within(panel).queryByText(/귀속 201/)).not.toBeInTheDocument()
     expect(within(panel).getByText('200,000원')).toBeVisible()
     expect(within(panel).getByText(/귀속일 2027-07-18/)).toBeVisible()
     expect(within(panel).getByText(/초년도 종료일 2027-07-18/)).toBeVisible()
@@ -368,9 +371,9 @@ describe('TRAN-W02 React form workflow', () => {
       throw new TypeError('Failed to fetch')
     }
     await user.click(button('btn-precheck'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to fetch')
+    expect(await screen.findByRole('alert')).toHaveTextContent('연결이 끊겨 요청을 마치지 못했습니다.')
     expect(button('btn-confirm')).toBeDisabled()
-    expect(screen.getAllByText('사전검증 후 서버 판정이 표시됩니다.')).toHaveLength(6)
+    expect(screen.getAllByText('사전검증을 하면 결과가 표시됩니다.')).toHaveLength(6)
     mutation = () => precheckResult
     await user.click(button('btn-precheck'))
     await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
@@ -407,8 +410,8 @@ describe('TRAN-W02 React form workflow', () => {
     }
     await user.click(button('btn-save'))
     expect(await screen.findByRole('alert')).toHaveTextContent('접근 권한이 없습니다.')
-    expect(screen.getByText('작성중, #77')).toBeVisible()
-    expect(screen.getByLabelText(/업무키/)).toBeEnabled()
+    expect(screen.getByText('작성중')).toBeVisible()
+    expect(screen.getByLabelText(/지급 관리번호/)).toBeEnabled()
   })
   it('hydrates from the fresh draft GET instead of a previous opening cache', async () => {
     draftResponse = { ...saved, amount: 300000 }
@@ -430,7 +433,7 @@ describe('TRAN-W02 React form workflow', () => {
     expect(screen.getByLabelText(/금액 \(원\)/)).toBeDisabled()
     expect(button('btn-add-attr')).toBeDisabled()
     expect(screen.getByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')).toBeVisible()
-    expect(screen.getAllByText(/서버 사전검증 결과 통과했습니다/)).toHaveLength(6)
+    expect(screen.getAllByText('사전검증을 통과했습니다.')).toHaveLength(6)
     let complete: ((value: Payment) => void) | undefined
     mutation = () =>
       new Promise<Payment>((resolve) => {
@@ -493,7 +496,7 @@ describe('TRAN-W02 React form workflow', () => {
       '/app/cap-checks?capCheckId=99&month=2026-07',
     )
     expect(within(dialog).queryByRole('button', { name: '확정 시도, 예외 등록' })).not.toBeInTheDocument()
-    expect(screen.getByText('작성중, #77')).toBeVisible()
+    expect(screen.getByText('작성중')).toBeVisible()
   })
   it('does not attempt confirmation for an input blocker before a recordable CAP blocker', async () => {
     precheckResult = {
@@ -513,18 +516,18 @@ describe('TRAN-W02 React form workflow', () => {
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
     await user.click(button('btn-precheck'))
     await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
-    await user.clear(screen.getByLabelText(/업무키/))
-    await user.type(screen.getByLabelText(/업무키/), 'DUPLICATE')
+    await user.clear(screen.getByLabelText(/지급 관리번호/))
+    await user.type(screen.getByLabelText(/지급 관리번호/), 'DUPLICATE')
     expect(button('btn-precheck')).toBeDisabled()
     expect(button('btn-confirm')).toBeDisabled()
     mutation = () => {
       throw new ApiError({ code: 'FGC-TRAN-004', message: '중복 업무키', field: 'sourceBusinessKey' }, 'DUP-REQ', 409)
     }
     await user.click(button('btn-save'))
-    await waitFor(() => expect(screen.getByLabelText(/업무키/)).toHaveAttribute('aria-invalid', 'true'))
+    await waitFor(() => expect(screen.getByLabelText(/지급 관리번호/)).toHaveAttribute('aria-invalid', 'true'))
     expect(button('btn-save')).toBeEnabled()
     expect(writes().at(-1)?.[1]?.method).toBe('PUT')
-    expect(screen.getByLabelText(/업무키/)).toHaveFocus()
+    expect(screen.getByLabelText(/지급 관리번호/)).toHaveFocus()
   })
   it('requires attribution and evidence but allows an imbalanced draft for server precheck', async () => {
     const { user } = mount()
@@ -605,7 +608,7 @@ describe('TRAN-W02 legacy defect regressions (#410)', () => {
       expect(button('btn-confirm')).toBeEnabled()
       expect(button('btn-precheck')).toBeDisabled()
       expect(button('btn-save')).toBeDisabled()
-      expect(screen.getByLabelText(/업무키/)).toBeDisabled()
+      expect(screen.getByLabelText(/지급 관리번호/)).toBeDisabled()
       await user.click(button('btn-precheck'))
       expect(writes().filter(([path]) => path.endsWith('/precheck'))).toHaveLength(1)
       expect(screen.getByText(/확정 창을 다시 열어/)).toBeVisible()
@@ -793,7 +796,7 @@ describe('CAP rejection recovery and resolved transport failures (#410)', () => 
     await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
     await waitFor(() => expect(within(dialog).getByRole('button', { name: '확정 실행' })).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: '취소' }))
-    expect(screen.getByLabelText(/업무키/)).toBeDisabled()
+    expect(screen.getByLabelText(/지급 관리번호/)).toBeDisabled()
     mutation = () => {
       throw new ApiError({ code: 'FGC-TRAN-004', message: '증빙 필요' }, 'REJECT', 422)
     }
@@ -802,7 +805,7 @@ describe('CAP rejection recovery and resolved transport failures (#410)', () => 
     await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
     await within(dialog).findByText('증빙 필요 (요청번호: REJECT)')
     await user.click(within(dialog).getByRole('button', { name: '취소' }))
-    expect(screen.getByLabelText(/업무키/)).toBeEnabled()
+    expect(screen.getByLabelText(/지급 관리번호/)).toBeEnabled()
     expect(button('btn-save')).toBeEnabled()
     expect(button('btn-precheck')).toBeEnabled()
     expect(button('btn-confirm')).toBeDisabled()
@@ -846,6 +849,33 @@ describe('read-only guide projection on the real payment form', () => {
 })
 
 describe('FUN-087 real form observer', () => {
+  it.each(['changed revision', 'rejected evidence'])(
+    'keeps a successful draft update when guide evidence has %s',
+    async (failure) => {
+      vi.stubEnv('VITE_ASSISTANT_AI', 'true')
+      const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+      const amount = await screen.findByLabelText(/금액 \(원\)/)
+      await waitFor(() => expect(amount).toBeEnabled())
+      await user.clear(amount)
+      await user.type(amount, '123000')
+      const observer = getPaymentGuideObserver()!
+      if (failure === 'rejected evidence') vi.spyOn(observer, 'acceptSaved').mockReturnValue(false)
+      mutation = () => {
+        if (failure === 'changed revision') observer.invalidateInput()
+        return { ...saved, amount: 123000 }
+      }
+
+      await user.click(button('btn-save'))
+
+      await waitFor(() => expect(button('btn-precheck')).toBeEnabled(), { timeout: 1000 })
+      expect(clients[0].getQueryData(draftQuery('77').queryKey)).toMatchObject({ amount: 123000 })
+      await waitFor(() => expect(useGuideRuntime.getState().observation?.saved).toBe(true))
+      expect(screen.queryByText('저장된 지급 초안을 확인할 수 없습니다.')).not.toBeInTheDocument()
+      expect(writes().filter(([, options]) => options?.method === 'PUT')).toHaveLength(1)
+    },
+    15_000,
+  )
+
   const read = async () => {
     const observer = getPaymentGuideObserver()!
     const context = observer.readContext()
@@ -1007,6 +1037,21 @@ describe('FUN-087 guide card and spotlight', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
   const panel = () => screen.getByRole('region', { name: '지급 업무 가이드' })
+  it('keeps the payment guide owned while folded for chat and releases it only on close', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    await user.click(within(panel()).getByRole('button', { name: '지급 초안 저장' }))
+    await waitFor(() => expect(useWorkflowGuide.getState().guideContext?.workflowId).toBe('payment.draft'))
+    act(() => useWorkflowGuide.getState().requestChat())
+    expect(within(panel()).getByRole('button', { name: '펼치기' })).toBeVisible()
+    expect(useWorkflowGuide.getState().paymentActive).toBe(true)
+    act(() => useWorkflowGuide.getState().start('contract.register'))
+    expect(useWorkflowGuide.getState().request).toBeNull()
+    expect(writes()).toHaveLength(0)
+    await user.click(within(panel()).getByRole('button', { name: '가이드 종료' }))
+    await waitFor(() => expect(useWorkflowGuide.getState().paymentActive).toBe(false))
+  })
   const next = async (user: ReturnType<typeof userEvent.setup>, acknowledgement = false) => {
     const control = within(panel()).getByRole('button', {
       name: acknowledgement ? '확인하고 다음' : '다음',
@@ -1066,7 +1111,7 @@ describe('FUN-087 guide card and spotlight', () => {
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
     await user.click(screen.getByRole('button', { name: '도움말' }))
-    await user.click(within(panel()).getByRole('button', { name: '지급 사전검증·확정' }))
+    await user.click(within(panel()).getByRole('button', { name: '지급 사전검증/확정' }))
     await next(user, true)
     await waitFor(() => expect(within(panel()).getByRole('heading')).toHaveTextContent('사전검증을 실행하세요'))
     expect(writes()).toHaveLength(0)

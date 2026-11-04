@@ -11,20 +11,34 @@ const user: ShellUser = {
   canViewAuditLog: false,
 }
 afterEach(() => vi.unstubAllEnvs())
-const open = () => userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' }))
+const open = () => userEvent.click(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' }))
+
+it('keeps the launcher in the app header and opens chat from that slot', async () => {
+  const headerSlot = document.createElement('div')
+  headerSlot.id = 'app-header-assistant'
+  document.body.append(headerSlot)
+  const view = render(<PicoAssistant canProcess />)
+  try {
+    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toBeInTheDocument()
+    await open()
+    expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveFocus()
+    await userEvent.click(screen.getByRole('button', { name: '비서 닫기' }))
+    expect(within(headerSlot).getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveFocus()
+  } finally { view.unmount(); headerSlot.remove() }
+})
 
 it('requires explicit demo opt-in and hides for AGENT, unknown roles and logout', () => {
   vi.stubEnv('VITE_ASSISTANT_DEMO', '')
   const view = render(<AssistantDemoMount user={user} />)
-  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기, 피코' })).not.toBeInTheDocument()
   view.rerender(<AssistantDemoMount user={user} enabled />)
-  expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toBeInTheDocument()
   for (const roleCode of ['AGENT', 'UNKNOWN']) {
     view.rerender(<AssistantDemoMount user={{ ...user, roleCode }} enabled />)
-    expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '업무 비서 AI 열기, 피코' })).not.toBeInTheDocument()
   }
   view.rerender(<AssistantDemoMount user={user} enabled loggingOut />)
-  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기 · 피코' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '업무 비서 AI 열기, 피코' })).not.toBeInTheDocument()
 })
 it('opens closed-by-default chat, preserves the four removals and restores keyboard focus', async () => {
   render(<PicoAssistant canProcess />)
@@ -33,12 +47,12 @@ it('opens closed-by-default chat, preserves the four removals and restores keybo
   expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveFocus()
   expect(screen.queryByText('현재 보고 있는 업무')).not.toBeInTheDocument()
   // CMN-C04 (화면정의서 v3.0 :3267): one context line above the question box, not a card.
-  expect(screen.getByText(/^현재 화면 .+ · 대상 선택 없음 · 기준월 /)).toBeInTheDocument()
+  expect(screen.getByText(/^현재 화면 .+, 대상 선택 없음, 기준월 /)).toBeInTheDocument()
   expect(screen.queryByText('PICO WORKFLOW ASSISTANT')).not.toBeInTheDocument()
   expect(document.querySelector('.launcher-dot,.pico-launcher-dot,.live-dot')).not.toBeInTheDocument()
   await userEvent.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '업무 비서 AI 열기 · 피코' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: '업무 비서 AI 열기, 피코' })).toHaveFocus()
 })
 it('renders a selected fixture and read-only plan without a financial request', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No financial calls'))
@@ -49,7 +63,7 @@ it('renders a selected fixture and read-only plan without a financial request', 
     expect(screen.getByText(/저장된 대상 확인 후/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '안내 순서 보기' }))
     const panel = screen.getByRole('tabpanel')
-    expect(within(panel).getByRole('heading', { name: '지급 사전검증·확정' })).toBeInTheDocument()
+    expect(within(panel).getByRole('heading', { name: '지급 사전검증/확정' })).toBeInTheDocument()
     expect(within(panel).getAllByRole('listitem')).toHaveLength(5)
     expect(within(panel).getByText(/시연 순서와 별개로 현재 지급 화면의 고정 도움말/)).toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalled()
@@ -62,7 +76,7 @@ it('discloses free text as unconnected instead of faking an AI answer or running
   await open()
   await userEvent.type(screen.getByRole('textbox', { name: '피코에게 질문' }), '지급액을 999999원으로 확정해줘')
   await userEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
-  expect(screen.getByText(/자유 질문 해석은 아직 연결하지 않았어요/)).toBeInTheDocument()
+  expect(screen.getByText(/시연 질문에만 답해요/)).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '안내 순서 보기' })).not.toBeInTheDocument()
   expect(screen.getByRole('textbox', { name: '피코에게 질문' })).toHaveValue('')
 })
@@ -76,7 +90,7 @@ it('shows synthetic amount, basis and missing/unsupported/stale states through e
   for (const [scenario, label] of [
     ['PAY-03', '미귀속 10000원'],
     ['PAY-05', '자료 부족'],
-    ['PAY-11', '지원 준비 중'],
+    ['PAY-11', '이 계산은 여기서 볼 수 없어요'],
     ['PAY-12', '다시 확인 필요'],
   ]) {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '시연 상황' }), scenario)

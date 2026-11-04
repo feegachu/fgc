@@ -177,7 +177,7 @@ export default function ClawbackPage() {
           >
             <option value="">{agents.error ? '설계사 조회 실패' : agents.isLoading ? '불러오는 중…' : '전체'}</option>
             {/* 목록을 아직 받지 않았어도 URL에서 온 선택값은 유지한다. */}
-            {!agents.data && draft.agentId ? <option value={draft.agentId}>설계사 #{draft.agentId}</option> : null}
+            {!agents.data && draft.agentId ? <option value={draft.agentId}>선택한 설계사</option> : null}
             {agents.data?.map((row) => (
               <option key={row.agentId} value={row.agentId}>
                 {nameWithCode(row.agentName, row.agentCode)}
