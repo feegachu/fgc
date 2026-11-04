@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import type { Browser, Locator, Page } from '@playwright/test'
 import { matchPath } from 'react-router'
 import { canOpen, screens } from '../src/app/screens'
@@ -117,14 +117,6 @@ const visibleText = (page: Page) =>
     return `${text}\n${hints.join('\n')}`
   })
 
-let dumpNo = 0
-async function dump(page: Page, role: string, route: string, step: string) {
-  const name = `e2e-artifacts/screens/${role}${route.replace(/[^a-zA-Z0-9]+/g, '_')}-${String(dumpNo++).padStart(4, '0')}-${step.replace(/[^\p{L}\p{N}]+/gu, '_')}`
-  mkdirSync('e2e-artifacts/screens', { recursive: true })
-  writeFileSync(`${name}.txt`, await visibleText(page))
-  await page.screenshot({ path: `${name}.png`, fullPage: true }).catch(() => undefined)
-}
-
 /** 글자를 읽는 시험이라 떠 있는 안내나 열린 창에 가려져도 누른다. */
 const press = (control: Locator) => control.evaluate((element: HTMLElement) => element.click())
 
@@ -237,17 +229,14 @@ async function walkRole(
 
   while (queue.length) {
     const target = queue.shift()!
+    visited.add(routePattern(pathnameOf(target.path)))
     const route = target.label ?? routePattern(pathnameOf(target.path))
     begin(route)
     const url = new URL(target.path, 'http://fgc.test')
     url.searchParams.set('month', month)
     await page.goto(`${url.pathname.slice(1)}${url.search}`)
     await settle(page)
-    let step = 0
-    const check = async () => {
-      scan(await visibleText(page), role, route, findings)
-      await dump(page, role, route, String(step++))
-    }
+    const check = async () => scan(await visibleText(page), role, route, findings)
     await check()
     const clickTabs = async () => {
       for (const tab of await page.locator('main [role=tab]').all()) {
@@ -275,12 +264,10 @@ async function walkRole(
     await press(page.getByRole('button', { name }).first())
     await settle(page)
     scan(await visibleText(page), role, current!.route, findings)
-    await dump(page, role, current!.route, 'overlay')
     for (const tab of await page.locator('[role=dialog] [role=tab]').all()) {
       await press(tab)
       await settle(page)
       scan(await visibleText(page), role, current!.route, findings)
-      await dump(page, role, current!.route, 'overlay-tab')
     }
     await finish()
   }
@@ -315,6 +302,21 @@ function transferTable(visits: Visit[]) {
     ...rows,
   ].join('\n')
 }
+
+test('검사 규칙은 코드를 잡고 업무 표기는 통과시킨다', () => {
+  const flagged = (text: string, route = '/contracts') => {
+    const found: Finding[] = []
+    scan(text, '시험', route, found)
+    return found.map((item) => item.match)
+  }
+  for (const leak of ['FGC-VRUN-003', 'MANUAL_CONTRACT', 'FINALIZED', 'validationRunId', 'journal_no', 'undefined', '[object Object]', 'IllegalStateException', 'FUN-045', 'IF-API-49', 'REG-08', 'VRUN-W02', '체크포인트'])
+    expect(flagged(`실패: ${leak} 확인`), leak).toContain(leak)
+  for (const shown of ['FGC-FGL01-202607-0001', 'FGC-B0101', 'A-FC-001', 'JV-2026-07-0010', 'GA→설계사', 'CSV 내보내기', 'GA-CUR-2026-V1', 'CLAW-GA-VIRTUAL-2026', '2026-CURRENT-A', 'STD-SAV-A', '요청번호 20261104-abcdef'])
+    expect(flagged(`표시: ${shown}`), shown).toEqual([])
+  expect(flagged('근거 REG-08, SRC-022', '/policies?policyVersionId=2')).toEqual([])
+  expect(flagged('BASE_COMMISSION', '/base')).toEqual([])
+  expect(flagged('validationRunId', '/base')).toEqual(['validationRunId'])
+})
 
 test('실사용자 화면에 개발 용어와 코드가 보이지 않고 콘솔 오류가 없다', async ({ page, browser, baseURL }, testInfo) => {
   test.setTimeout(20 * 60_000)
@@ -368,10 +370,6 @@ test('실사용자 화면에 개발 용어와 코드가 보이지 않고 콘솔 
       testInfo.annotations.push({ type: 'API 응답 1MB 초과', description: `${visit.route} ${visit.largestApi?.url} ${kb(visit.largestApi?.bytes ?? 0)}KB` })
     await testInfo.attach('화면 언어 일치 목록', { body: JSON.stringify(findings, null, 2), contentType: 'application/json' })
     await testInfo.attach('라우트별 전송량', { body: transferTable(visits), contentType: 'text/markdown' })
-    mkdirSync('e2e-artifacts', { recursive: true })
-    writeFileSync('e2e-artifacts/screen-language-findings.json', JSON.stringify(findings, null, 2))
-    writeFileSync('e2e-artifacts/screen-language-visits.json', JSON.stringify(visits, null, 2))
-    writeFileSync('e2e-artifacts/screen-language-transfer.md', transferTable(visits))
   }
 
   expect.soft(missing, '역할이 열 수 있는데 돌지 못한 라우트').toEqual([])
