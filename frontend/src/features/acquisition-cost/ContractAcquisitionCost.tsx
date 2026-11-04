@@ -16,6 +16,7 @@ export function ContractAcquisitionCost({ contractId, contractNo }: { contractId
   const query = useQuery(contractAcquisitionQuery(contractId, stage))
   const mutation = useRequestAcquisitionCheck()
   const latest = query.data?.content?.find((row) => row.paymentStage === stage)
+  const requestCheck = () => mutation.mutate({ contractId: Number(contractId), paymentStage: stage })
   return (
     <div className="acq-contract">
       <div className="acq-contract-actions">
@@ -38,7 +39,7 @@ export function ContractAcquisitionCost({ contractId, contractNo }: { contractId
             data-guide-feature="features.acquisition-cost.contract-acquisition-cost.button"
             loading={mutation.isPending}
             disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ contractId: Number(contractId), paymentStage: stage })}
+            onClick={requestCheck}
           >
             검증 요청
           </Button>
@@ -53,7 +54,7 @@ export function ContractAcquisitionCost({ contractId, contractNo }: { contractId
         </Link>
       </div>
       {mutation.error && (
-        <AcquisitionFailure error={mutation.error} retry={() => void query.refetch()} />
+        <AcquisitionFailure error={mutation.error} retry={requestCheck} reload={() => void query.refetch()} />
       )}
       {query.error ? (
         <AcquisitionFailure error={query.error} retry={() => void query.refetch()} />

@@ -134,7 +134,7 @@ public class AcquisitionCostCheckRepository {
     }
 
     /**
-     * 제외 증빙은 그 회차에 귀속된 확정 지급의 제4-32조제7항제3호 제외 기록이 모두 증빙을 가질 때만 인정한다(CapScheduleAmountQueryRepository와 같은 기준).
+     * 제외 증빙은 그 회차에 귀속된 확정 지급의 제4-32조제7항제3호 제외 기록이 모두 증빙을 갖고 귀속 합계가 회차 금액 이상일 때만 인정한다(CapScheduleAmountQueryRepository와 같은 기준).
      * shortcut: 재생성 전 판의 귀속은 따라가지 않는다. 제외되지 않아 검토 필요로만 틀리며, 4년·7년 회차의 지급 확정이 열리면 계보 조회를 붙인다.
      */
     public List<Line> findLines(long scheduleHeaderId) {
@@ -142,6 +142,7 @@ public class AcquisitionCostCheckRepository {
                 SELECT sl.schedule_line_id, sl.installment_no, ci.item_code, ci.item_name, cr.fee_component_type,
                        sl.expected_amount,
                        (SELECT CASE WHEN COUNT(*) > 0 AND BOOL_AND(NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL)
+                                         AND SUM(ta.attributed_amount) >= sl.expected_amount
                                     THEN MIN(NULLIF(BTRIM(ta.evidence_ref), '')) END
                           FROM fgc.transaction_attribution ta
                           JOIN fgc.commission_transaction ct

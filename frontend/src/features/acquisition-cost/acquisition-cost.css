@@ -43,7 +43,7 @@
 }
 .acq-limits {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
   gap: var(--space-3);
 }
 .acq-limit {
@@ -79,7 +79,7 @@
 }
 /* 넓은 계약 상세에서 이름과 값이 멀어지지 않게 나눈다. 좁은 분할 화면에서는 한 줄씩이다. */
 .acq-facts {
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   column-gap: var(--space-6);
 }
 .acq-limit dl > div,

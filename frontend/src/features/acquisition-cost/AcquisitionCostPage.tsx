@@ -170,7 +170,8 @@ function RequestCheckModal({ onClose, onDone }: { onClose: () => void; onDone: (
         {mutation.error && (
           <AcquisitionFailure
             error={mutation.error}
-            retry={() => void client.invalidateQueries({ queryKey: ['acquisition-cost'] })}
+            retry={submit}
+            reload={() => void client.invalidateQueries({ queryKey: ['acquisition-cost'] })}
           />
         )}
       </div>

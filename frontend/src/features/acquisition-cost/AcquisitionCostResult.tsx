@@ -217,7 +217,16 @@ export function AcquisitionCostResult({ check }: { check: AcquisitionCheck }) {
 }
 
 /** 실패를 0건이나 0원으로 보이지 않는다. 403은 다른 결과를 보이지 않고, 409는 입력을 지우지 않고 다시 조회하게 한다. */
-export function AcquisitionFailure({ error, retry }: { error: Error; retry?: () => void }) {
+/** retry는 [다시 시도], reload는 409의 [다시 조회]. 조회 실패는 둘이 같아 retry만 넘긴다. */
+export function AcquisitionFailure({
+  error,
+  retry,
+  reload = retry,
+}: {
+  error: Error
+  retry?: () => void
+  reload?: () => void
+}) {
   const status = error instanceof ApiError ? error.status : undefined
   const message =
     status === 403
@@ -230,7 +239,7 @@ export function AcquisitionFailure({ error, retry }: { error: Error; retry?: () 
       <p>{message}</p>
       {status === 422 && error instanceof ApiError && error.field && <p>확인할 항목: {error.field}</p>}
       {retry && status !== 403 && (
-        <Button data-guide-feature="features.acquisition-cost.acquisition-cost-result.button" variant="secondary" onClick={retry}>
+        <Button data-guide-feature="features.acquisition-cost.acquisition-cost-result.button" variant="secondary" onClick={status === 409 ? reload : retry}>
           {status === 409 ? '다시 조회' : '다시 시도'}
         </Button>
       )}

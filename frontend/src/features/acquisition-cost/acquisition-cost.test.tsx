@@ -412,7 +412,8 @@ describe('ACQC-W01 검증 요청', () => {
     // 실패해도 입력은 그대로다.
     expect(within(dialog).getByLabelText(/계약/)).toHaveValue('ACQ-001, 가상 종신')
 
-    await user.click(within(dialog).getByRole('button', { name: '검증 요청' }))
+    // [다시 시도]는 목록만 다시 읽지 않고 같은 키로 요청을 다시 보낸다.
+    await user.click(within(dialog).getByRole('button', { name: '다시 시도' }))
     await waitFor(() => expect(within(dialog).getByRole('button', { name: /검증 요청/ })).toBeDisabled())
     await user.keyboard('{Escape}')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -529,6 +530,31 @@ describe('CONT-W02 계약체결비용 영역', () => {
     expect((posts(request as never)[0][1] as { body: unknown }).body).toEqual({ contractId: 10, paymentStage: 'GA_TO_FC' })
     await user.click(screen.getByRole('link', { name: '전체 결과 보기' }))
     expect(router.state.location.search).toBe('?contractNo=ACQ-001')
+  })
+
+  it('요청 실패의 다시 시도는 같은 키로 다시 보내고 409의 다시 조회는 결과만 새로 읽는다', async () => {
+    let attempt = 0
+    let lists = 0
+    const { request, user } = mountContract((_, options) => {
+      if (options?.method !== 'POST') {
+        lists += 1
+        return page([])
+      }
+      attempt += 1
+      if (attempt === 1) throw new TypeError('Failed to fetch')
+      throw failure(409, 'FGC-IMPL-REQUEST_IN_PROGRESS', '같은 요청을 처리하고 있습니다.')
+    })
+    await user.click(await screen.findByRole('button', { name: '검증 요청' }))
+    await user.click(await screen.findByRole('button', { name: '다시 시도' }))
+    const reload = await screen.findByRole('button', { name: '다시 조회' })
+    const keys = posts(request).map(([, options]) => (options as { idempotencyKey: string }).idempotencyKey)
+    expect(keys).toHaveLength(2)
+    expect(keys[1]).toBe(keys[0])
+
+    const before = lists
+    await user.click(reload)
+    await waitFor(() => expect(lists).toBeGreaterThan(before))
+    expect(posts(request)).toHaveLength(2)
   })
 
   it('요청 실패와 조회 실패를 0건으로 표시하지 않고 읽기 역할에는 버튼이 없다', async () => {

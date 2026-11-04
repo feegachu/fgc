@@ -328,6 +328,28 @@ class AcquisitionCostCheckIntegrationTest {
                 .andExpect(jsonPath("$.data.exclusions[0].evidenceRef").value("EVD-NEWCOMER-651"));
     }
 
+    @Test
+    void exclusionNeedsEvidencedAttributionCoveringTheWholeInstallment() throws Exception {
+        long policy = paymentPolicy("3000");
+        long header = schedule(policy);
+        scheduleLine(header, 1, "BASE_COMMISSION", policy, "UPFRONT", "3000000");
+        long newcomer = scheduleLine(header, 1, "NEWCOMER_SUPPORT", policy, "NEWCOMER_SUPPORT", "300000");
+        String confirm = "UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?";
+
+        // 1원 모자라면 미지급분까지 빼지 않는다. 회차 전체를 넣고 검토 사유를 남긴다.
+        jdbc.update(confirm, excludedPayment(newcomer, "EVD-NEWCOMER-651", new BigDecimal("299999")));
+        check().andExpect(jsonPath("$.data.resultStatus").value("VIOLATION"))
+                .andExpect(jsonPath("$.data.upfront.calculatedAmount").value(3300000))
+                .andExpect(jsonPath("$.data.exclusions[0].excluded").value(false))
+                .andExpect(jsonPath("$.data.reasons[0].code").value("EXCLUSION_EVIDENCE_MISSING"));
+
+        // 귀속 합계가 회차 금액과 같으면 뺀다.
+        jdbc.update(confirm, excludedPayment(newcomer, "EVD-NEWCOMER-651", new BigDecimal("1")));
+        check().andExpect(jsonPath("$.data.resultStatus").value("NORMAL"))
+                .andExpect(jsonPath("$.data.upfront.calculatedAmount").value(3000000))
+                .andExpect(jsonPath("$.data.exclusions[0].excluded").value(true));
+    }
+
     // ── 예정 생성과의 경계, 확정 ───────────────────────────────────────────
 
     @Test
@@ -582,8 +604,12 @@ class AcquisitionCostCheckIntegrationTest {
 
     /** 제외 증빙이 달린 초안 지급. */
     private long excludedPayment(long scheduleLine, String evidence) {
-        long item = jdbc.queryForObject("SELECT commission_item_id FROM fgc.schedule_line WHERE schedule_line_id = ?", Long.class, scheduleLine);
         BigDecimal amount = jdbc.queryForObject("SELECT expected_amount FROM fgc.schedule_line WHERE schedule_line_id = ?", BigDecimal.class, scheduleLine);
+        return excludedPayment(scheduleLine, evidence, amount);
+    }
+
+    private long excludedPayment(long scheduleLine, String evidence, BigDecimal amount) {
+        long item = jdbc.queryForObject("SELECT commission_item_id FROM fgc.schedule_line WHERE schedule_line_id = ?", Long.class, scheduleLine);
         long transaction = jdbc.queryForObject("""
                 INSERT INTO fgc.commission_transaction(payment_stage, source_type, source_business_key, insurer_id,
                     recipient_agent_id, commission_item_id, settlement_month, paid_on, amount, cashflow_type, installment_no)
