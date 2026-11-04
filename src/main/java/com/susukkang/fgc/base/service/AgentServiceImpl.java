@@ -54,7 +54,9 @@ public class AgentServiceImpl implements AgentService {
         Pageable pageable = JpaListSort.pageable(page, size, sort, SORTABLE, Sort.by(Sort.Direction.ASC, "agentCode"));
 
         if (criteria.selectedId() != null && criteria.selectedId() < 1) throw validationException("selectedId");
-        Page<AgentResponse> result = (criteria.selectedId() != null
+        Page<AgentResponse> result = (criteria.branchId() != null
+                ? agentRepository.searchBranch(criteria.branchId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), pageable)
+                : criteria.selectedId() != null
                 ? agentRepository.search(criteria.selectedId(), criteria.organizationId(), normalizedKeyword, criteria.asOf(),
                     criteria.includeTerminated(), criteria.includeHistorical(), pageable)
                 : criteria.includeHistorical()
@@ -68,6 +70,9 @@ public class AgentServiceImpl implements AgentService {
     private void validateCriteria(AgentSearchCriteria criteria) {
         if (criteria.organizationId() != null && criteria.organizationId() < 1) {
             throw validationException("organizationId");
+        }
+        if (criteria.branchId() != null && criteria.branchId() < 1) {
+            throw validationException("branchId");
         }
     }
 

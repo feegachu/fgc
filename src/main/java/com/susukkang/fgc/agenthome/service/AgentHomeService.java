@@ -56,7 +56,7 @@ public class AgentHomeService {
     static final int PRIORITY_LIMIT = 20;
     static final String UNKNOWN = "UNKNOWN";
     /** 사람 확인이 필요한 상태 사건. 프로젝트 가정이며 정상화(ACTIVE)·청약 단계는 후보로 만들지 않는다. */
-    static final List<String> REVIEW_EVENT_STATUSES = List.of("UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED");
+    public static final List<String> REVIEW_EVENT_STATUSES = List.of("UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED");
     private static final Set<String> PERIODS = Set.of("6", "12", "ALL");
     private static final Set<String> INSURER_TYPES = Set.of("ALL", "LIFE", "NON_LIFE");
     private static final Map<String, String> CATEGORY_LABEL = Map.of(

@@ -92,6 +92,63 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     }
 
     /**
+     * FUN-080 관리자 홈의 지점 선택. 설계사는 대개 팀에 소속되므로 지점과 바로 아래 팀 소속을 함께 찾는다.
+     * 조직 단계상 지점 아래는 팀뿐이다(organization_type). 기존 organizationId 조건은 입력 화면이 쓰므로 그대로 둔다.
+     */
+    @Query(value = """
+            SELECT new com.susukkang.fgc.base.dto.AgentRow(
+                a.agentId,
+                a.agentCode,
+                a.agentName,
+                CAST(a.rankCode AS String),
+                a.organizationId,
+                o.organizationCode,
+                o.organizationName,
+                a.appointmentDate,
+                a.terminationDate,
+                a.agentStatus,
+                a.latestRegistrationDate,
+                a.priorThreeYearExperienceYn,
+                a.experienceCheckedOn,
+                a.newcomerSupportEligibleYn,
+                a.newcomerSupportEndDate,
+                a.activeYn
+            )
+            FROM Agent a
+            JOIN Organization o ON o.organizationId = a.organizationId
+            WHERE a.appointmentDate <= :asOf
+              AND (:includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
+              AND (a.organizationId = :branchId
+                   OR (o.parentId = :branchId AND o.organizationType = com.susukkang.fgc.base.code.OrganizationType.TEAM))
+              AND (
+                  CAST(:keyword AS String) IS NULL
+                  OR LOWER(a.agentCode) LIKE CONCAT('%', LOWER(CAST(:keyword AS String)), '%')
+                  OR LOWER(a.agentName) LIKE CONCAT('%', LOWER(CAST(:keyword AS String)), '%')
+              )
+            """,
+            countQuery = """
+            SELECT COUNT(a)
+            FROM Agent a
+            JOIN Organization o ON o.organizationId = a.organizationId
+            WHERE a.appointmentDate <= :asOf
+              AND (:includeTerminated = TRUE OR a.terminationDate IS NULL OR a.terminationDate >= :asOf)
+              AND (a.organizationId = :branchId
+                   OR (o.parentId = :branchId AND o.organizationType = com.susukkang.fgc.base.code.OrganizationType.TEAM))
+              AND (
+                  CAST(:keyword AS String) IS NULL
+                  OR LOWER(a.agentCode) LIKE CONCAT('%', LOWER(CAST(:keyword AS String)), '%')
+                  OR LOWER(a.agentName) LIKE CONCAT('%', LOWER(CAST(:keyword AS String)), '%')
+              )
+            """)
+    Page<AgentRow> searchBranch(
+            @Param("branchId") Long branchId,
+            @Param("keyword") String keyword,
+            @Param("asOf") LocalDate asOf,
+            @Param("includeTerminated") boolean includeTerminated,
+            Pageable pageable
+    );
+
+    /**
      * 소속 조직부터 상위 조직을 탐색해 가장 가까운 활성 설계사 ID를 반환한다.
      * 같은 조직에 여러 명이면 ID가 작은 설계사를 선택하고, 없으면 null을 반환한다.
      * 재귀 계층 탐색은 PostgreSQL 네이티브 SQL로 유지한다.

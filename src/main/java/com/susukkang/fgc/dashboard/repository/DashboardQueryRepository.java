@@ -1,7 +1,10 @@
 package com.susukkang.fgc.dashboard.repository;
 
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.dashboard.dto.RecentExceptionRow;
 import com.susukkang.fgc.dashboard.dto.RecentValidationRunRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
+import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseQueryRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.NativeQuery;
@@ -26,6 +29,7 @@ import java.util.List;
 public class DashboardQueryRepository {
 
     private final EntityManager entityManager;
+    private final ExceptionCaseQueryRepository exceptionCaseQueryRepository;
 
     public long countCapViolation(LocalDate month) {
         return countCapByStatus(month, "VIOLATION");
@@ -105,13 +109,10 @@ public class DashboardQueryRepository {
                 .getSingleResult()).longValue();
     }
 
+    /** 예외함 미처리 목록의 건수와 같은 쿼리를 쓴다(FUN-057·080). */
     public long countOpenException() {
-        return ((Number) entityManager.createNativeQuery("""
-                SELECT COUNT(*)
-                  FROM fgc.exception_case
-                 WHERE status IN ('NEW', 'IN_REVIEW')
-                """)
-                .getSingleResult()).longValue();
+        return exceptionCaseQueryRepository.count(new ExceptionCaseSearchDTO(),
+                ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER));
     }
 
     public List<RecentExceptionRow> findRecentExceptions(int limit) {
