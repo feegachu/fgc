@@ -97,6 +97,21 @@ class CommissionPaymentApiControllerTest {
     @MockitoBean
     private ConstraintErrorCodeResolver constraintErrorCodeResolver;
 
+    @MockitoBean private org.springframework.transaction.PlatformTransactionManager transactions;
+    @org.junit.jupiter.api.BeforeEach void configureSnapshotTransactions() {
+        given(transactions.getTransaction(any())).willAnswer(invocation -> new org.springframework.transaction.support.SimpleTransactionStatus());
+    }
+
+    @Test void optionalProofFailurePreservesPrecheckJsonAndOmitsHeader() throws Exception {
+        var result=new TransactionPrecheckResponse(101L,List.of(),List.of(),true);
+        given(commissionPaymentService.precheck(101L)).willReturn(result);
+        given(precheckProofs.issuePrecheck(101L)).willThrow(new IllegalStateException("proof unavailable"));
+        mockMvc.perform(post("/api/v1/transactions/101/precheck").with(user("settlement01").roles("SETTLEMENT")).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.confirmable").value(true))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().doesNotExist("X-FGC-Precheck-Token"));
+        verify(commissionPaymentService,org.mockito.Mockito.times(2)).precheck(101L);
+    }
+
     @Test
     void bindsAttributionImbalanceFilterFromFinalizeChecklistLink() throws Exception {
         given(commissionPaymentService.search(any(CommissionPaymentSearchCondition.class), eq(1), eq(20)))

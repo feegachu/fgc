@@ -49,7 +49,8 @@ class PaymentCalculationIntegrationTest {
         assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.amounts()).isEmpty();assertThat(stale.recommendation().allowed()).isFalse();
     }
 
-    @Autowired com.susukkang.fgc.assistant.service.CalculationDependencyFingerprint fingerprints;
+    @MockitoSpyBean com.susukkang.fgc.assistant.service.CalculationDependencyFingerprint fingerprints;
+    @Autowired com.susukkang.fgc.assistant.service.AssistantPrecheckProofService precheckProofs;
     @Test void dependencyQueryIsRepeatableAndMeasuresSeedCost() {
         var transaction=new TransactionTemplate(transactionManager);
         transaction.setReadOnly(true);transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
@@ -62,6 +63,23 @@ class PaymentCalculationIntegrationTest {
             }
         });
         System.out.println("#733 dependency SHA256 query seed timings(ms): "+durations);
+    }
+
+    @Test void failedProofSqlRollsBackBeforeFreshPrecheckWithoutBusinessWrites() {
+        var expected=payments.precheck(paymentId);
+        assertThat(expected.confirmable()).as("fixture permits a real precheck proof attempt").isTrue();
+        var before=counts();
+        doAnswer(invocation -> {
+            assertThat(jdbc.queryForObject("SHOW transaction_read_only",String.class)).isEqualTo("on");
+            assertThat(jdbc.queryForObject("SHOW transaction_isolation",String.class)).isEqualTo("repeatable read");
+            jdbc.execute("SELECT 1 / 0");
+            return invocation.callRealMethod();
+        }).when(fingerprints).current();
+        var checked=precheckProofs.check(paymentId);
+        assertThat(checked.token()).isNull();assertThat(checked.result()).isEqualTo(expected);
+        assertThat(jdbc.queryForObject("SELECT 1",Integer.class)).isEqualTo(1);
+        assertThat(counts()).isEqualTo(before);
+        org.mockito.Mockito.verify(fingerprints).current();
     }
 
     @BeforeEach void createOwnedCommittedDraft() {
