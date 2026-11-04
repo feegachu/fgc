@@ -1,6 +1,6 @@
 import { getPaymentGuideObserver, paymentGuideConditions } from './payment-guide'
 import { selectOption } from '../../test/selectOption'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useWorkflowGuide } from '../assistant/workflow-state'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -746,20 +746,21 @@ describe('오래된 지급 초안 저장 (#753)', () => {
   const detailReads = () =>
     vi.mocked(apiClient.request).mock.calls.filter(([path, options]) => path === '/api/v1/transactions/77' && !options?.method)
 
-  it('수정 저장은 상세의 수정 시각을 원문 그대로 보내고 신규 저장에는 보내지 않는다', async () => {
-    const edit = mount('/app/transactions/new?id=77&month=2026-07')
+  it('수정 저장은 상세의 수정 시각을 원문 그대로 보낸다', async () => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-save')).toBeEnabled())
-    await edit.user.click(button('btn-save'))
+    await user.click(button('btn-save'))
     await screen.findByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')
     expect(writes()[0][1]).toMatchObject({ method: 'PUT', body: { expectedUpdatedAt: saved.updatedAt } })
-    cleanup()
+  })
 
-    const create = mount()
-    await fillNew(create.user)
-    await create.user.click(button('btn-save'))
+  it('신규 저장에는 수정 시각을 보내지 않는다', async () => {
+    const { user } = mount()
+    await fillNew(user)
+    await user.click(button('btn-save'))
     await screen.findByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')
-    expect(writes()[1][1]?.method).toBe('POST')
-    expect(writes()[1][1]?.body).not.toHaveProperty('expectedUpdatedAt')
+    expect(writes()[0][1]?.method).toBe('POST')
+    expect(writes()[0][1]?.body).not.toHaveProperty('expectedUpdatedAt')
   })
 
   it('409 충돌 후 입력과 토큰을 유지하고, 명시적인 재조회 후에만 저장한다', async () => {
