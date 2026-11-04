@@ -785,6 +785,76 @@
     "element": "textarea"
   },
   {
+    "id": "features.agent-statement.agent-statement-page.agent-select",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.contract-input",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.contract-link",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-basic",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-close-button",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-evidence",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-panel",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.item-select",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.list-panel",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.list-retry-button",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.month-input",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.row-evidence-button",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.summary",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.type-select",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "select"
+  },
+  {
     "id": "features.arbitrage.arbitrage-amount-summary.button",
     "file": "features/arbitrage/ArbitrageAmountSummary.tsx",
     "element": "button"
