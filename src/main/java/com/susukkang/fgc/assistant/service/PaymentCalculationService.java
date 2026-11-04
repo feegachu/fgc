@@ -29,6 +29,7 @@ import java.util.*;
 public class PaymentCalculationService {
     private final CommissionPaymentService payments;
     private final ObjectMapper mapper;
+    private final AssistantCalculationSources sources;
     private static final Set<String> CAP_MONEY = Set.of("basePremiumAmount", "refund12mAmount", "complianceDeductionAmount", "limitAmount", "existingIncludedAmount", "candidateAmount", "includedAmount", "remainingAmount");
     private static final Set<String> CAP_IDS = Set.of("contractId", "capRuleSetId", "capCheckId");
 
@@ -36,6 +37,7 @@ public class PaymentCalculationService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PaymentCalculationSnapshot calculate(PaymentCalculationRequest request) {
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) requireProcessing();
+        if ((request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL && request.kind()==PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE) || Set.of(PaymentCalculationRequest.Kind.EXPECTED_COMMISSION, PaymentCalculationRequest.Kind.CAP_STATUS, PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE).contains(request.kind())) return sources.calculate(request);
         if (request.mode() != PaymentCalculationRequest.Mode.EXISTING ||
                 !Set.of(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE, PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE).contains(request.kind()))
             return result(request, "UNSUPPORTED", null, Map.of(), List.of(), null, List.of(), List.of(), "이 계산은 여기서 볼 수 없어요.");
