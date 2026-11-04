@@ -137,6 +137,26 @@ afterEach(() => {
 })
 
 describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
+  it.each(['new', '21/edit'])('계약 %s 저장 후 첫 상세 이동부터 기준 정산월과 목록 복귀 조건을 유지한다', async (path) => {
+    const { user, router } = renderAt(`/contracts/${path}?month=2026-07&returnTo=${encodeURIComponent('/contracts?contractNo=CONT&page=2')}`)
+    if (path === 'new') {
+      await waitFor(() => expect(field('보험회사')).toBeEnabled())
+      await selectOption(user, field('보험회사'), '1')
+      await waitFor(() => expect(field('상품 판매버전')).toBeEnabled())
+      await selectOption(user, field('상품 판매버전'), '7')
+      await selectOption(user, field('모집 설계사'), '3')
+      fireEvent.change(field('계약번호'), { target: { value: 'NEW-MONTH' } })
+      fireEvent.change(field('월납환산 초회보험료(원)'), { target: { value: '100000' } })
+      fireEvent.change(field('초회 보험료(원)'), { target: { value: '95000' } })
+    }
+    await ready()
+    await user.click(save())
+    await screen.findByText('계약 상세')
+    const savedParams = new URLSearchParams(router.state.location.search)
+    expect(savedParams.get('month')).toBe('2026-07')
+    expect(savedParams.get('returnTo')).toBe('/contracts?contractNo=CONT&page=2&selectedId=21')
+  })
+
   it('수정 화면은 상세 캐시의 옛 값 대신 새 조회가 끝난 값으로 초기화한다', async () => {
     let finish!: (value: ContractDetail) => void
     const pending = new Promise<ContractDetail>((resolve) => {
