@@ -59,26 +59,32 @@ test('실패 월 재시작은 이전 시도를 기다리고 다른 탭의 빠른
       failureMessage: newAttempt ? '다른 탭이 재시작한 원장의 재실패' : '25번째 원장 저장 실패',
     }) })
   })
-  await page.route('**/api/v1/validation-runs/7/execute', (route) => {
+  await page.route('**/api/v1/validation-runs/7/restart', (route) => {
     accepted = true
     posts += 1
     return route.fulfill({ status: 202, json: envelope({ validationRunId: 7, status: 'RUNNING' }) })
   })
+  await page.route('**/api/v1/validation-runs/7/restartability', route => route.fulfill({ json: envelope({ allowed: true, expectedStateVersion: 'failed-101', lastFailedBatchExecutionId: 101, failedStep: 6, checkpointAvailable: true }) }))
+  await page.route('**/api/v1/validation-runs/7/retries', route => route.fulfill({ json: envelope([]) }))
   await page.goto('validation-runs/7')
   const restart = page.getByRole('button', { name: /실패 지점부터 재시작/ })
   await expect(restart).toBeEnabled()
-  await testInfo.attach('재시작 전 - API fixture', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+  await testInfo.attach('재시작 전 - API fixture', { body: await page.screenshot({ path: testInfo.outputPath(posts === 0 ? 'restart-before.png' : 'restart-after.png'), fullPage: true }), contentType: 'image/png' })
   await restart.click()
+  await page.getByRole('textbox', { name: '재시작 사유' }).fill('실패 원인 수정')
+  await page.getByRole('button', { name: '재시작 요청' }).click()
   await expect(restart).toBeDisabled()
   await expect(page.getByText('실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.')).toBeVisible()
   await expect(restart).toBeEnabled({ timeout: 10_000 })
   await expect(page.getByText('다른 탭이 재시작한 원장의 재실패', { exact: false })).toBeVisible()
   expect(posts).toBe(1)
-  await testInfo.attach('새 시도 재실패 - API fixture', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+  await testInfo.attach('새 시도 재실패 - API fixture', { body: await page.screenshot({ path: testInfo.outputPath(posts === 0 ? 'restart-before.png' : 'restart-after.png'), fullPage: true }), contentType: 'image/png' })
 })
 
 test('실행을 만들고 돌려 확정한다', async ({ page }) => {
   let status: 'CREATED' | 'RUNNING' | 'COMPLETED' | 'FINALIZED' = 'CREATED'
+  await page.route('**/api/v1/validation-runs/7/restartability', route => route.fulfill({ json: envelope({ allowed: false, reason: '실패 상태가 아닙니다.' }) }))
+  await page.route('**/api/v1/validation-runs/7/retries', route => route.fulfill({ json: envelope([]) }))
   let polls = 0
   await page.route('**/api/v1/auth/refresh', (route) =>
     route.fulfill({ json: envelope({ accessToken: 'vrun-fixture', tokenType: 'Bearer', expiresIn: 1800 }) }),

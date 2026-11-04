@@ -23,6 +23,7 @@ import com.susukkang.fgc.contract.dto.ContractCreateResponse;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractInput;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
+import com.susukkang.fgc.contract.dto.ContractEventJobRow;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
 import com.susukkang.fgc.contract.dto.ContractStatusEventRequest;
@@ -32,6 +33,7 @@ import com.susukkang.fgc.contract.dto.ContractUpdateResponse;
 import com.susukkang.fgc.contract.dto.ContractView;
 import com.susukkang.fgc.contract.entity.ContractStatusEvent;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
+import com.susukkang.fgc.contract.repository.ContractEventJobRepository;
 import com.susukkang.fgc.contract.repository.ContractFinancialSnapshotRepository;
 import com.susukkang.fgc.contract.repository.ContractQueryRepository;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
@@ -46,6 +48,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
@@ -63,6 +66,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 설명 : 보험계약 서비스의 조회·생성·수정·재검증 업무를 구현한다.
@@ -99,6 +103,7 @@ public class ContractServiceImpl implements ContractService {
     private final ContractLockRepository contractLockRepository;
     private final ContractFinancialSnapshotRepository contractFinancialSnapshotRepository;
     private final ContractStatusEventRepository contractStatusEventRepository;
+    private final ContractEventJobRepository contractEventJobRepository;
     private final AgentDataScopeService agentScope;
     private final ContractWriteRequestRepository contractWriteRequestRepository;
     private final ContractStatusFollowUpService statusFollowUpService;
@@ -147,8 +152,9 @@ public class ContractServiceImpl implements ContractService {
                 .orElseThrow(() -> validationException("contractId", "존재하지 않는 보험계약입니다."));
     }
 
+    // 작업 상태, 처리 이력, 영향 건수를 한 시점으로 읽는다. 조회 중 worker가 끝나도 성공 행에 이전 시점의 0건이 붙지 않는다.
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<ContractStatusEventResponse> selectStatusEventsByContractId(Long contractId) {
         agentScope.requireContract(contractId);
         // 1. 계약 존재 확인
@@ -162,13 +168,20 @@ public class ContractServiceImpl implements ContractService {
             return List.of();
         }
 
-        // 4. Job별 처리 이력을 한 번에 조회하고 상태사건 ID별로 묶기
+        // FUN-085: 영향 건수는 다른 수혜자 회차와 남의 지급 건까지 센다. AGENT에게는 싣지 않고 본인 범위는 IF-API-89로 본다.
+        boolean withSummary = agentScope.currentAgentId() == null;
+
+        // 4. 후속 작업의 현재 상태와 Job별 처리 이력을 한 번에 조회하고 상태사건 ID별로 묶기
+        Map<Long, List<ContractEventJobRow>> jobsByEvent = contractEventJobRepository
+                .findByContract(contractId, ContractStatusFollowUpService.MAX_ATTEMPTS).stream()
+                .collect(Collectors.groupingBy(ContractEventJobRow::contractStatusEventId));
         Map<Long, List<ContractStatusEventProcessingResponse>> processingsByEvent = new LinkedHashMap<>();
         for (ContractStatusEventProcessingRow processing
                 : contractQueryRepository.findStatusEventProcessingsByContractId(contractId)) {
             processingsByEvent
                     .computeIfAbsent(processing.contractStatusEventId(), ignored -> new ArrayList<>())
-                    .add(processing.toResponse());
+                    .add(toProcessingResponse(processing,
+                            jobsByEvent.getOrDefault(processing.contractStatusEventId(), List.of()), withSummary));
         }
 
         // 5. 등록자가 남은 사건만 사용자 정보를 붙인다(원천에 등록자가 없으면 null)
@@ -189,9 +202,27 @@ public class ContractServiceImpl implements ContractService {
                         event.getContractStatusEventId(),
                         event.getReasonCode(),
                         event.getReasonText(),
-                        event.getRegisteredBy() == null ? null : registrants.get(event.getRegisteredBy())
+                        event.getRegisteredBy() == null ? null : registrants.get(event.getRegisteredBy()),
+                        event.getCreatedAt(),
+                        ContractStatusEventResponse.EventFollowUp.of(jobsByEvent
+                                .getOrDefault(event.getContractStatusEventId(), List.of()).stream()
+                                .map(ContractEventJobRow::job).toList())
                 ))
                 .toList();
+    }
+
+    /** 요약과 오류 코드는 후속 작업의 행에만 있다. 배치 행은 영향을 남기지 않고 실패 사유도 코드가 아닌 자유 문구다. */
+    private static ContractStatusEventProcessingResponse toProcessingResponse(
+            ContractStatusEventProcessingRow row, List<ContractEventJobRow> jobs, boolean withSummary) {
+        ContractEventJobRow followUp = jobs.stream()
+                .filter(job -> job.job().job().equals(row.processingJob()))
+                .findFirst().orElse(null);
+        boolean failed = "FAILED".equals(row.processingStatus());
+        return new ContractStatusEventProcessingResponse(
+                row.processingJob(), row.processingStatus(), row.processedAt(),
+                row.processingJob(), row.processingStatus(),
+                followUp == null || failed || !withSummary ? null : followUp.summary(),
+                followUp != null && failed ? ContractStatusFollowUpService.errorCodeOf(row.failureReason()) : null);
     }
 
     @Override

@@ -105,6 +105,7 @@ public class ValidationRunFinalizationServiceImpl implements ValidationRunFinali
         // 개선: 체크리스트 계산 전에 검증월 잠금을 잡는다. 실행 생성도 같은 잠금을 잡으므로
         //       생성 중이면 그 커밋을 기다린 뒤 새 스냅샷(READ COMMITTED, 문장 단위)으로 다시 센다.
         validationRunRepository.lockValidationMonth(lockedRun.getValidationMonth());
+        if (validationRunRepository.hasActiveRetryForMonth(lockedRun.getValidationMonth())) throw new FgcBusinessException(FgcErrorCode.VRUN_005);
 
         // 조회 API 결과를 신뢰하지 않고 확정 트랜잭션에서 8개 조건을 다시 계산한다.
         // 조건 7(더 최근 실행)·8(이미 확정된 실행)은 위 검증월 잠금을 잡은 뒤 세야 경합이 없다.

@@ -1526,17 +1526,17 @@
   },
   {
     "id": "features.contract.contract-tabs.button",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/detailParts.tsx",
     "element": "Button"
   },
   {
     "id": "features.contract.contract-tabs.button-3",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "Button"
   },
   {
     "id": "features.contract.contract-tabs.button-4",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "Button"
   },
   {
@@ -1551,13 +1551,23 @@
   },
   {
     "id": "features.contract.contract-tabs.section-3",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "section"
   },
   {
     "id": "features.contract.contract-tabs.section-5",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.contract.status-history.effects",
+    "file": "features/contract/ContractStatusHistory.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.status-history.effects-close",
+    "file": "features/contract/ContractStatusHistory.tsx",
+    "element": "Button"
   },
   {
     "id": "features.dashboard.dashboard-page.button",
@@ -2560,6 +2570,21 @@
     "element": "Button"
   },
   {
+    "id": "features.transaction.transaction-form-page.btn-reload",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-reload-apply",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-reload-keep",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.transaction.transaction-form-page.btn-save",
     "file": "features/transaction/TransactionFormPage.tsx",
     "element": "Button"
@@ -2713,6 +2738,36 @@
     "id": "features.validation.finalize-dialogs.button-3",
     "file": "features/validation/FinalizeDialogs.tsx",
     "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-2",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-3",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.section-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.table-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.textarea-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "textarea"
   },
   {
     "id": "features.validation.validation-run-detail-page.btn-finalize",

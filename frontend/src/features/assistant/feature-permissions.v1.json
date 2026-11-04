@@ -368,6 +368,8 @@
     "features.contract.contract-tabs.section-2": "OWN_OR_INTERNAL_READ",
     "features.contract.contract-tabs.section-3": "OWN_OR_INTERNAL_READ",
     "features.contract.contract-tabs.section-5": "INTERNAL_READ",
+    "features.contract.status-history.effects": "OWN_OR_INTERNAL_READ",
+    "features.contract.status-history.effects-close": "OWN_OR_INTERNAL_READ",
     "features.dashboard.dashboard-page.button": "INTERNAL_READ",
     "features.dashboard.dashboard-page.composition": "INTERNAL_READ",
     "features.dashboard.dashboard-page.link": "INTERNAL_READ",
@@ -568,6 +570,9 @@
     "features.transaction.transaction-form-page.biz-key": "CAN_PROCESS",
     "features.transaction.transaction-form-page.btn-confirm": "CAN_PROCESS",
     "features.transaction.transaction-form-page.btn-precheck": "CAN_PROCESS",
+    "features.transaction.transaction-form-page.btn-reload": "CAN_PROCESS",
+    "features.transaction.transaction-form-page.btn-reload-apply": "CAN_PROCESS",
+    "features.transaction.transaction-form-page.btn-reload-keep": "CAN_PROCESS",
     "features.transaction.transaction-form-page.btn-save": "CAN_PROCESS",
     "features.transaction.transaction-form-page.button": "CAN_PROCESS",
     "features.transaction.transaction-form-page.button-2": "CAN_PROCESS",
@@ -745,6 +750,12 @@
     "reference.tab.refund": "INTERNAL_READ",
     "reference.tab.rules": "INTERNAL_READ",
     "reference.tab.sources": "INTERNAL_READ",
-    "reference.tab.versions": "INTERNAL_READ"
+    "reference.tab.versions": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.section-1": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.table-1": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.button-1": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.button-2": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.button-3": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.textarea-1": "CAN_PROCESS"
   }
 }
