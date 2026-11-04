@@ -93,7 +93,7 @@ SQL은 표준 입력으로 넘긴다. 값이 프로세스 목록에 보이지 �
 | 로그 | `"${compose[@]}" logs --tail=200 api` | `podman logs` | 사용자가 준 요청번호로 찾는다 |
 | 디스크 | `df -h`, `docker system df` | `df -h`, `podman system df` | 8장. 파일 볼륨 가득 참은 health에 드러나지 않는다 [T21] |
 | DB | `"${compose[@]}" exec -T db pg_isready -U fgc -d fgc` | DB 컨테이너에서 같은 명령 | |
-| 배치 | 아래 SQL | 같은 SQL | `RUNNING`이 오래 남으면 6-3절 |
+| 배치 | 아래 SQL | 같은 SQL | `RUNNING`이 오래 남으면 6-3절, `계약수동`이 `CREATED`로 오래 남으면 6-5절 |
 
 ```sql
 SELECT validation_run_id, run_type, status, current_step, started_at, left(failure_message, 120)
@@ -682,6 +682,7 @@ SELECT (requested_at AT TIME ZONE 'Asia/Seoul')::date AS day, purpose,
 |---|---|---|
 | 월 실행 상태가 `FAILED` | Step 실패 | 6-2절 |
 | `RUNNING`인데 진행하지 않음, 실행 번호가 늘지 않음 | 프로세스가 중간에 죽음 | 6-3절 |
+| 수동 차익 검증이나 일 배치가 `FGC-VRUN-001`로 막힘, `계약수동` 실행이 `CREATED`로 오래 남음 | 실패한 수동 차익 검증이 남긴 행 | 6-5절 |
 | `계약수동` 실행 `FAILED` | 일 배치 Step 실패. 워터마크는 전진하지 않음 | 6-4절 |
 | `계약수동` 실행 `COMPLETED`인데 예외가 생김 | 계약 단위 실패 | 3장 |
 
@@ -793,6 +794,25 @@ SQL
 Step이 `FAILED`면 워터마크는 전진하지 않아 다음 실행이 같은 구간을 다시 읽는다(`WatermarkAdvanceStepListener`). `계약수동` 실행은 재시작 대상이 아니다(`FGC-VRUN-004`). 원인을 고치고 새 실행을 만들거나 다음 02:00을 기다린다. 이 경로는 코드 대조만 했다. Step 실패 주입은 월 실행으로 시험했다 [T13].
 
 자동 실행을 끄는 설정 `fgc.batch.daily-changed-contract.enabled`가 있지만 compose에 넘기는 변수가 없다. 배치를 멈춰야 하면 API를 멈춘다.
+
+### 6-5. `계약수동` 실행이 `CREATED`로 남음
+
+수동 차익 검증(IF-API-33)은 실행 행을 별도 트랜잭션으로 먼저 커밋한다. #871 전 코드는 검증이 실패해도 이 행을 남겼다. #871 뒤에는 실패한 검증이 자기 행을 지우지만, 지우기까지 실패하면 `afterCompletion threw exception` 오류 로그만 남고 행은 그대로다.
+
+활성 `계약수동` 실행은 전역 1건이라(V13) 이 행이 있으면 모든 수동 차익 검증이 `FGC-VRUN-001`로 막힌다. 02:00 일 배치도 막힌다. 일 배치는 그날 만든 행만 이어받고, 그 전 행이 남아 있으면 새 실행을 만들다 같은 오류로 실패한다 [코드 대조, `CreateDailyRunTasklet`].
+
+**탐지:** 화면의 `실행 생성 불가` 안내, 일 배치 실패 로그, 아래 SQL. **#871을 배포한 뒤 한 번 확인한다.** 그 전에 남은 행은 배포해도 사라지지 않는다.
+
+```sql
+SELECT validation_run_id, status, triggered_by, created_at FROM fgc.validation_run
+ WHERE run_type = 'MANUAL_CONTRACT' AND status IN ('CREATED', 'RUNNING');
+```
+
+**초기 판단:** `RUNNING`이면 6-3절이다. `CREATED`는 6-3절 SQL이 거절하고 상태 트리거도 `CREATED → FAILED`를 막는다(`guard_run_lifecycle`). 방금 만든 행은 진행 중인 수동 검증일 수 있다. 검증이 끝나기 전까지 다른 세션에는 `CREATED`로 보이므로 몇 분 뒤 다시 본다.
+
+**담당:** 정산담당자가 화면 실행, 강호원 확인. **조치:** VRUN-W01에서 그 `계약수동` 실행을 열고(VRUN-W02) `[실행]`을 누른다. 일 배치가 그 행으로 바로 돈다. 오늘 만든 행이 아니어도 된다. DB를 손으로 고치지 않는다. 워터마크 뒤의 변경 계약이 이때 처리되므로 시연 중이면 끝난 뒤에 누른다.
+
+**검증 [T29]:** 상태가 `COMPLETED`가 되고 수동 차익 검증이 다시 된다. `FAILED`로 끝나도 활성 행은 풀린다. 그 실패는 6-4절로 본다. 화면 버튼과 일 배치 경로는 코드 대조만 했다. 사후 기록은 1-4절.
 
 ---
 
@@ -1085,6 +1105,7 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 | T26 | head 이미지 승격, 호출 한도 | `274477d6` 이미지로 올림(V78 적용) → 500 모의 서버로 피코 15회 | V78 성공, `UP`. 호출 12회 뒤 `FALLBACK_RULE`, `RATE_LIMITED` 3건, 모의 서버 호출 12회 | 통과 |
 | T27 | 설계사 범위 | `agent01`로 계약 목록과 남의 계약 조회, 감사 옵션 조회 | 본인 13건. 남의 계약 403 `FGC-AUTH-005`. 감사 `'행위 종류'` 목록에 수동 절차 행위 코드 4개가 나온다 | 통과 |
 | T28 | 행 존재 검사 | PR #862 `55469651`에서 `PYTHONUTF8=1 python -m unittest discover -s infra/scripts/tests`. 임시 PostgreSQL 17에서 `missing-accounts-sql` 실행 | 시험 26개 통과. `agent01` 없음 → `agent01`, 모두 있음 → 빈 값, 두 개 없음 → `admin,settle01` | 통과 |
+| T29 | `CREATED` 잔존 | `ArbitrageTransactionBoundaryIntegrationTest.rowLeftBeforeThisFixIsClearedByExecuteSoTheNextCheckIsNotBlocked` (PR #871, Testcontainers PostgreSQL 17). 3일 전 `CREATED` 행 → 수동 검증 → `FAILED`로 UPDATE → `execute` → 수동 검증 | `FGC-VRUN-001`. 트리거 거절. 실행 `COMPLETED`. 수동 검증 성공. 화면 버튼과 일 배치 경로는 코드 대조만 | 통과 |
 
 **돌리지 못한 것**
 
@@ -1127,3 +1148,4 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 | 판 | 날짜 | 내용 | 근거 |
 |---|---|---|---|
 | v1.0 | 2026-11-04 | 최초 작성, #676 | FGC-PSR-005, SRC-060, SRC-065, SRC-067, SRC-075, SRC-076, SRC-077, 운영정책서 '일일 변경분 처리' |
+| v1.0 | 2026-11-04 | 6-5절 추가: 수동 차익 검증이 남긴 `CREATED` 행, #871 | 코드 대조, T29, V13, V7 `guard_run_lifecycle` |
