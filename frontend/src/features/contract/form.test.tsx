@@ -616,6 +616,25 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     await fillEvent(user)
   }
 
+  it('closes the saved status confirmation before waiting for help acknowledgement', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+    const { user, router, writes } = renderAt(undefined, (url, options) =>
+      options?.method ? saved() : url === '/api/v1/contracts/21' ? statusContract : undefined)
+    document.querySelector('.contract-form-page')!.id = 'main-content'
+    await terminate(user)
+    await user.click(screen.getByRole('button', { name: '도움말' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '다음' }))
+    await confirm(user)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '상태 변경 저장 확인' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+    expect(writes).toHaveLength(1)
+    expect(router.state.location.pathname).toBe('/contracts/21/edit')
+    await user.click(screen.getByRole('button', { name: '다음' }))
+    await user.click(await screen.findByRole('button', { name: '안내 마치기' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/21'))
+  })
+
   it('변경 상태는 서버 허용 전이만 보이고, 상태를 그대로 두면 사건 없이 멱등키와 함께 저장한다', async () => {
     const { user, writes, router } = renderAt(undefined, (url, options) =>
       options?.method
@@ -949,6 +968,44 @@ describe('[FGC-FUN-018·030] 보험료 파생·입력 검증', () => {
     expect(preview.getByText('-')).toBeInTheDocument()
     expect(preview.queryByText('9,007,199,254,740,984')).not.toBeInTheDocument()
   })
+})
+
+it('guide waits for server success and acknowledgement after failure', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  let attempts = 0
+  const { user, router, writes } = renderAt('/contracts/21/edit', (_, options) => {
+    if (options?.method && ++attempts === 1) throw new ApiError({ code: 'FGC-CONT-001', message: '저장 거절', field: 'contractNo' }, 'guide-failure', 409)
+  })
+  document.querySelector('.contract-form-page')!.id = 'main-content'
+  await ready()
+  await user.click(screen.getByRole('button', { name: '도움말' }))
+  const next = () => screen.getByRole('button', { name: '다음' })
+  await waitFor(() => expect(next()).toBeEnabled())
+  await user.click(next())
+  expect(writes).toHaveLength(0)
+  expect(next()).toBeDisabled()
+  await user.click(save())
+  await waitFor(() => expect(writes).toHaveLength(1))
+  expect(next()).toBeDisabled()
+  await user.click(save())
+  await waitFor(() => expect(next()).toBeEnabled())
+  expect(router.state.location.pathname).toBe('/contracts/21/edit')
+  await user.click(next())
+  expect(await screen.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: '안내 마치기' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/21'))
+})
+
+it.each([undefined, 0, Number.MAX_SAFE_INTEGER + 1])('keeps the contract locked after a successful response with invalid ID %s', async (contractId) => {
+  const { user, writes } = renderAt(undefined, (_, options) => options?.method ? { contractId } : undefined)
+  await ready()
+  await user.click(save())
+  expect(await screen.findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(save()).toBeDisabled()
+  expect(field('계약번호')).toBeDisabled()
+  fireEvent.submit(screen.getByRole('form'))
+  expect(writes).toHaveLength(1)
 })
 
 

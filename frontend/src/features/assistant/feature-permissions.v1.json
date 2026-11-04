@@ -751,6 +751,7 @@
     "reference.tab.rules": "INTERNAL_READ",
     "reference.tab.sources": "INTERNAL_READ",
     "reference.tab.versions": "INTERNAL_READ",
+    "validation.restart": "INTERNAL_READ",
     "contract.panel.acquisition": "INTERNAL_READ",
     "contract.tab.acquisition": "INTERNAL_READ",
     "navigation.menu.acqc-w01": "INTERNAL_READ",
