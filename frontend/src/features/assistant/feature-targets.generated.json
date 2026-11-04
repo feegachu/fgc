@@ -455,6 +455,11 @@
     "element": "Link"
   },
   {
+    "id": "dashboard.kpi-link.open",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "Link"
+  },
+  {
     "id": "dashboard.kpi-link.recon",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
@@ -476,6 +481,11 @@
   },
   {
     "id": "dashboard.kpi.journal",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "dashboard.kpi.open",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "KpiCard"
   },

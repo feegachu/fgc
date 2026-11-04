@@ -2634,6 +2634,21 @@
         "next": []
       },
       {
+        "stepId": "help.507ee300abcd57cdaafebaefa6807c9b",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-reference-info.source-link",
+        "title": "정책/룰셋, 근거 원문 열기",
+        "instruction": "정책/룰셋 화면의 ‘근거 원문 열기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.5276199353cd1f1f3ab926a4bfdf7a76",
         "screenId": "POL-W01",
         "targetId": "features.policies.policies-page.button-7",
@@ -4183,6 +4198,20 @@
         "targetId": "features.policies.policy-management.section",
         "title": "정책/룰셋, 수수료 규칙",
         "instruction": "정책/룰셋 화면의 ‘수수료 규칙’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.507ee300abcd57cdaafebaefa6807c9b",
+        "screenId": "POL-W01",
+        "targetId": "features.policies.policy-reference-info.source-link",
+        "title": "정책/룰셋, 근거 원문 열기",
+        "instruction": "정책/룰셋 화면의 ‘근거 원문 열기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8375,6 +8404,21 @@
         "next": []
       },
       {
+        "stepId": "help.193852053924ae475e58e987c4740713",
+        "screenId": "DASH-W01",
+        "targetId": "dashboard.kpi.open",
+        "title": "업무 대시보드, 미처리 예외",
+        "instruction": "업무 대시보드 화면의 ‘미처리 예외’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.4a575e07a7f018a9544285c856ecf61b",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.dashboard-page.section-3",
@@ -8485,6 +8529,21 @@
         "targetId": "features.dashboard.dashboard-page.link-3",
         "title": "업무 대시보드, 예외함 전체 보기",
         "instruction": "업무 대시보드 화면의 ‘예외함 전체 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.85d034206f7efda632354140360a0b8c",
+        "screenId": "DASH-W01",
+        "targetId": "dashboard.kpi-link.open",
+        "title": "업무 대시보드, 미처리 예외",
+        "instruction": "업무 대시보드 화면의 ‘미처리 예외’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

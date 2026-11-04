@@ -126,7 +126,7 @@
   background: var(--color-bg-surface);
 }
 .dashboard-page > .kpi-group {
-  --kpi-columns: 5;
+  --kpi-columns: 6;
 }
 @media (prefers-reduced-motion: no-preference) {
   .kpi-group > * {

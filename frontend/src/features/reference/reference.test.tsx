@@ -32,6 +32,7 @@ const policies: Policy[] = [
 ]
 const detail: PolicyDetail = {
   header: policies[0],
+  references: [{ ref: 'REG-08', detailTitle: '정책 근거 설명', explanation: '선택한 정책 버전의 저장된 설명' }],
   sourceRefs: ['SRC-01'],
   commissionRules: [
     {
@@ -175,6 +176,10 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   expect(screen.queryByRole('columnheader', { name: /^근거$/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /근거 표시/ })).not.toBeInTheDocument()
   expect(screen.getByText('프로젝트 가정')).toHaveClass('status-badge-warning')
+  await user.click(screen.getByRole('tab', { name: '관리 상세' }))
+  await user.click(await screen.findByRole('tab', { name: '근거 자료' }))
+  await user.click(screen.getByRole('button', { name: 'REG-08 근거 정보' }))
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('정책 근거 설명')
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
   await screen.findByText('650.1')
   expect(screen.getByText('1 ~ 12회차')).toBeVisible()

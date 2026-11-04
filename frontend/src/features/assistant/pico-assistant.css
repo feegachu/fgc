@@ -8,7 +8,8 @@
   position: fixed;
   right: 28px;
   bottom: 26px;
-  z-index: calc(var(--z-overlay) - 1);
+  /* 업무 가이드의 강조 영역과 안내 카드 아래에 두어 진행 버튼을 가리지 않는다. */
+  z-index: calc(var(--z-overlay) - 3);
 }
 /* #808 review · design :131 — the last business buttons must scroll clear of the fixed launcher. */
 .app-shell:has(.pico-assistant-root) .page-content {

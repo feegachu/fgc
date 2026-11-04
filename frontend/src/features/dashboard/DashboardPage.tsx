@@ -12,6 +12,7 @@ import { dateTime, errorText, int } from '../../lib/format'
 import { monthText, screenMessage } from '../../lib/screenText'
 import { withMonth } from '../../stores/workspace'
 import type { ShellContext } from '../../app/shell/AppShell'
+import { OPEN_STATUS } from '../exception/api'
 import { dashboardSummaryQueryOptions } from './api'
 import type { RecentException, RecentRun } from './api'
 import { DashboardSkeleton } from './DashboardSkeleton'
@@ -130,9 +131,18 @@ function DashboardContent({ month }: { month: string }) {
         tone: data.journalImbalance === 0 ? 'success' : 'error',
         to: href('/journals'),
       },
+      {
+        id: 'open',
+        color: 'warning',
+        label: '미처리 예외',
+        value: data.openException,
+        footer: data.openException === 0 ? '미처리 예외가 없습니다' : '신규 + 검토중',
+        tone: 'warning',
+        to: href('/exceptions', { status: OPEN_STATUS }),
+      },
     ] as const)
 
-  const compositionItems: CompositionItem[] = kpis?.map((kpi) => ({
+  const compositionItems: CompositionItem[] = kpis?.filter((kpi) => kpi.id !== 'open').map((kpi) => ({
     key: kpi.id,
     label: kpi.label,
     value: kpi.value ?? 0,
