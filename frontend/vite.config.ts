@@ -44,6 +44,8 @@ export default defineConfig({
     },
   },
   test: {
+    // 개인 .env.local의 AI/시연 opt-in이 시험 모드를 바꾸지 않게 한다. 개별 시험은 vi.stubEnv로 선택한다.
+    env: { VITE_ASSISTANT_AI: 'false', VITE_ASSISTANT_DEMO: 'false' },
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
