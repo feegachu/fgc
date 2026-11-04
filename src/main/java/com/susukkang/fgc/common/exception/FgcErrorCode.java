@@ -3,6 +3,7 @@ package com.susukkang.fgc.common.exception;
 import org.springframework.http.HttpStatus;
 
 public enum FgcErrorCode {
+    ASST_STALE_CONTEXT("FGC-ASST-STALE_CONTEXT",HttpStatus.CONFLICT,"error.assistant.staleContext"),
 
     CAP_001(
             "FGC-CAP-001",

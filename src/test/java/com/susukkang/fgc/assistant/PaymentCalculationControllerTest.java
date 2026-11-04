@@ -37,7 +37,7 @@ class PaymentCalculationControllerTest {
     @ParameterizedTest @ValueSource(strings={"COMPLIANCE","GA_ADMIN","SETTLEMENT","SYSTEM_ADMIN"})
     void internalReadRolesCanUseExactReadOnlyPost(String role) throws Exception {
         mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
-        verify(service).calculate(any());
+        verify(service).calculateVerified(any());
     }
     @ParameterizedTest @ValueSource(strings={"AGENT","UNKNOWN"})
     void deniesOtherRoles(String role) throws Exception {
@@ -59,10 +59,10 @@ class PaymentCalculationControllerTest {
         org.assertj.core.api.Assertions.assertThat(generated.path("paths").has("/api/v1/assistant/calculations")).isTrue();
         var file = java.nio.file.Path.of("frontend/openapi/schema.json");
         ObjectNode existing = (ObjectNode) mapper.readTree(java.nio.file.Files.readString(file));
-        ((ObjectNode) existing.get("paths")).set("/api/v1/assistant/calculations", generated.path("paths").get("/api/v1/assistant/calculations"));
+        generated.path("paths").fields().forEachRemaining(entry -> ((ObjectNode)existing.get("paths")).set(entry.getKey(),entry.getValue()));
         ObjectNode schemas = (ObjectNode) existing.path("components").path("schemas");
         generated.path("components").path("schemas").fields().forEachRemaining(entry -> {
-            var owned = java.util.Set.of("PaymentCalculationRequest", "Scope", "ApiResponsePaymentCalculationSnapshot", "PaymentCalculationSnapshot", "Basis", "Source", "Reason", "Recommendation", "Rounding", "JsonNode");
+            var owned = java.util.Set.of("PaymentCalculationRequest", "Scope", "ApiResponsePaymentCalculationSnapshot", "PaymentCalculationSnapshot", "Basis", "Source", "Reason", "Recommendation", "Rounding", "JsonNode", "AssistantCalculationValidity", "CalculationRevalidationRequest");
             if (!schemas.has(entry.getKey()) || owned.contains(entry.getKey())) schemas.set(entry.getKey(), entry.getValue());
             else if (!entry.getKey().equals("ApiError")) org.assertj.core.api.Assertions.assertThat(schemas.get(entry.getKey())).isEqualTo(entry.getValue());
         });
@@ -74,8 +74,8 @@ class PaymentCalculationControllerTest {
         when(payments.get(77L)).thenReturn(PaymentCalculationServiceTest.payment(com.susukkang.fgc.common.code.CommissionPaymentStatus.DRAFT,"100000","60000","30000"));
         var preview = new com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse.CapPreviewItem(3L,"C-3",com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC,"GA→설계사",java.time.LocalDate.of(2026,10,1),100000L,null,null,200000L,0L,100000L,100000L,100000L,"50",com.susukkang.fgc.common.code.CapResultStatus.NORMAL,"정상",9L,null,null,null);
         when(payments.precheck(77L)).thenReturn(new com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse(77L,java.util.List.of(preview),java.util.List.of(),true));
-        var actual = new PaymentCalculationService(payments,mapper, mock(com.susukkang.fgc.assistant.service.AssistantCalculationSources.class),mock(com.susukkang.fgc.assistant.service.AssistantPaymentCandidate.class));
-        when(service.calculate(any())).thenAnswer(invocation -> actual.calculate(invocation.getArgument(0)));
+        var actual = new PaymentCalculationService(payments,mapper, mock(com.susukkang.fgc.assistant.service.AssistantCalculationSources.class),mock(com.susukkang.fgc.assistant.service.AssistantPaymentCandidate.class),mock(com.susukkang.fgc.assistant.service.CalculationProofService.class));
+        when(service.calculateVerified(any())).thenAnswer(invocation -> actual.calculate(invocation.getArgument(0)));
         for (String kind : java.util.List.of("ATTRIBUTION_BALANCE","PAYMENT_CANDIDATE")) {
             String json = mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(body.replace("ATTRIBUTION_BALANCE",kind)))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.synthetic").value(false)).andExpect(jsonPath("$.data.snapshotOnly").value(true)).andExpect(jsonPath("$.data.validity").isEmpty()).andReturn().getResponse().getContentAsString();
@@ -86,7 +86,7 @@ class PaymentCalculationControllerTest {
         verify(payments,times(2)).get(77L); verify(payments).precheck(77L); verifyNoMoreInteractions(payments);
     }
     @Test void missingSourcePaymentIs400WithTheExistingErrorEnvelope() throws Exception {
-        when(service.calculate(any())).thenThrow(new FgcBusinessException(FgcErrorCode.COMMON_002, "paymentId", java.util.Map.of("field", "paymentId"), "지급 건을 찾을 수 없습니다."));
+        when(service.calculateVerified(any())).thenThrow(new FgcBusinessException(FgcErrorCode.COMMON_002, "paymentId", java.util.Map.of("field", "paymentId"), "지급 건을 찾을 수 없습니다."));
         mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
                 .andExpect(jsonPath("$.error.field").value("paymentId"));

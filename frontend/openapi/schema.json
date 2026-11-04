@@ -6350,8 +6350,7 @@
             "format" : "date-time"
           },
           "validity" : {
-            "type" : [ "object", "null" ],
-            "description" : "Always null in snapshot-only phase; not a server proof"
+            "$ref" : "#/components/schemas/AssistantCalculationValidity"
           },
           "lines" : {
             "type" : "array",
@@ -8679,6 +8678,47 @@
             "type" : "string"
           }
         }
+      },
+      "AssistantCalculationValidity" : {
+        "type" : "object",
+        "properties" : {
+          "stateToken" : {
+            "type" : "string"
+          },
+          "calculatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "inputFingerprint" : {
+            "type" : "string"
+          },
+          "dependencyFingerprint" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CalculationRevalidationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "calculationId" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "stateToken" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/PaymentCalculationRequest"
+          }
+        },
+        "required" : [ "calculationId", "input", "stateToken" ]
       }
     },
     "securitySchemes" : {
@@ -9066,7 +9106,7 @@
       "post" : {
         "tags" : [ "payment-calculation-controller" ],
         "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
-        "description" : "ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.",
+        "description" : "기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.",
         "operationId" : "calculate",
         "requestBody" : {
           "content" : {
@@ -13067,6 +13107,36 @@
         },
         "summary" : "검증 실행 진행률 조회 (IF-API-49)",
         "tags" : [ "검증 실행" ]
+      }
+    },
+    "/api/v1/assistant/calculations/revalidate" : {
+      "post" : {
+        "tags" : [ "payment-calculation-controller" ],
+        "summary" : "계산 입력·의존성·사용자·만료 재검증",
+        "description" : "변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.",
+        "operationId" : "revalidate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CalculationRevalidationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },

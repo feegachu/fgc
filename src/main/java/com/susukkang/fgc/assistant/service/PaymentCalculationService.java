@@ -31,8 +31,21 @@ public class PaymentCalculationService {
     private final ObjectMapper mapper;
     private final AssistantCalculationSources sources;
     private final AssistantPaymentCandidate candidates;
+    private final CalculationProofService proofs;
     private static final Set<String> CAP_MONEY = Set.of("basePremiumAmount", "refund12mAmount", "complianceDeductionAmount", "limitAmount", "existingIncludedAmount", "candidateAmount", "includedAmount", "remainingAmount");
     private static final Set<String> CAP_IDS = Set.of("contractId", "capRuleSetId", "capCheckId");
+
+    @PreAuthorize(Roles.ANY_ROLE)
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public PaymentCalculationSnapshot calculateVerified(PaymentCalculationRequest request) {
+        return proofs.issue(request,calculate(request));
+    }
+    @PreAuthorize(Roles.ANY_ROLE)
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public PaymentCalculationSnapshot revalidate(com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest request) {
+        if(request.input().kind()==PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE)requireProcessing();
+        return proofs.revalidate(request);
+    }
 
     @PreAuthorize(Roles.ANY_ROLE)
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)

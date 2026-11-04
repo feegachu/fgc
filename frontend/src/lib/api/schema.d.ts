@@ -211,7 +211,7 @@ export interface paths {
         put?: never;
         /**
          * 저장된 지급의 읽기 전용 계산 스냅샷
-         * @description ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.
+         * @description 기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.
          */
         post: operations["calculate"];
         delete?: never;
@@ -1555,6 +1555,26 @@ export interface paths {
         get: operations["progress"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/calculations/revalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계산 입력·의존성·사용자·만료 재검증
+         * @description 변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.
+         */
+        post: operations["revalidate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4258,8 +4278,7 @@ export interface components {
             recommendation?: components["schemas"]["Recommendation"];
             /** Format: date-time */
             calculatedAt?: string;
-            /** @description Always null in snapshot-only phase; not a server proof */
-            validity?: Record<string, never> | null;
+            validity?: components["schemas"]["AssistantCalculationValidity"];
             lines?: components["schemas"]["AssistantCalculationLine"][];
         };
         PaymentEvidence: {
@@ -5281,6 +5300,20 @@ export interface components {
             expectedAmount?: string;
             ruleId?: string;
             status?: string;
+        };
+        AssistantCalculationValidity: {
+            stateToken?: string;
+            /** Format: date-time */
+            calculatedAt?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            inputFingerprint?: string;
+            dependencyFingerprint?: string;
+        };
+        CalculationRevalidationRequest: {
+            calculationId: string;
+            stateToken: string;
+            input: components["schemas"]["PaymentCalculationRequest"];
         };
     };
     responses: never;
@@ -8319,6 +8352,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    revalidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalculationRevalidationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePaymentCalculationSnapshot"];
                 };
             };
         };

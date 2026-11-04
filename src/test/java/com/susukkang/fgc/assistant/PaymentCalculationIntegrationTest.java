@@ -39,6 +39,16 @@ class PaymentCalculationIntegrationTest {
     Long contractId;
     Long paymentId;
 
+    @Test void verifiedCalculationIsReadOnlyAndPaymentMutationMakesItStale() {
+        var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(paymentId.toString()),null,1L);
+        var before=counts();var result=calculations.calculateVerified(request);
+        assertThat(result.validity()).isNotNull();assertThat(counts()).isEqualTo(before);
+        assertThat(calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),request)).status()).isEqualTo(result.status());
+        jdbc.update("UPDATE fgc.commission_transaction SET amount=amount+1 WHERE commission_transaction_id=?",paymentId);
+        var stale=calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),request));
+        assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.amounts()).isEmpty();assertThat(stale.recommendation().allowed()).isFalse();
+    }
+
     @BeforeEach void createOwnedCommittedDraft() {
         AppUserView view = jdbc.queryForObject("SELECT user_id, login_id FROM fgc.app_user ORDER BY user_id LIMIT 1", (rs, row) -> {
             var value = new AppUserView();
