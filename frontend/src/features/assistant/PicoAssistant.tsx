@@ -1,3 +1,4 @@
+import { CalculationWorkbench } from './CalculationWorkbench'
 import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -530,6 +531,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
           >
             {tab === 'chat' ? (
               <>
+                <CalculationWorkbench key={`${guideContext}:${calculationEpoch}`} canProcess={canProcess} />
                 {observed && (
                   <PaymentCalculationPanel
                     key={`${observed.owner}:${observed.paymentId}:${observed.scopeKey}:${observed.revision}:${observed.saved}:${observed.busy}:${observed.ready}:${calculationEpoch}`}

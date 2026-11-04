@@ -38,6 +38,7 @@ import org.springframework.web.bind.annotation.*;
 public class CommissionPaymentApiController {
 
     private final CommissionPaymentService commissionPaymentService;
+    private final com.susukkang.fgc.assistant.service.AssistantPrecheckProofService precheckProofs;
 
     
     /**
@@ -170,6 +171,7 @@ public class CommissionPaymentApiController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200", description = "사전검증 결과 (차단 사유가 있어도 200 + blockers[])",
+                    headers = @io.swagger.v3.oas.annotations.headers.Header(name="X-FGC-Precheck-Token",description="confirmable=true이고 차단 사유가 없을 때만 발급되는 사용자·세션·대상·의존성에 묶인 5분 증표",schema=@io.swagger.v3.oas.annotations.media.Schema(type="string")),
                     useReturnTypeSchema = true),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400", description = "지급 건 없음 (FGC-COMMON-002)"),
@@ -180,10 +182,13 @@ public class CommissionPaymentApiController {
     })
     @PostMapping("/{paymentId}/precheck")
     @PreAuthorize(Roles.CAN_PROCESS)
-    public ApiResponse<TransactionPrecheckResponse> precheck(
+    public ResponseEntity<ApiResponse<TransactionPrecheckResponse>> precheck(
             @Parameter(description = "지급 건 ID", required = true)
             @PathVariable Long paymentId
     ) {
-        return ApiResponse.success(commissionPaymentService.precheck(paymentId));
+        var checked=precheckProofs.check(paymentId);
+        var response=ResponseEntity.ok();
+        if(checked.token()!=null)response.header("X-FGC-Precheck-Token",checked.token());
+        return response.body(ApiResponse.success(checked.result()));
     }
 }

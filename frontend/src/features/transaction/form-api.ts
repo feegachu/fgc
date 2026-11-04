@@ -5,7 +5,7 @@ import { errorText, internalErrorText } from '../../lib/format'
 
 type Schemas = components['schemas']
 export type Payment = Schemas['CommissionPaymentResponse']
-export type Precheck = Schemas['TransactionPrecheckResponse']
+export type Precheck = Schemas['TransactionPrecheckResponse'] & { precheckToken?: string }
 export type Blocker = Schemas['Blocker']
 export type CapPreview = Schemas['CapPreviewItem']
 export type Contract = Schemas['ContractView']
@@ -52,6 +52,14 @@ export const contractQuery = (id: number | undefined) =>
   })
 export const saveDraft = (id: string | null, body: PaymentPayload) =>
   data<Payment>(id ? path(id) : '/api/v1/transactions', { method: id ? 'PUT' : 'POST', body })
-export const precheckPayment = (id: string) => data<Precheck>(path(id, '/precheck'), { method: 'POST' })
+export const precheckPayment = async (id: string): Promise<Precheck> => {
+  let token: string | undefined
+  const result = await data<Precheck>(path(id, '/precheck'), { method: 'POST', onResponseHeaders: headers => { token = headers.get('X-FGC-Precheck-Token') ?? undefined } })
+  return { ...result, precheckToken: token }
+}
+export async function verifyPrecheck(id: string, token: string, signal?: AbortSignal) {
+  const result = await data<{ paymentId?: string; verified?: boolean; expiresAt?: string }>('/api/v1/assistant/prechecks/revalidate', {method:'POST',body:{paymentId:id,precheckToken:token},signal})
+  return result.verified === true && result.paymentId === id && !!result.expiresAt && Date.parse(result.expiresAt) > Date.now()
+}
 export const confirmPayment = (id: string) =>
   data<Payment>(path(id, '/confirm'), { method: 'POST', idempotencyKey: `TRAN-CONFIRM-${id}` })

@@ -50,4 +50,17 @@ class AssistantCalculationSourcesTest {
         var missing=service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE,null));assertThat(missing.status()).isEqualTo("INSUFFICIENT_DATA");verifyNoInteractions(schedules);
         assertThat(service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL,null)).missingInputs()).contains("activeSchedule");
     }
+    @Test void capForwardsEngineAmountsUsageAndRuleWithoutRecomputing() {
+        var cap=mock(com.susukkang.fgc.cap.dto.CapCalculationResult.class);
+        when(cap.resultStatus()).thenReturn(com.susukkang.fgc.common.code.CapResultStatus.WARNING);when(cap.capRuleSetId()).thenReturn(9L);when(cap.limitAmount()).thenReturn(new BigDecimal("1000"));when(cap.includedAmount()).thenReturn(new BigDecimal("900"));when(cap.remainingAmount()).thenReturn(new BigDecimal("100"));when(cap.usagePct()).thenReturn(new BigDecimal("90.000000"));when(caps.calculate(any())).thenReturn(cap);
+        var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.CAP_STATUS,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,"3",null,PaymentStage.GA_TO_FC,null,null,null,LocalDate.of(2026,10,8),null,null),null,1L);
+        var result=service.calculate(request);assertThat(result.amounts()).containsEntry("remainingAmount","100");assertThat(result.capPreview().getFirst()).containsEntry("usagePct","90.000000").containsEntry("resultStatus","WARNING");assertThat(result.basis().ruleIds()).containsExactly("9");assertThat(result.recommendation().allowed()).isFalse();
+        verify(caps).calculate(com.susukkang.fgc.cap.dto.CapCalculationCommand.realtime(3L,PaymentStage.GA_TO_FC,LocalDate.of(2026,10,8),null));verifyNoInteractions(schedules,reconciliations);
+    }
+    @Test void reconciliationPreservesStoredTotalsAndScopeAuthorization() {
+        var detail=mock(com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse.class);
+        when(detail.contractId()).thenReturn(3L);when(detail.expectedTotalAmount()).thenReturn(new BigDecimal("100000"));when(detail.actualTotalAmount()).thenReturn(new BigDecimal("50000"));when(detail.differenceAmount()).thenReturn(new BigDecimal("50000"));when(reconciliations.get(99L)).thenReturn(detail);
+        var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,null,null,null,null,null,null,null,"99",null),null,1L);
+        var result=service.calculate(request);assertThat(result.amounts()).containsEntry("differenceAmount","50000").containsEntry("actualAmount","50000");assertThat(result.recommendation().allowed()).isFalse();verify(access).requireContract(3L);verifyNoInteractions(caps,schedules);
+    }
 }

@@ -58,9 +58,14 @@ public class CalculationProofService {
     private String put(Grant grant) {
         synchronized(grants) {
             grants.entrySet().removeIf(entry->!clock.instant().isBefore(entry.getValue().expires()));
-            if(grants.size()>=1000 || grants.values().stream().filter(value->value.owner().equals(grant.owner())).count()>=32)throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
+            if(grants.values().stream().filter(value->value.owner().equals(grant.owner())).count()>=32)evictOldest(grant.owner());
+            if(grants.size()>=1000)evictOldest(null);
             byte[] bytes=new byte[32];random.nextBytes(bytes);String token=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);grants.put(token,grant);return token;
         }
+    }
+    private void evictOldest(String owner) {
+        grants.entrySet().stream().filter(entry->owner==null||entry.getValue().owner().equals(owner))
+            .min(java.util.Comparator.comparing(entry->entry.getValue().issued())).map(Map.Entry::getKey).ifPresent(grants::remove);
     }
     private String dependency(PaymentCalculationRequest input) {
         return input.kind()==PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE && input.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL?"NO_BUSINESS_DEPENDENCIES":dependencies.current();
@@ -73,7 +78,13 @@ public class CalculationProofService {
     }
     private String owner() {
         var auth=SecurityContextHolder.getContext().getAuthentication();if(auth==null || !auth.isAuthenticated())throw new AccessDeniedException("Authenticated calculation owner required");
-        String session=auth instanceof JwtAuthenticationToken jwt?jwt.getToken().getTokenValue():"test-or-service-principal";
+        String session;
+        if(auth.getDetails() instanceof com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter.SessionIdentity identity)session=identity.id();
+        else if(auth instanceof JwtAuthenticationToken jwt)session=jwt.getToken().hasClaim("sid")?jwt.getToken().getClaimAsString("sid"):jwt.getToken().getTokenValue();
+        else {
+            if(org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()!=null)throw new AccessDeniedException("Verified login session is required");
+            session="internal-test-or-service-principal";
+        }
         return PicoFingerprint.of(auth.getName()+"|"+auth.getAuthorities().stream().map(Object::toString).sorted().toList()+"|"+session);
     }
     private PaymentCalculationSnapshot copy(PaymentCalculationSnapshot result,String status,PaymentCalculationSnapshot.Validity validity,boolean stale) {

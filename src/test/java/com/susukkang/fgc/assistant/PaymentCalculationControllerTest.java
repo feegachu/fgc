@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.mockito.Mockito.*;
 
-@WebMvcTest(PaymentCalculationController.class)
+@WebMvcTest({PaymentCalculationController.class,com.susukkang.fgc.assistant.controller.AssistantPrecheckProofController.class,com.susukkang.fgc.transaction.controller.CommissionPaymentApiController.class})
 @Import({SecurityConfig.class, GlobalExceptionHandler.class,
         org.springdoc.core.configuration.SpringDocConfiguration.class,
         org.springdoc.core.properties.SpringDocConfigProperties.class,
@@ -29,11 +29,19 @@ class PaymentCalculationControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @MockitoBean PaymentCalculationService service;
+    @MockitoBean com.susukkang.fgc.transaction.service.CommissionPaymentService payments;
+    @MockitoBean com.susukkang.fgc.assistant.service.AssistantPrecheckProofService precheckProofs;
     @MockitoBean FgcMessageResolver messages;
     @MockitoBean ConstraintErrorCodeResolver constraints;
     String body = """
 {"contractVersion":"assistant.v1","kind":"ATTRIBUTION_BALANCE","mode":"EXISTING","scope":{"paymentId":"77"},"candidate":null,"clientRevision":1}
 """;
+    @Test void actualPrecheckVerificationIsProcessingOnly() throws Exception {
+        var request="{\"paymentId\":\"77\",\"precheckToken\":\"proof\"}";
+        mvc.perform(post("/api/v1/assistant/prechecks/revalidate").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_COMPLIANCE"))).contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isForbidden());
+        when(precheckProofs.verify(77L,"proof")).thenReturn(new com.susukkang.fgc.assistant.service.AssistantPrecheckProofService.Verification("77",true,java.time.OffsetDateTime.now().plusMinutes(5)));
+        mvc.perform(post("/api/v1/assistant/prechecks/revalidate").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isOk()).andExpect(jsonPath("$.data.verified").value(true));
+    }
     @ParameterizedTest @ValueSource(strings={"COMPLIANCE","GA_ADMIN","SETTLEMENT","SYSTEM_ADMIN"})
     void internalReadRolesCanUseExactReadOnlyPost(String role) throws Exception {
         mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role))).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
@@ -59,7 +67,13 @@ class PaymentCalculationControllerTest {
         org.assertj.core.api.Assertions.assertThat(generated.path("paths").has("/api/v1/assistant/calculations")).isTrue();
         var file = java.nio.file.Path.of("frontend/openapi/schema.json");
         ObjectNode existing = (ObjectNode) mapper.readTree(java.nio.file.Files.readString(file));
-        generated.path("paths").fields().forEachRemaining(entry -> ((ObjectNode)existing.get("paths")).set(entry.getKey(),entry.getValue()));
+        generated.path("paths").fields().forEachRemaining(entry -> {
+            if(entry.getKey().startsWith("/api/v1/transactions")) {
+                if(entry.getKey().endsWith("/precheck"))((ObjectNode)existing.path("paths").path(entry.getKey()).path("post").path("responses").path("200")).set("headers",entry.getValue().path("post").path("responses").path("200").get("headers"));
+                return;
+            }
+            ((ObjectNode)existing.get("paths")).set(entry.getKey(),entry.getValue());
+        });
         ObjectNode schemas = (ObjectNode) existing.path("components").path("schemas");
         generated.path("components").path("schemas").fields().forEachRemaining(entry -> {
             var owned = java.util.Set.of("PaymentCalculationRequest", "Scope", "ApiResponsePaymentCalculationSnapshot", "PaymentCalculationSnapshot", "Basis", "Source", "Reason", "Recommendation", "Rounding", "JsonNode", "AssistantCalculationValidity", "CalculationRevalidationRequest");

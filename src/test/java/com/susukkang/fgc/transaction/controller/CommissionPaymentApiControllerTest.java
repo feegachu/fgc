@@ -57,7 +57,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         CommissionPaymentApiController.class,
         GlobalExceptionHandler.class,
-        SecurityConfig.class
+        SecurityConfig.class,
+        com.susukkang.fgc.assistant.service.AssistantPrecheckProofService.class
 })
 class CommissionPaymentApiControllerTest {
 
@@ -88,6 +89,7 @@ class CommissionPaymentApiControllerTest {
 
     @MockitoBean
     private CommissionPaymentService commissionPaymentService;
+    @MockitoBean private com.susukkang.fgc.assistant.service.CalculationProofService precheckProofs;
 
     @MockitoBean
     private FgcMessageResolver messageResolver;
@@ -227,6 +229,14 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(jsonPath("$.data.capCheckIds[0]").value(55));
     }
 
+    @Test void actualPassingPrecheckAddsHeaderWithoutChangingJson() throws Exception {
+        given(commissionPaymentService.precheck(101L)).willReturn(new TransactionPrecheckResponse(101L,List.of(),List.of(),true));
+        given(precheckProofs.issuePrecheck(101L)).willReturn("actual-precheck-proof");
+        mockMvc.perform(post("/api/v1/transactions/101/precheck").with(user("settlement01").roles("SETTLEMENT")).with(csrf()))
+            .andExpect(status().isOk()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-FGC-Precheck-Token","actual-precheck-proof"))
+            .andExpect(jsonPath("$.data.confirmable").value(true)).andExpect(jsonPath("$.data.precheckToken").doesNotExist());
+    }
+
     // IF-API-24 (FGC-FUN-033) — 사전검증 미리보기는 차단 사유가 있어도 200 + blockers[]로 응답한다
     @Test
     void settlementRolePrechecksPayment() throws Exception {
@@ -238,6 +248,7 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.paymentId").value(101))
                 .andExpect(jsonPath("$.data.confirmable").value(false))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().doesNotExist("X-FGC-Precheck-Token"))
                 // SIR-008 — 금액은 JSON 숫자, 사용률은 문자열, 코드에는 한글 라벨 동봉
                 .andExpect(jsonPath("$.data.capPreview[0].limitAmount").value(1200000))
                 .andExpect(jsonPath("$.data.capPreview[0].usagePct").value("108.333333"))

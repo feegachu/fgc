@@ -331,3 +331,14 @@ it('로그아웃 뒤 도착한 이전 사용자의 성공 응답을 화면에 �
   result.resolve(ok({ private: 'previous-user-data' }))
   expect(await pending).toMatchObject({ name: 'ApiError', code: 'FGC-AUTH-002' })
 })
+
+it('exposes successful response headers separately from the unchanged JSON envelope',async()=>{
+  const response=ok({confirmable:true});response.headers.set('X-FGC-Precheck-Token','actual-proof')
+  const {client}=setup(vi.fn().mockResolvedValue(response));const headers=vi.fn()
+  expect(await client.request('/api/v1/transactions/77/precheck',{method:'POST',onResponseHeaders:headers})).toEqual({data:{confirmable:true},error:null,requestId:'req-1'})
+  expect(headers.mock.calls[0][0].get('X-FGC-Precheck-Token')).toBe('actual-proof')
+})
+it('does not deliver proof headers from a rejected response',async()=>{
+  const {client}=setup(vi.fn().mockResolvedValue(fail(409,'FGC-ASST-STALE_CONTEXT')));const headers=vi.fn()
+  await expect(client.request('/api/v1/transactions/77/precheck',{onResponseHeaders:headers})).rejects.toBeInstanceOf(ApiError);expect(headers).not.toHaveBeenCalled()
+})

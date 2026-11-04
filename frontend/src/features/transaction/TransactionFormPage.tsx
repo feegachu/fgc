@@ -1,3 +1,4 @@
+import { CalculationWorkbench } from '../assistant/CalculationWorkbench'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { isWonAmount } from '../assistant/guards'
 import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservation'
@@ -313,7 +314,7 @@ function TransactionForm({
     formValid: guideFormValid,
     saved: guideSaved && Boolean(paymentId) && !needsSave,
     busy: busy !== null,
-    precheck: !result ? 'NONE' : result.confirmable ? 'PASSED_WITHOUT_TOKEN' : 'REJECTED',
+    precheck: !result ? 'NONE' : result.confirmable ? (result.precheckToken ? 'PASSED_WITH_TOKEN' : 'PASSED_WITHOUT_TOKEN') : 'REJECTED',
     modalOpen,
   })
 
@@ -330,6 +331,23 @@ function TransactionForm({
     }
   }, [helpOpen])
 
+  function calculationCandidate() {
+    const payload = validatedPayload()
+    return {
+      ...payload,
+      amount: form.amount,
+      settlementMonth: form.settlementMonth,
+      contractId: payload.contractId == null ? null : rows[0].contractId,
+      agentId: payload.agentId == null ? null : form.agentId,
+      commissionItemId: form.commissionItemId,
+      allocationPolicyVersion: payload.allocationPolicyVersion == null ? null : String(payload.allocationPolicyVersion),
+      attributions: payload.attributions.map((row, index) => ({
+        ...row,
+        contractId: row.contractId == null ? null : rows[index].contractId,
+        amount: rows[index].amount,
+      })),
+    }
+  }
   function invalidatePreview() {
     setInputEdited(true)
     setGuideRevision((value) => value + 1)
@@ -553,6 +571,26 @@ function TransactionForm({
           </Link>
         </div>
       </header>
+      <CalculationWorkbench
+        key={`${paymentId}:${guideRevision}:${busy}:${ready}:${locked}:${confirmationNeedsRetry}`}
+        canProcess={ready && !locked && !confirmationNeedsRetry}
+        candidate={ready && !locked && !confirmationNeedsRetry ? calculationCandidate : undefined}
+        paymentId={paymentId}
+        revision={guideRevision}
+        onApply={ready && !locked && !confirmationNeedsRetry ? (amount, scope, snapshot) => {
+          const line = snapshot.lines?.[0]
+          if (
+            scope.aggregation !== 'SINGLE_LINE' || rows.length !== 1 || !line ||
+            line.attributionDate !== rows[0].attributionDate || scope.contractId !== rows[0].contractId ||
+            scope.settlementMonth !== form.settlementMonth || scope.paymentStage !== form.paymentStage ||
+            scope.commissionItemId !== form.commissionItemId ||
+            (form.paymentStage === 'GA_TO_FC' && scope.beneficiaryAgentId !== form.agentId)
+          ) return false
+          changeForm({ amount })
+          toast('예상액을 입력했습니다. 귀속 금액과 실제 명세를 확인한 후 저장·사전검증을 진행하세요.', 'success')
+          return true
+        } : undefined}
+      />
       <aside
         className="guidance guidance-info transaction-boundary-guidance"
         aria-labelledby="transaction-boundary-title"

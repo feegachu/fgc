@@ -26,9 +26,23 @@ class CalculationProofServiceTest {
     @Test void dependencyChangeRemovesAmountsAndRecommendation(){var r=proofs.issue(input(1),result());when(dependencies.current()).thenReturn("source-v2");var next=proofs.revalidate(new CalculationRevalidationRequest("calc",r.validity().stateToken(),input(1)));assertThat(next.status()).isEqualTo("STALE");assertThat(next.amounts()).isEmpty();assertThat(next.validity()).isNull();assertThat(next.recommendation().allowed()).isFalse();}
     @Test void fiveMinutesExpiresWithoutSleeping(){var r=proofs.issue(input(1),result());clock.now=clock.now.plusSeconds(300);assertThat(proofs.revalidate(new CalculationRevalidationRequest("calc",r.validity().stateToken(),input(1))).status()).isEqualTo("STALE");}
     @Test void sameUserDifferentJwtCannotUseGrant(){var r=proofs.issue(input(1),result());owner("two");assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc",r.validity().stateToken(),input(1)))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);}
+    @Test void productionConvertedSessionIdentityBindsGrants() {
+        var auth=org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("settler",null,List.of(new SimpleGrantedAuthority("ROLE_SETTLEMENT")));
+        auth.setDetails(new com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter.SessionIdentity("validated-session-one"));SecurityContextHolder.getContext().setAuthentication(auth);
+        var r=proofs.issue(input(1),result());
+        auth.setDetails(new com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter.SessionIdentity("validated-session-two"));
+        assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc",r.validity().stateToken(),input(1)))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
     @Test void changedInputAndForgedTokenAreRejected(){var r=proofs.issue(input(1),result());assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc",r.validity().stateToken(),input(2)))).isInstanceOf(FgcBusinessException.class);assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc","forged",input(1)))).isInstanceOf(FgcBusinessException.class);}
     @Test void calculationCannotBecomeActualPrecheck(){var r=proofs.issue(input(1),result());assertThatThrownBy(()->proofs.verifyPrecheck(77,r.validity().stateToken())).isInstanceOf(FgcBusinessException.class);String token=proofs.issuePrecheck(77);assertThat(proofs.verifyPrecheck(77,token)).isNotNull();assertThatThrownBy(()->proofs.verifyPrecheck(78,token)).isInstanceOf(FgcBusinessException.class);assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc",token,input(1)))).isInstanceOf(FgcBusinessException.class);when(dependencies.current()).thenReturn("changed");assertThatThrownBy(()->proofs.verifyPrecheck(77,token)).isInstanceOf(FgcBusinessException.class);}
     @Test void businessKeysAreNotNumericallyCollapsed(){var first=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE,PaymentCalculationRequest.Mode.HYPOTHETICAL,null,mapper.createObjectNode().put("sourceBusinessKey","007"),1L);var second=new PaymentCalculationRequest("assistant.v1",first.kind(),first.mode(),null,mapper.createObjectNode().put("sourceBusinessKey","7"),1L);var r=proofs.issue(first,result());assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc",r.validity().stateToken(),second))).isInstanceOf(FgcBusinessException.class);}
     @Test void hypotheticalBalanceHasNoBusinessReads(){var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE,PaymentCalculationRequest.Mode.HYPOTHETICAL,null,mapper.createObjectNode().put("amount","100"),1L);var r=proofs.issue(request,result());proofs.revalidate(new CalculationRevalidationRequest("calc",r.validity().stateToken(),request));verifyNoInteractions(dependencies);}
+    @Test void previewCapacityCannotBlockAnActualPrecheck() {
+        var oldest=proofs.issue(input(1),result());
+        for(int i=0;i<32;i++){clock.now=clock.now.plusSeconds(1);proofs.issue(input(1),result());}
+        String actual=proofs.issuePrecheck(77);
+        assertThat(proofs.verifyPrecheck(77,actual)).isNotNull();
+        assertThatThrownBy(()->proofs.revalidate(new CalculationRevalidationRequest("calc",oldest.validity().stateToken(),input(1)))).isInstanceOf(FgcBusinessException.class);
+    }
     static class MutableClock extends Clock {Instant now=Instant.parse("2026-11-04T00:00:00Z");public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId zone){return this;}public Instant instant(){return now;}}
 }

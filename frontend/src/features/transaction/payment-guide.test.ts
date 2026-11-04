@@ -30,7 +30,7 @@ let observer: PaymentGuideObserver
 let input: PaymentGuideInput
 let response: Payment
 const read = () => observer.readBusinessState(observer.readContext(), new AbortController().signal)
-const passed = { paymentId: 77, confirmable: true, blockers: [] }
+const passed = { paymentId: 77, confirmable: true, blockers: [], precheckToken: 'actual-proof' }
 beforeEach(() => {
   observer = new PaymentGuideObserver()
   input = {
@@ -46,7 +46,7 @@ beforeEach(() => {
   observer.update(input)
   response = structuredClone(draft)
   vi.spyOn(apiClient, 'request').mockImplementation(
-    async () => ({ data: response, error: null, requestId: 'G' }) as never,
+    async (path) => ({ data: path === '/api/v1/assistant/prechecks/revalidate' ? {paymentId:'77',verified:true,expiresAt:'2099-01-01T00:00:00Z'} : response, error: null, requestId: 'G' }) as never,
   )
 })
 afterEach(() => {
@@ -79,6 +79,19 @@ describe('payment guide server evidence', () => {
     ).toBe(true)
     expect((await read()).prechecked).toBe(false)
     observer.acceptPrecheck(observer.begin('precheck'), draft, { paymentId: 77 }, draft)
+    expect((await read()).prechecked).toBe(false)
+  })
+  it('does not accept a confirmable HTTP200 without a server token', async () => {
+    observer.acceptPrecheck(observer.begin('precheck'),draft,{paymentId:77,confirmable:true,blockers:[]},draft)
+    expect((await read()).prechecked).toBe(false)
+  })
+  it('invalidates the tutorial when server proof verification rejects stale dependencies', async () => {
+    precheck()
+    vi.mocked(apiClient.request).mockImplementation(async (path) => {
+      if(path==='/api/v1/assistant/prechecks/revalidate')throw new Error('STALE')
+      return {data:response,error:null,requestId:'G'} as never
+    })
+    await expect(read()).rejects.toThrow('SERVER_STATE_CHANGED')
     expect((await read()).prechecked).toBe(false)
   })
   it('rejects a response without identity or a changed saved version during precheck', () => {
