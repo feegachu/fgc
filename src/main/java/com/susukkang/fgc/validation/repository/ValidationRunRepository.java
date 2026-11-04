@@ -257,6 +257,10 @@ public interface ValidationRunRepository extends JpaRepository<ValidationRun, Lo
                                @Param("running") ValidationRunStatus running,
                                @Param("completed") ValidationRunStatus completed);
 
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM ValidationRun v WHERE v.validationRunId = :validationRunId AND v.status = :status")
+    int deleteIfStatus(@Param("validationRunId") Long validationRunId, @Param("status") ValidationRunStatus status);
+
     /** 배치 진행 기록 4/4: 임의 Step 실패 시 RUNNING → FAILED, 실패 Step·사유 기록. */
     @Modifying(clearAutomatically = true)
     @Query("""

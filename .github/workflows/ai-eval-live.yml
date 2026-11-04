@@ -1,0 +1,71 @@
+# .github/workflows/ai-eval-live.yml
+# TER-011 대표 세트를 실제 모델로 돌려 결과표를 남긴다(모델·프롬프트·입력 처리를 바꾼 뒤, 리허설 전).
+# 비용이 들고 시크릿을 쓰므로 수동 실행만 허용하고 실행할 때 승인 입력을 받는다. 호출은 최대 120회다(AnswerEvalLiveTest).
+# 일반 CI 는 저장된 답변을 재생하는 AnswerEvalRegressionTest 만 돈다. 절차는 docs/FGC_AI_평가_결과서_v1_0.md.
+name: AI evaluation live
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_paid_call:
+        description: 'Authorize the paid representative set (at most 120 calls)'
+        type: boolean
+        required: true
+        default: false
+      model:
+        description: 'Model ID to compare. Empty uses the value in application.yml'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-eval-live
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+
+      - name: Run representative set
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          FGC_LLM_LIVE: 'true'
+          FGC_EVAL_BASE_COMMIT: ${{ github.sha }}
+          MODEL_OVERRIDE: ${{ inputs.model }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY 시크릿이 비어 있습니다."
+            exit 1
+          fi
+          if [ -n "$MODEL_OVERRIDE" ]; then
+            export FGC_LLM_MODEL="$MODEL_OVERRIDE"
+          fi
+          ./gradlew test --tests '*AnswerEvalLiveTest' --no-daemon --console=plain
+
+      - name: Upload result table
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ai-eval-answers
+          path: build/ai-eval/answers
+          if-no-files-found: ignore
+          retention-days: 30
