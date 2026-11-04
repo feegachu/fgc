@@ -39,6 +39,9 @@ import java.util.Optional;
  */
 public interface ValidationRunRepository extends JpaRepository<ValidationRun, Long>, ValidationRunSearch {
 
+    @Query(value="SELECT EXISTS(SELECT 1 FROM fgc.validation_run_retry r JOIN fgc.validation_run v USING(validation_run_id) WHERE v.validation_month=:month AND r.state IN ('ACCEPTED','RUNNING'))",nativeQuery=true)
+    boolean hasActiveRetryForMonth(@Param("month") LocalDate month);
+
     /** 비동기 재시작 대기 중의 이전 FAILED와 새 시도 결과를 구별하는 추적 ID다. */
     @Query(value = """
             SELECT audit_log_id AS "attemptId", request_id AS "requestId" FROM fgc.audit_log

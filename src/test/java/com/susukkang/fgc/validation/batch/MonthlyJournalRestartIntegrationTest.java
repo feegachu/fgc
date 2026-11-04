@@ -27,9 +27,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 체크포인트만 모의한 표가 아니라 journal_header/line의 실제 멱등성과 부분 커밋을 확인한다.
  */
 @SpringBootTest(properties = "spring.datasource.url=jdbc:tc:postgresql:17:///fgc_restart_672?currentSchema=fgc")
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class MonthlyJournalRestartIntegrationTest {
     private static final LocalDate MONTH = LocalDate.of(2092, 6, 1);
+    @Autowired private org.springframework.test.web.servlet.MockMvc mvc;
+    @Autowired private com.susukkang.fgc.auth.service.FgcUserDetailsService users;
+    @Autowired private com.fasterxml.jackson.databind.ObjectMapper mapper;
+    @Autowired private com.susukkang.fgc.validation.service.ValidationRestartService restarts;
+    @Autowired private org.springframework.batch.core.explore.JobExplorer explorer;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private Job monthlyValidationJob;
     @Autowired private JobLauncher jobLauncher;
@@ -41,6 +47,7 @@ class MonthlyJournalRestartIntegrationTest {
     @Autowired private Step exceptionGenerationStep;
 
     @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles="SETTLEMENT")
     void twentyFifthJournalFailureRestartsSameInstanceAndPostsThirtySourcesOnce() throws Exception {
         // 공유 개발/운영 DB를 사용하지 않는다. 이 테스트 전용 컨텍스트만 Job 배선을 바꾼다.
         ((SimpleJob) monthlyValidationJob).setSteps(List.of(
@@ -102,8 +109,30 @@ class MonthlyJournalRestartIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT last_value FROM fgc.it_672_journal_attempt", Long.class)).isEqualTo(25L);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.journal_header WHERE validation_run_id=?", Long.class, runId))
                 .isEqualTo(24L);
-        var failedRow = ValidationRunRow.from(runs.findById(runId).orElseThrow());
-        var restarted = trigger.launch(failedRow, "IT-672-restart").get(60, TimeUnit.SECONDS);
+        var allowed = restarts.eligibility(runId);
+        assertThat(allowed.allowed()).isTrue();
+        var request = new com.susukkang.fgc.validation.dto.ValidationRestartRequest(first.getId(), allowed.expectedStateVersion(), "원인 수정 후 재시작");
+        var firstResponse = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/v1/validation-runs/{id}/restart",runId)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(users.loadUserByUsername("settle01")))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .header("Idempotency-Key","IT-672-restart").contentType("application/json")
+                .content(mapper.writeValueAsString(request)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isAccepted()).andReturn();
+        Long retryId=mapper.readTree(firstResponse.getResponse().getContentAsString()).path("data").path("retryId").longValue();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/v1/validation-runs/{id}/restart",runId)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(users.loadUserByUsername("settle01")))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                .header("Idempotency-Key","IT-672-restart").contentType("application/json")
+                .content(mapper.writeValueAsString(request)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isAccepted())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.retryId").value(retryId));
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(60)).untilAsserted(() ->
+                assertThat(restarts.history(runId).getFirst().state()).isEqualTo("SUCCEEDED"));
+        var restarted = explorer.getJobExecution(restarts.history(runId).getFirst().batchExecutionId());
+        assertThat(restarts.history(runId)).hasSize(1);
+        assertThat(restarts.eligibility(runId).allowed()).isFalse();
         assertThat(restarted.getStatus()).isEqualTo(BatchStatus.COMPLETED);
         assertThat(restarted.getJobInstance().getInstanceId()).isEqualTo(first.getJobInstance().getInstanceId());
         assertThat(restarted.getStepExecutions()).extracting(step -> step.getStepName())
@@ -122,7 +151,7 @@ class MonthlyJournalRestartIntegrationTest {
                 SELECT COUNT(*) FROM fgc.journal_line l JOIN fgc.journal_header h USING(journal_header_id)
                  WHERE h.validation_run_id=?
                 """, Long.class, runId)).isEqualTo(60L);
-        assertThat(runs.findLatestAttemptRequestId(runId)).isEqualTo("IT-672-restart");
+        assertThat(runs.findLatestAttemptRequestId(runId)).isNotBlank();
         assertThat(jdbc.queryForList("SELECT * FROM fgc.batch_watermark ORDER BY job_name,step_name"))
                 .isEqualTo(watermarks);
     }

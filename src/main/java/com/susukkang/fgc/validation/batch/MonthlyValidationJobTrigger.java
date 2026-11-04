@@ -68,6 +68,12 @@ public class MonthlyValidationJobTrigger {
      * 사용자) 값을 쓰면 triggeredBy 불일치로 VRUN_005가 난다.
      */
     public CompletableFuture<JobExecution> launch(ValidationRunRow run, String requestId) {
+        return launch(run, requestId, null);
+    }
+    public CompletableFuture<JobExecution> launchRestart(ValidationRunRow run, String requestId, Long retryId) {
+        return launch(run, requestId, retryId);
+    }
+    private CompletableFuture<JobExecution> launch(ValidationRunRow run, String requestId, Long retryId) {
         JobParameters requestedParameters = new JobParametersBuilder()
                 .addString("validationMonth", DateUtil.formatSettlementMonth(run.getValidationMonth()))
                 .addLong("runNo", run.getRunNo().longValue())
@@ -80,12 +86,14 @@ public class MonthlyValidationJobTrigger {
         JobParameters jobParameters = ValidationRunStatus.FAILED.name().equals(run.getStatus())
                 ? restartParameters(run, requestId) : requestedParameters;
 
+        if (retryId != null) jobParameters = new JobParametersBuilder(jobParameters).addLong("restartRetryId", retryId, false).toJobParameters();
+        JobParameters launchParameters = jobParameters;
         Long validationRunId = run.getValidationRunId();
 
         // whenComplete는 exceptionally와 달리 예외를 다른 값으로 바꿔치기하지 않는다 — 로그만
         // 남기고, 반환된 CompletableFuture는 실패 상태를 그대로 유지해 호출자가 원하면 알 수 있다.
         return CompletableFuture
-                .supplyAsync(() -> runOrWrap(run, jobParameters), taskExecutor)
+                .supplyAsync(() -> runOrWrap(run, launchParameters), taskExecutor)
                 .whenComplete((jobExecution, ex) -> {
                     if (ex != null) {
                         log.error("MonthlyValidationJob 실행 요청 실패 (validationRunId={}, requestId={})",

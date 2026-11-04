@@ -701,6 +701,12 @@
     "reference.tab.refund": "INTERNAL_READ",
     "reference.tab.rules": "INTERNAL_READ",
     "reference.tab.sources": "INTERNAL_READ",
-    "reference.tab.versions": "INTERNAL_READ"
+    "reference.tab.versions": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.section-1": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.table-1": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.button-1": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.button-2": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.button-3": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.textarea-1": "CAN_PROCESS"
   }
 }
