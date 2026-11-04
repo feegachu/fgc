@@ -5281,6 +5281,7 @@ export interface components {
             expectedAmount?: string;
             ruleId?: string;
             status?: string;
+            cashflowType?: string;
         };
     };
     responses: never;

@@ -62,7 +62,7 @@ class PaymentCalculationControllerTest {
         ((ObjectNode) existing.get("paths")).set("/api/v1/assistant/calculations", generated.path("paths").get("/api/v1/assistant/calculations"));
         ObjectNode schemas = (ObjectNode) existing.path("components").path("schemas");
         generated.path("components").path("schemas").fields().forEachRemaining(entry -> {
-            var owned = java.util.Set.of("PaymentCalculationRequest", "Scope", "ApiResponsePaymentCalculationSnapshot", "PaymentCalculationSnapshot", "Basis", "Source", "Reason", "Recommendation", "Rounding", "JsonNode");
+            var owned = java.util.Set.of("PaymentCalculationRequest", "Scope", "ApiResponsePaymentCalculationSnapshot", "PaymentCalculationSnapshot", "Basis", "Source", "Reason", "Recommendation", "Rounding", "JsonNode", "AssistantCalculationLine");
             if (!schemas.has(entry.getKey()) || owned.contains(entry.getKey())) schemas.set(entry.getKey(), entry.getValue());
             else if (!entry.getKey().equals("ApiError")) org.assertj.core.api.Assertions.assertThat(schemas.get(entry.getKey())).isEqualTo(entry.getValue());
         });
