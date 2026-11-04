@@ -7,6 +7,8 @@ import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEffectResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +26,20 @@ import java.util.Map;
 public class ContractStatusEffectQueryService {
 
     private static final int MAX_SIZE = 100;
+    /** FUN-085: AGENT는 같은 계약이어도 본인 회차와 본인 지급 건의 영향만 본다. 다른 수혜자 회차, 원수사→GA 지급, 남의 지급 건은 내주지 않는다. */
+    private static final String OWN_EFFECT = """
+            AND ((e.entity_type = 'SCHEDULE_LINE' AND EXISTS (SELECT 1 FROM fgc.schedule_line sl
+                    WHERE sl.schedule_line_id = e.entity_id AND sl.beneficiary_agent_id = :agentId))
+                OR (e.entity_type = 'PAYMENT' AND EXISTS (SELECT 1 FROM fgc.commission_transaction ct
+                    WHERE ct.commission_transaction_id = e.entity_id AND %s)))
+            """.formatted(AgentDataScopeService.OWN_PAYMENT);
+    /** 저장된 지급 건 금액은 헤더 총액이다. 남의 몫이 섞인 건은 AGENT에게 본인 귀속 합계로 보인다. */
+    private static final String AGENT_VISIBLE_AMOUNT = """
+            CASE WHEN e.entity_type = 'PAYMENT' THEN COALESCE((%s), e.amount) ELSE e.amount END
+            """.formatted(AgentDataScopeService.ownAmountIfMixed("e.entity_id"));
+
     private final JdbcTemplate jdbc;
+    private final NamedParameterJdbcTemplate namedJdbc;
     private final AgentDataScopeService agentScope;
 
     @Transactional(readOnly = true)
@@ -42,19 +57,25 @@ public class ContractStatusEffectQueryService {
         if (owned == null || owned == 0) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_004, "eventId", Map.of("eventId", eventId), null);
         }
-        long total = jdbc.queryForObject(
-                "SELECT count(*) FROM fgc.contract_status_event_effect WHERE contract_status_event_id = ?", Long.class, eventId);
-        List<ContractStatusEffectResponse> rows = jdbc.query("""
-                SELECT entity_type, entity_id, processing_job, previous_state, next_state, amount, policy_version_id,
-                       reason_code, reason
-                  FROM fgc.contract_status_event_effect
-                 WHERE contract_status_event_id = ?
-                 ORDER BY entity_type, entity_id, processing_job
-                 LIMIT ? OFFSET ?
-                """, (rs, row) -> new ContractStatusEffectResponse(rs.getString("entity_type"), rs.getLong("entity_id"),
+        Long scopeAgentId = agentScope.currentAgentId();
+        String ownEffect = scopeAgentId == null ? "" : OWN_EFFECT;
+        var params = new MapSqlParameterSource("eventId", eventId).addValue("agentId", scopeAgentId)
+                .addValue("size", size).addValue("offset", (long) (page - 1) * size);
+        StringBuilder count = new StringBuilder("SELECT count(*) FROM fgc.contract_status_event_effect e")
+                .append(" WHERE e.contract_status_event_id = :eventId ").append(ownEffect);
+        long total = namedJdbc.queryForObject(count.toString(), params, Long.class);
+        List<ContractStatusEffectResponse> rows = namedJdbc.query("""
+                SELECT e.entity_type, e.entity_id, e.processing_job, e.previous_state, e.next_state,
+                       __AMOUNT__ AS amount, e.policy_version_id, e.reason_code, e.reason
+                  FROM fgc.contract_status_event_effect e
+                 WHERE e.contract_status_event_id = :eventId __OWN_EFFECT__
+                 ORDER BY e.entity_type, e.entity_id, e.processing_job
+                 LIMIT :size OFFSET :offset
+                """.replace("__AMOUNT__", scopeAgentId == null ? "e.amount" : AGENT_VISIBLE_AMOUNT)
+                .replace("__OWN_EFFECT__", ownEffect), params, (rs, row) -> new ContractStatusEffectResponse(rs.getString("entity_type"), rs.getLong("entity_id"),
                 rs.getString("processing_job"), rs.getString("previous_state"), rs.getString("next_state"),
                 rs.getBigDecimal("amount"), (Long) rs.getObject("policy_version_id"), rs.getString("reason_code"),
-                rs.getString("reason")), eventId, size, (long) (page - 1) * size);
+                rs.getString("reason")));
         return new PageResponse<>(rows, page, size, total, (int) Math.ceil(total / (double) size), "entityType,entityId");
     }
 

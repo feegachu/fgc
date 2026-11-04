@@ -45,6 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 워밍업 후 교차 실행하며 시간은 합격 기준으로 사용하지 않는다.
  * 픽스처는 테스트 트랜잭션 종료 시 모두 롤백한다.
  */
+// FUN-085: 범위 검사는 인증 문맥이 없으면 전체 범위로 풀지 않는다. 내부 조회 역할로 호출한다.
+@org.springframework.security.test.context.support.WithMockUser(roles = "SETTLEMENT")
 @SpringBootTest(properties = {
         "fgc.batch.daily-changed-contract.enabled=false",
         "spring.jpa.properties.hibernate.generate_statistics=true",
