@@ -1,0 +1,19 @@
+# Merge after ../compose.yaml. Paths remain relative to infra/monitoring.
+# Resolve the existing application network from the running API container.
+services:
+  prometheus:
+    volumes:
+      - ./shinhan/targets.json:/etc/prometheus/targets.json:ro
+    networks: [default, application]
+    mem_limit: ${FGC_PROMETHEUS_MEMORY:-512m}
+  blackbox:
+    networks: [default, application]
+    mem_limit: ${FGC_BLACKBOX_MEMORY:-64m}
+  alertmanager:
+    mem_limit: ${FGC_ALERTMANAGER_MEMORY:-128m}
+  grafana:
+    mem_limit: ${FGC_GRAFANA_MEMORY:-256m}
+networks:
+  application:
+    external: true
+    name: ${FGC_APP_NETWORK:?Set the existing Shinhan API Docker network}

@@ -58,3 +58,5 @@ docker compose -p fgc-monitoring-674-test -f infra/monitoring/compose.yaml -f in
 - 중지: `docker compose -f infra/monitoring/compose.yaml stop`. 앱 monitoring 프로필을 제거하면 지표 HTTP 노출/JSON 로그가 기본값으로 돌아간다. 데이터 볼륨은 보존한다.
 - RTM ECR-007/PER-006에 구현모듈·테스트 근거 갱신 요청. 사람 리뷰 2인, 운영 수신 증거와 미확인 SRC 원문은 이슈 완료 전 남은 항목이다.
 - 공식 참조: https://docs.spring.io/spring-boot/3.5/reference/actuator/metrics.html , https://prometheus.io/docs/alerting/latest/configuration/ .
+
+신한 prod 내부망 배포·검증·SSH 터널·롤백 절차: [shinhan/README.md](shinhan/README.md).
