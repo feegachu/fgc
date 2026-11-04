@@ -18,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -196,6 +197,9 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 row("IF-78", POST, "/api/v1/ai/compare-chat/explain", "{\"rankResultId\":\"없는결과\"}", AGENT_ONLY),
                 row("IF-78", POST, "/api/v1/ai/compare-chat/ask",
                         "{\"rankResultId\":\"없는결과\",\"question\":\"권한 시험\"}", AGENT_ONLY),
+                // 설계사 계약 확인 기록 FUN-086 — IF-74A. 본인 계약 범위는 AgentDataScopeIntegrationTest 쪽이다
+                row("IF-74A", POST, "/api/v1/agent/me/contract-checks",
+                        "{\"contractId\":999999999,\"result\":\"CLOSED\",\"expectedContextVersion\":\"v\"}", AGENT_ONLY),
                 // 피코 #745·#751 — IF-60·60A·60B·60C. 조회 역할은 안내만, 처리 업무는 정산/시스템 관리자
                 row("IF-60", POST, "/api/v1/ai/pico/ask", """
                         {"question":"권한 시험","screenId":"TRAN-W02","entityRefs":[],"clientContextRevision":"1","guideVersion":"1.0"}""", INTERNAL),
@@ -261,8 +265,10 @@ class RoleApiAuthorizationMatrixIntegrationTest {
         if (actor == Actor.ANONYMOUS) {
             result.andExpect(status().isUnauthorized());
         } else if (row.allowed().contains(actor)) {
-            // 없는 ID 라 4xx 가 정상이다. 대상은 권한을 지나 업무 로직까지 갔다는 사실이다.
-            assertThat(result.andReturn().getResponse().getStatus()).as(row + " / " + actor).isNotIn(401, 403).isLessThan(500);
+            // 없는 ID 라 4xx 가 정상이다. 대상은 역할 검사를 지나 업무 로직까지 갔다는 사실이다(FGC-AUTH-005 는 역할 다음의 본인 범위 검사).
+            MockHttpServletResponse response = result.andReturn().getResponse();
+            assertThat(response.getStatus()).as(row + " / " + actor).isNotEqualTo(401).isLessThan(500);
+            assertThat(response.getContentAsString()).as(row + " / " + actor).doesNotContain("FGC-AUTH-003");
         } else {
             result.andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
         }
