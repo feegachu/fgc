@@ -114,6 +114,20 @@ class ValidationRestartIntegrationTest {
     return new ValidationRestartRequest(101L, s.expectedStateVersion(), "원인 수정");
   }
 
+  /** VRUN-W02 실패 시각. 실행의 완료 시각(completed_at)은 실패 전이에서 채워지지 않아 늘 `자료 없음`이었다. */
+  @Test
+  void failedAtComesFromTheFailedBatchExecutionNotFromTheRun() {
+    assertThat(service.eligibility(run).failedAt()).isNull();
+
+    var failed = new JobExecution(101L);
+    failed.getExecutionContext().putLong("validationRunId", run);
+    failed.setEndTime(java.time.LocalDateTime.of(2093, 7, 31, 23, 40));
+    when(lookup.findFailedExecution(any())).thenReturn(failed);
+
+    assertThat(service.eligibility(run).failedAt().toLocalDateTime())
+        .isEqualTo(java.time.LocalDateTime.of(2093, 7, 31, 23, 40));
+  }
+
   @Test
   void replayDoesNotLaunchAgainAndDifferentBodyIsRejected() {
     var q = request();

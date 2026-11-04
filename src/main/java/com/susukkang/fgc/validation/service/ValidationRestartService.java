@@ -64,6 +64,7 @@ public class ValidationRestartService {
     var run = runs.findById(id).orElseThrow(() -> missing(id));
     String version = run.getStatus().name() + ":" + run.getCurrentStep();
     Long executionId = null;
+    java.time.OffsetDateTime failedAt = null;
     boolean checkpoint = false;
     String reason = null;
     if (run.getStatus() != ValidationRunStatus.FAILED || "MANUAL_CONTRACT".equals(run.getRunType()))
@@ -72,6 +73,8 @@ public class ValidationRestartService {
       try {
         var previous = executions.findFailedExecution(ValidationRunRow.from(run));
         executionId = previous.getId();
+        if (previous.getEndTime() != null)
+          failedAt = previous.getEndTime().atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime();
         checkpoint =
             id.equals(
                 com.susukkang.fgc.validation.batch.ValidationRunBatchContext.getValidationRunId(
@@ -93,7 +96,7 @@ public class ValidationRestartService {
         checkpoint,
         null,
         null,
-        run.getCompletedAt());
+        failedAt);
   }
 
   private boolean active(Long id) {
