@@ -202,6 +202,20 @@ class ContractStatusPaymentRuleTest {
         return new StatusPoint(LocalDate.parse(effectiveDate).atStartOfDay(SEOUL).toOffsetDateTime(), eventSeq, status);
     }
 
+    @Test
+    void revivalNonPayableEvidenceExcludesLockedAndConfirmedLines() {
+        // FUN-029: 월잠금·확정은 NO_RETROACTIVE 근거 생성에서도 보존 대상으로 제외한다.
+        StatusPoint active = at("2026-01-01", 1, ACTIVE);
+        StatusPoint lapse = at("2026-09-01", 2, LAPSED);
+        StatusPoint revival = at("2026-10-15", 3, REVIVED);
+        List<ContractStatusEffect> effects = ContractStatusPaymentRule.judgeNotPayable(
+                List.of(active, lapse, revival), revival, POLICY,
+                List.of(lockedMonth(1, "2026-09-20"), line(2, "2026-09-20", ScheduleLineStatus.CONFIRMED),
+                        line(3, "2026-09-20", ScheduleLineStatus.CANCELLED)), List.of());
+        assertThat(effects).extracting(ContractStatusEffect::entityId, ContractStatusEffect::reasonCode)
+                .containsExactly(tuple(3L, "NO_RETROACTIVE"));
+    }
+
     private static Line line(long id, String dueDate, ScheduleLineStatus status) {
         return new Line(id, LocalDate.parse(dueDate), status, ScheduleHeaderStatus.PLANNED, new BigDecimal("1000"), false);
     }
