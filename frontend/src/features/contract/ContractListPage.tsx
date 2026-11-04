@@ -99,6 +99,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
   {
     key: 'premium',
     label: <span className="contract-premium-heading">월납환산 초회보험료</span>,
+    labelText: '월납환산 초회보험료',
     labelExtra: (
       <EvidenceLink label="월납환산 초회보험료 설명 보기" icon="help">
         주기 보험료를 월 기준으로 환산한 값입니다. 1,200% 한도 계산 기준으로 사용합니다.
@@ -299,7 +300,7 @@ function ContractFilters({
         >
           <option value="">{query?.isFetching ? '불러오는 중' : placeholder}</option>
           {draft[key] && !options.some((option) => option.value === draft[key]) && (
-            <option value={draft[key]}>선택된 ID: {draft[key]}</option>
+            <option value={draft[key]}>선택한 항목(목록에 없음)</option>
           )}
           {options.map((option) => (
             <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -388,7 +389,7 @@ function ContractFilters({
             '1,200% 판정',
             [
               ...Object.entries(STATUSES).map(([value, label]) => ({ value, label })),
-              { value: NEED_CHECK_STATUSES, label: '확인 필요(주의·위반·검토필요)' },
+              { value: NEED_CHECK_STATUSES, label: '확인 필요(주의, 위반, 검토필요)' },
             ],
           )}
         </div>

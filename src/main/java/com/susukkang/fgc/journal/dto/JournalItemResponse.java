@@ -54,7 +54,7 @@ public record JournalItemResponse(
         }
         return switch (sourceEntityType) {
             case "SCHEDULE_LINE" -> "스케줄행";
-            case "COMMISSION_TRANSACTION" -> "지급거래";
+            case "COMMISSION_TRANSACTION" -> "지급 건";
             case "JOURNAL_HEADER" -> "원분개";
             default -> sourceEntityType;
         };

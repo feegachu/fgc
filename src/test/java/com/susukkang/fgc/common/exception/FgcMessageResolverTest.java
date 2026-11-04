@@ -24,11 +24,20 @@ class FgcMessageResolverTest {
     @Test
     void replacesMessagePlaceholderWithParameter() {
         String message = resolver.resolve(
-                FgcErrorCode.COMMON_002,
-                Map.of("field", "contractNo")
+                FgcErrorCode.VRUN_002,
+                Map.of("n", 2)
         );
 
-        assertThat(message).isEqualTo("입력값을 확인하세요. (contractNo)");
+        assertThat(message).isEqualTo("확정 불가 — 2개 조건이 남았습니다. 아래 체크리스트를 확인하세요.");
+    }
+
+    /** SRC-074: 호출부가 field 를 넘겨도 화면 문구에 원문 필드 키를 보이지 않는다. */
+    @Test
+    void doesNotExposeFieldKeyEvenWhenCallerPassesIt() {
+        assertThat(resolver.resolve(FgcErrorCode.COMMON_002, Map.of("field", "contractNo")))
+                .isEqualTo("입력값을 확인하세요.");
+        assertThat(resolver.resolve(FgcErrorCode.IMPL_POLICY_MISSING, Map.of("field", "policyVersionId")))
+                .isEqualTo("적용 정책 또는 계산 근거가 부족해 계산할 수 없습니다.");
     }
 
     private static ResourceBundleMessageSource messageSource() {

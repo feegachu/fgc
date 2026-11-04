@@ -101,7 +101,7 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
         aria-expanded={expanded}
         aria-controls={expanded ? popupId : undefined}
         aria-activedescendant={expanded && options[active] ? `${popupId}-${active}` : undefined}
-        value={expanded ? keyword : selected ? source.label(selected) : value ? `선택값 확인 필요 (#${value})` : ''}
+        value={expanded ? keyword : selected ? source.label(selected) : value ? '선택한 항목(목록에 없음)' : ''}
         onFocus={() => {
           setOpen(true)
           setActive(-1)

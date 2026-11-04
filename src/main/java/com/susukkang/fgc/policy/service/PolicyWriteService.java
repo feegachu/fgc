@@ -297,7 +297,7 @@ public class PolicyWriteService {
                 default -> FIELD_POLICY_TYPE;
             };
             throw new FgcBusinessException(FgcErrorCode.POL_004, field,
-                    Map.of(FIELD_REASON, "제출에 필요한 유형별 규칙이 없거나 지원되지 않는 정책 유형입니다."), null);
+                    Map.of(FIELD_REASON, "정책 유형에 맞는 규칙을 먼저 입력하세요."), null);
         }
     }
 
