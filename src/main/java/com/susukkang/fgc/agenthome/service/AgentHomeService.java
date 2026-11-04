@@ -212,6 +212,8 @@ public class AgentHomeService {
         if (followUp != (request.nextCheckDate() != null)) {
             throw invalid("nextCheckDate");
         }
+        // FUN-085: 키 재사용·잠금 결과보다 먼저 본인 범위를 검사한다. 담당 변경 뒤의 재생도 다시 검사한다.
+        scope.requireContract(request.contractId());
         String hash = hash(request);
         if (!repository.tryLock(agentId, idempotencyKey)) {
             throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS, null, Map.of(), null);
@@ -220,7 +222,6 @@ public class AgentHomeService {
         if (existing.isPresent()) {
             return replay(existing.get(), hash, request.contractId());
         }
-        scope.requireContract(request.contractId());
         int seenSeq = repository.maxEventSeq(request.contractId());
         String current = contextVersion(request.contractId(), seenSeq);
         if (!current.equals(request.expectedContextVersion())) {

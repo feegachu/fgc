@@ -222,11 +222,18 @@ class AgentHomeIntegrationTest {
         record(ownContract, "CLOSED", null, null, "contract" + ownContract + "-event999", "k-stale-1")
                 .andExpect(status().isConflict()).andExpect(content().string(containsString("STATE_CHANGED")));
         record(otherContract, "CLOSED", null, null, version(otherContract), "k-other-1").andExpect(status().isForbidden());
+        // FUN-085·086: 본인 기록에 사용한 키를 남의 계약에 재사용해도 멱등 충돌(409)이 아니라 범위 거절(403)이다.
+        record(ownContract, "CLOSED", null, null, version(ownContract), "k-owned-1").andExpect(status().isOk());
+        record(otherContract, "CLOSED", null, null, version(otherContract), "k-owned-1")
+                .andExpect(status().isForbidden());
+        assertThat(id("SELECT count(*) FROM fgc.agent_contract_check WHERE agent_id = ? AND idempotency_key = ?",
+                ownAgent, "k-owned-1")).isEqualTo(1L);
         record(ownContract, "CLOSED", today.plusDays(1), null, version(ownContract), "k-bad-1").andExpect(status().isBadRequest());
         record(ownContract, "FOLLOW_UP", null, null, version(ownContract), "k-bad-2").andExpect(status().isBadRequest());
         record(ownContract, "CLOSED", null, "x".repeat(1001), version(ownContract), "k-bad-3").andExpect(status().isBadRequest());
         record(ownContract, "CLOSED", null, null, version(ownContract), null).andExpect(status().isBadRequest());
-        assertThat(id("SELECT count(*) FROM fgc.agent_contract_check")).isZero();
+        // 위에서 성공한 본인 계약 확인 1건 외에 거절된 요청은 어떤 행도 추가하지 않는다.
+        assertThat(id("SELECT count(*) FROM fgc.agent_contract_check")).isEqualTo(1L);
     }
 
     @Test
