@@ -9,10 +9,10 @@ import org.hibernate.query.NativeQuery;
 public record PaymentCandidateProjection(long paymentId,String paymentJson,String attributionJson) {
     public String sql(String original) {
         return """
-            WITH assistant_ct AS (
+            WITH assistant_ct AS NOT MATERIALIZED (
                 SELECT * FROM fgc.commission_transaction WHERE commission_transaction_id <> :candidatePaymentId
                 UNION ALL SELECT * FROM jsonb_populate_record(NULL::fgc.commission_transaction, CAST(:candidatePayment AS jsonb))
-            ), assistant_ta AS (
+            ), assistant_ta AS NOT MATERIALIZED (
                 SELECT * FROM fgc.transaction_attribution WHERE commission_transaction_id <> :candidatePaymentId
                 UNION ALL SELECT * FROM jsonb_populate_recordset(NULL::fgc.transaction_attribution, CAST(:candidateAttributions AS jsonb))
             )
