@@ -89,14 +89,19 @@ test('eleventh tab is bounded and restored; month updates every tab and removes 
   await page.getByRole('gridcell', { name: '8월', exact: true }).click()
   await page.getByRole('button', { name: '적용', exact: true }).click()
   await expect(page).toHaveURL(/month=2026-08/)
-  const hrefs = await page
-    .locator('.workspace-tab-link')
-    .evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-  expect(hrefs).toHaveLength(10)
-  for (const href of hrefs) {
-    expect(href).toContain('month=2026-08')
-    expect(href).not.toContain('page=')
-  }
+  // URL navigation commits before AppShell's effect updates every stored tab.
+  // Wait for that rendered result while retaining all month/page assertions.
+  await expect(async () => {
+    const hrefs = await page
+      .locator('.workspace-tab-link')
+      .evaluateAll((links) => links.map((link) => link.getAttribute('href')))
+    expect(hrefs).toHaveLength(10)
+    for (const href of hrefs) {
+      expect(href).toContain('month=2026-08')
+      expect(href).not.toContain('page=')
+    }
+  }).toPass({ timeout: 5000 })
+
 })
 
 test('unknown route and keyboard month cancellation', async ({ page }) => {
