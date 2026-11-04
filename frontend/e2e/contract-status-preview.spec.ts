@@ -192,6 +192,7 @@ test('실효 미리보기는 회차, 보류, 기지급, 환수 근거를 보이�
   await dialog.getByRole('button', { name: '닫기', exact: true }).click()
   await expect(dialog).toBeHidden()
   await expect(page).toHaveURL(/\?tab=basic/)
+  await page.screenshot({ path: 'e2e-artifacts/731-status-preview-entry.png' })
   expect(writes).toEqual([])
 })
 
