@@ -540,10 +540,11 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private List<TransactionPrecheckResponse.Blocker> toBlockers(List<GateFailure> failures) {
         return failures.stream()
                 .map(failure -> {
-                    // CAP_003(미해결 위반)은 hasBlockingUnresolvedViolation의 지급 건 단위 판정이라 어느 귀속행이
-                    // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 예외 건을
+                    // CAP_003(미해결 위반)과 IMPL_PAYMENT_HELD(상태 사건 보류)는 지급 건 단위 판정이라 어느 귀속행이
+                    // 원인인지 알 수 없다 — 임의의 첫 귀속행 ID를 노출하면 사용자가 엉뚱한 계약을
                     // 찾게 되므로 계약·귀속행 ID를 비운다
-                    boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003;
+                    boolean paymentLevel = failure.errorCode() == FgcErrorCode.CAP_003
+                            || failure.errorCode() == FgcErrorCode.IMPL_PAYMENT_HELD;
                     return new TransactionPrecheckResponse.Blocker(
                             failure.errorCode().getCode(),
                             CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE.equals(failure.reasonCode())

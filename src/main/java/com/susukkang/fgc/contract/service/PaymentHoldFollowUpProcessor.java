@@ -122,13 +122,18 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
     }
 
     /**
-     * 새 스케줄 버전은 원래 지급예정일로 회차를 다시 만든다. 최신 사건이 납입 재개이면 재개 전(미납일~재개 전날)에 있던
+     * 새 스케줄 버전은 원래 지급예정일로 회차를 다시 만든다. 이력의 모든 납입 재개에 대해 재개 전(미납일~재개 전날)에 있던
      * PLANNED 회차의 지급예정일을 재개일로 다시 잡는다. 이미 재개일이면 범위 밖이라 되풀이해도 바뀌지 않는다.
      */
-    private void resetResumedDueDates(List<ContractStatusEvent> timeline, ContractStatusEvent latest) {
-        if (!isPaymentResumed(latest)) {
-            return;
+    private void resetResumedDueDates(List<ContractStatusEvent> timeline) {
+        for (ContractStatusEvent event : timeline) {
+            if (isPaymentResumed(event)) {
+                resetResumedDueDates(timeline, event);
+            }
         }
+    }
+
+    private void resetResumedDueDates(List<ContractStatusEvent> timeline, ContractStatusEvent latest) {
         LocalDate resumedOn = resumeDate(latest);
         LocalDate unpaidOn = null;
         for (int i = timeline.indexOf(latest) - 1; i >= 0; i--) {
@@ -174,7 +179,7 @@ public class PaymentHoldFollowUpProcessor implements ContractStatusFollowUpProce
                 applyLine(effect);
             }
         }
-        resetResumedDueDates(timeline, latest);
+        resetResumedDueDates(timeline);
     }
 
     /** 규칙이 이미 확정·월잠금 회차를 걸러 냈지만 DB 상태가 그 사이 바뀌었을 수 있어 조건으로 한 번 더 지킨다. */
