@@ -6,11 +6,9 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.testcontainers.containers.PostgreSQLContainer;
 
-/** #844: 열린 선행 PR의 고정 SHA DDL을 임시 디렉터리로 제공하는 순서 검증. */
-@EnabledIfEnvironmentVariable(named = "FGC_844_PENDING_MIGRATIONS", matches = ".+")
+/** #844: 병합된 정식 마이그레이션 V78→V79→V80의 순서와 재실행을 검증한다. */
 class ValidationRestartMigrationOrderTest {
   @Test
   void pendingVersionsApplyBeforeRestartAndSecondMigrationIsNoOp() throws Exception {
@@ -32,11 +30,7 @@ class ValidationRestartMigrationOrderTest {
           Flyway.configure()
               .dataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword())
               .schemas("fgc")
-              .locations(
-                  "classpath:db/migration",
-                  "classpath:db/demo",
-                  "classpath:db/demo-agent",
-                  "filesystem:" + System.getenv("FGC_844_PENDING_MIGRATIONS"))
+              .locations("classpath:db/migration", "classpath:db/demo", "classpath:db/demo-agent")
               .outOfOrder(false)
               .load();
       assertThat(all.migrate().migrationsExecuted).isEqualTo(3);

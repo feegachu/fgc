@@ -1,4 +1,5 @@
 import { CellDisclosure } from '../../components/CellDisclosure'
+import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
 import { errorText, internalErrorText, isNegative } from '../../lib/format'
@@ -12,16 +13,23 @@ export function Money({
   value,
   difference = false,
   unit = true,
+  animate = false,
 }: {
   value?: Amount
   difference?: boolean
   unit?: boolean
+  animate?: boolean
 }) {
+  const formatted = amountText(value, unit)
+  const numeric = Number(value)
+  const canAnimateAmount = animate && Number.isSafeInteger(numeric) && formatted === amountText(numeric, unit)
   return (
     <span
       className={`${isNegative(value) ? 'is-negative-amount' : ''} ${difference && value != null && Number(value) !== 0 ? 'reco-react-difference' : ''}`}
     >
-      {amountText(value, unit)}
+      {canAnimateAmount
+        ? <AnimatedNumber value={numeric} format={(amount) => amountText(Math.round(amount), unit)} />
+        : formatted}
     </span>
   )
 }

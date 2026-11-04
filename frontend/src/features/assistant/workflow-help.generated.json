@@ -2649,21 +2649,6 @@
         "next": []
       },
       {
-        "stepId": "help.50e41a8dce46d7934ed24f2fc0f09745",
-        "screenId": "POL-W01",
-        "targetId": "features.policies.policies-page.button-5",
-        "title": "정책/룰셋, 근거 상세 보기",
-        "instruction": "정책/룰셋 화면의 ‘근거 상세 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "GA_ADMIN",
-          "SETTLEMENT",
-          "COMPLIANCE"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.5276199353cd1f1f3ab926a4bfdf7a76",
         "screenId": "POL-W01",
         "targetId": "features.policies.policies-page.button-7",
@@ -4227,20 +4212,6 @@
         "targetId": "features.policies.policy-reference-info.source-link",
         "title": "정책/룰셋, 근거 원문 열기",
         "instruction": "정책/룰셋 화면의 ‘근거 원문 열기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "GA_ADMIN",
-          "SETTLEMENT"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.50e41a8dce46d7934ed24f2fc0f09745",
-        "screenId": "POL-W01",
-        "targetId": "features.policies.policies-page.button-5",
-        "title": "정책/룰셋, 근거 상세 보기",
-        "instruction": "정책/룰셋 화면의 ‘근거 상세 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8503,8 +8474,8 @@
         "stepId": "help.193852053924ae475e58e987c4740713",
         "screenId": "DASH-W01",
         "targetId": "dashboard.kpi.open",
-        "title": "업무 대시보드, 처리할 예외 건",
-        "instruction": "업무 대시보드 화면의 ‘처리할 예외 건’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "업무 대시보드, 미처리 예외",
+        "instruction": "업무 대시보드 화면의 ‘미처리 예외’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8550,21 +8521,6 @@
         "targetId": "features.dashboard.dashboard-page.link-5",
         "title": "업무 대시보드, 회차 / 단계, 실행",
         "instruction": "업무 대시보드 화면의 ‘회차 / 단계, 실행’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "GA_ADMIN",
-          "SETTLEMENT",
-          "COMPLIANCE"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.6bf31664cd499e1c1ac18b647c9a62d7",
-        "screenId": "DASH-W01",
-        "targetId": "features.dashboard.dashboard-page.open-exception-type",
-        "title": "업무 대시보드, 건",
-        "instruction": "업무 대시보드 화면의 ‘건’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8653,8 +8609,8 @@
         "stepId": "help.85d034206f7efda632354140360a0b8c",
         "screenId": "DASH-W01",
         "targetId": "dashboard.kpi-link.open",
-        "title": "업무 대시보드, 예외함에서 처리",
-        "instruction": "업무 대시보드 화면의 ‘예외함에서 처리’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "title": "업무 대시보드, 미처리 예외",
+        "instruction": "업무 대시보드 화면의 ‘미처리 예외’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8685,6 +8641,21 @@
         "targetId": "dashboard.kpi-link.cap-warning",
         "title": "업무 대시보드, 1,200% 주의",
         "instruction": "업무 대시보드 화면의 ‘1,200% 주의’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.8a99df1c432c042b787aef26a20cbbb2",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.dashboard-page.composition",
+        "title": "업무 대시보드, 검증 항목별 건수 비중",
+        "instruction": "업무 대시보드 화면의 ‘검증 항목별 건수 비중’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8785,6 +8756,21 @@
         "next": []
       },
       {
+        "stepId": "help.e7831fa35027a7e90df436b2b736c0ae",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.risk-composition.link",
+        "title": "업무 대시보드, 건, 비중",
+        "instruction": "업무 대시보드 화면의 ‘건, 비중’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f4f52ad59307bf27cccf1703db3a611e",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.dashboard-page.button",
@@ -8846,6 +8832,18 @@
         "targetId": "features.agent-home.agent-home-page.button-5",
         "title": "포트폴리오, 보험사 필터 해제",
         "instruction": "포트폴리오 화면의 ‘보험사 필터 해제’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.1d397fd2935e912f683c2f51b0e99ee3",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.form",
+        "title": "포트폴리오, 확인 기록",
+        "instruction": "포트폴리오 화면의 ‘확인 기록’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"
@@ -8937,11 +8935,59 @@
         "next": []
       },
       {
+        "stepId": "help.3a598aab8f51297307f82019b2ec3f8e",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.button",
+        "title": "포트폴리오, 확인 기록",
+        "instruction": "포트폴리오 화면의 ‘확인 기록’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.3c8d8b21d9bab8255d74e9974602a3ce",
         "screenId": "AGNT-W01",
         "targetId": "features.agent-home.chatbot.chatbot-modal.retry-category",
         "title": "포트폴리오, 다시 시도",
         "instruction": "포트폴리오 화면의 ‘다시 시도’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.435590c7c1189eb303f681d8a77fdaf0",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.input-2",
+        "title": "포트폴리오, 후속 확인 필요",
+        "instruction": "포트폴리오 화면의 ‘후속 확인 필요’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.44f1b8d14cdbdaee804dfcbb3b537b09",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.button-2",
+        "title": "포트폴리오, 메모",
+        "instruction": "포트폴리오 화면의 ‘메모’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.4965de0326f8e56ff5e2869d08c9285d",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.textarea",
+        "title": "포트폴리오, 메모",
+        "instruction": "포트폴리오 화면의 ‘메모’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"
@@ -8973,6 +9019,18 @@
         "next": []
       },
       {
+        "stepId": "help.59b52525ce41272c2832ddef5d12f527",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.agent-home-page.button-4",
+        "title": "포트폴리오, 다시 시도",
+        "instruction": "포트폴리오 화면의 ‘다시 시도’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.65408e839bc9c932efd31bdd5280e180",
         "screenId": "AGNT-W01",
         "targetId": "features.agent-home.agent-home-page.button-2",
@@ -8990,6 +9048,18 @@
         "targetId": "features.agent-home.chatbot.filter-panel.exclude-cap-overflow",
         "title": "포트폴리오, 한도를 넘어 이월이 생기는 상품은 제외",
         "instruction": "포트폴리오 화면의 ‘한도를 넘어 이월이 생기는 상품은 제외’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.6c44554e8adac61e5a5e6b4bf692e900",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.input",
+        "title": "포트폴리오, 종결",
+        "instruction": "포트폴리오 화면의 ‘종결’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"
@@ -9057,6 +9127,18 @@
         "next": []
       },
       {
+        "stepId": "help.80639107fdf43cea84b51c8d9bca3e6e",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.section",
+        "title": "포트폴리오, 확인할 계약",
+        "instruction": "포트폴리오 화면의 ‘확인할 계약’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.855290d19f2f3824efad4ccf6c0cb9f5",
         "screenId": "AGNT-W01",
         "targetId": "features.agent-home.agent-home-page.fgc-ai",
@@ -9098,6 +9180,18 @@
         "targetId": "features.agent-home.chatbot.chatbot-modal.restart",
         "title": "포트폴리오, 처음으로",
         "instruction": "포트폴리오 화면의 ‘처음으로’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.a8a538942d4c5933d043049c84115b16",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.priority-contracts.input-3",
+        "title": "포트폴리오, 다음 확인일",
+        "instruction": "포트폴리오 화면의 ‘다음 확인일’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"
@@ -12604,6 +12698,21 @@
         "next": []
       },
       {
+        "stepId": "help.eba1fb9312b0dcb3a90acee5b52d8173",
+        "screenId": "RECO-W01",
+        "targetId": "features.reconciliation.reconciliation-page.section",
+        "title": "대사 실행/결과, 대사 실행 조건",
+        "instruction": "대사 실행/결과 화면의 ‘대사 실행 조건’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.ecfa438d28a690d90a095e2a22bdfdb9",
         "screenId": "SCHE-W01",
         "targetId": "features.schedule.schedule-list-page.select-2",
@@ -13205,6 +13314,20 @@
         "next": []
       },
       {
+        "stepId": "help.127ee48068f0f3ef473f653062f834ce",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents.issue",
+        "title": "환수, PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성",
+        "instruction": "환수 화면의 ‘PDF 생성 중… / 발행 재시도 / 재발행 / PDF 생성’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1318f3d9644e289b559276c142fd7f51",
         "screenId": "CLAW-W01",
         "targetId": "components.filter-bar.button",
@@ -13354,6 +13477,21 @@
         "next": []
       },
       {
+        "stepId": "help.656e0be9784a1064d7e34d0b7e998bf1",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents",
+        "title": "환수, 환수 PDF·발행 이력",
+        "instruction": "환수 화면의 ‘환수 PDF·발행 이력’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.72a8955bc7142cd0e6096ad5cdec97de",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-detail.contextlink-2",
@@ -13442,6 +13580,21 @@
         "next": []
       },
       {
+        "stepId": "help.aaf232c751d95f121b9d97f4b39f32a9",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents.download",
+        "title": "환수, 발행판 v 다운로드",
+        "instruction": "환수 화면의 ‘발행판 v 다운로드’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.bee2fb86fec01c97509a183b7242f391",
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-calculation.form",
@@ -13476,6 +13629,21 @@
         "targetId": "components.pagination.button-5",
         "title": "환수, 마지막",
         "instruction": "환수 화면의 ‘마지막’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cf5e5b3a76b9fdeb939c437e0c7a2f53",
+        "screenId": "CLAW-W01",
+        "targetId": "clawback.documents.refresh",
+        "title": "환수, 다시 조회",
+        "instruction": "환수 화면의 ‘다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

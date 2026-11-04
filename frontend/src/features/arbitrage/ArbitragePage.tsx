@@ -79,7 +79,7 @@ export default function ArbitragePage() {
   const busy = query.isLoading || query.isFetching
   const canRecheck = user.canProcess && selected?.paymentStage === 'GA_TO_FC'
   return (
-    <div className="arb-page">
+    <div className="arb-page list-page">
       <header className="page-header">
         <div className="page-header-copy">
           <h1 className="page-title">차익거래 검증</h1>

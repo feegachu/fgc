@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { KpiCard } from './KpiCard'
 
@@ -7,11 +7,18 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-it('공통 KPI 숫자는 올라가는 효과 없이 처음부터 최종값과 소수점 표시 형식을 보인다', () => {
+it('공통 KPI 숫자는 0부터 채워지고 변경된 값의 소수점 형식을 유지한다', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] })
   const view = render(<KpiCard guideId={undefined} label="처리 건수" value={1234} unit="건" />)
+  expect(screen.getByText('0')).toBeVisible()
+  act(() => vi.advanceTimersByTime(350))
+  expect(Number(screen.getByText(/^[\d,]+$/, { selector: '[aria-hidden="true"]' }).textContent?.replaceAll(',', '')))
+    .toBeGreaterThan(0)
+  act(() => vi.advanceTimersByTime(400))
   expect(screen.getByText('1,234')).toBeInTheDocument()
   view.rerender(<KpiCard guideId={undefined} label="비중" value={12.3} unit="%" format={(value) => value.toFixed(1)} />)
+  act(() => vi.advanceTimersByTime(750))
   expect(screen.getByText('12.3')).toBeInTheDocument()
 })
 

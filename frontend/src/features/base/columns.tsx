@@ -4,8 +4,15 @@ import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { date } from '../../lib/format'
 import type { Agent, CommissionItem, Insurer, Organization, Product } from './api'
-import { CATEGORY_LABEL } from '../agent-home/model'
 import { SCHEDULE_REGIME } from '../schedule/labels'
+
+/** 상품군 코드 → 화면에 보이는 상품군 이름. */
+const CATEGORY_LABEL: Record<string, string> = {
+  HEALTH_PROTECTION: '건강보장',
+  TERM_PROTECTION: '정기보장',
+  LONG_TERM_NONLIFE: '장기손해',
+  SAVINGS: '연금/저축',
+}
 
 /** 판매 채널 코드 표시. FGC는 대면 모집만 쓰고 TM은 과거 자료 표기다(화면정의서 SCHE-W01 체계). */
 export const channelLabels: Record<string, string> = { FACE_TO_FACE: '대면', TM: 'TM' }
