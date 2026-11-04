@@ -82,7 +82,7 @@ class ValidationRunScheduleServiceTest {
         assertThat(result.skips().getFirst().reasonCode()).isEqualTo("DATA_QUALITY");
         verify(exceptionCaseRepository).insertDataQualityCase(
                 118L, 10L, "예상 스케줄 정합성 오류",
-                "GA_TO_FC 활성 OPERATIONAL 스케줄 헤더가 중복되었습니다.");
+                "GA→설계사: 사용 중인 운영 스케줄이 두 개 이상입니다.");
         verify(itemService, never()).process(any(), any());
     }
 

@@ -58,7 +58,7 @@ export function normalizeCriteria(params: URLSearchParams): RunCriteria {
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const { data } = await apiClient.request<T>(path, { signal })
-  if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (data == null) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
 
@@ -130,7 +130,7 @@ export const finalizeChecklistQuery = (id: string, enabled: boolean) =>
         signal,
       )
       if (!Array.isArray(checklist.conditions) || checklist.conditions.length !== 8) {
-        throw new Error('확정 조건 응답 형식이 올바르지 않습니다.')
+        throw new Error('확정 조건을 불러오지 못했습니다. 다시 시도하세요.')
       }
       return checklist
     },
@@ -140,7 +140,8 @@ export const finalizeChecklistQuery = (id: string, enabled: boolean) =>
 
 async function post<T>(path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
   const { data } = await apiClient.request<T>(path, { method: 'POST', body, idempotencyKey })
-  if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  // 쓰기 요청은 이미 처리됐을 수 있어 같은 요청을 다시 보내라고 하지 않는다.
+  if (data == null) throw new Error('처리 결과를 확인하지 못했습니다. 화면을 새로 열어 결과를 확인하세요.')
   return data
 }
 
@@ -154,7 +155,7 @@ export const executeRun = async (id: string) => {
     `/api/v1/validation-runs/${encodeURIComponent(id)}/execute`,
     { method: 'POST' },
   )
-  if (response.data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (response.data == null) throw new Error('처리 결과를 확인하지 못했습니다. 화면을 새로 열어 결과를 확인하세요.')
   return { ...response.data, requestId: response.requestId }
 }
 

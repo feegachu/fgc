@@ -263,7 +263,7 @@ class ValidationRunControllerTest {
         given(validationRunFinalizationService.getChecklist(100L)).willReturn(
                 new FinalizeChecklistResponse(100L, true, List.of(
                         new FinalizeChecklistConditionResponse(
-                                1, "검증 실행 상태가 계산완료(COMPLETED)인가", true, 0, "/validation-runs/100"))));
+                                1, "검증 실행이 계산완료 상태인가", true, 0, "/validation-runs/100"))));
 
         mockMvc.perform(get("/api/v1/validation-runs/100/finalize-checklist")
                         .with(user(settlementPrincipal())))
