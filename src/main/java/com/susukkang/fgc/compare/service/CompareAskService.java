@@ -88,9 +88,11 @@ public class CompareAskService {
         }
         Output output = call(q, describe(ranking) + askedPair(ranking, q));
         if (output == null) {
+            log.warn("LLM 호출이 실패해 대체 답변을 씁니다. 사유는 ai_call_log 에 있습니다.");
             return fallbackAnswer(q, ranking);
         }
         if (Boolean.FALSE.equals(output.inScope)) {
+            log.info("LLM 이 질문을 범위 밖(inScope=false)으로 판단했습니다. rankQuestion={}", hasItems(ranking) && isRankQuestion(q));
             // 순위 결과가 있는 상태의 순위·이유 질문은 범위 안이다. 모델이 거절해도 서버 값으로 풀어 답한다.
             return hasItems(ranking) && isRankQuestion(q)
                     ? fallbackAnswer(q, ranking)
@@ -98,8 +100,10 @@ public class CompareAskService {
         }
         String text = output.answer == null ? "" : output.answer.strip();
         // AI 문장에는 숫자가 없어야 한다. 질문에 적은 숫자나 다른 항목의 값을 서버 값처럼 내보내지 않는다.
-        if (!isValid(text, ranking)) {
-            log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다.");
+        String rejected = rejectReason(text, ranking);
+        if (rejected != null) {
+            // 답변 원문은 남기지 않는다. 어느 검증에서 걸렸는지만 코드로 남긴다.
+            log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다. reason={}", rejected);
             return fallbackAnswer(q, ranking);
         }
         // 순위 질문의 숫자는 서버가 만든 문장으로 보여 주고, AI 는 그 뒤에 이유를 말로 풀어 쓴다.
@@ -234,9 +238,20 @@ public class CompareAskService {
 
     /** 숫자, 단정 표현, 너무 긴 글은 걸러낸다. 서버가 준 보험사·상품 이름 안의 숫자는 예외다. */
     static boolean isValid(String text, CompareRankingResponse ranking) {
-        if (text.isBlank() || text.length() > MAX_LENGTH || FORBIDDEN.stream().anyMatch(text::contains)) {
-            return false;
+        return rejectReason(text, ranking) == null;
+    }
+
+    /** 답변을 버리는 이유 코드. 통과하면 null 이다. */
+    static String rejectReason(String text, CompareRankingResponse ranking) {
+        if (text.isBlank()) {
+            return "BLANK";
         }
-        return AnswerNumberGuard.allowed(text, CompareSummaryService.names(ranking));
+        if (text.length() > MAX_LENGTH) {
+            return "TOO_LONG";
+        }
+        if (FORBIDDEN.stream().anyMatch(text::contains)) {
+            return "FORBIDDEN_PHRASE";
+        }
+        return AnswerNumberGuard.allowed(text, CompareSummaryService.names(ranking)) ? null : "NUMBER_GUARD";
     }
 }
