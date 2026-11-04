@@ -790,3 +790,14 @@ it('gives different exception summary types distinct guide targets and preserves
   expect(screen.getByRole('link', { name: '새 예외 1건' })).not.toHaveAttribute('data-guide-feature')
   expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
 })
+
+it('preserves a newer cached action when an older guide acknowledgement arrives', () => {
+  const client = new QueryClient()
+  const newer = { actionSeq: 2, toStatus: 'RESOLVED' as const }
+  client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [newer] }]))
+  applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
+  const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
+  expect(item.status).toBe('RESOLVED')
+  expect(item.actions).toEqual([newer])
+  client.clear()
+})
