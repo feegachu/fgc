@@ -165,14 +165,15 @@ public final class Dar012Planner {
                 answers.add(new AnswerRow(d.contractNo(), "RECON_AMOUNT_DIFF", "RECON_AMOUNT_MISMATCH", expected,
                         "명세 금액 %s (차이 %d원)".formatted(actual.toPlainString(), d.delta())));
             } else if (plainNormal && i % 50 == 13) {
+                // 1,200% 판정은 schedule_line.expected_amount만 합산해 명세 지급액으로는 한도 경계를 심을 수 없다. 대사 금액 차이로만 쓴다.
                 actual = d.monthly().multiply(policy.capPremiumMultiplier()).setScale(0, RoundingMode.HALF_UP).setScale(2);
-                answers.add(new AnswerRow(d.contractNo(), "CAP_AT_LIMIT", "CAP_AT_LIMIT", actual,
-                        "단일 지급이 한도(월환산 보험료 x 한도 배수)와 정확히 같다"));
+                answers.add(new AnswerRow(d.contractNo(), "RECON_PAID_AT_CAP_MULTIPLE", "RECON_AMOUNT_MISMATCH", expected,
+                        "명세 금액 %s (월환산 보험료 x 한도 배수). 한도 경계 사례가 아니다".formatted(actual.toPlainString())));
             } else if (plainNormal && i % 50 == 38) {
                 BigDecimal limit = d.monthly().multiply(policy.capPremiumMultiplier()).setScale(0, RoundingMode.HALF_UP).setScale(2);
                 actual = limit.add(BigDecimal.valueOf(1000)).setScale(2);
-                answers.add(new AnswerRow(d.contractNo(), "CAP_OVER_LIMIT", "CAP_EXCEEDED", limit,
-                        "단일 지급이 한도보다 1,000원 많다 — 명세 %s".formatted(actual.toPlainString())));
+                answers.add(new AnswerRow(d.contractNo(), "RECON_PAID_OVER_CAP_MULTIPLE", "RECON_AMOUNT_MISMATCH", expected,
+                        "명세 금액 %s (월환산 보험료 x 한도 배수 + 1000원). 한도 경계 사례가 아니다".formatted(actual.toPlainString())));
             }
             int rowNo = rowCounter.merge(batchKey, 1, Integer::sum);
             String yyyymm = "%04d%02d".formatted(month.getYear(), month.getMonthValue());

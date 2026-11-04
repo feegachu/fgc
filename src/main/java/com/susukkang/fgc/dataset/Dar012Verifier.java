@@ -57,19 +57,11 @@ public class Dar012Verifier {
         this.capCheckService = capCheckService;
     }
 
-    /**
-     * 시나리오별 정답표 비교 결과. deferred 는 합치 여부를 판정하지 않고 보류한 건수다(한도 경계 시나리오).
-     * divergences 는 정답표와 다른 계약번호(최대 20건).
-     */
-    public record ScenarioResult(String scenario, int inScope, int matched, int deferred, List<String> divergences) {}
+    /** 시나리오별 정답표 비교 결과. divergences 는 정답표와 다른 계약번호(최대 20건). */
+    public record ScenarioResult(String scenario, int inScope, int matched, List<String> divergences) {}
 
     /** 조회 응답시간. 단위 ms. */
     public record QueryTiming(String name, int repeats, long p50, long p95, long max) {}
-
-    /** 한도 경계 시나리오는 정답표 한도 계산식이 엔진(환급·준수공제 반영)과 달라 합치를 판정하지 않는다. */
-    static boolean isDeferred(String expectedResultType) {
-        return "CAP_AT_LIMIT".equals(expectedResultType) || "CAP_EXCEEDED".equals(expectedResultType);
-    }
 
     /**
      * 한 계약의 보험사→GA 단계 1회차 대사 행 전체로 정답표 기대를 판정한다. 행 순서와 무관하다.
@@ -86,8 +78,7 @@ public class Dar012Verifier {
     /**
      * 정답표와 이번 월 통합검증 실행의 결과를 비교한다. 대사 결과는 이 검증 실행에 연결된 대사 실행(reconciliation_run)의
      * 보험사→GA 단계 1회차 행만, 계약 상태는 계약 현재 상태로 본다. 대상은 계약일이 검증월인 계약이다
-     * (명세 지급은 계약월 1회차만 만들기 때문). 한도 경계 시나리오는 보류로 세고 상태 분포만
-     * {@link #capStatusDistribution}으로 기록한다.
+     * (명세 지급은 계약월 1회차만 만들기 때문). 그래서 정답표 전체를 보려면 계약 창의 달마다 실행한다.
      */
     public List<ScenarioResult> compareWithAnswerKey(Dar012Plan plan, LocalDate month, long validationRunId) {
         LocalDate from = month.withDayOfMonth(1);
@@ -115,12 +106,8 @@ public class Dar012Verifier {
             if (!status.containsKey(a.contractNo())) {
                 continue;
             }
-            int[] c = counts.computeIfAbsent(a.scenario(), k -> new int[3]);
+            int[] c = counts.computeIfAbsent(a.scenario(), k -> new int[2]);
             c[0]++;
-            if (isDeferred(a.expectedResultType())) {
-                c[2]++;
-                continue;
-            }
             boolean ok = judgeReconciliation(a.expectedResultType(), recon.getOrDefault(a.contractNo(), List.of()));
             if (ok && a.expectedResultType().startsWith("STATUS_") && !"STATUS_LATE_ARRIVAL".equals(a.expectedResultType())) {
                 ok = a.expectedResultType().endsWith(status.get(a.contractNo()));
@@ -135,34 +122,8 @@ public class Dar012Verifier {
             }
         }
         List<ScenarioResult> results = new ArrayList<>();
-        counts.forEach((k, c) -> results.add(new ScenarioResult(k, c[0], c[1], c[2], divergences.getOrDefault(k, List.of()))));
+        counts.forEach((k, c) -> results.add(new ScenarioResult(k, c[0], c[1], divergences.getOrDefault(k, List.of()))));
         return results;
-    }
-
-    /** 1,200% 시나리오 계약의 이번 검증 실행 보험사→GA 단계 엔진 판정 분포(시나리오 → 상태 → 건수). */
-    public Map<String, Map<String, Long>> capStatusDistribution(Dar012Plan plan, LocalDate month, long validationRunId) {
-        Map<String, String> cap = capStatusByContract(month.withDayOfMonth(1), month.withDayOfMonth(1).plusMonths(1),
-                validationRunId);
-        Map<String, Map<String, Long>> out = new LinkedHashMap<>();
-        for (Dar012Plan.AnswerRow a : plan.answers()) {
-            String s = cap.get(a.contractNo());
-            if (s != null && a.scenario().startsWith("CAP_")) {
-                out.computeIfAbsent(a.scenario(), k -> new LinkedHashMap<>()).merge(s, 1L, Long::sum);
-            }
-        }
-        return out;
-    }
-
-    private Map<String, String> capStatusByContract(LocalDate from, LocalDate to, long validationRunId) {
-        Map<String, String> cap = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT c.contract_no, cc.result_status FROM cap_check cc JOIN insurance_contract c ON c.contract_id = cc.contract_id
-                 WHERE cc.validation_run_id = ? AND cc.payment_stage = 'INSURER_TO_GA'
-                   AND c.contract_date >= ? AND c.contract_date < ? AND starts_with(c.contract_no, 'FGC-')
-                """, rs -> {
-            cap.put(rs.getString(1), rs.getString(2));
-        }, validationRunId, from, to);
-        return cap;
     }
 
     /** 같은 1,200% 판정 건수를 홈·설계사 소계·계약 목록·원천 cap_check 네 곳에서 읽은 값. */
@@ -188,7 +149,7 @@ public class Dar012Verifier {
             long agent = agentRows.stream().mapToLong(r ->
                     status == CapResultStatus.VIOLATION ? r.getViolationCount() : r.getWarningCount()).sum();
             ContractSearchCondition condition = new ContractSearchCondition();
-            condition.setCapResultStatus(status);
+            condition.setCapResultStatus(List.of(status));
             long list = contractService.selectByCondition(condition, 1, 1).totalElements();
             long sourceChecks = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM cap_check WHERE validation_run_id = ? AND result_status = ?", Long.class,

@@ -23,7 +23,7 @@ public final class Dar012ReportWriter {
     private Dar012ReportWriter() {}
 
     /** 같은 seed·계약 수·기준일이면 항상 같은 값이 나오는 건수·합계. 생성 시각 같은 비결정 값은 넣지 않는다. */
-    public static Map<String, Object> metadata(Dar012Plan plan, int agent01Linked) {
+    public static Map<String, Object> metadata(Dar012Plan plan, String agent01PreviousAgentCode) {
         Map<String, Object> counts = new LinkedHashMap<>();
         counts.put("organizations", plan.organizations().size());
         counts.put("agents", plan.agents().size());
@@ -58,15 +58,18 @@ public final class Dar012ReportWriter {
         meta.put("sums", sums);
         meta.put("contractsByInsurer", byInsurer);
         meta.put("answersByScenario", byScenario);
-        meta.put("agent01LinkedToRepresentative", agent01Linked == 1);
+        meta.put("agent01PreviousAgentCode", agent01PreviousAgentCode);
+        meta.put("agent01RepresentativeAgentCode", plan.agents().get(0).code());
+        meta.put("answerKeyScope", "대사 금액 차이, 공통 패턴, 명세 없음, 상태 사건만 담는다. 한도 경계 미포함: "
+                + "1,200% 판정은 schedule_line.expected_amount만 합산해 명세 지급액을 심어도 판정이 바뀌지 않는다");
         meta.put("excluded", "스케줄·1,200% 결과·차익거래·분개·대사·예외는 만들지 않는다 — 실제 엔진·배치가 만든다");
         return meta;
     }
 
-    public static Path write(Dar012Plan plan, Path outputDir, boolean agent01Linked) throws IOException {
+    public static Path write(Dar012Plan plan, Path outputDir, String agent01PreviousAgentCode) throws IOException {
         Files.createDirectories(outputDir);
         Path json = outputDir.resolve(plan.datasetId() + ".json");
-        Files.writeString(json, MAPPER.writeValueAsString(metadata(plan, agent01Linked ? 1 : 0)) + "\n", StandardCharsets.UTF_8);
+        Files.writeString(json, MAPPER.writeValueAsString(metadata(plan, agent01PreviousAgentCode)) + "\n", StandardCharsets.UTF_8);
         Files.writeString(outputDir.resolve(plan.datasetId() + "-answers.csv"), answersCsv(plan), StandardCharsets.UTF_8);
         return json;
     }

@@ -20,7 +20,8 @@ import java.util.Map;
 
 /**
  * DAR-012 생성기 진입점 (시드명세 §50). {@code dar012} 프로필에서만 등록되므로 기본 프로필·test·배포 환경에서는
- * 자동 실행되지 않는다. 실행 순서: 빈 DB에 Flyway 적용 → 이 실행기 → 기존 월 통합검증 배치 → 정답표 비교.
+ * 자동 실행되지 않는다. 실행 순서: 새 격리 DB에 Flyway 적용 → 이 실행기 → 기존 월 통합검증 배치 → 정답표 비교.
+ * 신한 서버와 개발계 DB에는 적재하지 않는다(시드명세 §50). {@link Dar012Loader#assertFreshBaseline}이 막는다.
  */
 @Slf4j
 @Component
@@ -65,7 +66,6 @@ public class Dar012Runner implements ApplicationRunner {
             verification.put("partial", !completed);
             if (completed) {
                 verification.put("answerKeyComparison", verifier.compareWithAnswerKey(generated.plan(), properties.validationMonth(), batch.validationRunId()));
-                verification.put("capStatusDistribution", verifier.capStatusDistribution(generated.plan(), properties.validationMonth(), batch.validationRunId()));
                 verification.put("aggregateConsistency", verifier.checkAggregateConsistency(properties.validationMonth(), batch.validationRunId()));
                 verification.put("contractDetailSample", verifier.checkContractDetailSample(batch.validationRunId()));
                 verification.put("queryTimings", verifier.measureQueries(properties.validationMonth(), batch.validationRunId(),
@@ -83,16 +83,17 @@ public class Dar012Runner implements ApplicationRunner {
         System.exit(SpringApplication.exit(context, () -> finalExitCode));
     }
 
-    /** 테스트와 실행기가 같은 경로를 쓴다. 정책 확인 → 중복 검사 → 계획 → 적재 → 출력 순서다. */
+    /** 테스트와 실행기가 같은 경로를 쓴다. 중복 검사 → 기본 시드 확인 → 정책 확인 → 계획 → 적재 → 출력 순서다. */
     public record Generated(Path metadataFile, Dar012Plan plan) {}
 
     public static Generated generate(Dar012Loader loader, Dar012Properties p) throws java.io.IOException {
         LocalDate windowStart = p.baseDate().withDayOfMonth(1).minusMonths(2);
         LocalDate windowEnd = p.baseDate().withDayOfMonth(1).minusDays(1);
         loader.assertNotLoaded(p.datasetId());
+        loader.assertFreshBaseline();
         Dar012Loader.PolicyRefs policy = loader.readPolicy(windowStart, windowEnd);
         Dar012Plan plan = Dar012Planner.plan(p.datasetId(), p.seed(), p.contracts(), p.baseDate(), policy.inputs());
         Dar012Loader.LoadResult result = loader.load(plan, policy);
-        return new Generated(Dar012ReportWriter.write(plan, p.outputDir(), result.agent01Linked()), plan);
+        return new Generated(Dar012ReportWriter.write(plan, p.outputDir(), result.agent01PreviousAgentCode()), plan);
     }
 }

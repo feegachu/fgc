@@ -29,11 +29,4 @@ class Dar012VerifierTest {
         assertThat(Dar012Verifier.judgeReconciliation("STATUS_LAPSED", List.of("MATCHED", "AMOUNT_DIFFERENCE"))).isFalse();
         assertThat(Dar012Verifier.judgeReconciliation("STATUS_LAPSED", List.of())).isFalse();
     }
-
-    @Test
-    void capBoundaryScenariosAreDeferredNotMatched() {
-        assertThat(Dar012Verifier.isDeferred("CAP_AT_LIMIT")).isTrue();
-        assertThat(Dar012Verifier.isDeferred("CAP_EXCEEDED")).isTrue();
-        assertThat(Dar012Verifier.isDeferred("RECON_AMOUNT_MISMATCH")).isFalse();
-    }
 }

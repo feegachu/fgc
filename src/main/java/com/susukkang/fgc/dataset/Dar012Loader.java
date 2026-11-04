@@ -11,9 +11,12 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * DAR-012 기초 데이터를 한 트랜잭션으로 적재한다 (시드명세 §50, §22).
@@ -26,6 +29,18 @@ public class Dar012Loader {
     static final String SOURCE_PREFIX = "SYNTHETIC:DAR012:";
     private static final int BATCH_SIZE = 1000;
     private static final LocalDate ORG_EFFECTIVE_FROM = LocalDate.of(2026, 1, 1);
+    /** 새 DB(db/migration + db/demo)를 실제로 조회해 고정한 기본 계약 목록. db/demo에 계약을 더하면 이 목록도 고친다. */
+    private static final Set<String> BASE_CONTRACT_NOS = Set.of(
+            "FGC-FGL01-202601-0001", "FGC-FGL01-202603-0475", "FGC-FGL01-202607-0001", "FGC-FGL01-202607-0002",
+            "FGC-FGL01-202607-0003", "FGC-FGL01-202607-0004", "FGC-FGL01-202607-0005", "FGC-FGL01-202608-0001",
+            "FGC-FGL01-202608-0002", "FGC-FGL01-202608-0003", "FGC-FGL01-202608-0004", "FGC-FGL01-202608-0005",
+            "FGC-FGL01-202703-0001", "FGC-FGL02-202601-0001", "FGC-FGL02-202603-0475", "FGC-FGL02-202605-0001",
+            "FGC-FGL02-202608-0001", "FGC-FGL02-202611-0001", "FGC-FGL03-202608-0001", "FGC-FGN01-202603-0001",
+            "FGC-FGN01-202605-0001");
+    /** V64가 만든 agent01의 초기 연결(시드명세 §5). */
+    private static final String BASE_AGENT01_AGENT_CODE = "A-FC-001";
+    private static final String AGENT01_AGENT_CODE_SQL =
+            "SELECT a.agent_code FROM app_user u JOIN agent a ON a.agent_id = u.agent_id WHERE u.login_id = 'agent01'";
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
@@ -66,7 +81,7 @@ public class Dar012Loader {
                 """, Date.valueOf(windowStart), Date.valueOf(windowEnd));
         if (caps.size() != 1) {
             throw new IllegalStateException("계약 기간 전체를 덮는 원수사→GA 1,200% 룰셋이 1건으로 정해지지 않는다: " + caps.size()
-                    + "건 (V58 적용 여부를 확인한다)");
+                    + "건 (db/demo V63 적용 여부를 확인한다)");
         }
         // 월 통합검증은 상품·납입기간·채널로 예상 해약환급률표를 찾는다. 표가 없는 납입기간의 계약은 REVIEW_REQUIRED가 되므로
         // 계약 납입기간은 보험사의 현행 판매버전 상품에 연결된 활성 환급률표의 값을 그대로 쓴다.
@@ -105,9 +120,49 @@ public class Dar012Loader {
         }
     }
 
+    /**
+     * 기본 시드 그대로인 새 격리 DB에만 적재한다(시드명세 §50). 업무나 배치를 돌린 DB, 목록과 다른 계약이 있는 DB,
+     * agent01 연결이 바뀐 DB는 아무것도 쓰기 전에 멈춘다. 적재한 행은 지울 수 없어서 사용 중인 DB에 넣으면 되돌릴 방법이 없다.
+     */
+    public void assertFreshBaseline() {
+        List<String> problems = new ArrayList<>();
+        jdbc.queryForMap("""
+                SELECT (SELECT COUNT(*) FROM validation_run) AS validation_run,
+                       (SELECT COUNT(*) FROM schedule_header) AS schedule_header,
+                       (SELECT COUNT(*) FROM cap_check) AS cap_check,
+                       (SELECT COUNT(*) FROM journal_header) AS journal_header,
+                       (SELECT COUNT(*) FROM exception_case) AS exception_case,
+                       (SELECT COUNT(*) FROM reconciliation_run) AS reconciliation_run,
+                       (SELECT COUNT(*) FROM audit_log) AS audit_log
+                """).forEach((table, rows) -> {
+            if (((Number) rows).longValue() > 0) {
+                problems.add(table + " " + rows + "건");
+            }
+        });
+        Set<String> contracts = new TreeSet<>(jdbc.queryForList("SELECT contract_no FROM insurance_contract", String.class));
+        Set<String> missing = new TreeSet<>(BASE_CONTRACT_NOS);
+        missing.removeAll(contracts);
+        contracts.removeAll(BASE_CONTRACT_NOS);
+        if (!contracts.isEmpty()) {
+            problems.add("목록에 없는 계약 " + contracts.size() + "건(첫 번호 " + contracts.iterator().next() + ")");
+        }
+        if (!missing.isEmpty()) {
+            problems.add("목록에서 빠진 계약 " + missing);
+        }
+        List<String> agent01 = jdbc.queryForList(AGENT01_AGENT_CODE_SQL, String.class);
+        if (!List.of(BASE_AGENT01_AGENT_CODE).equals(agent01)) {
+            problems.add("agent01 연결 " + agent01 + "(기본 시드는 " + BASE_AGENT01_AGENT_CODE + ")");
+        }
+        if (!problems.isEmpty()) {
+            throw new IllegalStateException("기본 시드 그대로인 새 DB가 아니라 적재하지 않는다: " + String.join(", ", problems)
+                    + ". 새 격리 DB에 Flyway를 적용한 뒤 실행한다. 신한 서버와 개발계 DB에는 적재하지 않는다(시드명세 §50)");
+        }
+    }
+
     public LoadResult load(Dar012Plan plan, PolicyRefs policy) {
         return tx.execute(status -> {
             assertNotLoaded(plan.datasetId());
+            assertFreshBaseline();
             String source = SOURCE_PREFIX + plan.datasetId();
             Map<String, Long> insurer = idMap("SELECT insurer_code, insurer_id FROM insurer");
             Map<String, Long> offering = offeringByInsurer(plan);
@@ -267,19 +322,21 @@ public class Dar012Loader {
             int confirmed = jdbc.update("UPDATE commission_transaction SET status = 'CONFIRMED' "
                     + "WHERE status = 'DRAFT' AND starts_with(source_business_key, ?)", source + ":");
 
-            boolean linked = linkAgent01(agent.get("D12-A-0001"));
-            log.info("DAR-012 적재 완료: dataset_id={}, 설계사={}, 계약={}, 지급={}, agent01 연결={}", plan.datasetId(),
-                    plan.agents().size(), plan.contracts().size(), confirmed, linked);
-            return new LoadResult(confirmed, linked);
+            String previousAgentCode = linkAgent01(agent.get("D12-A-0001"));
+            log.info("DAR-012 적재 완료: dataset_id={}, 설계사={}, 계약={}, 지급={}, agent01 이전 연결={}", plan.datasetId(),
+                    plan.agents().size(), plan.contracts().size(), confirmed, previousAgentCode);
+            return new LoadResult(confirmed, previousAgentCode);
         });
     }
 
-    /** 대표 설계사 연결(시드명세 §5). AGENT 계정이 아직 없으면(FUN-085 이전) 건너뛰고 결과에 남긴다. */
-    private boolean linkAgent01(Long representativeAgentId) {
-        return jdbc.update("UPDATE app_user SET agent_id = ? WHERE login_id = 'agent01'", representativeAgentId) > 0;
+    /** 대표 설계사 연결(시드명세 §5). 게이트가 초기 연결을 확인한 같은 트랜잭션에서 옮기고 이전 연결을 돌려준다. */
+    private String linkAgent01(Long representativeAgentId) {
+        String previousAgentCode = jdbc.queryForObject(AGENT01_AGENT_CODE_SQL, String.class);
+        jdbc.update("UPDATE app_user SET agent_id = ? WHERE login_id = 'agent01'", representativeAgentId);
+        return previousAgentCode;
     }
 
-    public record LoadResult(int confirmedPayments, boolean agent01Linked) {}
+    public record LoadResult(int confirmedPayments, String agent01PreviousAgentCode) {}
 
     private Map<String, Long> offeringByInsurer(Dar012Plan plan) {
         LocalDate first = plan.contracts().stream().map(ContractRow::contractDate).min(LocalDate::compareTo).orElseThrow();

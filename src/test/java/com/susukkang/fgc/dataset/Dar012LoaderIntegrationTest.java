@@ -42,10 +42,12 @@ class Dar012LoaderIntegrationTest {
         properties = new Dar012Properties("D12-IT", 20261118L, CONTRACTS, LocalDate.of(2026, 9, 10), tempDir, false, null, null);
         long goldenContractsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM insurance_contract", Long.class);
         goldenContracts = goldenContractsBefore;
+        goldenFingerprintBefore = goldenFingerprint();
         metadataFile = Dar012Runner.generate(loader, properties).metadataFile();
     }
 
     private long goldenContracts;
+    private String goldenFingerprintBefore;
 
     @AfterAll
     void stop() {
@@ -92,6 +94,18 @@ class Dar012LoaderIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM schedule_line")).isZero();
         assertThat(count("SELECT COUNT(*) FROM cap_check")).isZero();
         assertThat(count("SELECT COUNT(*) FROM insurance_contract WHERE data_origin = 'SEED'")).isEqualTo(goldenContracts + CONTRACTS);
+        assertThat(goldenFingerprint()).isEqualTo(goldenFingerprintBefore);
+    }
+
+    @Test
+    void movesAgent01ToTheRepresentativeAndRecordsThePreviousLink() throws Exception {
+        assertThat(jdbc.queryForObject("""
+                SELECT a.agent_code FROM app_user u JOIN agent a ON a.agent_id = u.agent_id WHERE u.login_id = 'agent01'
+                """, String.class)).isEqualTo("D12-A-0001");
+        assertThat(Files.readString(metadataFile)).contains("\"datasetId\" : \"D12-IT\"")
+                .contains("\"agent01PreviousAgentCode\" : \"A-FC-001\"")
+                .contains("\"agent01RepresentativeAgentCode\" : \"D12-A-0001\"")
+                .contains("한도 경계 미포함");
     }
 
     @Test
@@ -104,5 +118,15 @@ class Dar012LoaderIntegrationTest {
 
     private long count(String sql) {
         return jdbc.queryForObject(sql, Long.class);
+    }
+
+    /** 합성 데이터가 아닌 계약 행과 지급 행의 내용 전체. 한 글자라도 바뀌면 값이 달라진다. */
+    private String goldenFingerprint() {
+        return jdbc.queryForObject("""
+                SELECT md5((SELECT string_agg(c::text, ',' ORDER BY c.contract_id) FROM insurance_contract c
+                             WHERE c.agent_id NOT IN (SELECT agent_id FROM agent WHERE starts_with(agent_code, 'D12-A-')))
+                           || (SELECT string_agg(t::text, ',' ORDER BY t.commission_transaction_id) FROM commission_transaction t
+                                WHERE t.source_business_key IS NULL OR NOT starts_with(t.source_business_key, 'SYNTHETIC:DAR012:')))
+                """, String.class);
     }
 }

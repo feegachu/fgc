@@ -14,7 +14,7 @@ class Dar012PropertiesTest {
     }
 
     @Test
-    void rejectsBaseDateEarlierThanTheFixedAppointmentRange() {
+    void rejectsBaseDateWhoseContractWindowCrossesTheSalesPeriodBoundary() {
         assertThatThrownBy(() -> withBaseDate(Dar012Properties.MIN_BASE_DATE.minusDays(1)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("base-date");
     }
