@@ -257,6 +257,13 @@ class MonthlyJournalRestartIntegrationTest {
         .extracting(step -> step.getStepName())
         .doesNotContain("createRunStep")
         .contains("journalPostingStep", "imbalanceCheckStep", "exceptionGenerationStep");
+    assertThirtySourcesPostedOnce(runId);
+    assertThat(runs.findLatestAttemptRequestId(runId)).isNotBlank();
+    assertThat(jdbc.queryForList("SELECT * FROM fgc.batch_watermark ORDER BY job_name,step_name"))
+        .isEqualTo(watermarks);
+  }
+
+  private void assertThirtySourcesPostedOnce(Long runId) {
     assertThat(runs.findById(runId).orElseThrow().getStatus().name()).isEqualTo("COMPLETED");
     assertThat(
             jdbc.queryForObject(
@@ -286,8 +293,5 @@ class MonthlyJournalRestartIntegrationTest {
                 Long.class,
                 runId))
         .isEqualTo(60L);
-    assertThat(runs.findLatestAttemptRequestId(runId)).isNotBlank();
-    assertThat(jdbc.queryForList("SELECT * FROM fgc.batch_watermark ORDER BY job_name,step_name"))
-        .isEqualTo(watermarks);
   }
 }
