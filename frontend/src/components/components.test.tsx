@@ -23,6 +23,7 @@ afterEach(() => {
   vi.useRealTimers()
   useToastStore.setState({ messages: [] })
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 it('Button loading과 Field 오류를 입력·라벨에 연결한다', () => {
   render(
@@ -98,6 +99,49 @@ it('DataTable 빈 목록은 오류 대신 빈 상태 문구를 보여 준다', (
     />,
   )
   expect(screen.getByRole('table', { name: '빈 목록' })).toHaveTextContent('조건에 맞는 자료가 없습니다.')
+})
+it('DataTable 가로로 넘치는 표는 가려진 쪽을 data-scroll 로 알리고 크기가 바뀌면 다시 계산한다', () => {
+  let resize = () => {}
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback
+      }
+      observe() {}
+      disconnect() {}
+    },
+  )
+  render(
+    <DataTable
+      caption="넓은 표"
+      resizable={false}
+      rows={[]}
+      rowKey={() => ''}
+      columns={[{ key: 'id', label: '계약', render: () => '' }]}
+    />,
+  )
+  const viewport = screen.getByRole('table', { name: '넓은 표' }).parentElement!
+  const layout = (scrollWidth: number, scrollLeft = 0) => {
+    Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 600 })
+    Object.defineProperty(viewport, 'scrollWidth', { configurable: true, value: scrollWidth })
+    Object.defineProperty(viewport, 'scrollLeft', { configurable: true, value: scrollLeft })
+  }
+  layout(600)
+  act(() => resize())
+  expect(viewport).not.toHaveAttribute('data-scroll')
+  layout(1000)
+  act(() => resize())
+  expect(viewport).toHaveAttribute('data-scroll', 'start')
+  layout(1000, 200)
+  fireEvent.scroll(viewport)
+  expect(viewport).toHaveAttribute('data-scroll', 'middle')
+  layout(1000, 400)
+  fireEvent.scroll(viewport)
+  expect(viewport).toHaveAttribute('data-scroll', 'end')
+  layout(600)
+  act(() => resize())
+  expect(viewport).not.toHaveAttribute('data-scroll')
 })
 it('Pagination은 1-base 5페이지 그룹이며 끝에서 다음을 막는다', async () => {
   const change = vi.fn()
