@@ -28,6 +28,7 @@ import {
 } from './api'
 import type { FinalizeChecklist, ValidationRunDetail, ValidationTarget } from './api'
 import { FinalizeDialogs } from './FinalizeDialogs'
+import { ValidationRestartPanel } from './ValidationRestartPanel'
 import { RunStatusBadge } from './RunStatusBadge'
 import { failureText, MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
 import { useRestartAttemptDeadline } from './useRestartAttemptDeadline'
@@ -121,8 +122,7 @@ function DetailBody({
   const checklist = useQuery(finalizeChecklistQuery(id, status === 'COMPLETED'))
   const canProcess = user?.canProcess === true
   const canFinalize = user?.canFinalizeValidation === true
-  const canRestart = status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT'
-  const canExecute = (status === 'CREATED' || canRestart) && !startUnconfirmed
+  const canExecute = (status === 'CREATED') && !startUnconfirmed
 
   // 폴링이 종료 상태에 닿으면 헤더·결과 요약·확정 조건을 다시 불러온다(1차는 전체 리로드였다).
   const finished = (executed || header.status === 'RUNNING') && live && !isRunning(live.status)
@@ -156,12 +156,19 @@ function DetailBody({
   }, [progress.errorUpdateCount, progress.dataUpdatedAt, progress.error, progress.isSuccess, progress.isError])
 
   const [executionGuide] = useState(() => new SaveGuide())
+  const [finalizeGuide] = useState(() => new SaveGuide())
   useRunGuide(executionGuide, id, Boolean(status), id, status, progress.isError ? '진행률 조회에 실패했습니다. 서버 결과를 다시 확인하세요.' : status === 'FAILED' ? failureMessage || '검증 실행 실패' : '')
+  useEffect(() => {
+    if (status === 'FINALIZED' && finalizeGuide.getSnapshot().savedId === null) {
+      finalizeGuide.begin()
+      void finalizeGuide.saved(id).catch(error => finalizeGuide.fail(String(error)))
+    }
+  }, [finalizeGuide, id, status])
 
   const execute = useMutation({
     mutationFn: () => { executionGuide.begin(); return executeRun(id) },
     meta: { errorToast: false },
-    onMutate: () => ({ restarting: canRestart, attemptId: progress.data?.attemptId ?? 0 }),
+    onMutate: () => ({ restarting: false, attemptId: progress.data?.attemptId ?? 0 }),
     onSuccess: (_response, _variables, before) => {
       announced.current = false
       setPreviousAttemptId(before?.restarting ? before.attemptId : null)
@@ -177,7 +184,7 @@ function DetailBody({
   return (
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
-        <ScreenHelp screenId="VRUN-W02" saveGuide={executionGuide} outcome="execution" />
+        <ScreenHelp screenId="VRUN-W02" saveGuide={executionGuide} finalizeGuide={finalizeGuide} runStatus={status} outcome="execution" />
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
@@ -273,13 +280,13 @@ function DetailBody({
               className="vrun-row-button"
               data-guide-target="validation.execute" aria-describedby="execute-action-note"
               loading={execute.isPending}
-              disabled={!canProcess || !canExecute || (canRestart && !progress.isSuccess) || (executed && !finished)}
+              disabled={!canProcess || !canExecute || (executed && !finished)}
               onClick={() => execute.mutate()}
             >
               <span className="material-symbols-rounded" aria-hidden="true">
                 play_arrow
               </span>
-              {canRestart ? '실패 지점부터 재시작' : '실행'}
+              실행
             </Button>
           </div>
         </header>
@@ -288,7 +295,7 @@ function DetailBody({
             className="vrun-action-note"
             id="execute-action-note"
             role={startUnconfirmed ? 'alert' : 'status'}
-            hidden={canProcess && canExecute && (!executed || finished)}
+            hidden={canProcess && !startUnconfirmed && (canExecute || status === 'FAILED') && (!executed || finished)}
           >
             {status === 'FINALIZED'
               ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.'
@@ -298,8 +305,15 @@ function DetailBody({
                   ? '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.'
                   : executed && !finished
                     ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
-                    : '생성됨이나 실패 상태의 월 실행만 실행할 수 있습니다.'}
+                    : '새 실행은 생성됨 상태에서만 시작할 수 있습니다.'}
           </p>
+          {header.runType !== 'MANUAL_CONTRACT' && <ValidationRestartPanel key={id} id={id} month={header.validationMonth ?? ""} runNo={header.runNo ?? 0} status={status ?? 'CREATED'} waiting={!progress.isSuccess || !!(executed && !finished)} canProcess={canProcess} onAccepted={() => {
+            announced.current = false
+            setPreviousAttemptId(progress.data?.attemptId ?? 0)
+            setExecuted(true)
+            setAttemptWaitGeneration(value => value + 1)
+            toast('재시작 요청을 접수했습니다. 실제 진행 상태를 확인합니다.', 'info')
+          }} />}
           <p className="vrun-progress-line">
             <span>진행률</span>
             <span className="vrun-progress-value" role="status" aria-live="polite">
@@ -339,6 +353,7 @@ function DetailBody({
       <ChecklistSection status={status} checklist={checklist} />
 
       <FinalizeSection
+        finalizeGuide={finalizeGuide}
         id={id}
         status={status}
         canFinalize={canFinalize}
@@ -636,6 +651,7 @@ function newKey(id: string) {
 }
 
 function FinalizeSection({
+  finalizeGuide,
   runType,
   id,
   status,
@@ -646,6 +662,7 @@ function FinalizeSection({
   onDone,
   onFailed,
 }: {
+  finalizeGuide: SaveGuide
   id: string
   runType?: string
   status?: string
@@ -658,7 +675,6 @@ function FinalizeSection({
 }) {
   const [confirming, setConfirming] = useState(false)
   const [finalized, setFinalized] = useState(false)
-  const [finalizeGuide] = useState(() => new SaveGuide())
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const supportedType = runType === 'MONTHLY' || runType === 'PRE_CONFIRM'
@@ -674,6 +690,7 @@ function FinalizeSection({
     },
     meta: { errorToast: false },
     onSuccess: async (result) => {
+      if (result.status === 'FINALIZED') onDone()
       if (!mounted.current) return
       if (result.status !== 'FINALIZED') throw new Error('서버의 최종 확정 상태를 확인하지 못했습니다.')
       if (!(await finalizeGuide.saved(id)) || !mounted.current) return

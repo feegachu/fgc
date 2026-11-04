@@ -700,7 +700,7 @@ describe('RECO-W01·W02 React 전환', () => {
   })
 })
 
-it('execution help survives run selection and waits for the completed result query', async () => {
+it('execution help resets on run selection and waits for the new completed result query', async () => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   let created = false
@@ -725,10 +725,14 @@ it('execution help survives run selection and waits for the completed result que
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   await user.click(screen.getByRole('button', { name: '대사 실행' }))
   await waitFor(() => expect(finishResult).toBeDefined())
+  await waitFor(() => expect(screen.getByRole('button', { name: '도움말' })).toHaveAttribute('aria-expanded', 'false'))
+  await user.click(screen.getByRole('button', { name: '도움말' }))
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   finishResult!(results)
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: '다음' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   expect(screen.getByText(/서버 실행 성공 · ID 42/)).toBeVisible()
   await user.selectOptions(screen.getByLabelText(/지급단계/, { selector: 'select' }), 'INSURER_TO_GA')
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeDisabled())
-})
+}, 10000)

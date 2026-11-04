@@ -79,7 +79,7 @@ jobs:
       # Dependabot/fork PR의 토큰은 read-only이므로, 권한 있는 별도 workflow_run이
       # 이 아티팩트를 읽어 동일 커밋에 "테스트 결과" 체크를 게시한다.
       - name: Upload JUnit XML
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' }}
         with:
           name: junit-test-results
@@ -88,7 +88,7 @@ jobs:
           retention-days: 1
 
       - name: Publish test report (쓰기 가능한 실행)
-        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6
         if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' && (github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository)) }}
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
@@ -98,7 +98,7 @@ jobs:
       # Dependabot/fork PR에서도 현재 job summary와 로그 annotation은 즉시 남긴다.
       # 별도 체크 게시 자체는 test-report.yml의 workflow_run이 담당한다.
       - name: Annotate test report (Dependabot/fork PR)
-        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
+        uses: mikepenz/action-junit-report@6ef3fdcfcd5f0b5d14df3e659ef19b8c6820f93d # v6
         if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' && github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.full_name != github.repository) }}
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
@@ -106,7 +106,7 @@ jobs:
           detailed_summary: true
 
       - name: Upload HTML test report (실패 분석용)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ failure() && needs.changes.outputs.run_checks == 'true' }}
         with:
           name: test-report
@@ -137,7 +137,7 @@ jobs:
 
       - name: Set up Node (frontend/.nvmrc)
         if: needs.changes.outputs.run_checks == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: frontend/.nvmrc
           cache: npm
@@ -160,7 +160,7 @@ jobs:
         if: needs.changes.outputs.run_checks == 'true'
       - name: Upload frontend coverage
         if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run_checks == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: frontend-coverage
           path: frontend/coverage/
@@ -182,7 +182,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: frontend/.nvmrc
           package-manager-cache: false
@@ -204,7 +204,7 @@ jobs:
         run: python3 .github/scripts/npm_audit_summary.py
       - name: Upload npm audit evidence
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: npm-audit-report
           path: |
@@ -227,7 +227,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

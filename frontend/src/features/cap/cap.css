@@ -73,9 +73,6 @@
   border-color: var(--color-action-primary);
   box-shadow: var(--shadow-focus);
 }
-.cap-react-stage-panel {
-  border-radius: var(--radius-12);
-}
 .cap-react-stage-panel > .surface-header {
   padding: var(--space-4) var(--space-6) 0;
 }
@@ -88,7 +85,7 @@
 .cap-react-stage {
   min-width: 0;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-12);
+  border-radius: var(--radius-8);
   padding: var(--space-5);
   background: var(--color-bg-surface);
 }
@@ -136,9 +133,9 @@
 }
 .cap-react-stage h3 {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   font-weight: 700;
-  line-height: 1.375rem;
+  line-height: 1.25rem;
 }
 .cap-react-stage-code {
   margin: var(--space-1) 0 0;
@@ -251,6 +248,14 @@
 }
 .cap-react-detail h3 {
   margin: 0 0 var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+.cap-react-detail h3 small {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
 }
 .cap-react-detail-lines .data-table {
   min-width: 51rem;

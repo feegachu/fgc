@@ -15,8 +15,19 @@ public record ValidationRunDetailResponse(
         ArbitrageSummary arbitrageSummary,
         LedgerSummary ledgerSummary,
         ReconciliationSummary reconciliationSummary,
-        ExceptionSummary exceptionSummary
+        ExceptionSummary exceptionSummary,
+        com.susukkang.fgc.validation.service.ValidationRestartService.Restartability restartability,
+        java.util.List<com.susukkang.fgc.validation.service.ValidationRestartService.Retry> retries
 ) {
+    public ValidationRunDetailResponse(ValidationRunItemResponse header, List<ValidationTargetItemResponse> targets,
+            TargetSummary targetSummary, CapSummary capSummary, ArbitrageSummary arbitrageSummary,
+            LedgerSummary ledgerSummary, ReconciliationSummary reconciliationSummary, ExceptionSummary exceptionSummary) {
+        this(header, targets, targetSummary, capSummary, arbitrageSummary, ledgerSummary, reconciliationSummary, exceptionSummary, null, List.of());
+    }
+    public ValidationRunDetailResponse withRestart(com.susukkang.fgc.validation.service.ValidationRestartService.Restartability allowed,
+            List<com.susukkang.fgc.validation.service.ValidationRestartService.Retry> history) {
+        return new ValidationRunDetailResponse(header,targets,targetSummary,capSummary,arbitrageSummary,ledgerSummary,reconciliationSummary,exceptionSummary,allowed,history);
+    }
     /** ③ 대상 선별 건수 (선정·제외·검토필요) */
     public record TargetSummary(long selectedCount, long excludedCount, long reviewRequiredCount) {
     }

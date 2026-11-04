@@ -16,4 +16,7 @@ public interface ValidationRunCreateService {
      *         (VRUN_001) command.runType()이 MONTHLY이고 해당 월에 이미 활성 실행이 있을 때
      */
     ValidationRunRow create(CreateValidationRunCommand command);
+
+    /** 호출자의 트랜잭션이 롤백돼 아무 결과도 남기지 못한 실행을 지운다. CREATED가 아니면 그대로 둔다. */
+    void discardIfStillCreated(Long validationRunId);
 }

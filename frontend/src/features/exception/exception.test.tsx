@@ -12,6 +12,7 @@ import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
+import { applyActionToCache } from './api'
 
 const user = {
   loginId: 'settle01',
@@ -165,12 +166,12 @@ function renderPage(path = '/app/exceptions') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   clients.push(client)
   const router = createMemoryRouter(routes, { basename: '/app/', initialEntries: [path] })
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, actions: userEvent.setup(), unmount: view.unmount }
 }
 const table = () => screen.findByRole('table', { name: '예외 목록' })
 
@@ -682,6 +683,68 @@ it('committed correction with an invalid receipt refreshes and cannot be posted 
   expect(within(dialog).getByRole('button', { name: '정정 실행' })).toBeDisabled()
   fireEvent.submit(dialog.querySelector('form')!)
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+})
+
+it('does not append a cached action twice or overwrite a newer cached status', () => {
+  const client = new QueryClient()
+  const action = { actionSeq: 1, actionType: 'START_REVIEW', toStatus: 'IN_REVIEW' } as const
+  client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [action] }]))
+  applyActionToCache(client, 11, action)
+  const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
+  expect(item.actions).toHaveLength(1)
+  expect(item.status).toBe('RESOLVED')
+  client.clear()
+})
+
+it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a committed action after unmount (help=%s, sequence=%s)', async (guided, sequence) => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  let finish!: (value: unknown) => void
+  postResponse = () => new Promise(resolve => { finish = resolve })
+  const { actions, unmount } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  const form = within(await screen.findByRole('form', { name: '예외 처리' }))
+  await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(form.getByLabelText(/처리 사유/), '원천 확인')
+  if (guided) {
+    await actions.click(form.getByRole('button', { name: '도움말' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+    await actions.click(screen.getByRole('button', { name: '다음' }))
+  }
+  await actions.click(form.getByRole('button', { name: '처리 저장' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  const receipt = { actionSeq: sequence, actionType: 'START_REVIEW', fromStatus: 'NEW', toStatus: 'IN_REVIEW' }
+  if (guided) {
+    await act(async () => finish(receipt))
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  }
+  unmount()
+  if (!guided) await act(async () => finish(receipt))
+  await waitFor(() => {
+    const [, data] = clients[0].getQueriesData<ExceptionSearchResult>({ queryKey: ['exceptions', 'search'] })[0]
+    expect(data!.content![0].status).toBe(sequence ? 'IN_REVIEW' : 'NEW')
+    expect(data!.content![0].actions).toHaveLength(sequence ? 1 : 0)
+    expect(clients[0].getQueriesData({ queryKey: ['exceptions', 'search'] }).every(([key]) => clients[0].getQueryState(key)?.isInvalidated)).toBe(true)
+  })
+})
+
+it('invalidates a completed correction when help is unmounted before acknowledgement', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  searchResponse = () => search([correctionCase])
+  postResponse = () => ({ actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 72 })
+  const { actions, unmount } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
+  const dialog = within(await screen.findByRole('dialog'))
+  await dialog.findByText(/J-0070/)
+  await actions.type(dialog.getByLabelText(/정정 사유/), '계정 오류 정정')
+  await actions.click(dialog.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(dialog.getByRole('button', { name: '다음' }))
+  clients[0].setQueryData(['validation-runs', 'receipt-test'], { status: 'COMPLETED' })
+  await actions.click(dialog.getByRole('button', { name: '정정 실행' }))
+  await waitFor(() => expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled())
+  unmount()
+  await waitFor(() => expect(clients[0].getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
 })
 
 it('차익거래 판정 사유로 저장된 예외 설명의 개발 용어는 쉬운 말로 보이고 다른 설명은 그대로 둔다', async () => {

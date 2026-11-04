@@ -139,6 +139,11 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
   const paymentChangedAt = Date.parse(payment.updatedAt ?? payment.createdAt ?? '')
   const validationStartedAt = Date.parse(run.startedAt ?? '')
   if (
+    ['COMPLETED', 'FINALIZED'].includes(run.status ?? '') &&
+    (!Number.isFinite(paymentChangedAt) || !Number.isFinite(validationStartedAt))
+  )
+    throw new Error('지급 변경 또는 검증 시작 시각을 확인하지 못했습니다. 최신 결과를 다시 조회하세요.')
+  if (
     Number.isFinite(paymentChangedAt) &&
     Number.isFinite(validationStartedAt) &&
     paymentChangedAt > validationStartedAt

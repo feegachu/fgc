@@ -200,7 +200,7 @@ export default function CapListPage() {
     },
   ]
   return (
-    <div className="cap-react-page">
+    <div className="cap-react-page list-page">
       <header className="page-header">
         <ScreenHelp screenId="CAP-W01" />
         <h1 className="page-title">1,200% 한도 검증 현황</h1>

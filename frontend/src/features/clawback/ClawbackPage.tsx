@@ -1,7 +1,7 @@
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { nameWithCode } from '../../lib/screenText'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useIsMutating, useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
@@ -24,6 +24,7 @@ import {
 } from './api'
 import type { CandidateRow, Criteria } from './api'
 import { ClawbackDetail } from './ClawbackDetail'
+import { ClawbackDocuments } from './ClawbackDocuments'
 import { columns } from './columns'
 import { CalculationBadge } from './badges'
 import { calculationStatuses, triggerLabels } from './labels'
@@ -35,7 +36,8 @@ const draftOf = (criteria: Criteria): Draft => {
   return rest
 }
 export default function ClawbackPage() {
-  const { month } = useOutletContext<ShellContext>()
+  const { month, user } = useOutletContext<ShellContext>()
+  const calculating = useIsMutating({ mutationKey: ['clawback', 'calculate'] }) > 0
   const [params, setParams] = useSearchParams()
   const criteria = criteriaFromParams(params, month ?? '')
   const source = JSON.stringify(criteria)
@@ -281,7 +283,16 @@ export default function ClawbackPage() {
                 ) : null}
               </div>
             ) : detail.data ? (
-              <ClawbackDetail detail={detail.data} />
+              <>
+                <ClawbackDetail detail={detail.data} />
+                <ClawbackDocuments
+                  key={`${selected?.candidateId}:${detail.data.latestCalculation?.calculationVersion}:${detail.data.candidate?.sourceVersion}`}
+                  detail={detail.data}
+                  roleCode={user.roleCode}
+                  refreshing={detail.isFetching || calculating}
+                  onRefresh={() => detail.refetch()}
+                />
+              </>
             ) : null}
           </div>
         </section>

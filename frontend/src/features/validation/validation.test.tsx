@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -113,12 +113,12 @@ function renderAt(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   clients.push(client)
   const router = createMemoryRouter(routes, { basename: '/app/', initialEntries: [path] })
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, actions: userEvent.setup(), client, unmount: view.unmount }
 }
 const calls = (key: string) =>
   vi
@@ -135,6 +135,9 @@ const listPage = (content: unknown[], totalPages = 1) => ({
 
 function detailHandlers(header = run(), checklist = conditions(true)) {
   handlers['GET /api/v1/validation-runs/7'] = () => detail(header)
+  handlers['GET /api/v1/validation-runs/7/restartability'] = () => ({ allowed: header.status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT', expectedStateVersion: 'failed-1', lastFailedBatchExecutionId: 1, failedStep: 5, checkpointAvailable: true })
+  handlers['GET /api/v1/validation-runs/7/retries'] = () => []
+
   handlers['GET /api/v1/validation-runs'] = () => listPage([header])
   handlers['GET /api/v1/validation-runs/7/finalize-checklist'] = () => ({
     validationRunId: 7,
@@ -315,6 +318,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     detailHandlers(failed)
     let polls = 0
     handlers['POST /api/v1/validation-runs/7/execute'] = () => ({ validationRunId: 7, status: 'RUNNING' })
+  handlers['POST /api/v1/validation-runs/7/restart'] = () => ({ validationRunId: 7, retryId: 1, status: 'ACCEPTED' })
     handlers['GET /api/v1/validation-runs/7/progress'] = () => {
       polls += 1
       return polls <= 2
@@ -331,18 +335,20 @@ describe('VRUN-W02 상세·실행·확정', () => {
     const restart = await screen.findByRole('button', { name: /실패 지점부터 재시작/ })
     await waitFor(() => expect(restart).toBeEnabled())
     await actions.click(restart)
+    await actions.type(screen.getByRole('textbox', { name: '재시작 사유' }), '원인 수정')
+    await actions.click(screen.getByRole('button', { name: '재시작 요청' }))
     await waitFor(() => expect(polls).toBe(2))
     expect(screen.getByRole('button', { name: /실패 지점부터 재시작/ })).toBeDisabled()
     await waitFor(() => expect(polls).toBeGreaterThan(2), { timeout: 5000 })
     await waitFor(() => expect(screen.getByRole('button', { name: /실패 지점부터 재시작/ })).toBeEnabled())
-    expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+    expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(1)
   }, 15000)
 
   it('계약수동 실패는 월 재시작을 할 수 없다', async () => {
     detailHandlers(run({ status: 'FAILED', runType: 'MANUAL_CONTRACT', currentStep: 3 }))
     renderAt('/app/validation-runs/7')
     expect(await screen.findByRole('button', { name: /실행$/ })).toBeDisabled()
-    expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(0)
+    expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(0)
   })
 
   it('실패한 월 실행도 조회 전용 사용자는 재시작할 수 없다', async () => {
@@ -350,7 +356,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     detailHandlers(run({ status: 'FAILED', currentStep: 5 }))
     renderAt('/app/validation-runs/7')
     expect(await screen.findByRole('button', { name: /실패 지점부터 재시작/ })).toBeDisabled()
-    expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(0)
+    expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(0)
   })
 
   it('실패 사유가 오류코드뿐이면 상세에 코드 대신 실패한 단계를 보인다', async () => {
@@ -477,6 +483,7 @@ it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수�
   detailHandlers(run({ status: 'FAILED', currentStep: 5 }))
   let advanced = false
   handlers['POST /api/v1/validation-runs/7/execute'] = () => ({ validationRunId: 7, status: 'RUNNING' })
+  handlers['POST /api/v1/validation-runs/7/restart'] = () => ({ validationRunId: 7, retryId: 1, status: 'ACCEPTED' })
   handlers['GET /api/v1/validation-runs/7/progress'] = () => ({
     status: 'FAILED',
     currentStep: 5,
@@ -486,12 +493,14 @@ it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수�
   const restart = await screen.findByRole('button', { name: /실패 지점부터 재시작/ })
   await waitFor(() => expect(restart).toBeEnabled())
   await actions.click(restart)
+    await actions.type(screen.getByRole('textbox', { name: '재시작 사유' }), '원인 수정')
+    await actions.click(screen.getByRole('button', { name: '재시작 요청' }))
   const message = await screen.findByText(
     '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.',
   )
   expect(message).toHaveAttribute('role', 'alert')
   expect(restart).toBeDisabled()
-  expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
+  expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(1)
   const pollsAfterDeadline = calls('GET /api/v1/validation-runs/7/progress').length
   await new Promise((resolve) => nativeTimeout(resolve, 2100))
   expect(calls('GET /api/v1/validation-runs/7/progress')).toHaveLength(pollsAfterDeadline)
@@ -499,8 +508,8 @@ it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수�
   await actions.click(screen.getByRole('button', { name: '새로고침' }))
   await waitFor(() => expect(restart).toBeEnabled())
   expect(message).not.toBeVisible()
-  expect(calls('POST /api/v1/validation-runs/7/execute')).toHaveLength(1)
-  })
+  expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(1)
+}, 15000)
 
 it('finalize help rejects a non-FINALIZED response and waits for acknowledgement after retry', async () => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
@@ -535,6 +544,59 @@ it('finalize help rejects a non-FINALIZED response and waits for acknowledgement
   expect(keys[0]).toBe(keys[1])
 })
 
+it('invalidates a finalized run even if its page unmounts before the response', async () => {
+  currentUser = gaAdmin
+  detailHandlers()
+  let finish!: (value: unknown) => void
+  handlers['POST /api/v1/validation-runs/7/finalize'] = () => new Promise(resolve => { finish = resolve })
+  const { actions, client, unmount } = renderAt('/app/validation-runs/7')
+  client.setQueryData(['validation-runs', 'receipt-test'], { status: 'COMPLETED' })
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  await actions.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  unmount()
+  await act(async () => finish({ status: 'FINALIZED' }))
+  await waitFor(() => expect(client.getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
+})
+
+it('the detail help waits for the real finalization result before completing', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  currentUser = gaAdmin
+  detailHandlers()
+  handlers['POST /api/v1/validation-runs/7/finalize'] = () => ({ status: 'FINALIZED' })
+  const { actions } = renderAt('/app/validation-runs/7?month=2026-07')
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(await screen.findByRole('button', { name: '도움말' }))
+  const next = () => screen.getByRole('button', { name: '다음' })
+  for (let i = 0; i < 3; i++) { await waitFor(() => expect(next()).toBeEnabled()); await actions.click(next()) }
+  expect(next()).toBeDisabled()
+  expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  await actions.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }))
+  const done = await screen.findByRole('dialog', { name: '확정했습니다' })
+  await actions.click(within(done).getByRole('button', { name: '확인' }))
+  await waitFor(() => expect(next()).toBeEnabled())
+  await actions.click(next())
+  expect(await screen.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+}, 10000)
+
+it('invalidates a created run even if its page unmounts before the response', async () => {
+  handlers['GET /api/v1/validation-runs'] = () => listPage([])
+  handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+  let finish!: (value: unknown) => void
+  handlers['POST /api/v1/validation-runs'] = () => new Promise(resolve => { finish = resolve })
+  const { actions, client, unmount } = renderAt('/app/validation-runs')
+  const create = await screen.findByRole('button', { name: /실행 생성/ })
+  await waitFor(() => expect(create).toBeEnabled())
+  client.setQueryData(['validation-runs', 'receipt-test'], [])
+  await actions.click(create)
+  await waitFor(() => expect(finish).toBeDefined())
+  unmount()
+  await act(async () => finish({ validationRunId: 7, runNo: 2, status: 'CREATED' }))
+  await waitFor(() => expect(client.getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
+})
+
 it('does not allow finalizing a partial contract run even with a passed checklist', async () => {
   currentUser = gaAdmin
   detailHandlers()
@@ -555,4 +617,27 @@ it('resolves tutorial overview and progress targets on a successful detail respo
   expect(overviewElement).toBeVisible()
   expect(overviewElement).toHaveTextContent('검증월')
   expect(document.querySelector(`[data-guide-feature="${progress.targetId}"]`)).toContainElement(screen.getByRole('heading', { name: /진행 단계/ }))
+})
+
+
+it('stops the creation spinner while help acknowledgement keeps duplicate submission blocked', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  handlers['GET /api/v1/validation-runs'] = () => listPage([])
+  handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+  handlers['POST /api/v1/validation-runs'] = () => ({ validationRunId: 7, runNo: 2, status: 'CREATED' })
+  const { actions } = renderAt('/app/validation-runs?month=2026-07')
+  const create = await screen.findByRole('button', { name: /실행 생성/ })
+  await waitFor(() => expect(create).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '다음' }))
+  await waitFor(() => expect(screen.getByText('저장 가이드 · 2/2')).toBeVisible())
+  await actions.click(create)
+  await waitFor(() => expect(calls('POST /api/v1/validation-runs')).toHaveLength(1))
+  await waitFor(() => expect(create).not.toHaveAttribute('aria-busy', 'true'))
+  expect(create).toBeDisabled()
+  await actions.click(create)
+  expect(calls('POST /api/v1/validation-runs')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: '다음' })).toBeEnabled()
 })

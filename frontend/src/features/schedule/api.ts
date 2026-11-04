@@ -130,11 +130,12 @@ export async function confirmSchedule(id: string) {
   return data
 }
 
-export async function regenerateSchedule(id: string, reason: string) {
+export async function regenerateSchedule(id: string, reason: string, onCommitted?: () => void) {
   const { data } = await apiClient.request<ScheduleRegenResult>(schedulePath(id, '/regenerate'), {
     method: 'POST',
     body: { reason },
   })
+  onCommitted?.()
   if (data?.scheduleHeaderId == null) throw new Error('새 버전을 확인할 수 없습니다.')
   return data
 }

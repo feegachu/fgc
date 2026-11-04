@@ -455,10 +455,11 @@ function ScheduleDetailView({ id }: { id: string }) {
         open={regenerateOpen}
         onClose={() => setRegenerateOpen(false)}
         onSubmit={async (reason, committed) => {
-          const result = await regenerateSchedule(id, reason)
-          committed()
+          const result = await regenerateSchedule(id, reason, () => {
+            committed()
+            void client.invalidateQueries({ queryKey: ['schedules'] })
+          })
           if (Number(result.scheduleHeaderId) === Number(id) || !Number.isSafeInteger(result.versionNo) || result.versionNo! <= (header?.scheduleVersionNo ?? 0)) throw new Error('서버 응답에서 새 스케줄 버전을 확인하지 못했습니다. 목록을 새로 조회하세요.')
-          void client.invalidateQueries({ queryKey: ['schedules'] })
           return result.scheduleHeaderId!
         }}
         onComplete={(newId) => {
@@ -703,18 +704,31 @@ function RegenerateModal({
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const input = useRef<HTMLTextAreaElement>(null)
   const [reason, setReason] = useState('')
-  const clearUnsaved = useUnsavedWork(open && Boolean(reason), reason)
+  const stored = useRef(false)
+  const [committed, setCommitted] = useState(false)
+  const clearUnsaved = useUnsavedWork(open && !committed && Boolean(reason), reason)
   const [error, setError] = useState('')
   useEffect(() => { saveGuide.update(reason, Boolean(reason.trim()) && reason.trim().length <= REASON_MAX) }, [saveGuide, reason])
   const mutation = useMutation({
     mutationFn: async (value: string) => {
       saveGuide.begin()
-      const newId = await onSubmit(value, clearUnsaved)
+      const newId = await onSubmit(value, () => {
+        stored.current = true
+        clearUnsaved()
+        if (mounted.current) setCommitted(true)
+      })
       if (!mounted.current) return
       if (await saveGuide.saved(newId)) { if (mounted.current) onComplete(newId) }
     },
     meta: { errorToast: false },
     onError: (caught) => {
+      if (stored.current) {
+        const message = '서버 생성 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 생성하지 말고 목록에서 새 버전을 확인하세요.'
+        saveGuide.fail(message)
+        setError(message)
+        toast(message, 'warning')
+        return
+      }
       saveGuide.fail(errorText(caught, '새 스케줄 버전을 만들지 못했습니다.'))
       // 서버 검증(@NotBlank·@Size)이 사유 필드를 지목하면 Toast 가 아니라 필드 옆에 둔다(가이드 §11).
       if (caught instanceof ApiError && caught.field === 'reason') setError(caught.message)
@@ -722,12 +736,14 @@ function RegenerateModal({
     },
   })
   const close = () => {
+    if (mutation.isPending) return
     setReason('')
     setError('')
     mutation.reset()
     onClose()
   }
   function submit() {
+    if (stored.current || mutation.isPending) return
     const trimmed = reason.trim()
     const message = !trimmed
       ? '저장할 수 없습니다. 생성 사유를 입력하세요.'
@@ -755,7 +771,7 @@ function RegenerateModal({
           <button data-guide-feature="features.schedule.schedule-detail-page.button-7" type="button" className="button button-secondary" disabled={mutation.isPending} onClick={close}>
             취소
           </button>
-          <Button data-guide-feature="features.schedule.schedule-detail-page.button-8" data-guide-target="schedule.regenerate.submit" loading={mutation.isPending && !saved} disabled={mutation.isPending} onClick={submit}>
+          <Button data-guide-feature="features.schedule.schedule-detail-page.button-8" data-guide-target="schedule.regenerate.submit" loading={mutation.isPending && !saved} disabled={mutation.isPending || committed} onClick={submit}>
             새 버전 만들기
           </Button>
         </>
@@ -778,7 +794,7 @@ function RegenerateModal({
         <textarea data-guide-feature="features.schedule.schedule-detail-page.regenerate-reason"
           ref={input}
           data-guide-target="schedule.regenerate.reason"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || committed}
           className="textarea-control"
           id="regenerate-reason"
           maxLength={REASON_MAX}

@@ -136,12 +136,13 @@ function wireDetail(
 
 function mountEditor(initial?: DraftDocument, policyId?: number) {
   const onSaved = vi.fn()
+  const onClose = vi.fn()
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <PolicyDraftEditor initial={initial} policyId={policyId} onClose={vi.fn()} onSaved={onSaved} />
+      <PolicyDraftEditor initial={initial} policyId={policyId} onClose={onClose} onSaved={onSaved} />
     </QueryClientProvider>,
   )
-  return { user: userEvent.setup(), onSaved }
+  return { user: userEvent.setup(), onSaved, onClose }
 }
 
 function mountManagement(
@@ -661,6 +662,21 @@ it('policy guide requires valid inputs and server success before closing', async
   expect(await screen.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
   await user.click(screen.getByRole('button', { name: '안내 마치기' }))
   await waitFor(() => expect(onSaved).toHaveBeenCalledWith(17))
+})
+
+it('keeps a stored policy locked if the server receipt ID cannot be verified', async () => {
+  const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({ ...result, policyVersionId: 0 }))
+  const initial = { ...emptyDraft(), policyCode: 'RECEIPT-TEST', policyName: '저장 확인', policyType: 'SCHEDULE_ELIGIBILITY', sourceClass: 'GA_POLICY', effectiveFrom: '2027-01-01' }
+  const { user, onSaved, onClose } = mountEditor(initial)
+  await user.click(screen.getByRole('button', { name: '초안 저장' }))
+  expect(await screen.findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(screen.getByRole('button', { name: '초안 저장' })).toBeDisabled()
+  expect(screen.getByLabelText(/정책명/)).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: '초안 저장' }))
+  expect(request).toHaveBeenCalledTimes(1)
+  expect(onSaved).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: '창 닫기' }))
+  expect(onClose).toHaveBeenCalledTimes(1)
 })
 
 

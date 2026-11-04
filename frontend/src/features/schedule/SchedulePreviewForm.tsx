@@ -58,6 +58,10 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
     onSuccess: async (id, attempt) => {
       clearUnsaved()
       if (mounted.current) setServerSaved(true)
+      // Mark old results stale even if the user left before the successful response.
+      // Refetch after the guide finishes so deactivating the old header cannot remove its card.
+      void client.invalidateQueries({ queryKey: ['schedules'], refetchType: 'none' })
+      void client.invalidateQueries({ queryKey: ['contracts'], refetchType: 'none' })
       if (!mounted.current || locationKey.current !== attempt.locationKey) return
       // 안내 중에는 서버 성공을 표시하고 사용자가 안내를 마친 뒤 결과 화면으로 이동한다.
       const continueNavigation = await saveGuide.saved(id)

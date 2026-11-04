@@ -64,6 +64,7 @@ public class ValidationRunController {
     private final ValidationRunDetailService validationRunDetailService;
     private final ValidationRunExecuteService validationRunExecuteService;
     private final ValidationRunFinalizationService validationRunFinalizationService;
+    private final com.susukkang.fgc.validation.service.ValidationRestartService restartService;
 
     @Operation(
             summary = "검증 실행 생성 (IF-API-45)",
@@ -221,7 +222,7 @@ public class ValidationRunController {
     public ApiResponse<ValidationRunDetailResponse> detail(
             @Parameter(description = "validation_run_id") @PathVariable Long id
     ) {
-        return ApiResponse.success(validationRunDetailService.detail(id));
+        return ApiResponse.success(validationRunDetailService.detail(id).withRestart(restartService.eligibility(id), restartService.history(id)));
     }
 
     @Operation(
@@ -229,7 +230,7 @@ public class ValidationRunController {
             description = "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 "
                     + "MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. "
                     + "202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. "
-                    + "FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). "
+                    + "FAILED 재시작은 IF-API-82 /restart를 사용한다. "
                     + "MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다."
     )
     @ApiResponses({
@@ -276,7 +277,7 @@ public class ValidationRunController {
     public ApiResponse<ValidationRunProgressResponse> progress(
             @Parameter(description = "validation_run_id") @PathVariable Long id
     ) {
-        return ApiResponse.success(validationRunDetailService.progress(id));
+        return ApiResponse.success(validationRunDetailService.progress(id).withRetry(restartService.history(id)));
     }
 
     @Operation(
