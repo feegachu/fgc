@@ -157,6 +157,7 @@ describe('CONT-W02 계약 상세', () => {
             scheduleHeaderId: fc ? 10 : 20,
             scheduleVersionNo: 2,
             lineCount: 1,
+            installmentCount: 1,
             status: 'CONFIRMED',
             statusLabel: '서버 확정',
           },
@@ -183,7 +184,7 @@ describe('CONT-W02 계약 상세', () => {
     expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
     expect(await screen.findByRole('cell', { name: 'GA' })).toBeInTheDocument()
     expect(screen.queryByLabelText('지급단계')).toBeNull()
-    expect(within(fc).getByText('버전 2, 1회차')).toBeInTheDocument()
+    expect(within(fc).getByText('버전 2, 1회차, 1행')).toBeInTheDocument()
     expect(within(fc).queryByRole('link')).not.toBeInTheDocument()
     expect(within(fc).queryByText('서버 확정')).not.toBeInTheDocument()
   })
@@ -396,7 +397,7 @@ describe('CONT-W02 계약 상세', () => {
       if (url.includes('/schedules?')) return { headers: [], lines: [] }
     })
     await actions.click(await screen.findByRole('button', { name: '스케줄 재생성' }))
-    await waitFor(() => expect(screen.getAllByText('현재 운영 스케줄이 없습니다.')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('생성된 스케줄이 없습니다.')).toHaveLength(2))
     expect(router.state.location.search).toBe('?tab=schedules')
     expect(calls('/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL')[0].options?.method).toBe('POST')
     expect(messages()).toContain('예상 스케줄을 새 버전으로 재생성했습니다.')

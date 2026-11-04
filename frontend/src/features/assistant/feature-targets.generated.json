@@ -405,6 +405,11 @@
     "element": "section"
   },
   {
+    "id": "contract.schedule.preview-detail",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "Link"
+  },
+  {
     "id": "contract.tab.arbitrage",
     "file": "features/contract/ContractTabs.tsx",
     "element": "button"
@@ -3503,6 +3508,31 @@
     "id": "reference.tab.versions",
     "file": "features/reference/ReferenceUI.tsx",
     "element": "button"
+  },
+  {
+    "id": "schedule.preview.form",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "form"
+  },
+  {
+    "id": "schedule.preview.reason",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "schedule.preview.refresh",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "schedule.preview.region",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "section"
+  },
+  {
+    "id": "schedule.preview.submit",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "Button"
   },
   {
     "id": "validation.restart",
