@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import org.springframework.batch.core.*;
 /** Bounded labels only: no execution IDs, parameters, user data or exception messages. */
 public final class BatchMetricsListener implements JobExecutionListener, StepExecutionListener {
     private static final Logger LOG = LoggerFactory.getLogger(BatchMetricsListener.class);
+    private static final String STATUS = "status";
     private final Supplier<MeterRegistry> registry;
     private final AtomicLong lastFailure = new AtomicLong();
     public BatchMetricsListener(Supplier<MeterRegistry> registry) { this.registry = registry; }
@@ -27,11 +29,11 @@ public final class BatchMetricsListener implements JobExecutionListener, StepExe
     @Override
     public void afterJob(JobExecution job) {
         String name = job.getJobInstance().getJobName();
-        Tags tags = Tags.of("job", name, "status", job.getStatus().name());
-        record("fgc.batch.job", tags, job.getStartTime(), job.getEndTime());
+        Tags tags = Tags.of("job", name, STATUS, job.getStatus().name());
+        recordDuration("fgc.batch.job", tags, job.getStartTime(), job.getEndTime());
         if (job.getStatus() == BatchStatus.FAILED) lastFailure.set(Instant.now().getEpochSecond());
         LOG.atInfo().addKeyValue("event", "batch_job_finished").addKeyValue("job", name)
-                .addKeyValue("status", job.getStatus().name()).log("Batch job finished");
+                .addKeyValue(STATUS, job.getStatus().name()).log("Batch job finished");
     }
 
     @Override
@@ -39,22 +41,31 @@ public final class BatchMetricsListener implements JobExecutionListener, StepExe
         // Partition suffixes may contain run-specific IDs: retain only the configured step name.
         String name = step.getStepName().split(":", 2)[0];
         Tags tags = Tags.of("job", step.getJobExecution().getJobInstance().getJobName(),
-                "step", name, "status", step.getStatus().name());
-        record("fgc.batch.step", tags, step.getStartTime(), step.getEndTime());
-        registry.get().counter("fgc.batch.items", tags.and("operation", "read")).increment(step.getReadCount());
-        registry.get().counter("fgc.batch.items", tags.and("operation", "written")).increment(step.getWriteCount());
-        registry.get().counter("fgc.batch.items", tags.and("operation", "skipped")).increment(step.getSkipCount());
+                "step", name, STATUS, step.getStatus().name());
+        recordDuration("fgc.batch.step", tags, step.getStartTime(), step.getEndTime());
+        recordItems(tags, "read", step.getReadCount());
+        recordItems(tags, "written", step.getWriteCount());
+        recordItems(tags, "skipped", step.getSkipCount());
         LOG.atInfo().addKeyValue("event", "batch_step_finished")
                 .addKeyValue("job", step.getJobExecution().getJobInstance().getJobName()).addKeyValue("step", name)
-                .addKeyValue("status", step.getStatus().name()).addKeyValue("read", step.getReadCount())
+                .addKeyValue(STATUS, step.getStatus().name()).addKeyValue("read", step.getReadCount())
                 .addKeyValue("written", step.getWriteCount()).addKeyValue("skipped", step.getSkipCount())
                 .log("Batch step finished");
         return null; // Preserve existing exit status.
     }
 
-    private void record(String name, Tags tags, LocalDateTime start, LocalDateTime end) {
+    private void recordItems(Tags tags, String operation, long count) {
+        // Monitoring counters are doubles; business totals remain in the batch metadata.
+        registry.get().counter("fgc.batch.items", tags.and("operation", operation)).increment((double) count);
+    }
+
+    private void recordDuration(String name, Tags tags, LocalDateTime start, LocalDateTime end) {
         if (start != null && end != null) {
-            Timer.builder(name).tags(tags).register(registry.get()).record(Duration.between(start, end).abs());
+            // Spring Batch stores timestamps in the JVM local time zone.
+            ZoneId zone = ZoneId.systemDefault();
+            Duration elapsed = Duration.between(start.atZone(zone), end.atZone(zone));
+            Timer.builder(name).tags(tags).register(registry.get())
+                    .record(elapsed.isNegative() ? Duration.ZERO : elapsed);
         }
     }
 }

@@ -24,7 +24,6 @@ public class MonitoringSecurityConfig {
         byte[] expected = ("Bearer " + token).getBytes(StandardCharsets.UTF_8);
         return http.securityMatcher("/actuator/prometheus", "/actuator/prometheus/**")
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

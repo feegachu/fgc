@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Configuration;
 /** Attach to all managed jobs/steps, including partition workers, without changing business listeners. */
 @Configuration(proxyBeanMethods = false)
 public class BatchMetricsConfiguration {
+    private BatchMetricsConfiguration() {}
+
     @Bean
     static BeanPostProcessor batchMetricsRegistration(ObjectProvider<MeterRegistry> registry) {
         return new BeanPostProcessor() {
