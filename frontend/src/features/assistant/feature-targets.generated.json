@@ -70,6 +70,11 @@
     "element": "button"
   },
   {
+    "id": "app.shell.workspace-tabs.button-3",
+    "file": "app/shell/WorkspaceTabs.tsx",
+    "element": "button"
+  },
+  {
     "id": "app.shell.workspace-tabs.link",
     "file": "app/shell/WorkspaceTabs.tsx",
     "element": "Link"
@@ -88,6 +93,26 @@
     "id": "arbitrage.summary.review_required",
     "file": "features/arbitrage/ArbitragePage.tsx",
     "element": "button"
+  },
+  {
+    "id": "clawback.documents",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "section"
+  },
+  {
+    "id": "clawback.documents.download",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "clawback.documents.issue",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "clawback.documents.refresh",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
   },
   {
     "id": "clawback.evidence.effects",
@@ -462,7 +487,7 @@
   {
     "id": "dashboard.kpi.open",
     "file": "features/dashboard/DashboardPage.tsx",
-    "element": "section"
+    "element": "KpiCard"
   },
   {
     "id": "dashboard.kpi.recon",
@@ -551,6 +576,11 @@
   },
   {
     "id": "features.agent-home.agent-home-page.button-3",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.agent-home-page.button-4",
     "file": "features/agent-home/AgentHomePage.tsx",
     "element": "button"
   },
@@ -708,6 +738,121 @@
     "id": "features.agent-home.chatbot.filter-panel.section",
     "file": "features/agent-home/chatbot/FilterPanel.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.button",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.button-2",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.contract-link",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.form",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.input",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.input-2",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.input-3",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.section",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.textarea",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "textarea"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.agent-select",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.contract-input",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.contract-link",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "ContextLink"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-basic",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-close-button",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-evidence",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.detail-panel",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.item-select",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.list-panel",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.list-retry-button",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.month-input",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.row-evidence-button",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.summary",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.type-select",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "select"
   },
   {
     "id": "features.arbitrage.arbitrage-amount-summary.button",
@@ -1370,6 +1515,11 @@
     "element": "button"
   },
   {
+    "id": "features.dashboard.dashboard-page.composition",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "section"
+  },
+  {
     "id": "features.dashboard.dashboard-page.link",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
@@ -1386,11 +1536,6 @@
   },
   {
     "id": "features.dashboard.dashboard-page.link-5",
-    "file": "features/dashboard/DashboardPage.tsx",
-    "element": "Link"
-  },
-  {
-    "id": "features.dashboard.dashboard-page.open-exception-type",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
   },
@@ -1413,6 +1558,11 @@
     "id": "features.dashboard.dashboard-page.settlement-guide",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "button"
+  },
+  {
+    "id": "features.dashboard.risk-composition.link",
+    "file": "features/dashboard/RiskComposition.tsx",
+    "element": "Link"
   },
   {
     "id": "features.error.error-pages.button",
@@ -1686,11 +1836,6 @@
   },
   {
     "id": "features.policies.policies-page.button-4",
-    "file": "features/policies/PoliciesPage.tsx",
-    "element": "Button"
-  },
-  {
-    "id": "features.policies.policies-page.button-5",
     "file": "features/policies/PoliciesPage.tsx",
     "element": "Button"
   },

@@ -27,6 +27,8 @@
 
 PR을 올리기 전에 `npm run lint && npm test -- --run && npm run build`가 통과해야 한다. CI의 `frontend` 필수 체크가 같은 명령을 돌린다.
 
+단위 시험은 개인 `.env.local`의 AI/시연 활성화 설정에 영향을 받지 않도록 Vitest의 `test.env`에서 `VITE_ASSISTANT_AI`·`VITE_ASSISTANT_DEMO`를 기본 false로 둔다. 해당 모드를 검증하는 개별 시험은 `vi.stubEnv`로 명시적으로 선택한다.
+
 ## 확정 디자인과 미리보기 (#783)
 
 개발·프로덕션에 동일한 고정 디자인을 적용합니다. 개발자 설정 패널은 제거했으며, 기존 `fgc.design-settings.v1` 저장값은 화면에 영향을 주지 않습니다.

@@ -106,6 +106,8 @@ class CommissionPaymentServiceImplTest {
     private CommissionPolicyService commissionPolicyService;
     @Mock
     private com.susukkang.fgc.exceptioncase.service.ExceptionCaseService exceptionCaseService;
+    @Mock
+    private com.susukkang.fgc.contract.service.PaymentHoldGate paymentHoldGate;
 
     private CommissionPaymentServiceImpl service;
     private FgcMessageResolver messageResolver;
@@ -131,7 +133,8 @@ class CommissionPaymentServiceImplTest {
                 messageResolver,
                 auditLogService,
                 commissionPolicyService,
-                exceptionCaseService
+                exceptionCaseService,
+                paymentHoldGate
         );
     }
 
@@ -2408,6 +2411,34 @@ class CommissionPaymentServiceImplTest {
         assertPrecheckSavesNothing();
     }
 
+    @Test
+    void paymentHoldBlocksPreviewAndConfirmationWithoutAttributingTheBlockerToTheFirstRow() {
+        // FUN-028 / IF-API-24: 지급 건 단위 보류를 무관한 첫 귀속행의 문제로 표시하지 않는다.
+        ConfirmationData data = confirmation(201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE");
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        given(paymentHoldGate.blockers(101L)).willReturn(List.of(
+                new com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker("OPEN_HOLD", 987L)));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers()).singleElement().satisfies(blocker -> {
+            assertThat(blocker.code()).isEqualTo("FGC-IMPL-PAYMENT_HELD");
+            assertThat(blocker.contractId()).isNull();
+            assertThat(blocker.transactionAttributionId()).isNull();
+        });
+        assertPrecheckSavesNothing();
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        assertThatThrownBy(() -> service.confirm(101L, "held-payment"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_HELD));
+        verify(writeRepository, never()).confirm(any(), any(), any());
+        verify(capExceptionRepository, never()).insertExceptionCase(any());
+    }
+
     // REG-08 — 한도 초과 건은 blockers에 FGC-CAP-001과 사용률이 포함되고, 그래도 아무것도 저장하지 않는다
     @Test
     void precheckReportsCapExceededWithoutSaving() {
@@ -2768,6 +2799,7 @@ class CommissionPaymentServiceImplTest {
         verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
         verify(capExceptionService, never()).findUnresolvedViolationContractIds(any());
         verify(writeRepository).confirm(101L, "deduction", "");
+        verify(paymentHoldGate, never()).blockers(anyLong());
     }
 
     @Test
