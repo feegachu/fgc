@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { ApiError } from '../../lib/api/client'
-import { errorText, int } from '../../lib/format'
+import { date, errorText, int } from '../../lib/format'
 import { recordContractCheck } from './api'
 import type { AgentHome, PriorityContract } from './api'
 
@@ -42,7 +42,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
                   {`${month} 예정 ${int(item.expectedAmount ?? 0)}원`}
                   {(item.heldCount ?? 0) > 0 && ` · 보류 ${item.heldCount}건 ${int(item.heldAmount ?? 0)}원`}
                   {item.lastCheck &&
-                    ` · 마지막 확인 ${item.lastCheck.checkedAt?.slice(0, 10)} ${item.lastCheck.result === 'CLOSED' ? '종결' : '후속 확인'}${
+                    ` · 마지막 확인 ${date(item.lastCheck.checkedAt)} ${item.lastCheck.result === 'CLOSED' ? '종결' : '후속 확인'}${
                       item.lastCheck.nextCheckDate ? ` (다음 ${item.lastCheck.nextCheckDate})` : ''
                     }`}
                 </span>
