@@ -1,0 +1,25 @@
+name: Monitoring integration
+on:
+  pull_request:
+    paths: ['infra/monitoring/**', '.github/workflows/monitoring.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  monitoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Start isolated monitoring and synthetic service
+        run: docker compose -p fgc-monitoring-674-test -f infra/monitoring/compose.yaml -f infra/monitoring/smoke/compose.yaml up -d --quiet-pull
+      - name: Validate rules and real notification delivery
+        run: |
+          docker compose -p fgc-monitoring-674-test -f infra/monitoring/compose.yaml -f infra/monitoring/smoke/compose.yaml exec -T prometheus promtool check config /etc/prometheus/prometheus.yml
+          python3 infra/monitoring/smoke/check.py
+      - name: Diagnostics
+        if: failure()
+        run: docker compose -p fgc-monitoring-674-test -f infra/monitoring/compose.yaml -f infra/monitoring/smoke/compose.yaml logs --tail=100
+      - name: Remove test containers and test-only volumes
+        if: always()
+        run: docker compose -p fgc-monitoring-674-test -f infra/monitoring/compose.yaml -f infra/monitoring/smoke/compose.yaml down -v
