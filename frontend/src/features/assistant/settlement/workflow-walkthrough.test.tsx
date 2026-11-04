@@ -46,6 +46,24 @@ it('blocks missing or duplicate targets and restores the same explanation after 
   await waitFor(() => expect(result.current.target).not.toBeNull())
   expect(result.current.index).toBe(0)
 })
+it('allows an empty optional cycle premium without writing a value', async () => {
+  const steps = workflowWalkthrough('contract.create', '/contracts/new', false)
+  document.querySelector('main')!.innerHTML = steps.slice(0, 10).map(step => `<input name="${step.id}" value="${step.id === 'premiumPerCycleAmount' ? '' : '1'}">`).join('')
+  const input = document.querySelector<HTMLInputElement>('[name="premiumPerCycleAmount"]')!
+  const changed = vi.fn()
+  input.addEventListener('input', changed)
+  const { result } = renderHook(() => useWorkflowWalkthrough('contract.create', '/contracts/new', false))
+  for (let index = 0; index < 6; index++) {
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    act(() => result.current.next())
+  }
+  await waitFor(() => expect(result.current.step?.id).toBe('premiumPerCycleAmount'))
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  act(() => result.current.next())
+  expect(result.current.step?.id).toBe('firstPremiumAmount')
+  expect(input.value).toBe('')
+  expect(changed).not.toHaveBeenCalled()
+})
 it('uses a separate correction handoff even when the resolved exception disappeared', () => {
   const steps = workflowWalkthrough('exception.resolve', '/exceptions', true, true)
   expect(steps).toHaveLength(1)

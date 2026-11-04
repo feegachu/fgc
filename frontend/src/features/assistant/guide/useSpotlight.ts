@@ -68,10 +68,30 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         }
         measuredTarget = rect
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
-        const cardHeight = card.current?.offsetHeight || Math.min(460, height / 2)
-        // A fixed card cannot be scrolled into view by the browser. Keep its controls
-        // reachable even when the page cannot scroll enough to fit below the target.
-        const cardTop = rect ? Math.max(headerBottom + 8, Math.min(rect.bottom + 24, height - cardHeight - 12)) : null
+        const naturalHeight = Math.max(card.current?.offsetHeight || 0, card.current?.scrollHeight || 0)
+        const cardHeight = Math.min(naturalHeight || 460, 460, height / 2)
+        const topBoundary = headerBottom + 8
+        let cardLeft = rect ? Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)) : 0
+        let cardTop = rect ? rect.bottom + 24 : 0
+        let maxHeight = Math.min(460, height / 2)
+        if (rect && cardTop + cardHeight > height - 12) {
+          if (rect.top - 24 - cardHeight >= topBoundary) {
+            cardTop = rect.top - 24 - cardHeight
+          } else if (rect.right + 24 + cardWidth <= workspaceRight - 12) {
+            cardLeft = rect.right + 24
+            cardTop = Math.max(topBoundary, Math.min(rect.top, height - cardHeight - 12))
+          } else if (rect.left - 24 - cardWidth >= cardLeftBoundary + 12) {
+            cardLeft = rect.left - 24 - cardWidth
+            cardTop = Math.max(topBoundary, Math.min(rect.top, height - cardHeight - 12))
+          } else {
+            // Keep the target uncovered even when neither side fits a full card.
+            // The card scrolls internally in the larger free vertical slot.
+            const below = Math.max(0, height - 12 - rect.bottom - 24)
+            const above = Math.max(0, rect.top - 24 - topBoundary)
+            maxHeight = Math.min(maxHeight, Math.max(below, above))
+            cardTop = above > below ? topBoundary : rect.bottom + 24
+          }
+        }
         const box = rect ? {
           left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
           top: Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
@@ -81,8 +101,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         setPosition({
           box: box?.width && box.height ? box : null,
           card: rect ? {
-            left: Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)),
-            top: cardTop!,
+            left: cardLeft, top: cardTop, maxHeight, overflowY: 'auto',
             right: 'auto', bottom: 'auto', width: cardWidth,
           } : { left: 'auto', top: 'auto', right: 16, bottom: 16, width: cardWidth },
         })

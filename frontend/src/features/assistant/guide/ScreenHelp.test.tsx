@@ -8,6 +8,7 @@ import { MemoryRouter, useSearchParams } from 'react-router'
 import { ScreenHelp } from './ScreenHelp'
 import { FilterBar } from '../../../components/FilterBar'
 import definitions from './screen-help.json'
+import guideMascot from '../assets/pico-guide.png'
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ x: 10, y: 10, width: 100, height: 40 }] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
@@ -21,6 +22,7 @@ it('strict-mode help only explains, preserves input and restores focus on Escape
     <button data-guide-target="contract.new" onClick={write}>신규 등록</button>
   </main></MemoryRouter></StrictMode>)
   await user.click(screen.getByRole('button', { name: '도움말' }))
+  expect(document.querySelector('.payment-guide-mascot')).toHaveAttribute('src', guideMascot)
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
   await user.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
   expect(write).not.toHaveBeenCalled()

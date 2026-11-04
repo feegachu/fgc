@@ -25,7 +25,7 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
         field('contractNo', '계약번호를 입력하세요', '원천의 계약번호를 입력하고 중복 여부를 확인하세요.'),
         field('agentId', '담당 설계사를 선택하세요', '검색 결과에서 실제 계약 담당 설계사를 선택하세요.'),
         field('paymentCycleCode', '납입주기를 확인하세요', '월납·연납·일시납 등 실제 납입주기를 선택하세요.'),
-        field('premiumPerCycleAmount', '주기 보험료를 확인하세요', '한 납입주기마다 청구하는 실제 보험료를 입력하세요.'),
+        step('premiumPerCycleAmount', '[name="premiumPerCycleAmount"]', '주기 보험료를 확인하세요', '직접 입력하거나 비워 두세요. 비워 두면 월납환산 보험료와 납입주기로 자동 계산합니다.'),
         field('firstPremiumAmount', '초회 보험료를 입력하세요', '계약의 최초 납입 보험료를 입력하세요.'),
         field('monthlyEquivalentFirstPremium', '월납환산 보험료를 확인하세요', '초년도 한도의 기준 금액입니다. 실제 원천 기준으로 확인하세요.'),
         field('paymentTermMonths', '납입기간을 확인하세요', '상품 기준 납입기간을 개월 단위로 확인하세요. 자동 채워진 값도 확인합니다.'),

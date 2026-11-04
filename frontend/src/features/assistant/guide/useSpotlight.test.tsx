@@ -60,7 +60,8 @@ it('keeps the whole card in the viewport when page scrolling cannot expose it, i
     act(() => { vi.advanceTimersByTime(20) })
     const card = screen.getByRole('region', { name: 'Guide card' })
     expect(window.scrollBy).toHaveBeenCalledWith({ top: 180, behavior: 'instant' })
-    expect(card).toHaveStyle({ top: '480px', bottom: 'auto', right: 'auto', left: '270px', width: '360px' })
+    expect(card).toHaveStyle({ top: '68px', bottom: 'auto', right: 'auto', left: '270px', width: '360px' })
+    expect(Number.parseFloat(card.style.top) + card.offsetHeight).toBeLessThanOrEqual(320 - 10)
     expect(Number.parseFloat(card.style.top) + card.offsetHeight).toBeLessThanOrEqual(window.innerHeight - 12)
     const stable = card.getAttribute('style')
     for (let index = 0; index < 5; index++) {
@@ -72,6 +73,33 @@ it('keeps the whole card in the viewport when page scrolling cannot expose it, i
     vi.mocked(window.scrollBy).mockClear()
     act(() => { window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(40) })
     expect(window.scrollBy).not.toHaveBeenCalled()
+  } finally { target.remove() }
+})
+
+it.each([
+  { left: 100, top: 560, width: 100, height: 40, cardLeft: 100, cardTop: 236, maxHeight: 360 },
+  { left: 100, top: 260, width: 200, height: 200, cardLeft: 324, cardTop: 260, maxHeight: 360 },
+  { left: 980, top: 260, width: 200, height: 200, cardLeft: 596, cardTop: 260, maxHeight: 360 },
+  { left: 100, top: 200, width: 1100, height: 300, cardLeft: 100, cardTop: 524, maxHeight: 184 },
+])('keeps the highlighted target clear in a constrained viewport ($left, $top, $width)', (fixture) => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(300)
+  const target = document.createElement('button')
+  document.body.append(target)
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(fixture.left, fixture.top, fixture.width, fixture.height))
+  try {
+    render(<Card target={target} />)
+    act(() => { vi.advanceTimersByTime(80) })
+    const card = screen.getByRole('region', { name: 'Guide card' })
+    expect(card).toHaveStyle({ left: `${fixture.cardLeft}px`, top: `${fixture.cardTop}px`, maxHeight: `${fixture.maxHeight}px`, overflowY: 'auto' })
+    const box = JSON.parse(card.dataset.box!)
+    const bottom = fixture.cardTop + Math.min(300, fixture.maxHeight)
+    expect(bottom).toBeLessThanOrEqual(708)
+    expect(fixture.cardLeft + 360 <= box.left || fixture.cardLeft >= box.left + box.width || bottom <= box.top || fixture.cardTop >= box.top + box.height).toBe(true)
   } finally { target.remove() }
 })
 

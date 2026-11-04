@@ -8,6 +8,7 @@ import { GuideTargets } from './targets'
 import { useSpotlight } from './useSpotlight'
 import type { GuideDefinition } from './types'
 import definitions from './screen-help.json'
+import guideMascot from '../assets/pico-guide.png'
 import type { SaveGuide } from './save-guide'
 const noSave = { valid: false, pending: false, savedId: null, error: '' }
 const noSubscribe = () => () => {}
@@ -170,7 +171,7 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
       {!folded && position.box && !paused && !complete && <div className="payment-guide-spotlight" aria-hidden="true" style={position.box} />}
       <section ref={card} className="payment-guide-card" aria-label={`${definition.title} 도움말`} data-guide-anchored={Boolean(snapshot.target && !modal)} style={position.card}>
         <header className="payment-guide-header">
-          <img className="payment-guide-mascot" src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`} width="40" height="40" alt="" />
+          <img className="payment-guide-mascot" src={guideMascot} width="40" height="40" alt="" />
           <span>{saveGuide ? `${action} 가이드` : '화면 사용법'} · {Math.max(1, index + 1)}/{definition.steps.length}</span>
           <Button variant="ghost" onClick={() => setFolded(!folded)}>{folded ? '펼치기' : '접기'}</Button>
           <Button variant="ghost" onClick={close}>종료</Button>
