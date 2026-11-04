@@ -80,10 +80,21 @@ function scan(text: string, role: string, route: string, findings: Finding[]) {
   }
 }
 
+const inFlight = new WeakMap<Page, Set<unknown>>()
+function trackRequests(page: Page) {
+  const requests = new Set<unknown>()
+  inFlight.set(page, requests)
+  page.on('request', (request) => requests.add(request))
+  page.on('requestfinished', (request) => requests.delete(request))
+  page.on('requestfailed', (request) => requests.delete(request))
+}
+/** 화면 안에서 탭이나 행을 바꾸면 networkidle이 다시 오지 않아 진행 중 요청을 직접 센다. */
 async function settle(page: Page) {
-  await page.waitForLoadState('networkidle')
-  await page.waitForTimeout(150)
-  await page.waitForLoadState('networkidle')
+  await page.waitForLoadState('load')
+  for (let quiet = 0, waited = 0; quiet < 3 && waited < 100; waited++) {
+    await page.waitForTimeout(100)
+    quiet = inFlight.get(page)?.size ? 0 : quiet + 1
+  }
 }
 
 /** 눈에 보이는 글자 전부: 접힌 영역을 펼치고, 글자로 보이지 않는 아이콘 글꼴 이름은 뺀다. */
@@ -109,25 +120,24 @@ async function dump(page: Page, role: string, route: string, step: string) {
   await page.screenshot({ path: `${name}.png`, fullPage: true }).catch(() => undefined)
 }
 
+/** 글자를 읽는 시험이라 떠 있는 안내나 열린 창에 가려져도 누른다. */
+const press = (control: Locator) => control.evaluate((element: HTMLElement) => element.click())
+
 /** 첫 행의 상세를 연다. 첫 칸 버튼이나 행 클릭으로 선택하고, 행 안의 보기 버튼까지 누른다. */
 async function openFirstRow(page: Page, check: () => Promise<void>) {
-  const row = page.locator('main table tbody tr:not(:has(td.table-empty))').first()
-  if (!(await row.count())) return
-  const opener = row.locator('button.table-row-link').first()
-  if (await opener.count()) await opener.click()
+  const firstRow = () => page.locator('main table tbody tr:not(:has(td.table-empty))').first()
+  if (!(await firstRow().count())) return
+  const opener = firstRow().locator('button.table-row-link').first()
+  if (await opener.count()) await press(opener)
   else
-    await row.evaluate((tr: HTMLTableRowElement) => {
+    await firstRow().evaluate((tr: HTMLTableRowElement) => {
       ;[...tr.cells].find((cell) => !cell.querySelector('a, button, input, select, summary'))?.click()
     })
   await settle(page)
   await check()
-  const viewButton: Locator = page
-    .locator('main table tbody tr:not(:has(td.table-empty))')
-    .first()
-    .getByRole('button', { name: /보기|열기/ })
-    .first()
+  const viewButton = firstRow().getByRole('button', { name: /보기|열기/ }).first()
   if (await viewButton.count()) {
-    await viewButton.click()
+    await press(viewButton)
     await settle(page)
     await check()
     await page.keyboard.press('Escape')
@@ -144,6 +154,7 @@ async function walkRole(
 ) {
   const context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 1000 } })
   const page = await context.newPage()
+  trackRequests(page)
   let current: Visit | null = null
   const sizes: Promise<unknown>[] = []
   page.on('console', (message) => {
@@ -233,7 +244,7 @@ async function walkRole(
     await check()
     const clickTabs = async () => {
       for (const tab of await page.locator('main [role=tab]').all()) {
-        await tab.click()
+        await press(tab)
         await settle(page)
         await check()
       }
@@ -254,12 +265,12 @@ async function walkRole(
     begin(`${home} (${String(name).replace(/[/^]/g, '')})`)
     await page.goto(`${home.slice(1)}?month=${month}`)
     await settle(page)
-    await page.getByRole('button', { name }).click()
+    await press(page.getByRole('button', { name }).first())
     await settle(page)
     scan(await visibleText(page), role, current!.route, findings)
     await dump(page, role, current!.route, 'overlay')
     for (const tab of await page.locator('[role=dialog] [role=tab]').all()) {
-      await tab.click()
+      await press(tab)
       await settle(page)
       scan(await visibleText(page), role, current!.route, findings)
       await dump(page, role, current!.route, 'overlay-tab')
@@ -303,6 +314,7 @@ test('실사용자 화면에 개발 용어와 코드가 보이지 않고 콘솔 
   const findings: Finding[] = []
   const visits: Visit[] = []
 
+  trackRequests(page)
   await page.goto('login')
   await settle(page)
   scan(await visibleText(page), '로그인 전', '/login', findings)
@@ -342,22 +354,26 @@ test('실사용자 화면에 개발 용어와 코드가 보이지 않고 콘솔 
   ]
 
   const missing: string[] = []
-  for (const account of accounts) missing.push(...(await walkRole(browser, baseURL!, account, states, findings, visits)))
-
-  const report = findings.map((found) => `${found.role} | ${found.route} | ${found.label} | ${found.match} | ${found.context}`)
-  const consoleErrors = visits.flatMap((visit) => visit.consoleErrors.map((text) => `${visit.role} | ${visit.route} | ${text}`))
-  const oversized = visits.filter((visit) => (visit.largestApi?.bytes ?? 0) > 1024 * 1024)
-  for (const visit of oversized)
-    testInfo.annotations.push({ type: 'API 응답 1MB 초과', description: `${visit.route} ${visit.largestApi?.url} ${kb(visit.largestApi?.bytes ?? 0)}KB` })
-  await testInfo.attach('화면 언어 일치 목록', { body: JSON.stringify(findings, null, 2), contentType: 'application/json' })
-  await testInfo.attach('라우트별 전송량', { body: transferTable(visits), contentType: 'text/markdown' })
-  mkdirSync('e2e-artifacts', { recursive: true })
-  writeFileSync('e2e-artifacts/screen-language-findings.json', JSON.stringify(findings, null, 2))
-  writeFileSync('e2e-artifacts/screen-language-visits.json', JSON.stringify(visits, null, 2))
-  writeFileSync('e2e-artifacts/screen-language-transfer.md', transferTable(visits))
+  try {
+    for (const account of accounts) missing.push(...(await walkRole(browser, baseURL!, account, states, findings, visits)))
+  } finally {
+    for (const visit of visits.filter((item) => (item.largestApi?.bytes ?? 0) > 1024 * 1024))
+      testInfo.annotations.push({ type: 'API 응답 1MB 초과', description: `${visit.route} ${visit.largestApi?.url} ${kb(visit.largestApi?.bytes ?? 0)}KB` })
+    await testInfo.attach('화면 언어 일치 목록', { body: JSON.stringify(findings, null, 2), contentType: 'application/json' })
+    await testInfo.attach('라우트별 전송량', { body: transferTable(visits), contentType: 'text/markdown' })
+    mkdirSync('e2e-artifacts', { recursive: true })
+    writeFileSync('e2e-artifacts/screen-language-findings.json', JSON.stringify(findings, null, 2))
+    writeFileSync('e2e-artifacts/screen-language-visits.json', JSON.stringify(visits, null, 2))
+    writeFileSync('e2e-artifacts/screen-language-transfer.md', transferTable(visits))
+  }
 
   expect.soft(missing, '역할이 열 수 있는데 돌지 못한 라우트').toEqual([])
   expect.soft(states.map((item) => item.path), '어느 역할도 열지 못한 상태').toEqual([])
-  expect.soft(consoleErrors, '콘솔 오류').toEqual([])
-  expect(report, '화면에 보이는 개발 용어와 코드 (역할 | 라우트 | 종류 | 문자열 | 앞뒤 글)').toEqual([])
+  expect
+    .soft(visits.flatMap((visit) => visit.consoleErrors.map((text) => `${visit.role} | ${visit.route} | ${text}`)), '콘솔 오류')
+    .toEqual([])
+  expect(
+    findings.map((found) => `${found.role} | ${found.route} | ${found.label} | ${found.match} | ${found.context}`),
+    '화면에 보이는 개발 용어와 코드 (역할 | 라우트 | 종류 | 문자열 | 앞뒤 글)',
+  ).toEqual([])
 })

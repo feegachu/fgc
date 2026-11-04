@@ -1735,7 +1735,7 @@ FGC — 설계사
 | 실행 상태            | `validation_run.status`                        | `CREATED`·`RUNNING`·`COMPLETED`·`FAILED`·`FINALIZED` **5개** |
 | **진행 단계 (1~10)** | **`validation_run.current_step`**              | ★ 아래 설명                                                  |
 | 진행률 %             | `current_step / 10 × 100`                      | 화면에서 계산                                                |
-| 실패 단계            | `status='FAILED'` 일 때의 `current_step`       | 실패 사유는 `failure_message`                                |
+| 실패 단계            | `status='FAILED'` 일 때의 `current_step`       | 실패 사유는 `failure_message`. 사용자 문장만 저장하고 예외 원문은 요청번호로 서버 로그에서 찾는다(공통규칙 10, SRC-074) |
 | 단계 이름            | **DB 아님 — 화면 상수**                        | `화면_MVP/assets/fgc-seed.js` 의 `validationSteps`           |
 | 실행자 · 시작 · 완료 | `triggered_by` · `started_at` · `completed_at` |                                                              |
 | 확정자 · 확정시각    | `finalized_by` · `finalized_at`                |                                                              |
