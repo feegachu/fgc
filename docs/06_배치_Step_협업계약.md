@@ -35,9 +35,10 @@
 - Step 1 성공 직후 `validation_run`은 `CREATED → RUNNING`, `current_step = 1`로 전이한다.
 - Step 2~8이 성공하면 `current_step`을 해당 업무 단계로 갱신한다. Step 6a·6b는 모두 `current_step = 6`을 사용한다(`ValidationRunStepProgressListener`).
 - Step 실패는 실패 단계와 사유를 `validation_run`에 기록한다. 진행상황 기록 중 예외가 나면 Step·Job을 FAILED로 올린다.
-- 자동 반복 재시작은 제공하지 않는다. `FAILED` 월 실행은 IF-API-48과 React 재시작 버튼으로 같은 JobInstance의 실패 Step부터 수동 재개한다(#672, FUN-045). 완료 Step과 저장된 ExecutionContext는 유지한다. `MANUAL_CONTRACT` 실패를 월 배치로 재개하지 않는다.
+- 자동 반복 재시작은 제공하지 않는다. `FAILED` 월 실행은 IF-API-82와 VRUN-W02 재시작 창으로 같은 JobInstance의 실패 Step부터 수동 재개한다(#672, #844, FUN-045). `/execute`는 `CREATED`만 받는다. 완료 Step과 저장된 ExecutionContext는 유지한다. `MANUAL_CONTRACT` 실패를 월 배치로 재개하지 않는다.
 - 재시작의 조건부 `FAILED → RUNNING` 점유와 `VALIDATION_RUN_RETRIED` 감사 저장은 한 트랜잭션이다. 실패 단계·최초 시작 시각은 유지하고 실패 메시지는 초기화한다. 최초 실행의 식별 파라미터는 보존하며, 새 요청 ID는 비식별 `restartRequestId`로 전달한다. 메타데이터가 없거나 여러 JobInstance로 모호하면 요청을 거절한다.
 - 요청 당시 실패 실행의 ID를 비식별 `restartFromExecutionId`로 보존한다. 대기열 실행 직전에 최신 실패 ID를 재확인하고, DB의 실행별 advisory lock 안에서 같은 실패의 재시작 점유 감사가 이미 있는지도 검사한다. 이 감사의 `after_value.restartFromExecutionId`는 재실패 후에도 남으므로 오래된 대기 요청이 자동으로 또 재시작하지 못한다. 새 실패를 확인한 사용자의 새 요청만 다음 ID로 재개할 수 있다.
+- 재시작 접수는 `validation_run_retry`(V80)에 남는다: `ACCEPTED` → `LAUNCHING` → `RUNNING` → `SUCCEEDED` 또는 `FAILED`. 기동되지 않은 접수는 5분 뒤 `LAUNCH_TIMEOUT`으로 닫는다. 프로세스 중단으로 남은 `LAUNCHING`, `RUNNING`은 자동으로 닫지 않는다(운영 Runbook 6-3절).
 - 진행률 수치는 기존 `current_step / 10`을 유지한다. IF-API-49의 추가 추적 필드 `attemptId`·`requestId`는 감사 이력에서 읽는다. 동일 스냅샷으로 상태와 시도를 조회하고, 화면은 수락 이전 시도 번호의 FAILED 응답을 새 실패로 오인하지 않는다. 다른 탭이 먼저 재시작한 경우에도 새 시도를 따라간다.
 - 시작·완료·실패 감사 로그의 `user_id`는 `triggeredBy`, `request_id`는 신규 실행의 JobParameter `requestId`, 재시작은 비식별 `restartRequestId`다(`ValidationRunBatchAuditServiceImpl`). 최초 식별 파라미터를 바꾸지 않고 새 시도의 요청을 추적한다.
 
@@ -45,6 +46,6 @@
 
 이 절은 2차 계획과 현재 검증 상태를 구분한다. 구현한 항목은 위 표에 반영하되, 검증·리뷰 완료 전에는 인수 완료로 표시하지 않는다.
 
-- **FUN-045 실패 지점 재시작**: #672 / PR #688에서 구현했으며 인수·리뷰 대기다. 전용 일회성 DB의 실제 원장 INSERT 30건 중 25번째 실패 후 동일 인스턴스 재개, 최종 원장 30건·라인 60건·중복 0을 검증한다. 상태·감사 롤백, 동시 점유, 재실패 뒤 낡은 요청 차단, 워터마크 보존도 PostgreSQL 테스트로 확인한다. 실제 실행 결과는 PR의 HEAD별 CI·로컬 증빙을 기준으로 하며 사람 리뷰와 남은 DoD 없이 완료 처리하지 않는다.
+- **FUN-045 실패 지점 재시작**: PR #688과 #844로 구현했고 #672는 닫혔다. 경로는 IF-API-82, 이력은 `validation_run_retry`(V80)다. 전용 일회성 DB의 실제 원장 INSERT 30건 중 25번째 실패 후 동일 인스턴스 재개, 최종 원장 30건·라인 60건·중복 0을 `MonthlyJournalRestartIntegrationTest`로 검증한다. 상태·감사 롤백, 동시 점유, 재실패 뒤 낡은 요청 차단, 워터마크 보존도 PostgreSQL 테스트로 확인한다.
 - **FUN-062·064 계약체결비용·유지관리 검증**: `acquisition_cost_check`·`maintenance_check`를 채우는 Step을 추가한다(테이블은 있음). 추가할 때 `current_step` 번호 체계(0~10)와 확정 체크리스트(운영정책서 제44조)를 함께 갱신한다.
 - **FUN-068 보험사 원천 명세(AI 문서 입력분)**: 새 Step이 아니다. 적재된 `INSURER_STATEMENT` 원천은 Step 6a·7이 기존 조건(`INSURER_COMMISSION`·`PAYMENT`·`CONFIRMED`·`CONTRACT` 귀속)으로 읽는다. 차감·조정·환수 명세는 이 Job의 기표·대사 대상이 아니다(운영정책서 제55조).
