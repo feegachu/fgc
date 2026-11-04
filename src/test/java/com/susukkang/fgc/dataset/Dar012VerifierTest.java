@@ -1,11 +1,13 @@
 package com.susukkang.fgc.dataset;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Dar012VerifierTest {
 
@@ -22,6 +24,18 @@ class Dar012VerifierTest {
     void missingStatementNeedsAnActualMissingRow() {
         assertThat(Dar012Verifier.judgeReconciliation("RECON_MISSING_STATEMENT", List.of("MATCHED", "ACTUAL_MISSING"))).isTrue();
         assertThat(Dar012Verifier.judgeReconciliation("RECON_MISSING_STATEMENT", List.of("MATCHED"))).isFalse();
+    }
+
+    @Test
+    void internalRoleContextExistsOnlyInsideTheQueryAndIsClearedAfterAFailure() {
+        assertThat(Dar012Verifier.asInternalRole(() -> SecurityContextHolder.getContext().getAuthentication().getAuthorities().toString()))
+                .isEqualTo("[ROLE_SETTLEMENT]");
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+
+        assertThatThrownBy(() -> Dar012Verifier.asInternalRole(() -> {
+            throw new IllegalStateException("조회 실패");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
     @Test

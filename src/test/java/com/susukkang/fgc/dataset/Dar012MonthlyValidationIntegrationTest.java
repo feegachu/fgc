@@ -14,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -88,5 +89,11 @@ class Dar012MonthlyValidationIntegrationTest {
         assertThat(clawback.paidAmount()).isEqualByComparingTo(planted);
         assertThat(clawback.estimatedAmount()).as(clawback.reasons().toString()).isPositive();
         assertThat(clawback.reasons()).isEmpty();
+
+        // Dar012Runner가 이어서 부르는 조회도 같은 경로로 통과하고, 내부 역할 문맥이 다른 시험으로 새지 않는다.
+        assertThat(verifier.checkContractDetailSample(batch.validationRunId()))
+                .allSatisfy(s -> assertThat(s.matched()).as(s.name() + " " + s.paymentStage()).isEqualTo(s.sampled()));
+        assertThat(verifier.measureQueries(MONTH, batch.validationRunId(), 1)).hasSize(4);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 }

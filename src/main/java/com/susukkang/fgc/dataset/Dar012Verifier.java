@@ -7,6 +7,7 @@ import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ValidationRunType;
+import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.service.ContractService;
 import com.susukkang.fgc.dashboard.service.DashboardService;
@@ -20,6 +21,10 @@ import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -205,7 +210,7 @@ public class Dar012Verifier {
                     status == CapResultStatus.VIOLATION ? r.getViolationCount() : r.getWarningCount()).sum();
             ContractSearchCondition condition = new ContractSearchCondition();
             condition.setCapResultStatus(List.of(status));
-            long list = contractService.selectByCondition(condition, 1, 1).totalElements();
+            long list = asInternalRole(() -> contractService.selectByCondition(condition, 1, 1)).totalElements();
             long sourceChecks = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM cap_check WHERE validation_run_id = ? AND result_status = ?", Long.class,
                     validationRunId, status.name());
@@ -249,11 +254,27 @@ public class Dar012Verifier {
         List<QueryTiming> timings = new ArrayList<>();
         timings.add(time("dashboard-summary", repeats, () -> dashboardService.summarize(month)));
         ContractSearchCondition all = new ContractSearchCondition();
-        timings.add(time("contract-list", repeats, () -> contractService.selectByCondition(all, 1, 20)));
+        timings.add(time("contract-list", repeats, () -> asInternalRole(() -> contractService.selectByCondition(all, 1, 20))));
         Long contractId = jdbc.queryForObject("SELECT MAX(contract_id) FROM insurance_contract", Long.class);
-        timings.add(time("contract-detail", repeats, () -> contractService.selectContractDetailById(contractId)));
+        timings.add(time("contract-detail", repeats, () -> asInternalRole(() -> contractService.selectContractDetailById(contractId))));
         timings.add(time("agent-cap-subtotal", repeats, () -> validationRunRepository.summarizeCapByAgent(validationRunId)));
         return timings;
+    }
+
+    /**
+     * 계약 조회는 인증 문맥이 없으면 거절한다(AgentDataScopeService, FUN-085). 이 도구는 CLI에서 돌아 문맥이 없으므로
+     * 그 호출 구간에만 내부 역할 문맥을 세워 화면과 같은 범위 검사를 거치고, 끝나면 지운다.
+     */
+    static <T> T asInternalRole(Supplier<T> query) {
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated("dar012-verifier", null,
+                AuthorityUtils.createAuthorityList("ROLE_" + Roles.SETTLEMENT)));
+        SecurityContextHolder.setContext(context);
+        try {
+            return query.get();
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     private QueryTiming time(String name, int repeats, Supplier<?> call) {
