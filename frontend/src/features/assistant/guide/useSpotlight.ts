@@ -10,6 +10,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     let frame = 0
     let placementFrame = 0
     let preparedWidth: number | null = null
+    let measuredTarget: DOMRect | null = null
     const alignTarget = () => {
       if (!target?.isConnected) return
       target.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
@@ -42,10 +43,17 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const workspaceRight = Math.min(width, workspace?.right || width)
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
         const cardWidth = Math.min(360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+        let rect = target?.isConnected ? target.getBoundingClientRect() : null
+        // A resize can push the coach offscreen. A position-only change can be user scroll.
+        if (!resize && rect && measuredTarget
+          && (rect.width !== measuredTarget.width || rect.height !== measuredTarget.height)) {
+          preparedWidth = null
+        }
         if (target?.isConnected && preparedWidth !== workspaceRight - workspaceLeft) {
           preparedWidth = workspaceRight - workspaceLeft
           // Leave room below the real target for the coach, including at the end of a page.
           alignTarget()
+          rect = target.getBoundingClientRect()
           // The anchored card adds page scroll room in this render. Re-align once after
           // its layout commits; browser scroll anchoring can otherwise undo the first move.
           cancelAnimationFrame(placementFrame)
@@ -56,7 +64,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
             }
           })
         }
-        const rect = target?.isConnected ? target.getBoundingClientRect() : null
+        measuredTarget = rect
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
         const box = rect ? {
           left: Math.max(workspaceLeft, rect.left - 8),
@@ -74,16 +82,24 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         })
       })
     }
-    const resize = new ResizeObserver(() => {
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
       // A result panel can move the target without resizing the target itself.
       // Re-align on layout changes, while ordinary user scroll only updates the attachment.
       preparedWidth = null
       measure()
     })
-    if (target) resize.observe(target)
-    if (card.current) resize.observe(card.current)
+    if (target) resize?.observe(target)
+    if (card.current) resize?.observe(card.current)
     const workspace = document.getElementById('main-content')
-    if (workspace) resize.observe(workspace)
+    if (workspace) resize?.observe(workspace)
+    // A split pane can move or resize the target without a viewport event.
+    const layoutPoll = !resize && target ? window.setInterval(() => {
+      const rect = target.isConnected ? target.getBoundingClientRect() : null
+      if (rect?.left !== measuredTarget?.left || rect?.top !== measuredTarget?.top
+        || rect?.width !== measuredTarget?.width || rect?.height !== measuredTarget?.height) {
+        measure()
+      }
+    }, 100) : undefined
     window.addEventListener('scroll', measure, true)
     window.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('resize', measure)
@@ -91,7 +107,8 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     return () => {
       cancelAnimationFrame(frame)
       cancelAnimationFrame(placementFrame)
-      resize.disconnect()
+      resize?.disconnect()
+      window.clearInterval(layoutPoll)
       window.removeEventListener('scroll', measure, true)
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
