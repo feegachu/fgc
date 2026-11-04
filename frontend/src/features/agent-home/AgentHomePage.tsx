@@ -243,7 +243,7 @@ function Snapshot({
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="신규 계약 건수">
           <KpiCardContent
             label="신규 계약 건수"
-            value={int(now.count)}
+            value={now.count}
             zero={now.count === 0}
             unit="건"
             footer={
@@ -263,7 +263,7 @@ function Snapshot({
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="월납환산 초회보험료">
           <KpiCardContent
             label="월납환산 초회보험료"
-            value={int(now.premium)}
+            value={now.premium}
             zero={now.premium === 0}
             unit="원"
             footer={<Delta now={now.premium} before={before.premium} />}
@@ -277,7 +277,7 @@ function Snapshot({
         >
           <KpiCardContent
             label="수령 예정 수수료"
-            value={int(expected)}
+            value={expected}
             zero={expected === 0}
             unit="원"
             footer={
@@ -311,7 +311,7 @@ function Snapshot({
           >
             <KpiCardContent
               label="확인 필요 계약"
-              value={needReady ? int(need) : '…'}
+              value={needReady ? need : '…'}
               zero={needReady && need === 0}
               unit="건"
               footer={
