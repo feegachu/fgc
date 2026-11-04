@@ -144,8 +144,9 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().error().params()).doesNotContainKey("requestId");
     }
 
+    /** SRC-074: 내부 번호는 문구에서 빼고 params 에만 남긴다. 치환 안 된 {id} 노출(#259)도 없다. */
     @Test
-    void notFoundMessageResolvesIdPlaceholderWhenProvided() {
+    void notFoundMessageKeepsIdInParamsWithoutShowingIt() {
         ResponseEntity<ApiResponse<Void>> response = handler()
                 .handleBusinessException(new FgcBusinessException(
                         FgcErrorCode.COMMON_004,
@@ -153,8 +154,9 @@ class GlobalExceptionHandlerTest {
                 ));
 
         String message = response.getBody().error().message();
-        assertThat(message).doesNotContain("{id}");
-        assertThat(message).contains("42");
+        assertThat(message).isEqualTo("요청한 자료를 찾을 수 없습니다.");
+        assertThat(message).doesNotContain("{id}").doesNotContain("42");
+        assertThat(response.getBody().error().params()).containsEntry("id", 42L);
     }
 
     @Test

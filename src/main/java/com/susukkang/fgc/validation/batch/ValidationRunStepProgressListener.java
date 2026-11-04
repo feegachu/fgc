@@ -92,7 +92,7 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
                 .map(Throwable::getMessage)
                 .filter(msg -> msg != null && !msg.isBlank())
                 .reduce((a, b) -> a + " | " + b)
-                .orElse("Step " + stepExecution.getStepName() + " 실패 (상세 메시지 없음)");
+                .orElse(stepNo + "단계에서 실패했습니다.");
         return joined.length() > 2000 ? joined.substring(0, 2000) : joined;
     }
 }

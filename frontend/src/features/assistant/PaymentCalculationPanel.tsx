@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '../../lib/api/client'
 import { dateTimeSeconds, rateText } from '../../lib/format'
 import type { components } from '../../lib/api/schema'
+import { paymentStatusLabels } from '../contract/labels'
 import { isWonAmount } from './guards'
 import type { PaymentObservation } from './guide-runtime'
 import './payment-calculation.css'
@@ -11,7 +12,7 @@ type Kind = 'ATTRIBUTION_BALANCE' | 'PAYMENT_CANDIDATE'
 const names: Record<string, string> = {
   amount: '저장된 지급액',
   attributedTotal: '귀속 합계',
-  differenceAmount: '지급액 − 귀속 합계',
+  differenceAmount: '지급액과 귀속 합계의 차이',
   limitAmount: '한도',
   includedAmount: '산입액',
   remainingAmount: '잔여 한도',
@@ -80,15 +81,15 @@ export function PaymentCalculationPanel({
       setResult(data)
     } catch {
       if (!controller.signal.aborted && current === sequence.current)
-        setError('계산 결과를 조회하지 못했어요. 현재 지급 건과 서버 연결·권한을 확인하고 다시 조회하세요.')
+        setError('계산 결과를 조회하지 못했어요. 현재 지급 건과 권한을 확인하고 다시 조회하세요.')
     } finally {
       if (!controller.signal.aborted && current === sequence.current) setBusy(false)
     }
   }
   return (
     <details className="payment-calculation" open>
-      <summary>현재 지급 건 계산 조회 {observation.paymentId ? `#${observation.paymentId}` : ''}</summary>
-      <p>저장된 자료를 서버 계산기로 조회합니다. 시연 질문과 별개이며 자동 입력·확정하지 않아요.</p>
+      <summary>현재 지급 건 계산 조회 {observation.paymentId ? `(지급 번호 ${observation.paymentId})` : ''}</summary>
+      <p>저장된 자료로 계산합니다. 자동 입력이나 확정은 하지 않아요.</p>
       {!observation.saved && (
         <p role="status">현재 입력을 먼저 저장하세요. 이전 저장본의 계산 결과는 표시하지 않습니다.</p>
       )}
@@ -110,18 +111,18 @@ export function PaymentCalculationPanel({
           </button>
         )}
       </div>
-      {busy && <p role="status">서버 계산 결과를 읽고 있어요.</p>}
+      {busy && <p role="status">계산 결과를 불러오고 있어요.</p>}
       {error && <p role="alert">{error}</p>}
       {result && (
-        <section aria-label="서버 계산 조회 결과" aria-live="polite">
+        <section aria-label="계산 조회 결과" aria-live="polite">
           <strong>
             {result.status === 'CALCULATED'
               ? '계산 조회 완료'
               : result.status === 'REVIEW_REQUIRED'
-                ? '검토 필요'
-                : '자료·지원 범위 확인'}
+                ? '검토필요'
+                : '자료 확인 필요'}
           </strong>
-          <p>저장 상태: {result.paymentStatus ?? '미확인'} · 지급 완료액과 구분하세요.</p>
+          <p>저장 상태: {paymentStatusLabels[result.paymentStatus ?? ''] ?? '미확인'}. 지급 완료액과 구분하세요.</p>
           <dl>
             {Object.entries(result.amounts ?? {}).sort(([left], [right]) => rank(left) - rank(right)).map(([key, value]) => (
               <div key={key}>
@@ -135,7 +136,7 @@ export function PaymentCalculationPanel({
               <summary>귀속 행별 반올림 근거</summary>
               {result.basis.lines.map((line, index) => (
                 <p key={index}>
-                  귀속 {line.attributionSequence ?? '미확인'} · 계약 #{line.contractId ?? '미확인'} · 기준일{' '}
+                  귀속 {line.attributionSequence ?? '미확인'}, 계약 #{line.contractId ?? '미확인'}, 기준일{' '}
                   {line.attributionDate ?? '미확인'}
                   <br />
                   원천 {line.originalAmount ?? '미제공'}원 → 반올림 {won(line.roundedAmount)}
@@ -144,18 +145,18 @@ export function PaymentCalculationPanel({
             </details>
           )}
           <p>
-            기준일: {result.basis?.asOfDate ?? '행별 기준일 확인'} · 배부 정책 버전:{' '}
-            {result.basis?.policyVersionIds?.join(', ') || '미제공'} · 한도 규칙:{' '}
+            기준일: {result.basis?.asOfDate ?? '행별 기준일 확인'}, 배부 정책 버전:{' '}
+            {result.basis?.policyVersionIds?.join(', ') || '미제공'}, 한도 규칙:{' '}
             {result.basis?.ruleIds?.join(', ') || '미제공'}
           </p>
           {result.capPreview?.map((row, index) => (
             <div className="payment-calculation-cap" key={index}>
               <strong>
-                계약 #{String(row.contractId ?? '미확인')} ·{' '}
+                계약 #{String(row.contractId ?? '미확인')},{' '}
                 {String(row.resultStatusLabel ?? row.resultStatus ?? '미확인')}
               </strong>
               <p>
-                기준일 {String(row.asOfDate ?? '미제공')} · 한도 규칙 #{String(row.capRuleSetId ?? '미제공')}
+                기준일 {String(row.asOfDate ?? '미제공')}, 한도 규칙 #{String(row.capRuleSetId ?? '미제공')}
               </p>
               <dl>
                 {['limitAmount', 'candidateAmount', 'includedAmount', 'remainingAmount'].map((key) => (
@@ -170,8 +171,8 @@ export function PaymentCalculationPanel({
           ))}
           {result.confirmable != null && (
             <p>
-              계산기의 후보 판정: {result.confirmable ? '차단 사유 없음' : '차단 사유 확인'} · 실제 사전검증 완료 증표가
-              아닙니다.
+              계산기의 후보 판정: {result.confirmable ? '차단 사유 없음' : '차단 사유 확인'}. 사전검증을 대신하지
+              않습니다.
             </p>
           )}
           {result.blockers?.map((item, index) => (
@@ -179,14 +180,14 @@ export function PaymentCalculationPanel({
           ))}
           {result.basis?.sourceRefs?.map((source) => (
             <p key={source.sourceId}>
-              근거: {source.title} · #{source.entityId}
-              {source.version ? ` · 갱신 ${dateTimeSeconds(source.version)}` : ''}
+              근거: {source.title}, #{source.entityId}
+              {source.version ? `, 갱신 ${dateTimeSeconds(source.version)}` : ''}
             </p>
           ))}
-          <small>행별 원 단위 HALF_UP 후 합산 · 조회 시각 {dateTimeSeconds(result.calculatedAt)} (KST)</small>
+          <small>줄마다 원 단위로 반올림해 더했습니다. 조회 시각 {dateTimeSeconds(result.calculatedAt)} (한국 시간)</small>
           <p>{result.recommendation?.reason}</p>
           <small>
-            조회 시점의 자료입니다. 추천값 반영·가이드 통과에 사용할 수 없으며, 진행 전 다시 조회해야 합니다.
+            조회 시점의 자료입니다. 추천값 반영이나 가이드 통과에 사용할 수 없으며, 진행 전 다시 조회해야 합니다.
           </small>
         </section>
       )}

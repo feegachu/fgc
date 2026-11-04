@@ -6,6 +6,8 @@ import './resize.css'
 export interface TableColumn<T> {
   key: string
   label: ReactNode
+  /** label이 글자가 아닐 때 열 너비 조절 손잡이에 붙일 이름. */
+  labelText?: string
   render: (row: T) => ReactNode
   width?: string
   cellClassName?: string
@@ -341,7 +343,7 @@ function TableContents<T>({
                 key={column.key}
                 className="column-resize-handle"
                 style={{ left: handle.left, top: handle.top, height: handle.height }}
-                label={`${typeof column.label === 'string' ? column.label : column.key} 열 너비`}
+                label={`${typeof column.label === 'string' ? column.label : (column.labelText ?? column.key)} 열 너비`}
                 value={handle.width}
                 min={minimumWidths[cellIndex] ?? MIN_COLUMN_WIDTH}
                 max={Math.max(MAX_COLUMN_WIDTH, handle.width)}

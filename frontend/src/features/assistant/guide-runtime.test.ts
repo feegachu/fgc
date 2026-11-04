@@ -109,11 +109,11 @@ it('does not accept confirmable without current server token, nor mark confirmed
   runtime().publish({ ...observation, saved: true, precheck: 'REJECTED' })
   runtime().next()
   expect(runtime().session).toMatchObject({ index: 2, status: 'BLOCKED' })
-  expect(runtime().session?.reason).toContain('차단')
+  expect(runtime().session?.reason).toContain('확정이 막혔습니다')
   runtime().publish({ ...observation, saved: true, precheck: 'PASSED_WITHOUT_TOKEN' })
   runtime().next()
   expect(runtime().session).toMatchObject({ index: 2, status: 'BLOCKED' })
-  expect(runtime().session?.reason).toContain('증표')
+  expect(runtime().session?.reason).toContain('확정 버튼으로 직접')
   const session = runtime().session!
   expect(completion({ ...session, index: 4 }, observation).ok).toBe(false)
 })

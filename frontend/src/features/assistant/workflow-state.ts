@@ -7,6 +7,8 @@ export const useWorkflowGuide = create<{
   paymentActive: boolean
   settlementActive: boolean
   guideContext: { workflowId: string; stepId: string } | null
+  chatSequence: number
+  requestChat: () => void
   start: (id: string, stepId?: string) => void
   clear: () => void
 }>((set) => ({
@@ -15,6 +17,8 @@ export const useWorkflowGuide = create<{
   paymentActive: false,
   settlementActive: false,
   guideContext: null,
+  chatSequence: 0,
+  requestChat: () => set((state) => ({ chatSequence: state.chatSequence + 1 })),
   start: (id, stepId) => set((state) => {
     if (state.settlementActive || state.paymentActive) {
       toast('진행 중인 안내를 닫은 뒤 새 업무 안내를 시작해주세요.', 'warning')
