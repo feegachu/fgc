@@ -66,6 +66,8 @@ function TableContents<T>({
   layoutKey,
 }: DataTableProps<T> & { layoutKey: string }) {
   const tableRef = useRef<HTMLTableElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [scrollEdge, setScrollEdge] = useState<'start' | 'middle' | 'end'>()
   const columnCount = columns.length + (onSelectionChange ? 1 : 0)
   const [widths, setWidths] = useState<number[] | null>(() => {
     const saved = readLayout(layoutKey)
@@ -136,6 +138,25 @@ function TableContents<T>({
     }
   }, [resizable, rows, columns])
 
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    // Mark which side of a horizontally overflowing table is hidden. 1px absorbs subpixel rounding.
+    const syncEdge = () => {
+      const hidden = viewport.scrollWidth - viewport.clientWidth
+      const left = viewport.scrollLeft
+      setScrollEdge(hidden <= 1 ? undefined : left <= 1 ? 'start' : left >= hidden - 1 ? 'end' : 'middle')
+    }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncEdge)
+    observer?.observe(viewport)
+    if (tableRef.current) observer?.observe(tableRef.current)
+    viewport.addEventListener('scroll', syncEdge, { passive: true })
+    return () => {
+      observer?.disconnect()
+      viewport.removeEventListener('scroll', syncEdge)
+    }
+  }, [])
+
   function measureWidths(index: number, shrinking = false) {
     // The last column absorbs spare space. Do not persist that extra space when
     // another column is resized, or every drag would unnecessarily widen the table.
@@ -170,7 +191,11 @@ function TableContents<T>({
     )
   }
   return (
-    <div className={`data-table-viewport ${resizable ? 'resizable-table-viewport' : ''} ${viewportClassName}`}>
+    <div
+      ref={viewportRef}
+      data-scroll={scrollEdge}
+      className={`data-table-viewport ${resizable ? 'resizable-table-viewport' : ''} ${viewportClassName}`}
+    >
       <table data-guide-feature="components.data-table.table"
         ref={tableRef}
         className={`data-table ${resizable ? 'data-table-resizable' : ''} ${className}`}
