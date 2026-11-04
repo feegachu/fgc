@@ -94,11 +94,12 @@ class CompareAskServiceTest {
     }
 
     @Test
-    @DisplayName("순수령액·환수 노출액이 모두 같으면 상품 ID 기준이라고 밝히고 모순된 문장을 만들지 않는다")
+    @DisplayName("순수령액·환수 노출액이 모두 같으면 상품 등록 순서라고 밝히고 모순된 문장을 만들지 않는다")
     void fullyTiedItemsAreExplainedByDisplayOrder() {
         String text = CompareAskService.rankAnswer(tiedItems(50_000).items(), "2순위인 이유");
 
-        assertThat(text).contains("표시 순서(상품 ID) 기준").doesNotContain("환수 노출액이 더 작은 쪽");
+        assertThat(text).contains("상품 등록 순서로 순위를 정했어요").doesNotContain("환수 노출액이 더 작은 쪽")
+                .doesNotContain("상품 ID");
     }
 
     @Test

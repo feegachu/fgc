@@ -4,6 +4,11 @@ import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { date } from '../../lib/format'
 import type { Agent, CommissionItem, Insurer, Organization, Product } from './api'
+import { CATEGORY_LABEL } from '../agent-home/model'
+import { SCHEDULE_REGIME } from '../schedule/labels'
+
+/** 판매 채널 코드 표시. FGC는 대면 모집만 쓰고 TM은 과거 자료 표기다(화면정의서 SCHE-W01 체계). */
+export const channelLabels: Record<string, string> = { FACE_TO_FACE: '대면', TM: 'TM' }
 const active = (value?: boolean) => (
   <StatusBadge tone={value ? 'success' : 'neutral'}>{value ? '사용' : '사용중지'}</StatusBadge>
 )
@@ -102,7 +107,7 @@ export const productColumns: TableColumn<Product>[] = [
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.standardProductCode} limit={20} singleLine />,
   },
-  { key: 'group', label: '상품군', render: (r) => present(r.productGroupCode) },
+  { key: 'group', label: '상품군', render: (r) => CATEGORY_LABEL[r.productGroupCode ?? ''] ?? present(r.productGroupCode) },
   {
     key: 'version',
     label: '판매버전',
@@ -132,14 +137,14 @@ export const productColumns: TableColumn<Product>[] = [
   {
     key: 'channel',
     label: '채널',
-    render: (r) => present(r.channelCode),
+    render: (r) => channelLabels[r.channelCode ?? ''] ?? present(r.channelCode),
   },
   {
     key: 'fee',
     label: '수수료체계',
     render: (r) => (
       <CategoryBadge value={r.feeRegimeCode} optionCount={3}>
-        {present(r.feeRegimeCode)}
+        {SCHEDULE_REGIME[r.feeRegimeCode as keyof typeof SCHEDULE_REGIME] ?? present(r.feeRegimeCode)}
       </CategoryBadge>
     ),
   },
