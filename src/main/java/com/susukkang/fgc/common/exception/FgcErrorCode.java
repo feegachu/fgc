@@ -130,6 +130,7 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.validationRun.invalidTransition"
     ),
+    VRUN_008("FGC-VRUN-008", HttpStatus.SERVICE_UNAVAILABLE, "error.validationRun.launchUnavailable"),
     VRUN_005(
             "FGC-VRUN-005",
             HttpStatus.CONFLICT,

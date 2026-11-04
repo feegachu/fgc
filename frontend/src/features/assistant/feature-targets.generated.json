@@ -2815,6 +2815,36 @@
     "element": "Button"
   },
   {
+    "id": "features.validation.validation-restart-panel.button-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-2",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-3",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.section-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.table-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.textarea-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "textarea"
+  },
+  {
     "id": "features.validation.validation-run-detail-page.btn-finalize",
     "file": "features/validation/ValidationRunDetailPage.tsx",
     "element": "Button"

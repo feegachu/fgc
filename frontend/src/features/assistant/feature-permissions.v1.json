@@ -768,6 +768,12 @@
     "features.acquisition-cost.acquisition-cost-result.button": "INTERNAL_READ",
     "features.acquisition-cost.contract-acquisition-cost.select": "INTERNAL_READ",
     "features.acquisition-cost.contract-acquisition-cost.button": "CAN_PROCESS",
-    "features.acquisition-cost.contract-acquisition-cost.link": "INTERNAL_READ"
+    "features.acquisition-cost.contract-acquisition-cost.link": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.section-1": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.table-1": "INTERNAL_READ",
+    "features.validation.validation-restart-panel.button-1": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.button-2": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.button-3": "CAN_PROCESS",
+    "features.validation.validation-restart-panel.textarea-1": "CAN_PROCESS"
   }
 }
