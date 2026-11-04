@@ -54,12 +54,12 @@ for (const width of [320, 375, 768]) {
       return {
         right: summaryBox.right,
         sameColumn: cards.every((card) => Math.abs(card.getBoundingClientRect().left - cards[0].getBoundingClientRect().left) < 1),
-        textFits: cards.every((card) => [...card.querySelectorAll<HTMLElement>('.ast-card-amount, .ast-card-help, .ast-type')].every((text) => {
+        textFits: cards.every((card) => [...card.querySelectorAll<HTMLElement>('.ast-card-amount, .ast-card-help, .ast-card-note, .ast-type')].every((text) => {
           const range = document.createRange(); range.selectNodeContents(text)
           const box = card.getBoundingClientRect()
           return text.scrollWidth <= text.clientWidth + 1 && [...range.getClientRects()].every((rect) => rect.left >= box.left && rect.right <= box.right)
         })),
-        contrasts: [...element.querySelectorAll('.ast-card-help, .ast-type')].map(contrast),
+        contrasts: [...element.querySelectorAll('.ast-card-help, .ast-card-note, .ast-type')].map(contrast),
       }
     })
     expect(metrics.right).toBeLessThanOrEqual(width)

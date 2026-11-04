@@ -14,6 +14,7 @@ import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
 import {
   ENTRY_TYPE_OPTIONS,
+  InvalidStatementAgentIdError,
   entryTypeLabel,
   filterParams,
   readFilters,
@@ -202,7 +203,7 @@ export default function AgentStatementPage() {
                         ? '수수료 명세를 불러오는 중입니다.'
                         : '기준월이나 조회 조건을 바꿔 다시 조회해 보세요.'}
                   </span>
-                  {list.isError && (
+                  {list.isError && !(list.error instanceof InvalidStatementAgentIdError) && (
                     <Button data-guide-feature="features.agent-statement.agent-statement-page.list-retry-button" variant="secondary" onClick={() => void list.refetch()}>
                       다시 시도
                     </Button>

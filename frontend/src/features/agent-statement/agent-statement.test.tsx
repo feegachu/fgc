@@ -241,6 +241,7 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     renderAt('/app/agent/statements?month=2026-07&agentId=..%2F..%2Ftransactions&entryKey=test', adminUser)
     expect(await screen.findAllByText('설계사 ID를 확인한 뒤 다시 조회하세요.')).not.toHaveLength(0)
     expect(paths).toEqual([])
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
   })
 
   it('403 은 권한 문구로 구별한다', async () => {

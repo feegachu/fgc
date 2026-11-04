@@ -46,6 +46,8 @@
 
 .ast-card-label { display: flex; align-items: center; }
 .ast-card-help { display: block; margin-top: 0.125rem; color: var(--color-text-secondary); }
+.ast-card-note,
+.ast-hero .ast-muted { color: var(--color-text-secondary); }
 
 .ast-card-amount {
   min-width: 0;

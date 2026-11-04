@@ -107,12 +107,18 @@ export function filterParams(filters: StatementFilters, keepAgent: boolean) {
   return query
 }
 
+export class InvalidStatementAgentIdError extends Error {}
+
+function validAgentId(agentId: string) {
+  return /^[1-9][0-9]{0,18}$/.test(agentId) && BigInt(agentId) <= 9223372036854775807n
+}
+
 /** 본인 경로(agentId 없음)와 내부 경로를 한곳에서 정한다. 본인 화면은 설계사 ID 를 보내지 않는다. */
 export function statementPath(agentId: string | null) {
   if (agentId === null) return '/api/v1/agent/me/statements'
   // URL 입력도 서버의 양의 Long 범위로 제한한다. 잘못된 ID를 본인 경로로 대체하지 않는다.
-  if (!/^[1-9][0-9]{0,18}$/.test(agentId) || BigInt(agentId) > 9223372036854775807n)
-    throw new Error('설계사 ID를 확인한 뒤 다시 조회하세요.')
+  if (!validAgentId(agentId))
+    throw new InvalidStatementAgentIdError('설계사 ID를 확인한 뒤 다시 조회하세요.')
   return `/api/v1/reports/agents/${agentId}/statements`
 }
 
@@ -120,6 +126,8 @@ export function statementListQuery(filters: StatementFilters, agentId: string | 
   return queryOptions({
     queryKey: ['agent-statements', 'list', agentId, filters],
     enabled,
+    // 입력 오류만 즉시 표시하고 정상 요청에는 앱의 기본 재시도 정책을 유지한다.
+    ...(agentId !== null && !validAgentId(agentId) ? { retry: false as const } : {}),
     queryFn: async ({ signal }) => {
       const query = filterParams(filters, false)
       query.set('size', String(PAGE_SIZE))
@@ -137,6 +145,7 @@ export function statementDetailQuery(entryKey: string, agentId: string | null, r
     queryKey: ['agent-statements', 'detail', agentId, entryKey],
     // 내부 사용자가 설계사를 고르기 전에는 본인 전용 경로를 부르지 않는다(목록과 같은 조건).
     enabled: ready && entryKey !== '',
+    ...(agentId !== null && !validAgentId(agentId) ? { retry: false as const } : {}),
     queryFn: async ({ signal }) => {
       const response = await apiClient.request<StatementDetail>(
         `${statementPath(agentId)}/${encodeURIComponent(entryKey)}`,
