@@ -138,10 +138,10 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(card).not.toHaveTextContent('내역 보기')
   })
 
-  it('수령 예정 수수료 카드를 누르면 수수료 지급 화면으로 간다', async () => {
+  it('수령 예정 수수료 카드는 해당 기준월의 명세 화면으로 연결된다', async () => {
     renderHome()
     const card = await screen.findByRole('link', { name: '수령 예정 수수료' })
-    expect(card).toHaveAttribute('href', '/app/transactions')
+    expect(card).toHaveAttribute('href', '/app/agent/statements?month=2026-07')
   })
 
   it('판매 관리 필터는 서버에 기간·보험사 구분·보험사를 보내 다시 집계한다', async () => {

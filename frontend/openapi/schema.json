@@ -1,6 +1,30 @@
 {
   "components" : {
     "schemas" : {
+      "Accepted" : {
+        "properties" : {
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "previousBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "validationRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ActiveMonthlyRunResponse" : {
         "properties" : {
           "exists" : {
@@ -430,6 +454,20 @@
         "required" : [ "data", "error", "requestId" ],
         "type" : "object"
       },
+      "ApiResponseAccepted" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Accepted"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseActiveMonthlyRunResponse" : {
         "properties" : {
           "data" : {
@@ -672,6 +710,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/ContractScheduleResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseContractStatusPreviewResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ContractStatusPreviewResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -1063,6 +1115,23 @@
         },
         "type" : "object"
       },
+      "ApiResponseListRetry" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Retry"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseListScheduleHeaderResponse" : {
         "properties" : {
           "data" : {
@@ -1183,6 +1252,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PageResponseCommissionPaymentListResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePageResponseContractStatusEffectResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseContractStatusEffectResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -1393,6 +1476,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/ReconciliationRunSearchResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseRestartability" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Restartability"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -2881,6 +2978,31 @@
         },
         "type" : "object"
       },
+      "ClawbackLine" : {
+        "properties" : {
+          "appliedRatePct" : {
+            "type" : "number"
+          },
+          "basisAmount" : {
+            "type" : "number"
+          },
+          "clawbackAmount" : {
+            "type" : "number"
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "transactionAttributionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ClawbackNoticeDocumentRequest" : {
         "properties" : {
           "calculationVersion" : {
@@ -2926,6 +3048,47 @@
           "version" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ClawbackReview" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "candidate" : {
+            "type" : "boolean"
+          },
+          "elapsedMonths" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ClawbackLine"
+            },
+            "type" : "array"
+          },
+          "policyCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "policyVersionNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -3635,6 +3798,8 @@
             "type" : "string"
           },
           "rankResultId" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3738,7 +3903,8 @@
       "CompareExplainRequest" : {
         "properties" : {
           "rankResultId" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3849,7 +4015,8 @@
       "CompareRankingRequest" : {
         "properties" : {
           "categoryCode" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           },
           "filters" : {
@@ -4357,8 +4524,48 @@
         },
         "type" : "object"
       },
+      "ContractStatusEffectResponse" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "entityId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "entityType" : {
+            "type" : "string"
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "previousState" : {
+            "type" : [ "string", "null" ]
+          },
+          "processingJob" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "reasonCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ContractStatusEventProcessingResponse" : {
         "properties" : {
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
           "processedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -4368,6 +4575,16 @@
           },
           "processingStatus" : {
             "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ProcessingSummary"
+            }, {
+              "type" : "null"
+            } ]
           }
         },
         "type" : "object"
@@ -4411,6 +4628,9 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "followUp" : {
+            "$ref" : "#/components/schemas/EventFollowUp"
+          },
           "newStatus" : {
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
@@ -4441,6 +4661,10 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "recordedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "registeredBy" : {
             "anyOf" : [ {
               "$ref" : "#/components/schemas/RegisteredBy"
@@ -4453,6 +4677,85 @@
           },
           "sourceSystem" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContractStatusPreviewRequest" : {
+        "properties" : {
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "effectiveAt", "eventType" ],
+        "type" : "object"
+      },
+      "ContractStatusPreviewResponse" : {
+        "properties" : {
+          "clawbackReview" : {
+            "$ref" : "#/components/schemas/ClawbackReview"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "currentStatus" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "excludedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
+          },
+          "heldAmount" : {
+            "$ref" : "#/components/schemas/HeldAmount"
+          },
+          "paidAmount" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PaidAmount"
+            },
+            "type" : "array"
+          },
+          "payments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewPayment"
+            },
+            "type" : "array"
+          },
+          "pendingFollowUps" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "resumedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
+          },
+          "snapshotAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "stoppedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -4803,6 +5106,21 @@
           "reconMismatch" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventFollowUp" : {
+        "properties" : {
+          "jobs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FollowUpJob"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -5376,6 +5694,48 @@
           "status" : {
             "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FollowUpJob" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
+          "lastAttemptAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextRetryAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HeldAmount" : {
+        "properties" : {
+          "after" : {
+            "type" : "number"
+          },
+          "before" : {
+            "type" : "number"
           }
         },
         "type" : "object"
@@ -6359,6 +6719,36 @@
         },
         "type" : "object"
       },
+      "PageResponseContractStatusEffectResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ContractStatusEffectResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageResponseContractView" : {
         "properties" : {
           "content" : {
@@ -6565,6 +6955,18 @@
           "totalPages" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PaidAmount" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -7451,6 +7853,73 @@
         },
         "type" : "object"
       },
+      "PreviewLine" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "dueDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextDueDate" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "previousState" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PreviewPayment" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "commissionTransactionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "previousState" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ProcessingEffect" : {
         "properties" : {
           "failureReason" : {
@@ -7469,6 +7938,27 @@
           "validationRunId" : {
             "format" : "int64",
             "type" : [ "integer", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "ProcessingSummary" : {
+        "properties" : {
+          "changedScheduleLines" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excludedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "heldPayments" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "resumedPayments" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -8178,6 +8668,92 @@
         },
         "type" : "object"
       },
+      "Restartability" : {
+        "properties" : {
+          "allowed" : {
+            "type" : "boolean"
+          },
+          "checkpointAvailable" : {
+            "type" : "boolean"
+          },
+          "completedCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedStateVersion" : {
+            "type" : "string"
+          },
+          "failedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedStep" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lastFailedBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "remainingCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Retry" : {
+        "properties" : {
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : "string"
+          },
+          "failedStep" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "finishedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "previousBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "requestedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "requestedBy" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ReverseJournalRequest" : {
         "properties" : {
           "evidenceRef" : {
@@ -8771,6 +9347,27 @@
         },
         "type" : "object"
       },
+      "ValidationRestartRequest" : {
+        "properties" : {
+          "expectedBatchExecutionId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedStateVersion" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedBatchExecutionId", "expectedStateVersion", "reason" ],
+        "type" : "object"
+      },
       "ValidationRunDetailResponse" : {
         "properties" : {
           "arbitrageSummary" : {
@@ -8790,6 +9387,15 @@
           },
           "reconciliationSummary" : {
             "$ref" : "#/components/schemas/ReconciliationSummary"
+          },
+          "restartability" : {
+            "$ref" : "#/components/schemas/Restartability"
+          },
+          "retries" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Retry"
+            },
+            "type" : "array"
           },
           "targetSummary" : {
             "$ref" : "#/components/schemas/TargetSummary"
@@ -8888,6 +9494,10 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "currentStep" : {
             "format" : "int32",
             "type" : "integer"
@@ -8905,6 +9515,10 @@
           },
           "requestId" : {
             "type" : "string"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "status" : {
             "type" : "string"
@@ -11162,6 +11776,96 @@
         "tags" : [ "계약" ]
       }
     },
+    "/api/v1/contracts/{id}/status-events/preview" : {
+      "post" : {
+        "operationId" : "previewContractStatusEvent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ContractStatusPreviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractStatusPreviewResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "계약" ]
+      }
+    },
+    "/api/v1/contracts/{id}/status-events/{eventId}/effects" : {
+      "get" : {
+        "operationId" : "getContractStatusEventEffects",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "eventId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseContractStatusEffectResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "계약" ]
+      }
+    },
     "/api/v1/contracts/{id}/transactions" : {
       "get" : {
         "operationId" : "getContractTransactions",
@@ -13289,7 +13993,7 @@
     },
     "/api/v1/validation-runs/{id}/execute" : {
       "post" : {
-        "description" : "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.",
+        "description" : "CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED 재시작은 IF-API-82 /restart를 사용한다. MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.",
         "operationId" : "execute",
         "parameters" : [ {
           "description" : "validation_run_id",
@@ -13512,6 +14216,104 @@
         },
         "summary" : "검증 실행 진행률 조회 (IF-API-49)",
         "tags" : [ "검증 실행" ]
+      }
+    },
+    "/api/v1/validation-runs/{id}/restart" : {
+      "post" : {
+        "operationId" : "restart",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ValidationRestartRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAccepted"
+                }
+              }
+            },
+            "description" : "Accepted"
+          }
+        },
+        "tags" : [ "validation-restart-controller" ]
+      }
+    },
+    "/api/v1/validation-runs/{id}/restartability" : {
+      "get" : {
+        "operationId" : "eligibility",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseRestartability"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "validation-restart-controller" ]
+      }
+    },
+    "/api/v1/validation-runs/{id}/retries" : {
+      "get" : {
+        "operationId" : "history",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRetry"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "validation-restart-controller" ]
       }
     }
   },

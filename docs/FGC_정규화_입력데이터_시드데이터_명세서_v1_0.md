@@ -1471,7 +1471,7 @@ DAR012 생성기는 고정 seed를 사용한다(예: `random_seed = 20261118`). 
 | 1,200% 정책 | cap_rule_set, cap_rule_item |
 | 배부근거 | allocation_policy |
 | 환급률 | refund_rate_table, refund_rate_line |
-| 계약·상태·재무 | insurance_contract, contract_status_event, contract_status_event_processing, contract_event_job, contract_status_event_effect, contract_write_request, contract_financial_snapshot |
+| 계약·상태·재무 | insurance_contract, contract_status_event, contract_status_event_processing, contract_event_job, contract_status_event_effect, payment_hold, contract_write_request, contract_financial_snapshot |
 | 실제 돈 | statement_batch, commission_transaction, transaction_attribution |
 | 예상 스케줄 | schedule_header, schedule_line |
 | 배치 진행 | batch_watermark, validation_run.current_step |
@@ -1658,3 +1658,7 @@ REG-17·18·24처럼 FGC가 외부 의무 전체를 구현하지 않는 영역�
 - `SRC-016` GA 설계사 4년·7년 수수료 체계 및 환수 통합 분석팩 — 기사 예시 수치를 법정값으로 사용하지 않음
 - `SRC-019`, `SRC-020` 회사별 지급·환수 자료 — 회사·시점별 사적 기준
 - `SRC-022`, `SRC-025` 현행 보험업감독규정 통합본·FAQ 2차 배포안 — 분급 상한과 신인 판정 근거
+
+
+### 재시작 운영 데이터 매핑 — FUN-045 (#672, #844)
+`validation_run_retry`는 시드가 아닌 월 통합검증의 재시작 요청·실행 이력이다. V80에서 생성하고 validation_run·app_user를 참조한다. 실패 단계(failed_step)·멱등 요청·이전/새 Batch 실행을 연결하며 ACCEPTED/LAUNCHING/RUNNING/SUCCEEDED/FAILED를 기록한다. 활성 재시도는 실행당 1건이다. V78(#774)→V79(#831)→V80(#844) 순서로 적용하며 이미 적용된 파일의 체크섬은 변경하지 않는다. V78·V79는 develop에 병합되었으며 V80은 이 PR의 미병합·미배포 신규 파일이다. 정식 classpath 파일로 순차 적용과 재실행 무변경을 검증한다.

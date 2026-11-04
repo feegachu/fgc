@@ -25,6 +25,7 @@ const pages: Record<string, ComponentType> = {
   '/clawbacks': lazy(() => import('../features/clawback/ClawbackPage')),
   '/cap-checks': lazy(() => import('../features/cap/CapListPage')),
   '/transactions': lazy(() => import('../features/transaction/TransactionListPage')),
+  '/agent/statements': lazy(() => import('../features/agent-statement/AgentStatementPage')),
   '/transactions/new': lazy(() => import('../features/transaction/TransactionFormPage')),
   '/audit-logs': lazy(() => import('../features/audit/AuditLogPage')),
   '/journals': lazy(() => import('../features/ledger/LedgerPage')),
