@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -103,16 +103,16 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(kpis.closest('.app-shell')).toHaveAttribute('data-kpi-style', 'summary')
     expect(kpis.closest('.app-shell')).toHaveClass('app-theme')
     expect(screen.queryByRole('button', { name: '개발자' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /버튼 색상|버튼 표시 방식|전후 비교/ })).not.toBeInTheDocument()
     expect(links[0]).toContain('/cap-checks?status=VIOLATION')
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
     expect(summaryCalls()).toHaveLength(1)
   })
-  it('KPI 5종과 처리할 예외, 최근 예외와 실행을 형식 규칙에 맞게 보여 준다', async () => {
+  it('KPI 5종과 도넛, 최근 예외와 실행을 형식 규칙에 맞게 보여 준다', async () => {
     renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
     expect(within(kpis).getAllByRole('link')).toHaveLength(5)
-    // 미처리 예외는 KPI 대신 '처리할 예외' 제목 숫자로 보인다(공통 원칙 03).
-    expect(screen.getByRole('heading', { name: '처리할 예외 5건' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '검증 항목별 건수 비중' })).toBeInTheDocument()
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toHaveTextContent('1,234건')
     expect(summaryCalls()).toEqual(['/api/v1/dashboard/summary?month=2026-07'])
     const table = screen.getByRole('table', { name: '최근 예외 목록' })
@@ -122,6 +122,36 @@ describe('DASH-W01 업무 대시보드', () => {
     const run = screen.getByRole('link', { name: /2026년 7월 2회차/ })
     expect(within(run).getByRole('progressbar', { name: '검증 진행률' })).toHaveAttribute('aria-valuenow', '40')
     expect(run).toHaveTextContent('4/10 단계, 실행 settle01')
+  })
+
+  it('도넛과 범례의 hover·focus로 항목·건수·비중을 확인하며 기준월 링크를 유지한다', async () => {
+    const { actions } = renderDashboard()
+    const chart = await screen.findByRole('region', { name: '검증 항목별 건수 비중' })
+    expect(screen.queryByRole('heading', { name: /처리할 예외/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '대시보드 전후 비교' })).not.toBeInTheDocument()
+    expect(chart.querySelectorAll('.risk-donut-segment')).toHaveLength(4)
+    expect(within(chart).getByRole('link', { name: /1,200% 위반 1,234건, 비중/ })).toHaveAttribute(
+      'href', '/app/cap-checks?status=VIOLATION&month=2026-07',
+    )
+    expect(within(chart).getByRole('link', { name: /원장 불균형 0건, 비중 0.0%/ })).toHaveAttribute(
+      'href', '/app/journals?month=2026-07',
+    )
+    expect(within(chart).queryByRole('tooltip')).not.toBeInTheDocument()
+    const segment = chart.querySelector('.risk-donut-segment')!
+    await actions.hover(segment)
+    let detail = within(chart).getByRole('tooltip')
+    expect(detail).toHaveTextContent('1,200% 위반')
+    expect(detail).toHaveTextContent('1,234건')
+    expect(detail).toHaveTextContent('비중 99.2%')
+    await actions.unhover(segment)
+    expect(within(chart).queryByRole('tooltip')).not.toBeInTheDocument()
+    const zero = within(chart).getByRole('link', { name: /원장 불균형 0건/ })
+    fireEvent.focus(zero)
+    detail = within(chart).getByRole('tooltip')
+    expect(detail).toHaveTextContent('원장 불균형0건비중 0.0%')
+    expect(zero).toHaveAttribute('aria-describedby', detail.id)
+    fireEvent.keyDown(zero, { key: 'Escape' })
+    expect(within(chart).queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
   it('기준월을 바꾸면 해당 월로 다시 조회한다', async () => {
@@ -164,11 +194,13 @@ describe('DASH-W01 업무 대시보드', () => {
 
   it('데이터가 0건이면 KPI는 0건, 목록은 빈 상태 문구를 보여 준다', async () => {
     summaryResponse = async () =>
-      envelope({ ...summary, capViolation: 0, capWarning: 0, openException: 0, recentExceptions: [], recentRuns: [] })
+      envelope({ ...summary, capViolation: 0, capWarning: 0, arbitrageCandidate: 0, reconMismatch: 0,
+        journalImbalance: 0, openException: 0, recentExceptions: [], recentRuns: [] })
     renderDashboard()
     const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 0건' })).toHaveTextContent('0건')
     expect(screen.getAllByText('조건에 맞는 자료가 없습니다.')).toHaveLength(2)
+    expect(screen.getByText('이번 달 표시할 위험 건이 없습니다.')).toBeInTheDocument()
   })
 
   it('API 오류는 화면에 안내하고 다시 시도하면 복구한다', async () => {

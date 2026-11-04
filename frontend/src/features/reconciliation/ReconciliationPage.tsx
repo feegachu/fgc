@@ -342,14 +342,11 @@ export default function ReconciliationPage() {
     },
   ]
   return (
-    <div className="reco-react-page">
+    <div className="reco-react-page list-page">
       <header className="page-header">
         <h1 className="page-title">대사 실행/결과</h1>
       </header>
-      <section data-guide-feature="features.reconciliation.reconciliation-page.section" className="surface reco-react-run">
-        <header className="surface-header reco-react-panel-header">
-          <h2 className="surface-title">대사 실행</h2>
-        </header>
+      <section data-guide-feature="features.reconciliation.reconciliation-page.section" className="surface reco-react-run" aria-label="대사 실행 조건">
         <RunFilters
           key={JSON.stringify({ ...criteria, sort: '' })}
           criteria={criteria}
@@ -711,7 +708,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
           guideId="reconciliation.kpi.difference"
           label="차액 합계"
           zero={summary?.differenceTotal === 0}
-          value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
+          value={summary ? <Money value={summary.differenceTotal} difference unit={false} animate /> : EMPTY}
           unit="원"
           tone={summary?.differenceTotal === 0 ? 'success' : 'error'}
           footer="실제 지급액에서 예상 지급액을 뺀 합계"

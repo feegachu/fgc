@@ -96,7 +96,6 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <WorkspaceTabs activeId={current?.id} />
           )}
           <div className="app-header-actions">
-            <div id="app-header-assistant" className="app-header-assistant" />
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
               {month && (

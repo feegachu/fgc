@@ -1,7 +1,6 @@
 import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { createPortal } from 'react-dom'
 import type { ShellUser } from '../../app/shell/Sidebar'
 import { findGuide, GUIDE_CATALOG } from './catalog'
 import type { AssistantContext, CalculationResult, MessageResult } from './contracts'
@@ -150,7 +149,7 @@ export function AssistantDemoMount({
   screenId?: string
   screenContext?: string
 }) {
-  if (!enabled || loggingOut || !['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'].includes(user.roleCode))
+  if (loggingOut || !enabled || !['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'].includes(user.roleCode))
     return null
   return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} roleCode={user.roleCode} screenId={screenId} screenContext={screenContext} />
 }
@@ -178,9 +177,6 @@ function AssistantWithGuide({ canProcess, roleCode, screenId, screenContext }: {
 }
 export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
   const [open, setOpen] = useState(false)
-  const [minimized, setMinimized] = useState(false)
-  const [launcherSlot, setLauncherSlot] = useState<HTMLElement | null>(null)
-  useEffect(() => setLauncherSlot(document.getElementById('app-header-assistant')), [])
   const aiEnabled = import.meta.env.VITE_ASSISTANT_AI === 'true'
   const currentScreen = screenId ?? screenFor(window.location.pathname)?.id ?? 'CMN-C04'
   const currentRole = roleCode ?? (canProcess ? 'SETTLEMENT' : 'GA_ADMIN')
@@ -232,9 +228,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     stream = useRef<HTMLDivElement>(null)
   const panelId = useId(),
     titleId = useId()
-  useEffect(() => {
-    if (minimized) document.getElementById(`${panelId}-launcher`)?.focus()
-  }, [minimized, panelId])
   useEffect(() => {
     if (!visible) return
     textarea.current?.focus()
@@ -436,7 +429,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     setPlanError('')
   }
   const launcher = (
-    <div className={`pico-launcher${minimized ? ' is-compact' : ''}`}>
+    <div className="pico-launcher">
       <button
         id={`${panelId}-launcher`}
         className="pico-launcher-button"
@@ -450,25 +443,14 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
           setOpen(true)
         }}
       >
-        <img src={basic} alt="" />
+        <img src={basic} alt="" draggable={false} />
         <span className="pico-launcher-hint">업무 비서 AI</span>
       </button>
-      {!minimized && (
-        <button
-          type="button"
-          className="pico-launcher-close"
-          aria-label="피코를 상단 버튼으로 접기"
-          title="상단 버튼으로 접기"
-          onClick={() => setMinimized(true)}
-        >
-          <Symbol name="close" />
-        </button>
-      )}
     </div>
   )
   return (
-    <div className={`pico-assistant-root${minimized ? ' is-minimized' : ''}`}>
-      {!visible && (minimized && launcherSlot ? createPortal(launcher, launcherSlot) : launcher)}
+    <div className="pico-assistant-root">
+      {!visible && launcher}
       {visible && (
         <aside id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className="pico-panel">
           <header className="pico-panel-header">
@@ -481,18 +463,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
               </h2>
               <p>필요한 업무부터 함께 찾아요</p>
             </div>
-            <button
-              type="button"
-              className="pico-icon-button"
-              aria-label="피코를 오른쪽 아래에 표시"
-              title="오른쪽 아래에 피코 표시"
-              onClick={() => {
-                setMinimized(false)
-                setOpen(false)
-              }}
-            >
-              <img src={basic} alt="" />
-            </button>
             <button
               className="pico-icon-button"
               aria-label="새 대화"

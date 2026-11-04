@@ -1,29 +1,67 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { canAnimate } from '../../lib/motion'
 import { useWorkspaceStore } from '../../stores/workspace'
 export function WorkspaceTabs({ activeId }: { activeId?: string }) {
   const tabs = useWorkspaceStore((state) => state.tabs)
   const closeTab = useWorkspaceStore((state) => state.closeTab)
   const navigate = useNavigate()
   const rail = useRef<HTMLDivElement>(null)
-  const [overflow, setOverflow] = useState(false)
+  const [{ overflow, atStart, atEnd }, setScrollState] = useState({ overflow: false, atStart: true, atEnd: true })
   useEffect(() => {
-    const element = rail.current!
-    const update = () => setOverflow(element.scrollWidth > element.clientWidth + 1)
-    element
-      .querySelector<HTMLElement>('[aria-current="page"]')
-      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    const element = rail.current
+    const bar = element?.parentElement
+    if (!element || !bar) return
+    const update = () => {
+      // Compare against the space before the buttons take up any width.
+      const { paddingLeft, paddingRight } = getComputedStyle(bar)
+      const available = bar.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight)
+      const overflow = element.scrollWidth > available + 1
+      const atStart = element.scrollLeft <= 1
+      const atEnd = element.scrollLeft >= element.scrollWidth - element.clientWidth - 1
+      setScrollState((previous) =>
+        previous.overflow === overflow && previous.atStart === atStart && previous.atEnd === atEnd
+          ? previous
+          : { overflow, atStart, atEnd },
+      )
+    }
     update()
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
     observer?.observe(element)
+    element.addEventListener('scroll', update)
     window.addEventListener('resize', update)
     return () => {
       observer?.disconnect()
+      element.removeEventListener('scroll', update)
       window.removeEventListener('resize', update)
     }
-  }, [tabs, activeId])
+  }, [tabs])
+  useEffect(() => {
+    rail.current
+      ?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [tabs, activeId, overflow])
+
+  function scrollToEdge(edge: 'start' | 'end') {
+    const element = rail.current
+    if (!element || (edge === 'start' ? atStart : atEnd)) return
+    element.scrollTo({ left: edge === 'start' ? 0 : element.scrollWidth, behavior: canAnimate() ? 'smooth' : 'instant' })
+  }
+
   return (
     <nav className="workspace-tab-bar" aria-label="열린 업무 화면">
+      <button data-guide-feature="app.shell.workspace-tabs.button-3"
+        type="button"
+        className="workspace-tab-overflow"
+        aria-label="첫 번째 업무 탭으로 이동"
+        aria-disabled={atStart}
+        hidden={!overflow}
+        onClick={() => scrollToEdge('start')}
+      >
+        <span className="material-symbols-rounded" aria-hidden="true">
+          keyboard_arrow_left
+        </span>
+      </button>
       <div className="workspace-tabs" ref={rail}>
         {tabs.map((tab, index) => (
           <div
@@ -58,9 +96,10 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
       <button data-guide-feature="app.shell.workspace-tabs.button-2"
         type="button"
         className="workspace-tab-overflow"
-        aria-label="열린 화면 더 보기"
+        aria-label="마지막 업무 탭으로 이동"
+        aria-disabled={atEnd}
         hidden={!overflow}
-        onClick={() => rail.current?.scrollBy({ left: 220, behavior: 'smooth' })}
+        onClick={() => scrollToEdge('end')}
       >
         <span className="material-symbols-rounded" aria-hidden="true">
           keyboard_arrow_right

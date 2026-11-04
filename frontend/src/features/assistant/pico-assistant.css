@@ -3,14 +3,15 @@
   font-family: inherit;
   color: var(--color-text-primary);
 }
-.pico-launcher:not(.is-compact) {
+.pico-launcher {
+  --pico-size: 132px;
   position: fixed;
   right: 28px;
   bottom: 26px;
   z-index: calc(var(--z-overlay) - 1);
 }
 /* #808 review · design :131 — the last business buttons must scroll clear of the fixed launcher. */
-.app-shell:has(.pico-assistant-root:not(.is-minimized)) .page-content {
+.app-shell:has(.pico-assistant-root) .page-content {
   padding-bottom: calc(var(--space-8) + 120px);
 }
 /* Adopt the agent-home AI launcher treatment without coupling page styles. */
@@ -22,7 +23,7 @@
 @keyframes pico-launcher-border-spin {
   to { --pico-launcher-angle: 360deg; }
 }
-.pico-launcher:not(.is-compact) .pico-launcher-hint {
+.pico-launcher .pico-launcher-hint {
   position: absolute;
   right: 136px;
   bottom: 46px;
@@ -38,19 +39,20 @@
   color: #382450;
   white-space: nowrap;
 }
-.pico-launcher:not(.is-compact) .pico-launcher-button {
+.pico-launcher .pico-launcher-button {
   display: grid;
   place-items: center;
   position: relative;
-  width: 132px;
-  height: 132px;
+  width: var(--pico-size);
+  height: var(--pico-size);
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+  user-select: none;
   border-radius: 50%;
 }
-.pico-launcher:not(.is-compact) .pico-launcher-button img {
+.pico-launcher .pico-launcher-button img {
   display: block;
   width: 128px;
   height: 128px;
@@ -63,68 +65,9 @@
 .pico-launcher-button:focus-visible img {
   animation-play-state: paused;
 }
-.pico-launcher:not(.is-compact) .pico-launcher-button:focus-visible .pico-launcher-hint {
+.pico-launcher .pico-launcher-button:focus-visible .pico-launcher-hint {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 3px;
-}
-.pico-launcher-close {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--color-border-default);
-  border-radius: 50%;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-surface);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-}
-.pico-launcher-close:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-subtle);
-}
-.pico-launcher-close .material-symbols-rounded {
-  font-size: 16px;
-}
-.pico-launcher.is-compact {
-  display: flex;
-}
-.pico-launcher.is-compact .pico-launcher-button {
-  display: inline-flex;
-  height: var(--control-height-sm);
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0 0.625rem 0 0.375rem;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-6);
-  color: var(--color-steel-700);
-  background: var(--color-bg-surface);
-  font: inherit;
-  font-size: 0.875rem;
-  line-height: 1.375rem;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-.pico-launcher.is-compact .pico-launcher-button:hover {
-  border-color: var(--color-border-strong);
-}
-.pico-launcher.is-compact .pico-launcher-button:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
-}
-.pico-launcher.is-compact .pico-launcher-button img {
-  display: block;
-  width: 1.5rem;
-  height: 1.5rem;
-  object-fit: contain;
-}
-.pico-launcher.is-compact .pico-launcher-hint {
-  font-weight: 500;
 }
 .pico-assistant-root button:focus-visible,
 .pico-assistant-root select:focus-visible,
@@ -210,11 +153,6 @@
 }
 .pico-icon-button .material-symbols-rounded {
   font-size: 17px;
-}
-.pico-icon-button img {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
 }
 .pico-tabs {
   display: flex;
@@ -631,22 +569,19 @@
   }
 }
 @media (max-width: 760px) {
-  .pico-launcher:not(.is-compact) {
+  .pico-launcher {
+    --pico-size: 104px;
     right: 16px;
     bottom: 78px;
   }
-  .app-shell:has(.pico-assistant-root:not(.is-minimized)) .page-content {
+  .app-shell:has(.pico-assistant-root) .page-content {
     padding-bottom: calc(var(--space-8) + 160px);
   }
-  .pico-launcher:not(.is-compact) .pico-launcher-button {
-    width: 104px;
-    height: 104px;
-  }
-  .pico-launcher:not(.is-compact) .pico-launcher-button img {
+  .pico-launcher .pico-launcher-button img {
     width: 100px;
     height: 100px;
   }
-  .pico-launcher:not(.is-compact) .pico-launcher-hint {
+  .pico-launcher .pico-launcher-hint {
     right: 108px;
     bottom: 34px;
     font-size: 11px;
@@ -665,11 +600,6 @@
   }
   .pico-composer textarea {
     height: 63px;
-  }
-}
-@media (max-width: 47.9375rem) {
-  .pico-launcher.is-compact .pico-launcher-hint {
-    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

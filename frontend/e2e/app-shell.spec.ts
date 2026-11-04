@@ -53,6 +53,7 @@ for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
 }
 
 test('eleventh tab is bounded and restored; month updates every tab and removes page', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 850 })
   await session(page)
   await page.goto('contracts?month=2026-07&page=3&status=ACTIVE')
   await expect(page.locator('.workspace-tab.is-active .workspace-tab-link')).toHaveAttribute(
@@ -85,6 +86,20 @@ test('eleventh tab is bounded and restored; month updates every tab and removes 
   await expect(page.locator('.workspace-tab')).toHaveCount(10)
   await page.reload()
   await expect(page.locator('.workspace-tab')).toHaveCount(10)
+  const firstTab = page.getByRole('button', { name: '첫 번째 업무 탭으로 이동' })
+  const lastTab = page.getByRole('button', { name: '마지막 업무 탭으로 이동' })
+  await firstTab.click()
+  await expect(firstTab).toBeDisabled()
+  await expect(lastTab).toBeEnabled()
+  await lastTab.click()
+  await expect(lastTab).toBeDisabled()
+  await expect(firstTab).toBeEnabled()
+
+  const tab = await page.locator('.workspace-tab.is-active').boundingBox()
+  const month = await page.getByRole('button', { name: '기준 정산월 2026-07' }).boundingBox()
+  expect(tab?.height).toBe(month?.height)
+  expect(tab?.y).toBe(month?.y)
+
   await page.getByRole('button', { name: '기준 정산월 2026-07' }).click()
   await page.getByRole('gridcell', { name: '8월', exact: true }).click()
   await page.getByRole('button', { name: '적용', exact: true }).click()

@@ -128,6 +128,27 @@
 .dashboard-page > .kpi-group {
   --kpi-columns: 5;
 }
+@media (prefers-reduced-motion: no-preference) {
+  .kpi-group > * {
+    animation: kpi-rise 360ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  }
+  .kpi-group > :nth-child(2) { animation-delay: 50ms; }
+  .kpi-group > :nth-child(3) { animation-delay: 100ms; }
+  .kpi-group > :nth-child(4) { animation-delay: 150ms; }
+  .kpi-group > :nth-child(5) { animation-delay: 200ms; }
+  .kpi-group > :nth-child(n + 6) { animation-delay: 250ms; }
+
+  .dashboard-main-grid > .surface,
+  .dashboard-side-column > .surface {
+    animation: kpi-rise 420ms cubic-bezier(0.2, 0, 0, 1) 240ms backwards;
+  }
+}
+@keyframes kpi-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
 .vrun-exception-grid {
   --kpi-columns: 6;
 }

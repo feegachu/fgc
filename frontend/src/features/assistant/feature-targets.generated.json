@@ -70,6 +70,11 @@
     "element": "button"
   },
   {
+    "id": "app.shell.workspace-tabs.button-3",
+    "file": "app/shell/WorkspaceTabs.tsx",
+    "element": "button"
+  },
+  {
     "id": "app.shell.workspace-tabs.link",
     "file": "app/shell/WorkspaceTabs.tsx",
     "element": "Link"
@@ -430,11 +435,6 @@
     "element": "Link"
   },
   {
-    "id": "dashboard.kpi-link.open",
-    "file": "features/dashboard/DashboardPage.tsx",
-    "element": "Link"
-  },
-  {
     "id": "dashboard.kpi-link.recon",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
@@ -458,11 +458,6 @@
     "id": "dashboard.kpi.journal",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "KpiCard"
-  },
-  {
-    "id": "dashboard.kpi.open",
-    "file": "features/dashboard/DashboardPage.tsx",
-    "element": "section"
   },
   {
     "id": "dashboard.kpi.recon",
@@ -1370,6 +1365,11 @@
     "element": "button"
   },
   {
+    "id": "features.dashboard.dashboard-page.composition",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "section"
+  },
+  {
     "id": "features.dashboard.dashboard-page.link",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
@@ -1386,11 +1386,6 @@
   },
   {
     "id": "features.dashboard.dashboard-page.link-5",
-    "file": "features/dashboard/DashboardPage.tsx",
-    "element": "Link"
-  },
-  {
-    "id": "features.dashboard.dashboard-page.open-exception-type",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
   },
@@ -1413,6 +1408,11 @@
     "id": "features.dashboard.dashboard-page.settlement-guide",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "button"
+  },
+  {
+    "id": "features.dashboard.risk-composition.link",
+    "file": "features/dashboard/RiskComposition.tsx",
+    "element": "Link"
   },
   {
     "id": "features.error.error-pages.button",
@@ -1686,11 +1686,6 @@
   },
   {
     "id": "features.policies.policies-page.button-4",
-    "file": "features/policies/PoliciesPage.tsx",
-    "element": "Button"
-  },
-  {
-    "id": "features.policies.policies-page.button-5",
     "file": "features/policies/PoliciesPage.tsx",
     "element": "Button"
   },
