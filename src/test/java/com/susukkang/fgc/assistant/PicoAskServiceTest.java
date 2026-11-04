@@ -203,12 +203,20 @@ class PicoAskServiceTest {
         verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
     }
     @Test void ambiguousInScopeQuestionIsAskedBackWithoutSecondModelCall() {
-        // FUN-073: 범위 안이지만 대상이 모호하면 '범위 밖'이 아니라 다시 묻는다.
+        // FGC-FUN-073: 범위 안이지만 대상이 모호하면 '범위 밖'이 아니라 다시 묻는다.
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of(), false));
         var reply = service.ask(request("이거 어떻게 해요?"));
         assertThat(reply.decision()).isEqualTo(Decision.ASK_CLARIFICATION);
         assertThat(reply.source()).isEqualTo(Source.FIXED);
         assertThat(reply.fallbackReason()).isEqualTo("NEEDS_CLARIFICATION");
+        assertThat(reply.evidenceRefs()).isEmpty();
+        verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
+    }
+    @Test void outOfScopeWithSelectedWorkflowIsRejectedWithoutSecondModelCall() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.draft"), true));
+        var reply = service.ask(request("오늘 날씨"));
+        assertThat(reply.source()).isEqualTo(Source.FIXED);
+        assertThat(reply.fallbackReason()).isEqualTo("INVALID_AI_SELECTION");
         assertThat(reply.evidenceRefs()).isEmpty();
         verify(gateway,never()).call(any(),eq(PicoAskService.ModelAnswer.class));
     }

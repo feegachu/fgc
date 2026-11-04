@@ -30,7 +30,7 @@ public class PicoAskService {
     private final ObjectMapper mapper;
     private final PicoPaymentContextService paymentContext;
     private final LlmProperties properties;
-    /** outOfScope는 workflowIds가 빌 때만 뜻이 있다. 범위 밖(지원 범위 안내)과 범위 안이지만 모호함(재질문)을 나눈다(FUN-073). */
+    /** outOfScope=true는 workflowIds가 빌 때만 허용한다. 범위 밖(지원 범위 안내)과 범위 안이지만 모호함(재질문)을 나눈다(FGC-FUN-073). */
     public record GuideSelection(List<String> workflowIds, Boolean outOfScope) {}
     public record ModelAnswer(Decision decision,String message,List<String> evidenceChunkIds) {}
     private static final List<String> UNSAFE_TEXT = List.of(
@@ -158,9 +158,10 @@ public class PicoAskService {
             var allowedIds = allowed.stream().map(PicoGuideCatalog.Definition::workflowId).toList();
             if (selection == null || selection.workflowIds() == null || selection.workflowIds().size() > 2
                     || selection.workflowIds().stream().distinct().count() != selection.workflowIds().size()
-                    || selection.workflowIds().stream().anyMatch(id -> id == null || !allowedIds.contains(id)))
+                    || selection.workflowIds().stream().anyMatch(id -> id == null || !allowedIds.contains(id))
+                    || (Boolean.TRUE.equals(selection.outOfScope()) && !selection.workflowIds().isEmpty()))
                 return fallback(request, "INVALID_AI_SELECTION");
-            // FUN-073: 범위 밖 질문은 지원 범위를 안내하고, 범위 안이지만 모호한 질문은 다시 묻는다. 두 경우 모두 두 번째 호출을 하지 않는다.
+            // FGC-FUN-073: 범위 밖 질문은 지원 범위를 안내하고, 범위 안이지만 모호한 질문은 다시 묻는다. 두 경우 모두 두 번째 호출을 하지 않는다.
             if (selection.workflowIds().isEmpty()) return Boolean.TRUE.equals(selection.outOfScope())
                     ? fixed(request, Decision.UNSUPPORTED,
                             "업무 비서는 FGC 화면 사용법과 정산 업무 절차를 안내합니다. 이 질문은 안내 범위 밖입니다.",
