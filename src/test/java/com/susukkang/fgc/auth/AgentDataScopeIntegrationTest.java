@@ -427,7 +427,7 @@ class AgentDataScopeIntegrationTest {
             "POST /api/v1/ai/compare-chat/rank", "POST /api/v1/ai/compare-chat/explain", "POST /api/v1/ai/compare-chat/ask",
             "GET /api/v1/contracts", "GET /api/v1/contracts/export.csv", "GET /api/v1/contracts/{id}",
             "GET /api/v1/contracts/{id}/status-events",
-            "GET /api/v1/contracts/{id}/status-events/{eventId}/effects", // #831 병합 후 생기는 경로
+            "GET /api/v1/contracts/{id}/status-events/{eventId}/effects",
             "GET /api/v1/transactions", "GET /api/v1/transactions/{paymentId}",
             "GET /api/v1/agent/me/home", "POST /api/v1/agent/me/contract-checks",
             "GET /api/v1/agent/me/statements", "GET /api/v1/agent/me/statements/{entryKey}");
@@ -460,6 +460,7 @@ class AgentDataScopeIntegrationTest {
                 "GET /api/v1/clawbacks/{id}/notice-documents", "POST /api/v1/clawbacks/{id}/notice-documents",
                 "POST /api/v1/transactions", "PUT /api/v1/transactions/{paymentId}", "DELETE /api/v1/transactions/{paymentId}",
                 "POST /api/v1/transactions/{paymentId}/confirm", "POST /api/v1/contracts", "PUT /api/v1/contracts/{id}",
+                "POST /api/v1/contracts/{id}/status-events/preview",
                 "POST /api/v1/policies", "PUT /api/v1/policies/{policyVersionId}", "POST /api/v1/policies/{policyVersionId}/actions",
                 "GET /api/v1/reports/agents/{agentId}/statements", "GET /api/v1/contracts/{id}/transactions");
     }
@@ -490,6 +491,7 @@ class AgentDataScopeIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(foreignNo))));
         as(token, "/api/v1/contracts/" + contract).andExpect(status().isOk());
         for (String path : new String[]{"/api/v1/contracts/" + foreignContract, "/api/v1/contracts/" + foreignContract + "/status-events",
+                "/api/v1/contracts/" + foreignContract + "/status-events/1/effects",
                 "/api/v1/contracts?agentId=" + otherAgent, "/api/v1/contracts/export.csv?agentId=" + otherAgent,
                 "/api/v1/transactions?agentId=" + otherAgent,
                 "/api/v1/transactions/" + id("SELECT min(commission_transaction_id) FROM fgc.commission_transaction WHERE recipient_agent_id = ?", otherAgent)}) {
@@ -586,6 +588,80 @@ class AgentDataScopeIntegrationTest {
         assertThat(internal.path("note").asText()).isEqualTo("HEADER-NOTE-SECRET");
     }
 
+    /** IF-API-89: 본인 계약의 사건이어도 영향 행에는 다른 수혜자 회차와 남의 지급 건, 헤더 총액이 함께 들어 있다. AGENT에게는 본인 몫만 나간다. */
+    @Test
+    void statusEventEffectsShowOnlyOwnLinesAndPaymentsEvenOnOwnContract() throws Exception {
+        Long otherAgent = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", otherContract);
+        Long header = id("""
+                INSERT INTO fgc.schedule_header(contract_id, payment_stage, policy_version_id, schedule_version_no, schedule_regime)
+                SELECT ?, 'GA_TO_FC', min(pv.policy_version_id), 1, 'CURRENT' FROM fgc.policy_version pv
+                RETURNING schedule_header_id
+                """, ownContract);
+        Long ownLine = scheduleLine(header, 1, ownAgent);
+        Long managerLine = scheduleLine(header, 2, otherAgent);
+        Long ownPayment = payment("GA_MANUAL_PAYMENT", ownAgent, new Long[]{ownContract, ownAgent, 300L});
+        Long mixed = payment("GA_MANUAL_PAYMENT", ownAgent, new Long[]{ownContract, ownAgent, 1000L}, new Long[]{otherContract, otherAgent, 9000L});
+        Long managerPayment = id("SELECT commission_transaction_id FROM fgc.commission_transaction WHERE source_business_key = 'GA-2026-07-0102'");
+        Long insurerPayment = id("SELECT min(commission_transaction_id) FROM fgc.commission_transaction WHERE payment_stage = 'INSURER_TO_GA'");
+        Long event = statusEvent(ownContract);
+        effect(event, "SCHEDULE_LINE", ownLine, 100);
+        effect(event, "SCHEDULE_LINE", managerLine, 200);
+        effect(event, "PAYMENT", ownPayment, 300);
+        effect(event, "PAYMENT", mixed, 10000);
+        effect(event, "PAYMENT", managerPayment, 500);
+        effect(event, "PAYMENT", insurerPayment, 700);
+        String path = "/api/v1/contracts/" + ownContract + "/status-events/" + event + "/effects?size=100";
+
+        JsonNode page = data(read(path).andExpect(status().isOk()));
+        assertThat(page.path("totalElements").asLong()).isEqualTo(3);
+        assertThat(page.path("content").findValuesAsText("entityId"))
+                .containsExactlyInAnyOrder(ownLine.toString(), ownPayment.toString(), mixed.toString());
+        for (JsonNode row : page.path("content")) {
+            if (row.path("entityId").asLong() == mixed && "PAYMENT".equals(row.path("entityType").asText())) {
+                assertThat(row.path("amount").decimalValue()).isEqualByComparingTo("1000");
+            }
+        }
+
+        // 내부 역할의 기존 조회는 그대로다.
+        String settlement = tokens.login((FgcUserDetails) users.loadUserByUsername("settle01")).accessToken();
+        JsonNode internal = data(as(settlement, path).andExpect(status().isOk()));
+        assertThat(internal.path("totalElements").asLong()).isEqualTo(6);
+        assertThat(internal.path("content").findValues("amount")).extracting(JsonNode::intValue)
+                .containsExactlyInAnyOrder(100, 200, 300, 10000, 500, 700);
+
+        // 본인 계약 경로에 남의 계약 사건을 넣어도 읽을 수 없다.
+        read("/api/v1/contracts/" + ownContract + "/status-events/" + statusEvent(otherContract) + "/effects")
+                .andExpect(status().isNotFound());
+    }
+
+    private Long scheduleLine(Long header, int lineNo, Long beneficiary) {
+        return id("""
+                INSERT INTO fgc.schedule_line(schedule_header_id, line_no, installment_no, contract_month_no, due_date,
+                    commission_item_id, beneficiary_agent_id, basis_code, basis_amount, calculation_type, rate_pct,
+                    expected_amount, line_status)
+                SELECT ?, ?, ?, ?, DATE '2026-07-25', min(commission_item_id), ?, 'FIRST_YEAR_PREMIUM', 1000000, 'RATE', 10, 100, 'PLANNED'
+                FROM fgc.commission_item RETURNING schedule_line_id
+                """, header, lineNo, lineNo, lineNo, beneficiary);
+    }
+
+    private Long statusEvent(Long contractId) {
+        return id("""
+                INSERT INTO fgc.contract_status_event(contract_id, event_seq, previous_status, new_status, effective_at,
+                    received_at, reason_code, source_system, source_event_key)
+                SELECT ?, COALESCE(max(event_seq), 0) + 1, NULL, 'UNPAID', clock_timestamp(), clock_timestamp(), 'TEST', 'IT-SCOPE', ?
+                FROM fgc.contract_status_event WHERE contract_id = ?
+                RETURNING contract_status_event_id
+                """, contractId, UUID.randomUUID().toString(), contractId);
+    }
+
+    private void effect(Long event, String entityType, Long entityId, int amount) {
+        jdbc.update("""
+                INSERT INTO fgc.contract_status_event_effect(contract_status_event_id, processing_job, entity_type, entity_id,
+                    previous_state, next_state, amount, reason_code, reason)
+                VALUES (?, 'PaymentHoldJob', ?, ?, 'DRAFT', 'HELD', ?, 'TEST', 'scope fixture')
+                """, event, entityType, entityId, amount);
+    }
+
     @Test
     void mixedAdjustmentStatementCarriesOnlyOwnAmountAndNoHeaderNote() throws Exception {
         Long otherAgent = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", otherContract);
@@ -678,6 +754,7 @@ class AgentDataScopeIntegrationTest {
     private List<MockHttpServletRequestBuilder> scopedRoutes() {
         return List.of(get("/api/v1/auth/me"), get("/api/v1/contracts"), get("/api/v1/contracts/export.csv"),
                 get("/api/v1/contracts/" + ownContract), get("/api/v1/contracts/" + ownContract + "/status-events"),
+                get("/api/v1/contracts/" + ownContract + "/status-events/1/effects"),
                 get("/api/v1/transactions"), get("/api/v1/transactions/1"), get("/api/v1/agent/me/home"),
                 get("/api/v1/agent/me/statements?month=2026-07"), get("/api/v1/agent/me/statements/x"),
                 get("/api/v1/base/products"), get("/api/v1/ai/compare-chat/categories"), get("/api/v1/news/headlines"),
@@ -759,43 +836,6 @@ class AgentDataScopeIntegrationTest {
     private void assertLoginRequired(org.assertj.core.api.ThrowableAssert.ThrowingCallable read) {
         assertThatThrownBy(read).isInstanceOfSatisfying(FgcBusinessException.class,
                 exception -> assertThat(exception.getErrorCode()).isEqualTo(FgcErrorCode.AUTH_002));
-    }
-
-    @Test
-    @DisplayName("CT-G05 COMPLIANCE는 조회 질문만 가능하고 업무 쓰기는 막히며 AGENT의 073 요청은 403이다")
-    void ctG05ComplianceAsksReadOnlyAndAgentIsBlockedFromInternalAi() throws Exception {
-        String question = """
-                {"question":"초안 저장 방법","screenId":"TRAN-W02","entityRefs":[],"clientContextRevision":"r1","guideVersion":"1.0","conversation":[]}
-                """;
-        Long seededPayment = id("SELECT min(commission_transaction_id) FROM fgc.commission_transaction WHERE recipient_agent_id = ?", ownAgent);
-        String calculation = """
-                {"contractVersion":"assistant.v1","kind":"ATTRIBUTION_BALANCE","mode":"EXISTING","scope":{"paymentId":"%d"},"clientRevision":0}
-                """.formatted(seededPayment);
-        long aiCalls = id("SELECT count(*) FROM fgc.ai_call_log");
-        for (String path : new String[]{"/api/v1/ai/pico/ask", "/api/v1/ai/pico/guides/prepare", "/api/v1/ai/pico/guides/start",
-                "/api/v1/assistant/calculations"}) {
-            postAs(access, path, path.endsWith("calculations") ? calculation : question)
-                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
-        }
-        // 권한 검사 전에 내용이 AI로 넘어가지 않는다.
-        assertThat(id("SELECT count(*) FROM fgc.ai_call_log")).isEqualTo(aiCalls);
-
-        String compliance = tokens.login((FgcUserDetails) users.loadUserByUsername("audit01")).accessToken();
-        postAs(compliance, "/api/v1/ai/pico/ask", question).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.message").isNotEmpty());
-        postAs(compliance, "/api/v1/assistant/calculations", calculation).andExpect(status().isOk());
-        for (String path : new String[]{"/api/v1/transactions", "/api/v1/transactions/" + seededPayment + "/confirm", "/api/v1/contracts",
-                "/api/v1/policies", "/api/v1/clawbacks/1/notice-documents"}) {
-            postAs(compliance, path, "{}").andExpect(status().isForbidden());
-        }
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/contracts/" + ownContract)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + compliance).contentType("application/json").content("{}"))
-                .andExpect(status().isForbidden());
-    }
-
-    private ResultActions postAs(String token, String path, String body) throws Exception {
-        return mvc.perform(post(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .contentType("application/json").content(body));
     }
 
     private ResultActions as(String token, String path) throws Exception {

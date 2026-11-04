@@ -186,13 +186,7 @@ final class CommissionPaymentSql {
             """;
 
     /** FUN-085: AGENT 몫이 아닌 귀속행이 섞인 지급 건의 본인 귀속 합계. 섞이지 않았으면 행이 없다. */
-    static final String FIND_OWN_AMOUNT_IF_MIXED = """
-            SELECT (SELECT COALESCE(SUM(ta.attributed_amount), 0)
-                      FROM fgc.transaction_attribution ta
-                     WHERE ta.commission_transaction_id = ct.commission_transaction_id AND %s) AS amount
-              FROM fgc.commission_transaction ct
-             WHERE ct.commission_transaction_id = :paymentId AND %s
-            """.formatted(AgentDataScopeService.ownAttribution("ta"), AgentDataScopeService.MIXED_PAYMENT);
+    static final String FIND_OWN_AMOUNT_IF_MIXED = AgentDataScopeService.ownAmountIfMixed(":paymentId");
 
     static final String FIND_CONFIRMATION_DATA_FOR_UPDATE = FIND_CONFIRMATION_DATA + "\nFOR UPDATE OF ct";
 

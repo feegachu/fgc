@@ -52,6 +52,16 @@ public class AgentDataScopeService {
                      WHERE other_ta.commission_transaction_id = ct.commission_transaction_id AND %s IS NOT TRUE)
             """.formatted(ownAttribution("other_ta"));
 
+    /** 지급 건(paymentId 표현식)에 남의 몫이 섞였으면 :agentId의 귀속 합계를 돌려주는 SQL. 섞이지 않았으면 행이 없다. */
+    public static String ownAmountIfMixed(String paymentId) {
+        return """
+                SELECT (SELECT COALESCE(SUM(ta.attributed_amount), 0) FROM fgc.transaction_attribution ta
+                         WHERE ta.commission_transaction_id = ct.commission_transaction_id AND %s) AS amount
+                  FROM fgc.commission_transaction ct
+                 WHERE ct.commission_transaction_id = %s AND %s
+                """.formatted(ownAttribution("ta"), paymentId, MIXED_PAYMENT);
+    }
+
     /**
      * 내부 역할은 null(전체 범위), AGENT는 세션도 DB의 최신 연결로 검사한다. 인증 문맥이 없으면 어느 쪽으로도 해석하지 않는다.
      * 비동기·LLM 스레드에서 문맥이 사라져도 전체 범위가 되지 않게 한다. 배치·예약 작업은 이 서비스를 거치는 조회를 쓰지 않는다.
