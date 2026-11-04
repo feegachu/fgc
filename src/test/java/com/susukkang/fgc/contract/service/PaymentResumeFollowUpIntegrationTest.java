@@ -209,7 +209,9 @@ class PaymentResumeFollowUpIntegrationTest {
         assertThat(recorded).extracting(ContractStatusEffect::entityType, ContractStatusEffect::entityId,
                         ContractStatusEffect::nextState, ContractStatusEffect::reasonCode)
                 .contains(tuple(EntityType.PAYMENT, lateDraft, "EXCLUDED", "NO_RETROACTIVE"),
-                        tuple(EntityType.SCHEDULE_LINE, replannedLine, "EXCLUDED", "NO_RETROACTIVE"));
+                        tuple(EntityType.SCHEDULE_LINE, replannedLine, "CANCELLED", "STATUS_INACTIVE"));
+        // 실효 기간 회차는 effect 만 비대상으로 남기지 않고 실제로도 다시 중단돼 스케줄 확정 대상이 되지 않는다.
+        assertThat(lineStatus(replannedLine)).isEqualTo("CANCELLED");
         assertThat(gate.blockers(lateDraft)).isNotEmpty();
     }
 

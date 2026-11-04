@@ -40,6 +40,7 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
     private static final String PLANNED = "PLANNED";
     private static final String RELEASED = "RELEASED";
     private static final String EXCLUDED = "EXCLUDED";
+    private static final String CANCELLED = "CANCELLED";
     private static final Set<String> RESUMABLE_LINE_STATES = Set.of("CANCELLED", "HOLD");
 
     private final ContractStatusPaymentRule rule;
@@ -67,6 +68,14 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
                 jdbc.update("""
                         UPDATE fgc.schedule_line SET line_status = 'PLANNED'
                          WHERE schedule_line_id = ? AND line_status IN ('CANCELLED', 'HOLD')
+                        """, effect.entityId());
+                recorded.add(effect);
+            } else if (effect.entityType() == EntityType.SCHEDULE_LINE && CANCELLED.equals(effect.nextState())) {
+                // 실효 기간 회차가 재생성 등으로 PLANNED 가 됐으면 소급하지 않고 다시 중단해 스케줄 확정 대상에서 뺀다(NO_RETROACTIVE).
+                // 규칙이 이미 확정·월잠금 회차를 걸러 냈지만 DB 상태가 그 사이 바뀌었을 수 있어 조건으로 한 번 더 지킨다.
+                jdbc.update("""
+                        UPDATE fgc.schedule_line SET line_status = 'CANCELLED'
+                         WHERE schedule_line_id = ? AND line_status NOT IN ('CONFIRMED', 'MATCHED', 'ADJUSTED')
                         """, effect.entityId());
                 recorded.add(effect);
             } else if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
