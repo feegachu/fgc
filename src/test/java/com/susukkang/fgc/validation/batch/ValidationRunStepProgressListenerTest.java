@@ -85,6 +85,18 @@ class ValidationRunStepProgressListenerTest {
         verify(lifecycleService).fail(eq(100L), eq(5), org.mockito.ArgumentMatchers.eq(parameters()), contains("boom"));
     }
 
+    /** SRC-074: 예외 메시지가 없으면 내부 Step 이름 대신 단계 번호로 실패를 알린다. */
+    @Test
+    void stepFailureWithoutMessageUsesStepNumberText() {
+        ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(5, false, lifecycleService, auditService);
+        StepExecution stepExecution = stepExecutionWithRunId(100L);
+        stepExecution.setStatus(BatchStatus.FAILED);
+
+        listener.afterStep(stepExecution);
+
+        verify(lifecycleService).fail(100L, 5, parameters(), "5단계에서 실패했습니다.");
+    }
+
     @Test
     void doesNothingWhenValidationRunIdIsMissing() {
         ValidationRunStepProgressListener listener = new ValidationRunStepProgressListener(1, true, lifecycleService, auditService);

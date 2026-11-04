@@ -101,7 +101,7 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   const rid = Number((await successful(creating)).validationRunId)
   await next.click()
   await expect(guide).toContainText('6/9')
-  await expect(guide).toContainText('202 수락은 완료가 아닙니다')
+  await expect(guide).toContainText('월 통합검증 계산이 끝나지 않았습니다')
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await expect
     .poll(() => sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${rid}`), { timeout: 120000 })

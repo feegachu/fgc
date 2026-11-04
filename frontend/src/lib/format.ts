@@ -157,13 +157,20 @@ export function internalErrorText(requestId?: string | null) {
     : '처리 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.'
 }
 
+// 연결이 끊기면 fetch가 브라우저마다 다른 영어 문구의 TypeError를 던진다(Chrome, Firefox, Safari 순).
+const NETWORK_FAILURE = /Failed to fetch|NetworkError when attempting to fetch resource|Load failed/
+
 /** 내부 오류 코드는 숨기고, 문의에 필요한 요청번호는 한 번만 표시한다. */
 export function errorText(
   error?: { message?: string; code?: string; requestId?: string | null } | null,
   fallbackMessage?: string,
 ) {
+  if (error instanceof TypeError && NETWORK_FAILURE.test(error.message))
+    return '연결이 끊겨 요청을 마치지 못했습니다. 잠시 뒤 다시 시도하세요.'
+  // 그 밖의 TypeError는 코드 결함이라 영어 원문 대신 기본 문구를 보인다.
+  const message = error instanceof TypeError ? undefined : error?.message
   return errorScreenMessage(
-    rateText((error && error.message) || fallbackMessage || '요청을 처리하지 못했습니다.'),
+    rateText(message || fallbackMessage || '요청을 처리하지 못했습니다.'),
     error?.requestId,
   )
 }

@@ -76,7 +76,7 @@ export function criteriaFromParams(params: URLSearchParams, workspaceMonth: stri
 }
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const { data } = await apiClient.request<T>(path, { signal })
-  if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (data == null) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
 export const capListQuery = (criteria: CapCriteria) =>
@@ -98,9 +98,9 @@ export const capDetailQuery = (id: string | number | null | undefined) => {
   return queryOptions({
     queryKey: ['cap-checks', 'detail', detailId],
     queryFn: async ({ signal }) => {
-      if (detailId === null) throw new Error('계산근거 ID가 없습니다.')
+      if (detailId === null) throw new Error('계산근거를 찾을 수 없습니다.')
       const data = await get<CapBasis>(`/api/v1/cap-checks/${encodeURIComponent(detailId)}/details`, signal)
-      if (!data.capCheck) throw new Error('응답 데이터를 확인할 수 없습니다.')
+      if (!data.capCheck) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
       return data
     },
     enabled: detailId !== null,

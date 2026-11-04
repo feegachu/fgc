@@ -18,6 +18,8 @@ import { destinations, settlementCatalog, titles, FLOW_VERSION } from './catalog
 import './settlement.css'
 import '../../transaction/payment-guide.css'
 import { Modal } from '../../../components/Modal'
+import guideMascot from '../assets/pico-guide.png'
+import { useWorkflowGuide } from '../workflow-state'
 
 const id = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
@@ -49,6 +51,14 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   const request = useRef<AbortController | null>(null)
   const epoch = useRef(0)
   const acknowledged = useRef('')
+  useEffect(() => useWorkflowGuide.subscribe((state, previous) => {
+    if (state.chatSequence !== previous.chatSequence) {
+      request.current?.abort()
+      setBusy(false)
+      setCollapsed(true)
+      runtime.current?.pause('USER_PAUSED')
+    }
+  }), [])
   const current = useRef({ location, user, selection })
   useLayoutEffect(() => {
     current.current = { ...current.current, location, user, selection }
@@ -370,12 +380,13 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         ref={card}
         style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
         className="settlement-guide"
+        data-guide-anchored={Boolean(snapshot?.target && !collapsed)}
         aria-label="전체 업무 가이드"
         aria-busy={busy}
       >
         <header>
           <img
-            src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`}
+            src={guideMascot}
             alt=""
             className="settlement-guide-mascot"
             width="32"

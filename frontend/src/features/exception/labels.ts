@@ -19,6 +19,23 @@ const summaryDescriptions = {
   OTHER: '상세 내용 확인 필요',
 } satisfies Record<ExceptionType, string>
 
+const sourceLabels: Record<string, string> = {
+  COMMISSION_TRANSACTION: '지급 건',
+  INSURANCE_CONTRACT: '계약',
+  SCHEDULE_HEADER: '스케줄',
+  JOURNAL_HEADER: '분개',
+  RECONCILIATION_RESULT: '대사 결과',
+  ARBITRAGE_CHECK: '차익거래 검증',
+  CAP_CHECK: '1,200% 판정',
+}
+
+/** 원천 참조를 화면 이름으로 보인다. 계약은 내부 번호 대신 계약번호를 쓰고, 모르는 유형만 'TYPE:ID' 원문으로 남긴다. */
+export function sourceReference(type?: string, id?: string, contractNo?: string) {
+  if (!type || !Object.hasOwn(sourceLabels, type)) return `${type ?? ''}:${id ?? ''}`
+  const shown = type === 'INSURANCE_CONTRACT' && contractNo ? contractNo : id
+  return `${sourceLabels[type]} ${shown ?? ''}`.trim()
+}
+
 export function exceptionSummaryDescription(type?: string) {
   return type && Object.hasOwn(summaryDescriptions, type)
     ? summaryDescriptions[type as ExceptionType]

@@ -8,6 +8,7 @@ import com.susukkang.fgc.common.code.ArbitrageCheckStatus;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.journal.domain.JournalType;
 
 import java.text.DecimalFormat;
 import java.time.LocalDate;
@@ -114,11 +115,14 @@ public record ExceptionOccurrenceResponse(
 
     private String formatValue(String key, JsonNode value, DecimalFormat amountFormat) {
         // #602: 저장된 증거 코드는 보존하고 기존 업무 코드의 한국어 라벨만 표시한다.
-        if (PAYMENT_STAGE_KEY.equals(key) || "resultStatus".equals(key)) {
+        if (PAYMENT_STAGE_KEY.equals(key) || "resultStatus".equals(key) || "journalType".equals(key)) {
             String code = value.asText();
             try {
                 if (PAYMENT_STAGE_KEY.equals(key)) {
                     return PaymentStage.valueOf(code).label();
+                }
+                if ("journalType".equals(key)) {
+                    return JournalType.valueOf(code).label();
                 }
                 // REVIEW_REQUIRED는 한도(검토필요)와 차익거래(자료부족)의 의미가 다르다.
                 return "ARBITRAGE_CHECK".equals(sourceEntityType)

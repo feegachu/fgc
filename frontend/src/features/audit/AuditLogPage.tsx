@@ -61,7 +61,7 @@ const columns: TableColumn<AuditLog>[] = [
     sortKey: 'userLoginId',
     sortable: true,
     width: '6.5rem',
-    render: (row) => row.userLoginId ?? 'BATCH',
+    render: (row) => row.userLoginId ?? '자동 처리',
   },
   {
     key: 'action',
@@ -83,7 +83,7 @@ const columns: TableColumn<AuditLog>[] = [
       </CategoryBadge>
     ),
   },
-  { key: 'entityId', label: '대상 ID', width: '6rem', render: (row) => dash(row.entityId) },
+  { key: 'entityId', label: '대상 번호', width: '6rem', render: (row) => dash(row.entityId) },
   {
     key: 'reason',
     label: '사유',
@@ -98,7 +98,7 @@ const columns: TableColumn<AuditLog>[] = [
     width: '7rem',
     render: (row) => dash(row.policyVersionId),
   },
-  { key: 'requestId', label: '요청 ID', width: '10rem', render: (row) => dash(row.requestId) },
+  { key: 'requestId', label: '요청번호', width: '10rem', render: (row) => dash(row.requestId) },
 ]
 
 export default function AuditLogPage() {
@@ -277,7 +277,7 @@ function AuditFilter({
         </div>
         <div className="filter-field audit-filter-entity-id">
           <label className="filter-field-label" htmlFor="f-entityId">
-            대상 ID
+            대상 번호
           </label>
           <input data-guide-feature="features.audit.audit-log-page.input-3" className="field-control" type="text" placeholder="4104" {...bind('entityId')} />
         </div>

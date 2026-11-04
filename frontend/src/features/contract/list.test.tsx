@@ -216,7 +216,7 @@ it('[FGC-FUN-018] 판매 종료 버전을 이름으로 복원·선택하고 검�
   await waitFor(() => expect(product).toBeEnabled())
   expect(product).toHaveValue('12')
   expect(product.selectedOptions[0]).toHaveTextContent('상반기 보험, 2026-H1-B')
-  expect(screen.queryByRole('option', { name: '선택된 ID: 12' })).toBeNull()
+  expect(screen.queryByRole('option', { name: '선택한 항목(목록에 없음)' })).toBeNull()
   const query = new URL(
     requests.find((path) => path.startsWith('/api/v1/base/products?'))!,
     'http://localhost',
@@ -273,7 +273,7 @@ it('해촉 설계사 URL 검색조건을 ID 대체문구 대신 이름과 상태
   const agent = screen.getByLabelText('모집 설계사') as HTMLSelectElement
   expect(agent).toHaveValue('7')
   expect(agent.selectedOptions[0]).toHaveTextContent('퇴사 설계사 (FC7) (해촉, 기준정보 사용중지)')
-  expect(screen.queryByRole('option', { name: '선택된 ID: 7' })).toBeNull()
+  expect(screen.queryByRole('option', { name: '선택한 항목(목록에 없음)' })).toBeNull()
   await user.click(screen.getByRole('button', { name: 'CSV 내보내기' }))
   expect(exportCsv).toHaveBeenCalledWith('/api/v1/contracts/export.csv?agentId=7', {
     filename: 'contracts.csv',

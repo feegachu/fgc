@@ -30,6 +30,7 @@ import { ActiveBadge, ClassificationBadge, RegimeEvidence, ScheduleStatusBadge }
 import {
   CALCULATION_TYPE,
   EMPTY,
+  generationReason,
   LINE_STATUS,
   PAYMENT_STAGE,
   responseLabel,
@@ -103,7 +104,7 @@ function ScheduleDetailView({ id }: { id: string }) {
   const regenerateDisabled = !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
   const reasons: string[] = []
   if (header) {
-    if (!canProcess) reasons.push('확정/재생성은 정산 담당자만 할 수 있습니다.')
+    if (!canProcess) reasons.push('확정과 재생성은 정산담당자와 시스템관리자만 할 수 있습니다.')
     if (header.activeYn !== true) reasons.push('사용 중인 버전이 아닙니다.')
     if (header.status === 'CONFIRMED') reasons.push('이미 확정된 스케줄입니다.')
     else if (header.status !== 'PLANNED') reasons.push('예정 상태에서만 확정할 수 있습니다.')
@@ -111,7 +112,7 @@ function ScheduleDetailView({ id }: { id: string }) {
   const showNote = header && (confirmDisabled || regenerateDisabled) && reasons.length > 0
   const retry = () => void detail.refetch()
   const loadError = !validId
-    ? '스케줄 ID를 확인할 수 없습니다.'
+    ? '스케줄을 찾을 수 없습니다.'
     : detail.isError
       ? errorText(detail.error, '예상 스케줄을 불러오지 못했습니다.')
       : null
@@ -175,7 +176,7 @@ function ScheduleDetailView({ id }: { id: string }) {
       <section data-guide-feature="features.schedule.schedule-detail-page.section" className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-header-title">
-            스케줄 헤더,{' '}
+            스케줄 기본정보,{' '}
             <span className="tabular-nums">스케줄 번호 {header ? value(header.scheduleHeaderId) : '-'}</span>
           </h2>
           {/* 지급단계는 이동 컨트롤이다(화면정의서 SCHE-W02, IF-API-28C). */}
@@ -217,7 +218,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             회차별 예상 금액
           </h2>
           <p className="schedule-detail-note">
-            줄마다 원 단위 <span className="tabular-nums">HALF_UP</span>으로 반올림한 뒤 합계를 냅니다
+            줄마다 원 단위로 반올림(5 이상 올림)한 뒤 더합니다
           </p>
         </header>
         <div
@@ -280,7 +281,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 </th>
                 {/* IF-API-28 ruleRef — 규칙 5 "근거 없는 숫자는 화면에 띄우지 않습니다" */}
                 <th scope="col" className="is-left">
-                  규칙 ID
+                  적용 규칙 번호
                 </th>
                 <th scope="col">지급 등록</th>
               </tr>
@@ -513,7 +514,7 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
       </div>
       <div>
         <dt>생성 사유, 일시</dt>
-        <dd>{join(header.generationReason, dateTime(header.generatedAt))}</dd>
+        <dd>{join(generationReason(header.generationReason), dateTime(header.generatedAt))}</dd>
       </div>
     </dl>
   )
@@ -585,7 +586,7 @@ function VersionRow({ version, current }: { version: ScheduleHeader; current: bo
         <Text content={version.policyVersionLabel} />
       </td>
       <td>
-        <Text content={version.generationReason} />
+        <Text content={generationReason(version.generationReason)} />
       </td>
       <td>{dateTime(version.generatedAt)}</td>
       <td className="is-left tabular-nums">{int(version.lineCount)}</td>

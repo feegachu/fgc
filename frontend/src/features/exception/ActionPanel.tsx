@@ -15,11 +15,13 @@ import { applyActionToCache, postAction } from './api'
 import type { ExceptionCase } from './api'
 import { JournalCorrectionModal } from './JournalCorrectionModal'
 import { availableActions, isActionable, JOURNAL_CORRECTION_TYPE, severityTone, statusTone, typeTone } from './rules'
+import { sourceReference } from './labels'
+import { decisionReasonText } from '../arbitrage/utils'
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
 function Detail({ item }: { item: ExceptionCase }) {
-  const reference = `${item.sourceEntityType ?? ''}:${item.sourceEntityId ?? ''}`
+  const reference = sourceReference(item.sourceEntityType, item.sourceEntityId, item.contractNo)
   return (
     <dl className="exception-detail-grid">
       <div>
@@ -90,7 +92,8 @@ function Detail({ item }: { item: ExceptionCase }) {
       </div>
       <div className="exception-detail-wide">
         <dt>설명</dt>
-        <dd>{rateText(dash(item.description))}</dd>
+        {/* 차익거래 예외는 판정 사유 원문을 설명으로 저장한다. 개발 용어 구절만 쉬운 말로 바꾼다. */}
+        <dd>{rateText(decisionReasonText(item.description))}</dd>
       </div>
       <div className="exception-detail-wide">
         <dt>참조</dt>
@@ -100,7 +103,7 @@ function Detail({ item }: { item: ExceptionCase }) {
               <span className="material-symbols-rounded" aria-hidden="true">
                 open_in_new
               </span>
-              <span>{reference}</span>
+              <span>{reference} 열기</span>
             </Link>
           ) : (
             reference

@@ -103,7 +103,7 @@ const columns: TableColumn<Journal>[] = [
     label: '원천',
     width: '10rem',
     render: (row) =>
-      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} #${row.sourceEntityId ?? EMPTY}`),
+      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} ${row.sourceEntityId ?? EMPTY}`),
   },
   {
     key: 'contract',
@@ -141,7 +141,7 @@ const columns: TableColumn<Journal>[] = [
   { key: 'reversal', label: '역분개 표시', width: '12rem', render: (row) => disclose(row.reversalOfJournalNo) },
 ]
 const lineColumns: TableColumn<JournalLine>[] = [
-  { key: 'no', label: '번호', width: '4rem', render: (row) => int(row.lineNo) },
+  { key: 'no', label: '줄', width: '4rem', render: (row) => int(row.lineNo) },
   {
     key: 'account',
     label: '계정과목',
@@ -184,12 +184,6 @@ export default function LedgerPage() {
           </p>
         </div>
       </header>
-      {params.get('imbalanceOnly') === 'true' && (
-        <p className="guidance guidance-neutral" role="status">
-          불균형만 조회하는 목록 필터는 지원하지 않습니다. 분개를 선택하면 연결된 검증 실행의 불균형을 확인할 수
-          있습니다.
-        </p>
-      )}
       <LedgerFilters
         key={JSON.stringify({ ...criteria, sort: '' }) + month + searched}
         criteria={criteria}
@@ -283,10 +277,10 @@ export default function LedgerPage() {
                       <Button data-guide-feature="features.ledger.ledger-page.button-2" variant="secondary" disabled={!canReverse} onClick={() => setAction('correction')}>
                         역분개 + 재기표
                       </Button>
-                      {!canReverse && <p>역분개는 SETTLEMENT/GA_ADMIN/SYSTEM_ADMIN 권한이 필요합니다.</p>}
+                      {!canReverse && <p>역분개는 정산담당자, GA관리자, 시스템관리자만 할 수 있습니다.</p>}
                     </>
                   ) : (
-                    <p>POSTED 상태이고 아직 역분개되지 않은 원분개만 처리할 수 있습니다.</p>
+                    <p>기표됨 상태이고 역분개하지 않은 분개만 처리할 수 있습니다.</p>
                   )}
                 </div>
               </>
@@ -394,7 +388,7 @@ function DetailSummary({ detail }: { detail: JournalDetail }) {
     ['원분개', disclose(detail.reversalOfJournalNo)],
     ['역분개', disclose(detail.reversedByJournalNo)],
     ['재기표', disclose(detail.repostedJournalNo)],
-    ['정정그룹', disclose(detail.correctionGroupKey)],
+    ['정정 묶음', detail.correctionGroupKey ? '있음' : EMPTY],
     ['적요', disclose(detail.description)],
   ] as const
   return (
@@ -448,7 +442,7 @@ function JournalActionModal({
         onClose()
         navigate(month ? withMonth(result.target, month) : result.target)
       } else {
-        toast(`역분개 ${result.journalHeaderId}을 생성했습니다.`, 'success')
+        toast('역분개를 생성했습니다.', 'success')
         await invalidateJournalCorrectionQueries(client)
         onClose()
       }
