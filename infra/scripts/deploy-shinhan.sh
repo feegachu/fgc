@@ -13,6 +13,7 @@ exec 9>"$state/deploy.lock"
 flock -n 9 || { echo 'Another Shinhan deployment is running'; exit 1; }
 release="$state/releases/$(date -u +%Y%m%dT%H%M%SZ)-${commit:0:12}-${BUILD_NUMBER:-manual}"
 mkdir -p "$release/nginx" "$release/previous" "$state/backups"
+# A failure that can follow the migration ends with false, not exit: exit skips this trap and its rollback order.
 trap 'echo "Shinhan production promotion failed; inspect DB/API/web state. Release: $release. DB is not automatically rolled back. To roll back after fgc.flyway_schema_history has 66, 72 or 73, restore the backup named in $release/db-backup-path.txt first, then start previous/compose.yaml." >&2' ERR
 python3 "$helper" origin "$public_url" > "$release/origin.txt"
 mapfile -t public < "$release/origin.txt"
@@ -36,6 +37,7 @@ compose=(docker compose --project-directory "$state" --env-file "$state/.env" --
 # SRC-065: this server is public and the demo seed passwords are published in the repository.
 # Refuse to deploy while a demo account still accepts one, or while V66 would give agent01 one.
 db_query() { "${compose[@]}" exec -T db psql -U fgc -d fgc -XAtq -v ON_ERROR_STOP=1; }
+published_logins=$(python3 "$helper" published-logins "$root")
 unprotected=$(python3 "$helper" unprotected-sql "$root" | db_query)
 if [[ -n "$unprotected" ]]; then
     echo "Demo accounts still accept a published seed password: $unprotected. Change or lock them first (seed spec section 5, SRC-065)." >&2
@@ -76,14 +78,14 @@ done
 if [[ "$ready" != 1 ]]; then
     "${compose[@]}" logs --tail=120 api
     echo 'API readiness failed; web was not upgraded'
-    exit 1
+    false
 fi
 # The running web already proxies to the new API, so a failed recheck closes the public entry (SRC-065).
 unprotected=$(python3 "$helper" unprotected-sql "$root" | db_query)
 if [[ -n "$unprotected" ]]; then
     "${compose[@]}" stop web
     echo "Demo accounts accept a published seed password after migration: $unprotected. Public web stopped; protect them and rerun (SRC-065)." >&2
-    exit 1
+    false
 fi
 "${compose[@]}" run --rm -T --no-deps web nginx -t
 "${compose[@]}" up -d --force-recreate --no-deps web
@@ -97,18 +99,28 @@ check_http() {
     echo "HTTP check failed: $url HTTP=$code (expected $expected)" >&2
     return 1
 }
+unknown_login='{"loginId":"__shinhan_deploy_probe__","password":"x"}'
 check_login() {
-    local base=$1 code
+    local base=$1 body=$2 code
     code=$(curl --connect-timeout 3 --max-time 15 -sS -o /dev/null -w '%{http_code}' \
         -X POST "$base/api/v1/auth/login" -H "Host: $domain" -H "Origin: $origin" \
         -H 'Content-Type: application/json' -H 'X-FGC-Client: web' \
-        -d '{"loginId":"__shinhan_deploy_probe__","password":"x"}')
+        -d @- <<< "$body")
     [[ "$code" == 401 ]] || { echo "Token login route HTTP=$code (expected 401)"; return 1; }
 }
 check_http http://127.0.0.1/login 200
-check_login http://127.0.0.1
+check_login http://127.0.0.1 "$unknown_login"
+# SRC-065: the hash check misses a published password hashed again, and an unknown account's 401 proves nothing.
+# Each demo account must refuse it. Bodies go through stdin, so the password reaches neither argv nor this log.
+while IFS=$'\t' read -r account body; do
+    if ! check_login http://127.0.0.1 "$body"; then
+        "${compose[@]}" stop web
+        echo "Published seed password was not refused for $account. Public web stopped; protect it and rerun (SRC-065)." >&2
+        false
+    fi
+done <<< "$published_logins"
 check_http "$origin/login" 200
-check_login "$origin"
+check_login "$origin" "$unknown_login"
 cp "$release/release.json" "$state/current.json"
 cp "$release/promotion.json" "$state/current-promotion.json"
 "${compose[@]}" ps

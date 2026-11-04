@@ -169,6 +169,14 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue(all(f"'{value}'" in sql for value in hashes))
         self.assertIn("account_status = 'ACTIVE'", sql)
 
+    def test_published_logins_cover_every_demo_account_with_one_password(self):
+        logins = release.published_logins(ROOT.parents[1])
+        self.assertEqual([name for name, _ in logins], list(release.SEED_ACCOUNTS))
+        bodies = [json.loads(body) for _, body in logins]
+        self.assertEqual([body["loginId"] for body in bodies], list(release.SEED_ACCOUNTS))
+        self.assertEqual(len({body["password"] for body in bodies}), 1)
+        self.assertTrue(bodies[0]["password"])
+
     def test_changed_image_template_fails_instead_of_silent_misconfiguration(self):
         with self.assertRaises(ValueError):
             release.adapt_nginx("server { listen 80; }")
@@ -176,7 +184,7 @@ class ReleaseTests(unittest.TestCase):
 
 class DeploymentTests(unittest.TestCase):
     def deploy(self, *, bad_revision=False, bad_digest=False, backup_failure=False, api_failure=False, public_failure=False,
-               unprotected_before="", unprotected_after="", agent_unset="f", demo_agent_pending="0"):
+               unprotected_before="", unprotected_after="", agent_unset="f", demo_agent_pending="0", login_accepted=""):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         base = pathlib.Path(directory.name)
@@ -233,7 +241,11 @@ if [[ "$*" == *'https://example.com/login'* && "$PUBLIC_FAILURE" == 1 ]]; then p
 elif [[ "$*" == *'/actuator/health'* ]]; then
   [[ "$API_FAILURE" == 0 ]] || exit 7
   printf '{"status":"UP"}'
-elif [[ "$*" == *'/api/v1/auth/login'* ]]; then printf 401
+elif [[ "$*" == *'/api/v1/auth/login'* ]]; then
+  printf 'curl-args %s\n' "$*" >> "$DEPLOY_LOG"
+  account=$(sed -E 's/.*"loginId": *"([^"]*)".*/\1/')
+  printf 'login %s\n' "$account" >> "$DEPLOY_LOG"
+  if [[ "$account" == "$LOGIN_ACCEPTED" ]]; then printf 200; else printf 401; fi
 else printf 200
 fi
 ''',
@@ -255,6 +267,7 @@ fi
                             "PUBLIC_FAILURE": str(int(public_failure)),
                             "UNPROTECTED_BEFORE": unprotected_before, "UNPROTECTED_AFTER": unprotected_after,
                             "AGENT_UNSET": agent_unset, "DEMO_AGENT_PENDING": demo_agent_pending,
+                            "LOGIN_ACCEPTED": login_accepted,
                             "PYTHONUTF8": "1", "FGC_PUBLIC_URL": "https://example.com", "TEST_BIN": bin_dir.as_posix(), "TEST_HOME": home.as_posix()}
         bootstrap = 'if command -v cygpath >/dev/null; then export PATH="$(cygpath -u "$TEST_BIN"):/usr/bin:/bin"; export HOME="$(cygpath -u "$TEST_HOME")"; else export PATH="$TEST_BIN:/usr/bin:/bin"; fi; exec bash "$@"'
         result = subprocess.run([bash, "-c", bootstrap, "test", str(ROOT / "deploy-shinhan.sh"), str(promotion_path)],
@@ -277,6 +290,9 @@ fi
         self.assertLess(log.index("protection-check"), log.index("pg_dump"))
         self.assertEqual(log.count("protection-check"), 2)
         self.assertIn("out-of-order=false", log)
+        logins = [line.split()[1] for line in log.splitlines() if line.startswith("login ")]
+        self.assertEqual(logins, ["__shinhan_deploy_probe__", *release.SEED_ACCOUNTS, "__shinhan_deploy_probe__"])
+        self.assertLess(log.index("up -d --force-recreate"), log.index("login admin"))
 
     def test_demo_agent_migrations_pending_enable_out_of_order_only_for_that_run(self):
         result, state, log = self.deploy(demo_agent_pending="3")
@@ -305,6 +321,17 @@ fi
         self.assertIn("stop web", log)
         self.assertNotIn("up -d --force-recreate", log)
         self.assertFalse((state / "current.json").exists())
+        self.assertIn("db-backup-path.txt", result.stderr)
+
+    def test_published_password_login_not_refused_stops_public_web(self):
+        result, state, log = self.deploy(login_accepted="agent01")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stop web", log)
+        self.assertFalse((state / "current.json").exists())
+        self.assertIn("refused for agent01", result.stderr)
+        self.assertIn("db-backup-path.txt", result.stderr)
+        password = json.loads(release.published_logins(ROOT.parents[1])[0][1])["password"]
+        self.assertNotIn(password, result.stdout + result.stderr + log)
 
     def test_wrong_revision_never_mutates_deployment(self):
         result, state, log = self.deploy(bad_revision=True)
@@ -336,6 +363,7 @@ fi
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("up -d --force-recreate", log)
         self.assertFalse((state / "current.json").exists())
+        self.assertIn("db-backup-path.txt", result.stderr)
 
 
 if __name__ == "__main__":
