@@ -65,7 +65,14 @@ fresh_db() {
   docker run -d --name "$DB" --network "$NET" --memory 1g \
     -e POSTGRES_DB=fgc -e POSTGRES_USER=fgc -e POSTGRES_HOST_AUTH_METHOD=trust -e TZ=Asia/Seoul \
     "$PG_IMAGE" -c shared_preload_libraries=pg_stat_statements -c track_io_timing=on -c track_wal_io_timing=on >/dev/null
-  until psql_db -c 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements' >/dev/null 2>&1; do sleep 1; done
+  local _
+  for _ in $(seq 1 60); do
+    psql_db -c 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements' >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  docker logs --tail 20 "$DB"
+  echo "DB가 뜨지 않았다" >&2
+  exit 1
 }
 
 # start_app <환경변수=값>... compose와 다른 점은 Flyway 위치(db/demo-agent 없음, 시드명세 §50)와 GC 로그 뿐이다.
