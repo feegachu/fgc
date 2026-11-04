@@ -32,6 +32,7 @@ docker run --rm --network none --entrypoint cat "${images[1]}" \
 python3 "$helper" verify "$release"
 cp "$root/infra/shinhan/compose.yaml" "$release/compose.yaml"
 cp "$root/infra/shinhan/nginx-guard.conf" "$release/nginx/guard.conf"
+cp "$root/infra/shinhan/nginx-http.conf" "$release/nginx/http.conf"
 compose=(docker compose --project-directory "$state" --env-file "$state/.env" --env-file "$release/release.env" -f "$release/compose.yaml")
 "${compose[@]}" config --quiet
 # SRC-065: this server is public and the demo seed passwords are published in the repository.

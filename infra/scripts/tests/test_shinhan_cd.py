@@ -285,6 +285,9 @@ fi
         pulls = [line for line in log.splitlines() if line.startswith("pull ")]
         self.assertEqual(pulls, ["pull " + API, "pull " + WEB])
         self.assertIn("SPRING_PROFILES_ACTIVE: prod", (state / "compose.yaml").read_text())
+        self.assertIn("/etc/nginx/conf.d/fgc-http.conf:ro", (state / "compose.yaml").read_text())
+        self.assertIn("limit_req_zone", (state / "nginx/http.conf").read_text(encoding="utf-8"))
+        self.assertIn("limit_req zone=fgc_login ", (state / "nginx/guard.conf").read_text(encoding="utf-8"))
         self.assertEqual(len(list((state / "backups").glob("*.dump"))), 1)
         self.assertLess(log.index("pg_dump"), log.index("up -d db api"))
         self.assertLess(log.index("nginx -t"), log.index("up -d --force-recreate"))

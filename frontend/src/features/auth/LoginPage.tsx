@@ -64,7 +64,9 @@ export function LoginPage() {
       setError(
         caught instanceof ApiError && caught.code === 'FGC-AUTH-001'
           ? authMessages.invalidCredentials
-          : authErrorText(caught),
+          : caught instanceof ApiError && caught.status === 429
+            ? authMessages.tooManyAttempts
+            : authErrorText(caught),
       )
     } finally {
       submitting.current = false
