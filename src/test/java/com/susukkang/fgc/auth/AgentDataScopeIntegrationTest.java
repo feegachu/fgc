@@ -650,6 +650,24 @@ class AgentDataScopeIntegrationTest {
         // 본인 계약 경로에 남의 계약 사건을 넣어도 읽을 수 없다.
         read("/api/v1/contracts/" + ownContract + "/status-events/" + statusEvent(otherContract) + "/effects")
                 .andExpect(status().isNotFound());
+
+        // 이력의 영향 건수는 남의 행까지 세므로 AGENT 응답에 싣지 않는다.
+        jdbc.update("INSERT INTO fgc.contract_event_job(contract_status_event_id, processing_job, state, attempt_count)"
+                + " VALUES (?, 'PaymentHoldJob', 'SUCCEEDED', 1)", event);
+        jdbc.update("INSERT INTO fgc.contract_status_event_processing(contract_status_event_id, processing_job, processing_status)"
+                + " VALUES (?, 'PaymentHoldJob', 'SUCCEEDED')", event);
+        String history = "/api/v1/contracts/" + ownContract + "/status-events";
+        assertThat(processing(data(read(history).andExpect(status().isOk())), event).path("summary").isNull()).isTrue();
+        JsonNode summary = processing(data(as(settlement, history).andExpect(status().isOk())), event).path("summary");
+        assertThat(summary.path("heldPayments").asInt()).isEqualTo(4);
+        assertThat(summary.path("changedScheduleLines").asInt()).isEqualTo(2);
+    }
+
+    private static JsonNode processing(JsonNode events, Long eventId) {
+        for (JsonNode event : events) {
+            if (event.path("eventId").asLong() == eventId) return event.path("processings").get(0);
+        }
+        throw new AssertionError("사건이 이력에 없다: " + eventId);
     }
 
     private Long scheduleLine(Long header, int lineNo, Long beneficiary) {
