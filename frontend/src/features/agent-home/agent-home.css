@@ -162,7 +162,7 @@
   & .ah-status-legend em { margin-left: auto; font-style: normal; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* 상품 추천 AI 런처: 오른쪽 아래에 떠 있는 마스코트와 회전 테두리 라벨(#739 디자인) */
-  & .ah-launcher { position: fixed; right: 28px; bottom: 26px; z-index: 85; display: grid; place-items: center; width: 132px; height: 132px; padding: 0; background: none; border: 0; cursor: pointer; }
+  & .ah-launcher { position: fixed; right: 28px; bottom: 26px; z-index: calc(var(--z-overlay, 80) - 3); display: grid; place-items: center; width: 132px; height: 132px; padding: 0; background: none; border: 0; cursor: pointer; }
   /* 캐릭터 자체는 가만히 있는 모션(Bear Still)이고, 런처 전체가 위아래로 떠다닌다 */
   & .ah-launcher-mascot { display: block; filter: drop-shadow(0 6px 10px rgb(15 23 42 / 22%)); animation: ah-float 3.2s ease-in-out infinite; will-change: transform; }
   & .ah-launcher:hover .ah-launcher-mascot, & .ah-launcher:focus-visible .ah-launcher-mascot { animation-play-state: paused; }
