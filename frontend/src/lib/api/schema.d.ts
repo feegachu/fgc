@@ -5285,6 +5285,7 @@ export interface components {
             validationTargetId?: number;
         };
         AssistantCalculationLine: {
+            cashflowType?: string;
             sourceId?: string;
             contractId?: string;
             commissionItemId?: string;
@@ -5300,7 +5301,6 @@ export interface components {
             expectedAmount?: string;
             ruleId?: string;
             status?: string;
-            cashflowType?: string;
         };
         AssistantCalculationValidity: {
             stateToken?: string;
