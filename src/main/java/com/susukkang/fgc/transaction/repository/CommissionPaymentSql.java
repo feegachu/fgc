@@ -1,5 +1,7 @@
 package com.susukkang.fgc.transaction.repository;
 
+import com.susukkang.fgc.common.security.AgentDataScopeService;
+
 /**
  * 설명 : 지급 검색·집계 및 선택적 잠금에 필요한 PostgreSQL SQL.
  * JSON 스냅샷, 월 구간, LATERAL 배열 순서, FOR UPDATE OF와 기존 조건을 보존한다.
@@ -76,7 +78,7 @@ final class CommissionPaymentSql {
                            ct.commission_item_id,
                            item.item_code AS commission_item_code,
                            item.item_name AS commission_item_name,
-                           ct.amount,
+                           __AMOUNT__ AS amount,
                            ct.cashflow_type,
                            CASE ct.cashflow_type WHEN 'PAYMENT' THEN '지급' WHEN 'DEDUCTION' THEN '차감' END
                                AS cashflow_type_label,
@@ -84,7 +86,7 @@ final class CommissionPaymentSql {
                            CASE ct.status WHEN 'DRAFT' THEN '작성중' WHEN 'CONFIRMED' THEN '확정' WHEN 'CANCELLED' THEN '취소' END
                                AS status_label,
                            COUNT(attribution.transaction_attribution_id)::integer AS attribution_count,
-                           ct.amount - COALESCE(SUM(attribution.attributed_amount), 0) AS difference_amount
+                           __AMOUNT__ - COALESCE(SUM(attribution.attributed_amount), 0) AS difference_amount
                       FROM fgc.commission_transaction ct
                       JOIN fgc.commission_item item
                         ON item.commission_item_id = ct.commission_item_id
@@ -93,7 +95,7 @@ final class CommissionPaymentSql {
                       LEFT JOIN fgc.insurance_contract source_contract
                         ON source_contract.contract_id = ct.source_contract_id
                       LEFT JOIN fgc.transaction_attribution attribution
-                        ON attribution.commission_transaction_id = ct.commission_transaction_id
+                        ON attribution.commission_transaction_id = ct.commission_transaction_id __OWN_ATTRIBUTION__
             __FILTER__
                      GROUP BY ct.commission_transaction_id, agent.agent_name, item.item_code, item.item_name
                      __ORDER__
@@ -179,9 +181,18 @@ final class CommissionPaymentSql {
                    ta.evidence_ref,
                    ta.attribution_method
               FROM fgc.transaction_attribution ta
-             WHERE ta.commission_transaction_id = :paymentId
+             WHERE ta.commission_transaction_id = :paymentId __OWN_ATTRIBUTION__
              ORDER BY ta.attribution_seq
             """;
+
+    /** FUN-085: AGENT 몫이 아닌 귀속행이 섞인 지급 건의 본인 귀속 합계. 섞이지 않았으면 행이 없다. */
+    static final String FIND_OWN_AMOUNT_IF_MIXED = """
+            SELECT (SELECT COALESCE(SUM(ta.attributed_amount), 0)
+                      FROM fgc.transaction_attribution ta
+                     WHERE ta.commission_transaction_id = ct.commission_transaction_id AND %s) AS amount
+              FROM fgc.commission_transaction ct
+             WHERE ct.commission_transaction_id = :paymentId AND %s
+            """.formatted(AgentDataScopeService.ownAttribution("ta"), AgentDataScopeService.MIXED_PAYMENT);
 
     static final String FIND_CONFIRMATION_DATA_FOR_UPDATE = FIND_CONFIRMATION_DATA + "\nFOR UPDATE OF ct";
 

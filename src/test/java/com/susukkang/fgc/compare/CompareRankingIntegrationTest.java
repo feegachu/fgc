@@ -125,6 +125,43 @@ class CompareRankingIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.ai_call_log", Long.class)).isEqualTo(aiCalls);
     }
 
+    /** CT-A01: 두 설계사가 API로 만든 실제 순위 결과. 본인 결과는 게이트웨이까지 가고, 남의 결과는 그 전에 막힌다. */
+    @Test
+    void anotherAgentsRealRankResultNeverReachesTheGatewayButTheOwnResultDoes() throws Exception {
+        Long agentB = jdbc.queryForObject("SELECT agent_id FROM fgc.agent WHERE agent_code = 'A-FC-002'", Long.class);
+        jdbc.update("""
+                INSERT INTO fgc.app_user(login_id, password_hash, user_name, role_id, agent_id, account_status)
+                VALUES ('agent-b-compare', 'unused', '교차 검증 설계사', (SELECT role_id FROM fgc.app_role WHERE role_code = 'AGENT'), ?, 'ACTIVE')
+                """, agentB);
+        String rankBody = "{\"categoryCode\":\"HEALTH_PROTECTION\"}";
+        String resultB = data(post(RANK, token("agent-b-compare"), rankBody).andExpect(status().isOk())).path("rankResultId").asText();
+        String resultA = data(post(RANK, agentToken, rankBody).andExpect(status().isOk())).path("rankResultId").asText();
+        assertThat(resultB).isNotBlank().isNotEqualTo(resultA);
+        assertThat(store.find(agentB, resultA)).isEmpty();
+        long aiCalls = jdbc.queryForObject("SELECT count(*) FROM fgc.ai_call_log", Long.class);
+
+        post("/api/v1/ai/compare-chat/explain", agentToken, "{\"rankResultId\":\"" + resultB + "\"}")
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
+        post("/api/v1/ai/compare-chat/ask", agentToken, "{\"rankResultId\":\"" + resultB + "\",\"question\":\"1순위 이유는?\"}")
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FGC-AUTH-003"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.ai_call_log", Long.class)).isEqualTo(aiCalls);
+
+        // 대조군: 본인 결과는 게이트웨이까지 간다(시험 환경은 키가 없어 건너뜀으로 기록). 위 단언이 헛돌지 않는다는 증거다.
+        post("/api/v1/ai/compare-chat/explain", agentToken, "{\"rankResultId\":\"" + resultA + "\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.summarySource").value("RULE"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.ai_call_log", Long.class)).isEqualTo(aiCalls + 1);
+    }
+
+    @Test
+    void agentIdInTheRankBodyIsIgnored() throws Exception {
+        Long otherAgent = jdbc.queryForObject("SELECT agent_id FROM fgc.agent WHERE agent_code = 'A-FC-002'", Long.class);
+        JsonNode own = data(post(RANK, agentToken, "{\"categoryCode\":\"HEALTH_PROTECTION\"}").andExpect(status().isOk()));
+        JsonNode claimed = data(post(RANK, agentToken, "{\"categoryCode\":\"HEALTH_PROTECTION\",\"agentId\":" + otherAgent + "}")
+                .andExpect(status().isOk()));
+        assertThat(claimed.path("basePremium")).isEqualTo(own.path("basePremium"));
+        assertThat(claimed.path("capSummary")).isEqualTo(own.path("capSummary"));
+    }
+
     @Test
     void onlyAgentsCanUseTheCompareChat() throws Exception {
         post(RANK, token("gaadmin"), "{\"categoryCode\":\"HEALTH_PROTECTION\"}").andExpect(status().isForbidden());

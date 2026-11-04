@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * FUN-086 설계사 홈 조회. 모든 쿼리는 본인 계약 범위(담당 설계사 또는 유지 관리 담당 이력)만 읽는다.
+ * FUN-086 설계사 홈 조회. 모든 쿼리는 본인 계약(최초 연결 설계사)만 읽는다.
  * 범위 조건은 {@code AgentDataScopeService.requireContract} 와 같은 식이다.
  */
 @Repository
@@ -23,13 +23,7 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class AgentHomeRepository {
 
-    private static final String SCOPED = """
-            (c.agent_id = :agentId OR EXISTS (
-                SELECT 1 FROM fgc.contract_manager_assignment a
-                 WHERE a.contract_id = c.contract_id AND a.agent_id = :agentId
-                   AND a.assignment_type = 'MAINTENANCE_MANAGER'
-                   AND a.effective_from <= :today AND (a.effective_to IS NULL OR a.effective_to >= :today)))
-            """;
+    private static final String SCOPED = "c.agent_id = :agentId\n";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -50,13 +44,13 @@ public class AgentHomeRepository {
                               String requestHash) {
     }
 
-    public Optional<LocalDate> firstContractDate(long agentId, LocalDate today) {
+    public Optional<LocalDate> firstContractDate(long agentId) {
         return jdbc.query("SELECT min(c.contract_date) FROM fgc.insurance_contract c WHERE " + SCOPED,
-                new MapSqlParameterSource("agentId", agentId).addValue("today", today),
+                new MapSqlParameterSource("agentId", agentId),
                 (rs, row) -> rs.getObject(1, LocalDate.class)).stream().filter(java.util.Objects::nonNull).findFirst();
     }
 
-    public List<PortfolioRow> portfolio(long agentId, LocalDate today, LocalDate from, LocalDate to,
+    public List<PortfolioRow> portfolio(long agentId, LocalDate from, LocalDate to,
                                         OffsetDateTime asOfEnd, String insurerType, Long insurerId) {
         StringBuilder sql = new StringBuilder("""
                 SELECT c.contract_id, c.insurer_id, i.insurer_name, c.contract_date, c.monthly_equivalent_first_premium,
@@ -70,7 +64,7 @@ public class AgentHomeRepository {
                   LEFT JOIN fgc.product p ON p.product_id = o.product_id
                  WHERE c.contract_date BETWEEN :from AND :to AND
                 """).append(SCOPED);
-        MapSqlParameterSource params = new MapSqlParameterSource("agentId", agentId).addValue("today", today)
+        MapSqlParameterSource params = new MapSqlParameterSource("agentId", agentId)
                 .addValue("from", from).addValue("to", to).addValue("asOfEnd", asOfEnd);
         if (insurerType != null) {
             sql.append(" AND i.insurer_type = :insurerType");
@@ -106,7 +100,7 @@ public class AgentHomeRepository {
      * 확인할 계약 후보. 최신 확인(checked_at, id 내림차순) 이후의 새 사건·보류만 다시 후보가 된다.
      * 정렬: 후속일↑(후속 확인 사유가 있을 때만) → 마지막 사건 효력일↓ → 계약 ID↑.
      */
-    public List<Candidate> candidates(long agentId, LocalDate today, LocalDate asOf, OffsetDateTime asOfEnd,
+    public List<Candidate> candidates(long agentId, LocalDate asOf, OffsetDateTime asOfEnd,
                                       OffsetDateTime recentFrom, List<String> eventStatuses, int limit) {
         String sql = """
                 WITH last_check AS (
@@ -173,7 +167,7 @@ public class AgentHomeRepository {
                           last_effective_at DESC NULLS LAST, contract_id ASC
                  LIMIT :limit
                 """;
-        MapSqlParameterSource params = new MapSqlParameterSource("agentId", agentId).addValue("today", today)
+        MapSqlParameterSource params = new MapSqlParameterSource("agentId", agentId)
                 .addValue("asOf", asOf).addValue("asOfEnd", asOfEnd).addValue("recentFrom", recentFrom)
                 .addValue("eventStatuses", eventStatuses).addValue("limit", limit)
                 .addValue("month", asOf.withDayOfMonth(1));
