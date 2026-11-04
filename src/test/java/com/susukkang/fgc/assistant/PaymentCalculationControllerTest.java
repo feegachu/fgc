@@ -74,7 +74,7 @@ class PaymentCalculationControllerTest {
         when(payments.get(77L)).thenReturn(PaymentCalculationServiceTest.payment(com.susukkang.fgc.common.code.CommissionPaymentStatus.DRAFT,"100000","60000","30000"));
         var preview = new com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse.CapPreviewItem(3L,"C-3",com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC,"GA→설계사",java.time.LocalDate.of(2026,10,1),100000L,null,null,200000L,0L,100000L,100000L,100000L,"50",com.susukkang.fgc.common.code.CapResultStatus.NORMAL,"정상",9L,null,null,null);
         when(payments.precheck(77L)).thenReturn(new com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse(77L,java.util.List.of(preview),java.util.List.of(),true));
-        var actual = new PaymentCalculationService(payments,mapper, mock(com.susukkang.fgc.assistant.service.AssistantCalculationSources.class));
+        var actual = new PaymentCalculationService(payments,mapper, mock(com.susukkang.fgc.assistant.service.AssistantCalculationSources.class),mock(com.susukkang.fgc.assistant.service.AssistantPaymentCandidate.class));
         when(service.calculate(any())).thenAnswer(invocation -> actual.calculate(invocation.getArgument(0)));
         for (String kind : java.util.List.of("ATTRIBUTION_BALANCE","PAYMENT_CANDIDATE")) {
             String json = mvc.perform(post("/api/v1/assistant/calculations").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT"))).contentType(MediaType.APPLICATION_JSON).content(body.replace("ATTRIBUTION_BALANCE",kind)))

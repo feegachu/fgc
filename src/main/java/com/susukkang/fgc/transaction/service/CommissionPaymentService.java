@@ -28,5 +28,8 @@ public interface CommissionPaymentService {
     // IF-API-24 — 저장·상태 변경 없이 확정 게이트를 미리 계산한다 (FGC-FUN-033)
     TransactionPrecheckResponse precheck(Long paymentId);
 
+    /** Same preparation and confirmation gates on a SELECT-only candidate projection. */
+    TransactionPrecheckResponse precheckCandidate(CommissionPaymentCreateRequest request, Long replacedPaymentId);
+
     PageResponse<CommissionPaymentListResponse> search(CommissionPaymentSearchCondition condition, int page, int size);
 }

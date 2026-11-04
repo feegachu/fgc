@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.susukkang.fgc.transaction.repository.CommissionPaymentSql.*;
+import com.susukkang.fgc.transaction.domain.PaymentCandidateProjection;
 
 /**
  * 설명 : 지급 조회 DTO와 확정 시점의 판정 입력 조회. 단순 조회는 공유 JPA·JPQL을 사용한다.
@@ -291,8 +292,19 @@ public class CommissionPaymentQueryRepository {
         return queryConfirmationData(FIND_CONFIRMATION_DATA, paymentId);
     }
 
+    public List<ConfirmationData> findCandidateConfirmationData(PaymentCandidateProjection candidate) {
+        return queryConfirmationData(FIND_CONFIRMATION_DATA,candidate.paymentId(),candidate);
+    }
+    private NativeQuery<?> candidateQuery(String sql,PaymentCandidateProjection candidate) {
+        NativeQuery<?> query=nativeQuery(candidate==null?sql:candidate.sql(sql));
+        if(candidate!=null)candidate.bind(query);
+        return query;
+    }
     private List<ConfirmationData> queryConfirmationData(String sql, Long paymentId) {
-        NativeQuery<?> query = nativeQuery(sql);
+        return queryConfirmationData(sql,paymentId,null);
+    }
+    private List<ConfirmationData> queryConfirmationData(String sql,Long paymentId,PaymentCandidateProjection candidate) {
+        NativeQuery<?> query = candidateQuery(sql,candidate);
         query.setParameter("paymentId", paymentId);
         query.addScalar("payment_id", Long.class);
         query.addScalar("status", String.class);
@@ -348,8 +360,9 @@ public class CommissionPaymentQueryRepository {
         )).getResultList();
     }
 
-    public List<AttributedContractNo> findAttributedContractNumbers(Long paymentId) {
-        NativeQuery<?> query = nativeQuery(FIND_ATTRIBUTED_CONTRACT_NUMBERS);
+    public List<AttributedContractNo> findAttributedContractNumbers(Long paymentId) { return findAttributedContractNumbers(paymentId,null); }
+    public List<AttributedContractNo> findAttributedContractNumbers(Long paymentId, PaymentCandidateProjection candidate) {
+        NativeQuery<?> query = candidateQuery(FIND_ATTRIBUTED_CONTRACT_NUMBERS,candidate);
         query.setParameter("paymentId", paymentId);
         query.addScalar("contract_id", Long.class);
         query.addScalar("contract_no", String.class);
@@ -366,8 +379,9 @@ public class CommissionPaymentQueryRepository {
                 .getResultList();
     }
 
-    public CapRuleSnapshot findCapRuleSnapshot(Long paymentId, Long transactionAttributionId) {
-        NativeQuery<?> query = nativeQuery(FIND_CAP_RULE_SNAPSHOT);
+    public CapRuleSnapshot findCapRuleSnapshot(Long paymentId, Long transactionAttributionId) { return findCapRuleSnapshot(paymentId, transactionAttributionId,null); }
+    public CapRuleSnapshot findCapRuleSnapshot(Long paymentId, Long transactionAttributionId, PaymentCandidateProjection candidate) {
+        NativeQuery<?> query = candidateQuery(FIND_CAP_RULE_SNAPSHOT,candidate);
         query.setParameter("paymentId", paymentId);
         query.setParameter("transactionAttributionId", transactionAttributionId);
         query.addScalar("cap_rule_set_id", Long.class);
@@ -400,8 +414,9 @@ public class CommissionPaymentQueryRepository {
                 .getResultList().stream().findFirst().map(Object::toString).orElse(null);
     }
 
-    public boolean existsApplicableCapRuleSet(Long paymentId, Long transactionAttributionId) {
-        NativeQuery<?> query = nativeQuery(EXISTS_APPLICABLE_CAP_RULE_SET);
+    public boolean existsApplicableCapRuleSet(Long paymentId, Long transactionAttributionId) { return existsApplicableCapRuleSet(paymentId, transactionAttributionId,null); }
+    public boolean existsApplicableCapRuleSet(Long paymentId, Long transactionAttributionId, PaymentCandidateProjection candidate) {
+        NativeQuery<?> query = candidateQuery(EXISTS_APPLICABLE_CAP_RULE_SET,candidate);
         query.setParameter("paymentId", paymentId);
         query.setParameter("transactionAttributionId", transactionAttributionId);
         return query.setTupleTransformer((row, aliases) -> (Boolean) row[0])

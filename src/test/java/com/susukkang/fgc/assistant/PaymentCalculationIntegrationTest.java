@@ -207,6 +207,38 @@ class PaymentCalculationIntegrationTest {
         } finally {writer.shutdownNow();assertThat(writer.awaitTermination(5,TimeUnit.SECONDS)).isTrue();}
     }
 
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper candidateMapper;
+    private PaymentCalculationRequest candidateRequest(String operation,String amount) {
+        var source=payments.get(paymentId);
+        var candidate=candidateMapper.createObjectNode().put("operation",operation);
+        var payment=candidate.putObject("payment");payment.put("sourceType",source.sourceType());payment.put("sourceBusinessKey",source.sourceBusinessKey());payment.put("contractId",contractId.toString());payment.put("agentId",source.agentId().toString());payment.put("commissionItemId",source.commissionItemId().toString());payment.put("amount",amount);payment.put("settlementMonth","2026-07");payment.put("cashflowType",source.cashflowType());payment.put("scheduledPaymentDate",source.scheduledPaymentDate().toString());payment.put("paymentStage",source.paymentStage().name());payment.put("allocationPolicyVersion",source.allocationPolicyVersion().toString());payment.put("evidenceRef",source.evidenceRef());payment.put("note",source.note());
+        var row=payment.putArray("attributions").addObject();row.put("contractId",contractId.toString());row.put("attributionDate","2026-07-31");row.put("amount",amount);row.put("inclusionDecisionStatus","INCLUDED");row.put("exclusionType","NONE");row.put("inclusionDecisionReason","IT-733 snapshot");row.put("allocationBasis","DIRECT");row.put("evidenceRef","IT-733-EVIDENCE");row.put("attributionMethod","DIRECT");
+        return new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE,PaymentCalculationRequest.Mode.HYPOTHETICAL,operation.equals("REPLACE_DRAFT")?new PaymentCalculationRequest.Scope(paymentId.toString()):null,candidate,5L);
+    }
+    @Test void hypotheticalReplacementUsesRealGateAndDoesNotChangeAnySource() {
+        var before=counts();var source=paymentRow();var rows=attributionRows();var expected=payments.precheck(paymentId);
+        var same=calculations.calculate(candidateRequest("REPLACE_DRAFT","100000"));
+        assertThat(same.confirmable()).isEqualTo(expected.confirmable());assertThat(same.blockers().stream().map(com.susukkang.fgc.assistant.dto.PaymentCalculationSnapshot.Reason::code).toList()).containsExactlyElementsOf(expected.blockers().stream().map(com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse.Blocker::code).toList());
+        var changed=calculations.calculate(candidateRequest("REPLACE_DRAFT","120000"));
+        assertThat(changed.evidenceKind()).isEqualTo("HYPOTHETICAL");assertThat(changed.validity()).isNull();assertThat(changed.recommendation().allowed()).isFalse();
+        assertThat(changed.capPreview()).anySatisfy(row->assertThat(row.get("candidateAmount")).isEqualTo("120000"));
+        assertThat(paymentRow()).isEqualTo(source);assertThat(attributionRows()).isEqualTo(rows);assertThat(counts()).isEqualTo(before);
+    }
+    @Test void hypotheticalNewCandidateIsNotAddedTwiceOrPersisted() {
+        var before=counts();var source=paymentRow();var rows=attributionRows();
+        var result=calculations.calculate(candidateRequest("NEW_PAYMENT","100000"));
+        assertThat(result.evidenceKind()).isEqualTo("HYPOTHETICAL");assertThat(result.resolvedScope()).isEmpty();
+        assertThat(result.capPreview()).anySatisfy(row->assertThat(row.get("candidateAmount")).isEqualTo("100000"));
+        assertThat(counts()).isEqualTo(before);assertThat(paymentRow()).isEqualTo(source);assertThat(attributionRows()).isEqualTo(rows);
+    }
+    @Test void hypotheticalCannotReplaceNonDraftPayment() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            jdbc.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?",paymentId);
+            org.assertj.core.api.Assertions.assertThatThrownBy(()->calculations.calculate(candidateRequest("REPLACE_DRAFT","100000"))).isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+            status.setRollbackOnly();
+        });
+    }
+
     private PaymentCalculationRequest request(PaymentCalculationRequest.Kind kind) {
         return new PaymentCalculationRequest("assistant.v1", kind, PaymentCalculationRequest.Mode.EXISTING,
                 new PaymentCalculationRequest.Scope(paymentId.toString()), null, 0L);

@@ -43,6 +43,7 @@ import com.susukkang.fgc.transaction.domain.CommissionPaymentAttributionRow;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentCommand;
 import com.susukkang.fgc.transaction.domain.CommissionPaymentRow;
 import com.susukkang.fgc.transaction.domain.ConfirmationData;
+import com.susukkang.fgc.transaction.domain.PaymentCandidateProjection;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
 import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
@@ -367,7 +368,21 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // confirm은 첫 실패에서 차단하지만 미리보기는 모든 차단 사유를 blockers[]로 수집한다.
     @Transactional(readOnly = true)
     public TransactionPrecheckResponse precheck(Long paymentId) {
-        List<ConfirmationData> attributions = requireConfirmationData(paymentId, false);
+        return evaluatePrecheck(paymentId,requireConfirmationData(paymentId,false),null);
+    }
+
+    @Override
+    @PreAuthorize(Roles.CAN_PROCESS)
+    @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public TransactionPrecheckResponse precheckCandidate(CommissionPaymentCreateRequest request,Long replacedPaymentId) {
+        if(replacedPaymentId!=null)requireDraft(requireConfirmationData(replacedPaymentId,false).getFirst());
+        PreparedPayment prepared=buildCommand(replacedPaymentId,request.sourceType(),request.sourceBusinessKey(),request.contractId(),request.agentId(),request.commissionItemId(),request.amount(),request.settlementMonth(),request.cashflowType(),request.scheduledPaymentDate(),request.paymentStage(),request.allocationPolicyVersion(),request.attributions(),request.evidenceRef(),request.note());
+        long id=replacedPaymentId==null?0L:replacedPaymentId;
+        var candidate=PaymentCandidateProjection.from(id,prepared.payment(),prepared.attributions(),objectMapper);
+        return evaluatePrecheck(id,queryRepository.findCandidateConfirmationData(candidate),candidate);
+    }
+    private TransactionPrecheckResponse evaluatePrecheck(Long paymentId,List<ConfirmationData> attributions,PaymentCandidateProjection candidate) {
+        if(attributions.isEmpty())invalid("attributions","귀속 자료를 확인하세요.");
         ConfirmationData first = attributions.get(0);
         // [의도된 차이] 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005(409)로 먼저 끊는다.
         // 그래서 "비DRAFT + 미해결 CAP_VIOLATION" 엣지케이스는 confirm=CAP_003(422) / precheck=TRAN_005(409)로
@@ -386,7 +401,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         List<TransactionPrecheckResponse.CapPreviewItem> previews = new ArrayList<>();
         Map<CapGroupKey, CapEvaluation> evaluations = new LinkedHashMap<>();
         if (first.totalAttributedAmount() != null) {
-            Map<Long, String> contractNos = queryRepository.findAttributedContractNumbers(paymentId)
+            Map<Long, String> contractNos = (candidate==null?queryRepository.findAttributedContractNumbers(paymentId):queryRepository.findAttributedContractNumbers(paymentId,candidate))
                     .stream()
                     .collect(Collectors.toMap(
                             AttributedContractNo::contractId,
@@ -419,14 +434,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
                     continue;
                 }
-                CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
-                        paymentId,
-                        data.transactionAttributionId()
-                );
-                boolean applicableCapRuleSetExists = queryRepository.existsApplicableCapRuleSet(
-                        paymentId,
-                        data.transactionAttributionId()
-                );
+                CapRuleSnapshot rule = (candidate==null ? queryRepository.findCapRuleSnapshot(paymentId,data.transactionAttributionId()) : queryRepository.findCapRuleSnapshot(paymentId,data.transactionAttributionId(),candidate));
+                boolean applicableCapRuleSetExists = (candidate==null ? queryRepository.existsApplicableCapRuleSet(paymentId,data.transactionAttributionId()) : queryRepository.existsApplicableCapRuleSet(paymentId,data.transactionAttributionId(),candidate));
                 GateFailure ruleFailure = capRuleFailure(rule, data, applicableCapRuleSetExists);
                 if (ruleFailure != null) {
                     failures.add(ruleFailure);
@@ -485,9 +494,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             }
         }
         return new TransactionPrecheckResponse(
-                paymentId,
+                candidate==null?paymentId:null,
                 previews,
-                toBlockers(failures),
+                candidate==null?toBlockers(failures):toBlockers(failures).stream().map(row->new TransactionPrecheckResponse.Blocker(row.code(),row.message(),row.contractId(),null)).toList(),
                 failures.isEmpty(),
                 capExclusions(attributions)
         );

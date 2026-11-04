@@ -30,6 +30,7 @@ public class PaymentCalculationService {
     private final CommissionPaymentService payments;
     private final ObjectMapper mapper;
     private final AssistantCalculationSources sources;
+    private final AssistantPaymentCandidate candidates;
     private static final Set<String> CAP_MONEY = Set.of("basePremiumAmount", "refund12mAmount", "complianceDeductionAmount", "limitAmount", "existingIncludedAmount", "candidateAmount", "includedAmount", "remainingAmount");
     private static final Set<String> CAP_IDS = Set.of("contractId", "capRuleSetId", "capCheckId");
 
@@ -37,6 +38,11 @@ public class PaymentCalculationService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PaymentCalculationSnapshot calculate(PaymentCalculationRequest request) {
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) requireProcessing();
+        if(request.kind()==PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE && request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL) {
+            var checked=candidates.calculate(request);
+            var blockers=checked.blockers().stream().map(row->new PaymentCalculationSnapshot.Reason(row.code(),row.message(),string(row.contractId()),null)).toList();
+            return new PaymentCalculationSnapshot(UUID.randomUUID().toString(),request.kind().name(),request.mode().name(),checked.confirmable()?"CALCULATED":"REVIEW_REQUIRED",request.clientRevision(),false,true,"HYPOTHETICAL","KRW",null,Map.of(),Map.of(),checked.capPreview().stream().map(this::preview).toList(),checked.confirmable(),blockers,List.of(),basis(null,List.of(),List.of()),new PaymentCalculationSnapshot.Recommendation(false,null,null,"가상 후보입니다. 원본을 변경하지 않았으며 직접 저장·사전검증·확정해야 합니다.",List.of("ACTUAL_PRECHECK_REQUIRED")),OffsetDateTime.now(),null);
+        }
         if ((request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL && request.kind()==PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE) || Set.of(PaymentCalculationRequest.Kind.EXPECTED_COMMISSION, PaymentCalculationRequest.Kind.CAP_STATUS, PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE).contains(request.kind())) return sources.calculate(request);
         if (request.mode() != PaymentCalculationRequest.Mode.EXISTING ||
                 !Set.of(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE, PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE).contains(request.kind()))
