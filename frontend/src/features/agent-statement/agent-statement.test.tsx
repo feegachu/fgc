@@ -62,6 +62,7 @@ const detail = (row: StatementEntry): StatementDetail => ({
     internalKey: '내부 키',
     sourceType: 'GA_CONFIRMED_PAYMENT',
     attributionMethod: 'DIRECT',
+    paymentConditionCode: 'PAY_IF_ACTIVE_ON_DUE_DATE',
     commissionTransactionId: 7,
   },
   basis: list([row]).basis,
@@ -146,6 +147,7 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     // 저장 코드와 내부 이름 대신 화면 이름을 보인다(SRC-074).
     expect(within(panel).getByText('GA 확정지급')).toBeInTheDocument()
     expect(within(panel).getByText('직접 귀속')).toBeInTheDocument()
+    expect(within(panel).getByText('지급예정일 정상 계약')).toBeInTheDocument()
     expect(within(panel).getByText('지급 건 번호')).toBeInTheDocument()
     expect(panel).not.toHaveTextContent(/FIRST_YEAR|TRANSACTION_ATTRIBUTION|GA_CONFIRMED_PAYMENT|DIRECT/)
     expect(within(panel).getByRole('link', { name: '계약 상세 보기' })).toBeInTheDocument()

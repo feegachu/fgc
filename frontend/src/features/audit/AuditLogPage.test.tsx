@@ -122,9 +122,18 @@ describe('AUDT-W01 감사로그 조회', () => {
     const reason = 'JDBC exception executing SQL [WITH eligible_contract AS (SELECT ic.contract_id)]'
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'VALIDATION_RUN_FAILED', reason })])
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
-    expect(await within(table).findByText('월 통합검증 실패, 원인은 서버 로그에 있습니다')).toBeInTheDocument()
+    expect(await within(table).findByText('처리 중 오류로 실패했습니다.')).toBeInTheDocument()
     await screen.findByText('지급 / 금액')
     expect(document.body).not.toHaveTextContent('eligible_contract')
+  })
+
+  it('옛 실행 실패 사유의 업무 문장은 남기고 코드 조각만 뺀다', async () => {
+    const reason = 'FGC-VRUN-003 | 원장 불균형 1건이 발견되었습니다.'
+    renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'VALIDATION_RUN_FAILED', reason })])
+    const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    expect(await within(table).findByText('원장 불균형 1건이 발견되었습니다.')).toBeInTheDocument()
+    await screen.findByText('지급 / 금액')
+    expect(document.body).not.toHaveTextContent('FGC-VRUN-003')
   })
 
   it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 행위자가 없으면 자동 처리로 보인다', async () => {

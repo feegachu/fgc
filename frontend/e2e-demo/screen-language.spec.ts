@@ -258,16 +258,16 @@ async function walkRole(
   const home = role === 'AGENT' ? '/agent-home' : '/'
   const overlays = role === 'AGENT' ? ['상품 추천 AI'] : ['전체 업무 가이드', /^업무 비서 AI 열기/]
   for (const name of overlays) {
-    begin(`${home} (${String(name).replace(/[/^]/g, '')})`)
+    const { route } = begin(`${home} (${String(name).replace(/[/^]/g, '')})`)
     await page.goto(`${home.slice(1)}?month=${month}`)
     await settle(page)
     await press(page.getByRole('button', { name }).first())
     await settle(page)
-    scan(await visibleText(page), role, current!.route, findings)
+    scan(await visibleText(page), role, route, findings)
     for (const tab of await page.locator('[role=dialog] [role=tab]').all()) {
       await press(tab)
       await settle(page)
-      scan(await visibleText(page), role, current!.route, findings)
+      scan(await visibleText(page), role, route, findings)
     }
     await finish()
   }

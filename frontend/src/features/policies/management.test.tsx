@@ -52,7 +52,10 @@ describe('policy UI boundaries', () => {
     expect(policySeedText('PROJECT_ASSUMPTION — 합성값, #332 시연 커버리지 보강')).toBe('프로젝트 가정 — 합성값 시연 커버리지 보강')
     expect(policySeedText('REG-10 시행일 보정 (코드리뷰 PR #18 반영)')).toBe('REG-10 시행일 보정')
     expect(policySeedText('원수사 예상 해약환급률표 2026 (합성값·#332 보강)')).toBe('원수사 예상 해약환급률표 2026 (합성값 보강)')
+    // 사용자가 입력한 승인 근거는 그대로 보인다.
     expect(policySeedText('의결서-HTTP-001')).toBe('의결서-HTTP-001')
+    expect(policySeedText('데모 승인서 2026-001')).toBe('데모 승인서 2026-001')
+    expect(policySeedText('위원회 의결서, #123')).toBe('위원회 의결서, #123')
     expect(policySeedText(null)).toBe('-')
     expect(refLabel('운영정책서 제47조: 장기유지 61~84차월은 PROJECT_ASSUMPTION(시드값)')).toBe(
       '운영정책서 제47조: 장기유지 61~84차월은 프로젝트 가정(가정값)',

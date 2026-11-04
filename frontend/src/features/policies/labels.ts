@@ -37,16 +37,16 @@ export function policyParameterValue(value: unknown) {
 
 /**
  * 시드가 남긴 승인 근거, 출처 문구의 개발 용어와 이슈 번호를 화면에서만 바꾼다.
- * 이미 적용된 Flyway 파일은 고칠 수 없다. 저장값은 그대로다.
+ * 이미 적용된 Flyway 파일은 고칠 수 없다. 저장값은 그대로이고, 시드 문구 그대로만 맞춰 사용자가 입력한 근거는 건드리지 않는다.
  */
 export function policySeedText(value?: string | null) {
   if (!value) return '-'
-  if (/^(?:시드|데모) 승인/.test(value)) return '시연 자료 승인, 운영 정책 승인을 대체하지 않음'
+  if (/^(?:시드 승인 \(|데모 승인 — #\d)/.test(value)) return '시연 자료 승인, 운영 정책 승인을 대체하지 않음'
   return value
     .replaceAll('PROJECT_ASSUMPTION', '프로젝트 가정')
     .replaceAll('시드값', '가정값')
     .replace(/\s*\(코드리뷰 PR #\d+ 반영\)/, '')
-    .replace(/(?:,\s*|·)#\d+/, '')
+    .replace(/, #\d+(?= 시연)|·#\d+(?= 보강)/, '')
 }
 
 const policyCodeLabels: Record<string, string> = {
@@ -62,6 +62,7 @@ const policyCodeLabels: Record<string, string> = {
   APPROVED_ALLOCATION: '승인배부',
   MANUAL_REVIEW: '수동검토',
   NEWCOMER_NON_CONTRACT: '신인 지원 제외',
+  PAY_IF_ACTIVE_ON_DUE_DATE: '지급예정일 정상 계약',
   NOT_APPLICABLE: '해당 없음',
   TOTAL_PAID: '총 지급액',
   CONFIRMED_PAID: '확정 지급액',
