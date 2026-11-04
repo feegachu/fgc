@@ -26,6 +26,8 @@ if [[ ! "$target" =~ ^http://(127\.0\.0\.1|localhost):[0-9]{1,5}$ ]]; then
     exit 2
 fi
 
+# 스캔이 실제 LLM 을 부르거나 키가 격리 환경으로 들어가지 않게 지운다. 아래 docker run 도 -e 로 적은 값만 넘긴다.
+unset OPENAI_API_KEY SPRING_AI_OPENAI_API_KEY
 export MSYS_NO_PATHCONV=1 # Git Bash 가 컨테이너 안 경로(/zap/wrk)를 Windows 경로로 바꾸지 않게 한다
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
 root=$(pwd -W 2>/dev/null || pwd) # Windows 의 docker 는 C:/ 형식 경로를 받는다
@@ -97,7 +99,7 @@ scan() {
         zap_url=$(sed -E 's#//(127\.0\.0\.1|localhost):#//host.docker.internal:#' <<<"$target")
     fi
     # API scan 은 문서의 servers 주소로 공격 요청을 보낸다. 문서가 무엇을 적든 대상에 고정한다.
-    [[ "$name" == zap-api-scan ]] && set -- "$@" -O "${zap_url#http://}"
+    [[ "$name" == zap-api-scan ]] && set -- "$@" -O "$zap_url"
     chmod a+rwx "$out" # 컨테이너의 zap 사용자가 보고서를 쓰는 동안만 연다
     docker run --rm ${zap_network[@]+"${zap_network[@]}"} --memory=1500m -v "$out:/zap/wrk:rw" \
         -e "ZAP_AUTH_HEADER_VALUE=${ZAP_AUTH_HEADER_VALUE:-}" "$zap_image" \

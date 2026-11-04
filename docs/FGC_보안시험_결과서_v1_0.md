@@ -25,7 +25,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 코드 기준 | develop `274477d6` (이 PR 기준 커밋) |
+| 코드 기준 | develop `9a0a37ca` (이 PR 기준 커밋) |
 | RC | `r2.0.0-rc1` 미발행. 미확인 |
 | 시험 환경 | Testcontainers PostgreSQL 17, Windows 11 로컬 / GitHub Actions |
 | 시험 실행 | PR #858의 CI `build`(Gradle 전체 스위트), `frontend`, `ui`, `real-server`. 로컬: `test_zap_isolated_scan.py`, `test_shinhan_cd.py`, vitest 3개 파일 |
@@ -101,7 +101,7 @@ CI 관문은 CRITICAL만 막는다. SER-010의 "High는 조치 또는 위험수�
 
 GitHub 설정(2026-11-04 `gh api repos/feegachu/fgc`): `secret_scanning` enabled, `secret_scanning_push_protection` enabled. Secret scanning 경고 0건(전체 상태).
 
-**도구로 판정할 수 없는 항목:** 시연 계정 보호(시드 명세 §5, SRC-065)는 저장소가 아니라 서버 상태를 봐야 한다. 신한 서버 배포 게이트는 PR #836(열림)이 다룬다. 서버 접근이 없어 **미확인**이고, 그래서 SER-008은 충족으로 적지 않는다. RC 전에 Runbook(`docs/FGC_운영_장애대응_Runbook_v1_0.md`, #676) 절차로 확인한다.
+**도구로 판정할 수 없는 항목:** 시연 계정 보호(시드 명세 §5, SRC-065)는 저장소가 아니라 서버 상태를 봐야 한다. 신한 서버 배포 게이트는 PR #836(병합)이 다룬다. 서버 접근이 없어 실제 상태는 **미확인**이고, 그래서 SER-008은 충족으로 적지 않는다. RC 전에 Runbook(`docs/FGC_운영_장애대응_Runbook_v1_0.md`, #676) 절차로 확인한다.
 
 ### 4-4. 인가 행렬 (SER-002)
 
@@ -149,6 +149,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 | 다운로드 파일명 헤더 분리 | `downloadFilenameEncodesHostileContractNumber` | CR, LF, 따옴표가 헤더로 새지 않고 `filename*`에서 `..%2F` 등으로 인코딩 |
 | 저장소 키 경로 조작 | 기존 `PrivateVolumeFileStorageTest.rejectsArbitraryStorageKeys` 외 | 키 형식(`[a-f0-9]{32}`) 밖은 거부, 링크 거부 |
 | CSV 수식 | 기존 `CsvExportWriterTest` | 수식 시작 문자 무력화 |
+| CSRF | 기존 `tokenEndpointsRejectMissingClientHeaderOrForeignOrigin`, `originCheckFollowsHttpsBehindTlsTerminatingProxy` | Refresh 쿠키 경로는 Origin, X-FGC-Client가 맞지 않으면 거부. 나머지 API는 쿠키로 인증하지 않아 해당 없음(CodeQL #2 참고) |
 
 **요구사항 해석:** 자유 입력 칸의 `<script>` 문자열은 입력에서 막지 않고 글자 그대로 보관한다. 세부내용("출력 이스케이프와 허용목록")과 OWASP XSS Prevention Cheat Sheet(SRC-028, 출력 인코딩이 1차 방어)에 맞춘 판단이다. "저장·실행되지 않는다"를 "저장되어 실행되는 일이 없다"로 읽었다. 저장 자체를 막아야 한다는 뜻이면 다시 연다. 근거 없음, 확인 필요: 원문 출처 SRC-006이 누락이라 대조하지 못했다.
 
@@ -168,7 +169,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 
 | 남은 실행 | 상태 |
 |---|---|
-| API scan, 격리 | 전체 실행은 미확인, 사유: RC 미발행. 스크립트 확인으로 같은 격리 스택에 능동 스캔 3분 제한 1회를 돌렸다(`sha-5be9285f`, OpenAPI 경로 129개, 요청 경로 333개, 로그인 토큰 사용, 조치 전 이미지): FAIL 0, PASS 112 / High 0, Medium 0, Low 4, Informational 3. 시간 제한으로 끊긴 규칙이 있어 합격 판정에 쓰지 않는다 |
+| API scan, 격리 | 전체 실행은 미확인, 사유: RC 미발행. 스크립트 확인으로 같은 격리 스택에 능동 스캔 3분 제한 1회, 대상 고정(`-O`) 확인 1분 제한 1회를 돌렸다(`sha-5be9285f`, OpenAPI 경로 129개, 요청 경로 약 330개, 로그인 토큰 사용, 조치 전 이미지). 두 번 모두 FAIL 0, PASS 112 / High 0, Medium 0, Low 4, Informational 3. 시간 제한으로 끊긴 규칙이 있어 합격 판정에 쓰지 않는다 |
 | baseline, 개발계 RC | 미확인, 사유: RC 미발행. #677 표대로 수동 관찰만, 공유 서버라 사용자 승인 뒤 실행 |
 
 | 경고 (API scan 3분) | 등급 | 판단 |
@@ -179,7 +180,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 | 10036 Server 헤더 버전 노출 | Low | 위와 같음, 조치 |
 | 4xx 응답, 인증 요청 식별, URL의 `userId` 필터 | Informational | 결함 아님 |
 
-스크립트 `infra/scripts/zap-isolated-scan.sh`는 대상이 `http://127.0.0.1:<포트>` 또는 `http://localhost:<포트>`가 아니면 docker를 부르기 전에 거부한다(`test_zap_isolated_scan.py`, 사용자 정보와 접두어 우회 포함). 원본 보고서는 `build/zap/`(gitignore)에만 둔다.
+스크립트 `infra/scripts/zap-isolated-scan.sh`는 대상이 `http://127.0.0.1:<포트>` 또는 `http://localhost:<포트>`가 아니면 docker를 부르기 전에 거부한다(`test_zap_isolated_scan.py`, 사용자 정보와 접두어 우회 포함). API scan은 문서의 `servers`가 무엇이든 대상에 고정한다(`-O`). 실제 LLM을 부르지 않게 키 변수를 지우고 시작하며, 스캔 중 격리 DB의 `ai_call_log`는 0건이었다. 원본 보고서는 `build/zap/`(gitignore)에만 둔다.
 
 ### 4-7. CSP, 보안 헤더
 
@@ -194,7 +195,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 
 정책: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`
 
-이미지의 산출물에 인라인 스크립트, 외부 연결, `<style>` 삽입 코드, 외부 글꼴이 없음을 grep으로 확인했다(`style` 속성은 React가 CSSOM으로 넣으므로 막히지 않는다). PDF, CSV 내려받기는 `blob:` 앵커 다운로드라 CSP 대상이 아니다. 게시 이미지 `sha-5be9285f`를 격리 스택으로 띄워 Chromium으로 내부 화면 16개, 설계사 화면 3개, 도움말, 상품 추천 AI 대화창, CSV 내려받기를 지났고 CSP 위반 콘솔 메시지 0건, 글꼴 2종 로드를 확인했다(2026-11-04). 환수 PDF 내려받기는 발행 자료가 없어 열지 못했고 CSV와 같은 방식이다.
+이미지의 산출물에 인라인 스크립트, 외부 연결, 외부 글꼴이 없음을 grep으로 확인했다. `<style>` 생성은 React DOM 내부 경로 한 곳뿐이고 앱 코드는 쓰지 않는다(`style` 속성은 React가 CSSOM으로 넣으므로 막히지 않는다). PDF, CSV 내려받기는 `blob:` 앵커 다운로드라 CSP 대상이 아니다. 게시 이미지 `sha-5be9285f`를 격리 스택으로 띄워 Chromium으로 내부 화면 16개, 설계사 화면 3개, 도움말, 상품 추천 AI 대화창, CSV 내려받기를 지났고 CSP 위반 콘솔 메시지 0건, 글꼴 2종 로드를 확인했다(2026-11-04). 환수 PDF 내려받기는 발행 자료가 없어 열지 못했고 CSV와 같은 방식이다.
 
 API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)와 nginx 헤더가 겹쳐 나간다. 브라우저는 더 엄격한 쪽으로 처리하고 API 응답은 프레임에 넣지 않으므로 결함으로 세지 않는다.
 
@@ -209,7 +210,7 @@ API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)
 | 3 | FINALIZED 수정 시도 | 409 | 통과 | `FinalizedRunWriteConflictIntegrationTest` (실행 재기동, 재확정, 하위 대사 생성 모두 409 + 상태 유지), DB 트리거 `FinalizedValidationRunImmutabilityIntegrationTest` |
 | 4 | 위조 토큰 | 401 | 통과 | `expiredForgedOrForeignKeyTokensAreRejectedWithEnvelope`, `complianceTokenCannotWriteEvenWithEscalatedRolesClaim` |
 | 5 | 권한 없음 | 403 | 통과 | `RoleApiAuthorizationMatrixIntegrationTest` |
-| 6 | 롤백 배포 | 이전 digest | **미확인** | 사유: Stage 실 서버 시연은 RC에서 한다. 정적 확인: `Jenkinsfile.fgc` `ROLLBACK` 파라미터, `infra/scripts/tests/test_shinhan_cd.py` 17건 통과(로컬 `PYTHONUTF8=1`) |
+| 6 | 롤백 배포 | 이전 digest | **미확인** | 사유: Stage 실 서버 시연은 RC에서 한다. 정적 확인: `Jenkinsfile.fgc` `ROLLBACK` 파라미터, `infra/scripts/tests/test_shinhan_cd.py` 24건 통과(로컬 `PYTHONUTF8=1`) |
 
 ### 5-2. 요구사항별
 
@@ -222,7 +223,7 @@ API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)
 | ECR-005 | 태그 버전을 Stage에 배포하고 이전 버전 롤백 절차를 시연한다 | **미확인** | 사유: 위와 같음. 정적: GHCR digest 고정 승격 `test_tags_and_wrong_registry_cannot_replace_verified_digest` |
 | ECR-002 | React 앱과 Spring API가 독립 빌드, 테스트되고 통합환경에서 동작한다. 1차 Job 2개는 JPA 전환 뒤에도 재실행, 재시작 결과가 같다. 운영, 테스트 코드와 의존성에 MyBatis 참조가 남지 않는다 | 통과 (세부내용 Job 수는 아래 문서 차이) | MyBatis: import, `@MapperScan`, `SqlSession*` 0건, Mapper XML 0건, 의존성 `verifyPersistenceDependencies` 통과. 남은 글자 13개 파일은 이력 주석, 비교 기준 README, `verifyPersistenceDependencies` 검사 코드다. Thymeleaf 0건. 독립 빌드: CI `build`, `frontend` 별도 job. 재시작: `MonthlyJournalRestartIntegrationTest`, `JobInstanceIdentityPolicyIntegrationTest` |
 
-**문서 차이 (ECR-002):** 요구사항 세부내용은 "Job 5개로 확장"인데 인터페이스정의서 `docs/05_인터페이스정의서_v3_0.md:1201`은 "2차에 Job을 무조건 5개로 늘린다는 계획은 사용하지 않는다"이고 코드는 `MonthlyValidationJob`, `DailyChangedContractJob` 2개다. 인수조건 원문에는 5개가 없어 판정에는 영향이 없다. xlsx 세부내용 정리는 RTM 동기화와 함께 요청한다.
+**문서 차이 (ECR-002):** 요구사항 세부내용은 "Job 5개로 확장"인데 인터페이스정의서 `docs/05_인터페이스정의서_v3_0.md:1203`은 "2차에 Job을 무조건 5개로 늘린다는 계획은 사용하지 않는다"이고 코드는 `MonthlyValidationJob`, `DailyChangedContractJob` 2개다. 인수조건 원문에는 5개가 없어 판정에는 영향이 없다. xlsx 세부내용 정리는 RTM 동기화와 함께 요청한다.
 
 ## 6. RC 때 다시 할 일
 
