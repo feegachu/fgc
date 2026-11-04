@@ -66,6 +66,7 @@ public class Dar012Runner implements ApplicationRunner {
             verification.put("partial", !completed);
             if (completed) {
                 verification.put("answerKeyComparison", verifier.compareWithAnswerKey(generated.plan(), properties.validationMonth(), batch.validationRunId()));
+                verification.put("representativeClawback", verifier.checkRepresentativeClawback(generated.plan()));
                 verification.put("aggregateConsistency", verifier.checkAggregateConsistency(properties.validationMonth(), batch.validationRunId()));
                 verification.put("contractDetailSample", verifier.checkContractDetailSample(batch.validationRunId()));
                 verification.put("queryTimings", verifier.measureQueries(properties.validationMonth(), batch.validationRunId(),

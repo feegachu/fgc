@@ -1,6 +1,9 @@
 package com.susukkang.fgc.dataset;
 
 import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.clawback.repository.ClawbackCandidateQueryRepository;
+import com.susukkang.fgc.clawback.service.ClawbackCalculationService;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.contract.service.ContractService;
 import com.susukkang.fgc.dashboard.service.DashboardService;
 import com.susukkang.fgc.validation.batch.MonthlyValidationJobTrigger;
@@ -15,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
@@ -41,13 +45,16 @@ class Dar012MonthlyValidationIntegrationTest {
     @Autowired private ContractService contractService;
     @Autowired private ValidationRunRepository validationRunRepository;
     @Autowired private CapCheckService capCheckService;
+    @Autowired private ClawbackCandidateCaptureService clawbackCapture;
+    @Autowired private ClawbackCandidateQueryRepository clawbackCandidates;
+    @Autowired private ClawbackCalculationService clawbackCalculation;
     @Autowired private PlatformTransactionManager transactionManager;
 
     @Test
     void generatedDataCompletesTheMonthlyBatchAndMatchesTheAnswerKey(@TempDir Path tempDir) throws Exception {
         Dar012Properties properties = new Dar012Properties("D12-MV", 20261118L, 60, LocalDate.of(2026, 9, 10), tempDir, true, MONTH, 1);
         Dar012Verifier verifier = new Dar012Verifier(createService, trigger, jdbc, dashboardService, contractService,
-                validationRunRepository, capCheckService);
+                validationRunRepository, capCheckService, clawbackCapture, clawbackCandidates, clawbackCalculation);
         Dar012Plan plan = Dar012Runner.generate(new Dar012Loader(jdbc, new TransactionTemplate(transactionManager)), properties).plan();
 
         Dar012Verifier.BatchRun batch = verifier.runMonthlyValidation(properties);
@@ -60,9 +67,26 @@ class Dar012MonthlyValidationIntegrationTest {
                 """, Long.class, batch.validationRunId())).isZero();
         List<Dar012Verifier.ScenarioResult> comparison = verifier.compareWithAnswerKey(plan, MONTH, batch.validationRunId());
         assertThat(comparison).extracting(Dar012Verifier.ScenarioResult::scenario)
-                .contains("REP_AMOUNT_UNCONFIRMED", "STATUS_LAPSED", "STATUS_REVIVED", "STATUS_TERMINATED");
+                .contains("REP_AMOUNT_UNCONFIRMED", "STATUS_LAPSED", "STATUS_REVIVED", "STATUS_TERMINATED",
+                        "CAP_AT_LIMIT", "CAP_OVER_LIMIT_1WON");
         assertThat(comparison).allSatisfy(r -> assertThat(r.matched()).as(r.scenario() + " " + r.divergences()).isEqualTo(r.inScope()));
+        // 한도 경계: 엔진이 잔여 0원은 위반 아닌 WARNING으로, 1원 초과는 VIOLATION으로 낸다. 일반 계약은 NORMAL이 함께 나온다.
+        assertThat(comparison).filteredOn(r -> r.scenario().startsWith("CAP_")).hasSize(2)
+                .allSatisfy(r -> assertThat(r.inScope()).isEqualTo(1));
+        assertThat(jdbc.queryForList("""
+                SELECT DISTINCT cc.result_status FROM cap_check cc JOIN insurance_contract c ON c.contract_id = cc.contract_id
+                 WHERE cc.validation_run_id = ? AND cc.payment_stage = 'INSURER_TO_GA'
+                   AND c.agent_id IN (SELECT agent_id FROM agent WHERE starts_with(agent_code, 'D12-A-'))
+                """, String.class, batch.validationRunId())).contains("NORMAL", "WARNING", "VIOLATION");
         assertThat(verifier.checkAggregateConsistency(MONTH, batch.validationRunId()))
                 .allSatisfy(c -> assertThat(c.consistent()).as(c.name()).isTrue());
+
+        // 대표 해지 계약: 심은 GA→설계사 지급이 기지급액이 되고 환수 계산 엔진이 금액을 낸다.
+        Dar012Verifier.ClawbackCheck clawback = verifier.checkRepresentativeClawback(plan);
+        BigDecimal planted = plan.gaPayments().stream().filter(g -> g.contractNo().equals(clawback.contractNo()))
+                .map(Dar012Plan.GaPaymentRow::amount).findFirst().orElseThrow();
+        assertThat(clawback.paidAmount()).isEqualByComparingTo(planted);
+        assertThat(clawback.estimatedAmount()).as(clawback.reasons().toString()).isPositive();
+        assertThat(clawback.reasons()).isEmpty();
     }
 }

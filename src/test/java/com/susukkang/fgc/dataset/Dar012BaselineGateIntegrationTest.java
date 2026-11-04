@@ -43,7 +43,7 @@ class Dar012BaselineGateIntegrationTest {
         jdbc = new JdbcTemplate(dataSource);
         tx = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         loader = new Dar012Loader(jdbc, tx);
-        properties = new Dar012Properties("D12-GATE", 20261118L, 5, LocalDate.of(2026, 9, 10), tempDir, false, null, null);
+        properties = new Dar012Properties("D12-GATE", 20261118L, Dar012Planner.MIN_CONTRACTS, LocalDate.of(2026, 9, 10), tempDir, false, null, null);
     }
 
     @AfterAll

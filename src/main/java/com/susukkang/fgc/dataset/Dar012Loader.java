@@ -1,6 +1,8 @@
 package com.susukkang.fgc.dataset;
 
+import com.susukkang.fgc.dataset.Dar012Plan.CapBoundaryRow;
 import com.susukkang.fgc.dataset.Dar012Plan.ContractRow;
+import com.susukkang.fgc.dataset.Dar012Plan.GaPaymentRow;
 import com.susukkang.fgc.dataset.Dar012Plan.OrgRow;
 import com.susukkang.fgc.dataset.Dar012Plan.PaymentRow;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * DAR-012 기초 데이터를 한 트랜잭션으로 적재한다 (시드명세 §50, §22).
@@ -51,38 +54,24 @@ public class Dar012Loader {
     }
 
     /** 계획에 쓸 정책값. 승인된 ACTIVE 정책에서만 읽고 하나로 정해지지 않으면 중단한다. */
-    public record PolicyRefs(Dar012Planner.PolicyInputs inputs, long policyVersionId, long capRuleItemId) {}
+    public record PolicyRefs(Dar012Planner.PolicyInputs inputs, long policyVersionId, long capRuleItemId,
+                             long gaPolicyVersionId, long gaCapRuleItemId) {}
 
     public PolicyRefs readPolicy(LocalDate windowStart, LocalDate windowEnd) {
-        List<Map<String, Object>> rates = jdbc.queryForList("""
-                SELECT r.rate_pct, pv.policy_version_id
+        Map<String, Object> insurerRate = baseRate("INSURER_TO_GA", null, windowStart, windowEnd);
+        Map<String, Object> gaRate = baseRate("GA_TO_FC", "FC", windowStart, windowEnd);
+        Map<String, Object> insurerCap = baseCapRule("INSURER_TO_GA", windowStart, windowEnd);
+        Map<String, Object> gaCap = baseCapRule("GA_TO_FC", windowStart, windowEnd);
+        long policyVersionId = ((Number) insurerRate.get("policy_version_id")).longValue();
+        int firstYearMonths = ((Number) insurerCap.get("first_year_months")).intValue();
+        List<Dar012Planner.FirstYearLine> firstYearLines = jdbc.query("""
+                SELECT r.rate_pct, LEAST(r.installment_to, ?) - r.installment_from + 1 AS installments
                   FROM commission_rule r
-                  JOIN policy_version pv ON pv.policy_version_id = r.policy_version_id
-                  JOIN commission_item ci ON ci.commission_item_id = r.commission_item_id
-                 WHERE pv.policy_type = 'CURRENT_COMMISSION' AND pv.status = 'ACTIVE'
-                   AND pv.effective_from <= ? AND (pv.effective_to IS NULL OR pv.effective_to >= ?)
-                   AND r.payment_stage = 'INSURER_TO_GA' AND ci.item_code = 'BASE_COMMISSION'
-                   AND r.installment_from = 1 AND r.calculation_type = 'RATE'
-                   AND r.insurer_id IS NULL AND r.product_offering_id IS NULL
-                """, Date.valueOf(windowStart), Date.valueOf(windowEnd));
-        if (rates.size() != 1) {
-            throw new IllegalStateException("원수사→GA 초회 기본수수료율 정책이 1건으로 정해지지 않는다: " + rates.size() + "건");
-        }
-        List<Map<String, Object>> caps = jdbc.queryForList("""
-                SELECT crs.premium_multiplier, cri.cap_rule_item_id
-                  FROM cap_rule_set crs
-                  JOIN policy_version pv ON pv.policy_version_id = crs.policy_version_id
-                  JOIN cap_rule_item cri ON cri.cap_rule_set_id = crs.cap_rule_set_id
-                  JOIN commission_item ci ON ci.commission_item_id = cri.commission_item_id
-                 WHERE pv.status = 'ACTIVE' AND crs.payment_stage = 'INSURER_TO_GA'
-                   AND crs.insurer_id IS NULL AND crs.product_group_code IS NULL AND crs.channel_code IS NULL
-                   AND crs.contract_date_from <= ? AND (crs.contract_date_to IS NULL OR crs.contract_date_to >= ?)
-                   AND ci.item_code = 'BASE_COMMISSION'
-                """, Date.valueOf(windowStart), Date.valueOf(windowEnd));
-        if (caps.size() != 1) {
-            throw new IllegalStateException("계약 기간 전체를 덮는 원수사→GA 1,200% 룰셋이 1건으로 정해지지 않는다: " + caps.size()
-                    + "건 (db/demo V63 적용 여부를 확인한다)");
-        }
+                 WHERE r.policy_version_id = ? AND r.payment_stage = 'INSURER_TO_GA' AND r.calculation_type = 'RATE'
+                   AND r.insurer_id IS NULL AND r.product_offering_id IS NULL AND r.installment_from <= ?
+                 ORDER BY r.installment_from, r.commission_rule_id
+                """, (rs, row) -> new Dar012Planner.FirstYearLine(rs.getBigDecimal(1), rs.getInt(2)),
+                firstYearMonths, policyVersionId, firstYearMonths);
         // 월 통합검증은 상품·납입기간·채널로 예상 해약환급률표를 찾는다. 표가 없는 납입기간의 계약은 REVIEW_REQUIRED가 되므로
         // 계약 납입기간은 보험사의 현행 판매버전 상품에 연결된 활성 환급률표의 값을 그대로 쓴다.
         Map<String, Integer> terms = new HashMap<>();
@@ -103,10 +92,51 @@ public class Dar012Loader {
             }
             terms.put(insurerCode, found.get(0));
         }
-        return new PolicyRefs(new Dar012Planner.PolicyInputs((BigDecimal) rates.get(0).get("rate_pct"),
-                (BigDecimal) caps.get(0).get("premium_multiplier"), Map.copyOf(terms)),
-                ((Number) rates.get(0).get("policy_version_id")).longValue(),
-                ((Number) caps.get(0).get("cap_rule_item_id")).longValue());
+        return new PolicyRefs(new Dar012Planner.PolicyInputs((BigDecimal) insurerRate.get("rate_pct"),
+                (BigDecimal) insurerCap.get("premium_multiplier"), Map.copyOf(terms), (BigDecimal) gaRate.get("rate_pct"),
+                List.copyOf(firstYearLines)),
+                policyVersionId,
+                ((Number) insurerCap.get("cap_rule_item_id")).longValue(),
+                ((Number) gaRate.get("policy_version_id")).longValue(),
+                ((Number) gaCap.get("cap_rule_item_id")).longValue());
+    }
+
+    private Map<String, Object> baseRate(String stage, String rankCode, LocalDate windowStart, LocalDate windowEnd) {
+        List<Map<String, Object>> rates = jdbc.queryForList("""
+                SELECT r.rate_pct, pv.policy_version_id
+                  FROM commission_rule r
+                  JOIN policy_version pv ON pv.policy_version_id = r.policy_version_id
+                  JOIN commission_item ci ON ci.commission_item_id = r.commission_item_id
+                 WHERE pv.policy_type = 'CURRENT_COMMISSION' AND pv.status = 'ACTIVE'
+                   AND pv.effective_from <= ? AND (pv.effective_to IS NULL OR pv.effective_to >= ?)
+                   AND r.payment_stage = ? AND r.agent_rank_code IS NOT DISTINCT FROM CAST(? AS varchar)
+                   AND ci.item_code = 'BASE_COMMISSION'
+                   AND r.installment_from = 1 AND r.calculation_type = 'RATE'
+                   AND r.insurer_id IS NULL AND r.product_offering_id IS NULL
+                """, Date.valueOf(windowStart), Date.valueOf(windowEnd), stage, rankCode);
+        if (rates.size() != 1) {
+            throw new IllegalStateException(stage + " 초회 기본수수료율 정책이 1건으로 정해지지 않는다: " + rates.size() + "건");
+        }
+        return rates.get(0);
+    }
+
+    private Map<String, Object> baseCapRule(String stage, LocalDate windowStart, LocalDate windowEnd) {
+        List<Map<String, Object>> caps = jdbc.queryForList("""
+                SELECT crs.premium_multiplier, crs.first_year_months, cri.cap_rule_item_id
+                  FROM cap_rule_set crs
+                  JOIN policy_version pv ON pv.policy_version_id = crs.policy_version_id
+                  JOIN cap_rule_item cri ON cri.cap_rule_set_id = crs.cap_rule_set_id
+                  JOIN commission_item ci ON ci.commission_item_id = cri.commission_item_id
+                 WHERE pv.status = 'ACTIVE' AND crs.payment_stage = ?
+                   AND crs.insurer_id IS NULL AND crs.product_group_code IS NULL AND crs.channel_code IS NULL
+                   AND crs.contract_date_from <= ? AND (crs.contract_date_to IS NULL OR crs.contract_date_to >= ?)
+                   AND ci.item_code = 'BASE_COMMISSION'
+                """, stage, Date.valueOf(windowStart), Date.valueOf(windowEnd));
+        if (caps.size() != 1) {
+            throw new IllegalStateException("계약 기간 전체를 덮는 " + stage + " 1,200% 룰셋이 1건으로 정해지지 않는다: " + caps.size()
+                    + "건 (db/demo V63 적용 여부를 확인한다)");
+        }
+        return caps.get(0);
     }
 
     /** 같은 DB에 DAR-012 데이터가 이미 있으면 멈춘다. 설계사 코드가 데이터셋 접두어를 공유하므로 dataset_id가 달라도 막는다. */
@@ -168,6 +198,9 @@ public class Dar012Loader {
             Map<String, Long> offering = offeringByInsurer(plan);
             long itemBase = one("SELECT commission_item_id FROM commission_item WHERE item_code = 'BASE_COMMISSION'");
             long creator = one("SELECT user_id FROM app_user WHERE login_id = 'settle01'");
+            // 판매버전 조회(offeringByInsurer) 뒤에 만들어야 전용 상품이 일반 계약의 판매버전으로 뽑히지 않는다.
+            long capBoundaryOffering = insertCapBoundaryProduct(plan, insurer.get("FGL01"), source, creator);
+            Set<String> capBoundaryContracts = plan.capBoundaries().stream().map(CapBoundaryRow::contractNo).collect(Collectors.toSet());
 
             for (OrgRow o : plan.organizations()) {
                 jdbc.update("""
@@ -213,7 +246,7 @@ public class Dar012Loader {
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SEED', ?)
                     """, plan.contracts(), (ps, c) -> {
                 ps.setLong(1, insurer.get(c.insurerCode()));
-                ps.setLong(2, offering.get(c.insurerCode()));
+                ps.setLong(2, capBoundaryContracts.contains(c.contractNo()) ? capBoundaryOffering : offering.get(c.insurerCode()));
                 ps.setString(3, c.contractNo());
                 ps.setDate(4, Date.valueOf(c.contractDate()));
                 ps.setLong(5, agent.get(c.agentCode()));
@@ -296,6 +329,24 @@ public class Dar012Loader {
                 ps.setLong(11, creator);
                 ps.setInt(12, p.installmentNo());
             });
+            batch("""
+                    INSERT INTO commission_transaction(payment_stage, source_type, source_business_key, recipient_agent_id,
+                        commission_item_id, policy_version_id, settlement_month, due_date, paid_on, amount,
+                        cashflow_type, status, evidence_ref, created_by, installment_no)
+                    VALUES ('GA_TO_FC', 'GA_CONFIRMED_PAYMENT', ?, ?, ?, ?, ?, ?, ?, ?, 'PAYMENT', 'DRAFT', ?, ?, ?)
+                    """, plan.gaPayments(), (ps, p) -> {
+                ps.setString(1, p.businessKey());
+                ps.setLong(2, agent.get(p.agentCode()));
+                ps.setLong(3, itemBase);
+                ps.setLong(4, policy.gaPolicyVersionId());
+                ps.setDate(5, Date.valueOf(p.settlementMonth()));
+                ps.setDate(6, Date.valueOf(p.dueDate()));
+                ps.setDate(7, Date.valueOf(p.paidOn()));
+                ps.setBigDecimal(8, p.amount());
+                ps.setString(9, source);
+                ps.setLong(10, creator);
+                ps.setInt(11, p.installmentNo());
+            });
             Map<String, Long> payment = idMap("SELECT source_business_key, commission_transaction_id FROM commission_transaction "
                     + "WHERE starts_with(source_business_key, ?)", source + ":");
 
@@ -318,6 +369,21 @@ public class Dar012Loader {
                 ps.setLong(8, policy.capRuleItemId());
             });
 
+            batch("""
+                    INSERT INTO transaction_attribution(commission_transaction_id, attribution_seq, attribution_scope,
+                        contract_id, agent_id, attribution_date, attribution_month, attributed_amount,
+                        cap_rule_item_id, inclusion_status_snapshot, attribution_method)
+                    VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, ?, ?, 'INCLUDED', 'DIRECT')
+                    """, plan.gaPayments(), (ps, p) -> {
+                ps.setLong(1, payment.get(p.businessKey()));
+                ps.setLong(2, contract.get(p.contractNo()));
+                ps.setLong(3, agent.get(p.agentCode()));
+                ps.setDate(4, Date.valueOf(p.paidOn()));
+                ps.setDate(5, Date.valueOf(p.settlementMonth()));
+                ps.setBigDecimal(6, p.amount());
+                ps.setLong(7, policy.gaCapRuleItemId());
+            });
+
             // 귀속합계가 지급액과 같을 때만 DB 가드가 CONFIRMED를 허용한다(§22).
             int confirmed = jdbc.update("UPDATE commission_transaction SET status = 'CONFIRMED' "
                     + "WHERE status = 'DRAFT' AND starts_with(source_business_key, ?)", source + ":");
@@ -337,6 +403,56 @@ public class Dar012Loader {
     }
 
     public record LoadResult(int confirmedPayments, String agent01PreviousAgentCode) {}
+
+    /**
+     * 한도 경계 계약 전용 상품, 판매버전, 환급률표. 다른 계약과 공유하지 않아 일반 데이터의 판정을 흔들지 않는다.
+     * 환급률표는 정책 승인 절차를 따른다(시드명세 §4-1): DRAFT에서 자식 행을 넣고 APPROVED를 거쳐 ACTIVE로 올린다.
+     */
+    private long insertCapBoundaryProduct(Dar012Plan plan, long insurerId, String source, long creator) {
+        long approver = one("SELECT user_id FROM app_user WHERE login_id = 'gaadmin'");
+        Long policyVersionId = jdbc.queryForObject("""
+                INSERT INTO policy_version(policy_code, policy_name, policy_type, source_class, version_no, effective_from,
+                                           status, regulation_refs, source_refs, approval_evidence_ref, created_by)
+                VALUES ('INS-REFUND-D12-CAP-V1', '예상 해약환급률표(DAR-012 한도 경계)', 'REFUND_RATE', 'INSURER_RULE', 1,
+                        DATE '2026-01-01', 'DRAFT', ARRAY['REG-08'], ARRAY['DAR-012 합성값'], 'PROJECT_ASSUMPTION 합성값', ?)
+                RETURNING policy_version_id
+                """, Long.class, creator);
+        jdbc.update("""
+                INSERT INTO policy_parameter(policy_version_id, parameter_key, parameter_value, description)
+                VALUES (?, 'REFUND_RATE_BASIS', '"MONTHLY_EQUIVALENT_FIRST_PREMIUM_X12"'::jsonb,
+                        '환급률(%)을 곱할 기준 금액. 월납환산 초회보험료 x 12')
+                """, policyVersionId);
+        Long productId = jdbc.queryForObject("""
+                INSERT INTO product(insurer_id, insurer_product_code, standard_product_code, product_name, product_group_code, protection_type)
+                VALUES (?, 'P-D12-CAP', 'STD-D12-CAP', '합성 한도 경계 건강보험', 'HEALTH_PROTECTION', 'PROTECTION')
+                RETURNING product_id
+                """, Long.class, insurerId);
+        Long offeringId = jdbc.queryForObject("""
+                INSERT INTO product_offering(product_id, offering_version, sales_start_date, basic_document_version, basic_document_date,
+                                             channel_code, fee_regime_code, standard_deduction_80_yn, committee_approval_date, governance_status)
+                VALUES (?, 'D12-CAP-A', DATE '2026-01-01', 'BD-2026-01', DATE '2026-01-01',
+                        'FACE_TO_FACE', 'CURRENT', true, DATE '2026-01-01', 'APPROVED')
+                RETURNING product_offering_id
+                """, Long.class, productId);
+        for (CapBoundaryRow boundary : plan.capBoundaries()) {
+            Long tableId = jdbc.queryForObject("""
+                    INSERT INTO refund_rate_table(policy_version_id, insurer_id, product_id, product_offering_id, payment_term_months,
+                                                  channel_code, standard_deduction_80_yn, effective_from, source_product_code, source_document_ref)
+                    VALUES (?, ?, ?, ?, ?, 'FACE_TO_FACE', true, DATE '2026-01-01', 'STD-D12-CAP', ?)
+                    RETURNING refund_rate_table_id
+                    """, Long.class, policyVersionId, insurerId, productId, offeringId, boundary.paymentTermMonths(), source);
+            jdbc.update("""
+                    INSERT INTO refund_rate_line(refund_rate_table_id, contract_month_no, refund_rate_pct)
+                    SELECT ?, m, ROUND(? * m / 12, 6) FROM generate_series(1, 36) AS m
+                    """, tableId, boundary.month12RefundRatePct());
+        }
+        jdbc.update("""
+                UPDATE policy_version SET status = 'APPROVED', approved_at = TIMESTAMPTZ '2026-06-30 09:00:00+09', approved_by = ?
+                 WHERE policy_version_id = ?
+                """, approver, policyVersionId);
+        jdbc.update("UPDATE policy_version SET status = 'ACTIVE' WHERE policy_version_id = ?", policyVersionId);
+        return offeringId;
+    }
 
     private Map<String, Long> offeringByInsurer(Dar012Plan plan) {
         LocalDate first = plan.contracts().stream().map(ContractRow::contractDate).min(LocalDate::compareTo).orElseThrow();

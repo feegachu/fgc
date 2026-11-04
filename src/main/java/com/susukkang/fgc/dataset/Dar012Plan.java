@@ -21,6 +21,8 @@ public record Dar012Plan(
         List<SnapshotRow> snapshots,
         List<BatchRow> batches,
         List<PaymentRow> payments,
+        List<GaPaymentRow> gaPayments,
+        List<CapBoundaryRow> capBoundaries,
         List<AnswerRow> answers) {
 
     public record OrgRow(String code, String name, String type, String parentCode) {}
@@ -46,6 +48,13 @@ public record Dar012Plan(
     public record PaymentRow(String businessKey, String insurerCode, String contractNo, String insurerAgentCode,
                              LocalDate settlementMonth, LocalDate dueDate, LocalDate paidOn, BigDecimal amount,
                              int installmentNo) {}
+
+    /** 대표 설계사가 받은 GA→설계사 확정 지급 한 줄. 환수 기지급액과 수수료 명세의 원천이다. */
+    public record GaPaymentRow(String businessKey, String contractNo, String agentCode, LocalDate settlementMonth,
+                               LocalDate dueDate, LocalDate paidOn, BigDecimal amount, int installmentNo) {}
+
+    /** 한도 경계 계약 한 건이 쓰는 전용 상품의 환급률표. 납입기간으로 표를 가른다. */
+    public record CapBoundaryRow(String contractNo, int paymentTermMonths, BigDecimal month12RefundRatePct) {}
 
     /** 심은 이상의 정답표 한 줄. expectedAmount 가 null 이면 엔진이 계산하는 값이라 정답표에 금액이 없다. */
     public record AnswerRow(String contractNo, String scenario, String expectedResultType,

@@ -11,7 +11,7 @@ import java.time.LocalDate;
  *
  * @param datasetId  데이터셋 식별자. 필수이며 같은 DB에 이미 있으면 생성기가 멈춘다
  * @param seed       고정 난수 seed. 같은 seed·계약 수면 건수·합계가 같다
- * @param contracts  계약 수. 단계마다 새 DB에서 처음부터 만든다. 월 분개 번호 상한(9,999) 때문에 3,000건이면 월 통합검증이 실패한다
+ * @param contracts  계약 수(대표 5건과 한도 경계 2건 포함). 단계마다 새 DB에서 처음부터 만든다
  * @param baseDate   기준일. 시각 값은 이 날짜에서만 파생하고 now()를 쓰지 않는다
  * @param outputDir  {datasetId}.json, {datasetId}-answers.csv 출력 위치
  * @param runValidation  true면 적재 직후 기존 월 통합검증 배치를 실제 경로로 실행하고 정답표와 비교·성능을 기록한다
@@ -38,8 +38,9 @@ public record Dar012Properties(String datasetId, Long seed, Integer contracts, L
         }
         seed = seed == null ? DEFAULT_SEED : seed;
         contracts = contracts == null ? DEFAULT_CONTRACTS : contracts;
-        if (contracts < 5) {
-            throw new IllegalArgumentException("fgc.dar012.contracts 는 대표 설계사 사례 5건 이상이어야 한다: " + contracts);
+        if (contracts < Dar012Planner.MIN_CONTRACTS) {
+            throw new IllegalArgumentException("fgc.dar012.contracts 는 대표 설계사 5건과 한도 경계 2건을 담는 "
+                    + Dar012Planner.MIN_CONTRACTS + "건 이상이어야 한다: " + contracts);
         }
         baseDate = baseDate == null ? DEFAULT_BASE_DATE : baseDate;
         if (baseDate.isBefore(MIN_BASE_DATE)) {

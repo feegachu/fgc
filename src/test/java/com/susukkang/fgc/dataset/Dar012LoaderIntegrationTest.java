@@ -67,10 +67,10 @@ class Dar012LoaderIntegrationTest {
         String json = Files.readString(metadataFile);
         assertThat(json).contains("\"datasetId\" : \"D12-IT\"").contains("\"contracts\" : " + CONTRACTS)
                 .contains("프로젝트 가정, OI-024");
-        long payments = count("SELECT COUNT(*) FROM commission_transaction WHERE starts_with(source_business_key, 'SYNTHETIC:DAR012:D12-IT:')");
+        long payments = count("SELECT COUNT(*) FROM commission_transaction WHERE payment_stage = 'INSURER_TO_GA' AND starts_with(source_business_key, 'SYNTHETIC:DAR012:D12-IT:')");
         assertThat(json).contains("\"insurerStatementPayments\" : " + payments);
         String amount = jdbc.queryForObject("SELECT COALESCE(SUM(amount),0) FROM commission_transaction "
-                + "WHERE starts_with(source_business_key, 'SYNTHETIC:DAR012:D12-IT:')", java.math.BigDecimal.class).toPlainString();
+                + "WHERE payment_stage = 'INSURER_TO_GA' AND starts_with(source_business_key, 'SYNTHETIC:DAR012:D12-IT:')", java.math.BigDecimal.class).toPlainString();
         assertThat(json).contains("\"insurerStatementAmount\" : \"" + amount + "\"");
         assertThat(Files.readString(metadataFile.resolveSibling("D12-IT-answers.csv")))
                 .startsWith("contract_no,scenario,expected_result_type,expected_amount,note");
@@ -105,7 +105,28 @@ class Dar012LoaderIntegrationTest {
         assertThat(Files.readString(metadataFile)).contains("\"datasetId\" : \"D12-IT\"")
                 .contains("\"agent01PreviousAgentCode\" : \"A-FC-001\"")
                 .contains("\"agent01RepresentativeAgentCode\" : \"D12-A-0001\"")
-                .contains("한도 경계 미포함");
+                .contains("한도 경계를 담는다");
+    }
+
+    @Test
+    void capBoundaryContractsUseTheirOwnApprovedProductAndOtherContractsDoNot() {
+        assertThat(count("SELECT COUNT(*) FROM policy_version WHERE policy_code = 'INS-REFUND-D12-CAP-V1' AND status = 'ACTIVE' AND approved_by <> created_by")).isEqualTo(1);
+        assertThat(count("""
+                SELECT COUNT(*) FROM insurance_contract c JOIN product_offering po USING (product_offering_id)
+                  JOIN product p ON p.product_id = po.product_id WHERE p.standard_product_code = 'STD-D12-CAP'
+                """)).isEqualTo(Dar012Planner.CAP_BOUNDARY_CONTRACTS);
+        assertThat(count("SELECT COUNT(*) FROM refund_rate_line l JOIN refund_rate_table t USING (refund_rate_table_id) WHERE t.source_product_code = 'STD-D12-CAP' AND l.contract_month_no = 12"))
+                .isEqualTo(Dar012Planner.CAP_BOUNDARY_CONTRACTS);
+    }
+
+    @Test
+    void representativeReceivesConfirmedGaPaymentsAttributedToHimself() {
+        assertThat(count("""
+                SELECT COUNT(*) FROM commission_transaction t JOIN transaction_attribution a USING (commission_transaction_id)
+                  JOIN agent ag ON ag.agent_id = t.recipient_agent_id
+                 WHERE t.payment_stage = 'GA_TO_FC' AND t.status = 'CONFIRMED' AND t.cashflow_type = 'PAYMENT' AND t.installment_no = 1
+                   AND ag.agent_code = 'D12-A-0001' AND a.agent_id = t.recipient_agent_id AND a.attribution_scope = 'CONTRACT'
+                """)).isEqualTo(4);
     }
 
     @Test

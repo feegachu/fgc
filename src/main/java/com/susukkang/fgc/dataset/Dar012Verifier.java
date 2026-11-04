@@ -1,6 +1,9 @@
 package com.susukkang.fgc.dataset;
 
 import com.susukkang.fgc.cap.service.CapCheckService;
+import com.susukkang.fgc.clawback.repository.ClawbackCandidateQueryRepository;
+import com.susukkang.fgc.clawback.service.ClawbackCalculationService;
+import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ValidationRunType;
@@ -19,6 +22,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,10 +48,15 @@ public class Dar012Verifier {
     private final ContractService contractService;
     private final ValidationRunRepository validationRunRepository;
     private final CapCheckService capCheckService;
+    private final ClawbackCandidateCaptureService clawbackCapture;
+    private final ClawbackCandidateQueryRepository clawbackCandidates;
+    private final ClawbackCalculationService clawbackCalculation;
 
     public Dar012Verifier(ValidationRunCreateService createService, MonthlyValidationJobTrigger trigger, JdbcTemplate jdbc,
                           DashboardService dashboardService, ContractService contractService,
-                          ValidationRunRepository validationRunRepository, CapCheckService capCheckService) {
+                          ValidationRunRepository validationRunRepository, CapCheckService capCheckService,
+                          ClawbackCandidateCaptureService clawbackCapture, ClawbackCandidateQueryRepository clawbackCandidates,
+                          ClawbackCalculationService clawbackCalculation) {
         this.createService = createService;
         this.trigger = trigger;
         this.jdbc = jdbc;
@@ -55,6 +64,9 @@ public class Dar012Verifier {
         this.contractService = contractService;
         this.validationRunRepository = validationRunRepository;
         this.capCheckService = capCheckService;
+        this.clawbackCapture = clawbackCapture;
+        this.clawbackCandidates = clawbackCandidates;
+        this.clawbackCalculation = clawbackCalculation;
     }
 
     /** 시나리오별 정답표 비교 결과. divergences 는 정답표와 다른 계약번호(최대 20건). */
@@ -75,9 +87,19 @@ public class Dar012Verifier {
         };
     }
 
+    /** 한도 경계 정답을 엔진의 원수사→GA 판정과 잔여 한도로 판정한다. 잔여 0원은 위반이 아니라 주의다(CapResultStatus.judge). */
+    static boolean judgeCap(String expectedResultType, String resultStatus, BigDecimal remainingAmount) {
+        if (resultStatus == null || remainingAmount == null) {
+            return false;
+        }
+        return "CAP_AT_LIMIT".equals(expectedResultType)
+                ? "WARNING".equals(resultStatus) && remainingAmount.signum() == 0
+                : "VIOLATION".equals(resultStatus) && remainingAmount.compareTo(BigDecimal.ONE.negate()) == 0;
+    }
+
     /**
      * 정답표와 이번 월 통합검증 실행의 결과를 비교한다. 대사 결과는 이 검증 실행에 연결된 대사 실행(reconciliation_run)의
-     * 보험사→GA 단계 1회차 행만, 계약 상태는 계약 현재 상태로 본다. 대상은 계약일이 검증월인 계약이다
+     * 보험사→GA 단계 1회차 행만, 계약 상태는 계약 현재 상태로, 한도 경계는 이 실행의 보험사→GA cap_check로 본다. 대상은 계약일이 검증월인 계약이다
      * (명세 지급은 계약월 1회차만 만들기 때문). 그래서 정답표 전체를 보려면 계약 창의 달마다 실행한다.
      */
     public List<ScenarioResult> compareWithAnswerKey(Dar012Plan plan, LocalDate month, long validationRunId) {
@@ -99,6 +121,17 @@ public class Dar012Verifier {
                 + "AND starts_with(contract_no, 'FGC-')", rs -> {
             status.put(rs.getString(1), rs.getString(2));
         }, from, to);
+        Map<String, String> capStatus = new LinkedHashMap<>();
+        Map<String, BigDecimal> capRemaining = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT c.contract_no, cc.result_status, cc.remaining_amount
+                  FROM cap_check cc JOIN insurance_contract c ON c.contract_id = cc.contract_id
+                 WHERE cc.validation_run_id = ? AND cc.payment_stage = 'INSURER_TO_GA'
+                   AND c.contract_date >= ? AND c.contract_date < ? AND starts_with(c.contract_no, 'FGC-')
+                """, rs -> {
+            capStatus.put(rs.getString(1), rs.getString(2));
+            capRemaining.put(rs.getString(1), rs.getBigDecimal(3));
+        }, validationRunId, from, to);
 
         Map<String, int[]> counts = new LinkedHashMap<>();
         Map<String, List<String>> divergences = new LinkedHashMap<>();
@@ -108,7 +141,9 @@ public class Dar012Verifier {
             }
             int[] c = counts.computeIfAbsent(a.scenario(), k -> new int[2]);
             c[0]++;
-            boolean ok = judgeReconciliation(a.expectedResultType(), recon.getOrDefault(a.contractNo(), List.of()));
+            boolean ok = a.expectedResultType().startsWith("CAP_")
+                    ? judgeCap(a.expectedResultType(), capStatus.get(a.contractNo()), capRemaining.get(a.contractNo()))
+                    : judgeReconciliation(a.expectedResultType(), recon.getOrDefault(a.contractNo(), List.of()));
             if (ok && a.expectedResultType().startsWith("STATUS_") && !"STATUS_LATE_ARRIVAL".equals(a.expectedResultType())) {
                 ok = a.expectedResultType().endsWith(status.get(a.contractNo()));
             }
@@ -124,6 +159,26 @@ public class Dar012Verifier {
         List<ScenarioResult> results = new ArrayList<>();
         counts.forEach((k, c) -> results.add(new ScenarioResult(k, c[0], c[1], divergences.getOrDefault(k, List.of()))));
         return results;
+    }
+
+    /** 대표 설계사 해지 계약의 환수 후보. 기지급액은 지급 원천에서, 예상 환수액은 환수 계산 엔진에서 나온 값이다. */
+    public record ClawbackCheck(String contractNo, BigDecimal paidAmount, BigDecimal estimatedAmount, List<String> reasons) {}
+
+    /**
+     * 대표 설계사의 해지 사건을 일 배치의 Writer와 같은 경로로 환수 후보로 잡고 FUN-054 조회와 FUN-055 계산으로 금액을 읽는다.
+     * 후보 행은 일 배치와 같은 서비스가 만들고, 환수 계산은 저장하지 않는다(estimate).
+     */
+    public ClawbackCheck checkRepresentativeClawback(Dar012Plan plan) {
+        String contractNo = plan.contracts().get(Dar012Planner.REPRESENTATIVE_CONTRACTS - 1).contractNo();
+        Long eventId = jdbc.queryForObject("""
+                SELECT e.contract_status_event_id FROM contract_status_event e JOIN insurance_contract c ON c.contract_id = e.contract_id
+                 WHERE c.contract_no = ? AND e.new_status = 'TERMINATED'
+                """, Long.class, contractNo);
+        clawbackCapture.captureStatusEvents(List.of(eventId));
+        Long candidateId = jdbc.queryForObject("SELECT candidate_id FROM clawback_candidate WHERE status_event_id = ?", Long.class, eventId);
+        var detail = clawbackCandidates.findById(candidateId).orElseThrow();
+        var estimate = clawbackCalculation.estimate(detail);
+        return new ClawbackCheck(contractNo, detail.candidate().paidAmount(), estimate.amount(), estimate.reasons());
     }
 
     /** 같은 1,200% 판정 건수를 홈·설계사 소계·계약 목록·원천 cap_check 네 곳에서 읽은 값. */

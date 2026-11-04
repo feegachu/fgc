@@ -34,12 +34,16 @@ public final class Dar012ReportWriter {
         counts.put("financialSnapshots", plan.snapshots().size());
         counts.put("statementBatches", plan.batches().size());
         counts.put("insurerStatementPayments", plan.payments().size());
+        counts.put("gaToFcPayments", plan.gaPayments().size());
+        counts.put("capBoundaryContracts", plan.capBoundaries().size());
         counts.put("answerRows", plan.answers().size());
 
         Map<String, Object> sums = new LinkedHashMap<>();
         sums.put("monthlyEquivalentPremium", plan.contracts().stream()
                 .map(Dar012Plan.ContractRow::monthlyEquivalent).reduce(BigDecimal.ZERO, BigDecimal::add).toPlainString());
         sums.put("insurerStatementAmount", plan.payments().stream().map(PaymentRow::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).toPlainString());
+        sums.put("gaToFcAmount", plan.gaPayments().stream().map(Dar012Plan.GaPaymentRow::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add).toPlainString());
 
         Map<String, Long> byScenario = plan.answers().stream()
@@ -60,8 +64,8 @@ public final class Dar012ReportWriter {
         meta.put("answersByScenario", byScenario);
         meta.put("agent01PreviousAgentCode", agent01PreviousAgentCode);
         meta.put("agent01RepresentativeAgentCode", plan.agents().get(0).code());
-        meta.put("answerKeyScope", "대사 금액 차이, 공통 패턴, 명세 없음, 상태 사건만 담는다. 한도 경계 미포함: "
-                + "1,200% 판정은 schedule_line.expected_amount만 합산해 명세 지급액을 심어도 판정이 바뀌지 않는다");
+        meta.put("answerKeyScope", "대사 금액 차이, 공통 패턴, 명세 없음, 상태 사건, 한도 경계를 담는다. 1,200% 판정은 "
+                + "schedule_line.expected_amount만 합산하므로 한도 경계는 전용 상품의 12차월 환급률로 한도를 맞춘 계약 2건으로 심는다");
         meta.put("excluded", "스케줄·1,200% 결과·차익거래·분개·대사·예외는 만들지 않는다 — 실제 엔진·배치가 만든다");
         return meta;
     }
