@@ -46,7 +46,7 @@ public class AgentDataScopeService {
                     WHERE any_ta.commission_transaction_id = ct.commission_transaction_id))
             """.formatted(ownAttribution("own_ta"));
 
-    /** 지급 건(별칭 ct)에 :agentId 몫이 아닌 귀속행이 섞여 있는지. 이때는 헤더 총액·전체 근거를 AGENT에게 내주지 않는다. */
+    /** 지급 건(별칭 ct)에 :agentId 몫이 아닌 귀속행이 섞여 있는지. 이때는 헤더 총액과 전체 근거를 AGENT에게 내주지 않는다. */
     public static final String MIXED_PAYMENT = """
             EXISTS (SELECT 1 FROM fgc.transaction_attribution other_ta
                      WHERE other_ta.commission_transaction_id = ct.commission_transaction_id AND %s IS NOT TRUE)
@@ -64,7 +64,7 @@ public class AgentDataScopeService {
 
     /**
      * 내부 역할은 null(전체 범위), AGENT는 세션도 DB의 최신 연결로 검사한다. 인증 문맥이 없으면 어느 쪽으로도 해석하지 않는다.
-     * 비동기·LLM 스레드에서 문맥이 사라져도 전체 범위가 되지 않게 한다. 배치·예약 작업은 이 서비스를 거치는 조회를 쓰지 않는다.
+     * 비동기나 LLM 스레드에서 문맥이 사라져도 전체 범위가 되지 않게 한다. 배치와 예약 작업은 이 서비스를 거치는 조회를 쓰지 않는다.
      */
     public Long currentAgentId() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
