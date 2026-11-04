@@ -35,6 +35,14 @@ export const LINE_STATUS: Record<string, string> = SCHEDULE_STATUS
 /** 계산방식도 응답에 라벨 필드가 없다(ScheduleLineResponse.calculationType). */
 export const CALCULATION_TYPE: Record<string, string> = { RATE: '요율', FIXED: '정액' }
 
+/** 생성 사유 코드(ScheduleService, ContractServiceImpl). 재생성 때 직접 입력한 사유는 코드가 아니라 그대로 보인다. */
+const GENERATION_REASON: Record<string, string> = {
+  CONTRACT_CREATED: '계약 등록',
+  CONTRACT_UPDATED: '계약 수정',
+  CONTRACT_DETAIL_MANUAL: '계약 상세에서 재생성',
+}
+export const generationReason = (reason?: string | null) => (reason && GENERATION_REASON[reason]) || reason
+
 /*
  * 상태 배지 톤 — 화면정의서 4장 규칙 4. 근거와 선택 이유는 1차 schedule-labels.js 주석 그대로다.
  * CONFIRMED 는 VRUN-W01 의 확정과 같은 review + 자물쇠(규칙 8 확정 후 잠금)로 표시한다.
@@ -56,8 +64,8 @@ export const statusTone = (code?: string | null): StatusTone => (code && STATUS_
 export const isLocked = (code?: string | null) => code === 'CONFIRMED'
 
 export const REGIME_EVIDENCE = {
-  title: 'REG-19 · 적용 체계 판정',
-  body: '적용 체계는 계약 체결연도만으로 정하지 않습니다. 상품 판매개시일 · 기초서류 버전 · 판매채널을 함께 보고 정합니다.',
+  title: 'REG-19, 적용 체계 판정',
+  body: '적용 체계는 계약 체결연도만으로 정하지 않습니다. 상품 판매개시일, 기초서류 버전, 판매채널을 함께 보고 정합니다.',
 }
 
 /** 서버 라벨 → 코드표 → 코드값 → '-' 순서. 1차 responseLabel 과 같은 결과다. */
@@ -67,5 +75,5 @@ export function responseLabel(
   code?: string | null,
 ) {
   if (typeof serverLabel === 'string' && serverLabel.trim()) return serverLabel
-  return (code && labels[code]) || code || EMPTY
+  return (code && labels[code]) || (code ? '확인 필요' : EMPTY)
 }

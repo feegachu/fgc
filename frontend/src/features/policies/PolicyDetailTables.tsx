@@ -2,11 +2,18 @@ import { Fragment } from 'react'
 import { ReferenceText } from '../reference/ReferenceUI'
 import { present } from '../reference/utils'
 import { DataTable } from '../../components/DataTable'
-import { StatusBadge } from '../../components/StatusBadge'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { date, int, isNegative, rate, won } from '../../lib/format'
 import type { PolicyDetail } from './api'
-import { policyAgentRankLabel } from './labels'
+import { policyAgentRankLabel, policyCodeLabel } from './labels'
+import { screenMessage } from '../../lib/screenText'
+import { channelLabels } from '../base/columns'
+
+const refundConditions: Record<string, string> = {
+  NONE: '없음',
+  STANDARD_DEDUCTION_80: '표준해약공제액 80% 이상 상품',
+}
 export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['commissionRules']> }) {
   if (!rows.length)
     return (
@@ -54,14 +61,25 @@ export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['comm
         {
           key: 'calculation',
           label: '계산방식',
-          render: (r) =>
-            r.calculationType === 'RATE' ? '요율' : r.calculationType === 'FIXED' ? '정액' : present(r.calculationType),
+          render: (r) => (
+            <CategoryBadge value={r.calculationType} optionCount={2}>
+              {r.calculationType === 'RATE'
+                ? '요율'
+                : r.calculationType === 'FIXED'
+                  ? '정액'
+                  : present(r.calculationType)}
+            </CategoryBadge>
+          ),
         },
         {
           key: 'basis',
           label: '기준코드',
           cellClassName: 'policy-disclosure-cell',
-          render: (r) => <ReferenceText value={present(r.basisCode)} limit={20} singleLine />,
+          render: (r) => (
+            <CategoryBadge value={r.basisCode} optionCount={1}>
+              <ReferenceText value={policyCodeLabel(r.basisCode)} limit={20} singleLine />
+            </CategoryBadge>
+          ),
         },
         { key: 'rate', label: '요율(%)', align: 'left', render: (r) => rate(r.ratePct) },
         {
@@ -113,7 +131,12 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
             key: 'refund',
             label: '환급금 가산 조건',
             cellClassName: 'policy-disclosure-cell',
-            render: (r) => <ReferenceText value={r.refundAdditionCondition} limit={28} />,
+            render: (r) => (
+              <ReferenceText
+                value={refundConditions[r.refundAdditionCondition ?? ''] ?? r.refundAdditionCondition}
+                limit={28}
+              />
+            ),
           },
         ]}
       />
@@ -121,7 +144,7 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
         .filter((set) => set.items?.length)
         .map((set) => (
           <Fragment key={set.capRuleSetId}>
-            <h3 className="policy-detail-title">항목별 산입 판정 — {set.paymentStageLabel}</h3>
+            <h3 className="policy-detail-title">항목별 산입 판정, {set.paymentStageLabel}</h3>
             <DataTable
               className="policy-cap-item-table"
               viewportClassName="policy-detail-table-viewport"
@@ -154,7 +177,7 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
                         : r.inclusionStatus === 'EXCLUDED'
                           ? '제외'
                           : r.inclusionStatus === 'REVIEW_REQUIRED'
-                            ? '검토 필요'
+                            ? '검토필요'
                             : '-'}
                     </StatusBadge>
                   ),
@@ -163,19 +186,27 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
                   key: 'exclusion',
                   label: '제외 유형',
                   cellClassName: 'policy-disclosure-cell',
-                  render: (r) => <ReferenceText value={r.exclusionType} limit={24} singleLine />,
+                  render: (r) => (
+                    <CategoryBadge value={r.exclusionType} optionCount={2}>
+                      <ReferenceText value={policyCodeLabel(r.exclusionType)} limit={24} singleLine />
+                    </CategoryBadge>
+                  ),
                 },
                 {
                   key: 'attribution',
                   label: '귀속 방법',
                   cellClassName: 'policy-disclosure-cell',
-                  render: (r) => <ReferenceText value={r.attributionMethod} limit={24} singleLine />,
+                  render: (r) => (
+                    <CategoryBadge value={r.attributionMethod} optionCount={5}>
+                      <ReferenceText value={policyCodeLabel(r.attributionMethod)} limit={24} singleLine />
+                    </CategoryBadge>
+                  ),
                 },
                 {
                   key: 'reason',
-                  label: '판단 이유 (필수 저장값)',
+                  label: '판단 이유',
                   cellClassName: 'policy-disclosure-cell',
-                  render: (r) => <ReferenceText value={r.decisionReason} limit={36} />,
+                  render: (r) => <ReferenceText value={screenMessage(r.decisionReason)} limit={36} />,
                 },
               ]}
             />
@@ -194,7 +225,8 @@ export function RefundTables({ rows }: { rows: NonNullable<PolicyDetail['refundR
   return rows.map((table) => (
     <Fragment key={table.refundRateTableId}>
       <h3 className="policy-detail-title">
-        {table.insurerName} · {table.productName} · 납입 {table.paymentTermMonths}개월 · 채널 {table.channelCode}
+        {table.insurerName}, {table.productName}, 납입 {table.paymentTermMonths}개월, 채널{' '}
+        {channelLabels[table.channelCode ?? ''] ?? table.channelCode}
       </h3>
       <dl className="policy-refund-metadata">
         <div>
@@ -237,7 +269,9 @@ export function RefundTables({ rows }: { rows: NonNullable<PolicyDetail['refundR
             align: 'center',
             render: (r) =>
               r.contractMonthNo === 12 && table.standardDeduction80Yn ? (
-                <StatusBadge tone="warning">1,200% 한도 가산에 쓰는 값</StatusBadge>
+                <StatusBadge kind="text" tone="warning">
+                  1,200% 한도 가산에 쓰는 값
+                </StatusBadge>
               ) : (
                 ''
               ),

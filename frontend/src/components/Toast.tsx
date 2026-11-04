@@ -17,7 +17,7 @@ function Toast({ item }: { item: ToastMessage }) {
     const timer = setTimeout(() => close(item.id), item.duration)
     return () => clearTimeout(timer)
   }, [item.id, item.duration, close])
-  const [title, ...details] = item.message.split(' — ')
+  const [title, ...details] = item.message.split(', ')
   return (
     <div className={`toast toast-${item.tone}`} role={item.tone === 'error' ? 'alert' : 'status'} aria-atomic="true">
       <span className="toast-icon" aria-hidden="true">
@@ -25,9 +25,9 @@ function Toast({ item }: { item: ToastMessage }) {
       </span>
       <div className="toast-content">
         <p className="toast-message">{title}</p>
-        {details.length > 0 && <p className="toast-message-detail">{details.join(' — ')}</p>}
+        {details.length > 0 && <p className="toast-message-detail">{details.join(', ')}</p>}
       </div>
-      <button type="button" className="icon-button toast-close" aria-label="알림 닫기" onClick={() => close(item.id)}>
+      <button data-guide-feature="components.toast.button" type="button" className="icon-button toast-close" aria-label="알림 닫기" onClick={() => close(item.id)}>
         <span className="material-symbols-rounded" aria-hidden="true">
           close
         </span>

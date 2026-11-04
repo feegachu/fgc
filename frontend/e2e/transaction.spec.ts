@@ -368,7 +368,7 @@ test('한도 초과는 확정 시도 후 DRAFT를 유지하고 예외함 링크�
   const fixture = await installApi(page, { violation: true })
   await enterDraft(page, 1300000, 1)
   await expect(page.getByRole('link', { name: '예외함에서 처리하기' })).toHaveCount(0)
-  await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
+  await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
   await expect(page.getByRole('link', { name: '예외함에서 처리하기' })).toHaveAttribute(
     'href',
     /\/exceptions\?type=CAP_VIOLATION&contractNo=DEMO-CONTRACT-1(?:&month=2026-07)?$/,
@@ -396,7 +396,7 @@ test('확정 응답이 유실되어도 명시적 재시도는 같은 멱등키�
 test('COMPLIANCE는 지급 등록 경로에 접근할 수 없다', async ({ page }) => {
   const fixture = await installApi(page, { reader: true })
   await page.goto('transactions/new')
-  await expect(page.getByRole('heading', { name: '403 · 권한 없음' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '권한 없음' })).toBeVisible()
   await expect(page.locator('#btn-save')).toHaveCount(0)
   expect(fixture.requests.some((request) => request.path.startsWith('/api/v1/transactions'))).toBe(false)
 })
@@ -506,7 +506,7 @@ for (const source of ['preview', 'detail', 'failed detail']) {
     await expect(page.locator('#btn-confirm')).toBeEnabled()
     await page.locator('#btn-confirm').click()
     await expect(page.getByRole('link', { name: '예외함에서 처리하기' })).toHaveCount(0)
-    await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
+    await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
     const link = page.getByRole('link', { name: '예외함에서 처리하기' })
     await expect(link).toBeVisible()
     if (source !== 'failed detail') await expect(link).toHaveAttribute('href', /contractNo=OUTSIDE-CONTRACT-103/)
@@ -545,19 +545,20 @@ test('빈 저장 초안은 빈 귀속표로 보여 주고 서버 입력 오류�
   await page.locator('#btn-precheck').click()
   await expect(page.locator('#btn-confirm')).toBeEnabled()
   await page.locator('#btn-confirm').click()
-  await expect(page.getByRole('dialog')).toContainText('FGC-TRAN-002')
+  await expect(page.getByRole('dialog')).toContainText('귀속행을 입력하세요.')
+  await expect(page.getByRole('dialog')).not.toContainText('FGC-TRAN-002')
   await expect(page.locator('#btn-confirm-submit')).toHaveCount(0)
 })
 
 test('기록된 한도 거절 응답 유실 뒤 CAP-003 재응답에도 예외함 동선을 유지한다', async ({ page }) => {
   const fixture = await installApi(page, { violation: true, lostCapRejection: true })
   await enterDraft(page, 1300000, 1)
-  await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
+  await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
   await expect(page.locator('#transaction-confirm-blockers')).toBeVisible()
   await page.getByRole('button', { name: '취소', exact: true }).click()
   await page.locator('#btn-confirm').click()
-  await page.getByRole('button', { name: '확정 시도 · 예외 등록' }).click()
-  await expect(page.getByRole('dialog')).toContainText('FGC-CAP-003')
+  await page.getByRole('button', { name: '확정 시도, 예외 등록' }).click()
+  await expect(page.getByRole('dialog')).toContainText('1,200% 한도를 초과했습니다.')
   const link = page.getByRole('link', { name: '예외함에서 처리하기' })
   await expect(link).toHaveAttribute('href', /type=CAP_VIOLATION/)
   await expect(link).not.toHaveAttribute('href', /contractNo=/)
@@ -604,11 +605,11 @@ for (const viewport of [
     const help = page.getByRole('button', { name: '도움말', exact: true })
     await help.click()
     const card = page.getByRole('region', { name: '지급 업무 가이드' })
-    await card.getByRole('button', { name: '지급 사전검증·확정' }).click()
+    await card.getByRole('button', { name: '지급 사전검증/확정' }).click()
     await expect(page.getByTestId('payment-guide-spotlight')).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('guide-scope.png') })
     await card.getByRole('button', { name: '확인하고 다음' }).click()
-    await card.getByRole('button', { name: '다음', exact: true }).click()
+    await expect(card.getByRole('heading', { name: '사전검증을 실행하세요' })).toBeVisible()
     expect(
       fixture.requests.filter((request) => request.method === 'POST' && request.path.includes('/transactions')),
     ).toHaveLength(0)

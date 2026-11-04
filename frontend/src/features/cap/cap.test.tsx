@@ -1,3 +1,4 @@
+import workflowDefinitions from '../assistant/workflow-guides.v1.json'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -18,7 +19,7 @@ const item: CapItem = {
   contractId: 3,
   contractNo: 'C-2026-0001',
   paymentStage: 'INSURER_TO_GA',
-  paymentStageLabel: '원수사 → GA',
+  paymentStageLabel: '원수사→GA',
   asOfDate: '2026-07-01',
   basePremiumAmount: 100000,
   refund12mAmount: 288000,
@@ -160,21 +161,21 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
       insurerId: '',
       orgId: '',
       contractNo: 'C',
-      sort: '',
+      sort: 'usagePct,desc',
     })
     expect(criteriaFromParams(new URLSearchParams(), null).month).toBe('')
   })
-  it('#604 허용된 정렬만 요청에 싣고 나머지는 서버 기본 정렬로 되돌린다', () => {
+  it('#604 허용된 정렬만 요청에 싣고 나머지는 화면 기본 정렬(사용률 높은 순)로 되돌린다', () => {
     expect(criteriaFromParams(new URLSearchParams('sort=usagePct,desc'), '2026-07').sort).toBe('usagePct,desc')
-    expect(criteriaFromParams(new URLSearchParams('sort=resultStatus,asc'), '2026-07').sort).toBe('')
-    expect(criteriaFromParams(new URLSearchParams('sort=usagePct'), '2026-07').sort).toBe('')
+    expect(criteriaFromParams(new URLSearchParams('sort=resultStatus,asc'), '2026-07').sort).toBe('usagePct,desc')
+    expect(criteriaFromParams(new URLSearchParams('sort=usagePct'), '2026-07').sort).toBe('usagePct,desc')
   })
   it('#604 헤더를 누르면 정렬 방향이 바뀌고 첫 페이지로 돌아가며 검색조건과 유지한다', async () => {
     const { router, user } = renderAt('/cap-checks?month=2026-07&contractNo=C-1&page=2')
     const table = await screen.findByRole('table', { name: '계약별 판정 목록' })
     // 순서 기준이 없는 판정 컬럼은 정렬 버튼이 없다. 도움말 버튼은 정렬 버튼과 분리되어 있다.
     expect(within(table).queryByRole('button', { name: '판정' })).toBeNull()
-    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'none')
+    expect(within(table).getByRole('columnheader', { name: /사용률/ })).toHaveAttribute('aria-sort', 'descending')
     await user.click(within(table).getByRole('button', { name: '사용률' }))
     await waitFor(() => expect(new URLSearchParams(listCalls().at(-1)!.split('?')[1]).get('sort')).toBe('usagePct,asc'))
     const last = new URLSearchParams(listCalls().at(-1)!.split('?')[1])
@@ -193,15 +194,15 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     renderAt('/cap-checks')
     const table = await screen.findByRole('table', { name: '계약별 판정 목록' })
     await waitFor(() => expect(within(table).getByText('C-2026-0001')).toBeVisible())
-    expect(screen.getByLabelText('기준월')).toHaveValue('2026-07')
+    expect(screen.getByLabelText('정산월')).toHaveValue('2026-07')
     expect(listCalls().every((url) => new URLSearchParams(url.split('?')[1]).get('month') === '2026-07')).toBe(true)
     expect(within(table).getByText('1,200.0%')).toBeVisible()
     expect(within(table).getByText('주의')).toBeVisible() // 1200%를 프론트에서 VIOLATION으로 다시 판정하지 않음
     expect(within(table).getByText('-85,000원')).toHaveClass('is-negative-amount')
     expect(within(table).getByRole('link', { name: 'C-2026-0001' })).toHaveAttribute('href', '/contracts/3?tab=cap')
-    expect(screen.getByRole('button', { name: /저장 판정 정상\s*30/ })).toBeVisible()
+    expect(screen.getByRole('button', { name: /판정 결과 정상\s*30/ })).toBeVisible()
     expect(screen.getByText('30,000,000원')).toBeVisible() // 현재 페이지 1행으로 합산하지 않음
-    expect(screen.getByText('모니터링 지표 · 규제 판정 아님')).toBeVisible()
+    expect(screen.getByText('모니터링 지표, 규제 판정 아님')).toBeVisible()
   })
   it('필터·페이지·행 수를 URL에 유지하고 뒤로 이동 시 조건을 복원한다', async () => {
     const { router, user } = renderAt(
@@ -217,17 +218,17 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     expect(new URLSearchParams(router.state.location.search).has('page')).toBe(false)
     await user.click(screen.getByRole('button', { name: '2' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
-    await user.selectOptions(screen.getByLabelText('한 화면 행 수'), '50')
+    await user.selectOptions(screen.getByLabelText('화면 행 수'), '50')
     await waitFor(() => expect(router.state.location.search).toContain('size=50'))
     expect(new URLSearchParams(router.state.location.search).has('page')).toBe(false)
     await router.navigate(-1)
-    await waitFor(() => expect(screen.getByLabelText('한 화면 행 수')).toHaveValue('10'))
+    await waitFor(() => expect(screen.getByLabelText('화면 행 수')).toHaveValue('10'))
     expect(new URLSearchParams(router.state.location.search).get('page')).toBe('2')
     expect(screen.getByLabelText('계약번호')).toHaveValue('NEW')
   })
   it('KPI 상태 토글과 초기화가 페이지를 리셋한다', async () => {
     const { router, user } = renderAt('/cap-checks?month=2026-07&page=2&size=10')
-    const kpi = await screen.findByRole('button', { name: /저장 판정 위반\s*2/ })
+    const kpi = await screen.findByRole('button', { name: /판정 결과 위반\s*2/ })
     await user.click(kpi)
     await waitFor(() => expect(router.state.location.search).toContain('status=VIOLATION'))
     expect(kpi).toHaveAttribute('aria-pressed', 'true')
@@ -235,7 +236,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     await user.click(kpi)
     await waitFor(() => expect(new URLSearchParams(router.state.location.search).has('status')).toBe(false))
     await user.click(screen.getByRole('button', { name: '초기화' }))
-    await waitFor(() => expect(screen.getByLabelText('한 화면 행 수')).toHaveValue('20'))
+    await waitFor(() => expect(screen.getByLabelText('화면 행 수')).toHaveValue('20'))
     expect(screen.getByLabelText('계약번호')).toHaveValue('')
   })
   it.each(['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'])('%s 역할은 읽기만 한다', async (role) => {
@@ -260,7 +261,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     )
     await screen.findByText('조건에 맞는 계약 판정이 없습니다.')
     expect(screen.getByText('조건에 맞는 지급단계별 집계가 없습니다.')).toBeVisible()
-    expect(screen.getByText('조건에 맞는 GA → 설계사 단계 모니터링 대상이 없습니다.')).toBeVisible()
+    expect(screen.getByText('조건에 맞는 GA→설계사 단계 모니터링 대상이 없습니다.')).toBeVisible()
   })
 })
 
@@ -291,7 +292,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText(storedReason)).toBeInTheDocument()
-    expect(screen.queryByText('적용대상 아님 — 시행 전 계약')).not.toBeInTheDocument()
+    expect(screen.queryByText('적용대상 아님, 시행 전 계약')).not.toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
@@ -326,8 +327,9 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('적용대상 아님 — 시행 전 계약')).toBeInTheDocument()
-    expect(screen.getByText('CONTRACT_BEFORE_EFFECTIVE_DATE')).toBeInTheDocument()
+    expect(await screen.findByText('적용대상 아님, 시행 전 계약')).toBeInTheDocument()
+    expect(screen.queryByText('CONTRACT_BEFORE_EFFECTIVE_DATE')).not.toBeInTheDocument()
+    expect(screen.queryByText('CAP_APPLICABILITY_V1')).not.toBeInTheDocument()
     expect(screen.getByText('2026-06-30')).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
     expect(screen.queryByText('② 계산식')).not.toBeInTheDocument()
@@ -354,7 +356,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     )
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('한도 = 100,000 × 12.0 − 288,000 + 3,000 = 915,000원')
-    expect(within(dialog).getByText('증빙 미연결 / 후속 연결 대기')).toBeVisible()
+    expect(within(dialog).getByText('증빙 없음')).toBeVisible()
     expect(within(dialog).getByText('제외 항목 미포함')).toBeVisible()
     const detailRows = within(dialog).getByRole('table', { name: '항목별 산입 내역' }).querySelectorAll('tbody tr')
     expect(detailRows[0]).toHaveTextContent('기본수수료') // API 순서를 프론트에서 임의 재정렬하지 않음
@@ -379,7 +381,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
         throw new ApiError({ code: 'FGC-COMMON-500', message: 'internal database secret' }, 'trace-500', 500)
     })
     const dialog = await screen.findByRole('dialog')
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('요청 ID: trace-500')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('처리 중 오류가 발생했습니다. 요청번호 trace-500를 담당자에게 알려주세요.')
     expect(screen.queryByText(/internal database secret/)).not.toBeInTheDocument()
   })
   it.each([null, undefined, ''])(
@@ -403,7 +405,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
       expect(request).not.toHaveBeenCalled()
       expect(capDetailQuery(emptyId).enabled).toBe(false)
       expect(capDetailQuery(emptyId).queryKey).toEqual(['cap-checks', 'detail', null])
-      await expect(client.fetchQuery(capDetailQuery(emptyId))).rejects.toThrow('계산근거 ID가 없습니다.')
+      await expect(client.fetchQuery(capDetailQuery(emptyId))).rejects.toThrow('계산근거를 찾을 수 없습니다.')
       expect(request).not.toHaveBeenCalled()
       view.unmount()
       const opened = createMemoryRouter([{ path: '/contracts/:id', element: <Consumer id={11} /> }], {
@@ -459,3 +461,28 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
 })
+
+
+it.each(['NORMAL', 'NOT_APPLICABLE'] as const)(
+  'provides one shared guide target for the %s calculation basis', async (resultStatus) => {
+    const data: CapBasis = {
+      ...basis,
+      capCheck: { ...item, resultStatus, resultStatusLabel: resultStatus === 'NORMAL' ? '정상' : '비적용' },
+    }
+    vi.spyOn(apiClient, 'request').mockResolvedValue(envelope(data))
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter><CapDetailModal capCheckId={11} onClose={() => {}} /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    const dialog = await screen.findByRole('dialog', { name: '계산근거' })
+    const content = resultStatus === 'NORMAL' ? '① 입력값' : '한도/산입금액/사용률 계산 대상이 아닙니다.'
+    await within(dialog).findByText(content)
+    const targetId = workflowDefinitions.find((guide) => guide.workflowId === 'cap.review')!.steps[2].targetId
+    const targets = document.querySelectorAll(`[data-guide-feature="${targetId}"]`)
+    expect(targets).toHaveLength(1)
+    expect(dialog).toContainElement(targets[0] as HTMLElement)
+    expect(targets[0]).toHaveTextContent(content)
+    expect(targets[0]).toBeVisible()
+  },
+)

@@ -10,5 +10,27 @@ export function policyAgentRankLabel(code?: string | null, paymentStage?: string
   // 원수사→GA는 개인 직급이 해당 없고, 다른 단계의 null은 직급 정보 누락이다.
   if (code === null) return paymentStage === 'INSURER_TO_GA' ? '해당 없음(GA 수령)' : '-'
   if (code == null || code.trim() === '') return '-'
-  return Object.hasOwn(agentRankLabels, code) ? agentRankLabels[code as keyof typeof agentRankLabels] : code
+  return Object.hasOwn(agentRankLabels, code) ? agentRankLabels[code as keyof typeof agentRankLabels] : '확인 필요'
+}
+
+const policyCodeLabels: Record<string, string> = {
+  RATE: '요율',
+  FIXED: '정액',
+  MONTHLY_EQUIVALENT_FIRST_PREMIUM: '월납환산 초회보험료',
+  NONE: '제외 없음',
+  NEW_AGENT_SUPPORT: '신인 지원금',
+  // 귀속 방법은 화면정의서 TRAN-W01 귀속 방법 표기와 같다.
+  DIRECT: '직접 귀속',
+  SETTLEMENT_SUPPORT_MONTHLY: '정착지원금 월귀속',
+  FIRST_CONTRACT_CARRY_FORWARD: '최초계약 이월',
+  APPROVED_ALLOCATION: '승인배부',
+  MANUAL_REVIEW: '수동검토',
+  NOT_APPLICABLE: '해당 없음',
+  TOTAL_PAID: '총 지급액',
+  CONFIRMED_PAID: '확정 지급액',
+  PAID_COMMISSION: '지급 수수료',
+  PAID_ATTRIBUTED_AMOUNT: '확정 지급 귀속액',
+}
+export function policyCodeLabel(code?: string | null) {
+  return code ? (policyCodeLabels[code] ?? '확인 필요') : '-'
 }

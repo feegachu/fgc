@@ -106,17 +106,19 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+/* 다른 값과 같은 왼쪽 선에 맞춘다(목록 기호는 reset.css에서 지움). */
 .claw-reason-list {
   margin: 0;
-  padding-left: 1rem;
+  padding: 0;
 }
 
 .claw-evidence {
   margin-top: var(--space-3);
   overflow: hidden;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-6);
+  border-radius: var(--radius-8);
 }
+/* 카드 안 소제목은 다른 화면(정책 상세, 계약 상세 패널)과 같은 13px 굵게. */
 .claw-evidence-title {
   display: flex;
   align-items: center;
@@ -124,8 +126,9 @@
   margin: 0;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--color-border-default);
-  font-size: 0.75rem;
-  line-height: 1.125rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
 }
 .claw-evidence-table {
   overflow-x: auto;
@@ -137,22 +140,140 @@
   font-size: 0.75rem;
   line-height: 1.125rem;
 }
-.claw-policy-badge {
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-status-info-border);
-  border-radius: var(--radius-6);
-  color: var(--color-status-info-text);
-  font-size: 0.6875rem;
+.claw-policy-options {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.claw-policy-options legend {
+  padding: 0 0 var(--space-2);
+}
+.claw-policy-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-8);
+  cursor: pointer;
+}
+.claw-policy-option:has(input:checked) {
+  border-color: var(--color-border-focus);
+  background: var(--color-action-subtle);
+}
+.claw-policy-option:has(input:disabled) {
+  cursor: default;
+}
+.claw-policy-option-text {
+  display: grid;
+  min-width: 0;
+  gap: 0.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+.claw-policy-option-text strong {
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.claw-policy-option-text span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+.claw-policy-select {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--color-action-primary);
+}
+.claw-policy-select:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.claw-calculation-form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+}
+.claw-calculation-form .field-error {
+  margin: 0;
 }
 .claw-calculation-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border-top: 1px solid var(--color-border-default);
 }
 .claw-calculation-actions .field-helper {
   margin: 0;
+}
+.claw-calculation-result {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+}
+.claw-calculation-result > p {
+  margin: 0;
+}
+.claw-calculation-result .claw-evidence-table {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-8);
+}
+/* 결과표는 4열이라 카드 폭에 맞춘다. 금액 열이 가로 스크롤 뒤로 숨지 않는다. */
+.claw-calculation-result {
+  container-type: inline-size;
+}
+.claw-calculation-result .data-table {
+  min-width: 0;
+}
+.claw-lines-list {
+  display: none;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.claw-lines-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-8);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.claw-lines-list strong {
+  flex-basis: 100%;
+  font-weight: 600;
+}
+@container (max-width: 25rem) {
+  .claw-calculation-result .claw-lines-table {
+    display: none;
+  }
+  .claw-calculation-result .claw-lines-list {
+    display: grid;
+  }
+}
+.claw-calculation-summary {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.claw-calculation-stale {
+  color: var(--color-status-warning-text);
+  font-size: 0.8125rem;
+}
+.claw-calculation-total {
+  font-size: 0.8125rem;
+}
+.claw-calculation-total strong {
+  margin-left: var(--space-2);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
 }

@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { apiClient, ApiError } from '../../lib/api/client'
 import type { components } from '../../lib/api/schema'
-import { errorText } from '../../lib/format'
+import { errorText, internalErrorText } from '../../lib/format'
 
 type Schemas = components['schemas']
 export type Payment = Schemas['CommissionPaymentResponse']
@@ -16,7 +16,7 @@ export type PaymentRequest = Schemas['CommissionPaymentCreateRequest']
 
 export function formError(error: unknown, fallback: string) {
   if (error instanceof ApiError && (error.status >= 500 || error.code === 'FGC-COMMON-500')) {
-    return `요청을 처리하지 못했습니다.${error.requestId ? ` 요청 ID: ${error.requestId}` : ''}`
+    return internalErrorText(error.requestId)
   }
   return errorText(error instanceof Error ? error : undefined, fallback)
 }
@@ -31,7 +31,7 @@ export type PaymentPayload = Omit<NullableOptional<PaymentRequest>, 'attribution
 
 async function data<T>(path: string, options: Parameters<typeof apiClient.request>[1] = {}) {
   const response = await apiClient.request<T>(path, options)
-  if (response.data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (response.data == null) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return response.data
 }
 const path = (id: string, suffix = '') => `/api/v1/transactions/${encodeURIComponent(id)}${suffix}`

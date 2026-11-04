@@ -1,5 +1,8 @@
 import { useContext, useEffect, useRef, useState } from 'react'
+import { errorText } from '../../lib/format'
+import { screenMessage } from '../../lib/screenText'
 import { useQueryClient } from '@tanstack/react-query'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { Modal } from '../../components/Modal'
@@ -18,6 +21,7 @@ import {
   regimeFor,
   sources,
   sourceStatusTags,
+  statusLabels,
 } from './management'
 import type { DraftDocument } from './management'
 import { validateDraft } from './draftValidation'
@@ -68,6 +72,7 @@ export function PolicyDraftEditor({
   const [latest, setLatest] = useState('')
   const [discard, setDiscard] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const clearUnsaved = useUnsavedWork(dirty)
   const saving = useRef(false)
   const requestKey = usePolicyRequest()
   const titleFocus = useRef<HTMLInputElement>(null)
@@ -131,10 +136,10 @@ export function PolicyDraftEditor({
       cache.setQueryData(['policies', 'detail', policyId], normalizePolicyDetail(response.data))
       const header = response.data.header
       setLatest(
-        `최신 정책: ${header?.policyName ?? ''} · ${header?.statusLabel ?? header?.status ?? ''}. 입력은 보존했습니다. 최신 내용으로 편집하려면 취소 후 다시 여세요.`,
+        `최신 정책: ${header?.policyName ?? ''}, ${statusLabels[header?.status ?? ''] ?? header?.statusLabel ?? '확인 필요'}. 입력은 보존했습니다. 최신 내용으로 편집하려면 취소 후 다시 여세요.`,
       )
     } catch (cause) {
-      setLatest(cause instanceof Error ? cause.message : '최신 정책을 조회하지 못했습니다.')
+      setLatest(errorText(cause instanceof Error ? cause : null, '최신 정책을 조회하지 못했습니다.'))
     } finally {
       saving.current = false
       setBusy(false)
@@ -175,15 +180,17 @@ export function PolicyDraftEditor({
       const id = preview
         ? await preview.save(document, policyId)
         : (await savePolicyDraft(document, policyId, requestKey({ policyId, document }))).policyVersionId
+      setDirty(false)
+      clearUnsaved()
       onSaved(id)
     } catch (cause) {
-      const message =
-        cause instanceof Error ? cause.message : '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'
-      setFailure(message)
+      setFailure(
+        errorText(cause instanceof Error ? cause : null, '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'),
+      )
       setConflict(cause instanceof ApiError && cause.status === 409)
       if (cause instanceof ApiError && cause.field) {
         const path = cause.field.replace(/\[(\d+)\]/g, '.$1')
-        setErrors({ [path]: message })
+        setErrors({ [path]: screenMessage(cause.message) })
         focusError(path)
       }
     } finally {
@@ -222,20 +229,20 @@ export function PolicyDraftEditor({
         <>
           <span className="policy-editor-footer-note">
             {preview
-              ? '미리보기 · 변경 내용은 이 화면에서만 유지됩니다.'
+              ? '미리보기, 변경 내용은 이 화면에서만 유지됩니다.'
               : '초안으로 저장한 후 검토를 요청할 수 있습니다.'}
           </span>
-          <Button variant="secondary" disabled={busy} onClick={close}>
+          <Button data-guide-feature="features.policies.policy-draft-editor.button" variant="secondary" disabled={busy} onClick={close}>
             취소
           </Button>
-          <Button loading={busy} disabled={discard} onClick={() => void save()}>
+          <Button data-guide-feature="features.policies.policy-draft-editor.button-2" loading={busy} disabled={discard} onClick={() => void save()}>
             초안 저장
           </Button>
         </>
       }
     >
       <div className="policy-editor-intro">
-        <StatusBadge tone="warning">DRAFT · 초안</StatusBadge>
+        <StatusBadge tone="warning">초안</StatusBadge>
         <span>기본정보와 유형별 규칙을 작성한 후 검토를 요청하세요.</span>
         <span className="policy-required-note">* 필수 입력</span>
       </div>
@@ -243,10 +250,10 @@ export function PolicyDraftEditor({
         <div className="policy-notice policy-notice-warning" role="alert">
           <span>저장하지 않은 내용이 있습니다. 편집을 취소할까요?</span>
           <div className="policy-actions">
-            <Button variant="secondary" onClick={() => setDiscard(false)}>
+            <Button data-guide-feature="features.policies.policy-draft-editor.button-3" variant="secondary" onClick={() => setDiscard(false)}>
               계속 편집
             </Button>
-            <Button onClick={onClose}>편집 취소</Button>
+            <Button data-guide-feature="features.policies.policy-draft-editor.button-4" onClick={onClose}>편집 취소</Button>
           </div>
         </div>
       )}
@@ -258,13 +265,13 @@ export function PolicyDraftEditor({
       {conflict && policyId !== undefined && (
         <div className="policy-notice policy-notice-warning">
           <span>조회 이후 정책이 변경됐습니다. 입력을 보존하고 최신 상태를 확인하세요.</span>
-          <Button variant="secondary" disabled={busy} onClick={() => void reloadLatest()}>
+          <Button data-guide-feature="features.policies.policy-draft-editor.reload-latest" variant="secondary" disabled={busy} onClick={() => void reloadLatest()}>
             다시 조회
           </Button>
           {latest && <p role="status">{latest}</p>}
         </div>
       )}
-      <form
+      <form data-guide-feature="features.policies.policy-draft-editor.form"
         noValidate
         onSubmit={(e) => {
           e.preventDefault()
@@ -274,7 +281,7 @@ export function PolicyDraftEditor({
       >
         <nav className="policy-editor-nav" aria-label="정책 작성 단계">
           {sections.map((item, index) => (
-            <button
+            <button data-guide-feature="features.policies.policy-draft-editor.button-5"
               key={item.id}
               type="button"
               aria-current={section === item.id ? 'step' : undefined}
@@ -296,7 +303,6 @@ export function PolicyDraftEditor({
         <fieldset disabled={busy} className="policy-editor-content">
           <div className="policy-section-heading">
             <div>
-              <p className="policy-eyebrow">POLICY CONFIGURATION</p>
               <h2>{sections.find((item) => item.id === section)?.label}</h2>
             </div>
           </div>
@@ -313,7 +319,7 @@ export function PolicyDraftEditor({
               <div className="policy-form-grid policy-form-grid-two">
                 {field('policyCode', '정책코드', true, 'text', 80)}
                 <Field label="정책명" required error={errors.policyName}>
-                  <input
+                  <input data-guide-feature="features.policies.policy-draft-editor.policy-policy-name"
                     ref={titleFocus}
                     id="policy-policyName"
                     maxLength={200}
@@ -358,7 +364,7 @@ export function PolicyDraftEditor({
                 {field('effectiveFrom', '적용 시작일', true, 'date')}
                 {field('effectiveTo', '적용 종료일', false, 'date')}
                 <Field label="수수료 체계" helper="정책 유형에 따라 자동으로 선택됩니다.">
-                  <input
+                  <input data-guide-feature="features.policies.policy-draft-editor.input"
                     readOnly
                     value={
                       { CURRENT: '현행', FOUR_YEAR_2027: '4년 분급', SEVEN_YEAR_2029: '7년 분급' }[
@@ -373,7 +379,7 @@ export function PolicyDraftEditor({
                 <span className="material-symbols-rounded" aria-hidden="true">
                   info
                 </span>
-                <span>종료일을 비워두면 계속 적용됩니다. 정책 버전·상태·작성자·승인 정보는 저장 시 결정됩니다.</span>
+                <span>종료일을 비워두면 계속 적용됩니다. 정책 버전/상태/작성자/승인 정보는 저장 시 결정됩니다.</span>
               </div>
             </>
           )}
@@ -382,7 +388,7 @@ export function PolicyDraftEditor({
               <p className="policy-section-description">
                 지급 대상과 회차별 계산 방식을 설정합니다. 요율은 100%를 초과해 입력할 수 있습니다.
                 {installment &&
-                  ' 상품 판매버전을 지정하면 해당 버전의 판매개시일·기초서류에 맞는 분급 룰셋을 적용합니다.'}
+                  ' 상품 판매버전을 지정하면 해당 버전의 판매개시일/기초서류에 맞는 분급 룰셋을 적용합니다.'}
               </p>
               {draft.commissionRules.map((rule, index) => (
                 <CommissionRow
@@ -412,7 +418,7 @@ export function PolicyDraftEditor({
                   description="지급단계, 상품 판매버전, 회차와 계산 방식을 추가하세요."
                 />
               )}
-              <Button
+              <Button data-guide-feature="features.policies.policy-draft-editor.button-6"
                 variant="secondary"
                 id="policy-commissionRules"
                 onClick={() => set('commissionRules', [...draft.commissionRules, emptyCommission()])}
@@ -429,7 +435,7 @@ export function PolicyDraftEditor({
                   : '7년 분급은 최대 84회차입니다. 장기유지 구간은 확정된 근거에 따라 직접 입력하세요.'}
               </div>
               <p className="policy-section-description">
-                최대 회차는 체계의 상한입니다. 실제 지급 회차·월 요율·월 동일 금액은 수수료 규칙에서 설정합니다. 정책
+                최대 회차는 체계의 상한입니다. 실제 지급 회차/월 요율/월 동일 금액은 수수료 규칙에서 설정합니다. 정책
                 설정과 승인은 예정 스케줄의 지급 확정을 뜻하지 않습니다.
               </p>
               {draft.feeRegimeRules.map((rule, index) => {
@@ -458,12 +464,12 @@ export function PolicyDraftEditor({
                   />
                 )
                 return (
-                  <section className="policy-rule-editor" key={index}>
+                  <section data-guide-feature="features.policies.policy-draft-editor.section" className="policy-rule-editor" key={index}>
                     <header>
                       <h3>
                         <span className="policy-row-number">{String(index + 1).padStart(2, '0')}</span>분급 룰셋
                       </h3>
-                      <Button
+                      <Button data-guide-feature="features.policies.policy-draft-editor.button-7"
                         variant="ghost"
                         onClick={() => {
                           set(
@@ -478,11 +484,11 @@ export function PolicyDraftEditor({
                     </header>
                     <div className="policy-form-grid">
                       <Field label="체계" required>
-                        <input readOnly value={rule.feeRegimeCode === 'FOUR_YEAR_2027' ? '4년 분급' : '7년 분급'} />
+                        <input data-guide-feature="features.policies.policy-draft-editor.input-2" readOnly value={rule.feeRegimeCode === 'FOUR_YEAR_2027' ? '4년 분급' : '7년 분급'} />
                       </Field>
                       <DraftInput
                         path={prefix + 'salesStartDateFrom'}
-                        label="판매 시작일 범위 · 시작"
+                        label="판매 시작일 범위, 시작"
                         required
                         type="date"
                         errors={errors}
@@ -491,7 +497,7 @@ export function PolicyDraftEditor({
                       />
                       <DraftInput
                         path={prefix + 'salesStartDateTo'}
-                        label="판매 시작일 범위 · 종료"
+                        label="판매 시작일 범위, 종료"
                         type="date"
                         errors={errors}
                         value={rule.salesStartDateTo}
@@ -507,7 +513,7 @@ export function PolicyDraftEditor({
                       />
                       <DraftInput
                         path={prefix + 'basicDocumentDateFrom'}
-                        label="기초서류 일자 · 시작"
+                        label="기초서류 일자, 시작"
                         type="date"
                         errors={errors}
                         value={rule.basicDocumentDateFrom}
@@ -515,7 +521,7 @@ export function PolicyDraftEditor({
                       />
                       <DraftInput
                         path={prefix + 'basicDocumentDateTo'}
-                        label="기초서류 일자 · 종료"
+                        label="기초서류 일자, 종료"
                         type="date"
                         errors={errors}
                         value={rule.basicDocumentDateTo}
@@ -533,19 +539,19 @@ export function PolicyDraftEditor({
                         onChange={(v) => update({ sourceRefs: v.split(',') })}
                       />
                       <label className="policy-checkbox">
-                        <input
+                        <input data-guide-feature="features.policies.policy-draft-editor.input-3"
                           type="checkbox"
                           checked={rule.reviewRequiredYn}
                           onChange={(e) => update({ reviewRequiredYn: e.target.checked })}
                         />
-                        검토 필요
+                        검토필요
                       </label>
                     </div>
                     {rule.feeRegimeCode === 'FOUR_YEAR_2027' &&
                       (rule.longTermMaintenanceFrom !== '' || rule.longTermMaintenanceTo !== '') && (
                         <div className="policy-notice policy-notice-warning">
                           <span>4년 분급에 남아 있는 장기유지 값을 초기화한 후 저장하세요.</span>
-                          <Button
+                          <Button data-guide-feature="features.policies.policy-draft-editor.button-8"
                             variant="secondary"
                             id={`policy-${prefix}longTermMaintenance`}
                             onClick={() => update({ longTermMaintenanceFrom: '', longTermMaintenanceTo: '' })}
@@ -563,7 +569,7 @@ export function PolicyDraftEditor({
                   description="판매 시작일 범위와 최대 회차를 설정하세요."
                 />
               )}
-              <Button
+              <Button data-guide-feature="features.policies.policy-draft-editor.button-9"
                 variant="secondary"
                 id="policy-feeRegimeRules"
                 onClick={() => set('feeRegimeRules', [...draft.feeRegimeRules, emptyRegime(draft.policyType)])}
@@ -575,16 +581,16 @@ export function PolicyDraftEditor({
           {section === 'parameters' && (
             <>
               <p className="policy-section-description">
-                기존에 지원하는 지급조건을 선택합니다. 각 조건의 적용 근거는 근거 자료에서 연결하세요.
+                적용할 지급조건을 고릅니다. 각 조건의 적용 근거는 근거 자료에서 연결하세요.
               </p>
               {conditionOptions.map((option) => (
-                <section className="policy-condition-card" key={option.key}>
+                <section data-guide-feature="features.policies.policy-draft-editor.section-2" className="policy-condition-card" key={option.key}>
                   <header>
                     <h3>{option.label}</h3>
-                    <StatusBadge tone="info">지원 조건</StatusBadge>
+                    <StatusBadge tone="info">지급조건</StatusBadge>
                   </header>
                   <p>{option.description}</p>
-                  <code>{option.key}</code>
+
                   <DraftSelect
                     path={`parameters.${option.key}`}
                     label={option.label + ' 설정'}
@@ -616,10 +622,10 @@ export function PolicyDraftEditor({
                     draft.clawbackRules.map((r, i) => (i === index ? { ...r, ...patch } : r)),
                   )
                 return (
-                  <section className="policy-rule-editor" key={index}>
+                  <section data-guide-feature="features.policies.policy-draft-editor.section-3" className="policy-rule-editor" key={index}>
                     <header>
                       <h3>환수 규칙 {index + 1}</h3>
-                      <Button
+                      <Button data-guide-feature="features.policies.policy-draft-editor.button-10"
                         variant="ghost"
                         onClick={() => {
                           set(
@@ -691,7 +697,7 @@ export function PolicyDraftEditor({
                   description="회사 약정에 따른 경과월 구간과 환수율을 등록하세요."
                 />
               )}
-              <Button
+              <Button data-guide-feature="features.policies.policy-draft-editor.button-11"
                 variant="secondary"
                 id="policy-clawbackRules"
                 onClick={() =>
@@ -744,10 +750,10 @@ export function PolicyDraftEditor({
                     draft.sourceDetails.map((s, i) => (i === index ? { ...s, ...patch } : s)),
                   )
                 return (
-                  <section className="policy-rule-editor" key={index}>
+                  <section data-guide-feature="features.policies.policy-draft-editor.section-4" className="policy-rule-editor" key={index}>
                     <header>
                       <h3>근거 자료 {index + 1}</h3>
-                      <Button
+                      <Button data-guide-feature="features.policies.policy-draft-editor.button-12"
                         variant="ghost"
                         onClick={() => {
                           set(
@@ -780,7 +786,7 @@ export function PolicyDraftEditor({
                         onChange={(v) => update({ title: v })}
                       />
                       <Field label="설명" className="policy-span-all">
-                        <textarea
+                        <textarea data-guide-feature="features.policies.policy-draft-editor.textarea"
                           rows={3}
                           maxLength={2000}
                           value={source.explanation}
@@ -791,7 +797,7 @@ export function PolicyDraftEditor({
                         <legend>근거 상태 (복수 선택)</legend>
                         {[...new Set([...sourceStatusTags, ...(source.statusTags ?? [])])].map((tag) => (
                           <label key={tag} className="policy-checkbox">
-                            <input
+                            <input data-guide-feature="features.policies.policy-draft-editor.input-5"
                               type="checkbox"
                               checked={source.statusTags?.includes(tag) ?? false}
                               onChange={(e) =>
@@ -828,7 +834,7 @@ export function PolicyDraftEditor({
                   description="제출 전에 정책을 뒷받침하는 근거를 추가하세요."
                 />
               )}
-              <Button
+              <Button data-guide-feature="features.policies.policy-draft-editor.button-13"
                 variant="secondary"
                 onClick={() =>
                   set('sourceDetails', [...draft.sourceDetails, { ref: '', title: '', explanation: '', url: null }])

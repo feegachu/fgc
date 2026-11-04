@@ -15,12 +15,16 @@ const contractTones: Record<string, StatusTone> = {
 
 export function ContractStatusBadge({ code, label }: { code?: string; label?: string }) {
   return (
-    <StatusBadge tone={contractTones[code ?? ''] ?? 'neutral'}>
+    <StatusBadge
+      tablePresentation="dot"
+      optionCount={Object.keys(contractStatusLabels).length}
+      tone={contractTones[code ?? ''] ?? 'neutral'}
+    >
       {responseLabel(contractStatusLabels, code, label)}
     </StatusBadge>
   )
 }
 
 export function DataOriginBadge({ code, label }: { code?: string; label?: string }) {
-  return <StatusBadge>{responseLabel(dataOriginLabels, code, label)}</StatusBadge>
+  return <StatusBadge kind="text">{responseLabel(dataOriginLabels, code, label)}</StatusBadge>
 }

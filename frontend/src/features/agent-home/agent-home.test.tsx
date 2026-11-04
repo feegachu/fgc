@@ -19,7 +19,8 @@ const user = {
   canViewAuditLog: false,
 }
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'agent-home' })
-const page = (content: unknown[]) => envelope({ content, page: 1, size: 100, totalElements: content.length, totalPages: 1 })
+const page = (content: unknown[]) =>
+  envelope({ content, page: 1, size: 100, totalElements: content.length, totalPages: 1 })
 const contract = (patch: Partial<AgentContract>): AgentContract => ({
   contractId: 1,
   contractNo: 'C-0001',
@@ -83,8 +84,18 @@ describe('AGNT-W01 포트폴리오', () => {
     contracts = async () =>
       page([
         contract({}),
-        contract({ contractId: 2, contractNo: 'C-0002', contractDate: '2026-07-20', monthlyEquivalentFirstPremium: 80000 }),
-        contract({ contractId: 3, contractNo: 'C-0003', contractDate: '2026-06-02', monthlyEquivalentFirstPremium: 100000 }),
+        contract({
+          contractId: 2,
+          contractNo: 'C-0002',
+          contractDate: '2026-07-20',
+          monthlyEquivalentFirstPremium: 80000,
+        }),
+        contract({
+          contractId: 3,
+          contractNo: 'C-0003',
+          contractDate: '2026-06-02',
+          monthlyEquivalentFirstPremium: 100000,
+        }),
       ])
     const fc = { paymentStage: 'GA_TO_FC', cashflowType: 'PAYMENT' }
     payments = async () =>
@@ -98,16 +109,34 @@ describe('AGNT-W01 포트폴리오', () => {
     renderHome()
     expect(await kpi('신규 계약 건수')).toHaveTextContent('2건')
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('전월 1건')
-    expect(screen.getByRole('article', { name: '월 환산 초회보험료' })).toHaveTextContent('200,000')
+    expect(screen.getByRole('article', { name: '월납환산 초회보험료' })).toHaveTextContent('200,000')
     await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('500,000'))
     expect(screen.getByRole('article', { name: '설계사 프로필' })).toHaveTextContent('김설계')
+  })
+
+  it('전월과 같으면 화살표 없이 변동 없음으로 보인다', async () => {
+    contracts = async () =>
+      page([contract({}), contract({ contractId: 2, contractNo: 'C-0002', contractDate: '2026-06-10' })])
+    renderHome()
+    expect(await kpi('신규 계약 건수')).toHaveTextContent('1건')
+    const count = screen.getByRole('article', { name: '신규 계약 건수' })
+    const premium = screen.getByRole('article', { name: '월납환산 초회보험료' })
+    expect(count).toHaveTextContent('변동 없음')
+    expect(count).toHaveTextContent('전월 1건')
+    expect(premium).toHaveTextContent('전월 대비 변동 없음')
+    for (const card of [count, premium]) expect(card).not.toHaveTextContent(/[▲▼]/)
   })
 
   it('확인 필요 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
     contracts = async () =>
       page([
         contract({ contractId: 2, contractNo: 'C-0002', capResultStatus: 'WARNING', capResultStatusLabel: '주의' }),
-        contract({ contractId: 3, contractNo: 'C-0003', capResultStatus: 'REVIEW_REQUIRED', capResultStatusLabel: '검토필요' }),
+        contract({
+          contractId: 3,
+          contractNo: 'C-0003',
+          capResultStatus: 'REVIEW_REQUIRED',
+          capResultStatusLabel: '검토필요',
+        }),
       ])
     renderHome()
     const card = await screen.findByRole('link', { name: '확인 필요 계약' })
@@ -133,13 +162,13 @@ describe('AGNT-W01 포트폴리오', () => {
       ])
     renderHome()
     const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
-    expect(within(panel).getByText('최근 12개월 · 전체 보험사')).toBeInTheDocument()
+    expect(within(panel).getByText('최근 12개월, 전체 보험사')).toBeInTheDocument()
     expect(within(panel).getByText('합계 2건')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: '손해' }))
-    expect(within(panel).getByText('최근 12개월 · 손해보험')).toBeInTheDocument()
+    expect(within(panel).getByText('최근 12개월, 손해보험')).toBeInTheDocument()
     expect(within(panel).getByText('합계 1건')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: '6개월' }))
-    expect(within(panel).getByText('최근 6개월 · 손해보험')).toBeInTheDocument()
+    expect(within(panel).getByText('최근 6개월, 손해보험')).toBeInTheDocument()
     await userEvent.click(within(panel).getAllByRole('button', { name: '전체' })[1])
     await userEvent.click(within(panel).getByRole('button', { name: /B손해/ }))
     expect(within(panel).getByText('B손해 필터 적용 중')).toBeInTheDocument()
@@ -178,9 +207,13 @@ describe('AGNT-W01 포트폴리오', () => {
       throw new ApiError(null, 'req-1', 500)
     }
     renderHome()
-    await waitFor(() => expect(screen.getByLabelText('수령 예정 수수료')).toHaveTextContent('확인 불가'))
+    await waitFor(() =>
+      expect(screen.getByRole('article', { name: '수령 예정 수수료' })).toHaveTextContent('확인 불가'),
+    )
     expect(screen.getByRole('article', { name: '신규 계약 건수' })).toHaveTextContent('1건')
-    expect(within(screen.getByLabelText('수령 예정 수수료')).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('article', { name: '수령 예정 수수료' })).getByRole('button', { name: '다시 시도' }),
+    ).toBeInTheDocument()
   })
 
   it('계약 조회가 실패하면 오류와 다시 시도를 보여 준다', async () => {
@@ -192,9 +225,9 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
-  it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
+  it('[상품 추천 AI] 버튼을 누르면 모달이 열리고 Esc로 닫으면 버튼으로 돌아온다', async () => {
     renderHome()
-    const launcher = await screen.findByRole('button', { name: /상품 비교분석 추천 AI 열기/ })
+    const launcher = await screen.findByRole('button', { name: '상품 추천 AI' })
     await userEvent.click(launcher)
     const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
     expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
@@ -205,9 +238,11 @@ describe('AGNT-W01 포트폴리오', () => {
 
   it('관리자 역할은 포트폴리오에 접근할 수 없다', async () => {
     vi.mocked(apiClient.request).mockImplementation((async (path: string) =>
-      path.startsWith('/api/v1/contracts') ? contracts() : envelope({ ...user, roleCode: 'SETTLEMENT' })) as typeof apiClient.request)
+      path.startsWith('/api/v1/contracts')
+        ? contracts()
+        : envelope({ ...user, roleCode: 'SETTLEMENT' })) as typeof apiClient.request)
     renderHome()
-    expect(await screen.findByRole('heading', { name: '403 · 권한 없음' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '권한 없음' })).toBeInTheDocument()
     expect(vi.mocked(apiClient.request).mock.calls.some(([path]) => path.startsWith('/api/v1/contracts'))).toBe(false)
   })
 })

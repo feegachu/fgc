@@ -9,20 +9,35 @@ export const policyTypes = {
   SCHEDULE_ELIGIBILITY: '상태별 지급조건',
   CLAWBACK: '환수',
 } as const
+// 출처분류와 상태는 서버 라벨(PolicySourceClass, PolicyStatus)과 화면정의서 POL-W01 표기를 따른다.
 export const sources = {
   REGULATORY: '규제',
-  INSURER_RULE: '보험사 규정',
-  GA_POLICY: 'GA 정책',
+  INSURER_RULE: '보험사 규칙',
+  GA_POLICY: '회사 정책',
   PROJECT_ASSUMPTION: '프로젝트 가정',
 }
 export const sourceStatusTags = ['현행규정', '개정고시', '시행세칙', 'FAQ', '회사정책'] as const
-export const sourceReferenceNotice = 'FGC의 근거 정보는 참조용이며 상품위원회 등 법정 심의·의결을 대체하지 않습니다.'
+export const sourceReferenceNotice = 'FGC의 근거 정보는 참조용이며 상품위원회 등 법정 심의/의결을 대체하지 않습니다.'
 export const statusLabels: Record<string, string> = {
-  DRAFT: '초안',
-  REVIEW: '검토 중',
+  DRAFT: '작성중',
+  REVIEW: '검토중',
   APPROVED: '승인',
-  ACTIVE: '적용 중',
+  ACTIVE: '적용중',
   RETIRED: '종료',
+}
+/**
+ * 근거 코드는 그대로 저장하고 화면에서만 읽기 쉬운 이름으로 보인다.
+ * 'docs/05_인터페이스정의서_v2_0.md#9-5'처럼 시드에 남은 문서 경로와 승계 기록 'policy:45'가 대상이다.
+ * 'policy:45'의 45는 내부 번호라 판 번호(v2)처럼 보이지 않게 숫자를 빼고, 판은 versions에서 찾을 때만 붙인다.
+ */
+export function refLabel(ref: string, versions?: Pick<Policy, 'policyVersionId' | 'policyCode' | 'versionNo'>[]) {
+  const successor = /^policy:(\d+)$/.exec(ref)
+  if (successor) {
+    const next = versions?.find((version) => String(version.policyVersionId) === successor[1])
+    return next ? `다음 정책 버전 ${next.policyCode} v${next.versionNo}` : '다음 정책 버전'
+  }
+  const doc = /^docs\/(?:\d+_|FGC_)?(.+?)(?:_v\d+(?:_\d+)*)?\.md(?:#(.+))?$/.exec(ref)
+  return doc ? [doc[1].replaceAll('_', ' '), doc[2]].filter(Boolean).join(' ') : ref
 }
 export const actionLabels = {
   SUBMIT: '제출',

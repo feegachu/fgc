@@ -63,7 +63,7 @@ class ValidationRunRetryAuditTrailIntegrationTest {
 
     @Test
     void startFailAndRetrySequenceLeavesADistinguishableAuditTrail() {
-        int runNo = (int) (System.nanoTime() % 100000);
+        int runNo = 1 + (int) Math.floorMod(System.nanoTime(), 100000L);
         Long id = insertCreatedRun(runNo);
 
         MonthlyValidationJobParameters firstAttempt = new MonthlyValidationJobParameters(

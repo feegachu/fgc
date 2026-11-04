@@ -24,9 +24,28 @@ const contract = (patch: Partial<AgentContract>): AgentContract => ({
 const rows = buildRows(
   [
     contract({}),
-    contract({ contractId: 2, contractNo: 'C-2', contractDate: '2026-07-20', monthlyEquivalentFirstPremium: 50000, capResultStatus: 'WARNING' }),
-    contract({ contractId: 3, contractNo: 'C-3', contractDate: '2026-06-01', insurerName: 'B손해', productName: '장기 B', contractStatus: 'UNPAID' }),
-    contract({ contractId: 4, contractNo: 'C-4', contractDate: '2025-01-01', capResultStatus: 'REVIEW_REQUIRED', contractStatus: 'TERMINATED' }),
+    contract({
+      contractId: 2,
+      contractNo: 'C-2',
+      contractDate: '2026-07-20',
+      monthlyEquivalentFirstPremium: 50000,
+      capResultStatus: 'WARNING',
+    }),
+    contract({
+      contractId: 3,
+      contractNo: 'C-3',
+      contractDate: '2026-06-01',
+      insurerName: 'B손해',
+      productName: '장기 B',
+      contractStatus: 'UNPAID',
+    }),
+    contract({
+      contractId: 4,
+      contractNo: 'C-4',
+      contractDate: '2025-01-01',
+      capResultStatus: 'REVIEW_REQUIRED',
+      contractStatus: 'TERMINATED',
+    }),
   ],
   insurers,
   products,
@@ -72,12 +91,20 @@ describe('차트 집계', () => {
   })
   it('도넛 조각은 보험사 기준정보 순서이고 0건도 남긴다', () => {
     const { base } = aggregate(rows, '2026-07', 12, 'all', null)
-    expect(insurerSlices(base, insurers, 'all').map((s) => [s.name, s.value])).toEqual([['A생명', 2], ['B손해', 1]])
+    expect(insurerSlices(base, insurers, 'all').map((s) => [s.name, s.value])).toEqual([
+      ['A생명', 2],
+      ['B손해', 1],
+    ])
   })
   it('보장 유형·상태 비중은 건수 대비 비율을 첫째 자리에서 절사한다(공통규칙 3)', () => {
     const { focus } = aggregate(rows, '2026-07', 12, 'all', null)
     expect(categoryCounts(focus).find((c) => c.name === '건강보장')).toMatchObject({ count: 2, pct: 66.6 })
-    expect(statusCounts(focus).map((s) => [s.label, s.count])).toEqual([['정상', 2], ['미납', 1], ['실효', 0], ['해지·종료', 0]])
+    expect(statusCounts(focus).map((s) => [s.label, s.count])).toEqual([
+      ['정상', 2],
+      ['미납', 1],
+      ['실효', 0],
+      ['해지/종료', 0],
+    ])
   })
 })
 

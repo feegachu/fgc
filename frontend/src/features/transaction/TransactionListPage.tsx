@@ -14,7 +14,8 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
-import { StatusBadge } from '../../components/StatusBadge'
+import { ListHeader } from '../../components/ListHeader'
+import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { errorText, int, isNegative, month as formatMonth, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { withMonth } from '../../stores/workspace'
@@ -114,14 +115,20 @@ export default function TransactionListPage() {
     {
       key: 'source',
       label: '원천유형',
-      width: '7rem',
-      render: (row) => disclosure(row.sourceTypeLabel || row.sourceType),
+      width: '6.5rem',
+      render: (row) => (
+        <CategoryBadge tablePresentation="text" value={row.sourceType} optionCount={sourceOptions.length}>
+          {disclosure(
+            row.sourceTypeLabel || sourceOptions.find(([code]) => code === row.sourceType)?.[1] || '확인 필요',
+          )}
+        </CategoryBadge>
+      ),
     },
     {
       key: 'key',
-      label: '업무키',
+      label: '지급 관리번호',
       sortable: true,
-      width: '12rem',
+      width: '10rem',
       cellClassName: 'transaction-mono',
       render: (row) => <span title={row.sourceBusinessKey}>{row.sourceBusinessKey || '-'}</span>,
     },
@@ -136,14 +143,14 @@ export default function TransactionListPage() {
       key: 'agent',
       label: '수령 설계사',
       sortable: true,
-      width: '9rem',
+      width: '6.5rem',
       render: (row) => disclosure(row.recipientAgentName),
     },
     {
       key: 'item',
       label: '수수료 항목',
       sortable: true,
-      width: '8.5rem',
+      width: '7.5rem',
       render: (row) => disclosure(row.commissionItemName || row.commissionItemCode),
     },
     {
@@ -159,10 +166,11 @@ export default function TransactionListPage() {
     {
       key: 'flow',
       label: '흐름',
-      width: '5rem',
+      width: '4rem',
       align: 'center',
       render: (row) => (
         <StatusBadge
+          kind="category"
           tone={row.status === 'CANCELLED' ? 'neutral' : row.cashflowType === 'DEDUCTION' ? 'warning' : 'info'}
         >
           {row.status === 'CANCELLED' ? '취소' : row.cashflowTypeLabel || row.cashflowType}
@@ -172,48 +180,48 @@ export default function TransactionListPage() {
     {
       key: 'status',
       label: '상태',
-      width: '5.5rem',
+      width: '5rem',
       align: 'center',
       render: (row) => (
-        <StatusBadge tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}>
-          {row.statusLabel || row.status}
+        <StatusBadge
+          tablePresentation="dot"
+          tone={row.status === 'CONFIRMED' ? 'success' : row.status === 'CANCELLED' ? 'error' : 'neutral'}
+        >
+          {row.statusLabel || statusOptions.find(([code]) => code === row.status)?.[1] || '확인 필요'}
         </StatusBadge>
       ),
     },
     {
       key: 'attributions',
-      label: '귀속',
+      label: '귀속 계약',
       sortable: true,
-      width: '6.5rem',
+      width: '5.5rem',
       align: 'center',
-      render: (row) => {
-        const count = row.attributionCount ?? 0
-        const imbalance = count === 0 || Number(row.differenceAmount ?? 0) !== 0
-        return (
-          <StatusBadge tone={imbalance ? 'error' : 'success'}>
-            {count}건 · {imbalance ? '확인필요' : '일치'}
-          </StatusBadge>
-        )
-      },
+      render: (row) =>
+        (row.attributionCount ?? 0) === 0 ? (
+          <StatusBadge tone="error">0건</StatusBadge>
+        ) : (
+          `${int(row.attributionCount ?? 0)}건`
+        ),
     },
     {
       key: 'action',
       label: '작업',
-      width: '9rem',
+      width: '7rem',
       align: 'center',
       render: (row) =>
         row.status !== 'DRAFT' ? (
           '-'
         ) : user.canProcess ? (
           <div className="transaction-row-actions">
-            <ContextLink
+            <ContextLink data-guide-feature="features.transaction.transaction-list-page.context-link"
               className="button button-ghost"
               to={path(row.commissionTransactionId)}
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정`}
             >
               수정
             </ContextLink>
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button"
               variant="ghost"
               className="transaction-delete"
               disabled={deletion.isPending || row.sourceType !== 'GA_MANUAL_PAYMENT'}
@@ -228,14 +236,14 @@ export default function TransactionListPage() {
           </div>
         ) : (
           <div className="transaction-row-actions">
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-2"
               variant="ghost"
               disabled
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 수정 (조회 전용 권한)`}
             >
               수정
             </Button>
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-3"
               variant="ghost"
               disabled
               aria-label={`${row.sourceBusinessKey || '선택한 지급 건'} 삭제 (조회 전용 권한)`}
@@ -255,10 +263,10 @@ export default function TransactionListPage() {
         closeOnEscape={!deletion.isPending}
         footer={
           <>
-            <Button variant="secondary" disabled={deletion.isPending} onClick={closeDelete}>
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-4" variant="secondary" disabled={deletion.isPending} onClick={closeDelete}>
               취소
             </Button>
-            <Button
+            <Button data-guide-feature="features.transaction.transaction-list-page.button-5"
               loading={deletion.isPending}
               disabled={deleteTarget?.commissionTransactionId == null}
               onClick={() => {
@@ -275,7 +283,7 @@ export default function TransactionListPage() {
           <strong>{deleteTarget?.sourceBusinessKey || '선택한 지급 건'}</strong> 초안을 삭제하시겠습니까?
         </p>
         <p>
-          {deleteTarget?.paymentStageLabel} · {formatMonth(deleteTarget?.settlementMonth)} · {won(deleteTarget?.amount)}
+          {deleteTarget?.paymentStageLabel}, {formatMonth(deleteTarget?.settlementMonth)}, {won(deleteTarget?.amount)}
         </p>
         <p>삭제한 초안은 복구할 수 없습니다.</p>
         {deletion.isError && (
@@ -290,7 +298,7 @@ export default function TransactionListPage() {
         </div>
         <div className="page-header-actions">
           {user.canProcess && (
-            <ContextLink
+            <ContextLink data-guide-feature="features.transaction.transaction-list-page.context-link-2"
               className="button button-primary"
               to={returnLink(month ? withMonth('/transactions/new', month) : '/transactions/new', returnTo)}
             >
@@ -316,27 +324,21 @@ export default function TransactionListPage() {
           {listError(insurers.error)}
         </p>
       )}
-      <section
+      <section data-guide-feature="features.transaction.transaction-list-page.section"
         className="surface transaction-list-panel"
         aria-labelledby="transaction-list-title"
         aria-busy={search.isFetching}
       >
-        <header className="surface-header transaction-surface-header">
+        <ListHeader className="transaction-surface-header" total={total} totalId="row-count" pageSize={20}>
           <h2 className="surface-title" id="transaction-list-title">
             지급 건
           </h2>
-          <span className="transaction-result-count">
-            <span className="tabular-nums" id="row-count">
-              {int(total)}
-            </span>
-            건 · 한 화면 20행
-          </span>
-        </header>
+        </ListHeader>
         <DataTable
           className="transaction-list-table"
           viewportClassName="transaction-table-viewport"
           bodyId="list-body"
-          caption="검색 조건에 해당하는 수수료 지급 건"
+          caption="조회 조건에 해당하는 수수료 지급 건"
           columns={columns}
           {...sortBinding(filters.sort, TRANSACTION_SORT_KEYS, (sort) => apply({ ...filters, sort, page: 1 }))}
           rows={rows}
@@ -359,10 +361,10 @@ export default function TransactionListPage() {
                   ? listError(search.error)
                   : search.isPending
                     ? '수수료 지급 건을 불러오는 중입니다.'
-                    : '검색 조건을 바꾸어 다시 조회하세요.'}
+                    : '조건을 바꾸어 다시 조회하세요.'}
               </span>
               {search.isError && (
-                <Button variant="secondary" onClick={() => void search.refetch()}>
+                <Button data-guide-feature="features.transaction.transaction-list-page.button-6" variant="secondary" onClick={() => void search.refetch()}>
                   다시 시도
                 </Button>
               )}
@@ -370,7 +372,7 @@ export default function TransactionListPage() {
           }
           footer={
             <tr>
-              <td colSpan={6}>금액 절대값 합계</td>
+              <td colSpan={6}>금액 합계</td>
               <td className="is-number">
                 <span id="sum-amount" className={`tabular-nums ${isNegative(sum) ? 'is-negative-amount' : ''}`}>
                   {won(sum)}
@@ -414,7 +416,7 @@ function TransactionFilters({
   const options = (values: readonly (readonly [string, string])[], selected: string) => (
     <>
       <option value="">전체</option>
-      {selected && !values.some(([id]) => id === selected) && <option value={selected}>{selected}</option>}
+      {selected && !values.some(([id]) => id === selected) && <option value={selected}>선택한 항목(목록에 없음)</option>}
       {values.map(([id, label]) => (
         <option key={id} value={id}>
           {label}
@@ -432,7 +434,7 @@ function TransactionFilters({
     entries: readonly (readonly [string, string])[],
   ) => (
     <Field label={label} className={`filter-field ${className}`}>
-      <select
+      <select data-guide-feature="features.transaction.transaction-list-page.select"
         id={id}
         className="select-control"
         value={draft[key]}
@@ -454,7 +456,7 @@ function TransactionFilters({
     >
       <div className="filter-fields transaction-filter-fields">
         <Field label="정산월" className="filter-field transaction-filter-month">
-          <input
+          <input data-guide-feature="features.transaction.transaction-list-page.f-month"
             id="f-month"
             type="month"
             value={draft.settlementMonth}
@@ -470,10 +472,10 @@ function TransactionFilters({
           'f-insurer',
           '보험회사',
           'transaction-filter-insurer',
-          insurers.map((row) => [String(row.insurerId), `${row.insurerCode} · ${row.insurerName}`]),
+          insurers.map((row) => [String(row.insurerId), `${row.insurerCode}, ${row.insurerName}`]),
         )}
         <Field label="계약번호" className="filter-field transaction-filter-contract">
-          <input
+          <input data-guide-feature="features.transaction.transaction-list-page.f-contract-no"
             id="f-contract-no"
             type="search"
             placeholder="계약번호 입력"
@@ -486,8 +488,8 @@ function TransactionFilters({
         {select('agentId', 'f-agent', '수령 설계사', 'transaction-filter-agent', remembered(known.agents))}
         {select('commissionItemId', 'f-item', '수수료 항목', 'transaction-filter-item', remembered(known.items))}
         {select('status', 'f-status', '상태', 'transaction-filter-status-field', statusOptions)}
-        <label className="transaction-filter-checkbox">
-          <input
+        <label className="filter-checkbox">
+          <input data-guide-feature="features.transaction.transaction-list-page.f-noattr"
             id="f-noattr"
             type="checkbox"
             checked={draft.noAttributionOnly}

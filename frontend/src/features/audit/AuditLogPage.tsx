@@ -3,26 +3,25 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
+import { CategoryBadge } from '../../components/StatusBadge'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
-import { dateTimeSeconds, errorText, int } from '../../lib/format'
+import { dateTimeSeconds, errorText } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
-import {
-  AUDIT_SORT_KEYS,
-  auditLogDetailQuery,
-  auditLogOptionsQuery,
-  auditLogsQuery,
-  normalizeCriteria,
-} from './api'
+import { AUDIT_SORT_KEYS, auditLogDetailQuery, auditLogOptionsQuery, auditLogsQuery, normalizeCriteria } from './api'
 import type { AuditCriteria, AuditLog, AuditLogOptions } from './api'
 import {
+  actionLabels,
+  entityTypeLabels,
   auditActionLabel,
   auditActionWithCode,
   auditEntityTypeLabel,
   auditEntityTypeWithCode,
   auditReasonLabel,
   diffFieldLabel,
+  auditValueLabel,
 } from './labels'
 import './audit.css'
 
@@ -48,19 +47,57 @@ const dash = (value: unknown) => (value == null || value === '' ? '-' : String(v
 
 // 열 너비는 1차 audit.css 의 .audit-col-* 와 같은 값이다.
 const columns: TableColumn<AuditLog>[] = [
-  { key: 'occurredAt', label: '발생시각', sortable: true, width: '10rem', render: (row) => dateTimeSeconds(row.occurredAt) },
-  { key: 'user', label: '행위자', sortKey: 'userLoginId', sortable: true, width: '6.5rem', render: (row) => row.userLoginId ?? 'BATCH' },
-  { key: 'action', label: '행위', width: '11rem', render: (row) => auditActionLabel(row.actionCode) },
-  { key: 'entityType', label: '대상 종류', width: '11rem', render: (row) => auditEntityTypeLabel(row.entityType) },
-  { key: 'entityId', label: '대상 ID', width: '6rem', render: (row) => dash(row.entityId) },
+  {
+    key: 'occurredAt',
+    label: '발생시각',
+    sortable: true,
+    width: '10rem',
+    render: (row) => dateTimeSeconds(row.occurredAt),
+  },
+  {
+    key: 'user',
+    label: '행위자',
+    sortKey: 'userLoginId',
+    sortable: true,
+    width: '6.5rem',
+    render: (row) => row.userLoginId ?? '자동 처리',
+  },
+  {
+    key: 'action',
+    label: '행위',
+    width: '11rem',
+    render: (row) => (
+      <CategoryBadge value={row.actionCode} optionCount={Object.keys(actionLabels).length}>
+        {auditActionLabel(row.actionCode)}
+      </CategoryBadge>
+    ),
+  },
+  {
+    key: 'entityType',
+    label: '대상 종류',
+    width: '11rem',
+    render: (row) => (
+      <CategoryBadge value={row.entityType} optionCount={Object.keys(entityTypeLabels).length}>
+        {auditEntityTypeLabel(row.entityType)}
+      </CategoryBadge>
+    ),
+  },
+  { key: 'entityId', label: '대상 번호', width: '6rem', render: (row) => dash(row.entityId) },
   {
     key: 'reason',
     label: '사유',
     width: '14rem',
     render: (row) => auditReasonLabel(row.actionCode, row.reason),
   },
-  { key: 'policy', label: '정책버전', sortKey: 'policyVersionId', sortable: true, width: '7rem', render: (row) => dash(row.policyVersionId) },
-  { key: 'requestId', label: '요청 ID', width: '10rem', render: (row) => dash(row.requestId) },
+  {
+    key: 'policy',
+    label: '정책버전',
+    sortKey: 'policyVersionId',
+    sortable: true,
+    width: '7rem',
+    render: (row) => dash(row.policyVersionId),
+  },
+  { key: 'requestId', label: '요청번호', width: '10rem', render: (row) => dash(row.requestId) },
 ]
 
 export default function AuditLogPage() {
@@ -102,15 +139,12 @@ export default function AuditLogPage() {
         label="감사 기록과 변경 내용 비교 카드 너비"
         defaultRatio={60}
       >
-        <section className="surface audit-list-panel" aria-labelledby="audit-list-title">
-          <header className="surface-header audit-panel-header">
+        <section data-guide-feature="features.audit.audit-log-page.section" className="surface audit-list-panel" aria-labelledby="audit-list-title">
+          <ListHeader className="audit-panel-header" total={logs.data?.totalElements ?? 0} pageSize={20}>
             <h2 id="audit-list-title" className="surface-title">
               감사 기록
             </h2>
-            <p className="audit-panel-caption">
-              <span className="tabular-nums">{int(logs.data?.totalElements ?? 0)}</span>건 · 한 화면 20행
-            </p>
-          </header>
+          </ListHeader>
           {logs.isError && (
             <p className="field-error" role="alert">
               {errorText(logs.error)}
@@ -141,7 +175,7 @@ export default function AuditLogPage() {
           )}
         </section>
 
-        <section className="surface audit-diff-panel" aria-labelledby="audit-diff-title">
+        <section data-guide-feature="features.audit.audit-log-page.section-2" className="surface audit-diff-panel" aria-labelledby="audit-diff-title">
           <header className="surface-header audit-panel-header">
             <h2 id="audit-diff-title" className="surface-title">
               변경 내용 비교
@@ -192,19 +226,19 @@ function AuditFilter({
           <label className="filter-field-label" htmlFor="f-from">
             발생 시각 (시작)
           </label>
-          <input className="field-control" type="date" {...bind('from')} />
+          <input data-guide-feature="features.audit.audit-log-page.input" className="field-control" type="date" {...bind('from')} />
         </div>
         <div className="filter-field audit-filter-date">
           <label className="filter-field-label" htmlFor="f-to">
             발생 시각 (끝)
           </label>
-          <input className="field-control" type="date" {...bind('to')} />
+          <input data-guide-feature="features.audit.audit-log-page.input-2" className="field-control" type="date" {...bind('to')} />
         </div>
         <div className="filter-field audit-filter-user">
           <label className="filter-field-label" htmlFor="f-userId">
             행위자
           </label>
-          <select className="select-control" {...bind('userId')}>
+          <select data-guide-feature="features.audit.audit-log-page.select" className="select-control" {...bind('userId')}>
             <option value="">전체</option>
             {options?.users?.map((user) => (
               <option key={user.userId} value={String(user.userId)}>
@@ -217,7 +251,7 @@ function AuditFilter({
           <label className="filter-field-label" htmlFor="f-action">
             행위 종류
           </label>
-          <select className="select-control" {...bind('action')}>
+          <select data-guide-feature="features.audit.audit-log-page.select-2" className="select-control" {...bind('action')}>
             <option value="">전체</option>
             {options?.actionCodes?.map((code) => (
               <option key={code} value={code}>
@@ -230,7 +264,7 @@ function AuditFilter({
           <label className="filter-field-label" htmlFor="f-entityType">
             대상 종류
           </label>
-          <select className="select-control" {...bind('entityType')}>
+          <select data-guide-feature="features.audit.audit-log-page.select-3" className="select-control" {...bind('entityType')}>
             <option value="">전체</option>
             {options?.entityTypes?.map((type) => (
               <option key={type} value={type}>
@@ -241,9 +275,9 @@ function AuditFilter({
         </div>
         <div className="filter-field audit-filter-entity-id">
           <label className="filter-field-label" htmlFor="f-entityId">
-            대상 ID
+            대상 번호
           </label>
-          <input className="field-control" type="text" placeholder="4104" {...bind('entityId')} />
+          <input data-guide-feature="features.audit.audit-log-page.input-3" className="field-control" type="text" placeholder="4104" {...bind('entityId')} />
         </div>
       </div>
     </FilterBar>
@@ -257,12 +291,13 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
   return (
     <div>
       <p className="audit-diff-context">
-        <span>{auditActionWithCode(log.actionCode)}</span> ·{' '}
+        <span>{auditActionWithCode(log.actionCode)}</span>,{' '}
         <span>{`${auditEntityTypeWithCode(log.entityType)} #${dash(log.entityId)}`}</span>
       </p>
+      {log.reason && <p className="audit-reason">{reason}</p>}
       {log.reason && reason !== log.reason && (
         <details className="audit-reason-original">
-          <summary>사유 원문 보기</summary>
+          <summary data-guide-feature="features.audit.audit-log-page.summary">사유 원문 보기</summary>
           <p>{log.reason}</p>
         </details>
       )}
@@ -272,7 +307,7 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
         </p>
       )}
       <div className="data-table-viewport">
-        <table className="data-table audit-diff-table">
+        <table data-guide-feature="features.audit.audit-log-page.table" className="data-table audit-diff-table">
           <caption className="visually-hidden">선택한 감사 기록의 변경 전후 값 비교</caption>
           <colgroup>
             <col className="audit-diff-field" />
@@ -291,7 +326,7 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
               <tr className="audit-state-row">
                 <td colSpan={3}>
                   <div className="empty-state audit-empty-state">
-                    {detail.isPending ? '불러오는 중입니다.' : '기록된 변경 전·후 값이 없습니다.'}
+                    {detail.isPending ? '불러오는 중입니다.' : '기록된 변경 전/후 값이 없습니다.'}
                   </div>
                 </td>
               </tr>
@@ -300,9 +335,15 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
                 const changed = entry.changed ? ' audit-diff-cell-changed' : ''
                 return (
                   <tr key={entry.field}>
-                    <td className="tabular-nums audit-diff-value" title={entry.field}>{diffFieldLabel(entry.field ?? '')}</td>
-                    <td className={`tabular-nums audit-diff-value${changed}`}>{entry.before}</td>
-                    <td className={`tabular-nums audit-diff-value${changed}`}>{entry.after}</td>
+                    <td className="tabular-nums audit-diff-value" title={entry.field}>
+                      {diffFieldLabel(entry.field ?? '')}
+                    </td>
+                    <td className={`tabular-nums audit-diff-value${changed}`} title={entry.before ?? undefined}>
+                      {auditValueLabel(entry.before, entry.field)}
+                    </td>
+                    <td className={`tabular-nums audit-diff-value${changed}`} title={entry.after ?? undefined}>
+                      {auditValueLabel(entry.after, entry.field)}
+                    </td>
                   </tr>
                 )
               })

@@ -198,7 +198,7 @@
   grid-column: 1 / -1;
   margin: 0 0 var(--space-1);
   color: var(--color-text-link);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.125rem;
 }
@@ -271,7 +271,7 @@
   color: var(--color-text-secondary);
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-8);
 }
 
 .journal-correction-lines {
@@ -285,7 +285,7 @@
   gap: var(--space-2);
   padding: var(--space-3);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-8);
 }
 
 .journal-correction-line__title {
@@ -340,7 +340,7 @@
   margin-top: var(--space-3);
   overflow-x: auto;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-8);
 }
 
 .journal-correction-original-line {
@@ -533,7 +533,7 @@
 }
 
 .exception-card-note {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
 }
 
 .exception-placeholder {

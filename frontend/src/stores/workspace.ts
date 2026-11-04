@@ -55,7 +55,7 @@ export function createWorkspaceStore(
     month: null,
     owner: null,
     initialize: (user, defaultMonth, urlMonth, permissions) => {
-      if (!validMonth(defaultMonth)) throw new Error('서버 기준 정산월을 확인할 수 없습니다.')
+      if (!validMonth(defaultMonth)) throw new Error('기준 정산월을 불러오지 못했습니다.')
       if (get().owner === user) return
       owner = user
       let saved: { owner?: string; tabs?: unknown; month?: unknown } = {}

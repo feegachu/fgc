@@ -27,6 +27,6 @@ describe('visible reconciliation amount totals', () => {
     expect(amountText(0, false)).toBe('0')
     expect(sumAmounts([100, undefined])).toBeNull()
     expect(sumAmounts([100, 'bad'])).toBeNull()
-    expect(amountText(null)).toBe('—')
+    expect(amountText(null)).toBe('-')
   })
 })

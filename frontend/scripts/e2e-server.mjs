@@ -17,6 +17,8 @@ const child = spawn('java', ['-jar', resolve('../build/libs', jars[0])], {
   env: {
     ...process.env,
     SPRING_PROFILES_ACTIVE: 'e2e',
+    // Paid provider calls belong to the explicit live-smoke workflow.
+    OPENAI_API_KEY: '',
     SERVER_PORT: '18081',
     SPRING_DATASOURCE_URL: `jdbc:postgresql://127.0.0.1:${port}/fgc_e2e?currentSchema=fgc`,
     SPRING_DATASOURCE_USERNAME: 'fgc_e2e',

@@ -1,3 +1,4 @@
+import { workflowHelpSteps } from '../assistant/workflow-catalog'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -190,7 +191,8 @@ describe('EXCP-W01 예외함', () => {
     await userEvent.setup().click(within(await table()).getAllByRole('row')[1])
     expect(screen.queryByRole('option', { name: '재검토 시작' })).not.toBeInTheDocument()
     expect(document.querySelector('a[href*="transactions/new?id=41"]')).toBeNull()
-    expect(screen.getAllByText('COMMISSION_TRANSACTION:41')).not.toHaveLength(0)
+    expect(screen.getAllByText('지급 건 41')).not.toHaveLength(0)
+    expect(screen.queryByText(/COMMISSION_TRANSACTION/)).not.toBeInTheDocument()
   })
 
   it('미처리 기본값으로 요약 카드와 목록을 보여 준다', async () => {
@@ -279,8 +281,13 @@ describe('EXCP-W01 예외함', () => {
     await screen.findByText('6 / 12 페이지')
     const params = new URLSearchParams(router.state.location.search)
     for (const [key, value] of Object.entries({
-      month: '2026-07', validationMonth: '2026-07', type: 'CAP_VIOLATION', status: 'OPEN', contractNo: 'C-0001',
-    })) expect(params.get(key)).toBe(value)
+      month: '2026-07',
+      validationMonth: '2026-07',
+      type: 'CAP_VIOLATION',
+      status: 'OPEN',
+      contractNo: 'C-0001',
+    }))
+      expect(params.get(key)).toBe(value)
     expect(params.has('selected')).toBe(false)
     await actions.click(controls().getByRole('button', { name: '이전 5페이지' }))
     await screen.findByText('5 / 12 페이지')
@@ -360,7 +367,7 @@ describe('EXCP-W01 예외함', () => {
       search([
         {
           ...baseCase,
-          title: '한도 초과 — 사용률 104.166667%',
+          title: '한도 초과, 사용률 104.166667%',
           description: '1,200% 한도 초과(사용률 104.166667%).',
           occurrences: [
             {
@@ -387,15 +394,20 @@ describe('EXCP-W01 예외함', () => {
     const { actions } = renderPage()
     await actions.click(within(await table()).getByRole('button', { name: '11' }))
     expect(await screen.findByText('1,200,000원')).toBeInTheDocument()
-    expect(within(await table()).getByText('한도 초과 — 사용률 104.1%')).toBeInTheDocument()
-    expect(screen.getByText('한도 초과 — 사용률 104.1%', { selector: 'dd' })).toBeInTheDocument()
+    expect(within(await table()).getByText('한도 초과, 사용률 104.1%')).toBeInTheDocument()
+    expect(screen.getByText('한도 초과, 사용률 104.1%', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('1,200% 한도 초과(사용률 104.1%).', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('104.1%')).toBeInTheDocument()
     expect(screen.queryByText(/104\.166667%/)).not.toBeInTheDocument()
     expect(screen.getByText('1,200% 한도 초과', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('배정합니다')).toBeInTheDocument()
-    for (const link of screen.getAllByRole('link', { name: /INSURANCE_CONTRACT:3/ }))
-      expect(link).toHaveAttribute('href', '/app/contracts/3')
+    // 계약 원천은 내부 번호 대신 계약번호로 읽는다.
+    const references = screen.getAllByRole('link', { name: /^계약 C-0001/ })
+    expect(references.length).toBeGreaterThan(0)
+    for (const link of references) expect(link).toHaveAttribute('href', '/app/contracts/3')
+    expect(screen.getByText('검증 실행', { exact: false, selector: '.exception-occurrence-meta' })).toHaveTextContent(
+      '검증 실행 44, 1,200% 판정 9',
+    )
   })
 
   it('사유 없이는 저장할 수 없고, 저장하면 이력과 상태가 갱신된다', async () => {
@@ -431,7 +443,7 @@ describe('EXCP-W01 예외함', () => {
   it('서버가 처리를 거절하면 오류를 표시하고 폼을 유지한다', async () => {
     postResponse = () => {
       throw new ApiError(
-        { code: 'FGC-EXCP-003', message: '처리 불가 — 현재 상태에서는 수행할 수 없습니다.' },
+        { code: 'FGC-EXCP-003', message: '처리할 수 없습니다. 현재 상태에서는 수행할 수 없습니다.' },
         'req-9',
         409,
       )
@@ -441,7 +453,7 @@ describe('EXCP-W01 예외함', () => {
     await actions.selectOptions(await screen.findByLabelText(/조치/), 'START_REVIEW')
     await actions.type(screen.getByLabelText(/처리 사유/), '검토')
     await actions.click(screen.getByRole('button', { name: '처리 저장' }))
-    expect(await screen.findByText(/처리 불가/, { selector: '.exception-action-error' })).toBeInTheDocument()
+    expect(await screen.findByText(/처리할 수 없습니다/, { selector: '.exception-action-error' })).toBeInTheDocument()
     expect(screen.getByLabelText(/처리 사유/)).toHaveValue('검토')
   })
 
@@ -510,17 +522,16 @@ describe('EXCP-W01 예외함', () => {
     await actions.click(screen.getByRole('button', { name: '원장 정정 계속' }))
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText(/J-0070/)).toBeInTheDocument()
-    expect(within(dialog).getByText('차변·대변 검증 통과')).toBeInTheDocument()
+    expect(within(dialog).getByText('차변/대변 검증 통과')).toBeInTheDocument()
     // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
     expect(within(dialog).getAllByText('미수수수료').length).toBeGreaterThan(0)
     expect(within(dialog).queryByText(/1100|4100/)).not.toBeInTheDocument()
     await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
     await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
     expect(await within(dialog).findByText('역분개와 재기표를 완료했습니다.')).toBeInTheDocument()
-    expect(within(dialog).getByRole('link', { name: '재기표 #72' })).toHaveAttribute(
-      'href',
-      '/app/journals?selected=72',
-    )
+    expect(within(dialog).getByText('정정 묶음으로 연결했습니다.')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/CG-1|#72/)).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: /^재기표/ })).toHaveAttribute('href', '/app/journals?selected=72')
   })
 })
 
@@ -539,8 +550,8 @@ describe('원장 정정 입력 검증', () => {
       ]),
     ).toBeNull()
   })
-  it('양쪽이 모두 0 이거나 모두 양수인 라인을 거부한다', () => {
-    expect(validateCorrectionLines([{ debitAmount: '', creditAmount: '' }])).toContain('1번 라인')
+  it('양쪽이 모두 0 이거나 모두 양수인 줄을 거부한다', () => {
+    expect(validateCorrectionLines([{ debitAmount: '', creditAmount: '' }])).toContain('1번 줄')
     expect(validateCorrectionLines([{ debitAmount: '10', creditAmount: '10' }])).toContain('한쪽에만')
   })
   it('음수·소수·차대 불균형·0원 합계를 거부한다', () => {
@@ -562,6 +573,50 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
   await actions.clear(debit)
   await actions.type(debit, '0')
   await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
-  expect(await within(dialog).findByText(/1번 라인은 차변 또는 대변 중 한쪽에만/)).toBeInTheDocument()
+  expect(await within(dialog).findByText(/1번 줄은 차변 또는 대변 중 한쪽에만/)).toBeInTheDocument()
   expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
+})
+
+it('차익거래 판정 사유로 저장된 예외 설명의 개발 용어는 쉬운 말로 보이고 다른 설명은 그대로 둔다', async () => {
+  searchResponse = () =>
+    search([
+      {
+        ...baseCase,
+        type: 'DATA_QUALITY',
+        typeLabel: '데이터 품질',
+        title: '차익거래 검증 자료 확인 필요',
+        description: '기준일 이하 계약 금융 스냅샷이 없습니다.',
+        sourceEntityType: 'ARBITRAGE_CHECK',
+        sourceEntityId: '5',
+        sourceLink: '/arbitrage-checks',
+      },
+      { ...baseCase, exceptionCaseId: 13, description: '한도를 넘었습니다.' },
+    ])
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  expect(await screen.findByText('기준일 이전 계약 금액 자료가 없습니다.', { selector: 'dd' })).toBeInTheDocument()
+  expect(screen.queryByText(/스냅샷/)).not.toBeInTheDocument()
+  await actions.click(within(await table()).getByRole('button', { name: '13' }))
+  expect(await screen.findByText('한도를 넘었습니다.', { selector: 'dd' })).toBeInTheDocument()
+})
+
+
+it('gives different exception summary types distinct guide targets and preserves unknown types', async () => {
+  searchResponse = () => ({ ...search([baseCase]), summary: [
+    { type: 'CAP_VIOLATION', typeLabel: '1,200% 위반', count: 2 },
+    { type: 'JOURNAL_CORRECTION_REQUIRED', typeLabel: '원장 정정 필요', count: 3 },
+    { type: 'FUTURE_TYPE', typeLabel: '새 예외', count: 1 },
+  ] })
+  renderPage()
+  await table()
+  for (const [type, label] of [['cap_violation', '1,200% 위반'], ['journal_correction_required', '원장 정정 필요']]) {
+    const id = `exception.summary.${type}`
+    const nodes = document.querySelectorAll(`[data-guide-feature="${id}"]`)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]).toHaveTextContent(label)
+    expect(nodes[0]).toHaveAttribute('href', expect.stringContaining(`type=${type.toUpperCase()}`))
+    expect(workflowHelpSteps('exception.resolve', 'COMPLIANCE').some((step) => step.targetId === id)).toBe(true)
+  }
+  expect(screen.getByRole('link', { name: '새 예외 1건' })).not.toHaveAttribute('data-guide-feature')
+  expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
 })

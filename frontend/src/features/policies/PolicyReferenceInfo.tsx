@@ -18,7 +18,7 @@ export function PolicyReferenceInfo({ policyVersionId, refText }: { policyVersio
     <div className="policy-reference-info">
       {reference.registryTitle ? (
         <p className="policy-reference-registry">
-          규제조문표 · <strong>{reference.registryTitle}</strong>
+          규제조문표, <strong>{reference.registryTitle}</strong>
         </p>
       ) : null}
       {reference.statusTags?.length ? (
@@ -40,7 +40,7 @@ export function PolicyReferenceInfo({ policyVersionId, refText }: { policyVersio
           )}
           {safeSourceUrl(reference.url) ? (
             // 이전에 저장된 링크도 관리 상세와 같은 기준(http(s)·사용자 정보 없음)으로만 연다.
-            <a href={safeSourceUrl(reference.url)!} target="_blank" rel="noopener noreferrer">
+            <a data-guide-feature="features.policies.policy-reference-info.source-link" href={safeSourceUrl(reference.url)!} target="_blank" rel="noopener noreferrer">
               근거 원문 열기
             </a>
           ) : null}
