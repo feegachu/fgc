@@ -118,16 +118,16 @@ describe('CONT-W02 계약 상세', () => {
     await screen.findByRole('heading', { name: 'CONT-0001' })
     expect(screen.getAllByText('서버 정상')).toHaveLength(2)
     expect(screen.getByText('서버 월납')).toBeInTheDocument()
-    const history = await screen.findByRole('list', { name: '상태 사건' })
-    expect(
-      within(history)
-        .getAllByRole('heading', { level: 4 })
-        .map((item) => item.textContent),
-    ).toEqual(['#1 최초 → 정상', '#2 정상 처리 → 미납 처리'])
+    const history = await screen.findByRole('table', { name: '상태 사건' })
+    const row = (index: number) => within(within(history).getAllByRole('row')[index + 1]).getAllByRole('cell')
+    expect(row(0)[0]).toHaveTextContent('1')
+    expect(row(0)[1]).toHaveTextContent('최초 → 정상')
+    expect(row(1)[0]).toHaveTextContent('2')
+    expect(row(1)[1]).toHaveTextContent('정상 처리 → 미납 처리')
     expect(within(history).getByText('실패')).toBeInTheDocument()
     expect(within(history).getByText('2026-07-02 10:00')).toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '접수 순' }))
-    expect(within(history).getAllByRole('heading', { level: 4 })[0]).toHaveTextContent('#2 정상 처리 → 미납 처리')
+    expect(row(0)[1]).toHaveTextContent('정상 처리 → 미납 처리')
     expect(
       requested.filter(
         ({ url }) => !['/api/v1/auth/me', '/api/v1/contracts/1', '/api/v1/contracts/1/status-events'].includes(url),

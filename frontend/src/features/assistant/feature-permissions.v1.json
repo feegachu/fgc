@@ -368,6 +368,8 @@
     "features.contract.contract-tabs.section-2": "OWN_OR_INTERNAL_READ",
     "features.contract.contract-tabs.section-3": "OWN_OR_INTERNAL_READ",
     "features.contract.contract-tabs.section-5": "INTERNAL_READ",
+    "features.contract.status-history.effects": "OWN_OR_INTERNAL_READ",
+    "features.contract.status-history.effects-close": "OWN_OR_INTERNAL_READ",
     "features.dashboard.dashboard-page.button": "INTERNAL_READ",
     "features.dashboard.dashboard-page.composition": "INTERNAL_READ",
     "features.dashboard.dashboard-page.link": "INTERNAL_READ",

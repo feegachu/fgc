@@ -31,6 +31,7 @@ public class OpenApiConfig {
     private static final Map<String, List<String>> NULLABLE_REFERENCES = Map.of(
             "ClawbackCandidateDetailResponse", List.of("latestCalculation"),
             "ContractStatusEventResponse", List.of("registeredBy"),
+            "ContractStatusEventProcessingResponse", List.of("summary"),
             "AcquisitionCostCheckResponse",
             List.of("acquisitionCost", "upfront", "maintenance", "limitPolicy", "paymentPolicy"));
 
