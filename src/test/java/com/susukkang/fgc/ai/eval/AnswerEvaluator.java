@@ -143,6 +143,8 @@ final class AnswerEvaluator {
     private static final Pattern RANK_NAME = Pattern.compile("(\\d{1,3})위(?:는|가|인|이|의)?\\s*([^\\s,.]+)");
     private static final Pattern TOP_CLAIM = Pattern.compile("가장\\s*앞|제일\\s*앞|가장\\s*유리|제일\\s*유리|가장\\s*좋|제일\\s*좋|최상위|선두"
             + "|1위(?!보다|와|과|에|의|대비)|순수령액[이은]?\\s*가장\\s*(?:높|많|크|큰)");
+    /** '가장 높아지지는 않아요'처럼 문장 끝에서 부정하면 1위 주장이 아니다. */
+    private static final Pattern DENIED_ENDING = Pattern.compile("(?:않|아니|아닙)[가-힣]{0,4}\\s*$");
     private static final Pattern WRITE_CLAIM = Pattern.compile("(?:저장|확정|지급|승인|등록|처리|반영|제출|취소|삭제|수정)(?:을|를|이|가)?\\s*(?:완료)?\\s*"
             + "(?:했습니다|했어요|하였습니다|됐습니다|됐어요|되었습니다|마쳤습니다|마쳤어요|끝냈습니다|끝냈어요)"
             + "|(?:처리|저장|확정|등록|승인)(?:해)?\\s*드렸|완료(?:했습니다|했어요|되었습니다|됐습니다|됐어요)");
@@ -278,7 +280,7 @@ final class AnswerEvaluator {
             boolean namesTop = sentence.contains(top.insurer()) || sentence.contains(top.product());
             boolean namesOther = items.stream().skip(1)
                     .anyMatch(item -> sentence.contains(item.insurer()) || sentence.contains(item.product()));
-            if (!namesTop && namesOther && TOP_CLAIM.matcher(sentence).find()) {
+            if (!namesTop && namesOther && TOP_CLAIM.matcher(sentence).find() && !DENIED_ENDING.matcher(sentence).find()) {
                 return true;
             }
         }

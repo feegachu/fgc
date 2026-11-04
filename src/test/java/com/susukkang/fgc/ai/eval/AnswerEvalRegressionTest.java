@@ -77,8 +77,13 @@ class AnswerEvalRegressionTest {
                     }
                 }
             }
+            Path out = dir.resolve("rejudged");
             AnswerEvaluator.write(AnswerEvaluator.summarize(dir.getFileName() + "-rejudged", "기록 재판정(실제 호출 없음)", recorded.model(),
-                    recorded.promptVersion(), 0, null, null, results), dir.resolve("rejudged"));
+                    recorded.promptVersion(), 0, null, null, results), out);
+            // 재생 기록을 갱신할 때는 이 파일을 src/test/resources/ai-eval/answers 로 복사한다.
+            Map<String, String> verdicts = results.stream().collect(Collectors.toMap(CaseResult::id, CaseResult::verdict));
+            AnswerEvalHarness.MAPPER.writerWithDefaultPrettyPrinter().writeValue(out.resolve("recorded-answers.json").toFile(),
+                    new Recorded(recorded.model(), recorded.promptVersion(), recorded.baseCommit(), recorded.answers(), verdicts));
         }
     }
 
@@ -240,7 +245,8 @@ class AnswerEvalRegressionTest {
     @DisplayName("판정기: 서버 값만 쓴 정상 답과 금지를 설명하는 답은 결함이 아니다")
     void graderAcceptsTruthfulAnswers() throws IOException {
         String serverSentence = "2위는 푸른가상생명 가상 무해지 건강보험 D예요. 보수적 순수령액은 355,000원이에요. 1위보다 보수적 순수령액이 150,000원 적어요. "
-                + "한도 반영 수령 예상액은 1위와 같고, 환수 노출액은 1위보다 150,000원 더 커요. 다온가상손해보험 가상 간편 건강보험 F가 환수 부담이 작아 앞섰어요.";
+                + "한도 반영 수령 예상액은 1위와 같고, 환수 노출액은 1위보다 150,000원 더 커요. 다온가상손해보험 가상 간편 건강보험 F가 환수 부담이 작아 앞섰어요. "
+                + "하늘가상생명이 가장 좋은 등급이어도 순위가 가장 높아지지는 않아요.";
 
         Judgement judgement = AnswerEvaluator.judge(emptyCase("C-X"), new Shown(serverSentence, "LLM", null, List.of(), null, null), demoTool(),
                 List.of(), evidence -> true, 1);

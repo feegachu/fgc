@@ -359,6 +359,18 @@ class PicoAskServiceTest {
             assertThat(service.ask(request("초안 저장 방법")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
         }
     }
+    @Test void normalizesInlineProcedureListMarkersOnlyWhenConsecutive() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+            .thenReturn(answer("다음 순서로 진행하세요: 1) 지급 대상을 확인하고 2) 근거를 확인한 후 3) 초안을 저장하세요.","payment.draft:overview"));
+        var reply = service.ask(request("초안 저장 순서"));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        assertThat(reply.message()).isEqualTo("다음 순서로 진행하세요: 지급 대상을 확인하고 근거를 확인한 후 초안을 저장하세요.");
+        for (var message : List.of("먼저 1) 확인하고 3) 저장하세요.", "먼저 1. 지급액은 50000원입니다. 2. 저장하세요.",
+                "금액은 1. 2. 3. 4. 5. 6. 7. 8. 9. 입니다.", "요율은 1.5 입니다. 2.5 도 있습니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("초안 저장 순서")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
     @Test void sharedCatalogRegistersBothApprovedSavedDraftBranches() {
         var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("payment.confirm")).findFirst().orElseThrow();
         var scope = guide.steps().stream().filter(step -> step.stepId().equals("payment.scope")).findFirst().orElseThrow();
