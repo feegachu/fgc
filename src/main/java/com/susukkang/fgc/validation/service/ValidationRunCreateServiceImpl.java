@@ -153,8 +153,9 @@ public class ValidationRunCreateServiceImpl implements ValidationRunCreateServic
 
         // 1. MONTHLY 중복 체크
         if (command.runType() == ValidationRunType.MONTHLY
-                && validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(
-                        command.validationMonth(), ValidationRunType.MONTHLY.name(), ACTIVE_STATUSES)) {
+                && (validationRunRepository.existsByValidationMonthAndRunTypeAndStatusIn(
+                        command.validationMonth(), ValidationRunType.MONTHLY.name(), ACTIVE_STATUSES)
+                    || validationRunRepository.hasActiveRetryForMonth(command.validationMonth()))) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_001, Map.of());
         }
         // 1-1. MANUAL_CONTRACT 중복 체크 — uq_validation_run_active_manual_contract(V13)의
