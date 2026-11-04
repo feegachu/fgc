@@ -438,11 +438,13 @@ class ScheduleRepositoryIntegrationTest {
     void baselineComparisonStillDetectsLineContractMismatch() {
         var expected = com.susukkang.fgc.schedule.dto.ScheduleLineResponse.builder().contractId(1L).build();
         var actual = com.susukkang.fgc.schedule.dto.ScheduleLineResponse.builder().contractId(2L).build();
-        assertThatThrownBy(() -> assertSame(List.of(expected), List.of(actual)))
+        var expectedLines = List.of(expected);
+        var actualLines = List.of(actual);
+        var expectedDetail = ScheduleDetailResponse.builder().lines(expectedLines).build();
+        var actualDetail = ScheduleDetailResponse.builder().lines(actualLines).build();
+        assertThatThrownBy(() -> assertSame(expectedLines, actualLines))
                 .isInstanceOf(AssertionError.class).hasMessageContaining("contractId");
-        assertThatThrownBy(() -> assertSame(
-                ScheduleDetailResponse.builder().lines(List.of(expected)).build(),
-                ScheduleDetailResponse.builder().lines(List.of(actual)).build()))
+        assertThatThrownBy(() -> assertSame(expectedDetail, actualDetail))
                 .isInstanceOf(AssertionError.class).hasMessageContaining("contractId");
     }
 
