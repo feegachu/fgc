@@ -4,6 +4,10 @@ import type { Browser, Locator, Page } from '@playwright/test'
 import { matchPath } from 'react-router'
 import { canOpen, screens } from '../src/app/screens'
 import { test, expect, login, api, completeMonthly, sql } from './fixtures'
+import screenHelp from '../src/features/assistant/guide/screen-help.json' with { type: 'json' }
+import paymentGuides from '../src/features/assistant/payment-guides.v1.json' with { type: 'json' }
+import workflowGuides from '../src/features/assistant/workflow-guides.v1.json' with { type: 'json' }
+import workflowHelp from '../src/features/assistant/workflow-help.generated.json' with { type: 'json' }
 
 // 실사용자 화면에 개발 용어나 코드가 보이면 실패한다 (#755, SRC-074, 화면정의서 공통규칙 10).
 // 역할마다 갈 수 있는 모든 라우트를 돌고 목록은 첫 행의 상세까지 연다.
@@ -26,6 +30,7 @@ const forbidden = [
   { label: '빈 값', pattern: /\b(?:null|undefined|NaN)\b|\[object Object\]/g },
   { label: '개발 용어', pattern: /\w*Exception\b|\bSQL\b|jdbc|Flyway|watermark|tasklet|\bchunk\b/gi },
   { label: '개발 용어', pattern: /체크포인트|스냅샷|멱등|트랜잭션|쿼리|워터마크|파라미터|페이로드|배치|시드/g },
+  { label: '개발 용어', pattern: /\bID\b|\b[245]\d\d (?:수락|응답|오류)/g },
   { label: '스택 추적', pattern: /\bat [\w$.]+\([\w$.]+:\d+\)|\b(?:Type|Reference|Syntax)Error\b/g },
   { label: '내부 번호', pattern: /\b(?:FUN|IF-API|SRC|REG|TER|PER|DAR)-\d+/g },
   { label: '화면 ID', pattern: /\b[A-Z]{2,}-W\d\d\b/g },
@@ -238,6 +243,14 @@ async function walkRole(
     await settle(page)
     const check = async () => scan(await visibleText(page), role, route, findings)
     await check()
+    // 화면 도움말의 첫 단계를 실제로 연다. 나머지 단계 문구는 안내 문구 시험이 본다.
+    const help = page.getByRole('button', { name: '도움말', exact: true }).first()
+    if (!target.label && (await help.count())) {
+      await press(help)
+      await settle(page)
+      await check()
+      await press(help)
+    }
     const clickTabs = async () => {
       for (const tab of await page.locator('main [role=tab]').all()) {
         await press(tab)
@@ -309,13 +322,31 @@ test('검사 규칙은 코드를 잡고 업무 표기는 통과시킨다', () =>
     scan(text, '시험', route, found)
     return found.map((item) => item.match)
   }
-  for (const leak of ['FGC-VRUN-003', 'MANUAL_CONTRACT', 'FINALIZED', 'validationRunId', 'journal_no', 'undefined', '[object Object]', 'IllegalStateException', 'FUN-045', 'IF-API-49', 'REG-08', 'VRUN-W02', '체크포인트'])
-    expect(flagged(`실패: ${leak} 확인`), leak).toContain(leak)
+  for (const leak of ['FGC-VRUN-003', 'MANUAL_CONTRACT', 'FINALIZED', 'validationRunId', 'journal_no', 'undefined', '[object Object]', 'IllegalStateException', 'FUN-045', 'IF-API-49', 'REG-08', 'VRUN-W02', '체크포인트', '실행 ID', '202 수락'])
+    expect(flagged(`실패: ${leak} 확인`).some((match) => leak.includes(match)), leak).toBe(true)
   for (const shown of ['FGC-FGL01-202607-0001', 'FGC-B0101', 'A-FC-001', 'JV-2026-07-0010', 'GA→설계사', 'CSV 내보내기', 'GA-CUR-2026-V1', 'CLAW-GA-VIRTUAL-2026', '2026-CURRENT-A', 'STD-SAV-A', '요청번호 20261104-abcdef'])
     expect(flagged(`표시: ${shown}`), shown).toEqual([])
   expect(flagged('근거 REG-08, SRC-022', '/policies?policyVersionId=2')).toEqual([])
   expect(flagged('BASE_COMMISSION', '/base')).toEqual([])
   expect(flagged('validationRunId', '/base')).toEqual(['validationRunId'])
+})
+
+/** 사용자에게 보이는 안내 문구: 제목, 단계 설명, 업무 설명 */
+const guideTexts = (value: unknown, key = ''): string[] =>
+  typeof value === 'string'
+    ? ['title', 'instruction', 'description'].includes(key) ? [value] : []
+    : Array.isArray(value)
+      ? value.flatMap((item) => guideTexts(item, key))
+      : value && typeof value === 'object'
+        ? Object.entries(value).flatMap(([name, item]) => guideTexts(item, name))
+        : []
+
+test('화면 도움말과 업무 안내의 모든 단계 문구에 개발 용어가 없다', () => {
+  const found: Finding[] = []
+  for (const [catalog, content] of Object.entries({ screenHelp, workflowGuides, paymentGuides, workflowHelp }))
+    // 정책 화면 안내는 그 화면의 근거 표시 이름을 그대로 부른다(화면정의서 :336).
+    for (const text of guideTexts(content)) scan(text, catalog, text.startsWith('정책/룰셋') ? '/policies' : catalog, found)
+  expect(found.map((item) => `${item.route} | ${item.match} | ${item.context}`)).toEqual([])
 })
 
 test('실사용자 화면에 개발 용어와 코드가 보이지 않고 콘솔 오류가 없다', async ({ page, browser, baseURL }, testInfo) => {
