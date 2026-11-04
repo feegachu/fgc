@@ -30,7 +30,7 @@ public final class ContractAcquisitionCostValidator {
     private static final BigDecimal MAX_USAGE_PCT = new BigDecimal("999999.999999");
 
     enum Bucket {
-        UPFRONT("선지급"), MAINTENANCE("유지관리"), INDIRECT("유지관리(간접지원경비)"),
+        UPFRONT("선지급"), MAINTENANCE("유지관리"), INDIRECT("간접지원경비"),
         EXCLUSION_CANDIDATE("제외 후보"), UNCLASSIFIED("미분류");
 
         private final String label;

@@ -12,7 +12,7 @@ import { ListPagination } from '../../components/ListPagination'
 import { Modal } from '../../components/Modal'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { SearchSelect } from '../../components/SearchSelect'
-import { dateTime, usageRate } from '../../lib/format'
+import { dateTime } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { toast } from '../../stores/toasts'
 import { useInsurerOptions } from '../base/api'
@@ -29,32 +29,33 @@ const statuses = [
   { value: 'REVIEW_REQUIRED', label: '검토 필요' },
   { value: 'NOT_APPLICABLE', label: '적용 대상 아님' },
 ]
-const limitCell = (item?: AcquisitionItem | null) =>
+const limitCell = (item: AcquisitionItem | null | undefined, row: AcquisitionCheck) =>
   item ? (
-    <span className="acq-limit-cell">
-      <AcquisitionStatus status={item.status} label={item.statusLabel} />
-      <span className="tabular-nums">{item.usagePct == null ? '자료 없음' : `${usageRate(item.usagePct)}%`}</span>
-    </span>
-  ) : (
+    <AcquisitionStatus status={item.status} label={item.statusLabel} />
+  ) : row.resultStatus === 'NOT_APPLICABLE' ? (
     '-'
+  ) : (
+    '자료 없음'
   )
+// 좁은 폭에서도 판정과 두 한도가 먼저 보이게 앞에 둔다. 나머지 칸은 표를 밀어서 본다.
 const columns: TableColumn<AcquisitionCheck>[] = [
   {
     key: 'contract',
     label: '계약번호',
     sortKey: 'contractNo',
     sortable: true,
-    width: '12rem',
+    width: '13rem',
     cellClassName: 'tabular-nums',
     render: (row) => row.contractNo,
   },
   {
-    key: 'product',
-    label: '적용 상품·기초서류',
-    width: '13rem',
-    render: (row) => `${row.productName}, ${row.basicDocumentVersion}`,
+    key: 'result',
+    label: '판정',
+    width: '7.5rem',
+    render: (row) => <AcquisitionStatus status={row.resultStatus} label={row.resultStatusLabel} />,
   },
-  { key: 'stage', label: '지급단계', width: '6.5rem', render: (row) => row.paymentStageLabel },
+  { key: 'upfront', label: '선지급 결과', width: '6.5rem', render: (row) => limitCell(row.upfront, row) },
+  { key: 'maintenance', label: '유지관리 결과', width: '6.5rem', render: (row) => limitCell(row.maintenance, row) },
   {
     key: 'base',
     label: '계약체결비용 기준액',
@@ -62,14 +63,18 @@ const columns: TableColumn<AcquisitionCheck>[] = [
     align: 'number',
     render: (row) => (row.resultStatus === 'NOT_APPLICABLE' ? '-' : amountText(row.acquisitionCost?.amount)),
   },
-  { key: 'upfront', label: '선지급 결과', width: '9rem', render: (row) => limitCell(row.upfront) },
-  { key: 'maintenance', label: '유지관리 결과', width: '9rem', render: (row) => limitCell(row.maintenance) },
-  { key: 'policy', label: '적용 정책 버전', width: '13rem', render: (row) => policyText(row.limitPolicy) },
+  { key: 'stage', label: '지급단계', width: '6.5rem', render: (row) => row.paymentStageLabel },
   {
-    key: 'result',
-    label: '판정',
-    width: '7rem',
-    render: (row) => <AcquisitionStatus status={row.resultStatus} label={row.resultStatusLabel} />,
+    key: 'product',
+    label: '적용 상품·기초서류',
+    width: '14rem',
+    render: (row) => `${row.productName}, ${row.basicDocumentVersion}`,
+  },
+  {
+    key: 'policy',
+    label: '적용 정책 버전',
+    width: '13rem',
+    render: (row) => (row.resultStatus === 'NOT_APPLICABLE' ? '-' : policyText(row.limitPolicy)),
   },
   {
     key: 'checkedAt',
@@ -225,13 +230,11 @@ export default function AcquisitionCostPage() {
         </div>
       </header>
       <FilterBar
-        className="acq-filter-bar"
-        fieldsClassName="acq-filter-fields"
         icons
         onSubmit={() => patch({ contractNo })}
         onReset={reset}
       >
-        <Field variant="filter" className="acq-filter-field" label="판정">
+        <Field variant="filter" label="판정">
           <select
             data-guide-feature="features.acquisition-cost.acquisition-cost-page.select-2"
             className="select-control"
@@ -246,7 +249,7 @@ export default function AcquisitionCostPage() {
             ))}
           </select>
         </Field>
-        <Field variant="filter" className="acq-filter-field" label="지급단계">
+        <Field variant="filter" label="지급단계">
           <select
             data-guide-feature="features.acquisition-cost.acquisition-cost-page.select-3"
             className="select-control"
@@ -258,7 +261,7 @@ export default function AcquisitionCostPage() {
             <option value="INSURER_TO_GA">원수사→GA</option>
           </select>
         </Field>
-        <Field variant="filter" className="acq-filter-field" label="보험회사">
+        <Field variant="filter" label="보험회사">
           <select
             data-guide-feature="features.acquisition-cost.acquisition-cost-page.select-4"
             className="select-control"
@@ -274,7 +277,7 @@ export default function AcquisitionCostPage() {
             ))}
           </select>
         </Field>
-        <Field variant="filter" className="acq-filter-contract" label="계약번호">
+        <Field variant="filter" label="계약번호">
           <input
             data-guide-feature="features.acquisition-cost.acquisition-cost-page.input"
             type="search"
@@ -288,7 +291,7 @@ export default function AcquisitionCostPage() {
         className="acq-content-grid"
         storageKey="acquisition-cost-workspace"
         label="검증 결과 목록과 상세 너비"
-        defaultRatio={56}
+        defaultRatio={58}
       >
         <section
           data-guide-feature="features.acquisition-cost.acquisition-cost-page.section"

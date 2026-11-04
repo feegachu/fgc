@@ -1272,7 +1272,7 @@ A1·A2(및 0475 복제본)의 관리자수수료는 팀장 1명에게 90,000 1�
 **적재 상태와 전제 (2026-10-22)**
 
 - 4년·7년 시드는 아직 없다. 필요한 것: 4년·7년 정책버전(DRAFT→승격), 판매버전(`fee_regime_code` FOUR_YEAR_2027·SEVEN_YEAR_2029), 계약.
-- 계약체결비용은 지급 정책버전의 `policy_parameter`(`ACQUISITION_COST_BASIS`, `ACQUISITION_COST_RATE_PCT`)로 받는다(#651, 운영정책서 제46조, `REG-02`) — 프로젝트 가정. 이 시드에는 값이 없어 3,000,000원 예시는 시험 픽스처로만 재현한다. 값이 없으면 한도 검증은 금액 null과 `REVIEW_REQUIRED`다.
+- 계약체결비용은 지급 정책버전의 `policy_parameter`(`ACQUISITION_COST_BASIS`, `ACQUISITION_COST_RATE_PCT`)로 받는다(#651, 운영정책서 제46조, `REG-02`). 프로젝트 가정이다. 이 시드에는 값이 없어 3,000,000원 예시는 시험 픽스처로만 재현한다. 값이 없으면 한도 검증은 금액 null과 `REVIEW_REQUIRED`다.
 - SCH-07(현행·4년·7년 비교)은 `schedule_purpose='COMPARISON'` 헤더로 만들어 운영 집계(`OPERATIONAL`)와 섞지 않는다(DAR-012).
 
 ## 36. 환수

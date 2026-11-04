@@ -3,23 +3,8 @@
   min-width: 0;
   gap: var(--space-4);
 }
-.acq-filter-fields {
-  flex: 1 1 auto;
-}
-.acq-filter-field {
-  width: 9.5rem;
-}
-.acq-filter-contract {
-  width: 13rem;
-}
 .acq-panel {
   min-width: 0;
-}
-.acq-limit-cell {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
 }
 .acq-result,
 .acq-basis,
@@ -92,6 +77,11 @@
   gap: var(--space-1);
   margin: 0;
 }
+/* 넓은 계약 상세에서 이름과 값이 멀어지지 않게 나눈다. 좁은 분할 화면에서는 한 줄씩이다. */
+.acq-facts {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  column-gap: var(--space-6);
+}
 .acq-limit dl > div,
 .acq-facts > div {
   display: flex;
@@ -108,6 +98,9 @@
   margin: 0;
   overflow-wrap: anywhere;
   text-align: right;
+}
+.acq-basis .data-table {
+  min-width: 0;
 }
 .acq-failure {
   display: grid;
