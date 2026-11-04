@@ -10,6 +10,9 @@ services:
     networks: [default, application]
     mem_limit: ${FGC_BLACKBOX_MEMORY:-64m}
   alertmanager:
+    volumes:
+      - ./shinhan/alertmanager-discord.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./secrets/discord-webhook-url:/run/secrets/webhook-url:ro
     mem_limit: ${FGC_ALERTMANAGER_MEMORY:-128m}
   grafana:
     mem_limit: ${FGC_GRAFANA_MEMORY:-256m}

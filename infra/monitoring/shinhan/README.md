@@ -11,7 +11,7 @@
 - 기존 `~/fgc-stg`의 compose 프로젝트명, API 컨테이너, 현재 release.env와 네트워크를 확인한다. 서버 이름에 stg가 있어도 현재 운영일 수 있다.
 - `docker inspect <API컨테이너> --format '{{json .NetworkSettings.Networks}}'`로 실제 네트워크를 선택하고 서비스 별칭 `api`가 있는지 확인한다. 후보가 여러 개면 외부 연결용 네트워크를 임의로 선택하지 않는다.
 - CPU/메모리/디스크 여유, UI 포트 충돌을 확인한다. 설정 기본 메모리 상한 합계는 960 MiB이며 서버에 맞게 조정한다. Prometheus 데이터 보존 기본값은 15일이다.
-- 운영 알림 수신 URL/형식을 확정한다. smoke fixture나 개발 PC를 운영 수신기로 지정하지 않는다. 외부 수신 채널 미연결 상태를 알림 구축 완료로 보고하지 않는다.
+- 운영 Discord 채널과 Webhook URL을 확정한다. smoke fixture나 개발 PC를 운영 수신기로 지정하지 않는다. 외부 수신 채널 미연결 상태를 알림 구축 완료로 보고하지 않는다.
 
 ## 준비
 
@@ -21,7 +21,7 @@
 
 - `secrets/scrape-token`: 서버에서 생성한 임의 토큰. 앱과 Prometheus에 같은 값 사용.
 - `secrets/grafana-password`: 운영 Grafana 관리자 비밀번호.
-- `secrets/webhook-url`: Alertmanager generic webhook을 받는 실제 수신 서비스 URL. Slack을 직접 연결하려면 receiver를 `slack_configs`로 변경해야 한다.
+- `secrets/discord-webhook-url`: 운영 Discord 채널의 Webhook URL. 신한 override는 `discord_configs`를 사용하며, generic webhook 형식을 Discord URL로 보내지 않는다. 장애 발생과 해제 알림 모두 전송한다.
 
 비밀값을 Git, 명령 출력, PR 본문에 남기지 않는다. 디렉터리와 파일은 운영 계정이 관리하고 컨테이너 실행 UID가 필요한 파일만 읽도록 권한을 설정한다. Docker 이미지별 UID가 달라 모든 파일을 일괄 600으로 두면 수집이 실패할 수 있다.
 
@@ -64,3 +64,11 @@ ssh -N -L 23000:127.0.0.1:13000 -L 29090:127.0.0.1:19090 -L 29093:127.0.0.1:1909
 모니터링만 중지하려면 같은 디렉터리/네트워크 변수로 `docker compose -p fgc-monitoring -f compose.yaml -f shinhan/compose.yaml stop`을 실행한다. 데이터 볼륨은 보존한다. API 활성화까지 되돌려야 하면 해당 배포에서 보관한 기존 환경/compose를 복원하고 동일 운영 프로젝트에서 API만 갱신한다. DB 이미지나 볼륨은 변경하지 않는다.
 
 같은 물리 서버가 중단되면 이 모니터링도 중단된다. 상시 전원 운영과 별개로 서버 외부 생존 감시가 있어야 이 경우까지 탐지할 수 있다.
+
+## Discord 채널 준비
+
+Discord 서버 설정 → 연동(Integrations) → Webhooks → 새 Webhook 생성에서 알림 전용 채널을 지정하고 URL을 복사한다. Webhook 관리 권한이 있는 사람이 생성해야 한다. URL은 해당 채널에 메시지를 보낼 수 있는 비밀값이다.
+
+운영 서버의 `secrets/discord-webhook-url`에 URL만 한 줄로 저장한다. 실제 파일은 Git에서 제외되며 기본 미리보기 fixture 수신기와 별개다. 메시지에는 상태(FIRING/RESOLVED), 신한 prod, 경보명, 대상, 심각도, 배치명이 표시된다. 전송은 Alertmanager가 수행한다. Discord 채널에 접근할 수 있는 팀원이 확인하며 알림은 각자의 Discord 알림 설정을 따른다.
+
+수신 검증은 운영 앱을 중단하는 대신 식별 가능한 테스트 경보를 Alertmanager에 주입하고, 실제 채널에서 발생/해제 메시지를 모두 확인한다. 이 전송은 해당 채널에 연결하기로 승인한 배포 작업의 일부이며 실제 업무 장애 경보와 구분해야 한다. 배치 경보의 해제는 최근 실패 감지창 종료일 수 있어 재처리 성공 증거로 취급하지 않는다.
