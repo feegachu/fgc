@@ -32,6 +32,7 @@ function RoutedScreenHelp(props: HelpProps) {
     const selectionParams: Record<string, string[]> = {
       'EXCP-W01': ['selected'], 'AUDT-W01': ['selected'], 'CAP-W01': ['capCheckId'],
       'POL-W01': ['policyVersionId', 'tab', 'section'], 'TRAN-W01': ['selectedId'], 'SCHE-W01': ['selectedId'],
+      'RPT-W02': ['entryKey'], 'LEDG-W01': ['selected'],
     }
     selectionParams[screenId]?.forEach(key => context.delete(key))
   }

@@ -141,21 +141,20 @@ it('does not run an unregistered screen variant', () => {
   expect(screen.getByRole('button', { name: '도움말' })).toBeDisabled()
 })
 
-it('keeps read-only help on row selection, but resets it when the month changes', async () => {
+it.each([['EXCP-W01', 'selected'], ['RPT-W02', 'entryKey'], ['LEDG-W01', 'selected']])('keeps %s help on row selection, but resets it when the month changes', async (screenId, selectionParam) => {
   function Page() {
     const [params, setParams] = useSearchParams()
-    return <main id="main-content"><ScreenHelp screenId="EXCP-W01" />
-      {definitions.find(entry => entry.screenId === 'EXCP-W01' && !entry.variant)!.steps.map(step => <section key={step.targetId} data-guide-target={step.targetId} />)}
-      <button onClick={() => setParams({ month: params.get('month')!, selected: '11' })}>예외 선택</button>
-      <button onClick={() => setParams({ month: '2026-08', selected: '11' })}>월 변경</button>
+    return <main id="main-content"><ScreenHelp screenId={screenId} />
+      {definitions.find(entry => entry.screenId === screenId && !entry.variant)!.steps.map(step => <section key={step.targetId} data-guide-target={step.targetId} />)}
+      <button onClick={() => setParams({ month: params.get('month')!, [selectionParam]: '11' })}>행 선택</button>
+      <button onClick={() => setParams({ month: '2026-08', [selectionParam]: '11' })}>월 변경</button>
     </main>
   }
   render(<MemoryRouter initialEntries={['/?month=2026-07']}><Page /></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
-  await userEvent.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
-  const step = screen.getByText(/화면 사용법 · 2\//).textContent
-  await userEvent.click(screen.getByRole('button', { name: '예외 선택' }))
+  const step = screen.getByText(/화면 사용법 · 1\//).textContent
+  await userEvent.click(screen.getByRole('button', { name: '행 선택' }))
   expect(screen.getByText(step!)).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: '월 변경' }))
   expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()

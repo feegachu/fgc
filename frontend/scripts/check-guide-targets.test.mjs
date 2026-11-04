@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { inspectTargets, inspectHelpEntries, validateHelpCatalog, validateTargets, catalogTargets, check } from './check-guide-targets.mjs'
+import { inspectTargets, inspectHelpEntries, validateHelpCatalog, validateTargets, catalogTargets, check, isScreenSource } from './check-guide-targets.mjs'
+
+test('checkout directory names do not exclude application targets', () => {
+  for (const root of ['/tmp/test-checkout/spec/fgc', 'C:\\test-workspace\\spec\\fgc']) {
+    assert.equal(isScreenSource(`${root}/src/InspectionPage.tsx`), true)
+    assert.equal(isScreenSource(`${root}/src/InspectionPage.test.tsx`), false)
+    assert.equal(isScreenSource(`${root}/src/InspectionPage.spec.tsx`), false)
+    assert.equal(isScreenSource(`${root}/src/types.ts`), false)
+  }
+})
 test('a target used only by the imported payment JSON is required', () => {
   const required = catalogTargets([])
   const declarations = [...new Set(required)].filter(id => id !== 'payment.evidence').map(id => ({ id }))

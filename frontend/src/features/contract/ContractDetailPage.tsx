@@ -107,7 +107,7 @@ function ContractDetailView({ id }: { id: string }) {
   return (
     <div className="contract-react-detail contract-detail-page">
       <header className="page-header contract-detail-page-header">
-        <ScreenHelp screenId="CONT-W02" />
+        {isAgent ? <ScreenHelp screenId="CONT-W02" variant="agent" /> : <ScreenHelp screenId="CONT-W02" />}
         <div className="page-header-copy">
           <h1 className="page-title">보험계약 상세</h1>
         </div>

@@ -97,12 +97,13 @@ function renderAt(path: string, handler: Handler, roleCode = 'SETTLEMENT') {
     return envelope(result)
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, client, actions: userEvent.setup() }
 }
 const calls = (prefix: string) => requested.filter(({ url }) => url.startsWith(prefix))
 const query = (url: string) => Object.fromEntries(new URLSearchParams(url.split('?')[1]))
@@ -520,6 +521,35 @@ it('regeneration help validates reason and waits for new server version before n
   expect(await modal.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
   await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/12'))
+})
+
+it.each([
+  {},
+  { scheduleHeaderId: 0, versionNo: 3 },
+  { scheduleHeaderId: 11, versionNo: 3 },
+  { scheduleHeaderId: 12, versionNo: 2 },
+])('locks a committed regeneration with an invalid receipt %j but permits closing', async (receipt) => {
+  const { actions, client } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return receipt
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  client.setQueryData(['schedules', 'receipt-check'], [])
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
+  const submit = within(dialog).getByRole('button', { name: '새 버전 만들기' })
+  await actions.type(within(dialog).getByLabelText(/생성 사유/), '원천 변경')
+  await actions.click(submit)
+  expect(await within(dialog).findByText(/다시 생성하지 말고 목록에서/)).toBeVisible()
+  expect(submit).toBeDisabled()
+  expect(within(dialog).getByLabelText(/생성 사유/)).toBeDisabled()
+  expect(client.getQueryState(['schedules', 'receipt-check'])?.isInvalidated).toBe(true)
+  await actions.click(submit)
+  expect(calls('/api/v1/schedules/11/regenerate')).toHaveLength(1)
+  await actions.click(within(dialog).getByRole('button', { name: '취소' }))
+  expect(dialog).not.toBeInTheDocument()
 })
 
 it('blocks every close path while the new schedule version is being created', async () => {

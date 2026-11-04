@@ -83,6 +83,7 @@ export function PolicyDraftEditor({
   const [dirty, setDirty] = useState(false)
   const clearUnsaved = useUnsavedWork(dirty)
   const saving = useRef(false)
+  const storedRef = useRef(false)
   const requestKey = usePolicyRequest()
   const titleFocus = useRef<HTMLInputElement>(null)
   const set = <K extends keyof DraftDocument>(key: K, value: DraftDocument[K]) => {
@@ -155,7 +156,7 @@ export function PolicyDraftEditor({
     }
   }
   async function save() {
-    if (saving.current) return
+    if (saving.current || storedRef.current) return
     const nextErrors = validateDraft(draft)
     setErrors(nextErrors)
     const first = Object.keys(nextErrors)[0]
@@ -192,6 +193,7 @@ export function PolicyDraftEditor({
         ? await preview.save(document, policyId)
         : (await savePolicyDraft(document, policyId, requestKey({ policyId, document }))).policyVersionId
       stored = true
+      storedRef.current = true
       setCommitted(true)
       setDirty(false)
       clearUnsaved()
@@ -218,7 +220,7 @@ export function PolicyDraftEditor({
         focusError(path)
       }
     } finally {
-      if (!stored) saving.current = false
+      saving.current = false
       if (mounted.current) setBusy(false)
     }
   }

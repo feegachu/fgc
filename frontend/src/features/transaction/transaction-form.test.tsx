@@ -551,6 +551,8 @@ describe('TRAN-W02 React form workflow', () => {
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '2')
     expect(screen.queryByLabelText('1번 귀속행 계약번호')).not.toBeInTheDocument()
     expect(screen.getByLabelText('1번 귀속행 산입 판정')).toHaveValue('EXCLUDED:NEW_AGENT_SUPPORT')
+    expect(screen.getByText('신규 설계사 지원 건은 모든 귀속행에 증빙을 입력해야 합니다.')).toBeVisible()
+    expect(button('btn-save')).toBeDisabled()
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
     expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('')
     expect(screen.getByLabelText('1번 귀속행 귀속 방법')).toHaveValue('DIRECT')

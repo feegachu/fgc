@@ -31,11 +31,12 @@ function evidence(): Evidence {
       settlementMonth: '2026-07-01',
       paymentStage: 'GA_TO_FC',
       status: 'CONFIRMED',
+      updatedAt: '2026-07-10T10:00:00',
       attributions: [{ contractId: 1 }],
     },
     validation: {
       targets: [{ contractNo: 'C1', selectionStatus: 'SELECTED' }],
-      header: { validationRunId: 4, validationMonth: '2026-07-01', runType: 'MONTHLY', status: 'COMPLETED' },
+      header: { validationRunId: 4, validationMonth: '2026-07-01', runType: 'MONTHLY', status: 'COMPLETED', startedAt: '2026-07-10T11:00:00' },
     },
     reconciliation: {
       reconciliationRunId: 5,
@@ -95,9 +96,22 @@ describe('FUN-088 server evidence decisions', () => {
   )
   it('accepts a new validation started after the payment change', () => {
     const state = evidence()
+    state.payment!.updatedAt = undefined
     state.payment!.createdAt = '2026-10-30T15:00:00'
     state.validation!.header!.startedAt = '2026-10-30T15:01:00'
     expect(decide(selection, state, 'GA_ADMIN').step).toBe('validation.finalize')
+  })
+
+  it.each(['COMPLETED', 'FINALIZED'] as const)('refuses %s completion without verifiable timestamps', (status) => {
+    for (const value of [undefined, '', 'invalid-date']) {
+      for (const field of ['payment', 'validation'] as const) {
+        const state = evidence()
+        state.validation!.header!.status = status
+        if (field === 'payment') state.payment!.updatedAt = value
+        else state.validation!.header!.startedAt = value
+        expect(() => decide(selection, state, 'GA_ADMIN')).toThrow('시각을 확인하지 못했습니다')
+      }
+    }
   })
   it('starts a new contract without synthetic IDs', () =>
     expect(decide({ month: '2026-07', stage: 'GA_TO_FC' }, { scheduleAcknowledged: false }, 'SETTLEMENT').step).toBe(
@@ -235,7 +249,7 @@ describe('correction and permission boundaries', () => {
       state.validation = undefined
       expect(decide(next, state, 'GA_ADMIN').step).toBe('validation.execute')
       state.validation = {
-        header: { validationRunId: 6, validationMonth: '2026-07-01', runType: 'MONTHLY', status: 'COMPLETED' },
+        header: { validationRunId: 6, validationMonth: '2026-07-01', runType: 'MONTHLY', status: 'COMPLETED', startedAt: '2026-07-10T11:00:00' },
         targets: [{ contractNo: 'C1', selectionStatus: 'SELECTED' }],
       }
       state.reconciliation = undefined

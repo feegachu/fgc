@@ -64,6 +64,9 @@ export function validateTargets(required, declarations) {
 function files(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? files(resolve(dir, entry.name)) : [resolve(dir, entry.name)])
 }
+export function isScreenSource(file) {
+  return file.endsWith('.tsx') && !/\.(test|spec)\.tsx$/.test(file)
+}
 export function catalogTargets(catalog) {
   const required = catalog.flatMap((entry) => entry.steps.map((step) => step.targetId))
   const payment = JSON.parse(readFileSync(resolve(root, 'src/features/assistant/payment-guides.v1.json'), 'utf8'))
@@ -82,7 +85,7 @@ export function catalogTargets(catalog) {
 }
 export function check() {
   const catalog = JSON.parse(readFileSync(resolve(root, 'src/features/assistant/guide/screen-help.json'), 'utf8'))
-  const declarations = files(resolve(root, 'src')).filter((f) => f.endsWith('.tsx') && !/test|spec/.test(f)).flatMap((file) => inspectTargets(readFileSync(file, 'utf8'), file).map((id) => ({ id, file: relative(root, file) })))
+  const declarations = files(resolve(root, 'src')).filter(isScreenSource).flatMap((file) => inspectTargets(readFileSync(file, 'utf8'), file).map((id) => ({ id, file: relative(root, file) })))
   const required = catalogTargets(catalog)
   const errors = [...validateTargets(required, declarations), ...validateHelpCatalog(catalog)]
   const routedIds = [...readFileSync(resolve(root, 'src/app/screens.ts'), 'utf8').matchAll(/id: '([^']+)'/g)].map((match) => match[1])

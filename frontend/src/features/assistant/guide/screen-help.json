@@ -1,5 +1,17 @@
 [
   {
+    "screenId": "CONT-W02",
+    "variant": "agent",
+    "title": "보험계약 상세",
+    "page": "contract/ContractDetailPage.tsx",
+    "steps": [
+      {
+        "targetId": "contract.statusHistory",
+        "instruction": "본인 계약의 기본정보와 상태이력을 확인하세요. 효력일과 접수일을 구분하고 상태 변경의 처리 결과를 확인합니다."
+      }
+    ]
+  },
+  {
     "screenId": "RPT-W02",
     "title": "설계사 수수료 명세",
     "page": "agent-statement/AgentStatementPage.tsx",

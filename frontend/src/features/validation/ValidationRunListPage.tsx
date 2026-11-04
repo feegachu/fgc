@@ -1,7 +1,7 @@
 import { SaveGuide } from '../assistant/guide/save-guide'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -229,6 +229,7 @@ function CreateSection() {
   const hasActive = active.data?.exists === true
   const blockedByActive = runType === 'MONTHLY' && hasActive
   const [saveGuide] = useState(() => new SaveGuide())
+  const savedId = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useEffect(() => { saveGuide.update(`${month}:${runType}`, canProcess && monthOk && !blockedByActive && !active.isError && !active.isPending) }, [saveGuide, month, runType, canProcess, monthOk, blockedByActive, active.isError, active.isPending])
@@ -283,8 +284,8 @@ function CreateSection() {
           data-guide-target="validation.createSubmit"
           id="btn-create"
           aria-describedby="create-hint"
-          loading={mutation.isPending}
-          disabled={!canProcess || !monthOk || blockedByActive}
+          loading={mutation.isPending && savedId === null}
+          disabled={!canProcess || !monthOk || blockedByActive || mutation.isPending}
         >
           <span className="material-symbols-rounded" aria-hidden="true">
             add
