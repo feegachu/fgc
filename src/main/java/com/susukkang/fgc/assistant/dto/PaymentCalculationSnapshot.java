@@ -15,7 +15,7 @@ public record PaymentCalculationSnapshot(
         OffsetDateTime calculatedAt,
         @Schema(types = {"object", "null"}, description = "Always null in snapshot-only phase; not a server proof") Object validity, List<CalculationLine> lines) {
     @Schema(name="AssistantCalculationLine")
-    public record CalculationLine(String sourceId, String contractId, String commissionItemId, String beneficiaryAgentId, Integer installmentNo, String attributionDate, String dueDate, String basisCode, String basisAmount, String calculationType, String ratePct, String expectedAmount, String ruleId, String status) {}
+    public record CalculationLine(String sourceId, String contractId, String commissionItemId, String beneficiaryAgentId, Integer installmentNo, String attributionDate, String dueDate, String basisCode, String basisAmount, String calculationType, String ratePct, String expectedAmount, String ruleId, String status, String cashflowType) {}
     public PaymentCalculationSnapshot(String calculationId, String kind, String mode, String status, long clientRevision,
             boolean synthetic, boolean snapshotOnly, String evidenceKind, String currency, String paymentStatus,
             Map<String,String> resolvedScope, Map<String,String> amounts, List<Map<String,Object>> capPreview,
