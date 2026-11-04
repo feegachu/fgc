@@ -1403,7 +1403,7 @@ export interface paths {
         get: operations["get"];
         /**
          * DRAFT 수수료 지급 건 수정
-         * @description DRAFT 지급 건의 필수값과 참조 정보를 검증한 후 변경 내용을 저장합니다.
+         * @description expectedUpdatedAt으로 동시 수정을 검사한 뒤 DRAFT 지급 건의 필수값과 참조 정보를 검증해 변경 내용을 저장합니다.
          */
         put: operations["update"];
         post?: never;
@@ -3077,6 +3077,8 @@ export interface components {
             /** Format: int64 */
             contractId?: number;
             evidenceRef?: string;
+            /** Format: date-time */
+            expectedUpdatedAt: string;
             note?: string;
             /** @enum {string} */
             paymentStage: "INSURER_TO_GA" | "GA_TO_FC";
@@ -7936,7 +7938,7 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
                 };
             };
-            /** @description 필수값·귀속·증빙 검증 실패 */
+            /** @description 필수값·귀속·증빙·expectedUpdatedAt 검증 실패 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7954,7 +7956,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description DRAFT가 아니거나 자연키 중복 */
+            /** @description DRAFT가 아니거나 자연키 중복, 수정 시각 충돌(FGC-TRAN-010) */
             409: {
                 headers: {
                     [name: string]: unknown;
