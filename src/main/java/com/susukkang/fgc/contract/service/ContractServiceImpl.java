@@ -48,6 +48,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
@@ -151,8 +152,9 @@ public class ContractServiceImpl implements ContractService {
                 .orElseThrow(() -> validationException("contractId", "존재하지 않는 보험계약입니다."));
     }
 
+    // 작업 상태, 처리 이력, 영향 건수를 한 시점으로 읽는다. 조회 중 worker가 끝나도 성공 행에 이전 시점의 0건이 붙지 않는다.
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<ContractStatusEventResponse> selectStatusEventsByContractId(Long contractId) {
         agentScope.requireContract(contractId);
         // 1. 계약 존재 확인

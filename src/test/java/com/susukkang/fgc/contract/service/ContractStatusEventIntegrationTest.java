@@ -65,6 +65,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -550,8 +551,7 @@ class ContractStatusEventIntegrationTest {
         data(put(id, update(id, ACTIVE, event(AUG_1.plusDays(3))), UUID.randomUUID().toString()).andExpect(status().isOk()));
 
         // 잡기만 커밋한 작업: 재시도 시각 전이면 처리 중, 시각이 지나면(중단) 다시 대기다.
-        new TransactionTemplate(transactionManager)
-                .execute(tx -> jobRepository.claimNext(ContractStatusFollowUpService.MAX_ATTEMPTS));
+        claimUntil(unpaid);
         statusEvents(id)
                 .andExpect(jsonPath("$.data[1].followUp.status").value("PROCESSING"))
                 .andExpect(jsonPath("$.data[1].followUp.jobs[0].attemptCount").value(1));
@@ -574,6 +574,92 @@ class ContractStatusEventIntegrationTest {
         statusEvents(id)
                 .andExpect(jsonPath("$.data[1].followUp.status").value("EXHAUSTED"))
                 .andExpect(jsonPath("$.data[1].followUp.jobs[0].errorCode").value("X"));
+    }
+
+    @Test
+    @DisplayName("IF-API-16은 진행 중인 재시도와 마지막 시도를 소진이 아니라 처리 중으로 보이고, 마지막 시도가 실패로 끝나야 소진이다")
+    void lastAttemptIsProcessingUntilItEnds() throws Exception {
+        Long id = newContract();
+        processor.supported = EnumSet.of(UNPAID);
+        long eventId = data(put(id, update(id, UNPAID, event(AUG_1)), UUID.randomUUID().toString())
+                .andExpect(status().isOk())).path("statusEventId").asLong();
+        failedAttempts(eventId, ContractStatusFollowUpService.MAX_ATTEMPTS - 1);
+        statusEvents(id).andExpect(jsonPath("$.data[1].followUp.status").value("FAILED"));
+
+        // 마지막 시도를 잡은 직후: 저장 상태는 이전 실패의 FAILED이고 시도 횟수는 한도지만 아직 결과가 없다. 재조회가 멈추면 안 된다.
+        claimUntil(eventId);
+        statusEvents(id)
+                .andExpect(jsonPath("$.data[1].followUp.status").value("PROCESSING"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].attemptCount").value(ContractStatusFollowUpService.MAX_ATTEMPTS));
+
+        // 선점 시각이 지나도록 결과가 없으면(중단) 더는 잡히지 않으므로 소진이다.
+        jdbc.update("UPDATE fgc.contract_event_job SET next_retry_at = clock_timestamp() WHERE contract_status_event_id = ?",
+                eventId);
+        statusEvents(id).andExpect(jsonPath("$.data[1].followUp.status").value("EXHAUSTED"));
+
+        // 실제 worker가 마지막 시도에서 실패하면 바로 소진이다. 재시도 시각이 미래여도 처리 중으로 남지 않는다.
+        Long other = newContract();
+        processor.failuresLeft.set(10);
+        long otherEvent = data(put(other, update(other, UNPAID, event(AUG_1)), UUID.randomUUID().toString())
+                .andExpect(status().isOk())).path("statusEventId").asLong();
+        failedAttempts(otherEvent, ContractStatusFollowUpService.MAX_ATTEMPTS - 1);
+        followUps.runDueJobs();
+        assertThat(count("SELECT attempt_count FROM fgc.contract_event_job WHERE contract_status_event_id = ?", otherEvent))
+                .isEqualTo(ContractStatusFollowUpService.MAX_ATTEMPTS);
+        statusEvents(other)
+                .andExpect(jsonPath("$.data[1].followUp.status").value("EXHAUSTED"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].errorCode").value("IllegalStateException"));
+    }
+
+    @Test
+    @DisplayName("IF-API-16은 조회 중간에 worker가 끝나도 작업 상태, 처리 이력, 영향 건수를 한 시점으로 읽는다")
+    void statusHistoryReadsOneSnapshotWhileTheWorkerFinishes() throws Exception {
+        Long id = newContract();
+        processor.supported = EnumSet.of(UNPAID);
+        put(id, update(id, UNPAID, event(AUG_1)), UUID.randomUUID().toString()).andExpect(status().isOk());
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        doAnswer(invocation -> {
+            Object jobs = invocation.callRealMethod();
+            // 작업 행을 읽은 뒤 처리 이력을 읽기 전에 worker가 성공을 커밋한다.
+            worker.submit(followUps::runDueJobs).get(30, TimeUnit.SECONDS);
+            return jobs;
+        }).when(jobRepository).findByContract(any(), anyInt());
+        try {
+            // 같은 시점이면 아직 끝나지 않은 사건이다. 성공 행에 0건 요약이 붙어 보이면 안 된다.
+            statusEvents(id)
+                    .andExpect(jsonPath("$.data[1].followUp.status").value("PENDING"))
+                    .andExpect(jsonPath("$.data[1].processings").isEmpty());
+            statusEvents(id)
+                    .andExpect(jsonPath("$.data[1].followUp.status").value("SUCCEEDED"))
+                    .andExpect(jsonPath("$.data[1].processings[0].summary.changedScheduleLines").value(1));
+        } finally {
+            worker.shutdownNow();
+        }
+    }
+
+    /** 잡기만 커밋하고 멈춘 worker. 앞 테스트의 작업이 그사이 재시도 시각이 되어 먼저 잡혀도 이 사건의 작업까지 잡는다. */
+    private void claimUntil(long eventId) {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        Optional<ContractEventJobRepository.JobKey> claimed;
+        do {
+            claimed = transaction.execute(tx -> jobRepository.claimNext(ContractStatusFollowUpService.MAX_ATTEMPTS));
+            assertThat(claimed).isPresent();
+        } while (claimed.get().eventId() != eventId);
+    }
+
+    /** 앞선 시도가 모두 실패로 끝나고 재시도 시각이 된 작업. 실패 이력은 마지막 시도 뒤에 남는다. */
+    private void failedAttempts(long eventId, int attempts) {
+        jdbc.update("""
+                UPDATE fgc.contract_event_job
+                   SET state = 'FAILED', error_code = 'X', attempt_count = ?,
+                       last_attempt_at = clock_timestamp() - interval '2 minutes', next_retry_at = clock_timestamp()
+                 WHERE contract_status_event_id = ?
+                """, attempts, eventId);
+        jdbc.update("""
+                INSERT INTO fgc.contract_status_event_processing(contract_status_event_id, processing_job, processing_status,
+                    failure_reason, processed_at)
+                VALUES (?, ?, 'FAILED', 'X', clock_timestamp() - interval '1 minute')
+                """, eventId, RecordingProcessor.JOB);
     }
 
     @Test

@@ -126,16 +126,22 @@ public class ContractEventJobRepository {
     }
 
     /**
-     * IF-API-16: 계약의 후속 작업별 현재 상태와 영향 건수. 저장 상태만으로는 대기와 소진을 가를 수 없어 시도 횟수와 함께 판정한다.
-     * 소진은 claimNext가 더는 잡지 않는 작업이고, 처리 중은 잡은 뒤 결과가 없으며 재시도 시각 전인 작업이다(next_retry_at이 선점 시각을 겸한다).
+     * IF-API-16: 계약의 후속 작업별 현재 상태와 영향 건수. 저장 상태만으로는 대기, 처리 중, 소진을 가를 수 없어 시도 횟수와 이력으로 판정한다.
+     * 처리 중은 잡은 뒤 결과가 없는 시도다: 선점 시각 전(next_retry_at)이고 그 시도 뒤의 실패 이력이 없다. 재시도 중이면 저장 상태가 FAILED로 남아 있어 상태만 보면 안 된다.
+     * 소진은 그 다음에 본다. 마지막 시도가 끝나거나 선점 시각이 지나야 claimNext가 더는 잡지 않는 작업으로 확정된다.
      */
     public List<ContractEventJobRow> findByContract(Long contractId, int maxAttempts) {
         return jdbc.query("""
                 SELECT j.contract_status_event_id, j.processing_job, j.attempt_count, j.last_attempt_at, j.error_code,
                        CASE WHEN j.state = 'SUCCEEDED' THEN 'SUCCEEDED'
+                            WHEN j.attempt_count > 0 AND j.next_retry_at > clock_timestamp() AND NOT EXISTS (
+                                SELECT 1 FROM fgc.contract_status_event_processing p
+                                 WHERE p.contract_status_event_id = j.contract_status_event_id
+                                   AND p.processing_job = j.processing_job
+                                   AND p.processing_status = 'FAILED'
+                                   AND p.processed_at >= j.last_attempt_at) THEN 'PROCESSING'
                             WHEN j.attempt_count >= ? THEN 'EXHAUSTED'
                             WHEN j.state = 'FAILED' THEN 'FAILED'
-                            WHEN j.attempt_count > 0 AND j.next_retry_at > clock_timestamp() THEN 'PROCESSING'
                             ELSE 'PENDING' END AS follow_up_status,
                        CASE WHEN j.state <> 'SUCCEEDED' AND j.attempt_count < ? THEN j.next_retry_at END AS next_retry_at,
                        count(*) FILTER (WHERE f.entity_type = 'PAYMENT' AND f.next_state = 'HELD') AS held_payments,
