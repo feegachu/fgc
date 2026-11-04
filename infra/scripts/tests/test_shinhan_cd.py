@@ -184,7 +184,8 @@ class ReleaseTests(unittest.TestCase):
 
 class DeploymentTests(unittest.TestCase):
     def deploy(self, *, bad_revision=False, bad_digest=False, backup_failure=False, api_failure=False, public_failure=False,
-               unprotected_before="", unprotected_after="", agent_unset="f", demo_agent_pending="0", login_accepted=""):
+               unprotected_before="", unprotected_after="", agent_unset="f", demo_agent_pending="0", login_accepted="",
+               missing_accounts=""):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         base = pathlib.Path(directory.name)
@@ -224,6 +225,7 @@ if [[ "$*" == *'exec -T db psql'* ]]; then
     printf '%s' "$calls" > "$FIXTURES/protection-calls"
     printf 'protection-check\n' >> "$DEPLOY_LOG"
     if [[ "$calls" == 1 ]]; then printf '%s' "$UNPROTECTED_BEFORE"; else printf '%s' "$UNPROTECTED_AFTER"; fi
+  elif [[ "$sql" == *'FROM (VALUES'* ]]; then printf '%s' "$MISSING_ACCOUNTS"
   elif [[ "$sql" == *"password_hash = '!'"* ]]; then printf '%s' "$AGENT_UNSET"
   elif [[ "$sql" == *'flyway_schema_history'* ]]; then printf '%s' "$DEMO_AGENT_PENDING"
   fi
@@ -268,7 +270,7 @@ fi
                             "PUBLIC_FAILURE": str(int(public_failure)),
                             "UNPROTECTED_BEFORE": unprotected_before, "UNPROTECTED_AFTER": unprotected_after,
                             "AGENT_UNSET": agent_unset, "DEMO_AGENT_PENDING": demo_agent_pending,
-                            "LOGIN_ACCEPTED": login_accepted,
+                            "LOGIN_ACCEPTED": login_accepted, "MISSING_ACCOUNTS": missing_accounts,
                             "PYTHONUTF8": "1", "FGC_PUBLIC_URL": "https://example.com", "TEST_BIN": bin_dir.as_posix(), "TEST_HOME": home.as_posix()}
         bootstrap = 'if command -v cygpath >/dev/null; then export PATH="$(cygpath -u "$TEST_BIN"):/usr/bin:/bin"; export HOME="$(cygpath -u "$TEST_HOME")"; else export PATH="$TEST_BIN:/usr/bin:/bin"; fi; exec bash "$@"'
         result = subprocess.run([bash, "-c", bootstrap, "test", str(ROOT / "deploy-shinhan.sh"), str(promotion_path)],
@@ -340,6 +342,21 @@ fi
         self.assertIn("db-backup-path.txt", result.stderr)
         password = json.loads(release.published_logins(ROOT.parents[1])[0][1])["password"]
         self.assertNotIn(password, result.stdout + result.stderr + log)
+
+    def test_missing_demo_account_keeps_public_web_stopped(self):
+        result, state, log = self.deploy(missing_accounts="agent01")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stop web", log)
+        self.assertNotIn("up -d --force-recreate", log)
+        self.assertNotIn("login ", log)
+        self.assertFalse((state / "current.json").exists())
+        self.assertIn("no row", result.stderr)
+        self.assertIn("agent01", result.stderr)
+
+    def test_missing_accounts_sql_names_every_seed_account(self):
+        sql = release.missing_accounts_sql()
+        for name in release.SEED_ACCOUNTS:
+            self.assertIn(f"('{name}')", sql)
 
     def test_wrong_revision_never_mutates_deployment(self):
         result, state, log = self.deploy(bad_revision=True)
