@@ -964,6 +964,7 @@ FGC — 설계사
 | 귀속행 추가 | 표에 줄 추가                              |
 | 사전검증    | 저장하지 않고 한도만 미리 계산해 ③에 표시 |
 | 확정        | 위 6단계 전부 통과해야 성공               |
+| 최신 지급 건 다시 불러오기 | 저장이 충돌했을 때만 표시. 확인 창에서 고르면 입력을 최신 지급 건으로 바꿉니다 |
 
 **막아야 할 것 — 여기가 핵심입니다**
 
@@ -976,6 +977,7 @@ FGC — 설계사
 | 근거 없이 "제외" 선택            | 증빙 칸이 비면 저장 버튼 비활성                                        |
 | 확정된 건의 금액 수정            | 수정 버튼을 숨깁니다. 고치려면 취소 후 새로 만듭니다                   |
 | 초년도 지급을 13회차로 미뤄 적기 | 귀속일 기준으로 판정하므로 회차만 바꿔도 소용없습니다                  |
+| 오래된 화면으로 다른 사람의 수정 덮어쓰기 | 서버가 409로 거부(`FGC-TRAN-010`). 입력은 그대로 두고 최신 지급 건을 다시 불러오도록 안내합니다 (#753, SRC-028, SRC-067) |
 
 **초년도 경계 규칙 (헷갈리는 부분)**
 
@@ -993,7 +995,7 @@ FGC — 설계사
 
 - 쓰기: `commission_transaction`, `transaction_attribution`
 - 검증 시 생성: `cap_check`(`check_kind='PRE_CONFIRM'`), `cap_check_detail`, `exception_case`
-- API: `POST /api/v1/transactions` (작성중 저장) / `POST /api/v1/transactions/{id}/confirm` (확정)
+- API: `POST /api/v1/transactions` (작성중 저장) / `PUT /api/v1/transactions/{id}` (작성중 수정, `expectedUpdatedAt` 필수) / `POST /api/v1/transactions/{id}/confirm` (확정)
 
 **관련 요구사항** FUN-065, FUN-031, FUN-033, FUN-034 / REG-08·09·11·20·21
 
