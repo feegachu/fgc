@@ -1,4 +1,5 @@
 import { policyCodeLabel } from './labels'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useContext, useRef, useState } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
 import { ApiError } from '../../lib/api/client'
@@ -92,6 +93,7 @@ export function PolicyManagement({
   ]
   return (
     <div className="policy-management">
+      <ScreenHelp screenId="POL-W01" variant="management" />
       <header className="policy-detail-hero">
         <div>
           <h2>{policy.policyName ?? '정책명 자료 없음'}</h2>
@@ -168,7 +170,7 @@ export function PolicyManagement({
           <dd>{policySeedText(detail.approvalEvidenceRef)}</dd>
         </div>
       </dl>
-      <div className="policy-action-bar">
+      <div data-guide-target="policy.actions" className="policy-action-bar">
         <p>
           {refreshing
             ? '최신 정책을 불러오는 중입니다.'
@@ -317,7 +319,8 @@ export function PolicySources({
     </EvidenceLink>
   )
   return (
-    <div className="policy-sources">
+    <div data-guide-target="policy.sources" className="policy-sources">
+      <ScreenHelp screenId="POL-W01" variant="sources" />
       <div className="policy-section-heading">
         <h3>정책 근거 자료</h3>
         <span>{sources.length + missing.length}건</span>

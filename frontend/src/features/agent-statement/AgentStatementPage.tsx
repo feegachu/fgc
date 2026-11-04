@@ -14,6 +14,7 @@ import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
 import { policyCodeLabel } from '../policies/labels'
 import { sourceOptions } from '../transaction/list-api'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import {
   ENTRY_TYPE_OPTIONS,
   InvalidStatementAgentIdError,
@@ -161,6 +162,7 @@ export default function AgentStatementPage() {
   return (
     <div className="ast-page">
       <header className="page-header">
+        <ScreenHelp screenId="RPT-W02" />
         <div className="page-header-copy">
           <h1 className="page-title">설계사 수수료 명세</h1>
           <p className="ast-lede">
@@ -188,7 +190,7 @@ export default function AgentStatementPage() {
         <>
           <SummaryCards
             summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />
-          <section data-guide-feature="features.agent-statement.agent-statement-page.list-panel" className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
+          <section data-guide-feature="features.agent-statement.agent-statement-page.list-panel" data-guide-target="statement.results" className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
             <header className="surface-header">
               <h2 className="surface-title" id="ast-list-title">
                 명세 내역
@@ -429,7 +431,7 @@ function StatementFiltersBar({
     </>
   )
   return (
-    <FilterBar
+    <FilterBar data-guide-target="statement.filters"
       className="ast-filter"
       wrapFields={false}
       icons

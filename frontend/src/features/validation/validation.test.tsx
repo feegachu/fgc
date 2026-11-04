@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -113,12 +113,12 @@ function renderAt(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   clients.push(client)
   const router = createMemoryRouter(routes, { basename: '/app/', initialEntries: [path] })
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, actions: userEvent.setup(), client, unmount: view.unmount }
 }
 const calls = (key: string) =>
   vi
@@ -522,6 +522,102 @@ it('재시작 수락 후 새 시도가 없으면 자동 조회를 멈추고 수�
   expect(calls('POST /api/v1/validation-runs/7/restart')).toHaveLength(1)
 }, 15000)
 
+it('finalize help rejects a non-FINALIZED response and waits for acknowledgement after retry', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  currentUser = gaAdmin
+  detailHandlers()
+  let attempts = 0
+  const keys: (string | undefined)[] = []
+  handlers['POST /api/v1/validation-runs/7/finalize'] = (_path, init) => {
+    keys.push(init?.idempotencyKey)
+    return { status: ++attempts === 1 ? 'COMPLETED' : 'FINALIZED' }
+  }
+  const { actions } = renderAt('/app/validation-runs/7')
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  const modal = within(await screen.findByRole('dialog', { name: '이 검증 실행을 확정할까요?' }))
+  await actions.click(modal.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(modal.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(modal.getByRole('button', { name: '다음' }))
+  expect(attempts).toBe(0)
+  expect(modal.getByRole('button', { name: '다음' })).toBeDisabled()
+  await actions.click(modal.getByRole('button', { name: '확정' }))
+  await modal.findByText('서버의 최종 확정 상태를 확인하지 못했습니다.')
+  expect(modal.getByRole('button', { name: '다음' })).toBeDisabled()
+  await actions.click(modal.getByRole('button', { name: '확정' }))
+  await waitFor(() => expect(modal.getByRole('button', { name: '다음' })).toBeEnabled())
+  expect(screen.queryByRole('dialog', { name: '확정했습니다' })).toBeNull()
+  await actions.click(modal.getByRole('button', { name: '다음' }))
+  expect(await modal.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+  await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
+  expect(await screen.findByRole('dialog', { name: '확정했습니다' })).toBeVisible()
+  expect(keys[0]).toBe(keys[1])
+})
+
+it('invalidates a finalized run even if its page unmounts before the response', async () => {
+  currentUser = gaAdmin
+  detailHandlers()
+  let finish!: (value: unknown) => void
+  handlers['POST /api/v1/validation-runs/7/finalize'] = () => new Promise(resolve => { finish = resolve })
+  const { actions, client, unmount } = renderAt('/app/validation-runs/7')
+  client.setQueryData(['validation-runs', 'receipt-test'], { status: 'COMPLETED' })
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  await actions.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  unmount()
+  await act(async () => finish({ status: 'FINALIZED' }))
+  await waitFor(() => expect(client.getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
+})
+
+it('the detail help waits for the real finalization result before completing', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  currentUser = gaAdmin
+  detailHandlers()
+  handlers['POST /api/v1/validation-runs/7/finalize'] = () => ({ status: 'FINALIZED' })
+  const { actions } = renderAt('/app/validation-runs/7?month=2026-07')
+  await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(await screen.findByRole('button', { name: '도움말' }))
+  const next = () => screen.getByRole('button', { name: '다음' })
+  for (let i = 0; i < 3; i++) { await waitFor(() => expect(next()).toBeEnabled()); await actions.click(next()) }
+  expect(next()).toBeDisabled()
+  expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
+  await actions.click(screen.getByRole('button', { name: '확정' }))
+  await actions.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정' }))
+  const done = await screen.findByRole('dialog', { name: '확정했습니다' })
+  await actions.click(within(done).getByRole('button', { name: '확인' }))
+  await waitFor(() => expect(next()).toBeEnabled())
+  await actions.click(next())
+  expect(await screen.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+}, 10000)
+
+it('invalidates a created run even if its page unmounts before the response', async () => {
+  handlers['GET /api/v1/validation-runs'] = () => listPage([])
+  handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+  let finish!: (value: unknown) => void
+  handlers['POST /api/v1/validation-runs'] = () => new Promise(resolve => { finish = resolve })
+  const { actions, client, unmount } = renderAt('/app/validation-runs')
+  const create = await screen.findByRole('button', { name: /실행 생성/ })
+  await waitFor(() => expect(create).toBeEnabled())
+  client.setQueryData(['validation-runs', 'receipt-test'], [])
+  await actions.click(create)
+  await waitFor(() => expect(finish).toBeDefined())
+  unmount()
+  await act(async () => finish({ validationRunId: 7, runNo: 2, status: 'CREATED' }))
+  await waitFor(() => expect(client.getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
+})
+
+it('does not allow finalizing a partial contract run even with a passed checklist', async () => {
+  currentUser = gaAdmin
+  detailHandlers()
+  handlers['GET /api/v1/validation-runs/7'] = () => detail(run({ runType: 'MANUAL_CONTRACT' }))
+  renderAt('/app/validation-runs/7')
+  expect(await screen.findByText('월 전체를 계산한 월간·확정전 실행만 최종 확정할 수 있습니다.')).toBeVisible()
+  expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+  expect(calls('POST /api/v1/validation-runs/7/finalize')).toHaveLength(0)
+})
+
 
 it('resolves tutorial overview and progress targets on a successful detail response', async () => {
   detailHandlers()
@@ -532,4 +628,27 @@ it('resolves tutorial overview and progress targets on a successful detail respo
   expect(overviewElement).toBeVisible()
   expect(overviewElement).toHaveTextContent('검증월')
   expect(document.querySelector(`[data-guide-feature="${progress.targetId}"]`)).toContainElement(screen.getByRole('heading', { name: /진행 단계/ }))
+})
+
+
+it('stops the creation spinner while help acknowledgement keeps duplicate submission blocked', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  handlers['GET /api/v1/validation-runs'] = () => listPage([])
+  handlers['GET /api/v1/validation-runs/active-monthly'] = () => ({ exists: false })
+  handlers['POST /api/v1/validation-runs'] = () => ({ validationRunId: 7, runNo: 2, status: 'CREATED' })
+  const { actions } = renderAt('/app/validation-runs?month=2026-07')
+  const create = await screen.findByRole('button', { name: /실행 생성/ })
+  await waitFor(() => expect(create).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '다음' }))
+  await waitFor(() => expect(screen.getByText('저장 가이드 · 2/2')).toBeVisible())
+  await actions.click(create)
+  await waitFor(() => expect(calls('POST /api/v1/validation-runs')).toHaveLength(1))
+  await waitFor(() => expect(create).not.toHaveAttribute('aria-busy', 'true'))
+  expect(create).toBeDisabled()
+  await actions.click(create)
+  expect(calls('POST /api/v1/validation-runs')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: '다음' })).toBeEnabled()
 })
