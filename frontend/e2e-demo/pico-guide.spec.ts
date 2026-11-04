@@ -33,9 +33,14 @@ for (const width of [1440, 390]) {
     const tutorial = page.getByRole('region', { name: '업무 안내', exact: true })
     await expect(tutorial.getByRole('heading', { name: '계약 검색', exact: true })).toBeVisible()
     await expect.poll(async () => {
-      const target = await page.locator('.payment-guide-spotlight').boundingBox()
+      const target = await page.locator('[data-guide-feature="contract.filter.input.contractno"]').boundingBox()
+      const highlight = await page.locator('.payment-guide-spotlight').boundingBox()
       const coach = await tutorial.boundingBox()
-      return target && coach ? Math.abs(coach.y - target.y - target.height - 16) : 999
+      // Measure both offsets from the actual input: 10px highlight and 24px coach gap.
+      return target && highlight && coach ? Math.max(
+        Math.abs(highlight.y + highlight.height - target.y - target.height - 10),
+        Math.abs(coach.y - target.y - target.height - 24),
+      ) : 999
     }).toBeLessThan(2)
     await expect(tutorial.getByRole('button', { name: '이전 안내' })).toBeDisabled()
     await tutorial.getByRole('button', { name: '확인했어요, 다음 안내' }).click()
