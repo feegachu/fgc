@@ -66,7 +66,7 @@ public class CompareAskService {
             Pattern.compile("[\\w.+-]++@[\\w-]++\\.\\w"));
     private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)", Pattern.CANON_EQ);
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
-    private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
+    private static final List<String> FORBIDDEN = CompareSummaryService.FORBIDDEN;
 
     private final LlmGateway llmGateway;
 
