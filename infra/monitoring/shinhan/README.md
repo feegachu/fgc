@@ -23,6 +23,8 @@
 - `secrets/grafana-password`: 운영 Grafana 관리자 비밀번호.
 - `secrets/discord-webhook-url`: 운영 Discord 채널의 Webhook URL. 신한 override는 `discord_configs`를 사용하며, generic webhook 형식을 Discord URL로 보내지 않는다. 장애 발생과 해제 알림 모두 전송한다.
 
+설정 압축을 `umask 077`로 풀었으면 컨테이너가 설정을 읽도록 마운트할 YAML/JSON 파일은 0644, Grafana provisioning/dashboard 디렉터리는 0755로 조정한다. 배포 루트와 secrets 디렉터리는 0700으로 유지한다.
+
 비밀값을 Git, 명령 출력, PR 본문에 남기지 않는다. 디렉터리와 파일은 운영 계정이 관리하고 컨테이너 실행 UID가 필요한 파일만 읽도록 권한을 설정한다. Docker 이미지별 UID가 달라 모든 파일을 일괄 600으로 두면 수집이 실패할 수 있다.
 
 ## API 활성화
@@ -72,3 +74,15 @@ Discord 서버 설정 → 연동(Integrations) → Webhooks → 새 Webhook 생�
 운영 서버의 `secrets/discord-webhook-url`에 URL만 한 줄로 저장한다. 실제 파일은 Git에서 제외되며 기본 미리보기 fixture 수신기와 별개다. 메시지에는 상태(FIRING/RESOLVED), 신한 prod, 경보명, 대상, 심각도, 배치명이 표시된다. 전송은 Alertmanager가 수행한다. Discord 채널에 접근할 수 있는 팀원이 확인하며 알림은 각자의 Discord 알림 설정을 따른다.
 
 수신 검증은 운영 앱을 중단하는 대신 식별 가능한 테스트 경보를 Alertmanager에 주입하고, 실제 채널에서 발생/해제 메시지를 모두 확인한다. 이 전송은 해당 채널에 연결하기로 승인한 배포 작업의 일부이며 실제 업무 장애 경보와 구분해야 한다. 배치 경보의 해제는 최근 실패 감지창 종료일 수 있어 재처리 성공 증거로 취급하지 않는다.
+
+## 운영 앱에 계측 코드가 아직 없는 경우
+
+기존 운영 앱을 feature 브랜치 이미지로 교체하지 않고 health 감시만 먼저 배포할 수 있다. 이 단계에서는 `fgc-health` 수집과 health 실패 경보 및 Discord 전송만 유효하다. JVM/HTTP/배치 패널의 데이터, 오류율/배치 실패 경보와 metrics 수집 실패 경보는 활성화되지 않는다.
+
+```bash
+docker compose -p fgc-monitoring -f compose.yaml -f shinhan/compose.yaml -f shinhan/health-only.override.yaml up -d
+```
+
+`deployment.json`에 `phase: health-only`를 기록한다. 이는 전체 #674 계측 완료 상태가 아니다. #674가 포함된 앱 이미지가 검증된 경로로 배포된 후 API에 프로필·토큰을 적용하고 인증 scrape 200을 확인한 다음, health-only override를 제외하여 Prometheus를 재생성한다. `--remove-orphans`나 데이터 볼륨 삭제는 필요 없다. 이후 두 수집 대상 UP 및 HTTP/JVM/DB/배치 지표와 Discord까지 재검증하고 phase를 갱신한다.
+
+배포 후 상태/시작/중지는 `bash shinhan/manage.sh ps`, `bash shinhan/manage.sh up -d`, `bash shinhan/manage.sh stop`을 사용하면 deployment.json의 현재 phase를 유지한다. 파일이 없거나 phase가 불명확하면 실행을 거부한다.
