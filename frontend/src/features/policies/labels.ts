@@ -1,3 +1,5 @@
+import { isDeveloperText } from '../../lib/screenText'
+
 // 운영정책서 제15조의 공식 직급명. BRANCH_MANAGER는 지사장이다.
 const agentRankLabels = {
   FC: '설계사',
@@ -11,6 +13,26 @@ export function policyAgentRankLabel(code?: string | null, paymentStage?: string
   if (code === null) return paymentStage === 'INSURER_TO_GA' ? '해당 없음(GA 수령)' : '-'
   if (code == null || code.trim() === '') return '-'
   return Object.hasOwn(agentRankLabels, code) ? agentRankLabels[code as keyof typeof agentRankLabels] : '확인 필요'
+}
+
+/** 정책 파라미터는 저장 키로 찾는다. 화면에는 저장 키와 코드값을 쓰지 않는다(SRC-074). */
+const parameterLabels: Record<string, string> = {
+  ARBITRAGE_EFFECTIVE_CONTRACT_DATE: '차익거래 적용 시작일',
+  ARBITRAGE_REFUND_ADDITION_MONTHS: '해약환급금 합산 기간(개월)',
+  ARBITRAGE_REFUND_ADDITION_BOUNDARY_INCLUSIVE: '기간 경계일 포함',
+  TOLERANCE_AMOUNT_KRW: '대사 허용오차(원)',
+  TOLERANCE_DAYS: '대사 허용오차(일)',
+  REFUND_RATE_BASIS: '환급률 적용 기준',
+}
+const parameterValueLabels: Record<string, string> = {
+  true: '예',
+  false: '아니오',
+  MONTHLY_EQUIVALENT_FIRST_PREMIUM_X12: '월납환산 초회보험료 × 12',
+}
+export const policyParameterLabel = (key: string) => parameterLabels[key] ?? '설정 항목'
+export function policyParameterValue(value: unknown) {
+  const text = String(value)
+  return parameterValueLabels[text] ?? (isDeveloperText(text) ? '확인 필요' : text)
 }
 
 const policyCodeLabels: Record<string, string> = {

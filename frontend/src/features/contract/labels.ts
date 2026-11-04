@@ -88,9 +88,9 @@ export const followUpEmptyEffects = {
 const followUpFailures: Record<string, string> = {
   'FGC-IMPL-POLICY_MISSING': '적용할 정책을 찾지 못했습니다',
 }
-/** errorCode는 서버 오류 코드 또는 예외 이름이다. 코드는 운영 담당이 찾을 수 있게 함께 보인다. */
+/** errorCode는 서버 오류 코드 또는 예외 이름이라 화면에 쓰지 않는다(화면정의서 공통규칙 10). 원문은 서버 로그와 처리 이력에 있다. */
 export const followUpFailureText = (code?: string | null) =>
-  !code ? '기록 없이 중단됨' : `${followUpFailures[code] ?? '시스템 오류'} (${code})`
+  !code ? '기록 없이 중단됨' : (followUpFailures[code] ?? '시스템 오류')
 
 /** 상태 사건 사유코드. 자유 사유가 없는 사건(계약 등록, 보험사 자료)에 대신 보인다. */
 export const eventReasonLabels: Record<string, string> = {

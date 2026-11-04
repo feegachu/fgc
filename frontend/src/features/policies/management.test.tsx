@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
+import { policyParameterLabel, policyParameterValue } from './labels'
 import { PolicySources } from './PolicyManagement'
 import { emptyDraft, emptyRegime, permittedActions, PolicyPreviewContext, refLabel, safeSourceUrl } from './management'
 import type { DraftDocument } from './management'
@@ -35,6 +36,16 @@ describe('policy UI boundaries', () => {
     )
     expect(refLabel('REG-08')).toBe('REG-08')
   })
+  it('정책 파라미터의 저장 키와 코드값을 화면 문구로 바꾼다', () => {
+    expect(policyParameterLabel('ARBITRAGE_EFFECTIVE_CONTRACT_DATE')).toBe('차익거래 적용 시작일')
+    expect(policyParameterLabel('NEW_KEY_FROM_SERVER')).toBe('설정 항목')
+    expect(policyParameterValue('MONTHLY_EQUIVALENT_FIRST_PREMIUM_X12')).toBe('월납환산 초회보험료 × 12')
+    expect(policyParameterValue(false)).toBe('아니오')
+    expect(policyParameterValue(36)).toBe('36')
+    expect(policyParameterValue('2026-03-01')).toBe('2026-03-01')
+    expect(policyParameterValue('NEW_VALUE_FROM_SERVER')).toBe('확인 필요')
+  })
+
   it('does not allow unsafe source links', () => {
     expect(safeSourceUrl('javascript:alert(1)')).toBeNull()
     expect(safeSourceUrl('https://user:password@example.com')).toBeNull()

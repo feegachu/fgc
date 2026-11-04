@@ -1,11 +1,13 @@
 /// <reference types="vite/client" />
-import type { Browser, Page, TestInfo } from '@playwright/test'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import type { Browser, Locator, Page } from '@playwright/test'
 import { matchPath } from 'react-router'
 import { canOpen, screens } from '../src/app/screens'
-import { mkdirSync, writeFileSync } from 'node:fs'
 import { test, expect, login, api, completeMonthly, sql } from './fixtures'
 
-// 실사용자 화면에 개발 용어나 코드가 드러나지 않는지 실제 서버와 실제 화면으로 고정한다 (#755).
+// 실사용자 화면에 개발 용어나 코드가 보이면 실패한다 (#755, SRC-074, 화면정의서 공통규칙 10).
+// 역할마다 갈 수 있는 모든 라우트를 돌고 목록은 첫 행의 상세까지 연다.
+// 저장, 실행, 확정 버튼은 누르지 않는다. 데이터는 시험 준비에서만 쓴다.
 const month = '2026-07'
 const accounts = [
   { role: 'SETTLEMENT', loginId: 'settle01' },
@@ -15,18 +17,30 @@ const accounts = [
   { role: 'AGENT', loginId: 'agent01' },
 ] as const
 
-const forbidden: { label: string; pattern: RegExp }[] = [
+const forbidden = [
   { label: '오류 코드', pattern: /\bFGC-[A-Z]+-[A-Z0-9_]+\b/g },
-  { label: 'enum 코드', pattern: /\b[A-Z]{2,}(?:_[A-Z0-9]+)+\b/g },
-  { label: '대문자 코드', pattern: /\b[A-Z]{3,}\b/g },
-  { label: '식별자', pattern: /\b[a-z]+[A-Z][A-Za-z0-9]*\b/g },
-  { label: '식별자', pattern: /\b[a-z]+_[a-z0-9_]+\b/g },
+  { label: '코드값', pattern: /\b[A-Z]{2,}(?:_[A-Z0-9]+)+\b/g },
+  { label: '코드값', pattern: /\b[A-Z]{3,}\b/g },
+  { label: '변수 이름', pattern: /\b[a-z]+[A-Z][A-Za-z0-9]*\b/g },
+  { label: '변수 이름', pattern: /\b[a-z]+_[a-z0-9_]+\b/g },
   { label: '빈 값', pattern: /\b(?:null|undefined|NaN)\b|\[object Object\]/g },
   { label: '개발 용어', pattern: /\w*Exception\b|\bSQL\b|jdbc|Flyway|watermark|tasklet|\bchunk\b/gi },
   { label: '스택 추적', pattern: /\bat [\w$.]+\([\w$.]+:\d+\)|\b(?:Type|Reference|Syntax)Error\b/g },
   { label: '내부 번호', pattern: /\b(?:FUN|IF-API|SRC|REG|TER|PER|DAR)-\d+/g },
   { label: '화면 ID', pattern: /\b[A-Z]{2,}-W\d\d\b/g },
 ]
+
+/** 사용자가 알아보는 대문자 단어. 두 글자(GA, FC, AI)는 코드값 검사에 걸리지 않는다. */
+const businessWords = new Map([
+  ['FGC', '제품명이자 계약번호, 조직코드의 앞머리'],
+  ['CSV', '내보내기 파일 형식'],
+  ['PDF', '환수 통지서 파일 형식'],
+  ['BEST', '포트폴리오 막대 표시, 누구나 읽는 말'],
+])
+/** 연도가 든 하이픈 코드: 정책코드(화면정의서 :2027 필수 업무 코드, 사용자가 입력한다)와 판매버전(:612). */
+const businessCode = /\b(?:[A-Z][A-Z0-9]*-)+20\d\d(?:-[A-Z0-9]+)*\b|\b20\d\d(?:-[A-Z0-9]+)+\b/g
+/** 코드 열을 요구하는 화면. 기준정보는 조직코드, 항목코드 등을 보여 주는 화면이다(화면정의서 :612~:616). */
+const codeScreens = new Set(['/base'])
 
 interface Finding {
   role: string
@@ -38,7 +52,6 @@ interface Finding {
 interface Visit {
   role: string
   route: string
-  url: string
   requests: number
   js: number
   css: number
@@ -47,191 +60,304 @@ interface Visit {
   api: number
   largestApi: { url: string; bytes: number } | null
   consoleErrors: string[]
-  note: string
 }
 
+const pathnameOf = (path: string) => new URL(path, 'http://fgc.test').pathname
 const routePattern = (pathname: string) =>
   screens.find((screen) => matchPath({ path: screen.path, end: true }, pathname))?.path ?? pathname
 
-function scanText(text: string, role: string, route: string, findings: Finding[]) {
+function scan(text: string, role: string, route: string, findings: Finding[]) {
+  const shown = text.replace(businessCode, ' ')
   for (const { label, pattern } of forbidden) {
-    for (const hit of text.matchAll(pattern)) {
+    for (const hit of shown.matchAll(pattern)) {
       const match = hit[0]
-      if (findings.some((f) => f.role === role && f.route === route && f.match === match)) continue
+      if (label === '코드값' && (businessWords.has(match) || codeScreens.has(route))) continue
+      if (findings.some((found) => found.role === role && found.route === route && found.match === match)) continue
       const at = hit.index ?? 0
-      findings.push({
-        role,
-        route,
-        label,
-        match,
-        context: text.slice(Math.max(0, at - 30), at + match.length + 30).replace(/\s+/g, ' '),
-      })
+      const context = shown.slice(Math.max(0, at - 30), at + match.length + 30).replace(/\s+/g, ' ')
+      findings.push({ role, route, label, match, context })
     }
   }
 }
 
 async function settle(page: Page) {
-  await page.waitForLoadState('networkidle').catch(() => undefined)
+  await page.waitForLoadState('networkidle')
   await page.waitForTimeout(150)
-  await page.waitForLoadState('networkidle').catch(() => undefined)
+  await page.waitForLoadState('networkidle')
 }
 
-async function visibleText(page: Page) {
-  return page.evaluate(() => {
+/** 눈에 보이는 글자 전부: 접힌 영역을 펼치고, 글자로 보이지 않는 아이콘 글꼴 이름은 뺀다. */
+const visibleText = (page: Page) =>
+  page.evaluate(() => {
     for (const details of document.querySelectorAll('details')) details.open = true
-    const attributes = [...document.querySelectorAll<HTMLElement>('[placeholder],[title]')].flatMap((element) => [
+    const icons = [...document.querySelectorAll<HTMLElement>('.material-symbols-rounded, .material-symbols-outlined')]
+    for (const icon of icons) icon.style.display = 'none'
+    const text = document.body.innerText
+    for (const icon of icons) icon.style.display = ''
+    const hints = [...document.querySelectorAll('[placeholder], [title]')].flatMap((element) => [
       element.getAttribute('placeholder') ?? '',
       element.getAttribute('title') ?? '',
     ])
-    return `${document.body.innerText}\n${attributes.join('\n')}`
+    return `${text}\n${hints.join('\n')}`
   })
-}
 
+let dumpNo = 0
 async function dump(page: Page, role: string, route: string, step: string) {
-  const name = `e2e-artifacts/screens/${role}${route.replace(/[^a-zA-Z0-9]+/g, '_')}-${step.replace(/[^\p{L}\p{N}]+/gu, '_')}`
+  const name = `e2e-artifacts/screens/${role}${route.replace(/[^a-zA-Z0-9]+/g, '_')}-${String(dumpNo++).padStart(4, '0')}-${step.replace(/[^\p{L}\p{N}]+/gu, '_')}`
   mkdirSync('e2e-artifacts/screens', { recursive: true })
   writeFileSync(`${name}.txt`, await visibleText(page))
   await page.screenshot({ path: `${name}.png`, fullPage: true }).catch(() => undefined)
 }
 
-async function walkRole(browser: Browser, baseURL: string, role: string, loginId: string, findings: Finding[], visits: Visit[]) {
+/** 첫 행의 상세를 연다. 첫 칸 버튼이나 행 클릭으로 선택하고, 행 안의 보기 버튼까지 누른다. */
+async function openFirstRow(page: Page, check: () => Promise<void>) {
+  const row = page.locator('main table tbody tr:not(:has(td.table-empty))').first()
+  if (!(await row.count())) return
+  const opener = row.locator('button.table-row-link').first()
+  if (await opener.count()) await opener.click()
+  else
+    await row.evaluate((tr: HTMLTableRowElement) => {
+      ;[...tr.cells].find((cell) => !cell.querySelector('a, button, input, select, summary'))?.click()
+    })
+  await settle(page)
+  await check()
+  const viewButton: Locator = page
+    .locator('main table tbody tr:not(:has(td.table-empty))')
+    .first()
+    .getByRole('button', { name: /보기|열기/ })
+    .first()
+  if (await viewButton.count()) {
+    await viewButton.click()
+    await settle(page)
+    await check()
+    await page.keyboard.press('Escape')
+  }
+}
+
+async function walkRole(
+  browser: Browser,
+  baseURL: string,
+  { role, loginId }: (typeof accounts)[number],
+  states: { path: string; label: string }[],
+  findings: Finding[],
+  visits: Visit[],
+) {
   const context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 1000 } })
   const page = await context.newPage()
   let current: Visit | null = null
-  const consoleErrors: string[] = []
+  const sizes: Promise<unknown>[] = []
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text())
+    if (message.type() === 'error') current?.consoleErrors.push(message.text())
   })
-  page.on('pageerror', (error) => consoleErrors.push(`pageerror: ${error.message}`))
-  const pending: Promise<unknown>[] = []
+  page.on('pageerror', (error) => current?.consoleErrors.push(error.message))
   page.on('response', (response) => {
     const visit = current
     if (!visit) return
     visit.requests += 1
-    const request = response.request()
-    const type = request.resourceType()
-    pending.push(
-      request
+    const type = response.request().resourceType()
+    sizes.push(
+      response
+        .request()
         .sizes()
         .then(({ responseBodySize }) => {
-          if (type === 'script') visit.js += responseBodySize
-          else if (type === 'stylesheet') visit.css += responseBodySize
-          else if (type === 'font') visit.font += responseBodySize
-          else if (type === 'image') visit.image += responseBodySize
+          const bytes = Math.max(0, responseBodySize)
+          if (type === 'script') visit.js += bytes
+          else if (type === 'stylesheet') visit.css += bytes
+          else if (type === 'font') visit.font += bytes
+          else if (type === 'image') visit.image += bytes
           else if (type === 'fetch' || type === 'xhr') {
-            visit.api += responseBodySize
-            if (!visit.largestApi || responseBodySize > visit.largestApi.bytes)
-              visit.largestApi = { url: new URL(response.url()).pathname, bytes: responseBodySize }
+            visit.api += bytes
+            if (!visit.largestApi || bytes > visit.largestApi.bytes)
+              visit.largestApi = { url: pathnameOf(response.url()), bytes }
           }
         })
         .catch(() => undefined),
     )
   })
-
   const begin = (route: string) => {
-    current = { role, route, url: '', requests: 0, js: 0, css: 0, font: 0, image: 0, api: 0, largestApi: null, consoleErrors: [], note: '' }
-    consoleErrors.length = 0
+    current = { role, route, requests: 0, js: 0, css: 0, font: 0, image: 0, api: 0, largestApi: null, consoleErrors: [] }
     return current
   }
-  const finish = async (visit: Visit) => {
-    await Promise.all(pending.splice(0))
-    visit.url = page.url()
-    visit.consoleErrors = [...new Set(consoleErrors)]
-    visits.push(visit)
+  const finish = async () => {
+    await Promise.all(sizes.splice(0))
+    if (current) visits.push(current)
     current = null
   }
 
-  const me = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/auth/me' && response.ok())
+  begin('/login')
+  const me = page.waitForResponse((response) => pathnameOf(response.url()) === '/api/v1/auth/me' && response.ok())
   await login(page, loginId, role === 'AGENT' ? `/agent-home?month=${month}` : `/?month=${month}`)
   const user = (await (await me).json()).data
   await settle(page)
-  const queue = screens.filter((screen) => canOpen(screen, user) && !screen.path.includes(':')).map((screen) => screen.path)
-  const seen = new Set<string>(queue)
+  await finish()
+
+  const allowed = (pathname: string) => {
+    const screen = screens.find((candidate) => candidate.path === routePattern(pathname))
+    return !!screen && canOpen(screen, user)
+  }
+  const visited = new Set<string>()
+  const queue: { path: string; label?: string }[] = screens
+    .filter((screen) => canOpen(screen, user) && !screen.path.includes(':'))
+    .map((screen) => ({ path: screen.path }))
+  // 첫 행으로는 안 보이는 상태는 처음 열 수 있는 역할이 한 번만 본다.
+  for (const state of states.splice(0)) (allowed(pathnameOf(state.path)) ? queue : states).push(state)
+  const enqueue = (path: string) => {
+    const pattern = routePattern(pathnameOf(path))
+    if (!allowed(pathnameOf(path)) || visited.has(pattern) || queue.some((item) => routePattern(pathnameOf(item.path)) === pattern)) return
+    queue.push({ path })
+  }
+  const followLinks = async () => {
+    const links = await page
+      .locator('main a[href]:not([download]):not([target=_blank])')
+      .evaluateAll((elements) => elements.map((element) => element.getAttribute('href') ?? ''))
+    for (const href of links) if (href.startsWith('/')) enqueue(href)
+    const here = pathnameOf(page.url())
+    visited.add(routePattern(here))
+    // 수정 화면은 링크가 아니라 버튼으로 열린다.
+    if (routePattern(here) === '/contracts/:id') enqueue(`${here}/edit`)
+  }
 
   while (queue.length) {
     const target = queue.shift()!
-    const visit = begin(routePattern(new URL(target, 'http://x').pathname))
-    const separator = target.includes('?') ? '&' : '?'
-    await page.goto(`${target.replace(/^\//, '')}${separator}month=${month}`)
+    const route = target.label ?? routePattern(pathnameOf(target.path))
+    begin(route)
+    const url = new URL(target.path, 'http://fgc.test')
+    url.searchParams.set('month', month)
+    await page.goto(`${url.pathname.slice(1)}${url.search}`)
     await settle(page)
-    scanText(await visibleText(page), role, visit.route, findings)
-    await dump(page, role, visit.route, 'list')
-
-    // 탭은 눌러야 내용이 보인다.
-    for (const tab of await page.locator('main [role=tab]').all()) {
-      await tab.click().catch(() => undefined)
-      await settle(page)
-      scanText(await visibleText(page), role, visit.route, findings)
+    let step = 0
+    const check = async () => {
+      scan(await visibleText(page), role, route, findings)
+      await dump(page, role, route, String(step++))
     }
-
-    // 첫 행의 상세
-    const row = page.locator('main table tbody tr:not(:has(td.table-empty))').first()
-    if (await row.count()) {
-      const opener = row.locator('button.table-row-link').first()
-      if (await opener.count()) {
-        await opener.click()
-        visit.note = '첫 행 버튼'
-      } else {
-        const opened = await row.evaluate((tr: HTMLTableRowElement) => {
-          const cell = [...tr.cells].find((td) => !td.querySelector('a,button,input,select,summary'))
-          cell?.click()
-          return Boolean(cell)
-        })
-        visit.note = opened ? '첫 행 칸' : ''
-      }
-      await settle(page)
-      scanText(await visibleText(page), role, visit.route, findings)
-      await dump(page, role, visit.route, 'row')
-      for (const tab of await page.locator('[role=tab]').all()) {
-        await tab.click().catch(() => undefined)
+    await check()
+    const clickTabs = async () => {
+      for (const tab of await page.locator('main [role=tab]').all()) {
+        await tab.click()
         await settle(page)
-        scanText(await visibleText(page), role, visit.route, findings)
-        await dump(page, role, visit.route, `tab-${(await tab.textContent().catch(() => '')) ?? ''}`)
+        await check()
       }
-    } else visit.note = '행 없음'
-
-    // 다른 라우트로 가는 링크는 라우트 패턴마다 한 번씩만 따라간다.
-    const links = await page
-      .locator('main a[href]:not([download]):not([target=_blank])')
-      .evaluateAll((elements) => elements.map((element) => (element as HTMLAnchorElement).getAttribute('href') ?? ''))
-    for (const href of links) {
-      if (!href.startsWith('/')) continue
-      const pattern = routePattern(new URL(href, 'http://x').pathname)
-      if (seen.has(pattern) || !screens.some((screen) => screen.path === pattern)) continue
-      seen.add(pattern)
-      queue.push(href)
     }
-    await finish(visit)
+    await clickTabs()
+    await followLinks()
+    const listRoute = routePattern(pathnameOf(page.url()))
+    await openFirstRow(page, check)
+    await followLinks()
+    if (routePattern(pathnameOf(page.url())) !== listRoute) await clickTabs()
+    await finish()
   }
+
+  // 떠 있는 안내도 같은 기준이다(SRC-074). 버튼이 없으면 시험이 실패해 빠뜨리지 않는다.
+  const home = role === 'AGENT' ? '/agent-home' : '/'
+  const overlays = role === 'AGENT' ? ['상품 추천 AI'] : ['전체 업무 가이드', /^업무 비서 AI 열기/]
+  for (const name of overlays) {
+    begin(`${home} (${String(name).replace(/[/^]/g, '')})`)
+    await page.goto(`${home.slice(1)}?month=${month}`)
+    await settle(page)
+    await page.getByRole('button', { name }).click()
+    await settle(page)
+    scan(await visibleText(page), role, current!.route, findings)
+    await dump(page, role, current!.route, 'overlay')
+    for (const tab of await page.locator('[role=dialog] [role=tab]').all()) {
+      await tab.click()
+      await settle(page)
+      scan(await visibleText(page), role, current!.route, findings)
+      await dump(page, role, current!.route, 'overlay-tab')
+    }
+    await finish()
+  }
+
+  const missing = screens.filter((screen) => canOpen(screen, user) && !visited.has(screen.path)).map((screen) => screen.path)
   await context.close()
+  return missing.map((path) => `${role} ${path}`)
 }
 
-test('역할별 전체 화면 언어 수집', async ({ page, browser, baseURL }, testInfo: TestInfo) => {
-  test.setTimeout(30 * 60_000)
-  await login(page)
-  // 실패 실행: 대상 선별 단계에 실제 DB 예외를 넣어 서버 실패 경로 전체를 통과시킨다.
-  sql(`CREATE FUNCTION fgc.e2e_fail_target() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'e2e forced failure'; END $$ LANGUAGE plpgsql;
-       CREATE TRIGGER e2e_fail_target BEFORE INSERT ON fgc.validation_target FOR EACH ROW EXECUTE FUNCTION fgc.e2e_fail_target();`)
-  const failed = await api(page, '/validation-runs', { validationMonth: month, runType: 'MONTHLY' })
-  await api(page, `/validation-runs/${failed.validationRunId}/execute`, {})
-  await expect
-    .poll(async () => (await api(page, `/validation-runs/${failed.validationRunId}/progress`)).status, { timeout: 120_000 })
-    .toBe('FAILED')
-  const progress = await api(page, `/validation-runs/${failed.validationRunId}/progress`)
-  mkdirSync('e2e-artifacts', { recursive: true })
-  writeFileSync('e2e-artifacts/screen-language-failed-progress.json', JSON.stringify(progress, null, 2))
-  writeFileSync('e2e-artifacts/screen-language-failed-audit.txt', sql(`SELECT action_code, reason FROM fgc.audit_log WHERE entity_type='VALIDATION_RUN' AND action_code LIKE 'VALIDATION_RUN_%' ORDER BY audit_log_id DESC LIMIT 5`))
-  sql(`DROP TRIGGER e2e_fail_target ON fgc.validation_target; DROP FUNCTION fgc.e2e_fail_target();`)
-  await completeMonthly(page, month)
-  sql("UPDATE fgc.app_user SET account_status='ACTIVE', password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'")
+const kb = (bytes: number) => (bytes / 1024).toFixed(1)
+function transferTable(visits: Visit[]) {
+  const rows = visits.map((visit) =>
+    [
+      visit.role,
+      visit.route,
+      visit.requests,
+      kb(visit.js),
+      kb(visit.css),
+      kb(visit.font),
+      kb(visit.image),
+      kb(visit.api),
+      visit.largestApi ? `${visit.largestApi.url} ${kb(visit.largestApi.bytes)}` : '-',
+      visit.consoleErrors.length,
+    ].join(' | '),
+  )
+  return [
+    '실서버 시험은 Vite 개발 서버를 쓴다. JS, CSS는 번들 전 크기이고 같은 역할이 이미 받은 파일은 0이다.',
+    '합격선이 아니라 기록이다(KB). 배포본 크기는 빌드 산출물로 따로 잰다.',
+    '',
+    '역할 | 라우트 | 요청 수 | JS | CSS | 글꼴 | 이미지 | API | 가장 큰 API 응답 | 콘솔 오류',
+    '--- | --- | --- | --- | --- | --- | --- | --- | --- | ---',
+    ...rows,
+  ].join('\n')
+}
+
+test('실사용자 화면에 개발 용어와 코드가 보이지 않고 콘솔 오류가 없다', async ({ page, browser, baseURL }, testInfo) => {
+  test.setTimeout(20 * 60_000)
   const findings: Finding[] = []
   const visits: Visit[] = []
-  for (const { role, loginId } of accounts) {
-    await walkRole(browser, baseURL!, role, loginId, findings, visits)
-  }
-  await testInfo.attach('screen-language-findings.json', { body: JSON.stringify(findings, null, 2), contentType: 'application/json' })
-  await testInfo.attach('screen-language-visits.json', { body: JSON.stringify(visits, null, 2), contentType: 'application/json' })
+
+  await page.goto('login')
+  await settle(page)
+  scan(await visibleText(page), '로그인 전', '/login', findings)
+
+  await login(page)
+  // 실패한 실행: 대상 선별 단계에 실제 DB 오류를 넣어 서버 실패 경로 전체를 지난다.
+  sql(`CREATE FUNCTION fgc.e2e_fail_target() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'e2e forced failure'; END $$ LANGUAGE plpgsql;
+       CREATE TRIGGER e2e_fail_target BEFORE INSERT ON fgc.validation_target FOR EACH ROW EXECUTE FUNCTION fgc.e2e_fail_target();`)
+  const failedRun = (await api(page, '/validation-runs', { validationMonth: month, runType: 'MONTHLY' })).validationRunId
+  await api(page, `/validation-runs/${failedRun}/execute`, {})
+  await expect
+    .poll(async () => (await api(page, `/validation-runs/${failedRun}/progress`)).status, { timeout: 120_000 })
+    .toBe('FAILED')
+  sql('DROP TRIGGER e2e_fail_target ON fgc.validation_target; DROP FUNCTION fgc.e2e_fail_target();')
+  // 사용자에게는 요청번호를 보이고 예외 원문은 그 요청번호로 서버 로그에서 찾는다.
+  const progress = await api(page, `/validation-runs/${failedRun}/progress`)
+  expect(progress.failureMessage).toBe(`2단계 처리 중 오류가 발생했습니다. 요청번호 ${progress.requestId}를 담당자에게 알려주세요.`)
+  await expect.poll(() => readFileSync('e2e-artifacts/backend.log', 'utf8')).toContain(`requestId=${progress.requestId}`)
+  expect(readFileSync('e2e-artifacts/backend.log', 'utf8')).toContain('e2e forced failure')
+
+  await completeMonthly(page, month)
+  // V64가 꺼 둔 계정이라 시험 뒤 되돌아가는 DB에서만 켠다.
+  sql("UPDATE fgc.app_user SET account_status='ACTIVE', password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'")
+
+  const column = (query: string) => sql(query).split('\n').filter(Boolean)
+  const state = (path: string) => ({ path, label: path })
+  const states = [
+    state(`/validation-runs/${failedRun}`),
+    state(`/agent/statements?agentId=${sql("SELECT agent_id FROM fgc.agent WHERE agent_code='A-FC-001'")}`),
+    ...column(
+      `(SELECT commission_transaction_id FROM fgc.commission_transaction WHERE status='DRAFT' ORDER BY 1 LIMIT 1)
+       UNION ALL (SELECT commission_transaction_id FROM fgc.commission_transaction WHERE status='CONFIRMED' ORDER BY 1 LIMIT 1)`,
+    ).map((id) => state(`/transactions/new?id=${id}`)),
+    ...column('SELECT DISTINCT exception_type FROM fgc.exception_case ORDER BY 1').map((type) => state(`/exceptions?type=${type}&status=`)),
+    ...column('SELECT max(policy_version_id) FROM fgc.policy_version GROUP BY policy_type ORDER BY 1').map((id) => state(`/policies?policyVersionId=${id}`)),
+    ...column('SELECT DISTINCT action_code FROM fgc.audit_log ORDER BY 1').map((action) => state(`/audit-logs?action=${action}`)),
+  ]
+
+  const missing: string[] = []
+  for (const account of accounts) missing.push(...(await walkRole(browser, baseURL!, account, states, findings, visits)))
+
+  const report = findings.map((found) => `${found.role} | ${found.route} | ${found.label} | ${found.match} | ${found.context}`)
+  const consoleErrors = visits.flatMap((visit) => visit.consoleErrors.map((text) => `${visit.role} | ${visit.route} | ${text}`))
+  const oversized = visits.filter((visit) => (visit.largestApi?.bytes ?? 0) > 1024 * 1024)
+  for (const visit of oversized)
+    testInfo.annotations.push({ type: 'API 응답 1MB 초과', description: `${visit.route} ${visit.largestApi?.url} ${kb(visit.largestApi?.bytes ?? 0)}KB` })
+  await testInfo.attach('화면 언어 일치 목록', { body: JSON.stringify(findings, null, 2), contentType: 'application/json' })
+  await testInfo.attach('라우트별 전송량', { body: transferTable(visits), contentType: 'text/markdown' })
+  mkdirSync('e2e-artifacts', { recursive: true })
   writeFileSync('e2e-artifacts/screen-language-findings.json', JSON.stringify(findings, null, 2))
   writeFileSync('e2e-artifacts/screen-language-visits.json', JSON.stringify(visits, null, 2))
-  expect(findings.length).toBeGreaterThanOrEqual(0)
+  writeFileSync('e2e-artifacts/screen-language-transfer.md', transferTable(visits))
+
+  expect.soft(missing, '역할이 열 수 있는데 돌지 못한 라우트').toEqual([])
+  expect.soft(states.map((item) => item.path), '어느 역할도 열지 못한 상태').toEqual([])
+  expect.soft(consoleErrors, '콘솔 오류').toEqual([])
+  expect(report, '화면에 보이는 개발 용어와 코드 (역할 | 라우트 | 종류 | 문자열 | 앞뒤 글)').toEqual([])
 })

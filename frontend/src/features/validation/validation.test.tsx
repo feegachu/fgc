@@ -160,6 +160,14 @@ describe('스텝 규칙', () => {
     expect(failureText('FGC-VRUN-003 | FGC-COMMON-500', 0)).toBe('처리 중 오류로 실패했습니다.')
     expect(failureText('FGC-VRUN-003 | 스케줄 회차가 중복되었습니다.', 3)).toBe('스케줄 회차가 중복되었습니다.')
     expect(failureText('배치가 실패했습니다', 8)).toBe('배치가 실패했습니다')
+    expect(failureText('journal_no 월간 일련번호 상한(99999) 초과, year=2026', 6)).toBe('6단계에서 실패했습니다.')
+    expect(failureText('validation_run 5 은 이미 기동됨(status=RUNNING)', 2)).toBe('2단계에서 실패했습니다.')
+    expect(failureText('could not execute statement [ERROR: e2e] | 원장 불균형 1건이 발견되었습니다.', 6)).toBe(
+      '원장 불균형 1건이 발견되었습니다.',
+    )
+    expect(failureText('2단계 처리 중 오류가 발생했습니다. 요청번호 20261104-abcdef를 담당자에게 알려주세요.', 2)).toBe(
+      '2단계 처리 중 오류가 발생했습니다. 요청번호 20261104-abcdef를 담당자에게 알려주세요.',
+    )
     expect(failureText(null, 4)).toBe('4단계에서 실패했습니다.')
   })
 })

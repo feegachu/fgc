@@ -157,7 +157,7 @@ export default function AgentStatementPage() {
         initial={filters}
         isAgent={isAgent}
         agents={(agents.data ?? []).map((row) => [String(row.agentId), `${row.agentCode} · ${row.agentName}`])}
-        items={(items.data ?? []).map((row) => [String(row.commissionItemId), `${row.itemCode} · ${row.itemName}`])}
+        items={(items.data ?? []).map((row) => [String(row.commissionItemId), row.itemName ?? '-'])}
         onSearch={(next) => apply({ ...next, contractNo: next.contractNo.trim(), page: 1 })}
         onReset={() => apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: filters.agentId })}
       />

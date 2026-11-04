@@ -99,15 +99,32 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(listRequest().get('action')).toBe('PAYMENT_DELETED')
   })
 
-  it('삭제에 따른 예외 종결 사유는 한글로 읽고 상세에서 원문을 보존한다', async () => {
+  it('삭제에 따른 예외 종결 사유는 한글로 읽고 코드가 든 원문은 화면에 보이지 않는다', async () => {
     const reason = '초안 삭제(PAYMENT_DELETED): 지급 9007199254740993의 지급 예정이 철회되어 종결'
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'EXCEPTION_ACTION', reason })])
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
     expect(
       await within(table).findByText('지급 초안 삭제로 종결, 지급 건 9007199254740993'),
     ).toBeInTheDocument()
+    await screen.findByText('지급 / 금액')
+    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent('PAYMENT_DELETED')
+  })
+
+  it('사용자가 쓴 사유는 문장 부호만 바꿔 보이고 상세에서 원문을 보존한다', async () => {
+    const reason = '금액 정정 — 담당자 확인 완료'
+    renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'EXCEPTION_ACTION', reason })])
     await screen.findByText('사유 원문 보기')
     expect(document.querySelector('.audit-reason-original')).toHaveTextContent(reason)
+  })
+
+  it('옛 실행 실패 사유에 남은 예외 원문은 화면에 올리지 않는다', async () => {
+    const reason = 'JDBC exception executing SQL [WITH eligible_contract AS (SELECT ic.contract_id)]'
+    renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'VALIDATION_RUN_FAILED', reason })])
+    const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
+    expect(await within(table).findByText('월 통합검증 실패, 원인은 서버 로그에 있습니다')).toBeInTheDocument()
+    await screen.findByText('지급 / 금액')
+    expect(document.body).not.toHaveTextContent('eligible_contract')
   })
 
   it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 행위자가 없으면 자동 처리로 보인다', async () => {
@@ -259,7 +276,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(await screen.findByText('시작')).toBeInTheDocument()
   })
 
-  it('단계 진행과 분개 자동 사유를 한글로 표시하고 상세에서 원문과 큰 식별자를 보존한다', async () => {
+  it('단계 진행과 분개 자동 사유를 한글로 표시하고 큰 식별자를 보존하며 코드 원문은 보이지 않는다', async () => {
     const stepReason = 'MonthlyValidationJob advanced to step 7'
     const draftReason =
       'journalType=CONFIRMED_FC_PAYOUT,sourceEntityType=COMMISSION_TRANSACTION,sourceEntityId=9007199254740993,validationRunId=42'
@@ -276,11 +293,13 @@ describe('AUDT-W01 감사로그 조회', () => {
     ).toBeInTheDocument()
     expect(within(table).queryByText(stepReason)).not.toBeInTheDocument()
     expect(within(table).queryByText(draftReason)).not.toBeInTheDocument()
-    await actions.click(screen.getByText('사유 원문 보기'))
-    expect(screen.getByText(stepReason)).toBeVisible()
+    await screen.findByText('지급 / 금액')
+    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent('MonthlyValidationJob')
     await actions.click(screen.getAllByRole('button', { name: '2026-08-16 10:00:07' })[1])
     await waitFor(() => expect(document.querySelector('.audit-diff-context')).toHaveTextContent('분개 초안 저장'))
-    expect(document.querySelector('.audit-reason-original')).toHaveTextContent(draftReason)
+    expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent('journalType')
   })
 
   it.each([

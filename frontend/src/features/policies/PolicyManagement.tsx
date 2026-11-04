@@ -1,4 +1,4 @@
-import { policyCodeLabel } from './labels'
+import { policyCodeLabel, policyParameterLabel, policyParameterValue } from './labels'
 import { useContext, useRef, useState } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
 import { ApiError } from '../../lib/api/client'
@@ -563,7 +563,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
         return (
           <article className="policy-condition-card" key={parameter.key}>
             <header>
-              <h4>{option?.label ?? parameter.key}</h4>
+              <h4>{option?.label ?? policyParameterLabel(parameter.key)}</h4>
               <StatusBadge tone="info">지급조건</StatusBadge>
             </header>
             <strong>
@@ -571,7 +571,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
                 ? '설정 필요'
                 : option?.value === parameter.value
                   ? option.valueLabel
-                  : String(parameter.value)}
+                  : policyParameterValue(parameter.value)}
             </strong>
             <p>{parameter.description}</p>
           </article>
