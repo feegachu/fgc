@@ -9,6 +9,11 @@ import urllib.parse
 
 REGISTRY = "ghcr.io/feegachu/fgc"
 MAX_MANIFEST = 64 * 1024
+# Demo accounts whose seed passwords are published in this repository (seed spec section 5, SRC-065).
+SEED_ACCOUNTS = ("admin", "gaadmin", "settle01", "audit01", "agent01")
+SEED_HASH = re.compile(r"'(\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53})'")
+# The Flyway checksum freezes V3, so its comment stays the record of the published password.
+SEED_PASSWORD = re.compile(r"비밀번호 \d+개 모두 (\S+)")
 
 
 def validate_release(value):
@@ -97,6 +102,34 @@ def public_origin(value):
     return "https://" + host, host
 
 
+def seed_hashes(root):
+    """BCrypt literals in the demo seed SQL. An account still holding one accepts the published demo password."""
+    found = set()
+    for folder in ("demo", "demo-agent"):
+        for path in sorted((pathlib.Path(root) / "src/main/resources/db" / folder).glob("*.sql")):
+            found.update(SEED_HASH.findall(path.read_text(encoding="utf-8")))
+    if not found:
+        raise ValueError("No published demo seed hashes found")
+    return sorted(found)
+
+
+def unprotected_sql(root):
+    """Login IDs that are ACTIVE and still hold a published seed hash; empty output means protected."""
+    accounts = ", ".join(f"'{name}'" for name in SEED_ACCOUNTS)
+    hashes = ", ".join(f"'{value}'" for value in seed_hashes(root))
+    return ("SELECT coalesce(string_agg(login_id, ',' ORDER BY login_id), '') FROM fgc.app_user "
+            f"WHERE login_id IN ({accounts}) AND account_status = 'ACTIVE' AND password_hash IN ({hashes});")
+
+
+def published_logins(root):
+    """(account, login body with the published demo password). The deploy sends each and requires a refusal."""
+    seed = pathlib.Path(root) / "src/main/resources/db/demo/V3__seed_demo_data.sql"
+    passwords = SEED_PASSWORD.findall(seed.read_text(encoding="utf-8"))
+    if len(passwords) != 1:
+        raise ValueError("Published demo password not found in V3")
+    return [(name, json.dumps({"loginId": name, "password": passwords[0]})) for name in SEED_ACCOUNTS]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -112,9 +145,17 @@ def main():
     p.add_argument("directory")
     p = commands.add_parser("origin")
     p.add_argument("url")
+    p = commands.add_parser("unprotected-sql")
+    p.add_argument("root")
+    p = commands.add_parser("published-logins")
+    p.add_argument("root")
     args = parser.parse_args()
     if args.command == "origin":
         print("\n".join(public_origin(args.url)))
+    elif args.command == "unprotected-sql":
+        print(unprotected_sql(args.root))
+    elif args.command == "published-logins":
+        print("\n".join(f"{name}\t{body}" for name, body in published_logins(args.root)))
     elif args.command == "promote":
         value = stage_promotion(args.bundle, args.release, args.build, args.jenkins_url)
         pathlib.Path(args.output).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
