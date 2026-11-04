@@ -68,6 +68,8 @@ cp "$release/compose.yaml" "$state/compose.yaml"
 cp "$release/release.env" "$state/release.env"
 cp "$release/nginx/"* "$state/nginx/"
 compose=(docker compose --project-directory "$state" --env-file "$state/.env" --env-file "$state/release.env" -f "$state/compose.yaml")
+# SRC-065: close the public entry first. The old web would otherwise proxy to the new API before the checks below pass.
+"${compose[@]}" stop web
 "${compose[@]}" up -d db api
 ready=0
 for n in $(seq 1 90); do
@@ -77,16 +79,30 @@ for n in $(seq 1 90); do
 done
 if [[ "$ready" != 1 ]]; then
     "${compose[@]}" logs --tail=120 api
-    echo 'API readiness failed; web was not upgraded'
+    echo 'API readiness failed; public web stays stopped'
     false
 fi
-# The running web already proxies to the new API, so a failed recheck closes the public entry (SRC-065).
 unprotected=$(python3 "$helper" unprotected-sql "$root" | db_query)
 if [[ -n "$unprotected" ]]; then
-    "${compose[@]}" stop web
-    echo "Demo accounts accept a published seed password after migration: $unprotected. Public web stopped; protect them and rerun (SRC-065)." >&2
+    echo "Demo accounts accept a published seed password after migration: $unprotected. Public web stays stopped; protect them and rerun (SRC-065)." >&2
     false
 fi
+# SRC-065: the hash check misses a published password hashed again, and an unknown account's 401 proves nothing.
+# Each demo account must refuse it. A same-origin request reaches the API directly while the web is stopped;
+# bodies go through stdin, so the password reaches neither argv nor this log.
+refused_by_api() {
+    local code
+    code=$(curl --connect-timeout 3 --max-time 15 -sS -o /dev/null -w '%{http_code}' \
+        -X POST http://127.0.0.1:18081/api/v1/auth/login -H 'Origin: http://127.0.0.1:18081' \
+        -H 'Content-Type: application/json' -H 'X-FGC-Client: web' -d @- <<< "$1")
+    [[ "$code" == 401 ]]
+}
+while IFS=$'\t' read -r account body; do
+    if ! refused_by_api "$body"; then
+        echo "Published seed password was not refused for $account. Public web stays stopped; protect it and rerun (SRC-065)." >&2
+        false
+    fi
+done <<< "$published_logins"
 "${compose[@]}" run --rm -T --no-deps web nginx -t
 "${compose[@]}" up -d --force-recreate --no-deps web
 check_http() {
@@ -99,28 +115,18 @@ check_http() {
     echo "HTTP check failed: $url HTTP=$code (expected $expected)" >&2
     return 1
 }
-unknown_login='{"loginId":"__shinhan_deploy_probe__","password":"x"}'
 check_login() {
-    local base=$1 body=$2 code
+    local base=$1 code
     code=$(curl --connect-timeout 3 --max-time 15 -sS -o /dev/null -w '%{http_code}' \
         -X POST "$base/api/v1/auth/login" -H "Host: $domain" -H "Origin: $origin" \
         -H 'Content-Type: application/json' -H 'X-FGC-Client: web' \
-        -d @- <<< "$body")
+        -d '{"loginId":"__shinhan_deploy_probe__","password":"x"}')
     [[ "$code" == 401 ]] || { echo "Token login route HTTP=$code (expected 401)"; return 1; }
 }
 check_http http://127.0.0.1/login 200
-check_login http://127.0.0.1 "$unknown_login"
-# SRC-065: the hash check misses a published password hashed again, and an unknown account's 401 proves nothing.
-# Each demo account must refuse it. Bodies go through stdin, so the password reaches neither argv nor this log.
-while IFS=$'\t' read -r account body; do
-    if ! check_login http://127.0.0.1 "$body"; then
-        "${compose[@]}" stop web
-        echo "Published seed password was not refused for $account. Public web stopped; protect it and rerun (SRC-065)." >&2
-        false
-    fi
-done <<< "$published_logins"
+check_login http://127.0.0.1
 check_http "$origin/login" 200
-check_login "$origin" "$unknown_login"
+check_login "$origin"
 cp "$release/release.json" "$state/current.json"
 cp "$release/promotion.json" "$state/current-promotion.json"
 "${compose[@]}" ps

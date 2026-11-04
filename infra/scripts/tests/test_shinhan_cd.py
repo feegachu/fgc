@@ -241,6 +241,7 @@ if [[ "$*" == *'https://example.com/login'* && "$PUBLIC_FAILURE" == 1 ]]; then p
 elif [[ "$*" == *'/actuator/health'* ]]; then
   [[ "$API_FAILURE" == 0 ]] || exit 7
   printf '{"status":"UP"}'
+elif [[ "$*" != *'-d @-'* && "$*" == *'/api/v1/auth/login'* ]]; then printf 401
 elif [[ "$*" == *'/api/v1/auth/login'* ]]; then
   printf 'curl-args %s\n' "$*" >> "$DEPLOY_LOG"
   account=$(sed -E 's/.*"loginId": *"([^"]*)".*/\1/')
@@ -291,8 +292,11 @@ fi
         self.assertEqual(log.count("protection-check"), 2)
         self.assertIn("out-of-order=false", log)
         logins = [line.split()[1] for line in log.splitlines() if line.startswith("login ")]
-        self.assertEqual(logins, ["__shinhan_deploy_probe__", *release.SEED_ACCOUNTS, "__shinhan_deploy_probe__"])
-        self.assertLess(log.index("up -d --force-recreate"), log.index("login admin"))
+        self.assertEqual(logins, list(release.SEED_ACCOUNTS))
+        self.assertLess(log.index("stop web"), log.index("up -d db api"))
+        self.assertLess(log.index("up -d db api"), log.index("login admin"))
+        self.assertLess(log.index("login agent01"), log.index("up -d --force-recreate"))
+        self.assertIn("http://127.0.0.1:18081/api/v1/auth/login", log)
 
     def test_demo_agent_migrations_pending_enable_out_of_order_only_for_that_run(self):
         result, state, log = self.deploy(demo_agent_pending="3")
@@ -323,10 +327,11 @@ fi
         self.assertFalse((state / "current.json").exists())
         self.assertIn("db-backup-path.txt", result.stderr)
 
-    def test_published_password_login_not_refused_stops_public_web(self):
+    def test_published_password_login_not_refused_keeps_public_web_stopped(self):
         result, state, log = self.deploy(login_accepted="agent01")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("stop web", log)
+        self.assertNotIn("up -d --force-recreate", log)
         self.assertFalse((state / "current.json").exists())
         self.assertIn("refused for agent01", result.stderr)
         self.assertIn("db-backup-path.txt", result.stderr)
@@ -357,6 +362,7 @@ fi
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((state / "compose.yaml").read_text(), "old compose")
         self.assertNotIn("up -d", log)
+        self.assertNotIn("stop web", log)
 
     def test_api_failure_does_not_upgrade_web_or_mark_success(self):
         result, state, log = self.deploy(api_failure=True)
