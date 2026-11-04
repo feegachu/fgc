@@ -1,27 +1,29 @@
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { KpiCardContent } from '../../components/KpiCard'
-import { StatusBadge } from '../../components/StatusBadge'
 import { errorText, int } from '../../lib/format'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { useAuth } from '../auth/useAuth'
 import { NEED_CHECK_STATUSES } from '../contract/api'
-import { agentCommissionQuery, agentContractsQuery, agentInsurersQuery, agentProductsQuery } from './api'
+import { agentCapCountQuery, agentHomeQuery } from './api'
+import type { AgentHome } from './api'
 import { Donut, ProductBars, StatusBar, Trend } from './charts'
 import {
-  aggregate,
-  buildRows,
+  asOfForMonth,
   categoryCounts,
   deltaPercent,
   insurerSlices,
+  kindParam,
   monthStats,
+  periodParam,
   shiftMonth,
   statusCounts,
   trendSeries,
 } from './model'
-import type { InsurerKind, Period, Row } from './model'
+import type { InsurerKind, Period } from './model'
+import { PriorityContracts } from './PriorityContracts'
 import { ChatbotModal } from './chatbot/ChatbotModal'
 import './agent-home.css'
 import workflowGuides from '../assistant/workflow-guides.v1.json'
@@ -38,6 +40,8 @@ const KINDS: { value: InsurerKind; label: string }[] = [
   { value: 'LIFE', label: '생명' },
   { value: 'NON_LIFE', label: '손해' },
 ]
+type CountQuery = { data?: number; isError: boolean; refetch?: () => unknown }
+type FocusState = 'ready' | 'loading' | 'error'
 const periodLabel = (p: Period) => (p === 'all' ? '전체 기간' : `최근 ${p}개월`)
 const kindLabel = (k: InsurerKind) => (k === 'all' ? '전체 보험사' : k === 'LIFE' ? '생명보험' : '손해보험')
 
@@ -96,41 +100,40 @@ function Delta({ now, before }: { now: number; before?: number }) {
 }
 
 /** 카드의 건수와 같은 조건(이번 달 계약·한도 주의/위반/검토필요)으로 계약 목록을 연다. */
-const needContractsHref = (month: string) => {
-  const [year, mon] = month.split('-').map(Number)
-  const last = String(new Date(year, mon, 0).getDate()).padStart(2, '0')
+const needContractsHref = (month: string, asOf: string) => {
   const query = new URLSearchParams({
     capResultStatus: NEED_CHECK_STATUSES,
     contractDateFrom: `${month}-01`,
-    contractDateTo: `${month}-${last}`,
+    contractDateTo: asOf,
   })
   return `/contracts?${query.toString()}`
 }
 
 function AgentHomeContent({ month }: { month: string }) {
   const { user } = useAuth()
-  const contracts = useQuery(agentContractsQuery())
-  const insurers = useQuery(agentInsurersQuery())
-  const insurerIds = (insurers.data ?? []).flatMap((i) => (i.insurerId == null ? [] : [i.insurerId]))
-  const products = useQuery(agentProductsQuery(insurerIds, `${month}-01`))
-  const commission = useQuery(agentCommissionQuery(month))
-  const previousCommission = useQuery(agentCommissionQuery(shiftMonth(month, -1)))
+  const asOf = asOfForMonth(month)
   const [period, setPeriod] = useState<Period>(12)
   const [kind, setKind] = useState<InsurerKind>('all')
-  const [insurer, setInsurer] = useState<string | null>(null)
+  const [insurerId, setInsurerId] = useState<number | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
-  const closeChat = useCallback(() => setChatOpen(false), [])
+  const closeChat = () => setChatOpen(false)
 
-  // 보험사·상품 기준정보보다 먼저 그리면 생명·손해 구분과 보장 유형을 못 맞춰 그래프가 잠깐 틀리게 보인다.
-  const productsReady = insurerIds.length === 0 || products.data != null
-  const rows = useMemo(
-    () =>
-      contracts.data && insurers.data && productsReady
-        ? buildRows(contracts.data, insurers.data, products.data ?? [])
-        : null,
-    [contracts.data, insurers.data, products.data, productsReady],
-  )
-  const error = (contracts.error ?? insurers.error ?? products.error) as Error | null
+  // 지표·이번 달 수수료·확인할 계약은 필터와 무관한 기본 조회(12개월·전체 보험사)를 쓴다.
+  const summary = useQuery(agentHomeQuery({ asOf, period: '12', insurerType: 'ALL' }))
+  // 그래프는 선택한 기간·보험사 구분. 보험사를 고르면 그 보험사만 좁힌 조회를 하나 더 한다.
+  const chart = useQuery(agentHomeQuery({ asOf, period: periodParam(period), insurerType: kindParam(kind) }))
+  const focus = useQuery({
+    ...agentHomeQuery({ asOf, period: periodParam(period), insurerType: kindParam(kind), insurerId }),
+    enabled: insurerId != null,
+  })
+  const near = useQuery(agentCapCountQuery(month, asOf, 'WARNING,VIOLATION'))
+  const review = useQuery(agentCapCountQuery(month, asOf, 'REVIEW_REQUIRED'))
+  const error = (summary.error ?? chart.error) as Error | null
+  const chartData = chart.data
+  // 보험사를 고른 직후(이전 집계를 임시로 보여 주는 동안)나 조회 실패를 0건 차트로 그리지 않는다.
+  const focusState: FocusState =
+    insurerId == null ? 'ready' : focus.isError ? 'error' : focus.isPending || focus.isPlaceholderData ? 'loading' : 'ready'
+  const focusData = insurerId != null ? (focusState === 'ready' ? focus.data : undefined) : chartData
 
   return (
     <div className="ah">
@@ -156,12 +159,12 @@ function AgentHomeContent({ month }: { month: string }) {
           <button data-guide-feature="features.agent-home.agent-home-page.button-2"
             type="button"
             className="button button-secondary"
-            onClick={() => void Promise.all([contracts.refetch(), insurers.refetch(), products.refetch()])}
+            onClick={() => void Promise.all([summary.refetch(), chart.refetch()])}
           >
             다시 시도
           </button>
         </div>
-      ) : !rows ? (
+      ) : !summary.data || !chartData ? (
         <div className="empty-state" aria-busy="true">
           불러오는 중입니다.
         </div>
@@ -169,28 +172,28 @@ function AgentHomeContent({ month }: { month: string }) {
         <>
           <Snapshot
             month={month}
-            rows={rows}
+            home={summary.data}
             name={user?.userName ?? ''}
             launcher={<ChatbotLauncher open={chatOpen} onOpen={() => setChatOpen(true)} onClose={closeChat} />}
-            commission={commission}
-            previousCommission={previousCommission.data}
+            asOf={asOf}
+            near={near}
+            review={review}
           />
+          <PriorityContracts home={summary.data} />
           <Charts
-            month={month}
-            rows={rows}
-            insurers={insurers.data ?? []}
+            home={chartData}
+            focusHome={focusData}
+            focusState={focusState}
+            onRetryFocus={() => void focus.refetch()}
             period={period}
             kind={kind}
-            insurer={insurer}
+            insurerId={insurerId}
             onPeriod={setPeriod}
             onKind={(next) => {
               setKind(next)
-              if (insurer && next !== 'all') {
-                const match = (insurers.data ?? []).find((i) => i.insurerName === insurer)
-                if (match && match.insurerType !== next) setInsurer(null)
-              }
+              setInsurerId(null)
             }}
-            onInsurer={(name) => setInsurer((current) => (current === name ? null : name))}
+            onInsurer={(id) => setInsurerId((current) => (current === id ? null : id))}
           />
         </>
       )}
@@ -200,23 +203,29 @@ function AgentHomeContent({ month }: { month: string }) {
 
 function Snapshot({
   month,
-  rows,
+  home,
   name,
   launcher,
-  commission,
-  previousCommission,
+  asOf,
+  near,
+  review,
 }: {
   month: string
-  rows: Row[]
+  home: AgentHome
   name: string
   launcher: ReactNode
-  commission: { data?: number; isError: boolean; refetch: () => unknown }
-  previousCommission?: number
+  asOf: string
+  near: CountQuery
+  review: CountQuery
 }) {
-  const now = monthStats(rows, month)
-  const before = monthStats(rows, shiftMonth(month, -1))
+  const now = monthStats(home, month)
+  const before = monthStats(home, shiftMonth(month, -1))
   const countDelta = now.count - before.count
-  const need = now.near + now.review
+  const commission = home.myCommission
+  const expected = commission?.expected?.amount ?? 0
+  const needReady = near.data != null && review.data != null
+  const needFailed = near.isError || review.isError
+  const need = (near.data ?? 0) + (review.data ?? 0)
   return (
     <section data-guide-feature="features.agent-home.agent-home-page.section" className="ah-snapshot" aria-label="이번 달 판매 현황">
       <article className="ah-hero" aria-label="설계사 프로필">
@@ -260,90 +269,107 @@ function Snapshot({
             footer={<Delta now={now.premium} before={before.premium} />}
           />
         </article>
-        {commission.isError ? (
-          <article className="ah-kpi kpi-card kpi-card-info" aria-label="수령 예정 수수료">
+        <Link
+          data-guide-feature="features.agent-home.agent-home-page.commission-link"
+          className="ah-kpi ah-kpi-link kpi-card kpi-card-info"
+          to={`/agent/statements?month=${commission?.month ?? month}`}
+          aria-label="수령 예정 수수료"
+        >
+          <KpiCardContent
+            label="수령 예정 수수료"
+            value={int(expected)}
+            zero={expected === 0}
+            unit="원"
+            footer={
+              <span>{`${commission?.month ?? month} 기준 · 보류 ${int(commission?.held?.amount ?? 0)}원 · 환수 계산 ${int(commission?.clawback?.amount ?? 0)}원`}</span>
+            }
+          />
+        </Link>
+        {needFailed ? (
+          <article className="ah-kpi ah-kpi-alert kpi-card kpi-card-warning" aria-label="확인 필요 계약">
             <KpiCardContent
-              label="수령 예정 수수료"
+              label="확인 필요 계약"
               value="확인 불가"
               footer={
-                <button data-guide-feature="features.agent-home.agent-home-page.button-3" type="button" className="ah-retry" onClick={() => void commission.refetch()}>
+                <button
+                  data-guide-feature="features.agent-home.agent-home-page.button-3"
+                  type="button"
+                  className="ah-retry"
+                  onClick={() => void Promise.all([near.refetch?.(), review.refetch?.()])}
+                >
                   다시 시도
                 </button>
               }
             />
           </article>
         ) : (
-          <Link data-guide-feature="features.agent-home.agent-home-page.commission-link" className="ah-kpi ah-kpi-link kpi-card kpi-card-info" to={`/agent/statements?month=${month}`} aria-label="수령 예정 수수료">
+          <Link
+            data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
+            className="ah-kpi ah-kpi-link ah-kpi-alert kpi-card kpi-card-warning"
+            to={needContractsHref(month, asOf)}
+            aria-label="확인 필요 계약"
+          >
             <KpiCardContent
-              label="수령 예정 수수료"
-              value={commission.data == null ? '…' : int(commission.data)}
-              zero={commission.data === 0}
-              unit="원"
+              label="확인 필요 계약"
+              value={needReady ? int(need) : '…'}
+              zero={needReady && need === 0}
+              unit="건"
               footer={
-                commission.data == null ? <span>-</span> : <Delta now={commission.data} before={previousCommission} />
+                <div className="ah-badges">
+                  <span className="ah-badge warn">
+                    한도 근접 <b>{near.data ?? '-'}</b>
+                  </span>
+                  <span className="ah-badge danger">
+                    검토 필요 <b>{review.data ?? '-'}</b>
+                  </span>
+                </div>
               }
             />
           </Link>
         )}
-        <Link
-          data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
-          className="ah-kpi ah-kpi-link ah-kpi-alert kpi-card kpi-card-warning"
-          to={needContractsHref(month)}
-          aria-label="확인 필요 계약"
-        >
-          <KpiCardContent
-            label="확인 필요 계약"
-            value={int(need)}
-            zero={need === 0}
-            unit="건"
-            footer={
-              <div className="ah-badges">
-                <StatusBadge tone="warning">
-                  한도 근접 <b>{now.near}</b>
-                </StatusBadge>
-                <StatusBadge tone="error">
-                  검토필요 <b>{now.review}</b>
-                </StatusBadge>
-              </div>
-            }
-          />
-        </Link>
       </div>
     </section>
   )
 }
 
 function Charts({
-  month,
-  rows,
-  insurers,
+  home,
+  focusHome,
+  focusState,
+  onRetryFocus,
   period,
   kind,
-  insurer,
+  insurerId,
   onPeriod,
   onKind,
   onInsurer,
 }: {
-  month: string
-  rows: Row[]
-  insurers: { insurerName?: string; insurerType?: 'LIFE' | 'NON_LIFE' }[]
+  home: AgentHome
+  focusHome: AgentHome | undefined
+  focusState: FocusState
+  onRetryFocus: () => void
   period: Period
   kind: InsurerKind
-  insurer: string | null
+  insurerId: number | null
   onPeriod: (value: Period) => void
   onKind: (value: InsurerKind) => void
-  onInsurer: (name: string) => void
+  onInsurer: (id: number) => void
 }) {
-  const { base, focus, months } = aggregate(rows, month, period, kind, insurer)
-  const slices = insurerSlices(base, insurers, kind)
+  const slices = insurerSlices(home)
+  const selected = slices.find((s) => s.insurerId === insurerId) ?? null
   const label = periodLabel(period)
-  const rate = statusCounts(focus)
+  const rate = statusCounts(focusHome)
+  // 경고·합계·분포는 모두 같은 모집단(선택한 보험사까지 좁힌 집계)에서 읽는다.
+  const shown = focusHome ?? home
+  const warnings = focusState === 'ready' ? (shown.basis?.warnings ?? []) : []
+  const range = shown.range
   return (
     <section data-guide-feature="features.agent-home.agent-home-page.section-2" className="ah-panel" aria-label="설계사 판매 관리 그래프">
       <div className="ah-panel-head">
         <div>
           <h2 className="ah-panel-title">설계사 판매 관리</h2>
           <p className="ah-panel-sub">{`${label}, ${kindLabel(kind)}`}</p>
+          <p className="ah-panel-sub">{`기준일 ${home.asOf} · 집계 기간 ${range?.from ?? '-'} ~ ${range?.to ?? '-'} · 분모 계약 ${home.portfolio?.contractCount ?? 0}건`}</p>
         </div>
         <div className="ah-controls">
           <Segmented label="기간" options={PERIODS} value={period} onChange={onPeriod} />
@@ -351,18 +377,45 @@ function Charts({
         </div>
       </div>
       <div className="ah-filter-row">
-        {insurer && (
+        {selected && (
           <div className="ah-chip">
             <span className="ah-chip-dot" />
-            {insurer} 필터 적용 중
-            <button data-guide-feature="features.agent-home.agent-home-page.button-5" type="button" aria-label="보험사 필터 해제" onClick={() => onInsurer(insurer)}>
+            {selected.name} 필터 적용 중
+            <button
+              data-guide-feature="features.agent-home.agent-home-page.button-5"
+              type="button"
+              aria-label="보험사 필터 해제"
+              onClick={() => onInsurer(selected.insurerId)}
+            >
               ✕
             </button>
           </div>
         )}
-        <p className="ah-note">합계 {focus.length}건</p>
+        {focusState === 'ready' && <p className="ah-note">합계 {focusHome?.portfolio?.contractCount ?? 0}건</p>}
       </div>
-      <div className="ah-chart-grid">
+      {warnings.map((warning) => (
+        <p key={warning} className="ah-note" role="note">
+          {warning}
+        </p>
+      ))}
+      {focusState === 'error' ? (
+        <div role="alert" className="empty-state">
+          <p>선택한 보험사의 집계를 불러오지 못했습니다.</p>
+          <button
+            data-guide-feature="features.agent-home.agent-home-page.button-4"
+            type="button"
+            className="button button-secondary"
+            onClick={onRetryFocus}
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : focusState === 'loading' ? (
+        <div className="empty-state" aria-busy="true">
+          선택한 보험사 집계를 불러오는 중입니다.
+        </div>
+      ) : (
+        <div className="ah-chart-grid">
         <div className="ah-box ah-donut-box">
           <h3>
             보험사별 계약 건수 <span className="ah-sub">{label}</span>
@@ -370,11 +423,14 @@ function Charts({
           <div className="ah-donut-flex">
             <Donut
               slices={slices}
-              total={base.length}
-              centerTotal={focus.length}
-              hint={insurer ?? label}
-              selected={insurer}
-              onSelect={onInsurer}
+              total={home.portfolio?.contractCount ?? 0}
+              centerTotal={focusHome?.portfolio?.contractCount ?? 0}
+              hint={selected?.name ?? label}
+              selected={selected?.name ?? null}
+              onSelect={(name) => {
+                const slice = slices.find((s) => s.name === name)
+                if (slice) onInsurer(slice.insurerId)
+              }}
             />
           </div>
         </div>
@@ -382,21 +438,22 @@ function Charts({
           <h3>
             월별 신규 계약 추이 <span className="ah-sub">막대 건수, 선 월납환산 초회보험료(오른쪽 축)</span>
           </h3>
-          <Trend points={trendSeries(focus, months)} />
+          <Trend points={trendSeries(focusHome)} />
         </div>
         <div className="ah-box ah-product-box">
           <h3>
             보장 유형별 비중 <span className="ah-sub">건수 기준</span>
           </h3>
-          <ProductBars items={categoryCounts(focus)} />
+          <ProductBars items={categoryCounts(focusHome)} />
         </div>
         <div className="ah-box ah-status-box">
           <h3>
-            계약 상태 분포 <span className="ah-sub">정상률 {rate[0].pct.toFixed(1)}%</span>
+            계약 상태 분포 <span className="ah-sub">정상률 {(rate[0]?.pct ?? 0).toFixed(1)}%</span>
           </h3>
           <StatusBar items={rate} />
         </div>
-      </div>
+        </div>
+      )}
     </section>
   )
 }

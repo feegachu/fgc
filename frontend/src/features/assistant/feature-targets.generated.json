@@ -575,6 +575,11 @@
     "element": "button"
   },
   {
+    "id": "features.agent-home.agent-home-page.button-4",
+    "file": "features/agent-home/AgentHomePage.tsx",
+    "element": "button"
+  },
+  {
     "id": "features.agent-home.agent-home-page.button-5",
     "file": "features/agent-home/AgentHomePage.tsx",
     "element": "button"
@@ -728,6 +733,51 @@
     "id": "features.agent-home.chatbot.filter-panel.section",
     "file": "features/agent-home/chatbot/FilterPanel.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.button",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.button-2",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.contract-link",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.form",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.input",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.input-2",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.input-3",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.section",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-home.priority-contracts.textarea",
+    "file": "features/agent-home/PriorityContracts.tsx",
+    "element": "textarea"
   },
   {
     "id": "features.agent-statement.agent-statement-page.agent-select",
