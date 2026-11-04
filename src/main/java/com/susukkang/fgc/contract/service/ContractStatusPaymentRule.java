@@ -137,11 +137,15 @@ public class ContractStatusPaymentRule {
                 rs.getBigDecimal("expected_amount"), rs.getBoolean("month_locked")), contractId);
     }
 
-    /** 이 계약에 귀속된 지급(PAYMENT) 건과 귀속일. 차감 건과 설계사 단위 귀속은 판단하지 않는다. */
+    /**
+     * 이 계약에 귀속된 지급(PAYMENT) 건과 귀속일. 금액은 거래 전체가 아니라 이 계약의 귀속액 합이다(여러 계약에 나뉜 지급 건).
+     * 차감 건과 설계사 단위 귀속은 판단하지 않는다.
+     */
     private List<Payment> payments(Long contractId) {
         Map<Long, Payment> payments = new LinkedHashMap<>();
+        Map<Long, BigDecimal> attributed = new LinkedHashMap<>();
         jdbc.query("""
-                SELECT ct.commission_transaction_id, ct.status, ct.amount, ta.attribution_date
+                SELECT ct.commission_transaction_id, ct.status, ta.attributed_amount, ta.attribution_date
                   FROM fgc.commission_transaction ct
                   JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
                  WHERE ta.contract_id = ? AND ta.attribution_scope = 'CONTRACT' AND ct.cashflow_type = 'PAYMENT'
@@ -151,12 +155,16 @@ public class ContractStatusPaymentRule {
             Payment payment = payments.get(id);
             if (payment == null) {
                 payment = new Payment(id, CommissionPaymentStatus.valueOf(rs.getString("status")),
-                        rs.getBigDecimal("amount"), new ArrayList<>());
+                        null, new ArrayList<>());
                 payments.put(id, payment);
             }
+            attributed.merge(id, rs.getBigDecimal("attributed_amount"), BigDecimal::add);
             payment.attributionDates().add(rs.getObject("attribution_date", LocalDate.class));
         }, contractId);
-        return List.copyOf(payments.values());
+        return payments.values().stream()
+                .map(payment -> new Payment(payment.transactionId(), payment.status(),
+                        attributed.get(payment.transactionId()), payment.attributionDates()))
+                .toList();
     }
 
     record StatusPoint(OffsetDateTime effectiveAt, int eventSeq, ContractStatus status) {
