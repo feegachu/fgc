@@ -60,43 +60,66 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
 
     @Override
     public List<ContractStatusEffect> process(ContractStatusEvent event) {
+        List<ContractStatusEffect> planned = plan(event);
+        planned.forEach(effect -> apply(event, effect));
+        return planned;
+    }
+
+    @Override
+    public List<ContractStatusEffect> plan(ContractStatusEvent event) {
         Long contractId = event.getContractId();
-        List<ContractStatusEffect> recorded = new ArrayList<>();
+        List<ContractStatusEffect> planned = new ArrayList<>();
         for (ContractStatusEffect effect : rule.decide(event, holds.openHeldPaymentIds(contractId))) {
-            if (effect.entityType() == EntityType.SCHEDULE_LINE && PLANNED.equals(effect.nextState())
-                    && RESUMABLE_LINE_STATES.contains(effect.previousState())) {
-                // 지급예정일은 그대로 둔다. 부활은 실효 기간을 소급하지 않고 효력일 이후 회차만 되살린다.
-                jdbc.update("""
-                        UPDATE fgc.schedule_line SET line_status = 'PLANNED'
-                         WHERE schedule_line_id = ? AND line_status IN ('CANCELLED', 'HOLD')
-                        """, effect.entityId());
-                recorded.add(effect);
-            } else if (effect.entityType() == EntityType.SCHEDULE_LINE && CANCELLED.equals(effect.nextState())) {
-                // 실효 기간 회차가 재생성 등으로 PLANNED 가 됐으면 소급하지 않고 다시 중단해 스케줄 확정 대상에서 뺀다(NO_RETROACTIVE).
-                // 규칙이 이미 확정·월잠금 회차를 걸러 냈지만 DB 상태가 그 사이 바뀌었을 수 있어 조건으로 한 번 더 지킨다.
-                jdbc.update("""
-                        UPDATE fgc.schedule_line SET line_status = 'CANCELLED'
-                         WHERE schedule_line_id = ? AND line_status NOT IN ('CONFIRMED', 'MATCHED', 'ADJUSTED')
-                        """, effect.entityId());
-                recorded.add(effect);
-            } else if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
-                // 규칙이 재개 대상으로 판단한 지급은 미납 때부터 이어진 보류도 푼다. 다른 계약의 보류는 유지한다.
-                int released = holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), REVIVAL_RELEASES);
-                if (released > 0) {
-                    recorded.add(effect);
-                }
-            } else if (EXCLUDED.equals(effect.nextState())) {
-                recorded.add(effect);
+            if (recordable(effect, contractId)) {
+                planned.add(effect);
             }
         }
         // 규칙은 바뀌는 대상만 돌려주므로 되살리지 않은 대상과 그 근거는 같은 규칙의 판단에서 따로 만들어 남긴다.
         Set<String> already = new HashSet<>();
-        recorded.forEach(effect -> already.add(effect.entityType() + ":" + effect.entityId()));
+        planned.forEach(effect -> already.add(effect.entityType() + ":" + effect.entityId()));
         for (ContractStatusEffect effect : rule.notPayable(event)) {
             if (already.add(effect.entityType() + ":" + effect.entityId())) {
-                recorded.add(effect);
+                planned.add(effect);
             }
         }
-        return recorded;
+        return planned;
+    }
+
+    private boolean recordable(ContractStatusEffect effect, Long contractId) {
+        if (EXCLUDED.equals(effect.nextState())) {
+            return true;
+        }
+        if (effect.entityType() == EntityType.PAYMENT) {
+            return RELEASED.equals(effect.nextState()) && holds.hasOpenHold(effect.entityId(), contractId, REVIVAL_RELEASES);
+        }
+        return CANCELLED.equals(effect.nextState())
+                || (PLANNED.equals(effect.nextState()) && RESUMABLE_LINE_STATES.contains(effect.previousState()));
+    }
+
+    @Override
+    public Set<String> releasedHoldReasons() {
+        return REVIVAL_RELEASES;
+    }
+
+    private void apply(ContractStatusEvent event, ContractStatusEffect effect) {
+        if (effect.entityType() == EntityType.PAYMENT) {
+            if (RELEASED.equals(effect.nextState())) {
+                // 규칙이 재개 대상으로 판단한 지급은 미납 때부터 이어진 보류도 푼다. 다른 계약의 보류는 유지한다.
+                holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), REVIVAL_RELEASES);
+            }
+        } else if (PLANNED.equals(effect.nextState())) {
+            // 지급예정일은 그대로 둔다. 부활은 실효 기간을 소급하지 않고 효력일 이후 회차만 되살린다.
+            jdbc.update("""
+                    UPDATE fgc.schedule_line SET line_status = 'PLANNED'
+                     WHERE schedule_line_id = ? AND line_status IN ('CANCELLED', 'HOLD')
+                    """, effect.entityId());
+        } else if (CANCELLED.equals(effect.nextState())) {
+            // 실효 기간 회차가 재생성 등으로 PLANNED 가 됐으면 소급하지 않고 다시 중단해 스케줄 확정 대상에서 뺀다(NO_RETROACTIVE).
+            // 규칙이 이미 확정·월잠금 회차를 걸러 냈지만 DB 상태가 그 사이 바뀌었을 수 있어 조건으로 한 번 더 지킨다.
+            jdbc.update("""
+                    UPDATE fgc.schedule_line SET line_status = 'CANCELLED'
+                     WHERE schedule_line_id = ? AND line_status NOT IN ('CONFIRMED', 'MATCHED', 'ADJUSTED')
+                    """, effect.entityId());
+        }
     }
 }

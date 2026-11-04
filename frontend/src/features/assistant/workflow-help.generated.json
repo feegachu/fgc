@@ -706,6 +706,20 @@
         "next": []
       },
       {
+        "stepId": "help.227b8d4ff62756aef3a3aec670ed384d",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.reset",
+        "title": "보험계약 상세, 입력 초기화",
+        "instruction": "보험계약 상세 화면의 ‘입력 초기화’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.4c691ea754c8b6bb9d656a537b4165af",
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-detail-page.button-3",
@@ -764,6 +778,20 @@
         "next": []
       },
       {
+        "stepId": "help.63e39fa0c14fda6b68592ecb7c49ed6e",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.submit",
+        "title": "보험계약 상세, 영향 미리보기",
+        "instruction": "보험계약 상세 화면의 ‘영향 미리보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.6597d5b56a29b562e5b544c6940a7b4d",
         "screenId": "CONT-W02",
         "targetId": "features.cap.cap-detail-modal.section-4",
@@ -794,6 +822,34 @@
         "next": []
       },
       {
+        "stepId": "help.6c165d9922e2855fe3ef6cb9a1961b41",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.event-type",
+        "title": "보험계약 상세, 사건 종류",
+        "instruction": "보험계약 상세 화면의 ‘사건 종류’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.707c9b8ebc85bf2efe0d3f8216dd830e",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-detail-page.status-preview",
+        "title": "보험계약 상세, 영향 미리보기",
+        "instruction": "보험계약 상세 화면의 ‘영향 미리보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.7d59e5a37a11227b69a873858fd02d19",
         "screenId": "CONT-W02",
         "targetId": "features.cap.cap-detail-modal.section-5",
@@ -805,6 +861,33 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.943a30c0e997d6db611e6278656e2124",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.reload",
+        "title": "보험계약 상세, 다시 조회",
+        "instruction": "보험계약 상세 화면의 ‘다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.99378c56a3543266d5ed127aa91a76e2",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.edit",
+        "title": "보험계약 상세, 계약 수정으로 이동",
+        "instruction": "보험계약 상세 화면의 ‘계약 수정으로 이동’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -824,6 +907,20 @@
         "next": []
       },
       {
+        "stepId": "help.9ede33e49162c637bdadadc9270b846b",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.form",
+        "title": "보험계약 상세, 미리볼 상태 사건",
+        "instruction": "보험계약 상세 화면의 ‘미리볼 상태 사건’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.9efcba80180f1c701f99623e45001876",
         "screenId": "CONT-W02",
         "targetId": "features.cap.cap-detail-modal.section-3",
@@ -835,6 +932,34 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.a88a7473a530b35a69cd8980640ed321",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.retry",
+        "title": "보험계약 상세, 다시 시도",
+        "instruction": "보험계약 상세 화면의 ‘다시 시도’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.aaf2c90f830dc91dbdd3fece3f7c5a5d",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.close",
+        "title": "보험계약 상세, 닫기",
+        "instruction": "보험계약 상세 화면의 ‘닫기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -963,6 +1088,20 @@
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e00393739828c0891275f27db05f5e89",
+        "screenId": "CONT-W02",
+        "targetId": "features.contract.contract-status-preview.effective-at",
+        "title": "보험계약 상세, 효력일시",
+        "instruction": "보험계약 상세 화면의 ‘효력일시’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
           "SETTLEMENT"
         ],
         "next": []

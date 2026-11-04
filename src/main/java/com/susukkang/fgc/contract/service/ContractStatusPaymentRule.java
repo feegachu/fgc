@@ -65,10 +65,7 @@ public class ContractStatusPaymentRule {
         LocalDate contractDate = jdbc.queryForObject(
                 "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?", LocalDate.class, contractId);
         Long policyVersionId = policies.resolve(contractDate);
-        List<StatusPoint> timeline = events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(contractId).stream()
-                .map(ContractStatusPaymentRule::point)
-                .toList();
-        return judge(timeline, point(event), policyVersionId, lines(contractId), payments(contractId), heldPaymentIds);
+        return judge(timeline(event), point(event), policyVersionId, lines(contractId), payments(contractId), heldPaymentIds);
     }
 
     /**
@@ -82,10 +79,19 @@ public class ContractStatusPaymentRule {
         LocalDate contractDate = jdbc.queryForObject(
                 "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?", LocalDate.class, contractId);
         Long policyVersionId = policies.resolve(contractDate);
-        List<StatusPoint> timeline = events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(contractId).stream()
-                .map(ContractStatusPaymentRule::point)
-                .toList();
-        return judgeNotPayable(timeline, point(event), policyVersionId, lines(contractId), payments(contractId));
+        return judgeNotPayable(timeline(event), point(event), policyVersionId, lines(contractId), payments(contractId));
+    }
+
+    /** 저장 전 사건(미리보기, FUN-077)은 이력에 없으므로 저장한 것처럼 더해 저장 뒤 판단과 같은 입력으로 만든다. */
+    private List<StatusPoint> timeline(ContractStatusEvent event) {
+        List<StatusPoint> timeline = new ArrayList<>(
+                events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(event.getContractId()).stream()
+                        .map(ContractStatusPaymentRule::point)
+                        .toList());
+        if (event.getContractStatusEventId() == null) {
+            timeline.add(point(event));
+        }
+        return timeline;
     }
 
     static List<ContractStatusEffect> judgeNotPayable(List<StatusPoint> events, StatusPoint asOf, Long policyVersionId,
