@@ -26,14 +26,21 @@ interface Retry {
   reason: string
   state: string
   errorCode?: string | null
+  failedStep: number
   previousBatchExecutionId: number
   batchExecutionId?: number | null
 }
 const retryLabels: Record<string, string> = {
   ACCEPTED: '접수됨',
   RUNNING: '진행 중',
+  LAUNCHING: '기동 중',
   SUCCEEDED: '완료',
   FAILED: '실패',
+}
+const unstartedExecutionLabels: Record<string, string> = {
+  ACCEPTED: '기동 대기',
+  LAUNCHING: '기동 중',
+  FAILED: '기동 안 됨',
 }
 export function ValidationRestartPanel({
   id,
@@ -144,6 +151,7 @@ export function ValidationRestartPanel({
               <th>요청자</th>
               <th>요청 시각</th>
               <th>사유</th>
+              <th>대상 단계</th>
               <th>이전 실행</th>
               <th>새 실행</th>
               <th>시작</th>
@@ -158,8 +166,9 @@ export function ValidationRestartPanel({
                 <td>{r.requestedBy}</td>
                 <td>{new Date(r.requestedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
                 <td>{r.reason}</td>
+                <td>{r.failedStep}단계</td>
                 <td>{r.previousBatchExecutionId}</td>
-                <td>{r.batchExecutionId ?? '기동 대기'}</td>
+                <td>{r.batchExecutionId ?? unstartedExecutionLabels[r.state] ?? '자료 없음'}</td>
                 <td>
                   {r.startedAt
                     ? new Date(r.startedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })

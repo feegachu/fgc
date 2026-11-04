@@ -7942,6 +7942,10 @@
           "errorCode" : {
             "type" : "string"
           },
+          "failedStep" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
           "finishedAt" : {
             "format" : "date-time",
             "type" : "string"

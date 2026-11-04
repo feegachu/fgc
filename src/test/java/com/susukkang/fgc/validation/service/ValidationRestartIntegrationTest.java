@@ -58,6 +58,57 @@ class ValidationRestartIntegrationTest {
     when(trigger.launchRestart(any(), anyString(), anyLong())).thenReturn(pending);
   }
 
+  @AfterEach
+  void releaseThisTestsPendingReservation() {
+    pending.completeExceptionally(new IllegalStateException("test completed"));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"ACCEPTED", "LAUNCHING", "RUNNING"})
+  void anotherFailedRunsPendingRestartReservesTheMonth(String state) {
+    Long other =
+        jdbc.queryForObject(
+            """
+            INSERT INTO fgc.validation_run(validation_month,run_no,run_type,status,triggered_by)
+            SELECT validation_month,run_no+1,'MONTHLY','CREATED',triggered_by FROM fgc.validation_run
+            WHERE validation_run_id=? RETURNING validation_run_id
+            """,
+            Long.class,
+            run);
+    jdbc.update(
+        "UPDATE fgc.validation_run SET status='RUNNING',current_step=1,started_at=clock_timestamp()"
+            + " WHERE validation_run_id=?",
+        other);
+    jdbc.update(
+        "UPDATE fgc.validation_run SET"
+            + " status='FAILED',current_step=6,completed_at=clock_timestamp(),failure_message='test'"
+            + " WHERE validation_run_id=?",
+        other);
+    Long retry =
+        jdbc.queryForObject(
+            """
+            INSERT INTO fgc.validation_run_retry(validation_run_id,previous_batch_execution_id,failed_step,
+                requested_by,idempotency_key,request_hash,reason,state)
+            VALUES (?,101,6,?,'reserved',repeat('0',64),'test',?) RETURNING retry_id
+            """,
+            Long.class,
+            other,
+            user,
+            state);
+    try {
+      var q = request();
+      assertThat(service.eligibility(run).allowed()).isFalse();
+      assertThatThrownBy(() -> service.restart(run, user, "other-reserved", q))
+          .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+      verify(trigger, never()).launchRestart(any(), anyString(), anyLong());
+    } finally {
+      jdbc.update(
+          "UPDATE fgc.validation_run_retry SET state='FAILED',finished_at=clock_timestamp() WHERE"
+              + " retry_id=?",
+          retry);
+    }
+  }
+
   ValidationRestartRequest request() {
     var s = service.eligibility(run);
     return new ValidationRestartRequest(101L, s.expectedStateVersion(), "원인 수정");
@@ -197,6 +248,33 @@ class ValidationRestartIntegrationTest {
                 assertThat(e.getErrorCode())
                     .isEqualTo(com.susukkang.fgc.common.exception.FgcErrorCode.VRUN_008));
     assertThat(service.history(run).getFirst().state()).isEqualTo("FAILED");
+  }
+
+  @Test
+  void finalizedMonthDoesNotMasqueradeAsAnActiveRun() {
+    Long other =
+        jdbc.queryForObject(
+            "INSERT INTO fgc.validation_run(validation_month,run_no,run_type,status,triggered_by)"
+                + " SELECT validation_month,run_no+1,'MONTHLY','CREATED',triggered_by FROM"
+                + " fgc.validation_run WHERE validation_run_id=? RETURNING validation_run_id",
+            Long.class,
+            run);
+    jdbc.update(
+        "UPDATE fgc.validation_run SET status='RUNNING',current_step=1,started_at=clock_timestamp()"
+            + " WHERE validation_run_id=?",
+        other);
+    jdbc.update(
+        "UPDATE fgc.validation_run SET"
+            + " status='COMPLETED',current_step=8,completed_at=clock_timestamp() WHERE"
+            + " validation_run_id=?",
+        other);
+    jdbc.update(
+        "UPDATE fgc.validation_run SET"
+            + " status='FINALIZED',current_step=10,finalized_at=clock_timestamp(),finalized_by=?"
+            + " WHERE validation_run_id=?",
+        user,
+        other);
+    assertThat(service.eligibility(run).allowed()).isTrue();
   }
 
   @Test

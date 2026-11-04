@@ -16,6 +16,7 @@ import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,7 @@ public class MonthlyValidationJobTrigger {
 
     private final ThreadPoolTaskExecutor taskExecutor = createExecutor();
 
+    private final JdbcTemplate retryJdbc;
     private final Job monthlyValidationJob;
     private final JobLauncher jobLauncher;
     private final ValidationRunRepository validationRunRepository;
@@ -122,6 +124,14 @@ public class MonthlyValidationJobTrigger {
             if (expectedExecutionId != null
                     && !expectedExecutionId.equals(monthlyJobExecutionLookup.findFailedExecution(run).getId())) {
                 throw new IllegalStateException("요청 이후 다른 재시작이 이미 시도되었습니다.");
+            }
+            Long retryId = jobParameters.getLong("restartRetryId");
+            if (retryId != null && retryJdbc.update("""
+                    UPDATE fgc.validation_run_retry SET state='LAUNCHING'
+                     WHERE retry_id=? AND validation_run_id=? AND previous_batch_execution_id=?
+                       AND state='ACCEPTED' AND requested_at >= clock_timestamp()-interval '5 minutes'
+                    """, retryId, validationRunId, expectedExecutionId) != 1) {
+                throw new IllegalStateException("만료되었거나 이미 기동된 재시작 접수입니다.");
             }
             return jobLauncher.run(monthlyValidationJob, jobParameters);
         } catch (Exception e) {

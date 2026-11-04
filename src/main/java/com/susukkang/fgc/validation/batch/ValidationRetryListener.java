@@ -16,7 +16,7 @@ public class ValidationRetryListener implements JobExecutionListener {
         && jdbc.update(
                 "UPDATE fgc.validation_run_retry SET"
                     + " state='RUNNING',batch_execution_id=?,started_at=clock_timestamp() WHERE"
-                    + " retry_id=? AND state='ACCEPTED'",
+                    + " retry_id=? AND state='LAUNCHING'",
                 e.getId(),
                 id)
             != 1) throw new IllegalStateException("재시작 접수가 유효하지 않습니다.");
@@ -28,7 +28,7 @@ public class ValidationRetryListener implements JobExecutionListener {
     if (id != null)
       jdbc.update(
           "UPDATE fgc.validation_run_retry SET state=?,finished_at=clock_timestamp(),error_code=?"
-              + " WHERE retry_id=? AND state IN ('ACCEPTED','RUNNING')",
+              + " WHERE retry_id=? AND state IN ('ACCEPTED','LAUNCHING','RUNNING')",
           e.getStatus() == BatchStatus.COMPLETED ? "SUCCEEDED" : "FAILED",
           e.getStatus() == BatchStatus.COMPLETED ? null : "BATCH_FAILED",
           id);

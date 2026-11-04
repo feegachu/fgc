@@ -49,6 +49,7 @@ public class ValidationRestartService {
       Long retryId,
       Long previousBatchExecutionId,
       Long batchExecutionId,
+      Integer failedStep,
       Long requestedBy,
       String reason,
       String state,
@@ -99,7 +100,7 @@ public class ValidationRestartService {
     return Boolean.TRUE.equals(
         jdbc.queryForObject(
             "SELECT EXISTS(SELECT 1 FROM fgc.validation_run_retry WHERE validation_run_id=? AND"
-                + " state IN ('ACCEPTED','RUNNING'))",
+                + " state IN ('ACCEPTED','LAUNCHING','RUNNING'))",
             Boolean.class,
             id));
   }
@@ -107,9 +108,11 @@ public class ValidationRestartService {
   private boolean otherActive(Long id, java.time.LocalDate month) {
     return Boolean.TRUE.equals(
         jdbc.queryForObject(
-            "SELECT EXISTS(SELECT 1 FROM fgc.validation_run WHERE validation_month=? AND"
-                + " validation_run_id<>? AND run_type IN ('MONTHLY','PRE_CONFIRM') AND status IN"
-                + " ('CREATED','RUNNING','FINALIZED'))",
+            "SELECT EXISTS(SELECT 1 FROM fgc.validation_run v WHERE validation_month=? AND"
+                + " validation_run_id<>? AND run_type IN ('MONTHLY','PRE_CONFIRM') AND (status IN"
+                + " ('CREATED','RUNNING') OR EXISTS(SELECT 1 FROM fgc.validation_run_retry r WHERE"
+                + " r.validation_run_id=v.validation_run_id AND r.state IN"
+                + " ('ACCEPTED','LAUNCHING','RUNNING'))))",
             Boolean.class,
             month,
             id));
@@ -167,19 +170,25 @@ public class ValidationRestartService {
               Long retry =
                   jdbc.queryForObject(
                       "INSERT INTO"
-                          + " fgc.validation_run_retry(validation_run_id,previous_batch_execution_id,requested_by,idempotency_key,request_hash,reason,state)"
-                          + " VALUES (?,?,?,?,?,?,'ACCEPTED') RETURNING retry_id",
+                          + " fgc.validation_run_retry(validation_run_id,previous_batch_execution_id,requested_by,idempotency_key,request_hash,reason,failed_step,state)"
+                          + " VALUES (?,?,?,?,?,?,?,'ACCEPTED') RETURNING retry_id",
                       Long.class,
                       id,
                       request.expectedBatchExecutionId(),
                       user,
                       key,
                       hash,
-                      request.reason());
+                      request.reason(),
+                      initial.getCurrentStep());
               return new Claim(
                   new Accepted(id, retry, request.expectedBatchExecutionId(), null, "ACCEPTED"),
                   ValidationRunRow.from(initial));
             });
+    launchClaim(claim);
+    return claim.response();
+  }
+
+  private void launchClaim(Claim claim) {
     if (claim.run() != null) {
       try {
         trigger
@@ -196,7 +205,6 @@ public class ValidationRestartService {
         throw new FgcBusinessException(FgcErrorCode.VRUN_008);
       }
     }
-    return claim.response();
   }
 
   /** 기동되지 않은 오래된 접수만 만료한다. 실행 중인 Batch를 임의로 FAILED로 바꾸지 않는다. */
@@ -213,7 +221,7 @@ public class ValidationRestartService {
     jdbc.update(
         "UPDATE fgc.validation_run_retry SET"
             + " state='FAILED',finished_at=clock_timestamp(),error_code='LAUNCH_FAILED' WHERE"
-            + " retry_id=? AND state IN ('ACCEPTED','RUNNING')",
+            + " retry_id=? AND state IN ('ACCEPTED','LAUNCHING','RUNNING')",
         retry);
   }
 
@@ -227,6 +235,7 @@ public class ValidationRestartService {
                 r.getLong("retry_id"),
                 r.getLong("previous_batch_execution_id"),
                 r.getObject("batch_execution_id", Long.class),
+                r.getObject("failed_step", Integer.class),
                 r.getLong("requested_by"),
                 r.getString("reason"),
                 r.getString("state"),

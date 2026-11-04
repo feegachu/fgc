@@ -10,7 +10,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   clients.splice(0).forEach((c) => c.clear())
 })
-function setup(canProcess = true, fail = false) {
+function setup(canProcess = true, fail = false, rows: unknown[] = []) {
   const accepted = vi.fn()
   const requests: unknown[] = []
   vi.spyOn(apiClient, 'request').mockImplementation((async (
@@ -22,7 +22,7 @@ function setup(canProcess = true, fail = false) {
         data: { allowed: true, expectedStateVersion: 'failed-101', lastFailedBatchExecutionId: 101, failedStep: 6 },
         requestId: null,
       }
-    if (path.endsWith('/retries')) return { data: [], requestId: null }
+    if (path.endsWith('/retries')) return { data: rows, requestId: null }
     requests.push(options)
     if (fail && requests.length === 1) throw new ApiError(null, 'request', 500)
     return { data: { retryId: 9, status: 'ACCEPTED' }, requestId: null }
@@ -67,4 +67,23 @@ it('FGC-FUN-045 keeps read-only users from issuing restart requests', async () =
   const { requests } = setup(false)
   expect(await screen.findByRole('button', { name: '실패 지점부터 재시작' })).toBeDisabled()
   expect(requests).toHaveLength(0)
+})
+
+it('shows the original target step and does not call a failed unstarted retry waiting', async () => {
+  setup(true, false, [
+    {
+      retryId: 9,
+      failedStep: 6,
+      previousBatchExecutionId: 101,
+      batchExecutionId: null,
+      requestedBy: 1,
+      reason: '기동 실패',
+      state: 'FAILED',
+      requestedAt: '2026-11-04T00:00:00Z',
+      errorCode: 'LAUNCH_TIMEOUT',
+    },
+  ])
+  expect(await screen.findByText('6단계')).toBeInTheDocument()
+  expect(screen.getByText('기동 안 됨')).toBeInTheDocument()
+  expect(screen.queryByText('기동 대기')).not.toBeInTheDocument()
 })

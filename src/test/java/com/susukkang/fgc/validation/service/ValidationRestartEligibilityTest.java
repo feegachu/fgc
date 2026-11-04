@@ -27,7 +27,7 @@ class ValidationRestartEligibilityTest {
       value = ValidationRunStatus.class,
       names = {"CREATED", "RUNNING", "COMPLETED", "FINALIZED"})
   void refusesNonFailedRuns(ValidationRunStatus status) {
-    ValidationRun run = org.mockito.Mockito.mock(ValidationRun.class);
+    ValidationRun run = mock(ValidationRun.class);
     when(run.getStatus()).thenReturn(status);
     when(runs.findById(1L)).thenReturn(Optional.of(run));
     assertThat(service.eligibility(1L).allowed()).isFalse();

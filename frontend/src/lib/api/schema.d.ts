@@ -5046,6 +5046,8 @@ export interface components {
             /** Format: int64 */
             batchExecutionId?: number;
             errorCode?: string;
+            /** Format: int32 */
+            failedStep?: number;
             /** Format: date-time */
             finishedAt?: string;
             /** Format: int64 */
