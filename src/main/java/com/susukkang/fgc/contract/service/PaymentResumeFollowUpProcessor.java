@@ -22,7 +22,7 @@ import java.util.Set;
  *   <li>재개 대상: 부활 효력일 이후(정책이 허용한 미래) 회차만 PLANNED 로 되돌리고 그 귀속의 지급 건 보류를 해제한다.
  *       미확정 지급 건은 보류만 풀며 자동으로 확정·지급하지 않는다.</li>
  *   <li>비대상: 실효 기간(NO_RETROACTIVE)의 회차는 CANCELLED, 지급 건은 보류 그대로 두고 비대상 사유를 effect 로 남긴다.
- *       다른 사유의 보류가 남은 지급 건은 규칙이 풀지 않으므로 blocked 가 유지된다.</li>
+ *       다른 계약의 보류나 이 사건에서 해제하지 않은 보류가 남으면 확정 게이트가 계속 막는다.</li>
  *   <li>확정·기지급·월잠금 결과는 바꾸지 않는다.</li>
  * </ul>
  *
@@ -40,7 +40,7 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
     private static final String PLANNED = "PLANNED";
     private static final String RELEASED = "RELEASED";
     private static final String EXCLUDED = "EXCLUDED";
-    private static final Set<String> REVIVAL_RELEASES = Set.of("STATUS_INACTIVE");
+    private static final Set<String> REVIVAL_RELEASES = Set.of("STATUS_INACTIVE", "STATUS_UNPAID");
     private static final String CANCELLED = "CANCELLED";
     private static final Set<String> RESUMABLE_LINE_STATES = Set.of("CANCELLED", "HOLD");
 
@@ -80,9 +80,11 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
                         """, effect.entityId());
                 recorded.add(effect);
             } else if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
-                // 부활은 실효로 건 보류만 푼다. 미납 등 다른 사유의 보류는 이 사건으로 풀리지 않는다.
-                holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), REVIVAL_RELEASES);
-                recorded.add(effect);
+                // 규칙이 재개 대상으로 판단한 지급은 미납 때부터 이어진 보류도 푼다. 다른 계약의 보류는 유지한다.
+                int released = holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), REVIVAL_RELEASES);
+                if (released > 0) {
+                    recorded.add(effect);
+                }
             } else if (EXCLUDED.equals(effect.nextState())) {
                 recorded.add(effect);
             }

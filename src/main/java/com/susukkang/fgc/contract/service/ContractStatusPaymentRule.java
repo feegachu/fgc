@@ -96,7 +96,7 @@ public class ContractStatusPaymentRule {
                 .toList();
         List<ContractStatusEffect> notPayable = new ArrayList<>();
         for (Line line : lines) {
-            if (CONFIRMED_LINES.contains(line.status()) || CONFIRMED_HEADERS.contains(line.headerStatus())) {
+            if (line.monthLocked() || CONFIRMED_LINES.contains(line.status()) || CONFIRMED_HEADERS.contains(line.headerStatus())) {
                 continue;
             }
             worst(List.of(line.dueDate()), timeline).filter(verdict -> verdict.outcome() != Outcome.PAY)

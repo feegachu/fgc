@@ -103,6 +103,34 @@ class PaymentResumeFollowUpIntegrationTest {
     }
 
     @Test
+    void revivalReleasesFuturePaymentsHeldSinceUnpaidButKeepsTheLapsePeriodBlocked() {
+        // FUN-029: 미납 때 생긴 보류는 실효 사건에서 새 사유로 교체되지 않아도 부활 대상이면 해제한다.
+        long contract = contract("2026-03-01");
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long unpaid = statusEvent(contract, 2, "UNPAID", "2026-08-01T00:00:00+09:00");
+        long future = payment(contract, "2026-10-20", false);
+        long duringLapse = payment(contract, "2026-09-20", false);
+        holdProcessor.process(events.findById(unpaid).orElseThrow());
+        long lapse = statusEvent(contract, 3, "LAPSED", "2026-09-01T00:00:00+09:00");
+        holdProcessor.process(events.findById(lapse).orElseThrow());
+        assertThat(jdbc.queryForList("SELECT reason_code FROM fgc.payment_hold WHERE commission_transaction_id = ?",
+                String.class, future)).containsExactly("STATUS_UNPAID");
+        long revival = statusEvent(contract, 4, "REVIVED", "2026-10-15T00:00:00+09:00");
+
+        List<ContractStatusEffect> recorded = resumeProcessor.process(events.findById(revival).orElseThrow());
+
+        assertThat(recorded).filteredOn(effect -> effect.entityType() == EntityType.PAYMENT && effect.entityId().equals(future))
+                .singleElement().satisfies(effect -> assertThat(effect.nextState()).isEqualTo("RELEASED"));
+        assertThat(openHolds(future)).isZero();
+        assertThat(gate.blockers(future)).isEmpty();
+        assertThat(paymentStatus(future)).isEqualTo("DRAFT");
+        assertThat(openHolds(duringLapse)).isEqualTo(1);
+        assertThat(gate.blockers(duringLapse)).isNotEmpty();
+        assertThat(resumeProcessor.process(events.findById(revival).orElseThrow()))
+                .noneMatch(effect -> effect.entityId().equals(future) && "RELEASED".equals(effect.nextState()));
+    }
+
+    @Test
     void confirmedResultsAreKeptAsTheyWere() {
         Scenario s = lapsedThenRevived();
         resumeProcessor.process(events.findById(s.revival).orElseThrow());
@@ -151,10 +179,11 @@ class PaymentResumeFollowUpIntegrationTest {
         long lapseB = statusEvent(b, 2, "LAPSED", "2026-09-01T00:00:00+09:00");
         // 같은 지급 건이 A(부활 뒤 10/20)와 B(실효 기간 9/20)에 귀속된다.
         long shared = payment(a, "2026-10-20", false);
+        jdbc.update("UPDATE fgc.transaction_attribution SET attributed_amount = 2000 WHERE commission_transaction_id = ?", shared);
         jdbc.update("""
                 INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, contract_id, attribution_date,
                     attribution_month, attributed_amount, inclusion_status_snapshot, attribution_method)
-                VALUES (?, 2, ?, DATE '2026-09-20', DATE '2026-09-01', 0, 'INCLUDED', 'DIRECT')
+                VALUES (?, 2, ?, DATE '2026-09-20', DATE '2026-09-01', 3000, 'INCLUDED', 'DIRECT')
                 """, shared, b);
         holdProcessor.process(events.findById(lapseA).orElseThrow());
         holdProcessor.process(events.findById(lapseB).orElseThrow());
@@ -166,6 +195,8 @@ class PaymentResumeFollowUpIntegrationTest {
         // A 의 판단으로는 재개 대상이라 A 의 보류만 풀리고, B 의 실효로 걸린 보류는 남는다.
         assertThat(recorded).extracting(ContractStatusEffect::entityId, ContractStatusEffect::nextState)
                 .contains(tuple(shared, "RELEASED"));
+        assertThat(recorded).filteredOn(effect -> effect.entityType() == EntityType.PAYMENT && effect.entityId().equals(shared))
+                .singleElement().satisfies(effect -> assertThat(effect.amount()).isEqualByComparingTo("2000"));
         assertThat(openHolds(shared)).isEqualTo(1);
         assertThat(jdbc.queryForObject("""
                 SELECT e.contract_id FROM fgc.payment_hold h JOIN fgc.contract_status_event e USING (contract_status_event_id)
@@ -200,6 +231,13 @@ class PaymentResumeFollowUpIntegrationTest {
         Scenario s = lapsedThenRevived();
         // 실효 처리 뒤에 만든 실효 기간 초안(보류 없음)과 재생성 등으로 PLANNED 가 된 실효 기간 회차
         long lateDraft = payment(s.contract, "2026-09-28", false);
+        long otherContract = contract("2026-03-01");
+        jdbc.update("UPDATE fgc.transaction_attribution SET attributed_amount = 2000 WHERE commission_transaction_id = ?", lateDraft);
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, contract_id, attribution_date,
+                    attribution_month, attributed_amount, inclusion_status_snapshot, attribution_method)
+                VALUES (?, 2, ?, DATE '2026-09-28', DATE '2026-09-01', 3000, 'INCLUDED', 'DIRECT')
+                """, lateDraft, otherContract);
         long header = jdbc.queryForObject("SELECT schedule_header_id FROM fgc.schedule_line WHERE schedule_line_id = ?", Long.class, s.lapsePeriodLine);
         long replannedLine = line(header, 9, "2026-09-27", "PLANNED");
         assertThat(openHolds(lateDraft)).isZero();
@@ -212,6 +250,8 @@ class PaymentResumeFollowUpIntegrationTest {
                         tuple(EntityType.SCHEDULE_LINE, replannedLine, "CANCELLED", "STATUS_INACTIVE"));
         // 실효 기간 회차는 effect 만 비대상으로 남기지 않고 실제로도 다시 중단돼 스케줄 확정 대상이 되지 않는다.
         assertThat(lineStatus(replannedLine)).isEqualTo("CANCELLED");
+        assertThat(recorded).filteredOn(effect -> effect.entityType() == EntityType.PAYMENT && effect.entityId().equals(lateDraft))
+                .singleElement().satisfies(effect -> assertThat(effect.amount()).isEqualByComparingTo("2000"));
         assertThat(gate.blockers(lateDraft)).isNotEmpty();
     }
 
