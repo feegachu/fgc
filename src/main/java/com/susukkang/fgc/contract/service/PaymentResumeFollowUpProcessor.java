@@ -40,6 +40,7 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
     private static final String PLANNED = "PLANNED";
     private static final String RELEASED = "RELEASED";
     private static final String EXCLUDED = "EXCLUDED";
+    private static final Set<String> REVIVAL_RELEASES = Set.of("STATUS_INACTIVE");
     private static final String CANCELLED = "CANCELLED";
     private static final Set<String> RESUMABLE_LINE_STATES = Set.of("CANCELLED", "HOLD");
 
@@ -79,7 +80,8 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
                         """, effect.entityId());
                 recorded.add(effect);
             } else if (effect.entityType() == EntityType.PAYMENT && RELEASED.equals(effect.nextState())) {
-                holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId());
+                // 부활은 실효로 건 보류만 푼다. 미납 등 다른 사유의 보류는 이 사건으로 풀리지 않는다.
+                holds.releaseOpen(effect.entityId(), event.getContractId(), event.getContractStatusEventId(), REVIVAL_RELEASES);
                 recorded.add(effect);
             } else if (EXCLUDED.equals(effect.nextState())) {
                 recorded.add(effect);
