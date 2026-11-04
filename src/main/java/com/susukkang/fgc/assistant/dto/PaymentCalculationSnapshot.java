@@ -13,7 +13,17 @@ public record PaymentCalculationSnapshot(
         List<Map<String, Object>> capPreview, Boolean confirmable, List<Reason> blockers,
         List<String> missingInputs, Basis basis, Recommendation recommendation,
         OffsetDateTime calculatedAt,
-        @Schema(types = {"object", "null"}, description = "Always null in snapshot-only phase; not a server proof") Object validity) {
+        @Schema(types = {"object", "null"}, description = "Always null in snapshot-only phase; not a server proof") Object validity, List<CalculationLine> lines) {
+    @Schema(name="AssistantCalculationLine")
+    public record CalculationLine(String sourceId, String contractId, String commissionItemId, String beneficiaryAgentId, Integer installmentNo, String attributionDate, String dueDate, String basisCode, String basisAmount, String calculationType, String ratePct, String expectedAmount, String ruleId, String status) {}
+    public PaymentCalculationSnapshot(String calculationId, String kind, String mode, String status, long clientRevision,
+            boolean synthetic, boolean snapshotOnly, String evidenceKind, String currency, String paymentStatus,
+            Map<String,String> resolvedScope, Map<String,String> amounts, List<Map<String,Object>> capPreview,
+            Boolean confirmable, List<Reason> blockers, List<String> missingInputs, Basis basis,
+            Recommendation recommendation, OffsetDateTime calculatedAt, Object validity) {
+        this(calculationId,kind,mode,status,clientRevision,synthetic,snapshotOnly,evidenceKind,currency,paymentStatus,
+                resolvedScope,amounts,capPreview,confirmable,blockers,missingInputs,basis,recommendation,calculatedAt,validity,List.of());
+    }
     public record Reason(String code, String message, String contractId, String transactionAttributionId) {}
     @Schema(name = "AssistantCalculationSource")
     public record Source(String sourceId, String sourceType, String title, String version, String entityId) {}
