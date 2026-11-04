@@ -143,7 +143,7 @@ class CommissionPaymentPersistencePerformanceTest {
                 CommissionPaymentUpdateRequest update = new CommissionPaymentUpdateRequest(
                         request.sourceType(), key, 1L, 6L, itemId, request.amount(), request.settlementMonth(),
                         request.cashflowType(), request.scheduledPaymentDate(), request.paymentStage(),
-                        capPolicy, attributions, "PERF-EVIDENCE", "updated");
+                        capPolicy, attributions, "PERF-EVIDENCE", "updated", created.updatedAt());
                 CommissionPaymentResponse updated = measure(implementation, contracts.size(), "update", pair, order,
                         record, () -> service.update(created.paymentId(), update));
                 TransactionPrecheckResponse preview = measure(implementation, contracts.size(), "precheck", pair,
