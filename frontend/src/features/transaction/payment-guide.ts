@@ -213,6 +213,7 @@ export class PaymentGuideObserver {
     )
       return false
     this.server = structuredClone(refreshed)
+    this.checked = null
     this.confirmation = structuredClone(refreshed)
     this.emit()
     return true
@@ -248,7 +249,7 @@ export class PaymentGuideObserver {
       throw new GuideFailure('SERVER_STATE_CHANGED')
     }
     let verified = false
-    if (matches && !input.dirty && this.checked?.result.confirmable === true && !this.checked.result.blockers?.length && this.checked.result.precheckToken) {
+    if (matches && !input.dirty && payment?.status === 'DRAFT' && this.checked?.key === serverKey(payment) && this.checked.result.confirmable === true && !this.checked.result.blockers?.length && this.checked.result.precheckToken) {
       try {
         verified = await verifyPrecheck(input.paymentId!, this.checked.result.precheckToken, AbortSignal.any([signal,this.lifetime.signal]))
       } catch { signal.throwIfAborted(); verified = false }

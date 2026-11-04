@@ -94,6 +94,24 @@ describe('payment guide server evidence', () => {
     await expect(read()).rejects.toThrow('SERVER_STATE_CHANGED')
     expect((await read()).prechecked).toBe(false)
   })
+  it('rejects a successful proof verification that arrives after the form input changes', async () => {
+    precheck()
+    let entered!: () => void
+    let finish!: (value: unknown) => void
+    const started = new Promise<void>(resolve => { entered = resolve })
+    vi.mocked(apiClient.request).mockImplementation(async path => {
+      if (path === '/api/v1/assistant/prechecks/revalidate') {
+        entered()
+        return new Promise<never>(resolve => { finish = value => resolve(value as never) })
+      }
+      return { data: response, error: null, requestId: 'G' } as never
+    })
+    const reading = read()
+    await started
+    observer.invalidateInput()
+    finish({ data: { paymentId: '77', verified: true, expiresAt: '2099-01-01T00:00:00Z' }, error: null, requestId: 'G' })
+    await expect(reading).rejects.toThrow('CONTEXT_CHANGED')
+  })
   it('rejects a response without identity or a changed saved version during precheck', () => {
     expect(observer.acceptPrecheck(observer.begin('precheck'), draft, { confirmable: true }, draft)).toBe(false)
     expect(observer.acceptPrecheck(observer.begin('precheck'), draft, passed, { ...draft, updatedAt: 'later' })).toBe(
@@ -141,6 +159,20 @@ describe('payment guide server evidence', () => {
     const state = await read()
     expect(paymentGuideConditions.PAYMENT_CONFIRMED(observer.readContext(), state)).toBe('SATISFIED')
     expect(state.saved).toBe(false)
+  })
+  it('does not revalidate an obsolete precheck after verified confirmation', async () => {
+    precheck()
+    const confirmed: Payment = { ...draft, status: 'CONFIRMED', updatedAt: 'confirmed' }
+    expect(observer.acceptConfirmed(observer.begin('confirm'), confirmed, confirmed)).toBe(true)
+    response = confirmed
+    vi.mocked(apiClient.request).mockImplementation(async path => {
+      if (path === '/api/v1/assistant/prechecks/revalidate') throw new Error('STALE_AFTER_CONFIRM')
+      return { data: response, error: null, requestId: 'G' } as never
+    })
+    const state = await read()
+    expect(state.confirmed).toBe(true)
+    expect(state.prechecked).toBe(false)
+    expect(vi.mocked(apiClient.request).mock.calls.every(([path]) => path !== '/api/v1/assistant/prechecks/revalidate')).toBe(true)
   })
   it('does not reuse a confirmation merely because GET shows CONFIRMED', async () => {
     response = { ...draft, status: 'CONFIRMED' }
