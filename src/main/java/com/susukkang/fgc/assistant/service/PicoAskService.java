@@ -48,6 +48,8 @@ public class PicoAskService {
     private static final Pattern STEP_COUNT = Pattern.compile("(?<![\\p{N}.,+\\-])([1-9]\\d{0,2})\\s*단계");
     /** 줄 앞이나 문장 안의 '1. ', '2) ' 순번. 실제 답은 한 줄에 이어 쓰는 경우가 많다(TER-011 실측). 1부터 이어질 때만 지운다. */
     private static final Pattern LIST_MARKER = Pattern.compile("(?<!\\S)([1-9]\\d?)[.)][\\t ]+");
+    /** 화면 소제목의 ①②③은 영역 번호지만 답에 옮기면 숫자 검사에 걸린다(TER-011 P-N5). 검사를 풀지 않고 모델이 받는 근거에서만 뺀다. */
+    private static final Pattern AREA_NUMBER = Pattern.compile("[\\u2460-\\u2473]\\s*");
 
     private enum OutputRejection { INVALID_FIELDS, GENERATED_NUMBER, GENERATED_AMOUNT, UNSAFE_TEXT, INVALID_EVIDENCE }
 
@@ -190,6 +192,8 @@ public class PicoAskService {
             String helpQuery = (String) input.get("question") + " " + history.stream().map(turn -> turn.get("text")).collect(java.util.stream.Collectors.joining(" "));
             chunks = new ArrayList<>(allowed.stream().filter(guide -> selection.workflowIds().contains(guide.workflowId()))
                     .flatMap(guide -> catalog.chunks(guide, helpQuery, authorities).stream())
+                    .map(chunk -> new PicoGuideCatalog.Chunk(chunk.chunkId(), chunk.workflowId(), chunk.stepId(),
+                            AREA_NUMBER.matcher(chunk.title()).replaceAll(""), AREA_NUMBER.matcher(chunk.content()).replaceAll("")))
                     .sorted(Comparator.comparingInt(chunk -> chunk.stepId() == null ? 0 : chunk.stepId().startsWith("help.") ? 1 : 2)).toList());
             // Selected workflows without registered evidence: fixed notice instead of a second, ungrounded model call.
             if (chunks.isEmpty()) return fixed(request, Decision.UNSUPPORTED,

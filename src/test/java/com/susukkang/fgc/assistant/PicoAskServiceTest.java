@@ -371,6 +371,24 @@ class PicoAskServiceTest {
             assertThat(service.ask(request("초안 저장 순서")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
         }
     }
+    @Test void modelEvidenceOmitsAreaNumbersWhileTheNumberGuardStillRejectsThem() throws Exception {
+        role("GA_ADMIN");
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+                .thenReturn(new PicoAskService.GuideSelection(List.of("clawback.review"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer("환수 화면의 후보 근거 영역을 확인하세요.","clawback.review:overview"));
+        var reply = service.ask(request("환수 후보 근거는 어디에서 보나요?"));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        var prompts = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),any());
+        var evidence = new ObjectMapper().readTree(prompts.getAllValues().getLast().data()).path("evidence").toString();
+        assertThat(evidence).contains("후보 근거").doesNotContainPattern("[\\u2460-\\u2473]");
+        // 근거에서 뺐을 뿐 검사는 그대로다. 모델이 스스로 쓴 번호와 금액 우회는 계속 거절한다.
+        for (var message : List.of("③ 후보 근거 영역을 확인하세요.", "환수액은 ①억 원입니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"clawback.review:overview"));
+            assertThat(service.ask(request("환수 후보 근거는 어디에서 보나요?")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
     @Test void sharedCatalogRegistersBothApprovedSavedDraftBranches() {
         var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("payment.confirm")).findFirst().orElseThrow();
         var scope = guide.steps().stream().filter(step -> step.stepId().equals("payment.scope")).findFirst().orElseThrow();
