@@ -80,6 +80,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Timeout(60)
 class ContractStatusEventIntegrationTest {
 
+    /** 이 시험은 호출 순서·재시도를 기록용 처리기 하나로 확인한다. 실제 보류 처리기(FUN-028)는 PaymentHoldFollowUpIntegrationTest 가 확인하므로 작업을 만들지 않게 막는다. */
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private PaymentHoldFollowUpProcessor paymentHoldProcessor;
+
+
     private static final OffsetDateTime AUG_1 = OffsetDateTime.parse("2026-08-01T00:00:00+09:00");
     private static final String CODE = "MANUAL_STATUS_CHANGE";
     private static final String REASON = "보험회사 통보 반영";
@@ -100,6 +105,7 @@ class ContractStatusEventIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.when(paymentHoldProcessor.jobName()).thenReturn(PaymentHoldFollowUpProcessor.JOB);
         settle = (FgcUserDetails) users.loadUserByUsername("settle01");
         processor.reset();
         // 앞 테스트가 남긴 대기 작업을 비워 이 테스트가 만든 작업의 처리 순서만 본다.
