@@ -22,6 +22,7 @@ import {
 } from './model'
 import type { InsurerKind, Period, Row } from './model'
 import { ChatbotModal } from './chatbot/ChatbotModal'
+import { PicoMotion } from './mascot/PicoMotion'
 import './agent-home.css'
 import workflowGuides from '../assistant/workflow-guides.v1.json'
 import { useWorkflowGuide } from '../assistant/workflow-state'
@@ -415,7 +416,7 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
         aria-expanded={open}
         onClick={onOpen}
       >
-        <img src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`} alt="" width={128} height={128} />
+        <PicoMotion motion="still" size={128} className="ah-launcher-mascot" />
         <span className="ah-launcher-label">상품 추천 AI</span>
       </button>
       {open && <ChatbotModal onClose={onClose} />}

@@ -1,0 +1,58 @@
+import { Suspense, lazy, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { canAnimate } from '../../../lib/motion'
+import './pico-motion.css'
+
+/**
+ * 설계사 화면의 보라 피코 모션. pico-motion-purple.riv 의 상태별 아트보드를 그린다
+ * (원본: 캐릭터 디자인/fgc-bear/character-motion-purple — 파랑 파츠를 보라 그림 색으로 바꾼 것).
+ * - still   가만히                       (메인 화면 런처)
+ * - wave    웃으며 인사 → 눈 뜨고 갸웃   (챗봇 1단계)
+ * - hat     탐정 모자·화난 눈썹, 정지     (챗봇 2단계)
+ * - glasses 안경, 10초마다 지시봉 휘두르기 (챗봇 3단계)
+ * - worried 당황, 두리번두리번            (답변을 찾지 못했을 때)
+ */
+export type PicoMotionName = 'still' | 'wave' | 'hat' | 'glasses' | 'worried'
+
+const ARTBOARDS: Record<PicoMotionName, string> = {
+  still: 'Bear Still',
+  wave: 'Bear Wave',
+  hat: 'Bear Hat',
+  glasses: 'Bear Glasses',
+  worried: 'Bear Worried',
+}
+
+const brand = (name: string) => `${import.meta.env.BASE_URL}images/brand/${name}.png`
+/** 모션을 쓰지 않거나(동작 줄이기·테스트) Rive 를 불러오기 전·실패했을 때 보여 줄 보라 정지 그림. */
+const STILLS: Record<PicoMotionName, string> = {
+  still: brand('agent-mascot'),
+  wave: brand('chatbot-base'),
+  hat: brand('chatbot-search'),
+  glasses: brand('chatbot-sum-base'),
+  worried: brand('chatbot-sorry'),
+}
+
+// Rive 런타임(WASM 포함)은 모션을 실제로 그릴 때만 내려받는다.
+const PicoRive = lazy(() => import('./PicoRive'))
+
+export function PicoMotion({ motion, size, className }: { motion: PicoMotionName; size: number; className?: string }) {
+  const [animate] = useState(canAnimate)
+  const [failed, setFailed] = useState(false)
+  const still = <img src={STILLS[motion]} alt="" width={size} height={size} draggable={false} />
+  return (
+    <span
+      className={`pico-motion${className ? ` ${className}` : ''}`}
+      style={{ '--pico-size': `${size}px` } as CSSProperties}
+      data-pico-motion={motion}
+      aria-hidden="true"
+    >
+      {animate && !failed ? (
+        <Suspense fallback={still}>
+          <PicoRive artboard={ARTBOARDS[motion]} fallback={still} onError={() => setFailed(true)} />
+        </Suspense>
+      ) : (
+        still
+      )}
+    </span>
+  )
+}

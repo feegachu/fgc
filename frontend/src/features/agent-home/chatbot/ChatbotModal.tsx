@@ -4,6 +4,8 @@ import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { rate } from '../../../lib/format'
+import { PicoMotion } from '../mascot/PicoMotion'
+import type { PicoMotionName } from '../mascot/PicoMotion'
 import { askCompare, compareCategoriesQuery, compareExplainQuery, newsHeadlinesQuery, rankCompare } from './api'
 import type { CompareCategory, CompareEvidence, CompareExcluded, CompareItem, CompareRanking } from './api'
 import { FilterPanel } from './FilterPanel'
@@ -18,30 +20,15 @@ const CHECKS = ['내 한도 확인', '정책 수수료율 확인', '환수 규�
 /** 계산이 빨라도 화면이 깜빡이지 않도록 2단계는 캐릭터가 한 바퀴 도는 시간 동안 보여 준다. chatbot.css 의 cb-turn 주기(5.5s)와 같아야 한다. */
 const SPIN_MS = 5500
 const CHECK_MS = SPIN_MS / CHECKS.length
-// 설계사 화면의 보라 캐릭터를 쓴다(#839).
-const IMG = (name: string) => `${import.meta.env.BASE_URL}images/brand/chatbot-${name}.png`
-type MascotName = 'base' | 'search' | 'sum' | 'sorry'
+// 설계사 화면의 보라 캐릭터(#839) 단계별 모션: 1단계 웃으며 인사, 2단계 탐정 모자(정지), 3단계 안경과 지시봉, 답변을 찾지 못하면 당황.
+const MASCOTS = { base: 'wave', search: 'hat', sum: 'glasses', sorry: 'worried' } as const satisfies Record<
+  string,
+  PicoMotionName
+>
+type MascotName = keyof typeof MASCOTS
 
 function Mascot({ name, size = 101 }: { name: MascotName; size?: number }) {
-  // 답변(3단계)은 들고 있는 막대만 따로 움직이도록 몸통과 막대를 두 겹으로 그린다.
-  if (name === 'sum') {
-    return (
-      <span className="cb-mascot cb-pointer" style={{ width: size, height: size }} aria-hidden="true">
-        <img src={IMG('sum-base')} alt="" width={size} height={size} />
-        <img className="cb-stick" src={IMG('sum-stick')} alt="" width={size} height={size} />
-      </span>
-    )
-  }
-  return (
-    <img
-      className={`cb-mascot${name === 'search' ? ' cb-spin' : ''}`}
-      src={IMG(name)}
-      alt=""
-      width={size}
-      height={size}
-      aria-hidden="true"
-    />
-  )
+  return <PicoMotion motion={MASCOTS[name]} size={size} className="cb-mascot" />
 }
 
 function Bot({
