@@ -16,8 +16,15 @@ public record ValidationRunProgressResponse(
         Integer failedStep,
         String failureMessage,
         String requestId,
-        Long attemptId
+        Long attemptId, Long retryId, Long batchExecutionId
 ) {
+    public ValidationRunProgressResponse(String status,String statusLabel,Integer currentStep,Integer totalSteps,Integer progressPct,Integer failedStep,String failureMessage,String requestId,Long attemptId) {
+        this(status,statusLabel,currentStep,totalSteps,progressPct,failedStep,failureMessage,requestId,attemptId,null,null);
+    }
+    public ValidationRunProgressResponse withRetry(java.util.List<com.susukkang.fgc.validation.service.ValidationRestartService.Retry> history) {
+        var latest=history.isEmpty()?null:history.getFirst();
+        return new ValidationRunProgressResponse(status,statusLabel,currentStep,totalSteps,progressPct,failedStep,failureMessage,requestId,attemptId,latest==null?null:latest.retryId(),latest==null?null:latest.batchExecutionId());
+    }
     private static final int TOTAL_STEPS = 10;
 
     public static ValidationRunProgressResponse from(ValidationRunRow row) {
