@@ -21,6 +21,10 @@ export const contractErrorText = (error: Error, fallback?: string) =>
     ? internalErrorText(error.requestId)
     : errorText(error, fallback)
 
+/** IF-API-64 역할(인터페이스정의서 §4-4-8). 서버가 다시 검사하므로 화면은 버튼만 가린다. */
+export const canPreviewStatusEvent = (roleCode?: string) =>
+  ['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(roleCode ?? '')
+
 export type StatusSort = 'effectiveAt' | 'receivedAt'
 /** 유효한 일시 오름차순 → 사건 순번. 잘못된 일시는 끝에 둔다. 원본 캐시는 정렬하지 않는다. */
 export function sortStatusEvents(events: ContractStatusEvent[], sort: StatusSort) {

@@ -63,7 +63,11 @@ const agent = {
 }
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'form-test' })
 type Handler = (url: string, options?: RequestOptions) => unknown
-function renderAt(path = '/contracts/21/edit', handler?: Handler, cached?: ContractDetail) {
+function renderAt(
+  path: string | { pathname: string; state: unknown } = '/contracts/21/edit',
+  handler?: Handler,
+  cached?: ContractDetail,
+) {
   const writes: { url: string; options?: RequestOptions }[] = []
   vi.spyOn(apiClient, 'request').mockImplementation(async (url, options) => {
     if (options?.method) writes.push({ url, options })
@@ -615,6 +619,32 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     expect(writes[0].options?.idempotencyKey).toMatch(uuid)
     expect((writes[0].options?.body as ContractUpdateRequest).statusEvent).toBeUndefined()
     expect(router.state.location.state.message).toBe('계약 수정이 저장되었습니다.')
+  })
+
+  it('영향 미리보기에서 넘긴 상태와 효력일시를 초안으로 채우고 저장은 사람이 눌러야 보낸다', async () => {
+    const statusDraft = { contractStatus: 'TERMINATED', effectiveAt: '2026-10-20T00:00' }
+    const { writes } = renderAt({ pathname: '/contracts/21/edit', state: { statusDraft } }, (url) =>
+      url === '/api/v1/contracts/21' ? statusContract : undefined,
+    )
+
+    await waitFor(() => expect(field('변경 상태')).toHaveValue('TERMINATED'))
+
+    expect(field('효력일시')).toHaveValue('2026-10-20T00:00')
+    expect(screen.getByRole('group', { name: '상태 변경 사유' })).toBeInTheDocument()
+    expect(save()).toBeDisabled()
+    expect(writes).toHaveLength(0)
+  })
+
+  it('지금 고를 수 없는 상태의 미리보기 초안은 버린다', async () => {
+    const statusDraft = { contractStatus: 'LAPSED', effectiveAt: '2026-10-20T00:00' }
+    renderAt({ pathname: '/contracts/21/edit', state: { statusDraft } }, (url) =>
+      url === '/api/v1/contracts/21' ? statusContract : undefined,
+    )
+
+    await ready()
+
+    expect(field('변경 상태')).toHaveValue('ACTIVE')
+    expect(screen.queryByRole('group', { name: '상태 변경 사유' })).not.toBeInTheDocument()
   })
 
   it('상태를 바꾸면 사유 영역을 채우고 확인창에서 전후 상태·일시·사유를 검토한 뒤 서울 offset으로 보낸다', async () => {
