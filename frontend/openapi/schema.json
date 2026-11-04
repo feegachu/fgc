@@ -8634,9 +8634,6 @@
       "AssistantCalculationLine" : {
         "type" : "object",
         "properties" : {
-          "cashflowType" : {
-            "type" : "string"
-          },
           "sourceId" : {
             "type" : "string"
           },
@@ -8678,6 +8675,9 @@
             "type" : "string"
           },
           "status" : {
+            "type" : "string"
+          },
+          "cashflowType" : {
             "type" : "string"
           }
         }
