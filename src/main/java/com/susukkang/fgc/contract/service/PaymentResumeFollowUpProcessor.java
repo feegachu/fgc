@@ -70,15 +70,7 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
         Long contractId = event.getContractId();
         List<ContractStatusEffect> planned = new ArrayList<>();
         for (ContractStatusEffect effect : rule.decide(event, holds.openHeldPaymentIds(contractId))) {
-            boolean line = effect.entityType() == EntityType.SCHEDULE_LINE;
-            if (line && PLANNED.equals(effect.nextState()) && RESUMABLE_LINE_STATES.contains(effect.previousState())) {
-                planned.add(effect);
-            } else if (line && CANCELLED.equals(effect.nextState())) {
-                planned.add(effect);
-            } else if (!line && RELEASED.equals(effect.nextState())
-                    && holds.hasOpenHold(effect.entityId(), contractId, REVIVAL_RELEASES)) {
-                planned.add(effect);
-            } else if (EXCLUDED.equals(effect.nextState())) {
+            if (recordable(effect, contractId)) {
                 planned.add(effect);
             }
         }
@@ -91,6 +83,17 @@ public class PaymentResumeFollowUpProcessor implements ContractStatusFollowUpPro
             }
         }
         return planned;
+    }
+
+    private boolean recordable(ContractStatusEffect effect, Long contractId) {
+        if (EXCLUDED.equals(effect.nextState())) {
+            return true;
+        }
+        if (effect.entityType() == EntityType.PAYMENT) {
+            return RELEASED.equals(effect.nextState()) && holds.hasOpenHold(effect.entityId(), contractId, REVIVAL_RELEASES);
+        }
+        return CANCELLED.equals(effect.nextState())
+                || (PLANNED.equals(effect.nextState()) && RESUMABLE_LINE_STATES.contains(effect.previousState()));
     }
 
     @Override

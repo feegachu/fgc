@@ -653,7 +653,7 @@ public class ContractServiceImpl implements ContractService {
         return fieldError(FgcErrorCode.COMMON_002, field, detail);
     }
 
-    private FgcBusinessException fieldError(FgcErrorCode errorCode, String field, String detail) {
+    private static FgcBusinessException fieldError(FgcErrorCode errorCode, String field, String detail) {
         return new FgcBusinessException(errorCode, field, Map.of("field", field), detail);
     }
 
@@ -817,7 +817,7 @@ public class ContractServiceImpl implements ContractService {
     }
 
     static FgcBusinessException eventOrder(String field, String detail) {
-        return new FgcBusinessException(FgcErrorCode.IMPL_EVENT_ORDER, field, Map.of("field", field), detail);
+        return fieldError(FgcErrorCode.IMPL_EVENT_ORDER, field, detail);
     }
 
     /**

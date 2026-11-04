@@ -158,7 +158,7 @@ function ContractDetailView({ id }: { id: string }) {
                     onClick={() => setPreviewOpen(true)}
                   >
                     <span className="material-symbols-rounded" aria-hidden="true">
-                      preview
+                      search
                     </span>
                     영향 미리보기
                   </Button>

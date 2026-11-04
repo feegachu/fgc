@@ -4,7 +4,6 @@ import com.susukkang.fgc.clawback.dto.ClawbackCandidateDetailResponse;
 import com.susukkang.fgc.clawback.repository.ClawbackCandidateQueryRepository;
 import com.susukkang.fgc.clawback.repository.ClawbackCandidateWriteRepository;
 import com.susukkang.fgc.clawback.service.ClawbackCalculationService;
-import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import com.susukkang.fgc.common.code.ContractStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -64,7 +63,6 @@ public class ContractStatusPreviewService {
     private final InsuranceContractRepository contracts;
     private final ContractStatusEventRepository events;
     private final ObjectProvider<ContractStatusFollowUpProcessor> processors;
-    private final ContractStatusPaymentRule rule;
     private final PaymentHoldRepository holds;
     private final ClawbackCandidateQueryRepository clawbackEvidence;
     private final ClawbackCalculationService clawback;
@@ -100,10 +98,7 @@ public class ContractStatusPreviewService {
             }
         });
 
-        Map<Long, BigDecimal> draftAmounts = new HashMap<>();
-        rule.payments(contractId).stream()
-                .filter(payment -> payment.status() == CommissionPaymentStatus.DRAFT)
-                .forEach(payment -> draftAmounts.put(payment.transactionId(), payment.amount()));
+        Map<Long, BigDecimal> draftAmounts = draftAmounts(contractId);
         LocalDate eventDate = request.effectiveAt().atZoneSameInstant(DateUtil.SEOUL_ZONE).toLocalDate();
         // 후보가 되지 않는 사건도 기지급 근거는 같은 SQL에서 읽는다(지급 귀속 범위가 어긋나면 null).
         ClawbackCandidateDetailResponse evidence =
@@ -168,6 +163,22 @@ public class ContractStatusPreviewService {
                     rs.getObject("due_date", LocalDate.class)));
         }, contractId);
         return facts;
+    }
+
+    /** 미확정 지급 건의 이 계약 귀속액. 귀속행을 원 단위로 반올림한 뒤 더한다(운영정책서 제17조의2, 기지급과 같은 기준). */
+    private Map<Long, BigDecimal> draftAmounts(Long contractId) {
+        Map<Long, BigDecimal> amounts = new HashMap<>();
+        jdbc.query("""
+                SELECT ta.commission_transaction_id, SUM(ROUND(ta.attributed_amount, 0))
+                  FROM fgc.transaction_attribution ta
+                  JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
+                 WHERE ta.contract_id = ? AND ta.attribution_scope = 'CONTRACT' AND ct.cashflow_type = 'PAYMENT'
+                   AND ct.status = 'DRAFT'
+                 GROUP BY ta.commission_transaction_id
+                """, rs -> {
+            amounts.put(rs.getLong(1), rs.getBigDecimal(2));
+        }, contractId);
+        return amounts;
     }
 
     private static BigDecimal sum(Set<Long> paymentIds, Map<Long, BigDecimal> draftAmounts) {

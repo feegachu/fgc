@@ -29,12 +29,12 @@ function yesterdayInSeoul() {
   return `${seoul.toISOString().slice(0, 10)}T09:00`
 }
 
-/** 브라우저 토큰을 건드리지 않게 별도 세션으로 표에 없는 전이(정상→부활)를 보낸다. */
+/** 표에 없는 전이(정상→부활)를 별도 세션으로 보낸다. 같은 계정으로 로그인하면 브라우저 세션이 중복 로그인으로 끊긴다. */
 async function deniedPreview(page: Page, url: string, effectiveAt: string) {
   const origin = new URL(page.url()).origin
   const client = await request.newContext({ baseURL: origin, extraHTTPHeaders: { Origin: origin, 'X-FGC-Client': 'web' } })
   try {
-    const auth = await client.post('/api/v1/auth/login', { data: { loginId: 'settle01', password } })
+    const auth = await client.post('/api/v1/auth/login', { data: { loginId: 'gaadmin', password } })
     expect(auth.ok(), await auth.text()).toBe(true)
     const token = (await auth.json()).data.accessToken
     const before = database()
@@ -80,7 +80,8 @@ test('상태 사건 영향 미리보기는 실제 서버 결과를 보이고 DB 
   } else {
     await expect(dialog.getByText('변경되는 예정 회차가 없습니다')).toBeVisible()
   }
-  await page.screenshot({ path: 'e2e-artifacts/731-status-preview-real-server.png', fullPage: true })
+  await page.setViewportSize({ width: 1440, height: 1400 })
+  await dialog.screenshot({ path: 'e2e-artifacts/731-status-preview-real-server.png' })
 
   // 전이 표에 없는 사건은 화면이 선택지를 가려도 서버가 거절한다. 로그인 자체의 감사 기록은 비교에서 뺀다.
   const denied = await deniedPreview(page, `/api/v1${path}`, `${effectiveAt}:00+09:00`)

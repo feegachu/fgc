@@ -147,7 +147,7 @@ public class ContractStatusPaymentRule {
      * 이 계약에 귀속된 지급(PAYMENT) 건과 귀속일. 금액은 거래 전체가 아니라 이 계약의 귀속액 합이다(여러 계약에 나뉜 지급 건).
      * 차감 건과 설계사 단위 귀속은 판단하지 않는다.
      */
-    List<Payment> payments(Long contractId) {
+    private List<Payment> payments(Long contractId) {
         Map<Long, Payment> payments = new LinkedHashMap<>();
         Map<Long, BigDecimal> attributed = new LinkedHashMap<>();
         jdbc.query("""

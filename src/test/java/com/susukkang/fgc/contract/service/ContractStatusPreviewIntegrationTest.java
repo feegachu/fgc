@@ -225,6 +225,21 @@ class ContractStatusPreviewIntegrationTest {
     }
 
     @Test
+    @DisplayName("보류 금액은 귀속행을 원 단위로 반올림한 뒤 더하고 실제 결과와 같다(운영정책서 제17조의2)")
+    void heldAmountSumsRoundedAttributions() throws Exception {
+        Long id = contractWithOwnSchedule();
+        payment(id, CONTRACT_FEE, "GA_TO_FC", "2026-10-20", "1000.50", "DRAFT");
+        payment(id, CONTRACT_FEE, "GA_TO_FC", "2026-10-21", "2000.50", "DRAFT");
+
+        JsonNode preview = preview(id, UNPAID, "2026-09-01T00:00:00+09:00");
+
+        assertAmount(preview.path("heldAmount").path("before"), "0");
+        // 반올림 없이 더하면 3001 이다.
+        assertAmount(preview.path("heldAmount").path("after"), "3002");
+        assertMatchesActual(preview, save(id, UNPAID, "2026-09-01T00:00:00+09:00"), id);
+    }
+
+    @Test
     @DisplayName("끝나지 않은 앞 사건의 후속 작업이 있으면 결과와 함께 건수를 알린다")
     void pendingEarlierFollowUpsAreReported() throws Exception {
         Long id = contractWithOwnSchedule();
@@ -475,7 +490,7 @@ class ContractStatusPreviewIntegrationTest {
             });
         }
         assertThat(jdbc.queryForObject("""
-                SELECT COALESCE(SUM(ta.attributed_amount), 0)
+                SELECT COALESCE(SUM(ROUND(ta.attributed_amount, 0)), 0)
                   FROM fgc.transaction_attribution ta
                   JOIN fgc.commission_transaction ct ON ct.commission_transaction_id = ta.commission_transaction_id
                  WHERE ta.contract_id = ? AND ta.attribution_scope = 'CONTRACT' AND ct.status = 'DRAFT'
