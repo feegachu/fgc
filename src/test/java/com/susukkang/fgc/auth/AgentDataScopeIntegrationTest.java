@@ -108,6 +108,9 @@ class AgentDataScopeIntegrationTest {
                 .andExpect(jsonPath("$.error.message").value("본인 담당 자료만 조회·처리할 수 있습니다."));
         read("/api/v1/contracts/" + otherContract + "/status-events").andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FGC-AUTH-005"));
+        // IF-API-89 영향 조회도 남의 계약이면 객체 범위 검사(FGC-AUTH-005)로 막힌다. 경로 자체가 막힌 403 과 구별한다.
+        read("/api/v1/contracts/" + otherContract + "/status-events/1/effects").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-005"));
     }
 
     @Test
