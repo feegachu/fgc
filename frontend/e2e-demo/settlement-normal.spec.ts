@@ -93,6 +93,9 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   await page.getByRole('dialog').getByRole('button', { name: '확정 실행' }).click()
   expect((await successful(confirming)).status).toBe('CONFIRMED')
   await expect(page).toHaveURL(/\/transactions\?/)
+  // Router location can change before the guide commits its destination walkthrough.
+  await expect(page.getByRole('main').getByRole('heading', { name: '수수료 지급 건 목록', exact: true })).toBeVisible()
+  await expect(guide.getByRole('heading', { name: '확정된 지급을 확인하세요', exact: true })).toBeVisible()
 
   await continueFlow(page)
   await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
