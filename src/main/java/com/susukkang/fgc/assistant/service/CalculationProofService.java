@@ -73,11 +73,17 @@ public class CalculationProofService {
     }
     private String owner() {
         var auth=SecurityContextHolder.getContext().getAuthentication();if(auth==null || !auth.isAuthenticated())throw new AccessDeniedException("Authenticated calculation owner required");
-        String session=auth instanceof JwtAuthenticationToken jwt?jwt.getToken().getTokenValue():"test-or-service-principal";
+        String session;
+        if(auth.getDetails() instanceof com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter.SessionIdentity identity)session=identity.id();
+        else if(auth instanceof JwtAuthenticationToken jwt)session=jwt.getToken().hasClaim("sid")?jwt.getToken().getClaimAsString("sid"):jwt.getToken().getTokenValue();
+        else {
+            if(org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()!=null)throw new AccessDeniedException("Verified login session is required");
+            session="internal-test-or-service-principal";
+        }
         return PicoFingerprint.of(auth.getName()+"|"+auth.getAuthorities().stream().map(Object::toString).sorted().toList()+"|"+session);
     }
     private PaymentCalculationSnapshot copy(PaymentCalculationSnapshot result,String status,PaymentCalculationSnapshot.Validity validity,boolean stale) {
-        boolean allow=!stale && status.equals("CALCULATED") && result.kind().equals("EXPECTED_COMMISSION") && result.lines().size()==1 && result.resolvedScope().containsKey("policyVersionId") && !result.basis().ruleIds().isEmpty();
+        boolean allow=!stale && status.equals("CALCULATED") && result.kind().equals("EXPECTED_COMMISSION") && "SINGLE_LINE".equals(result.resolvedScope().get("aggregation")) && result.lines().size()==1 && result.resolvedScope().containsKey("policyVersionId") && !result.basis().ruleIds().isEmpty();
         var recommendation=new PaymentCalculationSnapshot.Recommendation(allow,allow?"payment.amount":null,allow?result.amounts().get("expectedAmount"):null,stale?"계산 근거가 변경되거나 만료됐습니다. 다시 계산해주세요.":result.recommendation().reason(),allow?List.of("VERIFY_ACTUAL_STATEMENT","ACTUAL_PRECHECK_REQUIRED"):result.recommendation().requiredChecks());
         var basis=stale?new PaymentCalculationSnapshot.Basis(result.basis().sourceRefs(),result.basis().rounding(),result.basis().asOfDate(),result.basis().policyVersionIds(),result.basis().ruleIds(),List.of()):result.basis();
         return new PaymentCalculationSnapshot(result.calculationId(),result.kind(),result.mode(),status,result.clientRevision(),result.synthetic(),true,result.evidenceKind(),result.currency(),result.paymentStatus(),result.resolvedScope(),stale?Map.of():result.amounts(),stale?List.of():result.capPreview(),stale?null:result.confirmable(),stale?List.of():result.blockers(),stale?List.of("CURRENT_DEPENDENCIES"):result.missingInputs(),basis,recommendation,result.calculatedAt(),validity,stale?List.of():result.lines());
