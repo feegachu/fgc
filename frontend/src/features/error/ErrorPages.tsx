@@ -28,12 +28,14 @@ function ErrorCard({ title, message, help, requestId, copyRequestId }: ErrorCard
   // 문구에 이미 요청 ID가 들어 있으면 다시 붙이지 않는다(format.ts errorText와 같은 규칙).
   return (
     <div className="error-page">
-      <section data-guide-feature="features.error.error-pages.section" className="surface error-card" aria-labelledby="error-title">
-        <header className="surface-header">
-          <h1 id="error-title" className="surface-title">
+      <header className="page-header">
+        <div className="page-header-copy">
+          <h1 id="error-title" className="page-title">
             {title}
           </h1>
-        </header>
+        </div>
+      </header>
+      <section data-guide-feature="features.error.error-pages.section" className="surface error-card" aria-labelledby="error-title">
         <div className="surface-body error-card-body">
           <p className="error-message" role="alert">
             {errorScreenMessage(message, requestId)}
