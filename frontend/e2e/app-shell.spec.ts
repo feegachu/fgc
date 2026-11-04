@@ -104,13 +104,12 @@ test('eleventh tab is bounded and restored; month updates every tab and removes 
   await page.getByRole('gridcell', { name: '8월', exact: true }).click()
   await page.getByRole('button', { name: '적용', exact: true }).click()
   await expect(page).toHaveURL(/month=2026-08/)
-  const hrefs = await page
-    .locator('.workspace-tab-link')
-    .evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-  expect(hrefs).toHaveLength(10)
-  for (const href of hrefs) {
-    expect(href).toContain('month=2026-08')
-    expect(href).not.toContain('page=')
+  const links = page.locator('.workspace-tab-link')
+  await expect(links).toHaveCount(10)
+  // URL 변경 후 셸의 effect가 모든 탭에 기준월을 반영할 때까지 기다린다.
+  for (let index = 0; index < 10; index += 1) {
+    await expect(links.nth(index)).toHaveAttribute('href', /[?&]month=2026-08(?:&|$)/)
+    await expect(links.nth(index)).not.toHaveAttribute('href', /[?&]page=/)
   }
 })
 
