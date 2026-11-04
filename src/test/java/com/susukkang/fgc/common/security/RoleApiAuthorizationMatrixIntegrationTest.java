@@ -154,6 +154,9 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 row("IF-19B", POST, "/api/v1/contracts/{}/cap-check", null, PROCESS),
                 row("IF-33", POST, "/api/v1/contracts/{}/arbitrage-check",
                         "{\"asOfDate\":\"" + MANUAL_RUN_MONTH + "\",\"reason\":\"권한 시험\"}", PROCESS),
+                // 계약 상태 미리보기 IF-64. 저장은 없지만 POST 라 전수 대조 대상이다
+                row("IF-64", POST, "/api/v1/contracts/{}/status-events/preview",
+                        "{\"eventType\":\"LAPSED\",\"effectiveAt\":\"2026-01-01T00:00:00+09:00\"}", PROCESS_OR_GA),
                 // 지급 — IF-22·23·23D·24·25
                 row("IF-22", POST, "/api/v1/transactions", PAYMENT, PROCESS),
                 row("IF-23", PUT, "/api/v1/transactions/{}", PAYMENT, PROCESS),

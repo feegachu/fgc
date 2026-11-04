@@ -16,7 +16,7 @@
 | 질문 | 답 |
 |---|---|
 | 무슨 도구로 | CodeQL(정적), Dependabot, npm audit, Trivy(의존성, 이미지), gitleaks, GitHub Secret scanning(비밀값), 역할 × API 행렬 통합 시험(인가), 공격 입력 통합 시험(입력), OWASP ZAP(동적) |
-| 어디까지 | 코드 전체 이력, 쓰기 API 38개 전수 대조(역할 시험 35개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 139건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
+| 어디까지 | 코드 전체 이력, 쓰기 API 39개 전수 대조(역할 시험 36개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 139건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
 | High/Critical 건수 | 탐지 15건 → 오탐 3, 이 PR로 조치 10, **예외 2(`.trivyignore` 승인 기재, Dependabot 해제는 PM 승인 대기)**. ZAP High 0 |
 | 조치 | 빌드 도구 classpath의 jackson, commons-lang3 올림. 개발 도구 zod 올림. API 이미지에서 쓰지 않는 pebble 제거. nginx 버전 노출 끄기. ZAP이 찾은 500 응답 3종을 400으로. 정적 화면 응답에 빠져 있던 보안 헤더(CSP 등)는 #782로 넣었고 신한 경로까지 확인 |
 | 남은 일 | RC에서 ZAP, Trivy, TLS, 롤백 실측. 시연 서버의 계정 보호 상태 확인(3절 층 3). SER-004 요구사항 해석 PM 확인(4-5) |
@@ -25,8 +25,8 @@
 
 | 항목 | 값 |
 |---|---|
-| 코드 기준 | develop `eb2a37a5` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
-| 이미지 기준 | 게시 이미지 `sha-69f77eff` (api `sha256:beaf2532…`, web `sha256:1cef1ee3…`). 이 PR의 조치 전 상태다. 그 뒤 develop의 #773(화면), #831(지급 보류, V79)은 이미지에 없고 의존성, `Containerfile`, nginx 변경은 없다 |
+| 코드 기준 | develop `dd1ba27b` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
+| 이미지 기준 | 게시 이미지 `sha-69f77eff` (api `sha256:beaf2532…`, web `sha256:1cef1ee3…`). 이 PR의 조치 전 상태다. 그 뒤 develop의 #773(화면), #831(지급 보류, V79), #835(지급 재개, 상태 미리보기)는 이미지에 없고 의존성, `Containerfile`, nginx 변경은 없다 |
 | RC | `r2.0.0-rc1` 미발행. 미확인 |
 | 시험 환경 | Testcontainers PostgreSQL 17, Windows 11 로컬 / GitHub Actions |
 | 시험 실행 | PR #858의 CI `build`(Gradle 전체 스위트), `frontend`, `ui`, `real-server`. 로컬: `test_zap_isolated_scan.py`, `test_shinhan_cd.py`, vitest 3개 파일 |
@@ -38,8 +38,8 @@
 |---|---|---|---|---|---|---|---|
 | 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `747bc68d` | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
 | 2 | 의존성, 이미지 | Dependabot, npm audit, Trivy 0.70.0 | 4-2 | 운영 jar, 빌드 classpath, npm, API/WEB 이미지 | Critical 2, High 10 | High 10 조치(jackson 5, zod 1, pebble 4). Critical 2는 예외(4-2, 7절) | 병합 뒤 재확인, 예외 승인 대기 |
-| 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조. 그 뒤 develop과 이 PR 커밋 16개는 같은 도구로 추가 1회, 0건 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
-| 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 38개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
+| 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조. 그 뒤 develop과 이 PR 커밋 20개는 같은 도구로 추가 1회, 0건 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
+| 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 39개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
 | 5 | 입력 | `InputAttackIntegrationTest`, `PrivateVolumeFileStorageTest`, `CsvExportWriterTest`, `exception.test.tsx`, `noRawHtml.test.ts` | 대표 검색, 정렬, 저장 후 응답, 다운로드 | 4-5 | 저장 후 실행, SQL 실행, 경로 탈출 0 | 4-5 | 시험 통과. 요구사항 해석은 PM 확인 대기(4-5) |
 | 5-2 | 업로드 | `noHandlerAcceptsFileUpload` | 앱 전체 매핑 | 해당 기능 없음 | 0 | #637 not planned, PR #707 닫힘 (트래커 #755 4번 11/2 결정). 업로드가 돌아오면 이 시험이 깨진다 | 해당 없음 |
 | 6 | AI(LLM) 주입 | #639 평가셋 | #639 | 프롬프트 주입, 다른 설계사 자료, 업무 쓰기 유도 | #639로 연결 | CT-G04, CT-G05는 #639가 판정. 서버 쪽 통제는 #833으로 병합: 사용자별 호출 한도(분당 12회), 범위 밖 질문 고정 안내, 지시문 노출 차단, 시간 제한 20초 | #639 |
@@ -100,7 +100,7 @@ CI 관문은 CRITICAL만 막는다. SER-010의 "High는 조치 또는 위험수�
 | 1 | generic-api-key | `AuthTokenApiIntegrationTest` | 오탐. 쿠키 속성 단언 문자열 |
 | 1 | generic-api-key | `JournalCorrectionExceptionRepositoryIntegrationTest` `keyPrefix` | 오탐. 시험 키 접두어 |
 
-전체 이력 스캔 뒤의 커밋(develop `eb2a37a5`까지와 이 PR, 16개)은 같은 도구로 한 번 더 돌려 0건이었다.
+전체 이력 스캔 뒤의 커밋(develop `dd1ba27b`까지와 이 PR, 20개)은 같은 도구로 한 번 더 돌려 0건이었다.
 
 GitHub 설정(2026-11-04 `gh api repos/feegachu/fgc`): `secret_scanning` enabled, `secret_scanning_push_protection` enabled. Secret scanning 경고 0건(전체 상태).
 
@@ -118,7 +118,7 @@ GitHub 설정(2026-11-04 `gh api repos/feegachu/fgc`): `secret_scanning` enabled
 |---|---|---|---|---|---|---|
 | 계약 IF-18, 19, 19A, 19B, 33 / 지급 IF-22, 23, 23D, 24, 25 / 스케줄 IF-29, 29A / 대사 IF-38, 42 / 검증 실행 IF-45, 48 | 허용 | 403 | 허용 | 403 | 403 | 401 |
 | 검증 확정 IF-51 | 허용 | 허용 | 403 | 403 | 403 | 401 |
-| 원장 정정 IF-36, 36A / 예외 처리 IF-44, 44A / 환수 IF-85, 73 | 허용 | 허용 | 허용 | 403 | 403 | 401 |
+| 원장 정정 IF-36, 36A / 예외 처리 IF-44, 44A / 환수 IF-85, 73 / 계약 상태 미리보기 IF-64 | 허용 | 허용 | 허용 | 403 | 403 | 401 |
 | 정책 작성 IF-79, 80, 81, IF-75 SUBMIT | 허용 | 허용 | 허용 | 403 | 403 | 401 |
 | 정책 승인 IF-75 APPROVE, REJECT, ACTIVATE | 허용 | 허용 | 403 | 403 | 403 | 401 |
 | 상품 비교 IF-77, 78 / 계약 확인 기록 IF-74A | 403 | 403 | 403 | 403 | 허용 | 401 |
@@ -234,7 +234,7 @@ API 응답에는 Spring Security 기본 헤더(`X-Frame-Options: DENY`, nosniff)
 | Trivy | 이미지마다 한 번씩: `trivy image --severity HIGH,CRITICAL --ignorefile .trivyignore ghcr.io/feegachu/fgc/api:sha-<RC SHA>`, 같은 명령을 `web`으로. 결과 건수 기록 |
 | npm audit, Dependabot | `npm audit --package-lock-only`, `gh api repos/feegachu/fgc/dependabot/alerts?state=open` 건수. 병합 뒤 Maven 경고가 #26만 남는지 확인 |
 | ZAP baseline | 격리: `API_IMAGE=... WEB_IMAGE=... bash infra/scripts/zap-isolated-scan.sh up` 뒤 `baseline`. 스택은 아래 API scan까지 유지. 개발계 baseline은 #677 표대로 수동 관찰만, 승인 뒤 |
-| ZAP API scan | 격리에서만, 같은 스택에서: `ZAP_LOGIN_PASSWORD=<시드 계정 비밀번호> bash infra/scripts/zap-isolated-scan.sh api` 뒤 `down`. 기본 능동 스캔 25분 제한(Access 토큰 수명 30분 안), 문서의 주소와 무관하게 대상 고정 |
+| ZAP API scan | 격리에서만, 같은 스택에서: `ZAP_LOGIN_PASSWORD=<시드 계정 비밀번호> bash infra/scripts/zap-isolated-scan.sh api` 뒤 `down`. 기본 능동 스캔 25분 제한, 문서의 주소와 무관하게 대상 고정. 토큰을 갱신하지 않으므로(수명 30분) 전체 시간과 만료 401 여부를 함께 적고, 만료로 인증 요청이 빠졌으면 그 실행을 합격 근거로 쓰지 않는다 |
 | TLS | `curl -I http://<도메인>/` 301, `curl -vI https://<도메인>/` 인증서 유효, `curl -I https://<도메인>/`에서 CSP, nosniff, HSTS 확인. 신한은 edge가 HSTS를 주는지 본다 |
 | 롤백 | Runbook 절차로 이전 digest 재배포 후 핵심 조회 확인, 배포 전 백업 파일 기록 |
 | CSP | RC 이미지를 격리 스택으로 띄워 화면을 지나며 콘솔의 CSP 위반 0건 확인 |
