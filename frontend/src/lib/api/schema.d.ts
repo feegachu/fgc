@@ -3537,23 +3537,27 @@ export interface components {
             sort?: string;
         };
         ContractStatusEffectResponse: {
-            amount?: number;
+            amount?: number | null;
             /** Format: int64 */
             entityId?: number;
             entityType?: string;
             nextState?: string;
             /** Format: int64 */
-            policyVersionId?: number;
-            previousState?: string;
+            policyVersionId?: number | null;
+            previousState?: string | null;
             processingJob?: string;
-            reason?: string;
+            reason?: string | null;
             reasonCode?: string;
         };
         ContractStatusEventProcessingResponse: {
+            errorCode?: string | null;
+            job?: string;
             /** Format: date-time */
             processedAt?: string;
             processingJob?: string;
             processingStatus?: string;
+            status?: string;
+            summary?: components["schemas"]["ProcessingSummary"] | null;
         };
         ContractStatusEventRequest: {
             /** Format: date-time */
@@ -3571,6 +3575,7 @@ export interface components {
             eventId?: number;
             /** Format: int32 */
             eventSeq?: number;
+            followUp?: components["schemas"]["EventFollowUp"];
             /** @enum {string} */
             newStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             newStatusLabel?: string;
@@ -3582,6 +3587,8 @@ export interface components {
             reasonCode?: string | null;
             /** Format: date-time */
             receivedAt?: string;
+            /** Format: date-time */
+            recordedAt?: string;
             registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
@@ -3743,6 +3750,11 @@ export interface components {
             recentRuns?: components["schemas"]["RecentValidationRunResponse"][];
             /** Format: int64 */
             reconMismatch?: number;
+        };
+        EventFollowUp: {
+            jobs?: components["schemas"]["FollowUpJob"][];
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
         };
         EvidenceItem: {
             label?: string;
@@ -3961,6 +3973,20 @@ export interface components {
             eventId?: number | null;
             /** @enum {string} */
             status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
+        };
+        FollowUpJob: {
+            /** Format: int32 */
+            attemptCount?: number;
+            errorCode?: string | null;
+            job?: string;
+            /** Format: date-time */
+            lastAttemptAt?: string | null;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: date-time */
+            nextRetryAt?: string | null;
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
         };
         HeldAmount: {
             after?: number;
@@ -4918,6 +4944,16 @@ export interface components {
             processingStatus?: string;
             /** Format: int64 */
             validationRunId?: number | null;
+        };
+        ProcessingSummary: {
+            /** Format: int32 */
+            changedScheduleLines?: number;
+            /** Format: int32 */
+            excludedCount?: number;
+            /** Format: int32 */
+            heldPayments?: number;
+            /** Format: int32 */
+            resumedPayments?: number;
         };
         /** @description 보험상품 판매버전 기준정보 */
         ProductResponse: {
