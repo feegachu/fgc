@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
+import { KpiCardContent } from '../../components/KpiCard'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
-import { dateTime, errorText, int, month as formatMonth } from '../../lib/format'
+import { dateTime, errorText, month as formatMonth } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { withMonth } from '../../stores/workspace'
 import { useAuth } from '../auth/useAuth'
@@ -25,7 +26,7 @@ import {
 import type { FinalizeChecklist, ValidationRunDetail, ValidationTarget } from './api'
 import { FinalizeDialogs } from './FinalizeDialogs'
 import { RunStatusBadge } from './RunStatusBadge'
-import { MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
+import { failureText, MANUAL_STEP_FROM, progressText, STEP_NAMES, STEP_STATE_TEXT, stepState } from './steps'
 import { useRestartAttemptDeadline } from './useRestartAttemptDeadline'
 import './validation.css'
 
@@ -60,20 +61,20 @@ function DetailError({ error, onRetry }: { error: Error; onRetry: () => void }) 
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">월 통합검증 상세 · 확정</h1>
+          <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
       </header>
-      <section className="surface">
+      <section data-guide-feature="features.validation.validation-run-detail-page.section" className="surface">
         <p className="vrun-inline-state is-error" role="alert">
           {notFound ? '존재하지 않는 검증 실행입니다.' : errorText(error, '실행 정보를 불러오지 못했습니다.')}
         </p>
         <p className="vrun-inline-state">
           {notFound ? (
-            <Link className="button button-secondary" to="/validation-runs">
+            <Link data-guide-feature="features.validation.validation-run-detail-page.link" className="button button-secondary" to="/validation-runs">
               실행 목록으로
             </Link>
           ) : (
-            <Button variant="secondary" onClick={onRetry}>
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button" variant="secondary" onClick={onRetry}>
               다시 시도
             </Button>
           )}
@@ -170,7 +171,7 @@ function DetailBody({
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">월 통합검증 상세 · 확정</h1>
+          <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
         <RunPicker currentId={id} link={link} />
       </header>
@@ -188,10 +189,10 @@ function DetailBody({
         </div>
       </div>
 
-      <section className="surface" aria-labelledby="vrun-header-title">
+      <section data-guide-feature="features.validation.validation-run-detail-page.section-2" className="surface" aria-labelledby="vrun-header-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-header-title">
-            실행 <span className="tabular-nums">{header.validationRunId}</span>
+            <span className="tabular-nums">{formatMonth(header.validationMonth)}</span> {header.runNo}회차 실행
           </h2>
           <RunStatusBadge status={status} label={live?.statusLabel ?? header.statusLabel} />
         </header>
@@ -222,27 +223,27 @@ function DetailBody({
               <dd className="tabular-nums">{dateTime(header.completedAt)}</dd>
             </div>
             <div>
-              <dt>확정자 · 확정시각</dt>
+              <dt>확정자, 확정시각</dt>
               <dd className="tabular-nums">
-                {header.finalizedAt ? `${header.finalizedBy ?? '-'} · ${dateTime(header.finalizedAt)}` : '-'}
+                {header.finalizedAt ? `${header.finalizedBy ?? '-'}, ${dateTime(header.finalizedAt)}` : '-'}
               </dd>
             </div>
           </dl>
           {status === 'FAILED' && (
             <p className="vrun-inline-state is-error" role="alert">
-              {failureMessage}
+              {failureText(failureMessage, currentStep)}
             </p>
           )}
         </div>
       </section>
 
-      <section data-guide-target="validation.progress" className="surface" aria-labelledby="vrun-stepper-title">
+      <section data-guide-feature="features.validation.validation-run-detail-page.section-3" data-guide-target="validation.progress" className="surface" aria-labelledby="vrun-stepper-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-stepper-title">
             진행 단계 (운영정책서 제43조)
           </h2>
           <div className="page-header-actions">
-            <Button
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button-2"
               variant="secondary"
               className="vrun-row-button"
               onClick={() => {
@@ -259,7 +260,7 @@ function DetailBody({
               새로고침
             </Button>
             {/* FAILED 월 실행은 같은 실행의 실패 지점부터 재시작한다(FUN-045). */}
-            <Button
+            <Button data-guide-feature="features.validation.validation-run-detail-page.button-3"
               className="vrun-row-button"
               aria-describedby="execute-action-note"
               loading={execute.isPending}
@@ -283,12 +284,12 @@ function DetailBody({
             {status === 'FINALIZED'
               ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.'
               : !canProcess
-                ? '실행 기동은 정산 담당자만 할 수 있습니다.'
+                ? '실행은 정산담당자와 시스템관리자만 할 수 있습니다.'
                 : startUnconfirmed
                   ? '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.'
                   : executed && !finished
                     ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
-                    : '생성됨 또는 실패한 월 실행만 기동할 수 있습니다.'}
+                    : '생성됨이나 실패 상태의 월 실행만 실행할 수 있습니다.'}
           </p>
           <p className="vrun-progress-line">
             <span>진행률</span>
@@ -352,11 +353,11 @@ function RunPicker({ currentId, link }: { currentId: string; link: (path: string
   const value = picked || currentId
   return (
     <div className="page-header-actions">
-      <div className="field vrun-run-picker">
-        <label className="field-label" htmlFor="pick-run">
+      <div className="filter-field vrun-run-picker">
+        <label className="filter-field-label" htmlFor="pick-run">
           실행
         </label>
-        <select
+        <select data-guide-feature="features.validation.validation-run-detail-page.pick-run"
           className="select-control"
           id="pick-run"
           value={value}
@@ -364,12 +365,12 @@ function RunPicker({ currentId, link }: { currentId: string; link: (path: string
         >
           {(runs.data?.content ?? []).map((run) => (
             <option key={run.validationRunId} value={String(run.validationRunId)}>
-              {formatMonth(run.validationMonth)} · {run.runNo}회차 · {run.statusLabel}
+              {formatMonth(run.validationMonth)}, {run.runNo}회차, {run.statusLabel}
             </option>
           ))}
         </select>
       </div>
-      <Button variant="secondary" onClick={() => void navigate(link(`/validation-runs/${value}`))}>
+      <Button data-guide-feature="features.validation.validation-run-detail-page.button-4" variant="secondary" onClick={() => void navigate(link(`/validation-runs/${value}`))}>
         <span className="material-symbols-rounded" aria-hidden="true">
           open_in_new
         </span>
@@ -386,11 +387,12 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
   const summary = detail.targetSummary
   const targets = detail.targets ?? []
   const columns: TableColumn<ValidationTarget>[] = [
-    { key: 'contract', label: '계약', width: '8rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
+    // 계약번호는 자르지 않는다(좁은 화면에서는 표 안에서 가로로 넘긴다).
+    { key: 'contract', label: '계약', width: '11.5rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
     {
       key: 'status',
       label: '선별',
-      width: '6rem',
+      width: '5rem',
       align: 'center',
       render: (t) => <StatusBadge tone={selectionTone(t.selectionStatus)}>{t.selectionStatusLabel}</StatusBadge>,
     },
@@ -406,7 +408,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
     {
       key: 'refund',
       label: '환급률표',
-      width: '6.5rem',
+      width: '5.5rem',
       cellClassName: 'tabular-nums',
       render: (t) => dash(t.refundRateTableId),
     },
@@ -418,13 +420,13 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
     },
   ]
   return (
-    <section className="surface" aria-labelledby="vrun-target-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-4" className="surface" aria-labelledby="vrun-target-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-target-title">
           ③ 대상 선별 결과
         </h2>
         <p className="vrun-card-note">
-          선정 {summary?.selectedCount ?? 0} · 제외 {summary?.excludedCount ?? 0} · 검토필요{' '}
+          선정 {summary?.selectedCount ?? 0}, 제외 {summary?.excludedCount ?? 0}, 검토필요{' '}
           {summary?.reviewRequiredCount ?? 0}
         </p>
       </header>
@@ -443,18 +445,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
 function SummaryCard({ label, value, unit, footer }: { label: string; value?: number; unit: string; footer?: string }) {
   return (
     <div className="kpi-card">
-      <p className="kpi-label">{label}</p>
-      <p className="kpi-value-row">
-        {value === undefined ? (
-          <span className="kpi-unit">{unit}</span>
-        ) : (
-          <>
-            <span className="kpi-value tabular-nums">{int(value)}</span>
-            <span className="kpi-unit">{unit}</span>
-          </>
-        )}
-      </p>
-      {footer && <p className="kpi-card-footer">{footer}</p>}
+      <KpiCardContent label={label} value={value ?? null} unit={unit} footer={footer} />
     </div>
   )
 }
@@ -467,13 +458,13 @@ function SummarySection({ detail, status }: { detail: ValidationRunDetail; statu
   const reco = detail.reconciliationSummary
   const before = status === 'CREATED'
   return (
-    <section className="surface" aria-labelledby="vrun-summary-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-5" className="surface" aria-labelledby="vrun-summary-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-summary-title">
           ④ 결과 요약
         </h2>
       </header>
-      <div className="kpi-grid vrun-summary-grid">
+      <div className="kpi-grid kpi-group vrun-summary-grid">
         <SummaryCard
           label="1,200%"
           unit={before ? '실행 전' : '건 검사'}
@@ -481,14 +472,14 @@ function SummarySection({ detail, status }: { detail: ValidationRunDetail; statu
           footer={
             before
               ? undefined
-              : `위반 ${cap?.violationCount} · 주의 ${cap?.warningCount} · 검토 ${cap?.reviewRequiredCount}`
+              : `위반 ${cap?.violationCount}, 주의 ${cap?.warningCount}, 검토 ${cap?.reviewRequiredCount}`
           }
         />
         <SummaryCard
           label="차익거래"
           unit={before ? '실행 전' : '건 검사'}
           value={before ? undefined : arb?.checkedCount}
-          footer={before ? undefined : `검토대상 ${arb?.candidateCount} · 검토 ${arb?.reviewRequiredCount}`}
+          footer={before ? undefined : `검토대상 ${arb?.candidateCount}, 검토 ${arb?.reviewRequiredCount}`}
         />
         <SummaryCard
           label="원장"
@@ -514,16 +505,16 @@ function ExceptionSection({ detail, openLink }: { detail: ValidationRunDetail; o
   // validationMonth 는 예외함의 검증월 검색조건이다(셸 기준월 month 와는 별개 파라미터).
   const href = openLink(`/exceptions?status=OPEN&validationMonth=${encodeURIComponent(month ?? '')}`)
   return (
-    <section className="surface" aria-labelledby="vrun-exception-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-6" className="surface" aria-labelledby="vrun-exception-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-exception-title">
           예외 생성 결과
         </h2>
-        <Link className="button button-secondary vrun-row-button" to={href}>
+        <Link data-guide-feature="features.validation.validation-run-detail-page.link-2" className="button button-secondary vrun-row-button" to={href}>
           예외함 열기
         </Link>
       </header>
-      <div className="kpi-grid vrun-exception-grid">
+      <div className="kpi-grid kpi-group vrun-exception-grid">
         <SummaryCard label="이번 실행 검출" value={summary?.detectedCount ?? 0} unit="건" />
         <SummaryCard label="신규 업무건" value={summary?.newCount ?? 0} unit="건" />
         <SummaryCard label="기존 업무건 재검출" value={summary?.recurringCount ?? 0} unit="건" />
@@ -570,7 +561,7 @@ function ChecklistSection({
     body = (
       <p className="vrun-inline-state is-error" role="alert">
         {errorText(checklist.error as Error, '확정 조건을 불러오지 못했습니다.')}
-        <Button variant="secondary" onClick={() => void checklist.refetch()}>
+        <Button data-guide-feature="features.validation.validation-run-detail-page.button-5" variant="secondary" onClick={() => void checklist.refetch()}>
           다시 시도
         </Button>
       </p>
@@ -593,7 +584,7 @@ function ChecklistSection({
                   {condition.passed ? '통과' : `미충족 ${condition.count}건`}
                 </StatusBadge>
                 {to && (
-                  <Link to={to} aria-label={`${condition.label} 미충족 건 바로가기`}>
+                  <Link data-guide-feature="features.validation.validation-run-detail-page.link-3" to={to} aria-label={`${condition.label} 미충족 건 바로가기`}>
                     바로가기
                   </Link>
                 )}
@@ -611,10 +602,10 @@ function ChecklistSection({
     )
   }
   return (
-    <section className="surface" aria-labelledby="vrun-checklist-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
-          ⑤ 확정 조건 (운영정책서 제44조 · 8개 전부 통과해야 함)
+          ⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)
         </h2>
         {summary.tone ? (
           <StatusBadge tone={summary.tone}>{summary.text}</StatusBadge>
@@ -677,33 +668,32 @@ function FinalizeSection({
   const passed = checklist?.passed === true
   const enabled = canFinalize && status === 'COMPLETED' && passed && !mutation.isPending
   let reason = ''
-  if (!canFinalize) reason = '확정 권한은 GA_ADMIN 또는 SYSTEM_ADMIN 에게만 있습니다.'
+  if (!canFinalize) reason = '확정은 GA관리자와 시스템관리자만 할 수 있습니다.'
   else if (status === 'FINALIZED') reason = '이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.'
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
   else if (!passed) reason = '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
   return (
-    <section data-guide-target="validation.finalize" className="surface" aria-labelledby="vrun-finalize-section-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-8" data-guide-target="validation.finalize" className="surface" aria-labelledby="vrun-finalize-section-title">
       <div className="vrun-finalize-row">
         <div className="vrun-finalize-copy">
           <p className="vrun-finalize-title" id="vrun-finalize-section-title">
-            ⑥ 확정 (FINALIZED)
+            ⑥ 확정
           </p>
           <p className="field-helper vrun-finalize-guide" id="finalize-action-guide">
             위 8개 조건이 모두 통과한 실행만 확정할 수 있습니다.
             <br />
-            확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 <strong>잠깁니다</strong>.{' '}
-            <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong>
+            확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 <strong>잠깁니다</strong>.{' '}
+            <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
             <br />
-            <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요. 확정 권한은{' '}
-            <span className="tabular-nums">GA_ADMIN</span> · <span className="tabular-nums">SYSTEM_ADMIN</span> 에게만
-            있습니다.
+            <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요. 확정은 GA관리자와 시스템관리자만 할
+            수 있습니다.
           </p>
           {/* 비활성 사유는 title 이 아니라 가시 텍스트로 전한다 — disabled 버튼은 포커스가 가지 않는다. */}
           <p className="vrun-action-note" id="finalize-action-note" role="status" hidden={!reason}>
             {reason}
           </p>
         </div>
-        <Button
+        <Button data-guide-feature="features.validation.validation-run-detail-page.btn-finalize"
           id="btn-finalize"
           aria-describedby="finalize-action-guide finalize-action-note"
           loading={mutation.isPending}
@@ -713,7 +703,7 @@ function FinalizeSection({
           <span className="material-symbols-rounded" aria-hidden="true">
             lock
           </span>
-          <span>{status === 'FINALIZED' ? '확정됨' : '확정'}</span>
+          <span>{status === 'FINALIZED' ? '확정(잠김)' : '확정'}</span>
         </Button>
       </div>
       <FinalizeDialogs

@@ -35,26 +35,26 @@ export function FinalizeDialogs({
         className="vrun-modal"
         footer={
           <>
-            <Button variant="secondary" disabled={pending} onClick={onCancel}>
+            <Button data-guide-feature="features.validation.finalize-dialogs.button" variant="secondary" disabled={pending} onClick={onCancel}>
               취소
             </Button>
-            <Button loading={pending} onClick={onConfirm}>
+            <Button data-guide-feature="features.validation.finalize-dialogs.button-2" loading={pending} onClick={onConfirm}>
               확정
             </Button>
           </>
         }
       >
         <p className="vrun-modal-description">
-          확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋·계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
+          확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
         </p>
         <div className="vrun-modal-points">
           <p>
-            <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong>
+            <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
           </p>
           <p>
-            수정 불가 — 확정된 검증 결과입니다. 결과를 바꾸려면 <strong>새 실행</strong>을 만드세요.
+            수정할 수 없습니다. 확정된 검증 결과입니다. 결과를 바꾸려면 <strong>새 실행</strong>을 만드세요.
           </p>
-          <p>확정 사실은 감사로그에 실행자·시각과 함께 남습니다.</p>
+          <p>확정 사실은 감사로그에 실행자/시각과 함께 남습니다.</p>
         </div>
         <dl className="vrun-kv">
           <div>
@@ -72,14 +72,14 @@ export function FinalizeDialogs({
         title="확정했습니다"
         onClose={onClosed}
         className="vrun-modal"
-        footer={<Button onClick={onClosed}>확인</Button>}
+        footer={<Button data-guide-feature="features.validation.finalize-dialogs.button-3" onClick={onClosed}>확인</Button>}
       >
         <p className="vrun-modal-description">
           이 실행의 검증 결과와 계산 근거가 잠겼습니다. 확정 사실은 감사로그에 남았습니다.
         </p>
         <div className="vrun-modal-points">
           <p>
-            <strong>검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.</strong>
+            <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
           </p>
         </div>
       </Modal>

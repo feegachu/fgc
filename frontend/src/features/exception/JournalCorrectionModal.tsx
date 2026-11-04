@@ -2,6 +2,7 @@ import { invalidateJournalCorrectionQueries } from '../ledger/correction-cache'
 import { accountDisplayName } from '../ledger/accountName'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
 import { Button } from '../../components/Button'
@@ -43,30 +44,30 @@ function OriginalJournal({ journal }: { journal: JournalDetail }) {
     <>
       <div className="journal-correction-original">
         <strong>
-          {journal.journalNo} · {journal.journalTypeLabel}
+          {journal.journalNo}, {journal.journalTypeLabel}
         </strong>
         <span className="text-secondary">분개일 {journal.journalDate}</span>
         <span className="text-secondary">
-          차변 {won(journal.debitTotal)} · 대변 {won(journal.creditTotal)}
+          차변 {won(journal.debitTotal)}, 대변 {won(journal.creditTotal)}
         </span>
         <span className="text-secondary">원장상태 {journal.statusLabel}</span>
         <strong className={`journal-correction-validation ${journal.balanced ? 'is-valid' : 'is-invalid'}`}>
-          {journal.balanced ? '차변·대변 검증 통과' : '차변·대변 검증 필요'}
+          {journal.balanced ? '차변/대변 검증 통과' : '차변/대변 검증 필요'}
         </strong>
-        {journal.correctionGroupKey && <span className="text-secondary">정정그룹 {journal.correctionGroupKey}</span>}
+        {journal.correctionGroupKey && <span className="text-secondary">정정 묶음 있음</span>}
         {journal.reversedByJournalHeaderId && (
-          <Link className="button button-ghost" to={`/journals?selected=${journal.reversedByJournalHeaderId}`}>
-            역분개 #{journal.reversedByJournalHeaderId}
+          <Link data-guide-feature="features.exception.journal-correction-modal.link" className="button button-ghost" to={`/journals?selected=${journal.reversedByJournalHeaderId}`}>
+            역분개 {journal.reversedByJournalNo}
           </Link>
         )}
         {journal.repostedJournalHeaderId && (
-          <Link className="button button-ghost" to={`/journals?selected=${journal.repostedJournalHeaderId}`}>
-            재기표 #{journal.repostedJournalHeaderId}
+          <Link data-guide-feature="features.exception.journal-correction-modal.link-2" className="button button-ghost" to={`/journals?selected=${journal.repostedJournalHeaderId}`}>
+            재기표 {journal.repostedJournalNo}
           </Link>
         )}
       </div>
-      <div className="journal-correction-original-lines" role="table" aria-label="원분개 라인">
-        {['라인', '계정과목', '차변', '대변', '설명'].map((heading) => (
+      <div className="journal-correction-original-lines" role="table" aria-label="원분개 줄">
+        {['줄', '계정과목', '차변', '대변', '적요'].map((heading) => (
           <strong key={heading} className="journal-correction-original-line is-heading" role="columnheader">
             {heading}
           </strong>
@@ -129,14 +130,14 @@ export function JournalCorrectionModal({
   return (
     <Modal
       open={open}
-      title="원분개 역분개 · 신규 재기표"
+      title="원분개 역분개, 신규 재기표"
       onClose={onClose}
       closeOnBackdrop
       className="modal-large journal-correction-modal"
       footer={
         <>
-          <p className="text-secondary">정정 실행 전 원분개와 신규 분개의 차변·대변을 확인하세요.</p>
-          <Button variant="secondary" onClick={onClose}>
+          <p className="text-secondary">정정 실행 전 원분개와 신규 분개의 차변/대변을 확인하세요.</p>
+          <Button data-guide-feature="features.exception.journal-correction-modal.button" variant="secondary" onClick={onClose}>
             닫기
           </Button>
         </>
@@ -188,6 +189,9 @@ function CorrectionBody({
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
   const [result, setResult] = useState<JournalCorrectionResult | null>(null)
+  const draftKey = JSON.stringify([journalDate, description, lines, reason, evidenceRef])
+  const [initialDraftKey] = useState(draftKey)
+  const clearUnsaved = useUnsavedWork(editable && result === null && draftKey !== initialDraftKey, draftKey)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -206,6 +210,7 @@ function CorrectionBody({
       }),
     meta: { errorToast: false },
     onSuccess: (done) => {
+      clearUnsaved()
       applyActionToCache(client, item.exceptionCaseId!, toAction(item, done))
       void invalidateJournalCorrectionQueries(client)
       setResult(done)
@@ -230,12 +235,12 @@ function CorrectionBody({
 
   const readOnly = !editable || result !== null
   return (
-    <form className="journal-correction-form journal-correction-modal-form" onSubmit={submit}>
+    <form data-guide-feature="features.exception.journal-correction-modal.form" className="journal-correction-form journal-correction-modal-form" onSubmit={submit}>
       <div className="journal-correction-guidance">
         원분개는 직접 수정하지 않습니다. 아래 신규 분개가 검증을 통과하면 역분개와 재기표를 한 번에 처리합니다.
       </div>
       <div className="journal-correction-compare-grid">
-        <section className="surface journal-correction-panel" aria-label="원분개 읽기 전용">
+        <section data-guide-feature="features.exception.journal-correction-modal.section" className="surface journal-correction-panel" aria-label="원분개 읽기 전용">
           <header className="surface-header journal-correction-panel-header">
             <h3 className="surface-title journal-correction-section-title">원분개 (읽기 전용)</h3>
           </header>
@@ -244,16 +249,16 @@ function CorrectionBody({
           </div>
         </section>
         {!readOnly && (
-          <section className="surface journal-correction-panel" aria-label="신규 재기표 입력">
+          <section data-guide-feature="features.exception.journal-correction-modal.section-2" className="surface journal-correction-panel" aria-label="신규 재기표 입력">
             <header className="surface-header journal-correction-panel-header">
               <h3 className="surface-title journal-correction-section-title">신규 재기표 입력</h3>
             </header>
             <div className="journal-correction-panel-body journal-correction-inputs">
               <Field label="새 분개일" required>
-                <input type="date" value={journalDate} onChange={(event) => setJournalDate(event.target.value)} />
+                <input data-guide-feature="features.exception.journal-correction-modal.input" type="date" value={journalDate} onChange={(event) => setJournalDate(event.target.value)} />
               </Field>
               <Field label="새 분개 설명" required>
-                <input
+                <input data-guide-feature="features.exception.journal-correction-modal.input-2"
                   maxLength={1000}
                   placeholder="올바른 분개 내용을 입력하세요."
                   value={description}
@@ -266,18 +271,18 @@ function CorrectionBody({
                     className="journal-correction-line"
                     key={line.key}
                     role="group"
-                    aria-label={`${index + 1}번 라인`}
+                    aria-label={`${index + 1}번 줄`}
                   >
-                    <strong className="journal-correction-line__title">{index + 1}번 라인</strong>
-                    <Button
+                    <strong className="journal-correction-line__title">{index + 1}번 줄</strong>
+                    <Button data-guide-feature="features.exception.journal-correction-modal.button-2"
                       variant="ghost"
                       className="journal-correction-line__remove"
                       onClick={() => setLines((current) => current.filter((candidate) => candidate.key !== line.key))}
                     >
-                      라인 삭제
+                      줄 삭제
                     </Button>
                     <Field label="계정과목" required>
-                      <select
+                      <select data-guide-feature="features.exception.journal-correction-modal.select"
                         className="select-control"
                         value={line.accountCode}
                         onChange={(event) => patchLine(line.key, { accountCode: event.target.value })}
@@ -291,7 +296,7 @@ function CorrectionBody({
                       </select>
                     </Field>
                     <Field label="차변" required>
-                      <input
+                      <input data-guide-feature="features.exception.journal-correction-modal.input-3"
                         type="number"
                         min="0"
                         max="9999999999999"
@@ -301,7 +306,7 @@ function CorrectionBody({
                       />
                     </Field>
                     <Field label="대변" required>
-                      <input
+                      <input data-guide-feature="features.exception.journal-correction-modal.input-4"
                         type="number"
                         min="0"
                         max="9999999999999"
@@ -310,8 +315,8 @@ function CorrectionBody({
                         onChange={(event) => patchLine(line.key, { creditAmount: event.target.value })}
                       />
                     </Field>
-                    <Field label="라인 설명">
-                      <input
+                    <Field label="줄 적요">
+                      <input data-guide-feature="features.exception.journal-correction-modal.input-5"
                         maxLength={500}
                         value={line.lineDescription}
                         onChange={(event) => patchLine(line.key, { lineDescription: event.target.value })}
@@ -320,18 +325,18 @@ function CorrectionBody({
                   </div>
                 ))}
               </div>
-              <Button
+              <Button data-guide-feature="features.exception.journal-correction-modal.button-3"
                 variant="secondary"
                 className="journal-correction-add-line"
                 onClick={() => setLines((current) => [...current, newLine()])}
               >
-                라인 추가
+                줄 추가
               </Button>
             </div>
           </section>
         )}
         {readOnly && (
-          <section
+          <section data-guide-feature="features.exception.journal-correction-modal.section-3"
             className="surface journal-correction-panel journal-correction-read-only"
             aria-label="원장 정정 처리 결과"
           >
@@ -342,21 +347,22 @@ function CorrectionBody({
               {result ? (
                 <div className="journal-correction-result" role="status">
                   <span>역분개와 재기표를 완료했습니다.</span>
-                  <span className="text-secondary">정정그룹 {result.correctionGroupKey}</span>
-                  <Link className="button button-ghost" to={`/journals?selected=${result.originalJournalHeaderId}`}>
-                    원분개 #{result.originalJournalHeaderId}
+                  <span className="text-secondary">정정 묶음으로 연결했습니다.</span>
+                  {/* 결과 응답에는 분개번호가 없다. 정정 뒤 다시 불러온 원분개 상세의 번호를 쓴다. */}
+                  <Link data-guide-feature="features.exception.journal-correction-modal.link-3" className="button button-ghost" to={`/journals?selected=${result.originalJournalHeaderId}`}>
+                    원분개 {journal.journalNo}
                   </Link>
-                  <Link className="button button-ghost" to={`/journals?selected=${result.reversalJournalHeaderId}`}>
-                    역분개 #{result.reversalJournalHeaderId}
+                  <Link data-guide-feature="features.exception.journal-correction-modal.link-4" className="button button-ghost" to={`/journals?selected=${result.reversalJournalHeaderId}`}>
+                    역분개 {journal.reversedByJournalNo}
                   </Link>
-                  <Link className="button button-ghost" to={`/journals?selected=${result.repostedJournalHeaderId}`}>
-                    재기표 #{result.repostedJournalHeaderId}
+                  <Link data-guide-feature="features.exception.journal-correction-modal.link-5" className="button button-ghost" to={`/journals?selected=${result.repostedJournalHeaderId}`}>
+                    재기표 {journal.repostedJournalNo}
                   </Link>
                 </div>
               ) : item.status === 'REJECTED' ? (
-                <p>오탐·반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
+                <p>오탐/반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
               ) : item.status === 'RESOLVED' ? (
-                <p>정정이 완료된 예외입니다. 원분개의 정정그룹과 연결 분개를 확인하세요.</p>
+                <p>정정이 완료된 예외입니다. 원분개의 정정 묶음과 연결 분개를 확인하세요.</p>
               ) : (
                 <p>검토를 시작하면 신규 분개를 입력할 수 있습니다.</p>
               )}
@@ -367,7 +373,7 @@ function CorrectionBody({
       {!readOnly && (
         <div className="surface journal-correction-action-panel">
           <Field label="정정 사유" required>
-            <textarea
+            <textarea data-guide-feature="features.exception.journal-correction-modal.textarea"
               className="textarea-control"
               maxLength={1000}
               placeholder="판단 근거와 실제 정정 내용을 입력하세요."
@@ -376,7 +382,7 @@ function CorrectionBody({
             />
           </Field>
           <Field label="증빙">
-            <input
+            <input data-guide-feature="features.exception.journal-correction-modal.input-6"
               type="text"
               maxLength={500}
               placeholder="문서번호 또는 링크"
@@ -389,7 +395,7 @@ function CorrectionBody({
               {error}
             </p>
           )}
-          <Button
+          <Button data-guide-feature="features.exception.journal-correction-modal.button-4"
             type="submit"
             className="exception-action-submit"
             loading={mutation.isPending}

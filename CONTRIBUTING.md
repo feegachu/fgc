@@ -950,3 +950,11 @@ Java 21과 Docker에서 `./gradlew clean build`로 전체 PostgreSQL 테스트�
 선택 실행하는 성능 테스트는 `scripts/verification/*-performance.init.gradle`을 사용합니다. 예: `./gradlew -I scripts/verification/contract-performance.init.gradle test --tests '*ContractReadPerformanceTest'`. 정정·전표 쓰기 성능 테스트도 각각 별도 Testcontainers DB를 생성합니다. 전환 전 SQL은 `src/test/java/.../common/persistence/baseline`의 JDBC 비교 기준으로만 남습니다. 운영 SQL과 공유하지 않으며, 응답·DB 결과·SQL 수를 비교합니다. JDBC와 JPA의 측정 시간은 드라이버·매핑 비용이 포함된 참고값이며 MyBatis 런타임의 성능으로 해석하지 않습니다.
 
 성능 6종까지 포함한 전체 검증은 `./gradlew clean build -I scripts/verification/persistence-integration.init.gradle`로 실행합니다. Node와 프런트 의존성이 준비된 환경에서 `FGC_EXPORT_OPENAPI=true`도 설정하면 실제 서버와 프런트의 HTTP 연동 테스트가 추가됩니다.
+
+## 프런트 가이드 변경 검사 (#813, SRC-028)
+
+화면 제목·버튼·입력·탭·표시 컴포넌트를 추가하거나 바꾸면 `data-guide-feature`와 동적 인스턴스를 등록하고,
+`frontend`에서 `npm run generate:guide-features` → `npm run generate:guide-knowledge`를 실행합니다.
+생성 JSON도 함께 커밋하고 `npm run check:guide-features`·`npm run check:guide-knowledge`를 통과해야 합니다.
+이 두 검사는 필수 `frontend` CI에 포함됩니다. 검사 통과와 별도로 대상이 정상 화면에 보이는지,
+조회 역할에 처리 안내가 노출되지 않는지 해당 튜토리얼을 실행해 확인합니다.

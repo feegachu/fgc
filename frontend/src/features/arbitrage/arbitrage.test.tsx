@@ -1,3 +1,4 @@
+import { workflowHelpSteps } from '../assistant/workflow-catalog'
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
@@ -9,6 +10,7 @@ import { useToastStore } from '../../stores/toasts'
 import ArbitragePage from './ArbitragePage'
 import { arbitrageTimelineQuery } from './api'
 import type { ArbitrageRow } from './api'
+import { decisionReasonText } from './utils'
 const row: ArbitrageRow = {
   arbitrageCheckId: 2,
   contractId: 10,
@@ -106,8 +108,8 @@ it('restores candidate URL, page and filters; stage is independent and all-stage
   await user.click(screen.getByRole('button', { name: '초기화' }))
   expect(screen.getByLabelText('지급단계')).toHaveValue('GA_TO_FC')
   expect(screen.getByLabelText('계약번호')).toHaveValue('')
-  await screen.findByRole('option', { name: 'INS1 · 가상생명' })
-  expect(screen.getByRole('option', { name: 'INS1 · 가상생명' })).toBeDisabled()
+  await screen.findByRole('option', { name: 'INS1, 가상생명' })
+  expect(screen.getByRole('option', { name: 'INS1, 가상생명' })).toBeDisabled()
 })
 it('rows support keyboard activation and timeline uses stored excess without recalculating', async () => {
   const user = userEvent.setup()
@@ -118,14 +120,14 @@ it('rows support keyboard activation and timeline uses stored excess without rec
   await user.keyboard('{Enter}')
   expect(rows[1]).toHaveAttribute('aria-selected', 'true')
   const detail = screen.getByRole('region', { name: '④ 상세' })
-  expect(within(detail).getByText('2026-07-01 · 7개월')).toBeVisible()
+  expect(within(detail).getByText('2026-07-01, 7개월')).toBeVisible()
   const cells = within(detail).getByRole('table').querySelectorAll('tbody tr td:first-child')
   expect([...cells].map((cell) => cell.textContent)).toEqual(['2026-07-01', '2026-07-31'])
 })
 it('#604 header toggles sort direction, returns to page 1, and keeps filters and Enter search', async () => {
   const user = userEvent.setup()
   const { router, request } = mount('/arbitrage-checks?month=2026-07&status=CANDIDATE&contractNo=ARB&page=2')
-  const tableName = { name: '검색 조건에 해당하는 계약별 차익거래 판정' }
+  const tableName = { name: '조회 조건에 해당하는 계약별 차익거래 판정' }
   const table = await screen.findByRole('table', tableName)
   const lastQuery = () =>
     new URLSearchParams(
@@ -232,7 +234,7 @@ it('required reason/date validation, trimmed POST, single submit, refreshed list
   await user.keyboard('{Escape}')
   expect(screen.getByRole('dialog')).toBeVisible()
   await user.keyboard('{Tab}')
-  expect(screen.getByRole('button', { name: '모달 닫기' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: '창 닫기' })).toHaveFocus()
   resolvePost(envelope({ arbitrageCheckId: 3, resultStatus: 'CLEAR' }))
   await screen.findByText('재검증 근거')
   await screen.findByText('차익거래 재검증을 완료했습니다.')
@@ -254,7 +256,7 @@ it('pending recheck keeps focus inside the modal after a single submit', async (
   await user.keyboard('{Escape}')
   expect(screen.getByRole('dialog')).toBeVisible()
   await user.tab()
-  expect(screen.getByRole('button', { name: '모달 닫기' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: '창 닫기' })).toHaveFocus()
 })
 it('recheck 403 keeps entered reason and server error visible without losing list', async () => {
   const user = userEvent.setup()
@@ -278,7 +280,7 @@ it.each([400, 500])('list %s errors use API code and hide 500 internals', async 
     throw new ApiError({ code: `FGC-COMMON-${status}`, message: 'server-detail' }, 'error-trace', status)
   })
   const alert = await screen.findByRole('alert')
-  expect(alert).toHaveTextContent(status === 500 ? '요청 ID: error-trace' : 'server-detail')
+  expect(alert).toHaveTextContent(status === 500 ? '처리 중 오류가 발생했습니다. 요청번호 error-trace를 담당자에게 알려주세요.' : 'server-detail')
   if (status === 500) expect(screen.queryByText('server-detail')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '이 계약만 다시 검증' })).toBeDisabled()
 })
@@ -312,7 +314,7 @@ it('insurer-to-GA rows remain readable but cannot invoke the GA-only manual API'
       : result([{ ...row, paymentStage: 'INSURER_TO_GA', paymentStageLabel: '원수사→GA' }], 1, 1),
   )
   await screen.findByText('서버 판정 근거')
-  expect(screen.getByText('단건 재검증은 GA→설계사 단계만 지원합니다.')).toBeVisible()
+  expect(screen.getByText('이 계약만 다시 검증은 GA→설계사 단계에서만 할 수 있습니다.')).toBeVisible()
   await user.click(screen.getByRole('button', { name: '이 계약만 다시 검증' }))
   expect(screen.getByRole('button', { name: '이 계약만 다시 검증' })).toBeDisabled()
   expect(request.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(false)
@@ -327,8 +329,9 @@ it('negative money uses common minus/red and displays stored excess independentl
   for (const amount of screen.getAllByText('-1,234원')) expect(amount).toHaveClass('is-negative-amount')
   await screen.findByRole('img', { name: '기준일별 초과액 추이' })
   for (const amount of screen.getAllByText('-987원')) expect(amount).toHaveClass('is-negative-amount')
-  const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector('.arb-calculation')!
-  expect(stored).toHaveTextContent('지급분 기준 초과액: -987원')
+  const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector<HTMLElement>('.arb-calculation')!
+  expect(within(stored).getByText('지급분 기준 초과액')).toBeVisible()
+  expect(within(stored).getByText('-987원')).toHaveClass('is-negative-amount')
 })
 
 it('timeline cache separates contract IDs even when contract number/stage match', async () => {
@@ -361,7 +364,7 @@ it('pagination shows at most five numbers and moves between page groups', async 
   expect(router.state.location.search).toContain('contractNo=ARB')
 })
 
-it('keeps projected-only excess separate from the CLEAR result in list and detail', async () => {
+it('preserves the CLEAR result and hides projected-only excess from the current judgement screen', async () => {
   const projected = {
     ...row,
     resultStatus: 'CLEAR' as const,
@@ -372,7 +375,42 @@ it('keeps projected-only excess separate from the CLEAR result in list and detai
   }
   mount(undefined, true, (path) => (path.includes('/insurers') ? fixtures(path) : result([projected], 1, 1)))
   await screen.findByText('서버 판정 근거')
-  expect(screen.getByText(/지급예정 포함 시 초과 \(모니터링\)/)).toBeVisible()
+  expect(screen.queryByText(/지급예정 포함 시 초과/)).not.toBeInTheDocument()
   expect(screen.getAllByText('이상없음').length).toBeGreaterThan(0)
-  expect(screen.getByText(/지급예정 포함 초과액 \(모니터링\)/)).toBeVisible()
+  expect(screen.getByRole('columnheader', { name: '지급예정액' })).toBeVisible()
+  const summary = screen.getByRole('region', { name: '차익거래 금액 요약' })
+  expect(within(summary).getByText('지급예정액')).toBeVisible()
+  expect(within(summary).getByText(/지급예정 포함 초과액/)).toBeVisible()
+  expect(within(summary).getByText('12,000원')).toBeVisible()
+})
+
+
+it('gives the three arbitrage summary cards distinct guide targets matching their filters', async () => {
+  mount()
+  await screen.findAllByRole('row', { name: '계약 ARB-001 상세 보기' })
+  const ids = ['arbitrage.summary.clear', 'arbitrage.summary.candidate', 'arbitrage.summary.review_required']
+  const labels = ['이상없음', '검토대상', '자료부족']
+  for (const [index, id] of ids.entries()) {
+    const nodes = document.querySelectorAll(`[data-guide-feature="${id}"]`)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]).toHaveTextContent(labels[index])
+    expect(workflowHelpSteps('arbitrage.review', 'COMPLIANCE').some((step) => step.targetId === id)).toBe(true)
+  }
+  expect(document.querySelector('[data-guide-feature="features.arbitrage.arbitrage-page.button"]')).toBeNull()
+})
+
+it('판정 근거의 서버 원문은 화면에서 쉬운 말로 바꾸고 앞뒤 말과 모르는 문구는 그대로 둔다', async () => {
+  const raw = { ...row, decisionReason: '자료부족: 기준일 이하 계약 금융 스냅샷이 없습니다.' }
+  mount(undefined, true, (path) => (path.includes('/insurers') ? fixtures(path) : result([raw], 1, 1)))
+  expect(await screen.findByText('자료부족: 기준일 이전 계약 금액 자료가 없습니다.')).toBeVisible()
+  expect(screen.queryByText(/금융 스냅샷/)).not.toBeInTheDocument()
+  expect(decisionReasonText('해약환급금 스냅샷 값이 없습니다.')).toBe('해약환급금 자료가 없습니다.')
+  expect(decisionReasonText('예상 해약환급금의 환급률표 ID가 없습니다. 상품을 확인하세요.')).toBe(
+    '예상 해약환급금에 연결된 환급률표가 없습니다. 상품을 확인하세요.',
+  )
+  expect(decisionReasonText('금융 스냅샷과 적용 환급률표가 일치하지 않습니다.')).toBe(
+    '계약 금액 자료와 적용 환급률표가 맞지 않습니다.',
+  )
+  expect(decisionReasonText('계약일이 없습니다.')).toBe('계약일이 없습니다.')
+  expect(decisionReasonText(null)).toBe('-')
 })

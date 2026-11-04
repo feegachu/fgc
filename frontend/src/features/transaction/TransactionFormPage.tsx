@@ -1,3 +1,10 @@
+import { useUnsavedWork } from '../../stores/unsavedWork'
+import { isWonAmount } from '../assistant/guards'
+import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservation'
+import { findGuide } from '../assistant/catalog'
+import { useWorkflowGuide } from '../assistant/workflow-state'
+import { connectPaymentGuideLaunch } from './payment-guide-launch'
+import { nameWithCode } from '../../lib/screenText'
 import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -62,8 +69,8 @@ export default function TransactionFormPage() {
       <div className="transaction-screen-state" role={draft.error ? 'alert' : 'status'}>
         {draft.error ? (
           <>
-            {formError(draft.error, '지급 건 화면을 초기화하지 못했습니다. 화면을 새로고침하세요.')}{' '}
-            <Button variant="secondary" onClick={() => void draft.refetch()}>
+            {formError(draft.error, '지급 건을 불러오지 못했습니다.')}{' '}
+            <Button data-guide-feature="features.transaction.transaction-form-page.button" variant="secondary" onClick={() => void draft.refetch()}>
               다시 시도
             </Button>
           </>
@@ -75,7 +82,7 @@ export default function TransactionFormPage() {
   if (id && draft.data?.status !== 'DRAFT')
     return (
       <div className="transaction-screen-state is-error" role="alert">
-        수정 가능한 지급 초안이 아닙니다. <Link to={withMonth('/transactions', activeMonth)}>목록으로</Link>
+        수정 가능한 지급 초안이 아닙니다. <Link data-guide-feature="features.transaction.transaction-form-page.link" to={withMonth('/transactions', activeMonth)}>목록으로</Link>
       </div>
     )
   return (
@@ -113,6 +120,9 @@ function TransactionForm({
   const root = useRef<HTMLDivElement>(null)
   const help = useRef<HTMLButtonElement>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [initialWorkflowId, setInitialWorkflowId] = useState<string | null>(null)
+  const [guideRevision, setGuideRevision] = useState(0)
+  const [guideSaved, setGuideSaved] = useState(Boolean(initialId))
   const fullFlow = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   const closeHelp = () => {
     setHelpOpen(false)
@@ -158,6 +168,7 @@ function TransactionForm({
   const [paymentId, setPaymentId] = useState(initialId)
   const [locked, setLocked] = useState(false)
   const [dirty, setDirty] = useState(!initialId)
+  const [inputEdited, setInputEdited] = useState(false)
   const [busy, setBusy] = useState<'save' | 'precheck' | 'confirm' | null>(null)
   const actionLock = useRef(false)
   const [fieldError, setFieldError] = useState<{ field: string; message: string }>()
@@ -198,6 +209,7 @@ function TransactionForm({
   const rows = rawRows.map((row) => normalizeRow(row, insurer, newcomer))
   const normalized = !loading && !referenceError && rows.some((row, index) => rowWasNormalized(rawRows[index], row))
   const needsSave = dirty || normalized
+  useUnsavedWork(inputEdited && needsSave && !confirmed)
   const confirmationNeedsRetry = Boolean(confirmError) && isRetryableConfirmation(confirmFailure)
   const confirmationRejected = confirmFailure != null && !isRetryableConfirmation(confirmFailure)
   const blockerId = result && confirmFailure ? blockedContractId(result, confirmFailure.code) : undefined
@@ -215,7 +227,7 @@ function TransactionForm({
   const inputDisabled =
     !canProcess || confirmed || locked || busy !== null || loading || Boolean(referenceError) || confirmationNeedsRetry
   const selectedAgent = agents.find((agent) => String(agent.agentId) === form.agentId)
-  const agentLabel = selectedAgent ? `${selectedAgent.agentCode} ${selectedAgent.agentName}` : '—'
+  const agentLabel = selectedAgent ? nameWithCode(selectedAgent.agentName, selectedAgent.agentCode) : '-'
   const ready = canProcess && !loading && !referenceError && busy == null && !confirmed
   const fieldMessage = (field: string) => (fieldError?.field === field ? fieldError.message : undefined)
   useEffect(() => {
@@ -263,7 +275,65 @@ function TransactionForm({
     if (guide.current && !disconnectGuide.current) disconnectGuide.current = connectPaymentGuide(guide.current)
   })
 
+  // Read-only guide projection: no input text, amounts, API payloads or server proof is stored.
+  let guideFormValid = false
+  try {
+    buildPayload(form, rows, newcomer)
+    guideFormValid =
+      !loading &&
+      !referenceError &&
+      (insurer || agents.some((agent) => String(agent.agentId) === form.agentId)) &&
+      availableItems(form, items).some((item) => String(item.commissionItemId) === form.commissionItemId) &&
+      (newcomer || rows.every((row) => contracts.some((contract) => String(contract.contractId) === row.contractId)))
+  } catch {
+    /* Existing validator owns form errors; observation does not display a second error. */
+  }
+  usePaymentGuideObservation({
+    paymentId,
+    scopeKey: JSON.stringify([
+      form.settlementMonth,
+      form.paymentStage,
+      form.agentId,
+      rows.map((row) => row.contractId),
+    ]),
+    revision: guideRevision,
+    canProcess,
+    ready: !loading && !referenceError && !confirmed,
+    amountValid: isWonAmount(form.amount) && !form.amount.startsWith('-'),
+    attributionsValid:
+      rows.length > 0 &&
+      rows.every(
+        (row) =>
+          (newcomer || contracts.some((contract) => String(contract.contractId) === row.contractId)) &&
+          row.attributionDate.trim() !== '' &&
+          isWonAmount(row.amount) &&
+          !row.amount.startsWith('-') &&
+          (row.attributionMethod !== 'APPROVED_ALLOCATION' || row.allocationBasis.trim() !== ''),
+      ),
+    formValid: guideFormValid,
+    saved: guideSaved && Boolean(paymentId) && !needsSave,
+    busy: busy !== null,
+    precheck: !result ? 'NONE' : result.confirmable ? 'PASSED_WITHOUT_TOKEN' : 'REJECTED',
+    modalOpen,
+  })
+
+  useEffect(() => connectPaymentGuideLaunch((id) => {
+    useWorkflowGuide.getState().clear()
+    setInitialWorkflowId(id)
+    setHelpOpen(true)
+  }), [])
+  useEffect(() => {
+    useWorkflowGuide.setState({ paymentActive: helpOpen })
+    return () => {
+      const context = useWorkflowGuide.getState().guideContext
+      useWorkflowGuide.setState({ paymentActive: false, ...(context && findGuide(context.workflowId, '1.0') ? { guideContext: null } : {}) })
+    }
+  }, [helpOpen])
+
   function invalidatePreview() {
+    setInputEdited(true)
+    setGuideRevision((value) => value + 1)
+    setGuideSaved(false)
     guide.current?.invalidateInput()
     setDirty(true)
     setResult(null)
@@ -317,19 +387,30 @@ function TransactionForm({
     const operation = observer.begin('save')
     try {
       const saved = await saveDraft(paymentId, payload)
-      if (!observer.isCurrent(operation)) return
-      if (!observer.acceptSaved(operation, saved)) throw new Error('저장된 지급 초안을 확인할 수 없습니다.')
+      if (!observer.isSamePayment(operation)) return
+      if (
+        saved.status !== 'DRAFT' ||
+        !Number.isSafeInteger(saved.commissionTransactionId) ||
+        Number(saved.commissionTransactionId) <= 0 ||
+        (paymentId && saved.commissionTransactionId !== Number(paymentId))
+      )
+        throw new Error('저장된 지급 초안을 확인할 수 없습니다.')
+      // Guide evidence can expire while the server commits the same payment.
+      observer.acceptSaved(operation, saved)
+      // A guide revision must not turn a successful same-payment business save into unsaved AI context.
+      setGuideSaved(true)
       setPaymentId(String(saved.commissionTransactionId))
       setForm(initialForm(month, saved))
       setRows(draftRows(saved))
       setLocked(true)
       setDirty(false)
+      setInputEdited(false)
       setResult(null)
       void queryClient.invalidateQueries({ queryKey: ['transactions', 'list'] })
       queryClient.setQueryData(draftQuery(String(saved.commissionTransactionId)).queryKey, saved)
-      toast('작성중(DRAFT)으로 저장했습니다. 저장만 했을 뿐 검증은 하지 않았습니다.', 'success')
+      toast('작성중으로 저장했습니다. 검증은 하지 않았습니다.', 'success')
     } catch (error) {
-      if (!observer.isCurrent(operation)) return
+      if (!observer.isSamePayment(operation)) return
       observer.fail(operation)
       const message = showError(error, '수수료 지급 건을 저장하지 못했습니다.')
       setSaveError(message)
@@ -440,6 +521,8 @@ function TransactionForm({
 
   return (
     <div
+      data-guide-screen="TRAN-W02"
+      data-guide-version="1.0"
       ref={root}
       className={`publishing-page transaction-page transaction-form-page${helpOpen ? ' has-payment-guide' : ''}`}
       data-guide-target="payment.form"
@@ -448,21 +531,21 @@ function TransactionForm({
     >
       <header className="page-header transaction-page-header">
         <div className="page-header-copy">
-          <h1 className="page-title">지급 건 등록 · 귀속 · 확정</h1>
+          <h1 className="page-title">지급 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
-          <button
+          <button data-guide-feature="features.transaction.transaction-form-page.button-2"
             ref={help}
             type="button"
             className="button button-secondary"
             disabled={fullFlow}
             title={fullFlow ? '전체 업무 가이드가 진행 중입니다.' : undefined}
             aria-expanded={helpOpen}
-            onClick={() => setHelpOpen(true)}
+            onClick={() => { useWorkflowGuide.getState().clear(); setInitialWorkflowId(null); setHelpOpen(true) }}
           >
             도움말
           </button>
-          <Link className="button button-secondary" to={returnTo}>
+          <Link data-guide-feature="features.transaction.transaction-form-page.link-2" className="button button-secondary" to={returnTo}>
             <span className="material-symbols-rounded" aria-hidden="true">
               arrow_back
             </span>{' '}
@@ -479,7 +562,7 @@ function TransactionForm({
         </span>
         <div>
           <h2 className="guidance-title" id="transaction-boundary-title">
-            초년도 구간은 [계약일, 1주년일)입니다
+            초년도는 계약일부터 1주년 전날까지입니다
           </h2>
           <p className="guidance-copy">
             계약일이 2026-07-18이면 귀속일 2027-07-17까지 초년도이고, 2027-07-18부터는 아닙니다. 회차 번호가 아닌
@@ -496,7 +579,7 @@ function TransactionForm({
           {referenceError ? (
             <>
               {formError(referenceError, '기준정보를 불러오지 못했습니다.')}{' '}
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.button-3"
                 variant="secondary"
                 onClick={() => {
                   void agentQuery.refetch()
@@ -526,12 +609,12 @@ function TransactionForm({
       <ResizableSplit
         className="transaction-form-layout"
         storageKey="transaction-form-workspace"
-        label="지급 건·귀속행과 확정 게이트 카드 너비"
+        label="지급 건, 귀속행과 확정 점검 카드 너비"
         defaultRatio={61}
         id="main-grid"
       >
         <div className="transaction-form-column">
-          <section
+          <section data-guide-feature="features.transaction.transaction-form-page.section"
             data-guide-target="payment.scope"
             className="surface transaction-form-panel"
             aria-labelledby="transaction-input-title"
@@ -542,13 +625,13 @@ function TransactionForm({
               </h2>
               <span id="tx-status">
                 <StatusBadge tone={confirmed ? 'success' : 'neutral'}>
-                  {paymentId ? `${confirmed ? '확정' : '작성중'} · #${paymentId}` : '미저장'}
+                  {paymentId ? (confirmed ? '확정' : '작성중') : '미저장'}
                 </StatusBadge>
               </span>
             </header>
             <div className="surface-body transaction-form-grid">
               <Field label="지급단계" required error={fieldMessage('stage')}>
-                <select
+                <select data-guide-feature="features.transaction.transaction-form-page.stage"
                   id="stage"
                   value={form.paymentStage}
                   disabled={inputDisabled}
@@ -559,17 +642,17 @@ function TransactionForm({
                 </select>
               </Field>
               <Field label="원천유형" required error={fieldMessage('sourceType')}>
-                <select id="sourceType" value={SOURCE_TYPE} disabled={inputDisabled} onChange={() => {}}>
+                <select data-guide-feature="features.transaction.transaction-form-page.source-type" id="sourceType" value={SOURCE_TYPE} disabled={inputDisabled} onChange={() => {}}>
                   <option value={SOURCE_TYPE}>GA 수기지급</option>
                 </select>
               </Field>
               <Field
-                label="업무키"
+                label="지급 관리번호"
                 required
                 helper="같은 원천유형 안에서 중복될 수 없습니다."
                 error={fieldMessage('bizKey')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.biz-key"
                   id="bizKey"
                   className="transaction-mono"
                   maxLength={160}
@@ -582,10 +665,10 @@ function TransactionForm({
               <Field
                 label="정산월"
                 required
-                helper="DB에는 항상 그 달 1일로 저장됩니다."
+                helper="선택한 달의 1일 기준으로 처리합니다."
                 error={fieldMessage('settlementMonth')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.settlement-month"
                   id="settlementMonth"
                   type="month"
                   value={form.settlementMonth}
@@ -600,13 +683,13 @@ function TransactionForm({
                   helper="GA→설계사 단계에서는 반드시 있어야 합니다."
                   error={fieldMessage('recipient')}
                 >
-                  <SearchSelect
+                  <SearchSelect data-guide-feature="features.transaction.transaction-form-page.recipient"
                     id="recipient"
                     value={form.agentId}
                     disabled={inputDisabled}
                     source={agentQuery.source}
                     selected={selectedAgent}
-                    placeholder="설계사 이름·코드 검색"
+                    placeholder="설계사 이름/코드 검색"
                     onSelect={(agentId, row) => {
                       agentQuery.remember(row)
                       changeForm({ agentId })
@@ -615,13 +698,13 @@ function TransactionForm({
                 </Field>
               )}
               <Field label="수수료 항목" required error={fieldMessage('item')}>
-                <SearchSelect
+                <SearchSelect data-guide-feature="features.transaction.transaction-form-page.item"
                   id="item"
                   value={form.commissionItemId}
                   disabled={inputDisabled}
                   source={itemQuery.source}
                   selected={items.find((row) => String(row.commissionItemId) === form.commissionItemId)}
-                  placeholder="수수료 항목 이름·코드 검색"
+                  placeholder="수수료 항목 이름/코드 검색"
                   onSelect={(commissionItemId, row) => {
                     itemQuery.remember(row)
                     changeForm({ commissionItemId })
@@ -631,10 +714,10 @@ function TransactionForm({
               <Field
                 label="금액 (원)"
                 required
-                helper="금액은 0 이상으로 입력하고 지급·차감은 흐름으로 구분합니다."
+                helper="금액은 0 이상으로 입력하고 지급/차감은 흐름으로 구분합니다."
                 error={fieldMessage('amount')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.amount"
                   id="amount"
                   data-guide-target="payment.amount"
                   className="transaction-number"
@@ -647,7 +730,7 @@ function TransactionForm({
                 />
               </Field>
               <Field label="흐름" required>
-                <select
+                <select data-guide-feature="features.transaction.transaction-form-page.cashflow"
                   id="cashflow"
                   value={form.cashflowType}
                   disabled={inputDisabled}
@@ -662,11 +745,11 @@ function TransactionForm({
                 helper="귀속행에서 제외를 고르면 증빙이 반드시 필요합니다."
                 error={fieldMessage('evidence')}
               >
-                <input
+                <input data-guide-feature="features.transaction.transaction-form-page.evidence"
                   id="evidence"
                   data-guide-target="payment.evidence"
                   maxLength={200}
-                  placeholder="문서번호 · 링크"
+                  placeholder="문서번호, 링크"
                   value={form.evidenceRef}
                   disabled={inputDisabled}
                   onChange={(event) => changeForm({ evidenceRef: event.target.value })}
@@ -706,15 +789,13 @@ function TransactionForm({
         </div>
         <div className="transaction-form-column">
           <GatePanel result={result} />
-          <div data-guide-target="payment.precheck.result">
-            <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} />
-          </div>
-          <section className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
+          <CapPanel result={result} pending={busy === 'precheck'} error={precheckError} contracts={contracts} />
+          <section data-guide-feature="features.transaction.transaction-form-page.section-2" className="surface transaction-action-panel" aria-labelledby="transaction-actions-title">
             <h2 className="visually-hidden" id="transaction-actions-title">
               지급 건 작업
             </h2>
             <div className="surface-body transaction-action-list">
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.btn-save"
                 id="btn-save"
                 data-guide-target="payment.save"
                 variant="secondary"
@@ -728,7 +809,7 @@ function TransactionForm({
                 </span>
                 {busy === 'save' ? '저장 중' : initialId && !locked ? '수정 저장' : '임시저장 (검증 없음)'}
               </Button>
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.btn-precheck"
                 id="btn-precheck"
                 data-guide-target="payment.precheck"
                 variant="secondary"
@@ -742,7 +823,7 @@ function TransactionForm({
                 </span>
                 {busy === 'precheck' ? '검증 중' : '사전검증'}
               </Button>
-              <Button
+              <Button data-guide-feature="features.transaction.transaction-form-page.btn-confirm"
                 id="btn-confirm"
                 data-guide-target="payment.confirm"
                 disabled={!ready || !result || needsSave || confirmationRejected}
@@ -755,23 +836,23 @@ function TransactionForm({
                 확정
               </Button>
               <p className="field-helper" id="transaction-action-help">
-                확정은 서버가 판정한 6단계를 모두 통과해야 합니다.
+                확정하려면 6단계 점검을 모두 통과해야 합니다.
               </p>
               {needsSave && initialId && (
                 <p className="field-helper">
                   {normalized
-                    ? '현재 지급 단계·항목에 맞춰 귀속 입력을 조정했습니다. 먼저 저장한 뒤 사전검증하세요.'
+                    ? '현재 지급 단계/항목에 맞춰 귀속 입력을 조정했습니다. 먼저 저장한 뒤 사전검증하세요.'
                     : '변경한 내용을 먼저 저장한 뒤 사전검증하세요.'}
                 </p>
               )}
               {confirmationNeedsRetry && (
                 <p className="field-helper" role="status">
-                  확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 같은 요청으로 결과를 확인하세요.
+                  확정 결과를 확인하지 못했습니다. 확정 창을 다시 열어 결과를 확인하세요.
                 </p>
               )}
               {!canProcess && (
                 <p className="field-error" id="transaction-permission-help">
-                  현재 계정은 조회만 가능하며 저장·사전검증·확정을 실행할 수 없습니다.
+                  현재 계정은 조회만 가능하며 저장/사전검증/확정을 실행할 수 없습니다.
                 </p>
               )}
               {saveError && (
@@ -785,6 +866,7 @@ function TransactionForm({
       </ResizableSplit>
       {helpOpen && (
         <PaymentGuide
+          initialWorkflowId={initialWorkflowId}
           root={root}
           modalOpen={modalOpen}
           confirmed={confirmed}

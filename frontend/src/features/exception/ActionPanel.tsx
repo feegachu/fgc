@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
 import { Field } from '../../components/Field'
@@ -12,11 +13,13 @@ import { applyActionToCache, postAction } from './api'
 import type { ExceptionCase } from './api'
 import { JournalCorrectionModal } from './JournalCorrectionModal'
 import { availableActions, isActionable, JOURNAL_CORRECTION_TYPE, severityTone, statusTone, typeTone } from './rules'
+import { sourceReference } from './labels'
+import { decisionReasonText } from '../arbitrage/utils'
 
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 
 function Detail({ item }: { item: ExceptionCase }) {
-  const reference = `${item.sourceEntityType ?? ''}:${item.sourceEntityId ?? ''}`
+  const reference = sourceReference(item.sourceEntityType, item.sourceEntityId, item.contractNo)
   return (
     <dl className="exception-detail-grid">
       <div>
@@ -59,15 +62,15 @@ function Detail({ item }: { item: ExceptionCase }) {
       </div>
       <div>
         <dt>검증월</dt>
-        <dd className="tabular-nums">{item.validationMonth ? date(item.validationMonth).slice(0, 7) : '—'}</dd>
+        <dd className="tabular-nums">{item.validationMonth ? date(item.validationMonth).slice(0, 7) : '-'}</dd>
       </div>
       <div>
         <dt>최초 검출 실행</dt>
-        <dd className="tabular-nums">{item.firstDetectedRunId ?? '—'}</dd>
+        <dd className="tabular-nums">{item.firstDetectedRunId ?? '-'}</dd>
       </div>
       <div>
         <dt>최근 검출 실행</dt>
-        <dd className="tabular-nums">{item.lastDetectedRunId ?? '—'}</dd>
+        <dd className="tabular-nums">{item.lastDetectedRunId ?? '-'}</dd>
       </div>
       <div>
         <dt>검출 횟수</dt>
@@ -87,17 +90,18 @@ function Detail({ item }: { item: ExceptionCase }) {
       </div>
       <div className="exception-detail-wide">
         <dt>설명</dt>
-        <dd>{rateText(dash(item.description))}</dd>
+        {/* 차익거래 예외는 판정 사유 원문을 설명으로 저장한다. 개발 용어 구절만 쉬운 말로 바꾼다. */}
+        <dd>{rateText(decisionReasonText(item.description))}</dd>
       </div>
       <div className="exception-detail-wide">
         <dt>참조</dt>
         <dd className="tabular-nums">
           {item.sourceLink ? (
-            <Link className="button button-secondary" to={item.sourceLink}>
+            <Link data-guide-feature="features.exception.action-panel.link" className="button button-secondary" to={item.sourceLink}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 open_in_new
               </span>
-              <span>{reference}</span>
+              <span>{reference} 열기</span>
             </Link>
           ) : (
             reference
@@ -108,7 +112,7 @@ function Detail({ item }: { item: ExceptionCase }) {
         <div className="exception-detail-wide">
           <dt>계산근거</dt>
           <dd>
-            <Link className="button button-secondary" to={item.capBasisLink}>
+            <Link data-guide-feature="features.exception.action-panel.link-2" className="button button-secondary" to={item.capBasisLink}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 calculate
               </span>
@@ -128,10 +132,12 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
   const actions = availableActions(item.status, item.type)
+  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]))
   const mutation = useMutation({
     mutationFn: () => postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }),
     meta: { errorToast: false },
     onSuccess: (action) => {
+      clearUnsaved()
       applyActionToCache(client, item.exceptionCaseId!, action)
       setActionType('')
       setReason('')
@@ -158,9 +164,9 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
     mutation.mutate()
   }
   return (
-    <form className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
+    <form data-guide-feature="features.exception.action-panel.form" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
       <Field label="조치" required>
-        <select className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
+        <select data-guide-feature="features.exception.action-panel.select" className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
           <option value="">조치를 선택하세요</option>
           {actions.map((action) => (
             <option key={action.type} value={action.type}>
@@ -170,7 +176,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
         </select>
       </Field>
       <Field label="처리 사유" required>
-        <textarea
+        <textarea data-guide-feature="features.exception.action-panel.textarea"
           className="textarea-control"
           maxLength={1000}
           placeholder="판단 근거와 처리 내용을 입력하세요."
@@ -179,7 +185,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
         />
       </Field>
       <Field label="증빙">
-        <input
+        <input data-guide-feature="features.exception.action-panel.input"
           type="text"
           placeholder="문서번호 또는 링크"
           value={evidenceRef}
@@ -191,7 +197,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
           {error}
         </p>
       )}
-      <Button
+      <Button data-guide-feature="features.exception.action-panel.button"
         type="submit"
         className="exception-action-submit"
         loading={mutation.isPending}
@@ -206,8 +212,7 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
 export function ActionPanel({ item }: { item: ExceptionCase }) {
   const canHandle = usePermission('canHandleException')
   const [correctionOpen, setCorrectionOpen] = useState(false)
-  const deletedRejectedPayment =
-    item.status === 'REJECTED' && item.sourceDeleted === true
+  const deletedRejectedPayment = item.status === 'REJECTED' && item.sourceDeleted === true
   const actionable = isActionable(item.status) && !deletedRejectedPayment
   const isCorrection = item.type === JOURNAL_CORRECTION_TYPE
   return (
@@ -215,7 +220,7 @@ export function ActionPanel({ item }: { item: ExceptionCase }) {
       <Detail item={item} />
       {actionable && canHandle && <ActionForm item={item} onStarted={() => setCorrectionOpen(true)} />}
       {isCorrection && canHandle && item.status !== 'NEW' && (
-        <Button variant="secondary" className="journal-correction-open" onClick={() => setCorrectionOpen(true)}>
+        <Button data-guide-feature="features.exception.action-panel.button-2" variant="secondary" className="journal-correction-open" onClick={() => setCorrectionOpen(true)}>
           <span className="material-symbols-rounded" aria-hidden="true">
             receipt_long
           </span>

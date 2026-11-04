@@ -116,7 +116,7 @@
   gap: var(--space-4);
 }
 
-.transaction-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.transaction-mono { font-variant-numeric: tabular-nums; }
 .transaction-number,
 .transaction-attribution-table input[type="number"] { text-align: right; font-variant-numeric: tabular-nums; }
 

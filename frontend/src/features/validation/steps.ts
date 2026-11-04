@@ -7,10 +7,10 @@ import type { StatusTone } from '../../components/StatusBadge'
 export const STEP_NAMES = [
   '실행 생성',
   '대상 선별',
-  '스케줄 생성·재검증',
+  '스케줄 생성/재검증',
   '1,200% 검증',
   '차익거래 검증',
-  '원장 기표·균형',
+  '원장 기표/균형',
   '양방향 대사',
   '예외 생성',
   '담당자 검토',
@@ -64,4 +64,21 @@ export function runStatusTone(status?: string): StatusTone {
 export const progressText = (currentStep?: number | null) => {
   const step = currentStep ?? 0
   return `${step}/10 단계 (${step * 10}%)`
+}
+
+const ERROR_CODE = /^FGC-[A-Z0-9]+(?:-[A-Z0-9]+)*$/
+
+/**
+ * 실패 사유는 Step 예외 메시지를 ' | '로 이은 값이다. 업무 예외는 메시지로 오류코드만 남기므로
+ * 코드 조각은 빼고(화면정의서 공통규칙 10), 읽을 문장이 하나도 없으면 실패한 단계로 안내한다.
+ */
+export function failureText(message?: string | null, failedStep?: number | null) {
+  const sentences = (message ?? '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter((part) => part && !ERROR_CODE.test(part))
+  if (sentences.length) return sentences.join(' | ')
+  return failedStep && failedStep >= 1 && failedStep <= STEP_NAMES.length
+    ? `${failedStep}단계에서 실패했습니다.`
+    : '처리 중 오류로 실패했습니다.'
 }

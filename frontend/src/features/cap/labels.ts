@@ -1,6 +1,6 @@
 import type { CapStage, CapAgent } from './api'
 
-export const STAGES = { INSURER_TO_GA: '원수사 → GA', GA_TO_FC: 'GA → 설계사' }
+export const STAGES = { INSURER_TO_GA: '원수사→GA', GA_TO_FC: 'GA→설계사' }
 export const STATUSES = { NORMAL: '정상', WARNING: '주의', VIOLATION: '위반', REVIEW_REQUIRED: '검토필요' }
 /** 목록 필터·배지용 — KPI 카드에는 적용대상 아님을 집계하지 않는다(#477, #482). */
 export const STATUS_LABELS: Record<string, string> = { ...STATUSES, NOT_APPLICABLE: '적용대상 아님' }

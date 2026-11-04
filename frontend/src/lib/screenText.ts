@@ -1,0 +1,51 @@
+const blockedActions: Record<string, string> = {
+  '지급 확정 불가': '지급을 확정할 수 없습니다',
+  '스케줄 확정 불가': '스케줄을 확정할 수 없습니다',
+  '저장 불가': '저장할 수 없습니다',
+  '처리 불가': '처리할 수 없습니다',
+  '수정 불가': '수정할 수 없습니다',
+  '삭제 불가': '삭제할 수 없습니다',
+  '취소 불가': '취소할 수 없습니다',
+  '실행 생성 불가': '실행을 만들 수 없습니다',
+  '상태 변경 불가': '상태를 변경할 수 없습니다',
+  '확정 불가': '확정할 수 없습니다',
+  '기표 불가': '기표할 수 없습니다',
+  '정정 불가': '정정할 수 없습니다',
+  '승인 불가': '승인할 수 없습니다',
+  '제출 불가': '제출할 수 없습니다',
+  '통지서 생성 불가': '통지서를 생성할 수 없습니다',
+  '되돌릴 수 없습니다': '되돌릴 수 없습니다',
+  '한도 검증 보류': '한도 검증을 보류합니다',
+}
+
+/** Presentation only. Stored messages and API values remain unchanged. */
+export function screenMessage(value?: string | null) {
+  if (!value || /^\s*[—-]\s*$/.test(value)) return '-'
+  return value
+    .replace(/^실제 지급 없음\s*—\s*예상\s*([\d,]+)원 지급 건 미발견$/, '실제 지급 누락 (예상 $1원)')
+    .replace(/^(.+?)(?: — |, )/, (_, lead: string) =>
+      blockedActions[lead] ? `${blockedActions[lead]}. ` : `${lead}, `,
+    )
+    .replace(/\bINSURER_TO_GA\b/g, '원수사→GA')
+    .replace(/\bGA_TO_FC\b/g, 'GA→설계사')
+    .replace(/(?<=\S)·(?=\S)/g, '/')
+    .replace(/\s*·\s*/g, ', ')
+    .replace(/\s*—\s*/g, ', ')
+}
+
+export function errorScreenMessage(value?: string | null, requestId?: string | null) {
+  const embeddedRequestId = value?.match(/\([^)]*요청 ID:\s*([^,)]+)[^)]*\)/)?.[1]?.trim()
+  const message = screenMessage(value).replace(/\s*\((?:FGC-[A-Z0-9-]+[^)]*|요청 ID:[^)]*)\)/g, '')
+  const traceId = requestId?.trim() || embeddedRequestId
+  return traceId && !message.includes(traceId) ? `${message} (요청번호: ${traceId})` : message
+}
+
+export function nameWithCode(name?: string | null, code?: string | null) {
+  return name && code ? `${name} (${code})` : name || code || '-'
+}
+
+export function monthText(value?: string | null) {
+  const match = value?.match(/^(\d{4})-(\d{2})(?:-|$)/)
+  if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) return '-'
+  return `${match[1]}년 ${Number(match[2])}월`
+}

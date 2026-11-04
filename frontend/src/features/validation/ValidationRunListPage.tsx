@@ -7,9 +7,11 @@ import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
+import { CategoryBadge } from '../../components/StatusBadge'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { sortBinding } from '../../lib/tableSort'
 import { dateTime, errorText, month as formatMonth } from '../../lib/format'
@@ -27,7 +29,7 @@ import {
 } from './api'
 import type { ValidationRun } from './api'
 import { RunStatusBadge } from './RunStatusBadge'
-import { progressText } from './steps'
+import { failureText, progressText } from './steps'
 import './validation.css'
 
 /*
@@ -40,7 +42,7 @@ import './validation.css'
 const FILTER_KEYS = { status: '', sort: '', page: '' }
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const finalizedText = (run: ValidationRun) =>
-  run.finalizedAt ? `${run.finalizedBy ?? '-'} · ${dateTime(run.finalizedAt)}` : '-'
+  run.finalizedAt ? `${run.finalizedBy ?? '-'}, ${dateTime(run.finalizedAt)}` : '-'
 
 export default function ValidationRunListPage() {
   const { params, update } = useSearchParamsState(FILTER_KEYS)
@@ -60,7 +62,16 @@ export default function ValidationRunListPage() {
       render: (r) => formatMonth(r.validationMonth),
     },
     { key: 'runNo', label: '회차', sortable: true, width: '3.5rem', align: 'left', render: (r) => r.runNo },
-    { key: 'type', label: '실행 유형', width: '7rem', render: (r) => dash(r.runTypeLabel) },
+    {
+      key: 'type',
+      label: '실행 유형',
+      width: '7rem',
+      render: (r) => (
+        <CategoryBadge value={r.runType} optionCount={3}>
+          {dash(r.runTypeLabel)}
+        </CategoryBadge>
+      ),
+    },
     {
       key: 'status',
       label: '상태',
@@ -103,7 +114,7 @@ export default function ValidationRunListPage() {
     },
     {
       key: 'finalized',
-      label: '확정자 · 확정시각',
+      label: '확정자, 확정시각',
       sortKey: 'finalizedAt',
       sortable: true,
       width: '10.5rem',
@@ -123,8 +134,8 @@ export default function ValidationRunListPage() {
         r.status === 'FAILED' ? (
           <CellDisclosure
             singleLine
-            preview={<span className="vrun-failure-text">{dash(r.failureMessage)}</span>}
-            full={dash(r.failureMessage)}
+            preview={<span className="vrun-failure-text">{failureText(r.failureMessage, r.currentStep)}</span>}
+            full={failureText(r.failureMessage, r.currentStep)}
           />
         ) : (
           '-'
@@ -133,7 +144,8 @@ export default function ValidationRunListPage() {
     {
       key: 'open',
       label: '상세',
-      width: '5rem',
+      width: '6rem',
+      cellClassName: 'vrun-open-cell',
       align: 'left',
       render: (r) => <OpenLink run={r} />,
     },
@@ -149,12 +161,12 @@ export default function ValidationRunListPage() {
 
       <CreateSection />
 
-      <section className="surface" aria-labelledby="vrun-list-title">
-        <header className="surface-header">
+      <section data-guide-feature="features.validation.validation-run-list-page.section" className="surface" aria-labelledby="vrun-list-title">
+        <ListHeader total={runs.data?.totalElements ?? 0} pageSize={20}>
           <h2 className="surface-title" id="vrun-list-title">
             ② 실행 목록
           </h2>
-        </header>
+        </ListHeader>
         <StatusFilter key={criteria.status} status={criteria.status} onSearch={(status) => update({ status })} />
         {runs.isError && (
           <p className="field-error" role="alert">
@@ -189,7 +201,7 @@ function OpenLink({ run }: { run: ValidationRun }) {
   const { month } = useOutletContext<ShellContext>()
   const to = `/validation-runs/${run.validationRunId}`
   return (
-    <Link
+    <Link data-guide-feature="features.validation.validation-run-list-page.link"
       className="button button-secondary vrun-row-button"
       to={month ? withMonth(to, month) : to}
       aria-label={`${formatMonth(run.validationMonth)} ${run.runNo}회차 실행 열기`}
@@ -223,7 +235,7 @@ function CreateSection() {
       void navigate(shellMonth ? withMonth(to, shellMonth) : to)
     },
     onError: (error) => {
-      toast(errorText(error as Error, '검증월(yyyy-MM)과 실행 유형을 확인하세요.'), 'error')
+      toast(errorText(error as Error, '검증월과 실행 유형을 확인하세요.'), 'error')
       void client.invalidateQueries({ queryKey: ['validation-runs', 'active-monthly'] })
     },
   })
@@ -232,21 +244,21 @@ function CreateSection() {
     if (monthOk) mutation.mutate()
   }
   return (
-    <section data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
+    <section data-guide-feature="features.validation.validation-run-list-page.section-2" data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-create-title">
           ① 새 실행 만들기
         </h2>
       </header>
-      <form className="vrun-create-form" onSubmit={submit}>
+      <form data-guide-feature="features.validation.validation-run-list-page.form" className="vrun-create-form search-conditions" onSubmit={submit}>
         <div className="vrun-create-month">
           <Field label="검증월" required>
-            <input type="month" value={month} onChange={(event) => setPicked(event.target.value)} />
+            <input data-guide-feature="features.validation.validation-run-list-page.input" type="month" value={month} onChange={(event) => setPicked(event.target.value)} />
           </Field>
         </div>
         <div className="vrun-create-type">
           <Field label="실행 유형" required>
-            <select className="select-control" value={runType} onChange={(event) => setRunType(event.target.value)}>
+            <select data-guide-feature="features.validation.validation-run-list-page.select" className="select-control" value={runType} onChange={(event) => setRunType(event.target.value)}>
               {RUN_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
                   {type.label}
@@ -256,7 +268,7 @@ function CreateSection() {
           </Field>
         </div>
         {/* 실행 생성은 SETTLEMENT (화면정의서 :1379, IF-API-45). 해당 월에 활성 MONTHLY 가 있으면 비활성 */}
-        <Button
+        <Button data-guide-feature="features.validation.validation-run-list-page.btn-create"
           type="submit"
           id="btn-create"
           aria-describedby="create-hint"
@@ -270,7 +282,7 @@ function CreateSection() {
         </Button>
         <p className="field-helper vrun-create-hint" id="create-hint">
           {!canProcess
-            ? '실행 생성은 정산 담당자만 할 수 있습니다.'
+            ? '실행 생성은 정산담당자와 시스템관리자만 할 수 있습니다.'
             : blockedByActive
               ? '선택한 검증월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.'
               : '같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.'}
@@ -283,12 +295,12 @@ function CreateSection() {
 function StatusFilter({ status, onSearch }: { status: string; onSearch: (status: string) => void }) {
   const [draft, setDraft] = useState(status)
   return (
-    <FilterBar className="vrun-filter-bar" icons onSubmit={() => onSearch(draft)}>
+    <FilterBar className="vrun-filter-bar" embedded onSubmit={() => onSearch(draft)}>
       <div className="filter-field vrun-filter-status">
         <label className="filter-field-label" htmlFor="f-status">
           상태
         </label>
-        <select
+        <select data-guide-feature="features.validation.validation-run-list-page.f-status"
           className="select-control"
           id="f-status"
           value={draft}

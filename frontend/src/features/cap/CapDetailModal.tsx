@@ -7,7 +7,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
-import { date, int, rate, usageRate, won } from '../../lib/format'
+import { date, int, rate, rateText, usageRate, won } from '../../lib/format'
 import { capDetailQuery } from './api'
 import { STAGES } from './labels'
 import type { CapBasis } from './api'
@@ -27,7 +27,7 @@ const columns: TableColumn<Detail>[] = [
     key: 'item',
     label: '항목',
     width: '10rem',
-    render: (row) => <CellDisclosure preview={row.commissionItemName || '—'} full={row.commissionItemName || '—'} />,
+    render: (row) => <CellDisclosure preview={row.commissionItemName || '-'} full={row.commissionItemName || '-'} />,
   },
   { key: 'amount', label: '금액', width: '8rem', align: 'number', render: (row) => <Amount value={row.amount} /> },
   {
@@ -45,7 +45,7 @@ const columns: TableColumn<Detail>[] = [
               : 'neutral'
         }
       >
-        {classification[row.classificationSnapshot ?? ''] || row.classificationSnapshot || '—'}
+        {classification[row.classificationSnapshot ?? ''] || row.classificationSnapshot || '-'}
       </StatusBadge>
     ),
   },
@@ -53,7 +53,7 @@ const columns: TableColumn<Detail>[] = [
     key: 'reason',
     label: '판단 이유',
     width: '12rem',
-    render: (row) => <CellDisclosure preview={row.decisionReason || '—'} full={row.decisionReason || '—'} />,
+    render: (row) => <CellDisclosure preview={rateText(row.decisionReason)} full={rateText(row.decisionReason)} />,
   },
   {
     key: 'evidence',
@@ -63,7 +63,7 @@ const columns: TableColumn<Detail>[] = [
       row.evidenceRef ? (
         <EvidenceLink label={row.evidenceRef}>{row.evidenceRef}</EvidenceLink>
       ) : (
-        '증빙 미연결 / 후속 연결 대기'
+        '증빙 없음'
       ),
   },
 ]
@@ -79,10 +79,10 @@ export function CapDetailModal({ capCheckId, onClose }: CapDetailModalProps) {
       onClose={onClose}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button data-guide-feature="features.cap.cap-detail-modal.button" variant="secondary" onClick={onClose}>
             닫기
           </Button>
-          <Link className="button button-primary" to="/exceptions" onClick={onClose}>
+          <Link data-guide-feature="features.cap.cap-detail-modal.link" className="button button-primary" to="/exceptions" onClick={onClose}>
             예외 목록 보기
           </Link>
         </>
@@ -91,7 +91,9 @@ export function CapDetailModal({ capCheckId, onClose }: CapDetailModalProps) {
       {detail.isError ? (
         <CapError error={detail.error} retry={() => void detail.refetch()} />
       ) : detail.data?.capCheck ? (
-        <BasisContent data={detail.data} />
+        <section data-guide-feature="features.cap.cap-detail-modal.section">
+          <BasisContent data={detail.data} />
+        </section>
       ) : (
         <p role="status">계산근거를 불러오는 중입니다.</p>
       )}
@@ -105,32 +107,24 @@ function BasisContent({ data }: { data: CapBasis }) {
   if (item.resultStatus === 'NOT_APPLICABLE') {
     const decision = snapshot.applicability as Record<string, unknown> | undefined
     return (
-      <section className="surface">
+      <div className="surface">
         <h3>
-          {item.contractNo || '—'} · {item.paymentStageLabel || '—'}
+          {item.contractNo || '-'}, {item.paymentStageLabel || '-'}
         </h3>
         <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
-        <p>{String(decision?.reason ?? snapshot.notApplicableReason ?? '적용대상 아님')}</p>
+        <p>{rateText(decision?.reason ?? snapshot.notApplicableReason ?? '적용대상 아님')}</p>
         <dl>
           <div>
             <dt>계약일</dt>
-            <dd>{String(decision?.contractDate ?? '—')}</dd>
+            <dd>{String(decision?.contractDate ?? '-')}</dd>
           </div>
           <div>
             <dt>적용 시작 계약일</dt>
-            <dd>{String(decision?.effectiveContractDate ?? '—')}</dd>
-          </div>
-          <div>
-            <dt>사유 코드</dt>
-            <dd>{String(decision?.reasonCode ?? '—')}</dd>
-          </div>
-          <div>
-            <dt>판정 기준 버전</dt>
-            <dd>{String(decision?.policyVersion ?? '—')}</dd>
+            <dd>{String(decision?.effectiveContractDate ?? '-')}</dd>
           </div>
         </dl>
-        <p>한도·산입금액·사용률 계산 대상이 아닙니다.</p>
-      </section>
+        <p>한도/산입금액/사용률 계산 대상이 아닙니다.</p>
+      </div>
     )
   }
   const details = data.details ?? []
@@ -138,7 +132,7 @@ function BasisContent({ data }: { data: CapBasis }) {
   const multiplier =
     typeof snapshot.premiumMultiplier === 'string' || typeof snapshot.premiumMultiplier === 'number'
       ? rate(snapshot.premiumMultiplier)
-      : '—'
+      : '-'
   // 수식 문자열만 구성한다. 한도/사용률/판정은 재계산하지 않는다(#468).
   const limitParts = [int(item.basePremiumAmount), '×', multiplier]
   if (item.refund12mAmount != null && item.refund12mAmount !== 0) limitParts.push('−', int(item.refund12mAmount))
@@ -155,23 +149,23 @@ function BasisContent({ data }: { data: CapBasis }) {
     ['한도 배수', `${multiplier}배`, false],
     ['해약환급금 합산', won(item.refund12mAmount), true],
     ['준법경영비 공제', insurerStage ? won(item.complianceDeductionAmount) : '적용하지 않음', insurerStage],
-    ['적용 룰셋', item.capRuleSetId == null ? '—' : `룰셋 ID ${item.capRuleSetId}`, false],
+    ['적용 룰셋', item.capRuleSetId == null ? '-' : `룰셋 ${item.capRuleSetId}번`, false],
   ] as const
   return (
     <div className="cap-react-detail">
       <header className="cap-react-detail-summary">
-        <strong>{item.contractNo || '—'}</strong>
-        <span>{item.paymentStageLabel || STAGES[item.paymentStage as keyof typeof STAGES] || '—'}</span>
+        <strong>{item.contractNo || '-'}</strong>
+        <span>{item.paymentStageLabel || STAGES[item.paymentStage as keyof typeof STAGES] || '-'}</span>
         <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
         <p>
-          기준일 {date(item.asOfDate)} · 룰셋 ID {item.capRuleSetId ?? '—'} · cap_check #{item.capCheckId ?? '—'}
+          기준일 {date(item.asOfDate)}, 룰셋 {item.capRuleSetId == null ? '-' : `${item.capRuleSetId}번`}
         </p>
       </header>
       <div className="cap-react-detail-grid">
         <div className="cap-react-detail-left">
-          <section className="surface">
+          <section data-guide-feature="features.cap.cap-detail-modal.section-2" className="surface">
             <h3>① 입력값</h3>
-            <table className="data-table">
+            <table data-guide-feature="features.cap.cap-detail-modal.table" className="data-table">
               <tbody>
                 {inputs.map(([label, value, monetary]) => (
                   <tr key={label}>
@@ -182,7 +176,7 @@ function BasisContent({ data }: { data: CapBasis }) {
               </tbody>
             </table>
           </section>
-          <section className="surface">
+          <section data-guide-feature="features.cap.cap-detail-modal.section-3" className="surface">
             <h3>
               ② 계산식 <CapEvidence />
             </h3>
@@ -194,7 +188,7 @@ function BasisContent({ data }: { data: CapBasis }) {
             </p>
             <p>= {usageRate(item.usagePct)}%</p>
           </section>
-          <section className="surface">
+          <section data-guide-feature="features.cap.cap-detail-modal.section-4" className="surface">
             <h3>④ 합계와 판정</h3>
             <CapUsage value={item.usagePct} status={item.resultStatus} warning={data.warningStartUsagePct} />
             {snapshot.warningUsagePct != null && <p>주의 기준 (1,200% 예산) {rate(snapshot.warningUsagePct)}%</p>}
@@ -221,7 +215,7 @@ function BasisContent({ data }: { data: CapBasis }) {
             <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
           </section>
         </div>
-        <section className="surface cap-react-detail-lines">
+        <section data-guide-feature="features.cap.cap-detail-modal.section-5" className="surface cap-react-detail-lines">
           <h3>
             ③ 항목별 산입 내역 <small>{int(details.length)}개 항목</small>
           </h3>
@@ -233,7 +227,7 @@ function BasisContent({ data }: { data: CapBasis }) {
             emptyMessage="저장된 항목별 산입 내역이 없습니다."
           />
           <p>
-            산입 합계 {won(includedTotal)} ·{' '}
+            산입 합계 {won(includedTotal)},{' '}
             <span className={matches ? undefined : 'is-negative-amount'}>
               {matches ? '제외 항목 미포함' : '저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.'}
             </span>

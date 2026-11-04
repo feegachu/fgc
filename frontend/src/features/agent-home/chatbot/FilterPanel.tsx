@@ -1,5 +1,6 @@
 import { EMPTY_FILTERS, toFilters } from './filters'
 import type { FilterDraft } from './filters'
+import { Button } from '../../../components/Button'
 
 function activeCount(draft: FilterDraft) {
   const filters = toFilters(draft)
@@ -23,15 +24,16 @@ export function FilterPanel({
       insurerIds: value.insurerIds.includes(id) ? value.insurerIds.filter((x) => x !== id) : [...value.insurerIds, id],
     })
   return (
-    <section className="cb-filters" aria-label="보험사 세부 선택">
+    <section data-guide-feature="features.agent-home.chatbot.filter-panel.section" className="cb-filters" aria-label="보험사 세부 선택">
       <div className="cb-filters-head">
         보험사 세부 선택
         <span className="cb-muted">선택 사항</span>
         {count > 0 && <span className="cb-pill">{count}개 적용</span>}
         {count > 0 && (
-          <button type="button" className="cb-filters-reset" onClick={() => onChange(EMPTY_FILTERS)}>
+          <Button data-guide-feature="features.agent-home.chatbot.filter-panel.reset" variant="secondary" className="cb-filters-reset" onClick={() => onChange(EMPTY_FILTERS)}>
+            <span className="material-symbols-rounded" aria-hidden="true">restart_alt</span>
             초기화
-          </button>
+          </Button>
         )}
       </div>
       <div className="cb-filters-body">
@@ -39,7 +41,7 @@ export function FilterPanel({
           <fieldset aria-label="비교할 보험사">
             <div className="cb-chips">
               {insurers.map((insurer) => (
-                <button
+                <button data-guide-feature="features.agent-home.chatbot.filter-panel.insurer-chip"
                   key={insurer.id}
                   type="button"
                   className={`cb-chip${value.insurerIds.includes(insurer.id) ? ' on' : ''}`}
@@ -52,8 +54,8 @@ export function FilterPanel({
             </div>
           </fieldset>
         )}
-        <label className="cb-filter-check">
-          <input
+        <label className="filter-checkbox">
+          <input data-guide-feature="features.agent-home.chatbot.filter-panel.exclude-cap-overflow"
             type="checkbox"
             checked={value.excludeCapOverflow}
             onChange={(event) => onChange({ ...value, excludeCapOverflow: event.target.checked })}

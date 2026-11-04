@@ -1,11 +1,15 @@
+import { guideFeatureId } from '../assistant/feature-ids'
+import { typeBadgeTone } from '../exception/rules'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { type CSSProperties, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
+import { KpiCardContent } from '../../components/KpiCard'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import type { TableColumn } from '../../components/DataTable'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { ListHeader } from '../../components/ListHeader'
 import { StatusBadge } from '../../components/StatusBadge'
 import { dateTime, errorText, int, rateText, usageRate } from '../../lib/format'
 import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
@@ -22,7 +26,8 @@ import {
 } from './api'
 import type { ExceptionCase, ExceptionFilters, ExceptionOptions } from './api'
 import { severityTone, statusOptions, statusTone, typeTone } from './rules'
-import { exceptionSummaryDescription } from './labels'
+import { exceptionSummaryDescription, sourceReference } from './labels'
+import { paymentDeletedReason } from '../audit/labels'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
 const cardTone = (type: string) => {
@@ -98,13 +103,18 @@ export function ExceptionPage() {
       sortable: true,
       width: '4rem',
       align: 'left',
-      render: (row) => row.exceptionCaseId },
+      render: (row) => row.exceptionCaseId,
+    },
     {
       key: 'type',
       label: '유형',
       width: '8.5rem',
       align: 'center',
-      render: (row) => <StatusBadge tone={typeTone(row.type)}>{row.typeLabel ?? '-'}</StatusBadge>,
+      render: (row) => (
+        <StatusBadge optionCount={14} kind="category" tone={typeBadgeTone(row.type)}>
+          {row.typeLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     {
       key: 'reason',
@@ -121,7 +131,11 @@ export function ExceptionPage() {
       sortable: true,
       width: '5rem',
       align: 'center',
-      render: (row) => <StatusBadge tone={severityTone(row.severity)}>{row.severityLabel ?? '-'}</StatusBadge>,
+      render: (row) => (
+        <StatusBadge kind="severity" optionCount={4} tone={severityTone(row.severity)} tablePresentation="text">
+          {row.severityLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     {
       key: 'contract',
@@ -129,7 +143,8 @@ export function ExceptionPage() {
       sortKey: 'contractNo',
       sortable: true,
       width: '12rem',
-      render: (row) => row.contractNo ?? '-' },
+      render: (row) => row.contractNo ?? '-',
+    },
     {
       key: 'title',
       label: '내용',
@@ -143,7 +158,11 @@ export function ExceptionPage() {
       label: '상태',
       width: '5.75rem',
       align: 'center',
-      render: (row) => <StatusBadge tone={statusTone(row.status)}>{row.statusLabel ?? '-'}</StatusBadge>,
+      render: (row) => (
+        <StatusBadge optionCount={4} tone={statusTone(row.status)} tablePresentation="dot">
+          {row.statusLabel ?? '-'}
+        </StatusBadge>
+      ),
     },
     {
       key: 'assignee',
@@ -151,7 +170,8 @@ export function ExceptionPage() {
       sortKey: 'assigneeLoginId',
       sortable: true,
       width: '6rem',
-      render: (row) => row.assigneeLoginId ?? '미배정' },
+      render: (row) => row.assigneeLoginId ?? '미배정',
+    },
     {
       key: 'detectedAt',
       label: '최근 검출',
@@ -166,7 +186,8 @@ export function ExceptionPage() {
       sortKey: 'detectionCount',
       sortable: true,
       width: '4rem',
-      render: (row) => `${row.detectionCount ?? 0}회` },
+      render: (row) => `${row.detectionCount ?? 0}회`,
+    },
     {
       key: 'reference',
       label: '참조',
@@ -174,14 +195,14 @@ export function ExceptionPage() {
       width: '8rem',
       cellClassName: 'tabular-nums exception-disclosure-cell',
       render: (row) => {
-        const reference = `${row.sourceEntityType}:${row.sourceEntityId}`
+        const reference = sourceReference(row.sourceEntityType, row.sourceEntityId, row.contractNo)
         return row.sourceLink ? (
           <Disclosure
             singleLine
-            preview={<Link to={row.sourceLink}>{reference}</Link>}
+            preview={<Link data-guide-feature="features.exception.exception-page.link" to={row.sourceLink}>{reference}</Link>}
             full={
-              <Link className="button button-secondary" to={row.sourceLink}>
-                {reference}
+              <Link data-guide-feature="features.exception.exception-page.link-2" className="button button-secondary" to={row.sourceLink}>
+                {reference} 열기
               </Link>
             }
           />
@@ -200,9 +221,14 @@ export function ExceptionPage() {
         </div>
       </header>
 
-      <section className="exception-summary-grid" aria-label="유형별 미처리 요약">
+      <section
+        data-guide-feature="features.exception.exception-page.section"
+        className="exception-summary-grid kpi-group"
+        aria-label="유형별 미처리 요약"
+        style={{ '--exception-kpi-count': data?.summary?.length || 1 } as CSSProperties}
+      >
         {data?.summary?.map((summary) => (
-          <Link
+          <Link data-guide-feature={guideFeatureId('exception.summary', summary.type ?? '')}
             key={summary.type}
             className={`kpi-card kpi-card-${cardTone(summary.type ?? '')} exception-summary-card ${filters.type === summary.type ? 'is-active' : ''}`}
             aria-current={filters.type === summary.type ? 'true' : undefined}
@@ -213,16 +239,12 @@ export function ExceptionPage() {
                 : `/exceptions?type=${summary.type}&status=${OPEN_STATUS}`
             }
           >
-            <div className="kpi-card-header">
-              <span className="kpi-label">{summary.typeLabel}</span>
-            </div>
-            <div className="kpi-value-row">
-              <strong className="kpi-value">{int(summary.count)}</strong>
-              <span className="kpi-unit">건</span>
-            </div>
-            <div className="kpi-card-footer">
-              <span className="kpi-comparison">{exceptionSummaryDescription(summary.type)}</span>
-            </div>
+            <KpiCardContent
+              label={summary.typeLabel ?? '-'}
+              value={summary.count ?? 0}
+              unit="건"
+              footer={exceptionSummaryDescription(summary.type)}
+            />
           </Link>
         ))}
         {data && !data.summary?.length && (
@@ -241,7 +263,7 @@ export function ExceptionPage() {
       {search.error && !data ? (
         <div role="alert" className="empty-state">
           <p>{errorText(search.error as Error, '예외 목록을 불러오지 못했습니다.')}</p>
-          <button type="button" className="button button-secondary" onClick={() => void search.refetch()}>
+          <button data-guide-feature="features.exception.exception-page.button" type="button" className="button button-secondary" onClick={() => void search.refetch()}>
             다시 시도
           </button>
         </div>
@@ -251,13 +273,10 @@ export function ExceptionPage() {
           storageKey="exceptions-workspace"
           label="예외 목록과 상세 카드 너비"
           primary={
-            <section className="surface">
-              <div className="surface-header">
+            <section data-guide-feature="features.exception.exception-page.section-2" className="surface">
+              <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
                 <span className="surface-title">예외 목록</span>
-                <span className="text-secondary exception-count-note">
-                  <span aria-live="polite">{int(data?.totalElements ?? 0)}</span>건
-                </span>
-              </div>
+              </ListHeader>
               {search.isPending ? (
                 <p role="status" className="empty-state">
                   불러오는 중입니다.
@@ -291,7 +310,7 @@ export function ExceptionPage() {
           }
           secondary={
             <div className="exception-side-panels">
-              <section className="surface">
+              <section data-guide-feature="features.exception.exception-page.section-3" className="surface">
                 <div className="surface-header">
                   <span className="surface-title">검출 이력</span>
                   <span className="text-secondary exception-card-note">실행별 증거는 고치거나 지울 수 없습니다</span>
@@ -300,11 +319,11 @@ export function ExceptionPage() {
                   {selected ? (
                     <Occurrences item={selected} />
                   ) : (
-                    <p className="text-secondary exception-placeholder">—</p>
+                    <p className="text-secondary exception-placeholder">-</p>
                   )}
                 </div>
               </section>
-              <section className="surface" data-guide-target="exception.action">
+              <section data-guide-feature="features.exception.exception-page.section-4" className="surface" data-guide-target="exception.action">
                 <div className="surface-header">
                   <span className="surface-title">처리</span>
                   {selected && <span>#{selected.exceptionCaseId}</span>}
@@ -317,13 +336,13 @@ export function ExceptionPage() {
                   )}
                 </div>
               </section>
-              <section className="surface">
+              <section data-guide-feature="features.exception.exception-page.section-5" className="surface">
                 <div className="surface-header">
                   <span className="surface-title">처리 이력</span>
                   <span className="text-secondary exception-card-note">기록만 쌓입니다. 고치거나 지울 수 없습니다</span>
                 </div>
                 <div className="surface-body">
-                  {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">—</p>}
+                  {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">-</p>}
                 </div>
               </section>
             </div>
@@ -342,17 +361,17 @@ function Occurrences({ item }: { item: ExceptionCase }) {
       {occurrences.map((occurrence) => (
         <li className="exception-history-item" key={occurrence.exceptionOccurrenceId}>
           <strong>
-            {(occurrence.validationMonth ?? '').slice(0, 7)} · {occurrence.runNo}회차 · {occurrence.detectionLabel}
+            {(occurrence.validationMonth ?? '').slice(0, 7)}, {occurrence.runNo}회차, {occurrence.detectionLabel}
           </strong>
           <p className="text-secondary exception-occurrence-meta">
-            실행 <span className="tabular-nums">{occurrence.validationRunId}</span> ·{' '}
+            검증 실행 <span className="tabular-nums">{occurrence.validationRunId}</span>,{' '}
             <span className="tabular-nums">
-              {occurrence.sourceEntityType}:{occurrence.sourceEntityId}
+              {sourceReference(occurrence.sourceEntityType, occurrence.sourceEntityId, item.contractNo)}
             </span>
           </p>
           {!!occurrence.evidenceItems?.length && (
             <details className="exception-evidence">
-              <summary className="text-secondary">검출 증거</summary>
+              <summary data-guide-feature="features.exception.exception-page.summary" className="text-secondary">검출 증거</summary>
               <ul className="exception-evidence-list">
                 {occurrence.evidenceItems.map((evidence) => (
                   <li key={evidence.label}>
@@ -386,12 +405,12 @@ function History({ item }: { item: ExceptionCase }) {
           </strong>
           <span className="text-secondary">
             {' '}
-            · {action.fromStatusLabel} → {action.toStatusLabel}
+            , {action.fromStatusLabel} → {action.toStatusLabel}
           </span>
-          <p className="exception-history-reason">{action.reason}</p>
+          <p className="exception-history-reason">{paymentDeletedReason(action.reason) ?? action.reason}</p>
           {action.evidenceRef && <p className="text-secondary exception-occurrence-meta">증빙: {action.evidenceRef}</p>}
           <small className="text-secondary">
-            {action.actionByLoginId} · {dateTime(action.actionAt)}
+            {action.actionByLoginId}, {dateTime(action.actionAt)}
           </small>
         </li>
       ))}
@@ -424,7 +443,7 @@ function FilterForm({
       <label className="filter-field-label" htmlFor={id}>
         {label}
       </label>
-      <select
+      <select data-guide-feature="features.exception.exception-page.select"
         className="select-control"
         id={id}
         value={String(draft[key])}
@@ -502,7 +521,7 @@ function FilterForm({
           <label className="filter-field-label" htmlFor="f-contract">
             계약번호
           </label>
-          <input
+          <input data-guide-feature="features.exception.exception-page.f-contract"
             className="field-control"
             id="f-contract"
             type="text"

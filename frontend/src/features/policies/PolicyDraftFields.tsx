@@ -1,3 +1,4 @@
+import { guideFeatureId } from '../assistant/feature-ids'
 import type { InputHTMLAttributes } from 'react'
 import { Field } from '../../components/Field'
 import { Button } from '../../components/Button'
@@ -23,7 +24,7 @@ export function DraftInput({
 } & Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'>) {
   return (
     <Field label={label} required={props.required} error={errors[path]}>
-      <input {...props} id={`policy-${path}`} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input data-guide-feature={guideFeatureId('policy.draft-input', path.replace(/\.\d+(?=\.|$)/g, ''))} {...props} id={`policy-${path}`} value={value} onChange={(event) => onChange(event.target.value)} />
     </Field>
   )
 }
@@ -52,7 +53,7 @@ export function DraftSelect({
 }) {
   return (
     <Field label={label} required={required} error={errors[path]} helper={helper}>
-      <select
+      <select data-guide-feature={guideFeatureId('policy.draft-select', path.replace(/\.\d+(?=\.|$)/g, ''))}
         id={`policy-${path}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -62,7 +63,7 @@ export function DraftSelect({
           {placeholder}
         </option>
         {value !== '' && !options.some((option) => String(option.value) === String(value)) && (
-          <option value={value}>기존 값 · {value}</option>
+          <option value={value}>저장된 값(목록에 없음)</option>
         )}
         {options.map((option) => (
           <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -101,7 +102,7 @@ export function ClawbackTargets({
           <p className="policy-note">적용 시작일을 입력하면 상품 판매버전과 수수료 항목을 선택할 수 있습니다.</p>
         )}
         {(insurers.error || products.error || items.error) && (
-          <Button
+          <Button data-guide-feature="features.policies.policy-draft-fields.button"
             variant="ghost"
             onClick={() => {
               void insurers.refetch()
@@ -130,7 +131,7 @@ export function ClawbackTargets({
       />
       <DraftSelect
         path={prefix + 'productOfferingId'}
-        label="상품 · 판매버전"
+        label="상품, 판매버전"
         errors={errors}
         value={rule.productOfferingId}
         placeholder="전체 상품"
@@ -138,7 +139,7 @@ export function ClawbackTargets({
         onChange={(v) => onChange({ productOfferingId: numberValue(v) })}
         options={(products.data ?? []).map((p) => ({
           value: p.productOfferingId!,
-          label: `${p.productName} · ${p.offeringVersion ?? '판매버전 자료 없음'} · ${p.salesStartDate ?? ''}`,
+          label: `${p.productName}, ${p.offeringVersion ?? '판매버전 자료 없음'}, ${p.salesStartDate ?? ''}`,
         }))}
       />
       <DraftSelect
@@ -177,12 +178,12 @@ export function CommissionRow({
   const set = <K extends keyof CommissionDraft>(key: K, value: CommissionDraft[K]) =>
     onChange({ ...rule, [key]: value })
   return (
-    <section className="policy-rule-editor" aria-label={`수수료 규칙 ${index + 1}`}>
+    <section data-guide-feature="features.policies.policy-draft-fields.section" className="policy-rule-editor" aria-label={`수수료 규칙 ${index + 1}`}>
       <header>
         <h3>
           <span className="policy-row-number">{String(index + 1).padStart(2, '0')}</span>수수료 규칙
         </h3>
-        <Button variant="ghost" onClick={onRemove} aria-label={`수수료 규칙 ${index + 1} 삭제`}>
+        <Button data-guide-feature="features.policies.policy-draft-fields.button-2" variant="ghost" onClick={onRemove} aria-label={`수수료 규칙 ${index + 1} 삭제`}>
           행 삭제
         </Button>
       </header>
@@ -191,7 +192,7 @@ export function CommissionRow({
         error={insurers.error || organizations.error || items.error || products.error}
       />
       {(insurers.error || organizations.error || items.error || products.error) && (
-        <Button
+        <Button data-guide-feature="features.policies.policy-draft-fields.button-3"
           variant="ghost"
           onClick={() => {
             void insurers.refetch()
@@ -206,7 +207,7 @@ export function CommissionRow({
         </Button>
       )}
       {!asOf && (
-        <p className="policy-note">기본정보의 적용 시작일을 입력하면 상품·조직·수수료 항목을 선택할 수 있습니다.</p>
+        <p className="policy-note">기본정보의 적용 시작일을 입력하면 상품/조직/수수료 항목을 선택할 수 있습니다.</p>
       )}
       <div className="policy-form-grid">
         <DraftSelect
@@ -216,7 +217,7 @@ export function CommissionRow({
           errors={errors}
           value={rule.paymentStage}
           onChange={(v) => set('paymentStage', v)}
-          options={optionsFor({ INSURER_TO_GA: '보험사 → GA', GA_TO_FC: 'GA → 설계사' })}
+          options={optionsFor({ INSURER_TO_GA: '원수사→GA', GA_TO_FC: 'GA→설계사' })}
         />
         <DraftSelect
           path={prefix + 'insurerId'}
@@ -233,7 +234,7 @@ export function CommissionRow({
         />
         <DraftSelect
           path={prefix + 'productOfferingId'}
-          label="상품 · 판매버전"
+          label="상품, 판매버전"
           errors={errors}
           value={rule.productOfferingId}
           disabled={!rule.insurerId || !asOf}
@@ -241,7 +242,7 @@ export function CommissionRow({
           onChange={(v) => set('productOfferingId', numberValue(v))}
           options={(products.data ?? []).map((p) => ({
             value: p.productOfferingId!,
-            label: `${p.productName} · ${p.offeringVersion ?? '판매버전 자료 없음'} · ${p.salesStartDate ?? ''}`,
+            label: `${p.productName}, ${p.offeringVersion ?? '판매버전 자료 없음'}, ${p.salesStartDate ?? ''}`,
           }))}
         />
         <DraftSelect
@@ -321,7 +322,7 @@ export function CommissionRow({
           errors={errors}
           value={rule.calculationType}
           onChange={(v) => onChange({ ...rule, calculationType: v as 'RATE' | 'FIXED', ratePct: '', fixedAmount: '' })}
-          options={optionsFor({ RATE: 'RATE · 요율', FIXED: 'FIXED · 고정금액' })}
+          options={optionsFor({ RATE: '요율', FIXED: '정액' })}
         />
         <DraftInput
           path={prefix + 'ratePct'}
@@ -337,7 +338,7 @@ export function CommissionRow({
         />
         <DraftInput
           path={prefix + 'fixedAmount'}
-          label="고정금액 (원)"
+          label="정액 (원)"
           required={rule.calculationType === 'FIXED'}
           disabled={rule.calculationType !== 'FIXED'}
           type="number"
@@ -373,10 +374,10 @@ export function CommissionRow({
           value={rule.agentRankCode}
           placeholder="전체 직급"
           onChange={(v) => set('agentRankCode', v)}
-          options={optionsFor({ FC: 'FC', TEAM_LEADER: '팀장', BRANCH_MANAGER: '지점장', DIVISION_HEAD: '본부장' })}
+          options={optionsFor({ FC: '설계사', TEAM_LEADER: '팀장', BRANCH_MANAGER: '지사장', DIVISION_HEAD: '본부장' })}
         />
         <label className="policy-checkbox">
-          <input
+          <input data-guide-feature="features.policies.policy-draft-fields.input-2"
             type="checkbox"
             checked={rule.equalMonthlyYn}
             onChange={(e) => set('equalMonthlyYn', e.target.checked)}

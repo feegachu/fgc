@@ -35,6 +35,8 @@ export const CAP_SORT_KEYS = [
   'remainingAmount',
   'usagePct',
 ] as const
+/** 처음 열면 사용률이 높은 순(위반이 맨 위)으로 본다. 사용률이 없는 적용대상 아님은 서버가 맨 뒤로 보낸다. API 기본값(asOfDate,desc)은 그대로다. */
+const DEFAULT_SORT = { key: 'usagePct', direction: 'desc' } as const
 export interface CapCriteria {
   month: string
   stage: string
@@ -67,14 +69,14 @@ export function criteriaFromParams(params: URLSearchParams, workspaceMonth: stri
     insurerId: referenceId(params.get('insurerId')),
     orgId: referenceId(params.get('orgId')),
     contractNo: params.get('contractNo')?.trim() ?? '',
-    sort: formatSort(parseSort(params.get('sort'), CAP_SORT_KEYS)),
+    sort: formatSort(parseSort(params.get('sort'), CAP_SORT_KEYS) ?? DEFAULT_SORT),
     page: positive(params.get('page')),
     size: [10, 20, 50].includes(size) ? size : 20,
   }
 }
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const { data } = await apiClient.request<T>(path, { signal })
-  if (data == null) throw new Error('응답 데이터를 확인할 수 없습니다.')
+  if (data == null) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
 export const capListQuery = (criteria: CapCriteria) =>
@@ -96,9 +98,9 @@ export const capDetailQuery = (id: string | number | null | undefined) => {
   return queryOptions({
     queryKey: ['cap-checks', 'detail', detailId],
     queryFn: async ({ signal }) => {
-      if (detailId === null) throw new Error('계산근거 ID가 없습니다.')
+      if (detailId === null) throw new Error('계산근거를 찾을 수 없습니다.')
       const data = await get<CapBasis>(`/api/v1/cap-checks/${encodeURIComponent(detailId)}/details`, signal)
-      if (!data.capCheck) throw new Error('응답 데이터를 확인할 수 없습니다.')
+      if (!data.capCheck) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
       return data
     },
     enabled: detailId !== null,

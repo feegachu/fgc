@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Button } from './Button'
 import { today } from '../lib/format'
+import { monthText } from '../lib/screenText'
 export function MonthSelector({
   value,
   onApply,
@@ -76,7 +77,7 @@ export function MonthSelector({
   }
   return (
     <div ref={root} className={`month-selector ${open ? 'is-open' : ''}`}>
-      <button
+      <button data-guide-feature="components.month-selector.button"
         ref={trigger}
         type="button"
         className="month-selector-trigger tabular-nums"
@@ -110,7 +111,7 @@ export function MonthSelector({
           aria-describedby={`${id}-scope`}
         >
           <div className="month-selector-year-navigation">
-            <button
+            <button data-guide-feature="components.month-selector.button-2"
               type="button"
               className="icon-button"
               aria-label="이전 연도"
@@ -126,7 +127,7 @@ export function MonthSelector({
               </span>
             </button>
             <strong className="month-selector-year tabular-nums">{year}년</strong>
-            <button
+            <button data-guide-feature="components.month-selector.button-3"
               type="button"
               className="icon-button"
               aria-label="다음 연도"
@@ -150,7 +151,7 @@ export function MonthSelector({
                   const month = `${String(year).padStart(4, '0')}-${String(index + 1).padStart(2, '0')}`
                   const disabled = disabledMonths.includes(month)
                   return (
-                    <button
+                    <button data-guide-feature="components.month-selector.button-4"
                       key={month}
                       ref={(element) => {
                         cells.current[index] = element
@@ -196,12 +197,12 @@ export function MonthSelector({
             </p>
           </div>
           <div className="month-selector-footer">
-            <p className="month-selector-selection">선택 · {draft ?? '-'}</p>
+            <p className="month-selector-selection">기준 정산월 : {monthText(draft)}</p>
             <div className="month-selector-actions">
-              <Button variant="secondary" disabled={busy} onClick={close}>
+              <Button data-guide-feature="components.month-selector.button-5" variant="secondary" disabled={busy} onClick={close}>
                 취소
               </Button>
-              <Button disabled={!draft || disabledMonths.includes(draft)} loading={busy} onClick={() => void apply()}>
+              <Button data-guide-feature="components.month-selector.button-6" disabled={!draft || disabledMonths.includes(draft)} loading={busy} onClick={() => void apply()}>
                 적용
               </Button>
             </div>
