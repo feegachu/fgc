@@ -1,6 +1,7 @@
 package com.susukkang.fgc.base.service;
 
 import com.susukkang.fgc.base.dto.AgentResponse;
+import com.susukkang.fgc.base.dto.AgentRow;
 import com.susukkang.fgc.base.dto.AgentSearchCriteria;
 import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
@@ -54,17 +55,23 @@ public class AgentServiceImpl implements AgentService {
         Pageable pageable = JpaListSort.pageable(page, size, sort, SORTABLE, Sort.by(Sort.Direction.ASC, "agentCode"));
 
         if (criteria.selectedId() != null && criteria.selectedId() < 1) throw validationException("selectedId");
-        Page<AgentResponse> result = (criteria.branchId() != null
-                ? agentRepository.searchBranch(criteria.branchId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), pageable)
-                : criteria.selectedId() != null
-                ? agentRepository.search(criteria.selectedId(), criteria.organizationId(), normalizedKeyword, criteria.asOf(),
-                    criteria.includeTerminated(), criteria.includeHistorical(), pageable)
-                : criteria.includeHistorical()
-                ? agentRepository.search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), true, pageable)
-                : agentRepository.search(criteria.organizationId(), normalizedKeyword, criteria.asOf(), criteria.includeTerminated(), pageable))
-                .map(AgentResponse::from);
+        Page<AgentResponse> result = findRows(criteria, normalizedKeyword, pageable).map(AgentResponse::from);
 
         return PageResponse.of(result.getContent(), page, size, result.getTotalElements(), sort == null ? SORT : sort.value());
+    }
+
+    private Page<AgentRow> findRows(AgentSearchCriteria criteria, String keyword, Pageable pageable) {
+        if (criteria.branchId() != null) {
+            return agentRepository.searchBranch(criteria.branchId(), keyword, criteria.asOf(), criteria.includeTerminated(), pageable);
+        }
+        if (criteria.selectedId() != null) {
+            return agentRepository.search(criteria.selectedId(), criteria.organizationId(), keyword, criteria.asOf(),
+                    criteria.includeTerminated(), criteria.includeHistorical(), pageable);
+        }
+        if (criteria.includeHistorical()) {
+            return agentRepository.search(criteria.organizationId(), keyword, criteria.asOf(), criteria.includeTerminated(), true, pageable);
+        }
+        return agentRepository.search(criteria.organizationId(), keyword, criteria.asOf(), criteria.includeTerminated(), pageable);
     }
 
     private void validateCriteria(AgentSearchCriteria criteria) {
