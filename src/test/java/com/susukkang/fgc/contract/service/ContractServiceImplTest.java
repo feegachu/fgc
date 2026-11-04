@@ -17,11 +17,16 @@ import com.susukkang.fgc.contract.dto.ContractInput;
 import com.susukkang.fgc.contract.dto.ContractSearchCondition;
 import com.susukkang.fgc.contract.dto.ContractUpdateRequest;
 import com.susukkang.fgc.contract.dto.ContractView;
+import com.susukkang.fgc.contract.dto.ContractEventJobRow;
+import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingResponse.ProcessingSummary;
 import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingRow;
+import com.susukkang.fgc.contract.dto.ContractStatusEventResponse.FollowUpJob;
+import com.susukkang.fgc.contract.dto.ContractStatusEventResponse.FollowUpStatus;
 import com.susukkang.fgc.contract.entity.InsuranceContract;
 import com.susukkang.fgc.contract.dto.ContractCreateResponse;
 import com.susukkang.fgc.contract.dto.ContractUpdateResponse;
 import com.susukkang.fgc.contract.entity.ContractStatusEvent;
+import com.susukkang.fgc.contract.repository.ContractEventJobRepository;
 import com.susukkang.fgc.contract.repository.ContractFinancialSnapshotRepository;
 import com.susukkang.fgc.contract.repository.ContractQueryRepository;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
@@ -93,6 +98,9 @@ class ContractServiceImplTest {
     private ContractStatusEventRepository contractStatusEventRepository;
 
     @Mock
+    private ContractEventJobRepository contractEventJobRepository;
+
+    @Mock
     private ScheduleService scheduleService;
 
     @Mock
@@ -123,9 +131,9 @@ class ContractServiceImplTest {
         ));
         given(contractQueryRepository.findStatusEventProcessingsByContractId(21L)).willReturn(List.of(
                 new ContractStatusEventProcessingRow(102L, "DailyChangedContractJob", "FAILED",
-                        secondEffective.plusDays(1).plusHours(1)),
+                        secondEffective.plusDays(1).plusHours(1), "자료 품질 오류"),
                 new ContractStatusEventProcessingRow(102L, "DailyChangedContractJob", "SUCCEEDED",
-                        secondEffective.plusDays(1).plusHours(2))
+                        secondEffective.plusDays(1).plusHours(2), null)
         ));
 
         var response = contractService.selectStatusEventsByContractId(21L);
@@ -133,9 +141,46 @@ class ContractServiceImplTest {
         assertThat(response).hasSize(2);
         assertThat(response.getFirst().effectiveAt()).isEqualTo(firstEffective);
         assertThat(response.getFirst().processings()).isEmpty();
+        assertThat(response.getFirst().followUp().status()).isEqualTo(FollowUpStatus.NOT_REQUIRED);
         assertThat(response.get(1).processings())
                 .extracting(processing -> processing.processingStatus())
                 .containsExactly("FAILED", "SUCCEEDED");
+        // 배치 행은 영향을 남기지 않고 실패 사유도 코드가 아니라서 요약·오류 코드를 만들지 않는다.
+        assertThat(response.get(1).processings()).allSatisfy(processing -> {
+            assertThat(processing.job()).isEqualTo(processing.processingJob());
+            assertThat(processing.status()).isEqualTo(processing.processingStatus());
+            assertThat(processing.summary()).isNull();
+            assertThat(processing.errorCode()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("작업이 여럿인 사건의 후속 상태는 가장 급한 작업을 따르고 요약은 성공 행, 오류 코드는 실패 행에만 붙는다")
+    void followUpTakesTheMostUrgentJobAndSummaryOnlyOnSuccess() {
+        given(insuranceContractRepository.existsById(21L)).willReturn(true);
+        OffsetDateTime at = OffsetDateTime.parse("2026-07-10T00:00:00+09:00");
+        given(contractStatusEventRepository.findByContractIdOrderByEffectiveAtAscEventSeqAsc(21L)).willReturn(List.of(
+                statusEvent(101L, 1, null, ACTIVE, at, at, "FGC_MANUAL", "EVENT-1")));
+        ProcessingSummary summary = new ProcessingSummary(2, 0, 3, 1);
+        given(contractEventJobRepository.findByContract(21L, ContractStatusFollowUpService.MAX_ATTEMPTS)).willReturn(List.of(
+                new ContractEventJobRow(101L, new FollowUpJob("HoldJob", FollowUpStatus.SUCCEEDED, 2, 5, at, null, null), summary),
+                new ContractEventJobRow(101L, new FollowUpJob("ResumeJob", FollowUpStatus.FAILED, 1, 5, at, at, "CODE"),
+                        new ProcessingSummary(0, 0, 0, 0))));
+        given(contractQueryRepository.findStatusEventProcessingsByContractId(21L)).willReturn(List.of(
+                new ContractStatusEventProcessingRow(101L, "HoldJob", "FAILED", at, "FGC-IMPL-POLICY_MISSING: 내부 메시지"),
+                new ContractStatusEventProcessingRow(101L, "HoldJob", "SUCCEEDED", at, null),
+                new ContractStatusEventProcessingRow(101L, "ResumeJob", "FAILED", at, "CODE")));
+
+        var event = contractService.selectStatusEventsByContractId(21L).getFirst();
+
+        assertThat(event.followUp().status()).isEqualTo(FollowUpStatus.FAILED);
+        assertThat(event.followUp().jobs()).hasSize(2);
+        assertThat(event.processings())
+                .extracting(processing -> processing.errorCode(), processing -> processing.summary())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("FGC-IMPL-POLICY_MISSING", null),
+                        org.assertj.core.groups.Tuple.tuple(null, summary),
+                        org.assertj.core.groups.Tuple.tuple("CODE", null));
     }
 
     @Test
