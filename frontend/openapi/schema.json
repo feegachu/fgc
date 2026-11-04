@@ -894,6 +894,20 @@
         },
         "type" : "object"
       },
+      "ApiResponsePageResponseContractStatusEffectResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseContractStatusEffectResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponsePageResponseContractView" : {
         "properties" : {
           "data" : {
@@ -4009,8 +4023,48 @@
         },
         "type" : "object"
       },
+      "ContractStatusEffectResponse" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "entityId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "entityType" : {
+            "type" : "string"
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "previousState" : {
+            "type" : [ "string", "null" ]
+          },
+          "processingJob" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "reasonCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ContractStatusEventProcessingResponse" : {
         "properties" : {
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
           "processedAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -4020,6 +4074,16 @@
           },
           "processingStatus" : {
             "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/ProcessingSummary"
+            }, {
+              "type" : "null"
+            } ]
           }
         },
         "type" : "object"
@@ -4063,6 +4127,9 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "followUp" : {
+            "$ref" : "#/components/schemas/EventFollowUp"
+          },
           "newStatus" : {
             "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
             "type" : "string"
@@ -4090,6 +4157,10 @@
             "type" : [ "string", "null" ]
           },
           "receivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "recordedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
@@ -4455,6 +4526,21 @@
           "reconMismatch" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventFollowUp" : {
+        "properties" : {
+          "jobs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FollowUpJob"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -5027,6 +5113,37 @@
           },
           "status" : {
             "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FollowUpJob" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
+          "lastAttemptAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextRetryAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
             "type" : "string"
           }
         },
@@ -5986,6 +6103,36 @@
           "content" : {
             "items" : {
               "$ref" : "#/components/schemas/CommissionPaymentListResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageResponseContractStatusEffectResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ContractStatusEffectResponse"
             },
             "type" : "array"
           },
@@ -7115,6 +7262,27 @@
           "validationRunId" : {
             "format" : "int64",
             "type" : [ "integer", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "ProcessingSummary" : {
+        "properties" : {
+          "changedScheduleLines" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excludedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "heldPayments" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "resumedPayments" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -10617,6 +10785,59 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseListContractStatusEventResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "계약" ]
+      }
+    },
+    "/api/v1/contracts/{id}/status-events/{eventId}/effects" : {
+      "get" : {
+        "operationId" : "getContractStatusEventEffects",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "eventId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseContractStatusEffectResponse"
                 }
               }
             },

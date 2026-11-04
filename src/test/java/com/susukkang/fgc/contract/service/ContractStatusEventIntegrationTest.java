@@ -62,11 +62,14 @@ import static com.susukkang.fgc.common.code.ContractStatus.TERMINATED;
 import static com.susukkang.fgc.common.code.ContractStatus.UNPAID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -477,6 +480,103 @@ class ContractStatusEventIntegrationTest {
     }
 
     @Test
+    @DisplayName("IF-API-16은 대상 없음, 처리 대기, 실패 후 재시도 대기, 재시도 성공을 구분하고 기존 필드를 유지한다")
+    void statusHistoryTellsFollowUpStatesApart() throws Exception {
+        Long id = newContract();
+        processor.supported = EnumSet.of(UNPAID);
+        processor.failuresLeft.set(1);
+        long eventId = data(put(id, update(id, UNPAID, event(AUG_1)), UUID.randomUUID().toString())
+                .andExpect(status().isOk())).path("statusEventId").asLong();
+
+        // 등록 직후: 최초 사건은 후속 작업이 없고, 상태 사건은 대기다. 끝난 시도가 없어 processings는 그대로 빈 배열이다.
+        statusEvents(id)
+                .andExpect(jsonPath("$.data[0].followUp.status").value("NOT_REQUIRED"))
+                .andExpect(jsonPath("$.data[0].followUp.jobs").isEmpty())
+                .andExpect(jsonPath("$.data[0].processings").isEmpty())
+                .andExpect(jsonPath("$.data[0].recordedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[1].eventId").value(eventId))
+                .andExpect(jsonPath("$.data[1].recordedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[1].followUp.status").value("PENDING"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].job").value(RecordingProcessor.JOB))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].attemptCount").value(0))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].maxAttempts").value(ContractStatusFollowUpService.MAX_ATTEMPTS))
+                .andExpect(jsonPath("$.data[1].processings").isEmpty());
+
+        followUps.runDueJobs();
+
+        // 실패: 재시도가 남아 있고 실패 이력에 코드만 나간다. 영향 요약은 0건이 아니라 null이다.
+        statusEvents(id)
+                .andExpect(jsonPath("$.data[1].followUp.status").value("FAILED"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].attemptCount").value(1))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].errorCode").value("IllegalStateException"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].lastAttemptAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].nextRetryAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[1].processings[0].processingJob").value(RecordingProcessor.JOB))
+                .andExpect(jsonPath("$.data[1].processings[0].processingStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data[1].processings[0].job").value(RecordingProcessor.JOB))
+                .andExpect(jsonPath("$.data[1].processings[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.data[1].processings[0].errorCode").value("IllegalStateException"))
+                .andExpect(jsonPath("$.data[1].processings[0].summary").doesNotExist())
+                .andExpect(content().string(not(containsString("후속 처리 실패 주입"))));
+
+        jdbc.update("UPDATE fgc.contract_event_job SET next_retry_at = clock_timestamp() WHERE contract_status_event_id = ?",
+                eventId);
+        followUps.runDueJobs();
+
+        // 재시도 성공: 실패 이력은 남고 성공 행에만 영향 요약이 붙는다.
+        statusEvents(id)
+                .andExpect(jsonPath("$.data[1].followUp.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].attemptCount").value(2))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].nextRetryAt").doesNotExist())
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].errorCode").doesNotExist())
+                .andExpect(jsonPath("$.data[1].processings[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.data[1].processings[0].errorCode").value("IllegalStateException"))
+                .andExpect(jsonPath("$.data[1].processings[1].status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data[1].processings[1].errorCode").doesNotExist())
+                .andExpect(jsonPath("$.data[1].processings[1].summary.heldPayments").value(0))
+                .andExpect(jsonPath("$.data[1].processings[1].summary.resumedPayments").value(0))
+                .andExpect(jsonPath("$.data[1].processings[1].summary.changedScheduleLines").value(1))
+                .andExpect(jsonPath("$.data[1].processings[1].summary.excludedCount").value(0));
+    }
+
+    @Test
+    @DisplayName("IF-API-16은 작업을 잡은 뒤 결과 전이면 처리 중, 재시도를 다 썼으면 저장 상태와 무관하게 소진으로 보이고 뒤 사건은 대기로 남는다")
+    void statusHistoryShowsProcessingAndExhausted() throws Exception {
+        Long id = newContract();
+        processor.supported = EnumSet.allOf(ContractStatus.class);
+        long unpaid = data(put(id, update(id, UNPAID, event(AUG_1)), UUID.randomUUID().toString())
+                .andExpect(status().isOk())).path("statusEventId").asLong();
+        data(put(id, update(id, ACTIVE, event(AUG_1.plusDays(3))), UUID.randomUUID().toString()).andExpect(status().isOk()));
+
+        // 잡기만 커밋한 작업: 재시도 시각 전이면 처리 중, 시각이 지나면(중단) 다시 대기다.
+        new TransactionTemplate(transactionManager)
+                .execute(tx -> jobRepository.claimNext(ContractStatusFollowUpService.MAX_ATTEMPTS));
+        statusEvents(id)
+                .andExpect(jsonPath("$.data[1].followUp.status").value("PROCESSING"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].attemptCount").value(1));
+        jdbc.update("UPDATE fgc.contract_event_job SET next_retry_at = clock_timestamp() WHERE contract_status_event_id = ?",
+                unpaid);
+        statusEvents(id).andExpect(jsonPath("$.data[1].followUp.status").value("PENDING"));
+
+        // 마지막 시도가 실패 기록 없이 끝난 작업은 저장 상태가 PENDING이어도 소진이다.
+        jdbc.update("UPDATE fgc.contract_event_job SET attempt_count = ? WHERE contract_status_event_id = ?",
+                ContractStatusFollowUpService.MAX_ATTEMPTS, unpaid);
+        followUps.runDueJobs();
+        assertThat(processor.processed).isEmpty();
+        statusEvents(id)
+                .andExpect(jsonPath("$.data[1].followUp.status").value("EXHAUSTED"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].nextRetryAt").doesNotExist())
+                .andExpect(jsonPath("$.data[2].followUp.status").value("PENDING"));
+
+        jdbc.update("UPDATE fgc.contract_event_job SET state = 'FAILED', error_code = 'X' WHERE contract_status_event_id = ?",
+                unpaid);
+        statusEvents(id)
+                .andExpect(jsonPath("$.data[1].followUp.status").value("EXHAUSTED"))
+                .andExpect(jsonPath("$.data[1].followUp.jobs[0].errorCode").value("X"));
+    }
+
+    @Test
     @DisplayName("CT-C01 같은 조회 시각으로 동시에 상태를 바꾸면 하나만 저장되고 나머지는 409다")
     void concurrentStatusChangesLetOnlyOneWin() throws Exception {
         Long id = newContract();
@@ -530,6 +630,10 @@ class ContractStatusEventIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body));
         return mvc.perform(key == null ? request : request.header("Idempotency-Key", key));
+    }
+
+    private ResultActions statusEvents(Long id) throws Exception {
+        return mvc.perform(get("/api/v1/contracts/{id}/status-events", id).with(user(settle))).andExpect(status().isOk());
     }
 
     private JsonNode data(ResultActions result) throws Exception {

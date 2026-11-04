@@ -1,10 +1,15 @@
 package com.susukkang.fgc.contract.repository;
 
+import com.susukkang.fgc.contract.dto.ContractEventJobRow;
 import com.susukkang.fgc.contract.dto.ContractStatusEffect;
+import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingResponse.ProcessingSummary;
+import com.susukkang.fgc.contract.dto.ContractStatusEventResponse.FollowUpJob;
+import com.susukkang.fgc.contract.dto.ContractStatusEventResponse.FollowUpStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -118,5 +123,39 @@ public class ContractEventJobRepository {
                 UPDATE fgc.contract_event_job SET state = 'FAILED', error_code = ?
                  WHERE contract_status_event_id = ? AND processing_job = ?
                 """, errorCode, job.eventId(), job.job());
+    }
+
+    /**
+     * IF-API-16: 계약의 후속 작업별 현재 상태와 영향 건수. 저장 상태만으로는 대기와 소진을 가를 수 없어 시도 횟수와 함께 판정한다.
+     * 소진은 claimNext가 더는 잡지 않는 작업이고, 처리 중은 잡은 뒤 결과가 없으며 재시도 시각 전인 작업이다(next_retry_at이 선점 시각을 겸한다).
+     */
+    public List<ContractEventJobRow> findByContract(Long contractId, int maxAttempts) {
+        return jdbc.query("""
+                SELECT j.contract_status_event_id, j.processing_job, j.attempt_count, j.last_attempt_at, j.error_code,
+                       CASE WHEN j.state = 'SUCCEEDED' THEN 'SUCCEEDED'
+                            WHEN j.attempt_count >= ? THEN 'EXHAUSTED'
+                            WHEN j.state = 'FAILED' THEN 'FAILED'
+                            WHEN j.attempt_count > 0 AND j.next_retry_at > clock_timestamp() THEN 'PROCESSING'
+                            ELSE 'PENDING' END AS follow_up_status,
+                       CASE WHEN j.state <> 'SUCCEEDED' AND j.attempt_count < ? THEN j.next_retry_at END AS next_retry_at,
+                       count(*) FILTER (WHERE f.entity_type = 'PAYMENT' AND f.next_state = 'HELD') AS held_payments,
+                       count(*) FILTER (WHERE f.entity_type = 'PAYMENT' AND f.next_state = 'RELEASED') AS resumed_payments,
+                       count(*) FILTER (WHERE f.entity_type = 'SCHEDULE_LINE' AND f.next_state <> 'EXCLUDED') AS changed_schedule_lines,
+                       count(*) FILTER (WHERE f.next_state = 'EXCLUDED') AS excluded_count
+                  FROM fgc.contract_event_job j
+                  JOIN fgc.contract_status_event e ON e.contract_status_event_id = j.contract_status_event_id
+                  LEFT JOIN fgc.contract_status_event_effect f
+                    ON f.contract_status_event_id = j.contract_status_event_id AND f.processing_job = j.processing_job
+                 WHERE e.contract_id = ?
+                 GROUP BY j.contract_status_event_id, j.processing_job
+                 ORDER BY j.contract_status_event_id, j.processing_job
+                """, (rs, row) -> new ContractEventJobRow(
+                rs.getLong("contract_status_event_id"),
+                new FollowUpJob(rs.getString("processing_job"), FollowUpStatus.valueOf(rs.getString("follow_up_status")),
+                        rs.getInt("attempt_count"), maxAttempts, rs.getObject("last_attempt_at", OffsetDateTime.class),
+                        rs.getObject("next_retry_at", OffsetDateTime.class), rs.getString("error_code")),
+                new ProcessingSummary(rs.getInt("held_payments"), rs.getInt("resumed_payments"),
+                        rs.getInt("changed_schedule_lines"), rs.getInt("excluded_count"))),
+                maxAttempts, maxAttempts, contractId);
     }
 }
