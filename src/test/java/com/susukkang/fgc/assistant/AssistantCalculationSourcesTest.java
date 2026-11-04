@@ -37,6 +37,39 @@ class AssistantCalculationSourcesTest {
     PaymentCalculationRequest expected(PaymentCalculationRequest.Scope.Aggregation aggregate,Integer installment) {
         return new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.EXPECTED_COMMISSION,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,"3","2026-10",PaymentStage.GA_TO_FC,installment,"4","5",null,null,aggregate),null,1L);
     }
+    @Test void amountStringsRejectLeadingZerosButKeepZeroFractionsAndBounds() {
+        for(String amount:List.of("0001","00","01.50","00.50")) {
+            assertThatThrownBy(()->CalculationAmounts.input(mapper.getNodeFactory().textNode(amount),"amount"))
+                    .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+        }
+        for(String amount:List.of("0","0.50","1","9999999999999.99")) {
+            assertThat(CalculationAmounts.input(mapper.getNodeFactory().textNode(amount),"amount"))
+                    .isEqualByComparingTo(amount);
+        }
+    }
+    @Test void reconciliationKeepsSourceReviewDecisionAndMissingAmounts() {
+        var detail=mock(com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse.class);
+        when(detail.contractId()).thenReturn(3L);
+        when(detail.expectedTotalAmount()).thenReturn(new BigDecimal("100000"));
+        when(detail.actualTotalAmount()).thenReturn(new BigDecimal("100000"));
+        when(detail.differenceAmount()).thenReturn(BigDecimal.ZERO);
+        when(reconciliations.get(99L)).thenReturn(detail);
+        var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(null,null,null,null,null,null,null,null,"99",null),null,1L);
+        when(detail.resultType()).thenReturn("REVIEW_REQUIRED");
+        var review=service.calculate(request);
+        assertThat(review.status()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(review.resolvedScope()).containsEntry("resultType","REVIEW_REQUIRED");
+        assertThat(review.amounts()).containsEntry("differenceAmount","0");
+        assertThat(review.recommendation().allowed()).isFalse();
+        when(detail.differenceAmount()).thenReturn(null);
+        assertThat(service.calculate(request).status()).isEqualTo("REVIEW_REQUIRED");
+        when(detail.resultType()).thenReturn("MATCHED");
+        assertThat(service.calculate(request).status()).isEqualTo("INSUFFICIENT_DATA");
+        when(detail.differenceAmount()).thenReturn(BigDecimal.ZERO);
+        var matched=service.calculate(request);
+        assertThat(matched.status()).isEqualTo("CALCULATED");
+        assertThat(matched.resolvedScope()).containsEntry("resultType","MATCHED");
+    }
     void schedule(String... amounts) {
         var lines=new ArrayList<ScheduleLineResponse>();int seq=0;
         for(String amount:amounts) lines.add(ScheduleLineResponse.builder().contractId(3L).commissionItemId(4L).beneficiaryAgentId(5L).lineNo(++seq).installmentNo(seq).dueDate(LocalDate.of(2026,10,9)).attributionDate(LocalDate.of(2026,10,8)).expectedAmount(new BigDecimal(amount)).lineStatus("PLANNED").cashflowType("PAYMENT").ruleRef(6L).build());
