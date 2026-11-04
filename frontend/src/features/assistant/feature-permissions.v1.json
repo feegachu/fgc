@@ -751,6 +751,7 @@
     "reference.tab.rules": "INTERNAL_READ",
     "reference.tab.sources": "INTERNAL_READ",
     "reference.tab.versions": "INTERNAL_READ",
+    "validation.restart": "INTERNAL_READ",
     "features.validation.validation-restart-panel.section-1": "INTERNAL_READ",
     "features.validation.validation-restart-panel.table-1": "INTERNAL_READ",
     "features.validation.validation-restart-panel.button-1": "CAN_PROCESS",

@@ -171,9 +171,10 @@ export const contractArbitrageChecksQuery = (id: string) =>
 export const contractJournalsQuery = (id: string) => contractTabQuery<ContractJournal[]>(id, 'journals')
 export const contractTransactionsQuery = (id: string) => contractTabQuery<ContractTransactions>(id, 'transactions')
 
+export class ContractSaveReceiptError extends Error {}
 export async function createContract(body: ContractCreateRequest) {
   const data = await request<Schema['ContractCreateResponse']>('/api/v1/contracts', { method: 'POST', body })
-  if (data.contractId == null) throw new Error('등록된 계약을 확인할 수 없습니다.')
+  if (data.contractId == null) throw new ContractSaveReceiptError('등록된 계약을 확인할 수 없습니다.')
   return data
 }
 /** 같은 본문은 같은 멱등키로 다시 보낸다. 상태 변경에는 서버가 멱등키를 요구한다(IF-API-19). */
@@ -183,7 +184,7 @@ export async function updateContract(id: string | number, body: ContractUpdateRe
     body,
     idempotencyKey,
   })
-  if (data.contractId == null) throw new Error('수정된 계약을 확인할 수 없습니다.')
+  if (data.contractId == null) throw new ContractSaveReceiptError('수정된 계약을 확인할 수 없습니다.')
   return data
 }
 /** IF-API-64 저장 전 상태 사건의 영향. 조회 성격이라 멱등키가 없고 아무것도 저장하지 않는다. */
