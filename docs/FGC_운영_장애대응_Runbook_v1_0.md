@@ -879,8 +879,8 @@ SELECT r.retry_id, r.validation_run_id, r.state, v.status AS run_status, r.previ
 |---|---|---|
 | `ACCEPTED` | `FAILED` | API가 다시 뜨면 스케줄러가 접수 5분 뒤 `FAILED`, `LAUNCH_TIMEOUT`으로 닫는다. 기다린다 |
 | `LAUNCHING` | `FAILED` | 아래 SQL |
-| `RUNNING` | `RUNNING` | 위 SQL로 실행을 `FAILED`로 표시한 **뒤에** 아래 SQL. 위 SQL은 이 행을 고치지 않고, 아래 SQL은 `RUNNING` 실행을 거절한다 |
-| `RUNNING` | `FAILED` | 아래 SQL. 위 SQL은 `RUNNING` 실행만 받는다 |
+| `RUNNING` | `RUNNING` | 앞의 멈춘 실행 SQL(`run_id`)로 실행을 `FAILED`로 표시한 **뒤에** 아래 SQL. 멈춘 실행 SQL은 이 행을 고치지 않고, 아래 SQL은 `RUNNING` 실행을 거절한다 |
+| `RUNNING` | `FAILED` | 아래 SQL. 멈춘 실행 SQL은 `RUNNING` 실행만 받는다 |
 | `RUNNING` | `COMPLETED` | 아래 SQL. 처리는 끝났고 마지막 기록만 못 한 경우라 접수를 `SUCCEEDED`로 닫는다 |
 
 **담당:** 실행 시스템 관리자, 승인 GA관리자. **조치:** PM 결정, 팀 공유 전 (1-5절). 다시 열 조건: 기동 시 자동 정리를 도입할 때. 위 초기 판단대로 API 시작 시각이 `requested_at`보다 늦은지 먼저 본다. 이 SQL은 접수 행과 그 실행에 남은 활성 배치 실행을 함께 닫는다. 배치 실행이 `STARTING`이나 `STARTED`로 남으면 서버가 재시작을 허용하지 않기 때문이다(`MonthlyJobExecutionLookup`).
@@ -1309,7 +1309,7 @@ AWS Pod의 파일 볼륨은 이름이 `fgc-files`이고 Podman 명령을 쓴다.
 | 3 | 배포 재현 | 2-1~2-4절 | T1, T22. 실 서버 미확인 |
 | 4 | 롤백 | 2-5, 2-6절 | T2, T3, T7. 실 서버 미확인 |
 | 5 | 키 교체 | 5-1~5-3절 | T19. 실제 키 미확인 |
-| 6 | 배치 실패 대응, 재시작 | 6장 | T13, T14 |
+| 6 | 배치 실패 대응, 재시작 | 6장 | T13, T14, T31 |
 | 7 | 쿼터 소진, 규칙형 전환 | 5-4절 | T16, T18 |
 | 8 | 업로드 볼륨 가득 | 8장 | T21 |
 
