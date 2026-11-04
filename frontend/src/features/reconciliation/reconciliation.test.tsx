@@ -299,6 +299,17 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(run).toBeEnabled()
     expect(screen.queryByText(/선택 후 실행할 수 있습니다/)).not.toBeInTheDocument()
   })
+  it('주소의 보험회사를 목록에서 찾지 못하면 다시 고르라고 안내한다', async () => {
+    renderAt('/reconciliations?month=2026-07&stage=GA_TO_FC&insurer=999', (url) =>
+      url.startsWith('/api/v1/base/insurers')
+        ? { content: [{ insurerId: 1, insurerCode: 'FGL01', insurerName: '미래가상생명', activeYn: true }], totalPages: 1 }
+        : undefined,
+    )
+    await screen.findByRole('option', { name: 'FGL01, 미래가상생명' })
+    const run = screen.getByRole('button', { name: '대사 실행' })
+    expect(run).toBeDisabled()
+    expect(run).toHaveAccessibleDescription('보험회사 선택 후 실행할 수 있습니다.')
+  })
   it('대사 실행 권한이 없는 역할에는 조건 안내 대신 권한 안내만 보인다', async () => {
     renderAt('/reconciliations?month=2026-07', undefined, 'COMPLIANCE')
     expect(await screen.findByText(/정산담당자와 시스템관리자만 할 수 있습니다/)).toBeVisible()

@@ -291,11 +291,12 @@ function DetailBody({
           </div>
         </header>
         <div className="surface-body">
+          {/* 숨겨져도 [실행]의 aria-describedby로 읽히므로 숨기는 상태에는 글자를 두지 않는다. */}
           <p
             className="vrun-action-note"
             id="execute-action-note"
             role={startUnconfirmed ? 'alert' : 'status'}
-            hidden={canProcess && !startUnconfirmed && (canExecute || status === 'FAILED') && (!executed || finished)}
+            hidden={canProcess && !startUnconfirmed && (canExecute || (status === 'FAILED' && header.runType !== 'MANUAL_CONTRACT')) && (!executed || finished)}
           >
             {status === 'FINALIZED'
               ? '확정된 실행은 다시 돌리지 않습니다. 새 실행을 만드세요.'
@@ -307,7 +308,11 @@ function DetailBody({
                     ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
                     : status === 'RUNNING'
                       ? '실행 중입니다. 끝나면 결과가 표시됩니다.'
-                      : '계산을 마친 실행입니다. 다시 계산하려면 새 실행을 만드세요.'}
+                      : status === 'COMPLETED'
+                        ? '계산을 마친 실행입니다. 다시 계산하려면 새 실행을 만드세요.'
+                        : status === 'FAILED' && header.runType === 'MANUAL_CONTRACT'
+                          ? '계약수동 실행은 실패 지점부터 재시작할 수 없습니다. 새 실행을 만드세요.'
+                          : ''}
           </p>
           {header.runType !== 'MANUAL_CONTRACT' && <ValidationRestartPanel key={id} id={id} month={header.validationMonth ?? ""} runNo={header.runNo ?? 0} status={status ?? 'CREATED'} waiting={!progress.isSuccess || !!(executed && !finished)} canProcess={canProcess} onAccepted={() => {
             announced.current = false

@@ -35,9 +35,10 @@ export function screenMessage(value?: string | null) {
 
 /**
  * 서버가 저장한 실패 사유에 섞인 예외 원문, 오류 코드, 변수 이름을 가려낸다(화면정의서 공통규칙 10).
- * 원문은 서버 로그에 있다. 요청번호는 문의에 필요한 값이라 보지 않는다.
+ * 원문은 서버 로그에 있다. 요청번호와 계약번호(화면정의서 EXCP-W01의 정식 형식)는 업무에 필요한 값이라 보지 않는다.
  */
-export const isDeveloperText = (value: string) => /[A-Za-z_]{3,}/.test(value.replace(/요청번호 [\w.-]+/g, ''))
+export const isDeveloperText = (value: string) =>
+  /[A-Za-z_]{3,}/.test(value.replace(/요청번호 [\w.-]+/g, '').replace(/\bFGC-[A-Z0-9]+-\d{6}-\d+\b/g, ''))
 
 export function errorScreenMessage(value?: string | null, requestId?: string | null) {
   const embeddedRequestId = value?.match(/\([^)]*요청 ID:\s*([^,)]+)[^)]*\)/)?.[1]?.trim()

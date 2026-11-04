@@ -569,7 +569,13 @@ function RunFilters({
   const insurers = useInsurerOptions()
   const insurer = insurers.data?.find((row) => String(row.insurerId) === fields.insurer)
   const inputValid = Boolean(canProcess && fields.month && fields.stage && fields.insurer && insurer && insurer.activeYn !== false)
-  const missing = [!fields.month && '정산월', !fields.stage && '지급단계', !fields.insurer && '보험회사'].filter(Boolean).join(', ')
+  const missing = [
+    !fields.month && '정산월',
+    !fields.stage && '지급단계',
+    (!fields.insurer || (!insurer && !insurers.isPending)) && '보험회사',
+  ]
+    .filter(Boolean)
+    .join(', ')
   // 꺼진 버튼은 포커스가 가지 않으므로 이유를 글자로 둔다. 권한이 없는 역할의 안내는 부모가 보인다.
   const runHint = !canProcess
     ? ''
