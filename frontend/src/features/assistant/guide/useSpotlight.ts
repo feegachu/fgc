@@ -58,6 +58,10 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         }
         const rect = target?.isConnected ? target.getBoundingClientRect() : null
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+        const cardHeight = card.current?.offsetHeight || Math.min(460, height / 2)
+        // A fixed card cannot be scrolled into view by the browser. Keep its controls
+        // reachable even when the page cannot scroll enough to fit below the target.
+        const cardTop = rect ? Math.max(headerBottom + 8, Math.min(rect.bottom + 24, height - cardHeight - 12)) : null
         const box = rect ? {
           left: Math.max(workspaceLeft, rect.left - 8),
           top: Math.max(headerBottom + 8, rect.top - 8),
@@ -68,7 +72,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           box: box?.width && box.height ? box : null,
           card: rect ? {
             left: Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)),
-            top: rect.bottom + 24,
+            top: cardTop!,
             right: 'auto', bottom: 'auto', width: cardWidth,
           } : { left: 'auto', top: 'auto', right: 16, bottom: 16, width: cardWidth },
         })

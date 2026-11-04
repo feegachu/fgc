@@ -39,7 +39,7 @@ it.each([
   } finally { header.remove(); target.remove() }
 })
 
-it('attaches below the real target and keeps the opposite inset clear on repeated resizes', () => {
+it('keeps the whole card in the viewport when page scrolling cannot expose it, including repeated resizes', () => {
   vi.useFakeTimers()
   let resize: (() => void) | undefined
   vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback } observe() {} disconnect() {} })
@@ -60,7 +60,8 @@ it('attaches below the real target and keeps the opposite inset clear on repeate
     act(() => { vi.advanceTimersByTime(20) })
     const card = screen.getByRole('region', { name: 'Guide card' })
     expect(window.scrollBy).toHaveBeenCalledWith({ top: 180, behavior: 'instant' })
-    expect(card).toHaveStyle({ top: '524px', bottom: 'auto', right: 'auto', left: '270px', width: '360px' })
+    expect(card).toHaveStyle({ top: '480px', bottom: 'auto', right: 'auto', left: '270px', width: '360px' })
+    expect(Number.parseFloat(card.style.top) + card.offsetHeight).toBeLessThanOrEqual(window.innerHeight - 12)
     const stable = card.getAttribute('style')
     for (let index = 0; index < 5; index++) {
       act(() => { resize?.(); vi.advanceTimersByTime(20) })
