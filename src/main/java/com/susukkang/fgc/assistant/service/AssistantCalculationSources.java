@@ -185,21 +185,13 @@ public class AssistantCalculationSources {
 
   private PaymentCalculationSnapshot expected(
       PaymentCalculationRequest request, PaymentCalculationRequest.Scope scope, long contract) {
-    if (scope.settlementMonth() == null || scope.aggregation() == null)
-      return missing(request, SETTLEMENT_MONTH, "aggregation");
+    List<String> missingFields = expectedMissingFields(scope);
+    if (!missingFields.isEmpty()) return missing(request, missingFields.toArray(String[]::new));
     YearMonth month;
     try {
       month = YearMonth.parse(scope.settlementMonth());
     } catch (java.time.DateTimeException e) {
       throw invalid(SETTLEMENT_MONTH);
-    }
-    if (scope.aggregation() == PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE) {
-      List<String> missingFields = new ArrayList<>();
-      if (scope.commissionItemId() == null) missingFields.add("commissionItemId");
-      if (scope.installmentNo() == null) missingFields.add("installmentNo");
-      if (scope.paymentStage() == com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC
-          && scope.beneficiaryAgentId() == null) missingFields.add("beneficiaryAgentId");
-      if (!missingFields.isEmpty()) return missing(request, missingFields.toArray(String[]::new));
     }
     var detail = schedules.selectByContractIdAndPaymentStage(contract, scope.paymentStage());
     if (detail == null || detail.getLines() == null) return missing(request, "activeSchedule");
@@ -210,6 +202,19 @@ public class AssistantCalculationSources {
     if (selected.stream().anyMatch(line -> line.getExpectedAmount() == null))
       return missing(request, EXPECTED_AMOUNT);
     return expectedResult(request, scope, contract, detail, selected);
+  }
+
+  private List<String> expectedMissingFields(PaymentCalculationRequest.Scope scope) {
+    List<String> missingFields = new ArrayList<>();
+    if (scope.settlementMonth() == null) missingFields.add(SETTLEMENT_MONTH);
+    if (scope.aggregation() == null) missingFields.add("aggregation");
+    if (scope.aggregation() == PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE) {
+      if (scope.commissionItemId() == null) missingFields.add("commissionItemId");
+      if (scope.installmentNo() == null) missingFields.add("installmentNo");
+      if (scope.paymentStage() == com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC
+          && scope.beneficiaryAgentId() == null) missingFields.add("beneficiaryAgentId");
+    }
+    return missingFields;
   }
 
   private List<ScheduleLineResponse> selectExpectedLines(
