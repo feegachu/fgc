@@ -111,9 +111,10 @@ function GuideSession({
       // The API's safe DRAFT entry does not claim a completed precheck. Reuse the
       // observer's owner/session-bound proof verification before advancing an
       // already completed precheck to its result acknowledgement, never confirm.
-      if (initialStepId && runtime.getSnapshot().step?.completionConditionId === 'CURRENT_PRECHECK_PASSED') {
+      const opened = runtime.getSnapshot()
+      if (initialStepId && opened.step?.completionConditionId === 'CURRENT_PRECHECK_PASSED') {
         const latest = await observer.readBusinessState(context, AbortSignal.timeout(5000))
-        if (!cancelled && latest.saved && latest.prechecked) await runtime.next()
+        if (!cancelled && runtime.getSnapshot() === opened && latest.saved && latest.prechecked) await runtime.next()
       }
     }).catch(() => {
       if (!cancelled) setMessage('현재 선택 대상과 권한을 확인한 뒤 안내를 다시 시작해주세요.')
