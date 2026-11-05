@@ -411,6 +411,34 @@ describe('EXCP-W01 예외함', () => {
     )
   })
 
+  it('저장된 설명과 처리 사유의 스크립트는 글자로만 보이고 실행되지 않는다 (SER-004)', async () => {
+    const payload = '<img src=x onerror="alert(1)"><script>alert(2)</script>'
+    searchResponse = () =>
+      search([
+        {
+          ...baseCase,
+          description: payload,
+          actions: [
+            {
+              actionSeq: 1,
+              actionTypeLabel: '담당 배정',
+              fromStatusLabel: '신규',
+              toStatusLabel: '신규',
+              reason: payload,
+              actionByLoginId: 'settle01',
+              actionAt: '2026-07-11T00:30:00+09:00',
+            },
+          ],
+        },
+      ])
+    const { actions } = renderPage()
+    await actions.click(within(await table()).getByRole('button', { name: '11' }))
+    expect(await screen.findByText(payload, { selector: '.exception-history-reason' })).toBeInTheDocument()
+    expect(screen.getByText(payload, { selector: 'dd' })).toBeInTheDocument()
+    expect(document.querySelector('img[src="x"]')).toBeNull()
+    expect(document.querySelector('#root script, main script, [onerror]')).toBeNull()
+  })
+
   it('사유 없이는 저장할 수 없고, 저장하면 이력과 상태가 갱신된다', async () => {
     postResponse = (path, body) => {
       expect(path).toBe('/api/v1/exceptions/11/actions')
