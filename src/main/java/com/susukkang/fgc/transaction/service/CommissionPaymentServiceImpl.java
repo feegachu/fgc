@@ -87,6 +87,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
     // after JSON 에 지급단계·포함/제외 판단·정착지원금 귀속·배부정책·증빙(REG-20·22)을 함께 담는다.
+    private static final String FIELD = "field";
+    private static final String REASON = "reason";
     private static final String REASON_CODE = "reasonCode";
     private static final String AUDIT_ENTITY_TYPE = "COMMISSION_PAYMENT";
     private static final String AUDIT_PAYMENT_CREATED = "PAYMENT_CREATED";
@@ -222,7 +224,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     public CommissionPaymentResponse confirmJournalCorrection(Long paymentId, String correctionGroupKey) {
         if (!writeRepository.isJournalCorrectionReplacement(paymentId, correctionGroupKey)) {
       throw new FgcBusinessException(
-          FgcErrorCode.COMMON_002, Map.of("field", "correctionGroupKey"));
+          FgcErrorCode.COMMON_002, Map.of(FIELD, "correctionGroupKey"));
         }
         return confirmPayment(paymentId, "JC:" + correctionGroupKey);
     }
@@ -615,7 +617,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return new FgcBusinessException(
                 FgcErrorCode.COMMON_002,
                 field,
-                Map.of("field", field),
+                Map.of(FIELD, field),
                 detail
         );
     }
@@ -1772,7 +1774,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         "attributionDate", row.attributionDate().toString(),
                         "firstYearStartInclusive", row.firstYearStartInclusive().toString(),
                         "firstYearEndExclusive", row.firstYearEndExclusive().toString(),
-                        REASON_CODE, row.reasonCode(), "reason", row.reason())).toList());
+                        REASON_CODE, row.reasonCode(), REASON, row.reason())).toList());
         snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
                 .add(result.candidateIncludedAmount()));
         snapshot.put("effectiveIncludedAmount", result.includedAmount());
@@ -1815,7 +1817,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         candidate.put("cashflowType", row.cashflowType());
         candidate.put("classification", row.inclusionDecisionStatus());
         candidate.put(REASON_CODE, reasonCode);
-        candidate.put("reason", reason);
+        candidate.put(REASON, reason);
         return candidate;
     }
 
@@ -1825,7 +1827,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     Map<?, ?> applicability =
         snapshot.get("applicability") instanceof Map<?, ?> decision ? decision : Map.of();
         String reasonCode = Objects.toString(applicability.get(REASON_CODE), null);
-        String reason = Objects.toString(applicability.get("reason"),
+        String reason = Objects.toString(applicability.get(REASON),
                 Objects.toString(snapshot.get("notApplicableReason"), "적용대상 아님"));
         snapshot.put("candidateAttributions", attributions.stream()
                 .filter(row -> java.util.Objects.equals(row.contractId(), data.contractId())
@@ -2316,7 +2318,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         throw new FgcBusinessException(
                 FgcErrorCode.COMMON_002,
                 field,
-                Map.of("field", field),
+                Map.of(FIELD, field),
                 detail
         );
     }
