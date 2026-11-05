@@ -90,7 +90,7 @@ export function check() {
   const errors = [...validateTargets(required, declarations), ...validateHelpCatalog(catalog)]
   const routedIds = [...readFileSync(resolve(root, 'src/app/screens.ts'), 'utf8').matchAll(/id: '([^']+)'/g)].map((match) => match[1])
   for (const id of new Set(routedIds)) {
-    if (id !== 'TRAN-W02' && !catalog.some((entry) => entry.screenId === id && !entry.variant)) errors.push(`${id}: missing routed screen help`)
+    if (!['TRAN-W02', 'AGNT-W01'].includes(id) && !catalog.some((entry) => entry.screenId === id && !entry.variant)) errors.push(`${id}: missing routed screen help`)
   }
   for (const entry of catalog) {
     const page = readFileSync(resolve(root, 'src/features', entry.page), 'utf8')

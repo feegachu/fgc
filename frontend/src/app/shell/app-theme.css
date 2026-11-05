@@ -12,6 +12,12 @@ html:root {
   --color-action-subtle: color-mix(in srgb, #0046ff 8%, white);
 }
 
+/* 화면이 셸보다 길어 스크롤할 때 셸 밖으로 드러나는 바닥 영역도 같은 바탕색으로 맞춘다. */
+html:has(.app-shell.app-theme),
+html:has(.app-shell.app-theme) body {
+  background: var(--app-canvas);
+}
+
 .app-shell.app-theme {
   background: var(--app-canvas);
   /* 한글은 단어 중간에서 줄을 바꾸지 않는다. 영문, 숫자의 줄바꿈은 그대로다. */

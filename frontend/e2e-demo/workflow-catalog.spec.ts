@@ -149,6 +149,8 @@ async function expectHighlight(page: Page, step: Step, target: Locator) {
 for (const guide of guides) {
   const role = guide.roles.includes('AGENT') ? 'AGENT' : guide.roles.includes('COMPLIANCE') ? 'COMPLIANCE' : 'SETTLEMENT'
   const account = role === 'AGENT' ? 'agent01' : role === 'COMPLIANCE' ? 'audit01' : 'settle01'
+  // #896: 설계사 홈의 '업무 안내' 메뉴를 없앴으므로 설계사 튜토리얼은 시작 경로가 없다. 새 시작 경로가 생기면 다시 켠다.
+  if (role === 'AGENT') continue
   const allowed = guide.steps.filter((step) => step.roles.includes(role))
   const limit = partial[guide.workflowId]?.count ?? allowed.length
   const planned = allowed.slice(0, limit)
