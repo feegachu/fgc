@@ -160,6 +160,7 @@ describe('스텝 규칙', () => {
     expect(failureText('FGC-VRUN-003 | FGC-COMMON-500', 0)).toBe('처리 중 오류로 실패했습니다.')
     expect(failureText('FGC-VRUN-003 | 스케줄 회차가 중복되었습니다.', 3)).toBe('3단계에서 실패했습니다.')
     expect(failureText("SQL [SELECT '계약' || '900101-1234567']", 3)).toBe('3단계에서 실패했습니다.')
+    expect(failureText('DB 오류 (23505): id=42', 3)).toBe('3단계에서 실패했습니다.')
     expect(failureText('스케줄 회차가 중복되었습니다. | 원장 불균형 1건이 발견되었습니다.', 3)).toBe(
       '스케줄 회차가 중복되었습니다. | 원장 불균형 1건이 발견되었습니다.',
     )

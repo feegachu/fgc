@@ -9,7 +9,8 @@ import java.util.regex.Pattern;
  */
 public final class ValidationFailureText {
     private static final Pattern REQUEST_NUMBER = Pattern.compile("요청번호 [\\w.-]+", Pattern.CANON_EQ);
-    private static final Pattern DEVELOPER_TEXT = Pattern.compile("[A-Za-z_]{3,}");
+    /** 영문 3자 이상, 키=값, 괄호 안 5자리 오류 코드(SQLSTATE). */
+    private static final Pattern DEVELOPER_TEXT = Pattern.compile("[A-Za-z_]{3,}|[A-Za-z_]+=|\\(\\d{5}\\)");
 
     private ValidationFailureText() {
     }

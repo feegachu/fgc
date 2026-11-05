@@ -19,6 +19,9 @@ it('기존 서버 안내 문구를 한국어 업무 표현으로 표시한다', 
 it('개발자 문장을 가려내고 요청번호는 보지 않는다', () => {
   expect(isDeveloperText('journal_no 월간 일련번호 상한(99999) 초과')).toBe(true)
   expect(isDeveloperText('FGC-VRUN-003')).toBe(true)
+  expect(isDeveloperText('DB 오류 (23505): id=42')).toBe(true)
+  expect(isDeveloperText('DB 오류 (23505)')).toBe(true)
+  expect(isDeveloperText('지급 건 ID가 없습니다.')).toBe(false)
   expect(isDeveloperText('처리 중 오류가 발생했습니다. 요청번호 abc.def_ghi-123를 담당자에게 알려주세요.')).toBe(false)
   expect(isDeveloperText('GA→설계사 1,200% 한도 초과')).toBe(false)
 })
