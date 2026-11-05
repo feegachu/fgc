@@ -11,6 +11,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date, int, month, won } from '../../lib/format'
+import { ContractAcquisitionCost } from '../acquisition-cost/ContractAcquisitionCost'
 import { CapDetailModal } from '../cap/CapDetailModal'
 import { Amount, CapStatus, CapUsage } from '../cap/badges'
 import { JOURNAL_TYPE } from '../ledger/labels'
@@ -145,6 +146,13 @@ export function ContractTabs({
               <CapTab id={id} />
             ) : name === 'arbitrage' ? (
               <ArbitrageTab id={id} />
+            ) : name === 'acquisition' ? (
+              <>
+                <PanelHeading title="계약체결비용 한도">
+                  선지급과 유지관리 예정 금액을 한도와 각각 비교합니다. 예정 스케줄 생성과 별개입니다.
+                </PanelHeading>
+                <ContractAcquisitionCost contractId={id} contractNo={contract.contractNo} />
+              </>
             ) : name === 'ledger' ? (
               <LedgerTab id={id} />
             ) : (
