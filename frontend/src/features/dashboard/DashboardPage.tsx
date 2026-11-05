@@ -152,6 +152,7 @@ function DashboardContent({ month }: { month: string }) {
             >
               다시 시도
             </button>
+            <UpdatedAt at={openCounts.dataUpdatedAt} />
           </>
         ) : openCounts.data?.total === 0 ? (
           '미처리 예외가 없습니다'

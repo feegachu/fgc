@@ -175,7 +175,8 @@ class HomeSummaryApiIntegrationTest {
                 .andExpect(jsonPath("$.data.attentionAgents[2].activeYn").value(false))
                 .andExpect(jsonPath("$.data.attentionAgents[3].reasons[*].code").value(contains("NEAR_LIMIT")))
                 .andExpect(jsonPath("$.data.attentionAgents[3].reasons[*].count").value(contains(1)))
-                .andExpect(jsonPath("$.data.basis").value(containsString("최근 30일")));
+                .andExpect(jsonPath("$.data.basis").value(containsString("최근 30일")))
+                .andExpect(jsonPath("$.data.basis").value(containsString("사유가 있는 해촉 설계사")));
     }
 
     @Test

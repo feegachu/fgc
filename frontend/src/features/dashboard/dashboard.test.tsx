@@ -366,11 +366,25 @@ describe('DASH-W01 업무 대시보드', () => {
     const retry = await within(kpis).findByRole('button', { name: '미처리 예외 다시 불러오기' })
     expect(within(kpis).getByRole('alert')).toHaveTextContent('불러오지 못했습니다')
     expect(within(within(kpis).getByRole('region', { name: '미처리 예외' })).queryByText('0')).not.toBeInTheDocument()
+    expect(within(within(kpis).getByRole('region', { name: '미처리 예외' })).queryByText(/^갱신 /)).not.toBeInTheDocument()
     expect(within(kpis).getByRole('link', { name: '1,200% 위반 1,234건' })).toBeInTheDocument()
     expect(screen.getByRole('table', { name: '최근 예외 목록' })).toBeInTheDocument()
     fail = false
     await actions.click(retry)
     expect(await within(kpis).findByRole('link', { name: '미처리 예외 5건' })).toBeInTheDocument()
+  })
+
+  it('미처리 건수를 다시 불러오다 실패하면 그 카드에 갱신 시각을 보인다', async () => {
+    renderDashboard()
+    const kpis = await screen.findByRole('region', { name: '주요 검증 지표' })
+    await within(kpis).findByRole('link', { name: '미처리 예외 5건' })
+    countsResponse = async () => {
+      throw serverError()
+    }
+    await clients[0].refetchQueries({ queryKey: ['exceptions', 'counts', 'OPEN'] })
+    await within(kpis).findByRole('alert')
+    const card = within(kpis).getByRole('region', { name: '미처리 예외' })
+    expect(within(card).getByText(/^갱신 \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)).toBeInTheDocument()
   })
 
   it('기준 정산월, 현황 기준일, 갱신 시각을 구분해 보여 주고 코드값을 드러내지 않는다', async () => {
