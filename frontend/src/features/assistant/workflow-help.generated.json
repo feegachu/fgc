@@ -9299,18 +9299,6 @@
         "next": []
       },
       {
-        "stepId": "help.0375b76eee4864ed219e1da521bc1c70",
-        "screenId": "AGNT-W01",
-        "targetId": "agent.guide-menu.open",
-        "title": "포트폴리오, 업무 안내",
-        "instruction": "포트폴리오 화면의 ‘업무 안내’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "AGENT"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.046fada8c93d92d080d5bad7f68b15f8",
         "screenId": "AGNT-W01",
         "targetId": "features.agent-home.chatbot.chatbot-modal.question-input",
@@ -9359,18 +9347,6 @@
         "next": []
       },
       {
-        "stepId": "help.2409e84582399caa98a55a43a9905d27",
-        "screenId": "AGNT-W01",
-        "targetId": "agent.guide-menu.agent.payments",
-        "title": "포트폴리오, 본인 지급 내역 조회",
-        "instruction": "포트폴리오 화면의 ‘본인 지급 내역 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "AGENT"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.2736561e771d8924db1e769f9ff71ab4",
         "screenId": "AGNT-W01",
         "targetId": "features.agent-home.agent-home-page.section-2",
@@ -9412,18 +9388,6 @@
         "targetId": "features.agent-home.chatbot.chatbot-modal.row-evidence",
         "title": "포트폴리오, 근거 보기",
         "instruction": "포트폴리오 화면의 ‘근거 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "AGENT"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.35efaa1aa734f64199d4f2616df73acc",
-        "screenId": "AGNT-W01",
-        "targetId": "agent.guide-menu.agent.portfolio",
-        "title": "포트폴리오, 설계사 포트폴리오 확인",
-        "instruction": "포트폴리오 화면의 ‘설계사 포트폴리오 확인’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"
@@ -9496,18 +9460,6 @@
         "targetId": "features.agent-home.chatbot.filter-panel.section",
         "title": "포트폴리오, 보험사 세부 선택",
         "instruction": "포트폴리오 화면의 ‘보험사 세부 선택’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "AGENT"
-        ],
-        "next": []
-      },
-      {
-        "stepId": "help.52e62034403fb8cd61e8bbd9e767745c",
-        "screenId": "AGNT-W01",
-        "targetId": "agent.guide-menu.agent.contract.detail",
-        "title": "포트폴리오, 본인 계약 상세 확인",
-        "instruction": "포트폴리오 화면의 ‘본인 계약 상세 확인’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"
@@ -9611,18 +9563,6 @@
         "next": []
       },
       {
-        "stepId": "help.7af22bd0b1c3b36991d6bb4d9ad159c2",
-        "screenId": "AGNT-W01",
-        "targetId": "agent.guide-menu.agent.contract.find",
-        "title": "포트폴리오, 본인 계약 조회",
-        "instruction": "포트폴리오 화면의 ‘본인 계약 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "AGENT"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.80639107fdf43cea84b51c8d9bca3e6e",
         "screenId": "AGNT-W01",
         "targetId": "features.agent-home.priority-contracts.section",
@@ -9700,6 +9640,18 @@
         "targetId": "features.agent-home.chatbot.chatbot-modal.suggest-restart",
         "title": "포트폴리오, 다른 카테고리도 추천 받기",
         "instruction": "포트폴리오 화면의 ‘다른 카테고리도 추천 받기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "AGENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.df2378812bb1f6c8f26e792eaa4858d8",
+        "screenId": "AGNT-W01",
+        "targetId": "features.agent-home.agent-home-page.section-3",
+        "title": "포트폴리오, 확인 필요 계약",
+        "instruction": "포트폴리오 화면의 ‘확인 필요 계약’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "AGENT"

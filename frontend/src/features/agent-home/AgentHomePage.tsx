@@ -1,4 +1,3 @@
-import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useOutletContext } from 'react-router'
@@ -27,9 +26,6 @@ import { PriorityContracts } from './PriorityContracts'
 import { ChatbotModal } from './chatbot/ChatbotModal'
 import { PicoMotion } from './mascot/PicoMotion'
 import './agent-home.css'
-import workflowGuides from '../assistant/workflow-guides.v1.json'
-import { useWorkflowGuide } from '../assistant/workflow-state'
-import { guideFeatureId } from '../assistant/feature-ids'
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: 6, label: '6개월' },
@@ -139,22 +135,6 @@ function AgentHomeContent({ month }: { month: string }) {
   return (
     <div className="ah">
       <h1 className="visually-hidden">포트폴리오</h1>
-      <ScreenHelp screenId="AGNT-W01" />
-      {import.meta.env.VITE_ASSISTANT_AI === 'true' && (
-        <details className="surface" style={{ padding: 12, marginBottom: 12 }}>
-          <summary data-guide-feature="agent.guide-menu.open" style={{ cursor: 'pointer' }}>업무 안내</summary>
-          <nav aria-label="본인 업무 안내" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            {workflowGuides.filter((guide) => guide.enabled && guide.roles.includes('AGENT')).map((guide) => (
-              <button data-guide-feature={guideFeatureId('agent.guide-menu', guide.workflowId)} key={guide.workflowId} type="button" className="button button-secondary"
-                onClick={(event) => {
-                  const menu = event.currentTarget.closest('details')
-                  if (menu) menu.open = false
-                  useWorkflowGuide.getState().start(guide.workflowId)
-                }}>{guide.title}</button>
-            ))}
-          </nav>
-        </details>
-      )}
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error, '포트폴리오를 불러오지 못했습니다.')}</p>
@@ -227,6 +207,7 @@ function Snapshot({
   const needFailed = near.isError || review.isError
   const need = (near.data ?? 0) + (review.data ?? 0)
   return (
+    <>
     <section data-guide-feature="features.agent-home.agent-home-page.section" data-guide-target="agent.overview" className="ah-snapshot" aria-label="이번 달 판매 현황">
       <article className="ah-hero" aria-label="설계사 프로필">
         <span className="ah-avatar" aria-hidden="true">
@@ -284,50 +265,44 @@ function Snapshot({
             }
           />
         </Link>
-        {needFailed ? (
-          <article className="ah-kpi ah-kpi-alert kpi-card kpi-card-warning" aria-label="확인 필요 계약">
-            <KpiCardContent
-              label="확인 필요 계약"
-              value="확인 불가"
-              footer={
-                <button
-                  data-guide-feature="features.agent-home.agent-home-page.button-3"
-                  type="button"
-                  className="ah-retry"
-                  onClick={() => void Promise.all([near.refetch?.(), review.refetch?.()])}
-                >
-                  다시 시도
-                </button>
-              }
-            />
-          </article>
-        ) : (
-          <Link
-            data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
-            className="ah-kpi ah-kpi-link ah-kpi-alert kpi-card kpi-card-warning"
-            to={needContractsHref(month, asOf)}
-            aria-label="확인 필요 계약"
-          >
-            <KpiCardContent
-              label="확인 필요 계약"
-              value={needReady ? need : '…'}
-              zero={needReady && need === 0}
-              unit="건"
-              footer={
-                <div className="ah-badges">
-                  <span className="ah-badge warn">
-                    한도 근접 <b>{near.data ?? '-'}</b>
-                  </span>
-                  <span className="ah-badge danger">
-                    검토 필요 <b>{review.data ?? '-'}</b>
-                  </span>
-                </div>
-              }
-            />
-          </Link>
-        )}
       </div>
     </section>
+      {needFailed ? (
+        <section data-guide-feature="features.agent-home.agent-home-page.section-3" className="ah-notice ah-notice-warn" aria-label="확인 필요 계약">
+          <p className="ah-notice-title">확인 필요 계약</p>
+          <p className="ah-notice-body">확인 불가</p>
+          <button
+            data-guide-feature="features.agent-home.agent-home-page.button-3"
+            type="button"
+            className="ah-retry"
+            onClick={() => void Promise.all([near.refetch?.(), review.refetch?.()])}
+          >
+            다시 시도
+          </button>
+        </section>
+      ) : !needReady || need > 0 ? (
+        <Link
+          data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
+          className="ah-notice ah-notice-warn ah-notice-link"
+          to={needContractsHref(month, asOf)}
+          aria-label="확인 필요 계약"
+        >
+          <span className="ah-notice-title">확인 필요 계약</span>
+          <span className="ah-notice-body">
+            {needReady ? `${need}건` : '…'}
+          </span>
+          <span className="ah-badges">
+            <span className="ah-badge warn">
+              한도 근접 <b>{near.data ?? '-'}</b>
+            </span>
+            <span className="ah-badge danger">
+              검토 필요 <b>{review.data ?? '-'}</b>
+            </span>
+          </span>
+          <span className="ah-notice-cta">계약 보기 ›</span>
+        </Link>
+      ) : null}
+    </>
   )
 }
 

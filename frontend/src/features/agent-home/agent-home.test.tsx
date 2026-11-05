@@ -126,7 +126,7 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(homeCalls()[0]).toContain('asOf=2026-07-31')
   })
 
-  it('확인 필요 계약 카드는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
+  it('확인 필요 계약 배너는 건수를 보여 주고 누르면 보험계약 목록으로 간다', async () => {
     capCount = (status) => (status === 'WARNING,VIOLATION' ? 1 : status === 'REVIEW_REQUIRED' ? 1 : 0)
     renderHome()
     const card = await screen.findByRole('link', { name: '확인 필요 계약' })
@@ -170,6 +170,7 @@ describe('AGNT-W01 포트폴리오', () => {
   })
 
   it('한도 건수 조회도 기준일까지로 맞춘다', async () => {
+    capCount = () => 1
     renderHome()
     const card = await screen.findByRole('link', { name: '확인 필요 계약' })
     expect(card.getAttribute('href')).toContain('contractDateTo=2026-07-31')
@@ -177,13 +178,21 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(calls.every((p) => p.includes('contractDateTo=2026-07-31'))).toBe(true)
   })
 
+  it('확인할 계약이 0건이면 배너를 숨긴다', async () => {
+    capCount = () => 0
+    renderHome()
+    await screen.findByRole('article', { name: '신규 계약 건수' })
+    await waitFor(() => expect(screen.queryByRole('link', { name: '확인 필요 계약' })).toBeNull())
+    expect(screen.queryByRole('region', { name: '확인 필요 계약' })).toBeNull()
+  })
+
   it('한도 건수 조회가 실패하면 로딩으로 두지 않고 확인 불가와 다시 시도를 보여 준다', async () => {
     capCount = () => {
       throw new ApiError(null, 'req-4', 500)
     }
     renderHome()
-    await waitFor(() => expect(screen.getByRole('article', { name: '확인 필요 계약' })).toHaveTextContent('확인 불가'))
-    expect(within(screen.getByRole('article', { name: '확인 필요 계약' })).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('region', { name: '확인 필요 계약' })).toHaveTextContent('확인 불가'))
+    expect(within(screen.getByRole('region', { name: '확인 필요 계약' })).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 
   it('보험사를 고른 뒤 그 집계가 로딩 중이거나 실패하면 0건 차트로 그리지 않는다', async () => {

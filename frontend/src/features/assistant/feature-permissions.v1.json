@@ -56,11 +56,6 @@
     ]
   },
   "targets": {
-    "agent.guide-menu.agent.contract.detail": "AGENT",
-    "agent.guide-menu.agent.contract.find": "AGENT",
-    "agent.guide-menu.agent.payments": "AGENT",
-    "agent.guide-menu.agent.portfolio": "AGENT",
-    "agent.guide-menu.open": "AGENT",
     "app.shell.app-shell.a": "OWN_OR_INTERNAL_READ",
     "app.shell.draft-navigation-guard.discard": "OWN_OR_INTERNAL_READ",
     "app.shell.draft-navigation-guard.keep": "OWN_OR_INTERNAL_READ",
@@ -180,6 +175,7 @@
     "features.agent-home.agent-home-page.need-contracts-link": "AGENT",
     "features.agent-home.agent-home-page.section": "AGENT",
     "features.agent-home.agent-home-page.section-2": "AGENT",
+    "features.agent-home.agent-home-page.section-3": "AGENT",
     "features.agent-home.charts.button": "AGENT",
     "features.agent-home.charts.circle": "AGENT",
     "features.agent-home.charts.table": "AGENT",
