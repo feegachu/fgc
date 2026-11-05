@@ -48,7 +48,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             ac.result_status,
             ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
             CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
-            ac.calculation_snapshot ->> 'candidateType' AS candidate_type
+            ac.calculation_snapshot ->> 'candidateType' AS candidate_type,
+            ac.calculation_snapshot ->> 'plannedCommissionBasis' AS planned_commission_basis
             FROM
             (SELECT DISTINCT ON (contract_id, payment_stage, as_of_date) *
             FROM fgc.arbitrage_check
@@ -296,7 +297,8 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
             ac.result_status,
             ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
             CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
-            ac.calculation_snapshot ->> 'candidateType' AS candidate_type
+            ac.calculation_snapshot ->> 'candidateType' AS candidate_type,
+            ac.calculation_snapshot ->> 'plannedCommissionBasis' AS planned_commission_basis
             FROM
             (SELECT DISTINCT ON (contract_id, payment_stage, as_of_date) *
             FROM fgc.arbitrage_check
@@ -468,6 +470,7 @@ public class ArbitrageCheckQueriesImpl implements ArbitrageCheckQueries {
         result.setDecisionReason((String) row[14]);
         result.setProjectedExcessAmount((BigDecimal) row[15]);
         result.setCandidateType((String) row[16]);
+        result.setPlannedCommissionBasis((String) row[17]);
         return result;
     }
 

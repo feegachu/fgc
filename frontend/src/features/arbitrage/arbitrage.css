@@ -570,3 +570,17 @@
     transition: none;
   }
 }
+
+.arb-planned-basis {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: normal;
+}
+.arb-planned-description {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  margin: 0.75rem 0 0;
+}

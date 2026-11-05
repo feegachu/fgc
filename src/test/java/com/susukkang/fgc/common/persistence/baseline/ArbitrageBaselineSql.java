@@ -27,7 +27,8 @@ final class ArbitrageBaselineSql {
                         ac.result_status,
                         ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
                         CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
-                        ac.calculation_snapshot ->> 'candidateType' AS candidate_type
+                        ac.calculation_snapshot ->> 'candidateType' AS candidate_type,
+                        ac.calculation_snapshot ->> 'plannedCommissionBasis' AS planned_commission_basis
                     FROM
                     """);
                 sql.append(" ");
@@ -588,7 +589,8 @@ final class ArbitrageBaselineSql {
                         ac.result_status,
                         ac.calculation_snapshot ->> 'decisionReason' AS decision_reason,
                         CAST(ac.calculation_snapshot ->> 'projectedExcessAmount' AS numeric) AS projected_excess_amount,
-                        ac.calculation_snapshot ->> 'candidateType' AS candidate_type
+                        ac.calculation_snapshot ->> 'candidateType' AS candidate_type,
+                        ac.calculation_snapshot ->> 'plannedCommissionBasis' AS planned_commission_basis
                     FROM
                     """);
                 sql.append(" ");

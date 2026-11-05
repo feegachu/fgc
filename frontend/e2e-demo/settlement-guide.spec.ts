@@ -19,6 +19,8 @@ for (const startMode of ['existing', 'new'] as const) {
     const contractNo = startMode === 'new' ? 'E2E-FUN088-CONTRACT' : 'FGC-FGL01-202607-0002'
     if (startMode === 'existing') await guide.getByLabel(/기존 계약번호/).fill(contractNo)
     await guide.getByRole('button', { name: '안내 시작', exact: true }).click()
+    // Guide setup may normalize the same contract route and replace its DOM after the URL first matches.
+    await expect(guide).toHaveAttribute('aria-busy', 'false')
     expect(writes).toHaveLength(0)
     if (startMode === 'new') {
       await expect(page).toHaveURL(/\/contracts\/new/)
@@ -43,6 +45,8 @@ for (const startMode of ['existing', 'new'] as const) {
       await expect(page).toHaveURL(new RegExp(`/contracts/${savedContract.contractId}(?:\\?|$)`))
     } else {
       await expect(page).toHaveURL(/\/contracts\/\d+/)
+      await expect(page.getByRole('main').getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '스케줄 재생성', exact: true })).toBeEnabled()
       const regenerated = page.waitForResponse(
         (response) => response.url().includes('/schedules/regenerate') && response.request().method() === 'POST',
       )
