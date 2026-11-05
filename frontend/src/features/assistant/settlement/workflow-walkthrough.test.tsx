@@ -43,6 +43,8 @@ it('blocks missing or duplicate targets and restores the same explanation after 
   await waitFor(() => expect(result.current.target).toBeNull())
   expect(result.current.ready).toBe(false)
   act(() => document.querySelectorAll('[name=contractDate]')[1].remove())
+  expect(result.current.status).toBe('PAUSED')
+  act(() => result.current.retry())
   await waitFor(() => expect(result.current.target).not.toBeNull())
   expect(result.current.index).toBe(0)
 })

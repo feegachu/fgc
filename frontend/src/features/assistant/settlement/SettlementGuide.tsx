@@ -476,6 +476,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
                 <h2>{walkthrough.step.title}</h2>
                 <p>{walkthrough.step.instruction}</p>
                 {walkthrough.message && <p role="status">{walkthrough.message}</p>}
+                {walkthrough.status === 'PAUSED' && <button onClick={walkthrough.retry}>다시 찾기</button>}
                 {walkthrough.step.id === 'save' && walkthrough.saved && <p role="status">저장 응답을 받았습니다. 서버 결과를 확인하고 다음 업무로 이동하세요.</p>}
                 <div className="settlement-guide-actions">
                   <button disabled={busy || walkthrough.index === 0} onClick={walkthrough.previous}>이전 설명</button>
@@ -490,6 +491,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
                 <h2>{explanation.step.title}</h2>
                 <p>{explanation.step.instruction}</p>
                 {explanation.message && <p role="status">{explanation.message}</p>}
+                {explanation.status === 'PAUSED' && <button onClick={explanation.retry}>다시 찾기</button>}
                 <div className="settlement-guide-actions">
                   <button disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전 설명</button>
                   {!explanation.last && <button disabled={busy || !explanation.ready} onClick={explanation.next}>확인하고 다음 설명</button>}
@@ -507,11 +509,11 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
             ) : (
               <div className="settlement-guide-actions">
                 {decision?.step === 'schedule.review' && (!detailedWorkflow || explanation.last) && (
-                  <button disabled={busy} onClick={() => void show(selection, false, true)}>
+                  <button disabled={busy || (detailedWorkflow && explanation.status === 'PAUSED')} onClick={() => void show(selection, false, true)}>
                     스케줄 확인 완료
                   </button>
                 )}
-                {!detailedPayment && (!detailedWorkflow || explanation.last || !explanation.target) && <button disabled={busy} onClick={() => void show(selection)}>
+                {!detailedPayment && (!detailedWorkflow || explanation.last || !explanation.target) && <button disabled={busy || (detailedWorkflow && explanation.status === 'PAUSED')} onClick={() => void show(selection)}>
                   현재 결과로 이어서 안내
                 </button>}
               </div>
