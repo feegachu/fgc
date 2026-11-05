@@ -246,6 +246,92 @@ class PaymentCalculationIntegrationTest {
         assertThat(result.capPreview()).anySatisfy(row->assertThat(row).containsEntry("candidateAmount", "100000"));
         assertThat(counts()).isEqualTo(before);assertThat(paymentRow()).isEqualTo(source);assertThat(attributionRows()).isEqualTo(rows);
     }
+    @Test void newCandidateIncludesPendingStatusJobsWithoutPersistingItself() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            long event = candidateStatusEvent(contractId, 1, "LAPSED");
+            jdbc.update("INSERT INTO fgc.contract_event_job(contract_status_event_id,processing_job) VALUES (?, 'PaymentHoldJob')", event);
+            var before = counts();
+            assertHeldCandidate(calculations.calculate(candidateRequest("NEW_PAYMENT", "100000")));
+            assertThat(counts()).isEqualTo(before);
+            tx.setRollbackOnly();
+        });
+    }
+
+    @Test void replacementChecksCandidateContractInsteadOfOriginalDraftContract() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            long other = copyCandidateContract();
+            long event = candidateStatusEvent(other, 1, "LAPSED");
+            jdbc.update("INSERT INTO fgc.contract_event_job(contract_status_event_id,processing_job) VALUES (?, 'PaymentHoldJob')", event);
+            assertThat(payments.precheck(paymentId).confirmable()).isTrue();
+            var before = counts();
+            assertHeldCandidate(calculations.calculate(candidateForContract("REPLACE_DRAFT", other)));
+            assertThat(counts()).isEqualTo(before);
+            tx.setRollbackOnly();
+        });
+    }
+
+    @Test void newCandidateUsesCurrentStatusPolicyEvenWithoutPendingJobs() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            candidateStatusEvent(contractId, 1, "LAPSED");
+            var before = counts();
+            assertHeldCandidate(calculations.calculate(candidateRequest("NEW_PAYMENT", "100000")));
+            assertThat(counts()).isEqualTo(before);
+            tx.setRollbackOnly();
+        });
+    }
+
+    @Test void replacementDropsOldContractJobsButPreservesOriginalOpenHold() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+            long other = copyCandidateContract();
+            long event = candidateStatusEvent(contractId, 1, "LAPSED");
+            jdbc.update("INSERT INTO fgc.contract_event_job(contract_status_event_id,processing_job) VALUES (?, 'PaymentHoldJob')", event);
+            var moved = candidateForContract("REPLACE_DRAFT", other);
+            assertThat(calculations.calculate(moved).confirmable()).isTrue();
+            jdbc.update("INSERT INTO fgc.payment_hold(commission_transaction_id,contract_status_event_id,reason_code) VALUES (?,?,'STATUS_INACTIVE')", paymentId, event);
+            var before = counts();
+            assertHeldCandidate(calculations.calculate(moved));
+            assertThat(counts()).isEqualTo(before);
+            tx.setRollbackOnly();
+        });
+    }
+
+    private void assertHeldCandidate(com.susukkang.fgc.assistant.dto.PaymentCalculationSnapshot result) {
+        assertThat(result.confirmable()).isFalse();
+        assertThat(result.status()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(result.blockers()).anySatisfy(blocker -> assertThat(blocker.code()).isEqualTo("FGC-IMPL-PAYMENT_HELD"));
+    }
+
+    private PaymentCalculationRequest candidateForContract(String operation, long targetContract) {
+        var request = candidateRequest(operation, "100000");
+        var payment = (com.fasterxml.jackson.databind.node.ObjectNode) request.candidate().get("payment");
+        payment.put("contractId", Long.toString(targetContract));
+        ((com.fasterxml.jackson.databind.node.ObjectNode) payment.get("attributions").get(0)).put("contractId", Long.toString(targetContract));
+        return request;
+    }
+
+    private long candidateStatusEvent(long targetContract, int sequence, String status) {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.contract_status_event(contract_id,event_seq,new_status,effective_at,received_at,
+                    source_system,source_event_key,data_origin)
+                VALUES (?,?,?,TIMESTAMPTZ '2026-07-15 00:00:00+09',TIMESTAMPTZ '2026-07-15 00:00:00+09',
+                    'IT-841',?,'MANUAL') RETURNING contract_status_event_id
+                """, Long.class, targetContract, sequence, status, UUID.randomUUID().toString());
+    }
+
+    private long copyCandidateContract() {
+        return jdbc.queryForObject("""
+                INSERT INTO fgc.insurance_contract(insurer_id,product_offering_id,contract_no,contract_date,
+                    agent_id,organization_id,premium_per_cycle_amount,first_premium_amount,
+                    monthly_equivalent_first_premium,premium_conversion_rule_code,payment_cycle_code,
+                    payment_term_months,standard_surrender_deduction_amount,current_status,data_origin)
+                SELECT insurer_id,product_offering_id,?,contract_date,agent_id,organization_id,
+                    premium_per_cycle_amount,first_premium_amount,monthly_equivalent_first_premium,
+                    premium_conversion_rule_code,payment_cycle_code,payment_term_months,
+                    standard_surrender_deduction_amount,current_status,'MANUAL'
+                FROM fgc.insurance_contract WHERE contract_id=? RETURNING contract_id
+                """, Long.class, "IT-841-" + UUID.randomUUID(), contractId);
+    }
+
     @Test void hypotheticalCannotReplaceNonDraftPayment() {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             jdbc.update("UPDATE fgc.commission_transaction SET status='CANCELLED' WHERE commission_transaction_id=?",paymentId);

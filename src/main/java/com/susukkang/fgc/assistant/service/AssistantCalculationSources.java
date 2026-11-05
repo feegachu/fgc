@@ -193,12 +193,14 @@ public class AssistantCalculationSources {
     } catch (java.time.DateTimeException e) {
       throw invalid(SETTLEMENT_MONTH);
     }
-    if (scope.aggregation() == PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE
-        && (scope.commissionItemId() == null
-            || scope.installmentNo() == null
-            || (scope.paymentStage() == com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC
-                && scope.beneficiaryAgentId() == null)))
-      return missing(request, "commissionItemId", "installmentNo", "beneficiaryAgentId");
+    if (scope.aggregation() == PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE) {
+      List<String> missingFields = new ArrayList<>();
+      if (scope.commissionItemId() == null) missingFields.add("commissionItemId");
+      if (scope.installmentNo() == null) missingFields.add("installmentNo");
+      if (scope.paymentStage() == com.susukkang.fgc.common.code.PaymentStage.GA_TO_FC
+          && scope.beneficiaryAgentId() == null) missingFields.add("beneficiaryAgentId");
+      if (!missingFields.isEmpty()) return missing(request, missingFields.toArray(String[]::new));
+    }
     var detail = schedules.selectByContractIdAndPaymentStage(contract, scope.paymentStage());
     if (detail == null || detail.getLines() == null) return missing(request, "activeSchedule");
     var selected = selectExpectedLines(detail.getLines(), scope, month);
