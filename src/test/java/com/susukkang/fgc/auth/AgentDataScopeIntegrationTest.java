@@ -703,16 +703,25 @@ class AgentDataScopeIntegrationTest {
     void managerRankDecidesOwnAttributionAtQueryTime() throws Exception {
         Long mixed = payment("GA_MANUAL_PAYMENT", ownAgent, new Long[]{ownContract, ownAgent, 1000L},
                 new Long[]{otherContract, ownAgent, 9000L});
+        String statements = "/api/v1/agent/me/statements?month=2026-07&entryType=PAYMENT&size=100";
+        String foreignKey = entryKey(id("SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id = ? AND contract_id = ?",
+                mixed, otherContract));
         assertThat(paymentRow(data(read("/api/v1/transactions?size=100")), mixed).path("amount").decimalValue())
                 .isEqualByComparingTo("1000");
+        assertThat(data(read(statements)).findValuesAsText("entryKey")).doesNotContain(foreignKey);
+        read("/api/v1/agent/me/statements/" + foreignKey).andExpect(status().isForbidden());
 
         jdbc.update("UPDATE fgc.agent SET rank_code = 'TEAM_LEADER' WHERE agent_id = ?", ownAgent);
         assertThat(paymentRow(data(read("/api/v1/transactions?size=100")), mixed).path("amount").decimalValue())
                 .isEqualByComparingTo("10000");
+        assertThat(data(read(statements)).findValuesAsText("entryKey")).contains(foreignKey);
+        read("/api/v1/agent/me/statements/" + foreignKey).andExpect(status().isOk());
 
         jdbc.update("UPDATE fgc.agent SET rank_code = 'FC' WHERE agent_id = ?", ownAgent);
         assertThat(paymentRow(data(read("/api/v1/transactions?size=100")), mixed).path("amount").decimalValue())
                 .isEqualByComparingTo("1000");
+        assertThat(data(read(statements)).findValuesAsText("entryKey")).doesNotContain(foreignKey);
+        read("/api/v1/agent/me/statements/" + foreignKey).andExpect(status().isForbidden());
     }
 
     @Test
