@@ -33,17 +33,32 @@ public class PaymentCalculationService {
     private final ObjectMapper mapper;
     private final AssistantCalculationSources sources;
     private final AssistantPaymentCandidate candidates;
+    private final CalculationProofService proofs;
     private static final Set<String> CAP_MONEY = Set.of("basePremiumAmount", "refund12mAmount", "complianceDeductionAmount", "limitAmount", "existingIncludedAmount", "candidateAmount", "includedAmount", "remainingAmount");
     private static final Set<String> CAP_IDS = Set.of("contractId", "capRuleSetId", "capCheckId");
 
     @PreAuthorize(Roles.ANY_ROLE)
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public PaymentCalculationSnapshot calculateVerified(PaymentCalculationRequest request) {
+        return proofs.issue(request,calculateSnapshot(request));
+    }
+    @PreAuthorize(Roles.ANY_ROLE)
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public PaymentCalculationSnapshot revalidate(com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest request) {
+        if(request.input().kind()==PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE)requireProcessing();
+        return proofs.revalidate(request);
+    }
+
+    @PreAuthorize(Roles.ANY_ROLE)
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PaymentCalculationSnapshot calculate(PaymentCalculationRequest request) {
+        return calculateSnapshot(request);
+    }
+
+    private PaymentCalculationSnapshot calculateSnapshot(PaymentCalculationRequest request) {
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) requireProcessing();
         if(request.kind()==PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE && request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL) {
-            var checked=candidates.calculate(request);
-            var blockers=checked.blockers().stream().map(row->new PaymentCalculationSnapshot.Reason(row.code(),row.message(),string(row.contractId()),null)).toList();
-            return new PaymentCalculationSnapshot(UUID.randomUUID().toString(),request.kind().name(),request.mode().name(),checked.confirmable()?CALCULATED:REVIEW_REQUIRED,request.clientRevision(),false,true,"HYPOTHETICAL","KRW",null,Map.of(),Map.of(),checked.capPreview().stream().map(this::preview).toList(),checked.confirmable(),blockers,List.of(),basis(null,List.of(),List.of()),new PaymentCalculationSnapshot.Recommendation(false,null,null,"가상 후보입니다. 원본을 변경하지 않았으며 직접 저장·사전검증·확정해야 합니다.",List.of("ACTUAL_PRECHECK_REQUIRED")),OffsetDateTime.now(java.time.ZoneOffset.UTC),null);
+            return hypotheticalCandidate(request);
         }
         if ((request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL && request.kind()==PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE) || Set.of(PaymentCalculationRequest.Kind.EXPECTED_COMMISSION, PaymentCalculationRequest.Kind.CAP_STATUS, PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE).contains(request.kind())) return sources.calculate(request);
         if (request.mode() != PaymentCalculationRequest.Mode.EXISTING ||
@@ -52,12 +67,29 @@ public class PaymentCalculationService {
         if (request.candidate() != null && !request.candidate().isNull()) throw invalid("candidate", "EXISTING 계산에는 후보를 전달할 수 없습니다.");
         if (request.scope() == null || request.scope().paymentId() == null)
             return result(request, "INSUFFICIENT_DATA", null, Map.of(), List.of(), null, List.of(), List.of("paymentId"), "저장된 지급 건을 선택하세요.");
-        long id;
-        try { id = Long.parseLong(request.scope().paymentId()); if (id <= 0) throw new NumberFormatException(); }
-        catch (NumberFormatException error) { throw invalid("scope.paymentId", "지급 ID 범위를 확인하세요."); }
+        long id = existingPaymentId(request);
         CommissionPaymentResponse payment = payments.get(id);
         if (!Objects.equals(payment.paymentId(), id)) throw new IllegalStateException("Payment scope mismatch");
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) {
+            return existingCandidate(request, payment, id);
+        }
+        return existingBalance(request, payment);
+    }
+    private PaymentCalculationSnapshot hypotheticalCandidate(PaymentCalculationRequest request) {
+            var checked=candidates.calculate(request);
+            var blockers=checked.blockers().stream().map(row->new PaymentCalculationSnapshot.Reason(row.code(),row.message(),string(row.contractId()),null)).toList();
+            return new PaymentCalculationSnapshot(UUID.randomUUID().toString(),request.kind().name(),request.mode().name(),checked.confirmable()?CALCULATED:REVIEW_REQUIRED,request.clientRevision(),false,true,"HYPOTHETICAL","KRW",null,Map.of(),Map.of(),checked.capPreview().stream().map(this::preview).toList(),checked.confirmable(),blockers,List.of(),basis(null,List.of(),List.of()),new PaymentCalculationSnapshot.Recommendation(false,null,null,"가상 후보입니다. 원본을 변경하지 않았으며 직접 저장·사전검증·확정해야 합니다.",List.of("ACTUAL_PRECHECK_REQUIRED")),OffsetDateTime.now(java.time.ZoneOffset.UTC),null);
+    }
+
+    private long existingPaymentId(PaymentCalculationRequest request) {
+        long id;
+        try { id = Long.parseLong(request.scope().paymentId()); if (id <= 0) throw new NumberFormatException(); }
+        catch (NumberFormatException error) { throw invalid("scope.paymentId", "지급 ID 범위를 확인하세요."); }
+        return id;
+    }
+
+    private PaymentCalculationSnapshot existingCandidate(PaymentCalculationRequest request,
+                                                         CommissionPaymentResponse payment, long id) {
             if (payment.status() != CommissionPaymentStatus.DRAFT)
                 return result(request, "UNSUPPORTED", payment, Map.of(), List.of(), null, List.of(), List.of(), "지급 후보 검토는 작성중인 지급 건만 할 수 있습니다.");
             TransactionPrecheckResponse checked = payments.precheck(id);
@@ -65,7 +97,10 @@ public class PaymentCalculationService {
             List<Map<String, Object>> previews = checked.capPreview().stream().map(this::preview).toList();
             List<PaymentCalculationSnapshot.Reason> blockers = checked.blockers().stream().map(row -> new PaymentCalculationSnapshot.Reason(row.code(), row.message(), string(row.contractId()), string(row.transactionAttributionId()))).toList();
             return result(request, checked.confirmable() ? CALCULATED : REVIEW_REQUIRED, payment, Map.of(), previews, checked.confirmable(), blockers, List.of(), "저장된 자료로 계산한 결과입니다. 사전검증이나 확정을 대신하지 않습니다.");
-        }
+    }
+
+    private PaymentCalculationSnapshot existingBalance(PaymentCalculationRequest request,
+                                                       CommissionPaymentResponse payment) {
         if (payment.amount() == null || payment.attributions() == null || payment.attributions().isEmpty() || payment.attributions().stream().anyMatch(row -> row.amount() == null))
             return result(request, "INSUFFICIENT_DATA", payment, Map.of(), List.of(), null, List.of(), List.of("amount/attributions"), "지급액 또는 귀속 자료가 없습니다. 0원으로 추정하지 않습니다.");
         BigDecimal amount = MoneyUtil.roundWon(payment.amount());
@@ -75,6 +110,7 @@ public class PaymentCalculationService {
                 Map.of("amount", amount.toPlainString(), "attributedTotal", total.toPlainString(), "differenceAmount", difference.toPlainString()), List.of(), null, List.of(), List.of(),
                 "저장된 지급액과 귀속 합계의 차액입니다. 추가 지급 추천이나 자동 배부가 아닙니다.");
     }
+
     private Map<String, Object> preview(TransactionPrecheckResponse.CapPreviewItem item) {
         Map<String, Object> result = mapper.convertValue(item, new TypeReference<LinkedHashMap<String, Object>>() {});
         result.put("asOfDate", string(item.asOfDate()));

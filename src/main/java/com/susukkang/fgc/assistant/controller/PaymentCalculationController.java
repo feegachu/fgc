@@ -24,8 +24,11 @@ public class PaymentCalculationController {
                 com.susukkang.fgc.common.exception.FgcErrorCode.COMMON_002, "request", java.util.Map.of("field", "request"), null));
     }
     @PostMapping
-    @Operation(summary = "저장된 지급의 읽기 전용 계산 스냅샷", description = "ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.")
+    @Operation(summary = "저장된 지급의 읽기 전용 계산 스냅샷", description = "기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.")
     public ApiResponse<PaymentCalculationSnapshot> calculate(@Valid @RequestBody PaymentCalculationRequest request) {
-        return ApiResponse.success(service.calculate(request));
+        return ApiResponse.success(service.calculateVerified(request));
     }
+    @PostMapping("/revalidate")
+    @Operation(summary="계산 입력·의존성·사용자·만료 재검증",description="변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.")
+    public ApiResponse<PaymentCalculationSnapshot> revalidate(@Valid @RequestBody com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest request) {return ApiResponse.success(service.revalidate(request));}
 }
