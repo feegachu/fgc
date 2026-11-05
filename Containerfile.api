@@ -19,8 +19,9 @@ RUN chmod +x gradlew && ./gradlew bootWar -x test --no-daemon
 # 태그를 고정한다 — "10.1-jre21" 은 날마다 다른 이미지라 스캔 결과가 재현되지 않는다 (교안: 리허설 후 Digest 고정)
 FROM docker.io/library/tomcat:10.1.60-jre21
 # base OS(Ubuntu) 패키지 CVE — 빌드 시점의 보안 패치 반영
+# /usr/bin/pebble: 베이스 이미지의 Go 프로세스 관리자. 실행 명령은 catalina.sh 이고 쓰는 곳이 없는데 Trivy HIGH 4건(Go stdlib)이 이 파일에서만 나와 지운다 (#677)
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
- && rm -rf /usr/local/tomcat/webapps/*
+ && rm -rf /usr/local/tomcat/webapps/* /usr/bin/pebble
 COPY --from=build /src/build/libs/fgc-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
 
 # 앞단 nginx 가 TLS 를 끝내고 X-Forwarded-Proto/For 를 넘긴다(nginx/default.conf.template). 외장 Tomcat 은

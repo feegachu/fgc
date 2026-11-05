@@ -9,6 +9,7 @@ map $http_host $fgc_forwarded_port { "~:(?<p>[0-9]+)$" $p; default $fgc_scheme_p
 server {
     listen 80;
     server_name _;
+    server_tokens off; # ZAP 10036: Server 헤더에 nginx 버전을 내보내지 않는다 (#677)
 
     # 보안 헤더 값 (#677). SPA 는 인라인 스크립트·eval·외부 연결이 없고 폰트도 자체 호스팅이라 'self' 만 허용한다.
     # 아래 include(fgc.d)보다 먼저 둔다 — 운영 TLS 설정(00-tls.conf)이 $fgc_hsts 를 덮어쓴다.
