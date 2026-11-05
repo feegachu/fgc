@@ -244,7 +244,10 @@ export default function ScheduleListPage() {
           </h2>
         </ListHeader>
 
-        {previewResults && <p className="schedule-data-warning">4년·7년 스케줄은 예정 결과이며 지급 확정 대상이 아닙니다.</p>}
+        {previewResults && <p className="schedule-data-warning">
+          <span className="material-symbols-rounded" aria-hidden="true">info</span>
+          <span>4년·7년 스케줄은 예정 결과이며 지급 확정 대상이 아닙니다.</span>
+        </p>}
         {list.isFetching && data && <p role="status">스케줄을 갱신 중입니다. 조회가 끝나면 결과를 확인해 주세요.</p>}
 
         {hasDuplicateActiveOperational(rows) && (

@@ -18,6 +18,7 @@ const targetMessages: Record<string, string> = {
   DUPLICATE_TARGET: '안내 대상이 여러 곳에 표시되어 있습니다. 대상 선택이나 열린 화면을 확인한 후 다시 찾으세요.',
   TARGET_CHANGED: '안내 대상이 숨겨지거나 화면 구성이 바뀌었습니다. 해당 탭이나 영역을 연 후 다시 찾으세요.',
   TARGET_TIMEOUT: '안내 영역을 찾지 못했습니다. 화면 로딩이 끝났는지 확인하고 필요한 탭이나 상세를 연 후 다시 찾으세요.',
+  PREPARATION_TIMEOUT: '안내 영역이 5초 안에 준비되지 않았습니다. 화면 로딩이 끝났는지 확인하고 필요한 탭이나 상세를 연 후 다시 찾으세요.',
   TARGET_VERSION_OR_REGISTRATION_MISSING: '현재 화면과 도움말 버전이 맞지 않습니다. 입력을 보존한 뒤 화면을 다시 열어 주세요.',
 }
 type HelpProps = { screenId: string; variant?: string; saveGuide?: SaveGuide; finalizeGuide?: SaveGuide; runStatus?: string; outcome?: 'execution' | 'processing' | 'finalization' | 'correction' }
