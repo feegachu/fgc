@@ -106,6 +106,13 @@ public class ExceptionCaseService {
                 result.totalPages(), result.sort());
     }
 
+    /** IF-API-69. status 해석은 IF-API-43 과 같고, 건수는 IF-API-43 요약과 같은 쿼리로 센다. */
+    @Transactional(readOnly = true)
+    public ExceptionCountsResponse counts(String status, LocalDate validationMonth) {
+        return ExceptionCountsResponse.from(exceptionCaseQueryRepository.countByTypeAndSeverity(
+                ExceptionCaseSearchDTO.builder().validationMonth(validationMonth).build(), parseStatuses(status)));
+    }
+
     private Map<Long, List<ExceptionOccurrenceResponse>> loadOccurrences(
             List<ExceptionCaseSearchRow> rows
     ) {
