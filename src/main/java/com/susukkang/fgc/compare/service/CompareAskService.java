@@ -191,13 +191,31 @@ public class CompareAskService {
             }
         }
         // 상품 이름(예: 튼튼건강)으로 물어도 같은 순위로 읽는다. 서버 문장과 AI 데이터가 같은 상품 쌍을 가리키게 한다.
+        String squeezed = squeeze(question);
         for (CompareRankingResponse.Item item : items) {
-            String product = item.product();
-            if (product != null && product.strip().length() >= 2 && question.contains(product.strip())) {
+            String key = productKey(item.product());
+            // 같은 이름이 여러 상품에 걸리면 어느 상품인지 알 수 없으므로 지정하지 않은 것으로 본다.
+            boolean unique = items.stream().filter(o -> key.equals(productKey(o.product()))).count() == 1;
+            String full = item.product() == null ? "" : squeeze(item.product().strip());
+            // 전체 이름을 그대로 적었으면 그 상품이다. 줄여 부른 이름은 다른 상품과 겹치지 않을 때만 인정한다.
+            if ((full.length() >= 2 && squeezed.contains(full)) || (key.length() >= 2 && unique && squeezed.contains(key))) {
                 ranks.add(item.rank());
             }
         }
         return ranks.stream().limit(2).toList();
+    }
+
+    /** 설계사는 '든든 건강보험'처럼 줄여 부르므로, '가상' 접두어와 끝의 한 글자 구분자(A·B·C)를 떼고 공백 없이 비교한다. */
+    private static String productKey(String product) {
+        if (product == null) {
+            return "";
+        }
+        String name = product.strip().replaceFirst("^가상\\s*", "").replaceFirst("\\s+[A-Za-z]$", "");
+        return squeeze(name);
+    }
+
+    private static String squeeze(String text) {
+        return text.replaceAll("\\s+", "");
     }
 
     /** 두 상품을 직접 견준다. 앞선 순위를 기준으로 뒤 순위의 차이를 말한다. */

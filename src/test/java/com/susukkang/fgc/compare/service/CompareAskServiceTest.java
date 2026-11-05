@@ -140,6 +140,19 @@ class CompareAskServiceTest {
     }
 
     @Test
+    @DisplayName("시드 형태의 긴 상품 이름('가상 든든 건강보험 C')을 줄여 불러도 같은 순위로 읽고, 이름이 겹치면 읽지 않는다")
+    void shortenedSeedProductNamesPointToRanks() {
+        Item first = new Item(1, 1, "가보험", "가상 든든 건강보험 C", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "가상 장기 건강보험 E", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of());
+        Item same = new Item(3, 3, "다보험", "가상 장기 건강보험 F", 500_000, 480_000, 0, 30_000, 450_000, 70.0, null, List.of());
+        List<Item> items = List.of(first, second, same);
+
+        assertThat(CompareAskService.askedRanks(items, "든든 건강보험이랑 가상 장기 건강보험 E 비교해줘")).containsExactly(1, 2);
+        assertThat(CompareAskService.askedRanks(items, "든든 건강보험 순위가 왜 이래?")).containsExactly(1);
+        assertThat(CompareAskService.askedRanks(items, "장기 건강보험이랑 비교해줘")).isEmpty();
+    }
+
+    @Test
     @DisplayName("두 순위 비교 답변은 이월 예정액을 0원이어도 서버 값으로 보여 준다")
     void pairAnswerIncludesCarryoverEvenWhenZero() {
         assertThat(CompareAskService.rankAnswer(threeItems().items(), "2위랑 3위 이월액 비교해줘"))
