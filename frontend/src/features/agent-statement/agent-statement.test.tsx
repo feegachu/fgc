@@ -35,6 +35,8 @@ const entry = (patch: Partial<StatementEntry> = {}): StatementEntry => ({
   statusLabel: '지급 확정',
   amount: 123456,
   policyVersionId: 3,
+  policyName: 'GA→설계사 현행 지급기준',
+  policyVersionNo: 2,
   source: { entityType: 'COMMISSION_TRANSACTION', id: 1 },
   dataStatus: 'AVAILABLE',
   ...patch,
@@ -64,6 +66,8 @@ const detail = (row: StatementEntry): StatementDetail => ({
     attributionMethod: 'DIRECT',
     paymentConditionCode: 'PAY_IF_ACTIVE_ON_DUE_DATE',
     commissionTransactionId: 7,
+    settlementMonth: '2026-07-01',
+    paidOn: '2026-07-25',
     replacesPaymentId: 5,
     replacedByPaymentId: 9,
   },
@@ -160,6 +164,37 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     await waitFor(() => expect(screen.queryByRole('region', { name: '명세 근거' })).not.toBeInTheDocument())
     expect(router.state.location.search).toContain('contractNo=C-0007')
     expect(router.state.location.search).not.toContain('entryKey')
+  })
+
+  it('근거의 정산월은 월까지만, 지급일은 날짜까지 보인다', async () => {
+    const row = entry()
+    handler = (path) => (path.includes('/statements/') ? detail(row) : list([row]))
+    renderAt('/app/agent/statements?month=2026-07')
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'C-0007 근거 보기' }))
+    const panel = await screen.findByRole('region', { name: '명세 근거' })
+    expect(await within(panel).findByText('2026-07')).toBeVisible()
+    expect(within(panel).queryByText('2026-07-01')).not.toBeInTheDocument()
+    expect(within(panel).getByText('2026-07-25')).toBeVisible()
+  })
+
+  it('적용 정책은 내부 번호 대신 이름과 판으로 보인다', async () => {
+    const row = entry()
+    handler = (path) => (path.includes('/statements/') ? detail(row) : list([row]))
+    renderAt('/app/agent/statements?month=2026-07')
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'C-0007 근거 보기' }))
+    const panel = await screen.findByRole('region', { name: '명세 근거' })
+    expect((await within(panel).findByText('적용 정책')).parentElement).toHaveTextContent(
+      /^적용 정책GA→설계사 현행 지급기준 v2$/,
+    )
+  })
+
+  it('적용 정책이 없으면 대시로 보인다', async () => {
+    const row = entry({ policyVersionId: null, policyName: null, policyVersionNo: null })
+    handler = (path) => (path.includes('/statements/') ? detail(row) : list([row]))
+    renderAt('/app/agent/statements?month=2026-07')
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'C-0007 근거 보기' }))
+    const panel = await screen.findByRole('region', { name: '명세 근거' })
+    expect((await within(panel).findByText('적용 정책')).parentElement).toHaveTextContent(/^적용 정책-$/)
   })
 
   it('근거 보기를 눌러도 아직 조회하지 않은 필터 입력은 지워지지 않는다', async () => {
@@ -292,7 +327,7 @@ describe('RPT-W02 설계사 수수료 명세', () => {
 
   it('내부 사용자는 설계사를 고르기 전에는 조회하지 않고 선택 후 내부 경로로 조회한다', async () => {
     renderAt('/app/agent/statements?month=2026-07', adminUser)
-    expect(await screen.findByText('조회할 설계사를 선택하세요.')).toBeInTheDocument()
+    expect(await screen.findByText('설계사를 고른 뒤 조회를 누르세요.')).toBeInTheDocument()
     expect(paths).toEqual([])
   })
 

@@ -171,7 +171,8 @@ public class AgentStatementService {
         return new StatementEntry(encodeKey(row.entryType(), row.sourceId(), row.subId()), row.entryType(),
                 row.contractId(), row.contractNo(), row.itemCode(), row.itemName(), row.installmentNo(),
                 row.basisDate(), row.statusCode(), statusLabel(row.entryType(), row.statusCode()), row.amount(),
-                row.policyVersionId(), new StatementEntry.Source(row.sourceEntityType(), row.sourceId()),
+                row.policyVersionId(), row.policyName(), row.policyVersionNo(),
+                new StatementEntry.Source(row.sourceEntityType(), row.sourceId()),
                 row.amount() == null ? StatementEntry.MISSING : StatementEntry.AVAILABLE);
     }
 

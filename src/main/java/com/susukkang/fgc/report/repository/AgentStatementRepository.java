@@ -150,12 +150,13 @@ public class AgentStatementRepository {
               FROM entries e
               LEFT JOIN fgc.insurance_contract ic ON ic.contract_id = e.contract_id
               JOIN fgc.commission_item ci ON ci.commission_item_id = e.commission_item_id
+              LEFT JOIN fgc.policy_version pv ON pv.policy_version_id = e.policy_version_id
             """;
 
     private static final String SELECT_ROWS = """
             SELECT e.entry_type, e.source_id, e.sub_id, e.contract_id, ic.contract_no, ci.item_code, ci.item_name,
                    e.installment_no, e.basis_date, e.status_code, e.amount, e.policy_version_id,
-                   e.source_entity_type, e.detail::text, e.basis_month
+                   e.source_entity_type, e.detail::text, e.basis_month, pv.policy_name, pv.version_no
             """;
 
     private final EntityManager entityManager;
@@ -167,7 +168,7 @@ public class AgentStatementRepository {
     public record Row(String entryType, long sourceId, long subId, Long contractId, String contractNo,
                       String itemCode, String itemName, Integer installmentNo, LocalDate basisDate,
                       String statusCode, BigDecimal amount, Long policyVersionId, String sourceEntityType,
-                      String detailJson, LocalDate basisMonth) {
+                      String detailJson, LocalDate basisMonth, String policyName, Integer policyVersionNo) {
     }
 
     public boolean agentExists(long agentId) {
@@ -245,7 +246,8 @@ public class AgentStatementRepository {
             return new Row((String) c[0], ((Number) c[1]).longValue(), ((Number) c[2]).longValue(),
                     c[3] == null ? null : ((Number) c[3]).longValue(), (String) c[4], (String) c[5], (String) c[6],
                     c[7] == null ? null : ((Number) c[7]).intValue(), date(c[8]), (String) c[9], (BigDecimal) c[10],
-                    c[11] == null ? null : ((Number) c[11]).longValue(), (String) c[12], (String) c[13], date(c[14]));
+                    c[11] == null ? null : ((Number) c[11]).longValue(), (String) c[12], (String) c[13], date(c[14]),
+                    (String) c[15], c[16] == null ? null : ((Number) c[16]).intValue());
         }).toList();
     }
 

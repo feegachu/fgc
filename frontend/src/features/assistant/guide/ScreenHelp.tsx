@@ -143,6 +143,17 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
     setBusy(true)
     try { await action() } finally { setBusy(false) }
   }
+  // 다시 시작, 다시 찾기를 누르면 그 자리 버튼이 꺼진 [이전]으로 바뀌어 포커스가 갇힌다. 끝나면 패널의 첫 활성 버튼으로 옮긴다.
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (busy || !refocus.current) return
+    refocus.current = false
+    const panel = card.current
+    const active = document.activeElement
+    if (active !== document.body && !panel?.contains(active)) return // 그새 패널 밖으로 옮긴 포커스는 뺏지 않는다.
+    const next = panel?.querySelector<HTMLButtonElement>('.payment-guide-actions button:not(:disabled)') ?? panel?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+    next?.focus()
+  }, [busy])
   useEffect(() => {
     const other = (event: Event) => {
       if ((event as CustomEvent).detail !== trigger) { runtime.stop(); setOpen(false); saveGuide?.deactivate() }
@@ -155,6 +166,7 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
     closeSettlementGuide(); saveGuide?.activate(); setOpen(true); setFolded(false)
     void run(() => runtime.start({ workflowId: `screen.${screenId.toLowerCase()}${variant ? `.${variant}` : ''}`, stepId: 'help.0', guideVersion: '3.0', entityRefs: [], clientContextRevision: String(revision.current), serverStateVersion: null }))
   }
+  const restart = () => { refocus.current = true; start() }
   const paused = ['PAUSED', 'ERROR'].includes(snapshot.status)
   const complete = snapshot.status === 'COMPLETED'
   const failedPath = validation && runStatus === 'FAILED'
@@ -178,12 +190,12 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
         </header>
         {!folded && <>
           <h2>{staleCompletion ? '실행 결과 변경 · 다시 확인' : complete ? (validation ? (failedPath ? '신규 실행 절차 안내 완료' : '서버 확정 확인 · 가이드 완료') : saveGuide ? `서버 ${action} 확인 · 가이드 완료` : '화면 사용법 안내 완료') : definition.title}</h2>
-          <p>{validation && complete && !staleCompletion ? (failedPath ? '실행 실패를 확인했습니다. 신규 실행 만들기로 이동해 새 검증을 생성하세요. 기존 실행을 최종 확정한 것이 아닙니다.' : `검증 실행 ${finalizeState.savedId}번의 서버 확정 결과를 확인했습니다. 검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.`) : staleCompletion ? '입력·선택 대상 또는 서버 결과가 바뀌었습니다. 현재 조건으로 안내를 다시 시작하세요.' : complete ? (saveGuide ? (outcome === 'correction' ? `서버 역분개·재기표 성공과 새 분개 번호 ${saveState.savedId}를 확인했습니다. 안내를 마치면 정정 이력을 갱신합니다. 재검증·재대사는 별도로 실행하세요.` : outcome === 'processing' ? `선택한 예외의 서버 처리 순번 ${saveState.savedId}를 확인했습니다. 원천 정정·재검증·재대사 완료와는 별개입니다. 안내를 마치면 처리 이력을 갱신합니다.` : outcome === 'finalization' ? `검증 실행 ${saveState.savedId}번의 서버 확정 결과를 확인했습니다. 검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.` : outcome === 'execution' ? `서버 실행 번호 ${saveState.savedId}의 완료 결과를 확인했습니다. 불일치 해소와 최종 확정은 별도 절차입니다.` : `서버에서 저장한 번호 ${saveState.savedId}를 확인했습니다. 안내를 마치면 저장 결과 화면으로 이동합니다.`) : '설명 확인을 마쳤습니다. 실제 저장·실행·확정 결과는 해당 업무 화면에서 확인하세요.') : outcome === 'execution' && saveState.savedId !== null && index <= 1 ? '이미 완료된 실행의 서버 결과를 확인했습니다. 다시 실행하지 않고 다음으로 진행하세요.' : snapshot.step?.instruction}</p>
+          <p>{validation && complete && !staleCompletion ? (failedPath ? '실행 실패를 확인했습니다. 신규 실행 만들기로 이동해 새 검증을 생성하세요. 기존 실행을 최종 확정한 것이 아닙니다.' : `이 검증 실행의 서버 확정 결과를 확인했습니다. 검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.`) : staleCompletion ? '입력·선택 대상 또는 서버 결과가 바뀌었습니다. 현재 조건으로 안내를 다시 시작하세요.' : complete ? (saveGuide ? (outcome === 'correction' ? `서버 역분개·재기표 성공과 새 분개 번호 ${saveState.savedId}를 확인했습니다. 안내를 마치면 정정 이력을 갱신합니다. 재검증·재대사는 별도로 실행하세요.` : outcome === 'processing' ? `선택한 예외의 서버 처리 순번 ${saveState.savedId}를 확인했습니다. 원천 정정·재검증·재대사 완료와는 별개입니다. 안내를 마치면 처리 이력을 갱신합니다.` : outcome === 'finalization' ? `이 검증 실행의 서버 확정 결과를 확인했습니다. 검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.` : outcome === 'execution' ? `서버 실행 번호 ${saveState.savedId}의 완료 결과를 확인했습니다. 불일치 해소와 최종 확정은 별도 절차입니다.` : `서버에서 저장한 번호 ${saveState.savedId}를 확인했습니다. 안내를 마치면 저장 결과 화면으로 이동합니다.`) : '설명 확인을 마쳤습니다. 실제 저장·실행·확정 결과는 해당 업무 화면에서 확인하세요.') : outcome === 'execution' && saveState.savedId !== null && index <= 1 ? '이미 완료된 실행의 서버 결과를 확인했습니다. 다시 실행하지 않고 다음으로 진행하세요.' : snapshot.step?.instruction}</p>
           {saveGuide && !complete && !needsFinalization && <p role="status">{saveState.error || (saveState.pending ? `서버 ${action} 결과를 기다리고 있습니다.` : saveState.savedId !== null ? `서버 ${action} 성공 · ${outcome === 'processing' ? '처리 순번' : '번호'} ${saveState.savedId}. 다음을 눌러 완료를 확인하세요.` : index === 0 ? (saveState.valid ? '필수 입력과 형식 조건을 충족했습니다.' : '필수 입력·형식을 확인하세요. 입력 조건이 충족되어야 다음으로 진행할 수 있습니다.') : `강조된 실제 ${action} 버튼을 누르세요. 서버 완료 결과를 확인해야 다음으로 진행할 수 있습니다.`)}</p>}
           {needsFinalization && !complete && <p role="status">{finalizeState.savedId !== null ? '서버의 최종 확정을 확인했습니다. 다음으로 완료를 확인하세요.' : '검증 계산 완료와 최종 확정은 다릅니다. 실제 확정의 서버 결과를 기다리고 있습니다.'}</p>}
-          {paused && <p role="status">{targetMessages[snapshot.reasonCode ?? ''] ?? '안내 대상을 표시할 수 없습니다. 대상 선택·탭·권한을 확인한 후 다시 찾으세요.'}</p>}
+          {paused && <p role="status">{snapshot.status === 'ERROR' ? '시스템 오류가 발생했습니다. 잠시 후 다시 시작하세요.' : targetMessages[snapshot.reasonCode ?? ''] ?? '안내 대상을 표시할 수 없습니다. 대상 선택·탭·권한을 확인한 후 다시 찾으세요.'}</p>}
           <div className="payment-guide-actions">
-            {complete ? <><Button onClick={staleCompletion ? start : close}>{staleCompletion ? '다시 시작' : '안내 마치기'}</Button>{!staleCompletion && <Button variant="secondary" disabled={busy} onClick={start}>다시 보기</Button>}</> : paused ? <Button disabled={busy} onClick={() => void run(() => runtime.resume())}>다시 찾기</Button> : <>
+            {complete ? <><Button onClick={staleCompletion ? restart : close}>{staleCompletion ? '다시 시작' : '안내 마치기'}</Button>{!staleCompletion && <Button variant="secondary" disabled={busy} onClick={restart}>다시 보기</Button>}</> : snapshot.status === 'ERROR' ? <Button disabled={busy} onClick={restart}>다시 시작</Button> : paused ? <Button disabled={busy} onClick={() => { refocus.current = true; void run(() => runtime.resume()) }}>다시 찾기</Button> : <>
               <Button disabled={busy || index <= 0} onClick={() => void run(() => runtime.previous())}>이전</Button>
               <Button disabled={busy || !snapshot.target || !nextReady} onClick={() => void run(() => runtime.next())}>{saveGuide ? '다음' : '설명 확인 · 다음'}</Button>
             </>}

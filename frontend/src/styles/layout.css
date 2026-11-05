@@ -799,6 +799,18 @@
   gap: var(--space-6);
 }
 
+/*
+ * 도움말 버튼이 머리의 첫 자식이어도 제목은 왼쪽, 도움말은 오른쪽(작업 버튼 옆)에 둔다.
+ * shortcut: 키보드 이동 순서는 DOM 그대로 도움말이 먼저다. 각 화면 JSX에서 버튼을 옮기면 함께 맞는다.
+ */
+.page-header > .button:first-child {
+  order: 1;
+}
+
+.page-header > :is(.page-title, .page-header-copy) {
+  margin-right: auto;
+}
+
 .page-content > .list-page {
   gap: var(--space-4);
 }
