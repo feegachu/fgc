@@ -130,6 +130,37 @@ class CompareAskServiceTest {
         assertThat(service.ask("2순위인 이유 알려줘", null).source()).isEqualTo("OUT_OF_SCOPE");
     }
 
+    @Test
+    @DisplayName("상품 이름 둘로 물으면 서버 문장도 그 두 상품을 직접 견주고 AI 데이터도 같은 쌍을 가리킨다")
+    void productNamesPointToTheSamePairAsRankNumbers() {
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "튼튼건강이랑 편한건강 비교해줘")).containsExactly(2, 3);
+        assertThat(CompareAskService.rankAnswer(threeItems().items(), "튼튼건강이랑 편한건강 비교해줘"))
+                .contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강", "2위보다 보수적 순수령액이 84,000원 적어요")
+                .doesNotContain("1위보다");
+    }
+
+    @Test
+    @DisplayName("두 순위 비교 답변은 이월 예정액을 0원이어도 서버 값으로 보여 준다")
+    void pairAnswerIncludesCarryoverEvenWhenZero() {
+        assertThat(CompareAskService.rankAnswer(threeItems().items(), "2위랑 3위 이월액 비교해줘"))
+                .contains("이월 예정액은 2위 0원, 3위 0원이에요.");
+    }
+
+    @Test
+    @DisplayName("'1등급' 같은 등급 표현은 순위 번호로 읽지 않는다")
+    void gradeWordIsNotARankNumber() {
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "3위랑 2위 중 1등급인 건?")).containsExactly(2, 3);
+    }
+
+    @Test
+    @DisplayName("순위 결과가 있어도 챗봇 소개 질문은 순위 금액이 아니라 소개 문장으로 답한다")
+    void introQuestionBeatsRankQuestionWhenNoRankIsNamed() {
+        llmReturns(false, "");
+
+        assertThat(service.ask("상품 비교 챗봇은 무슨 기능이야?", threeItems()).answer()).isEqualTo(CompareAskService.INTRO);
+        assertThat(service.ask("1위랑 2위 비교해줘", threeItems()).answer()).contains("1위는 가보험 든든건강");
+    }
+
     private static CompareRankingResponse threeItems() {
         CompareRankingResponse two = twoItems();
         Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());

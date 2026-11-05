@@ -69,7 +69,7 @@ public class CompareAskService {
             Pattern.compile("(?<!\\d)\\d{6}[\\s-]{0,3}[1-8]\\d{6}(?!\\d)"),
             Pattern.compile("(?<!\\d)0\\d{1,2}[-.\\s]?\\d{3,4}[-.\\s]?\\d{4}(?!\\d)"),
             Pattern.compile("[\\w.+-]++@[\\w-]++\\.\\w"));
-    private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)", Pattern.CANON_EQ);
+    private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)(?!급)", Pattern.CANON_EQ);
     /** 챗봇 자체를 묻는 질문(역할·소개·무엇을 알려 주는지). */
     private static final Pattern INTRO_QUESTION = Pattern.compile("역할|뭘 알려|무엇을 알려|뭐 하는|뭐하는|누구|소개|무슨 기능|AI야|ai야", Pattern.CANON_EQ);
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
@@ -146,11 +146,15 @@ public class CompareAskService {
 
     /** 순위 질문이면 서버 값으로 풀어 쓴 해설을, 용어 질문이면 용어 설명을, 아니면 안내 문장을 준다. 새 수치를 만들지 않는다. */
     static CompareAskResponse fallbackAnswer(String question, CompareRankingResponse ranking) {
+        // 소개 질문('상품 비교 챗봇은 무슨 기능이야?')은 "비교" 때문에 순위 질문으로도 읽히므로 먼저 가린다.
+        // 질문이 순위 번호나 상품 이름을 직접 가리키면 순위 질문으로 본다.
+        boolean intro = INTRO_QUESTION.matcher(question).find() && !isGlossaryQuestion(question)
+                && (!hasItems(ranking) || askedRanks(ranking.items(), question).isEmpty());
+        if (intro) {
+            return new CompareAskResponse(INTRO, CompareAskResponse.RULE);
+        }
         if (hasItems(ranking) && isRankQuestion(question)) {
             return new CompareAskResponse(rankAnswer(ranking.items(), question), CompareAskResponse.RULE);
-        }
-        if (INTRO_QUESTION.matcher(question).find() && !isGlossaryQuestion(question)) {
-            return new CompareAskResponse(INTRO, CompareAskResponse.RULE);
         }
         Optional<Term> term = GLOSSARY.stream().filter(t -> t.keywords().stream().anyMatch(question::contains)).findFirst();
         return term.map(t -> new CompareAskResponse(t.name() + ": " + t.body(), CompareAskResponse.RULE))
@@ -169,7 +173,7 @@ public class CompareAskService {
         return RANK_QUESTION.matcher(question).find();
     }
 
-    /** 질문에 적힌 순위 번호(예: 2순위·2위·2등) 중 결과 범위 안의 것을 작은 순서로 최대 둘까지 돌려준다. */
+    /** 질문에 적힌 순위 번호(예: 2순위·2위·2등)와 상품 이름이 가리키는 순위 중 결과 범위 안의 것을 작은 순서로 최대 둘까지 돌려준다. */
     static List<Integer> askedRanks(List<CompareRankingResponse.Item> items, String question) {
         Matcher m = RANK_NUMBER.matcher(question);
         TreeSet<Integer> ranks = new TreeSet<>();
@@ -179,14 +183,23 @@ public class CompareAskService {
                 ranks.add(rank);
             }
         }
+        // 상품 이름(예: 튼튼건강)으로 물어도 같은 순위로 읽는다. 서버 문장과 AI 데이터가 같은 상품 쌍을 가리키게 한다.
+        for (CompareRankingResponse.Item item : items) {
+            String product = item.product();
+            if (product != null && product.strip().length() >= 2 && question.contains(product.strip())) {
+                ranks.add(item.rank());
+            }
+        }
         return ranks.stream().limit(2).toList();
     }
 
     /** 두 상품을 직접 견준다. 앞선 순위를 기준으로 뒤 순위의 차이를 말한다. */
     static String pairAnswer(CompareRankingResponse.Item base, CompareRankingResponse.Item it) {
+        // 이월 예정액은 0원도 서버 값으로 보여 준다(이월액을 물어도 금액이 나오도록).
         return "%d위는 %s %s예요. 보수적 순수령액은 %,d원이에요. %d위는 %s %s예요. 보수적 순수령액은 %,d원이에요. "
                 .formatted(base.rank(), base.insurer(), base.product(), base.conservativeNet(),
-                        it.rank(), it.insurer(), it.product(), it.conservativeNet()) + comparison(base, it);
+                        it.rank(), it.insurer(), it.product(), it.conservativeNet()) + comparison(base, it)
+                + " 이월 예정액은 %d위 %,d원, %d위 %,d원이에요.".formatted(base.rank(), base.carryover(), it.rank(), it.carryover());
     }
 
     /**
