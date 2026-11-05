@@ -96,6 +96,7 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
         disabled={disabled}
         type="text"
         role="combobox"
+        data-selected-value={value}
         autoComplete="off"
         aria-autocomplete="list"
         aria-expanded={expanded}

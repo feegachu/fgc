@@ -147,6 +147,44 @@ class ContractStatusHistoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("CT-C02 실제 실효·부활 worker 결과를 스케줄 상세의 원천 사건과 대조한다")
+    void scheduleSourcesFollowRealHoldAndResumeJobs() throws Exception {
+        long contract = contract();
+        statusEvent(contract, 1, "ACTIVE", "2026-03-01T00:00:00+09:00");
+        long header = header(contract);
+        long confirmed = line(header, 1, "2026-08-10", "CONFIRMED");
+        long lapsePeriod = line(header, 2, "2026-09-25", "PLANNED");
+        long future = line(header, 3, "2026-10-25", "PLANNED");
+        long lapse = statusEvent(contract, 2, "LAPSED", "2026-09-01T00:00:00+09:00");
+        jobs.insertPending(lapse, PaymentHoldFollowUpProcessor.JOB);
+        followUps.runDueJobs();
+
+        assertScheduleSource(header, confirmed, "CONFIRMED", null);
+        assertScheduleSource(header, lapsePeriod, "CANCELLED", lapse);
+        assertScheduleSource(header, future, "CANCELLED", lapse);
+
+        long revival = statusEvent(contract, 3, "REVIVED", "2026-10-15T00:00:00+09:00");
+        jobs.insertPending(revival, PaymentResumeFollowUpProcessor.JOB);
+        followUps.runDueJobs();
+
+        assertScheduleSource(header, confirmed, "CONFIRMED", null);
+        // NO_RETROACTIVE is an exclusion, not the cause of the existing cancellation.
+        assertScheduleSource(header, lapsePeriod, "CANCELLED", lapse);
+        assertScheduleSource(header, future, "PLANNED", revival);
+        effects(contract, revival, "").andExpect(status().isOk());
+    }
+
+    private void assertScheduleSource(long header, long lineId, String state, Long source) throws Exception {
+        JsonNode lines = data(mvc.perform(get("/api/v1/schedules/{id}", header).with(user(settle)))
+                .andExpect(status().isOk())).path("lines");
+        JsonNode line = java.util.stream.StreamSupport.stream(lines.spliterator(), false)
+                .filter(row -> row.path("scheduleLineId").asLong() == lineId).findFirst().orElseThrow();
+        assertThat(line.path("lineStatus").asText()).isEqualTo(state);
+        if (source == null) assertThat(line.path("sourceStatusEventId").isNull()).isTrue();
+        else assertThat(line.path("sourceStatusEventId").asLong()).isEqualTo(source);
+    }
+
+    @Test
     @DisplayName("FUN-029 처리기가 남기는 값도 요약에 들어간다: 보류 해제, 회차 복원과 재중단, 소급 제외")
     void summaryCountsTheRevivalJobValues() throws Exception {
         long contract = contract();
