@@ -40,6 +40,9 @@ public class AgentController {
             @Parameter(description = "소속 조직 ID")
             @RequestParam(required = false)
             Long organizationId,
+            @Parameter(description = "지점 ID. 이 지점과 바로 아래 팀 소속 설계사를 찾는다(FUN-080 관리자 홈)")
+            @RequestParam(required = false)
+            Long branchId,
             @Parameter(description = "설계사 코드 또는 이름 검색어")
             @RequestParam(required = false)
             String keyword,
@@ -63,7 +66,7 @@ public class AgentController {
             @RequestParam(defaultValue = "20")
             int size
     ) {
-        AgentSearchCriteria criteria = new AgentSearchCriteria(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort, selectedId);
+        AgentSearchCriteria criteria = new AgentSearchCriteria(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort, selectedId, branchId);
         return ApiResponse.success(agentService.search(criteria, page, size));
     }
 }

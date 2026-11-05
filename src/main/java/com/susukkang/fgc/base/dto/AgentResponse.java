@@ -79,7 +79,7 @@ public record AgentResponse(
         };
     }
 
-    private static String statusLabel(String agentStatus) {
+    public static String statusLabel(String agentStatus) {
         if (agentStatus == null) {
             return null;
         }

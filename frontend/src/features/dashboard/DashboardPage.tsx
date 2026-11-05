@@ -9,14 +9,16 @@ import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { KpiCard } from '../../components/KpiCard'
 import { StatusBadge } from '../../components/StatusBadge'
-import { dateTime, errorText, int } from '../../lib/format'
+import { dateTime, int } from '../../lib/format'
 import { monthText, screenMessage } from '../../lib/screenText'
 import { withMonth } from '../../stores/workspace'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { OPEN_STATUS } from '../exception/api'
-import { dashboardSummaryQueryOptions } from './api'
+import { dashboardSummaryQueryOptions, openExceptionCountsQueryOptions } from './api'
 import type { RecentException, RecentRun } from './api'
+import { AgentOverview } from './AgentOverview'
 import { DashboardSkeleton } from './DashboardSkeleton'
+import { RegionError, UpdatedAt } from './RegionStatus'
 import { RiskComposition, type CompositionItem } from './RiskComposition'
 import { exceptionStatusTone, runStatusTone, severityTone } from './tones'
 
@@ -29,10 +31,11 @@ export function DashboardPage() {
 }
 
 function DashboardContent({ month }: { month: string }) {
-  const { data, error, isPending, refetch } = useQuery({
+  const { data, error, isPending, isFetching, dataUpdatedAt, refetch } = useQuery({
     ...dashboardSummaryQueryOptions(month),
     meta: { errorToast: false },
   })
+  const openCounts = useQuery(openExceptionCountsQueryOptions())
   const href = (path: string, params: Record<string, string> = {}) => {
     const search = new URLSearchParams(params).toString()
     return withMonth(search ? `${path}?${search}` : path, month)
@@ -136,8 +139,28 @@ function DashboardContent({ month }: { month: string }) {
         id: 'open',
         color: 'warning',
         label: '미처리 예외',
-        value: data.openException,
-        footer: data.openException === 0 ? '미처리 예외가 없습니다' : '신규 + 검토중',
+        value: openCounts.isError ? undefined : openCounts.data?.total,
+        footer: openCounts.isError ? (
+          <>
+            <span role="alert">불러오지 못했습니다</span>
+            <button data-guide-feature="features.dashboard.dashboard-page.open-retry"
+              type="button"
+              className="kpi-retry"
+              aria-label="미처리 예외 다시 불러오기"
+              disabled={openCounts.isFetching}
+              onClick={() => void openCounts.refetch()}
+            >
+              다시 시도
+            </button>
+            <UpdatedAt at={openCounts.dataUpdatedAt} />
+          </>
+        ) : openCounts.data?.total === 0 ? (
+          '미처리 예외가 없습니다'
+        ) : openCounts.isPending ? (
+          '불러오는 중'
+        ) : (
+          '신규 + 검토중'
+        ),
         tone: 'warning',
         to: href('/exceptions', { status: OPEN_STATUS }),
       },
@@ -169,39 +192,55 @@ function DashboardContent({ month }: { month: string }) {
           </button>
         </div>
       </header>
+      <p className="dashboard-basis">
+        <span>기준 정산월 {monthText(month)}</span>
+        <span>미처리 예외와 원장 불균형은 정산월과 상관없이 전체 건수입니다.</span>
+        {!error && <UpdatedAt at={dataUpdatedAt} />}
+      </p>
       {error ? (
-        <div role="alert" className="empty-state">
-          <p>{errorText(error as Error, '대시보드를 불러오지 못했습니다.')}</p>
-          <button data-guide-feature="features.dashboard.dashboard-page.button" type="button" className="button button-secondary" onClick={() => void refetch()}>
-            다시 시도
-          </button>
-        </div>
+        <RegionError
+          error={error}
+          fallback="대시보드를 불러오지 못했습니다."
+          updatedAt={dataUpdatedAt}
+          busy={isFetching}
+          onRetry={() => void refetch()}
+        />
       ) : isPending ? (
         <DashboardSkeleton />
       ) : (
         <>
           <section data-guide-feature="features.dashboard.dashboard-page.section" className="kpi-grid kpi-group" aria-label="주요 검증 지표">
-            {kpis?.map((kpi) => (
-              <Link data-guide-feature={guideFeatureId('dashboard.kpi-link', kpi.id)}
-                key={kpi.label}
-                to={kpi.to}
-                className="kpi-card-link"
-                data-kpi={kpi.id}
-                data-zero={(kpi.value ?? 0) === 0}
-                data-attention={kpi.tone === 'error' && (kpi.value ?? 0) > 0}
-                aria-label={`${kpi.label} ${int(kpi.value ?? 0)}건`}
-              >
+            {kpis?.map((kpi) => {
+              const card = (
                 <KpiCard
                   guideId={guideFeatureId('dashboard.kpi', kpi.id)}
                   label={kpi.label}
-                  value={kpi.value ?? 0}
-                  unit="건"
+                  value={kpi.value ?? '-'}
+                  unit={kpi.value == null ? undefined : '건'}
                   footer={<span className="kpi-comparison">{kpi.footer}</span>}
                   tone={kpi.tone}
-                  zero={(kpi.value ?? 0) === 0}
+                  zero={kpi.value === 0}
                 />
-              </Link>
-            ))}
+              )
+              // 아직 받지 못한 건수는 0으로 보이지 않고, 숫자가 없으면 눌러서 갈 조건도 없다.
+              return kpi.value == null ? (
+                <div key={kpi.label} className="kpi-card-link" data-kpi={kpi.id}>
+                  {card}
+                </div>
+              ) : (
+                <Link data-guide-feature={guideFeatureId('dashboard.kpi-link', kpi.id)}
+                  key={kpi.label}
+                  to={kpi.to}
+                  className="kpi-card-link"
+                  data-kpi={kpi.id}
+                  data-zero={kpi.value === 0}
+                  data-attention={kpi.tone === 'error' && kpi.value > 0}
+                  aria-label={`${kpi.label} ${int(kpi.value)}건`}
+                >
+                  {card}
+                </Link>
+              )
+            })}
           </section>
           <div className="dashboard-main-grid">
             <section data-guide-feature="features.dashboard.dashboard-page.section-2" className="surface" aria-labelledby="priority-title">
@@ -262,6 +301,7 @@ function DashboardContent({ month }: { month: string }) {
           </div>
         </>
       )}
+      <AgentOverview month={month} />
     </div>
   )
 }
