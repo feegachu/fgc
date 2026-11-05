@@ -464,11 +464,33 @@ final class CompareAskTools {
         if (saysBigger == saysSmaller) {
             return true;
         }
-        int subject = subjectBeforeThan(sentence.substring(0, pivot), fact.ranks());
+        int subject = subjectOf(sentence, pivot, fact.ranks());
         if (subject == 0) {
-            return true;
+            // 많다/적다를 말하는데 누가 주어인지 알 수 없으면 방향을 확인하지 못했으므로 통과시키지 않는다.
+            return false;
         }
         return saysBigger == (subject == fact.biggerRank());
+    }
+
+    /**
+     * 비교 문장의 주어(값이 크다/작다고 말하는 쪽). 'A가 B보다' 꼴은 보다 앞의 첫 순위, 'B보다 A가' 꼴은 보다 앞에 하나뿐이면 보다 뒤에 나온 나머지 순위다.
+     * 알아볼 수 없으면 0.
+     */
+    private int subjectOf(String sentence, int pivot, List<Integer> candidates) {
+        String before = sentence.substring(0, pivot);
+        int subject = subjectBeforeThan(before, candidates);
+        if (subject != 0) {
+            return subject;
+        }
+        List<Integer> inFront = candidates.stream().filter(rank -> firstMention(before, rank, find(rank)) >= 0).toList();
+        if (inFront.size() != 1) {
+            return 0;
+        }
+        String after = sentence.substring(pivot);
+        List<Integer> behind = candidates.stream()
+                .filter(rank -> !inFront.contains(rank) && firstMention(after, rank, find(rank)) >= 0)
+                .toList();
+        return behind.size() == 1 ? behind.get(0) : 0;
     }
 
     /** 'A가 B보다' 에서 A. 보다 앞에 두 순위가 모두 나오면 먼저 나온 쪽이 주어다. 하나뿐이면 어느 쪽인지 알 수 없어 0. */

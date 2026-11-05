@@ -86,6 +86,19 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("'B보다 A가' 어순도 값이 큰 쪽이 맞아야 통과한다")
+    void differenceDirectionWithObjectFirstWordOrder() {
+        CompareAskTools tools = toolsWith("compare", PAIR_1_3);
+
+        assertThat(tools.verify("1위 가보험 든든건강보다 3위 다보험 편한건강이 보수적 순수령액이 134,000원 많아요."))
+                .isEqualTo("DIRECTION_MISMATCH");
+        assertThat(tools.verify("3위 다보험 편한건강보다 1위 가보험 든든건강이 보수적 순수령액이 134,000원 적어요."))
+                .isEqualTo("DIRECTION_MISMATCH");
+        assertThat(tools.verify("1위 가보험 든든건강보다 3위 다보험 편한건강이 보수적 순수령액이 134,000원 적어요.")).isNull();
+        assertThat(tools.verify("3위 다보험 편한건강보다 1위 가보험 든든건강이 보수적 순수령액이 134,000원 많아요.")).isNull();
+    }
+
+    @Test
     @DisplayName("한도 영향은 화면처럼 소수 첫째 자리에서 절사해 준다(99.96% → 99.9%)")
     void capImpactIsTruncatedLikeTheScreen() {
         Item item = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 99.96, null, List.of());
