@@ -26,8 +26,17 @@ class ValidationFailureTextTest {
     }
 
     @Test
-    void keepsTheUserSentencesOfAMixedMessage() {
-        assertThat(ValidationFailureText.forResponse(USER_SENTENCE + " | " + OLD_RAW_MESSAGE)).isEqualTo(USER_SENTENCE);
+    void keepsSeveralUserSentencesTogether() {
+        String sentences = USER_SENTENCE + " | 원장 불균형 1건이 발견되었습니다.";
+        assertThat(ValidationFailureText.forResponse(sentences)).isEqualTo(sentences);
+    }
+
+    /** SQL의 || 로 잘린 뒤쪽 조각에는 영문이 없어 조각 판정으로는 그대로 나갔다. */
+    @Test
+    void dropsTheWholeMessageWhenAnyPartIsRaw() {
+        assertThat(ValidationFailureText.forResponse(USER_SENTENCE + " | " + OLD_RAW_MESSAGE)).isNull();
+        assertThat(ValidationFailureText.forResponse("SQL [SELECT '계약' || '900101-1234567']")).isNull();
+        assertThat(ValidationFailureText.forResponse("   ")).isNull();
     }
 
     @Test

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
-import { policyParameterLabel, policyParameterValue, policySeedText } from './labels'
+import { policyCodeLabel, policyParameterLabel, policyParameterValue, policySeedText } from './labels'
 import { PolicySources } from './PolicyManagement'
 import { emptyDraft, emptyRegime, permittedActions, PolicyPreviewContext, refLabel, safeSourceUrl } from './management'
 import type { DraftDocument } from './management'
@@ -44,6 +44,12 @@ describe('policy UI boundaries', () => {
     expect(policyParameterValue(36)).toBe('36')
     expect(policyParameterValue('2026-03-01')).toBe('2026-03-01')
     expect(policyParameterValue('NEW_VALUE_FROM_SERVER')).toBe('확인 필요')
+    // 상속 속성이 라벨로 나오면 React 자식이 객체가 되어 화면이 깨진다.
+    expect(policyParameterValue('__proto__')).toBe('확인 필요')
+    expect(policyParameterValue('constructor')).toBe('확인 필요')
+    expect(policyParameterLabel('constructor')).toBe('설정 항목')
+    expect(policyCodeLabel('__proto__')).toBe('확인 필요')
+    expect(policyCodeLabel('NEWCOMER_NON_CONTRACT')).toBe('신인 지원 계약 미귀속')
   })
 
   it('시드가 남긴 승인 근거와 출처 문구의 개발 용어를 화면에서만 바꾼다', () => {

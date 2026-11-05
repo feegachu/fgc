@@ -127,14 +127,25 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(document.body).not.toHaveTextContent('eligible_contract')
   })
 
-  it('옛 실행 실패 사유의 업무 문장은 남기고 코드 조각만 뺀다', async () => {
-    const reason = 'FGC-VRUN-003 | 원장 불균형 1건이 발견되었습니다.'
+  it('옛 실행 실패 사유에 코드가 섞여 있으면 조각을 살리지 않는다', async () => {
+    const reason = "FGC-VRUN-003 | SQL [SELECT '계약' || '900101-1234567']"
     renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode: 'VALIDATION_RUN_FAILED', reason })])
     const table = await screen.findByRole('table', { name: '검색조건에 해당하는 감사 기록 목록' })
-    expect(await within(table).findByText('원장 불균형 1건이 발견되었습니다.')).toBeInTheDocument()
+    expect(await within(table).findByText('처리 중 오류로 실패했습니다.')).toBeInTheDocument()
     await screen.findByText('지급 / 금액')
     expect(document.body).not.toHaveTextContent('FGC-VRUN-003')
+    expect(document.body).not.toHaveTextContent('900101')
   })
+
+  it.each(['VALIDATION_RUN_FAILED', 'VALIDATION_RUN_CREATION_FAILED'])(
+    '자동 기록 사유가 사용자 문장이어도 원문 보기를 두지 않는다 (%s)',
+    async (actionCode) => {
+      const reason = '상태 변경 불가 — 그 사이 다른 요청이 상태를 바꿨습니다. 다시 조회 후 시도하세요.'
+      renderAt('/audit-logs?selected=1', 'COMPLIANCE', [log(1, { actionCode, reason })])
+      await screen.findByText('지급 / 금액')
+      expect(screen.queryByText('사유 원문 보기')).not.toBeInTheDocument()
+    },
+  )
 
   it('URL 코드 검색조건을 복원하고 목록·선택지에 한글을 표시하며 행위자가 없으면 자동 처리로 보인다', async () => {
     renderAt('/audit-logs?month=2026-07&userId=12&action=PAYMENT_CONFIRMED&from=2026-08-01&to=2026-08-16&page=2')
