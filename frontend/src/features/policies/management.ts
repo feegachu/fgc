@@ -152,6 +152,15 @@ export interface PolicyWritePreview {
 }
 // Only the development preview provides these callbacks. Production never simulates a successful write.
 export const PolicyPreviewContext = createContext<PolicyWritePreview | null>(null)
+export const ACQUISITION_COST_BASIS = 'ACQUISITION_COST_BASIS'
+export const ACQUISITION_COST_RATE = 'ACQUISITION_COST_RATE_PCT'
+/** 기준율의 description을 편집하는 입력의 오류·포커스 경로. 저장 키가 아니다. */
+export const ACQUISITION_COST_SOURCE = 'ACQUISITION_COST_SOURCE'
+export const MONTHLY_EQUIVALENT_FIRST_PREMIUM = 'MONTHLY_EQUIVALENT_FIRST_PREMIUM'
+export const acquisitionCostLabels: Record<string, string> = {
+  [ACQUISITION_COST_BASIS]: '계약체결비용 기준금액',
+  [ACQUISITION_COST_RATE]: '계약체결비용 기준율(%)',
+}
 export const conditionOptions = [
   {
     key: 'STATUS_MONTH_RULE',

@@ -260,6 +260,17 @@
     ]
   },
   {
+    "screenId": "ACQC-W01",
+    "title": "계약체결비용 한도 검증",
+    "page": "acquisition-cost/AcquisitionCostPage.tsx",
+    "steps": [
+      {
+        "targetId": "acquisition.overview",
+        "instruction": "계약과 지급단계를 고른 뒤 선지급과 유지관리 결과를 한도와 따로 확인하세요. 정상은 총액 한도 안이라는 뜻이고, 자료가 부족하면 금액 없이 검토 필요로 나옵니다."
+      }
+    ]
+  },
+  {
     "screenId": "LEDG-W01",
     "title": "검증원장",
     "page": "ledger/LedgerPage.tsx",
