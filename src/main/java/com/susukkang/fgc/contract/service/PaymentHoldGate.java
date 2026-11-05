@@ -29,6 +29,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PaymentHoldGate {
 
+    private static final String REF_ID = "ref_id";
     private static final String BLOCKERS = """
             SELECT 'OPEN_HOLD' AS code, h.contract_status_event_id AS ref_id
               FROM fgc.payment_hold h
@@ -67,13 +68,13 @@ public class PaymentHoldGate {
         List<Blocker> blockers;
         if (candidate == null) {
             blockers = new ArrayList<>(jdbc.query(BLOCKERS,
-                    (rs, row) -> new Blocker(rs.getString("code"), rs.getLong("ref_id")), paymentId, paymentId, paymentId));
+                    (rs, row) -> new Blocker(rs.getString("code"), rs.getLong(REF_ID)), paymentId, paymentId, paymentId));
         } else {
             var parameters = candidate.parameters();
             parameters.put("paymentId", paymentId);
             blockers = new ArrayList<>(new NamedParameterJdbcTemplate(jdbc).query(
                     candidate.sql(BLOCKERS.replace("?", ":paymentId")), parameters,
-                    (rs, row) -> new Blocker(rs.getString("code"), rs.getLong("ref_id"))));
+                    (rs, row) -> new Blocker(rs.getString("code"), rs.getLong(REF_ID))));
         }
         if (blockers.isEmpty()) blockers.addAll(currentStatusBlockers(paymentId, candidate));
         return blockers;
@@ -92,7 +93,7 @@ public class PaymentHoldGate {
                   FROM fgc.contract_event_job j
                   JOIN fgc.contract_status_event e ON e.contract_status_event_id = j.contract_status_event_id
                  WHERE j.state <> 'SUCCEEDED' AND e.contract_id = ?
-                """, (rs, row) -> new Blocker(rs.getString("code"), rs.getLong("ref_id")), scheduleHeaderId, contractId);
+                """, (rs, row) -> new Blocker(rs.getString("code"), rs.getLong(REF_ID)), scheduleHeaderId, contractId);
     }
 
     /** 보류·중단 상태 사건이 있는 계약만 판단한다(없는 계약은 지급 대상이라 정책 해석도 하지 않는다). */
