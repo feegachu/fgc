@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useSearchParams } from 'react-router'
 import { ScreenHelp } from './ScreenHelp'
+import { GuideTargets } from './targets'
 import { FilterBar } from '../../../components/FilterBar'
 import definitions from './screen-help.json'
 import guideMascot from '../assets/pico-guide.png'
@@ -50,6 +51,31 @@ it('a duplicate live target pauses rather than highlighting an arbitrary element
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   expect(await screen.findByText(/안내 대상이 여러 곳/)).toBeVisible()
   expect(document.body).not.toHaveTextContent('DUPLICATE_TARGET')
+})
+it('an adapter failure is reported as a system error and a restart really retries', async () => {
+  vi.spyOn(GuideTargets.prototype, 'prepare').mockRejectedValueOnce(new Error('boom'))
+  render(<MemoryRouter><main id="main-content"><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters" /></main></MemoryRouter>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  expect(await screen.findByText(/시스템 오류가 발생했습니다/)).toBeVisible()
+  expect(screen.queryByText(/대상을 표시할 수 없습니다/)).not.toBeInTheDocument()
+  expect(document.body).not.toHaveTextContent('ADAPTER_FAILED')
+  expect(screen.queryByRole('button', { name: '다시 찾기' })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '다시 시작' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toHaveFocus())
+  expect(screen.queryByText(/시스템 오류가 발생했습니다/)).not.toBeInTheDocument()
+})
+it('a restart leaves focus alone when the user moved outside the panel meanwhile', async () => {
+  let release = () => {}
+  vi.spyOn(GuideTargets.prototype, 'prepare')
+    .mockRejectedValueOnce(new Error('boom'))
+    .mockImplementationOnce(() => new Promise<void>((resolve) => { release = resolve }))
+  render(<MemoryRouter><main id="main-content"><input aria-label="바깥 입력" /><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters" /></main></MemoryRouter>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  await userEvent.click(await screen.findByRole('button', { name: '다시 시작' }))
+  screen.getByLabelText('바깥 입력').focus()
+  act(() => release())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  expect(screen.getByLabelText('바깥 입력')).toHaveFocus()
 })
 it('FilterBar forwards the target to its actual form', () => {
   render(<FilterBar data-guide-target="test.filters" onSubmit={() => {}}>필터</FilterBar>)
@@ -170,7 +196,7 @@ it('recovers after a duplicate is removed without changing input or writing', as
   expect(await screen.findByText(/안내 대상이 여러 곳/)).toBeVisible()
   act(() => screen.getByTestId('duplicate').remove())
   await userEvent.click(screen.getByRole('button', { name: '다시 찾기' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toHaveFocus())
   expect(screen.getByLabelText('보존 검색')).toHaveValue('keep')
   expect(write).not.toHaveBeenCalled()
   await userEvent.click(screen.getByRole('button', { name: '종료' }))

@@ -406,6 +406,15 @@ describe('CONT-W02 계약 상세', () => {
     expect(requested.some(({ options }) => options?.method === 'POST')).toBe(false)
   })
 
+  it('AGENT에게는 세 작업과 권한 안내를 보이지 않는다', async () => {
+    renderAt('/contracts/1', undefined, false, undefined, 'AGENT')
+    await screen.findByRole('heading', { name: 'CONT-0001' })
+    for (const label of ['수정', '스케줄 재생성', '한도 재검증']) {
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+    }
+    expect(screen.queryByText(/정산담당자와 시스템관리자만/)).not.toBeInTheDocument()
+  })
+
   it('재검증 중 중복 실행을 막고 성공 후 계약·스케줄·CAP 캐시를 만료시킨다', async () => {
     let finish!: (value: unknown) => void
     const pending = new Promise((resolve) => {

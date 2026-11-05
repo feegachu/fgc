@@ -150,6 +150,13 @@
 .reco-react-note {
   padding: 1rem;
 }
+.reco-run-hint {
+  padding: 0 1rem 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-align: right;
+}
 .reco-react-guidance {
   display: block;
 }

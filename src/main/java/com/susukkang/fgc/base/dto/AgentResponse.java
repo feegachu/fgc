@@ -73,7 +73,7 @@ public record AgentResponse(
         return switch (rankCode) {
             case "FC" -> "설계사";
             case "TEAM_LEADER" -> "팀장";
-            case "BRANCH_MANAGER" -> "지점장";
+            case "BRANCH_MANAGER" -> "지사장";
             case "DIVISION_HEAD" -> "본부장";
             default -> rankCode;
         };

@@ -10,6 +10,6 @@ package com.susukkang.fgc.common.code;
 public enum AgentRankCode {
     FC, //설계사
     TEAM_LEADER, // 팀장
-    BRANCH_MANAGER, // 지점장
+    BRANCH_MANAGER, // 지사장
     DIVISION_HEAD // 본부장
 }
