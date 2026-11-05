@@ -174,6 +174,31 @@ class CapCheckControllerTest {
     }
 
     @Test
+    void searchPassesFirstDayOfMonthAndNamesAnInvalidMonth() throws Exception {
+        given(capCheckService.search(any(), anyInt(), anyInt())).willReturn(
+                new CapCheckSearchResult(
+                        new CapCheckSummary(0, 0, 0, 0),
+                        List.of(),
+                        List.of(),
+                        PageResponse.of(List.of(), 1, 20, 0, "asOfDate,desc")));
+
+        mockMvc.perform(get("/api/v1/cap-checks").param("month", "2026-07")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isOk());
+        org.mockito.ArgumentCaptor<CapCheckSearchCriteria> criteriaCaptor =
+                org.mockito.ArgumentCaptor.forClass(CapCheckSearchCriteria.class);
+        verify(capCheckService).search(criteriaCaptor.capture(), anyInt(), anyInt());
+        org.assertj.core.api.Assertions.assertThat(criteriaCaptor.getValue().month())
+                .isEqualTo(LocalDate.of(2026, 7, 1));
+
+        mockMvc.perform(get("/api/v1/cap-checks").param("month", "2026-13")
+                        .with(user("settle01").roles("SETTLEMENT")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("month"));
+    }
+
+    @Test
     void searchRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/cap-checks")).andExpect(status().isUnauthorized());
     }
