@@ -59,7 +59,7 @@ DB와 API 컨테이너는 `infra/shinhan/compose.yaml`과 같은 힙, 메모리 
 | 파일 | 내용 |
 |---|---|
 | `conditions.txt` | 커밋, 앱, 힙, 메모리 한도, Docker 자원, 시작 시 다른 컨테이너와 사용 가능 메모리 |
-| `report.txt` | 전체와 Step별 시간, 처리 행 수, `pg_stat_statements` 상위, 커밋과 WAL, 캐시 적중률, 순차 스캔 상위 |
+| `report.txt` | 전체와 Step별 시간, 처리 행 수, `pg_stat_statements` 상위, 커밋과 WAL(배치 구간이 아니라 DB 생성부터의 누계, 시작과 보고 시각을 함께 적는다), 캐시 적중률, 순차 스캔 상위 |
 | `resources.txt`, `stats.csv`, `host.csv`, `gc.log` | `docker stats` 5초 표본 요약(`run-batch.sh`는 배치 구간 요약을 따로 적는다), 호스트 CPU와 사용 가능 메모리 30초 표본, 메모리 초과 여부, JVM GC 요약 |
 | `verdict.txt` | PER-003 판정, PER-007 인덱스 사용과 신규 생성 건수 |
 | `summary.json`, `k6.log` | k6 요약과 API별 p95, PER-001, 004, 005 판정 |
