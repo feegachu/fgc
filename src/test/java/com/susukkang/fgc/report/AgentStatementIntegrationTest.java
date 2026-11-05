@@ -370,11 +370,11 @@ class AgentStatementIntegrationTest {
                 """, Long.class, ownAgent));
         String foreignKey = java.util.Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(("PAYMENT:" + otherAttribution + ":0").getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        // 남의 키는 없는 키와 같은 404 로 답한다.
-        request("/api/v1/agent/me/statements/" + foreignKey, agentToken).andExpect(status().isNotFound());
+        // 남의 키는 없는 키와 같은 403 으로 답한다(FUN-085).
+        request("/api/v1/agent/me/statements/" + foreignKey, agentToken).andExpect(status().isForbidden());
         request("/api/v1/agent/me/statements/" + java.util.Base64.getUrlEncoder().withoutPadding()
                 .encodeToString("PAYMENT:999999999:0".getBytes(java.nio.charset.StandardCharsets.UTF_8)), agentToken)
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
         request("/api/v1/agent/me/statements/not-a-key", agentToken).andExpect(status().isBadRequest());
         // 내부 경로에서도 지정한 설계사의 범위를 벗어난 키는 404 다.
         request("/api/v1/reports/agents/" + ownAgent + "/statements/" + foreignKey, internalToken)
