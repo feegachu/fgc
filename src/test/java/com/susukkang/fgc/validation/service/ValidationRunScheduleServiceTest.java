@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +39,8 @@ class ValidationRunScheduleServiceTest {
     @Mock ExceptionCaseRepository exceptionCaseRepository;
     @Mock ScheduleRegenerationBatchItemService itemService;
 
+    @Mock com.susukkang.fgc.schedule.repository.SchedulePreviewRepository previews;
+    @Mock com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService previewPolicies;
     private ValidationRunScheduleService service;
 
     @BeforeEach
@@ -47,7 +50,7 @@ class ValidationRunScheduleServiceTest {
                 commissionPolicyService,
                 scheduleMapper,
                 exceptionCaseRepository,
-                itemService);
+                itemService, previews, previewPolicies);
     }
 
     @Test
@@ -66,6 +69,21 @@ class ValidationRunScheduleServiceTest {
         // 같은 REQUIRES_NEW 트랜잭션 안에서 처리된다(코드리뷰 반영). 이 Service 자신은
         // 더 이상 scheduleMapper.linkHeadersToValidationRun을 직접 호출하지 않는다 —
         // 그 책임은 ScheduleRegenerationBatchItemServiceTest가 검증한다.
+        verify(itemService).process(10L, 118L);
+    }
+
+    @Test
+    void installmentContractsValidatePreviewPoliciesInsteadOfCurrentPolicies() {
+        given(validationTargetRepository.selectScheduleStates(118L))
+                .willReturn(List.of(validState(10L, PaymentStage.GA_TO_FC)));
+        given(previews.isInstallmentContract(10L)).willReturn(true);
+        var selected = mock(com.susukkang.fgc.policy.dto.FeeRegimeSchedulePolicy.class);
+        given(selected.isSelected()).willReturn(true);
+        given(previewPolicies.resolve(eq(10L), any())).willReturn(selected);
+        given(itemService.process(10L, 118L)).willReturn(new ScheduleGenerationResult(List.of(200L), 108));
+        var result = service.validateContractSchedules(118L);
+        assertThat(result.processedCount()).isEqualTo(1);
+        verify(commissionPolicyService, never()).resolveCurrentCommission(any(), any());
         verify(itemService).process(10L, 118L);
     }
 
@@ -114,7 +132,9 @@ class ValidationRunScheduleServiceTest {
                         validState(10L, PaymentStage.GA_TO_FC),
                         validState(20L, PaymentStage.INSURER_TO_GA),
                         validState(20L, PaymentStage.GA_TO_FC)));
-        doThrow(new FgcBusinessException(FgcErrorCode.COMMON_002))
+        doThrow(new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED,
+                "scheduleHeaderId", java.util.Map.of("reason", "DATA_QUALITY"),
+                "GA_TO_FC: 취소된 예정판은 자동 재생성하지 않습니다."))
                 .when(itemService).process(10L, 118L);
         given(itemService.process(20L, 118L))
                 .willReturn(new ScheduleGenerationResult(List.of(202L), 12));
@@ -131,7 +151,8 @@ class ValidationRunScheduleServiceTest {
         // 직급 공석 등으로 수취인을 찾지 못하면 계약 전체의 예상 스케줄이 0행이 되는데,
         // 케이스를 남기지 않으면 담당자가 그 사실을 알 수 없고 대사가 엉뚱한 판정을 낸다.
         verify(exceptionCaseRepository).insertDataQualityCase(
-                eq(118L), eq(10L), eq("예상 스케줄 생성 실패"), any());
+                118L, 10L, "예상 스케줄 생성 실패",
+                "GA_TO_FC: 취소된 예정판은 자동 재생성하지 않습니다.");
         verify(itemService).process(10L, 118L);
         verify(itemService).process(20L, 118L);
     }

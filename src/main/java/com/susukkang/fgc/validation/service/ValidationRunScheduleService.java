@@ -3,6 +3,9 @@ package com.susukkang.fgc.validation.service;
 import com.susukkang.fgc.common.code.ScheduleHeaderStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.schedule.repository.SchedulePreviewRepository;
+import com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.schedule.repository.ScheduleWriteRepository;
@@ -35,6 +38,8 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
     private final ScheduleWriteRepository scheduleWriteRepository;
     private final ExceptionCaseRepository exceptionCaseRepository;
     private final ScheduleRegenerationBatchItemService itemService;
+    private final SchedulePreviewRepository previews;
+    private final FeeRegimeSchedulePolicyService previewPolicies;
 
     @Override
     public StepProcessingResult regenerateSchedules(ValidationStepContext context) {
@@ -91,6 +96,7 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                 itemService.process(contractId, validationRunId);
                 processedCount++;
             } catch (FgcBusinessException exception) {
+                String message = exception.getDetail() != null ? exception.getDetail() : exception.getMessage();
                 // 2026-08-20 hjKang - 스케줄 생성 실패를 예외함에 노출한다.
                 // 기존 코드: ContractSkip 만 남기고 exception_case 를 만들지 않아 무음 스킵이었다.
                 // 문제: 조직 계층에 해당 직급 관리자가 없으면(예: 팀장 공석) 관리자수수료 수취인을
@@ -102,12 +108,12 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
                         validationRunId,
                         contractId,
                         "예상 스케줄 생성 실패",
-                        exception.getMessage()
+                        message
                 );
                 skips.add(new ContractSkip(
                         contractId,
                         "SCHEDULE_REGENERATION_FAILED",
-                        exception.getMessage()
+                        message
                 ));
             }
         }
@@ -121,13 +127,11 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
     private ContractSkip validatePolicies(Long validationRunId, Long contractId) {
         for (PaymentStage paymentStage : PaymentStage.values()) {
             try {
-                commissionPolicyService.resolveCurrentCommission(contractId, paymentStage);
+                validateStagePolicy(contractId, paymentStage);
             } catch (FgcBusinessException exception) {
                 String reasonCode = String.valueOf(
                         exception.getParams().getOrDefault("reason", "POLICY_MISSING"));
-                String message = "POLICY_DUPLICATE".equals(reasonCode)
-                        ? "적용 가능한 현행 수수료 정책이 중복되었습니다."
-                        : "적용 가능한 현행 수수료 정책이 없습니다.";
+                String message = policyFailureMessage(exception, reasonCode);
                 scheduleWriteRepository.upsertPolicyReviewCase(
                         contractId,
                         paymentStage,
@@ -145,6 +149,23 @@ public class ValidationRunScheduleService implements ScheduleRegenerationPort {
             }
         }
         return null;
+    }
+
+    private void validateStagePolicy(Long contractId, PaymentStage paymentStage) {
+        if (previews.isInstallmentContract(contractId)) {
+            var selected = previewPolicies.resolve(contractId, paymentStage);
+            if (!selected.isSelected()) throw new FgcBusinessException(
+                    FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED,
+                    "policyVersionId", Map.of("reason", "POLICY_MISSING"),
+                    "분급 예정 정책 검토 필요: " + selected.selection().resolution().reasonCode());
+        } else commissionPolicyService.resolveCurrentCommission(contractId, paymentStage);
+    }
+
+    private String policyFailureMessage(FgcBusinessException exception, String reasonCode) {
+        if (exception.getDetail() != null) return exception.getDetail();
+        return "POLICY_DUPLICATE".equals(reasonCode)
+                ? "적용 가능한 현행 수수료 정책이 중복되었습니다."
+                : "적용 가능한 현행 수수료 정책이 없습니다.";
     }
 
     private String findStructuralError(List<ValidationScheduleState> states) {
