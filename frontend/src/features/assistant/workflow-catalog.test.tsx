@@ -45,7 +45,8 @@ describe('role-scoped tutorial and UI knowledge', () => {
 
   it('keeps agent help within own-data views and excludes internal tabs and mutations', () => {
     const steps = WORKFLOW_GUIDES.flatMap((definition) => workflowSteps(definition, 'AGENT'))
-    expect(steps.length).toBeGreaterThan(0)
+    // #896: 설계사 홈 도움말을 없애 설계사 튜토리얼은 모두 비활성이다. 다시 켜면 아래 범위 검사가 그대로 적용된다.
+    expect(steps).toEqual([])
     expect(steps.every((step) => ['AGNT-W01', 'CONT-W01', 'CONT-W02', 'TRAN-W01'].includes(step.screenId))).toBe(true)
     expect(steps.some((step) => step.targetId === 'contract.tab.ledger')).toBe(false)
     expect(steps.some((step) => step.targetId === 'features.transaction.transaction-list-page.context-link')).toBe(false)

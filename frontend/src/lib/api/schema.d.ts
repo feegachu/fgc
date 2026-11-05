@@ -292,9 +292,49 @@ export interface paths {
         put?: never;
         /**
          * 저장된 지급의 읽기 전용 계산 스냅샷
-         * @description ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.
+         * @description 기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.
          */
         post: operations["calculate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/calculations/revalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계산 입력·의존성·사용자·만료 재검증
+         * @description 변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.
+         */
+        post: operations["revalidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/prechecks/revalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 현재 지급의 실제 사전검증 증표 확인
+         * @description 계산 증표로 대체할 수 없습니다. 금융 상태를 변경하지 않습니다.
+         */
+        post: operations["verify"];
         delete?: never;
         options?: never;
         head?: never;
@@ -944,6 +984,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions/options": {
         parameters: {
             query?: never;
@@ -986,6 +1042,26 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["journalCorrection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/home/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 관리자 홈 GA·설계사 현황 (IF-API-68)
+         * @description 기준일의 등록·활동·해촉 설계사 수, 지점별 설계사·유효 계약 수, 확인할 설계사 상위 10명을 돌려준다. asOf 생략 시 오늘(Asia/Seoul)을 쓴다. 전체 설계사 검색은 IF-API-07 을 쓴다.
+         */
+        get: operations["homeSummary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2221,6 +2297,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseExceptionCountsResponse: {
+            data?: components["schemas"]["ExceptionCountsResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseExceptionOptionsResponse: {
             data?: components["schemas"]["ExceptionOptionsResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2233,6 +2314,11 @@ export interface components {
         };
         ApiResponseFinalizeValidationRunResponse: {
             data?: components["schemas"]["FinalizeValidationRunResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseHomeSummaryResponse: {
+            data?: components["schemas"]["HomeSummaryResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2507,6 +2593,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseVerification: {
+            data?: components["schemas"]["Verification"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseVoid: {
             data?: unknown;
             error?: components["schemas"]["ApiError"];
@@ -2559,7 +2650,10 @@ export interface components {
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             paymentStageLabel?: string;
             plannedCommissionAmount?: number;
-            projectedExcessAmount?: number;
+            /** @description 저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다. */
+            plannedCommissionBasis?: string | null;
+            /** @description 예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다. */
+            projectedExcessAmount?: number | null;
             refundAdditionAppliedYn?: boolean;
             /** @enum {string} */
             resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
@@ -2587,12 +2681,39 @@ export interface components {
             originalAmount?: string;
             roundedAmount?: string;
         };
+        AssistantCalculationLine: {
+            attributionDate?: string;
+            basisAmount?: string;
+            basisCode?: string;
+            beneficiaryAgentId?: string;
+            calculationType?: string;
+            cashflowType?: string;
+            commissionItemId?: string;
+            contractId?: string;
+            dueDate?: string;
+            expectedAmount?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            ratePct?: string;
+            ruleId?: string;
+            sourceId?: string;
+            status?: string;
+        };
         AssistantCalculationSource: {
             entityId?: string;
             sourceId?: string;
             sourceType?: string;
             title?: string;
             version?: string;
+        };
+        AssistantCalculationValidity: {
+            /** Format: date-time */
+            calculatedAt?: string;
+            dependencyFingerprint?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            inputFingerprint?: string;
+            stateToken?: string;
         };
         /** @description 변경 내용 비교 행 — before/after JSON 의 리프 경로 하나 */
         AuditDiffEntry: {
@@ -2751,6 +2872,11 @@ export interface components {
             installmentNo?: number;
             /** Format: int64 */
             transactionAttributionId?: number;
+        };
+        CalculationRevalidationRequest: {
+            calculationId: string;
+            input: components["schemas"]["PaymentCalculationRequest"];
+            stateToken: string;
         };
         CapAgentSummaryResponse: {
             agentCode?: string;
@@ -4133,6 +4259,12 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        ExceptionCountsResponse: {
+            bySeverity?: components["schemas"]["ExceptionSeverityCountResponse"][];
+            byType?: components["schemas"]["ExceptionTypeSummaryResponse"][];
+            /** Format: int64 */
+            total?: number;
+        };
         ExceptionOccurrenceResponse: {
             /** Format: date-time */
             detectedAt?: string;
@@ -4160,6 +4292,13 @@ export interface components {
             severities?: components["schemas"]["Option"][];
             types?: components["schemas"]["Option"][];
             validationMonths?: string[];
+        };
+        ExceptionSeverityCountResponse: {
+            /** Format: int64 */
+            count?: number;
+            /** @enum {string} */
+            severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
+            severityLabel?: string;
         };
         ExceptionSummary: {
             /** Format: int64 */
@@ -4287,6 +4426,54 @@ export interface components {
         HeldAmount: {
             after?: number;
             before?: number;
+        };
+        HomeAgentCounts: {
+            /** Format: int64 */
+            active?: number;
+            /** Format: int64 */
+            registered?: number;
+            /** Format: int64 */
+            terminated?: number;
+        };
+        HomeAttentionAgent: {
+            activeYn?: boolean;
+            /** Format: int64 */
+            agentId?: number;
+            branch?: string;
+            code?: string;
+            /** Format: int64 */
+            contractCount?: number;
+            name?: string;
+            reasons?: components["schemas"]["HomeAttentionReason"][];
+            status?: string;
+            statusLabel?: string;
+        };
+        HomeAttentionReason: {
+            code?: string;
+            /** Format: int64 */
+            count?: number;
+            label?: string;
+        };
+        HomeBranch: {
+            /** Format: int64 */
+            activeContractCount?: number;
+            /** Format: int64 */
+            agentCount?: number;
+            /** Format: int64 */
+            attentionCount?: number;
+            name?: string;
+            /** Format: int64 */
+            organizationId?: number;
+        };
+        HomeSummaryResponse: {
+            agents?: components["schemas"]["HomeAgentCounts"];
+            /** Format: date */
+            asOf?: string;
+            attentionAgents?: components["schemas"]["HomeAttentionAgent"][];
+            /** Format: int64 */
+            attentionTotal?: number;
+            basis?: string;
+            branches?: components["schemas"]["HomeBranch"][];
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -4877,6 +5064,7 @@ export interface components {
             currency?: string;
             evidenceKind?: string;
             kind?: string;
+            lines?: components["schemas"]["AssistantCalculationLine"][];
             missingInputs?: string[];
             mode?: string;
             paymentStatus?: string;
@@ -4887,8 +5075,7 @@ export interface components {
             snapshotOnly?: boolean;
             status?: string;
             synthetic?: boolean;
-            /** @description Always null in snapshot-only phase; not a server proof */
-            validity?: Record<string, never> | null;
+            validity?: components["schemas"]["AssistantCalculationValidity"];
         };
         PaymentEvidence: {
             attributedAmount?: number;
@@ -5872,7 +6059,20 @@ export interface components {
             status?: "PLANNED" | "CONFIRMED" | "MATCHED" | "ADJUSTED" | "HOLD" | "CANCELLED" | "RESTARTED";
         };
         Scope: {
+            /** @enum {string} */
+            aggregation?: "SINGLE_LINE" | "MONTH_TOTAL";
+            /** Format: date */
+            asOfDate?: string;
+            beneficiaryAgentId?: string;
+            commissionItemId?: string;
+            contractId?: string;
+            /** Format: int32 */
+            installmentNo?: number;
             paymentId?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            reconciliationResultId?: string;
+            settlementMonth?: string;
         };
         Source: {
             entityType?: string;
@@ -6064,6 +6264,16 @@ export interface components {
             selectionStatusLabel?: string;
             /** Format: int64 */
             validationTargetId?: number;
+        };
+        Verification: {
+            /** Format: date-time */
+            expiresAt?: string;
+            paymentId?: string;
+            verified?: boolean;
+        };
+        VerifyRequest: {
+            paymentId: string;
+            precheckToken: string;
         };
     };
     responses: never;
@@ -6488,6 +6698,54 @@ export interface operations {
             };
         };
     };
+    revalidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalculationRevalidationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePaymentCalculationSnapshot"];
+                };
+            };
+        };
+    };
+    verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVerification"];
+                };
+            };
+        };
+    };
     search_10: {
         parameters: {
             query?: {
@@ -6701,6 +6959,8 @@ export interface operations {
                 selectedId?: number;
                 /** @description 소속 조직 ID */
                 organizationId?: number;
+                /** @description 지점 ID. 이 지점과 바로 아래 팀 소속 설계사를 찾는다(FUN-080 관리자 홈) */
+                branchId?: number;
                 /** @description 설계사 코드 또는 이름 검색어 */
                 keyword?: string;
                 /**
@@ -7698,6 +7958,29 @@ export interface operations {
             };
         };
     };
+    counts: {
+        parameters: {
+            query?: {
+                status?: string;
+                validationMonth?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionCountsResponse"];
+                };
+            };
+        };
+    };
     options: {
         parameters: {
             query?: never;
@@ -7766,6 +8049,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseJournalCorrectionActionResponse"];
+                };
+            };
+        };
+    };
+    homeSummary: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 현황 기준일(yyyy-MM-dd). 생략하면 오늘
+                 * @example 2026-11-04
+                 */
+                asOf?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseHomeSummaryResponse"];
                 };
             };
         };
@@ -8880,6 +9189,8 @@ export interface operations {
             /** @description 사전검증 결과 (차단 사유가 있어도 200 + blockers[]) */
             200: {
                 headers: {
+                    /** @description confirmable=true이고 차단 사유가 없을 때만 발급되는 사용자·세션·대상·의존성에 묶인 5분 증표 */
+                    "X-FGC-Precheck-Token"?: string;
                     [name: string]: unknown;
                 };
                 content: {

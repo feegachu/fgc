@@ -377,9 +377,9 @@ it('preserves the CLEAR result and hides projected-only excess from the current 
   await screen.findByText('서버 판정 근거')
   expect(screen.queryByText(/지급예정 포함 시 초과/)).not.toBeInTheDocument()
   expect(screen.getAllByText('이상없음').length).toBeGreaterThan(0)
-  expect(screen.getByRole('columnheader', { name: '지급예정액' })).toBeVisible()
+  expect(screen.getByRole('columnheader', { name: '지급예정액·계산 기준' })).toBeVisible()
   const summary = screen.getByRole('region', { name: '차익거래 금액 요약' })
-  expect(within(summary).getByText('지급예정액')).toBeVisible()
+  expect(within(summary).getByText('지급예정액 (기준 미기록)')).toBeVisible()
   expect(within(summary).getByText(/지급예정 포함 초과액/)).toBeVisible()
   expect(within(summary).getByText('12,000원')).toBeVisible()
 })
@@ -404,6 +404,9 @@ it('판정 근거의 서버 원문은 화면에서 쉬운 말로 바꾸고 앞�
   mount(undefined, true, (path) => (path.includes('/insurers') ? fixtures(path) : result([raw], 1, 1)))
   expect(await screen.findByText('자료부족: 기준일 이전 계약 금액 자료가 없습니다.')).toBeVisible()
   expect(screen.queryByText(/금융 스냅샷/)).not.toBeInTheDocument()
+  expect(decisionReasonText('FGC-CAP-004: 적용 가능한 1,200% 룰셋이 없습니다')).toBe('적용 가능한 1,200% 룰셋이 없습니다')
+  expect(decisionReasonText('FGC-CAP-002 / FGC-COMMON-004')).toBe('자동 처리 중 오류가 기록되었습니다. 계약 자료를 확인하세요.')
+  expect(decisionReasonText('FGC-FGL01-202607-0001 계약 금액 확인')).toBe('FGC-FGL01-202607-0001 계약 금액 확인')
   expect(decisionReasonText('해약환급금 스냅샷 값이 없습니다.')).toBe('해약환급금 자료가 없습니다.')
   expect(decisionReasonText('예상 해약환급금의 환급률표 ID가 없습니다. 상품을 확인하세요.')).toBe(
     '예상 해약환급금에 연결된 환급률표가 없습니다. 상품을 확인하세요.',

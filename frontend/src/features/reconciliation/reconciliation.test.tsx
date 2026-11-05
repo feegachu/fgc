@@ -732,7 +732,7 @@ it('execution help resets on run selection and waits for the new completed resul
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   await user.click(screen.getByRole('button', { name: '다음' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
-  expect(screen.getByText(/서버 실행 성공 · ID 42/)).toBeVisible()
+  expect(screen.getByText(/서버 실행 성공 · 번호 42/)).toBeVisible()
   await user.selectOptions(screen.getByLabelText(/지급단계/, { selector: 'select' }), 'INSURER_TO_GA')
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeDisabled())
 }, 10000)

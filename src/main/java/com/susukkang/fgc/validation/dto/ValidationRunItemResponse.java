@@ -35,6 +35,6 @@ public record ValidationRunItemResponse(
                 runType, runType.label(), status, status.label(), row.getCurrentStep(),
                 row.getTriggeredBy(), DateUtil.toSeoul(row.getStartedAt()),
                 DateUtil.toSeoul(row.getCompletedAt()), row.getFinalizedBy(),
-                DateUtil.toSeoul(row.getFinalizedAt()), row.getFailureMessage());
+                DateUtil.toSeoul(row.getFinalizedAt()), ValidationFailureText.forResponse(row.getFailureMessage()));
     }
 }

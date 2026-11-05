@@ -12,6 +12,8 @@ import { ListPagination } from '../../components/ListPagination'
 import { date, int, rate, today, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
+import { policyCodeLabel } from '../policies/labels'
+import { sourceOptions } from '../transaction/list-api'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import {
   ENTRY_TYPE_OPTIONS,
@@ -32,16 +34,16 @@ const AMOUNT_KEYS = ['basisAmount', 'fixedAmount', 'originallyPaidAmount']
 const PERCENT_KEYS = ['ratePct', 'appliedRatePct']
 /** 서버가 근거(evidence)로 내려주는 원천 항목의 화면 이름. 목록에 없는 키는 그대로 보여 주지 않고 숨긴다. */
 const EVIDENCE_LABELS: Record<string, string> = {
-  commissionTransactionId: '지급 건 ID',
+  commissionTransactionId: '지급 건 번호',
   sourceType: '원천 유형',
   attributionMethod: '귀속 방식',
   settlementMonth: '정산월',
   paidOn: '지급일',
   cashflowType: '흐름',
   note: '비고',
-  replacesPaymentId: '대체한 지급 건 ID',
-  replacedByPaymentId: '대체된 지급 건 ID',
-  scheduleHeaderId: '스케줄 ID',
+  replacesPaymentId: '이 건이 대체한 지급 건 번호',
+  replacedByPaymentId: '이 건을 대체한 지급 건 번호',
+  scheduleHeaderId: '스케줄 번호',
   scheduleVersionNo: '스케줄 버전',
   paymentConditionCode: '지급 조건',
   basisCode: '기준 코드',
@@ -49,12 +51,24 @@ const EVIDENCE_LABELS: Record<string, string> = {
   calculationType: '계산 방식',
   ratePct: '적용률(%)',
   fixedAmount: '고정 금액',
-  clawbackCaseId: '환수 케이스 ID',
-  caseNo: '환수 케이스 번호',
-  clawbackRuleId: '환수 규칙 ID',
-  transactionAttributionId: '기지급 귀속행 ID',
+  clawbackCaseId: '환수 건 번호',
+  caseNo: '환수 관리번호',
+  transactionAttributionId: '기지급 귀속행 번호',
   originallyPaidAmount: '기지급 기준액',
   appliedRatePct: '적용 환수율(%)',
+}
+
+/** 근거 값 중 코드로 오는 항목의 화면 이름. 저장 코드는 화면에 쓰지 않는다(SRC-074). */
+const EVIDENCE_VALUE_LABELS: Record<string, Record<string, string>> = {
+  sourceType: Object.fromEntries(sourceOptions),
+  cashflowType: { PAYMENT: '지급', DEDUCTION: '차감' },
+}
+const CODE_VALUE_KEYS = ['attributionMethod', 'paymentConditionCode', 'basisCode', 'calculationType']
+const SOURCE_LABELS: Record<string, string> = {
+  TRANSACTION_ATTRIBUTION: '지급 귀속',
+  COMMISSION_TRANSACTION: '지급 건',
+  SCHEDULE_LINE: '스케줄 회차',
+  CLAWBACK_LINE: '환수 계산',
 }
 
 export default function AgentStatementPage() {
@@ -103,7 +117,7 @@ export default function AgentStatementPage() {
       sortable: true,
       width: '10rem',
       align: 'center',
-      render: (row) => <span title={row.commissionItemCode}>{row.commissionItemName || row.commissionItemCode}</span>,
+      render: (row) => row.commissionItemName || '-',
     },
     {
       key: 'installmentNo',
@@ -148,12 +162,12 @@ export default function AgentStatementPage() {
   return (
     <div className="ast-page">
       <header className="page-header">
-        <ScreenHelp screenId="RPT-W02" />
+        {!isAgent && <ScreenHelp screenId="RPT-W02" />}
         <div className="page-header-copy">
           <h1 className="page-title">설계사 수수료 명세</h1>
-          <p className="ast-lede">
-            {isAgent ? '내 귀속 기준의 지급·보류·조정·환수 내역입니다.' : '설계사를 선택해 본인 귀속 기준 명세를 조회합니다.'}
-          </p>
+          {!isAgent && (
+            <p className="ast-lede">설계사를 선택해 본인 귀속 기준 명세를 조회합니다.</p>
+          )}
         </div>
       </header>
       <StatementFiltersBar
@@ -161,7 +175,7 @@ export default function AgentStatementPage() {
         initial={filters}
         isAgent={isAgent}
         agents={(agents.data ?? []).map((row) => [String(row.agentId), `${row.agentCode} · ${row.agentName}`])}
-        items={(items.data ?? []).map((row) => [String(row.commissionItemId), `${row.itemCode} · ${row.itemName}`])}
+        items={(items.data ?? []).map((row) => [String(row.commissionItemId), row.itemName ?? '-'])}
         onSearch={(next) => apply({ ...next, contractNo: next.contractNo.trim(), page: 1 })}
         onReset={() => {
           setResetCount((count) => count + 1)
@@ -342,11 +356,11 @@ function DetailPanel({
               <h3 className="ast-group-title">기본 정보</h3>
               <dl className="ast-dl">
                 <Row label="계약번호" value={entry.contractNo ?? '연결 계약 없음'} />
-                <Row label="수수료 항목" value={`${entry.commissionItemName} (${entry.commissionItemCode})`} />
+                <Row label="수수료 항목" value={entry.commissionItemName} />
                 <Row label="회차" value={entry.installmentNo == null ? '-' : `${entry.installmentNo}회`} />
                 <Row label="기준 설명" value={detail?.basis.dateBasis[entry.entryType]} />
-                <Row label="정책 버전 ID" value={entry.policyVersionId == null ? '-' : String(entry.policyVersionId)} />
-                <Row label="원천" value={`${entry.source.entityType} #${entry.source.id}`} />
+                <Row label="정책 관리번호" value={entry.policyVersionId == null ? '-' : String(entry.policyVersionId)} />
+                <Row label="원천" value={`${SOURCE_LABELS[entry.source.entityType] ?? '원천 자료'} ${entry.source.id}번`} />
               </dl>
             </section>
             {evidence.length > 0 && (
@@ -383,7 +397,8 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 function evidenceValue(key: string, value: string | number) {
   if (AMOUNT_KEYS.includes(key)) return won(value)
   if (PERCENT_KEYS.includes(key)) return `${rate(value)}%`
-  return String(value)
+  if (CODE_VALUE_KEYS.includes(key)) return policyCodeLabel(String(value))
+  return EVIDENCE_VALUE_LABELS[key]?.[value] ?? String(value)
 }
 
 function StatementFiltersBar({

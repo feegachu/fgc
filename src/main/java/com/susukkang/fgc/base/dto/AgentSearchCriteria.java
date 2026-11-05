@@ -11,8 +11,14 @@ public record AgentSearchCriteria(
         boolean includeTerminated,
         boolean includeHistorical,
         String sort,
-        Long selectedId
+        Long selectedId,
+        Long branchId
 ) {
+    public AgentSearchCriteria(Long organizationId, String keyword, LocalDate asOf, boolean includeTerminated,
+                               boolean includeHistorical, String sort, Long selectedId) {
+        this(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort, selectedId, null);
+    }
+
     public AgentSearchCriteria(Long organizationId, String keyword, LocalDate asOf, boolean includeTerminated,
                                boolean includeHistorical, String sort) {
         this(organizationId, keyword, asOf, includeTerminated, includeHistorical, sort, null);

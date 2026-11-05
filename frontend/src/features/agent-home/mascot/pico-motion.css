@@ -1,0 +1,5 @@
+/* 피코 모션(PicoMotion). 정지 그림과 Rive 캔버스를 같은 칸에 겹친다. 크기는 --pico-size(화면 CSS에서 바꿀 수 있음). */
+.pico-motion { position: relative; display: inline-block; flex: 0 0 auto; width: var(--pico-size); height: var(--pico-size); }
+.pico-motion > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pico-motion .pico-motion-canvas { position: absolute; inset: 0; opacity: 0; }
+.pico-motion .pico-motion-canvas.is-ready { opacity: 1; }

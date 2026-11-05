@@ -3,9 +3,11 @@ package com.susukkang.fgc.journal.service;
 import com.susukkang.fgc.common.exception.ConstraintErrorCodeResolver;
 import com.susukkang.fgc.journal.domain.JournalAccountCode;
 import com.susukkang.fgc.journal.domain.JournalType;
+import com.susukkang.fgc.journal.dto.JournalCorrectionResult;
 import com.susukkang.fgc.journal.dto.JournalHeaderDraft;
 import com.susukkang.fgc.journal.dto.JournalHeaderRow;
 import com.susukkang.fgc.journal.dto.JournalLineDraft;
+import com.susukkang.fgc.journal.dto.ReverseAndRepostJournalCommand;
 import com.susukkang.fgc.journal.dto.ReverseJournalCommand;
 import com.susukkang.fgc.journal.repository.JournalHeaderRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -16,7 +18,9 @@ import org.postgresql.util.PSQLException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -25,6 +29,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -136,12 +141,11 @@ class JournalPersistenceBoundaryIntegrationTest {
             recordTransaction(transactionIds);
             int attempt = attempts.incrementAndGet();
             // Spring Data @Query 메서드는 인터페이스 메서드라 spy의 callRealMethod로 실행할 수 없다.
-            // 운영 네이티브 쿼리와 같은 식을 현재 REQUIRES_NEW 연결에서 실제로 실행한다.
-            Integer sequence = jdbcTemplate.queryForObject("""
-                    SELECT COALESCE(MAX(CAST(SUBSTRING(journal_no FROM 'JV-\\d{4}-\\d{2}-(\\d+)$') AS int)), 0) + 1
-                      FROM fgc.journal_header
-                     WHERE journal_no LIKE 'JV-' || ? || '-' || ? || '-%'
-                    """, Integer.class, year(month), monthNumber(month));
+            // 운영 네이티브 쿼리 문자열을 그대로 읽어 현재 REQUIRES_NEW 연결에서 실제로 실행한다.
+            Integer sequence = new NamedParameterJdbcTemplate(jdbcTemplate).queryForObject(
+                    JournalHeaderRepository.class.getMethod("findNextJournalSeq", String.class, String.class)
+                            .getAnnotation(Query.class).value(),
+                    Map.of("year", year(month), "month", monthNumber(month)), Integer.class);
             // 처음 두 트랜잭션이 같은 MAX+1을 읽은 뒤 동시에 INSERT하도록 한다.
             // 충돌 후 세 번째 시도는 DB에서 새 번호를 실제로 다시 읽는다.
             if (attempt <= 2) {
@@ -181,17 +185,88 @@ class JournalPersistenceBoundaryIntegrationTest {
 
     @Test
     void lastMonthlySequenceSucceedsAndOverflowLeavesNoAdditionalWrites() {
-        seedHeader(month, 9998);
+        seedHeader(month, 99_998);
         JournalHeaderRow last = persistenceService.saveDraft(draft(month, "last-number"), actorId, marker + "-last");
 
-        assertThat(last.getJournalNo()).isEqualTo(numberPrefix(month) + "9999");
+        assertThat(last.getJournalNo()).isEqualTo(numberPrefix(month) + "99999");
         assertThatThrownBy(() -> persistenceService.saveDraft(draft(month, "overflow"), actorId, marker + "-overflow"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("월간 일련번호 상한(9999) 초과")
-                .hasMessageContaining("seq=10000");
+                .hasMessageContaining("월간 일련번호 상한(99999) 초과")
+                .hasMessageContaining("seq=100000");
         assertOwnedWrites(2, 2, 1);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fgc.audit_log WHERE request_id = ?",
                 Long.class, marker + "-overflow")).isZero();
+    }
+
+    @Test
+    void savedNumbersPassTheOldFourDigitCapAndKeepExistingNumbers() {
+        seedHeader(month, 9999);
+
+        JournalHeaderRow tenThousandth = persistenceService.saveDraft(draft(month, "number-10000"), actorId, marker + "-10000");
+        JournalHeaderRow next = persistenceService.saveDraft(draft(month, "number-10001"), actorId, marker + "-10001");
+
+        assertThat(tenThousandth.getJournalNo()).isEqualTo(numberPrefix(month) + "10000");
+        // 문자열로 MAX를 구하면 9999가 10000보다 커서 여기서 번호가 겹친다.
+        assertThat(next.getJournalNo()).isEqualTo(numberPrefix(month) + "10001");
+        assertThat(jdbcTemplate.queryForList("SELECT journal_no FROM fgc.journal_header WHERE description = ?",
+                String.class, marker)).containsExactlyInAnyOrder(numberPrefix(month) + "9999",
+                numberPrefix(month) + "10000", numberPrefix(month) + "10001");
+    }
+
+    @Test
+    void numbersOutsideTheFormatDoNotBreakSavingOrTheNextNumber() {
+        seedHeader(month, 41);
+        // 문자가 섞였거나 int를 넘는 번호. 인덱스 식이나 채번에서 정수로 바꾸려 들면 여기서 실패한다.
+        for (String suffix : List.of("ABC", "0099-X", "12345678901", "")) {
+            seedHeader(month, numberPrefix(month) + suffix);
+        }
+        seedHeader(month, "TEST-" + marker);
+
+        JournalHeaderRow saved = persistenceService.saveDraft(draft(month, "after-non-format"), actorId, marker + "-after");
+
+        assertThat(saved.getJournalNo()).isEqualTo(numberPrefix(month) + "0042");
+    }
+
+    @Test
+    void correctionNumbersPassTheOldFourDigitCap() {
+        JournalHeaderDraft source = draft(month, "correction-past-cap");
+        JournalHeaderRow original = persistenceService.saveDraft(source, actorId, marker + "-correction");
+        seedHeader(month, 9999);
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            // 기표한 분개와 정정 행은 지울 수 없어 외부 트랜잭션째 rollback한다.
+            status.setRollbackOnly();
+            assertThat(headerRepository.markPosted(original.getJournalHeaderId(), actorId)).isEqualTo(1);
+
+            JournalCorrectionResult result = correctionService.reverseAndRepost(new ReverseAndRepostJournalCommand(
+                    new ReverseJournalCommand(original.getJournalHeaderId(), "#673 1만 번을 넘는 정정 번호", null, actorId),
+                    source.toBuilder().revisionNo(2).build()));
+
+            assertThat(journalNoOf(result.journalHeaderId())).isEqualTo(numberPrefix(month) + "10000");
+            assertThat(journalNoOf(result.repostedJournalHeaderId())).isEqualTo(numberPrefix(month) + "10001");
+        });
+    }
+
+    @Test
+    void correctionOverflowKeepsTheMonthlyCap() {
+        JournalHeaderRow last = persistenceService.saveDraft(draft(month, "correction-last"), actorId, marker + "-correction-last");
+        JournalHeaderRow overflow = persistenceService.saveDraft(draft(month, "correction-overflow"), actorId, marker + "-correction-overflow");
+        seedHeader(month, 99_998);
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            status.setRollbackOnly();
+            assertThat(headerRepository.markPosted(last.getJournalHeaderId(), actorId)).isEqualTo(1);
+            assertThat(headerRepository.markPosted(overflow.getJournalHeaderId(), actorId)).isEqualTo(1);
+
+            JournalCorrectionResult reversal = correctionService.reverse(new ReverseJournalCommand(
+                    last.getJournalHeaderId(), "#673 마지막 정정 번호", null, actorId));
+
+            assertThat(journalNoOf(reversal.journalHeaderId())).isEqualTo(numberPrefix(month) + "99999");
+            assertThatThrownBy(() -> correctionService.reverse(new ReverseJournalCommand(
+                    overflow.getJournalHeaderId(), "#673 상한을 넘는 정정 번호", null, actorId)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("월간 일련번호 상한 초과");
+        });
     }
 
     @Test
@@ -311,11 +386,20 @@ class JournalPersistenceBoundaryIntegrationTest {
     }
 
     private void seedHeader(LocalDate date, int sequence) {
+        seedHeader(date, numberPrefix(date) + String.format("%04d", sequence));
+    }
+
+    private void seedHeader(LocalDate date, String journalNo) {
         jdbcTemplate.update("""
                 INSERT INTO fgc.journal_header (
                     journal_no, journal_date, journal_type, source_entity_type, source_entity_id, revision_no, description
                 ) VALUES (?, ?, 'EXPECTED_INSURER_INCOME', 'JOURNAL_BOUNDARY_SEED', ?, 1, ?)
-                """, numberPrefix(date) + String.format("%04d", sequence), date, UUID.randomUUID().toString(), marker);
+                """, journalNo, date, UUID.randomUUID().toString(), marker);
+    }
+
+    private String journalNoOf(Long journalHeaderId) {
+        return jdbcTemplate.queryForObject("SELECT journal_no FROM fgc.journal_header WHERE journal_header_id = ?",
+                String.class, journalHeaderId);
     }
 
     private void assertOwnedWrites(long headers, long lines, long draftAudits) {

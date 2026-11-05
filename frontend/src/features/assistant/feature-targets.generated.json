@@ -1,30 +1,5 @@
 [
   {
-    "id": "agent.guide-menu.agent.contract.detail",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "button"
-  },
-  {
-    "id": "agent.guide-menu.agent.contract.find",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "button"
-  },
-  {
-    "id": "agent.guide-menu.agent.payments",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "button"
-  },
-  {
-    "id": "agent.guide-menu.agent.portfolio",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "button"
-  },
-  {
-    "id": "agent.guide-menu.open",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "summary"
-  },
-  {
     "id": "app.shell.app-shell.a",
     "file": "app/shell/AppShell.tsx",
     "element": "a"
@@ -1665,8 +1640,63 @@
     "element": "Button"
   },
   {
+    "id": "features.dashboard.agent-overview.active",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "features.dashboard.agent-overview.as-of",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.dashboard.agent-overview.attention",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.agent-overview.branch",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.dashboard.agent-overview.branches",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.agent-overview.contracts-link",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.agent-overview.keyword",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.dashboard.agent-overview.registered",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "features.dashboard.agent-overview.search",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.agent-overview.section",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.agent-overview.terminated",
+    "file": "features/dashboard/AgentOverview.tsx",
+    "element": "KpiCard"
+  },
+  {
     "id": "features.dashboard.dashboard-page.button",
-    "file": "features/dashboard/DashboardPage.tsx",
+    "file": "features/dashboard/RegionStatus.tsx",
     "element": "button"
   },
   {
@@ -1693,6 +1723,11 @@
     "id": "features.dashboard.dashboard-page.link-5",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "Link"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.open-retry",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "button"
   },
   {
     "id": "features.dashboard.dashboard-page.section",

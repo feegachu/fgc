@@ -73,7 +73,12 @@ export function ValidationRestartPanel({
   const history = useQuery({
     queryKey: ['validation-retries', id, status],
     queryFn: async () => (await apiClient.request<Retry[]>(`/api/v1/validation-runs/${id}/retries`)).data,
-    refetchInterval: status === 'FAILED' || status === 'RUNNING' ? 2000 : false,
+    // The run and retry completion are committed separately; keep polling an active retry.
+    refetchInterval: (query) =>
+      status === 'FAILED' || status === 'RUNNING' ||
+      query.state.data?.some((retry) => ['ACCEPTED', 'LAUNCHING', 'RUNNING'].includes(retry.state))
+        ? 2000
+        : false,
   })
   const mutation = useMutation({
     mutationFn: async () => {
@@ -190,7 +195,7 @@ export function ValidationRestartPanel({
       )}
       {status === 'FAILED' && (
         <p>
-          체크포인트: {state.data?.checkpointAvailable ? '있음' : '확인 필요'} · 완료 대상:{' '}
+          이어서 처리할 지점: {state.data?.checkpointAvailable ? '있음' : '확인 필요'} · 완료 대상:{' '}
           {state.data?.completedCount ?? '자료 없음'} · 남은 대상: {state.data?.remainingCount ?? '자료 없음'} · 실패
           시각:{' '}
           {state.data?.failedAt
