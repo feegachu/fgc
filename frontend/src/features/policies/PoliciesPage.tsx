@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { present, useReferenceDate } from '../reference/utils'
 import { useContext, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -5,23 +6,18 @@ import { Button } from '../../components/Button'
 import { useAuth } from '../auth/useAuth'
 import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
-import { PolicyPreviewContext, refLabel, sourceReferenceNotice } from './management'
+import { PolicyPreviewContext } from './management'
 import './policies.css'
 import { useSearchParams } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import { ListHeader } from '../../components/ListHeader'
 import { Field } from '../../components/Field'
-import { EvidenceLink } from '../../components/EvidenceLink'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date } from '../../lib/format'
 import { QueryState, ReferenceTabs, ReferenceText } from '../reference/ReferenceUI'
 import { usePolicies, usePolicyDetail } from './api'
 import { CapRuleSets, CommissionRules, RefundTables } from './PolicyDetailTables'
-import { PolicyReferenceInfo } from './PolicyReferenceInfo'
-import type { Policy } from './api'
-/** 규제와 근거자료가 모두 없는 정책 행을 구분한다. */
-const policyRefs = (policy: Policy) => [...(policy.regulationRefs ?? []), ...(policy.sourceRefs ?? [])]
 const tabs = [
   { id: 'versions', label: '정책 버전' },
   { id: 'management', label: '관리 상세' },
@@ -75,11 +71,12 @@ export function PoliciesPage() {
   return (
     <div className="policy-page">
       <header className="page-header policy-page-header">
+        <ScreenHelp screenId="POL-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">정책/룰셋 관리</h1>
           <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
-        <div className="policy-header-actions">
+        <div data-guide-target="policy.filters" className="policy-header-actions">
           <Field className="policy-date-field" variant="filter" label="적용 기준일">
             <input data-guide-feature="features.policies.policies-page.input" type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
           </Field>
@@ -112,7 +109,7 @@ export function PoliciesPage() {
           </Button>
         </p>
       )}
-      <div className="policy-tabs">
+      <div data-guide-target="policy.overview" className="policy-tabs">
         <ReferenceTabs
           panelClassName="surface policy-tab-panel"
           label="정책 상세 구분"
@@ -147,7 +144,7 @@ export function PoliciesPage() {
               rows={policies.data ?? []}
               rowKey={(r) => String(r.policyVersionId)}
               selectedKeys={id === undefined ? [] : [String(id)]}
-              rowClassName={(r) => `policy-row ${policyRefs(r).length ? '' : 'policy-row-missing-reference'}`}
+              rowClassName={() => 'policy-row'}
               onRowActivate={(r) => patch({ policyVersionId: String(r.policyVersionId) })}
               columns={[
                 {
@@ -237,38 +234,6 @@ export function PoliciesPage() {
                       {present(r.statusLabel)}
                     </StatusBadge>
                   ),
-                },
-                {
-                  key: 'refs',
-                  label: '근거',
-                  width: '11.5rem',
-                  cellClassName: 'policy-disclosure-cell',
-                  render: (r) =>
-                    policyRefs(r).length ? (
-                      policyRefs(r).map((ref) => (
-                        <EvidenceLink key={ref} label={refLabel(ref)}>
-                          {r.policyName}, {refLabel(ref)}
-                          {r.policyVersionId != null ? (
-                            <PolicyReferenceInfo policyVersionId={r.policyVersionId} refText={ref} />
-                          ) : null}
-                          <p>{sourceReferenceNotice}</p>
-                          <Button data-guide-feature="features.policies.policies-page.button-5"
-                            variant="ghost"
-                            onClick={() =>
-                              patch({
-                                policyVersionId: String(r.policyVersionId),
-                                tab: 'management',
-                                section: 'sources',
-                              })
-                            }
-                          >
-                            근거 상세 보기
-                          </Button>
-                        </EvidenceLink>
-                      ))
-                    ) : (
-                      <StatusBadge>근거 미기재</StatusBadge>
-                    ),
                 },
               ]}
             />

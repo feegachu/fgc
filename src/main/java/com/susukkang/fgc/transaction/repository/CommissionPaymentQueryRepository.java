@@ -38,6 +38,8 @@ import com.susukkang.fgc.transaction.domain.PaymentCandidateProjection;
 @RequiredArgsConstructor
 public class CommissionPaymentQueryRepository {
     private static final String COL_AMOUNT = "amount";
+    private static final String AGENT_ID = "agentId";
+    private static final String OWN_ATTRIBUTION_SLOT = "__OWN_ATTRIBUTION__";
 
     private final EntityManager entityManager;
     private final AgentRepository agentRepository;
@@ -49,10 +51,14 @@ public class CommissionPaymentQueryRepository {
             "month", "ct.settlement_month",
             "agent", "agent.agent_name",
             "item", "item.item_name",
-            COL_AMOUNT, "ct.amount",
+            // 출력 별칭이다. AGENT에게는 보이는 금액(본인 몫)으로 정렬해 순서로 헤더 총액이 드러나지 않게 한다.
+            COL_AMOUNT, COL_AMOUNT,
             "attributions", "COUNT(attribution.transaction_attribution_id)");
     public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("commissionTransactionId", false);
+    /** FUN-085: 다른 설계사 몫이 섞인 지급 건의 AGENT 금액은 헤더 총액이 아니라 본인 귀속 합계다(attribution은 본인 행만 조인). */
+    private static final String AGENT_VISIBLE_AMOUNT = "(CASE WHEN " + AgentDataScopeService.MIXED_PAYMENT
+            + " THEN COALESCE(SUM(attribution.attributed_amount), 0) ELSE ct.amount END)";
 
     /** 요청 정렬을 검증한다. 허용 key 가 아니면 COMMON_002. 조건이 없거나 비어 있으면 지급 건 ID 내림차순. */
     public static ListSort sortOf(CommissionPaymentSearchCondition condition) {
@@ -94,7 +100,7 @@ public class CommissionPaymentQueryRepository {
                 SELECT COUNT(c) FROM InsuranceContract c
                  WHERE c.agentId = :agentId AND c.contractDate < :monthStart
                 """, Long.class)
-                .setParameter("agentId", agentId).setParameter("monthStart", monthStart)
+                .setParameter(AGENT_ID, agentId).setParameter("monthStart", monthStart)
                 .getSingleResult().intValue();
     }
 
@@ -121,8 +127,12 @@ public class CommissionPaymentQueryRepository {
     }
 
     public List<CommissionPaymentListResponse> selectByCondition(CommissionPaymentSearchCondition condition, int size, long offset) {
-        SearchFilter filter = searchFilter(condition);
-        NativeQuery<?> query = nativeQuery(SELECT_BY_CONDITION.replace("__FILTER__", filter.sql())
+        Long scopeAgentId = agentScope.listScope(condition.getAgentId());
+        SearchFilter filter = searchFilter(condition, scopeAgentId);
+        NativeQuery<?> query = nativeQuery(SELECT_BY_CONDITION
+                .replace("__AMOUNT__", scopeAgentId == null ? "ct.amount" : AGENT_VISIBLE_AMOUNT)
+                .replace(OWN_ATTRIBUTION_SLOT, ownAttributionClause(scopeAgentId, "attribution"))
+                .replace("__FILTER__", filter.sql())
                 .replace("__ORDER__", SqlSort.orderBy(sortOf(condition), SORTABLE, "ct.commission_transaction_id DESC")));
         filter.parameters().forEach(query::setParameter);
         query.setParameter("size", size);
@@ -170,7 +180,7 @@ public class CommissionPaymentQueryRepository {
     }
 
     public long countByCondition(CommissionPaymentSearchCondition condition) {
-        SearchFilter filter = searchFilter(condition);
+        SearchFilter filter = searchFilter(condition, agentScope.listScope(condition.getAgentId()));
         NativeQuery<?> query = nativeQuery(COUNT_BY_CONDITION.replace("__FILTER__", filter.sql()));
         filter.parameters().forEach(query::setParameter);
         return query.setTupleTransformer((row, aliases) -> ((Number) row[0]).longValue())
@@ -252,12 +262,37 @@ public class CommissionPaymentQueryRepository {
                 (String) row[16],
                 (OffsetDateTime) row[17],
                 (OffsetDateTime) row[18]
-        )).getResultList().stream().findFirst().orElse(null);
+        )).getResultList().stream().findFirst().map(this::scopedForAgent).orElse(null);
+    }
+
+    /** FUN-085: 다른 설계사 몫이 섞인 지급 건은 AGENT에게 헤더 총액과 헤더 근거 대신 본인 귀속 합계만 보인다. */
+    private CommissionPaymentRow scopedForAgent(CommissionPaymentRow row) {
+        Long agentId = agentScope.currentAgentId();
+        if (agentId == null) {
+            return row;
+        }
+        NativeQuery<?> query = nativeQuery(FIND_OWN_AMOUNT_IF_MIXED);
+        query.setParameter("paymentId", row.paymentId());
+        query.setParameter(AGENT_ID, agentId);
+        query.addScalar(COL_AMOUNT, BigDecimal.class);
+        BigDecimal ownAmount = (BigDecimal) query.getResultList().stream().findFirst().orElse(null);
+        if (ownAmount == null) {
+            return row;
+        }
+        return new CommissionPaymentRow(row.paymentId(), row.sourceType(), row.sourceBusinessKey(), null, row.agentId(),
+                row.commissionItemId(), row.commissionItemCode(), row.commissionItemName(), ownAmount,
+                row.settlementMonth(), row.cashflowType(), row.scheduledPaymentDate(), row.paymentStage(), row.status(),
+                row.allocationPolicyVersion(), null, null, row.createdAt(), row.updatedAt());
     }
 
     public List<CommissionPaymentAttributionRow> findAttributions(Long paymentId) {
-        NativeQuery<?> query = nativeQuery(FIND_ATTRIBUTIONS);
+        Long scopeAgentId = agentScope.currentAgentId();
+        NativeQuery<?> query = nativeQuery(FIND_ATTRIBUTIONS
+                .replace(OWN_ATTRIBUTION_SLOT, ownAttributionClause(scopeAgentId, "ta")));
         query.setParameter("paymentId", paymentId);
+        if (scopeAgentId != null) {
+            query.setParameter(AGENT_ID, scopeAgentId);
+        }
         query.addScalar("attribution_sequence", Integer.class);
         query.addScalar("contract_id", Long.class);
         query.addScalar("attribution_date", LocalDate.class);
@@ -448,19 +483,56 @@ public class CommissionPaymentQueryRepository {
     }
 
     public List<Long> findCapCheckIds(Long paymentId) {
+        // FUN-085: 한도 판정 식별자는 내부 근거라 AGENT 응답에 싣지 않는다.
+        if (agentScope.currentAgentId() != null) {
+            return List.of();
+        }
         NativeQuery<?> query = nativeQuery(FIND_CAP_CHECK_IDS);
         query.setParameter("paymentId", paymentId);
         return query.setTupleTransformer((row, aliases) -> ((Number) row[0]).longValue())
                 .getResultList();
     }
 
-    private SearchFilter searchFilter(CommissionPaymentSearchCondition condition) {
+    private static String ownAttributionClause(Long scopeAgentId, String alias) {
+        return scopeAgentId == null ? "" : "AND " + AgentDataScopeService.ownAttribution(alias);
+    }
+
+    /** FUN-085: AGENT는 본인 몫의 계약번호로만 찾는다. 남의 계약번호로 지급 건을 떠보지 못하게 한다. */
+    private static String contractNoFilter(Long scopeAgentId) {
+        return """
+                    AND (
+                        (__OWN_SOURCE__ source_contract.contract_no ILIKE CONCAT('%', :contractNo, '%'))
+                        OR EXISTS (
+                            SELECT 1
+                              FROM fgc.transaction_attribution filter_ta
+                              JOIN fgc.insurance_contract filter_contract
+                                ON filter_contract.contract_id = filter_ta.contract_id
+                             WHERE filter_ta.commission_transaction_id = ct.commission_transaction_id __OWN_ATTRIBUTION__
+                               AND filter_contract.contract_no ILIKE CONCAT('%', :contractNo, '%')
+                        )
+                    )
+                    """.replace("__OWN_SOURCE__", scopeAgentId == null ? "" : "source_contract.agent_id = :agentId AND")
+                    .replace(OWN_ATTRIBUTION_SLOT, ownAttributionClause(scopeAgentId, "filter_ta"));
+    }
+
+    /** 헤더 총액 기준 필터다. 혼합 건은 AGENT에게 차액 0으로 보이므로 여기에도 걸리지 않게 한다. */
+    private static String imbalanceFilter(Long scopeAgentId) {
+        String filter = """
+                AND EXISTS (
+                    SELECT 1
+                      FROM fgc.vw_transaction_attribution_balance imbalance
+                     WHERE imbalance.commission_transaction_id = ct.commission_transaction_id
+                )
+                """;
+        return scopeAgentId == null ? filter : filter + " AND NOT " + AgentDataScopeService.MIXED_PAYMENT;
+    }
+
+    private SearchFilter searchFilter(CommissionPaymentSearchCondition condition, Long scopeAgentId) {
         StringBuilder sql = new StringBuilder("WHERE 1 = 1\n");
         Map<String, Object> parameters = new LinkedHashMap<>();
-        Long scopeAgentId = agentScope.currentAgentId();
         if (scopeAgentId != null) {
-            sql.append(" AND ct.recipient_agent_id = :scopeAgentId\n");
-            parameters.put("scopeAgentId", scopeAgentId);
+            sql.append(" AND ").append(AgentDataScopeService.OWN_PAYMENT);
+            parameters.put(AGENT_ID, scopeAgentId);
         }
         if (condition.getSettlementMonth() != null && !condition.getSettlementMonth().isEmpty()) {
             sql.append("""
@@ -493,26 +565,14 @@ public class CommissionPaymentQueryRepository {
             parameters.put("insurerId", condition.getInsurerId());
         }
         if (condition.getContractNo() != null && !condition.getContractNo().isEmpty()) {
-            sql.append("""
-                    AND (
-                        source_contract.contract_no ILIKE CONCAT('%', :contractNo, '%')
-                        OR EXISTS (
-                            SELECT 1
-                              FROM fgc.transaction_attribution filter_ta
-                              JOIN fgc.insurance_contract filter_contract
-                                ON filter_contract.contract_id = filter_ta.contract_id
-                             WHERE filter_ta.commission_transaction_id = ct.commission_transaction_id
-                               AND filter_contract.contract_no ILIKE CONCAT('%', :contractNo, '%')
-                        )
-                    )
-                    """);
+            sql.append(contractNoFilter(scopeAgentId));
             parameters.put("contractNo", condition.getContractNo());
         }
         if (condition.getAgentId() != null) {
             sql.append("""
                     AND ct.recipient_agent_id = :agentId
                     """);
-            parameters.put("agentId", condition.getAgentId());
+            parameters.put(AGENT_ID, condition.getAgentId());
         }
         if (condition.getCommissionItemId() != null) {
             sql.append("""
@@ -530,13 +590,7 @@ public class CommissionPaymentQueryRepository {
                     """);
         }
         if (Boolean.TRUE.equals(condition.getAttributionImbalanceOnly())) {
-            sql.append("""
-                    AND EXISTS (
-                        SELECT 1
-                          FROM fgc.vw_transaction_attribution_balance imbalance
-                         WHERE imbalance.commission_transaction_id = ct.commission_transaction_id
-                    )
-                    """);
+            sql.append(imbalanceFilter(scopeAgentId));
         }
         return new SearchFilter(sql.toString(), parameters);
     }

@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -138,6 +139,7 @@ function AgentHomeContent({ month }: { month: string }) {
   return (
     <div className="ah">
       <h1 className="visually-hidden">포트폴리오</h1>
+      <ScreenHelp screenId="AGNT-W01" />
       {import.meta.env.VITE_ASSISTANT_AI === 'true' && (
         <details className="surface" style={{ padding: 12, marginBottom: 12 }}>
           <summary data-guide-feature="agent.guide-menu.open" style={{ cursor: 'pointer' }}>업무 안내</summary>
@@ -227,7 +229,7 @@ function Snapshot({
   const needFailed = near.isError || review.isError
   const need = (near.data ?? 0) + (review.data ?? 0)
   return (
-    <section data-guide-feature="features.agent-home.agent-home-page.section" className="ah-snapshot" aria-label="이번 달 판매 현황">
+    <section data-guide-feature="features.agent-home.agent-home-page.section" data-guide-target="agent.overview" className="ah-snapshot" aria-label="이번 달 판매 현황">
       <article className="ah-hero" aria-label="설계사 프로필">
         <span className="ah-avatar" aria-hidden="true">
           {name.slice(0, 1) || '설'}
@@ -243,7 +245,7 @@ function Snapshot({
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="신규 계약 건수">
           <KpiCardContent
             label="신규 계약 건수"
-            value={int(now.count)}
+            value={now.count}
             zero={now.count === 0}
             unit="건"
             footer={
@@ -263,7 +265,7 @@ function Snapshot({
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="월납환산 초회보험료">
           <KpiCardContent
             label="월납환산 초회보험료"
-            value={int(now.premium)}
+            value={now.premium}
             zero={now.premium === 0}
             unit="원"
             footer={<Delta now={now.premium} before={before.premium} />}
@@ -272,12 +274,12 @@ function Snapshot({
         <Link
           data-guide-feature="features.agent-home.agent-home-page.commission-link"
           className="ah-kpi ah-kpi-link kpi-card kpi-card-info"
-          to="/transactions"
+          to={`/agent/statements?month=${commission?.month ?? month}`}
           aria-label="수령 예정 수수료"
         >
           <KpiCardContent
             label="수령 예정 수수료"
-            value={int(expected)}
+            value={expected}
             zero={expected === 0}
             unit="원"
             footer={
@@ -311,7 +313,7 @@ function Snapshot({
           >
             <KpiCardContent
               label="확인 필요 계약"
-              value={needReady ? int(need) : '…'}
+              value={needReady ? need : '…'}
               zero={needReady && need === 0}
               unit="건"
               footer={

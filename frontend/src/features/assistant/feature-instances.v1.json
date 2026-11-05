@@ -19,7 +19,8 @@
     "vrun-w01",
     "vrun-w02",
     "audt-w01",
-    "claw-w01"
+    "claw-w01",
+    "acqc-w01"
   ],
   "navigation.group": [
     "contracts",
@@ -32,7 +33,8 @@
     "cap",
     "arbitrage",
     "ledger",
-    "payment"
+    "payment",
+    "acquisition"
   ],
   "contract.panel": [
     "basic",
@@ -40,7 +42,8 @@
     "cap",
     "arbitrage",
     "ledger",
-    "payment"
+    "payment",
+    "acquisition"
   ],
   "contract.schedule-stage": [
     "insurer_to_ga",
@@ -81,14 +84,16 @@
     "cap-warning",
     "arbitrage",
     "recon",
-    "journal"
+    "journal",
+    "open"
   ],
   "dashboard.kpi-link": [
     "cap-violation",
     "cap-warning",
     "arbitrage",
     "recon",
-    "journal"
+    "journal",
+    "open"
   ],
   "clawback.evidence": [
     "source",
@@ -123,6 +128,8 @@
     "feeregimerules.salesstartdatefrom",
     "feeregimerules.salesstartdateto",
     "feeregimerules.sourcerefs",
+    "parameters.acquisition_cost_rate_pct",
+    "parameters.acquisition_cost_source",
     "policycode",
     "regulationrefs",
     "sourcedetails.ref",

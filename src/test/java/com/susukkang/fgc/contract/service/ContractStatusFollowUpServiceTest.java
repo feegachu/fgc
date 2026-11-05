@@ -104,4 +104,13 @@ class ContractStatusFollowUpServiceTest {
 
         assertThat(reason).hasSize(storedLength).isEqualTo(full.substring(0, storedLength));
     }
+
+    @Test
+    // IF-API-16 errorCode: 실패 이력에서 코드만 꺼낸다. 메시지(내부 정보)는 응답에 나가지 않는다.
+    void readsOnlyTheCodeBackFromTheFailureReason() {
+        assertThat(ContractStatusFollowUpService.errorCodeOf(ContractStatusFollowUpService.failureReason(
+                new IllegalStateException("내부: 메시지")))).isEqualTo("IllegalStateException");
+        assertThat(ContractStatusFollowUpService.errorCodeOf(ContractStatusFollowUpService.failureReason(
+                new IllegalStateException()))).isEqualTo("IllegalStateException");
+    }
 }

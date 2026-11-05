@@ -106,6 +106,8 @@ class CommissionPaymentServiceImplTest {
     private CommissionPolicyService commissionPolicyService;
     @Mock
     private com.susukkang.fgc.exceptioncase.service.ExceptionCaseService exceptionCaseService;
+    @Mock
+    private com.susukkang.fgc.contract.service.PaymentHoldGate paymentHoldGate;
 
     private CommissionPaymentServiceImpl service;
     private FgcMessageResolver messageResolver;
@@ -131,7 +133,8 @@ class CommissionPaymentServiceImplTest {
                 messageResolver,
                 auditLogService,
                 commissionPolicyService,
-                exceptionCaseService
+                exceptionCaseService,
+                paymentHoldGate
         );
     }
 
@@ -840,6 +843,46 @@ class CommissionPaymentServiceImplTest {
         assertThat(response.attributions()).isEmpty();
         verify(writeRepository).deleteAttributions(101L);
         verify(writeRepository, never()).insertAttributions(anyList());
+    }
+
+    // #753: 잠금 뒤 최신 행과 비교해 거절하면 참조 조회, 원천, 귀속, 검증 연결, 감사에 닿지 않는다.
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void rejectsStaleOrMissingTokenBeforeAnyPaymentSideEffects(boolean missing) {
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        )));
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        CommissionPaymentUpdateRequest request = withToken(updateRequest(List.of(
+                attribution(3L, "500000", AttributionMethod.DIRECT)
+        )), missing ? null : row(CommissionPaymentStatus.DRAFT).updatedAt().minusNanos(1000));
+
+        assertThatThrownBy(() -> service.update(101L, request))
+                .isInstanceOfSatisfying(FgcBusinessException.class, failure -> assertThat(failure.getErrorCode())
+                        .isEqualTo(missing ? FgcErrorCode.COMMON_002 : FgcErrorCode.TRAN_010));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(queryRepository);
+        order.verify(queryRepository).findConfirmationDataForUpdate(101L);
+        order.verify(queryRepository).findById(101L);
+        org.mockito.Mockito.verifyNoInteractions(writeRepository, capCheckWriteRepository, auditLogService);
+    }
+
+    @Test
+    void acceptsSameInstantTokenInAnotherOffset() {
+        stubReferences(3L);
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(confirmation(
+                201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE"
+        )));
+        given(writeRepository.updateTransaction(any(CommissionPaymentCommand.class))).willReturn(1);
+        given(queryRepository.findById(101L)).willReturn(row(CommissionPaymentStatus.DRAFT));
+        given(queryRepository.findAttributions(101L)).willReturn(List.of());
+
+        service.update(101L, withToken(updateRequest(List.of()),
+                row(CommissionPaymentStatus.DRAFT).updatedAt().withOffsetSameInstant(java.time.ZoneOffset.UTC)));
+
+        verify(writeRepository).updateTransaction(any(CommissionPaymentCommand.class));
     }
 
     @Test
@@ -2087,7 +2130,28 @@ class CommissionPaymentServiceImplTest {
                 request.allocationPolicyVersion(),
                 request.attributions(),
                 request.evidenceRef(),
-                request.note()
+                request.note(),
+                row(CommissionPaymentStatus.DRAFT).updatedAt()
+        );
+    }
+
+    private CommissionPaymentUpdateRequest withToken(CommissionPaymentUpdateRequest source, OffsetDateTime token) {
+        return new CommissionPaymentUpdateRequest(
+                source.sourceType(),
+                source.sourceBusinessKey(),
+                source.contractId(),
+                source.agentId(),
+                source.commissionItemId(),
+                source.amount(),
+                source.settlementMonth(),
+                source.cashflowType(),
+                source.scheduledPaymentDate(),
+                source.paymentStage(),
+                source.allocationPolicyVersion(),
+                source.attributions(),
+                source.evidenceRef(),
+                source.note(),
+                token
         );
     }
 
@@ -2406,6 +2470,34 @@ class CommissionPaymentServiceImplTest {
         assertThat(item.resultStatus()).isEqualTo(CapResultStatus.NORMAL);
         assertThat(item.capCheckId()).isNull();
         assertPrecheckSavesNothing();
+    }
+
+    @Test
+    void paymentHoldBlocksPreviewAndConfirmationWithoutAttributingTheBlockerToTheFirstRow() {
+        // FUN-028 / IF-API-24: 지급 건 단위 보류를 무관한 첫 귀속행의 문제로 표시하지 않는다.
+        ConfirmationData data = confirmation(201L, 3L, "500000", "500000", InclusionDecisionStatus.INCLUDED,
+                ExclusionType.NONE, AttributionMethod.DIRECT, "EVIDENCE");
+        given(queryRepository.findConfirmationData(101L)).willReturn(List.of(data));
+        given(queryRepository.findCapRuleSnapshot(101L, 201L)).willReturn(capRule("0", null));
+        given(capCalculator.calculate(any())).willReturn(capCalculation(3L));
+        given(paymentHoldGate.blockers(101L)).willReturn(List.of(
+                new com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker("OPEN_HOLD", 987L)));
+
+        TransactionPrecheckResponse response = service.precheck(101L);
+
+        assertThat(response.confirmable()).isFalse();
+        assertThat(response.blockers()).singleElement().satisfies(blocker -> {
+            assertThat(blocker.code()).isEqualTo("FGC-IMPL-PAYMENT_HELD");
+            assertThat(blocker.contractId()).isNull();
+            assertThat(blocker.transactionAttributionId()).isNull();
+        });
+        assertPrecheckSavesNothing();
+        given(queryRepository.findConfirmationDataForUpdate(101L)).willReturn(List.of(data));
+        assertThatThrownBy(() -> service.confirm(101L, "held-payment"))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(FgcErrorCode.IMPL_PAYMENT_HELD));
+        verify(writeRepository, never()).confirm(any(), any(), any());
+        verify(capExceptionRepository, never()).insertExceptionCase(any());
     }
 
     // REG-08 — 한도 초과 건은 blockers에 FGC-CAP-001과 사용률이 포함되고, 그래도 아무것도 저장하지 않는다
@@ -2768,6 +2860,7 @@ class CommissionPaymentServiceImplTest {
         verify(capCheckWriteRepository, never()).insertCapCheck(any(CapCheckCommand.class));
         verify(capExceptionService, never()).findUnresolvedViolationContractIds(any());
         verify(writeRepository).confirm(101L, "deduction", "");
+        verify(paymentHoldGate, never()).blockers(anyLong());
     }
 
     @Test
