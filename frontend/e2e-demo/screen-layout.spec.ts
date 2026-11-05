@@ -1,6 +1,6 @@
 // 실제 자료로 표를 그렸을 때 읽어야 할 열과 값이 가려지지 않는지 잰다. 글자 내용은 vitest와 screen-language.spec.ts가 본다.
 import type { Page } from '@playwright/test'
-import { test, expect, login, completeMonthly } from './fixtures'
+import { test, expect, login, completeMonthly, sql } from './fixtures'
 
 const month = '2026-07'
 // 1440폭 화면에서 세로 스크롤바(17px)를 뺀 실제 본문 폭. 시험 브라우저는 스크롤바를 그리지 않는다.
@@ -45,6 +45,80 @@ async function coveredAtScrollEnd(page: Page) {
     return covered
   })
 }
+
+/** 제목이 왼쪽 끝에서, 도움말 버튼이 오른쪽 끝에서 떨어진 픽셀. 머리가 아직 없으면 null. */
+const headerLayout = (page: Page, selector: string, titleSelector: string) =>
+  page.evaluate(
+    ([headerSelector, title]) => {
+      const header = document.querySelector(headerSelector)
+      const heading = header?.querySelector(title)
+      const help = [...(header?.querySelectorAll('button') ?? [])].find((button) => button.textContent?.trim() === '도움말')
+      if (!header || !heading || !help) return null
+      const box = header.getBoundingClientRect()
+      const padding = parseFloat(getComputedStyle(header).paddingRight)
+      return {
+        titleFromLeft: Math.round(heading.getBoundingClientRect().left - box.left - padding),
+        helpFromRight: Math.round(box.right - padding - help.getBoundingClientRect().right),
+      }
+    },
+    [selector, titleSelector],
+  )
+
+test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자를 가득 채우지 않는다', async ({ page }) => {
+  await page.setViewportSize(viewport)
+  await login(page)
+  const run = await completeMonthly(page, month)
+  const contract = sql('SELECT min(contract_id) FROM fgc.insurance_contract')
+  const schedule = sql('SELECT min(schedule_header_id) FROM fgc.schedule_header')
+  // completeMonthly의 준비 요청도 admin으로 로그인해 앞선 세션을 밀어내므로 그 뒤에 들어간다.
+  await login(page, 'admin', `/?month=${month}`)
+  const atEdges = { titleFromLeft: 0, helpFromRight: 0 }
+
+  for (const route of [
+    './',
+    'base',
+    'policies',
+    'contracts/new',
+    `contracts/${contract}`,
+    'contracts',
+    'transactions',
+    'agent/statements',
+    `schedules/${schedule}`,
+    'schedules',
+    'cap-checks',
+    'arbitrage-checks',
+    'acquisition-cost-checks',
+    'journals',
+    'reconciliations',
+    'clawbacks',
+    `validation-runs/${run}`,
+    'audit-logs',
+  ]) {
+    await page.goto(`${route}?month=${month}`)
+    await expect.poll(() => headerLayout(page, '.page-header', '.page-title'), { message: route }).toEqual(atEdges)
+  }
+
+  // VRUN-W01은 도움말이 쪽 머리가 아니라 새 실행 만들기 머리에 있다.
+  await page.goto(`validation-runs?month=${month}`)
+  await expect.poll(() => headerLayout(page, '.surface-header', '.surface-title')).toEqual(atEdges)
+
+  // EXCP-W01은 처리 양식 안에 있다. 칸을 채우지 않고 오른쪽에 붙는다.
+  await page.goto(`exceptions?month=${month}`)
+  await expect.poll(() => headerLayout(page, '.page-header', '.page-title'), { message: 'exceptions' }).toEqual(atEdges)
+  await page.locator('.exception-row').first().click()
+  const formHelp = page.locator('.exception-action-form > .button')
+  await expect(formHelp).toHaveText('도움말')
+  expect((await formHelp.boundingBox())!.width).toBeLessThan(160)
+
+  // AGNT-W01은 쪽 머리가 없다. V64가 꺼 둔 계정이라 시험 뒤 되돌아가는 DB에서만 켠다.
+  sql(
+    "UPDATE fgc.app_user SET account_status='ACTIVE', password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'",
+  )
+  await login(page, 'agent01', `/agent-home?month=${month}`)
+  const agentHelp = page.locator('.ah > .button')
+  await expect(agentHelp).toHaveText('도움말')
+  expect((await agentHelp.boundingBox())!.width).toBeLessThan(160)
+})
 
 test('1440폭에서 읽어야 할 열이 가로 스크롤 뒤로 가지 않고 업무 비서가 끝의 값을 가리지 않는다', async ({ page }) => {
   await page.setViewportSize(viewport)

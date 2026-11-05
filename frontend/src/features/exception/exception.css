@@ -156,6 +156,11 @@
   border-top: 1px solid var(--color-border-default);
 }
 
+/* 격자 칸을 가득 채우지 않게 한다. */
+.exception-action-form > .button {
+  justify-self: end;
+}
+
 .exception-action-submit {
   justify-self: end;
 }

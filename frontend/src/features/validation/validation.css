@@ -180,6 +180,11 @@
   width: 6rem;
 }
 
+/* 새 실행 만들기 머리의 도움말도 쪽 머리처럼 제목 오른쪽에 둔다. */
+.vrun-list-page .surface-header > .button:first-child {
+  order: 1;
+}
+
 .vrun-run-table td.vrun-open-cell {
   text-overflow: clip;
 }
