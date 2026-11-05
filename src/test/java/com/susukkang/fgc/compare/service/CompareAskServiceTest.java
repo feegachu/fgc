@@ -205,6 +205,28 @@ class CompareAskServiceTest {
         assertThat(captor.getValue().data()).contains("[자리표시자]", "{diff.net}", "쓸 수 있는 순위 번호: 1, 2, 3");
     }
 
+    @Test
+    @DisplayName("AI가 소개 질문에 정상 답해도 순위 금액 문장을 앞에 붙이지 않는다")
+    void introAnswerFromLlmHasNoRankSentence() {
+        llmReturns(true, "상품 비교 결과를 풀어서 설명해 드려요.");
+
+        CompareAskResponse response = service.ask("상품 비교 챗봇은 무슨 기능이야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).isEqualTo("상품 비교 결과를 풀어서 설명해 드려요.");
+    }
+
+    @Test
+    @DisplayName("순위 결과가 있어도 '1등급이 뭐야?'는 순위 문장이 아니라 용어 설명으로 답한다")
+    void gradeQuestionIsGlossaryNotRank() {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask("협회 1등급이 뭐야?", threeItems());
+
+        assertThat(response.answer()).doesNotContain("1위는");
+        assertThat(CompareAskService.isRankQuestion("1등급이 뭐야?")).isFalse();
+    }
+
     private static CompareRankingResponse threeItems() {
         CompareRankingResponse two = twoItems();
         Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());

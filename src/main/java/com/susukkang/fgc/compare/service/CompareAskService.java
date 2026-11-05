@@ -75,7 +75,7 @@ public class CompareAskService {
     private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)(?!급)", Pattern.CANON_EQ);
     /** 챗봇 자체를 묻는 질문(역할·소개·무엇을 알려 주는지). */
     private static final Pattern INTRO_QUESTION = Pattern.compile("역할|뭘 알려|무엇을 알려|뭐 하는|뭐하는|누구|소개|무슨 기능|AI야|ai야", Pattern.CANON_EQ);
-    private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
+    private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)(?!급)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = CompareSummaryService.FORBIDDEN;
 
     private final LlmGateway llmGateway;
@@ -101,10 +101,10 @@ public class CompareAskService {
             return fallbackAnswer(q, ranking);
         }
         if (Boolean.FALSE.equals(output.inScope)) {
-            log.info("LLM 이 질문을 범위 밖(inScope=false)으로 판단했습니다. rankQuestion={}", hasItems(ranking) && isRankQuestion(q));
+            log.info("LLM 이 질문을 범위 밖(inScope=false)으로 판단했습니다. rankQuestion={}", asksRanking(q, ranking));
             // 순위 결과가 있는 상태의 순위·이유 질문은 범위 안이다. 모델이 거절해도 서버 값으로 풀어 답한다.
             // 모델이 거절해도 서버가 아는 질문(순위·용어·챗봇 소개)은 서버 문장으로 답한다.
-            return (hasItems(ranking) && isRankQuestion(q)) || isGlossaryQuestion(q) || INTRO_QUESTION.matcher(q).find()
+            return asksRanking(q, ranking) || isGlossaryQuestion(q) || INTRO_QUESTION.matcher(q).find()
                     ? fallbackAnswer(q, ranking)
                     : new CompareAskResponse(OUT_OF_SCOPE, CompareAskResponse.OUT_OF_SCOPE);
         }
@@ -126,7 +126,7 @@ public class CompareAskService {
             return new CompareAskResponse(rendered.get(), CompareAskResponse.LLM);
         }
         // 자리표시자가 없으면 순위 질문의 숫자는 서버가 만든 문장으로 보여 주고, AI 는 그 뒤에 이유를 말로 풀어 쓴다.
-        String answer = hasItems(ranking) && isRankQuestion(q) ? rankAnswer(ranking.items(), q) + " " + text : text;
+        String answer = asksRanking(q, ranking) ? rankAnswer(ranking.items(), q) + " " + text : text;
         return new CompareAskResponse(answer, CompareAskResponse.LLM);
     }
 
@@ -159,19 +159,26 @@ public class CompareAskService {
 
     /** 순위 질문이면 서버 값으로 풀어 쓴 해설을, 용어 질문이면 용어 설명을, 아니면 안내 문장을 준다. 새 수치를 만들지 않는다. */
     static CompareAskResponse fallbackAnswer(String question, CompareRankingResponse ranking) {
-        // 소개 질문('상품 비교 챗봇은 무슨 기능이야?')은 "비교" 때문에 순위 질문으로도 읽히므로 먼저 가린다.
-        // 질문이 순위 번호나 상품 이름을 직접 가리키면 순위 질문으로 본다.
-        boolean intro = INTRO_QUESTION.matcher(question).find() && !isGlossaryQuestion(question)
-                && (!hasItems(ranking) || askedRanks(ranking.items(), question).isEmpty());
-        if (intro) {
+        if (isIntroQuestion(question, ranking)) {
             return new CompareAskResponse(INTRO, CompareAskResponse.RULE);
         }
-        if (hasItems(ranking) && isRankQuestion(question)) {
+        if (asksRanking(question, ranking)) {
             return new CompareAskResponse(rankAnswer(ranking.items(), question), CompareAskResponse.RULE);
         }
         Optional<Term> term = GLOSSARY.stream().filter(t -> t.keywords().stream().anyMatch(question::contains)).findFirst();
         return term.map(t -> new CompareAskResponse(t.name() + ": " + t.body(), CompareAskResponse.RULE))
                 .orElseGet(() -> new CompareAskResponse(FALLBACK, CompareAskResponse.RULE));
+    }
+
+    /** 소개 질문('상품 비교 챗봇은 무슨 기능이야?')은 "비교" 때문에 순위 질문으로도 읽히므로 먼저 가린다. 순위 번호나 상품 이름을 직접 가리키면 순위 질문이다. */
+    static boolean isIntroQuestion(String question, CompareRankingResponse ranking) {
+        return INTRO_QUESTION.matcher(question).find() && !isGlossaryQuestion(question)
+                && (!hasItems(ranking) || askedRanks(ranking.items(), question).isEmpty());
+    }
+
+    /** 순위 결과가 있고 순위를 묻는 질문일 때만 서버 순위 문장을 붙인다(소개 질문은 제외). */
+    private static boolean asksRanking(String question, CompareRankingResponse ranking) {
+        return hasItems(ranking) && isRankQuestion(question) && !isIntroQuestion(question, ranking);
     }
 
     private static boolean hasItems(CompareRankingResponse ranking) {
