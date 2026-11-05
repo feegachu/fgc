@@ -161,7 +161,68 @@ class CompareAskServiceTest {
 
         assertThat(CompareAskService.askedRanks(items, "변액 연금저축보험은 왜 이 순위야?")).containsExactly(2);
         assertThat(CompareAskService.askedRanks(items, "가상 변액 연금저축보험 P 왜 이래?")).containsExactly(2);
-        assertThat(CompareAskService.askedRanks(items, "연금저축보험이랑 변액 연금저축보험 비교해줘")).containsExactly(1, 2);
+        // '연금저축보험'은 카테고리 이름과 같아 줄인 이름으로는 O 로 읽지 않는다. 전체 이름을 적으면 읽는다.
+        assertThat(CompareAskService.askedRanks(items, "연금저축보험이랑 변액 연금저축보험 비교해줘")).containsExactly(2);
+        assertThat(CompareAskService.askedRanks(items, "가상 연금저축보험 O랑 변액 연금저축보험 비교해줘")).containsExactly(1, 2);
+    }
+
+    private static CompareRankingResponse rankingOf(Item... items) {
+        CompareRankingResponse base = ranking();
+        return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
+                base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
+                List.of(items), List.of(), CompareRankingFilters.NONE);
+    }
+
+    private static List<Item> termItems() {
+        return List.of(
+                new Item(1, 1, "가보험", "가상 정기보험 K", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of()),
+                new Item(2, 2, "나보험", "가상 CEO 정기보험 L", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of()),
+                new Item(3, 3, "다보험", "가상 경영인정기보험", 500_000, 480_000, 0, 30_000, 450_000, 70.0, null, List.of()));
+    }
+
+    @Test
+    @DisplayName("카테고리 이름(정기보험)만 말하면 같은 이름으로 줄여지는 상품으로 읽지 않고, 적은 순위 번호를 그대로 쓴다")
+    void categoryNameIsNotReadAsAProduct() {
+        List<Item> items = termItems();
+
+        assertThat(CompareAskService.askedRanks(items, "정기보험 2위랑 3위 차이 알려줘")).containsExactly(2, 3);
+        assertThat(CompareAskService.askedRanks(items, "정기보험 3위는 왜 3위야?")).containsExactly(3);
+        assertThat(CompareAskService.rankAnswer(items, "정기보험 2위랑 3위 차이 알려줘"))
+                .contains("2위는 나보험 가상 CEO 정기보험 L", "3위는 다보험 가상 경영인정기보험").doesNotContain("1위");
+        assertThat(CompareAskService.askedRanks(items, "가상 정기보험 K는 왜 1등이야?")).containsExactly(1);
+    }
+
+    @Test
+    @DisplayName("적은 순위 번호는 이름으로 찾은 순위에 밀려나지 않는다")
+    void rankNumbersComeBeforeNamedRanks() {
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "2위랑 3위 중 든든건강보다 나은 건?")).containsExactly(2, 3);
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "3위랑 든든건강 비교해줘")).containsExactly(1, 3);
+    }
+
+    @Test
+    @DisplayName("카테고리 이름이 든 소개 질문('연금저축보험 비교 챗봇은 무슨 기능이야?')은 소개 문장으로 답한다")
+    void introQuestionWithCategoryNameIsIntro() {
+        llmReturns(false, "");
+        CompareRankingResponse savings = rankingOf(
+                new Item(1, 1, "가보험", "가상 연금저축보험 O", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of()),
+                new Item(2, 2, "나보험", "가상 변액 연금저축보험 P", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of()));
+
+        assertThat(service.ask("연금저축보험 비교 챗봇은 무슨 기능이야?", savings).answer()).isEqualTo(CompareAskService.INTRO);
+    }
+
+    @Test
+    @DisplayName("용어를 함께 물은 소개 질문에는 순위 비교 문장을 붙이지 않는다(AI 거절·성공·실패)")
+    void introQuestionWithGlossaryTermHasNoRankSentence() {
+        String question = "상품 비교 챗봇은 무슨 기능이야? 이월도 알려줘";
+
+        llmReturns(false, "");
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("이월:").doesNotContain("1위는");
+
+        llmReturns(true, "비교 결과와 이월 같은 용어를 설명해 드려요.");
+        assertThat(service.ask(question, threeItems()).answer()).isEqualTo("비교 결과와 이월 같은 용어를 설명해 드려요.");
+
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("이월:").doesNotContain("1위는");
     }
 
     @Test

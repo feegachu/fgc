@@ -176,6 +176,10 @@ public class CompareAskService {
         if (asked.size() >= 2) {
             return true;
         }
+        // 용어를 함께 물은 소개 질문('챗봇은 무슨 기능이야? 이월도 알려줘')은 소개 판정에서 빠지지만, 순위·상품을 가리키지 않았으니 순위 질문도 아니다.
+        if (asked.isEmpty() && INTRO_QUESTION.matcher(question).find()) {
+            return false;
+        }
         boolean gradeOnly = question.contains("등급") && asked.isEmpty();
         return isRankQuestion(question) && !gradeOnly;
     }
@@ -192,25 +196,39 @@ public class CompareAskService {
         return RANK_QUESTION.matcher(question).find();
     }
 
-    /** 질문에 적힌 순위 번호(예: 2순위·2위·2등)와 상품 이름이 가리키는 순위 중 결과 범위 안의 것을 작은 순서로 최대 둘까지 돌려준다. */
+    /**
+     * 질문에 적힌 순위 번호(예: 2순위·2위·2등)와 상품 이름이 가리키는 순위 중 결과 범위 안의 것을 작은 순서로 최대 둘까지 돌려준다.
+     * 적은 순위 번호를 먼저 채우고 남는 자리에만 이름으로 찾은 순위를 넣는다. 이름 때문에 적은 번호가 밀려나지 않게 한다.
+     */
     static List<Integer> askedRanks(List<CompareRankingResponse.Item> items, String question) {
         Matcher m = RANK_NUMBER.matcher(question);
-        TreeSet<Integer> ranks = new TreeSet<>();
+        TreeSet<Integer> numbered = new TreeSet<>();
         while (m.find()) {
             int rank = Integer.parseInt(m.group(1));
             if (rank >= 1 && rank <= items.size()) {
-                ranks.add(rank);
+                numbered.add(rank);
             }
         }
+        TreeSet<Integer> ranks = new TreeSet<>(numbered.stream().limit(2).toList());
         // 상품 이름(예: 튼튼건강)으로 물어도 같은 순위로 읽는다. 서버 문장과 AI 데이터가 같은 상품 쌍을 가리키게 한다.
-        ranks.addAll(namedRanks(items, question));
-        return ranks.stream().limit(2).toList();
+        for (int named : namedRanks(items, question)) {
+            if (ranks.size() >= 2) {
+                break;
+            }
+            ranks.add(named);
+        }
+        return List.copyOf(ranks);
     }
+
+    /** 카테고리 화면 이름(정기보험·연금저축보험 등). 줄여 부른 상품 이름이 이것과 같으면 카테고리를 말한 것인지 상품을 말한 것인지 알 수 없다. */
+    private static final java.util.Set<String> CATEGORY_NAMES = CompareRankingService.CATEGORY_LABELS.values().stream()
+            .map(CompareAskService::squeeze).collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     /**
      * 질문에 상품 이름이 들어 있는 순위. 전체 이름을 적었으면 그 상품이고, 줄여 부른 이름은 다른 상품과 같은 이름이 아닐 때만 인정한다.
      * 긴 이름부터 맞춰 질문에서 그 부분을 지운 뒤 다음 이름을 찾는다. 그래서 '변액 연금저축보험'을 물으면 그 안에 든 '연금저축보험'은 따로 맞지 않는다.
      * 보험사만 다르고 전체 이름이 같은 상품은 이름만으로 고를 수 없으므로 어느 순위로도 읽지 않는다(그 부분은 질문에서 지운다).
+     * 줄여 부른 이름이 카테고리 화면 이름과 같으면 줄인 이름으로는 읽지 않는다.
      */
     private static List<Integer> namedRanks(List<CompareRankingResponse.Item> items, String question) {
         String remaining = squeeze(question);
@@ -224,7 +242,8 @@ public class CompareAskService {
             boolean keyUnique = items.stream().filter(o -> key.equals(productKey(o.product()))).count() == 1;
             if (full.length() >= 2 && remaining.contains(full)) {
                 candidates.add(new Named(item.rank(), full, !fullUnique));
-            } else if (key.length() >= 2 && keyUnique && remaining.contains(key)) {
+            } else if (key.length() >= 2 && keyUnique && !CATEGORY_NAMES.contains(key) && remaining.contains(key)) {
+                // '가상 정기보험 K'를 줄인 '정기보험'은 카테고리 이름과 같아 상품으로 읽지 않는다(전체 이름을 적으면 읽는다).
                 candidates.add(new Named(item.rank(), key, false));
             }
         }
