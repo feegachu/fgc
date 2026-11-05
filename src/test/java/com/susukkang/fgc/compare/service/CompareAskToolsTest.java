@@ -96,6 +96,23 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("상품을 앞 문장에서 한 번 말하고 이어 쓴 금액은 가장 가까운 상품의 것으로 통과한다")
+    void subjectCarriesAcrossSentences() {
+        CompareAskTools tools = toolsWith("get_item", RANK_2);
+
+        assertThat(tools.verify("2위 나보험 튼튼건강을 볼게요. 보수적 순수령액은 634,000원이고 환수 노출액은 16,000원이에요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("한도 반영 수령 예상액 자리에 다른 항목의 금액을 쓰면 거절한다")
+    void metricConfusionIsRejected() {
+        CompareAskTools tools = toolsWith("get_item", RANK_2);
+
+        assertThat(tools.verify("2위 나보험 튼튼건강의 한도 반영 수령 예상액은 634,000원이에요.")).isEqualTo("VALUE_PAIR_MISMATCH");
+        assertThat(tools.verify("2위 나보험 튼튼건강의 한도 반영 수령 예상액은 650,000원이에요.")).isNull();
+    }
+
+    @Test
     @DisplayName("두 상품의 차이는 많고 적음이 서버 값과 같을 때만 통과한다")
     void directionMustMatchServerValues() {
         CompareAskTools tools = toolsWith("compare", PAIR_2_3);

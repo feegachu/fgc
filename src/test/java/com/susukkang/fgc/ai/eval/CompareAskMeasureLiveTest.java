@@ -82,6 +82,7 @@ class CompareAskMeasureLiveTest {
         appender.start();
         logger.addAppender(appender);
         List<String[]> rows = new ArrayList<>();
+        List<String> details = new ArrayList<>();
         Map<String, Integer> outcomes = new LinkedHashMap<>();
         try (AnswerEvalHarness harness = AnswerEvalHarness.live(properties)) {
             CompareAskService service = new CompareAskService(harness.gateway());
@@ -91,13 +92,18 @@ class CompareAskMeasureLiveTest {
                     break;
                 }
                 appender.list.clear();
+                harness.gateway().prepare(null);
                 CompareAskResponse response = service.ask(q.text(), ranking);
                 String outcome = outcome(response, appender.list);
                 outcomes.merge(outcome, 1, Integer::sum);
                 rows.add(new String[] {q.kind(), q.text(), response.source(), outcome, response.answer().replace("\n", " ")});
+                if (outcome.startsWith("검증 탈락")) {
+                    details.add("### " + q.text() + " → " + outcome + "\n\n- 모델 원문: " + harness.gateway().outputs().get("Output")
+                            + "\n- 도구 호출: " + harness.gateway().outputs().get("ToolCalls") + "\n");
+                }
                 done++;
             }
-            write(properties.model(), harness.gateway().calls(), done, outcomes, rows);
+            write(properties.model(), harness.gateway().calls(), done, outcomes, rows, details);
         } finally {
             logger.detachAppender(appender);
         }
@@ -120,7 +126,8 @@ class CompareAskMeasureLiveTest {
         return "LLM".equals(response.source()) ? "LLM 답" : "서버 문장(" + response.source() + ")";
     }
 
-    private static void write(String model, int calls, int questions, Map<String, Integer> outcomes, List<String[]> rows) throws IOException {
+    private static void write(String model, int calls, int questions, Map<String, Integer> outcomes, List<String[]> rows,
+            List<String> details) throws IOException {
         StringBuilder md = new StringBuilder("# /ask 실측 (").append(model).append(", 질문 ").append(questions).append("개, 호출 ")
                 .append(calls).append("회)\n\n## 결과 분포\n\n| 결과 | 건수 |\n|---|---|\n");
         outcomes.forEach((k, v) -> md.append("| ").append(k).append(" | ").append(v).append(" |\n"));
@@ -128,6 +135,8 @@ class CompareAskMeasureLiveTest {
         for (String[] r : rows) {
             md.append("| ").append(String.join(" | ", r)).append(" |\n");
         }
+        md.append("\n## 검증 탈락 상세\n\n");
+        details.forEach(d -> md.append(d).append("\n"));
         Path out = Path.of("build/ai-eval/ask-measure/result.md");
         Files.createDirectories(out.getParent());
         Files.writeString(out, md.toString(), StandardCharsets.UTF_8);
