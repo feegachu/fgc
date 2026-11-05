@@ -1728,6 +1728,7 @@
         "type" : "object"
       },
       "ApiResponsePaymentCalculationSnapshot" : {
+        "type" : "object",
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PaymentCalculationSnapshot"
@@ -1738,8 +1739,7 @@
           "requestId" : {
             "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "ApiResponsePicoAskResponse" : {
         "properties" : {
@@ -2400,39 +2400,39 @@
         "type" : "object"
       },
       "Basis" : {
+        "type" : "object",
         "properties" : {
-          "asOfDate" : {
-            "type" : "string"
-          },
-          "lines" : {
+          "sourceRefs" : {
+            "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/AssistantAttributionLine"
-            },
-            "type" : "array"
-          },
-          "policyVersionIds" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
+              "$ref" : "#/components/schemas/AssistantCalculationSource"
+            }
           },
           "rounding" : {
             "$ref" : "#/components/schemas/Rounding"
           },
-          "ruleIds" : {
+          "asOfDate" : {
+            "type" : "string"
+          },
+          "policyVersionIds" : {
+            "type" : "array",
             "items" : {
               "type" : "string"
-            },
-            "type" : "array"
+            }
           },
-          "sourceRefs" : {
+          "ruleIds" : {
+            "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/AssistantCalculationSource"
-            },
-            "type" : "array"
+              "type" : "string"
+            }
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantAttributionLine"
+            }
           }
-        },
-        "type" : "object"
+        }
       },
       "Blocker" : {
         "properties" : {
@@ -7517,119 +7517,125 @@
         "type" : "object"
       },
       "PaymentCalculationRequest" : {
+        "type" : "object",
         "properties" : {
+          "contractVersion" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "assistant\\.v1"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ]
+          },
+          "mode" : {
+            "type" : "string",
+            "enum" : [ "EXISTING", "HYPOTHETICAL" ]
+          },
+          "scope" : {
+            "$ref" : "#/components/schemas/Scope"
+          },
           "candidate" : {
             "$ref" : "#/components/schemas/JsonNode"
           },
           "clientRevision" : {
+            "type" : "integer",
             "format" : "int64",
             "maximum" : 9007199254740991,
-            "minimum" : 0,
-            "type" : "integer"
-          },
-          "contractVersion" : {
-            "minLength" : 1,
-            "pattern" : "assistant\\.v1",
-            "type" : "string"
-          },
-          "kind" : {
-            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ],
-            "type" : "string"
-          },
-          "mode" : {
-            "enum" : [ "EXISTING", "HYPOTHETICAL" ],
-            "type" : "string"
-          },
-          "scope" : {
-            "$ref" : "#/components/schemas/Scope"
+            "minimum" : 0
           }
         },
-        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ],
-        "type" : "object"
+        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ]
       },
       "PaymentCalculationSnapshot" : {
+        "type" : "object",
         "properties" : {
-          "amounts" : {
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "type" : "object"
-          },
-          "basis" : {
-            "$ref" : "#/components/schemas/Basis"
-          },
-          "blockers" : {
-            "items" : {
-              "$ref" : "#/components/schemas/Reason"
-            },
-            "type" : "array"
-          },
-          "calculatedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
           "calculationId" : {
             "type" : "string"
           },
-          "capPreview" : {
-            "items" : {
-              "additionalProperties" : { },
-              "type" : "object"
-            },
-            "type" : "array"
+          "kind" : {
+            "type" : "string"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
           },
           "clientRevision" : {
-            "format" : "int64",
-            "type" : "integer"
+            "type" : "integer",
+            "format" : "int64"
           },
-          "confirmable" : {
+          "synthetic" : {
             "type" : "boolean"
           },
-          "currency" : {
-            "type" : "string"
+          "snapshotOnly" : {
+            "type" : "boolean"
           },
           "evidenceKind" : {
             "type" : "string"
           },
-          "kind" : {
-            "type" : "string"
-          },
-          "missingInputs" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          },
-          "mode" : {
+          "currency" : {
             "type" : "string"
           },
           "paymentStatus" : {
             "type" : "string"
           },
+          "resolvedScope" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "amounts" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "capPreview" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "additionalProperties" : { }
+            }
+          },
+          "confirmable" : {
+            "type" : "boolean"
+          },
+          "blockers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Reason"
+            }
+          },
+          "missingInputs" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "basis" : {
+            "$ref" : "#/components/schemas/Basis"
+          },
           "recommendation" : {
             "$ref" : "#/components/schemas/Recommendation"
           },
-          "resolvedScope" : {
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "type" : "object"
-          },
-          "snapshotOnly" : {
-            "type" : "boolean"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "synthetic" : {
-            "type" : "boolean"
+          "calculatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           },
           "validity" : {
-            "description" : "Always null in snapshot-only phase; not a server proof",
-            "type" : [ "object", "null" ]
+            "type" : [ "object", "null" ],
+            "description" : "Always null in snapshot-only phase; not a server proof"
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantCalculationLine"
+            }
           }
-        },
-        "type" : "object"
+        }
       },
       "PaymentEvidence" : {
         "properties" : {
@@ -8610,21 +8616,21 @@
         "type" : "object"
       },
       "Reason" : {
+        "type" : "object",
         "properties" : {
           "code" : {
-            "type" : "string"
-          },
-          "contractId" : {
             "type" : "string"
           },
           "message" : {
             "type" : "string"
           },
+          "contractId" : {
+            "type" : "string"
+          },
           "transactionAttributionId" : {
             "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "RecentExceptionResponse" : {
         "properties" : {
@@ -8715,27 +8721,27 @@
         "type" : "object"
       },
       "Recommendation" : {
+        "type" : "object",
         "properties" : {
           "allowed" : {
             "type" : "boolean"
+          },
+          "targetId" : {
+            "type" : "string"
+          },
+          "suggestedAmount" : {
+            "type" : "string"
           },
           "reason" : {
             "type" : "string"
           },
           "requiredChecks" : {
+            "type" : "array",
             "items" : {
               "type" : "string"
-            },
-            "type" : "array"
-          },
-          "suggestedAmount" : {
-            "type" : "string"
-          },
-          "targetId" : {
-            "type" : "string"
+            }
           }
-        },
-        "type" : "object"
+        }
       },
       "ReconciliationExceptionBulkCreateResponse" : {
         "properties" : {
@@ -9403,19 +9409,19 @@
         "type" : "object"
       },
       "Rounding" : {
+        "type" : "object",
         "properties" : {
-          "aggregation" : {
-            "type" : "string"
+          "scale" : {
+            "type" : "integer",
+            "format" : "int32"
           },
           "mode" : {
             "type" : "string"
           },
-          "scale" : {
-            "format" : "int32",
-            "type" : "integer"
+          "aggregation" : {
+            "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "Ruleset" : {
         "properties" : {
@@ -9798,13 +9804,50 @@
         "type" : "object"
       },
       "Scope" : {
+        "type" : "object",
         "properties" : {
           "paymentId" : {
-            "pattern" : "[1-9][0-9]{0,18}",
-            "type" : "string"
+            "type" : "string",
+            "pattern" : "[1-9][0-9]{0,18}"
+          },
+          "contractId" : {
+            "type" : "string",
+            "pattern" : "[1-9][0-9]{0,18}"
+          },
+          "settlementMonth" : {
+            "type" : "string",
+            "pattern" : "[0-9]{4}-[0-9]{2}"
+          },
+          "paymentStage" : {
+            "type" : "string",
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ]
+          },
+          "installmentNo" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "commissionItemId" : {
+            "type" : "string",
+            "pattern" : "[1-9][0-9]{0,18}"
+          },
+          "beneficiaryAgentId" : {
+            "type" : "string",
+            "pattern" : "[1-9][0-9]{0,18}"
+          },
+          "asOfDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reconciliationResultId" : {
+            "type" : "string",
+            "pattern" : "[1-9][0-9]{0,18}"
+          },
+          "aggregation" : {
+            "type" : "string",
+            "enum" : [ "SINGLE_LINE", "MONTH_TOTAL" ]
           }
-        },
-        "type" : "object"
+        }
       },
       "Source" : {
         "properties" : {
@@ -10306,6 +10349,57 @@
           }
         },
         "type" : "object"
+      },
+      "AssistantCalculationLine" : {
+        "type" : "object",
+        "properties" : {
+          "cashflowType" : {
+            "type" : "string"
+          },
+          "sourceId" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "type" : "string"
+          },
+          "beneficiaryAgentId" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "attributionDate" : {
+            "type" : "string"
+          },
+          "dueDate" : {
+            "type" : "string"
+          },
+          "basisCode" : {
+            "type" : "string"
+          },
+          "basisAmount" : {
+            "type" : "string"
+          },
+          "calculationType" : {
+            "type" : "string"
+          },
+          "ratePct" : {
+            "type" : "string"
+          },
+          "expectedAmount" : {
+            "type" : "string"
+          },
+          "ruleId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        }
       }
     },
     "securitySchemes" : {
@@ -10906,6 +11000,8 @@
     },
     "/api/v1/assistant/calculations" : {
       "post" : {
+        "tags" : [ "payment-calculation-controller" ],
+        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
         "description" : "ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.",
         "operationId" : "calculate",
         "requestBody" : {
@@ -10920,18 +11016,16 @@
         },
         "responses" : {
           "200" : {
+            "description" : "OK",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
                 }
               }
-            },
-            "description" : "OK"
+            }
           }
-        },
-        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
-        "tags" : [ "payment-calculation-controller" ]
+        }
       }
     },
     "/api/v1/audit-logs" : {
