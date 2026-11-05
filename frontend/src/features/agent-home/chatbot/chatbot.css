@@ -1,8 +1,20 @@
 /* FUN-079 상품 추천 AI 챗봇 모달 — 목업(chatbot-fun079-modal.html)의 채팅형 디자인을 옮긴다. 모든 규칙은 .cb 아래에만 적용한다. */
 .cb {
-  --cb-brand: var(--color-action-primary);
-  /* 글자용 진한 파랑. 테마의 hover 토큰은 옅은 배경색(#dfeaff)이라 글자에 쓰면 흰 바탕에서 보이지 않는다(app-theme.css 보조 버튼 글자와 같은 값). */
-  --cb-brand-dark: #1d4ed8;
+  /*
+   * 설계사 화면 보라 포인트(agent-theme.css)와 같은 값이다(#839). 모달은 body 로 포털되어
+   * .app-shell.is-agent 범위 밖이라 여기서 다시 지정한다.
+   */
+  --color-action-primary: #513a95;
+  --color-blue-50: #f4eeff;
+  --color-blue-100: #e7d9ff;
+  --color-border-focus: #8c2fff;
+  --color-text-link: #513a95;
+  /* 단계 번호·주요 버튼·보내기 등 진한 보라 면도 홈 화면 글자처럼 사이드바 로고색으로 맞춘다. */
+  --cb-brand: #513a95;
+  /* 글자용 보라. 사이드바 로고와 같은 값이다(agent-theme.css 버튼 글자와 같음). */
+  --cb-brand-dark: #513a95;
+  /* 로고색 면 위에 올렸을 때(hover) 한 단계 진한 값 */
+  --cb-brand-hover: #3f2c78;
   --cb-brand-100: var(--color-blue-100);
   --cb-brand-50: var(--color-blue-50);
   --cb-line: var(--color-border-default);
@@ -77,13 +89,13 @@
 .cb .cb-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cb .cb-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 28px 26px; background: #fff; }
 .cb .cb-bot { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 12px; animation: cb-in 0.22s ease-out; }
-.cb .cb-bot .cb-mascot { width: 101px; height: 101px; flex: 0 0 101px; transform-origin: 50% 90%; animation: cb-bob 2.8s ease-in-out infinite; }
-/* 2단계(상품 선별 중)에서는 캐릭터가 천천히 한 바퀴씩 돈다. 회전 중심은 배의 F 로고(그림 가로 48%, 세로 66% 지점)다 */
-.cb .cb-bot .cb-mascot.cb-spin { transform-origin: 48% 66%; animation: cb-turn 5.5s linear infinite; }
-/* 선별 중 말풍선은 길어서 캐릭터가 맨 아래로 처지므로, 이때만 말풍선 세로 가운데에 맞춘다 */
-.cb .cb-bot:has(.cb-spin) { align-items: center; }
+/* 캐릭터 움직임은 단계별 피코 모션(mascot/PicoMotion, Rive)이 그린다 */
+.cb .cb-bot .cb-mascot { width: 101px; height: 101px; flex: 0 0 101px; }
+/* 선별 중(2단계)에는 3단계처럼 캐릭터를 '피코 AI' 이름 옆(위쪽)에 두고, 불러오는 동안 한 바퀴씩 천천히 돈다.
+   한 바퀴(5.5s)는 ChatbotModal 의 SPIN_MS 와 같아야 한다. 회전 중심은 배의 F 로고(가로 48%, 세로 66%)다 */
+.cb .cb-bot:has([data-pico-motion='hat']) { align-items: flex-start; }
+.cb .cb-bot [data-pico-motion='hat'] { transform-origin: 48% 66%; animation: cb-turn 5.5s linear infinite; }
 @keyframes cb-turn { to { transform: rotate(360deg); } }
-@keyframes cb-bob { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-5px) rotate(-3deg); } 75% { transform: translateY(-3px) rotate(3deg); } }
 .cb .cb-bot-msg { flex: 1; min-width: 0; max-width: calc(100% - 113px); }
 @keyframes cb-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -103,7 +115,7 @@
 /* 1단계 */
 .cb .cb-replies { margin: 2px 0 14px; align-items: stretch; }
 .cb .cb-replies .cb-replies-bubble { align-self: flex-end; width: min(100%, 880px); box-sizing: border-box; }
-.cb .cb-logo { flex: 0 0 auto; width: 108px; height: 44px; background: #1e3f5a; -webkit-mask: var(--cb-logo) center / contain no-repeat; mask: var(--cb-logo) center / contain no-repeat; }
+.cb .cb-logo { flex: 0 0 auto; width: 108px; height: 44px; background: #291e5a; -webkit-mask: var(--cb-logo) center / contain no-repeat; mask: var(--cb-logo) center / contain no-repeat; }
 .cb .cb-replies-bubble { padding: 14px; border-radius: var(--radius-16) var(--radius-16) 6px var(--radius-16); background: var(--cb-brand-50); }
 .cb .cb-cats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
 .cb .cb-cat {
@@ -155,7 +167,7 @@
 .cb .cb-check.active b { color: var(--cb-brand-dark); }
 .cb .cb-check.pending b { color: var(--cb-t400); }
 .cb .cb-skeleton { margin: 0 0 0 90px; overflow: hidden; border-radius: 6px var(--radius-16) var(--radius-16) var(--radius-16); background: #fff; box-shadow: var(--cb-shadow); }
-.cb .cb-skeleton-head { padding: 15px 22px; border-bottom: 1px solid var(--cb-line); background: #fafbff; font-size: 14px; font-weight: 700; }
+.cb .cb-skeleton-head { padding: 15px 22px; border-bottom: 1px solid var(--cb-line); background: #fdfaff; font-size: 14px; font-weight: 700; }
 .cb .cb-skeleton-row { display: grid; grid-template-columns: 50px 1.8fr 1fr 1fr; gap: 14px; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--cb-line-light); }
 .cb .cb-skeleton-row i { display: block; height: 17px; border-radius: var(--radius-4); background: #edf2f7; }
 
@@ -190,7 +202,7 @@
 .cb .cb-btn { padding: 10px 26px; border: 1.5px solid #94a3b8; box-shadow: 0 2px 6px rgb(15 23 42 / 12%); border-radius: var(--radius-full); background: #fff; color: var(--cb-t700); font-size: 13px; font-weight: 600; transition: all 0.15s; }
 .cb .cb-btn:hover { border-color: var(--color-blue-100); background: var(--cb-brand-50); color: var(--cb-brand-dark); }
 .cb .cb-btn.primary { border-color: var(--cb-brand); background: var(--cb-brand); color: #fff; }
-.cb .cb-btn.primary:hover { border-color: var(--cb-brand-dark); background: var(--cb-brand-dark); }
+.cb .cb-btn.primary:hover { border-color: var(--cb-brand-hover); background: var(--cb-brand-hover); }
 .cb .cb-btn.small { padding: 6px 12px; border-radius: var(--radius-8); font-size: 12px; font-weight: 500; }
 
 /* 하단 입력줄(선택지만 받으므로 잠겨 있다)·푸터 */
@@ -203,7 +215,7 @@
 .cb .cb-composer-field.ready { font-size: 14px; font-weight: 600; color: var(--cb-t900); background: #fff; border-color: var(--cb-brand); }
 .cb button.cb-send { border: 0; }
 .cb button.cb-send.on { background: var(--cb-brand); }
-.cb button.cb-send.on:hover { background: var(--cb-brand-dark); }
+.cb button.cb-send.on:hover { background: var(--cb-brand-hover); }
 .cb .cb-footer { display: flex; justify-content: center; padding: 10px 22px; background: #fff; }
 
 /* 근거 서랍 */
@@ -253,7 +265,7 @@
   .cb .cb-step-txt { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cb .cb-modal, .cb .cb-bot, .cb .cb-user, .cb .cb-faq-card, .cb .cb-drawer, .cb .cb-bot .cb-mascot { animation: none; }
+  .cb .cb-modal, .cb .cb-bot, .cb .cb-user, .cb .cb-faq-card, .cb .cb-drawer, .cb .cb-bot [data-pico-motion='hat'] { animation: none; }
   .cb .cb-dots i { animation: none; }
 }
 
@@ -296,3 +308,5 @@
   .cb .cb-suggest { grid-template-columns: 1fr; padding: 8px 14px 0; }
 }
 .cb .cb-asked { margin-top: 32px; }
+/* 협회 등급 배지(info)도 설계사 화면의 보라 포인트를 따른다(#839). */
+.cb .status-badge.status-badge-info { --badge-ink: #513a95; }

@@ -37,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @version 1.0
  * @since 2026-08-06
  */
+// FUN-085: 범위 검사는 인증 문맥이 없으면 전체 범위로 풀지 않는다. 내부 조회 역할로 호출한다.
+@org.springframework.security.test.context.support.WithMockUser(roles = "SETTLEMENT")
 @SpringBootTest
 @Transactional
 class ContractRepositoryIntegrationTest {

@@ -1,5 +1,5 @@
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { workflowHelpSteps } from '../assistant/workflow-catalog'
-import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -12,6 +12,7 @@ import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
 import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
+import { applyActionToCache } from './api'
 
 const user = {
   loginId: 'settle01',
@@ -165,12 +166,12 @@ function renderPage(path = '/app/exceptions') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   clients.push(client)
   const router = createMemoryRouter(routes, { basename: '/app/', initialEntries: [path] })
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, actions: userEvent.setup(), unmount: view.unmount }
 }
 const table = () => screen.findByRole('table', { name: '예외 목록' })
 
@@ -410,6 +411,34 @@ describe('EXCP-W01 예외함', () => {
     )
   })
 
+  it('저장된 설명과 처리 사유의 스크립트는 글자로만 보이고 실행되지 않는다 (SER-004)', async () => {
+    const payload = '<img src=x onerror="alert(1)"><script>alert(2)</script>'
+    searchResponse = () =>
+      search([
+        {
+          ...baseCase,
+          description: payload,
+          actions: [
+            {
+              actionSeq: 1,
+              actionTypeLabel: '담당 배정',
+              fromStatusLabel: '신규',
+              toStatusLabel: '신규',
+              reason: payload,
+              actionByLoginId: 'settle01',
+              actionAt: '2026-07-11T00:30:00+09:00',
+            },
+          ],
+        },
+      ])
+    const { actions } = renderPage()
+    await actions.click(within(await table()).getByRole('button', { name: '11' }))
+    expect(await screen.findByText(payload, { selector: '.exception-history-reason' })).toBeInTheDocument()
+    expect(screen.getByText(payload, { selector: 'dd' })).toBeInTheDocument()
+    expect(document.querySelector('img[src="x"]')).toBeNull()
+    expect(document.querySelector('#root script, main script, [onerror]')).toBeNull()
+  })
+
   it('사유 없이는 저장할 수 없고, 저장하면 이력과 상태가 갱신된다', async () => {
     postResponse = (path, body) => {
       expect(path).toBe('/api/v1/exceptions/11/actions')
@@ -485,7 +514,9 @@ describe('EXCP-W01 예외함', () => {
     expect(await table()).toBeInTheDocument()
   })
 
-  it('원장 정정 예외는 원분개를 불러와 재기표를 요청하고 결과 링크를 보여 준다', async () => {
+  it.each([false, true])('원장 정정은 실제 서버 성공 뒤 결과를 표시한다 (도움말=%s)', async (guided) => {
+    vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
     searchResponse = () => search([correctionCase])
     postResponse = (path, body) => {
       expect(path).toBe('/api/v1/exceptions/12/journal-correction')
@@ -526,8 +557,25 @@ describe('EXCP-W01 예외함', () => {
     // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
     expect(within(dialog).getAllByText('미수수수료').length).toBeGreaterThan(0)
     expect(within(dialog).queryByText(/1100|4100/)).not.toBeInTheDocument()
+    if (guided) {
+      await actions.click(within(dialog).getByRole('button', { name: '도움말' }))
+      expect(within(dialog).getByRole('button', { name: '다음' })).toBeDisabled()
+    }
     await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
+    if (guided) {
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: '다음' })).toBeEnabled())
+      await actions.click(within(dialog).getByRole('button', { name: '다음' }))
+      expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
+      expect(within(dialog).getByRole('button', { name: '다음' })).toBeDisabled()
+    }
     await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
+    if (guided) {
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: '다음' })).toBeEnabled())
+      expect(within(dialog).queryByText('역분개와 재기표를 완료했습니다.')).toBeNull()
+      await actions.click(within(dialog).getByRole('button', { name: '다음' }))
+      expect(await within(dialog).findByText('서버 정정 확인 · 가이드 완료')).toBeVisible()
+      await actions.click(within(dialog).getByRole('button', { name: '안내 마치기' }))
+    }
     expect(await within(dialog).findByText('역분개와 재기표를 완료했습니다.')).toBeInTheDocument()
     expect(within(dialog).getByText('정정 묶음으로 연결했습니다.')).toBeInTheDocument()
     expect(within(dialog).queryByText(/CG-1|#72/)).not.toBeInTheDocument()
@@ -577,6 +625,159 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
   expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
 })
 
+it('action help requires a real action sequence and preserves input for a failed retry', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  let attempts = 0
+  postResponse = () => {
+    attempts++
+    if (attempts === 1) throw new ApiError({ code: 'FGC-EXCP-003', message: '상태 충돌' }, 'guide-conflict', 409)
+    return { exceptionActionId: undefined, actionSeq: 1, actionType: 'START_REVIEW', actionTypeLabel: '검토 시작', fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중', reason: '원천 확인' }
+  }
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  const form = within(await screen.findByRole('form', { name: '예외 처리' }))
+  await actions.click(form.getByRole('button', { name: '도움말' }))
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
+  await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(form.getByLabelText(/처리 사유/), '원천 확인')
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(screen.getByRole('button', { name: '다음' }))
+  expect(attempts).toBe(0)
+  await actions.click(form.getByRole('button', { name: '처리 저장' }))
+  await screen.findByText(/상태 충돌/, { selector: '.exception-action-error' })
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
+  expect(form.getByLabelText(/처리 사유/)).toHaveValue('원천 확인')
+  await actions.click(form.getByRole('button', { name: '처리 저장' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  expect(screen.queryByText('1. 검토 시작')).not.toBeInTheDocument()
+  await actions.click(screen.getByRole('button', { name: '다음' }))
+  expect(await screen.findByText('서버 처리 확인 · 가이드 완료')).toBeVisible()
+  await actions.click(screen.getByRole('button', { name: '안내 마치기' }))
+  expect(await screen.findByText('1. 검토 시작')).toBeVisible()
+})
+
+it('resolved journal corrections expose read-only results without a write guide', async () => {
+  searchResponse = () => search([{ ...correctionCase, status: 'RESOLVED', statusLabel: '해결' }])
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(await screen.findByRole('button', { name: '원장 정정 확인' }))
+  const dialog = await screen.findByRole('dialog')
+  await within(dialog).findByText(/J-0070/)
+  expect(within(dialog).queryByRole('button', { name: '도움말' })).not.toBeInTheDocument()
+  expect(within(dialog).queryByRole('button', { name: '정정 실행' })).not.toBeInTheDocument()
+  expect(requests().some(([path]) => path.endsWith('/journal-correction'))).toBe(false)
+})
+
+
+it.each(['status', 'sequence', 'pending refresh'])('committed action with %s mismatch refreshes and blocks resubmission', async (kind) => {
+  let finish: ((value: unknown) => void) | undefined
+  const response = { actionSeq: kind === 'sequence' ? 0 : 1, actionType: 'START_REVIEW', fromStatus: kind === 'status' ? 'IN_REVIEW' : 'NEW', toStatus: 'IN_REVIEW' }
+  postResponse = () => kind === 'pending refresh' ? new Promise(resolve => { finish = resolve }) : response
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  const form = await screen.findByRole('form', { name: '예외 처리' })
+  await actions.selectOptions(within(form).getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(within(form).getByLabelText(/처리 사유/), '원천 확인')
+  const reads = searchPaths().length
+  await actions.click(within(form).getByRole('button', { name: '처리 저장' }))
+  if (kind === 'pending refresh') {
+    await waitFor(() => expect(finish).toBeDefined())
+    await act(async () => { clients[0].setQueriesData({ queryKey: ['exceptions', 'search'] }, search([{ ...baseCase, status: 'IN_REVIEW' }])) })
+    await waitFor(() => expect(within(form).queryByRole('option', { name: '검토 시작' })).not.toBeInTheDocument())
+    await act(async () => { finish!(response) })
+  }
+  expect(await within(form).findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  await waitFor(() => expect(searchPaths().length).toBeGreaterThan(reads))
+  expect(within(form).getByRole('button', { name: '처리 저장' })).toBeDisabled()
+  fireEvent.submit(form)
+  expect(within(form).getByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+})
+
+it.each([
+  { actionSeq: 2, repostedJournalHeaderId: 0 },
+  ...[undefined, null, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '2'].map(actionSeq => ({ actionSeq, repostedJournalHeaderId: 72 })),
+])('committed correction with an invalid receipt %j refreshes and cannot be posted twice', async (receipt) => {
+  searchResponse = () => search([correctionCase])
+  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, toStatus: 'RESOLVED', ...receipt })
+  const { actions } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
+  const dialog = await screen.findByRole('dialog')
+  await within(dialog).findByText(/J-0070/)
+  await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
+  const reads = searchPaths().length
+  await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
+  expect(await within(dialog).findByText(/서버 정정 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  await waitFor(() => expect(searchPaths().length).toBeGreaterThan(reads))
+  expect(within(dialog).getByRole('button', { name: '정정 실행' })).toBeDisabled()
+  fireEvent.submit(dialog.querySelector('form')!)
+  expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+})
+
+it('does not append a cached action twice or overwrite a newer cached status', () => {
+  const client = new QueryClient()
+  const action = { actionSeq: 1, actionType: 'START_REVIEW', toStatus: 'IN_REVIEW' } as const
+  client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [action] }]))
+  applyActionToCache(client, 11, action)
+  const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
+  expect(item.actions).toHaveLength(1)
+  expect(item.status).toBe('RESOLVED')
+  client.clear()
+})
+
+it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a committed action after unmount (help=%s, sequence=%s)', async (guided, sequence) => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  let finish!: (value: unknown) => void
+  postResponse = () => new Promise(resolve => { finish = resolve })
+  const { actions, unmount } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '11' }))
+  const form = within(await screen.findByRole('form', { name: '예외 처리' }))
+  await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
+  await actions.type(form.getByLabelText(/처리 사유/), '원천 확인')
+  if (guided) {
+    await actions.click(form.getByRole('button', { name: '도움말' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+    await actions.click(screen.getByRole('button', { name: '다음' }))
+  }
+  await actions.click(form.getByRole('button', { name: '처리 저장' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  const receipt = { actionSeq: sequence, actionType: 'START_REVIEW', fromStatus: 'NEW', toStatus: 'IN_REVIEW' }
+  if (guided) {
+    await act(async () => finish(receipt))
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
+  }
+  unmount()
+  if (!guided) await act(async () => finish(receipt))
+  await waitFor(() => {
+    const [, data] = clients[0].getQueriesData<ExceptionSearchResult>({ queryKey: ['exceptions', 'search'] })[0]
+    expect(data!.content![0].status).toBe(sequence ? 'IN_REVIEW' : 'NEW')
+    expect(data!.content![0].actions).toHaveLength(sequence ? 1 : 0)
+    expect(clients[0].getQueriesData({ queryKey: ['exceptions', 'search'] }).every(([key]) => clients[0].getQueryState(key)?.isInvalidated)).toBe(true)
+  })
+})
+
+it('invalidates a completed correction when help is unmounted before acknowledgement', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  searchResponse = () => search([correctionCase])
+  postResponse = () => ({ actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 72 })
+  const { actions, unmount } = renderPage()
+  await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
+  const dialog = within(await screen.findByRole('dialog'))
+  await dialog.findByText(/J-0070/)
+  await actions.type(dialog.getByLabelText(/정정 사유/), '계정 오류 정정')
+  await actions.click(dialog.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled())
+  await actions.click(dialog.getByRole('button', { name: '다음' }))
+  clients[0].setQueryData(['validation-runs', 'receipt-test'], { status: 'COMPLETED' })
+  await actions.click(dialog.getByRole('button', { name: '정정 실행' }))
+  await waitFor(() => expect(dialog.getByRole('button', { name: '다음' })).toBeEnabled())
+  unmount()
+  await waitFor(() => expect(clients[0].getQueryState(['validation-runs', 'receipt-test'])?.isInvalidated).toBe(true))
+})
+
 it('차익거래 판정 사유로 저장된 예외 설명의 개발 용어는 쉬운 말로 보이고 다른 설명은 그대로 둔다', async () => {
   searchResponse = () =>
     search([
@@ -619,4 +820,15 @@ it('gives different exception summary types distinct guide targets and preserves
   }
   expect(screen.getByRole('link', { name: '새 예외 1건' })).not.toHaveAttribute('data-guide-feature')
   expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
+})
+
+it('preserves a newer cached action when an older guide acknowledgement arrives', () => {
+  const client = new QueryClient()
+  const newer = { actionSeq: 2, toStatus: 'RESOLVED' as const }
+  client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [newer] }]))
+  applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
+  const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
+  expect(item.status).toBe('RESOLVED')
+  expect(item.actions).toEqual([newer])
+  client.clear()
 })

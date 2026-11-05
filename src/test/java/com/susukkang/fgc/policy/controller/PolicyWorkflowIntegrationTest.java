@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -58,6 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PolicyWorkflowIntegrationTest {
 
     @Autowired private MockMvc mvc;
+    @Autowired private com.susukkang.fgc.schedule.service.ScheduleService scheduleGenerator;
     @Autowired private ObjectMapper mapper;
     @Autowired private JdbcTemplate jdbc;
     @MockitoBean(name = "policyClock") private Clock policyClock;
@@ -1375,6 +1377,294 @@ class PolicyWorkflowIntegrationTest {
         assertThat(review.selection().resolution().candidateRulesetIds()).hasSize(1);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029"})
+    void contractRegenerationRejectsInvalidReasonBeforeAnyWrites(String regime) throws Exception {
+        boolean seven = regime.equals("SEVEN_YEAR_2029");
+        long offering = insertOffering(seven, seven ? "2029-01-01" : "2027-01-01", "REASON-" + UUID.randomUUID());
+        jdbc.update("UPDATE fgc.product_offering SET fee_regime_code=? WHERE product_offering_id=?", regime, offering);
+        long contract = insertContract(offering, seven ? "2029-03-02" : "2027-03-02");
+        long audits = jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log", Long.class);
+        String path = "/api/v1/contracts/" + contract + "/schedules/regenerate";
+        for (String reason : new String[]{null, "", "   ", "가".repeat(41)}) {
+            var legacy = request(HttpMethod.POST, path).with(user(writer)).with(csrf());
+            if (reason != null) legacy.param("reason", reason);
+            mvc.perform(legacy).andExpect(status().isBadRequest());
+            ObjectNode body = mapper.createObjectNode();
+            if (reason != null) body.put("reason", reason);
+            writeError(HttpMethod.POST, path, body, writer, key(), 400);
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=?", Long.class, contract)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.audit_log", Long.class)).isEqualTo(audits);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, 67", "true, 67", "true, 61"})
+    // FGC-FUN-037 / FGC-FUN-038: 정책 회차 및 예정판 멱등성.
+    void previewPersistsPolicyInstallmentsAndPreservesVersionsWithIdempotency(boolean seven, int longTermFrom) throws Exception {
+        String regime = seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027";
+        String start = seven ? "2029-01-01" : "2027-01-01";
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(seven, start, document);
+        long contract = insertContract(offering, seven ? "2029-03-02" : "2027-03-02");
+        ObjectNode draft = installmentDraft(seven, offering, start, document);
+        ((ObjectNode) draft.path("commissionRules").get(0)).put("agentRankCode", "FC");
+        ObjectNode second = ((ObjectNode) draft.path("commissionRules").get(0)).deepCopy();
+        second.put("commissionItemId", insertItem());
+        if (seven) {
+            ((ObjectNode) draft.path("feeRegimeRules").get(0)).put("longTermMaintenanceFrom", longTermFrom).put("longTermMaintenanceTo", 84);
+            second.put("feeComponentType", "LONG_TERM_MAINTENANCE").put("installmentFrom", longTermFrom)
+                    .put("calculationType", "FIXED").putNull("ratePct").put("fixedAmount", "12000");
+        }
+        ((com.fasterxml.jackson.databind.node.ArrayNode) draft.path("commissionRules")).add(second);
+        JsonNode created = create(draft, writer);
+        long policy = created.path("policyVersionId").asLong();
+        ObjectNode unapproved = mapper.createObjectNode().put("reason", "승인 정책 없음").put("regime", regime)
+                .put("policyVersionId", policy).put("expectedSourceVersion", scheduleRead("/api/v1/contracts/" + contract + "/schedules?paymentStage=GA_TO_FC").path("previewContext").path("expectedSourceVersion").asText());
+        assertThat(writeError(HttpMethod.POST, "/api/v1/contracts/" + contract + "/schedules/regenerate?paymentStage=GA_TO_FC", unapproved, writer, key(), 422).path("code").asText())
+                .isEqualTo("FGC-IMPL-SCHEDULE_REVIEW_REQUIRED");
+        JsonNode submitted = action(policy, "SUBMIT", created, writer, 200);
+        JsonNode approved = action(policy, "APPROVE", submitted, approver, 200);
+        action(policy, "ACTIVATE", approved, approver, 200);
+        long operational = jdbc.queryForObject("""
+                INSERT INTO fgc.schedule_header(contract_id,payment_stage,policy_version_id,schedule_version_no,schedule_purpose,schedule_regime,status,active_yn)
+                SELECT ?, 'GA_TO_FC', policy_version_id, 1, 'OPERATIONAL', 'CURRENT', 'PLANNED', true
+                FROM fgc.policy_version WHERE policy_type='CURRENT_COMMISSION' ORDER BY policy_version_id LIMIT 1 RETURNING schedule_header_id
+                """, Long.class, contract);
+        String contractPath = "/api/v1/contracts/" + contract + "/schedules";
+        JsonNode context = scheduleRead(contractPath + "?paymentStage=GA_TO_FC").path("previewContext");
+        ObjectNode payload = mapper.createObjectNode().put("reason", "4년 예정 검증").put("regime", regime)
+                .put("policyVersionId", policy).put("expectedSourceVersion", context.path("expectedSourceVersion").asText());
+        String requestKey = key();
+        JsonNode generated = concurrentPreviewWithSameKey(contract, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, requestKey);
+        long header = generated.get(0).asLong();
+        writeError(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, approver, requestKey, 403);
+        assertThat(write(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, requestKey, 200)).isEqualTo(generated);
+        JsonNode detail = scheduleRead("/api/v1/schedules/" + header);
+        assertPreviewPolicyLines(detail, seven, longTermFrom, regime, header, policy);
+        assertPreviewVersionLifecycle(contract, header, operational, payload, requestKey, detail);
+
+    }
+
+    private void assertPreviewVersionLifecycle(long contract, long header, long operational,
+            ObjectNode payload, String requestKey, JsonNode detail) throws Exception {
+        String contractPath = "/api/v1/contracts/" + contract + "/schedules";
+        int lineCount = detail.path("lines").size();
+        assertThat(writeError(HttpMethod.POST, "/api/v1/schedules/" + header + "/confirm", mapper.createObjectNode(), writer, key(), 409).path("code").asText())
+                .isEqualTo("FGC-IMPL-SCHEDULE_PREVIEW_ONLY");
+        assertThat(writeError(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, key(), 409).path("code").asText())
+                .isEqualTo("FGC-IMPL-SCHEDULE_SOURCE_CHANGED");
+        payload.put("reason", "다른 요청");
+        writeError(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, requestKey, 409);
+        payload.put("expectedSourceVersion", detail.path("previewContext").path("expectedSourceVersion").asText());
+        String nextKey = key();
+        JsonNode next = write(HttpMethod.POST, "/api/v1/schedules/" + header + "/regenerate", payload, writer, nextKey, 200);
+        assertThat(write(HttpMethod.POST, "/api/v1/schedules/" + header + "/regenerate", payload, writer, nextKey, 200)).isEqualTo(next);
+        assertThat(next.path("versionNo").asLong()).isEqualTo(2);
+        assertThat(scheduleRead("/api/v1/schedules/" + header).path("header").path("activeYn").asBoolean()).isFalse();
+        assertThat(scheduleRead("/api/v1/schedules/" + header).path("lines").size()).isEqualTo(lineCount);
+        assertThat(scheduleRead("/api/v1/schedules/" + header + "/versions").size()).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT active_yn FROM fgc.schedule_header WHERE schedule_header_id=?", Boolean.class, operational)).isTrue();
+        long current = next.path("scheduleHeaderId").asLong();
+        payload.put("expectedSourceVersion", scheduleRead("/api/v1/schedules/" + current).path("previewContext").path("expectedSourceVersion").asText());
+        // A freshly read token must not authorize generation from an inactive historical header.
+        assertThat(writeError(HttpMethod.POST, "/api/v1/schedules/" + header + "/regenerate", payload, writer, key(), 409).path("code").asText())
+                .isEqualTo("FGC-IMPL-SCHEDULE_SOURCE_CHANGED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION'", Integer.class, contract)).isEqualTo(2);
+        assertPreviewRollbackAndConcurrency(contract, current, payload);
+    }
+
+    private void assertPreviewRollbackAndConcurrency(long contract, long current, ObjectNode payload) throws Exception {
+        // 헤더 INSERT/기존판 비활성화 뒤 계산에 실패해도 전체 트랜잭션이 복구된다.
+        jdbc.execute("ALTER TABLE fgc.schedule_header ADD CONSTRAINT fun037_fault_" + contract + " CHECK (contract_id <> " + contract + " OR schedule_version_no < 3)");
+        try {
+            writeError(HttpMethod.POST, "/api/v1/schedules/" + current + "/regenerate", payload, writer, key(), 500);
+        } finally {
+            jdbc.execute("ALTER TABLE fgc.schedule_header DROP CONSTRAINT fun037_fault_" + contract);
+        }
+        assertThat(jdbc.queryForObject("SELECT active_yn FROM fgc.schedule_header WHERE schedule_header_id=?", Boolean.class, current)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION'", Integer.class, contract)).isEqualTo(2);
+        var outcomes = concurrently(
+                () -> perform(HttpMethod.POST, "/api/v1/schedules/" + current + "/regenerate", payload, writer, key()),
+                () -> perform(HttpMethod.POST, "/api/v1/schedules/" + current + "/regenerate", payload, writer, key()));
+        assertThat(outcomes.stream().map(outcome -> outcome.getResponse().getStatus()).sorted().toList()).containsExactly(200, 409);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION' AND active_yn", Integer.class, contract)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION'", Integer.class, contract)).isEqualTo(3);
+        long newest = jdbc.queryForObject("SELECT schedule_header_id FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION' AND active_yn", Long.class, contract);
+        payload.put("expectedSourceVersion", scheduleRead("/api/v1/schedules/" + newest).path("previewContext").path("expectedSourceVersion").asText());
+        jdbc.update("UPDATE fgc.schedule_header SET status='CANCELLED' WHERE schedule_header_id=?", newest);
+        assertThat(writeError(HttpMethod.POST, "/api/v1/schedules/" + newest + "/regenerate", payload, writer, key(), 409).path("code").asText())
+                .isEqualTo("FGC-IMPL-SCHEDULE_SOURCE_CHANGED");
+    }
+
+    private void assertPreviewPolicyLines(JsonNode detail, boolean seven, int longTermFrom,
+            String regime, long header, long policy) throws Exception {
+        int installments = seven ? 84 : 48;
+        int lineCount = seven ? 84 + (85 - longTermFrom) : 96;
+        assertThat(detail.path("header").path("installmentCount").asInt()).isEqualTo(installments);
+        assertThat(detail.path("header").path("lineCount").asInt()).isEqualTo(lineCount);
+        assertThat(detail.path("header").path("maxInstallmentNo").asInt()).isEqualTo(installments);
+        assertThat(detail.path("header").path("schedulePurpose").asText()).isEqualTo("SIMULATION");
+        assertThat(detail.path("header").path("canConfirm").asBoolean()).isFalse();
+        assertThat(detail.path("lines").size()).isEqualTo(lineCount);
+        assertThat(detail.path("header").path("scheduleRegime").asText()).isEqualTo(regime);
+        assertThat(detail.path("header").path("expectedTotal").decimalValue()).isEqualByComparingTo(seven ? String.valueOf(2016000 + (85 - longTermFrom) * 12000) : "4320000");
+        assertThat(jdbc.queryForObject("SELECT scenario_code FROM fgc.schedule_header WHERE schedule_header_id=?", String.class, header))
+                .isEqualTo("PHASE2_" + regime + "_" + policy);
+        if (seven) assertLongTermLines(detail, longTermFrom);
+        JsonNode listing = scheduleRead("/api/v1/schedules?regime=" + regime + "&page=1&size=100");
+        assertThat(StreamSupport.stream(listing.path("content").spliterator(), false)
+                .anyMatch(row -> row.path("scheduleHeaderId").asLong() == header && row.path("installmentCount").asInt() == installments)).isTrue();
+        JsonNode last = detail.path("lines").get(lineCount - 1);
+        assertThat(last.path("installmentNo").asInt()).isEqualTo(installments);
+        assertThat(last.path("dueDate").asText()).isEqualTo(seven ? "2036-02-02" : "2031-02-02");
+        assertThat(last.path("expectedAmount").decimalValue()).isEqualByComparingTo(seven ? "12000" : "45000");
+        assertThat(last.path("feeComponentType").asText()).isEqualTo(seven ? "LONG_TERM_MAINTENANCE" : "MAINTENANCE");
+        assertThat(last.path("scheduleLineId").asLong()).isPositive();
+    }
+
+    private void assertLongTermLines(JsonNode detail, int longTermFrom) {
+        var longTerm = StreamSupport.stream(detail.path("lines").spliterator(), false)
+                .filter(line -> line.path("feeComponentType").asText().equals("LONG_TERM_MAINTENANCE")).toList();
+        assertThat(longTerm).hasSize(85 - longTermFrom);
+        assertThat(longTerm.stream().map(line -> line.path("installmentNo").asInt()).toList())
+                .containsExactlyElementsOf(java.util.stream.IntStream.rangeClosed(longTermFrom, 84).boxed().toList());
+        assertThat(longTerm).allSatisfy(line -> assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("12000"));
+        assertThat(StreamSupport.stream(detail.path("lines").spliterator(), false)
+                .filter(line -> line.path("feeComponentType").asText().equals("MAINTENANCE")).toList())
+                .allSatisfy(line -> assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("24000"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    // FGC-FUN-037 / FGC-FUN-038: 실제 정책 회차만 저장하고 동일 계산을 재사용한다.
+    void previewStoresOnlyActualFixedPolicyInstallments(boolean seven) throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        long offering = insertOffering(seven, seven ? "2029-01-01" : "2027-01-01", document);
+        long contract = insertContract(offering, seven ? "2029-03-02" : "2027-03-02");
+        ObjectNode draft = installmentDraft(seven, offering, seven ? "2029-01-01" : "2027-01-01", document);
+        ((ObjectNode) draft.path("commissionRules").get(0)).put("agentRankCode", "FC")
+                .put("installmentTo", 12).put("calculationType", "FIXED").putNull("ratePct").put("fixedAmount", "12000");
+        JsonNode created = create(draft, writer);
+        long policy = created.path("policyVersionId").asLong();
+        JsonNode submitted = action(policy, "SUBMIT", created, writer, 200);
+        JsonNode approved = action(policy, "APPROVE", submitted, approver, 200);
+        action(policy, "ACTIVATE", approved, approver, 200);
+        String path = "/api/v1/contracts/" + contract + "/schedules";
+        ObjectNode payload = mapper.createObjectNode().put("reason", "실제 12회차 정액 정책")
+                .put("regime", seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027").put("policyVersionId", policy)
+                .put("expectedSourceVersion", scheduleRead(path + "?paymentStage=GA_TO_FC").path("previewContext").path("expectedSourceVersion").asText());
+        long header = write(HttpMethod.POST, path + "/regenerate?paymentStage=GA_TO_FC", payload, writer, key(), 200).get(0).asLong();
+        JsonNode detail = scheduleRead("/api/v1/schedules/" + header);
+        assertFixedPolicyLines(detail);
+        // 같은 원천·승인 정책이면 자동 생성은 수동 결과를 재사용한다.
+        assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        assertTimestampOnlyUpdatesReusePreview(contract, offering, header);
+        jdbc.update("UPDATE fgc.insurance_contract SET monthly_equivalent_first_premium=200000 WHERE contract_id=?", contract);
+        var automatic = scheduleGenerator.generateSchedulesByContractId(contract);
+        assertThat(automatic.scheduleHeaderIds()).hasSize(1);
+        assertThat(automatic.createdLineCount()).isEqualTo(12);
+        JsonNode autoDetail = scheduleRead("/api/v1/schedules/" + automatic.scheduleHeaderIds().getFirst());
+        assertThat(autoDetail.path("header").path("schedulePurpose").asText()).isEqualTo("SIMULATION");
+        assertThat(autoDetail.path("header").path("canConfirm").asBoolean()).isFalse();
+        for (JsonNode line : autoDetail.path("lines")) {
+            assertThat(line.path("basisAmount").decimalValue()).isEqualByComparingTo("200000");
+            assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("12000");
+        }
+        assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        jdbc.update("UPDATE fgc.schedule_header SET status='CANCELLED' WHERE schedule_header_id=?", automatic.scheduleHeaderIds().getFirst());
+        jdbc.update("UPDATE fgc.insurance_contract SET monthly_equivalent_first_premium=300000 WHERE contract_id=?", contract);
+        assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        assertThat(scheduleRead("/api/v1/schedules/" + header).path("lines").get(0).path("basisAmount").decimalValue())
+                .isEqualByComparingTo("100000");
+        assertFixedPreviewCsv(header);
+
+    }
+
+    private void assertTimestampOnlyUpdatesReusePreview(long contract, long offering, long header) {
+        var contractUpdated = jdbc.queryForObject("SELECT updated_at FROM fgc.insurance_contract WHERE contract_id=?", java.sql.Timestamp.class, contract);
+        jdbc.update("UPDATE fgc.insurance_contract SET monthly_equivalent_first_premium=monthly_equivalent_first_premium WHERE contract_id=?", contract);
+        assertThat(jdbc.queryForObject("SELECT updated_at FROM fgc.insurance_contract WHERE contract_id=?", java.sql.Timestamp.class, contract)).isAfter(contractUpdated);
+        assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        var offeringUpdated = jdbc.queryForObject("SELECT updated_at FROM fgc.product_offering WHERE product_offering_id=?", java.sql.Timestamp.class, offering);
+        jdbc.update("UPDATE fgc.product_offering SET fee_regime_code=fee_regime_code WHERE product_offering_id=?", offering);
+        assertThat(jdbc.queryForObject("SELECT updated_at FROM fgc.product_offering WHERE product_offering_id=?", java.sql.Timestamp.class, offering)).isAfter(offeringUpdated);
+        assertThat(scheduleGenerator.generateSchedulesByContractId(contract).scheduleHeaderIds()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.schedule_header WHERE contract_id=? AND schedule_purpose='SIMULATION'", Integer.class, contract)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT active_yn FROM fgc.schedule_header WHERE schedule_header_id=?", Boolean.class, header)).isTrue();
+    }
+
+    private void assertFixedPolicyLines(JsonNode detail) {
+        assertThat(detail.path("header").path("installmentCount").asInt()).isEqualTo(12);
+        assertThat(detail.path("header").path("lineCount").asInt()).isEqualTo(12);
+        assertThat(detail.path("lines").size()).isEqualTo(12);
+        for (JsonNode line : detail.path("lines")) {
+            assertThat(line.path("basisCode").asText()).isEqualTo("MONTHLY_EQUIVALENT_FIRST_PREMIUM");
+            assertThat(line.path("basisAmount").decimalValue()).isEqualByComparingTo("100000");
+            assertThat(line.path("fixedAmount").decimalValue()).isEqualByComparingTo("12000");
+            assertThat(line.path("expectedAmount").decimalValue()).isEqualByComparingTo("12000");
+        }
+    }
+
+    private void assertFixedPreviewCsv(long header) throws Exception {
+        String csv = mvc.perform(get("/api/v1/schedules/" + header + "/export.csv").with(user(writer)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        var csvLines = csv.lines().toList();
+        assertThat(csvLines).hasSize(13);
+        assertThat(csvLines.getFirst()).endsWith("\"수수료 규칙 ID\",\"정액\"");
+        for (String csvLine : csvLines.subList(1, csvLines.size())) {
+            String[] cells = java.util.Arrays.stream(csvLine.split(",", -1))
+                    .map(cell -> cell.substring(1, cell.length() - 1)).toArray(String[]::new);
+            assertThat(cells).hasSize(14);
+            assertThat(cells[6]).isEqualTo("MONTHLY_EQUIVALENT_FIRST_PREMIUM");
+            assertThat(new java.math.BigDecimal(cells[7])).isEqualByComparingTo("100000");
+            assertThat(cells[8]).isEqualTo("FIXED");
+            assertThat(cells[9]).isEmpty();
+            assertThat(new java.math.BigDecimal(cells[10])).isEqualByComparingTo("12000");
+            assertThat(new java.math.BigDecimal(cells[13])).isEqualByComparingTo("12000");
+        }    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void monthlyPreviewRollsBackBothStagesWhenSecondStageIsCancelled(boolean seven) throws Exception {
+        String document = "BD-" + UUID.randomUUID();
+        String from = seven ? "2029-01-01" : "2027-01-01";
+        long offering = insertOffering(seven, from, document);
+        long contract = insertContract(offering, seven ? "2029-03-02" : "2027-03-02");
+        ObjectNode draft = installmentDraft(seven, offering, from, document);
+        ObjectNode rule = (ObjectNode) draft.path("commissionRules").get(0);
+        rule.put("agentRankCode", "FC");
+        ((com.fasterxml.jackson.databind.node.ArrayNode) draft.path("commissionRules"))
+                .add(rule.deepCopy().put("paymentStage", "INSURER_TO_GA"));
+        JsonNode created = create(draft, writer);
+        long policy = created.path("policyVersionId").asLong();
+        JsonNode submitted = action(policy, "SUBMIT", created, writer, 200);
+        JsonNode approved = action(policy, "APPROVE", submitted, approver, 200);
+        action(policy, "ACTIVATE", approved, approver, 200);
+
+        var first = scheduleGenerator.generateSchedulesForValidation(contract);
+        assertThat(first.scheduleHeaderIds()).hasSize(2);
+        assertThat(first.createdLineCount()).isEqualTo(seven ? 168 : 96);
+        assertThat(scheduleGenerator.generateSchedulesForValidation(contract).scheduleHeaderIds()).isEmpty();
+        jdbc.update("UPDATE fgc.schedule_header SET status='CANCELLED' WHERE contract_id=? AND payment_stage='GA_TO_FC'", contract);
+        jdbc.update("UPDATE fgc.insurance_contract SET monthly_equivalent_first_premium=200000 WHERE contract_id=?", contract);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> scheduleGenerator.generateSchedulesForValidation(contract))
+                .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class)
+                .satisfies(error -> assertThat(((com.susukkang.fgc.common.exception.FgcBusinessException) error).getDetail())
+                        .contains("GA_TO_FC", "취소"));
+        // INSURER_TO_GA가 먼저 새 판을 만들었더라도 두 번째 단계 실패 시 함께 롤백된다.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.schedule_header WHERE contract_id=?", Long.class, contract))
+                .isEqualTo(2L);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.schedule_header WHERE contract_id=? AND active_yn", Long.class, contract))
+                .isEqualTo(2L);
+        assertThat(jdbc.queryForObject("SELECT MAX(basis_amount) FROM fgc.schedule_line WHERE schedule_header_id=?",
+                java.math.BigDecimal.class, first.scheduleHeaderIds().getFirst())).isEqualByComparingTo("100000");
+    }
+
+    private JsonNode scheduleRead(String path) throws Exception {
+        return body(mvc.perform(get(path).with(user(writer))).andExpect(status().isOk()).andReturn()).path("data");
+    }
+
     private ObjectNode installmentDraft(boolean seven, long offering, String from, String document) {
         ObjectNode draft = draft().put("policyType", seven ? "SEVEN_YEAR_COMMISSION" : "FOUR_YEAR_COMMISSION")
                 .put("feeRegimeCode", seven ? "SEVEN_YEAR_2029" : "FOUR_YEAR_2027")
@@ -1551,6 +1841,32 @@ class PolicyWorkflowIntegrationTest {
 
     private static List<String> values(JsonNode array) {
         return StreamSupport.stream(array.spliterator(), false).map(JsonNode::asText).toList();
+    }
+
+    /** Hold the contract row so the first HTTP request keeps its advisory lock while the second arrives. */
+    private JsonNode concurrentPreviewWithSameKey(long contract, String path, ObjectNode payload, String requestKey) throws Exception {
+        try (var blocker = jdbc.getDataSource().getConnection(); var executor = Executors.newSingleThreadExecutor()) {
+            blocker.setAutoCommit(false);
+            try (var statement = blocker.prepareStatement("SELECT contract_id FROM fgc.insurance_contract WHERE contract_id=? FOR UPDATE")) {
+                statement.setLong(1, contract);
+                statement.executeQuery().close();
+            }
+            var first = executor.submit(() -> perform(HttpMethod.POST, path, payload, writer, requestKey));
+            try {
+                org.awaitility.Awaitility.await().atMost(Duration.ofSeconds(10))
+                        .pollInterval(Duration.ofMillis(20)).until(() ->
+                                Boolean.FALSE.equals(jdbc.queryForObject(
+                                        "SELECT pg_try_advisory_xact_lock(hashtextextended(?,0))", Boolean.class,
+                                        "schedule-preview:" + requestKey)));
+                assertThat(writeError(HttpMethod.POST, path, payload, writer, requestKey, 409).path("code").asText())
+                        .isEqualTo("FGC-IMPL-REQUEST_IN_PROGRESS");
+            } finally {
+                blocker.rollback();
+            }
+            MvcResult result = first.get(20, TimeUnit.SECONDS);
+            assertThat(result.getResponse().getStatus()).isEqualTo(200);
+            return mapper.readTree(result.getResponse().getContentAsString()).path("data");
+        }
     }
 
     private static List<MvcResult> concurrently(Callable<MvcResult> first, Callable<MvcResult> second) throws Exception {
