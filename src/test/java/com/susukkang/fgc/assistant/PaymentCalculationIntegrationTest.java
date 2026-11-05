@@ -51,6 +51,86 @@ class PaymentCalculationIntegrationTest {
     }
 
     @MockitoSpyBean com.susukkang.fgc.assistant.service.CalculationDependencyFingerprint fingerprints;
+    @Test void hypotheticalBodyContractAndNullAttributionFallbackBecomeStaleWhenTheSourceChanges() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            try {
+                long bodyContract=copyCandidateContract();
+                var input=candidateRequest("NEW_PAYMENT","100000");
+                var payment=(com.fasterxml.jackson.databind.node.ObjectNode)input.candidate().get("payment");
+                payment.put("contractId",Long.toString(bodyContract));
+                var rows=(com.fasterxml.jackson.databind.node.ArrayNode)payment.get("attributions");
+                var first=(com.fasterxml.jackson.databind.node.ObjectNode)rows.get(0);
+                first.put("amount","50000");
+                var fallback=first.deepCopy();fallback.putNull("contractId");rows.add(fallback);
+                var result=calculations.calculateVerified(input);
+                assertThat(result.validity()).isNotNull();
+                jdbc.update("UPDATE fgc.insurance_contract SET updated_at=updated_at+INTERVAL '1 second' WHERE contract_id=?",bodyContract);
+                assertThat(calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),input)).status()).isEqualTo("STALE");
+            } finally {status.setRollbackOnly();}
+        });
+    }
+    @Test void candidateIncludesOtherContractsOfTheRecipientForFirstContractRules() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            try {
+                var input=candidateRequest("NEW_PAYMENT","100000");
+                var result=calculations.calculateVerified(input);
+                assertThat(result.validity()).isNotNull();
+                long another=copyCandidateContract();
+                assertThat(another).isNotEqualTo(contractId);
+                assertThat(calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),input)).status()).isEqualTo("STALE");
+            } finally {status.setRollbackOnly();}
+        });
+    }
+    @Test void unrelatedNoticeAndOtherContractUpdatesKeepTheCurrentFingerprint() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            try {
+                var input=request(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE);
+                String before=fingerprints.current(input);
+                jdbc.update("INSERT INTO fgc.notice(title,body,target_role_codes,post_from,created_by) SELECT 'scope-test','synthetic','[]'::jsonb,CURRENT_DATE,user_id FROM fgc.app_user ORDER BY user_id LIMIT 1");
+                Long other=jdbc.queryForObject("SELECT contract_id FROM fgc.insurance_contract WHERE contract_id<>? ORDER BY contract_id LIMIT 1",Long.class,contractId);
+                jdbc.update("UPDATE fgc.insurance_contract SET updated_at=updated_at+INTERVAL '1 second' WHERE contract_id=?",other);
+                assertThat(fingerprints.current(input)).isEqualTo(before);
+                jdbc.update("UPDATE fgc.insurance_contract SET updated_at=updated_at+INTERVAL '1 second' WHERE contract_id=?",contractId);
+                assertThat(fingerprints.current(input)).isNotEqualTo(before);
+            } finally {status.setRollbackOnly();}
+        });
+    }
+    @Test void deletingAnAttributionInvalidatesTheFingerprintWithoutChangingThePaymentRow() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            try {
+                var input=request(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE);
+                String before=fingerprints.current(input);
+                String payment=paymentRow();
+                assertThat(jdbc.update("DELETE FROM fgc.transaction_attribution WHERE commission_transaction_id=?",paymentId)).isPositive();
+                assertThat(paymentRow()).isEqualTo(payment);
+                assertThat(fingerprints.current(input)).isNotEqualTo(before);
+            } finally {status.setRollbackOnly();}
+        });
+    }
+    @Test void scopedFingerprintKeepsFiveSecondBudgetWithOneHundredThousandUnrelatedFinancialRows() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            try {
+                var input=request(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE);
+                String before=fingerprints.current(input);
+                Long other=jdbc.queryForObject("SELECT contract_id FROM fgc.insurance_contract WHERE contract_id<>? ORDER BY contract_id LIMIT 1",Long.class,contractId);
+                assertThat(jdbc.update("""
+                    INSERT INTO fgc.contract_financial_snapshot(contract_id,as_of_date,contract_month_no,cumulative_paid_premium,surrender_value,source_ref)
+                    SELECT ?, DATE '1200-01-01' + n, n+1, 100, 50, 'assistant-scope-perf'
+                    FROM generate_series(1,100000) n
+                    """,other)).isEqualTo(100000);
+                var samples=new ArrayList<Long>();
+                for(int i=0;i<12;i++) {
+                    long started=System.nanoTime();
+                    assertThat(fingerprints.current(input)).isEqualTo(before);
+                    samples.add(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
+                }
+                var sorted=samples.stream().sorted().toList();
+                long p95=sorted.get((int)Math.ceil(sorted.size()*0.95)-1);
+                System.out.println("#854 unrelated financial rows=100000, cold/warm(ms)="+samples+", p95(ms)="+p95);
+                assertThat(p95).isLessThan(5000);
+            } finally {status.setRollbackOnly();}
+        });
+    }
     @Autowired com.susukkang.fgc.assistant.service.AssistantPrecheckProofService precheckProofs;
     @Test void dependencyQueryIsRepeatableAndMeasuresSeedCost() {
         var transaction=new TransactionTemplate(transactionManager);
@@ -75,12 +155,12 @@ class PaymentCalculationIntegrationTest {
             assertThat(jdbc.queryForObject("SHOW transaction_isolation",String.class)).isEqualTo("repeatable read");
             jdbc.execute("SELECT 1 / 0");
             return invocation.callRealMethod();
-        }).when(fingerprints).current();
+        }).when(fingerprints).forPayment(paymentId);
         var checked=precheckProofs.check(paymentId);
         assertThat(checked.token()).isNull();assertThat(checked.result()).isEqualTo(expected);
         assertThat(jdbc.queryForObject("SELECT 1",Integer.class)).isEqualTo(1);
         assertThat(counts()).isEqualTo(before);
-        verify(fingerprints).current();
+        verify(fingerprints).forPayment(paymentId);
     }
 
     @BeforeEach void createOwnedCommittedDraft() {
