@@ -21,18 +21,18 @@
 .ast-filter { align-items: flex-end; }
 .ast-filter-fields { flex: 1 1 auto; }
 
-/* 조회 버튼은 사이드바 메뉴 색 계열로 맞춘다. */
-.ast-filter .button-primary { background: var(--color-nav-bg-default); }
-.ast-filter .button-primary:hover { background: var(--color-nav-bg-hover); }
-.ast-filter .button-primary:active { background: var(--color-nav-bg-active); }
+/* 조회 버튼은 요약 막대와 같은 흰색으로 맞춘다. */
+.ast-filter .button-primary { background: var(--color-bg-surface); }
+.ast-filter .button-primary:hover { background: var(--color-bg-subtle); }
+.ast-filter .button-primary:active { background: var(--color-bg-subtle); }
 
-/* 유형별 요약: 표 위의 한 줄 막대. 흰 표면과 구분되도록 연한 회색 바탕을 쓴다. */
+/* 유형별 요약: 표 위의 한 줄 막대. 조회 버튼과 같은 흰색 바탕을 쓴다. */
 .ast-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   border: 1px solid var(--ast-gray-line);
   border-radius: var(--radius-md);
-  background: var(--ast-gray);
+  background: var(--color-bg-surface);
   overflow: hidden;
 }
 

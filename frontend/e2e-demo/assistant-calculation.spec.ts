@@ -1,0 +1,26 @@
+import { selectEntity } from '../e2e/selectEntity'
+import { test,expect,login,api,responseFor,successful,sql } from './fixtures'
+test.use({video:'off'})
+const counts=()=>sql("SELECT json_build_array((SELECT count(*) FROM fgc.commission_transaction),(SELECT count(*) FROM fgc.transaction_attribution),(SELECT count(*) FROM fgc.cap_check),(SELECT count(*) FROM fgc.journal_header),(SELECT count(*) FROM fgc.exception_case),(SELECT count(*) FROM fgc.audit_log))")
+test('#733 실제 서버: 가상 귀속·신규 후보 무저장 계산',async({page},info)=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message))
+  await login(page,'settle01','/transactions/new?month=2026-07')
+  const contracts=await api(page,'/contracts?contractNo=FGC-FGL01-202607-0002&page=1&size=20')
+  const contract=await api(page,`/contracts/${contracts.content[0].contractId}`)
+  const items=await api(page,'/base/commission-items?asOf=2026-07-01')
+  const item=items.find((entry:{itemCode:string})=>entry.itemCode==='BASE_COMMISSION')
+  await selectEntity(page,page.locator('#recipient'),String(contract.agentId));await selectEntity(page,page.locator('#item'),String(item.commissionItemId))
+  await page.locator('#bizKey').fill('E2E-733-NO-WRITE');await page.locator('#amount').fill('20')
+  if(!(await page.locator('[data-contract-id]').count()))await page.locator('#btn-add-attr').click()
+  await selectEntity(page,page.locator('[data-contract-id]'),String(contract.contractId));await page.locator('[data-attr-date]').fill('2026-07-31');await page.locator('[data-attr-amount]').fill('20')
+  const before=counts(), workbench=page.locator('.transaction-form-page > .payment-calculation')
+  await workbench.locator('summary').click();await workbench.getByLabel('계산 업무').selectOption('PAYMENT_CANDIDATE')
+  const calculating=responseFor(page,'/assistant/calculations');await workbench.getByRole('button',{name:'계산 조회',exact:true}).click();const response=await calculating
+  expect(response.headers()['x-fgc-precheck-token']).toBeUndefined();expect(response.ok()).toBe(true)
+  const candidate=(await response.json()).data;expect(candidate.mode).toBe('HYPOTHETICAL');expect(candidate.evidenceKind).toBe('HYPOTHETICAL');expect(candidate.validity.stateToken).toBeTruthy();expect(candidate.recommendation.allowed).toBe(false)
+  await expect(workbench.getByText('가상 후보 · 실제 사전검증 완료를 뜻하지 않습니다.')).toBeVisible();expect(counts()).toBe(before)
+  const validating=responseFor(page,'/assistant/calculations/revalidate');await workbench.getByRole('button',{name:'최신 근거 재확인'}).click();expect((await successful(validating)).status).toBe(candidate.status);expect(counts()).toBe(before)
+  await workbench.getByLabel('계산 업무').selectOption('ATTRIBUTION_BALANCE');await workbench.getByLabel('지급액',{exact:true}).fill('1.49');await workbench.getByLabel('귀속 금액 (쉼표로 구분)').fill('0.50,0.50')
+  const balancing=responseFor(page,'/assistant/calculations');await workbench.getByRole('button',{name:'계산 조회',exact:true}).click();expect((await successful(balancing)).amounts.differenceAmount).toBe('-1');await expect(workbench.getByText('-1원')).toBeVisible();expect(counts()).toBe(before)
+  await info.attach('read-only-candidate-and-balance',{body:await page.screenshot(),contentType:'image/png'});expect(errors).toEqual([])
+})

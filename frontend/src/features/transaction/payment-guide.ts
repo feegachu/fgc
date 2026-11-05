@@ -1,6 +1,6 @@
 import type { GuideCondition, GuideContext, GuideEnvironment } from '../assistant/guide/types'
 import { GuideFailure } from '../assistant/guide/targets'
-import { readPayment } from './form-api'
+import { readPayment, verifyPrecheck } from './form-api'
 import type { Payment, Precheck } from './form-api'
 import { draftRows, initialForm } from './form-model'
 import type { AttributionRow, FormValues } from './form-model'
@@ -213,6 +213,7 @@ export class PaymentGuideObserver {
     )
       return false
     this.server = structuredClone(refreshed)
+    this.checked = null
     this.confirmation = structuredClone(refreshed)
     this.emit()
     return true
@@ -247,6 +248,14 @@ export class PaymentGuideObserver {
       this.emit()
       throw new GuideFailure('SERVER_STATE_CHANGED')
     }
+    let verified = false
+    if (matches && !input.dirty && payment?.status === 'DRAFT' && this.checked?.key === serverKey(payment) && this.checked.result.confirmable === true && !this.checked.result.blockers?.length && this.checked.result.precheckToken) {
+      try {
+        verified = await verifyPrecheck(input.paymentId!, this.checked.result.precheckToken, AbortSignal.any([signal,this.lifetime.signal]))
+      } catch { signal.throwIfAborted(); verified = false }
+      if (this.disposed || JSON.stringify(this.readContext()) !== initialContext) throw new GuideFailure('CONTEXT_CHANGED')
+      if (!verified) { this.checked = null; this.acknowledgements.delete('PRECHECK_RESULT_ACKNOWLEDGED'); this.emit(); throw new GuideFailure('SERVER_STATE_CHANGED') }
+    }
     const amountsValid = validWon(input.form.amount) && input.rows.every((row) => validWon(row.amount))
     return {
       available: input.ready && readers.includes(input.role),
@@ -267,6 +276,7 @@ export class PaymentGuideObserver {
       validationMessage: input.validationMessage,
       saved: matches && !input.dirty && payment?.status === 'DRAFT',
       prechecked:
+        verified &&
         matches &&
         !input.dirty &&
         this.checked?.key === serverKey(payment!) &&
