@@ -3,6 +3,7 @@ package com.susukkang.fgc.ai.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.susukkang.fgc.ai.config.LlmProperties;
 import com.susukkang.fgc.ai.repository.AiCallLogRepository;
@@ -29,12 +30,15 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
 
     /** 저장 답변에서 공급자 장애를 뜻하는 값이자, 호출 실패를 기록할 때 쓰는 값이다. */
     public static final String AI_FAILURE = "AI_001";
+    /** 도구 호출 경로에서 모델이 부른 도구 목록(이름·인자). 저장 답변을 재생할 때 같은 도구를 먼저 실행해 서버 검증이 같게 돌게 한다. */
+    public static final String TOOL_CALLS = "ToolCalls";
 
     private final ObjectMapper mapper;
     private final Set<String> instructions = new TreeSet<>();
     private Map<String, JsonNode> saved;
     private Map<String, JsonNode> outputs = new LinkedHashMap<>();
     private int calls;
+    private int modelRequests;
     private int caseCalls;
     private int caseFailures;
 
@@ -65,6 +69,45 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
             caseFailures++;
             outputs.put(outputType.getSimpleName(), TextNode.valueOf(AI_FAILURE));
             throw e;
+        }
+    }
+
+    @Override
+    public <T> T callWithTools(LlmRequest request, Class<T> outputType, List<ToolSpec> tools, ToolRunner runner, int maxToolCalls) {
+        calls++;
+        caseCalls++;
+        instructions.add(request.purpose() + "\n" + request.instructions());
+        ArrayNode toolCalls = mapper.createArrayNode();
+        ToolRunner recording = (name, arguments) -> {
+            toolCalls.addObject().put("name", name).put("arguments", arguments);
+            return runner.run(name, arguments);
+        };
+        try {
+            T output;
+            if (saved == null) {
+                output = super.callWithTools(request, outputType, tools, recording, maxToolCalls);
+            } else {
+                replayToolCalls(runner);
+                output = replay(outputType);
+            }
+            outputs.put(outputType.getSimpleName(), mapper.valueToTree(output));
+            if (saved == null && !toolCalls.isEmpty()) {
+                outputs.put(TOOL_CALLS, toolCalls);
+            } else if (saved != null && saved.get(TOOL_CALLS) != null) {
+                outputs.put(TOOL_CALLS, saved.get(TOOL_CALLS));
+            }
+            return output;
+        } catch (FgcBusinessException e) {
+            caseFailures++;
+            outputs.put(outputType.getSimpleName(), TextNode.valueOf(AI_FAILURE));
+            throw e;
+        }
+    }
+
+    private void replayToolCalls(ToolRunner runner) {
+        JsonNode recorded = saved.get(TOOL_CALLS);
+        if (recorded != null && recorded.isArray()) {
+            recorded.forEach(call -> runner.run(call.path("name").asText(), call.path("arguments").asText()));
         }
     }
 
@@ -103,8 +146,19 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
         return outputs;
     }
 
+    /** 질문(서비스 호출) 수. 도구 경로는 질문 하나가 모델 요청 여러 번이므로 실제 요청 수는 {@link #modelRequests()} 로 본다. */
     public int calls() {
         return calls;
+    }
+
+    /** 모델에 실제로 보낸 요청 수(도구 라운드 포함). 저장 답변 재생은 세지 않는다. */
+    public int modelRequests() {
+        return modelRequests;
+    }
+
+    @Override
+    protected void beforeModelRequest() {
+        modelRequests++;
     }
 
     public int caseCalls() {
