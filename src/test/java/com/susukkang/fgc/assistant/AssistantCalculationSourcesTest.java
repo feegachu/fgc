@@ -97,6 +97,94 @@ class AssistantCalculationSourcesTest {
   }
 
   @Test
+  void sourceIdentityListsOnlyUnprovidedContractOrStage() {
+    for (var kind :
+        List.of(
+            PaymentCalculationRequest.Kind.CAP_STATUS,
+            PaymentCalculationRequest.Kind.EXPECTED_COMMISSION)) {
+      var withoutStage =
+          new PaymentCalculationRequest(
+              "assistant.v1",
+              kind,
+              PaymentCalculationRequest.Mode.EXISTING,
+              new PaymentCalculationRequest.Scope(
+                  null,
+                  "3",
+                  "2026-10",
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL),
+              null,
+              1L);
+      assertThat(service.calculate(withoutStage).missingInputs()).containsExactly("paymentStage");
+      var withoutContract =
+          new PaymentCalculationRequest(
+              "assistant.v1",
+              kind,
+              PaymentCalculationRequest.Mode.EXISTING,
+              new PaymentCalculationRequest.Scope(
+                  null,
+                  null,
+                  "2026-10",
+                  PaymentStage.INSURER_TO_GA,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL),
+              null,
+              1L);
+      assertThat(service.calculate(withoutContract).missingInputs()).containsExactly("contractId");
+    }
+    verifyNoInteractions(schedules, caps, contracts, access);
+  }
+
+  @Test
+  void expectedCalculationCollectsAllKnownMissingFieldsBeforeReadingSources() {
+    var request =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.EXPECTED_COMMISSION,
+            PaymentCalculationRequest.Mode.EXISTING,
+            null,
+            null,
+            1L);
+    assertThat(service.calculate(request).missingInputs())
+        .containsExactly("contractId", "paymentStage", "settlementMonth", "aggregation");
+    var single =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            request.kind(),
+            request.mode(),
+            new PaymentCalculationRequest.Scope(
+                null,
+                null,
+                null,
+                PaymentStage.GA_TO_FC,
+                null,
+                null,
+                null,
+                null,
+                null,
+                PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE),
+            null,
+            1L);
+    assertThat(service.calculate(single).missingInputs())
+        .containsExactly(
+            "contractId",
+            "settlementMonth",
+            "commissionItemId",
+            "installmentNo",
+            "beneficiaryAgentId");
+    verifyNoInteractions(schedules, caps, contracts, access);
+  }
+
+  @Test
   void singleLineListsOnlyFieldsMissingForItsPaymentStage() {
     var insurer =
         new PaymentCalculationRequest(
