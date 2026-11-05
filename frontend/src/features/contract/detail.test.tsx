@@ -99,7 +99,9 @@ describe('CONT-W02 계약 상세', () => {
     expect(within(table).getByRole('columnheader', { name: '지급예정액·계산 기준' })).toBeVisible()
     expect(within(table).getByText('50,000원')).toBeVisible()
     expect(within(table).getByText(label!)).toBeVisible()
-    expect(within(table).getByText(label!)).toHaveAttribute('title')
+    expect(within(table).getByText(label!)).not.toHaveAttribute('title')
+    if (basis === 'UNRESOLVED_UPPER_BOUND_V1')
+      expect(within(table).getByText('연결이 불명확한 지급은 차감하지 않은 상한입니다. 자료 확인 전에는 확정된 잔여액으로 해석하지 마세요.')).toBeVisible()
     expect(requested.some(({ options }) => options?.method === 'POST')).toBe(false)
   })
 

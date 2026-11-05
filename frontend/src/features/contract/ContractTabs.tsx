@@ -406,7 +406,8 @@ const arbitrageColumns: TableColumn<ContractArbitrageCheck>[] = [
       return (
         <>
           <Amount value={row.plannedCommissionAmount} />
-          <small style={{ display: 'block' }} title={basis.description}>{basis.label}</small>
+          <small style={{ display: 'block' }}>{basis.label}</small>
+          <small style={{ display: 'block', whiteSpace: 'normal' }}>{basis.description}</small>
         </>
       )
     },

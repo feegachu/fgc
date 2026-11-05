@@ -16,5 +16,7 @@ it.each([
   render(<div>{planned.render!(row)}</div>)
   expect(screen.getByText('50,000원')).toBeVisible()
   expect(screen.getByText(label!)).toBeVisible()
-  expect(screen.getByText(label!)).toHaveAttribute('title')
+  expect(screen.getByText(label!)).not.toHaveAttribute('title')
+  if (basis === 'UNRESOLVED_UPPER_BOUND_V1')
+    expect(screen.getByText('연결이 불명확한 지급은 차감하지 않은 상한입니다. 자료 확인 전에는 확정된 잔여액으로 해석하지 마세요.')).toBeVisible()
 })

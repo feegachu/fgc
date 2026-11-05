@@ -64,7 +64,8 @@ export const columns: TableColumn<ArbitrageRow>[] = [
       return (
         <>
           <ArbitrageAmount value={r.plannedCommissionAmount} />
-          <span className="arb-planned-basis" title={basis.description}>{basis.label}</span>
+          <span className="arb-planned-basis">{basis.label}</span>
+          <small style={{ display: 'block', whiteSpace: 'normal' }}>{basis.description}</small>
         </>
       )
     },
