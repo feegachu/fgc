@@ -208,6 +208,47 @@ class CompareAskServiceTest {
         assertThat(CompareAskService.isRankQuestion("1등급이 뭐야?")).isFalse();
     }
 
+    @Test
+    @DisplayName("'2등급과 3등급 차이'는 '차이'가 있어도 순위 비교가 아니라 등급 용어 설명으로 답한다(AI 거절·실패·성공)")
+    void gradeDifferenceQuestionIsNotRankComparison() {
+        String question = "2등급과 3등급 차이가 뭐야?";
+
+        llmReturns(false, "");
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("협회 수수료 등급:").doesNotContain("1위는");
+
+        llmReturns(true, "협회가 공시한 등급끼리의 차이예요.");
+        CompareAskResponse ok = service.ask(question, threeItems());
+        assertThat(ok.source()).isEqualTo("LLM");
+        assertThat(ok.answer()).isEqualTo("협회가 공시한 등급끼리의 차이예요.");
+
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("협회 수수료 등급:").doesNotContain("1위는");
+    }
+
+    @Test
+    @DisplayName("순위 단어 없이 상품 이름 둘로만 물어도 순위 질문으로 보고 두 상품의 이월 예정액을 서버 값으로 답한다")
+    void twoProductNamesWithoutRankWordAreRankQuestion() {
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+
+        CompareAskResponse response = service.ask("튼튼건강이랑 편한건강 중 이월 예정액이 어느 쪽이 더 커?", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강", "이월 예정액은 2위 0원, 3위 0원이에요.")
+                .doesNotStartWith("이월:");
+    }
+
+    @Test
+    @DisplayName("보험사만 다르고 이름이 같은 상품은 이름만으로 어느 순위인지 정하지 않는다")
+    void duplicateFullProductNameIsNotResolvedToARank() {
+        Item first = new Item(1, 1, "가보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of());
+        Item third = new Item(3, 3, "다보험", "편한건강", 500_000, 480_000, 0, 30_000, 450_000, 70.0, null, List.of());
+        List<Item> items = List.of(first, second, third);
+
+        assertThat(CompareAskService.askedRanks(items, "튼튼건강 순위가 왜 이래?")).isEmpty();
+        assertThat(CompareAskService.askedRanks(items, "튼튼건강이랑 편한건강 비교해줘")).containsExactly(3);
+    }
+
     private static CompareRankingResponse threeItems() {
         CompareRankingResponse two = twoItems();
         Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());
