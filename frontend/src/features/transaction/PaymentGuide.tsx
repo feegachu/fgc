@@ -108,6 +108,13 @@ function GuideSession({
       if (initialStepId && !guide.steps.some((step) => step.stepId === initialStepId)) throw new Error('INVALID_GUIDE_STEP')
       await runtime.start({ workflowId: guide.workflowId, stepId: initialStepId ?? guide.steps[0].stepId, guideVersion: guide.guideVersion,
         entityRefs: context.entityRefs, clientContextRevision: context.clientContextRevision, serverStateVersion: context.serverStateVersion })
+      // The API's safe DRAFT entry does not claim a completed precheck. Reuse the
+      // observer's owner/session-bound proof verification before advancing an
+      // already completed precheck to its result acknowledgement, never confirm.
+      if (initialStepId && runtime.getSnapshot().step?.completionConditionId === 'CURRENT_PRECHECK_PASSED') {
+        const latest = await observer.readBusinessState(context, AbortSignal.timeout(5000))
+        if (!cancelled && latest.saved && latest.prechecked) await runtime.next()
+      }
     }).catch(() => {
       if (!cancelled) setMessage('현재 선택 대상과 권한을 확인한 뒤 안내를 다시 시작해주세요.')
     })
