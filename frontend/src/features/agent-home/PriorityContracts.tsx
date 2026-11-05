@@ -8,7 +8,7 @@ import type { AgentHome, PriorityContract } from './api'
 
 const REASON_LABEL: Record<string, string> = {
   FOLLOW_UP: '후속 확인일 도래',
-  STATUS_EVENT_UNCONFIRMED: '상태 변화 미확인',
+  STATUS_EVENT_UNCONFIRMED: '상태 사건 미확인',
   HOLD_UNRESOLVED: '보류 미해결',
 }
 
@@ -24,7 +24,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
         <div>
           <h2 className="ah-panel-title">확인할 계약</h2>
           <p className="ah-panel-sub">
-            {total === 0 ? '지금 확인할 계약이 없어요' : `상태 변화, 보류, 후속 확인 대상 ${total}건${total > items.length ? ` · 상위 ${items.length}건 표시` : ''}`}
+            {total === 0 ? '지금 확인할 계약이 없어요' : `총 ${total}건${total > items.length ? ` · 상위 ${items.length}건 표시` : ''}`}
           </p>
         </div>
       </div>
@@ -36,7 +36,7 @@ export function PriorityContracts({ home }: { home: AgentHome }) {
                 <Link data-guide-feature="features.agent-home.priority-contracts.contract-link" to={`/contracts/${item.contractId}`}>{item.contractNo}</Link>
                 <span className="ah-priority-meta">
                   {item.insurerName} · {item.productName} · {item.currentStatus}
-                  {item.elapsedDays != null && ` · 상태 변화 후 ${item.elapsedDays}일 경과`}
+                  {item.elapsedDays != null && ` · 마지막 사건 ${item.elapsedDays}일 경과`}
                 </span>
                 <span className="ah-priority-meta">
                   {`${month} 예정 ${int(item.expectedAmount ?? 0)}원`}
