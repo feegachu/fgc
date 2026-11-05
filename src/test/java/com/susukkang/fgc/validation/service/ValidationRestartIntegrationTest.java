@@ -114,18 +114,60 @@ class ValidationRestartIntegrationTest {
     return new ValidationRestartRequest(101L, s.expectedStateVersion(), "원인 수정");
   }
 
-  /** VRUN-W02 실패 시각. 실행의 완료 시각(completed_at)은 실패 전이에서 채워지지 않아 늘 `자료 없음`이었다. */
+  /** VRUN-W02 실패 시각은 실행의 completed_at이 아니라 실패한 JobExecution.endTime에서 온다. */
   @Test
   void failedAtComesFromTheFailedBatchExecutionNotFromTheRun() {
     assertThat(service.eligibility(run).failedAt()).isNull();
 
+    var endTime = java.time.LocalDateTime.of(2093, 7, 31, 23, 40);
     var failed = new JobExecution(101L);
     failed.getExecutionContext().putLong("validationRunId", run);
-    failed.setEndTime(java.time.LocalDateTime.of(2093, 7, 31, 23, 40));
+    failed.setEndTime(endTime);
     when(lookup.findFailedExecution(any())).thenReturn(failed);
 
-    assertThat(service.eligibility(run).failedAt().toLocalDateTime())
-        .isEqualTo(java.time.LocalDateTime.of(2093, 7, 31, 23, 40));
+    assertThat(service.eligibility(run).failedAt())
+        .hasToString(
+            com.susukkang.fgc.common.util.DateUtil.toSeoul(
+                    endTime.atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime())
+                .toString());
+  }
+
+  /** 같은 순간을 UTC와 Asia/Seoul JVM의 벽시계 값으로 넣어도 응답은 같은 순간의 +09:00이다. */
+  @Test
+  void failedAtIsTheSameSeoulInstantWhicheverZoneTheBatchRanIn() {
+    assertThat(
+            ValidationRestartService.seoulInstant(
+                java.time.LocalDateTime.of(2026, 1, 1, 0, 0), java.time.ZoneId.of("UTC")))
+        .hasToString("2026-01-01T09:00+09:00");
+    assertThat(
+            ValidationRestartService.seoulInstant(
+                java.time.LocalDateTime.of(2026, 1, 1, 9, 0), java.time.ZoneId.of("Asia/Seoul")))
+        .hasToString("2026-01-01T09:00+09:00");
+  }
+
+  /** 실행기가 스케줄러보다 먼저 만료 접수에 닿아도 오류 코드는 같다. */
+  @Test
+  void aRequestThatExpiredBeforeTheExecutorReachedItIsRecordedAsTimeout() {
+    var a = service.restart(run, user, "late-executor", request());
+    jdbc.update(
+        "UPDATE fgc.validation_run_retry SET requested_at=clock_timestamp()-interval '6 minutes'"
+            + " WHERE retry_id=?",
+        a.retryId());
+    pending.completeExceptionally(new IllegalStateException("만료되었거나 이미 기동된 재시작 접수입니다."));
+    assertThat(service.history(run).getFirst().errorCode()).isEqualTo("LAUNCH_TIMEOUT");
+  }
+
+  /** 이미 기동을 시작한 작업의 실패는 오래됐어도 LAUNCH_FAILED다. */
+  @Test
+  void aLaunchThatAlreadyStartedStaysLaunchFailedEvenWhenOld() {
+    var a = service.restart(run, user, "started-old", request());
+    jdbc.update(
+        "UPDATE fgc.validation_run_retry SET"
+            + " state='LAUNCHING',requested_at=clock_timestamp()-interval '6 minutes' WHERE"
+            + " retry_id=?",
+        a.retryId());
+    pending.completeExceptionally(new IllegalStateException("launch failed"));
+    assertThat(service.history(run).getFirst().errorCode()).isEqualTo("LAUNCH_FAILED");
   }
 
   @Test

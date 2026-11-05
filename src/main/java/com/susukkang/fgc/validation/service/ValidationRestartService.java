@@ -74,7 +74,7 @@ public class ValidationRestartService {
         var previous = executions.findFailedExecution(ValidationRunRow.from(run));
         executionId = previous.getId();
         if (previous.getEndTime() != null)
-          failedAt = previous.getEndTime().atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime();
+          failedAt = seoulInstant(previous.getEndTime(), java.time.ZoneId.systemDefault());
         checkpoint =
             id.equals(
                 com.susukkang.fgc.validation.batch.ValidationRunBatchContext.getValidationRunId(
@@ -97,6 +97,13 @@ public class ValidationRestartService {
         null,
         null,
         failedAt);
+  }
+
+  /** Spring Batch는 JVM 시간대의 벽시계 값을 저장한다. 그 시간대로 읽은 뒤 같은 순간을 Asia/Seoul로 내보낸다(SIR-008). */
+  static java.time.OffsetDateTime seoulInstant(
+      java.time.LocalDateTime batchTime, java.time.ZoneId batchZone) {
+    return com.susukkang.fgc.common.util.DateUtil.toSeoul(
+        batchTime.atZone(batchZone).toOffsetDateTime());
   }
 
   private boolean active(Long id) {
@@ -220,11 +227,13 @@ public class ValidationRestartService {
             + " clock_timestamp()-interval '5 minutes'");
   }
 
+  /** 5분이 지난 미기동 접수는 스케줄러와 실행기 중 누가 먼저 와도 LAUNCH_TIMEOUT이다. 기동된 뒤의 실패는 LAUNCH_FAILED다. */
   private void fail(Long retry) {
     jdbc.update(
-        "UPDATE fgc.validation_run_retry SET"
-            + " state='FAILED',finished_at=clock_timestamp(),error_code='LAUNCH_FAILED' WHERE"
-            + " retry_id=? AND state IN ('ACCEPTED','LAUNCHING','RUNNING')",
+        "UPDATE fgc.validation_run_retry SET state='FAILED',finished_at=clock_timestamp(),"
+            + " error_code=CASE WHEN state='ACCEPTED' AND batch_execution_id IS NULL AND requested_at"
+            + " < clock_timestamp()-interval '5 minutes' THEN 'LAUNCH_TIMEOUT' ELSE 'LAUNCH_FAILED'"
+            + " END WHERE retry_id=? AND state IN ('ACCEPTED','LAUNCHING','RUNNING')",
         retry);
   }
 
