@@ -2135,34 +2135,43 @@
         "type" : "object"
       },
       "ArbitrageCheckView" : {
+        "type" : "object",
         "properties" : {
           "arbitrageCheckId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "asOfDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "candidateType" : {
-            "type" : "string"
+            "type" : "integer",
+            "format" : "int64"
           },
           "contractId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "contractMonthNo" : {
-            "format" : "int32",
-            "type" : "integer"
+            "type" : "integer",
+            "format" : "int64"
           },
           "contractNo" : {
             "type" : "string"
           },
+          "paymentStage" : {
+            "type" : "string",
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ]
+          },
+          "asOfDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "contractMonthNo" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "cumulativePaidPremium" : {
             "type" : "number"
           },
-          "decisionReason" : {
-            "type" : "string"
+          "paidCommissionAmount" : {
+            "type" : "number"
+          },
+          "plannedCommissionAmount" : {
+            "type" : "number"
+          },
+          "plannedCommissionBasis" : {
+            "type" : [ "string", "null" ],
+            "description" : "저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다."
           },
           "includedSurrenderValueAmount" : {
             "type" : "number"
@@ -2170,41 +2179,37 @@
           "netDifferenceAmount" : {
             "type" : "number"
           },
-          "paidCommissionAmount" : {
-            "type" : "number"
+          "projectedExcessAmount" : {
+            "type" : [ "number", "null" ],
+            "description" : "예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다."
           },
-          "paymentStage" : {
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+          "candidateType" : {
+            "type" : "string"
+          },
+          "refundAdditionAppliedYn" : {
+            "type" : "boolean"
+          },
+          "surrenderValueSourceType" : {
+            "type" : "string",
+            "enum" : [ "ACTUAL", "EXPECTED_TABLE", "NOT_APPLICABLE" ]
+          },
+          "resultStatus" : {
+            "type" : "string",
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ]
+          },
+          "decisionReason" : {
             "type" : "string"
           },
           "paymentStageLabel" : {
             "type" : "string"
           },
-          "plannedCommissionAmount" : {
-            "type" : "number"
-          },
-          "projectedExcessAmount" : {
-            "type" : "number"
-          },
-          "refundAdditionAppliedYn" : {
-            "type" : "boolean"
-          },
-          "resultStatus" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+          "surrenderValueSourceTypeLabel" : {
             "type" : "string"
           },
           "resultStatusLabel" : {
             "type" : "string"
-          },
-          "surrenderValueSourceType" : {
-            "enum" : [ "ACTUAL", "EXPECTED_TABLE", "NOT_APPLICABLE" ],
-            "type" : "string"
-          },
-          "surrenderValueSourceTypeLabel" : {
-            "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "ArbitrageSearchResponse" : {
         "properties" : {
