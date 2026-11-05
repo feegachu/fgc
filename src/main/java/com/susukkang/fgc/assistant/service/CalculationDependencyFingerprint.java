@@ -73,9 +73,10 @@ public class CalculationDependencyFingerprint {
                 UNION SELECT CAST(:paymentId AS bigint) WHERE :paymentId > 0
             ) selected
         ), business AS (
-            SELECT t.table_name, array_agg(c.column_name) AS columns
-            FROM information_schema.tables t JOIN information_schema.columns c
-              ON c.table_schema = t.table_schema AND c.table_name = t.table_name
+            SELECT t.table_name, array_agg(a.attname::text) AS columns
+            FROM information_schema.tables t JOIN pg_catalog.pg_attribute a
+              ON a.attrelid = pg_catalog.to_regclass(format('%I.%I', t.table_schema, t.table_name))
+             AND a.attnum > 0 AND NOT a.attisdropped
             WHERE t.table_schema = 'fgc' AND t.table_type = 'BASE TABLE'
               AND t.table_name NOT IN ('audit_log','ai_call_log','app_user','app_role','flyway_schema_history',
                   'notice','inquiry','inquiry_action','library_item','knowledge_chunk','agent_contract_check')
@@ -88,6 +89,7 @@ public class CalculationDependencyFingerprint {
                 WHEN table_name = 'commission_transaction' THEN format('t.commission_transaction_id = ANY(%L::bigint[])', payments.ids)
                 WHEN table_name = 'transaction_attribution' THEN format('t.contract_id = ANY(%L::bigint[]) OR t.commission_transaction_id = ANY(%L::bigint[])', roots.ids, payments.ids)
                 WHEN 'contract_id' = ANY(columns) THEN format('t.contract_id IS NULL OR t.contract_id = ANY(%L::bigint[])', roots.ids)
+                WHEN table_name = 'exception_occurrence' THEN format('t.exception_case_id IN (SELECT exception_case_id FROM fgc.exception_case WHERE contract_id IS NULL OR contract_id = ANY(%L::bigint[]) OR (source_entity_type = ''COMMISSION_TRANSACTION'' AND source_entity_id IN (SELECT unnest(%L::bigint[])::text)))', roots.ids, payments.ids)
                 WHEN 'schedule_header_id' = ANY(columns) THEN format('t.schedule_header_id IN (SELECT schedule_header_id FROM fgc.schedule_header WHERE contract_id = ANY(%L::bigint[]))', roots.ids)
                 WHEN 'cap_check_id' = ANY(columns) THEN format('t.cap_check_id IN (SELECT cap_check_id FROM fgc.cap_check WHERE contract_id = ANY(%L::bigint[]))', roots.ids)
                 WHEN 'reconciliation_result_id' = ANY(columns) THEN format('t.reconciliation_result_id IN (SELECT reconciliation_result_id FROM fgc.reconciliation_result WHERE contract_id = ANY(%L::bigint[]))', roots.ids)
