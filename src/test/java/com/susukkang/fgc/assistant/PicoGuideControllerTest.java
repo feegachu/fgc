@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.*;
 
 @WebMvcTest(PicoGuideController.class)
-@Import({SecurityConfig.class,GlobalExceptionHandler.class,org.springdoc.core.configuration.SpringDocConfiguration.class,org.springdoc.core.properties.SpringDocConfigProperties.class,org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration.class})
+@Import({com.susukkang.fgc.common.config.OpenApiConfig.class,SecurityConfig.class,GlobalExceptionHandler.class,org.springdoc.core.configuration.SpringDocConfiguration.class,org.springdoc.core.properties.SpringDocConfigProperties.class,org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration.class})
 class PicoGuideControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper mapper;
     @MockitoBean PicoGuideStartService service; @MockitoBean FgcMessageResolver messages; @MockitoBean ConstraintErrorCodeResolver constraints;

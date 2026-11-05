@@ -1770,6 +1770,7 @@
         "type" : "object"
       },
       "ApiResponsePicoAskResponse" : {
+        "type" : "object",
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PicoAskResponse"
@@ -1780,10 +1781,10 @@
           "requestId" : {
             "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "ApiResponsePicoGuideResponse" : {
+        "type" : "object",
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PicoGuideResponse"
@@ -1794,8 +1795,7 @@
           "requestId" : {
             "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "ApiResponsePolicyDetailResponse" : {
         "properties" : {
@@ -7974,115 +7974,122 @@
         "type" : "object"
       },
       "PicoAskRequest" : {
+        "type" : "object",
         "properties" : {
-          "clientContextRevision" : {
-            "maxLength" : 80,
-            "minLength" : 0,
-            "type" : "string"
+          "question" : {
+            "type" : "string",
+            "maxLength" : 2000,
+            "minLength" : 0
           },
-          "conversation" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PicoConversationTurn"
-            },
-            "maxItems" : 6,
-            "minItems" : 0,
-            "type" : "array"
+          "screenId" : {
+            "type" : "string",
+            "maxLength" : 30,
+            "minLength" : 0
           },
           "entityRefs" : {
+            "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/PicoEntityRef"
             },
             "maxItems" : 6,
-            "minItems" : 0,
-            "type" : "array"
+            "minItems" : 0
+          },
+          "clientContextRevision" : {
+            "type" : "string",
+            "maxLength" : 80,
+            "minLength" : 0
           },
           "guideVersion" : {
+            "type" : "string",
             "maxLength" : 40,
-            "minLength" : 0,
-            "type" : "string"
+            "minLength" : 0
           },
-          "question" : {
-            "maxLength" : 2000,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "screenId" : {
-            "maxLength" : 30,
-            "minLength" : 0,
-            "type" : "string"
+          "conversation" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PicoConversationTurn"
+            },
+            "maxItems" : 6,
+            "minItems" : 0
           }
         },
-        "required" : [ "clientContextRevision", "entityRefs", "guideVersion", "question", "screenId" ],
-        "type" : "object"
+        "required" : [ "clientContextRevision", "entityRefs", "guideVersion", "question", "screenId" ]
       },
       "PicoAskResponse" : {
+        "type" : "object",
         "properties" : {
-          "contextRevision" : {
-            "type" : "string"
-          },
           "decision" : {
-            "enum" : [ "ANSWER_ONLY", "ASK_CLARIFICATION", "UNSUPPORTED" ],
-            "type" : "string"
-          },
-          "evidenceRefs" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PicoEvidenceRef"
-            },
-            "type" : "array"
-          },
-          "fallbackReason" : {
-            "type" : "string"
-          },
-          "guideVersion" : {
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "ANSWER_ONLY", "START_GUIDE", "ASK_CLARIFICATION", "UNSUPPORTED" ]
           },
           "message" : {
             "type" : "string"
           },
-          "source" : {
-            "enum" : [ "AI", "FIXED" ],
+          "guideVersion" : {
             "type" : "string"
+          },
+          "contextRevision" : {
+            "type" : "string"
+          },
+          "evidenceRefs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PicoEvidenceRef"
+            }
           },
           "validatedGuide" : {
-            "description" : "Always null for the first read-only guide-answer scope",
-            "type" : [ "object", "null" ]
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/PicoValidatedGuide"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "source" : {
+            "type" : "string",
+            "enum" : [ "AI", "FIXED" ]
+          },
+          "fallbackReason" : {
+            "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "PicoConversationTurn" : {
+        "type" : "object",
         "properties" : {
           "role" : {
-            "enum" : [ "USER", "ASSISTANT" ],
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "USER", "ASSISTANT" ]
           },
           "text" : {
+            "type" : "string",
             "maxLength" : 2000,
-            "minLength" : 0,
-            "type" : "string"
+            "minLength" : 0
           }
         },
-        "required" : [ "role", "text" ],
-        "type" : "object"
+        "required" : [ "role", "text" ]
       },
       "PicoEntityRef" : {
+        "type" : "object",
         "properties" : {
-          "id" : {
-            "exclusiveMinimum" : 0,
-            "format" : "int64",
-            "type" : "integer"
-          },
           "type" : {
-            "enum" : [ "CONTRACT", "PAYMENT", "SCHEDULE", "VALIDATION_RUN", "RECONCILIATION_RUN", "EXCEPTION" ],
-            "type" : "string"
+            "type" : "string",
+            "enum" : [ "CONTRACT", "PAYMENT", "SCHEDULE", "VALIDATION_RUN", "RECONCILIATION_RUN", "EXCEPTION" ]
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "exclusiveMinimum" : 0
           }
         },
-        "required" : [ "id", "type" ],
-        "type" : "object"
+        "required" : [ "id", "type" ]
       },
       "PicoEvidenceRef" : {
+        "type" : "object",
         "properties" : {
           "chunkId" : {
+            "type" : "string"
+          },
+          "workflowId" : {
             "type" : "string"
           },
           "stepId" : {
@@ -8090,73 +8097,79 @@
           },
           "title" : {
             "type" : "string"
-          },
-          "workflowId" : {
-            "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "PicoGuideRequest" : {
+        "type" : "object",
         "properties" : {
-          "clientContextRevision" : {
-            "maxLength" : 80,
-            "minLength" : 0,
-            "type" : "string"
+          "workflowId" : {
+            "type" : "string",
+            "maxLength" : 60,
+            "minLength" : 0
           },
           "guideVersion" : {
+            "type" : "string",
             "maxLength" : 40,
-            "minLength" : 0,
-            "type" : "string"
+            "minLength" : 0
           },
           "paymentId" : {
+            "type" : "string",
             "minLength" : 1,
-            "pattern" : "[1-9][0-9]{0,18}",
-            "type" : "string"
+            "pattern" : "[1-9][0-9]{0,18}"
+          },
+          "clientContextRevision" : {
+            "type" : "string",
+            "maxLength" : 80,
+            "minLength" : 0
           },
           "prepareToken" : {
+            "type" : [ "string", "null" ],
             "maxLength" : 100,
-            "minLength" : 0,
-            "type" : [ "string", "null" ]
+            "minLength" : 0
           },
-          "workflowId" : {
-            "maxLength" : 60,
-            "minLength" : 0,
-            "type" : "string"
+          "stepId" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "serverStateVersion" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
           }
         },
-        "required" : [ "clientContextRevision", "guideVersion", "paymentId", "workflowId" ],
-        "type" : "object"
+        "required" : [ "clientContextRevision", "guideVersion", "paymentId", "workflowId" ]
       },
       "PicoGuideResponse" : {
+        "type" : "object",
         "properties" : {
-          "clientContextRevision" : {
-            "type" : "string"
-          },
-          "expiresAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "guideVersion" : {
-            "type" : "string"
-          },
-          "paymentId" : {
-            "type" : "string"
-          },
-          "prepareToken" : {
-            "type" : [ "string", "null" ]
-          },
           "status" : {
+            "type" : "string"
+          },
+          "workflowId" : {
             "type" : "string"
           },
           "stepId" : {
             "type" : "string"
           },
-          "workflowId" : {
+          "guideVersion" : {
             "type" : "string"
+          },
+          "paymentId" : {
+            "type" : "string"
+          },
+          "clientContextRevision" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "prepareToken" : {
+            "type" : [ "string", "null" ]
           }
-        },
-        "type" : "object"
+        }
       },
       "PolicyActionRequest" : {
         "description" : "정책 제출·승인·반려·활성화 요청",
@@ -10681,6 +10694,32 @@
         },
         "required" : [ "paymentId", "precheckToken" ],
         "type" : "object"
+      },
+      "PicoValidatedGuide" : {
+        "type" : "object",
+        "properties" : {
+          "workflowId" : {
+            "type" : "string"
+          },
+          "stepId" : {
+            "type" : "string"
+          },
+          "guideVersion" : {
+            "type" : "string"
+          },
+          "entityRefs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PicoEntityRef"
+            }
+          },
+          "clientContextRevision" : {
+            "type" : "string"
+          },
+          "serverStateVersion" : {
+            "type" : [ "string", "null" ]
+          }
+        }
       }
     },
     "securitySchemes" : {
@@ -11131,7 +11170,9 @@
     },
     "/api/v1/ai/pico/ask" : {
       "post" : {
-        "description" : "비식별 질문·최근 대화와 역할별 업무 자료로 의미 검색 후 근거를 인용합니다. validatedGuide=null. 금융 계산·업무 쓰기는 기존 프로그램에서 수행합니다.",
+        "tags" : [ "pico-ask-controller" ],
+        "summary" : "승인된 업무 가이드의 대화형 질문 답변",
+        "description" : "질문·최근 대화와 역할별 승인 근거로 답변합니다. START_GUIDE에만 서버가 검증한 시작 위치를 반환하며 지급 시작은 prepare/start에서 다시 검사합니다. 금융 쓰기 없음.",
         "operationId" : "picoAsk",
         "requestBody" : {
           "content" : {
@@ -11145,27 +11186,27 @@
         },
         "responses" : {
           "200" : {
+            "description" : "OK",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePicoAskResponse"
                 }
               }
-            },
-            "description" : "OK"
+            }
           }
-        },
-        "summary" : "승인된 업무 가이드의 대화형 질문 답변",
-        "tags" : [ "pico-ask-controller" ]
+        }
       }
     },
     "/api/v1/ai/pico/guides/prepare" : {
       "post" : {
+        "tags" : [ "pico-guide-controller" ],
+        "summary" : "현재 저장 지급 가이드의 일회성 시작 준비",
         "description" : "첫 scope 강조 전용. 금융 승인/진도 저장/외부 모델 호출 없음.",
         "operationId" : "prepare",
         "parameters" : [ {
-          "in" : "header",
           "name" : "Authorization",
+          "in" : "header",
           "required" : true,
           "schema" : {
             "type" : "string"
@@ -11183,27 +11224,27 @@
         },
         "responses" : {
           "200" : {
+            "description" : "OK",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePicoGuideResponse"
                 }
               }
-            },
-            "description" : "OK"
+            }
           }
-        },
-        "summary" : "현재 저장 지급 가이드의 일회성 시작 준비",
-        "tags" : [ "pico-guide-controller" ]
+        }
       }
     },
     "/api/v1/ai/pico/guides/start" : {
       "post" : {
+        "tags" : [ "pico-guide-controller" ],
+        "summary" : "사용자 선택 후 지급 저장본을 재검증해 가이드 시작",
         "description" : "동일 사용자·Bearer·역할·저장본·카탈로그·revision·5분 만료 및 일회성 검증.",
         "operationId" : "start",
         "parameters" : [ {
-          "in" : "header",
           "name" : "Authorization",
+          "in" : "header",
           "required" : true,
           "schema" : {
             "type" : "string"
@@ -11221,18 +11262,16 @@
         },
         "responses" : {
           "200" : {
+            "description" : "OK",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePicoGuideResponse"
                 }
               }
-            },
-            "description" : "OK"
+            }
           }
-        },
-        "summary" : "사용자 선택 후 지급 저장본을 재검증해 가이드 시작",
-        "tags" : [ "pico-guide-controller" ]
+        }
       }
     },
     "/api/v1/arbitrage-checks" : {

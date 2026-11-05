@@ -70,7 +70,9 @@ class PicoGuideApiLiveSmokeTest {
     @Test
     void securedGuideApiRetrievesApprovedEvidenceAndUnderstandsAFollowup() throws Exception {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        String question = "초안 저장 방법을 알려줘";
+        String question = "초안 저장이 지급 확정까지 끝났다는 뜻인지 설명해줘";
+        when(paymentContext.read(77L)).thenReturn(new com.susukkang.fgc.assistant.service.PicoPaymentContextService.Snapshot(
+                com.susukkang.fgc.common.code.CommissionPaymentStatus.DRAFT,"a".repeat(64)));
         mvc.perform(post("/api/v1/ai/pico/ask").with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_AGENT")))
                 .contentType(MediaType.APPLICATION_JSON).content(body(question)))
                 .andExpect(status().isForbidden());
@@ -105,17 +107,20 @@ class PicoGuideApiLiveSmokeTest {
             var followup = mapper.readTree(mvc.perform(post("/api/v1/ai/pico/ask")
                     .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SETTLEMENT")))
                     .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(new PicoAskRequest(
-                            "그 화면에서 수령인은 어디에서 선택해?", "TRAN-W02", List.of(), "synthetic-r2", "1.0", history))))
+                            "그 초안을 확정하고 싶어. 이어서 화면 안내를 시작해줘", "TRAN-W02",
+                            List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)), "synthetic-r2", "1.0", history))))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
             safe.put("followupEvidenceWorkflows", followup.path("evidenceRefs").findValuesAsText("workflowId"));
             assertThat(followup.path("source").asText()).isEqualTo("AI");
-            assertThat(followup.path("decision").asText()).isEqualTo("ANSWER_ONLY");
-            assertThat(followup.path("message").asText()).containsAnyOf("수령", "설계사", "수취");
+            assertThat(followup.path("decision").asText()).isEqualTo("START_GUIDE");
             assertThat(followup.path("evidenceRefs").size()).isBetween(1, 8);
             for (var ref : followup.path("evidenceRefs")) {
                 assertThat(ref.path("workflowId").asText()).as("Follow-up must remain grounded in the payment workflow").startsWith("payment.");
             }
-            assertThat(followup.path("validatedGuide").isNull()).isTrue();
+            assertThat(followup.path("validatedGuide").path("workflowId").asText()).isEqualTo("payment.confirm");
+            assertThat(followup.path("validatedGuide").path("stepId").asText()).isEqualTo("payment.precheck");
+            safe.put("followupDecision",followup.path("decision").asText());
+            safe.put("entryStep",followup.path("validatedGuide").path("stepId").asText());
             safe.put("followupPassed", true);
             safe.put("checksPassed", true);
         } finally {
@@ -142,7 +147,7 @@ class PicoGuideApiLiveSmokeTest {
     }
 
     private String body(String question) throws Exception {
-        return mapper.writeValueAsString(new PicoAskRequest(question, "TRAN-W02", List.of(),
+        return mapper.writeValueAsString(new PicoAskRequest(question, "TRAN-W02", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)),
                 "synthetic-r1", "1.0", List.of()));
     }
 
