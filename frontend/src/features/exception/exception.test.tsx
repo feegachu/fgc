@@ -695,9 +695,12 @@ it.each(['status', 'sequence', 'pending refresh'])('committed action with %s mis
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
 })
 
-it('committed correction with an invalid receipt refreshes and cannot be posted twice', async () => {
+it.each([
+  { actionSeq: 2, repostedJournalHeaderId: 0 },
+  ...[undefined, null, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '2'].map(actionSeq => ({ actionSeq, repostedJournalHeaderId: 72 })),
+])('committed correction with an invalid receipt %j refreshes and cannot be posted twice', async (receipt) => {
   searchResponse = () => search([correctionCase])
-  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 0, toStatus: 'RESOLVED' })
+  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, toStatus: 'RESOLVED', ...receipt })
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
@@ -817,4 +820,15 @@ it('gives different exception summary types distinct guide targets and preserves
   }
   expect(screen.getByRole('link', { name: '새 예외 1건' })).not.toHaveAttribute('data-guide-feature')
   expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
+})
+
+it('preserves a newer cached action when an older guide acknowledgement arrives', () => {
+  const client = new QueryClient()
+  const newer = { actionSeq: 2, toStatus: 'RESOLVED' as const }
+  client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [newer] }]))
+  applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
+  const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
+  expect(item.status).toBe('RESOLVED')
+  expect(item.actions).toEqual([newer])
+  client.clear()
 })
