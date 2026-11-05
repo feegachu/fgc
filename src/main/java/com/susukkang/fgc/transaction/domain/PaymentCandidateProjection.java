@@ -32,6 +32,14 @@ public record PaymentCandidateProjection(
     query.setParameter("candidateAttributions", attributionJson);
   }
 
+  public java.util.Map<String, Object> parameters() {
+    java.util.Map<String, Object> parameters = new java.util.HashMap<>();
+    parameters.put("candidatePaymentId", paymentId);
+    parameters.put("candidatePayment", paymentJson);
+    parameters.put("candidateAttributions", attributionJson);
+    return parameters;
+  }
+
   public static PaymentCandidateProjection from(
       long id,
       CommissionPaymentCommand payment,
@@ -57,6 +65,8 @@ public record PaymentCandidateProjection(
       row.put("commission_transaction_id", id);
       row.set("attribution_seq", mapper.valueToTree(line.getAttributionSequence()));
       row.set("contract_id", mapper.valueToTree(line.getContractId()));
+      row.set("schedule_line_id", mapper.valueToTree(line.getScheduleLineId()));
+      row.put("attribution_scope", line.getAttributionScope());
       row.set("attributed_amount", mapper.valueToTree(line.getAmount()));
       row.set("attribution_date", mapper.valueToTree(line.getAttributionDate()));
       row.set("attribution_month", mapper.valueToTree(line.getAttributionMonth()));
