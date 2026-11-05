@@ -1,4 +1,5 @@
 import { getPaymentGuideObserver, paymentGuideConditions } from './payment-guide'
+import { launchPaymentGuide } from './payment-guide-launch'
 import { selectOption } from '../../test/selectOption'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useWorkflowGuide } from '../assistant/workflow-state'
@@ -1198,6 +1199,36 @@ describe('FUN-087 guide card and spotlight', () => {
     await waitFor(() => expect(control).toBeEnabled())
     await user.click(control)
   }
+  it.each(['before', 'verified', 'stale'] as const)('starts an AI payment guide at the current verified precheck stage: %s', async (state) => {
+    const { user } = mount('/app/transactions/new?id=77&month=2026-07')
+    await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
+    if (state !== 'before') {
+      await user.click(button('btn-precheck'))
+      await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
+    }
+    if (state === 'stale') {
+      const original = vi.mocked(apiClient.request).getMockImplementation()!
+      vi.mocked(apiClient.request).mockImplementation(async (...args) => {
+        if (args[0] === '/api/v1/assistant/prechecks/revalidate') throw new ApiError({ code: 'FGC-IMPL-GUIDE_STATE_STALE', message: 'STALE' }, 'PROOF', 409)
+        return original(...args)
+      })
+    }
+    const before = writes().length
+    act(() => { expect(launchPaymentGuide('payment.confirm', 'payment.precheck')).toBe(true) })
+    await waitFor(() => expect(within(panel()).getByRole('heading')).toHaveTextContent(
+      state === 'verified' ? '검증 결과를 확인하세요' : '사전검증을 실행하세요',
+    ))
+    if (state === 'verified') expect(within(panel()).getByRole('button', { name: '확인하고 다음' })).toBeEnabled()
+    else if (state === 'before') expect(within(panel()).getByRole('button', { name: /^다음$/ })).toBeDisabled()
+    else {
+      expect(panel()).toHaveAttribute('data-guide-status', 'PAUSED')
+      expect(within(panel()).queryByRole('button', { name: /^다음$/ })).not.toBeInTheDocument()
+    }
+    expect(writes()).toHaveLength(before)
+    expect(writes().some(([path]) => path.endsWith('/confirm'))).toBe(false)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('registers every catalog target once, never saves on next, and completes after real save', async () => {
     const { user } = mount()
     await fillNew(user)
