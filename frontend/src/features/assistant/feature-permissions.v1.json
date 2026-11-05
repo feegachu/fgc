@@ -56,11 +56,6 @@
     ]
   },
   "targets": {
-    "agent.guide-menu.agent.contract.detail": "AGENT",
-    "agent.guide-menu.agent.contract.find": "AGENT",
-    "agent.guide-menu.agent.payments": "AGENT",
-    "agent.guide-menu.agent.portfolio": "AGENT",
-    "agent.guide-menu.open": "AGENT",
     "app.shell.app-shell.a": "OWN_OR_INTERNAL_READ",
     "app.shell.draft-navigation-guard.discard": "OWN_OR_INTERNAL_READ",
     "app.shell.draft-navigation-guard.keep": "OWN_OR_INTERNAL_READ",

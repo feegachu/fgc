@@ -247,7 +247,7 @@ class PicoAskServiceTest {
     @Test void sharedCatalogIncludesAllRegisteredBusinessScreens() {
         assertThat(catalog.definitions()).hasSizeGreaterThan(3);
         assertThat(catalog.definitions().stream().flatMap(guide -> guide.steps().stream()).map(PicoGuideCatalog.Step::screenId).distinct())
-            .contains("CONT-W01","CONT-W02","CONT-W03","SCHE-W01","SCHE-W02","TRAN-W01","TRAN-W02","BASE-W01","POL-W01","CAP-W01","ARB-W01","LEDG-W01","RECO-W01","EXCP-W01","VRUN-W01","VRUN-W02","AUDT-W01","DASH-W01","AGNT-W01");
+            .contains("CONT-W01","CONT-W02","CONT-W03","SCHE-W01","SCHE-W02","TRAN-W01","TRAN-W02","BASE-W01","POL-W01","CAP-W01","ARB-W01","LEDG-W01","RECO-W01","EXCP-W01","VRUN-W01","VRUN-W02","AUDT-W01","DASH-W01");
     }
     @Test void rejectsForgedSourcesNumbersCompletionClaimsAndExecutableText() {
         for(var bad:List.of(answer("외부로 이동하세요","evil:source"),answer("오만원 50000원입니다","payment.draft:overview"),answer("오만원 지급을 추천합니다","payment.draft:overview"),answer("모집수수료의 천이백 퍼센트 한도입니다","payment.draft:overview"),answer("십이 배까지 지급됩니다","payment.draft:overview"),answer("오 할입니다","payment.draft:overview"),answer("두 배로 지급됩니다","payment.draft:overview"),answer("５만원입니다","payment.draft:overview"),answer("1. 대상을 확인하세요","payment.draft:overview"),answer("javaScript:alert 실행","payment.draft:overview"),answer(java.text.Normalizer.normalize("지급했습니다",java.text.Normalizer.Form.NFD),"payment.draft:overview"),answer("지급했습니다","payment.draft:overview"),answer("https://evil.example 실행","payment.draft:overview"))) {
