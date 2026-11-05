@@ -347,7 +347,7 @@ DB는 `batch_watermark`, `contract_status_event_processing`, `validation_run.cur
 | `MonthlyValidationJob` (IF-BAT-01) | VRUN-W02 실행 버튼 → `POST /api/v1/validation-runs/{id}/execute` | 제43조 1~8단계 자동, 9~10단계는 사람. `CREATED` 실행만 기동한다. `FAILED` 실행은 재기동하지 않고 새 실행을 만든다 — 실패 지점 재시작은 2차(FUN-045) |
 | `DailyChangedContractJob` (IF-BAT-02) | 매일 02:00 KST 자동(`@Scheduled`, 프로젝트 운영 가정) + 수동 재실행 | 변경 계약의 스케줄 생성·1,200% 재합산·차익거래 재검사. 원장 불균형은 월 검증 Step 6b 범위이며 이 일 배치가 호출하지 않는다(SRC-065). 실행 유형은 `MANUAL_CONTRACT`이며 확정 대상이 아니다(제44조) |
 
-**2차 FUN-045 변경(#672, PR #688 — 인수·리뷰 대기):** 위 표는 1차 제공 이력이다. 2차에서는 `FAILED`인 `MONTHLY`·`PRE_CONFIRM`을 VRUN-W02 / IF-API-48에서 같은 JobInstance의 실패 Step부터 수동 재시작한다. 완료 Step·체크포인트·최초 시작 시각은 유지한다. `MANUAL_CONTRACT` 실패, 완료·확정 실행은 이 경로로 재시작하지 않는다. 메타데이터 누락·모호성은 `FGC-VRUN-005`로 거절하고 운영자가 확인한다. 자동 반복 재시작이나 워터마크 후퇴를 월 재시작 수단으로 사용하지 않는다. 일 배치 복구 절차는 아래와 같이 별도로 유지한다.
+**2차 FUN-045 변경(#672, PR #688, #844):** 위 표는 1차 제공 이력이다. 2차에서는 `FAILED`인 `MONTHLY`·`PRE_CONFIRM`을 VRUN-W02 / IF-API-82에서 같은 JobInstance의 실패 Step부터 수동 재시작한다. 완료 Step·체크포인트·최초 시작 시각은 유지한다. `MANUAL_CONTRACT` 실패, 완료·확정 실행은 이 경로로 재시작하지 않는다. 메타데이터 누락·모호성은 `FGC-VRUN-005`로 거절하고 운영자가 확인한다. 자동 반복 재시작이나 워터마크 후퇴를 월 재시작 수단으로 사용하지 않는다. 일 배치 복구 절차는 아래와 같이 별도로 유지한다.
 
 일 배치 실패 복구는 다음 두 경로를 구분한다(SRC-065, #522).
 

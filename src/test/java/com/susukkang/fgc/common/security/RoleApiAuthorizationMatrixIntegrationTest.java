@@ -144,6 +144,12 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 {"contractVersion":"assistant.v1","kind":"%s","mode":"EXISTING","clientRevision":1}""".formatted(kind);
     }
 
+    private static String revalidation(String kind) {
+        return """
+                {"calculationId":"authorization-matrix","stateToken":"unknown-token","input":%s}"""
+                .formatted(calculation(kind));
+    }
+
     private static String guide(String workflowId) {
         return """
                 {"workflowId":"%s","guideVersion":"1.0","paymentId":"999999999","clientContextRevision":"1"}""".formatted(workflowId);
@@ -218,6 +224,10 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                         {"question":"권한 시험","screenId":"TRAN-W02","entityRefs":[],"clientContextRevision":"1","guideVersion":"1.0"}""", INTERNAL),
                 row("IF-60A 잔액", POST, "/api/v1/assistant/calculations", calculation("ATTRIBUTION_BALANCE"), INTERNAL),
                 row("IF-60A 후보", POST, "/api/v1/assistant/calculations", calculation("PAYMENT_CANDIDATE"), PROCESS),
+                row("IF-60A 잔액 재검증", POST, "/api/v1/assistant/calculations/revalidate", revalidation("ATTRIBUTION_BALANCE"), INTERNAL),
+                row("IF-60A 후보 재검증", POST, "/api/v1/assistant/calculations/revalidate", revalidation("PAYMENT_CANDIDATE"), PROCESS),
+                row("IF-60A 실제 사전검증 증표", POST, "/api/v1/assistant/prechecks/revalidate",
+                        "{\"paymentId\":\"999999999\",\"precheckToken\":\"unknown-token\"}", PROCESS),
                 row("IF-60B 조회", POST, "/api/v1/ai/pico/guides/prepare", guide("payment.amount.review"), INTERNAL),
                 row("IF-60B 처리", POST, "/api/v1/ai/pico/guides/prepare", guide("payment.confirm"), PROCESS),
                 row("IF-60C 조회", POST, "/api/v1/ai/pico/guides/start", guide("payment.amount.review"), INTERNAL),

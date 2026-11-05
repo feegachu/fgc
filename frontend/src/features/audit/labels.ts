@@ -1,6 +1,7 @@
 import { JOURNAL_TYPE } from '../ledger/labels'
 import { contractStatusLabels, dataOriginLabels, paymentCycleLabels } from '../contract/labels'
 import { screenMessage } from '../../lib/screenText'
+import { failureText } from '../validation/steps'
 
 // 감사 이벤트 기록 경로의 코드 표시용 매핑. 저장값과 검색값은 원본 코드를 유지한다.
 export const actionLabels = {
@@ -104,6 +105,9 @@ export function auditReasonLabel(actionCode?: string | null, reason?: string | n
     const step = /^MonthlyValidationJob advanced to step ([0-9]+)$/.exec(reason)
     if (step && step[0] === reason) return `월 통합검증 ${step[1]}단계 진행`
   }
+  // 옛 실행의 실패 사유에는 예외 원문이 남아 있다. 새 실행은 서버가 사용자 문장을 남긴다.
+  if (actionCode === 'VALIDATION_RUN_FAILED' || actionCode === 'VALIDATION_RUN_CREATION_FAILED')
+    return failureText(reason)
   if (actionCode === 'LOGIN_FAIL' && Object.hasOwn(loginFailureReasons, reason))
     return loginFailureReasons[reason as keyof typeof loginFailureReasons]
   if (actionCode === 'JOURNAL_DRAFT_SAVED') {

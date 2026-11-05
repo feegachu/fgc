@@ -1,5 +1,9 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.common.exception.FgcBusinessException;
+import com.susukkang.fgc.common.exception.FgcMessageResolver;
+import com.susukkang.fgc.validation.batch.contract.LedgerImbalanceDetectedException;
+import com.susukkang.fgc.validation.batch.contract.SkipLimitExceededException;
 import com.susukkang.fgc.validation.dto.MonthlyValidationJobParameters;
 import com.susukkang.fgc.validation.service.ValidationRunBatchAuditService;
 import com.susukkang.fgc.validation.service.ValidationRunBatchLifecycleService;
@@ -20,14 +24,17 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
     private final boolean initialStep;
     private final ValidationRunBatchLifecycleService lifecycleService;
     private final ValidationRunBatchAuditService auditService;
+    private final FgcMessageResolver messageResolver;
 
     public ValidationRunStepProgressListener(int stepNo, boolean initialStep,
                                               ValidationRunBatchLifecycleService lifecycleService,
-                                              ValidationRunBatchAuditService auditService) {
+                                              ValidationRunBatchAuditService auditService,
+                                              FgcMessageResolver messageResolver) {
         this.stepNo = stepNo;
         this.initialStep = initialStep;
         this.lifecycleService = lifecycleService;
         this.auditService = auditService;
+        this.messageResolver = messageResolver;
     }
 
     /**
@@ -62,7 +69,7 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
                 MonthlyValidationJobParameters parameters = MonthlyValidationJobParameters.from(
                         stepExecution.getJobExecution().getJobParameters());
                 auditService.recordRunCreationFailed(stepExecution.getJobExecution().getId(), parameters,
-                        summarizeFailure(stepExecution));
+                        summarizeFailure(stepExecution, parameters.requestId()));
             }
             return stepExecution.getExitStatus();
         }
@@ -80,19 +87,38 @@ public class ValidationRunStepProgressListener implements StepExecutionListener 
                 lifecycleService.advance(validationRunId, stepNo, parameters);
             }
         } else {
-            // 실패 사유는 이 Step에서 던진 예외들의 메시지를 모아 남김
-            String failureMessage = summarizeFailure(stepExecution);
+            String failureMessage = summarizeFailure(stepExecution, parameters.requestId());
             lifecycleService.fail(validationRunId, stepNo, parameters, failureMessage);
         }
         return stepExecution.getExitStatus();
     }
 
-    private String summarizeFailure(StepExecution stepExecution) {
+    /**
+     * 실패 사유는 화면과 감사로그에 그대로 보이므로 사용자 문장만 남긴다(화면정의서 공통규칙 10, SRC-074).
+     * 예외 원문은 요청번호와 함께 서버 로그에 남겨 원인 추적을 잃지 않는다.
+     */
+    private String summarizeFailure(StepExecution stepExecution, String requestId) {
+        stepExecution.getFailureExceptions().forEach(failure ->
+                log.error("Step {}({}) 실패 requestId={}", stepNo, stepExecution.getStepName(), requestId, failure));
         String joined = stepExecution.getFailureExceptions().stream()
-                .map(Throwable::getMessage)
-                .filter(msg -> msg != null && !msg.isBlank())
+                .map(failure -> userMessage(failure, requestId))
+                .distinct()
                 .reduce((a, b) -> a + " | " + b)
                 .orElse(stepNo + "단계에서 실패했습니다.");
         return joined.length() > 2000 ? joined.substring(0, 2000) : joined;
+    }
+
+    private String userMessage(Throwable failure, String requestId) {
+        if (failure instanceof LedgerImbalanceDetectedException) {
+            return failure.getMessage() + " 검증원장에서 확인한 뒤 실패 지점부터 재시작하세요.";
+        }
+        if (failure instanceof SkipLimitExceededException skip) {
+            return "처리하지 못한 계약 " + skip.getSkippedCount() + "건이 허용 한도 " + skip.getSkipLimit()
+                    + "건을 넘었습니다. 계약 자료를 확인한 뒤 실패 지점부터 재시작하세요.";
+        }
+        if (failure instanceof FgcBusinessException business && !business.getErrorCode().getStatus().is5xxServerError()) {
+            return messageResolver.resolve(business.getErrorCode(), business.getParams());
+        }
+        return stepNo + "단계 처리 중 오류가 발생했습니다. 요청번호 " + requestId + "를 담당자에게 알려주세요.";
     }
 }

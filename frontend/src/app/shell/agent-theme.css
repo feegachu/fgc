@@ -8,7 +8,6 @@
  * 글자색은 너무 쨍하지 않도록 사이드바 로고와 같은 #513a95 를 쓴다.
  */
 .app-shell.is-agent {
-  --app-canvas: #f4edfa;
   --color-blue-50: #f4eeff;
   --color-blue-100: #e7d9ff;
   --color-blue-500: #8c2fff;

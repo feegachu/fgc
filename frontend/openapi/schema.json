@@ -1756,7 +1756,6 @@
         "type" : "object"
       },
       "ApiResponsePaymentCalculationSnapshot" : {
-        "type" : "object",
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PaymentCalculationSnapshot"
@@ -1767,7 +1766,8 @@
           "requestId" : {
             "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "ApiResponsePicoAskResponse" : {
         "properties" : {
@@ -2063,6 +2063,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseVerification" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Verification"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseVoid" : {
         "properties" : {
           "data" : { },
@@ -2183,8 +2197,13 @@
           "plannedCommissionAmount" : {
             "type" : "number"
           },
+          "plannedCommissionBasis" : {
+            "description" : "저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다.",
+            "type" : [ "string", "null" ]
+          },
           "projectedExcessAmount" : {
-            "type" : "number"
+            "description" : "예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다.",
+            "type" : [ "number", "null" ]
           },
           "refundAdditionAppliedYn" : {
             "type" : "boolean"
@@ -2254,6 +2273,57 @@
         },
         "type" : "object"
       },
+      "AssistantCalculationLine" : {
+        "properties" : {
+          "attributionDate" : {
+            "type" : "string"
+          },
+          "basisAmount" : {
+            "type" : "string"
+          },
+          "basisCode" : {
+            "type" : "string"
+          },
+          "beneficiaryAgentId" : {
+            "type" : "string"
+          },
+          "calculationType" : {
+            "type" : "string"
+          },
+          "cashflowType" : {
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "dueDate" : {
+            "type" : "string"
+          },
+          "expectedAmount" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "ratePct" : {
+            "type" : "string"
+          },
+          "ruleId" : {
+            "type" : "string"
+          },
+          "sourceId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AssistantCalculationSource" : {
         "properties" : {
           "entityId" : {
@@ -2269,6 +2339,28 @@
             "type" : "string"
           },
           "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AssistantCalculationValidity" : {
+        "properties" : {
+          "calculatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "dependencyFingerprint" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "inputFingerprint" : {
+            "type" : "string"
+          },
+          "stateToken" : {
             "type" : "string"
           }
         },
@@ -2423,39 +2515,39 @@
         "type" : "object"
       },
       "Basis" : {
-        "type" : "object",
         "properties" : {
-          "sourceRefs" : {
-            "type" : "array",
+          "asOfDate" : {
+            "type" : "string"
+          },
+          "lines" : {
             "items" : {
-              "$ref" : "#/components/schemas/AssistantCalculationSource"
-            }
+              "$ref" : "#/components/schemas/AssistantAttributionLine"
+            },
+            "type" : "array"
+          },
+          "policyVersionIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "rounding" : {
             "$ref" : "#/components/schemas/Rounding"
           },
-          "asOfDate" : {
-            "type" : "string"
-          },
-          "policyVersionIds" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
           "ruleIds" : {
-            "type" : "array",
             "items" : {
               "type" : "string"
-            }
+            },
+            "type" : "array"
           },
-          "lines" : {
-            "type" : "array",
+          "sourceRefs" : {
             "items" : {
-              "$ref" : "#/components/schemas/AssistantAttributionLine"
-            }
+              "$ref" : "#/components/schemas/AssistantCalculationSource"
+            },
+            "type" : "array"
           }
-        }
+        },
+        "type" : "object"
       },
       "Blocker" : {
         "properties" : {
@@ -2568,6 +2660,25 @@
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "CalculationRevalidationRequest" : {
+        "properties" : {
+          "calculationId" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/PaymentCalculationRequest"
+          },
+          "stateToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "calculationId", "input", "stateToken" ],
         "type" : "object"
       },
       "CapAgentSummaryResponse" : {
@@ -7701,125 +7812,124 @@
         "type" : "object"
       },
       "PaymentCalculationRequest" : {
-        "type" : "object",
         "properties" : {
-          "contractVersion" : {
-            "type" : "string",
-            "minLength" : 1,
-            "pattern" : "assistant\\.v1"
-          },
-          "kind" : {
-            "type" : "string",
-            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ]
-          },
-          "mode" : {
-            "type" : "string",
-            "enum" : [ "EXISTING", "HYPOTHETICAL" ]
-          },
-          "scope" : {
-            "$ref" : "#/components/schemas/Scope"
-          },
           "candidate" : {
             "$ref" : "#/components/schemas/JsonNode"
           },
           "clientRevision" : {
-            "type" : "integer",
             "format" : "int64",
             "maximum" : 9007199254740991,
-            "minimum" : 0
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "contractVersion" : {
+            "minLength" : 1,
+            "pattern" : "assistant\\.v1",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ],
+            "type" : "string"
+          },
+          "mode" : {
+            "enum" : [ "EXISTING", "HYPOTHETICAL" ],
+            "type" : "string"
+          },
+          "scope" : {
+            "$ref" : "#/components/schemas/Scope"
           }
         },
-        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ]
+        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ],
+        "type" : "object"
       },
       "PaymentCalculationSnapshot" : {
-        "type" : "object",
         "properties" : {
+          "amounts" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "basis" : {
+            "$ref" : "#/components/schemas/Basis"
+          },
+          "blockers" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Reason"
+            },
+            "type" : "array"
+          },
+          "calculatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "calculationId" : {
+            "type" : "string"
+          },
+          "capPreview" : {
+            "items" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "array"
+          },
+          "clientRevision" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "confirmable" : {
+            "type" : "boolean"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "evidenceKind" : {
             "type" : "string"
           },
           "kind" : {
             "type" : "string"
           },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantCalculationLine"
+            },
+            "type" : "array"
+          },
+          "missingInputs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
           "mode" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "clientRevision" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "synthetic" : {
-            "type" : "boolean"
-          },
-          "snapshotOnly" : {
-            "type" : "boolean"
-          },
-          "evidenceKind" : {
-            "type" : "string"
-          },
-          "currency" : {
             "type" : "string"
           },
           "paymentStatus" : {
             "type" : "string"
           },
-          "resolvedScope" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          },
-          "amounts" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          },
-          "capPreview" : {
-            "type" : "array",
-            "items" : {
-              "type" : "object",
-              "additionalProperties" : { }
-            }
-          },
-          "confirmable" : {
-            "type" : "boolean"
-          },
-          "blockers" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/Reason"
-            }
-          },
-          "missingInputs" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "basis" : {
-            "$ref" : "#/components/schemas/Basis"
-          },
           "recommendation" : {
             "$ref" : "#/components/schemas/Recommendation"
           },
-          "calculatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
+          "resolvedScope" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "snapshotOnly" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "synthetic" : {
+            "type" : "boolean"
           },
           "validity" : {
-            "type" : [ "object", "null" ],
-            "description" : "Always null in snapshot-only phase; not a server proof"
-          },
-          "lines" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/AssistantCalculationLine"
-            }
+            "$ref" : "#/components/schemas/AssistantCalculationValidity"
           }
-        }
+        },
+        "type" : "object"
       },
       "PaymentEvidence" : {
         "properties" : {
@@ -8800,21 +8910,21 @@
         "type" : "object"
       },
       "Reason" : {
-        "type" : "object",
         "properties" : {
           "code" : {
-            "type" : "string"
-          },
-          "message" : {
             "type" : "string"
           },
           "contractId" : {
             "type" : "string"
           },
+          "message" : {
+            "type" : "string"
+          },
           "transactionAttributionId" : {
             "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "RecentExceptionResponse" : {
         "properties" : {
@@ -8905,27 +9015,27 @@
         "type" : "object"
       },
       "Recommendation" : {
-        "type" : "object",
         "properties" : {
           "allowed" : {
             "type" : "boolean"
-          },
-          "targetId" : {
-            "type" : "string"
-          },
-          "suggestedAmount" : {
-            "type" : "string"
           },
           "reason" : {
             "type" : "string"
           },
           "requiredChecks" : {
-            "type" : "array",
             "items" : {
               "type" : "string"
-            }
+            },
+            "type" : "array"
+          },
+          "suggestedAmount" : {
+            "type" : "string"
+          },
+          "targetId" : {
+            "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "ReconciliationExceptionBulkCreateResponse" : {
         "properties" : {
@@ -9593,19 +9703,19 @@
         "type" : "object"
       },
       "Rounding" : {
-        "type" : "object",
         "properties" : {
-          "scale" : {
-            "type" : "integer",
-            "format" : "int32"
+          "aggregation" : {
+            "type" : "string"
           },
           "mode" : {
             "type" : "string"
           },
-          "aggregation" : {
-            "type" : "string"
+          "scale" : {
+            "format" : "int32",
+            "type" : "integer"
           }
-        }
+        },
+        "type" : "object"
       },
       "Ruleset" : {
         "properties" : {
@@ -9988,50 +10098,50 @@
         "type" : "object"
       },
       "Scope" : {
-        "type" : "object",
         "properties" : {
-          "paymentId" : {
-            "type" : "string",
-            "pattern" : "[1-9][0-9]{0,18}"
-          },
-          "contractId" : {
-            "type" : "string",
-            "pattern" : "[1-9][0-9]{0,18}"
-          },
-          "settlementMonth" : {
-            "type" : "string",
-            "pattern" : "[0-9]{4}-[0-9]{2}"
-          },
-          "paymentStage" : {
-            "type" : "string",
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ]
-          },
-          "installmentNo" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 1
-          },
-          "commissionItemId" : {
-            "type" : "string",
-            "pattern" : "[1-9][0-9]{0,18}"
-          },
-          "beneficiaryAgentId" : {
-            "type" : "string",
-            "pattern" : "[1-9][0-9]{0,18}"
+          "aggregation" : {
+            "enum" : [ "SINGLE_LINE", "MONTH_TOTAL" ],
+            "type" : "string"
           },
           "asOfDate" : {
-            "type" : "string",
-            "format" : "date"
+            "format" : "date",
+            "type" : "string"
+          },
+          "beneficiaryAgentId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "contractId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "paymentId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
           },
           "reconciliationResultId" : {
-            "type" : "string",
-            "pattern" : "[1-9][0-9]{0,18}"
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
           },
-          "aggregation" : {
-            "type" : "string",
-            "enum" : [ "SINGLE_LINE", "MONTH_TOTAL" ]
+          "settlementMonth" : {
+            "pattern" : "\\d{4}-\\d{2}",
+            "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "Source" : {
         "properties" : {
@@ -10534,56 +10644,36 @@
         },
         "type" : "object"
       },
-      "AssistantCalculationLine" : {
-        "type" : "object",
+      "Verification" : {
         "properties" : {
-          "cashflowType" : {
+          "expiresAt" : {
+            "format" : "date-time",
             "type" : "string"
           },
-          "sourceId" : {
+          "paymentId" : {
             "type" : "string"
           },
-          "contractId" : {
+          "verified" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "VerifyRequest" : {
+        "properties" : {
+          "paymentId" : {
+            "minLength" : 1,
+            "pattern" : "[1-9]\\d{0,18}",
             "type" : "string"
           },
-          "commissionItemId" : {
-            "type" : "string"
-          },
-          "beneficiaryAgentId" : {
-            "type" : "string"
-          },
-          "installmentNo" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "attributionDate" : {
-            "type" : "string"
-          },
-          "dueDate" : {
-            "type" : "string"
-          },
-          "basisCode" : {
-            "type" : "string"
-          },
-          "basisAmount" : {
-            "type" : "string"
-          },
-          "calculationType" : {
-            "type" : "string"
-          },
-          "ratePct" : {
-            "type" : "string"
-          },
-          "expectedAmount" : {
-            "type" : "string"
-          },
-          "ruleId" : {
-            "type" : "string"
-          },
-          "status" : {
+          "precheckToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
             "type" : "string"
           }
-        }
+        },
+        "required" : [ "paymentId", "precheckToken" ],
+        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -11184,9 +11274,7 @@
     },
     "/api/v1/assistant/calculations" : {
       "post" : {
-        "tags" : [ "payment-calculation-controller" ],
-        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
-        "description" : "ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.",
+        "description" : "기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.",
         "operationId" : "calculate",
         "requestBody" : {
           "content" : {
@@ -11200,16 +11288,78 @@
         },
         "responses" : {
           "200" : {
-            "description" : "OK",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
                 }
               }
-            }
+            },
+            "description" : "OK"
           }
-        }
+        },
+        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
+        "tags" : [ "payment-calculation-controller" ]
+      }
+    },
+    "/api/v1/assistant/calculations/revalidate" : {
+      "post" : {
+        "description" : "변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.",
+        "operationId" : "revalidate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CalculationRevalidationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "계산 입력·의존성·사용자·만료 재검증",
+        "tags" : [ "payment-calculation-controller" ]
+      }
+    },
+    "/api/v1/assistant/prechecks/revalidate" : {
+      "post" : {
+        "description" : "계산 증표로 대체할 수 없습니다. 금융 상태를 변경하지 않습니다.",
+        "operationId" : "verify",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VerifyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVerification"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "현재 지급의 실제 사전검증 증표 확인",
+        "tags" : [ "assistant-precheck-proof-controller" ]
       }
     },
     "/api/v1/audit-logs" : {
@@ -14895,7 +15045,16 @@
                 }
               }
             },
-            "description" : "사전검증 결과 (차단 사유가 있어도 200 + blockers[])"
+            "description" : "사전검증 결과 (차단 사유가 있어도 200 + blockers[])",
+            "headers" : {
+              "X-FGC-Precheck-Token" : {
+                "description" : "confirmable=true이고 차단 사유가 없을 때만 발급되는 사용자·세션·대상·의존성에 묶인 5분 증표",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
           },
           "400" : {
             "content" : {

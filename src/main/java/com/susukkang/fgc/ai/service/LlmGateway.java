@@ -9,7 +9,11 @@ import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.errors.OpenAIException;
 import com.openai.errors.OpenAIIoException;
 import com.openai.errors.OpenAIServiceException;
+import com.openai.models.responses.EasyInputMessage;
 import com.openai.models.responses.ResponseCreateParams;
+import com.openai.models.responses.ResponseFunctionToolCall;
+import com.openai.models.responses.ResponseInputItem;
+import com.openai.models.responses.ToolChoiceOptions;
 import com.openai.models.responses.ResponseUsage;
 import com.openai.models.responses.StructuredResponse;
 import com.openai.models.responses.StructuredResponseOutputMessage;
@@ -35,11 +39,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.io.InterruptedIOException;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * 설명 : 외부 LLM(OpenAI Responses API) 호출이 지나가는 서버의 유일한 지점(SER-013·IF-EXT-03, OI-023).
@@ -112,30 +119,122 @@ public class LlmGateway {
      * @since 2026-10-23
      */
     public <T> T call(LlmRequest request, Class<T> outputType) {
+        precheck(request);
+        long started = System.nanoTime();
+        StructuredResponse<T> response = send(request, started, () -> client.responses().create(ResponseCreateParams.builder()
+                .model(properties.model())
+                .instructions(INSTRUCTION_MARKER + "\n" + request.instructions() + "\n\n" + DATA_GUARD)
+                .input(request.data())
+                .store(false)
+                .maxOutputTokens(properties.maxOutputTokens())
+                .text(outputType)
+                .build()));
+        return readOutput(request, response, started);
+    }
+
+    /** 모델이 부를 수 있는 서버 도구. argsType 의 공개 필드가 인자 스키마가 된다. */
+    public record ToolSpec(String name, String description, Class<?> argsType) {
+    }
+
+    /** 도구 실행기. 서버가 검증한 값만 JSON 문자열로 돌려준다. 모델이 만든 인자는 믿지 않고 실행기가 직접 확인한다. */
+    @FunctionalInterface
+    public interface ToolRunner {
+        String run(String name, String argumentsJson);
+    }
+
+    /**
+     * 설명 : 모델이 서버 도구를 부르면 실행기로 값을 얻어 이어 붙이고, 최종 구조화 출력이 나올 때까지 되풀이한다(#889).
+     * store=false 라 이전 응답 ID 를 쓰지 못하므로 호출 내용을 매번 통째로 다시 보낸다. 도구 호출은 maxToolCalls 번까지만 받고,
+     * 그 뒤에는 도구를 끄고 답을 받는다. 라운드마다 ai_call_log 1행을 남긴다. 실패·건너뜀이면 FGC-AI-001 을 던진다.
+     */
+    public <T> T callWithTools(LlmRequest request, Class<T> outputType, List<ToolSpec> tools, ToolRunner runner, int maxToolCalls) {
+        List<ResponseInputItem> items = new ArrayList<>();
+        items.add(ResponseInputItem.ofEasyInputMessage(EasyInputMessage.builder()
+                .role(EasyInputMessage.Role.USER).content(request.data()).build()));
+        int toolCalls = 0;
+        // 라운드마다 앞선 내용을 통째로 다시 보내므로, 보내는 입력 크기는 도구 호출·결과를 더한 누적값이다.
+        long inputChars = request.data().length();
+        while (true) {
+            // 분당 호출 상한은 질문 수가 아니라 외부 호출 수 기준이고(IF-EXT-03), 입력 크기 상한도 라운드마다 실제로 보내는 크기에 건다.
+            precheck(request, inputChars);
+            boolean toolsOpen = toolCalls < maxToolCalls;
+            long started = System.nanoTime();
+            List<ResponseInputItem> sent = List.copyOf(items);
+            StructuredResponse<T> response = send(request, started, () -> {
+                var builder = ResponseCreateParams.builder()
+                        .model(properties.model())
+                        .instructions(INSTRUCTION_MARKER + "\n" + request.instructions() + "\n\n" + DATA_GUARD)
+                        .inputOfResponse(sent)
+                        .store(false)
+                        .maxOutputTokens(properties.maxOutputTokens())
+                        .parallelToolCalls(false)
+                        .text(outputType);
+                for (ToolSpec tool : tools) {
+                    builder.addTool(tool.argsType(), function -> function.name(tool.name()).description(tool.description()));
+                }
+                if (!toolsOpen) {
+                    builder.toolChoice(ToolChoiceOptions.NONE);
+                }
+                return client.responses().create(builder.build());
+            });
+            List<ResponseFunctionToolCall> calls = response.output().stream()
+                    .flatMap(item -> item.functionCall().stream()).toList();
+            if (calls.isEmpty() || !toolsOpen) {
+                return readOutput(request, response, started);
+            }
+            record(request, AiCallStatus.SUCCESS, null, response.usage().orElse(null), elapsedMs(started));
+            for (ResponseFunctionToolCall call : calls) {
+                String result = runTool(runner, call);
+                inputChars += call.arguments().length() + result.length();
+                items.add(ResponseInputItem.ofFunctionCall(call));
+                items.add(ResponseInputItem.ofFunctionCallOutput(
+                        ResponseInputItem.FunctionCallOutput.builder().callId(call.callId()).output(result).build()));
+            }
+            toolCalls += calls.size();
+        }
+    }
+
+    private static String runTool(ToolRunner runner, ResponseFunctionToolCall call) {
+        try {
+            return runner.run(call.name(), call.arguments());
+        } catch (RuntimeException e) {
+            // 모델에는 사유만 알려 주고 다음 라운드에서 답하게 한다. 예외 내용은 로그에 남기지 않는다.
+            log.warn("LLM 도구 실행 실패 tool={}", call.name());
+            return "{\"error\":\"도구를 실행하지 못했습니다\"}";
+        }
+    }
+
+    /** 외부 호출 전 공통 검사. 건너뛰면 ai_call_log 를 남기고 FGC-AI-001 을 던진다. */
+    private void precheck(LlmRequest request) {
+        precheck(request, request.data().length());
+    }
+
+    /** inputChars 는 이번 호출로 보낼 입력 크기(도구 라운드는 누적값)다. */
+    private void precheck(LlmRequest request, long inputChars) {
         if (client == null) {
             throw skipped(request, "NO_API_KEY");
         }
         if (Instant.now().isBefore(disabledUntil)) {
             throw skipped(request, "AI_DISABLED");
         }
-        if (request.data().length() > properties.maxInputChars()) {
+        if (inputChars > properties.maxInputChars()) {
             throw skipped(request, "INPUT_TOO_LARGE");
         }
         if (overMinuteLimit(currentUserId())) {
             throw skipped(request, "RATE_LIMITED");
         }
+    }
 
-        long started = System.nanoTime();
-        StructuredResponse<T> response;
+    /** 모델에 요청을 실제로 보내기 직전에 한 번 불린다(도구 라운드도 한 번씩). 평가용 게이트웨이가 실제 요청 수를 세는 데 쓴다. */
+    protected void beforeModelRequest() {
+        // 운영에서는 할 일이 없다.
+    }
+
+    /** 외부 호출 1회. 실패 사유를 분류해 ai_call_log 에 남기고 FGC-AI-001 로 바꿔 던진다. */
+    private <T> StructuredResponse<T> send(LlmRequest request, long started, Supplier<StructuredResponse<T>> action) {
+        beforeModelRequest();
         try {
-            response = client.responses().create(ResponseCreateParams.builder()
-                    .model(properties.model())
-                    .instructions(INSTRUCTION_MARKER + "\n" + request.instructions() + "\n\n" + DATA_GUARD)
-                    .input(request.data())
-                    .store(false)
-                    .maxOutputTokens(properties.maxOutputTokens())
-                    .text(outputType)
-                    .build());
+            return action.get();
         } catch (OpenAIServiceException e) {
             if (DISABLING_STATUSES.contains(e.statusCode())) {
                 disable();
@@ -152,7 +251,6 @@ public class LlmGateway {
         } catch (OpenAIException e) {
             throw failed(request, AiCallStatus.ERROR, e.getClass().getSimpleName(), null, started);
         }
-        return readOutput(request, response, started);
     }
 
     /**

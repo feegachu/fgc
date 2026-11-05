@@ -98,6 +98,10 @@ async function start(page: Page, guide: Guide, role: string) {
       await expect(tutorial(page).getByText('목록에서 안내받을 대상을 직접 선택한 뒤 현재 대상에서 다시 시작하세요.', { exact: true })).toBeVisible()
       await page.getByRole('table').locator('tbody a[href^="/contracts/"]').first().click()
       await expect(page).toHaveURL(/\/contracts\/\d+(?:\?|$)/)
+      // Restart reads the committed DOM route; the URL may change before the detail page mounts.
+      await expect(page.getByRole('main').getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
+      await expect(page.locator('[data-guide-page="CONT-W02"]')).toHaveAttribute('data-guide-pathname', new URL(page.url()).pathname)
+      await expect(feature(page, 'features.contract.contract-detail-page.section')).toBeVisible()
       await tutorial(page).getByRole('button', { name: '현재 대상에서 다시 시작', exact: true }).click()
     }
   } else {
@@ -149,6 +153,8 @@ async function expectHighlight(page: Page, step: Step, target: Locator) {
 for (const guide of guides) {
   const role = guide.roles.includes('AGENT') ? 'AGENT' : guide.roles.includes('COMPLIANCE') ? 'COMPLIANCE' : 'SETTLEMENT'
   const account = role === 'AGENT' ? 'agent01' : role === 'COMPLIANCE' ? 'audit01' : 'settle01'
+  // #896: 설계사 홈의 '업무 안내' 메뉴를 없앴으므로 설계사 튜토리얼은 시작 경로가 없다. 새 시작 경로가 생기면 다시 켠다.
+  if (role === 'AGENT') continue
   const allowed = guide.steps.filter((step) => step.roles.includes(role))
   const limit = partial[guide.workflowId]?.count ?? allowed.length
   const planned = allowed.slice(0, limit)

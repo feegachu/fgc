@@ -35,6 +35,7 @@ it('a duplicate live target pauses rather than highlighting an arbitrary element
   render(<MemoryRouter><main id="main-content"><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters"/><section data-guide-target="contract.filters"/></main></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   expect(await screen.findByText(/안내 대상이 여러 곳/)).toBeVisible()
+  expect(document.body).not.toHaveTextContent('DUPLICATE_TARGET')
 })
 it('FilterBar forwards the target to its actual form', () => {
   render(<FilterBar data-guide-target="test.filters" onSubmit={() => {}}>필터</FilterBar>)
@@ -136,6 +137,7 @@ it('withdraws a highlight when a target becomes hidden through style changes', a
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
   act(() => { document.querySelector<HTMLElement>('[data-guide-target="contract.filters"]')!.style.display = 'none' })
   expect(await screen.findByText(/안내 대상이 숨겨지거나/)).toBeVisible()
+  expect(document.body).not.toHaveTextContent('TARGET_CHANGED')
   expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()
 })
 it('does not run an unregistered screen variant', () => {

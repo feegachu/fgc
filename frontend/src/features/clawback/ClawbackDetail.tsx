@@ -4,6 +4,7 @@ import { DataTable } from '../../components/DataTable'
 import { CategoryBadge, StatusValue } from '../../components/StatusBadge'
 import type { TableColumn } from '../../components/DataTable'
 import { date, dateTime, int } from '../../lib/format'
+import { isDeveloperText } from '../../lib/screenText'
 import { present } from '../arbitrage/utils'
 import { useCommissionItems } from '../base/api'
 import type { CandidateDetail } from './api'
@@ -173,7 +174,11 @@ const effectColumns: TableColumn<Detail['effects'][number]>[] = [
     ),
   },
   { key: 'at', label: '처리 시각', cellClassName: 'tabular-nums', render: (r) => dateTime(r.processedAt) },
-  { key: 'reason', label: '실패 사유', render: (r) => present(r.failureReason) },
+  {
+    key: 'reason',
+    label: '실패 사유',
+    render: (r) => (r.failureReason && isDeveloperText(r.failureReason) ? '시스템 오류' : present(r.failureReason)),
+  },
 ]
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
