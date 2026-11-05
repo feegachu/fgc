@@ -359,7 +359,7 @@ function DetailPanel({
                 <Row label="수수료 항목" value={entry.commissionItemName} />
                 <Row label="회차" value={entry.installmentNo == null ? '-' : `${entry.installmentNo}회`} />
                 <Row label="기준 설명" value={detail?.basis.dateBasis[entry.entryType]} />
-                <Row label="정책 관리번호" value={entry.policyVersionId == null ? '-' : String(entry.policyVersionId)} />
+                <Row label="적용 정책" value={entry.policyName ? `${entry.policyName} v${entry.policyVersionNo}` : '-'} />
                 <Row label="원천" value={`${SOURCE_LABELS[entry.source.entityType] ?? '원천 자료'} ${entry.source.id}번`} />
               </dl>
             </section>

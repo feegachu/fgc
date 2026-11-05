@@ -17,6 +17,8 @@ export interface StatementEntry {
   statusLabel: string
   amount: number | null
   policyVersionId: number | null
+  policyName: string | null
+  policyVersionNo: number | null
   source: { entityType: string; id: number }
   dataStatus: 'AVAILABLE' | 'MISSING'
 }

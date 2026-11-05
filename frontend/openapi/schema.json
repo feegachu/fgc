@@ -9946,8 +9946,15 @@
             "format" : "int32",
             "type" : "integer"
           },
+          "policyName" : {
+            "type" : "string"
+          },
           "policyVersionId" : {
             "format" : "int64",
+            "type" : "integer"
+          },
+          "policyVersionNo" : {
+            "format" : "int32",
             "type" : "integer"
           },
           "source" : {

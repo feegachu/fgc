@@ -20,6 +20,8 @@ public record StatementEntry(
         String statusLabel,
         BigDecimal amount,
         Long policyVersionId,
+        String policyName,
+        Integer policyVersionNo,
         Source source,
         String dataStatus
 ) {
