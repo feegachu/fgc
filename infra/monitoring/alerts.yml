@@ -1,0 +1,22 @@
+groups:
+  - name: fgc
+    rules:
+      - alert: FgcMetricsUnavailable
+        expr: up{job="fgc"} == 0
+        for: 10s
+        labels: {severity: critical}
+        annotations: {summary: 'FGC metrics scrape failed (process, network or credentials)'}
+      - alert: FgcHealthDown
+        expr: probe_success{job="fgc-health"} == 0 or up{job="fgc-health"} == 0
+        for: 10s
+        labels: {severity: critical}
+        annotations: {summary: 'FGC health failed (includes DB connectivity)'}
+      - alert: FgcHighErrorRate
+        expr: sum by (instance) (rate(http_server_requests_seconds_count{job="fgc",status=~"5.."}[30s])) / clamp_min(sum by (instance) (rate(http_server_requests_seconds_count{job="fgc"}[30s])), 0.001) > 0.05
+        for: 10s
+        labels: {severity: warning}
+        annotations: {summary: 'FGC HTTP 5xx ratio exceeds 5 percent over 30 seconds'}
+      - alert: FgcBatchFailed
+        expr: (time() - fgc_batch_last_failure_timestamp{job="fgc"} < 120) and (fgc_batch_last_failure_timestamp{job="fgc"} > 0)
+        labels: {severity: critical}
+        annotations: {summary: 'FGC batch failure detected; inspect structured step logs'}

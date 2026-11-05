@@ -9,6 +9,8 @@ async function authFixture(page: Page, roleCode = 'SETTLEMENT', session = { vers
   await page.route('**/api/v1/base/**', (route) => route.fulfill({ json: envelope({ content: [], totalPages: 0, totalElements: 0 }) }))
   await page.route('**/api/v1/base/commission-items?**', (route) => route.fulfill({ json: envelope([]) }))
   await page.route('**/api/v1/dashboard/**', (route) => route.fulfill({ json: envelope({ recentExceptions: [], recentRuns: [] }) }))
+  await page.route('**/api/v1/home/**', (route) => route.fulfill({ json: envelope({ branches: [], attentionAgents: [] }) }))
+  await page.route('**/api/v1/exceptions/counts**', (route) => route.fulfill({ json: envelope({ total: 0, bySeverity: [], byType: [] }) }))
   let issued = initial ? ++session.version : 0
   let expired = false
   const token = () => envelope({ accessToken: `fixture-${issued}`, tokenType: 'Bearer', expiresIn: 1800 })

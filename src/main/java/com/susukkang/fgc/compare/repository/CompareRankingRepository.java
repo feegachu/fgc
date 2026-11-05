@@ -18,6 +18,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public class CompareRankingRepository {
+    private static final String INSURER_ID = "insurerId";
+
 
     public record Offering(long offeringId, long insurerId, String insurer, long productId, String product, String groupCode) {
     }
@@ -85,7 +87,7 @@ public class CompareRankingRepository {
                   AND (r.agent_rank_code IS NULL OR r.agent_rank_code = :rank)
                 ORDER BY r.commission_rule_id
                 """)
-                .setParameter("offeringId", offering.offeringId()).setParameter("insurerId", offering.insurerId())
+                .setParameter("offeringId", offering.offeringId()).setParameter(INSURER_ID, offering.insurerId())
                 .setParameter("asOf", asOf).setParameter("orgId", agent.organizationId())
                 .setParameter("rank", agent.rankCode()).getResultList();
         return rows.stream().map(r -> new RuleRow(((Number) r[0]).longValue(), ((Number) r[1]).longValue(),
@@ -112,7 +114,7 @@ public class CompareRankingRepository {
                   AND (r.insurer_id IS NULL OR r.insurer_id = :insurerId)
                   AND (r.product_offering_id IS NULL OR r.product_offering_id = :offeringId)
                 ORDER BY r.policy_version_id, r.clawback_rule_id
-                """).setParameter("asOf", asOf).setParameter("insurerId", offering.insurerId())
+                """).setParameter("asOf", asOf).setParameter(INSURER_ID, offering.insurerId())
                 .setParameter("offeringId", offering.offeringId()).getResultList();
         return rows.stream().map(r -> new ClawbackRuleResolver.RuleRow(((Number) r[0]).longValue(), (String) r[1],
                 r[2] == null ? null : ((Number) r[2]).longValue(), (Boolean) r[3], (Boolean) r[4], ((Number) r[5]).intValue(),
@@ -131,7 +133,7 @@ public class CompareRankingRepository {
                   AND (s.product_group_code IS NULL OR s.product_group_code = :groupCode)
                 ORDER BY (s.insurer_id IS NULL), (s.product_group_code IS NULL), s.contract_date_from DESC, s.cap_rule_set_id DESC
                 LIMIT 1
-                """).setParameter("asOf", asOf).setParameter("insurerId", offering.insurerId())
+                """).setParameter("asOf", asOf).setParameter(INSURER_ID, offering.insurerId())
                 .setParameter("groupCode", offering.groupCode()).getResultList();
         return rows.stream().findFirst().map(r -> new CapRule((BigDecimal) r[0], (String) r[1], ((Number) r[2]).longValue()));
     }
