@@ -552,7 +552,8 @@ describe('production policy workflow', () => {
     )
   })
 
-  it('focuses a bracket-indexed server field error and preserves unsaved form values', async () => {
+  it.each([false, true])('focuses a server field after rendering, including an early animation frame: %s', async (earlyFrame) => {
+    if (earlyFrame) vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { callback(0); return 0 })
     vi.spyOn(apiClient, 'request').mockRejectedValue(
       new ApiError(
         {

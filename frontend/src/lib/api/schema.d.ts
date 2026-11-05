@@ -2742,12 +2742,12 @@ export interface components {
             userId?: number;
         };
         Basis: {
-            asOfDate?: string;
-            lines?: components["schemas"]["AssistantAttributionLine"][];
-            policyVersionIds?: string[];
-            rounding?: components["schemas"]["Rounding"];
-            ruleIds?: string[];
             sourceRefs?: components["schemas"]["AssistantCalculationSource"][];
+            rounding?: components["schemas"]["Rounding"];
+            asOfDate?: string;
+            policyVersionIds?: string[];
+            ruleIds?: string[];
+            lines?: components["schemas"]["AssistantAttributionLine"][];
         };
         Blocker: {
             code?: string;
@@ -4956,46 +4956,47 @@ export interface components {
             value: components["schemas"]["JsonNode"];
         };
         PaymentCalculationRequest: {
-            candidate?: components["schemas"]["JsonNode"];
-            /** Format: int64 */
-            clientRevision: number;
             contractVersion: string;
             /** @enum {string} */
             kind: "EXPECTED_COMMISSION" | "ATTRIBUTION_BALANCE" | "CAP_STATUS" | "PAYMENT_CANDIDATE" | "RECONCILIATION_DIFFERENCE" | "ARBITRAGE_EXCESS" | "JOURNAL_CORRECTION_REVIEW";
             /** @enum {string} */
             mode: "EXISTING" | "HYPOTHETICAL";
             scope?: components["schemas"]["Scope"];
+            candidate?: components["schemas"]["JsonNode"];
+            /** Format: int64 */
+            clientRevision: number;
         };
         PaymentCalculationSnapshot: {
-            amounts?: {
-                [key: string]: string;
-            };
-            basis?: components["schemas"]["Basis"];
-            blockers?: components["schemas"]["Reason"][];
-            /** Format: date-time */
-            calculatedAt?: string;
             calculationId?: string;
-            capPreview?: {
-                [key: string]: unknown;
-            }[];
+            kind?: string;
+            mode?: string;
+            status?: string;
             /** Format: int64 */
             clientRevision?: number;
-            confirmable?: boolean;
-            currency?: string;
+            synthetic?: boolean;
+            snapshotOnly?: boolean;
             evidenceKind?: string;
-            kind?: string;
-            missingInputs?: string[];
-            mode?: string;
+            currency?: string;
             paymentStatus?: string;
-            recommendation?: components["schemas"]["Recommendation"];
             resolvedScope?: {
                 [key: string]: string;
             };
-            snapshotOnly?: boolean;
-            status?: string;
-            synthetic?: boolean;
+            amounts?: {
+                [key: string]: string;
+            };
+            capPreview?: {
+                [key: string]: unknown;
+            }[];
+            confirmable?: boolean;
+            blockers?: components["schemas"]["Reason"][];
+            missingInputs?: string[];
+            basis?: components["schemas"]["Basis"];
+            recommendation?: components["schemas"]["Recommendation"];
+            /** Format: date-time */
+            calculatedAt?: string;
             /** @description Always null in snapshot-only phase; not a server proof */
             validity?: Record<string, never> | null;
+            lines?: components["schemas"]["AssistantCalculationLine"][];
         };
         PaymentEvidence: {
             attributedAmount?: number;
@@ -5469,8 +5470,8 @@ export interface components {
         };
         Reason: {
             code?: string;
-            contractId?: string;
             message?: string;
+            contractId?: string;
             transactionAttributionId?: string;
         };
         RecentExceptionResponse: {
@@ -5511,10 +5512,10 @@ export interface components {
         };
         Recommendation: {
             allowed?: boolean;
+            targetId?: string;
+            suggestedAmount?: string;
             reason?: string;
             requiredChecks?: string[];
-            suggestedAmount?: string;
-            targetId?: string;
         };
         ReconciliationExceptionBulkCreateResponse: {
             /** Format: int64 */
@@ -5817,10 +5818,10 @@ export interface components {
             reversalOfId?: number;
         };
         Rounding: {
-            aggregation?: string;
-            mode?: string;
             /** Format: int32 */
             scale?: number;
+            mode?: string;
+            aggregation?: string;
         };
         Ruleset: {
             /** Format: date */
@@ -5980,6 +5981,19 @@ export interface components {
         };
         Scope: {
             paymentId?: string;
+            contractId?: string;
+            settlementMonth?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            /** Format: int32 */
+            installmentNo?: number;
+            commissionItemId?: string;
+            beneficiaryAgentId?: string;
+            /** Format: date */
+            asOfDate?: string;
+            reconciliationResultId?: string;
+            /** @enum {string} */
+            aggregation?: "SINGLE_LINE" | "MONTH_TOTAL";
         };
         Source: {
             entityType?: string;
@@ -6171,6 +6185,24 @@ export interface components {
             selectionStatusLabel?: string;
             /** Format: int64 */
             validationTargetId?: number;
+        };
+        AssistantCalculationLine: {
+            cashflowType?: string;
+            sourceId?: string;
+            contractId?: string;
+            commissionItemId?: string;
+            beneficiaryAgentId?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            attributionDate?: string;
+            dueDate?: string;
+            basisCode?: string;
+            basisAmount?: string;
+            calculationType?: string;
+            ratePct?: string;
+            expectedAmount?: string;
+            ruleId?: string;
+            status?: string;
         };
     };
     responses: never;

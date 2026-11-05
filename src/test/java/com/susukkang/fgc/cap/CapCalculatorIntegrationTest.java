@@ -474,6 +474,26 @@ class CapCalculatorIntegrationTest {
                 .singleElement().extracting(ScheduleAmountView::getEvidenceRef).isNull();
     }
 
+    /** 제외 증빙은 회차 금액을 채워야 한다(REG-11). 일부만 채우면 회차 전체를 빼지 않고 사람 판단으로 보낸다. */
+    @Test
+    void doesNotExcludeAWholeLineWhenEvidenceCoversOnlyPartOfItsAmount() {
+        Long contractId = contractId("FGC-FGL01-202607-0001");
+        Long headerId = insertOperationalScheduleWithBaseCommissionLines(
+                contractId, LocalDate.of(2026, 7, 10), new BigDecimal("101"));
+        Long lineId = scheduleLineIds(headerId).getFirst();
+        Long itemId = jdbcTemplate.queryForObject(
+                "SELECT commission_item_id FROM fgc.commission_item WHERE item_code='NEWCOMER_SUPPORT'", Long.class);
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET commission_item_id=? WHERE schedule_line_id=?", itemId, lineId);
+
+        insertScheduleEvidence(contractId, lineId, itemId, "GA_TO_FC", "EXCLUDED", "EVD-PART", true); // 100원, 1원 모자람
+        assertThat(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(contractId, "GA_TO_FC", 12))
+                .singleElement().extracting(ScheduleAmountView::getEvidenceRef).isNull();
+        assertThat(calculatorClassification(contractId, itemId)).isEqualTo("REVIEW_REQUIRED");
+
+        insertScheduleEvidence(contractId, lineId, itemId, "GA_TO_FC", "EXCLUDED", "EVD-REST", true); // 합계 200원
+        assertThat(calculatorClassification(contractId, itemId)).isEqualTo("EXCLUDED");
+    }
+
     // #501: 상세 순번(detail_seq)이 조회 순서를 따르므로 실행 계획과 무관하게 항목 → 계약월차 → 행 ID 순이어야 한다.
     // 평소엔 ix_schedule_line_contract_month 인덱스 스캔이 우연히 월차 순서를 내지만, 부하·통계에 따라
     // 순차 스캔으로 바뀌면 힙 순서가 나온다. 인덱스 스캔을 끄고, 행을 역순으로 고쳐 써서 힙 순서를 뒤집은 뒤

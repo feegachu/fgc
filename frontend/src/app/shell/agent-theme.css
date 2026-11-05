@@ -1,3 +1,72 @@
-/* 설계사 화면도 다른 역할과 같은 셸 색을 쓴다(공통 원칙 01). 상단 제목 배치만 따로 둔다. */
+/* 설계사 화면은 셸 구성은 같고 포인트 색만 보라색이다(#839). 상단 제목 배치는 따로 둔다. */
 .agent-topbar { display: flex; align-items: stretch; gap: 18px; min-width: 0; height: 100%; }
 .agent-top-title { display: flex; align-items: center; padding-left: 24px; font-size: 16px; font-weight: 700; white-space: nowrap; }
+
+/*
+ * app-theme.css 의 파랑 포인트를 채도·명도는 그대로 두고 색상(hue)만 +44° 돌린 값이다.
+ * 기준: #0046ff(224°) → #7500ff(268°, 기존 설계사 보라 #7f57ac 의 색상).
+ * 글자색은 너무 쨍하지 않도록 사이드바 로고와 같은 #513a95 를 쓴다.
+ */
+.app-shell.is-agent {
+  --app-canvas: #f4edfa;
+  --color-blue-50: #f4eeff;
+  --color-blue-100: #e7d9ff;
+  --color-blue-500: #8c2fff;
+  --color-blue-600: #7b1fe5;
+  --color-blue-700: #651ab8;
+  --color-blue-800: #521b91;
+  --color-text-link: #513a95;
+  --color-border-focus: #8c2fff;
+  --color-status-info-text: #513a95;
+  --color-status-info-bg: #f4efff;
+  --color-status-info-border: #af93fd;
+  --color-status-info-solid: #7f30ec;
+  --color-nav-bg-default: #f4eeff;
+  --color-nav-bg-hover: color-mix(in srgb, #7500ff 7%, transparent);
+  --color-nav-bg-active: color-mix(in srgb, #7500ff 12%, transparent);
+  --color-nav-text-default: #21174b;
+  --color-nav-text-muted: #21174b;
+  --color-action-primary: #7500ff;
+  --color-action-primary-hover: #ebdfff;
+  --color-action-primary-down: #ebdfff;
+  --color-action-subtle: color-mix(in srgb, #7500ff 8%, white);
+}
+.app-shell.is-agent .app-sidebar {
+  color: #21174b;
+  background: color-mix(in srgb, color-mix(in srgb, #f4eeff 30%, white) 70%, transparent);
+}
+.app-shell.is-agent .sidebar-brand img {
+  filter: brightness(0) saturate(100%) invert(24%) sepia(54%) saturate(929%) hue-rotate(218deg);
+}
+.app-shell.is-agent
+  .app-sidebar
+  :is(.sidebar-nav-link.is-active, .sidebar-nav-details[open] > .sidebar-nav-summary, .sidebar-subnav-link.is-active) {
+  color: color-mix(in srgb, #7500ff 35%, #0f172a);
+  background: color-mix(in srgb, #7500ff 10%, #ffffff66);
+}
+.app-shell.is-agent .button-primary:not(:disabled):not(.is-disabled) {
+  color: #513a95;
+  border-color: #dfc6ff;
+  background: #f4edff;
+}
+.app-shell.is-agent .button-primary:is(:hover, :active):not(:disabled):not(.is-disabled) {
+  background: #ebdfff;
+}
+.app-shell.is-agent .button-secondary:not(:disabled):not(.is-disabled) {
+  color: #513a95;
+  border-color: #dfc6ff;
+}
+.app-shell.is-agent .button-secondary:is(:hover, :active):not(:disabled):not(.is-disabled) {
+  color: #513a95;
+  border-color: #dfc6ff;
+  background: #f4edff;
+}
+.app-shell.is-agent .button-ghost:not(:disabled):not(.is-disabled) {
+  color: #513a95;
+}
+.app-shell.is-agent .workspace-tab-close:hover {
+  background: color-mix(in srgb, #7500ff 16%, transparent);
+}
+.app-shell.is-agent .status-badge-info {
+  --badge-ink: #513a95;
+}
