@@ -39,6 +39,16 @@ class PaymentCalculationIntegrationTest {
     Long contractId;
     Long paymentId;
 
+    @Test void verifiedCalculationIsReadOnlyAndPaymentMutationMakesItStale() {
+        var request=new PaymentCalculationRequest("assistant.v1",PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE,PaymentCalculationRequest.Mode.EXISTING,new PaymentCalculationRequest.Scope(paymentId.toString()),null,1L);
+        var before=counts();var result=calculations.calculateVerified(request);
+        assertThat(result.validity()).isNotNull();assertThat(counts()).isEqualTo(before);
+        assertThat(calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),request)).status()).isEqualTo(result.status());
+        jdbc.update("UPDATE fgc.commission_transaction SET amount=amount+1 WHERE commission_transaction_id=?",paymentId);
+        var stale=calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),request));
+        assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.amounts()).isEmpty();assertThat(stale.recommendation().allowed()).isFalse();
+    }
+
     @BeforeEach void createOwnedCommittedDraft() {
         AppUserView view = jdbc.queryForObject("SELECT user_id, login_id FROM fgc.app_user ORDER BY user_id LIMIT 1", (rs, row) -> {
             var value = new AppUserView();
@@ -47,7 +57,9 @@ class PaymentCalculationIntegrationTest {
             return value;
         });
         var principal = new FgcUserDetails(view, true, true);
-        SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+        var authentication=UsernamePasswordAuthenticationToken.authenticated(principal,null,principal.getAuthorities());
+        authentication.setDetails(new com.susukkang.fgc.auth.service.FgcJwtAuthenticationConverter.SessionIdentity("integration-session-"+UUID.randomUUID()));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
         contractId = jdbc.queryForObject("""
                 INSERT INTO fgc.insurance_contract(insurer_id,product_offering_id,contract_no,contract_date,
                     agent_id,organization_id,premium_per_cycle_amount,first_premium_amount,
@@ -129,11 +141,14 @@ class PaymentCalculationIntegrationTest {
             } finally { writerDone.countDown(); }
         });
         try {
-            var result = calculations.calculate(request(PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE));
+            var result = calculations.calculateVerified(request(PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE));
             writer.get(20, TimeUnit.SECONDS);
             assertThat(result.basis().lines()).singleElement().satisfies(line -> assertThat(line.originalAmount()).isEqualTo("100000.00"));
             assertThat(result.capPreview()).isNotEmpty();
             assertThat(result.capPreview().getFirst()).containsEntry("candidateAmount", "100000");
+            assertThat(result.validity()).isNotNull();
+            var stale=calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),request(PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE)));
+            assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.amounts()).isEmpty();assertThat(stale.basis().lines()).isEmpty();
             assertThat(jdbc.queryForObject("SELECT amount FROM fgc.commission_transaction WHERE commission_transaction_id=?", BigDecimal.class, paymentId)).isEqualByComparingTo("900000");
             assertThat(jdbc.queryForObject("SELECT attributed_amount FROM fgc.transaction_attribution WHERE commission_transaction_id=?", BigDecimal.class, paymentId)).isEqualByComparingTo("900000");
         } finally {
