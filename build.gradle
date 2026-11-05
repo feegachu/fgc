@@ -160,3 +160,23 @@ tasks.register('picoGuidePreview', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.susukkang.fgc.assistant.PicoGuidePreviewServer'
 }
+
+// DAR-012 600인 합성 데이터셋 생성기(시드명세 §50). Flyway 밖의 명시적 진입점이며 dar012 프로필에서만 동작한다.
+// 새 격리 DB에 Flyway(db/migration + db/demo)를 적용한 뒤 실행한다. DB 접속은 SPRING_DATASOURCE_* 환경변수를 쓴다.
+// 신한 서버와 개발계 DB에 쓰지 않는다. db/demo-agent를 읽지 않으므로 그 이력이 있는 DB에서는 Flyway 검증에서 멈춘다.
+// 예: gradlew generateDar012 -Pdar012.dataset-id=D12-1K -Pdar012.contracts=1000 [-Pdar012.seed=20261118]
+//     월 통합검증까지: -Pdar012.run-validation=true -Pdar012.validation-month=2026-08-01
+tasks.register('generateDar012', org.springframework.boot.gradle.tasks.run.BootRun) {
+    group = 'application'
+    description = 'DAR-012 합성 데이터셋 기초 데이터를 적재하고 메타데이터·정답표를 build/dar012에 쓴다.'
+    mainClass = 'com.susukkang.fgc.FgcApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    systemProperty 'spring.profiles.active', 'dar012'
+    systemProperty 'spring.flyway.locations', 'classpath:db/migration,classpath:db/demo'
+    // devtools 재시작 스레드에서는 기동 실패가 종료 코드 0으로 끝날 수 있다. 게이트가 멈춘 실행이 BUILD SUCCESSFUL로 보이면 안 된다.
+    systemProperty 'spring.devtools.restart.enabled', 'false'
+    doFirst {
+        args = project.properties.findAll { k, v -> k.startsWith('dar012.') }
+                .collect { k, v -> "--fgc.${k}=${v}".toString() }
+    }
+}
