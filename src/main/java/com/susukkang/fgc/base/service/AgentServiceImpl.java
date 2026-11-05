@@ -62,7 +62,8 @@ public class AgentServiceImpl implements AgentService {
 
     private Page<AgentRow> findRows(AgentSearchCriteria criteria, String keyword, Pageable pageable) {
         if (criteria.branchId() != null) {
-            return agentRepository.searchBranch(criteria.branchId(), keyword, criteria.asOf(), criteria.includeTerminated(), pageable);
+            return agentRepository.search(criteria.selectedId(), criteria.organizationId(), criteria.branchId(), keyword, criteria.asOf(),
+                    criteria.includeTerminated(), criteria.includeHistorical(), pageable);
         }
         if (criteria.selectedId() != null) {
             return agentRepository.search(criteria.selectedId(), criteria.organizationId(), keyword, criteria.asOf(),

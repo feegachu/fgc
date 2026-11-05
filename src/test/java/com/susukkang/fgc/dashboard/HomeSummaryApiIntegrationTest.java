@@ -233,6 +233,18 @@ class HomeSummaryApiIntegrationTest {
                 .andExpect(jsonPath("$.error.field").value("branchId"));
     }
 
+    @Test
+    void 지점으로_찾을_때_다른_조건도_함께_적용한다() throws Exception {
+        String branch = String.valueOf(branchA);
+        mvc.perform(agents().param("branchId", branch).param("organizationId", branch))
+                .andExpect(jsonPath("$.data.content[*].agentCode").value(contains("IT-H-A2", "IT-H-A4")));
+        mvc.perform(agents().param("branchId", branch).param("selectedId", String.valueOf(agent1)))
+                .andExpect(jsonPath("$.data.content[*].agentCode").value(contains("IT-H-A1")));
+        mvc.perform(agents().param("branchId", branch).param("includeHistorical", "true"))
+                .andExpect(jsonPath("$.data.content[*].agentCode")
+                        .value(contains("IT-H-A1", "IT-H-A2", "IT-H-A3", "IT-H-A4", "IT-H-A5", "IT-H-A7")));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"SYSTEM_ADMIN", "GA_ADMIN", "SETTLEMENT", "COMPLIANCE"})
     void 내부_역할은_현황을_본다(String role) throws Exception {

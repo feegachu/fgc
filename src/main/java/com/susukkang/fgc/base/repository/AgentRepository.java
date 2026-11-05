@@ -20,6 +20,10 @@ import java.time.LocalDate;
  */
 public interface AgentRepository extends JpaRepository<Agent, Long> {
 
+    /**
+     * branchId는 FUN-080 관리자 홈의 지점 선택이다. 설계사는 대개 팀에 소속되므로 지점과 바로 아래 팀 소속을 함께 찾는다.
+     * 조직 단계상 지점 아래는 팀뿐이다(organization_type). 입력 화면이 쓰는 organizationId 의미는 그대로 둔다.
+     */
     @Query(value = """
             SELECT new com.susukkang.fgc.base.dto.AgentRow(
                 a.agentId,
@@ -98,14 +102,6 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     default Page<AgentRow> search(Long selectedId, Long organizationId, String keyword, LocalDate asOf,
                                  boolean includeTerminated, boolean includeHistorical, Pageable pageable) {
         return search(selectedId, organizationId, null, keyword, asOf, includeTerminated, includeHistorical, pageable);
-    }
-
-    /**
-     * FUN-080 관리자 홈의 지점 선택. 설계사는 대개 팀에 소속되므로 지점과 바로 아래 팀 소속을 함께 찾는다.
-     * 조직 단계상 지점 아래는 팀뿐이다(organization_type). 입력 화면이 쓰는 organizationId 의미는 그대로 둔다.
-     */
-    default Page<AgentRow> searchBranch(Long branchId, String keyword, LocalDate asOf, boolean includeTerminated, Pageable pageable) {
-        return search(null, null, branchId, keyword, asOf, includeTerminated, false, pageable);
     }
 
     default Page<AgentRow> search(Long organizationId, String keyword, LocalDate asOf, boolean includeTerminated,
