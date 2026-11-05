@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.DateTimeException;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Map;
 
@@ -70,8 +72,19 @@ public class CapCheckController {
             @Parameter(description = "페이지(1-base)") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "페이지 크기(최대 100)") @RequestParam(defaultValue = "20") int size
     ) {
+        // 2026-11-04 yslee - #677 ZAP API scan 이 찾은 잘못된 month 500 처리
+        // 기존 코드: YearMonth.parse 예외를 그대로 두어 FGC-COMMON-500 이 됐다.
+        // 개선: 대시보드, 원장 검색과 같이 FGC-COMMON-002 로 돌려준다.
+        LocalDate monthStart = null;
+        if (month != null) {
+            try {
+                monthStart = YearMonth.parse(month).atDay(1);
+            } catch (DateTimeException e) {
+                throw new FgcBusinessException(FgcErrorCode.COMMON_002, "month", Map.of("field", "month"), null);
+            }
+        }
         CapCheckSearchCriteria criteria = new CapCheckSearchCriteria(
-                month == null ? null : YearMonth.parse(month).atDay(1),
+                monthStart,
                 stage == null ? null : stage.name(),
                 status == null ? null : status.name(),
                 insurerId,

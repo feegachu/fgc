@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -114,6 +115,7 @@ export default function AuditLogPage() {
   return (
     <div className="audit-page">
       <header className="page-header">
+        <ScreenHelp screenId="AUDT-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">감사로그 조회</h1>
         </div>
@@ -139,7 +141,7 @@ export default function AuditLogPage() {
         label="감사 기록과 변경 내용 비교 카드 너비"
         defaultRatio={60}
       >
-        <section data-guide-feature="features.audit.audit-log-page.section" className="surface audit-list-panel" aria-labelledby="audit-list-title">
+        <section data-guide-feature="features.audit.audit-log-page.section" data-guide-target="audit.overview" className="surface audit-list-panel" aria-labelledby="audit-list-title">
           <ListHeader className="audit-panel-header" total={logs.data?.totalElements ?? 0} pageSize={20}>
             <h2 id="audit-list-title" className="surface-title">
               감사 기록

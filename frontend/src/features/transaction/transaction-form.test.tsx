@@ -534,7 +534,7 @@ describe('TRAN-W02 React form workflow', () => {
     const { user } = mount()
     await fillNew(user)
     await selectOption(user, screen.getByLabelText('1번 귀속행 산입 판정'), 'EXCLUDED:NEW_AGENT_SUPPORT')
-    await user.click(button('btn-save'))
+    expect(button('btn-save')).toBeDisabled()
     expect(await screen.findByText('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.')).toBeVisible()
     expect(writes()).toHaveLength(0)
     await user.type(screen.getByLabelText('1번 귀속행 증빙'), '증빙-1')
@@ -551,6 +551,8 @@ describe('TRAN-W02 React form workflow', () => {
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '2')
     expect(screen.queryByLabelText('1번 귀속행 계약번호')).not.toBeInTheDocument()
     expect(screen.getByLabelText('1번 귀속행 산입 판정')).toHaveValue('EXCLUDED:NEW_AGENT_SUPPORT')
+    expect(screen.getByText('신규 설계사 지원 건은 모든 귀속행에 증빙을 입력해야 합니다.')).toBeVisible()
+    expect(button('btn-save')).toBeDisabled()
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
     expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('')
     expect(screen.getByLabelText('1번 귀속행 귀속 방법')).toHaveValue('DIRECT')
@@ -1229,6 +1231,7 @@ describe('FUN-087 guide card and spotlight', () => {
       await user.click(button('btn-confirm'))
       await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '확정 실행' }))
       expect(await screen.findByRole('heading', { name: '지급 확정 완료' })).toBeVisible()
+      expect(screen.queryByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')).not.toBeInTheDocument()
       expect(screen.getByText(/가이드 완료 확인은 보류/)).toBeVisible()
       expect(screen.getByRole('region', { name: '지급 업무 가이드' })).not.toHaveAttribute(
         'data-guide-status',
@@ -1262,6 +1265,7 @@ describe('FUN-087 guide card and spotlight', () => {
     mutation = () => ({ ...saved, status: 'CONFIRMED' })
     await user.click(within(dialog).getByRole('button', { name: '확정 실행' }))
     expect(await screen.findByRole('heading', { name: '지급 확정 완료' })).toBeVisible()
+    expect(screen.queryByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')).not.toBeInTheDocument()
     await waitFor(() => expect(panel()).toHaveAttribute('data-guide-status', 'COMPLETED'))
     expect(screen.queryByRole('heading', { name: '지급 목록 결과' })).not.toBeInTheDocument()
     expect(screen.getByLabelText(/금액 \(원\)/)).toBeDisabled()

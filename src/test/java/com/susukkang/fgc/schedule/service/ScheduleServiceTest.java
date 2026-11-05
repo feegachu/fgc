@@ -75,6 +75,15 @@ class ScheduleServiceTest {
     private ScheduleQueryRepository scheduleQueryRepository;
 
     @Mock
+    private com.susukkang.fgc.schedule.repository.SchedulePreviewRepository previews;
+
+    @Mock
+    private com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService previewPolicies;
+
+    @Mock
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    @Mock
     private ScheduleWriteRepository scheduleWriteRepository;
 
     @Mock
@@ -133,6 +142,33 @@ class ScheduleServiceTest {
         assertThat(condition.getPurpose()).isEqualTo(SchedulePurpose.OPERATIONAL);
         verify(scheduleQueryRepository).selectByCondition(condition, 20, 0L);
         verify(scheduleQueryRepository).countByCondition(condition);
+    }
+
+    // FGC-FUN-037 / FGC-FUN-038: 저장 직전에도 48/84회차 상한을 적용한다.
+    @ParameterizedTest
+    @EnumSource(value = ScheduleRegime.class, names = {"FOUR_YEAR_2027", "SEVEN_YEAR_2029"})
+    void rejectsPreviewAboveRegimeLimitBeforeCreatingHeader(ScheduleRegime regime) throws Exception {
+        int tooMany = regime == ScheduleRegime.FOUR_YEAR_2027 ? 49 : 85;
+        var contract = withContractId(10L, InsuranceContract.builder().build());
+        var policy = ResolvedCommissionPolicy.builder().policyVersionId(20L)
+                .policyType(PolicyType.CURRENT_COMMISSION).paymentStage(PaymentStage.INSURER_TO_GA)
+                .scheduleRegime(regime).rules(List.of(rule(30L, AgentRankCode.FC, 1, tooMany, "1"))).build();
+        var selected = mock(com.susukkang.fgc.policy.dto.FeeRegimeSchedulePolicy.class);
+        given(selected.isSelected()).willReturn(true);
+        given(selected.commissionPolicy()).willReturn(policy);
+        given(insuranceContractRepository.findById(10L)).willReturn(Optional.of(contract));
+        given(previews.isInstallmentContract(10L)).willReturn(true);
+        given(previews.active(eq(10L), eq(PaymentStage.INSURER_TO_GA), anyString())).willReturn(null);
+        given(previewPolicies.resolve(10L, PaymentStage.INSURER_TO_GA)).willReturn(selected);
+        given(objectMapper.writeValueAsString(selected)).willReturn("selected-policy");
+
+        assertThatThrownBy(() -> scheduleService.generateSchedulesByContractId(10L))
+                .isInstanceOfSatisfying(FgcBusinessException.class, error ->
+                        assertThat(error.getField()).isEqualTo("installmentTo"));
+        verify(scheduleWriteRepository, never()).insertScheduleHeader(any());
+        verify(scheduleWriteRepository, never()).insertAllScheduleLines(any());
+        verify(previews, never()).deactivate(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test

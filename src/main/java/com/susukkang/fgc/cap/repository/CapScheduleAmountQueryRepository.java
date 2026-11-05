@@ -24,7 +24,7 @@ public class CapScheduleAmountQueryRepository {
 
     private final EntityManager entityManager;
 
-    // 해당 귀속행이 있고 모두 증빙을 갖춘 경우에만 증빙을 반환한다. 증빙이 없어도 스케줄 행은 조회한다.
+    // 해당 귀속행이 있고 모두 증빙을 갖췄으며 합계가 회차 금액을 채운 경우에만 증빙을 반환한다(REG-11). 증빙이 없어도 스케줄 행은 조회한다.
     // CapCalculatorImpl이 반환 순서대로 detail_seq를 매기므로 결정적 정렬이 필요하다(#501).
     // CAP-W02 ③ "항목별 산입 내역"은 같은 항목을 모아 월차 순으로 둔다(FUN-035, 화면정의서 CAP-W02 "③ 표 정렬").
     // 항목 사이 순서는 commission_item_id(등록 순)일 뿐 업무 규칙이 아니다 — 규정·협회 자료에 표시 순서가 없다(#507).
@@ -65,6 +65,7 @@ public class CapScheduleAmountQueryRepository {
                    SELECT CASE
                               WHEN COUNT(ta.transaction_attribution_id) > 0
                                AND BOOL_AND(NULLIF(BTRIM(ta.evidence_ref), '') IS NOT NULL)
+                               AND SUM(ROUND(ta.attributed_amount, 0)) >= ROUND(sl.expected_amount, 0)
                                   THEN MIN(NULLIF(BTRIM(ta.evidence_ref), ''))
                           END
                      FROM fgc.transaction_attribution ta
