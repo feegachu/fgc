@@ -22,6 +22,7 @@ export const actionLabels = {
   PAYMENT_CANCELLED: '지급 취소',
   SCHEDULE_CONFIRMED: '스케줄 확정',
   ARBITRAGE_RECHECKED: '차익거래 재검증',
+  ACQUISITION_COST_CHECKED: '계약체결비용 한도 검증',
   EXCEPTION_ACTION: '예외 조치',
   JOURNAL_DRAFT_SAVED: '분개 초안 저장',
   JOURNAL_CORRECTION_REQUESTED: '원장 정정 요청',

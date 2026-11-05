@@ -28,10 +28,12 @@ import java.util.Set;
 public class OpenApiConfig {
 
     // 응답 스키마 → null이 올 수 있는 $ref 속성. 3.1에서는 @Schema(nullable = true)가 $ref 옆에서 사라진다.
-    private static final Map<String, String> NULLABLE_REFERENCES = Map.of(
-            "ClawbackCandidateDetailResponse", "latestCalculation",
-            "ContractStatusEventResponse", "registeredBy",
-            "ContractStatusEventProcessingResponse", "summary");
+    private static final Map<String, List<String>> NULLABLE_REFERENCES = Map.of(
+            "ClawbackCandidateDetailResponse", List.of("latestCalculation"),
+            "ContractStatusEventResponse", List.of("registeredBy"),
+            "ContractStatusEventProcessingResponse", List.of("summary"),
+            "AcquisitionCostCheckResponse",
+            List.of("acquisitionCost", "upfront", "maintenance", "limitPolicy", "paymentPolicy"));
 
     // 실패 응답 봉투. springdoc은 단순 클래스명을 스키마 이름으로 쓰므로 Java 클래스명과 겹치지 않게 둔다.
     private static final String FAILURE_RESPONSE = "ApiFailureResponse";
@@ -45,14 +47,16 @@ public class OpenApiConfig {
     /** OpenAPI 3.1에서 nullable $ref를 참조 대상 또는 null의 합집합으로 표현한다. */
     @Bean
     public OpenApiCustomizer nullableReferences() {
-        return api -> NULLABLE_REFERENCES.forEach((schemaName, property) -> {
+        return api -> NULLABLE_REFERENCES.forEach((schemaName, properties) -> {
             var owner = api.getComponents().getSchemas().get(schemaName);
             if (owner == null || owner.getProperties() == null) return;
-            var reference = (Schema<?>) owner.getProperties().get(property);
-            if (reference == null || reference.get$ref() == null) return;
-            owner.addProperty(property, new ComposedSchema()
-                    .addAnyOfItem(new Schema<>().$ref(reference.get$ref()))
-                    .addAnyOfItem(new Schema<>().types(Set.of("null"))));
+            properties.forEach(property -> {
+                var reference = (Schema<?>) owner.getProperties().get(property);
+                if (reference == null || reference.get$ref() == null) return;
+                owner.addProperty(property, new ComposedSchema()
+                        .addAnyOfItem(new Schema<>().$ref(reference.get$ref()))
+                        .addAnyOfItem(new Schema<>().types(Set.of("null"))));
+            });
         });
     }
 
