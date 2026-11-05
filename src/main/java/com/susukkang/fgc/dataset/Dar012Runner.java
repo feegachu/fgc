@@ -68,15 +68,17 @@ public class Dar012Runner implements ApplicationRunner {
             if (completed) {
                 List<Dar012Verifier.ScenarioResult> answerKey = verifier.compareWithAnswerKey(generated.plan(), properties.validationMonth(), batch.validationRunId());
                 List<Dar012Verifier.ConsistencyCheck> aggregates = verifier.checkAggregateConsistency(properties.validationMonth(), batch.validationRunId());
+                Dar012Verifier.ClawbackCheck clawback = verifier.checkRepresentativeClawback(generated.plan());
+                List<Dar012Verifier.DetailSample> details = verifier.checkContractDetailSample(batch.validationRunId());
                 verification.put("answerKeyComparison", answerKey);
-                verification.put("representativeClawback", verifier.checkRepresentativeClawback(generated.plan()));
+                verification.put("representativeClawback", clawback);
                 verification.put("aggregateConsistency", aggregates);
-                verification.put("contractDetailSample", verifier.checkContractDetailSample(batch.validationRunId()));
+                verification.put("contractDetailSample", details);
                 verification.put("queryTimings", verifier.measureQueries(properties.validationMonth(), batch.validationRunId(),
                         properties.queryRepeats()));
-                if (hasMismatch(answerKey, aggregates)) {
+                if (hasMismatch(answerKey, aggregates, details, clawback)) {
                     exitCode = 1;
-                    log.error("DAR-012 정답표나 집계가 맞지 않는다. 결과 파일의 answerKeyComparison, aggregateConsistency를 본다.");
+                    log.error("DAR-012 검증이 맞지 않는다. 결과 파일의 answerKeyComparison, aggregateConsistency, contractDetailSample, representativeClawback을 본다.");
                 }
             } else {
                 exitCode = 1;
@@ -91,9 +93,14 @@ public class Dar012Runner implements ApplicationRunner {
         System.exit(SpringApplication.exit(context, () -> finalExitCode));
     }
 
-    static boolean hasMismatch(List<Dar012Verifier.ScenarioResult> answerKey, List<Dar012Verifier.ConsistencyCheck> aggregates) {
+    /** #635 인수조건: 정답표, 홈, 설계사 소계, 계약 상세가 일치하고 대표 설계사의 환수 사례가 계산된다. */
+    static boolean hasMismatch(List<Dar012Verifier.ScenarioResult> answerKey, List<Dar012Verifier.ConsistencyCheck> aggregates,
+                               List<Dar012Verifier.DetailSample> details, Dar012Verifier.ClawbackCheck clawback) {
         return answerKey.stream().anyMatch(result -> result.matched() != result.inScope())
-                || aggregates.stream().anyMatch(check -> !check.consistent());
+                || aggregates.stream().anyMatch(check -> !check.consistent())
+                || details.stream().anyMatch(sample -> sample.matched() != sample.sampled())
+                || clawback.estimatedAmount() == null || clawback.estimatedAmount().signum() <= 0
+                || !clawback.reasons().isEmpty();
     }
 
     /** 테스트와 실행기가 같은 경로를 쓴다. 중복 검사 → 기본 시드 확인 → 출력 경로 확인 → 정책 확인 → 계획 → 적재 → 출력 순서다. */
