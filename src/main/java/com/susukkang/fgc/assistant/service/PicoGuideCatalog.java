@@ -103,6 +103,10 @@ public class PicoGuideCatalog {
     public List<Step> allowedSteps(Definition guide, Collection<String> roles) {
         return guide.steps().stream().filter(step -> step.roles().stream().anyMatch(roles::contains)).toList();
     }
+    public List<Step> allowedHelpSteps(Definition guide, Collection<String> roles) {
+        return help.getOrDefault(guide.workflowId(), List.of()).stream()
+                .filter(step -> step.roles().stream().anyMatch(roles::contains)).toList();
+    }
     public List<Chunk> chunks(Definition guide, String query, Collection<String> roles) {
         var chunks = new ArrayList<>(chunks(guide, roles));
         var terms = grams(query);

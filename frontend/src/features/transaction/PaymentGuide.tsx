@@ -16,6 +16,7 @@ import guideMascot from '../assistant/assets/pico-guide.png'
 
 interface Props {
   initialWorkflowId?: string | null
+  initialStepId?: string
   root: RefObject<HTMLDivElement | null>
   modalOpen: boolean
   confirmed: boolean
@@ -44,6 +45,7 @@ const reasons: Record<string, string> = {
 }
 function GuideSession({
   initialWorkflowId,
+  initialStepId,
   observer,
   root,
   modalOpen,
@@ -103,13 +105,14 @@ function GuideSession({
     void Promise.resolve().then(async () => {
       if (cancelled) return
       const context = observer.readContext()
-      await runtime.start({ workflowId: guide.workflowId, stepId: guide.steps[0].stepId, guideVersion: guide.guideVersion,
+      if (initialStepId && !guide.steps.some((step) => step.stepId === initialStepId)) throw new Error('INVALID_GUIDE_STEP')
+      await runtime.start({ workflowId: guide.workflowId, stepId: initialStepId ?? guide.steps[0].stepId, guideVersion: guide.guideVersion,
         entityRefs: context.entityRefs, clientContextRevision: context.clientContextRevision, serverStateVersion: context.serverStateVersion })
     }).catch(() => {
       if (!cancelled) setMessage('현재 선택 대상과 권한을 확인한 뒤 안내를 다시 시작해주세요.')
     })
     return () => { cancelled = true }
-  }, [initialWorkflowId, observer, runtime])
+  }, [initialWorkflowId, initialStepId, observer, runtime])
 
   useEffect(() => {
     const changed = () => runtime.contextChanged()

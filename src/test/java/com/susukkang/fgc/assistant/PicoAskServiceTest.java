@@ -30,6 +30,34 @@ class PicoAskServiceTest {
     void role(String role) { SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("reader","unused",List.of(new SimpleGrantedAuthority("ROLE_"+role)))); }
     PicoAskRequest request(String question) { return new PicoAskRequest(question,"TRAN-W02",List.of(),"r1","1.0",List.of()); }
     PicoAskService.ModelAnswer answer(String message,String source) { return new PicoAskService.ModelAnswer(Decision.ANSWER_ONLY,message,List.of(source)); }
+    @Test void startsSavedDraftAtRegisteredPrecheckWithoutClaimingItPassed() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.confirm"),false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.START_GUIDE,"사전검증 결과를 확인한 뒤 확정하세요.",List.of("payment.confirm:overview")));
+        when(contexts.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.DRAFT,"saved-version"));
+        var input = new PicoAskRequest("저장했는데 다음 안내해줘", "TRAN-W02", List.of(new PicoAskRequest.EntityRef(PicoAskRequest.EntityType.PAYMENT,77L)),"r1","1.0",List.of());
+        var result=service.ask(input);
+        assertThat(result.decision()).isEqualTo(Decision.START_GUIDE);
+        assertThat(result.validatedGuide().stepId()).isEqualTo("payment.precheck");
+        assertThat(result.validatedGuide().serverStateVersion()).isEqualTo("saved-version");
+        assertThat(result.validatedGuide().entityRefs()).isEqualTo(input.entityRefs());
+        verify(contexts,times(2)).read(77L);
+    }
+    @Test void guideStartWithoutStoredTargetAsksForContextRatherThanInventingAnId() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.START_GUIDE,"작성한 지급 건을 확인하세요.",List.of("payment.draft:overview")));
+        var result=service.ask(request("이어서 안내해줘"));
+        assertThat(result.decision()).isEqualTo(Decision.ASK_CLARIFICATION);
+        assertThat(result.validatedGuide()).isNull();
+        verifyNoInteractions(contexts);
+    }
+    @Test void generalGuideStartUsesOnlyRegisteredRoleAllowedEntry() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("contract.find"),false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.START_GUIDE,"계약 목록에서 검색 조건을 확인하세요.",List.of("contract.find:overview")));
+        var result=service.ask(request("계약 검색 안내 시작해줘"));
+        assertThat(result.decision()).isEqualTo(Decision.START_GUIDE);
+        assertThat(result.validatedGuide().stepId()).isEqualTo(catalog.definitions().stream().filter(g->g.workflowId().equals("contract.find")).findFirst().orElseThrow().steps().getFirst().stepId());
+        assertThat(result.validatedGuide().entityRefs()).isEmpty();
+        assertThat(result.validatedGuide().serverStateVersion()).isNull();
+    }
     @Test void preservesMeaningAndRedactsUserAuthoredPrivatePatternsInBothStages() {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("초안 저장은 지급 확정과 구분됩니다.","payment.draft:overview"));
         var response=service.ask(request("초안 저장하면 지급 끝? 고객 김철수 123456789 private@example.com sk-testabc123456789"));

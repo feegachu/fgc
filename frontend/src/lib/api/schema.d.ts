@@ -175,7 +175,7 @@ export interface paths {
         put?: never;
         /**
          * 승인된 업무 가이드의 대화형 질문 답변
-         * @description 비식별 질문·최근 대화와 역할별 업무 자료로 의미 검색 후 근거를 인용합니다. validatedGuide=null. 금융 계산·업무 쓰기는 기존 프로그램에서 수행합니다.
+         * @description 질문·최근 대화와 역할별 승인 근거로 답변합니다. START_GUIDE에만 서버가 검증한 시작 위치를 반환하며 지급 시작은 prepare/start에서 다시 검사합니다. 금융 쓰기 없음.
          */
         post: operations["picoAsk"];
         delete?: never;
@@ -4620,25 +4620,24 @@ export interface components {
             transactionAttributionId?: number;
         };
         PicoAskRequest: {
-            clientContextRevision: string;
-            conversation?: components["schemas"]["PicoConversationTurn"][];
-            entityRefs: components["schemas"]["PicoEntityRef"][];
-            guideVersion: string;
             question: string;
             screenId: string;
+            entityRefs: components["schemas"]["PicoEntityRef"][];
+            clientContextRevision: string;
+            guideVersion: string;
+            conversation?: components["schemas"]["PicoConversationTurn"][];
         };
         PicoAskResponse: {
-            contextRevision?: string;
             /** @enum {string} */
-            decision?: "ANSWER_ONLY" | "ASK_CLARIFICATION" | "UNSUPPORTED";
-            evidenceRefs?: components["schemas"]["PicoEvidenceRef"][];
-            fallbackReason?: string;
-            guideVersion?: string;
+            decision?: "ANSWER_ONLY" | "START_GUIDE" | "ASK_CLARIFICATION" | "UNSUPPORTED";
             message?: string;
+            guideVersion?: string;
+            contextRevision?: string;
+            evidenceRefs?: components["schemas"]["PicoEvidenceRef"][];
+            validatedGuide?: components["schemas"]["PicoValidatedGuide"] | null;
             /** @enum {string} */
             source?: "AI" | "FIXED";
-            /** @description Always null for the first read-only guide-answer scope */
-            validatedGuide?: Record<string, never> | null;
+            fallbackReason?: string;
         };
         PicoConversationTurn: {
             /** @enum {string} */
@@ -4646,34 +4645,36 @@ export interface components {
             text: string;
         };
         PicoEntityRef: {
-            /** Format: int64 */
-            id: number;
             /** @enum {string} */
             type: "CONTRACT" | "PAYMENT" | "SCHEDULE" | "VALIDATION_RUN" | "RECONCILIATION_RUN" | "EXCEPTION";
+            /** Format: int64 */
+            id: number;
         };
         PicoEvidenceRef: {
             chunkId?: string;
+            workflowId?: string;
             stepId?: string;
             title?: string;
-            workflowId?: string;
         };
         PicoGuideRequest: {
-            clientContextRevision: string;
+            workflowId: string;
             guideVersion: string;
             paymentId: string;
+            clientContextRevision: string;
             prepareToken?: string | null;
-            workflowId: string;
+            stepId?: string;
+            serverStateVersion?: string;
         };
         PicoGuideResponse: {
+            status?: string;
+            workflowId?: string;
+            stepId?: string;
+            guideVersion?: string;
+            paymentId?: string;
             clientContextRevision?: string;
             /** Format: date-time */
             expiresAt?: string;
-            guideVersion?: string;
-            paymentId?: string;
             prepareToken?: string | null;
-            status?: string;
-            stepId?: string;
-            workflowId?: string;
         };
         /** @description 정책 제출·승인·반려·활성화 요청 */
         PolicyActionRequest: {
@@ -6164,6 +6165,14 @@ export interface components {
             expectedBatchExecutionId: number;
             expectedStateVersion: string;
             reason: string;
+        };
+        PicoValidatedGuide: {
+            workflowId?: string;
+            stepId?: string;
+            guideVersion?: string;
+            entityRefs?: components["schemas"]["PicoEntityRef"][];
+            clientContextRevision?: string;
+            serverStateVersion?: string | null;
         };
     };
     responses: never;

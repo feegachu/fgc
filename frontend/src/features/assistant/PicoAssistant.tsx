@@ -344,7 +344,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                 ? '가이드 버전이 변경됐어요. 작성 중인 내용을 보존한 뒤 화면을 새로 열어주세요.'
                 : error instanceof Error && error.message === 'STALE_PICO_CONTEXT'
                   ? '질문 이후 화면이나 입력이 바뀌었어요. 대화는 유지되니 현재 화면에서 다시 질문해주세요.'
-                  : error instanceof Error && ['INVALID_PICO_REPLY', 'INVALID_PICO_EVIDENCE', 'MISSING_PICO_EVIDENCE'].includes(error.message)
+                  : error instanceof Error && ['INVALID_PICO_REPLY', 'INVALID_PICO_GUIDE', 'INVALID_PICO_EVIDENCE', 'MISSING_PICO_EVIDENCE'].includes(error.message)
                     ? '답변 근거를 확인하지 못했어요. 대화는 유지되니 다시 질문해주세요.'
                     : '답변을 받지 못했어요. 입력 내용은 유지되며 기존 업무 화면의 도움말을 사용할 수 있어요.',
           },
@@ -606,6 +606,16 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                             {source.title} (v{entry.reply.guideVersion})
                           </div>
                         ))}
+                        {entry.reply.decision === 'START_GUIDE' && entry.reply.validatedGuide && (
+                          findWorkflowGuide(entry.reply.validatedGuide.workflowId!, '1.0') ? (
+                            <button type="button" className="button button-secondary" disabled={!isCurrentLiveReply(entry)}
+                              onClick={() => { const guide = entry.reply.validatedGuide!; useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(guide.workflowId!, guide.stepId); setOpen(false) }}>
+                              이 업무 안내 시작, {findWorkflowGuide(entry.reply.validatedGuide.workflowId!, '1.0')?.title}
+                            </button>
+                          ) : <PicoGuideStartButton workflowId={entry.reply.validatedGuide.workflowId!}
+                            validatedGuide={entry.reply.validatedGuide} contextRevision={entry.reply.contextRevision!}
+                            canProcess={canProcess} sourceContextAvailable={entry.hasPaymentContext} contextValid={isCurrentLiveReply(entry)} />
+                        )}
                         {entry.reply.decision === 'ANSWER_ONLY' &&
                           [...new Set(entry.reply.evidenceRefs?.map((source) => source.workflowId))]
                             .filter((id): id is string => Boolean(id))
@@ -629,7 +639,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                                 contextValid={isCurrentLiveReply(entry)}
                               />
                             ))}
-                        {entry.reply.decision === 'ANSWER_ONLY' && !isCurrentLiveReply(entry) && <p className="pico-notice" role="status">질문 또는 화면이 바뀌었습니다. 현재 화면에서 다시 질문하면 안내를 시작할 수 있습니다.</p>}
+                        {['ANSWER_ONLY', 'START_GUIDE'].includes(entry.reply.decision ?? '') && !isCurrentLiveReply(entry) && <p className="pico-notice" role="status">질문 또는 화면이 바뀌었습니다. 현재 화면에서 다시 질문하면 안내를 시작할 수 있습니다.</p>}
                         {entry.reply.decision === 'ANSWER_ONLY' && !canProcess && !observed?.paymentId && entry.reply.evidenceRefs?.some((ref) => ref.workflowId != null && !findWorkflowGuide(ref.workflowId, '1.0')) && <p className="pico-notice" role="status">지급 작성 화면 안내는 정산담당자에게 요청하세요. 현재 계정은 조회 안내만 사용할 수 있습니다.</p>}
                         <small>일반 업무 안내입니다. 현재 지급 처리 완료를 뜻하지 않습니다.</small>
                       </article>

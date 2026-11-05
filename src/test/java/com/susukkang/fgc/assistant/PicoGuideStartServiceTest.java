@@ -29,6 +29,16 @@ class PicoGuideStartServiceTest {
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
     void role(String name, String role) { SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(name,null,List.of(new SimpleGrantedAuthority("ROLE_"+role)))); }
     PicoGuideRequest request(String token) { return new PicoGuideRequest("payment.draft","1.0","77","r1",token); }
+    @Test void validatedSavedDraftStartsAtPrecheckAndBindsTheRequestedStepAndState() {
+        var input=new PicoGuideRequest("payment.confirm","1.0","77","r1",null,"payment.precheck","original");
+        var prepared=service.prepare(input,"Bearer session-one");
+        assertThat(prepared.stepId()).isEqualTo("payment.precheck");
+        var started=service.start(new PicoGuideRequest(input.workflowId(),input.guideVersion(),input.paymentId(),input.clientContextRevision(),prepared.prepareToken(),input.stepId(),input.serverStateVersion()),"Bearer session-one");
+        assertThat(started.stepId()).isEqualTo("payment.precheck");
+        assertStale(()->service.prepare(new PicoGuideRequest("payment.confirm","1.0","77","r1",null,"payment.confirm","original"),"Bearer session-one"));
+        when(payments.read(77L)).thenReturn(new PicoPaymentContextService.Snapshot(CommissionPaymentStatus.DRAFT,"changed"));
+        assertStale(()->service.prepare(input,"Bearer session-one"));
+    }
     @Test void generalWorkflowCannotObtainPaymentStartGrant() {
         assertThatThrownBy(() -> service.prepare(new PicoGuideRequest("contract.register","1.0","77","r1",null),"Bearer session-one"))
             .isInstanceOf(FgcBusinessException.class);

@@ -282,6 +282,29 @@ it('connects the latest answer evidence to an explicitly selected and server-rev
   expect(screen.queryByRole('textbox', { name: '피코에게 질문' })).not.toBeInTheDocument()
 })
 
+it('starts a state-validated answer at the server-selected precheck instead of the first scope', async () => {
+  observePayment()
+  const launch = vi.fn()
+  disconnectPayment = connectPaymentGuideLaunch(launch)
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (path, options) => {
+    const body = options!.body as Record<string, unknown>
+    if (path.endsWith('/ask')) return envelope({ ...reply, decision: 'START_GUIDE', contextRevision: body.clientContextRevision,
+      evidenceRefs: [{ chunkId: 'payment.confirm:overview', workflowId: 'payment.confirm', stepId: null, title: '지급 확정' }],
+      validatedGuide: { workflowId: 'payment.confirm', stepId: 'payment.precheck', guideVersion: '1.0',
+        entityRefs: [{ type: 'PAYMENT', id: 77 }], clientContextRevision: body.clientContextRevision, serverStateVersion: 'a'.repeat(64) } })
+    return envelope({ status: path.endsWith('/prepare') ? 'PREPARED' : 'STARTED', workflowId: body.workflowId,
+      stepId: body.stepId, guideVersion: '1.0', paymentId: body.paymentId, clientContextRevision: body.clientContextRevision,
+      expiresAt: '2099-01-01T00:00:00Z', prepareToken: path.endsWith('/prepare') ? 'x'.repeat(43) : null })
+  }) as typeof apiClient.request)
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await userEvent.click(await screen.findByRole('button', { name: /이 업무 안내 시작/ }))
+  await waitFor(() => expect(launch).toHaveBeenCalledWith('payment.confirm', 'payment.precheck'))
+  expect(request.mock.calls[1][1]?.body).toMatchObject({ stepId: 'payment.precheck', serverStateVersion: 'a'.repeat(64) })
+  expect(request.mock.calls.map(([path]) => path)).toEqual(['/api/v1/ai/pico/ask', '/api/v1/ai/pico/guides/prepare', '/api/v1/ai/pico/guides/start'])
+})
+
 it('keeps a completed answer actionable after a temporary ready refresh finishes', async () => {
   observePayment()
   mockResponse()

@@ -19,7 +19,7 @@ export async function startPicoGuide(request: Omit<GuideRequest, 'prepareToken'>
       data.guideVersion !== request.guideVersion ||
       data.paymentId !== request.paymentId ||
       data.clientContextRevision !== request.clientContextRevision ||
-      data.stepId !== 'payment.scope' ||
+      data.stepId !== (request.stepId ?? 'payment.scope') ||
       !findGuide(data.workflowId!, '1.0') ||
       !Number.isFinite(Date.parse(data.expiresAt ?? '')) ||
       (action === 'prepare' ? !/^[A-Za-z0-9_-]{43}$/.test(data.prepareToken ?? '') : data.prepareToken != null)

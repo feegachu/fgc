@@ -25,7 +25,7 @@ public class PicoGuideStartService {
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Grant> grants = new HashMap<>();
     private record Grant(String owner, String account, PicoGuideRequest request, String paymentFingerprint,
-                         String catalogFingerprint, Instant expiresAt) {}
+                         String catalogFingerprint, Instant expiresAt, String stepId) {}
 
     @Autowired
     public PicoGuideStartService(PicoPaymentContextService payments, PicoGuideCatalog catalog, ObjectMapper mapper) {
@@ -40,6 +40,7 @@ public class PicoGuideStartService {
         definition(request);
         if (request.prepareToken() != null) throw invalid();
         var snapshot = snapshot(request);
+        String stepId = entryStep(request, snapshot);
         var expiresAt = clock.instant().plus(Duration.ofMinutes(5));
         byte[] bytes = new byte[32]; random.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -51,9 +52,9 @@ public class PicoGuideStartService {
                     && g.request().workflowId().equals(request.workflowId()));
             if (grants.size() >= 1000 || grants.values().stream().filter(g -> g.account().equals(account)).count() >= 8)
                 throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
-            grants.put(token, new Grant(owner, account, request, snapshot.fingerprint(), catalogFingerprint(), expiresAt));
+            grants.put(token, new Grant(owner, account, request, snapshot.fingerprint(), catalogFingerprint(), expiresAt, stepId));
         }
-        return response("PREPARED", request, expiresAt, token);
+        return response("PREPARED", request, expiresAt, token, stepId);
     }
     public PicoGuideResponse start(PicoGuideRequest request, String bearer) {
         String owner = owner(bearer);
@@ -67,10 +68,23 @@ public class PicoGuideStartService {
             grants.remove(request.prepareToken());
         }
         var current = snapshot(request);
+        if (!grant.stepId().equals(entryStep(request, current))) throw stale();
         if (!grant.paymentFingerprint().equals(current.fingerprint())
                 || !grant.catalogFingerprint().equals(catalogFingerprint())
                 || !clock.instant().isBefore(grant.expiresAt())) throw stale();
-        return response("STARTED", request, grant.expiresAt(), null);
+        return response("STARTED", request, grant.expiresAt(), null, grant.stepId());
+    }
+    private String entryStep(PicoGuideRequest request, PicoPaymentContextService.Snapshot current) {
+        if (request.serverStateVersion() != null && !request.serverStateVersion().equals(current.fingerprint())) throw stale();
+        var guide = catalog.paymentDefinitions().stream().filter(value -> value.workflowId().equals(request.workflowId())).findFirst().orElseThrow(PicoGuideStartService::invalid);
+        String step = request.stepId() == null ? guide.steps().getFirst().stepId() : PicoGuideEntry.paymentStep(guide, true);
+        if (request.stepId() != null && !request.stepId().equals(step)) throw stale();
+        // Legacy first-scope requests retain their definition-level permission contract.
+        // New state-selected entry requests must also satisfy the registered step role.
+        if (request.stepId() == null) return step;
+        var roles = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream().map(a -> a.getAuthority().replaceFirst("^ROLE_", "")).toList();
+        if (catalog.allowedSteps(guide, roles).stream().noneMatch(value -> value.stepId().equals(step))) throw new AccessDeniedException("Guide step permission denied");
+        return step;
     }
     private PicoPaymentContextService.Snapshot snapshot(PicoGuideRequest request) {
         long id;
@@ -100,10 +114,11 @@ public class PicoGuideStartService {
     private void purge() { grants.values().removeIf(g -> !clock.instant().isBefore(g.expiresAt())); }
     private static boolean sameRequest(PicoGuideRequest a, PicoGuideRequest b) {
         return Objects.equals(a.workflowId(), b.workflowId()) && Objects.equals(a.guideVersion(), b.guideVersion())
-                && Objects.equals(a.paymentId(), b.paymentId()) && Objects.equals(a.clientContextRevision(), b.clientContextRevision());
+                && Objects.equals(a.paymentId(), b.paymentId()) && Objects.equals(a.clientContextRevision(), b.clientContextRevision())
+                && Objects.equals(a.stepId(), b.stepId()) && Objects.equals(a.serverStateVersion(), b.serverStateVersion());
     }
-    private static PicoGuideResponse response(String status, PicoGuideRequest request, Instant expiry, String token) {
-        return new PicoGuideResponse(status, request.workflowId(), "payment.scope", request.guideVersion(), request.paymentId(), request.clientContextRevision(), expiry, token);
+    private static PicoGuideResponse response(String status, PicoGuideRequest request, Instant expiry, String token, String stepId) {
+        return new PicoGuideResponse(status, request.workflowId(), stepId, request.guideVersion(), request.paymentId(), request.clientContextRevision(), expiry, token);
     }
     private static FgcBusinessException stale() { return new FgcBusinessException(FgcErrorCode.IMPL_GUIDE_STATE_STALE); }
     private static FgcBusinessException invalid() { return new FgcBusinessException(FgcErrorCode.COMMON_002, "guide", Map.of("field", "guide"), "가이드 시작 요청을 확인하세요."); }

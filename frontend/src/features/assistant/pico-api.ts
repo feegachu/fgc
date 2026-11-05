@@ -36,9 +36,8 @@ export async function askPico(
   if (data.guideVersion !== '1.0') throw new Error('PICO_GUIDE_VERSION_MISMATCH')
   if (data.contextRevision !== revision) throw new Error('STALE_PICO_CONTEXT')
   if (
-    data.validatedGuide != null ||
     !['AI', 'FIXED'].includes(data.source ?? '') ||
-    !['ANSWER_ONLY', 'ASK_CLARIFICATION', 'UNSUPPORTED'].includes(data.decision ?? '') ||
+    !['ANSWER_ONLY', 'START_GUIDE', 'ASK_CLARIFICATION', 'UNSUPPORTED'].includes(data.decision ?? '') ||
     typeof data.message !== 'string' ||
     !data.message.trim() ||
     data.message.length > 2000 ||
@@ -55,7 +54,21 @@ export async function askPico(
     )
       throw new Error('INVALID_PICO_EVIDENCE')
   }
-  if (data.source === 'AI' && data.decision === 'ANSWER_ONLY' && !data.evidenceRefs.length)
+  if (data.decision === 'START_GUIDE') {
+    const guide = data.validatedGuide
+    if (!guide || data.source !== 'AI' || guide.guideVersion !== data.guideVersion || guide.clientContextRevision !== revision ||
+      !guide.workflowId || !guide.stepId || !Array.isArray(guide.entityRefs) ||
+      !data.evidenceRefs.some((ref) => ref.workflowId === guide.workflowId)) throw new Error('INVALID_PICO_GUIDE')
+    const payment = findGuide(guide.workflowId, '1.0')
+    const workflow = findWorkflowGuide(guide.workflowId, '1.0')
+    if (payment) {
+      if (!findStep(guide.workflowId, '1.0', guide.stepId) || !paymentRef || guide.entityRefs.length !== 1 ||
+        guide.entityRefs[0].type !== 'PAYMENT' || guide.entityRefs[0].id !== paymentRef.id ||
+        !/^[a-f0-9]{64}$/.test(guide.serverStateVersion ?? '')) throw new Error('INVALID_PICO_GUIDE')
+    } else if (!workflow || guide.entityRefs.length || guide.serverStateVersion != null ||
+      ![...workflow.steps, ...workflowHelpSteps(guide.workflowId)].some((step) => step.stepId === guide.stepId)) throw new Error('INVALID_PICO_GUIDE')
+  } else if (data.validatedGuide != null) throw new Error('INVALID_PICO_GUIDE')
+  if (data.source === 'AI' && ['ANSWER_ONLY', 'START_GUIDE'].includes(data.decision ?? '') && !data.evidenceRefs.length)
     throw new Error('MISSING_PICO_EVIDENCE')
   return data
 }
