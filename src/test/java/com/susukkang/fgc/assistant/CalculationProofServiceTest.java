@@ -25,7 +25,8 @@ class CalculationProofServiceTest {
   @BeforeEach
   void setup() {
     owner("one");
-    when(dependencies.current()).thenReturn("source-v1");
+    when(dependencies.current(any(PaymentCalculationRequest.class))).thenReturn("source-v1");
+    when(dependencies.forPayment(anyLong())).thenCallRealMethod();
   }
 
   @AfterEach
@@ -100,7 +101,7 @@ class CalculationProofServiceTest {
   @Test
   void dependencyChangeRemovesAmountsAndRecommendation() {
     var r = proofs.issue(input(1), result());
-    when(dependencies.current()).thenReturn("source-v2");
+    when(dependencies.current(any(PaymentCalculationRequest.class))).thenReturn("source-v2");
     var next =
         proofs.revalidate(
             new CalculationRevalidationRequest("calc", r.validity().stateToken(), input(1)));
@@ -176,7 +177,7 @@ class CalculationProofServiceTest {
     var rejectedRequest5 = new CalculationRevalidationRequest("calc", token, input(1));
     assertThatThrownBy(() -> proofs.revalidate(rejectedRequest5))
         .isInstanceOf(FgcBusinessException.class);
-    when(dependencies.current()).thenReturn("changed");
+    when(dependencies.current(any(PaymentCalculationRequest.class))).thenReturn("changed");
     assertThatThrownBy(() -> proofs.verifyPrecheck(77, token))
         .isInstanceOf(FgcBusinessException.class);
   }
@@ -273,7 +274,7 @@ class CalculationProofServiceTest {
             original.calculatedAt(),
             null);
     var issued = proofs.issue(input(1), withLines);
-    when(dependencies.current()).thenReturn("changed");
+    when(dependencies.current(any(PaymentCalculationRequest.class))).thenReturn("changed");
     var stale =
         proofs.revalidate(
             new CalculationRevalidationRequest("calc", issued.validity().stateToken(), input(1)));
@@ -356,14 +357,15 @@ class CalculationProofServiceTest {
           .isEqualTo(aggregation == PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE);
       if (aggregation == PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE)
         assertThat(issued.recommendation().suggestedAmount()).isEqualTo("100000");
-      when(dependencies.current()).thenReturn("changed-" + aggregation);
+      when(dependencies.current(any(PaymentCalculationRequest.class))).thenReturn("changed-" + aggregation);
       var stale =
           proofs.revalidate(
               new CalculationRevalidationRequest(
                   issued.calculationId(), issued.validity().stateToken(), request));
       assertThat(stale.status()).isEqualTo("STALE");
       assertThat(stale.recommendation().allowed()).isFalse();
-      when(dependencies.current()).thenReturn("source-v1");
+      when(dependencies.current(any(PaymentCalculationRequest.class))).thenReturn("source-v1");
+    when(dependencies.forPayment(anyLong())).thenReturn("source-v1");
     }
   }
 

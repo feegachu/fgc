@@ -1557,7 +1557,7 @@
     "roles": [
       "AGENT"
     ],
-    "enabled": true,
+    "enabled": false,
     "route": "/agent-home",
     "steps": [
       {
@@ -2046,7 +2046,7 @@
     "roles": [
       "AGENT"
     ],
-    "enabled": true,
+    "enabled": false,
     "route": "/contracts",
     "steps": [
       {
@@ -2090,7 +2090,7 @@
     "roles": [
       "AGENT"
     ],
-    "enabled": true,
+    "enabled": false,
     "route": "/contracts/:id",
     "steps": [
       {
@@ -2134,7 +2134,7 @@
     "roles": [
       "AGENT"
     ],
-    "enabled": true,
+    "enabled": false,
     "route": "/transactions",
     "steps": [
       {

@@ -75,6 +75,7 @@ public class PicoGuideStartService {
         return response("STARTED", request, grant.expiresAt(), null, grant.stepId());
     }
     private String entryStep(PicoGuideRequest request, PicoPaymentContextService.Snapshot current) {
+        if (request.stepId() != null && request.serverStateVersion() == null) throw stale();
         if (request.serverStateVersion() != null && !request.serverStateVersion().equals(current.fingerprint())) throw stale();
         var guide = catalog.paymentDefinitions().stream().filter(value -> value.workflowId().equals(request.workflowId())).findFirst().orElseThrow(PicoGuideStartService::invalid);
         String step = request.stepId() == null ? guide.steps().getFirst().stepId() : PicoGuideEntry.paymentStep(guide, true);

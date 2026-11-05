@@ -195,7 +195,7 @@ describe('CONT-W02 상태이력 표', () => {
       '실패, 재시도 대기',
       [
         '2/5회 시도, 다음 재시도 2026-09-02 10:00',
-        '실패 사유: 적용할 정책을 찾지 못했습니다 (FGC-IMPL-POLICY_MISSING)',
+        '실패 사유: 적용할 정책을 찾지 못했습니다',
       ],
     ],
     [
@@ -514,7 +514,8 @@ describe('CONT-W02 사건 영향 패널', () => {
     const dialog = await openPanel(actions)
     const list = within(dialog).getByRole('list', { name: '처리 이력' })
     expect(list.children).toHaveLength(2)
-    expect(within(list).getByText('실패 사유: 시스템 오류 (IllegalStateException)')).toBeInTheDocument()
+    expect(within(list).getByText('실패 사유: 시스템 오류')).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('IllegalStateException')
     expect(within(list).getByText('지급 보류 1건')).toBeInTheDocument()
     expect(within(dialog).getByText('재시도 후 성공, 2/5회 시도')).toBeInTheDocument()
   })

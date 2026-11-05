@@ -31,6 +31,7 @@ class PicoGuideStartServiceTest {
     PicoGuideRequest request(String token) { return new PicoGuideRequest("payment.draft","1.0","77","r1",token); }
     @Test void validatedSavedDraftStartsAtPrecheckAndBindsTheRequestedStepAndState() {
         var input=new PicoGuideRequest("payment.confirm","1.0","77","r1",null,"payment.precheck","original");
+        assertStale(() -> service.prepare(new PicoGuideRequest("payment.confirm","1.0","77","r1",null,"payment.precheck",null),"Bearer session-one"));
         var prepared=service.prepare(input,"Bearer session-one");
         assertThat(prepared.stepId()).isEqualTo("payment.precheck");
         var started=service.start(new PicoGuideRequest(input.workflowId(),input.guideVersion(),input.paymentId(),input.clientContextRevision(),prepared.prepareToken(),input.stepId(),input.serverStateVersion()),"Bearer session-one");

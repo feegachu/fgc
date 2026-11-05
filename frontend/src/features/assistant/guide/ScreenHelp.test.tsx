@@ -32,7 +32,8 @@ it('strict-mode help only explains, preserves input and restores focus on Escape
 it('a duplicate live target pauses rather than highlighting an arbitrary element', async () => {
   render(<MemoryRouter><main id="main-content"><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters"/><section data-guide-target="contract.filters"/></main></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
-  expect(await screen.findByText(/DUPLICATE_TARGET/)).toBeVisible()
+  expect(await screen.findByText(/대상을 표시할 수 없습니다/)).toBeVisible()
+  expect(document.body).not.toHaveTextContent('DUPLICATE_TARGET')
 })
 it('FilterBar forwards the target to its actual form', () => {
   render(<FilterBar data-guide-target="test.filters" onSubmit={() => {}}>필터</FilterBar>)
@@ -133,7 +134,8 @@ it('withdraws a highlight when a target becomes hidden through style changes', a
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
   act(() => { document.querySelector<HTMLElement>('[data-guide-target="contract.filters"]')!.style.display = 'none' })
-  expect(await screen.findByText(/TARGET_CHANGED/)).toBeVisible()
+  expect(await screen.findByText(/대상을 표시할 수 없습니다/)).toBeVisible()
+  expect(document.body).not.toHaveTextContent('TARGET_CHANGED')
   expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()
 })
 it('does not run an unregistered screen variant', () => {
