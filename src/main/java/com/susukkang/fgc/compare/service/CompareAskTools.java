@@ -331,7 +331,8 @@ final class CompareAskTools {
                 if (fact.kind() == Kind.DIFF && new HashSet<>(fact.ranks()).equals(mentioned)
                         && fact.metrics().stream().anyMatch(metrics::contains)) {
                     paired = true;
-                    if (directionHolds(sentence, fact)) {
+                    // 두 값이 같은데(biggerRank=0) 많다/적다고 말하면 틀린 방향이다. 금액이 든 '0원 많아요'는 verifyNumber 쪽 규칙을 따른다.
+                    if (fact.biggerRank() != 0 && directionHolds(sentence, fact)) {
                         return null;
                     }
                 }

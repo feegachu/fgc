@@ -228,6 +228,10 @@ class CompareAskToolsTest {
         CompareAskTools notCompared = toolsWith("get_item", RANK_2, "get_item", RANK_3);
         assertThat(notCompared.verify(right)).isEqualTo("DIRECTION_NOT_FROM_TOOL");
 
+        // 이월 예정액은 2위·3위 모두 0원이라 어느 쪽이 많다/적다고 말하면 틀린 방향이다.
+        assertThat(compared.verify("2위 나보험 튼튼건강이 3위 다보험 편한건강보다 이월 예정액이 더 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(compared.verify("3위 다보험 편한건강이 2위 나보험 튼튼건강보다 이월 예정액이 더 적어요.")).isEqualTo("DIRECTION_MISMATCH");
+
         // 상품 하나만 말하거나 항목 이름이 없는 문장은 방향을 확인할 수 없어 보지 않는다.
         assertThat(notCompared.verify("나보험 튼튼건강은 환수 부담이 작은 편이에요.")).isNull();
     }
