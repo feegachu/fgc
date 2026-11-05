@@ -98,6 +98,8 @@ for (const seven of [false, true]) {
     const listCsv = await downloadCsv(page, info.outputPath('01-list.csv'))
     expect(listCsv).toContain(fixture.code)
     await page.screenshot({ path: info.outputPath('01-real-list.png'), fullPage: true })
+    await page.locator('.schedule-table-viewport').evaluate(element => { element.scrollLeft = element.scrollWidth })
+    await page.screenshot({ path: info.outputPath('01-real-list-right-columns.png'), fullPage: true })
     await row.getByRole('link', { name: '회차 보기' }).click()
     const table = page.getByRole('table', { name: '회차별 예상 지급 금액' })
     await expect(table.locator('tbody tr')).toHaveCount(lineCount)
@@ -107,7 +109,12 @@ for (const seven of [false, true]) {
     const detailCsv = await downloadCsv(page, info.outputPath('02-lines.csv'))
     expect(detailCsv.trim().split(/\r?\n/)).toHaveLength(lineCount + 1)
     expect(detailCsv).toContain(seven ? '2036-02-02' : '2031-02-02')
+    await expect(table.locator('tfoot')).toContainText(`${fixture.detail.header.expectedTotal.toLocaleString('ko-KR')}원`)
     await page.screenshot({ path: info.outputPath('02-real-detail.png'), fullPage: true })
+    await page.getByRole('region', { name: '회차별 예상 금액 표', exact: true }).evaluate(element => { element.scrollLeft = element.scrollWidth })
+    await page.screenshot({ path: info.outputPath('02-real-detail-right-columns.png'), fullPage: true })
+    await table.locator('tbody tr').last().scrollIntoViewIfNeeded()
+    await page.screenshot({ path: info.outputPath('02-final-installment.png'), fullPage: true })
     expect(sql(`SELECT count(*) FROM fgc.schedule_header WHERE contract_id=${fixture.contract}`)).toBe(before)
     await expect(page.getByRole('button', { name: `${fixture.years}년 예정 새 버전 만들기`, exact: true })).toBeDisabled()
     await page.getByLabel('생성 사유', { exact: true }).fill('확인된 승인 정책 새 판')
@@ -196,6 +203,7 @@ test('SCHE DoD: 역할별 직접 API/URL·ID 변경과 읽기 전용 버튼을 �
       if (['gaadmin', 'audit01'].includes(account)) {
         await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
         await expect(page.getByRole('button', { name: '새 버전 만들기', exact: true })).toBeDisabled()
+        await expect(page.getByText('확정과 재생성은 정산담당자와 시스템관리자만 할 수 있습니다.')).toBeVisible()
         await expect(page.locator('a[href*="/transactions/new"]')).toHaveCount(0)
       }
     }
@@ -273,6 +281,8 @@ test('SCHE DoD CT-C02: 실제 상태 효과 API와 회차 원천 사건 표시�
   await page.reload()
   const detail = await successful(response)
   expect(detail.lines.find((entry: { scheduleLineId: number }) => entry.scheduleLineId === line).sourceStatusEventId).toBe(Number(event))
+  await page.getByRole('region', { name: '회차별 예상 금액 표', exact: true }).evaluate(element => { element.scrollLeft = element.scrollWidth })
+  await expect(row.getByText(`원천 사건 #${event}`, { exact: true })).toBeInViewport()
   await page.screenshot({ path: info.outputPath('real-source-status-event.png'), fullPage: true })
 })
 
