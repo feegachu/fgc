@@ -76,7 +76,7 @@ public class ScheduleController {
             rows.add(CsvExportWriter.row(
                     line.getLineNo(), line.getInstallmentNo(), line.getContractMonthNo(), line.getDueDate(),
                     line.getCommissionItemName(), line.getRecipientName(), line.getBasisCode(), line.getBasisAmount(),
-                    line.getCalculationType(), line.getRatePct(), line.getExpectedAmount(), line.getLineStatus(), line.getRuleRef()
+                    line.getCalculationType(), line.getRatePct(), line.getExpectedAmount(), line.getLineStatus(), line.getRuleRef(), line.getFixedAmount()
             ));
         }
         String filename = "예상스케줄_" + detail.getHeader().getContractNo() + "_v"
@@ -85,7 +85,7 @@ public class ScheduleController {
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(CsvExportWriter.write(List.of(
-                        "줄번호", "회차", "계약차월", "지급예정일", "수수료 항목", "수령자", "기준코드", "기준금액", "계산방식", "요율", "예상금액", "상태", "수수료 규칙 ID"
+                        "줄번호", "회차", "계약차월", "지급예정일", "수수료 항목", "수령자", "기준코드", "기준금액", "계산방식", "요율", "예상금액", "상태", "수수료 규칙 ID", "정액"
                 ), rows));
     }
 
