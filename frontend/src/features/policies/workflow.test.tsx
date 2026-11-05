@@ -136,12 +136,13 @@ function wireDetail(
 
 function mountEditor(initial?: DraftDocument, policyId?: number) {
   const onSaved = vi.fn()
+  const onClose = vi.fn()
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <PolicyDraftEditor initial={initial} policyId={policyId} onClose={vi.fn()} onSaved={onSaved} />
+      <PolicyDraftEditor initial={initial} policyId={policyId} onClose={onClose} onSaved={onSaved} />
     </QueryClientProvider>,
   )
-  return { user: userEvent.setup(), onSaved }
+  return { user: userEvent.setup(), onSaved, onClose }
 }
 
 function mountManagement(
@@ -576,6 +577,30 @@ describe('production policy workflow', () => {
     expect(screen.getByLabelText(/정책명/)).toHaveValue('아직 저장하지 않은 이름')
   })
 
+  it('still focuses the rejected field when the next frame comes before the form is unlocked', async () => {
+    vi.spyOn(apiClient, 'request').mockRejectedValue(
+      new ApiError(
+        {
+          code: 'FGC-COMMON-002',
+          field: 'feeRegimeRules[0].maxInstallments',
+          message: '서버에서 허용하지 않는 회차입니다.',
+        },
+        'server-validation',
+        400,
+      ),
+    )
+    const { user } = mountEditor(normalizePolicyDetail(wireDetail()).editDocument, 17)
+    // 저장 중에는 fieldset이 잠겨 있어 그 안의 입력에 focus가 먹지 않는다. 부하가 큰 CI에서 프레임이 먼저 온 경우다.
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0)
+      return 0
+    })
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    const limit = await screen.findByLabelText(/최대 회차/)
+    await waitFor(() => expect(limit).toHaveFocus())
+    frame.mockRestore()
+  }, 20_000)
+
   it('unlinks a deleted source detail while preserving other references and rule-specific evidence', async () => {
     const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
     const draft = normalizePolicyDetail(wireDetail()).editDocument!
@@ -635,6 +660,47 @@ describe('production policy workflow', () => {
     expect(screen.getByText(/환수는 확정 지급 귀속액/)).toBeVisible()
     expect(request).not.toHaveBeenCalled()
   })
+})
+
+it('policy guide requires valid inputs and server success before closing', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope())
+  const { user, onSaved } = mountEditor()
+  await user.click(screen.getByRole('button', { name: '도움말' }))
+  const next = () => screen.getByRole('button', { name: '다음' })
+  expect(next()).toBeDisabled()
+  await user.type(screen.getByLabelText(/정책코드/), 'GUIDE-TEST')
+  await user.type(screen.getByLabelText(/정책명/), '저장 안내 검증')
+  await user.selectOptions(screen.getByLabelText(/정책 유형/), 'SCHEDULE_ELIGIBILITY')
+  await user.selectOptions(screen.getByLabelText(/출처 분류/), 'GA_POLICY')
+  fireEvent.change(screen.getByLabelText(/적용 시작일/), { target: { value: '2027-01-01' } })
+  await waitFor(() => expect(next()).toBeEnabled())
+  await user.click(next())
+  expect(request).not.toHaveBeenCalled()
+  expect(next()).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: '초안 저장' }))
+  await waitFor(() => expect(next()).toBeEnabled())
+  expect(onSaved).not.toHaveBeenCalled()
+  await user.click(next())
+  expect(await screen.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: '안내 마치기' }))
+  await waitFor(() => expect(onSaved).toHaveBeenCalledWith(17))
+})
+
+it('keeps a stored policy locked if the server receipt ID cannot be verified', async () => {
+  const request = vi.spyOn(apiClient, 'request').mockResolvedValue(envelope({ ...result, policyVersionId: 0 }))
+  const initial = { ...emptyDraft(), policyCode: 'RECEIPT-TEST', policyName: '저장 확인', policyType: 'SCHEDULE_ELIGIBILITY', sourceClass: 'GA_POLICY', effectiveFrom: '2027-01-01' }
+  const { user, onSaved, onClose } = mountEditor(initial)
+  await user.click(screen.getByRole('button', { name: '초안 저장' }))
+  expect(await screen.findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(screen.getByRole('button', { name: '초안 저장' })).toBeDisabled()
+  expect(screen.getByLabelText(/정책명/)).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: '초안 저장' }))
+  expect(request).toHaveBeenCalledTimes(1)
+  expect(onSaved).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: '창 닫기' }))
+  expect(onClose).toHaveBeenCalledTimes(1)
 })
 
 

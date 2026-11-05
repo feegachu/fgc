@@ -85,7 +85,7 @@ regulation_baseline: "FGC 규제 근거·조문표 v0.2.1"
 따라서 현재 `db/demo`만 실행한 결과를 “25명·68계약 GOLDEN 완료”로 표시하지 않는다. 이 문서의 T001~T068(§24)는 전체 GOLDEN 구현을 위한 목표 명세이며, 해당 SQL과 기대값 파일이 추가되어야 완료된다.
 
 
-**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 GA 지급률 정책(`commission_rule`·계약체결비용 `policy_parameter`, #649·#651; 규제 상한 룰셋은 V65로 적재), AGENT 계정(§5), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
+**목표만 있고 아직 없는 것**: `golden_expected_assertions.sql`·`load_data_generator.sql`(`src/test/resources/sql` 디렉터리 없음), T001~T068, STD-AUTO-A(FGN02 상품 0), STD-TERM-A `2029-SEVEN-YEAR`, REVIVED 사건 0건, 차익거래 1~36차월 월별 스냅샷(A1 등은 1행씩), REC-09·10 fixture, `committee_document_ref`(시드 NULL), `agent_history` 행(§8), 4년·7년 분급 GA 지급률 정책(`commission_rule`·계약체결비용 `policy_parameter`, #649. #651은 입력 경로와 판정만 구현했고 값을 시드하지 않았다; 규제 상한 룰셋은 V65로 적재), AGENT 계정(§5), AI 입력 샘플(§52), 협회 등급자료(§53). 각 항목은 해당 SQL·기대값이 들어올 때 이 목록에서 지운다.
 
 ## 2. 시드 파일 구성
 
@@ -1234,7 +1234,7 @@ A1·A2(및 0475 복제본)의 관리자수수료는 팀장 1명에게 90,000 1�
 검증:
 
 - `PROJECT_ASSUMPTION`에 따라 1~48차월 48개 동일금액 행을 만들고 49차월 행은 만들지 않는다. 이 시작회차를 규제 확정값으로 표시하지 않는다. (`REG-04`, `SRC-003`, `SRC-022`)
-- `acquisition_cost_check_detail`에는 선지급 총액(`UPFRONT_TOTAL`), 월별 유지관리 한도(`MAINTENANCE_MONTHLY`), 유지관리 총액(`MAINTENANCE_TOTAL`)을 각각 저장한다
+- `acquisition_cost_check_detail`에는 선지급 총액(`UPFRONT_TOTAL`), 유지관리 총액(`MAINTENANCE_TOTAL`)을 각각 저장한다. 월별 유지관리 한도(`MAINTENANCE_MONTHLY`)는 FUN-064 범위이고 미진행이다(운영정책서 제45조의2, `REG-03`)
 - 초년도 1,200% 사용률은 계약체결비용 상세에 섞지 않고 별도 `cap_check`에 저장한다
 - 세 한도를 서로 차감하지 않는다. `계약체결비용 − 선지급 − 유지관리총액` 같은 계산은 하지 않는다
 - 시책 100,000 추가 시 초년도 1,240,000 → `VIOLATION` (초년도 여유가 60,000원뿐)
@@ -1272,7 +1272,7 @@ A1·A2(및 0475 복제본)의 관리자수수료는 팀장 1명에게 90,000 1�
 **적재 상태와 전제 (2026-10-22)**
 
 - 4년·7년 시드는 아직 없다. 필요한 것: 4년·7년 정책버전(DRAFT→승격), 판매버전(`fee_regime_code` FOUR_YEAR_2027·SEVEN_YEAR_2029), 계약.
-- 계약체결비용 3,000,000원을 담을 칸이 스키마에 없다(계약 테이블·정책 파라미터 어느 쪽인지 미정). 근거 없음 — 확인 필요. 정하기 전에는 `policy_parameter`(상품 판매버전 단위 값)로 두는 안을 기본으로 검토한다 — 프로젝트 가정.
+- 계약체결비용은 지급 정책버전의 `policy_parameter`(`ACQUISITION_COST_BASIS`, `ACQUISITION_COST_RATE_PCT`)로 받는다(#651, 운영정책서 제46조, `REG-02`). 프로젝트 가정이다. 이 시드에는 값이 없어 3,000,000원 예시는 시험 픽스처로만 재현한다. 값이 없으면 한도 검증은 금액 null과 `REVIEW_REQUIRED`다.
 - SCH-07(현행·4년·7년 비교)은 `schedule_purpose='COMPARISON'` 헤더로 만들어 운영 집계(`OPERATIONAL`)와 섞지 않는다(DAR-012).
 
 ## 36. 환수
