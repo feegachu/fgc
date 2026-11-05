@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { canAnimate, useDrawn } from './motion'
+import { canAnimate, useDrawn, useTween } from './motion'
 
 function stubMotion(reduce: boolean) {
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: reduce && query.includes('reduce') }))
@@ -32,6 +32,17 @@ describe('모션 유틸', () => {
         vi.advanceTimersByTime(50)
       })
       expect(result.current).toBe(true)
+    })
+
+    it('useTween 첫 프레임 시각이 시작보다 앞서도 값이 0 아래로 내려가지 않는다', () => {
+      let frame: FrameRequestCallback | undefined
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        frame = callback
+        return 1
+      })
+      const { result } = renderHook(() => useTween([10], 500, true))
+      act(() => frame?.(performance.now() - 16))
+      expect(result.current[0]).toBe(0)
     })
   })
 })
