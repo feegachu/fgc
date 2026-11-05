@@ -53,8 +53,8 @@ public class AssistantCalculationSources {
     var scope = request.scope();
     if (request.kind() == PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE)
       return reconciliation(request, scope);
-    if (scope == null || scope.contractId() == null || scope.paymentStage() == null)
-      return missing(request, CONTRACT_ID, PAYMENT_STAGE);
+    List<String> missingFields = sourceMissingFields(request.kind(), scope);
+    if (!missingFields.isEmpty()) return missing(request, missingFields.toArray(String[]::new));
     long contract = id(scope.contractId(), CONTRACT_ID);
     scopeAccess.requireContract(contract);
     if (request.kind() == PaymentCalculationRequest.Kind.CAP_STATUS)
@@ -185,8 +185,6 @@ public class AssistantCalculationSources {
 
   private PaymentCalculationSnapshot expected(
       PaymentCalculationRequest request, PaymentCalculationRequest.Scope scope, long contract) {
-    List<String> missingFields = expectedMissingFields(scope);
-    if (!missingFields.isEmpty()) return missing(request, missingFields.toArray(String[]::new));
     YearMonth month;
     try {
       month = YearMonth.parse(scope.settlementMonth());
@@ -202,6 +200,22 @@ public class AssistantCalculationSources {
     if (selected.stream().anyMatch(line -> line.getExpectedAmount() == null))
       return missing(request, EXPECTED_AMOUNT);
     return expectedResult(request, scope, contract, detail, selected);
+  }
+
+  private List<String> sourceMissingFields(
+      PaymentCalculationRequest.Kind kind, PaymentCalculationRequest.Scope scope) {
+    List<String> missingFields = new ArrayList<>();
+    if (scope == null || scope.contractId() == null) missingFields.add(CONTRACT_ID);
+    if (scope == null || scope.paymentStage() == null) missingFields.add(PAYMENT_STAGE);
+    if (kind == PaymentCalculationRequest.Kind.EXPECTED_COMMISSION) {
+      if (scope == null) {
+        missingFields.add(SETTLEMENT_MONTH);
+        missingFields.add("aggregation");
+      } else {
+        missingFields.addAll(expectedMissingFields(scope));
+      }
+    }
+    return missingFields;
   }
 
   private List<String> expectedMissingFields(PaymentCalculationRequest.Scope scope) {
