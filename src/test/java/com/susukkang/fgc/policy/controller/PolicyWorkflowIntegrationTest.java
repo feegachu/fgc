@@ -1442,6 +1442,7 @@ class PolicyWorkflowIntegrationTest {
         assertThat(write(HttpMethod.POST, contractPath + "/regenerate?paymentStage=GA_TO_FC", payload, writer, requestKey, 200)).isEqualTo(generated);
         JsonNode detail = scheduleRead("/api/v1/schedules/" + header);
         assertPreviewPolicyLines(detail, seven, longTermFrom, regime, header, policy);
+        assertPreviewPolicyEvidence(detail, header, policy, requestKey);
         assertPreviewVersionLifecycle(contract, header, operational, payload, requestKey, detail);
 
     }
@@ -1521,6 +1522,42 @@ class PolicyWorkflowIntegrationTest {
         assertThat(last.path("expectedAmount").decimalValue()).isEqualByComparingTo(seven ? "12000" : "45000");
         assertThat(last.path("feeComponentType").asText()).isEqualTo(seven ? "LONG_TERM_MAINTENANCE" : "MAINTENANCE");
         assertThat(last.path("scheduleLineId").asLong()).isPositive();
+    }
+
+    private void assertPreviewPolicyEvidence(JsonNode detail, long header, long policy, String requestKey) throws Exception {
+        assertThat(detail.path("header").path("policyVersionId").asLong()).isEqualTo(policy);
+        assertThat(jdbc.queryForObject("SELECT policy_version_id FROM fgc.schedule_header WHERE schedule_header_id=?",
+                Long.class, header)).isEqualTo(policy);
+        var ruleByItem = new java.util.HashMap<Long, Long>();
+        jdbc.query("SELECT commission_item_id, commission_rule_id FROM fgc.commission_rule WHERE policy_version_id=?",
+                (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+                    ruleByItem.put(rs.getLong("commission_item_id"), rs.getLong("commission_rule_id"));
+                }, policy);
+        assertThat(ruleByItem).hasSize(2);
+        for (JsonNode line : detail.path("lines")) {
+            long item = line.path("commissionItemId").asLong();
+            assertThat(ruleByItem).containsKey(item);
+            // The wire field is ruleRef; the stored column is source_commission_rule_id.
+            assertThat(line.path("ruleRef").asLong()).isEqualTo(ruleByItem.get(item));
+        }
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM fgc.schedule_line sl
+                LEFT JOIN fgc.commission_rule cr ON cr.commission_rule_id=sl.source_commission_rule_id
+                WHERE sl.schedule_header_id=? AND (
+                    cr.policy_version_id IS DISTINCT FROM ?
+                    OR cr.commission_item_id IS DISTINCT FROM sl.commission_item_id
+                    OR sl.installment_no NOT BETWEEN cr.installment_from AND cr.installment_to)
+                """, Long.class, header, policy)).isZero();
+        var audits = jdbc.queryForList("""
+                SELECT policy_version_id, after_value::text AS result FROM fgc.audit_log
+                WHERE action_code='SCHEDULE_PREVIEW_CREATED' AND entity_type='SCHEDULE_REQUEST' AND entity_id=?
+                """, requestKey);
+        // Successful same-key retries above must preserve one creation evidence record.
+        assertThat(audits).hasSize(1);
+        assertThat(((Number) audits.getFirst().get("policy_version_id")).longValue()).isEqualTo(policy);
+        JsonNode evidence = mapper.readTree((String) audits.getFirst().get("result"));
+        assertThat(evidence.path("scheduleHeaderId").asLong()).isEqualTo(header);
+        assertThat(values(evidence.path("sourceRefs"))).containsExactlyInAnyOrder("REG-03", "SRC-022");
     }
 
     private void assertLongTermLines(JsonNode detail, int longTermFrom) {
