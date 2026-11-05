@@ -116,10 +116,11 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   await page.getByRole('button', { name: '역분개 + 재기표', exact: true }).click()
   await page.getByRole('textbox', { name: '정정 요청 사유', exact: true }).fill('예상 지급 대비 과소 지급 원천 정정')
   await page.getByRole('button', { name: '예외함에서 정정 계속', exact: true }).click()
-  const expandForAction = guide.getByRole('button', { name: '펼치기', exact: true })
-  if (await expandForAction.isVisible()) await expandForAction.click()
   await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
   await page.getByLabel('처리 사유').fill('원분개와 지급 예정 금액 확인')
+  await expect(guide).toHaveAttribute('aria-busy', 'false')
+  const expandForAction = guide.getByRole('button', { name: '펼치기', exact: true })
+  if (await expandForAction.isVisible()) await expandForAction.click()
   // Save from the action explanation itself. A resolved case can remove its form;
   // do not skip ahead to a permanent target before exercising that transition.
   for (let step = 0; step < 6 && !(await guide.getByRole('heading', { name: '처리 내용을 직접 저장하세요' }).isVisible()); step++) {
