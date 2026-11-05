@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams, useLocation } from 'react-router'
@@ -255,7 +256,7 @@ export default function TransactionListPage() {
     },
   ]
   return (
-    <div className="transaction-page transaction-list-page">
+    <div className="transaction-page transaction-list-page list-page">
       <Modal
         open={deleteTarget !== null}
         title="지급 초안 삭제"
@@ -293,6 +294,7 @@ export default function TransactionListPage() {
         )}
       </Modal>
       <header className="page-header transaction-page-header">
+        <ScreenHelp screenId="TRAN-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">수수료 지급 건 목록</h1>
         </div>
@@ -324,7 +326,7 @@ export default function TransactionListPage() {
           {listError(insurers.error)}
         </p>
       )}
-      <section data-guide-feature="features.transaction.transaction-list-page.section"
+      <section data-guide-feature="features.transaction.transaction-list-page.section" data-guide-target="payment.results"
         className="surface transaction-list-panel"
         aria-labelledby="transaction-list-title"
         aria-busy={search.isFetching}
@@ -446,8 +448,8 @@ function TransactionFilters({
     </Field>
   )
   return (
-    <FilterBar
-      className="transaction-filter-bar"
+    <FilterBar data-guide-target="payment.filters"
+      className="transaction-filter-bar list-filter-bar"
       wrapFields={false}
       icons
       resetFirst

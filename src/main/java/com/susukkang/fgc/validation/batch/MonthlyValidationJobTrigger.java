@@ -16,6 +16,7 @@ import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,7 @@ public class MonthlyValidationJobTrigger {
 
     private final ThreadPoolTaskExecutor taskExecutor = createExecutor();
 
+    private final JdbcTemplate retryJdbc;
     private final Job monthlyValidationJob;
     private final JobLauncher jobLauncher;
     private final ValidationRunRepository validationRunRepository;
@@ -68,6 +70,12 @@ public class MonthlyValidationJobTrigger {
      * 사용자) 값을 쓰면 triggeredBy 불일치로 VRUN_005가 난다.
      */
     public CompletableFuture<JobExecution> launch(ValidationRunRow run, String requestId) {
+        return launch(run, requestId, null);
+    }
+    public CompletableFuture<JobExecution> launchRestart(ValidationRunRow run, String requestId, Long retryId) {
+        return launch(run, requestId, retryId);
+    }
+    private CompletableFuture<JobExecution> launch(ValidationRunRow run, String requestId, Long retryId) {
         JobParameters requestedParameters = new JobParametersBuilder()
                 .addString("validationMonth", DateUtil.formatSettlementMonth(run.getValidationMonth()))
                 .addLong("runNo", run.getRunNo().longValue())
@@ -80,12 +88,14 @@ public class MonthlyValidationJobTrigger {
         JobParameters jobParameters = ValidationRunStatus.FAILED.name().equals(run.getStatus())
                 ? restartParameters(run, requestId) : requestedParameters;
 
+        if (retryId != null) jobParameters = new JobParametersBuilder(jobParameters).addLong("restartRetryId", retryId, false).toJobParameters();
+        JobParameters launchParameters = jobParameters;
         Long validationRunId = run.getValidationRunId();
 
         // whenComplete는 exceptionally와 달리 예외를 다른 값으로 바꿔치기하지 않는다 — 로그만
         // 남기고, 반환된 CompletableFuture는 실패 상태를 그대로 유지해 호출자가 원하면 알 수 있다.
         return CompletableFuture
-                .supplyAsync(() -> runOrWrap(run, jobParameters), taskExecutor)
+                .supplyAsync(() -> runOrWrap(run, launchParameters), taskExecutor)
                 .whenComplete((jobExecution, ex) -> {
                     if (ex != null) {
                         log.error("MonthlyValidationJob 실행 요청 실패 (validationRunId={}, requestId={})",
@@ -114,6 +124,14 @@ public class MonthlyValidationJobTrigger {
             if (expectedExecutionId != null
                     && !expectedExecutionId.equals(monthlyJobExecutionLookup.findFailedExecution(run).getId())) {
                 throw new IllegalStateException("요청 이후 다른 재시작이 이미 시도되었습니다.");
+            }
+            Long retryId = jobParameters.getLong("restartRetryId");
+            if (retryId != null && retryJdbc.update("""
+                    UPDATE fgc.validation_run_retry SET state='LAUNCHING'
+                     WHERE retry_id=? AND validation_run_id=? AND previous_batch_execution_id=?
+                       AND state='ACCEPTED' AND requested_at >= clock_timestamp()-interval '5 minutes'
+                    """, retryId, validationRunId, expectedExecutionId) != 1) {
+                throw new IllegalStateException("만료되었거나 이미 기동된 재시작 접수입니다.");
             }
             return jobLauncher.run(monthlyValidationJob, jobParameters);
         } catch (Exception e) {

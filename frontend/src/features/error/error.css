@@ -1,13 +1,17 @@
 /* 1차 static/css/features/error.css 를 옮겼다. 색·간격은 variables.css 토큰만 쓴다. */
 .error-page {
   display: grid;
-  justify-items: center;
+  gap: var(--space-3);
+}
+
+/* 셸 밖(최상위 오류 바운더리)에는 .page-content 여백이 없어 같은 여백을 직접 둔다. */
+#root > .error-page {
+  padding: var(--space-4) var(--layout-page-padding) var(--space-8);
 }
 
 .error-card {
   width: 100%;
   max-width: 35rem;
-  margin-top: var(--space-10);
 }
 
 .error-card-body {
@@ -40,10 +44,4 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-@media (max-width: 47.9375rem) {
-  .error-card {
-    margin-top: var(--space-4);
-  }
 }

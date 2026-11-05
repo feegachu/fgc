@@ -1,4 +1,5 @@
 import { typeBadgeTone } from '../exception/rules'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { openSettlementGuide } from '../assistant/settlement/entry'
 import { useQuery } from '@tanstack/react-query'
 import type { CSSProperties } from 'react'
@@ -10,29 +11,16 @@ import { KpiCard } from '../../components/KpiCard'
 import { StatusBadge } from '../../components/StatusBadge'
 import { dateTime, errorText, int } from '../../lib/format'
 import { monthText, screenMessage } from '../../lib/screenText'
-import { useDrawn } from '../../lib/motion'
 import { withMonth } from '../../stores/workspace'
 import type { ShellContext } from '../../app/shell/AppShell'
-import { exceptionSearchQueryOptions, OPEN_STATUS } from '../exception/api'
-import type { ExceptionFilters } from '../exception/api'
+import { OPEN_STATUS } from '../exception/api'
 import { dashboardSummaryQueryOptions } from './api'
 import type { RecentException, RecentRun } from './api'
 import { DashboardSkeleton } from './DashboardSkeleton'
+import { RiskComposition, type CompositionItem } from './RiskComposition'
 import { exceptionStatusTone, runStatusTone, severityTone } from './tones'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
-/** 예외함을 처음 열 때와 같은 조건(미처리 전체)이라 '예외함에서 처리'로 넘어가도 건수가 그대로다. */
-const OPEN_EXCEPTIONS: ExceptionFilters = {
-  type: '',
-  reasonCode: '',
-  severity: '',
-  status: OPEN_STATUS,
-  assigneeFilter: '',
-  validationMonth: '',
-  contractNo: '',
-  sort: '',
-  page: 1,
-}
 
 export function DashboardPage() {
   const { month } = useOutletContext<ShellContext>()
@@ -96,12 +84,12 @@ function DashboardContent({ month }: { month: string }) {
     { key: 'createdAt', label: '발생', cellClassName: 'tabular-nums', render: (e) => dateTime(e.createdAt) },
   ]
 
-  // 미처리 예외는 아래 '처리할 예외' 제목 숫자로 보여 준다.
   const kpis =
     data &&
     ([
       {
         id: 'cap-violation',
+        color: 'error',
         label: '1,200% 위반',
         value: data.capViolation,
         footer: '확정 위반 판정',
@@ -110,6 +98,7 @@ function DashboardContent({ month }: { month: string }) {
       },
       {
         id: 'cap-warning',
+        color: 'warning',
         label: '1,200% 주의',
         value: data.capWarning,
         footer: '사용률 경고 기준 이상',
@@ -118,6 +107,7 @@ function DashboardContent({ month }: { month: string }) {
       },
       {
         id: 'arbitrage',
+        color: 'review',
         label: '차익거래 검토대상',
         value: data.arbitrageCandidate,
         footer: '위반 확정 아님',
@@ -126,6 +116,7 @@ function DashboardContent({ month }: { month: string }) {
       },
       {
         id: 'recon',
+        color: 'info',
         label: '대사 불일치',
         value: data.reconMismatch,
         footer: '허용오차 0원',
@@ -134,28 +125,49 @@ function DashboardContent({ month }: { month: string }) {
       },
       {
         id: 'journal',
+        color: 'success',
         label: '원장 불균형',
         value: data.journalImbalance,
         footer: '기표 전 0건 필수',
         tone: data.journalImbalance === 0 ? 'success' : 'error',
         to: href('/journals'),
       },
+      {
+        id: 'open',
+        color: 'warning',
+        label: '미처리 예외',
+        value: data.openException,
+        footer: data.openException === 0 ? '미처리 예외가 없습니다' : '신규 + 검토중',
+        tone: 'warning',
+        to: href('/exceptions', { status: OPEN_STATUS }),
+      },
     ] as const)
+
+  const compositionItems: CompositionItem[] = kpis?.filter((kpi) => kpi.id !== 'open').map((kpi) => ({
+    key: kpi.id,
+    label: kpi.label,
+    value: kpi.value ?? 0,
+    color: kpi.color,
+    to: kpi.to,
+  })) ?? []
 
   return (
     <div className="dashboard-page">
       <header className="page-header">
+        <ScreenHelp screenId="DASH-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>
-        <button data-guide-feature="features.dashboard.dashboard-page.settlement-guide"
-          type="button"
-          className="button button-secondary"
-          data-guide-target="dashboard.guide"
-          onClick={openSettlementGuide}
-        >
-          전체 업무 가이드
-        </button>
+        <div className="page-header-actions">
+          <button data-guide-feature="features.dashboard.dashboard-page.settlement-guide"
+            type="button"
+            className="button button-secondary"
+            data-guide-target="dashboard.guide"
+            onClick={openSettlementGuide}
+          >
+            전체 업무 가이드
+          </button>
+        </div>
       </header>
       {error ? (
         <div role="alert" className="empty-state">
@@ -212,7 +224,17 @@ function DashboardContent({ month }: { month: string }) {
               </div>
             </section>
             <div className="dashboard-side-column">
-              <OpenExceptions total={data?.openException ?? 0} href={href} />
+              <section data-guide-feature="features.dashboard.dashboard-page.composition"
+                className="surface risk-composition-card" aria-labelledby="composition-title"
+              >
+                <header className="surface-header">
+                  <h2 id="composition-title" className="surface-title">검증 항목별 건수 비중</h2>
+                </header>
+                <RiskComposition items={compositionItems} />
+                <p className="risk-composition-note">
+                  미처리 예외는 일부 항목과 겹쳐 비중에서 제외했습니다. 항목마다 세는 단위가 달라 건수의 단순 비율로 표시합니다.
+                </p>
+              </section>
               <section data-guide-feature="features.dashboard.dashboard-page.section-3" className="surface run-list-card" aria-labelledby="run-list-title">
                 <div className="run-list-header">
                   <h2 id="run-list-title" className="run-list-title">
@@ -244,56 +266,12 @@ function DashboardContent({ month }: { month: string }) {
   )
 }
 
-/** 처리할 예외: 미처리 건수를 제목 숫자로, 유형별 건수를 예외함으로 가는 목록으로 보여 준다. */
-function OpenExceptions({
-  total,
-  href,
-}: {
-  total: number
-  href: (path: string, params?: Record<string, string>) => string
-}) {
-  const open = useQuery(exceptionSearchQueryOptions(OPEN_EXCEPTIONS))
-  const types = [...(open.data?.summary ?? [])]
-    .filter((item) => (item.count ?? 0) > 0)
-    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
-  return (
-    <section data-guide-feature="dashboard.kpi.open" className="surface dashboard-open" aria-labelledby="open-title">
-      <header className="surface-header">
-        <h2 id="open-title" className="surface-title">
-          처리할 예외 <span className="dashboard-open-total tabular-nums">{int(total)}건</span>
-        </h2>
-        <Link data-guide-feature="dashboard.kpi-link.open" className="run-list-link" to={href('/exceptions', { status: OPEN_STATUS })}>
-          예외함에서 처리
-        </Link>
-      </header>
-      {types.length ? (
-        <ul className="dashboard-open-list">
-          {types.map((item) => (
-            <li key={item.type}>
-              <Link
-                data-guide-feature="features.dashboard.dashboard-page.open-exception-type"
-                to={href('/exceptions', { type: item.type ?? '', status: OPEN_STATUS })}
-                className={item.type === 'CAP_VIOLATION' ? 'is-danger' : undefined}
-              >
-                <span>{item.typeLabel ?? '-'}</span>
-                <strong className="tabular-nums">{int(item.count ?? 0)}건</strong>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="dashboard-open-empty">{total ? '유형별 건수는 예외함에서 확인할 수 있습니다.' : '처리할 예외가 없습니다.'}</p>
-      )}
-    </section>
-  )
-}
 
 const RUN_STEPS = 10
 
 function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const step = run.currentStep ?? 0
   const progress = Math.max(0, Math.min(100, step * 10))
-  const drawn = useDrawn()
   return (
     <Link data-guide-feature="features.dashboard.dashboard-page.link-5" className="run-row" to={to}>
       <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}회차`}</strong>
@@ -310,7 +288,7 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
         {Array.from({ length: RUN_STEPS }, (_, index) => (
           <span
             key={index}
-            className={`run-step${drawn && index < step ? ' is-done' : ''}`}
+            className={`run-step${index < step ? ' is-done' : ''}`}
             style={{ '--i': index } as CSSProperties}
           />
         ))}

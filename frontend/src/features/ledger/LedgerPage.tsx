@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { guideFeatureId } from '../assistant/feature-ids'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { invalidateJournalCorrectionQueries } from './correction-cache'
@@ -173,13 +174,11 @@ export default function LedgerPage() {
   const select = (row: Journal) =>
     row.journalHeaderId != null && update({ selected: String(row.journalHeaderId) }, { resetPage: false })
   return (
-    <div className="ledger-react-page">
+    <div className="ledger-react-page list-page">
       <header className="page-header">
+        <ScreenHelp screenId="LEDG-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">검증원장 조회</h1>
-          <p className="page-description">
-            이 원장은 회사의 정식 회계장부가 아닙니다. 정산이 맞는지 확인하려고 FGC가 따로 만드는 보조 장부입니다.
-          </p>
         </div>
       </header>
       <LedgerFilters
@@ -196,7 +195,7 @@ export default function LedgerPage() {
         label="분개 목록과 분개 상세 카드 너비"
         defaultRatio={55}
       >
-        <section data-guide-feature="features.ledger.ledger-page.section" className="surface" aria-busy={list.isFetching}>
+        <section data-guide-feature="features.ledger.ledger-page.section" data-guide-target="ledger.overview" className="surface" aria-busy={list.isFetching}>
           <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">분개 목록</h2>
           </ListHeader>

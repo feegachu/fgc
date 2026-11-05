@@ -71,6 +71,11 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.transaction.deleteLinked"
     ),
+    TRAN_010(
+            "FGC-TRAN-010",
+            HttpStatus.CONFLICT,
+            "error.transaction.concurrentUpdate"
+    ),
 
     CONT_001(
             "FGC-CONT-001",
@@ -88,6 +93,9 @@ public enum FgcErrorCode {
             "error.contract.concurrentUpdate"
     ),
 
+    IMPL_SCHEDULE_PREVIEW_ONLY("FGC-IMPL-SCHEDULE_PREVIEW_ONLY", HttpStatus.CONFLICT, "error.schedule.previewOnly"),
+    IMPL_SCHEDULE_SOURCE_CHANGED("FGC-IMPL-SCHEDULE_SOURCE_CHANGED", HttpStatus.CONFLICT, "error.schedule.sourceChanged"),
+    IMPL_SCHEDULE_REVIEW_REQUIRED("FGC-IMPL-SCHEDULE_REVIEW_REQUIRED", HttpStatus.UNPROCESSABLE_ENTITY, "error.schedule.reviewRequired"),
     SCHE_001(
             "FGC-SCHE-001",
             HttpStatus.CONFLICT,
@@ -129,6 +137,7 @@ public enum FgcErrorCode {
             HttpStatus.CONFLICT,
             "error.validationRun.invalidTransition"
     ),
+    VRUN_008("FGC-VRUN-008", HttpStatus.SERVICE_UNAVAILABLE, "error.validationRun.launchUnavailable"),
     VRUN_005(
             "FGC-VRUN-005",
             HttpStatus.CONFLICT,
@@ -266,6 +275,7 @@ public enum FgcErrorCode {
     IMPL_AGENT_FIXED("FGC-IMPL-AGENT_FIXED", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.agentFixed"),
     IMPL_EVENT_ORDER("FGC-IMPL-EVENT_ORDER", HttpStatus.UNPROCESSABLE_ENTITY, "error.contract.eventOrder"),
     IMPL_TRANSITION_DENIED("FGC-IMPL-TRANSITION_DENIED", HttpStatus.CONFLICT, "error.contract.transitionDenied"),
+    IMPL_PAYMENT_HELD("FGC-IMPL-PAYMENT_HELD", HttpStatus.CONFLICT, "error.payment.onHold"),
 
     COMMON_002(
             "FGC-COMMON-002",
