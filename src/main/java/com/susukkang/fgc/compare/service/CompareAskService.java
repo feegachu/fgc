@@ -7,6 +7,7 @@ import com.susukkang.fgc.compare.dto.CompareAskResponse;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse;
 import java.text.Normalizer;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -44,7 +45,9 @@ public class CompareAskService {
     static final String INSTRUCTIONS = """
             너는 보험대리점 설계사에게 상품 비교 순위를 해설하고 기본 용어를 설명하는 도우미다.
             data 의 '용어 설명', '순위 결과', '순위별 비교 근거'만 근거로 답한다. 거기에 없는 내용과 계산을 만들지 마라.
-            답에는 숫자(금액·비율·순위 번호·날짜)를 쓰지 않는다. '1,200% 룰'이라는 용어 이름만 쓸 수 있다. 순위·금액은 서버가 답 앞에 따로 붙인다.
+            답에는 숫자(금액·비율·순위 번호·날짜)를 직접 쓰지 않는다. '1,200% 룰'이라는 용어 이름만 쓸 수 있다.
+            금액과 순위가 필요하면 data 의 '자리표시자' 목록에 있는 것만 중괄호째 그대로 쓴다(예: {r2.net}). 서버가 실제 값으로 바꿔 준다.
+            자리표시자를 하나도 쓰지 않으면 서버가 순위·금액 문장을 답 앞에 따로 붙인다. 목록에 없는 자리표시자를 만들지 마라.
             상품은 보험사·상품 이름으로 부르고, 어느 쪽이 더 크거나 작은지와 그 이유(한도·이월·환수)를 말로 풀어 쓴다.
             다음 질문은 모두 범위 안이다(inScope=true): 몇 위인 이유, 1위와 다른 순위의 차이, 한도·이월·환수가 순위에 준 영향,
             상품 간 비교, 순위 계산 기준, 위 용어의 뜻. 순위 결과가 있으면 '순위별 비교 근거'의 차이를 풀어서 이유를 설명한다.
@@ -91,7 +94,8 @@ public class CompareAskService {
             // 외부 모델에 개인정보를 보내지 않는다. 질문 원문은 저장하지도 않는다.
             return new CompareAskResponse(PERSONAL_INFO, CompareAskResponse.RULE);
         }
-        Output output = call(q, describe(ranking) + askedPair(ranking, q));
+        Map<String, String> slots = hasItems(ranking) ? AnswerSlots.values(ranking, askedRanks(ranking.items(), q)) : Map.of();
+        Output output = call(q, describe(ranking) + askedPair(ranking, q) + AnswerSlots.describe(slots));
         if (output == null) {
             log.warn("LLM 호출이 실패해 대체 답변을 씁니다. 사유는 ai_call_log 에 있습니다.");
             return fallbackAnswer(q, ranking);
@@ -112,7 +116,16 @@ public class CompareAskService {
             log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다. reason={}", rejected);
             return fallbackAnswer(q, ranking);
         }
-        // 순위 질문의 숫자는 서버가 만든 문장으로 보여 주고, AI 는 그 뒤에 이유를 말로 풀어 쓴다.
+        if (AnswerSlots.uses(text)) {
+            // 모델이 자리표시자로 쓴 문장은 서버 값으로 채워 그대로 낸다. 목록에 없는 자리표시자면 버린다.
+            Optional<String> rendered = AnswerSlots.render(text, slots);
+            if (rendered.isEmpty()) {
+                log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다. reason=UNKNOWN_SLOT");
+                return fallbackAnswer(q, ranking);
+            }
+            return new CompareAskResponse(rendered.get(), CompareAskResponse.LLM);
+        }
+        // 자리표시자가 없으면 순위 질문의 숫자는 서버가 만든 문장으로 보여 주고, AI 는 그 뒤에 이유를 말로 풀어 쓴다.
         String answer = hasItems(ranking) && isRankQuestion(q) ? rankAnswer(ranking.items(), q) + " " + text : text;
         return new CompareAskResponse(answer, CompareAskResponse.LLM);
     }
@@ -278,6 +291,6 @@ public class CompareAskService {
         if (FORBIDDEN.stream().anyMatch(text::contains)) {
             return "FORBIDDEN_PHRASE";
         }
-        return AnswerNumberGuard.allowed(text, CompareSummaryService.names(ranking)) ? null : "NUMBER_GUARD";
+        return AnswerNumberGuard.allowed(AnswerSlots.strip(text), CompareSummaryService.names(ranking)) ? null : "NUMBER_GUARD";
     }
 }

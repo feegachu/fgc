@@ -161,6 +161,50 @@ class CompareAskServiceTest {
         assertThat(service.ask("1위랑 2위 비교해줘", threeItems()).answer()).contains("1위는 가보험 든든건강");
     }
 
+    @Test
+    @DisplayName("모델이 자리표시자로 쓴 문장은 서버 값으로 채워 그대로 낸다")
+    void slotAnswerIsRenderedWithServerValues() {
+        llmReturns(true, "{r3.rank}는 {r2.rank}보다 순수령액이 {diff.net} 낮아요. 환수 노출액이 {r3.clawback}로 더 크기 때문이에요.");
+
+        CompareAskResponse response = service.ask("3위랑 2위 차이가 뭐야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).isEqualTo("3위는 2위보다 순수령액이 84,000원 낮아요. 환수 노출액이 30,000원로 더 크기 때문이에요.");
+    }
+
+    @Test
+    @DisplayName("목록에 없는 자리표시자를 쓴 답변은 버리고 서버 문장으로 답한다")
+    void unknownSlotFallsBackToRuleAnswer() {
+        llmReturns(true, "{r9.net}이에요.");
+
+        CompareAskResponse response = service.ask("3위랑 2위 차이가 뭐야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강").doesNotContain("{");
+    }
+
+    @Test
+    @DisplayName("자리표시자와 함께 숫자를 직접 쓰면 답변을 버린다")
+    void slotAnswerWithWrittenNumberIsRejected() {
+        llmReturns(true, "{r2.rank}는 {r2.net}이고 3위보다 앞서요.");
+
+        CompareAskResponse response = service.ask("3위랑 2위 차이가 뭐야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+    }
+
+    @Test
+    @DisplayName("모델 데이터에 자리표시자 목록은 주되 금액 값은 새로 주지 않는다")
+    void slotGuideIsSentToModel() {
+        llmReturns(true, "{r2.rank}가 앞서요.");
+
+        service.ask("3위랑 2위 차이가 뭐야?", threeItems());
+
+        org.mockito.ArgumentCaptor<LlmGateway.LlmRequest> captor = org.mockito.ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway).call(captor.capture(), eq(CompareAskService.Output.class));
+        assertThat(captor.getValue().data()).contains("[자리표시자]", "{diff.net}", "쓸 수 있는 순위 번호: 1, 2, 3");
+    }
+
     private static CompareRankingResponse threeItems() {
         CompareRankingResponse two = twoItems();
         Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());
