@@ -1,0 +1,464 @@
+package com.susukkang.fgc.assistant;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susukkang.fgc.assistant.dto.*;
+import com.susukkang.fgc.assistant.service.*;
+import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.security.AgentDataScopeService;
+import com.susukkang.fgc.reconciliation.service.ReconciliationResultQueryService;
+import com.susukkang.fgc.schedule.dto.*;
+import com.susukkang.fgc.schedule.repository.ScheduleQueryRepository;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+import org.junit.jupiter.api.*;
+
+class AssistantCalculationSourcesTest {
+  ScheduleQueryRepository schedules = mock(ScheduleQueryRepository.class);
+  CapCalculator caps = mock(CapCalculator.class);
+  ReconciliationResultQueryService reconciliations = mock(ReconciliationResultQueryService.class);
+  AgentDataScopeService access = mock(AgentDataScopeService.class);
+  com.susukkang.fgc.cap.repository.CapContractQueryRepository contracts =
+      mock(com.susukkang.fgc.cap.repository.CapContractQueryRepository.class);
+  AssistantCalculationSources service =
+      new AssistantCalculationSources(schedules, caps, reconciliations, access, contracts);
+  ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+
+  @Test
+  void hypotheticalBalanceRoundsEachLineWithoutAnySourceRead() throws Exception {
+    var request =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE,
+            PaymentCalculationRequest.Mode.HYPOTHETICAL,
+            null,
+            mapper.readTree(
+                "{\"balance\":{\"amount\":\"100000\",\"attributionAmounts\":[\"60000\",\"30000\"]}}"),
+            4L);
+    var result = service.calculate(request);
+    assertThat(result.amounts()).containsEntry("differenceAmount", "10000");
+    assertThat(result.recommendation().allowed()).isFalse();
+    var rounding =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            request.kind(),
+            request.mode(),
+            null,
+            mapper.readTree(
+                "{\"balance\":{\"amount\":\"1.49\",\"attributionAmounts\":[\"0.50\",\"0.50\"]}}"),
+            5L);
+    assertThat(service.calculate(rounding).amounts()).containsEntry("differenceAmount", "-1");
+    verifyNoInteractions(schedules, caps, reconciliations, access);
+  }
+
+  @Test
+  void rejectsFloatingPointAndExponentInsteadOfCoercing() throws Exception {
+    for (String amount : List.of("100.0", "\"1e3\"", "\"-1\"", "\"10000000000000\"", "\"0.001\"")) {
+      var candidate =
+          mapper.readTree(
+              "{\"balance\":{\"amount\":" + amount + ",\"attributionAmounts\":[\"0\"]}}");
+      assertThatThrownBy(
+              () ->
+                  service.calculate(
+                      new PaymentCalculationRequest(
+                          "assistant.v1",
+                          PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE,
+                          PaymentCalculationRequest.Mode.HYPOTHETICAL,
+                          null,
+                          candidate,
+                          1L)))
+          .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+    }
+  }
+
+  PaymentCalculationRequest expected(
+      PaymentCalculationRequest.Scope.Aggregation aggregate, Integer installment) {
+    return new PaymentCalculationRequest(
+        "assistant.v1",
+        PaymentCalculationRequest.Kind.EXPECTED_COMMISSION,
+        PaymentCalculationRequest.Mode.EXISTING,
+        new PaymentCalculationRequest.Scope(
+            null,
+            "3",
+            "2026-10",
+            PaymentStage.GA_TO_FC,
+            installment,
+            "4",
+            "5",
+            null,
+            null,
+            aggregate),
+        null,
+        1L);
+  }
+
+  @Test
+  void sourceIdentityListsOnlyUnprovidedContractOrStage() {
+    for (var kind :
+        List.of(
+            PaymentCalculationRequest.Kind.CAP_STATUS,
+            PaymentCalculationRequest.Kind.EXPECTED_COMMISSION)) {
+      var withoutStage =
+          new PaymentCalculationRequest(
+              "assistant.v1",
+              kind,
+              PaymentCalculationRequest.Mode.EXISTING,
+              new PaymentCalculationRequest.Scope(
+                  null,
+                  "3",
+                  "2026-10",
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL),
+              null,
+              1L);
+      assertThat(service.calculate(withoutStage).missingInputs()).containsExactly("paymentStage");
+      var withoutContract =
+          new PaymentCalculationRequest(
+              "assistant.v1",
+              kind,
+              PaymentCalculationRequest.Mode.EXISTING,
+              new PaymentCalculationRequest.Scope(
+                  null,
+                  null,
+                  "2026-10",
+                  PaymentStage.INSURER_TO_GA,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL),
+              null,
+              1L);
+      assertThat(service.calculate(withoutContract).missingInputs()).containsExactly("contractId");
+    }
+    verifyNoInteractions(schedules, caps, contracts, access);
+  }
+
+  @Test
+  void expectedCalculationCollectsAllKnownMissingFieldsBeforeReadingSources() {
+    var request =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.EXPECTED_COMMISSION,
+            PaymentCalculationRequest.Mode.EXISTING,
+            null,
+            null,
+            1L);
+    assertThat(service.calculate(request).missingInputs())
+        .containsExactly("contractId", "paymentStage", "settlementMonth", "aggregation");
+    var single =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            request.kind(),
+            request.mode(),
+            new PaymentCalculationRequest.Scope(
+                null,
+                null,
+                null,
+                PaymentStage.GA_TO_FC,
+                null,
+                null,
+                null,
+                null,
+                null,
+                PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE),
+            null,
+            1L);
+    assertThat(service.calculate(single).missingInputs())
+        .containsExactly(
+            "contractId",
+            "settlementMonth",
+            "commissionItemId",
+            "installmentNo",
+            "beneficiaryAgentId");
+    verifyNoInteractions(schedules, caps, contracts, access);
+  }
+
+  @Test
+  void singleLineListsOnlyFieldsMissingForItsPaymentStage() {
+    var insurer =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.EXPECTED_COMMISSION,
+            PaymentCalculationRequest.Mode.EXISTING,
+            new PaymentCalculationRequest.Scope(
+                null,
+                "3",
+                "2026-10",
+                PaymentStage.INSURER_TO_GA,
+                null,
+                "4",
+                null,
+                null,
+                null,
+                PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE),
+            null,
+            1L);
+    assertThat(service.calculate(insurer).missingInputs()).containsExactly("installmentNo");
+    var agent =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            insurer.kind(),
+            insurer.mode(),
+            new PaymentCalculationRequest.Scope(
+                null,
+                "3",
+                "2026-10",
+                PaymentStage.GA_TO_FC,
+                1,
+                "4",
+                null,
+                null,
+                null,
+                PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE),
+            null,
+            1L);
+    assertThat(service.calculate(agent).missingInputs()).containsExactly("beneficiaryAgentId");
+    verifyNoInteractions(schedules);
+  }
+
+  @Test
+  void amountStringsRejectLeadingZerosButKeepZeroFractionsAndBounds() {
+    for (String amount : List.of("0001", "00", "01.50", "00.50")) {
+      assertThatThrownBy(
+              () -> CalculationAmounts.input(mapper.getNodeFactory().textNode(amount), "amount"))
+          .isInstanceOf(com.susukkang.fgc.common.exception.FgcBusinessException.class);
+    }
+    for (String amount : List.of("0", "0.50", "1", "9999999999999.99")) {
+      assertThat(CalculationAmounts.input(mapper.getNodeFactory().textNode(amount), "amount"))
+          .isEqualByComparingTo(amount);
+    }
+  }
+
+  @Test
+  void reconciliationKeepsSourceReviewDecisionAndMissingAmounts() {
+    var detail =
+        mock(com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse.class);
+    when(detail.contractId()).thenReturn(3L);
+    when(detail.expectedTotalAmount()).thenReturn(new BigDecimal("100000"));
+    when(detail.actualTotalAmount()).thenReturn(new BigDecimal("100000"));
+    when(detail.differenceAmount()).thenReturn(BigDecimal.ZERO);
+    when(reconciliations.get(99L)).thenReturn(detail);
+    var request =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE,
+            PaymentCalculationRequest.Mode.EXISTING,
+            new PaymentCalculationRequest.Scope(
+                null, null, null, null, null, null, null, null, "99", null),
+            null,
+            1L);
+    when(detail.resultType()).thenReturn("REVIEW_REQUIRED");
+    var review = service.calculate(request);
+    assertThat(review.status()).isEqualTo("REVIEW_REQUIRED");
+    assertThat(review.resolvedScope()).containsEntry("resultType", "REVIEW_REQUIRED");
+    assertThat(review.amounts()).containsEntry("differenceAmount", "0");
+    assertThat(review.recommendation().allowed()).isFalse();
+    when(detail.differenceAmount()).thenReturn(null);
+    assertThat(service.calculate(request).status()).isEqualTo("REVIEW_REQUIRED");
+    when(detail.resultType()).thenReturn("MATCHED");
+    assertThat(service.calculate(request).status()).isEqualTo("INSUFFICIENT_DATA");
+    when(detail.differenceAmount()).thenReturn(BigDecimal.ZERO);
+    var matched = service.calculate(request);
+    assertThat(matched.status()).isEqualTo("CALCULATED");
+    assertThat(matched.resolvedScope()).containsEntry("resultType", "MATCHED");
+  }
+
+  void schedule(String... amounts) {
+    var lines = new ArrayList<ScheduleLineResponse>();
+    int seq = 0;
+    for (String amount : amounts)
+      lines.add(
+          ScheduleLineResponse.builder()
+              .contractId(3L)
+              .commissionItemId(4L)
+              .beneficiaryAgentId(5L)
+              .lineNo(++seq)
+              .installmentNo(seq)
+              .dueDate(LocalDate.of(2026, 10, 9))
+              .attributionDate(LocalDate.of(2026, 10, 8))
+              .expectedAmount(new BigDecimal(amount))
+              .lineStatus("PLANNED")
+              .cashflowType("PAYMENT")
+              .ruleRef(6L)
+              .build());
+    when(schedules.selectByContractIdAndPaymentStage(3L, PaymentStage.GA_TO_FC))
+        .thenReturn(
+            ScheduleDetailResponse.builder()
+                .scheduleHeaderId(7L)
+                .header(ScheduleHeaderResponse.builder().generatedAt(OffsetDateTime.now()).build())
+                .lines(lines)
+                .build());
+  }
+
+  @Test
+  void explicitMonthAggregationAndExactInstallmentUseStoredLinesOnly() {
+    schedule("0.50", "0.50");
+    var monthly =
+        service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL, null));
+    assertThat(monthly.amounts()).containsEntry("expectedAmount", "2");
+    assertThat(monthly.lines()).hasSize(2);
+    var single =
+        service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE, 2));
+    assertThat(single.amounts()).containsEntry("expectedAmount", "1");
+    assertThat(single.lines().getFirst().attributionDate()).isEqualTo("2026-10-08");
+    verify(access, times(2)).requireContract(3L);
+  }
+
+  @Test
+  void absentScheduleNeverGeneratesOneAndMissingSelectionNeverPicksFirst() {
+    var missing =
+        service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE, null));
+    assertThat(missing.status()).isEqualTo("INSUFFICIENT_DATA");
+    verifyNoInteractions(schedules);
+    assertThat(
+            service
+                .calculate(expected(PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL, null))
+                .missingInputs())
+        .contains("activeSchedule");
+  }
+
+  @Test
+  void capForwardsEngineAmountsUsageAndRuleWithoutRecomputing() {
+    var capContract = mock(com.susukkang.fgc.cap.dto.CapContractView.class);
+    when(contracts.findCapViewByContractId(3L)).thenReturn(capContract);
+    var cap = mock(com.susukkang.fgc.cap.dto.CapCalculationResult.class);
+    when(cap.resultStatus()).thenReturn(com.susukkang.fgc.common.code.CapResultStatus.WARNING);
+    when(cap.capRuleSetId()).thenReturn(9L);
+    when(cap.limitAmount()).thenReturn(new BigDecimal("1000"));
+    when(cap.includedAmount()).thenReturn(new BigDecimal("900"));
+    when(cap.remainingAmount()).thenReturn(new BigDecimal("100"));
+    when(cap.usagePct()).thenReturn(new BigDecimal("90.000000"));
+    when(caps.calculate(any())).thenReturn(cap);
+    var request =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.CAP_STATUS,
+            PaymentCalculationRequest.Mode.EXISTING,
+            new PaymentCalculationRequest.Scope(
+                null,
+                "3",
+                null,
+                PaymentStage.GA_TO_FC,
+                null,
+                null,
+                null,
+                LocalDate.of(2026, 10, 8),
+                null,
+                null),
+            null,
+            1L);
+    var result = service.calculate(request);
+    assertThat(result.amounts()).containsEntry("remainingAmount", "100");
+    assertThat(result.capPreview().getFirst())
+        .containsEntry("usagePct", "90.000000")
+        .containsEntry("resultStatus", "WARNING");
+    assertThat(result.basis().ruleIds()).containsExactly("9");
+    assertThat(result.recommendation().allowed()).isFalse();
+    verify(caps)
+        .calculate(
+            com.susukkang.fgc.cap.dto.CapCalculationCommand.realtime(
+                3L, PaymentStage.GA_TO_FC, LocalDate.of(2026, 10, 8), null));
+    verifyNoInteractions(schedules, reconciliations);
+  }
+
+  @Test
+  void reconciliationPreservesStoredTotalsAndScopeAuthorization() {
+    var detail =
+        mock(com.susukkang.fgc.reconciliation.dto.ReconciliationResultDetailResponse.class);
+    when(detail.contractId()).thenReturn(3L);
+    when(detail.expectedTotalAmount()).thenReturn(new BigDecimal("100000"));
+    when(detail.actualTotalAmount()).thenReturn(new BigDecimal("50000"));
+    when(detail.differenceAmount()).thenReturn(new BigDecimal("50000"));
+    when(reconciliations.get(99L)).thenReturn(detail);
+    var request =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE,
+            PaymentCalculationRequest.Mode.EXISTING,
+            new PaymentCalculationRequest.Scope(
+                null, null, null, null, null, null, null, null, "99", null),
+            null,
+            1L);
+    var result = service.calculate(request);
+    assertThat(result.amounts())
+        .containsEntry("differenceAmount", "50000")
+        .containsEntry("actualAmount", "50000");
+    assertThat(result.recommendation().allowed()).isFalse();
+    verify(access).requireContract(3L);
+    verifyNoInteractions(caps, schedules);
+  }
+
+  @Test
+  void mixedDeductionRowsNeverBecomePositivePaymentRecommendation() {
+    schedule("100000", "10000");
+    schedules
+        .selectByContractIdAndPaymentStage(3L, PaymentStage.GA_TO_FC)
+        .getLines()
+        .set(
+            1,
+            ScheduleLineResponse.builder()
+                .contractId(3L)
+                .commissionItemId(4L)
+                .beneficiaryAgentId(5L)
+                .lineNo(2)
+                .installmentNo(2)
+                .dueDate(LocalDate.of(2026, 10, 9))
+                .attributionDate(LocalDate.of(2026, 10, 8))
+                .expectedAmount(new BigDecimal("10000"))
+                .lineStatus("PLANNED")
+                .ruleRef(6L)
+                .cashflowType("DEDUCTION")
+                .build());
+    var result =
+        service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL, null));
+    assertThat(result.status()).isEqualTo("REVIEW_REQUIRED");
+    assertThat(result.amounts()).isEmpty();
+    assertThat(result.lines().get(1).cashflowType()).isEqualTo("DEDUCTION");
+    assertThat(result.recommendation().allowed()).isFalse();
+  }
+
+  @Test
+  void missingCapContractAndRuleProduceInsufficientDataWithoutFakeZero() {
+    var request =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.CAP_STATUS,
+            PaymentCalculationRequest.Mode.EXISTING,
+            new PaymentCalculationRequest.Scope(
+                null,
+                "3",
+                null,
+                PaymentStage.GA_TO_FC,
+                null,
+                null,
+                null,
+                LocalDate.of(2026, 10, 8),
+                null,
+                null),
+            null,
+            1L);
+    assertThat(service.calculate(request).missingInputs()).contains("contractId");
+    verifyNoInteractions(caps);
+    var capContract = mock(com.susukkang.fgc.cap.dto.CapContractView.class);
+    when(contracts.findCapViewByContractId(3L)).thenReturn(capContract);
+    when(caps.calculate(any()))
+        .thenThrow(
+            new com.susukkang.fgc.common.exception.FgcBusinessException(
+                com.susukkang.fgc.common.exception.FgcErrorCode.CAP_004));
+    var missing = service.calculate(request);
+    assertThat(missing.status()).isEqualTo("INSUFFICIENT_DATA");
+    assertThat(missing.amounts()).isEmpty();
+    assertThat(missing.missingInputs()).contains("applicableCapRuleSet");
+  }
+}

@@ -539,7 +539,7 @@ class AgentDataScopeIntegrationTest {
                 JOIN fgc.commission_transaction ct USING (commission_transaction_id)
                 WHERE ct.recipient_agent_id = ? AND ct.payment_stage = 'GA_TO_FC' AND ct.status = 'CONFIRMED'
                 """, otherAgent);
-        as(token, "/api/v1/agent/me/statements/" + entryKey(foreignRow)).andExpect(status().isNotFound());
+        as(token, "/api/v1/agent/me/statements/" + entryKey(foreignRow)).andExpect(status().isForbidden());
 
         // 홈 합계와 확인 기록도 본인 계약만 다룬다.
         JsonNode home = data(as(token, "/api/v1/agent/me/home?period=ALL").andExpect(status().isOk()));
@@ -595,7 +595,7 @@ class AgentDataScopeIntegrationTest {
         assertThat(after.path("items").path("content").findValuesAsText("contractId")).doesNotContain(otherContract.toString());
         Long foreignRow = id("SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id = ? AND contract_id = ?",
                 mixed, otherContract);
-        read("/api/v1/agent/me/statements/" + entryKey(foreignRow)).andExpect(status().isNotFound());
+        read("/api/v1/agent/me/statements/" + entryKey(foreignRow)).andExpect(status().isForbidden());
 
         // 내부 역할의 기존 조회는 그대로다.
         String settlement = tokens.login((FgcUserDetails) users.loadUserByUsername("settle01")).accessToken();
@@ -696,6 +696,32 @@ class AgentDataScopeIntegrationTest {
                     previous_state, next_state, amount, reason_code, reason)
                 VALUES (?, 'PaymentHoldJob', ?, ?, 'DRAFT', 'HELD', ?, 'TEST', 'scope fixture')
                 """, event, entityType, entityId, amount);
+    }
+
+    /** 남의 계약에 걸린 본인 수령 행은 FC에게 남의 몫, 관리자 직급에게 본인 몫이다. 직급은 조회 시점 값이다(운영정책서 제58조). */
+    @Test
+    void managerRankDecidesOwnAttributionAtQueryTime() throws Exception {
+        Long mixed = payment("GA_MANUAL_PAYMENT", ownAgent, new Long[]{ownContract, ownAgent, 1000L},
+                new Long[]{otherContract, ownAgent, 9000L});
+        String statements = "/api/v1/agent/me/statements?month=2026-07&entryType=PAYMENT&size=100";
+        String foreignKey = entryKey(id("SELECT transaction_attribution_id FROM fgc.transaction_attribution WHERE commission_transaction_id = ? AND contract_id = ?",
+                mixed, otherContract));
+        assertThat(paymentRow(data(read("/api/v1/transactions?size=100")), mixed).path("amount").decimalValue())
+                .isEqualByComparingTo("1000");
+        assertThat(data(read(statements)).findValuesAsText("entryKey")).doesNotContain(foreignKey);
+        read("/api/v1/agent/me/statements/" + foreignKey).andExpect(status().isForbidden());
+
+        jdbc.update("UPDATE fgc.agent SET rank_code = 'TEAM_LEADER' WHERE agent_id = ?", ownAgent);
+        assertThat(paymentRow(data(read("/api/v1/transactions?size=100")), mixed).path("amount").decimalValue())
+                .isEqualByComparingTo("10000");
+        assertThat(data(read(statements)).findValuesAsText("entryKey")).contains(foreignKey);
+        read("/api/v1/agent/me/statements/" + foreignKey).andExpect(status().isOk());
+
+        jdbc.update("UPDATE fgc.agent SET rank_code = 'FC' WHERE agent_id = ?", ownAgent);
+        assertThat(paymentRow(data(read("/api/v1/transactions?size=100")), mixed).path("amount").decimalValue())
+                .isEqualByComparingTo("1000");
+        assertThat(data(read(statements)).findValuesAsText("entryKey")).doesNotContain(foreignKey);
+        read("/api/v1/agent/me/statements/" + foreignKey).andExpect(status().isForbidden());
     }
 
     @Test
