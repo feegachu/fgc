@@ -6117,7 +6117,7 @@ export interface components {
             };
         };
         StatementEntry: {
-            amount?: number;
+            amount?: number | null;
             /** Format: date */
             basisDate?: string;
             commissionItemCode?: string;
@@ -6129,10 +6129,10 @@ export interface components {
             entryKey?: string;
             entryType?: string;
             /** Format: int32 */
-            installmentNo?: number;
+            installmentNo?: number | null;
             policyName?: string | null;
             /** Format: int64 */
-            policyVersionId?: number;
+            policyVersionId?: number | null;
             /** Format: int32 */
             policyVersionNo?: number | null;
             source?: components["schemas"]["Source"];

@@ -10269,7 +10269,7 @@
       "StatementEntry" : {
         "properties" : {
           "amount" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "basisDate" : {
             "format" : "date",
@@ -10299,14 +10299,14 @@
           },
           "installmentNo" : {
             "format" : "int32",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "policyName" : {
             "type" : [ "string", "null" ]
           },
           "policyVersionId" : {
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "policyVersionNo" : {
             "format" : "int32",
