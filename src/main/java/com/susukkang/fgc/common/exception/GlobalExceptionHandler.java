@@ -1,6 +1,7 @@
 package com.susukkang.fgc.common.exception;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -76,8 +77,13 @@ public class GlobalExceptionHandler {
                 productionDetail(exception.getDetail())
         );
 
+        // 2026-11-04 yslee - #677 오류 봉투의 Content-Type 고정(아래 처리기도 같다)
+        // 기존 코드: 응답 형식을 요청의 Accept 에 맡겼다.
+        // 문제: 화면이 CSV 를 Accept: text/csv 로 부르면 봉투를 쓸 변환기가 없어 본문 없는 500 이 됐다(ZAP API scan).
+        // 개선: Accept 와 무관하게 표준 봉투(JSON)로 응답한다.
         return ResponseEntity
                 .status(errorCode.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.failure(apiError));
     }
 
@@ -228,6 +234,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(errorCode.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.failure(apiError));
     }
 
@@ -255,6 +262,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(errorCode.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.failure(apiError));
     }
 
@@ -298,6 +306,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(errorCode.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.failure(apiError));
     }
 
@@ -320,6 +329,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(errorCode.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.failure(apiError));
     }
 
