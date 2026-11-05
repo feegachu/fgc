@@ -79,6 +79,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class BaselineCommissionPaymentService implements CommissionPaymentService {
+    /** New assistant preview is outside the frozen pre-migration write performance baseline. */
+    @Override
+    public com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse precheckCandidate(
+            com.susukkang.fgc.transaction.dto.CommissionPaymentCreateRequest request, Long paymentId) {
+        throw new UnsupportedOperationException("Candidate preview is not part of the frozen baseline");
+    }
+
     @Override
     public void deleteDraft(Long paymentId) {
         throw new UnsupportedOperationException("초안 삭제는 성능 비교 기준 버전에 없는 기능입니다.");
