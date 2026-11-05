@@ -36,9 +36,7 @@ import static org.hamcrest.Matchers.containsString;
 class AgentHomeIntegrationTest {
     private static final String SCOPED = """
             FROM fgc.insurance_contract c JOIN fgc.insurer i ON i.insurer_id = c.insurer_id
-            WHERE (c.agent_id = ? OR EXISTS (SELECT 1 FROM fgc.contract_manager_assignment a
-                    WHERE a.contract_id = c.contract_id AND a.agent_id = ? AND a.assignment_type = 'MAINTENANCE_MANAGER'
-                      AND a.effective_from <= CURRENT_DATE AND (a.effective_to IS NULL OR a.effective_to >= CURRENT_DATE)))
+            WHERE c.agent_id = ?
             """;
 
     @Autowired MockMvc mvc;
@@ -58,9 +56,7 @@ class AgentHomeIntegrationTest {
     void prepare() {
         ownAgent = id("SELECT agent_id FROM fgc.agent WHERE agent_code = 'A-FC-001'");
         ownContract = id("SELECT min(contract_id) FROM fgc.insurance_contract WHERE agent_id = ?", ownAgent);
-        otherContract = id("SELECT min(contract_id) FROM fgc.insurance_contract c WHERE c.agent_id <> ? AND NOT EXISTS ("
-                + "SELECT 1 FROM fgc.contract_manager_assignment a WHERE a.contract_id = c.contract_id AND a.agent_id = ?)",
-                ownAgent, ownAgent);
+        otherContract = id("SELECT min(contract_id) FROM fgc.insurance_contract c WHERE c.agent_id <> ?", ownAgent);
         jdbc.update("UPDATE fgc.app_user SET password_hash = ?, account_status = 'ACTIVE' WHERE login_id = 'agent01'",
                 passwords.encode(UUID.randomUUID().toString()));
         agentToken = tokens.login((FgcUserDetails) users.loadUserByUsername("agent01")).accessToken();
@@ -69,7 +65,7 @@ class AgentHomeIntegrationTest {
     @Test
     void portfolioBreakdownsShareOnePopulationAndMatchManualCounts() throws Exception {
         // 기준일 이후 계약일은 모집단에서 빠진다(기간은 contractDate 기준).
-        long all = id("SELECT count(*) " + SCOPED + " AND c.contract_date <= ?", ownAgent, ownAgent, today);
+        long all = id("SELECT count(*) " + SCOPED + " AND c.contract_date <= ?", ownAgent, today);
         assertThat(all).isPositive();
 
         JsonNode data = data(home("period=ALL&asOf=" + today));
@@ -80,7 +76,7 @@ class AgentHomeIntegrationTest {
         assertThat(sum(portfolio.path("categories"), "count")).isEqualTo(all);
         assertThat(sum(portfolio.path("statuses"), "count")).isEqualTo(all);
         BigDecimal premium = jdbc.queryForObject("SELECT COALESCE(sum(c.monthly_equivalent_first_premium), 0) " + SCOPED
-                + " AND c.contract_date <= ?", BigDecimal.class, ownAgent, ownAgent, today);
+                + " AND c.contract_date <= ?", BigDecimal.class, ownAgent, today);
         BigDecimal premiumSum = BigDecimal.ZERO;
         for (JsonNode m : portfolio.path("monthly")) {
             premiumSum = premiumSum.add(m.path("monthlyEquivalentFirstPremiumSum").decimalValue());
@@ -96,7 +92,7 @@ class AgentHomeIntegrationTest {
     void periodBoundariesIncludeTheFirstDayOfTheWindowAndExcludeEarlierContracts() throws Exception {
         LocalDate from = today.withDayOfMonth(1).minusMonths(5);
         long expected = id("SELECT count(*) " + SCOPED + " AND c.contract_date BETWEEN ? AND ?",
-                ownAgent, ownAgent, from, today);
+                ownAgent, from, today);
         JsonNode data = data(home("period=6&asOf=" + today));
         assertThat(data.path("range").path("from").asText()).isEqualTo(from.toString());
         assertThat(data.path("range").path("to").asText()).isEqualTo(today.toString());
@@ -234,6 +230,34 @@ class AgentHomeIntegrationTest {
         record(ownContract, "CLOSED", null, null, version(ownContract), null).andExpect(status().isBadRequest());
         // 위에서 성공한 본인 계약 확인 1건 외에 거절된 요청은 어떤 행도 추가하지 않는다.
         assertThat(id("SELECT count(*) FROM fgc.agent_contract_check")).isEqualTo(1L);
+    }
+
+    @Test
+    void maintenanceAssignmentDoesNotExpandTheHomeOrContractChecks() throws Exception {
+        // FUN-085: 최초 연결 설계사만 본인 계약이다. 담당 이력은 현재 유효해도 범위를 넓히지 않는다.
+        long own = id("SELECT count(*) " + SCOPED + " AND c.contract_date <= ?", ownAgent, today);
+        addEventTo(otherContract, "TERMINATED");
+        jdbc.update("""
+                INSERT INTO fgc.contract_manager_assignment(contract_id, agent_id, assignment_type, effective_from, effective_to)
+                VALUES (?, ?, 'MAINTENANCE_MANAGER', ?, ?)
+                """, otherContract, ownAgent, today.minusDays(1), today.plusDays(1));
+        JsonNode data = data(home("period=ALL&asOf=" + today));
+        assertThat(data.path("portfolio").path("contractCount").asLong()).isEqualTo(own);
+        assertThat(priorityItem(otherContract, today)).isNull();
+        record(otherContract, "CLOSED", null, null, version(otherContract), "k-maintenance-1").andExpect(status().isForbidden());
+        assertThat(id("SELECT count(*) FROM fgc.agent_contract_check WHERE idempotency_key = 'k-maintenance-1'")).isZero();
+    }
+
+    @Test
+    void contractCheckOwnerComesFromTheSessionNotTheRequestBody() throws Exception {
+        Long otherAgent = id("SELECT agent_id FROM fgc.insurance_contract WHERE contract_id = ?", otherContract);
+        var body = json.createObjectNode().put("contractId", ownContract).put("result", "CLOSED")
+                .put("expectedContextVersion", version(ownContract)).put("agentId", otherAgent);
+        mvc.perform(post("/api/v1/agent/me/contract-checks").header(HttpHeaders.AUTHORIZATION, "Bearer " + agentToken)
+                        .header("Idempotency-Key", "k-body-agent-1").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isOk());
+        assertThat(id("SELECT agent_id FROM fgc.agent_contract_check WHERE idempotency_key = 'k-body-agent-1'")).isEqualTo(ownAgent);
     }
 
     @Test
