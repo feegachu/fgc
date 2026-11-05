@@ -12,7 +12,6 @@ import { ListPagination } from '../../components/ListPagination'
 import { date, int, rate, today, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
-import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import {
   ENTRY_TYPE_OPTIONS,
   InvalidStatementAgentIdError,
@@ -148,12 +147,11 @@ export default function AgentStatementPage() {
   return (
     <div className="ast-page">
       <header className="page-header">
-        <ScreenHelp screenId="RPT-W02" />
         <div className="page-header-copy">
           <h1 className="page-title">설계사 수수료 명세</h1>
-          <p className="ast-lede">
-            {isAgent ? '내 귀속 기준의 지급·보류·조정·환수 내역입니다.' : '설계사를 선택해 본인 귀속 기준 명세를 조회합니다.'}
-          </p>
+          {!isAgent && (
+            <p className="ast-lede">설계사를 선택해 본인 귀속 기준 명세를 조회합니다.</p>
+          )}
         </div>
       </header>
       <StatementFiltersBar

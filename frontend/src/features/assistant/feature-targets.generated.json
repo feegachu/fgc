@@ -685,11 +685,6 @@
     "element": "section"
   },
   {
-    "id": "features.agent-home.agent-home-page.section-3",
-    "file": "features/agent-home/AgentHomePage.tsx",
-    "element": "section"
-  },
-  {
     "id": "features.agent-home.charts.button",
     "file": "features/agent-home/charts.tsx",
     "element": "button"

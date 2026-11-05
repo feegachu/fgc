@@ -86,13 +86,6 @@
   & .ah-delta.up { color: var(--ok); }
   & .ah-delta.down { color: var(--bad); }
   & .ah-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-  /* KPI 아래 확인 필요 계약 알림 배너 */
-  & .ah-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 12px 18px; margin-top: 12px; border: 1px solid var(--warn, #e0a030); border-left-width: 4px; border-radius: 12px; background: color-mix(in srgb, var(--warn, #e0a030) 10%, var(--color-bg-surface)); color: var(--ink); text-decoration: none; }
-  & .ah-notice-title { font-size: 0.875rem; font-weight: 700; }
-  & .ah-notice-body { font-size: 1.125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  & .ah-notice-cta { margin-left: auto; font-size: 0.8125rem; font-weight: 600; color: var(--color-text-link); }
-  & .ah-notice-link:hover { background: color-mix(in srgb, var(--warn, #e0a030) 16%, var(--color-bg-surface)); }
-  & .ah-notice-link:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
   & .ah-retry { font-size: 0.75rem; color: var(--color-text-link); text-decoration: underline; }
 
   /* 설계사 판매 관리 */

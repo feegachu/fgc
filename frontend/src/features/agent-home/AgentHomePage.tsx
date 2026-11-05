@@ -22,7 +22,6 @@ import {
   trendSeries,
 } from './model'
 import type { InsurerKind, Period } from './model'
-import { PriorityContracts } from './PriorityContracts'
 import { ChatbotModal } from './chatbot/ChatbotModal'
 import { PicoMotion } from './mascot/PicoMotion'
 import './agent-home.css'
@@ -160,7 +159,6 @@ function AgentHomeContent({ month }: { month: string }) {
             near={near}
             review={review}
           />
-          <PriorityContracts home={summary.data} />
           <Charts
             home={chartData}
             focusHome={focusData}
@@ -207,7 +205,6 @@ function Snapshot({
   const needFailed = near.isError || review.isError
   const need = (near.data ?? 0) + (review.data ?? 0)
   return (
-    <>
     <section data-guide-feature="features.agent-home.agent-home-page.section" data-guide-target="agent.overview" className="ah-snapshot" aria-label="이번 달 판매 현황">
       <article className="ah-hero" aria-label="설계사 프로필">
         <span className="ah-avatar" aria-hidden="true">
@@ -265,44 +262,50 @@ function Snapshot({
             }
           />
         </Link>
+        {needFailed ? (
+          <article className="ah-kpi ah-kpi-alert kpi-card kpi-card-warning" aria-label="확인 필요 계약">
+            <KpiCardContent
+              label="확인 필요 계약"
+              value="확인 불가"
+              footer={
+                <button
+                  data-guide-feature="features.agent-home.agent-home-page.button-3"
+                  type="button"
+                  className="ah-retry"
+                  onClick={() => void Promise.all([near.refetch?.(), review.refetch?.()])}
+                >
+                  다시 시도
+                </button>
+              }
+            />
+          </article>
+        ) : (
+          <Link
+            data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
+            className="ah-kpi ah-kpi-link ah-kpi-alert kpi-card kpi-card-warning"
+            to={needContractsHref(month, asOf)}
+            aria-label="확인 필요 계약"
+          >
+            <KpiCardContent
+              label="확인 필요 계약"
+              value={needReady ? need : '…'}
+              zero={needReady && need === 0}
+              unit="건"
+              footer={
+                <div className="ah-badges">
+                  <span className="ah-badge warn">
+                    한도 근접 <b>{near.data ?? '-'}</b>
+                  </span>
+                  <span className="ah-badge danger">
+                    검토 필요 <b>{review.data ?? '-'}</b>
+                  </span>
+                </div>
+              }
+            />
+          </Link>
+        )}
       </div>
     </section>
-      {needFailed ? (
-        <section data-guide-feature="features.agent-home.agent-home-page.section-3" className="ah-notice ah-notice-warn" aria-label="확인 필요 계약">
-          <p className="ah-notice-title">확인 필요 계약</p>
-          <p className="ah-notice-body">확인 불가</p>
-          <button
-            data-guide-feature="features.agent-home.agent-home-page.button-3"
-            type="button"
-            className="ah-retry"
-            onClick={() => void Promise.all([near.refetch?.(), review.refetch?.()])}
-          >
-            다시 시도
-          </button>
-        </section>
-      ) : !needReady || need > 0 ? (
-        <Link
-          data-guide-feature="features.agent-home.agent-home-page.need-contracts-link"
-          className="ah-notice ah-notice-warn ah-notice-link"
-          to={needContractsHref(month, asOf)}
-          aria-label="확인 필요 계약"
-        >
-          <span className="ah-notice-title">확인 필요 계약</span>
-          <span className="ah-notice-body">
-            {needReady ? `${need}건` : '…'}
-          </span>
-          <span className="ah-badges">
-            <span className="ah-badge warn">
-              한도 근접 <b>{near.data ?? '-'}</b>
-            </span>
-            <span className="ah-badge danger">
-              검토 필요 <b>{review.data ?? '-'}</b>
-            </span>
-          </span>
-          <span className="ah-notice-cta">계약 보기 ›</span>
-        </Link>
-      ) : null}
-    </>
   )
 }
 
