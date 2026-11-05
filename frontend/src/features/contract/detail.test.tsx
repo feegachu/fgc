@@ -39,7 +39,7 @@ let requested: { url: string; options?: RequestOptions }[]
 const calls = (suffix: string) => requested.filter(({ url }) => url === `/api/v1/contracts/1${suffix}`)
 const messages = () => useToastStore.getState().messages.map(({ message }) => message)
 
-function renderAt(path: string, handler: Handler = () => undefined, canProcess = true, state?: object) {
+function renderAt(path: string, handler: Handler = () => undefined, canProcess = true, state?: object, roleCode = 'ADMIN') {
   requested = []
   vi.spyOn(apiClient, 'request').mockImplementation(async (url, options) => {
     requested.push({ url, options })
@@ -47,7 +47,7 @@ function renderAt(path: string, handler: Handler = () => undefined, canProcess =
       return envelope({
         loginId: 'operator',
         userName: '정산 담당자',
-        roleCode: 'ADMIN',
+        roleCode,
         demoMonth: '2026-07',
         canProcess,
       })
@@ -61,7 +61,7 @@ function renderAt(path: string, handler: Handler = () => undefined, canProcess =
   const initial = new URL(path, 'http://localhost')
   const router = createMemoryRouter(
     [
-      { path: '/contracts/:id', element: <ContractDetailPage /> },
+      { path: '/contracts/:id', element: <main id="main-content"><ContractDetailPage /></main> },
       { path: '/contracts/:id/edit', element: <h1>계약 수정 화면</h1> },
       { path: '/contracts', element: <h1>계약 목록 화면</h1> },
       { path: '/schedules/:id', element: <h1>스케줄 상세 화면</h1> },
@@ -118,16 +118,16 @@ describe('CONT-W02 계약 상세', () => {
     await screen.findByRole('heading', { name: 'CONT-0001' })
     expect(screen.getAllByText('서버 정상')).toHaveLength(2)
     expect(screen.getByText('서버 월납')).toBeInTheDocument()
-    const history = await screen.findByRole('list', { name: '상태 사건' })
-    expect(
-      within(history)
-        .getAllByRole('heading', { level: 4 })
-        .map((item) => item.textContent),
-    ).toEqual(['#1 최초 → 정상', '#2 정상 처리 → 미납 처리'])
+    const history = await screen.findByRole('table', { name: '상태 사건' })
+    const row = (index: number) => within(within(history).getAllByRole('row')[index + 1]).getAllByRole('cell')
+    expect(row(0)[0]).toHaveTextContent('1')
+    expect(row(0)[1]).toHaveTextContent('최초 → 정상')
+    expect(row(1)[0]).toHaveTextContent('2')
+    expect(row(1)[1]).toHaveTextContent('정상 처리 → 미납 처리')
     expect(within(history).getByText('실패')).toBeInTheDocument()
     expect(within(history).getByText('2026-07-02 10:00')).toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '접수 순' }))
-    expect(within(history).getAllByRole('heading', { level: 4 })[0]).toHaveTextContent('#2 정상 처리 → 미납 처리')
+    expect(row(0)[1]).toHaveTextContent('정상 처리 → 미납 처리')
     expect(
       requested.filter(
         ({ url }) => !['/api/v1/auth/me', '/api/v1/contracts/1', '/api/v1/contracts/1/status-events'].includes(url),
@@ -157,6 +157,7 @@ describe('CONT-W02 계약 상세', () => {
             scheduleHeaderId: fc ? 10 : 20,
             scheduleVersionNo: 2,
             lineCount: 1,
+            installmentCount: 1,
             status: 'CONFIRMED',
             statusLabel: '서버 확정',
           },
@@ -183,7 +184,7 @@ describe('CONT-W02 계약 상세', () => {
     expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
     expect(await screen.findByRole('cell', { name: 'GA' })).toBeInTheDocument()
     expect(screen.queryByLabelText('지급단계')).toBeNull()
-    expect(within(fc).getByText('버전 2, 1회차')).toBeInTheDocument()
+    expect(within(fc).getByText('버전 2, 1회차, 1행')).toBeInTheDocument()
     expect(within(fc).queryByRole('link')).not.toBeInTheDocument()
     expect(within(fc).queryByText('서버 확정')).not.toBeInTheDocument()
   })
@@ -396,7 +397,7 @@ describe('CONT-W02 계약 상세', () => {
       if (url.includes('/schedules?')) return { headers: [], lines: [] }
     })
     await actions.click(await screen.findByRole('button', { name: '스케줄 재생성' }))
-    await waitFor(() => expect(screen.getAllByText('현재 운영 스케줄이 없습니다.')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('생성된 스케줄이 없습니다.')).toHaveLength(2))
     expect(router.state.location.search).toBe('?tab=schedules')
     expect(calls('/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL')[0].options?.method).toBe('POST')
     expect(messages()).toContain('예상 스케줄을 새 버전으로 재생성했습니다.')
@@ -501,4 +502,21 @@ it('registers each fixed contract tab and panel as a distinct guide target', asy
   const panelIds = panels.map((panel) => panel.getAttribute('data-guide-feature'))
   expect(panelIds).toContain('contract.panel.schedules')
   expect(new Set(panelIds).size).toBe(panels.length)
+})
+
+
+it('finishes AGENT detail help using only visible basic information', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  const { actions } = renderAt('/contracts/1', undefined, false, undefined, 'AGENT')
+  await screen.findByRole('tab', { name: '기본정보' })
+  await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1))
+  await actions.click(screen.getByRole('button', { name: '도움말' }))
+  const next = await screen.findByRole('button', { name: '설명 확인 · 다음' })
+  await waitFor(() => expect(next).toBeEnabled())
+  expect(screen.getByText('화면 사용법 · 1/1')).toBeVisible()
+  await actions.click(next)
+  expect(await screen.findByText('화면 사용법 안내 완료')).toBeVisible()
+  expect(screen.queryByRole('tab', { name: /스케줄/ })).toBeNull()
+  expect(calls('/schedules')).toHaveLength(0)
 })

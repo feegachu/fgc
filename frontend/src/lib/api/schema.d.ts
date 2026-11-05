@@ -799,6 +799,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/status-events/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewContractStatusEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/status-events/{eventId}/effects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getContractStatusEventEffects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/transactions": {
         parameters: {
             query?: never;
@@ -1403,7 +1435,7 @@ export interface paths {
         get: operations["get"];
         /**
          * DRAFT 수수료 지급 건 수정
-         * @description DRAFT 지급 건의 필수값과 참조 정보를 검증한 후 변경 내용을 저장합니다.
+         * @description expectedUpdatedAt으로 동시 수정을 검사한 뒤 DRAFT 지급 건의 필수값과 참조 정보를 검증해 변경 내용을 저장합니다.
          */
         put: operations["update"];
         post?: never;
@@ -1532,7 +1564,7 @@ export interface paths {
         put?: never;
         /**
          * 검증 실행 기동 (IF-API-48)
-         * @description CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED인 MONTHLY·PRE_CONFIRM은 같은 JobInstance의 실패 Step부터 재시작한다(FUN-045). MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.
+         * @description CREATED 상태의 실행을 runType에 따라 비동기로 기동한다 — MONTHLY·PRE_CONFIRM은 MonthlyValidationJob(IF-BAT-01), MANUAL_CONTRACT는 DailyChangedContractJob(IF-BAT-02)으로 간다. 202는 수락의 의미이며 실제 진행은 IF-API-49 폴링으로 본다. FAILED 재시작은 IF-API-82 /restart를 사용한다. MANUAL_CONTRACT 재시작은 이 경로에서 지원하지 않는다.
          */
         post: operations["execute"];
         delete?: never;
@@ -1601,10 +1633,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/validation-runs/{id}/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation-runs/{id}/restartability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["eligibility"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/validation-runs/{id}/retries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Accepted: {
+            /** Format: int64 */
+            batchExecutionId?: number;
+            /** Format: int64 */
+            previousBatchExecutionId?: number;
+            /** Format: int64 */
+            retryId?: number;
+            status?: string;
+            /** Format: int64 */
+            validationRunId?: number;
+        };
         ActiveMonthlyRunResponse: {
             exists?: boolean;
         };
@@ -1816,6 +1907,11 @@ export interface components {
             error: components["schemas"]["ApiError"];
             requestId: string;
         };
+        ApiResponseAccepted: {
+            data?: components["schemas"]["Accepted"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseActiveMonthlyRunResponse: {
             data?: components["schemas"]["ActiveMonthlyRunResponse"];
             error?: components["schemas"]["ApiError"];
@@ -1903,6 +1999,11 @@ export interface components {
         };
         ApiResponseContractScheduleResponse: {
             data?: components["schemas"]["ContractScheduleResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseContractStatusPreviewResponse: {
+            data?: components["schemas"]["ContractStatusPreviewResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2031,6 +2132,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseListRetry: {
+            data?: components["schemas"]["Retry"][];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseListScheduleHeaderResponse: {
             data?: components["schemas"]["ScheduleHeaderResponse"][];
             error?: components["schemas"]["ApiError"];
@@ -2074,6 +2180,11 @@ export interface components {
         };
         ApiResponsePageResponseCommissionPaymentListResponse: {
             data?: components["schemas"]["PageResponseCommissionPaymentListResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseContractStatusEffectResponse: {
+            data?: components["schemas"]["PageResponseContractStatusEffectResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2149,6 +2260,11 @@ export interface components {
         };
         ApiResponseReconciliationRunSearchResponse: {
             data?: components["schemas"]["ReconciliationRunSearchResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseRestartability: {
+            data?: components["schemas"]["Restartability"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2838,6 +2954,16 @@ export interface components {
             triggerType?: "STATUS_EVENT" | "ARBITRAGE";
             unpaidAmount?: number | null;
         };
+        ClawbackLine: {
+            appliedRatePct?: number;
+            basisAmount?: number;
+            clawbackAmount?: number;
+            commissionItemName?: string;
+            /** Format: int32 */
+            installmentNo?: number | null;
+            /** Format: int64 */
+            transactionAttributionId?: number;
+        };
         ClawbackNoticeDocumentRequest: {
             /**
              * Format: int32
@@ -2860,6 +2986,20 @@ export interface components {
             sha256?: string;
             /** Format: int32 */
             version?: number;
+        };
+        ClawbackReview: {
+            amount?: number | null;
+            candidate?: boolean;
+            /** Format: int32 */
+            elapsedMonths?: number | null;
+            lines?: components["schemas"]["ClawbackLine"][];
+            policyCode?: string | null;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            /** Format: int32 */
+            policyVersionNo?: number | null;
+            reason?: string;
+            reasonCodes?: string[];
         };
         ClawbackRuleDraft: {
             clawbackBasisCode: string;
@@ -3077,6 +3217,8 @@ export interface components {
             /** Format: int64 */
             contractId?: number;
             evidenceRef?: string;
+            /** Format: date-time */
+            expectedUpdatedAt: string;
             note?: string;
             /** @enum {string} */
             paymentStage: "INSURER_TO_GA" | "GA_TO_FC";
@@ -3450,6 +3592,7 @@ export interface components {
         ContractScheduleResponse: {
             headers?: components["schemas"]["ScheduleHeaderResponse"][];
             lines?: components["schemas"]["ScheduleLineResponse"][];
+            previewContext?: components["schemas"]["SchedulePreviewContext"];
         };
         ContractSearchCondition: {
             /** Format: int64 */
@@ -3470,11 +3613,28 @@ export interface components {
             productOfferingId?: number;
             sort?: string;
         };
+        ContractStatusEffectResponse: {
+            amount?: number | null;
+            /** Format: int64 */
+            entityId?: number;
+            entityType?: string;
+            nextState?: string;
+            /** Format: int64 */
+            policyVersionId?: number | null;
+            previousState?: string | null;
+            processingJob?: string;
+            reason?: string | null;
+            reasonCode?: string;
+        };
         ContractStatusEventProcessingResponse: {
+            errorCode?: string | null;
+            job?: string;
             /** Format: date-time */
             processedAt?: string;
             processingJob?: string;
             processingStatus?: string;
+            status?: string;
+            summary?: components["schemas"]["ProcessingSummary"] | null;
         };
         ContractStatusEventRequest: {
             /** Format: date-time */
@@ -3492,6 +3652,7 @@ export interface components {
             eventId?: number;
             /** Format: int32 */
             eventSeq?: number;
+            followUp?: components["schemas"]["EventFollowUp"];
             /** @enum {string} */
             newStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
             newStatusLabel?: string;
@@ -3503,9 +3664,38 @@ export interface components {
             reasonCode?: string | null;
             /** Format: date-time */
             receivedAt?: string;
+            /** Format: date-time */
+            recordedAt?: string;
             registeredBy?: components["schemas"]["RegisteredBy"] | null;
             sourceEventKey?: string;
             sourceSystem?: string;
+        };
+        ContractStatusPreviewRequest: {
+            /** Format: date-time */
+            effectiveAt: string;
+            /** @enum {string} */
+            eventType: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+        };
+        ContractStatusPreviewResponse: {
+            clawbackReview?: components["schemas"]["ClawbackReview"];
+            /** Format: int64 */
+            contractId?: number;
+            /** @enum {string} */
+            currentStatus?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            /** Format: date-time */
+            effectiveAt?: string;
+            /** @enum {string} */
+            eventType?: "APPLIED" | "ACTIVE" | "UNPAID" | "LAPSED" | "REVIVED" | "CANCELLED" | "TERMINATED" | "MATURED";
+            excludedLines?: components["schemas"]["PreviewLine"][];
+            heldAmount?: components["schemas"]["HeldAmount"];
+            paidAmount?: components["schemas"]["PaidAmount"][];
+            payments?: components["schemas"]["PreviewPayment"][];
+            /** Format: int64 */
+            pendingFollowUps?: number;
+            resumedLines?: components["schemas"]["PreviewLine"][];
+            /** Format: date-time */
+            snapshotAt?: string;
+            stoppedLines?: components["schemas"]["PreviewLine"][];
         };
         ContractTransactionAttributionResponse: {
             agentCode?: string;
@@ -3637,6 +3827,11 @@ export interface components {
             recentRuns?: components["schemas"]["RecentValidationRunResponse"][];
             /** Format: int64 */
             reconMismatch?: number;
+        };
+        EventFollowUp: {
+            jobs?: components["schemas"]["FollowUpJob"][];
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
         };
         EvidenceItem: {
             label?: string;
@@ -3807,6 +4002,27 @@ export interface components {
             type?: "CAP_WARNING" | "CAP_VIOLATION" | "CAP_REVIEW_REQUIRED" | "RECONCILIATION_MISMATCH" | "JOURNAL_IMBALANCE" | "JOURNAL_CORRECTION_REQUIRED" | "ARBITRAGE_CANDIDATE" | "REFUND_TABLE_MISSING" | "PRODUCT_CODE_MISMATCH" | "POLICY_MISSING" | "POLICY_DUPLICATE" | "ALLOCATION_EVIDENCE_MISSING" | "DATA_QUALITY" | "OTHER";
             typeLabel?: string;
         };
+        FeeRegimeResolution: {
+            /** Format: date */
+            basicDocumentDate?: string;
+            basicDocumentVersion?: string;
+            candidateOfferingIds?: number[];
+            candidateRulesetIds?: number[];
+            /** Format: date */
+            contractDate?: string;
+            declaredFeeRegimeCode?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
+            /** @enum {string} */
+            reasonCode?: "UNKNOWN_REGIME" | "CONTRACT_OUTSIDE_SALES_PERIOD" | "OFFERING_NOT_UNIQUE" | "NOT_APPLICABLE" | "CURRENT_BUT_ELIGIBLE" | "REGIME_NOT_ELIGIBLE" | "FOUR_YEAR_AFTER_SPECIAL_PERIOD" | "SEVEN_YEAR_IN_SPECIAL_PERIOD" | "RULESET_MISSING" | "RULESET_AMBIGUOUS" | "RULESET_FLAGGED" | "RULESET_LIMIT_MISSING" | "COMMISSION_RULE_INVALID" | "RULESET_SELECTED";
+            regRefs?: string[];
+            /** Format: int64 */
+            rulesetId?: number;
+            /** Format: date */
+            salesStartDate?: string;
+            /** @enum {string} */
+            status?: "SELECTED" | "NOT_APPLICABLE" | "REVIEW_REQUIRED";
+        };
         FeeRegimeRuleDraft: {
             /** Format: date */
             basicDocumentDateFrom?: string;
@@ -3828,6 +4044,20 @@ export interface components {
             /** Format: date */
             salesStartDateTo?: string;
             sourceRefs: string[];
+        };
+        FeeRegimeRulesetSelection: {
+            limits?: components["schemas"]["RulesetLimit"][];
+            resolution?: components["schemas"]["FeeRegimeResolution"];
+            ruleset?: components["schemas"]["Ruleset"];
+            selected?: boolean;
+        };
+        FeeRegimeSchedulePolicy: {
+            commissionPolicy?: components["schemas"]["ResolvedCommissionPolicy"];
+            selected?: boolean;
+            selection?: components["schemas"]["FeeRegimeRulesetSelection"];
+            sourceRefs?: string[];
+            /** Format: int32 */
+            versionNo?: number;
         };
         FinalizeChecklistConditionResponse: {
             /** Format: int64 */
@@ -3855,6 +4085,24 @@ export interface components {
             eventId?: number | null;
             /** @enum {string} */
             status?: "PENDING" | "SUCCEEDED" | "FAILED" | "NOT_REQUIRED";
+        };
+        FollowUpJob: {
+            /** Format: int32 */
+            attemptCount?: number;
+            errorCode?: string | null;
+            job?: string;
+            /** Format: date-time */
+            lastAttemptAt?: string | null;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: date-time */
+            nextRetryAt?: string | null;
+            /** @enum {string} */
+            status?: "EXHAUSTED" | "FAILED" | "PROCESSING" | "PENDING" | "SUCCEEDED" | "NOT_REQUIRED";
+        };
+        HeldAmount: {
+            after?: number;
+            before?: number;
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -4298,6 +4546,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseContractStatusEffectResponse: {
+            content?: components["schemas"]["ContractStatusEffectResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseContractView: {
             content?: components["schemas"]["ContractView"][];
             /** Format: int32 */
@@ -4381,6 +4641,11 @@ export interface components {
             totalElements?: number;
             /** Format: int32 */
             totalPages?: number;
+        };
+        PaidAmount: {
+            amount?: number | null;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
         };
         ParameterDraft: {
             description?: string;
@@ -4756,6 +5021,33 @@ export interface components {
             /** Format: int32 */
             versionNo?: number;
         };
+        PreviewLine: {
+            amount?: number | null;
+            commissionItemName?: string;
+            /** Format: date */
+            dueDate?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            /** Format: date */
+            nextDueDate?: string | null;
+            nextState?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
+            /** Format: int64 */
+            scheduleLineId?: number;
+        };
+        PreviewPayment: {
+            amount?: number | null;
+            /** Format: int64 */
+            commissionTransactionId?: number;
+            nextState?: string;
+            previousState?: string;
+            reason?: string;
+            reasonCode?: string;
+        };
         ProcessingEffect: {
             failureReason?: string | null;
             /** Format: date-time */
@@ -4764,6 +5056,16 @@ export interface components {
             processingStatus?: string;
             /** Format: int64 */
             validationRunId?: number | null;
+        };
+        ProcessingSummary: {
+            /** Format: int32 */
+            changedScheduleLines?: number;
+            /** Format: int32 */
+            excludedCount?: number;
+            /** Format: int32 */
+            heldPayments?: number;
+            /** Format: int32 */
+            resumedPayments?: number;
         };
         /** @description 보험상품 판매버전 기준정보 */
         ProductResponse: {
@@ -5119,6 +5421,88 @@ export interface components {
             userId?: number;
             userName?: string;
         };
+        ResolvedCommissionPolicy: {
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            /** @enum {string} */
+            policyType?: "CURRENT_COMMISSION" | "FOUR_YEAR_COMMISSION" | "SEVEN_YEAR_COMMISSION" | "CAP_1200" | "ALLOCATION" | "REFUND_RATE" | "CLAWBACK" | "RECONCILIATION_TOLERANCE" | "SCHEDULE_ELIGIBILITY" | "ARBITRAGE";
+            /** Format: int64 */
+            policyVersionId?: number;
+            rules?: components["schemas"]["ResolvedCommissionRule"][];
+            /** @enum {string} */
+            scheduleRegime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
+        };
+        ResolvedCommissionRule: {
+            /** @enum {string} */
+            agentRankCode?: "FC" | "TEAM_LEADER" | "BRANCH_MANAGER" | "DIVISION_HEAD";
+            basisCode?: string;
+            /** @enum {string} */
+            calculationType?: "FIXED" | "RATE";
+            /** Format: int64 */
+            commissionItemId?: number;
+            /** Format: int64 */
+            commissionRuleId?: number;
+            equalMonthlyYn?: boolean;
+            /** @enum {string} */
+            feeComponentType?: "CURRENT" | "UPFRONT" | "MAINTENANCE" | "LONG_TERM_MAINTENANCE" | "INCENTIVE" | "SETTLEMENT_SUPPORT" | "NEWCOMER_SUPPORT" | "COMMON_COST" | "OTHER";
+            fixedAmount?: number;
+            /** Format: int32 */
+            installmentFrom?: number;
+            /** Format: int32 */
+            installmentTo?: number;
+            /** Format: int64 */
+            insurerId?: number;
+            /** Format: int64 */
+            organizationId?: number;
+            paymentConditionCode?: string;
+            /** Format: int32 */
+            priorityNo?: number;
+            /** Format: int64 */
+            productOfferingId?: number;
+            ratePct?: number;
+            /** @enum {string} */
+            roundingMode?: "UP" | "DOWN" | "CEILING" | "FLOOR" | "HALF_UP" | "HALF_DOWN" | "HALF_EVEN" | "UNNECESSARY";
+            /** Format: int32 */
+            roundingScale?: number;
+        };
+        Restartability: {
+            allowed?: boolean;
+            checkpointAvailable?: boolean;
+            /** Format: int64 */
+            completedCount?: number;
+            expectedStateVersion?: string;
+            /** Format: date-time */
+            failedAt?: string;
+            /** Format: int32 */
+            failedStep?: number;
+            /** Format: int64 */
+            lastFailedBatchExecutionId?: number;
+            reason?: string;
+            reasonCode?: string;
+            /** Format: int64 */
+            remainingCount?: number;
+        };
+        Retry: {
+            /** Format: int64 */
+            batchExecutionId?: number;
+            errorCode?: string;
+            /** Format: int32 */
+            failedStep?: number;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: int64 */
+            previousBatchExecutionId?: number;
+            reason?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            /** Format: int64 */
+            requestedBy?: number;
+            /** Format: int64 */
+            retryId?: number;
+            /** Format: date-time */
+            startedAt?: string;
+            state?: string;
+        };
         ReverseJournalRequest: {
             evidenceRef?: string;
             reason: string;
@@ -5135,9 +5519,38 @@ export interface components {
             /** Format: int32 */
             scale?: number;
         };
+        Ruleset: {
+            /** Format: date */
+            basicDocumentDateFrom?: string;
+            /** Format: date */
+            basicDocumentDateTo?: string;
+            basicDocumentVersion?: string;
+            feeRegimeCode?: string;
+            /** Format: int32 */
+            longTermMaintenanceFrom?: number;
+            /** Format: int32 */
+            longTermMaintenanceTo?: number;
+            /** Format: int32 */
+            maxInstallments?: number;
+            /** Format: int64 */
+            policyVersionId?: number;
+            /** Format: int64 */
+            rulesetId?: number;
+            /** Format: date */
+            salesStartDateFrom?: string;
+            /** Format: date */
+            salesStartDateTo?: string;
+            sourceRefs?: string[];
+        };
+        RulesetLimit: {
+            includesIndirectExpense?: boolean;
+            limitCode?: string;
+            limitPct?: number;
+        };
         ScheduleDetailResponse: {
             header?: components["schemas"]["ScheduleHeaderResponse"];
             lines?: components["schemas"]["ScheduleLineResponse"][];
+            previewContext?: components["schemas"]["SchedulePreviewContext"];
         };
         ScheduleEvidence: {
             /** Format: int64 */
@@ -5162,17 +5575,27 @@ export interface components {
         };
         ScheduleHeaderResponse: {
             activeYn?: boolean;
+            canConfirm?: boolean;
+            confirmBlockedReason?: string;
+            /** Format: int64 */
+            contractId?: number;
             contractNo?: string;
             expectedTotal?: number;
             /** Format: date-time */
             generatedAt?: string;
             generationReason?: string;
+            /** Format: int32 */
+            installmentCount?: number;
             insurerName?: string;
             /** Format: int32 */
             lineCount?: number;
+            /** Format: int32 */
+            maxInstallmentNo?: number;
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             paymentStageLabel?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
             policyVersionLabel?: string;
             productName?: string;
             /** Format: int64 */
@@ -5206,6 +5629,8 @@ export interface components {
             /** Format: date */
             dueDate?: string;
             expectedAmount?: number;
+            feeComponentType?: string;
+            fixedAmount?: number;
             /** Format: int32 */
             installmentNo?: number;
             /** Format: int32 */
@@ -5215,9 +5640,22 @@ export interface components {
             recipientName?: string;
             /** Format: int64 */
             ruleRef?: number;
+            /** Format: int64 */
+            scheduleLineId?: number;
+            /** Format: int64 */
+            sourceStatusEventId?: number;
+        };
+        SchedulePreviewContext: {
+            expectedSourceVersion?: string;
+            policy?: components["schemas"]["FeeRegimeSchedulePolicy"];
         };
         ScheduleRegenRequest: {
+            expectedSourceVersion?: string;
+            /** Format: int64 */
+            policyVersionId?: number;
             reason: string;
+            /** @enum {string} */
+            regime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
         };
         ScheduleRegenResponse: {
             /** Format: int64 */
@@ -5334,6 +5772,12 @@ export interface components {
             /** Format: int64 */
             paymentId?: number;
         };
+        ValidationRestartRequest: {
+            /** Format: int64 */
+            expectedBatchExecutionId: number;
+            expectedStateVersion: string;
+            reason: string;
+        };
         ValidationRunDetailResponse: {
             arbitrageSummary?: components["schemas"]["ArbitrageSummary"];
             capSummary?: components["schemas"]["CapSummary"];
@@ -5341,6 +5785,8 @@ export interface components {
             header?: components["schemas"]["ValidationRunItemResponse"];
             ledgerSummary?: components["schemas"]["LedgerSummary"];
             reconciliationSummary?: components["schemas"]["ReconciliationSummary"];
+            restartability?: components["schemas"]["Restartability"];
+            retries?: components["schemas"]["Retry"][];
             targetSummary?: components["schemas"]["TargetSummary"];
             targets?: components["schemas"]["ValidationTargetItemResponse"][];
         };
@@ -5382,6 +5828,8 @@ export interface components {
         ValidationRunProgressResponse: {
             /** Format: int64 */
             attemptId?: number;
+            /** Format: int64 */
+            batchExecutionId?: number;
             /** Format: int32 */
             currentStep?: number;
             /** Format: int32 */
@@ -5390,6 +5838,8 @@ export interface components {
             /** Format: int32 */
             progressPct?: number;
             requestId?: string;
+            /** Format: int64 */
+            retryId?: number;
             status?: string;
             statusLabel?: string;
             /** Format: int32 */
@@ -6745,16 +7195,23 @@ export interface operations {
     };
     regenerateSchedules: {
         parameters: {
-            query: {
-                reason: string;
+            query?: {
+                reason?: string;
+                paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             };
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: number;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRegenRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -6785,6 +7242,58 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListContractStatusEventResponse"];
+                };
+            };
+        };
+    };
+    previewContractStatusEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractStatusPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseContractStatusPreviewResponse"];
+                };
+            };
+        };
+    };
+    getContractStatusEventEffects: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+                eventId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseContractStatusEffectResponse"];
                 };
             };
         };
@@ -7701,7 +8210,9 @@ export interface operations {
     regenerate: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: number;
             };
@@ -7936,7 +8447,7 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
                 };
             };
-            /** @description 필수값·귀속·증빙 검증 실패 */
+            /** @description 필수값·귀속·증빙·expectedUpdatedAt 검증 실패 */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7954,7 +8465,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiFailureResponse"];
                 };
             };
-            /** @description DRAFT가 아니거나 자연키 중복 */
+            /** @description DRAFT가 아니거나 자연키 중복, 수정 시각 충돌(FGC-TRAN-010) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8512,6 +9023,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    restart: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidationRestartRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccepted"];
+                };
+            };
+        };
+    };
+    eligibility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRestartability"];
+                };
+            };
+        };
+    };
+    history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListRetry"];
                 };
             };
         };

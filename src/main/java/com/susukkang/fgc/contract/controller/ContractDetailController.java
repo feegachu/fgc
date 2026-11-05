@@ -14,11 +14,14 @@ import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractJournalResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEventResponse;
+import com.susukkang.fgc.contract.dto.ContractStatusPreviewRequest;
+import com.susukkang.fgc.contract.dto.ContractStatusPreviewResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import com.susukkang.fgc.contract.service.ContractJournalProjectionService;
 import com.susukkang.fgc.contract.dto.ContractStatusEffectResponse;
 import com.susukkang.fgc.contract.service.ContractService;
 import com.susukkang.fgc.contract.service.ContractStatusEffectQueryService;
+import com.susukkang.fgc.contract.service.ContractStatusPreviewService;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.contract.service.ContractTransactionProjectionService;
 import com.susukkang.fgc.schedule.service.ScheduleService;
@@ -47,6 +50,7 @@ public class ContractDetailController {
 
     private final ContractService contractService;
     private final ContractStatusEffectQueryService effectQueryService;
+    private final ContractStatusPreviewService statusPreviewService;
     private final ScheduleService scheduleService;
     private final CapCheckService capCheckService;
     private final ArbitrageService arbitrageService;
@@ -72,11 +76,22 @@ public class ContractDetailController {
         return ApiResponse.success(effectQueryService.effects(id, eventId, page, size));
     }
 
+    /** IF-API-64 저장 전 상태 사건의 영향 미리보기. 아무것도 저장하지 않으며 저장은 IF-API-19 로만 한다. */
+    @PostMapping("/{id}/status-events/preview")
+    @PreAuthorize(Roles.CAN_PREVIEW_STATUS_EVENT)
+    public ApiResponse<ContractStatusPreviewResponse> previewContractStatusEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody ContractStatusPreviewRequest request) {
+        return ApiResponse.success(statusPreviewService.preview(id, request));
+    }
+
     @GetMapping("/{id}/schedules")
     public ApiResponse<ContractScheduleResponse> getContractSchedules(
             @PathVariable Long id,
             @RequestParam PaymentStage paymentStage) {
-        return ApiResponse.success(scheduleService.selectByContractId(id, paymentStage));
+        var result = scheduleService.selectByContractId(id, paymentStage);
+        result.setPreviewContext(scheduleService.previewContext(id, paymentStage));
+        return ApiResponse.success(result);
     }
 
     @GetMapping("/{id}/cap-checks")
@@ -97,8 +112,13 @@ public class ContractDetailController {
     @PreAuthorize(Roles.CAN_PROCESS)
     public ApiResponse<List<Long>> regenerateSchedules(
             @PathVariable Long id,
-            @RequestParam(name = "reason") String reason) {
-        return ApiResponse.success(contractService.regenerateSchedules(id, reason));
+            @RequestParam(name = "reason", required = false) String reason,
+            @RequestParam(name = "paymentStage", defaultValue = "GA_TO_FC") PaymentStage stage,
+            @jakarta.validation.Valid @RequestBody(required = false) com.susukkang.fgc.schedule.dto.ScheduleRegenRequest request,
+            @org.springframework.web.bind.annotation.RequestHeader(name = "Idempotency-Key", required = false) String key) {
+        if (request != null && request.getRegime() != null && request.getRegime() != com.susukkang.fgc.schedule.code.ScheduleRegime.CURRENT)
+            return ApiResponse.success(List.of(scheduleService.generatePreview(id, stage, request, key).getScheduleHeaderId()));
+        return ApiResponse.success(contractService.regenerateSchedules(id, request == null ? reason : request.getReason()));
     }
 
     @PostMapping("/{id}/arbitrage-check")

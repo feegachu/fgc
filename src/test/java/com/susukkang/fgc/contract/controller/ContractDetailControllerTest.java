@@ -19,6 +19,7 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.exception.GlobalExceptionHandler;
 import com.susukkang.fgc.contract.dto.ContractDetailResponse;
 import com.susukkang.fgc.contract.dto.ContractScheduleResponse;
+import com.susukkang.fgc.contract.dto.ContractStatusEventProcessingResponse;
 import com.susukkang.fgc.contract.dto.ContractStatusEventResponse;
 import com.susukkang.fgc.contract.dto.ContractTransactionTabResponse;
 import com.susukkang.fgc.contract.service.ContractJournalProjectionService;
@@ -36,6 +37,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -65,6 +67,7 @@ class ContractDetailControllerTest {
 
     @MockitoBean ContractService contractService;
     @MockitoBean com.susukkang.fgc.contract.service.ContractStatusEffectQueryService effectQueryService;
+    @MockitoBean com.susukkang.fgc.contract.service.ContractStatusPreviewService statusPreviewService;
     @MockitoBean ScheduleService scheduleService;
     @MockitoBean CapCheckService capCheckService;
     @MockitoBean ArbitrageService arbitrageService;
@@ -114,13 +117,49 @@ class ContractDetailControllerTest {
     void statusEventLabelsKeepNullablePreviousStatus() throws Exception {
         when(contractService.selectStatusEventsByContractId(21L)).thenReturn(List.of(
                 new ContractStatusEventResponse(1, null, ContractStatus.ACTIVE,
-                        null, null, List.of(), "TEST", "1", 7L, null, null, null)));
+                        null, null, List.of(), "TEST", "1", 7L, null, null, null, null,
+                        ContractStatusEventResponse.EventFollowUp.of(List.of()))));
 
         mockMvc.perform(get("/api/v1/contracts/{id}/status-events", 21L)
                         .with(user("settlement").roles("SETTLEMENT")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].previousStatusLabel").doesNotExist())
-                .andExpect(jsonPath("$.data[0].newStatusLabel").value("정상"));
+                .andExpect(jsonPath("$.data[0].newStatusLabel").value("정상"))
+                .andExpect(jsonPath("$.data[0].followUp.status").value("NOT_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("IF-API-16 처리 행은 기존 필드를 유지하면서 새 필드를 함께 내보낸다")
+    void statusEventProcessingKeepsLegacyFieldsNextToTheNewOnes() throws Exception {
+        OffsetDateTime processedAt = OffsetDateTime.parse("2026-08-02T10:00:00+09:00");
+        when(contractService.selectStatusEventsByContractId(21L)).thenReturn(List.of(
+                new ContractStatusEventResponse(2, ContractStatus.ACTIVE, ContractStatus.LAPSED,
+                        processedAt, processedAt,
+                        List.of(new ContractStatusEventProcessingResponse("HoldJob", "SUCCEEDED", processedAt,
+                                "HoldJob", "SUCCEEDED",
+                                new ContractStatusEventProcessingResponse.ProcessingSummary(1, 2, 3, 4), null)),
+                        "FGC_MANUAL", "KEY", 7L, "MANUAL_STATUS_CHANGE", "사유", null, processedAt,
+                        ContractStatusEventResponse.EventFollowUp.of(List.of()))));
+
+        mockMvc.perform(get("/api/v1/contracts/{id}/status-events", 21L)
+                        .with(user("settlement").roles("SETTLEMENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].processings[0].processingJob").value("HoldJob"))
+                .andExpect(jsonPath("$.data[0].processings[0].processingStatus").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data[0].processings[0].job").value("HoldJob"))
+                .andExpect(jsonPath("$.data[0].processings[0].status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data[0].processings[0].processedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].processings[0].summary.heldPayments").value(1))
+                .andExpect(jsonPath("$.data[0].processings[0].summary.resumedPayments").value(2))
+                .andExpect(jsonPath("$.data[0].processings[0].summary.changedScheduleLines").value(3))
+                .andExpect(jsonPath("$.data[0].processings[0].summary.excludedCount").value(4))
+                .andExpect(jsonPath("$.data[0].processings[0].errorCode").doesNotExist())
+                .andExpect(jsonPath("$.data[0].eventSeq").value(2))
+                .andExpect(jsonPath("$.data[0].sourceSystem").value("FGC_MANUAL"))
+                .andExpect(jsonPath("$.data[0].sourceEventKey").value("KEY"))
+                .andExpect(jsonPath("$.data[0].effectiveAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].receivedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].recordedAt").isNotEmpty());
     }
 
     @Test

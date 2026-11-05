@@ -43,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({ValidationRunController.class, GlobalExceptionHandler.class, FgcMessageResolver.class,
         ConstraintErrorCodeResolver.class, MessageSourceAutoConfiguration.class, SecurityConfig.class})
 class ValidationRunSearchControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.susukkang.fgc.validation.service.ValidationRestartService restartService;
 
     @Autowired
     private MockMvc mockMvc;

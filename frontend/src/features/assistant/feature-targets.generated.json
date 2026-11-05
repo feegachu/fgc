@@ -405,6 +405,11 @@
     "element": "section"
   },
   {
+    "id": "contract.schedule.preview-detail",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "Link"
+  },
+  {
     "id": "contract.tab.arbitrage",
     "file": "features/contract/ContractTabs.tsx",
     "element": "button"
@@ -1300,6 +1305,11 @@
     "element": "section"
   },
   {
+    "id": "features.contract.contract-detail-page.status-preview",
+    "file": "features/contract/ContractDetailPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.contract.contract-form-page.agent-id",
     "file": "features/contract/ContractFormPage.tsx",
     "element": "SearchSelect"
@@ -1475,18 +1485,63 @@
     "element": "section"
   },
   {
+    "id": "features.contract.contract-status-preview.close",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.edit",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.effective-at",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract.contract-status-preview.event-type",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract.contract-status-preview.form",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "form"
+  },
+  {
+    "id": "features.contract.contract-status-preview.reload",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.reset",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.retry",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.contract-status-preview.submit",
+    "file": "features/contract/ContractStatusPreview.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.contract.contract-tabs.button",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/detailParts.tsx",
     "element": "Button"
   },
   {
     "id": "features.contract.contract-tabs.button-3",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "Button"
   },
   {
     "id": "features.contract.contract-tabs.button-4",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "Button"
   },
   {
@@ -1501,13 +1556,23 @@
   },
   {
     "id": "features.contract.contract-tabs.section-3",
-    "file": "features/contract/ContractTabs.tsx",
+    "file": "features/contract/ContractStatusHistory.tsx",
     "element": "section"
   },
   {
     "id": "features.contract.contract-tabs.section-5",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.contract.status-history.effects",
+    "file": "features/contract/ContractStatusHistory.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract.status-history.effects-close",
+    "file": "features/contract/ContractStatusHistory.tsx",
+    "element": "Button"
   },
   {
     "id": "features.dashboard.dashboard-page.button",
@@ -2510,6 +2575,21 @@
     "element": "Button"
   },
   {
+    "id": "features.transaction.transaction-form-page.btn-reload",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-reload-apply",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction.transaction-form-page.btn-reload-keep",
+    "file": "features/transaction/TransactionFormPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.transaction.transaction-form-page.btn-save",
     "file": "features/transaction/TransactionFormPage.tsx",
     "element": "Button"
@@ -2663,6 +2743,36 @@
     "id": "features.validation.finalize-dialogs.button-3",
     "file": "features/validation/FinalizeDialogs.tsx",
     "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-2",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.button-3",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.section-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.table-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.validation.validation-restart-panel.textarea-1",
+    "file": "features/validation/ValidationRestartPanel.tsx",
+    "element": "textarea"
   },
   {
     "id": "features.validation.validation-run-detail-page.btn-finalize",
@@ -3398,5 +3508,35 @@
     "id": "reference.tab.versions",
     "file": "features/reference/ReferenceUI.tsx",
     "element": "button"
+  },
+  {
+    "id": "schedule.preview.form",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "form"
+  },
+  {
+    "id": "schedule.preview.reason",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "schedule.preview.refresh",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "schedule.preview.region",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "section"
+  },
+  {
+    "id": "schedule.preview.submit",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "validation.restart",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Link"
   }
 ]
