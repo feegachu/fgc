@@ -118,7 +118,15 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   await page.getByRole('button', { name: '예외함에서 정정 계속', exact: true }).click()
   await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
   await page.getByLabel('처리 사유').fill('원분개와 지급 예정 금액 확인')
-  await readFlowExplanations(page)
+  await expect(guide).toHaveAttribute('aria-busy', 'false')
+  const expandForAction = guide.getByRole('button', { name: '펼치기', exact: true })
+  if (await expandForAction.isVisible()) await expandForAction.click()
+  // Save from the action explanation itself. A resolved case can remove its form;
+  // do not skip ahead to a permanent target before exercising that transition.
+  for (let step = 0; step < 6 && !(await guide.getByRole('heading', { name: '처리 내용을 직접 저장하세요' }).isVisible()); step++) {
+    await guide.getByRole('button', { name: '확인하고 다음 설명', exact: true }).click()
+  }
+  await expect(guide.getByRole('heading', { name: '처리 내용을 직접 저장하세요' })).toBeVisible()
   await page.getByRole('button', { name: '처리 저장', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await expect(dialog).toBeVisible()
@@ -152,6 +160,9 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   // rather than pretending its vanished input targets were reviewed.
   const expandAfterCorrection = guide.getByRole('button', { name: '펼치기', exact: true })
   if (await expandAfterCorrection.isVisible()) await expandAfterCorrection.click()
+  await expect(guide).toContainText('안내 대상이 사라지거나 숨겨져 중단했습니다')
+  await expect(guide.getByRole('button', { name: '확인하고 다음 설명', exact: true })).toBeDisabled()
+  await expect(guide.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeEnabled()
   await guide.getByRole('button', { name: '현재 결과로 이어서 안내' }).click()
   await expect(guide).toContainText('기존 지급이 취소되었습니다')
   await guide.getByLabel('정정 후 지급 번호', { exact: true }).fill(String(pid))

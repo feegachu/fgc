@@ -61,7 +61,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     (!!routeContract && !!selection.contractId && Number(routeContract) !== selection.contractId) ||
     (!!routeSchedule && !!selection.scheduleId && Number(routeSchedule) !== selection.scheduleId)
   )
-  const detailedPayment = decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
+  const detailedPayment = !busy && decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
   const walkthrough = usePaymentWalkthrough(detailedPayment, month, selection?.stage, selection?.contractId)
   // Wait for navigation and the destination's server-loaded target before observing
   // explanations; the previous form can unmount during a normal draft-to-saved reload.
