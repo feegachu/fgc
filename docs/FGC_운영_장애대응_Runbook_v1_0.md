@@ -99,7 +99,7 @@ SQL은 표준 입력으로 넘긴다. 값이 프로세스 목록에 보이지 �
 | 컨테이너 | `"${compose[@]}" ps` | `podman pod ps`, `podman ps` | **`Up`이어도 앱이 살아 있다는 뜻이 아니다.** 외장 Tomcat은 WAR 기동이 실패해도 프로세스가 남는다 [T7] |
 | 앱 | `curl -fsS http://127.0.0.1:18081/actuator/health` | 같은 경로를 `API_BIND` 포트로 | `UP`이어야 한다. **404면 WAR 기동 실패다** (Flyway 검증 실패 포함) [T7]. `DOWN`이면 DB부터 본다 |
 | 웹 | `curl -I http://127.0.0.1/login` | `WEB_BIND` 포트 | 200 |
-| 로그 | `"${compose[@]}" logs --tail=200 api` | `podman logs` | 사용자가 준 요청번호로 찾는다 |
+| 로그 | `"${compose[@]}" logs --tail=200 api` | `podman logs` | 사용자가 준 요청번호로 찾는다. 오래된 줄은 `--tail` 없이 받아 요청번호로 거른다. 신한 서버는 컨테이너당 10MB 파일 3개만 남으니(`infra/shinhan/compose.yaml`) 장애 직후 찾는다 |
 | 디스크 | `df -h`, `docker system df` | `df -h`, `podman system df` | 8장. 파일 볼륨 가득 참은 health에 드러나지 않는다 [T21] |
 | DB | `"${compose[@]}" exec -T db pg_isready -U fgc -d fgc` | DB 컨테이너에서 같은 명령 | |
 | 배치 | 아래 SQL | 같은 SQL | `RUNNING`이 오래 남으면 6-3절, `계약수동`이 `CREATED`로 오래 남으면 6-5절 |
@@ -779,7 +779,7 @@ SELECT (requested_at AT TIME ZONE 'Asia/Seoul')::date AS day, purpose,
 
 인터페이스정의서 §4-4-4가 정본이다. 그 절의 "PR #688 과도기" 표는 오른쪽 칸(정식 계약)이 지금 동작이다. `MANUAL_CONTRACT`는 월 재시작으로 보내지 않는다(6-4절).
 
-**조치:** 실패 사유를 읽고 원인을 고친 뒤 재시작한다. 고치지 않으면 같은 곳에서 다시 실패한다 [T13]. 성공해도 자동으로 확정되지 않는다.
+**조치:** 실패 사유를 읽고 원인을 고친 뒤 재시작한다. 사유에 요청번호가 있으면(PR #879 `561b37b5`부터의 새 실패) 사유와 DB에는 예외 원문이 없으니 서버 로그에서 `requestId=<요청번호>`를 찾아 본다. 고치지 않으면 같은 곳에서 다시 실패한다 [T13]. 성공해도 자동으로 확정되지 않는다.
 
 **검증 (앞의 두 SQL은 [T13], 마지막 SQL은 코드 대조):**
 
