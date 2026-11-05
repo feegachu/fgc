@@ -12,6 +12,21 @@
     ]
   },
   {
+    "screenId": "RPT-W02",
+    "title": "설계사 수수료 명세",
+    "page": "agent-statement/AgentStatementPage.tsx",
+    "steps": [
+      {
+        "targetId": "statement.filters",
+        "instruction": "기준월과 조회 조건을 선택하세요. 내부 사용자는 설계사를 선택하고, 설계사는 본인 귀속 내역을 조회합니다."
+      },
+      {
+        "targetId": "statement.results",
+        "instruction": "조회 후 지급·보류·조정·환수 내역과 금액을 확인하세요. 근거 보기에서 계산 근거를 확인하며, 금액 미확인은 0원과 구분합니다."
+      }
+    ]
+  },
+  {
     "screenId": "CONT-W01",
     "title": "보험계약 목록",
     "page": "contract/ContractListPage.tsx",

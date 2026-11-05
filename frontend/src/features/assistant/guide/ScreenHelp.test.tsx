@@ -141,7 +141,7 @@ it('does not run an unregistered screen variant', () => {
   expect(screen.getByRole('button', { name: '도움말' })).toBeDisabled()
 })
 
-it.each([['EXCP-W01', 'selected'], ['LEDG-W01', 'selected']])('keeps %s help on row selection, but resets it when the month changes', async (screenId, selectionParam) => {
+it.each([['EXCP-W01', 'selected'], ['RPT-W02', 'entryKey'], ['LEDG-W01', 'selected']])('keeps %s help on row selection, but resets it when the month changes', async (screenId, selectionParam) => {
   function Page() {
     const [params, setParams] = useSearchParams()
     return <main id="main-content"><ScreenHelp screenId={screenId} />

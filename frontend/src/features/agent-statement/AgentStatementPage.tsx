@@ -12,6 +12,7 @@ import { ListPagination } from '../../components/ListPagination'
 import { date, int, rate, today, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import {
   ENTRY_TYPE_OPTIONS,
   InvalidStatementAgentIdError,
@@ -147,6 +148,7 @@ export default function AgentStatementPage() {
   return (
     <div className="ast-page">
       <header className="page-header">
+        {!isAgent && <ScreenHelp screenId="RPT-W02" />}
         <div className="page-header-copy">
           <h1 className="page-title">설계사 수수료 명세</h1>
           {!isAgent && (
