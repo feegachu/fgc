@@ -2,6 +2,7 @@ package com.susukkang.fgc.compare.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -72,7 +73,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("LLM 호출이 실패해도 순위 질문에는 서버 값으로 답한다")
     void rankQuestionFallsBackWhenGatewayFails() {
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
 
         assertThat(service.ask("1위와 2위 차이가 뭐야?", twoItems()).answer()).contains("1위는 가보험 든든건강");
     }
@@ -130,6 +131,188 @@ class CompareAskServiceTest {
         assertThat(service.ask("2순위인 이유 알려줘", null).source()).isEqualTo("OUT_OF_SCOPE");
     }
 
+    @Test
+    @DisplayName("상품 이름 둘로 물으면 서버 문장도 그 두 상품을 직접 견주고 AI 데이터도 같은 쌍을 가리킨다")
+    void productNamesPointToTheSamePairAsRankNumbers() {
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "튼튼건강이랑 편한건강 비교해줘")).containsExactly(2, 3);
+        assertThat(CompareAskService.rankAnswer(threeItems().items(), "튼튼건강이랑 편한건강 비교해줘"))
+                .contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강", "2위보다 보수적 순수령액이 84,000원 적어요")
+                .doesNotContain("1위보다");
+    }
+
+    @Test
+    @DisplayName("시드 형태의 긴 상품 이름('가상 든든 건강보험 C')을 줄여 불러도 같은 순위로 읽고, 이름이 겹치면 읽지 않는다")
+    void shortenedSeedProductNamesPointToRanks() {
+        Item first = new Item(1, 1, "가보험", "가상 든든 건강보험 C", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "가상 장기 건강보험 E", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of());
+        Item same = new Item(3, 3, "다보험", "가상 장기 건강보험 F", 500_000, 480_000, 0, 30_000, 450_000, 70.0, null, List.of());
+        List<Item> items = List.of(first, second, same);
+
+        assertThat(CompareAskService.askedRanks(items, "든든 건강보험이랑 가상 장기 건강보험 E 비교해줘")).containsExactly(1, 2);
+        assertThat(CompareAskService.askedRanks(items, "든든 건강보험 순위가 왜 이래?")).containsExactly(1);
+        assertThat(CompareAskService.askedRanks(items, "장기 건강보험이랑 비교해줘")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("다른 상품 이름 안에 든 짧은 이름은 따로 맞지 않는다(변액 연금저축보험 ⊃ 연금저축보험)")
+    void nameContainedInAnotherNameIsNotMatchedSeparately() {
+        Item o = new Item(1, 1, "가보험", "가상 연금저축보험 O", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of());
+        Item pItem = new Item(2, 2, "나보험", "가상 변액 연금저축보험 P", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of());
+        List<Item> items = List.of(o, pItem);
+
+        assertThat(CompareAskService.askedRanks(items, "변액 연금저축보험은 왜 이 순위야?")).containsExactly(2);
+        assertThat(CompareAskService.askedRanks(items, "가상 변액 연금저축보험 P 왜 이래?")).containsExactly(2);
+        // '연금저축보험'은 카테고리 이름과 같아 줄인 이름으로는 O 로 읽지 않는다. 전체 이름을 적으면 읽는다.
+        assertThat(CompareAskService.askedRanks(items, "연금저축보험이랑 변액 연금저축보험 비교해줘")).containsExactly(2);
+        assertThat(CompareAskService.askedRanks(items, "가상 연금저축보험 O랑 변액 연금저축보험 비교해줘")).containsExactly(1, 2);
+    }
+
+    private static CompareRankingResponse rankingOf(Item... items) {
+        CompareRankingResponse base = ranking();
+        return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
+                base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null,
+                List.of(items), List.of(), CompareRankingFilters.NONE);
+    }
+
+    private static List<Item> termItems() {
+        return List.of(
+                new Item(1, 1, "가보험", "가상 정기보험 K", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of()),
+                new Item(2, 2, "나보험", "가상 CEO 정기보험 L", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of()),
+                new Item(3, 3, "다보험", "가상 경영인정기보험", 500_000, 480_000, 0, 30_000, 450_000, 70.0, null, List.of()));
+    }
+
+    @Test
+    @DisplayName("카테고리 이름(정기보험)만 말하면 같은 이름으로 줄여지는 상품으로 읽지 않고, 적은 순위 번호를 그대로 쓴다")
+    void categoryNameIsNotReadAsAProduct() {
+        List<Item> items = termItems();
+
+        assertThat(CompareAskService.askedRanks(items, "정기보험 2위랑 3위 차이 알려줘")).containsExactly(2, 3);
+        assertThat(CompareAskService.askedRanks(items, "정기보험 3위는 왜 3위야?")).containsExactly(3);
+        assertThat(CompareAskService.rankAnswer(items, "정기보험 2위랑 3위 차이 알려줘"))
+                .contains("2위는 나보험 가상 CEO 정기보험 L", "3위는 다보험 가상 경영인정기보험").doesNotContain("1위");
+        assertThat(CompareAskService.askedRanks(items, "가상 정기보험 K는 왜 1등이야?")).containsExactly(1);
+    }
+
+    @Test
+    @DisplayName("적은 순위 번호는 이름으로 찾은 순위에 밀려나지 않는다")
+    void rankNumbersComeBeforeNamedRanks() {
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "2위랑 3위 중 든든건강보다 나은 건?")).containsExactly(2, 3);
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "3위랑 든든건강 비교해줘")).containsExactly(1, 3);
+    }
+
+    @Test
+    @DisplayName("카테고리 이름이 든 소개 질문('연금저축보험 비교 챗봇은 무슨 기능이야?')은 소개 문장으로 답한다")
+    void introQuestionWithCategoryNameIsIntro() {
+        llmReturns(false, "");
+        CompareRankingResponse savings = rankingOf(
+                new Item(1, 1, "가보험", "가상 연금저축보험 O", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of()),
+                new Item(2, 2, "나보험", "가상 변액 연금저축보험 P", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of()));
+
+        assertThat(service.ask("연금저축보험 비교 챗봇은 무슨 기능이야?", savings).answer()).isEqualTo(CompareAskService.INTRO);
+    }
+
+    @Test
+    @DisplayName("용어를 함께 물은 소개 질문에는 순위 비교 문장을 붙이지 않는다(AI 거절·성공·실패)")
+    void introQuestionWithGlossaryTermHasNoRankSentence() {
+        String question = "상품 비교 챗봇은 무슨 기능이야? 이월도 알려줘";
+
+        llmReturns(false, "");
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("이월:").doesNotContain("1위는");
+
+        llmReturns(true, "비교 결과와 이월 같은 용어를 설명해 드려요.");
+        assertThat(service.ask(question, threeItems()).answer()).isEqualTo("비교 결과와 이월 같은 용어를 설명해 드려요.");
+
+        gatewayFails();
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("이월:").doesNotContain("1위는");
+    }
+
+    @Test
+    @DisplayName("두 순위 비교 답변은 이월 예정액을 0원이어도 서버 값으로 보여 준다")
+    void pairAnswerIncludesCarryoverEvenWhenZero() {
+        assertThat(CompareAskService.rankAnswer(threeItems().items(), "2위랑 3위 이월액 비교해줘"))
+                .contains("이월 예정액은 2위 0원, 3위 0원이에요.");
+    }
+
+    @Test
+    @DisplayName("'1등급' 같은 등급 표현은 순위 번호로 읽지 않는다")
+    void gradeWordIsNotARankNumber() {
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "3위랑 2위 중 1등급인 건?")).containsExactly(2, 3);
+    }
+
+    @Test
+    @DisplayName("순위 결과가 있어도 챗봇 소개 질문은 순위 금액이 아니라 소개 문장으로 답한다")
+    void introQuestionBeatsRankQuestionWhenNoRankIsNamed() {
+        llmReturns(false, "");
+
+        assertThat(service.ask("상품 비교 챗봇은 무슨 기능이야?", threeItems()).answer()).isEqualTo(CompareAskService.INTRO);
+        assertThat(service.ask("1위랑 2위 비교해줘", threeItems()).answer()).contains("1위는 가보험 든든건강");
+    }
+
+    @Test
+    @DisplayName("AI가 소개 질문에 정상 답해도 순위 금액 문장을 앞에 붙이지 않는다")
+    void introAnswerFromLlmHasNoRankSentence() {
+        llmReturns(true, "상품 비교 결과를 풀어서 설명해 드려요.");
+
+        CompareAskResponse response = service.ask("상품 비교 챗봇은 무슨 기능이야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).isEqualTo("상품 비교 결과를 풀어서 설명해 드려요.");
+    }
+
+    @Test
+    @DisplayName("순위 결과가 있어도 '1등급이 뭐야?'는 순위 문장이 아니라 용어 설명으로 답한다")
+    void gradeQuestionIsGlossaryNotRank() {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask("협회 1등급이 뭐야?", threeItems());
+
+        assertThat(response.answer()).doesNotContain("1위는");
+        assertThat(CompareAskService.isRankQuestion("1등급이 뭐야?")).isFalse();
+    }
+
+    @Test
+    @DisplayName("'2등급과 3등급 차이'는 '차이'가 있어도 순위 비교가 아니라 등급 용어 설명으로 답한다(AI 거절·실패·성공)")
+    void gradeDifferenceQuestionIsNotRankComparison() {
+        String question = "2등급과 3등급 차이가 뭐야?";
+
+        llmReturns(false, "");
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("협회 수수료 등급:").doesNotContain("1위는");
+
+        llmReturns(true, "협회가 공시한 등급끼리의 차이예요.");
+        CompareAskResponse ok = service.ask(question, threeItems());
+        assertThat(ok.source()).isEqualTo("LLM");
+        assertThat(ok.answer()).isEqualTo("협회가 공시한 등급끼리의 차이예요.");
+
+        gatewayFails();
+        assertThat(service.ask(question, threeItems()).answer()).startsWith("협회 수수료 등급:").doesNotContain("1위는");
+    }
+
+    @Test
+    @DisplayName("순위 단어 없이 상품 이름 둘로만 물어도 순위 질문으로 보고 두 상품의 이월 예정액을 서버 값으로 답한다")
+    void twoProductNamesWithoutRankWordAreRankQuestion() {
+        gatewayFails();
+
+        CompareAskResponse response = service.ask("튼튼건강이랑 편한건강 중 이월 예정액이 어느 쪽이 더 커?", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강", "이월 예정액은 2위 0원, 3위 0원이에요.")
+                .doesNotStartWith("이월:");
+    }
+
+    @Test
+    @DisplayName("보험사만 다르고 이름이 같은 상품은 이름만으로 어느 순위인지 정하지 않는다")
+    void duplicateFullProductNameIsNotResolvedToARank() {
+        Item first = new Item(1, 1, "가보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of());
+        Item third = new Item(3, 3, "다보험", "편한건강", 500_000, 480_000, 0, 30_000, 450_000, 70.0, null, List.of());
+        List<Item> items = List.of(first, second, third);
+
+        assertThat(CompareAskService.askedRanks(items, "튼튼건강 순위가 왜 이래?")).isEmpty();
+        assertThat(CompareAskService.askedRanks(items, "튼튼건강이랑 편한건강 비교해줘")).containsExactly(3);
+        // 보험사를 붙여 쓰면 어느 상품인지 알 수 있다(AI 답 검사와 같은 규칙).
+        assertThat(CompareAskService.askedRanks(items, "나보험 튼튼건강 순위가 왜 이래?")).containsExactly(2);
+    }
+
     private static CompareRankingResponse threeItems() {
         CompareRankingResponse two = twoItems();
         Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());
@@ -156,17 +339,21 @@ class CompareAskServiceTest {
     }
 
     @Test
-    @DisplayName("순위 둘을 물으면 LLM 에도 그 두 상품의 비교 근거를 준다")
-    void askedPairIsSentToModel() {
+    @DisplayName("순위 결과가 있으면 모델에 상품 목록과 도구를 주고 금액은 주지 않는다")
+    void toolPathSendsItemListAndToolsButNoAmounts() {
         llmReturns(true, "나보험 튼튼건강은 환수 부담이 더 작아요.");
 
         CompareAskResponse response = service.ask("3위랑 2위를 비교해줘", threeItems());
 
-        org.mockito.ArgumentCaptor<LlmGateway.LlmRequest> captor = org.mockito.ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
-        verify(gateway).call(captor.capture(), eq(CompareAskService.Output.class));
-        assertThat(captor.getValue().data()).contains("[질문이 가리킨 비교]", "2위보다 보수적 순수령액이 84,000원 적어요");
+        ArgumentCaptor<LlmGateway.LlmRequest> captor = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        ArgumentCaptor<List<LlmGateway.ToolSpec>> tools = ArgumentCaptor.forClass(List.class);
+        verify(gateway).callWithTools(captor.capture(), eq(CompareAskService.Output.class), tools.capture(), any(), anyInt());
+        assertThat(captor.getValue().data()).contains("[상품 목록]", "2위 나보험 튼튼건강", "3위 다보험 편한건강").doesNotContain("634,000");
+        assertThat(tools.getValue()).extracting(LlmGateway.ToolSpec::name).containsExactly("get_item", "compare", "explain_term");
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).startsWith("2위는 나보험 튼튼건강").endsWith("환수 부담이 더 작아요.");
+        // 순위 질문이므로 서버가 만든 순위·금액 문장이 앞에 붙고, AI 문장은 숫자 없이 뒤에 온다.
+        assertThat(response.answer()).startsWith("2위는 나보험 튼튼건강").endsWith(" 나보험 튼튼건강은 환수 부담이 더 작아요.");
+        verify(gateway, never()).call(any(), eq(CompareAskService.Output.class));
     }
 
     private void llmReturns(Boolean inScope, String answer) {
@@ -174,18 +361,170 @@ class CompareAskServiceTest {
         output.inScope = inScope;
         output.answer = answer;
         when(gateway.call(any(), eq(CompareAskService.Output.class))).thenReturn(output);
+        when(gateway.callWithTools(any(), eq(CompareAskService.Output.class), any(), any(), anyInt())).thenReturn(output);
+    }
+
+    /** 모델 호출이 실패한다. 순위 결과가 있으면 도구 경로(callWithTools)를 타므로 두 경로를 모두 실패시킨다. */
+    private void gatewayFails() {
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        when(gateway.callWithTools(any(), eq(CompareAskService.Output.class), any(), any(), anyInt()))
+                .thenThrow(new IllegalStateException("down"));
+    }
+
+    /** 모델이 도구를 (이름, 인자 JSON) 순서대로 부른 뒤 답하는 것을 흉내 낸다. */
+    private void llmCallsTools(Boolean inScope, String answer, String... nameAndArgs) {
+        CompareAskService.Output output = new CompareAskService.Output();
+        output.inScope = inScope;
+        output.answer = answer;
+        when(gateway.callWithTools(any(), eq(CompareAskService.Output.class), any(), any(), anyInt())).thenAnswer(invocation -> {
+            LlmGateway.ToolRunner runner = invocation.getArgument(3, LlmGateway.ToolRunner.class);
+            for (int i = 0; i < nameAndArgs.length; i += 2) {
+                runner.run(nameAndArgs[i], nameAndArgs[i + 1]);
+            }
+            return output;
+        });
     }
 
     @Test
     @DisplayName("순위 질문은 서버가 만든 순위·금액 문장 뒤에 숫자 없는 AI 풀이를 붙인다")
-    void rankQuestionCombinesServerFactsWithAiProse() {
-        llmReturns(true, "가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
+    void toolAnswerIsPrefixedWithServerSentence() {
+        llmCallsTools(true, "가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.", "get_item", "{\"rank\":1}");
 
         CompareAskResponse response = service.ask("왜 1위야?", ranking());
 
         assertThat(response.source()).isEqualTo("LLM");
         assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 보수적 순수령액은 684,000원이에요.")
-                .endsWith("가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
+                .endsWith(" 가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
+    }
+
+    @Test
+    @DisplayName("도구로 얻은 금액이라도 AI 문장에 숫자를 쓰면 서버 문장으로 대체한다")
+    void toolAmountInAiTextIsReplaced() {
+        llmCallsTools(true, "1위 가보험 든든건강의 보수적 순수령액은 684,000원이에요.", "get_item", "{\"rank\":1}");
+
+        CompareAskResponse response = service.ask("왜 1위야?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요.");
+    }
+
+    @Test
+    @DisplayName("질문이 두 상품을 가리키면 AI 문장이 다른 상품을 말할 때 서버 문장으로 대체한다")
+    void aiTextAboutOtherProductIsReplaced() {
+        llmCallsTools(true, "가보험 든든건강은 환수 부담이 가장 작아요.", "compare", "{\"rankA\":2,\"rankB\":3}");
+
+        CompareAskResponse response = service.ask("3위랑 2위 비교해줘", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).startsWith("2위는 나보험 튼튼건강").doesNotContain("가장 작아요");
+    }
+
+    @Test
+    @DisplayName("같은 보험사 상품이 더 있어도, 질문한 두 상품만 말한 맞는 답은 버리지 않는다")
+    void sharedInsurerDoesNotDropCorrectAnswer() {
+        CompareRankingResponse base = ranking();
+        CompareRankingResponse shared = new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                base.warnings(), null, List.of(
+                        new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of()),
+                        new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of()),
+                        new Item(3, 3, "가보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of())),
+                List.of(), CompareRankingFilters.NONE);
+        llmCallsTools(true, "나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+
+        CompareAskResponse response = service.ask("1위랑 2위 비교해줘", shared);
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).endsWith(" 나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.");
+    }
+
+    @Test
+    @DisplayName("질문을 따라 줄여 쓴 상품 이름의 AI 답도 방향과 다른 상품 언급을 검사한다")
+    void shortenedNamesInAiAnswerAreChecked() {
+        String question = "든든 건강보험이랑 장기 건강보험 중 환수 부담이 작은 건?";
+        CompareRankingResponse seed = CompareAskToolsTest.seedNamedRanking();
+
+        llmCallsTools(true, "든든 건강보험이 장기 건강보험보다 환수 부담이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+        assertThat(service.ask(question, seed).source()).as("반대 방향").isEqualTo("RULE");
+
+        llmCallsTools(true, "튼튼 건강보험은 환수 부담이 중간이에요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+        assertThat(service.ask(question, seed).source()).as("질문하지 않은 상품").isEqualTo("RULE");
+
+        llmCallsTools(true, "장기 건강보험이 든든 건강보험보다 환수 부담이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+        CompareAskResponse ok = service.ask(question, seed);
+        assertThat(ok.source()).isEqualTo("LLM");
+        assertThat(ok.answer()).startsWith("1위는 가보험 가상 든든 건강보험 C").endsWith(" 장기 건강보험이 든든 건강보험보다 환수 부담이 더 작아요.");
+    }
+
+    @Test
+    @DisplayName("도구를 부르지 않고 금액을 쓰면 서버 문장으로 대체한다")
+    void amountWithoutToolCallIsReplaced() {
+        llmReturns(true, "1위 가보험 든든건강의 보수적 순수령액은 684,000원이에요.");
+
+        CompareAskResponse response = service.ask("왜 1위야?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요.");
+    }
+
+    @Test
+    @DisplayName("AI 문장에 금액을 쓰면(다른 순위의 금액이어도) 서버 문장으로 대체한다")
+    void amountAttachedToWrongRankIsReplaced() {
+        llmCallsTools(true, "3위 다보험 편한건강의 보수적 순수령액은 634,000원이에요.",
+                "get_item", "{\"rank\":2}", "get_item", "{\"rank\":3}");
+
+        CompareAskResponse response = service.ask("3위 순수령액이 얼마야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).contains("3위는 다보험 편한건강").doesNotContain("634,000원이에요. 3위");
+    }
+
+    @Test
+    @DisplayName("많고 적음이 서버 값과 반대인 비교 답은 서버 문장으로 대체한다")
+    void reversedDirectionIsReplaced() {
+        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 많아요.",
+                "compare", "{\"rankA\":2,\"rankB\":3}");
+
+        CompareAskResponse response = service.ask("3위랑 2위 순수령액 차이가 뭐야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+    }
+
+    @Test
+    @DisplayName("많고 적음이 서버 값과 같은 비교 답은 서버 문장 뒤에 붙여 낸다")
+    void correctDirectionIsReturned() {
+        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 적어요.",
+                "compare", "{\"rankA\":2,\"rankB\":3}");
+
+        CompareAskResponse response = service.ask("3위랑 2위 순수령액 차이가 뭐야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        // 금액은 서버 문장에만 있고, AI 문장은 방향만 말로 쓴다.
+        assertThat(response.answer()).contains("2위보다 보수적 순수령액이 84,000원 적어요")
+                .endsWith(" 다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 적어요.");
+    }
+
+    @Test
+    @DisplayName("특정 상품을 이득이라고 권하는 답은 서버 문장으로 대체한다")
+    void recommendationAnswerIsReplaced() {
+        llmReturns(true, "고객에게 가장 이득이 되는 상품은 가보험 든든건강입니다.");
+
+        CompareAskResponse response = service.ask("고객한테는 어떤 게 이득이야?", ranking());
+
+        assertThat(response.source()).isNotEqualTo("LLM");
+        assertThat(response.answer()).doesNotContain("이득이 되는");
+    }
+
+    @Test
+    @DisplayName("도구 호출이 실패하면 서버 문장으로 대체한다")
+    void gatewayFailureFallsBackToRuleAnswer() {
+        when(gateway.callWithTools(any(), eq(CompareAskService.Output.class), any(), any(), anyInt()))
+                .thenThrow(new com.susukkang.fgc.common.exception.FgcBusinessException(com.susukkang.fgc.common.exception.FgcErrorCode.AI_001));
+
+        CompareAskResponse response = service.ask("왜 1위야?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요.");
     }
 
     @Test
@@ -294,7 +633,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("LLM 호출이 실패해도 용어 질문에는 용어 설명으로 답한다")
     void gatewayFailureUsesGlossary() {
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
 
         CompareAskResponse response = service.ask("환수가 뭐예요?", null);
 
@@ -305,7 +644,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("용어에 해당하지 않는 질문은 LLM 이 실패하면 안내 문장을 준다")
     void unknownQuestionGetsGuidance() {
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
 
         assertThat(service.ask("가입 권유 문구 써줘", ranking()).answer()).isEqualTo(CompareAskService.FALLBACK);
     }

@@ -46,6 +46,8 @@ class LlmGatewayTest {
     private final List<JsonNode> sent = new CopyOnWriteArrayList<>();
     /** 받은 요청 본문으로 모델 출력 문자열(JSON)을 만든다. */
     private volatile Function<JsonNode, String> reply = request -> "{\"label\":\"정산데이터\",\"rowCount\":3}";
+    /** 응답 본문 전체를 직접 정한다. null 을 돌려주면 reply 로 만든 기본 본문을 쓴다. */
+    private volatile Function<JsonNode, String> rawReply = request -> null;
     private HttpServer server;
 
     public static class DocKind {
@@ -59,7 +61,8 @@ class LlmGatewayTest {
         server.createContext("/", exchange -> {
             JsonNode request = mapper.readTree(exchange.getRequestBody());
             sent.add(request);
-            byte[] bytes = envelope(reply.apply(request)).getBytes(StandardCharsets.UTF_8);
+            String raw = rawReply.apply(request);
+            byte[] bytes = (raw != null ? raw : envelope(reply.apply(request))).getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, bytes.length);
             exchange.getResponseBody().write(bytes);
@@ -92,6 +95,59 @@ class LlmGatewayTest {
         signIn(8L);
         assertThat(gateway.call(request(), DocKind.class).rowCount).isEqualTo(3);
         assertThat(sent).hasSize(13);
+    }
+
+    public static class RankArgs {
+        public int rank;
+    }
+
+    private static final List<LlmGateway.ToolSpec> TOOLS = List.of(new LlmGateway.ToolSpec("get_item", "순위 하나", RankArgs.class));
+
+    /** 도구가 열려 있으면 도구를 부르고, 닫히면(tool_choice=none) 최종 답을 낸다. */
+    private void replyWithToolCallsWhileOpen() {
+        rawReply = request -> "none".equals(request.path("tool_choice").asText()) ? null : """
+                {"id":"resp_t","object":"response","created_at":1,"status":"completed","model":"fgc-test-model",
+                 "output":[{"type":"function_call","id":"fc_1","call_id":"call_1","name":"get_item","arguments":"{\\"rank\\":1}","status":"completed"}],
+                 "usage":{"input_tokens":11,"output_tokens":7,"total_tokens":18,
+                   "input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":0}}}
+                """;
+    }
+
+    @Test
+    void everyToolRoundCountsTowardThePerUserMinuteLimit() {
+        LlmGateway gateway = gateway();
+        signIn(9L);
+        for (int i = 0; i < 11; i++) {
+            gateway.call(request(), DocKind.class);
+        }
+        replyWithToolCallsWhileOpen();
+
+        // 12번째 호출(첫 라운드)은 나가지만, 도구 결과를 붙인 다음 라운드는 13번째 호출이라 상한에 걸린다.
+        assertAi001(() -> gateway.callWithTools(request(), DocKind.class, TOOLS, (name, args) -> "{\"금액\":\"1원\"}", 4));
+
+        assertThat(sent).hasSize(12);
+        assertThat(lastLog().getErrorCode()).isEqualTo("RATE_LIMITED");
+    }
+
+    @Test
+    void accumulatedToolResultsAreCheckedAgainstTheInputLimit() {
+        LlmGateway gateway = gateway();
+        replyWithToolCallsWhileOpen();
+
+        // 첫 입력은 상한(1000자) 안이지만, 도구 결과를 붙여 다시 보낼 입력은 상한을 넘는다.
+        assertAi001(() -> gateway.callWithTools(request(), DocKind.class, TOOLS, (name, args) -> "가".repeat(1000), 4));
+
+        assertThat(sent).hasSize(1);
+        assertThat(lastLog().getErrorCode()).isEqualTo("INPUT_TOO_LARGE");
+    }
+
+    @Test
+    void toolRoundsWithinTheLimitsFinishWithTheFinalAnswer() {
+        LlmGateway gateway = gateway();
+        replyWithToolCallsWhileOpen();
+
+        assertThat(gateway.callWithTools(request(), DocKind.class, TOOLS, (name, args) -> "{\"금액\":\"1원\"}", 2).rowCount).isEqualTo(3);
+        assertThat(sent).hasSize(3);
     }
 
     @Test
