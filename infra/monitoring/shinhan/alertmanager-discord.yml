@@ -1,0 +1,22 @@
+global:
+  resolve_timeout: 1m
+route:
+  receiver: discord-operations
+  group_by: [alertname, instance, exported_job]
+  group_wait: 5s
+  group_interval: 10s
+  repeat_interval: 4h
+receivers:
+  - name: discord-operations
+    discord_configs:
+      - webhook_url_file: /run/secrets/webhook-url
+        send_resolved: true
+        title: '[{{ .Status | toUpper }}] FGC 신한 prod · {{ .CommonLabels.alertname }}'
+        message: |-
+          {{ range .Alerts }}
+          **경보:** {{ .Labels.alertname }}
+          **상태:** {{ .Status }} · **등급:** {{ .Labels.severity }}
+          **대상:** {{ .Labels.instance }}
+          {{ if .Labels.exported_job }}**배치:** {{ .Labels.exported_job }}{{ end }}
+          **내용:** {{ .Annotations.summary }}
+          {{ end }}
