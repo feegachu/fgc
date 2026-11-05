@@ -285,8 +285,9 @@ class ArbitrageTransactionBoundaryIntegrationTest {
     doThrow(new FgcBusinessException(FgcErrorCode.COMMON_500, Map.of()))
         .when(auditLogService)
         .record(any());
+    Long contractId = reference.id();
     try {
-      assertThatThrownBy(() -> service.reArbitrageCheck(reference.id(), request, userId))
+      assertThatThrownBy(() -> service.reArbitrageCheck(contractId, request, userId))
           .isInstanceOf(FgcBusinessException.class);
     } finally {
       reset(auditLogService);
