@@ -22,7 +22,7 @@
 | 3 | 운영정책서 '일일 변경분 처리', 인터페이스정의서 §7-5, [SRC-065], 훈련 T8~T12 |
 | 4 | 시드 명세서 §5, [SRC-065], [SRC-076], [SRC-027 D-04], 훈련 T4~T7, T27, T28 |
 | 5 | [SRC-060], [SRC-075], 인터페이스정의서 IF-EXT-03, 훈련 T16~T19, T26. 예산 임계값은 가상 GA 정책 |
-| 6 | 인터페이스정의서 §4-4-4, §7-6, FUN-045 (#672, PR #844), V80, 코드 대조 [SRC-028]. 훈련 T13, T14는 #844 전 이미지, T31은 #844 뒤 이미지. 6-3절은 PM 결정, 팀 공유 전 |
+| 6 | 인터페이스정의서 §4-4-4, §7-6, FUN-045 (#672, PR #844), V80, 코드 대조 [SRC-028]. 실패 사유 문구는 화면정의서 공통규칙 10, [SRC-074]. 훈련 T13, T14는 #844 전 이미지, T31은 #844 뒤 이미지. 6-3절은 PM 결정, 팀 공유 전 |
 | 7 | V74, V79, #719 코멘트, 인터페이스정의서 §4-4-2, PR #831, #835, 코드 대조 [SRC-028]. 훈련 T15는 처리기가 없던 이미지. PM 결정, 팀 공유 전 |
 | 8 | PR #812, 트래커 4번 [SRC-067], 훈련 T21 |
 | 9 | 트래커 4번, PMR-007, TER-010 [SRC-067], 훈련 T20 |
@@ -779,7 +779,18 @@ SELECT (requested_at AT TIME ZONE 'Asia/Seoul')::date AS day, purpose,
 
 인터페이스정의서 §4-4-4가 정본이다. 그 절의 "PR #688 과도기" 표는 오른쪽 칸(정식 계약)이 지금 동작이다. `MANUAL_CONTRACT`는 월 재시작으로 보내지 않는다(6-4절).
 
-**조치:** 실패 사유를 읽고 원인을 고친 뒤 재시작한다. 사유에 요청번호가 있으면(PR #879 `561b37b5`부터의 새 실패) 사유와 DB에는 예외 원문이 없으니 서버 로그에서 `requestId=<요청번호>`를 찾아 본다. 고치지 않으면 같은 곳에서 다시 실패한다 [T13]. 성공해도 자동으로 확정되지 않는다.
+**조치:** 실패 사유를 읽고 원인을 고친 뒤 재시작한다. 사유에 요청번호가 있으면(PR #879 `561b37b5`부터의 새 실패) 사유에는 예외 원문이 없으니 서버 로그에서 `requestId=<요청번호>`를 찾아 본다. 로그가 회전해 없으면 아래 SQL로 Spring Batch가 저장한 예외를 본다. 앞 2,500자만 남으니 재배포 전에 로그를 받아 두는 편이 낫다. 고치지 않으면 같은 곳에서 다시 실패한다 [T13]. 성공해도 자동으로 확정되지 않는다.
+
+```sql
+SELECT s.job_execution_id, s.step_name, s.exit_message
+  FROM fgc.batch_step_execution s
+  JOIN fgc.batch_job_execution_params p USING (job_execution_id)
+ WHERE p.parameter_name IN ('requestId', 'restartRequestId') AND p.parameter_value = '<요청번호>'
+   AND s.status = 'FAILED'
+ ORDER BY s.step_execution_id DESC;
+```
+
+이 SQL은 `MonthlyJournalRestartIntegrationTest`에 임시 조회를 넣어 PR #879 `ab88aa52`로 확인했다(커밋 안 함). 25번째 분개 실패에서 사유는 사용자 문장이고 `exit_message`에 예외 원문이 있었다.
 
 **검증 (앞의 두 SQL은 [T13], 마지막 SQL은 코드 대조):**
 
@@ -851,7 +862,7 @@ BEGIN
   UPDATE fgc.batch_job_execution SET status = 'FAILED', exit_code = 'FAILED', end_time = clock_timestamp(), last_updated = clock_timestamp(),
          exit_message = 'Runbook: 프로세스 중단 뒤 실패로 표시'
    WHERE job_execution_id = ANY (v_exec);
-  UPDATE fgc.validation_run SET status = 'FAILED', failure_message = 'Runbook: 프로세스 중단 뒤 실패로 표시 (' || current_setting('recovery.ticket') || ')'
+  UPDATE fgc.validation_run SET status = 'FAILED', failure_message = '운영 복구: 프로세스 중단 뒤 실패로 표시'
    WHERE validation_run_id = v_run;
   INSERT INTO fgc.audit_log (user_id, action_code, entity_type, entity_id, before_value, after_value, reason, request_id)
   VALUES (v_executor, 'VALIDATION_RUN_FORCED_FAILED', 'validation_run', v_run::text,
@@ -865,7 +876,7 @@ COMMIT;
 SQL
 ```
 
-**검증 [T14]:** 상태 `FAILED`, 배치 실행 `FAILED`. `계약수동`은 새 실행을 만든다. 감사 행위 `VALIDATION_RUN_FORCED_FAILED`. 월 실행은 `[실패 지점부터 재시작]`으로 실패 Step부터 이어 간다(6-2절). T14는 #844 전 이미지라 재시작을 `execute`로 돌렸다. 이 SQL 뒤의 `/restart`는 [T31]로 확인했다.
+**검증 [T14]:** 상태 `FAILED`, 배치 실행 `FAILED`. `계약수동`은 새 실행을 만든다. 감사 행위 `VALIDATION_RUN_FORCED_FAILED`. 월 실행은 `[실패 지점부터 재시작]`으로 실패 Step부터 이어 간다(6-2절). T14는 #844 전 이미지라 재시작을 `execute`로 돌렸다. 이 SQL 뒤의 `/restart`는 [T31]로 확인했다. 화면 사유는 `운영 복구: 프로세스 중단 뒤 실패로 표시`이고 티켓은 감사 `request_id`에 남는다. PR #879부터 영문 3자 이상이 든 사유 문장은 응답에서 빠져(`ValidationFailureText`, 화면정의서 공통규칙 10, [SRC-074]) 이 문구에 영문이나 티켓을 넣지 않는다. T14는 옛 문구로 돌렸고 그 뒤 문구만 바꿨다.
 
 **재시작 도중에 죽었을 때 [T31].** `validation_run_retry`에 활성 행이 남는다. 남아 있으면 그 실행의 버튼은 `'이미 재시작 요청이 진행 중입니다.'`로, 같은 달 다른 실행의 버튼은 `'같은 월에 다른 실행이 진행 중입니다.'`로 꺼진다. 같은 달의 새 `월간` 실행은 `FGC-VRUN-001`, 확정은 `FGC-VRUN-005`로 막힌다(`hasActiveRetryForMonth`).
 
@@ -997,7 +1008,7 @@ SELECT validation_run_id, status, triggered_by, created_at FROM fgc.validation_r
 | 단계 | 내용 |
 |---|---|
 | 탐지 | 아래 SQL. 계약 상세 `기본정보` 탭 `'상태이력'` 표의 `'후속 상태'`가 `자동 재시도 소진`이고 표 위에 `'자동 재시도를 모두 쓴 후속 처리가 있습니다. 이 계약의 뒤 사건도 함께 멈춥니다. 운영 담당 확인이 필요합니다.'`. 확정 화면의 `'확정할 수 없습니다. 계약 상태 사건으로 보류된 지급 건이거나 후속 처리가 끝나지 않았습니다.'`로 먼저 드러나기도 한다 |
-| 초기 판단 | 실패 사유를 읽는다. 뒤에 기다리는 사건이 있는지 본다. 화면이 `처리 중`이면 마지막 시도가 끝나지 않은 것이니 기다린다(아래 SQL도 이 행을 뺀다). `FGC-IMPL-POLICY_MISSING`이면 계약일에 적용할 상태별 지급조건 정책을 찾지 못한 것이다 |
+| 초기 판단 | 실패 사유를 읽는다. 원문이 더 필요하면 서버 로그에서 `eventId=<사건 번호>`를 찾는다. 스케줄러가 돌리는 작업이라 요청번호가 없다. 뒤에 기다리는 사건이 있는지 본다. 화면이 `처리 중`이면 마지막 시도가 끝나지 않은 것이니 기다린다(아래 SQL도 이 행을 뺀다). `FGC-IMPL-POLICY_MISSING`이면 계약일에 적용할 상태별 지급조건 정책을 찾지 못한 것이다 |
 | 담당 | 실행 시스템 관리자, 승인 GA관리자, 원인은 해당 처리기 담당 |
 | 조치 | 원인을 고치고 아래 SQL. 정책 누락은 정책 절차로 고친다 |
 | 검증 | 아래 표 |
