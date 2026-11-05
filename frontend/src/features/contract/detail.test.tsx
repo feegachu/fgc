@@ -86,6 +86,23 @@ afterEach(() => {
 })
 
 describe('CONT-W02 계약 상세', () => {
+  it.each([
+    ['REMAINING_V1', '잔여 지급예정액'],
+    ['UNRESOLVED_UPPER_BOUND_V1', '지급예정액 상한'],
+    [null, '지급예정액 (기준 미기록)'],
+    ['UNRECOGNIZED', '지급예정액 (기준 확인 필요)'],
+  ])('계약 이력도 같은 금액의 저장 기준 %s를 구분한다', async (basis, label) => {
+    renderAt('/contracts/1?tab=arbitrage', (url) => url.endsWith('/arbitrage-checks') ? [{
+      arbitrageCheckId: 5, plannedCommissionAmount: 50000, plannedCommissionBasis: basis,
+    }] : undefined)
+    const table = await screen.findByRole('table', { name: '차익거래 검증 결과' })
+    expect(within(table).getByRole('columnheader', { name: '지급예정액·계산 기준' })).toBeVisible()
+    expect(within(table).getByText('50,000원')).toBeVisible()
+    expect(within(table).getByText(label!)).toBeVisible()
+    expect(within(table).getByText(label!)).toHaveAttribute('title')
+    expect(requested.some(({ options }) => options?.method === 'POST')).toBe(false)
+  })
+
   it('지급 등록에 계약·수령인과 상세 화면의 목록 맥락을 전달한다', async () => {
     const { actions, router } = renderAt('/contracts/1?month=2026-07&returnTo=%2Fcontracts%3Fpage%3D3')
     const link = await screen.findByRole('link', { name: '지급 등록' })

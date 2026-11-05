@@ -1,3 +1,4 @@
+import { plannedBasisPresentation } from '../arbitrage/planned-basis'
 import { returnLink } from '../transaction/payment-entry'
 import { useRef } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
@@ -398,9 +399,17 @@ const arbitrageColumns: TableColumn<ContractArbitrageCheck>[] = [
   },
   {
     key: 'planned',
-    label: '지급예정액',
+    label: '지급예정액·계산 기준',
     align: 'number',
-    render: (row) => <Amount value={row.plannedCommissionAmount} />,
+    render: (row) => {
+      const basis = plannedBasisPresentation(row.plannedCommissionBasis)
+      return (
+        <>
+          <Amount value={row.plannedCommissionAmount} />
+          <small style={{ display: 'block' }} title={basis.description}>{basis.label}</small>
+        </>
+      )
+    },
   },
   {
     key: 'surrender',
