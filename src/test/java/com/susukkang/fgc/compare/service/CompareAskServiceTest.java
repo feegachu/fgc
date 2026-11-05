@@ -194,6 +194,28 @@ class CompareAskServiceTest {
     }
 
     @Test
+    @DisplayName("이름 자리표시자로 쓴 방향·상품은 서버 값으로 채워 나간다")
+    void nameAndDirectionSlotsAreRendered() {
+        llmReturns(true, "{diff.net.more}가 {diff.net.less}보다 순수령액이 {diff.net} 많아요.");
+
+        CompareAskResponse response = service.ask("3위랑 2위 차이가 뭐야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).isEqualTo("나보험 튼튼건강가 다보험 편한건강보다 순수령액이 84,000원 많아요.");
+    }
+
+    @Test
+    @DisplayName("자리표시자를 쓰면서 상품 이름을 직접 쓴 답은 버리고 서버 문장으로 답한다")
+    void typedProductNameWithSlotsIsRejected() {
+        llmReturns(true, "편한건강은 순수령액이 {r2.net}이에요.");
+
+        CompareAskResponse response = service.ask("3위랑 2위 차이가 뭐야?", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).doesNotContain("{");
+    }
+
+    @Test
     @DisplayName("모델 데이터에 자리표시자 목록은 주되 금액 값은 새로 주지 않는다")
     void slotGuideIsSentToModel() {
         llmReturns(true, "{r2.rank}가 앞서요.");

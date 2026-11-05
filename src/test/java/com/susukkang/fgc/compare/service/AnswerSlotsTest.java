@@ -32,6 +32,39 @@ class AnswerSlotsTest {
     }
 
     @Test
+    @DisplayName("이름 자리표시자와, 차이의 큰 쪽·작은 쪽 이름은 서버가 정한다. 값이 같으면 방향은 주지 않는다")
+    void namesAndDirectionComeFromServer() {
+        Map<String, String> values = AnswerSlots.values(ranking(), List.of(1, 2));
+
+        assertThat(values).containsEntry("r2.name", "나보험 튼튼건강")
+                .containsEntry("diff.net.more", "가보험 든든건강").containsEntry("diff.net.less", "나보험 튼튼건강")
+                .containsEntry("diff.clawback.more", "가보험 든든건강").containsEntry("diff.clawback.less", "나보험 튼튼건강");
+    }
+
+    @Test
+    @DisplayName("두 값이 같으면 큰 쪽·작은 쪽 자리표시자는 없어 방향을 쓰면 답이 버려진다")
+    void equalValuesHaveNoDirection() {
+        Item first = new Item(1, 1, "가보험", "든든건강", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of());
+        CompareRankingResponse base = ranking();
+        CompareRankingResponse equal = new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                List.of(), null, List.of(first, second), List.of(), CompareRankingFilters.NONE);
+
+        Map<String, String> values = AnswerSlots.values(equal, List.of(1, 2));
+
+        assertThat(values).containsEntry("diff.net", "0원").doesNotContainKey("diff.net.more");
+        assertThat(AnswerSlots.render("{diff.net.more}가 커요.", values)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("자리표시자와 함께 상품 이름을 직접 쓴 답은 가려낸다")
+    void detectsTypedProductName() {
+        assertThat(AnswerSlots.typesProductName("{r2.name}보다 튼튼건강이 앞서요.", ranking())).isTrue();
+        assertThat(AnswerSlots.typesProductName("{r2.name}가 {r1.name}보다 낮아요.", ranking())).isFalse();
+    }
+
+    @Test
     @DisplayName("자리표시자를 서버 값으로 채운다")
     void rendersSlots() {
         Map<String, String> values = AnswerSlots.values(ranking(), List.of());

@@ -48,7 +48,7 @@ public class CompareAskService {
             답에는 숫자(금액·비율·순위 번호·날짜)를 직접 쓰지 않는다. '1,200% 룰'이라는 용어 이름만 쓸 수 있다.
             금액과 순위가 필요하면 data 의 '자리표시자' 목록에 있는 것만 중괄호째 그대로 쓴다(예: {r2.net}). 서버가 실제 값으로 바꿔 준다.
             자리표시자를 하나도 쓰지 않으면 서버가 순위·금액 문장을 답 앞에 따로 붙인다. 목록에 없는 자리표시자를 만들지 마라.
-            상품은 보험사·상품 이름으로 부르고, 어느 쪽이 더 크거나 작은지와 그 이유(한도·이월·환수)를 말로 풀어 쓴다.
+            상품은 {r2.name} 처럼 이름 자리표시자로 부르고, 어느 쪽이 더 크거나 작은지는 .more/.less 자리표시자로, 그 이유(한도·이월·환수)는 말로 풀어 쓴다.
             다음 질문은 모두 범위 안이다(inScope=true): 몇 위인 이유, 1위와 다른 순위의 차이, 한도·이월·환수가 순위에 준 영향,
             상품 간 비교, 순위 계산 기준, 위 용어의 뜻. 순위 결과가 있으면 '순위별 비교 근거'의 차이를 풀어서 이유를 설명한다.
             용어 뜻을 묻는 질문('협회등급이 뭐야?', '순수령액이 어떻게 되는거지')과 이 챗봇이 무엇을 알려 주는지 묻는 질문('너는 뭘 알려주는거야', '역할이 뭐야')은
@@ -119,8 +119,8 @@ public class CompareAskService {
         if (AnswerSlots.uses(text)) {
             // 모델이 자리표시자로 쓴 문장은 서버 값으로 채워 그대로 낸다. 목록에 없는 자리표시자면 버린다.
             Optional<String> rendered = AnswerSlots.render(text, slots);
-            if (rendered.isEmpty()) {
-                log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다. reason=UNKNOWN_SLOT");
+            if (rendered.isEmpty() || AnswerSlots.typesProductName(text, ranking)) {
+                log.warn("LLM 답변이 검증을 통과하지 못해 대체 답변을 씁니다. reason={}", rendered.isEmpty() ? "UNKNOWN_SLOT" : "NAME_TYPED");
                 return fallbackAnswer(q, ranking);
             }
             return new CompareAskResponse(rendered.get(), CompareAskResponse.LLM);
