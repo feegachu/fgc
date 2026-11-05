@@ -1,0 +1,16 @@
+services:
+  fixture:
+    image: python:3.12-alpine
+    command: [python, /fixture.py]
+    volumes: ["./smoke/fixture.py:/fixture.py:ro"]
+    ports: ["127.0.0.1:18774:8080"]
+  prometheus:
+    volumes:
+      - ./smoke/targets.json:/etc/prometheus/targets.json:ro
+      - ./smoke/scrape-token:/run/secrets/scrape-token:ro
+  alertmanager:
+    volumes:
+      - ./smoke/webhook-url:/run/secrets/webhook-url:ro
+  grafana:
+    volumes:
+      - ./smoke/grafana-password:/run/secrets/grafana-password:ro

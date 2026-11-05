@@ -4,9 +4,8 @@ import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { rate } from '../../../lib/format'
-import picoBasic from '../../assistant/assets/pico-basic.png'
-import picoDetective from '../../assistant/assets/pico-detective.png'
-import picoGuide from '../../assistant/assets/pico-guide.png'
+import { PicoMotion } from '../mascot/PicoMotion'
+import type { PicoMotionName } from '../mascot/PicoMotion'
 import { askCompare, compareCategoriesQuery, compareExplainQuery, newsHeadlinesQuery, rankCompare } from './api'
 import type { CompareCategory, CompareEvidence, CompareExcluded, CompareItem, CompareRanking } from './api'
 import { FilterPanel } from './FilterPanel'
@@ -21,20 +20,15 @@ const CHECKS = ['내 한도 확인', '정책 수수료율 확인', '환수 규�
 /** 계산이 빨라도 화면이 깜빡이지 않도록 2단계는 캐릭터가 한 바퀴 도는 시간 동안 보여 준다. chatbot.css 의 cb-turn 주기(5.5s)와 같아야 한다. */
 const SPIN_MS = 5500
 const CHECK_MS = SPIN_MS / CHECKS.length
-// 업무 비서 AI와 같은 파랑 피코 그림을 쓴다. 사과하는 파랑 그림이 없어 기본 그림으로 대신한다.
-const MASCOTS = { base: picoBasic, search: picoDetective, sum: picoGuide, sorry: picoBasic }
+// 설계사 화면의 보라 캐릭터(#839) 단계별 모션: 1단계 웃으며 인사, 2단계 탐정 모자(정지), 3단계 안경과 지시봉, 답변을 찾지 못하면 당황.
+const MASCOTS = { base: 'wave', search: 'hat', sum: 'glasses', sorry: 'worried' } as const satisfies Record<
+  string,
+  PicoMotionName
+>
+type MascotName = keyof typeof MASCOTS
 
-function Mascot({ name, size = 101 }: { name: keyof typeof MASCOTS; size?: number }) {
-  return (
-    <img
-      className={`cb-mascot${name === 'search' ? ' cb-spin' : ''}`}
-      src={MASCOTS[name]}
-      alt=""
-      width={size}
-      height={size}
-      aria-hidden="true"
-    />
-  )
+function Mascot({ name, size = 101 }: { name: MascotName; size?: number }) {
+  return <PicoMotion motion={MASCOTS[name]} size={size} className="cb-mascot" />
 }
 
 function Bot({
@@ -42,7 +36,7 @@ function Bot({
   name = '피코 AI',
   children,
 }: {
-  avatar?: keyof typeof MASCOTS
+  avatar?: MascotName
   name?: string
   children: ReactNode
 }) {
