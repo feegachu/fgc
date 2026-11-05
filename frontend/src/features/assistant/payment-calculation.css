@@ -63,3 +63,7 @@
   padding: 10px 0;
   border-bottom: 1px solid #dce6f0;
 }
+
+.payment-calculation label { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; }
+.payment-calculation input, .payment-calculation select { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #cbdced; border-radius: var(--radius-8); background: white; color: inherit; font: inherit; }
+.payment-calculation section { overflow-wrap: anywhere; }
