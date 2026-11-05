@@ -208,7 +208,7 @@ class PicoAskServiceTest {
                 return values.stream().map(item -> {
                     var guide = (PicoGuideCatalog.Definition) item;
                     return new PicoGuideCatalog.Definition(guide.workflowId(),guide.guideVersion(),guide.title(),guide.description(),
-                            guide.capability(),guide.keywords(),guide.steps(),!guide.workflowId().equals("settlement.journey"),guide.roles());
+                            guide.capability(),guide.keywords(),guide.steps(),!guide.workflowId().equals("settlement.journey"),guide.roles(),guide.requiredSlots());
                 }).toList();
             }
             return value;
