@@ -157,7 +157,7 @@
 }
 
 /* 격자 칸을 가득 채우지 않게 한다. */
-.exception-action-form > .button {
+.exception-action-form > .button:first-child {
   justify-self: end;
 }
 

@@ -106,7 +106,7 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
   await page.goto(`exceptions?month=${month}`)
   await expect.poll(() => headerLayout(page, '.page-header', '.page-title'), { message: 'exceptions' }).toEqual(atEdges)
   await page.locator('.exception-row').first().click()
-  const formHelp = page.locator('.exception-action-form > .button')
+  const formHelp = page.locator('.exception-action-form > .button:first-child')
   await expect(formHelp).toHaveText('도움말')
   expect((await formHelp.boundingBox())!.width).toBeLessThan(160)
 
