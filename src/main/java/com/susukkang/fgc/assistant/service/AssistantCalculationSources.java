@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class AssistantCalculationSources {
+  private static final String AGGREGATION = "aggregation";
   private static final String UNSUPPORTED = "UNSUPPORTED";
   private static final String CONTRACT_ID = "contractId";
   private static final String PAYMENT_STAGE = "paymentStage";
@@ -210,7 +211,7 @@ public class AssistantCalculationSources {
     if (kind == PaymentCalculationRequest.Kind.EXPECTED_COMMISSION) {
       if (scope == null) {
         missingFields.add(SETTLEMENT_MONTH);
-        missingFields.add("aggregation");
+        missingFields.add(AGGREGATION);
       } else {
         missingFields.addAll(expectedMissingFields(scope));
       }
@@ -221,7 +222,7 @@ public class AssistantCalculationSources {
   private List<String> expectedMissingFields(PaymentCalculationRequest.Scope scope) {
     List<String> missingFields = new ArrayList<>();
     if (scope.settlementMonth() == null) missingFields.add(SETTLEMENT_MONTH);
-    if (scope.aggregation() == null) missingFields.add("aggregation");
+    if (scope.aggregation() == null) missingFields.add(AGGREGATION);
     if (scope.aggregation() == PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE) {
       if (scope.commissionItemId() == null) missingFields.add("commissionItemId");
       if (scope.installmentNo() == null) missingFields.add("installmentNo");
@@ -291,7 +292,7 @@ public class AssistantCalculationSources {
     resolved.put(CONTRACT_ID, scope.contractId());
     resolved.put(SETTLEMENT_MONTH, scope.settlementMonth());
     resolved.put(PAYMENT_STAGE, scope.paymentStage().name());
-    resolved.put("aggregation", scope.aggregation().name());
+    resolved.put(AGGREGATION, scope.aggregation().name());
     Long policy = schedules.selectActiveOperationalPolicyVersionId(contract, scope.paymentStage());
     if (policy != null) resolved.put(POLICY_VERSION_ID, policy.toString());
     var dates = selected.stream().map(ScheduleLineResponse::getDueDate).distinct().toList();
