@@ -12,20 +12,19 @@ import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 설명 : 상품 비교 챗봇이 모델에 열어 주는 서버 도구와, 모델 답변을 도구 결과로 검증하는 규칙(FUN-079, #889).
- * 도구는 서버가 계산한 순위 결과의 값만 돌려주고, 돌려준 금액마다 '어느 순위의 어느 항목인지'를 기억한다.
- * 검증은 답변의 모든 금액·비율이 도구가 준 값이고, 금액 바로 앞에 가장 가까이 쓴 상품(순위·이름)과 항목 이름이 그 값의 것인지,
- * 두 상품의 차이를 말할 때 많고 적음의 방향이 서버 값과 같은지를 본다. 요청 하나에 한 번 만들고 버린다(상태를 가진다).
+ * 설명 : 상품 비교 챗봇이 모델에 열어 주는 서버 도구와, 모델 답변을 검증하는 규칙(FUN-079, #889).
+ * 도구는 서버가 계산한 순위 결과의 값만 돌려준다. 모델은 그 값으로 어느 쪽이 크고 작은지를 판단해 이유를 말로 쓰고,
+ * 답에는 숫자(금액·비율·순위 번호·날짜)를 쓰지 않는다(인터페이스정의서 §4-4-6). 금액·순위는 서버 문장이 맡는다.
+ * 검증은 숫자·한글 금액·추천 단정을 거절하고, 두 상품의 많고 적음을 말한 문장은 compare 결과의 방향과 맞는지 본다.
+ * 요청 하나에 한 번 만들고 버린다(부른 compare 결과를 기억한다).
  */
 final class CompareAskTools {
 
@@ -33,10 +32,10 @@ final class CompareAskTools {
     static final String COMPARE = "compare";
     static final String EXPLAIN_TERM = "explain_term";
 
-    /** 금액이 가리킬 수 있는 항목. */
+    /** 비교 문장이 가리킬 수 있는 항목. EXPECTED·CAP_IMPACT 는 compare 가 차이를 주지 않으므로 많고 적음을 말하면 근거 없는 주장으로 거절된다. */
     private enum Metric { NET, CAPPED, EXPECTED, CLAWBACK, CARRY, CAP_IMPACT }
 
-    /** 답변에서 항목을 가리키는 말. 금액 앞에 가장 가까이 있는(끝이 가장 뒤인, 같으면 더 긴) 말이 그 금액의 항목이다. */
+    /** 답변에서 항목을 가리키는 말. 문장 안에서 가장 뒤에 있는(끝이 같으면 더 긴) 말이 그 문장의 항목이다. */
     private record MetricPhrase(String text, Set<Metric> metrics) {
     }
 
@@ -75,13 +74,10 @@ final class CompareAskTools {
     private static final String CARRY_LABEL = "이월 예정액";
     private static final String CAP_IMPACT_LABEL = "한도 영향";
     private static final String ERROR = "error";
-    private static final String UNIT_WON = "원";
     private static final String UNIT_PERCENT = "%";
-    private static final Pattern NUMBER = Pattern.compile("(\\d[\\d,]*+(?:\\.\\d++)?)\\s*+(원|%|순위|위|등(?!급))?", Pattern.CANON_EQ);
-    private static final Pattern RANK_LABEL = Pattern.compile("(\\d{1,3})\\s*+위");
-    private static final Pattern TERM_1200 = Pattern.compile("1,?200\\s*%");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
-    private static final List<String> BIGGER_WORDS = List.of("많", "높", "크");
+    /** '커요'는 '크다'의 활용이라 '크'로는 잡히지 않는다. */
+    private static final List<String> BIGGER_WORDS = List.of("많", "높", "크", "커");
     private static final List<String> SMALLER_WORDS = List.of("적", "낮", "작");
     /** 확정 추천·유리함 단정은 참고 순위 원칙에 어긋난다(FUN-079). 거절 안내에 쓰는 '추천' 자체는 막지 않는다. */
     // 정규식으로 넓히면 '추천드리지 않아요' 같은 거절 안내까지 막으므로, 같은 뜻의 변형을 문구로 하나씩 더한다.
@@ -103,18 +99,12 @@ final class CompareAskTools {
         public String name;
     }
 
-    /** 값이 한 상품의 금액인지, 두 상품의 차이인지. */
-    private enum Kind { ABSOLUTE, DIFF }
-
-    /**
-     * 도구가 돌려준 값 하나가 가리키는 대상. ranks 는 값이 속한 순위(차이는 두 순위), biggerRank 는 차이에서 값이 큰 쪽(같거나 아니면 0).
-     * kind 로 한 상품의 금액과 차이를 나눠, 차이를 한 상품의 금액처럼(또는 그 반대로) 쓴 문장을 막는다.
-     */
-    private record Fact(Kind kind, List<Integer> ranks, Set<Metric> metrics, int biggerRank) {
+    /** compare 가 돌려준 차이 하나. biggerRank 는 값이 큰 쪽 순위(같으면 0). */
+    private record Diff(Set<Integer> ranks, Metric metric, int biggerRank) {
     }
 
     private final CompareRankingResponse ranking;
-    private final Map<String, List<Fact>> factsByValue = new HashMap<>();
+    private final List<Diff> diffs = new ArrayList<>();
 
     CompareAskTools(CompareRankingResponse ranking) {
         this.ranking = ranking;
@@ -156,7 +146,7 @@ final class CompareAskTools {
             row.put("항목", e.label());
             row.put("규칙", e.rule());
             if (e.value() != null) {
-                row.put("금액", remember(won(e.value()), Kind.ABSOLUTE, List.of(item.rank()), metricsOf(e.label()), 0));
+                row.put("금액", won(e.value()));
             }
         }
         return node.toString();
@@ -182,7 +172,8 @@ final class CompareAskTools {
     private void putDiff(ObjectNode diff, String label, Metric metric, Item a, Item b, long av, long bv) {
         ObjectNode row = diff.putObject(label);
         int bigger = av == bv ? 0 : av > bv ? a.rank() : b.rank();
-        row.put("금액", remember(won(Math.abs(av - bv)), Kind.DIFF, List.of(a.rank(), b.rank()), EnumSet.of(metric), bigger));
+        diffs.add(new Diff(Set.of(a.rank(), b.rank()), metric, bigger));
+        row.put("금액", won(Math.abs(av - bv)));
         row.put("값이 더 큰 쪽", bigger == 0 ? "같음" : bigger + "위");
     }
 
@@ -199,60 +190,32 @@ final class CompareAskTools {
 
     private ObjectNode describeItem(Item item) {
         ObjectNode node = JSON.createObjectNode();
-        List<Integer> self = List.of(item.rank());
         node.put("순위", item.rank() + "위");
         node.put("상품", item.insurer() + " " + item.product());
-        node.put(NET_LABEL, remember(won(item.conservativeNet()), Kind.ABSOLUTE, self, EnumSet.of(Metric.NET), 0));
-        node.put(CAPPED_LABEL, remember(won(item.cappedReceipt()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CAPPED), 0));
-        node.put(EXPECTED_LABEL, remember(won(item.expectedReceipt()), Kind.ABSOLUTE, self, EnumSet.of(Metric.EXPECTED), 0));
-        node.put(CLAWBACK_LABEL, remember(won(item.clawbackExposure()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CLAWBACK), 0));
-        node.put(CARRY_LABEL, remember(won(item.carryover()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CARRY), 0));
+        node.put(NET_LABEL, won(item.conservativeNet()));
+        node.put(CAPPED_LABEL, won(item.cappedReceipt()));
+        node.put(EXPECTED_LABEL, won(item.expectedReceipt()));
+        node.put(CLAWBACK_LABEL, won(item.clawbackExposure()));
+        node.put(CARRY_LABEL, won(item.carryover()));
         if (item.capImpactPct() != null) {
-            node.put(CAP_IMPACT_LABEL, remember(percent(item.capImpactPct()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CAP_IMPACT), 0));
+            node.put(CAP_IMPACT_LABEL, percent(item.capImpactPct()));
         }
         return node;
     }
 
     /**
      * 한도 영향은 화면과 같게 소수 첫째 자리에서 절사한다(인터페이스정의서 capImpactPct, 화면정의서 공통규칙 3).
-     * 99.96% 를 100.0% 로 올리면 화면(99.9%)과 다른 숫자가 나가고 한도를 다 쓴 것처럼 읽힌다.
+     * 99.96% 를 100.0% 로 올리면 화면(99.9%)과 다른 값을 모델이 근거로 삼고 한도를 다 쓴 것처럼 읽힌다.
      */
     static String percent(double pct) {
         return BigDecimal.valueOf(pct).setScale(1, RoundingMode.DOWN).toPlainString() + UNIT_PERCENT;
-    }
-
-    /** 도구가 돌려주는 값을 기억하고 그대로 돌려준다. */
-    private String remember(String value, Kind kind, List<Integer> ranks, Set<Metric> metrics, int biggerRank) {
-        factsByValue.computeIfAbsent(value, k -> new ArrayList<>()).add(new Fact(kind, ranks, metrics, biggerRank));
-        return value;
-    }
-
-    /** 근거 줄의 이름이 가리키는 항목. 알 수 없으면 모든 항목으로 본다(근거 금액을 엉뚱한 항목으로 막지 않는다). */
-    private static Set<Metric> metricsOf(String label) {
-        Set<Metric> metrics = EnumSet.noneOf(Metric.class);
-        if (label.contains("환수")) {
-            metrics.add(Metric.CLAWBACK);
-        }
-        if (label.contains("이월")) {
-            metrics.add(Metric.CARRY);
-        }
-        if (label.contains("순수령")) {
-            metrics.add(Metric.NET);
-        } else if (label.contains("수령")) {
-            metrics.addAll(RECEIPT);
-        }
-        if (label.contains("한도")) {
-            metrics.add(Metric.CAP_IMPACT);
-            metrics.add(Metric.CAPPED);
-        }
-        return metrics.isEmpty() ? EnumSet.allOf(Metric.class) : metrics;
     }
 
     private Item find(int rank) {
         return ranking.items().stream().filter(i -> i.rank() == rank).findFirst().orElse(null);
     }
 
-    /** 기본 Locale 에 따라 천 단위 구분자가 바뀌지 않게 Locale.ROOT 로 고정한다(답변 대조 키와 같아야 한다). */
+    /** 기본 Locale 에 따라 천 단위 구분자가 바뀌지 않게 Locale.ROOT 로 고정한다. */
     static String won(long amount) {
         return String.format(Locale.ROOT, "%,d원", amount);
     }
@@ -263,7 +226,7 @@ final class CompareAskTools {
 
     // ---- 검증 ----
 
-    /** 도구로 얻지 않은 값, 상품·항목이 맞지 않는 금액, 반대 방향, 확정 추천이면 사유 코드를, 통과하면 null 을 돌려준다. */
+    /** 숫자·한글 금액, 확정 추천, 근거 없는·반대 방향의 비교 문장이면 사유 코드를, 통과하면 null 을 돌려준다. */
     String verify(String text) {
         if (text.isBlank()) {
             return "BLANK";
@@ -278,32 +241,23 @@ final class CompareAskTools {
         if (RECOMMEND_PHRASES.stream().anyMatch(normalized::contains)) {
             return "RECOMMENDATION";
         }
-        if (AnswerNumberGuard.hasKoreanAmount(normalized)) {
-            return "KOREAN_AMOUNT";
+        // 금액·비율·순위 번호는 서버 문장이 맡는다. 보험사·상품 이름 안의 숫자와 용어 '1,200% 룰'만 예외다.
+        if (!AnswerNumberGuard.allowed(text, CompareSummaryService.names(ranking))) {
+            return "NUMBER_GUARD";
         }
-        // 이름 안의 숫자(상품명 '…2026' 등)와 1,200% 룰은 수치가 아니므로 같은 길이의 빈칸으로 가리고 숫자를 찾는다(위치를 유지한다).
-        String masked = mask(TERM_1200, mask(names(), normalized));
-        Matcher m = NUMBER.matcher(masked);
-        while (m.find()) {
-            String reason = verifyNumber(normalized, m.start(), m.group(1), m.group(2));
-            if (reason != null) {
-                return reason;
-            }
-        }
-        return verifyComparisonsWithoutAmount(normalized, masked);
+        return verifyComparisons(normalized);
     }
 
     /**
-     * 금액·비율 없이 두 상품의 많고 적음만 말한 문장('3위 편한건강이 2위 튼튼건강보다 환수 부담이 더 작아요')도 방향을 본다.
-     * 두 순위·항목이 같은 compare 결과가 있으면 그 방향과 대조하고, 없으면 도구가 근거를 주지 않은 주장이므로 거절한다.
-     * 금액이 든 문장은 verifyNumber 가 이미 봤다. 항목 이름이 없으면 무엇을 견줬는지 알 수 없어 보지 않는다.
+     * 두 상품의 많고 적음을 말한 문장('편한건강이 튼튼건강보다 환수 부담이 더 작아요')은 같은 두 상품·항목의 compare 결과와 방향이 맞아야 한다.
+     * compare 를 부르지 않았으면 도구가 근거를 주지 않은 주장이므로 거절한다. 상품 하나만 말하거나 항목 이름이 없으면 보지 않는다.
      */
-    private String verifyComparisonsWithoutAmount(String normalized, String masked) {
+    private String verifyComparisons(String normalized) {
         int start = 0;
         Matcher ends = SENTENCE_END.matcher(normalized);
         while (start < normalized.length()) {
             int end = ends.find() ? ends.start() : normalized.length();
-            String reason = verifyComparisonSentence(normalized.substring(start, end), masked.substring(start, end));
+            String reason = verifyComparisonSentence(normalized.substring(start, end));
             if (reason != null) {
                 return reason;
             }
@@ -312,159 +266,53 @@ final class CompareAskTools {
         return null;
     }
 
-    private String verifyComparisonSentence(String sentence, String maskedSentence) {
+    private String verifyComparisonSentence(String sentence) {
         int pivot = sentence.indexOf("보다");
-        if (pivot <= 0 || hasAmount(maskedSentence)) {
+        if (pivot <= 0) {
             return null;
         }
+        // '보수적 순수령액'의 '적'이 '적어요'로 읽히지 않게 항목 이름은 지우고 서술어만 본다.
         String predicate = sentence.substring(pivot).replace("보수적", " ");
         boolean saysBigger = BIGGER_WORDS.stream().anyMatch(predicate::contains);
         boolean saysSmaller = SMALLER_WORDS.stream().anyMatch(predicate::contains);
-        Set<Integer> mentioned = ranksMentionedIn(sentence);
-        Set<Metric> metrics = nearestMetricsBefore(sentence, sentence.length());
+        Set<Integer> mentioned = ranksMentioned(sentence);
+        Set<Metric> metrics = metricsIn(sentence);
         if (saysBigger == saysSmaller || mentioned.size() != 2 || metrics.isEmpty()) {
             return null;
         }
         boolean paired = false;
-        for (List<Fact> facts : factsByValue.values()) {
-            for (Fact fact : facts) {
-                if (fact.kind() == Kind.DIFF && new HashSet<>(fact.ranks()).equals(mentioned)
-                        && fact.metrics().stream().anyMatch(metrics::contains)) {
-                    paired = true;
-                    // 두 값이 같은데(biggerRank=0) 많다/적다고 말하면 틀린 방향이다. 금액이 든 '0원 많아요'는 verifyNumber 쪽 규칙을 따른다.
-                    if (fact.biggerRank() != 0 && directionHolds(sentence, fact)) {
-                        return null;
-                    }
+        for (Diff diff : diffs) {
+            if (diff.ranks().equals(mentioned) && metrics.contains(diff.metric())) {
+                paired = true;
+                // 두 값이 같은데(biggerRank=0) 많다/적다고 말하면 틀린 방향이다.
+                int subject = subjectOf(sentence, pivot, diff.ranks());
+                if (diff.biggerRank() != 0 && subject != 0 && saysBigger == (subject == diff.biggerRank())) {
+                    return null;
                 }
             }
         }
         return paired ? "DIRECTION_MISMATCH" : "DIRECTION_NOT_FROM_TOOL";
     }
 
-    private static boolean hasAmount(String maskedSentence) {
-        Matcher m = NUMBER.matcher(maskedSentence);
-        while (m.find()) {
-            if (UNIT_WON.equals(m.group(2)) || UNIT_PERCENT.equals(m.group(2))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String verifyNumber(String text, int at, String number, String unit) {
-        if (unit == null) {
-            return "BARE_NUMBER";
-        }
-        if (!UNIT_WON.equals(unit) && !UNIT_PERCENT.equals(unit)) {
-            return isRank(number) ? null : "UNKNOWN_RANK";
-        }
-        List<Fact> facts = factsByValue.get(number + unit);
-        if (facts == null) {
-            return "VALUE_NOT_FROM_TOOL";
-        }
-        // '보다'·'차이'가 있는 문장의 금액은 두 상품의 차이여야 하고, 없는 문장의 금액은 한 상품의 금액이어야 한다.
-        String sentence = sentenceAround(text, at);
-        Kind expected = sentence.contains("보다") || sentence.contains("차이") ? Kind.DIFF : Kind.ABSOLUTE;
-        List<Fact> sameKind = facts.stream().filter(f -> f.kind() == expected).toList();
-        if (sameKind.isEmpty()) {
-            return "VALUE_KIND_MISMATCH";
-        }
-        if (expected == Kind.DIFF) {
-            return verifyDifference(text, at, sentence, sameKind);
-        }
-        int subject = nearestRankBefore(text, at);
-        Set<Metric> metrics = nearestMetricsBefore(text, at);
-        if (subject == 0 || metrics.isEmpty()) {
-            return "VALUE_PAIR_MISMATCH";
-        }
-        boolean paired = false;
-        for (Fact fact : sameKind) {
-            if (fact.ranks().contains(subject) && fact.metrics().stream().anyMatch(metrics::contains)) {
-                paired = true;
-                if (directionHolds(sentence, fact)) {
-                    return null;
-                }
-            }
-        }
-        return paired ? "DIRECTION_MISMATCH" : "VALUE_PAIR_MISMATCH";
-    }
-
-    /**
-     * 차이 값은 그 문장이 가리키는 두 순위가 서버가 계산한 두 순위와 정확히 같을 때만 인정한다.
-     * 한쪽 순위만 맞거나 다른 순위와 비교한 문장(예: compare(1,3)의 차이를 "2위가 1위보다"로 쓴 문장)은 거절한다.
-     */
-    private String verifyDifference(String text, int at, String sentence, List<Fact> facts) {
-        Set<Metric> metrics = nearestMetricsBefore(text, at);
-        Set<Integer> mentioned = ranksMentionedIn(sentence);
-        if (metrics.isEmpty() || mentioned.size() != 2) {
-            return "VALUE_PAIR_MISMATCH";
-        }
-        boolean paired = false;
-        for (Fact fact : facts) {
-            if (new HashSet<>(fact.ranks()).equals(mentioned) && fact.metrics().stream().anyMatch(metrics::contains)) {
-                paired = true;
-                if (directionHolds(sentence, fact)) {
-                    return null;
-                }
-            }
-        }
-        return paired ? "DIRECTION_MISMATCH" : "VALUE_PAIR_MISMATCH";
-    }
-
-    /** 한 문장에서 순위 표기(N위) 또는 보험사·상품 이름으로 언급된 순위 집합. */
-    private Set<Integer> ranksMentionedIn(String sentence) {
+    /** 글에서 보험사·상품 이름으로 언급된 순위 집합. 답에는 순위 번호를 쓸 수 없으므로 이름으로만 찾는다. */
+    Set<Integer> ranksMentioned(String text) {
+        String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
         Set<Integer> ranks = new HashSet<>();
-        Matcher labels = RANK_LABEL.matcher(sentence);
-        while (labels.find()) {
-            int rank = Integer.parseInt(labels.group(1));
-            if (find(rank) != null) {
-                ranks.add(rank);
-            }
-        }
         for (Item item : ranking.items()) {
-            if (mentions(sentence, item.product()) || mentions(sentence, item.insurer())) {
+            if (firstMention(normalized, item) >= 0) {
                 ranks.add(item.rank());
             }
         }
         return ranks;
     }
 
-    private static boolean mentions(String sentence, String name) {
-        return name != null && !name.isBlank() && sentence.contains(Normalizer.normalize(name, Normalizer.Form.NFKC));
-    }
-
-    /** 금액 앞에서 가장 가까이 언급된 상품(순위 표기 또는 이름)의 순위. 없으면 0. 앞 문장에서 이어 말한 것도 센다. */
-    private int nearestRankBefore(String text, int at) {
-        int best = 0;
-        int bestAt = -1;
-        Matcher labels = RANK_LABEL.matcher(text);
-        while (labels.find() && labels.start() < at) {
-            int rank = Integer.parseInt(labels.group(1));
-            if (find(rank) != null && labels.start() > bestAt) {
-                bestAt = labels.start();
-                best = rank;
-            }
-        }
-        for (Item item : ranking.items()) {
-            int named = lastIndexBefore(text, item.product(), at);
-            named = Math.max(named, lastIndexBefore(text, item.insurer(), at));
-            if (named > bestAt) {
-                bestAt = named;
-                best = item.rank();
-            }
-        }
-        return best;
-    }
-
-    /** 같은 문장 안에서 금액 앞에 가장 가까이 쓴 항목 이름이 가리키는 항목들. 문장 안에 없으면 빈 집합. */
-    private static Set<Metric> nearestMetricsBefore(String text, int at) {
-        int sentenceStart = sentenceStart(text, at);
-        String before = text.substring(sentenceStart, at);
+    /** 문장 안에서 가장 뒤에 쓴 항목 이름이 가리키는 항목들. 없으면 빈 집합. */
+    private static Set<Metric> metricsIn(String sentence) {
         int bestEnd = -1;
         int bestLength = -1;
         Set<Metric> best = Set.of();
         for (MetricPhrase phrase : METRIC_PHRASES) {
-            int found = before.lastIndexOf(phrase.text());
+            int found = sentence.lastIndexOf(phrase.text());
             if (found < 0) {
                 continue;
             }
@@ -478,150 +326,49 @@ final class CompareAskTools {
         return best;
     }
 
-    private static int lastIndexBefore(String text, String name, int at) {
-        if (name == null || name.isBlank()) {
-            return -1;
-        }
-        String normalizedName = Normalizer.normalize(name, Normalizer.Form.NFKC);
-        int found = text.lastIndexOf(normalizedName, Math.max(at - 1, 0));
-        return found >= 0 && found < at ? found : -1;
-    }
-
-    private static int sentenceStart(String text, int at) {
-        Matcher m = SENTENCE_END.matcher(text);
-        int start = 0;
-        while (m.find() && m.end() <= at) {
-            start = m.end();
-        }
-        return start;
-    }
-
-    private static String sentenceAround(String text, int at) {
-        int start = sentenceStart(text, at);
-        Matcher m = SENTENCE_END.matcher(text);
-        int end = text.length();
-        while (m.find()) {
-            if (m.start() >= at) {
-                end = m.start();
-                break;
-            }
-        }
-        return text.substring(start, Math.max(start, end));
-    }
-
-    /** '가가 나보다 N원 많아요' 꼴에서 앞쪽(가)이 서버 값이 큰 쪽인지 본다. 꼴을 알아볼 수 없으면 통과시킨다. */
-    private boolean directionHolds(String sentence, Fact fact) {
-        if (fact.biggerRank() == 0) {
-            return true;
-        }
-        int pivot = sentence.indexOf("보다");
-        if (pivot <= 0) {
-            return true;
-        }
-        // '보수적 순수령액'의 '적'이 '적어요'로 읽히지 않게 항목 이름은 지우고 서술어만 본다.
-        String predicate = sentence.substring(pivot).replace("보수적", " ");
-        boolean saysBigger = BIGGER_WORDS.stream().anyMatch(predicate::contains);
-        boolean saysSmaller = SMALLER_WORDS.stream().anyMatch(predicate::contains);
-        if (saysBigger == saysSmaller) {
-            return true;
-        }
-        int subject = subjectOf(sentence, pivot, fact.ranks());
-        if (subject == 0) {
-            // 많다/적다를 말하는데 누가 주어인지 알 수 없으면 방향을 확인하지 못했으므로 통과시키지 않는다.
-            return false;
-        }
-        return saysBigger == (subject == fact.biggerRank());
-    }
-
     /**
-     * 비교 문장의 주어(값이 크다/작다고 말하는 쪽). 'A가 B보다' 꼴은 보다 앞의 첫 순위, 'B보다 A가' 꼴은 보다 앞에 하나뿐이면 보다 뒤에 나온 나머지 순위다.
+     * 비교 문장의 주어(값이 크다/작다고 말하는 쪽). 'A가 B보다' 꼴은 보다 앞에 먼저 나온 상품, 'B보다 A가' 꼴은 보다 앞에 하나뿐이면 보다 뒤의 나머지 상품이다.
      * 알아볼 수 없으면 0.
      */
-    private int subjectOf(String sentence, int pivot, List<Integer> candidates) {
+    private int subjectOf(String sentence, int pivot, Set<Integer> candidates) {
         String before = sentence.substring(0, pivot);
-        int subject = subjectBeforeThan(before, candidates);
-        if (subject != 0) {
-            return subject;
-        }
-        List<Integer> inFront = candidates.stream().filter(rank -> firstMention(before, rank, find(rank)) >= 0).toList();
-        if (inFront.size() != 1) {
-            return 0;
-        }
         String after = sentence.substring(pivot);
-        List<Integer> behind = candidates.stream()
-                .filter(rank -> !inFront.contains(rank) && firstMention(after, rank, find(rank)) >= 0)
-                .toList();
-        return behind.size() == 1 ? behind.get(0) : 0;
-    }
-
-    /** 'A가 B보다' 에서 A. 보다 앞에 두 순위가 모두 나오면 먼저 나온 쪽이 주어다. 하나뿐이면 어느 쪽인지 알 수 없어 0. */
-    private int subjectBeforeThan(String part, List<Integer> candidates) {
         int first = 0;
         int firstAt = Integer.MAX_VALUE;
-        int found = 0;
+        List<Integer> inFront = new ArrayList<>();
         for (int rank : candidates) {
-            int at = firstMention(part, rank, find(rank));
+            int at = firstMention(before, find(rank));
             if (at >= 0) {
-                found++;
+                inFront.add(rank);
                 if (at < firstAt) {
                     firstAt = at;
                     first = rank;
                 }
             }
         }
-        return found >= 2 ? first : 0;
+        if (inFront.size() >= 2) {
+            return first;
+        }
+        if (inFront.size() != 1) {
+            return 0;
+        }
+        List<Integer> behind = candidates.stream()
+                .filter(rank -> !inFront.contains(rank) && firstMention(after, find(rank)) >= 0)
+                .toList();
+        return behind.size() == 1 ? behind.get(0) : 0;
     }
 
-    private static int firstMention(String part, int rank, Item item) {
-        int best = part.indexOf(rank + "위");
+    private static int firstMention(String part, Item item) {
+        int best = -1;
         if (item != null) {
             for (String name : new String[] {item.product(), item.insurer()}) {
-                int at = name == null ? -1 : part.indexOf(name);
+                int at = name == null || name.isBlank() ? -1 : part.indexOf(Normalizer.normalize(name, Normalizer.Form.NFKC));
                 if (at >= 0 && (best < 0 || at < best)) {
                     best = at;
                 }
             }
         }
         return best;
-    }
-
-    private boolean isRank(String number) {
-        try {
-            return find(Integer.parseInt(number)) != null;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    private List<String> names() {
-        List<String> names = new ArrayList<>();
-        for (Item item : ranking.items()) {
-            for (String name : new String[] {item.insurer(), item.product()}) {
-                if (name != null && !name.isBlank()) {
-                    names.add(Normalizer.normalize(name, Normalizer.Form.NFKC));
-                }
-            }
-        }
-        return names;
-    }
-
-    /** 이름들을 같은 길이의 빈칸으로 바꾼다. */
-    private static String mask(List<String> names, String text) {
-        String result = text;
-        for (String name : names) {
-            result = result.replace(name, " ".repeat(name.length()));
-        }
-        return result;
-    }
-
-    private static String mask(Pattern pattern, String text) {
-        Matcher m = pattern.matcher(text);
-        StringBuilder out = new StringBuilder();
-        while (m.find()) {
-            m.appendReplacement(out, " ".repeat(m.end() - m.start()));
-        }
-        m.appendTail(out);
-        return out.toString();
     }
 
     /** 모델이 읽을 상품 목록(금액 없음). 금액은 도구로만 얻는다. */

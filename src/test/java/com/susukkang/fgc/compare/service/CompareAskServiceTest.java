@@ -247,7 +247,8 @@ class CompareAskServiceTest {
         assertThat(captor.getValue().data()).contains("[상품 목록]", "2위 나보험 튼튼건강", "3위 다보험 편한건강").doesNotContain("634,000");
         assertThat(tools.getValue()).extracting(LlmGateway.ToolSpec::name).containsExactly("get_item", "compare", "explain_term");
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).isEqualTo("나보험 튼튼건강은 환수 부담이 더 작아요.");
+        // 순위 질문이므로 서버가 만든 순위·금액 문장이 앞에 붙고, AI 문장은 숫자 없이 뒤에 온다.
+        assertThat(response.answer()).startsWith("2위는 나보험 튼튼건강").endsWith(" 나보험 튼튼건강은 환수 부담이 더 작아요.");
         verify(gateway, never()).call(any(), eq(CompareAskService.Output.class));
     }
 
@@ -274,15 +275,37 @@ class CompareAskServiceTest {
     }
 
     @Test
-    @DisplayName("도구로 얻은 금액을 맞는 상품·항목에 써서 답하면 그대로 낸다")
-    void toolAnswerWithServerValuesIsReturnedAsIs() {
-        llmCallsTools(true, "1위 가보험 든든건강의 보수적 순수령액은 684,000원이고, 환수 노출액은 50,000원이에요.",
-                "get_item", "{\"rank\":1}");
+    @DisplayName("순위 질문은 서버가 만든 순위·금액 문장 뒤에 숫자 없는 AI 풀이를 붙인다")
+    void toolAnswerIsPrefixedWithServerSentence() {
+        llmCallsTools(true, "가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.", "get_item", "{\"rank\":1}");
 
         CompareAskResponse response = service.ask("왜 1위야?", ranking());
 
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).isEqualTo("1위 가보험 든든건강의 보수적 순수령액은 684,000원이고, 환수 노출액은 50,000원이에요.");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 보수적 순수령액은 684,000원이에요.")
+                .endsWith(" 가보험 든든건강은 환수 부담이 작아 가장 앞섰어요.");
+    }
+
+    @Test
+    @DisplayName("도구로 얻은 금액이라도 AI 문장에 숫자를 쓰면 서버 문장으로 대체한다")
+    void toolAmountInAiTextIsReplaced() {
+        llmCallsTools(true, "1위 가보험 든든건강의 보수적 순수령액은 684,000원이에요.", "get_item", "{\"rank\":1}");
+
+        CompareAskResponse response = service.ask("왜 1위야?", ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요.");
+    }
+
+    @Test
+    @DisplayName("질문이 두 상품을 가리키면 AI 문장이 다른 상품을 말할 때 서버 문장으로 대체한다")
+    void aiTextAboutOtherProductIsReplaced() {
+        llmCallsTools(true, "가보험 든든건강은 환수 부담이 가장 작아요.", "compare", "{\"rankA\":2,\"rankB\":3}");
+
+        CompareAskResponse response = service.ask("3위랑 2위 비교해줘", threeItems());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).startsWith("2위는 나보험 튼튼건강").doesNotContain("가장 작아요");
     }
 
     @Test
@@ -297,7 +320,7 @@ class CompareAskServiceTest {
     }
 
     @Test
-    @DisplayName("다른 순위의 금액을 상품에 붙인 답은 서버 문장으로 대체한다")
+    @DisplayName("AI 문장에 금액을 쓰면(다른 순위의 금액이어도) 서버 문장으로 대체한다")
     void amountAttachedToWrongRankIsReplaced() {
         llmCallsTools(true, "3위 다보험 편한건강의 보수적 순수령액은 634,000원이에요.",
                 "get_item", "{\"rank\":2}", "get_item", "{\"rank\":3}");
@@ -311,7 +334,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("많고 적음이 서버 값과 반대인 비교 답은 서버 문장으로 대체한다")
     void reversedDirectionIsReplaced() {
-        llmCallsTools(true, "3위 다보험 편한건강이 2위 나보험 튼튼건강보다 보수적 순수령액이 84,000원 많아요.",
+        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 많아요.",
                 "compare", "{\"rankA\":2,\"rankB\":3}");
 
         CompareAskResponse response = service.ask("3위랑 2위 순수령액 차이가 뭐야?", threeItems());
@@ -320,15 +343,17 @@ class CompareAskServiceTest {
     }
 
     @Test
-    @DisplayName("많고 적음이 서버 값과 같은 비교 답은 그대로 낸다")
+    @DisplayName("많고 적음이 서버 값과 같은 비교 답은 서버 문장 뒤에 붙여 낸다")
     void correctDirectionIsReturned() {
-        llmCallsTools(true, "3위 다보험 편한건강이 2위 나보험 튼튼건강보다 보수적 순수령액이 84,000원 적어요.",
+        llmCallsTools(true, "다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 적어요.",
                 "compare", "{\"rankA\":2,\"rankB\":3}");
 
         CompareAskResponse response = service.ask("3위랑 2위 순수령액 차이가 뭐야?", threeItems());
 
         assertThat(response.source()).isEqualTo("LLM");
-        assertThat(response.answer()).contains("84,000원 적어요");
+        // 금액은 서버 문장에만 있고, AI 문장은 방향만 말로 쓴다.
+        assertThat(response.answer()).contains("2위보다 보수적 순수령액이 84,000원 적어요")
+                .endsWith(" 다보험 편한건강이 나보험 튼튼건강보다 보수적 순수령액이 더 적어요.");
     }
 
     @Test

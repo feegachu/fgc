@@ -10,6 +10,8 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class CompareAskToolsTest {
 
@@ -57,60 +59,15 @@ class CompareAskToolsTest {
     }
 
     @Test
-    @DisplayName("한 상품의 금액을 차이처럼, 차이를 한 상품의 금액처럼 쓴 문장은 거절한다")
-    void absoluteAndDifferenceAreNotInterchangeable() {
-        // 1위 684,000원, 3위 550,000원, 차이 134,000원
-        CompareAskTools tools = toolsWith("compare", PAIR_1_3);
-
-        assertThat(tools.verify("1위 가보험 든든건강이 3위 다보험 편한건강보다 보수적 순수령액이 550,000원 많아요."))
-                .isEqualTo("VALUE_KIND_MISMATCH");
-        assertThat(tools.verify("3위 다보험 편한건강의 보수적 순수령액은 134,000원이에요.")).isEqualTo("VALUE_KIND_MISMATCH");
-        assertThat(tools.verify("1위 가보험 든든건강이 3위 다보험 편한건강보다 보수적 순수령액이 134,000원 많아요.")).isNull();
-        assertThat(tools.verify("1위와 3위의 보수적 순수령액 차이는 134,000원이에요.")).isNull();
-        assertThat(tools.verify("3위 다보험 편한건강의 보수적 순수령액은 550,000원이에요.")).isNull();
-    }
-
-    @Test
-    @DisplayName("차이 값은 문장이 가리키는 두 순위가 서버가 계산한 두 순위와 같을 때만 통과한다")
-    void differenceMustMatchBothRanks() {
-        // compare(1,3)만 호출: 차이 134,000원
-        CompareAskTools tools = toolsWith("compare", PAIR_1_3);
-
-        assertThat(tools.verify("2위 나보험 튼튼건강은 1위 가보험 든든건강보다 보수적 순수령액이 134,000원 많아요."))
-                .isEqualTo("VALUE_PAIR_MISMATCH");
-        assertThat(tools.verify("2위와 1위의 보수적 순수령액 차이는 134,000원이에요.")).isEqualTo("VALUE_PAIR_MISMATCH");
-        assertThat(tools.verify("2위 나보험 튼튼건강은 3위 다보험 편한건강보다 보수적 순수령액이 134,000원 적어요."))
-                .isEqualTo("VALUE_PAIR_MISMATCH");
-        assertThat(tools.verify("1위 가보험 든든건강의 보수적 순수령액이 134,000원 많아요.")).isEqualTo("VALUE_KIND_MISMATCH");
-        assertThat(tools.verify("1위와 3위의 보수적 순수령액 차이는 134,000원이에요.")).isNull();
-    }
-
-    @Test
-    @DisplayName("'B보다 A가' 어순도 값이 큰 쪽이 맞아야 통과한다")
-    void differenceDirectionWithObjectFirstWordOrder() {
-        CompareAskTools tools = toolsWith("compare", PAIR_1_3);
-
-        assertThat(tools.verify("1위 가보험 든든건강보다 3위 다보험 편한건강이 보수적 순수령액이 134,000원 많아요."))
-                .isEqualTo("DIRECTION_MISMATCH");
-        assertThat(tools.verify("3위 다보험 편한건강보다 1위 가보험 든든건강이 보수적 순수령액이 134,000원 적어요."))
-                .isEqualTo("DIRECTION_MISMATCH");
-        assertThat(tools.verify("1위 가보험 든든건강보다 3위 다보험 편한건강이 보수적 순수령액이 134,000원 적어요.")).isNull();
-        assertThat(tools.verify("3위 다보험 편한건강보다 1위 가보험 든든건강이 보수적 순수령액이 134,000원 많아요.")).isNull();
-    }
-
-    @Test
-    @DisplayName("한도 영향은 화면처럼 소수 첫째 자리에서 절사해 준다(99.96% → 99.9%)")
+    @DisplayName("한도 영향은 화면처럼 소수 첫째 자리에서 절사해 모델에 준다(99.96% → 99.9%)")
     void capImpactIsTruncatedLikeTheScreen() {
         Item item = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 99.96, null, List.of());
         CompareRankingResponse base = ranking();
         CompareRankingResponse one = new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
                 base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
                 base.warnings(), null, List.of(item), List.of(), CompareRankingFilters.NONE);
-        CompareAskTools tools = new CompareAskTools(one);
 
-        assertThat(tools.run("get_item", RANK_1)).contains("99.9%").doesNotContain("100.0%");
-        assertThat(tools.verify("1위 가보험 든든건강의 한도 영향은 99.9%예요.")).isNull();
-        assertThat(tools.verify("1위 가보험 든든건강의 한도 영향은 100.0%예요.")).isEqualTo("VALUE_NOT_FROM_TOOL");
+        assertThat(new CompareAskTools(one).run("get_item", RANK_1)).contains("99.9%").doesNotContain("100.0%");
         assertThat(CompareAskTools.percent(90.0)).isEqualTo("90.0%");
     }
 
@@ -124,70 +81,25 @@ class CompareAskToolsTest {
     }
 
     @Test
-    @DisplayName("도구로 얻은 금액을 맞는 상품·항목과 함께 쓰면 통과한다")
-    void valueWithMatchingItemAndMetricPasses() {
-        CompareAskTools tools = toolsWith("get_item", RANK_1, "get_item", RANK_2);
+    @DisplayName("숫자 없이 상품 이름과 이유를 말로 쓴 답은 통과하고, 용어 이름 1,200% 룰과 상품명 안의 숫자는 허용한다")
+    void proseWithoutNumbersPasses() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
 
-        assertThat(tools.verify("1위 가보험 든든건강의 보수적 순수령액은 684,000원이에요. 2위의 환수 노출액은 16,000원이에요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강은 환수 부담이 작아 보수적 순수령액이 가장 커서 앞섰어요.")).isNull();
         assertThat(tools.verify("1,200% 룰은 첫해 수수료의 한도예요.")).isNull();
     }
 
-    @Test
-    @DisplayName("도구가 주지 않은 금액·한글 금액·순위 밖 번호·단위 없는 숫자는 거절한다")
-    void unknownNumbersAreRejected() {
-        CompareAskTools tools = toolsWith("get_item", RANK_1);
-
-        assertThat(tools.verify("1위의 보수적 순수령액은 999,000원이에요.")).isEqualTo("VALUE_NOT_FROM_TOOL");
-        assertThat(tools.verify("1위의 보수적 순수령액은 육십팔만원이에요.")).isEqualTo("KOREAN_AMOUNT");
-        assertThat(tools.verify("9위의 순수령액이 가장 커요.")).isEqualTo("UNKNOWN_RANK");
-        assertThat(tools.verify("상품은 3개 있어요.")).isEqualTo("BARE_NUMBER");
-    }
-
-    @Test
-    @DisplayName("다른 순위의 금액이나 항목이 다른 금액을 붙인 문장은 거절한다")
-    void valueOnTheWrongItemOrMetricIsRejected() {
-        CompareAskTools tools = toolsWith("get_item", RANK_2, "get_item", RANK_3);
-
-        assertThat(tools.verify("3위 다보험 편한건강의 보수적 순수령액은 634,000원이에요.")).isEqualTo("VALUE_PAIR_MISMATCH");
-        assertThat(tools.verify("2위 나보험 튼튼건강의 환수 노출액은 634,000원이에요.")).isEqualTo("VALUE_PAIR_MISMATCH");
-        assertThat(tools.verify("634,000원이에요.")).isEqualTo("VALUE_PAIR_MISMATCH");
-    }
-
-    @Test
-    @DisplayName("상품을 앞 문장에서 한 번 말하고 이어 쓴 금액은 가장 가까운 상품의 것으로 통과한다")
-    void subjectCarriesAcrossSentences() {
-        CompareAskTools tools = toolsWith("get_item", RANK_2);
-
-        assertThat(tools.verify("2위 나보험 튼튼건강을 볼게요. 보수적 순수령액은 634,000원이고 환수 노출액은 16,000원이에요.")).isNull();
-    }
-
-    @Test
-    @DisplayName("한도 반영 수령 예상액 자리에 다른 항목의 금액을 쓰면 거절한다")
-    void metricConfusionIsRejected() {
-        CompareAskTools tools = toolsWith("get_item", RANK_2);
-
-        assertThat(tools.verify("2위 나보험 튼튼건강의 한도 반영 수령 예상액은 634,000원이에요.")).isEqualTo("VALUE_PAIR_MISMATCH");
-        assertThat(tools.verify("2위 나보험 튼튼건강의 한도 반영 수령 예상액은 650,000원이에요.")).isNull();
-    }
-
-    @Test
-    @DisplayName("두 상품의 차이는 많고 적음이 서버 값과 같을 때만 통과한다")
-    void directionMustMatchServerValues() {
-        CompareAskTools tools = toolsWith("compare", PAIR_2_3);
-
-        assertThat(tools.verify("3위 다보험 편한건강이 2위 나보험 튼튼건강보다 보수적 순수령액이 84,000원 적어요.")).isNull();
-        assertThat(tools.verify("2위 나보험 튼튼건강이 3위 다보험 편한건강보다 보수적 순수령액이 84,000원 많아요.")).isNull();
-        assertThat(tools.verify("3위 다보험 편한건강이 2위 나보험 튼튼건강보다 보수적 순수령액이 84,000원 많아요."))
-                .isEqualTo("DIRECTION_MISMATCH");
-        assertThat(tools.verify("2위 나보험 튼튼건강이 3위 다보험 편한건강보다 환수 노출액이 14,000원 적어요.")).isNull();
-    }
-
-    @Test
-    @DisplayName("값이 같은 쌍은 방향을 어느 쪽으로 써도 막지 않는다")
-    void equalValuesHaveNoDirection() {
-        CompareAskTools tools = toolsWith("compare", PAIR_1_3);
-
-        assertThat(tools.verify("1위 가보험 든든건강이 3위 다보험 편한건강보다 이월 예정액이 0원 많아요.")).isNull();
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "가보험 든든건강의 보수적 순수령액은 684,000원이에요.",  // 도구가 준 금액이어도 AI 문장에는 쓰지 않는다
+            "1위 가보험 든든건강은 환수 부담이 작아요.",            // 순위 번호
+            "가보험 든든건강의 한도 영향은 90.5%예요.",            // 비율
+            "가보험 든든건강의 보수적 순수령액은 ６８４,０００원이에요.", // 전각 숫자
+            "가보험 든든건강의 보수적 순수령액은 육십팔만원이에요.",     // 한글 금액
+            "상품은 3개 있어요."})
+    @DisplayName("AI 문장의 숫자(금액·순위 번호·비율·전각·한글 금액)는 도구 값이어도 거절한다")
+    void numbersInAiTextAreRejected(String text) {
+        assertThat(toolsWith("get_item", RANK_1).verify(text)).isEqualTo("NUMBER_GUARD");
     }
 
     @Test
@@ -195,8 +107,8 @@ class CompareAskToolsTest {
     void recommendationsAreRejected() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);
 
-        assertThat(tools.verify("1위 가보험 든든건강을 추천합니다.")).isEqualTo("RECOMMENDATION");
-        assertThat(tools.verify("고객에게 가장 이득이 되는 상품은 1위예요.")).isEqualTo("RECOMMENDATION");
+        assertThat(tools.verify("가보험 든든건강을 추천합니다.")).isEqualTo("RECOMMENDATION");
+        assertThat(tools.verify("고객에게 가장 이득이 되는 상품은 가보험 든든건강이에요.")).isEqualTo("RECOMMENDATION");
         assertThat(tools.verify("순위는 참고용이라 특정 상품을 추천하지는 않아요.")).isNull();
     }
 
@@ -205,8 +117,8 @@ class CompareAskToolsTest {
     void recommendationVariantsAreRejectedButRefusalsPass() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);
 
-        for (String text : List.of("1위 가보험 든든건강을 추천드려요.", "1위 상품을 추천할게요.", "1위 상품을 추천해 드릴게요.",
-                "1위 상품이 더 낫습니다.", "1위 상품이 좋은 선택이에요.")) {
+        for (String text : List.of("가보험 든든건강을 추천드려요.", "든든건강을 추천할게요.", "든든건강을 추천해 드릴게요.",
+                "든든건강이 더 낫습니다.", "든든건강이 좋은 선택이에요.")) {
             assertThat(tools.verify(text)).as(text).isEqualTo("RECOMMENDATION");
         }
         assertThat(tools.verify("특정 상품을 추천드리지 않아요.")).isNull();
@@ -214,34 +126,57 @@ class CompareAskToolsTest {
     }
 
     @Test
-    @DisplayName("금액 없이 많고 적음만 말한 비교 문장도 compare 결과의 방향과 맞아야 하고, compare 를 부르지 않았으면 거절한다")
-    void comparisonWithoutAmountMustMatchToolDirection() {
-        // 환수 노출액: 2위 16,000원, 3위 30,000원 → 2위가 더 작다
-        String wrong = "3위 다보험 편한건강이 2위 나보험 튼튼건강보다 환수 부담이 더 작아요.";
-        String right = "2위 나보험 튼튼건강이 3위 다보험 편한건강보다 환수 부담이 더 작아요.";
-
+    @DisplayName("두 상품의 많고 적음은 compare 결과의 방향과 맞아야 하고, 'B보다 A가' 어순도 본다")
+    void comparisonMustMatchToolDirection() {
+        // 환수 노출액: 튼튼건강(2위) 16,000원, 편한건강(3위) 30,000원 → 튼튼건강이 더 작다
         CompareAskTools compared = toolsWith("compare", PAIR_2_3);
-        assertThat(compared.verify(wrong)).isEqualTo("DIRECTION_MISMATCH");
-        assertThat(compared.verify(right)).isNull();
-        assertThat(compared.verify("3위 다보험 편한건강보다 2위 나보험 튼튼건강이 환수 부담이 더 작아요.")).isNull();
 
-        CompareAskTools notCompared = toolsWith("get_item", RANK_2, "get_item", RANK_3);
-        assertThat(notCompared.verify(right)).isEqualTo("DIRECTION_NOT_FROM_TOOL");
-
-        // 이월 예정액은 2위·3위 모두 0원이라 어느 쪽이 많다/적다고 말하면 틀린 방향이다.
-        assertThat(compared.verify("2위 나보험 튼튼건강이 3위 다보험 편한건강보다 이월 예정액이 더 많아요.")).isEqualTo("DIRECTION_MISMATCH");
-        assertThat(compared.verify("3위 다보험 편한건강이 2위 나보험 튼튼건강보다 이월 예정액이 더 적어요.")).isEqualTo("DIRECTION_MISMATCH");
-
-        // 상품 하나만 말하거나 항목 이름이 없는 문장은 방향을 확인할 수 없어 보지 않는다.
-        assertThat(notCompared.verify("나보험 튼튼건강은 환수 부담이 작은 편이에요.")).isNull();
+        assertThat(compared.verify("나보험 튼튼건강이 다보험 편한건강보다 환수 부담이 더 작아요.")).isNull();
+        assertThat(compared.verify("다보험 편한건강보다 나보험 튼튼건강이 환수 부담이 더 작아요.")).isNull();
+        assertThat(compared.verify("다보험 편한건강이 나보험 튼튼건강보다 환수 부담이 더 작아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(compared.verify("나보험 튼튼건강보다 다보험 편한건강이 환수 부담이 더 작아요.")).isEqualTo("DIRECTION_MISMATCH");
+        // '보수적'의 '적'은 서술어로 읽지 않는다.
+        assertThat(compared.verify("나보험 튼튼건강이 다보험 편한건강보다 보수적 순수령액이 더 많아요.")).isNull();
     }
 
     @Test
-    @DisplayName("전각 숫자로 쓴 금액도 정규화해 도구 값과 대조한다")
-    void fullWidthDigitsAreNormalized() {
-        CompareAskTools tools = toolsWith("get_item", RANK_1);
+    @DisplayName("값이 같은 항목에 많다·적다고 쓰면 거절한다")
+    void equalValuesHaveNoDirection() {
+        // 이월 예정액은 2위·3위 모두 0원
+        CompareAskTools compared = toolsWith("compare", PAIR_2_3);
 
-        assertThat(tools.verify("1위 가보험 든든건강의 보수적 순수령액은 ６８４,０００원이에요.")).isNull();
-        assertThat(tools.verify("1위 가보험 든든건강의 보수적 순수령액은 ９９９,０００원이에요.")).isEqualTo("VALUE_NOT_FROM_TOOL");
+        assertThat(compared.verify("나보험 튼튼건강이 다보험 편한건강보다 이월 예정액이 더 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(compared.verify("다보험 편한건강이 나보험 튼튼건강보다 이월 예정액이 더 적어요.")).isEqualTo("DIRECTION_MISMATCH");
+    }
+
+    @Test
+    @DisplayName("compare 로 견주지 않은 두 상품이나 compare 가 주지 않는 항목의 많고 적음은 근거 없는 주장으로 거절한다")
+    void comparisonWithoutToolEvidenceIsRejected() {
+        String claim = "나보험 튼튼건강이 다보험 편한건강보다 환수 부담이 더 작아요.";
+
+        assertThat(toolsWith("get_item", RANK_2, "get_item", RANK_3).verify(claim)).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        // compare(1,3)을 불렀어도 2위·3위를 견준 근거는 아니다.
+        assertThat(toolsWith("compare", PAIR_1_3).verify(claim)).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+        // 한도 영향은 compare 가 차이를 주지 않는다.
+        assertThat(toolsWith("compare", PAIR_2_3).verify("나보험 튼튼건강이 다보험 편한건강보다 한도 영향이 더 커요."))
+                .isEqualTo("DIRECTION_NOT_FROM_TOOL");
+    }
+
+    @Test
+    @DisplayName("상품 하나만 말하거나 항목 이름이 없는 문장은 방향을 확인할 수 없어 보지 않는다")
+    void sentencesWithoutTwoProductsAndMetricAreNotChecked() {
+        CompareAskTools tools = toolsWith("get_item", RANK_2);
+
+        assertThat(tools.verify("나보험 튼튼건강은 환수 부담이 작은 편이에요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강이 다보험 편한건강보다 앞섰어요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("답에서 언급한 상품은 보험사·상품 이름으로 찾는다")
+    void ranksMentionedByName() {
+        CompareAskTools tools = new CompareAskTools(ranking());
+
+        assertThat(tools.ranksMentioned("나보험 튼튼건강은 편한건강보다 환수 부담이 작아요.")).containsExactlyInAnyOrder(2, 3);
+        assertThat(tools.ranksMentioned("가보험 상품이 앞섰어요.")).containsExactly(1);
     }
 }
