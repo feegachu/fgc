@@ -29,6 +29,7 @@ public class OpenApiConfig {
 
     // 응답 스키마 → null이 올 수 있는 $ref 속성. 3.1에서는 @Schema(nullable = true)가 $ref 옆에서 사라진다.
     private static final Map<String, List<String>> NULLABLE_REFERENCES = Map.of(
+            "PicoAskResponse", List.of("validatedGuide"),
             "ClawbackCandidateDetailResponse", List.of("latestCalculation"),
             "ContractStatusEventResponse", List.of("registeredBy"),
             "ContractStatusEventProcessingResponse", List.of("summary"),
