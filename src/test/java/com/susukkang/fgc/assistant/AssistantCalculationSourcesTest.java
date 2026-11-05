@@ -97,6 +97,49 @@ class AssistantCalculationSourcesTest {
   }
 
   @Test
+  void singleLineListsOnlyFieldsMissingForItsPaymentStage() {
+    var insurer =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            PaymentCalculationRequest.Kind.EXPECTED_COMMISSION,
+            PaymentCalculationRequest.Mode.EXISTING,
+            new PaymentCalculationRequest.Scope(
+                null,
+                "3",
+                "2026-10",
+                PaymentStage.INSURER_TO_GA,
+                null,
+                "4",
+                null,
+                null,
+                null,
+                PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE),
+            null,
+            1L);
+    assertThat(service.calculate(insurer).missingInputs()).containsExactly("installmentNo");
+    var agent =
+        new PaymentCalculationRequest(
+            "assistant.v1",
+            insurer.kind(),
+            insurer.mode(),
+            new PaymentCalculationRequest.Scope(
+                null,
+                "3",
+                "2026-10",
+                PaymentStage.GA_TO_FC,
+                1,
+                "4",
+                null,
+                null,
+                null,
+                PaymentCalculationRequest.Scope.Aggregation.SINGLE_LINE),
+            null,
+            1L);
+    assertThat(service.calculate(agent).missingInputs()).containsExactly("beneficiaryAgentId");
+    verifyNoInteractions(schedules);
+  }
+
+  @Test
   void amountStringsRejectLeadingZerosButKeepZeroFractionsAndBounds() {
     for (String amount : List.of("0001", "00", "01.50", "00.50")) {
       assertThatThrownBy(
