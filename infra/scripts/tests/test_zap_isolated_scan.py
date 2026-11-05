@@ -49,7 +49,7 @@ class ZapTargetGuard(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stderr)
         self.assertFalse(docker_called)
 
-    def run_up(self, failing_call):
+    def run_up(self, failing_call, command="up", curl="printf 502", **extra_env):
         """docker 호출을 기록하고 failing_call 로 시작하는 호출만 실패시킨다."""
         with tempfile.TemporaryDirectory() as stub_dir:
             calls = pathlib.Path(stub_dir) / "calls"
@@ -59,15 +59,15 @@ class ZapTargetGuard(unittest.TestCase):
                 f"case \"$*\" in {failing_call}*) exit 1;; esac\n", encoding="utf-8")
             stub.chmod(0o755)
             # API 가 뜨지 않는 경로를 기다리지 않고 돌린다.
-            for name, body in (("curl", "printf 502"), ("sleep", ":"), ("seq", "echo 1")):
+            for name, body in (("curl", curl), ("sleep", ":"), ("seq", "echo 1")):
                 other = pathlib.Path(stub_dir) / name
                 other.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
                 other.chmod(0o755)
             # Git 의 bin/bash.exe 는 PATH 앞에 usr/bin 을 붙여 위 스텁을 가린다. 실제 bash 를 바로 부른다.
             shell = pathlib.Path(BASH).parents[1] / "usr/bin/bash.exe" if os.name == "nt" else pathlib.Path(BASH)
-            env = {**os.environ, "API_IMAGE": "api", "WEB_IMAGE": "web",
+            env = {**os.environ, "API_IMAGE": "api", "WEB_IMAGE": "web", **extra_env,
                    "PATH": f"{stub_dir}{os.pathsep}{shell.parent}{os.pathsep}{os.environ['PATH']}"}
-            result = subprocess.run([str(shell), str(SCRIPT), "up"], env=env, capture_output=True,
+            result = subprocess.run([str(shell), str(SCRIPT), command], env=env, capture_output=True,
                                     text=True, encoding="utf-8", stdin=subprocess.DEVNULL, timeout=60)
             return result, calls.read_text(encoding="utf-8")
 
@@ -83,19 +83,36 @@ class ZapTargetGuard(unittest.TestCase):
         self.assertLess(calls.index("logs --tail 40 fgc-zap-api"), calls.index("rm -fv fgc-zap-web"))
         self.assertIn("network rm", calls)
 
-    def test_baseline_target_stays_loopback_whatever_scan_path_the_caller_set(self):
+    def test_baseline_stays_loopback_and_unauthenticated_whatever_the_caller_set(self):
         with tempfile.TemporaryDirectory() as stub_dir:
             calls = pathlib.Path(stub_dir) / "calls"
             stub = pathlib.Path(stub_dir) / "docker"
             stub.write_text(f"#!/bin/sh\necho \"$*\" >> '{calls.as_posix()}'\n", encoding="utf-8")
             stub.chmod(0o755)
             env = {**os.environ, "SCAN_PATH": "@evil.example", "ZAP_TARGET": "http://127.0.0.1:18770",
+                   "ZAP_AUTH_HEADER_VALUE": "Bearer left-in-shell",
                    "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}"}
             subprocess.run([BASH, str(SCRIPT), "baseline"], env=env, capture_output=True,
                            text=True, encoding="utf-8", stdin=subprocess.DEVNULL, timeout=60)
             recorded = calls.read_text(encoding="utf-8")
         self.assertIn("zap-baseline.py -t http://127.0.0.1:18770 ", recorded)
         self.assertNotIn("evil.example", recorded)
+        self.assertNotIn("left-in-shell", recorded)
+
+    def test_refuses_a_non_numeric_active_scan_limit_before_docker(self):
+        with mock.patch.dict(os.environ, {"ZAP_ACTIVE_MINUTES": "25 -config connection.proxyChain.enabled=true"}):
+            result, docker_called = self.run_script("http://127.0.0.1:18770", command="api")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(docker_called)
+
+    def test_api_gives_zap_the_token_the_limit_and_its_own_target(self):
+        _, calls = self.run_up("no-such-call", command="api", curl="""cat >/dev/null; printf '{"data":{"accessToken":"t"}}'""",
+                               ZAP_LOGIN_PASSWORD="not-a-real-password", ZAP_ACTIVE_MINUTES="7",
+                               ZAP_TARGET="http://127.0.0.1:18770", SCAN_PATH="@evil.example")
+        self.assertIn("ZAP_AUTH_HEADER_VALUE=Bearer t", calls)
+        self.assertIn("scanner.maxScanDurationInMins=7", calls)
+        self.assertIn("-t http://127.0.0.1:18770/v3/api-docs ", calls)
+        self.assertNotIn("evil.example", calls)
 
     def test_up_leaves_a_running_stack_alone_when_the_network_already_exists(self):
         result, calls = self.run_up("network create")

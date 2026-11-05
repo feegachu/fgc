@@ -179,7 +179,7 @@ AGENT 본인 데이터 범위는 #621의 `AgentDataScopeIntegrationTest`가 맡�
 | API scan, RC 이미지 | 미확인, 사유: RC 미발행 |
 | baseline, 개발계 RC | 미확인, 사유: RC 미발행. #677 표대로 수동 관찰만, 공유 서버라 사용자 승인 뒤 실행 |
 
-스크립트 `infra/scripts/zap-isolated-scan.sh`는 대상이 `http://127.0.0.1:<포트>` 또는 `http://localhost:<포트>`가 아니면 docker를 부르기 전에 거부한다(`test_zap_isolated_scan.py`, 사용자 정보와 접두어 우회 포함). API scan은 문서의 `servers`가 무엇이든 대상에 고정하고(`-O`), 로그인에 실패하면 빈 토큰으로 스캔하지 않고 멈춘다. 실제 LLM을 부르지 않게 키 변수를 지우고 시작하며, 스캔 중 격리 DB의 `ai_call_log`는 0건이었다. 원본 보고서는 `build/zap/`(gitignore)에만 둔다.
+스크립트 `infra/scripts/zap-isolated-scan.sh`는 대상이 `http://127.0.0.1:<포트>` 또는 `http://localhost:<포트>`가 아니면 docker를 부르기 전에 거부한다(`test_zap_isolated_scan.py`, 사용자 정보와 접두어 우회 포함). API scan은 문서의 `servers`가 무엇이든 대상에 고정하고(`-O`), 로그인에 실패하면 빈 토큰으로 스캔하지 않고 멈춘다. baseline은 호출 환경의 경로와 토큰을 쓰지 않고, `ZAP_ACTIVE_MINUTES`는 숫자만 받는다. 실제 LLM을 부르지 않게 키 변수를 지우고 시작하며, 스캔 중 격리 DB의 `ai_call_log`는 0건이었다. 원본 보고서는 `build/zap/`(gitignore)에만 둔다.
 
 ### 4-7. CSP, 보안 헤더
 

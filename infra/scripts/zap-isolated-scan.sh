@@ -26,6 +26,13 @@ if [[ ! "$target" =~ ^http://(127\.0\.0\.1|localhost):[0-9]{1,5}$ ]]; then
     exit 2
 fi
 
+# ZAP 은 -z 문자열을 공백으로 나눠 설정으로 읽는다. 숫자가 아니면 다른 설정(프록시 등)을 끼워 넣을 수 있다.
+active_minutes=${ZAP_ACTIVE_MINUTES:-25}
+if [[ ! "$active_minutes" =~ ^[0-9]+$ ]]; then
+    echo "거부: ZAP_ACTIVE_MINUTES 는 숫자만 허용합니다." >&2
+    exit 2
+fi
+
 # 스캔이 실제 LLM 을 부르거나 키가 격리 환경으로 들어가지 않게 지운다. 아래 docker run 도 -e 로 적은 값만 넘긴다.
 unset OPENAI_API_KEY SPRING_AI_OPENAI_API_KEY
 export MSYS_NO_PATHCONV=1 # Git Bash 가 컨테이너 안 경로(/zap/wrk)를 Windows 경로로 바꾸지 않게 한다
@@ -129,14 +136,15 @@ case "$command" in
     up) up ;;
     down) down ;;
     # 호출자 환경의 SCAN_PATH 가 대상 뒤에 붙으면 @evil.example 처럼 loopback 검사를 우회한다. api 는 아래에서 값을 정한다.
-    baseline) SCAN_PATH= scan zap-baseline -m 2 -z "-Xmx768m -silent" ;;
+    # baseline 은 미인증 관찰이다. 셸에 남은 토큰을 붙이지 않는다.
+    baseline) SCAN_PATH= ZAP_AUTH_HEADER_VALUE= scan zap-baseline -m 2 -z "-Xmx768m -silent" ;;
     api)
         # 대입을 나눠야 set -e 가 로그인 실패에서 멈춘다. 빈 토큰으로 스캔하면 인증 API 를 못 본 채 통과로 보인다.
         token=$(login_token)
         [[ -n "$token" ]] || { echo "로그인 토큰을 받지 못했습니다." >&2; exit 1; }
         # shortcut: 토큰을 갱신하지 않고 수명(30분)에 5분 여유만 둔다. 기동과 문서 가져오기는 제한 밖이고 측정한 전체 시간은 7분이다. 30분에 닿는 규모가 되면 갱신을 넣는다.
         ZAP_AUTH_HEADER_VALUE="Bearer $token" SCAN_PATH=/v3/api-docs \
-            scan zap-api-scan -f openapi -z "-Xmx1g -silent -config scanner.maxScanDurationInMins=${ZAP_ACTIVE_MINUTES:-25}"
+            scan zap-api-scan -f openapi -z "-Xmx1g -silent -config scanner.maxScanDurationInMins=$active_minutes"
         ;;
     *)
         echo "사용법: $0 up|baseline|api|down" >&2
