@@ -2063,6 +2063,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseVerification" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Verification"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseVoid" : {
         "properties" : {
           "data" : { },
@@ -10629,6 +10643,37 @@
           }
         },
         "type" : "object"
+      },
+      "Verification" : {
+        "properties" : {
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "paymentId" : {
+            "type" : "string"
+          },
+          "verified" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "VerifyRequest" : {
+        "properties" : {
+          "paymentId" : {
+            "minLength" : 1,
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "precheckToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "paymentId", "precheckToken" ],
+        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -11285,6 +11330,36 @@
         },
         "summary" : "계산 입력·의존성·사용자·만료 재검증",
         "tags" : [ "payment-calculation-controller" ]
+      }
+    },
+    "/api/v1/assistant/prechecks/revalidate" : {
+      "post" : {
+        "description" : "계산 증표로 대체할 수 없습니다. 금융 상태를 변경하지 않습니다.",
+        "operationId" : "verify",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VerifyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVerification"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "현재 지급의 실제 사전검증 증표 확인",
+        "tags" : [ "assistant-precheck-proof-controller" ]
       }
     },
     "/api/v1/audit-logs" : {
@@ -14970,7 +15045,16 @@
                 }
               }
             },
-            "description" : "사전검증 결과 (차단 사유가 있어도 200 + blockers[])"
+            "description" : "사전검증 결과 (차단 사유가 있어도 200 + blockers[])",
+            "headers" : {
+              "X-FGC-Precheck-Token" : {
+                "description" : "confirmable=true이고 차단 사유가 없을 때만 발급되는 사용자·세션·대상·의존성에 묶인 5분 증표",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
           },
           "400" : {
             "content" : {

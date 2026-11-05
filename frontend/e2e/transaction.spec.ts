@@ -31,6 +31,7 @@ async function installApi(
   const requests: { path: string; method: string; key?: string }[] = []
   let payment: Record<string, unknown> = options.initialDraft ?? {}
   let confirmationAttempts = 0
+  let precheckToken: string | undefined
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -49,6 +50,16 @@ async function installApi(
         canHandleException: !options.reader,
         demoMonth: '2026-07',
       }
+    else if (path === '/api/v1/assistant/prechecks/revalidate') {
+      const body = request.postDataJSON()
+      if (options.reader || payment.status !== 'DRAFT' || body.paymentId !== '101' ||
+          !precheckToken || body.precheckToken !== precheckToken)
+        return route.fulfill({ status: 409, json: {
+          data: null, error: { code: 'FGC-ASST-STALE_CONTEXT', message: '현재 사전검증 증표가 아닙니다.' },
+          requestId: 'fixture-precheck-stale',
+        } })
+      data = { paymentId: '101', verified: true, expiresAt: '2099-01-01T00:00:00Z' }
+    }
     else if (path === '/api/v1/base/agents')
       data = {
         content: [
@@ -92,12 +103,15 @@ async function installApi(
             requestId: 'stale-save',
           },
         })
+      precheckToken = undefined
       payment = { ...payment, ...body, updatedAt: '2026-07-31T10:00:00.000001+09:00' }
       data = payment
     } else if (path === '/api/v1/transactions' && request.method() === 'POST') {
+      precheckToken = undefined
       payment = { ...request.postDataJSON(), commissionTransactionId: 101, status: 'DRAFT' }
       return route.fulfill({ status: 201, json: envelope(payment) })
     } else if (path === '/api/v1/transactions/101/precheck') {
+      precheckToken = undefined
       if (payment.status === 'CONFIRMED')
         return route.fulfill({
           status: 409,
@@ -154,6 +168,11 @@ async function installApi(
               },
             ],
       }
+      // Mirror the real optional proof header; only a successful precheck grants it.
+      precheckToken = options.violation ? undefined : 'fixture-precheck-101'
+      return route.fulfill({ json: envelope(data),
+        headers: precheckToken ? { 'X-FGC-Precheck-Token': precheckToken } : {},
+      })
     } else if (path === '/api/v1/transactions/101/confirm') {
       confirmationAttempts++
       if (options.retryConfirmation && confirmationAttempts === 1)
@@ -174,6 +193,7 @@ async function installApi(
             requestId: 'recorded-violation',
           },
         })
+      precheckToken = undefined
       payment = { ...payment, status: 'CONFIRMED', capCheckIds: [201, 202] }
       // Model a committed operation whose HTTP response is lost. Retrying must use the
       // original key and return the existing result, rather than creating a second payment.
@@ -191,6 +211,7 @@ async function installApi(
         })
       data = payment
     } else if (path === '/api/v1/transactions/101' && request.method() === 'DELETE') {
+      precheckToken = undefined
       payment = {}
       data = null
     } else if (path === '/api/v1/transactions/101') data = payment

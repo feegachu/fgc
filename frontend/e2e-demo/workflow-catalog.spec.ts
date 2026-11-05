@@ -98,6 +98,10 @@ async function start(page: Page, guide: Guide, role: string) {
       await expect(tutorial(page).getByText('목록에서 안내받을 대상을 직접 선택한 뒤 현재 대상에서 다시 시작하세요.', { exact: true })).toBeVisible()
       await page.getByRole('table').locator('tbody a[href^="/contracts/"]').first().click()
       await expect(page).toHaveURL(/\/contracts\/\d+(?:\?|$)/)
+      // Restart reads the committed DOM route; the URL may change before the detail page mounts.
+      await expect(page.getByRole('main').getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
+      await expect(page.locator('[data-guide-page="CONT-W02"]')).toHaveAttribute('data-guide-pathname', new URL(page.url()).pathname)
+      await expect(feature(page, 'features.contract.contract-detail-page.section')).toBeVisible()
       await tutorial(page).getByRole('button', { name: '현재 대상에서 다시 시작', exact: true }).click()
     }
   } else {
