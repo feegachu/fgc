@@ -70,11 +70,12 @@ public interface JournalHeaderRepository
             """)
     int markReversed(@Param("journalHeaderId") Long journalHeaderId);
 
-    // PostgreSQL 정규식 SUBSTRING과 기존 월별 채번 규칙을 그대로 사용한다.
+    // V82 부분 인덱스의 끝값 한 건으로 MAX를 구한다. 정규식이 인덱스 조건과 글자까지 같아야 인덱스가 쓰인다.
     @Query(value = """
-            SELECT COALESCE(MAX(CAST(SUBSTRING(journal_no FROM 'JV-\\d{4}-\\d{2}-(\\d+)$') AS int)), 0) + 1
+            SELECT COALESCE(MAX(CAST(substring(journal_no FROM 12) AS int)), 0) + 1
               FROM fgc.journal_header
-             WHERE journal_no LIKE 'JV-' || :year || '-' || :month || '-%'
+             WHERE left(journal_no, 10) = 'JV-' || :year || '-' || :month
+               AND journal_no ~ '^JV-[0-9]{4}-[0-9]{2}-[0-9]{1,9}$'
             """, nativeQuery = true)
     Integer findNextJournalSeq(@Param("year") String year, @Param("month") String month);
 }
