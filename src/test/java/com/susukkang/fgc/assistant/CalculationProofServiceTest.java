@@ -223,6 +223,21 @@ class CalculationProofServiceTest {
   }
 
   @Test
+  void previewCapacityCannotBlockAnActualPrecheck() {
+    var oldest = proofs.issue(input(1), result());
+    for (int i = 0; i < 32; i++) {
+      clock.now = clock.now.plusSeconds(1);
+      proofs.issue(input(1), result());
+    }
+    String actual = proofs.issuePrecheck(77);
+    assertThat(proofs.verifyPrecheck(77, actual)).isNotNull();
+    var rejectedRequest =
+        new CalculationRevalidationRequest("calc", oldest.validity().stateToken(), input(1));
+    assertThatThrownBy(() -> proofs.revalidate(rejectedRequest))
+        .isInstanceOf(FgcBusinessException.class);
+  }
+
+  @Test
   void staleResponseAlsoRemovesBasisAmountsAndOldBlockerMessages() {
     var original = result();
     var basis =
