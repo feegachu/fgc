@@ -523,7 +523,7 @@ class CommissionPaymentIntegrationTest {
         CommissionPaymentCreateRequest request = request("IT-JPA-NOOP-" + UUID.randomUUID());
         CommissionPaymentResponse created = commissionPaymentService.create(request);
 
-        CommissionPaymentResponse updated = commissionPaymentService.update(created.paymentId(), updateRequest(request, request.amount()));
+        CommissionPaymentResponse updated = commissionPaymentService.update(created.paymentId(), updateRequest(created.paymentId(), request, request.amount()));
 
         assertThat(updated.amount()).isEqualByComparingTo(created.amount());
         assertThat(updated.updatedAt()).isAfter(created.updatedAt());
@@ -563,7 +563,7 @@ class CommissionPaymentIntegrationTest {
         assertThat(entityManager.contains(previous)).isTrue();
         assertThat(previous.getExclusionTypeSnapshot()).isNull();
 
-        CommissionPaymentResponse updated = commissionPaymentService.update(created.paymentId(), updateRequest(request, BigDecimal.ONE));
+        CommissionPaymentResponse updated = commissionPaymentService.update(created.paymentId(), updateRequest(created.paymentId(), request, BigDecimal.ONE));
 
         assertThat(entityManager.contains(previous)).isFalse();
         assertThat(entityManager.find(TransactionAttribution.class, attributionId)).isNull();
@@ -979,7 +979,7 @@ class CommissionPaymentIntegrationTest {
 
         assertThatThrownBy(() -> commissionPaymentService.update(
                 paymentId,
-                updateRequest(manualRequest, new BigDecimal("999"))
+                updateRequest(paymentId, manualRequest, new BigDecimal("999"))
         )).isInstanceOfSatisfying(FgcBusinessException.class,
                 exception -> assertThat(exception.getErrorCode())
                         .isEqualTo(FgcErrorCode.TRAN_005));
@@ -1152,7 +1152,7 @@ class CommissionPaymentIntegrationTest {
                 .capPreview().getFirst();
         BigDecimal amountAtLimit = BigDecimal.valueOf(before.limitAmount() - before.existingIncludedAmount());
         assertThat(amountAtLimit).isNotNegative();
-        commissionPaymentService.update(second.paymentId(), updateRequest(secondRequest, amountAtLimit));
+        commissionPaymentService.update(second.paymentId(), updateRequest(second.paymentId(), secondRequest, amountAtLimit));
         TransactionPrecheckResponse warning = commissionPaymentService.precheck(second.paymentId());
         assertThat(warning.confirmable()).isTrue();
         assertThat(warning.capPreview()).singleElement()
@@ -1212,7 +1212,7 @@ class CommissionPaymentIntegrationTest {
 
         CommissionPaymentResponse updated = commissionPaymentService.update(
                 created.paymentId(),
-                updateRequest(rejectedRequest, BigDecimal.ZERO)
+                updateRequest(created.paymentId(), rejectedRequest, BigDecimal.ZERO)
         );
         assertThat(updated.status()).isEqualTo(CommissionPaymentStatus.DRAFT);
         assertThat(jdbcTemplate.queryForObject("""
@@ -1816,7 +1816,9 @@ class CommissionPaymentIntegrationTest {
         );
     }
 
+    // 이 클래스의 수정은 최신 상세를 읽은 편집자다. 오래된 요청은 CommissionPaymentStaleUpdateIntegrationTest가 검증한다.
     private CommissionPaymentUpdateRequest updateRequest(
+            Long paymentId,
             CommissionPaymentCreateRequest source,
             BigDecimal amount
     ) {
@@ -1846,7 +1848,8 @@ class CommissionPaymentIntegrationTest {
                         ))
                         .toList(),
                 source.evidenceRef(),
-                source.note()
+                source.note(),
+                commissionPaymentService.get(paymentId).updatedAt()
         );
     }
 

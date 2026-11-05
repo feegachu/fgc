@@ -73,7 +73,7 @@ public class CompareAskService {
     /** 챗봇 자체를 묻는 질문(역할·소개·무엇을 알려 주는지). */
     private static final Pattern INTRO_QUESTION = Pattern.compile("역할|뭘 알려|무엇을 알려|뭐 하는|뭐하는|누구|소개|무슨 기능|AI야|ai야", Pattern.CANON_EQ);
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)|순위|차이|비교", Pattern.CANON_EQ);
-    private static final List<String> FORBIDDEN = List.of("반드시", "무조건", "보장합니다", "확정입니다");
+    private static final List<String> FORBIDDEN = CompareSummaryService.FORBIDDEN;
 
     private final LlmGateway llmGateway;
 
