@@ -16,7 +16,7 @@
 | 질문 | 답 |
 |---|---|
 | 무슨 도구로 | CodeQL(정적), Dependabot, npm audit, Trivy(의존성, 이미지), gitleaks, GitHub Secret scanning(비밀값), 역할 × API 행렬 통합 시험(인가), 공격 입력 통합 시험(입력), OWASP ZAP(동적) |
-| 어디까지 | 코드 전체 이력, 쓰기 API 40개 전수 대조(역할 시험 37개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 139건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
+| 어디까지 | 코드 전체 이력, 쓰기 API 41개 전수 대조(역할 시험 38개, 토큰 API 3개는 기존 시험) × 역할 5개 + 미인증, 대표 공격 입력 139건. 실 서버 스캔과 TLS 실측은 RC에서 한다 |
 | High/Critical 건수 | 탐지 15건 → 오탐 3, 이 PR로 조치 10, **예외 2(`.trivyignore` 승인 기재, Dependabot #26은 PM이 해제)**. ZAP High 0 |
 | 조치 | 빌드 도구 classpath의 jackson, commons-lang3 올림. 개발 도구 zod 올림. API 이미지에서 쓰지 않는 pebble 제거. nginx 버전 노출 끄기. ZAP이 찾은 500 응답 3종을 400으로. 정적 화면 응답에 빠져 있던 보안 헤더(CSP 등)는 #782로 넣었고 신한 경로까지 확인 |
 | 남은 일 | RC에서 ZAP, Trivy, TLS, 롤백 실측. 시연 서버의 계정 보호 상태 확인(3절 층 3). 신한 경로 로그인 제한의 앞단 가정 측정(6절) |
@@ -25,7 +25,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 코드 기준 | develop `df13a4f2` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
+| 코드 기준 | develop `a2371010` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
 | 이미지 기준 | 게시 이미지 `sha-69f77eff` (api `sha256:beaf2532…`, web `sha256:1cef1ee3…`). 이 PR의 조치 전 상태다. 그 뒤 develop의 #773(화면), #831(지급 보류, V79), #835(지급 재개, 상태 미리보기)는 이미지에 없고 의존성, `Containerfile`, nginx 변경은 없다 |
 | RC | `r2.0.0-rc1` 미발행. 미확인 |
 | 시험 환경 | Testcontainers PostgreSQL 17, Windows 11 로컬 / GitHub Actions |
@@ -36,10 +36,10 @@
 
 | # | 층 | 도구, 버전 | 대상 | 범위 | 발견 | 조치, 판정 | 상태 |
 |---|---|---|---|---|---|---|---|
-| 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `df13a4f2`(2026-11-04 분석, RC에서 다시 확인) | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
+| 1 | 정적 코드 분석 | CodeQL 2.27.4, `security-extended`, 워크플로 `.github/workflows/codeql.yml`(#782) | develop `a2371010`(2026-11-05 분석, RC에서 다시 확인) | java-kotlin 120규칙, javascript-typescript 103규칙, actions 23규칙 | High 3, Medium 1 (누적) | 열린 경고 0. 처리 내역은 4-1 | 충족 |
 | 2 | 의존성, 이미지 | Dependabot, npm audit, Trivy 0.70.0 | 4-2 | 운영 jar, 빌드 classpath, npm, API/WEB 이미지 | Critical 2, High 10 | High 10 조치(jackson 5, zod 1, pebble 4). Critical 2는 예외(4-2, 7절) | 병합 뒤 재확인 |
 | 3 | 비밀값 | GitHub Secret scanning, Push protection, gitleaks v8.30.1 | 전체 이력 (스캔 시점 develop `185dc854`) | 이력 커밋 1,138개(병합 제외), 로컬의 모든 참조. 그 뒤 develop과 이 PR 커밋 20개는 같은 도구로 추가 1회, 0건 | 자동 탐지 9, 전부 오탐(4-3) | 활성 비밀 자동 탐지 0. 시연 계정 보호는 서버 상태를 봐야 해 미확인 | 일부 미확인 |
-| 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 40개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
+| 4 | 인가 | `RoleApiAuthorizationMatrixIntegrationTest` | 앱 전체 매핑 | 쓰기 API 41개 + 역할을 가르는 읽기, 역할 5개 + 미인증 | 불일치 0 | 4-4 | 충족 |
 | 5 | 입력 | `InputAttackIntegrationTest`, `PrivateVolumeFileStorageTest`, `CsvExportWriterTest`, `exception.test.tsx`, `noRawHtml.test.ts` | 대표 검색, 정렬, 저장 후 응답, 다운로드 | 4-5 | 저장 후 실행, SQL 실행, 경로 탈출 0 | 4-5 | 통과. 요구사항 해석은 4-5에서 확정 |
 | 5-2 | 업로드 | `noHandlerAcceptsFileUpload` | 앱 전체 매핑 | 해당 기능 없음 | 0 | #637 not planned, PR #707 닫힘 (트래커 #755 4번 11/2 결정). 업로드가 돌아오면 이 시험이 깨진다 | 해당 없음 |
 | 6 | AI(LLM) 주입 | #639 평가셋 | #639 | 프롬프트 주입, 다른 설계사 자료, 업무 쓰기 유도 | #639로 연결 | CT-G04, CT-G05는 #639가 판정. 서버 쪽 통제는 #833으로 병합: 사용자별 호출 한도(분당 12회), 범위 밖 질문 고정 안내, 지시문 노출 차단, 시간 제한 20초 | #639 |
@@ -116,7 +116,7 @@ GitHub 설정(2026-11-04 `gh api repos/feegachu/fgc`): `secret_scanning` enabled
 
 | API 묶음 (인터페이스정의서 §4-2) | SYSTEM_ADMIN | GA_ADMIN | SETTLEMENT | COMPLIANCE | AGENT | 미인증 |
 |---|---|---|---|---|---|---|
-| 계약 IF-18, 19, 19A, 19B, 33 / 지급 IF-22, 23, 23D, 24, 25 / 스케줄 IF-29, 29A / 대사 IF-38, 42 / 검증 실행 IF-45, 48, 82 | 허용 | 403 | 허용 | 403 | 403 | 401 |
+| 계약 IF-18, 19, 19A, 19B, 33 / 계약체결비용 FUN-062 요청(IF 번호 미발급) / 지급 IF-22, 23, 23D, 24, 25 / 스케줄 IF-29, 29A / 대사 IF-38, 42 / 검증 실행 IF-45, 48, 82 | 허용 | 403 | 허용 | 403 | 403 | 401 |
 | 검증 확정 IF-51 | 허용 | 허용 | 403 | 403 | 403 | 401 |
 | 원장 정정 IF-36, 36A / 예외 처리 IF-44, 44A / 환수 IF-85, 73 / 계약 상태 미리보기 IF-64 | 허용 | 허용 | 허용 | 403 | 403 | 401 |
 | 정책 작성 IF-79, 80, 81, IF-75 SUBMIT | 허용 | 허용 | 허용 | 403 | 403 | 401 |

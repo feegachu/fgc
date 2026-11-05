@@ -157,6 +157,8 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                         "{" + CONTRACT + ",\"expectedUpdatedAt\":\"2026-01-01T00:00:00+09:00\"}", PROCESS),
                 row("IF-19A", POST, "/api/v1/contracts/{}/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL", null, PROCESS),
                 row("IF-19B", POST, "/api/v1/contracts/{}/cap-check", null, PROCESS),
+                row("FUN-062", POST, "/api/v1/acquisition-cost-checks",
+                        "{\"contractId\":999999999,\"paymentStage\":\"GA_TO_FC\"}", PROCESS),
                 row("IF-33", POST, "/api/v1/contracts/{}/arbitrage-check",
                         "{\"asOfDate\":\"" + MANUAL_RUN_MONTH + "\",\"reason\":\"권한 시험\"}", PROCESS),
                 // 계약 상태 미리보기 IF-64. 저장은 없지만 POST 라 전수 대조 대상이다
@@ -332,7 +334,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
             "/api/v1/clawbacks/candidates/1", "/api/v1/contracts/1/journals", "/api/v1/contracts/1/schedules",
             "/api/v1/contracts/1/transactions", "/api/v1/dashboard/summary", "/api/v1/exceptions", "/api/v1/journals",
             "/api/v1/policies", "/api/v1/reconciliations", "/api/v1/reports/agents/1/statements", "/api/v1/schedules",
-            "/api/v1/validation-runs", "/api/v1/arbitrage-checks"})
+            "/api/v1/validation-runs", "/api/v1/arbitrage-checks", "/api/v1/acquisition-cost-checks"})
     void internalReadsStayClosedForAgent(String url) throws Exception {
         mvc.perform(asActor(Actor.AGENT, request(GET, url)))
                 .andExpect(status().isForbidden())
