@@ -68,6 +68,50 @@ describe('policy UI boundaries', () => {
     rule.maxInstallments = ''
     expect(validateDraft(draft)[errorPath]).toBe('필수 항목을 입력하세요.')
   })
+  it('acquisition cost rate needs a positive number and the source of the value', () => {
+    const draft = regimeDraft('FOUR_YEAR_COMMISSION')
+    expect(validateDraft(draft)).toEqual({})
+    draft.parameters = [{ key: 'ACQUISITION_COST_RATE_PCT', value: 0, description: '' }]
+    expect(validateDraft(draft)['parameters.ACQUISITION_COST_RATE_PCT']).toBe('0보다 큰 기준율을 입력하세요.')
+    expect(validateDraft(draft)['parameters.ACQUISITION_COST_SOURCE']).toBe('값의 출처를 입력하세요.')
+    draft.parameters = [{ key: 'ACQUISITION_COST_RATE_PCT', value: 3000, description: '가상 GA 정책' }]
+    expect(validateDraft(draft)).toEqual({})
+  })
+  it('installment editor saves the acquisition cost basis with its source and never fills in a value', { timeout: 20_000 }, async () => {
+    const { user, save } = mountRegimeEditor(regimeDraft('FOUR_YEAR_COMMISSION'))
+    await user.click(screen.getByRole('button', { name: /계약체결비용 기준/ }))
+    const rate = screen.getByLabelText('월납환산 초회보험료 대비 기준율(%)')
+    expect(rate).toHaveValue(null)
+    await user.type(rate, '3000')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    expect(await screen.findByText('값의 출처를 입력하세요.')).toBeInTheDocument()
+    expect(save).not.toHaveBeenCalled()
+    await user.type(screen.getByLabelText('값의 출처'), '가상 GA 정책(PROJECT_ASSUMPTION)')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    await waitFor(() => expect(save).toHaveBeenCalled())
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parameters: [
+          expect.objectContaining({ key: 'ACQUISITION_COST_BASIS', value: 'MONTHLY_EQUIVALENT_FIRST_PREMIUM' }),
+          { key: 'ACQUISITION_COST_RATE_PCT', value: 3000, description: '가상 GA 정책(PROJECT_ASSUMPTION)' },
+        ],
+      }),
+      1,
+    )
+  })
+  it('installment editor removes the acquisition cost parameters when both inputs are cleared', { timeout: 20_000 }, async () => {
+    const draft = regimeDraft('SEVEN_YEAR_COMMISSION')
+    draft.parameters = [
+      { key: 'ACQUISITION_COST_BASIS', value: 'MONTHLY_EQUIVALENT_FIRST_PREMIUM', description: '기준금액' },
+      { key: 'ACQUISITION_COST_RATE_PCT', value: 3000, description: '가상' },
+    ]
+    const { user, save } = mountRegimeEditor(draft)
+    await user.click(screen.getByRole('button', { name: /계약체결비용 기준/ }))
+    await user.clear(screen.getByLabelText('월납환산 초회보험료 대비 기준율(%)'))
+    await user.clear(screen.getByLabelText('값의 출처'))
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ parameters: [] }), 1))
+  })
   it('production editor allows draft saving', () => {
     render(
       <QueryClientProvider client={new QueryClient()}>

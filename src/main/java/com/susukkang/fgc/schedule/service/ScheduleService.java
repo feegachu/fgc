@@ -1,5 +1,17 @@
 package com.susukkang.fgc.schedule.service;
 
+import com.susukkang.fgc.policy.service.FeeRegimeSchedulePolicyService;
+import com.susukkang.fgc.schedule.repository.SchedulePreviewRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.susukkang.fgc.auth.dto.FgcUserDetails;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
+import java.util.HexFormat;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
+
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
@@ -44,6 +56,9 @@ import java.util.Objects;
 public class ScheduleService {
 
     private final CommissionPolicyService commissionPolicyService;
+    private final FeeRegimeSchedulePolicyService previewPolicies;
+    private final SchedulePreviewRepository previews;
+    private final ObjectMapper objectMapper;
     private final ScheduleQueryRepository scheduleQueryRepository;
     private final ScheduleWriteRepository scheduleWriteRepository;
     private final AgentRepository agentRepository;
@@ -54,6 +69,86 @@ public class ScheduleService {
     private final AuditLogService auditLogService;
     private final ScheduleReviewService scheduleReviewService;
     private final InsuranceContractRepository insuranceContractRepository;
+
+    @Transactional(readOnly = true)
+    public SchedulePreviewContext previewContext(Long contractId, PaymentStage stage) {
+        return new SchedulePreviewContext(previewPolicies.resolve(contractId, stage), previews.sourceVersion(contractId, stage));
+    }
+
+    @Transactional
+    public ScheduleRegenResponse regeneratePreview(Long scheduleId, ScheduleRegenRequest request, String key) {
+        var source = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
+        if (source == null) throw validationException("scheduleId", "스케줄을 찾을 수 없습니다.");
+        return generatePreview(source.getContractId(), source.getPaymentStage(), request, key, scheduleId);
+    }
+
+    /** 명시적 4년 예정 생성. 운영판과 확정 회차는 변경하지 않는다. */
+    @Transactional
+    public ScheduleRegenResponse generatePreview(Long contractId, PaymentStage stage, ScheduleRegenRequest request, String key) {
+        return generatePreview(contractId, stage, request, key, null);
+    }
+
+    private ScheduleRegenResponse generatePreview(Long contractId, PaymentStage stage, ScheduleRegenRequest request, String key, Long sourceScheduleId) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof FgcUserDetails actor)
+                || !List.of("SETTLEMENT", "SYSTEM_ADMIN").contains(actor.getRoleCode()))
+            throw new AccessDeniedException("예정 생성 권한이 없습니다.");
+        if (key == null || !key.matches("[A-Za-z0-9._:-]{1,100}")) throw validationException("Idempotency-Key", "멱등키가 필요합니다.");
+        if (stage == null || request.getRegime() != ScheduleRegime.FOUR_YEAR_2027 || request.getPolicyVersionId() == null
+                || request.getExpectedSourceVersion() == null || request.getExpectedSourceVersion().isBlank() || request.getReason() == null || request.getReason().isBlank() || request.getReason().length() > 40)
+            throw validationException("regime", "4년 체계·선택 정책·원천 버전·사유를 확인하세요.");
+        if (!previews.lockRequest(key)) throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
+        String hash;
+        try {
+            String source = contractId + ":" + stage + ":" + sourceScheduleId + ":" + objectMapper.writeValueAsString(request);
+            hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)));
+            var prior = previews.request(key);
+            if (!prior.isEmpty()) {
+                var stored = prior.getFirst();
+                var result = objectMapper.readTree((String) stored.get("result"));
+                if (!Objects.equals(stored.get("user_id"), actor.getUserId()) || !hash.equals(result.path("requestHash").asText()))
+                    throw new FgcBusinessException(FgcErrorCode.IMPL_IDEMPOTENCY_CONFLICT);
+                return ScheduleRegenResponse.builder().scheduleHeaderId(result.path("scheduleHeaderId").asLong()).versionNo(result.path("versionNo").asLong()).build();
+            }
+        } catch (JsonProcessingException | NoSuchAlgorithmException error) {
+            throw new IllegalStateException(error);
+        }
+        scheduleWriteRepository.lockContractForScheduleGeneration(contractId);
+        if (!insuranceContractRepository.existsById(contractId))
+            throw validationException("contractId", "존재하지 않는 계약입니다.");
+        // Replay above remains valid after the source was deactivated by the first successful request.
+        if (sourceScheduleId != null) {
+            var source = scheduleQueryRepository.selectScheduleHeaderById(sourceScheduleId);
+            if (source == null || !Boolean.TRUE.equals(source.getActiveYn()) || source.getStatus() == ScheduleHeaderStatus.CANCELLED)
+                throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_SOURCE_CHANGED);
+        }
+        previews.lockInputs(contractId, request.getPolicyVersionId());
+        if (!Objects.equals(previews.sourceVersion(contractId, stage), request.getExpectedSourceVersion()))
+            throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_SOURCE_CHANGED);
+        var selected = previewPolicies.resolve(contractId, stage);
+        if (!selected.isSelected() || selected.commissionPolicy().getScheduleRegime() != request.getRegime()
+                || !Objects.equals(selected.commissionPolicy().getPolicyVersionId(), request.getPolicyVersionId()))
+            throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED, "policyVersionId",
+                    Map.of("status", "REVIEW_REQUIRED", "reason", selected.selection().resolution().reasonCode()), "선택 정책과 상품 판매버전의 적용 근거를 다시 확인하세요.");
+        var policy = selected.commissionPolicy();
+        validateResolvedPolicy(policy, stage);
+        if (policy.getRules().stream().anyMatch(rule -> rule.getInstallmentTo() > 48))
+            throw validationException("installmentTo", "4년 예정은 최대 48회차입니다.");
+        var contract = insuranceContractRepository.findById(contractId).orElseThrow();
+        String scenario = "PHASE2_" + request.getRegime().name() + "_" + policy.getPolicyVersionId();
+        Long old = previews.active(contractId, stage, scenario);
+        var header = ScheduleHeaderInsertDTO.builder().contractId(contractId).paymentStage(stage)
+                .policyVersionId(policy.getPolicyVersionId()).scheduleVersionNo(previews.nextVersion(contractId, stage, scenario))
+                .schedulePurpose(SchedulePurpose.SIMULATION).scenarioCode(scenario).scheduleRegime(request.getRegime())
+                .status(ScheduleHeaderStatus.PLANNED).activeYn(true).generationReason(request.getReason()).regeneratedFromId(old).build();
+        previews.deactivate(old);
+        saveSchedule(contract, policy, header);
+        auditLogService.record(AuditLogService.AuditEvent.builder().actionCode("SCHEDULE_PREVIEW_CREATED")
+                .entityType("SCHEDULE_REQUEST").entityId(key).policyVersionId(policy.getPolicyVersionId()).reason(request.getReason())
+                .after(Map.of("requestHash", hash, "scheduleHeaderId", header.getScheduleHeaderId(), "versionNo", header.getScheduleVersionNo(),
+                        "sourceVersion", request.getExpectedSourceVersion(), "sourceRefs", selected.sourceRefs())).build());
+        return ScheduleRegenResponse.builder().scheduleHeaderId(header.getScheduleHeaderId()).versionNo(header.getScheduleVersionNo().longValue()).build();
+    }
 
     /**
      * 설명 : 검색 조건에 따라 스케줄 헤더를 조회한다.
@@ -90,7 +185,8 @@ public class ScheduleService {
 
         // 검색 용도가 지정되지 않으면 운영 스케줄만 조회한다.
         if (condition.getPurpose() == null) {
-            condition.setPurpose(SchedulePurpose.OPERATIONAL);
+            condition.setPurpose(condition.getRegime() == ScheduleRegime.FOUR_YEAR_2027
+                    || condition.getRegime() == ScheduleRegime.SEVEN_YEAR_2029 ? SchedulePurpose.SIMULATION : SchedulePurpose.OPERATIONAL);
         }
         // offset : DB가 앞에서 건널 뛸 행 개수 -> offset 번째 부터 조회함
         long offset = (long) (page - 1) * size;
@@ -271,6 +367,7 @@ public class ScheduleService {
      */
     @Transactional
     public List<Long> regenerateContractSchedules(Long contractId, String reason) {
+        validateRegenerationReason(reason);
         if (contractId == null) {
             throw validationException("contractId", "계약 ID가 존재하지 않습니다.");
         }
@@ -524,16 +621,13 @@ public class ScheduleService {
                 contractId,
                 paymentStage
         );
-        if (detail == null) {
-            return ContractScheduleResponse.builder()
-                    .headers(List.of())
-                    .lines(List.of())
-                    .build();
-        }
-
+        List<ScheduleDetailResponse> active = new ArrayList<>();
+        if (detail != null) active.add(detail);
+        previews.activePreviews(contractId, paymentStage).stream()
+                .map(scheduleQueryRepository::selectScheduleDetailById).filter(Objects::nonNull).forEach(active::add);
         return ContractScheduleResponse.builder()
-                .headers(List.of(detail.getHeader()))
-                .lines(detail.getLines() == null ? List.of() : detail.getLines())
+                .headers(active.stream().map(ScheduleDetailResponse::getHeader).toList())
+                .lines(active.isEmpty() || active.getFirst().getLines() == null ? List.of() : active.getFirst().getLines())
                 .build();
     }
     /** 지급단계 한 건의 스케줄 생성 결과. */
@@ -990,7 +1084,8 @@ public class ScheduleService {
             condition = new ScheduleSearchCondition();
         }
         if (condition.getPurpose() == null) {
-            condition.setPurpose(SchedulePurpose.OPERATIONAL);
+            condition.setPurpose(condition.getRegime() == ScheduleRegime.FOUR_YEAR_2027
+                    || condition.getRegime() == ScheduleRegime.SEVEN_YEAR_2029 ? SchedulePurpose.SIMULATION : SchedulePurpose.OPERATIONAL);
         }
         return scheduleQueryRepository.selectAllByCondition(condition);
     }
@@ -1077,6 +1172,13 @@ public class ScheduleService {
         return policyRegime;
     }
 
+    private void validateRegenerationReason(String reason) {
+        if (reason == null || reason.isBlank())
+            throw validationException("reason", "재생성 사유는 필수입니다.");
+        if (reason.length() > 40)
+            throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
+    }
+
     /**
      * 설명 : FUN-039 새 스케줄 생성 , 기존 스케줄은 유지하고 상태,활성화 여부만 변경하고 새 스케줄 헤더와 라인을 생성한다.
      *
@@ -1088,11 +1190,7 @@ public class ScheduleService {
      */
     @Transactional
     public ScheduleRegenResponse regenerateSchedules(Long scheduleId, String reason) {
-        // 서비스 직접 호출에서도 재생성 사유의 필수값과 DB 최대 길이를 검증
-        if (reason == null || reason.isBlank())
-            throw validationException("reason", "재생성 사유는 필수입니다.");
-        if (reason.length() > 40)
-            throw validationException("reason", "재생성 사유는 40자 이하여야 합니다.");
+        validateRegenerationReason(reason);
 
         // 기존 스케줄 헤더 조회 및 존재 여부 검증
         ScheduleHeaderInsertDTO oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
@@ -1105,6 +1203,8 @@ public class ScheduleService {
         oldHeader = scheduleQueryRepository.selectScheduleHeaderById(scheduleId);
         if (oldHeader == null)
             throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
+        if (oldHeader.getScheduleRegime() == ScheduleRegime.FOUR_YEAR_2027 || oldHeader.getScheduleRegime() == ScheduleRegime.SEVEN_YEAR_2029)
+            throw validationException("regime", "예정 재생성은 체계·정책·원천 버전과 멱등키를 함께 보내야 합니다.");
         if (!Boolean.TRUE.equals(oldHeader.getActiveYn()))
             throw new FgcBusinessException(FgcErrorCode.SCHE_001);
         if (oldHeader.getStatus() == ScheduleHeaderStatus.CANCELLED)
@@ -1222,6 +1322,8 @@ public class ScheduleService {
         if (header == null) {
             throw validationException("scheduleId", "존재하지 않는 스케줄입니다.");
         }
+        if (header.getScheduleRegime() == ScheduleRegime.FOUR_YEAR_2027 || header.getScheduleRegime() == ScheduleRegime.SEVEN_YEAR_2029)
+            throw new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_PREVIEW_ONLY);
         if (header.getStatus() == ScheduleHeaderStatus.CONFIRMED) {
             return selectScheduleDetailById(scheduleId);
         }

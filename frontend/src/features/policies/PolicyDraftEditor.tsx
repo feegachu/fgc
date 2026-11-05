@@ -1,4 +1,7 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { SaveGuide } from '../assistant/guide/save-guide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 import { errorText } from '../../lib/format'
 import { screenMessage } from '../../lib/screenText'
 import { useQueryClient } from '@tanstack/react-query'
@@ -10,6 +13,10 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { ClawbackTargets, CommissionRow, DraftInput, DraftSelect } from './PolicyDraftFields'
 import {
+  ACQUISITION_COST_BASIS,
+  ACQUISITION_COST_RATE,
+  ACQUISITION_COST_SOURCE,
+  MONTHLY_EQUIVALENT_FIRST_PREMIUM,
   conditionOptions,
   emptyCommission,
   emptyDraft,
@@ -29,6 +36,7 @@ import type { DraftErrors } from './draftValidation'
 import { normalizePolicyDetail, savePolicyDraft } from './writeApi'
 import type { PolicyDetailResponse } from './writeApi'
 import { usePolicyRequest } from './usePolicyRequest'
+import { toast } from '../../stores/toasts'
 
 type Section = 'basic' | 'commissionRules' | 'feeRegimeRules' | 'parameters' | 'clawbackRules' | 'sourceDetails'
 function sectionFor(path: string): Section {
@@ -58,6 +66,9 @@ export function PolicyDraftEditor({
   onSaved: (id: number) => void
   initialProblem?: { field: string; message: string }
 }) {
+  const [saveGuide] = useState(() => new SaveGuide())
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const preview = useContext(PolicyPreviewContext)
   const cache = useQueryClient()
   const [draft, setDraft] = useState(() => structuredClone(initial ?? emptyDraft()))
@@ -66,7 +77,10 @@ export function PolicyDraftEditor({
   const [errors, setErrors] = useState<DraftErrors>(() =>
     initialPath && initialProblem ? { [initialPath]: initialProblem.message } : {},
   )
+  useEffect(() => { saveGuide.update(draft, !preview && Object.keys(validateDraft(draft)).length === 0) }, [saveGuide, draft, preview])
+  const serverSaved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
   const [busy, setBusy] = useState(false)
+  const [committed, setCommitted] = useState(false)
   const [failure, setFailure] = useState(initialProblem?.message ?? '')
   const [conflict, setConflict] = useState(false)
   const [latest, setLatest] = useState('')
@@ -74,6 +88,7 @@ export function PolicyDraftEditor({
   const [dirty, setDirty] = useState(false)
   const clearUnsaved = useUnsavedWork(dirty)
   const saving = useRef(false)
+  const storedRef = useRef(false)
   const requestKey = usePolicyRequest()
   const titleFocus = useRef<HTMLInputElement>(null)
   const set = <K extends keyof DraftDocument>(key: K, value: DraftDocument[K]) => {
@@ -101,6 +116,7 @@ export function PolicyDraftEditor({
       ? [{ id: 'commissionRules' as const, label: '수수료 규칙', count: draft.commissionRules.length }]
       : []),
     ...(installment ? [{ id: 'feeRegimeRules' as const, label: '분급 룰셋', count: draft.feeRegimeRules.length }] : []),
+    ...(installment ? [{ id: 'parameters' as const, label: '계약체결비용 기준', count: draft.parameters.length }] : []),
     ...(draft.policyType === 'SCHEDULE_ELIGIBILITY'
       ? [{ id: 'parameters' as const, label: '상태별 지급조건', count: draft.parameters.length }]
       : []),
@@ -109,6 +125,17 @@ export function PolicyDraftEditor({
       : []),
     { id: 'sourceDetails', label: '근거 자료', count: draft.sourceDetails.length },
   ]
+  const acquisitionRate = draft.parameters.find((parameter) => parameter.key === ACQUISITION_COST_RATE)
+  const setAcquisitionCost = (rate: string, description: string) =>
+    set(
+      'parameters',
+      rate.trim() || description.trim()
+        ? [
+            { key: ACQUISITION_COST_BASIS, value: MONTHLY_EQUIVALENT_FIRST_PREMIUM, description: '기준금액' },
+            { key: ACQUISITION_COST_RATE, value: rate.trim() === '' ? '' : Number(rate), description },
+          ]
+        : [],
+    )
   const close = () => {
     if (saving.current) return
     if (dirty) setDiscard(true)
@@ -116,7 +143,11 @@ export function PolicyDraftEditor({
   }
   function focusError(path: string) {
     const group = sectionFor(path)
-    setSection(sections.some((item) => item.id === group) ? group : 'basic')
+    // 저장 중 잠긴 fieldset 안의 입력과 아직 그리지 않은 구역의 입력에는 focus가 먹지 않으므로 먼저 화면에 반영한다.
+    flushSync(() => {
+      setBusy(false)
+      setSection(sections.some((item) => item.id === group) ? group : 'basic')
+    })
     const parameter = /^parameters\.(\d+)\./.exec(path)
     const focusPath = parameter ? `parameters.${draft.parameters[Number(parameter[1])]?.key}` : path
     requestAnimationFrame(() => focusPolicyField(focusPath))
@@ -146,7 +177,7 @@ export function PolicyDraftEditor({
     }
   }
   async function save() {
-    if (saving.current) return
+    if (saving.current || storedRef.current) return
     const nextErrors = validateDraft(draft)
     setErrors(nextErrors)
     const first = Object.keys(nextErrors)[0]
@@ -156,7 +187,9 @@ export function PolicyDraftEditor({
     }
     saving.current = true
     setBusy(true)
+    saveGuide.begin()
     setFailure('')
+    let stored = false
     try {
       const document = {
         ...draft,
@@ -180,13 +213,27 @@ export function PolicyDraftEditor({
       const id = preview
         ? await preview.save(document, policyId)
         : (await savePolicyDraft(document, policyId, requestKey({ policyId, document }))).policyVersionId
+      stored = true
+      storedRef.current = true
+      setCommitted(true)
       setDirty(false)
       clearUnsaved()
-      onSaved(id)
+      void cache.invalidateQueries({ queryKey: ['policies'], refetchType: 'none' })
+      if (!mounted.current) return
+      if (preview || (await saveGuide.saved(id))) { if (mounted.current) onSaved(id) }
     } catch (cause) {
-      setFailure(
-        errorText(cause instanceof Error ? cause : null, '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.'),
-      )
+      if (!mounted.current) return
+      if (stored) {
+        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 목록에서 저장 결과를 확인하세요.'
+        saveGuide.fail(message)
+        setFailure(message)
+        void cache.invalidateQueries({ queryKey: ['policies'] })
+        toast(message, 'warning')
+        return
+      }
+      const message = errorText(cause instanceof Error ? cause : null, '저장하지 못했습니다. 입력 내용을 확인하고 다시 시도하세요.')
+      saveGuide.fail(message)
+      setFailure(message)
       setConflict(cause instanceof ApiError && cause.status === 409)
       if (cause instanceof ApiError && cause.field) {
         const path = cause.field.replace(/\[(\d+)\]/g, '.$1')
@@ -195,7 +242,7 @@ export function PolicyDraftEditor({
       }
     } finally {
       saving.current = false
-      setBusy(false)
+      if (mounted.current) setBusy(false)
     }
   }
   const field = (
@@ -228,20 +275,21 @@ export function PolicyDraftEditor({
       footer={
         <>
           <span className="policy-editor-footer-note">
-            {preview
+            {serverSaved ? '서버에 초안이 저장되었습니다. 가이드 완료를 확인해 주세요.' : preview
               ? '미리보기, 변경 내용은 이 화면에서만 유지됩니다.'
               : '초안으로 저장한 후 검토를 요청할 수 있습니다.'}
           </span>
           <Button data-guide-feature="features.policies.policy-draft-editor.button" variant="secondary" disabled={busy} onClick={close}>
             취소
           </Button>
-          <Button data-guide-feature="features.policies.policy-draft-editor.button-2" loading={busy} disabled={discard} onClick={() => void save()}>
+          <Button data-guide-feature="features.policies.policy-draft-editor.button-2" data-guide-target="policy.save" loading={busy && !serverSaved} disabled={discard || busy || committed} onClick={() => void save()}>
             초안 저장
           </Button>
         </>
       }
     >
       <div className="policy-editor-intro">
+      <ScreenHelp screenId="POL-W01" variant="editor" saveGuide={saveGuide} />
         <StatusBadge tone="warning">초안</StatusBadge>
         <span>기본정보와 유형별 규칙을 작성한 후 검토를 요청하세요.</span>
         <span className="policy-required-note">* 필수 입력</span>
@@ -271,7 +319,7 @@ export function PolicyDraftEditor({
           {latest && <p role="status">{latest}</p>}
         </div>
       )}
-      <form data-guide-feature="features.policies.policy-draft-editor.form"
+      <form data-guide-feature="features.policies.policy-draft-editor.form" data-guide-target="policy.editor"
         noValidate
         onSubmit={(e) => {
           e.preventDefault()
@@ -300,7 +348,7 @@ export function PolicyDraftEditor({
             </button>
           ))}
         </nav>
-        <fieldset disabled={busy} className="policy-editor-content">
+        <fieldset disabled={busy || committed} className="policy-editor-content">
           <div className="policy-section-heading">
             <div>
               <h2>{sections.find((item) => item.id === section)?.label}</h2>
@@ -578,7 +626,32 @@ export function PolicyDraftEditor({
               </Button>
             </>
           )}
-          {section === 'parameters' && (
+          {section === 'parameters' && installment && (
+            <>
+              <p className="policy-section-description">
+                계약체결비용 한도 검증의 기준금액을 정합니다. 규정이 정한 고정값이 아니므로 값의 출처를 함께 적습니다. 비워 두면 한도 검증은 검토 필요로 남고 예정 스케줄 생성에는 영향이 없습니다.
+              </p>
+              <DraftInput
+                path={`parameters.${ACQUISITION_COST_RATE}`}
+                label="월납환산 초회보험료 대비 기준율(%)"
+                type="number"
+                min={0}
+                step="any"
+                errors={errors}
+                value={String(acquisitionRate?.value ?? '')}
+                onChange={(value) => setAcquisitionCost(value, acquisitionRate?.description ?? '')}
+              />
+              <DraftInput
+                path={`parameters.${ACQUISITION_COST_SOURCE}`}
+                label="값의 출처"
+                maxLength={500}
+                errors={errors}
+                value={acquisitionRate?.description ?? ''}
+                onChange={(value) => setAcquisitionCost(String(acquisitionRate?.value ?? ''), value)}
+              />
+            </>
+          )}
+          {section === 'parameters' && !installment && (
             <>
               <p className="policy-section-description">
                 적용할 지급조건을 고릅니다. 각 조건의 적용 근거는 근거 자료에서 연결하세요.

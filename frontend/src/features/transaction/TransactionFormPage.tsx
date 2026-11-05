@@ -268,6 +268,9 @@ function TransactionForm({
     }))
     return buildPayload(validatedForm, validatedRows, newcomer)
   }
+  const missingEvidence = rows.some((row) =>
+    (newcomer || row.decision.startsWith('EXCLUDED')) && !row.evidenceRef.trim(),
+  )
   let guideInputValid = false
   let guideValidationMessage: string | undefined
   try {
@@ -387,7 +390,7 @@ function TransactionForm({
     setFieldError(error)
   }
   async function save() {
-    if (!ready || locked || confirmationNeedsRetry || actionLock.current) return
+    if (!ready || locked || missingEvidence || confirmationNeedsRetry || actionLock.current) return
     setFieldError(undefined)
     setSaveError('')
     let payload
@@ -626,7 +629,10 @@ function TransactionForm({
           )}
         </div>
       )}
-      {locked && (
+      {missingEvidence && (
+        <p role="status">{newcomer ? '신규 설계사 지원 건은 모든 귀속행에 증빙을 입력해야 합니다.' : '제외 귀속행은 제외유형과 증빙을 입력해야 합니다.'}</p>
+      )}
+      {locked && !confirmed && (
         <div id="draft-lock-notice" className="guidance guidance-neutral transaction-lock-notice" role="status">
           <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
             lock
@@ -831,7 +837,7 @@ function TransactionForm({
                 data-guide-target="payment.save"
                 variant="secondary"
                 loading={busy === 'save'}
-                disabled={!ready || locked || confirmationNeedsRetry}
+                disabled={!ready || locked || missingEvidence || confirmationNeedsRetry}
                 onClick={() => void save()}
                 aria-describedby="transaction-action-help transaction-permission-help"
               >

@@ -20,6 +20,10 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleLineResponse {
+    private Long scheduleLineId;
+    private Long sourceStatusEventId;
+    private String feeComponentType;
+    private BigDecimal fixedAmount;
     private Long contractId;
     private Long beneficiaryAgentId;
     private Long commissionItemId;
