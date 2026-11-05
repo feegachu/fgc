@@ -69,6 +69,7 @@ export interface Decision {
   step: SettlementStep
   reason: string
   complete?: boolean
+  correctionPending?: boolean
 }
 export function decide(selection: Selection, evidence: Evidence, role: string): Decision {
   const at = (step: SettlementStep, reason: string): Decision => ({ step, reason })
@@ -104,10 +105,10 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     throw new Error('지급의 계약, 기준월, 지급단계가 현재 안내 대상과 다릅니다.')
   if (payment.status !== 'CONFIRMED') {
     if (payment.status === 'CANCELLED')
-      return at(
+      return { ...at(
         'exception.resolve',
         '기존 지급이 취소되었습니다. 원천 정정 결과의 확정된 지급 번호를 선택한 뒤 새 월 검증을 실행하고 재대사 결과를 확인하세요.',
-      )
+      ), correctionPending: true }
     if (payment.status !== 'DRAFT') throw new Error('현재 지급 상태는 이 흐름에서 처리할 수 없습니다.')
     if (evidence.paymentGuide && !evidence.paymentGuide.saved)
       return at('payment.draft', '변경된 입력을 실제 저장한 뒤 이어가세요.')

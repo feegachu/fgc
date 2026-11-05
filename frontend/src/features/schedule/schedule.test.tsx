@@ -168,6 +168,70 @@ describe('1차 schedule-list.test.cjs 이전', () => {
 })
 
 describe('SCHE-W01 예상 스케줄 목록', () => {
+  it('#725 페이지 갱신 중 이전 결과를 표시하고 상세 이동·CSV를 잠근다', async () => {
+    let finish!: (value: ReturnType<typeof listPage>) => void
+    const pending = new Promise<ReturnType<typeof listPage>>((resolve) => { finish = resolve })
+    const { actions, router } = renderAt('/schedules?month=2026-07', (url) => {
+      if (!url.startsWith('/api/v1/schedules?')) return undefined
+      return query(url).page === '2' ? pending : listPage([header(11)], { totalPages: 2, totalElements: 21 })
+    })
+    await screen.findByRole('link', { name: 'C-2026-0001 회차 보기' })
+    await actions.click(screen.getByRole('button', { name: '2' }))
+    expect(await screen.findByText(/스케줄을 갱신 중입니다/)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'C-2026-0001 회차 보기' })
+    expect(link).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeDisabled()
+    await actions.click(link)
+    expect(router.state.location.pathname).toBe('/schedules')
+    await act(async () => finish(listPage([header(22, { contractNo: 'C-PAGE-2' })], { page: 2, totalPages: 2, totalElements: 21 })))
+    expect(await screen.findByRole('link', { name: 'C-PAGE-2 회차 보기' })).not.toHaveAttribute('aria-disabled')
+    expect(screen.queryByText(/스케줄을 갱신 중입니다/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeEnabled()
+  })
+
+  it('#725 초기화는 정렬·선택·페이지를 지우고 같은 조건의 검색도 다시 조회한다', async () => {
+    const { actions, router } = renderAt('/schedules?month=2026-07&sort=total,desc&selectedId=11&page=2', (url) =>
+      url.startsWith('/api/v1/schedules?') ? listPage([header(11)], { totalPages: 2 }) : undefined,
+    )
+    await screen.findByRole('link', { name: 'C-2026-0001 회차 보기' })
+    await actions.click(screen.getByRole('button', { name: /초기화/ }))
+    await waitFor(() => expect(router.state.location.search).toBe('?month=2026-07&purpose=OPERATIONAL'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeEnabled())
+    const count = calls('/api/v1/schedules?').length
+    await actions.click(screen.getByRole('button', { name: '조회' }))
+    await waitFor(() => expect(calls('/api/v1/schedules?').length).toBeGreaterThan(count))
+    expect(requested.every(({ options }) => !options?.method || options.method === 'GET')).toBe(true)
+  })
+
+  it('#725 예정 안내와 실제 회차·행 수, 자료 없음·0원·음수를 구분한다', async () => {
+    renderAt('/schedules?regime=SEVEN_YEAR_2029', (url) => url.startsWith('/api/v1/schedules?') ? listPage([
+      header(11, { scheduleRegime: 'SEVEN_YEAR_2029', installmentCount: 84, lineCount: 108, expectedTotal: 0 }),
+      header(12, { expectedTotal: undefined, installmentCount: undefined, lineCount: undefined }),
+      header(13, { expectedTotal: -1000 }),
+    ]) : undefined)
+    expect(await screen.findByText('84회 · 108행')).toBeInTheDocument()
+    expect(screen.getByText('회차 자료 없음 · 행 수 자료 없음')).toBeInTheDocument()
+    expect(screen.getByText('자료 없음')).toBeInTheDocument()
+    expect(screen.getByText('0원')).toBeInTheDocument()
+    expect(screen.getByText('-1,000원')).toBeInTheDocument()
+    expect(screen.getByText(/예정 결과이며 지급 확정 대상이 아닙니다/)).toBeInTheDocument()
+  })
+
+  it('#725 이전 체계의 늦은 응답이 현재 선택한 체계를 덮어쓰지 않는다', async () => {
+    let finish!: (value: ReturnType<typeof listPage>) => void
+    const pending = new Promise<ReturnType<typeof listPage>>((resolve) => { finish = resolve })
+    renderAt('/schedules?month=2026-07&regime=FOUR_YEAR_2027', (url) => {
+      if (!url.startsWith('/api/v1/schedules?')) return undefined
+      return query(url).regime === 'FOUR_YEAR_2027' ? pending : listPage([header(22, { contractNo: 'C-SEVEN' })])
+    })
+    fireEvent.change(await screen.findByLabelText('적용 체계'), { target: { value: 'SEVEN_YEAR_2029' } })
+    await screen.findByRole('link', { name: 'C-SEVEN 회차 보기' })
+    await act(async () => finish(listPage([header(11, { contractNo: 'C-FOUR' })])))
+    expect(screen.getByRole('link', { name: 'C-SEVEN 회차 보기' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'C-FOUR 회차 보기' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('적용 체계')).toHaveValue('SEVEN_YEAR_2029')
+  })
+
   it('#1 URL 조건으로 조회·라벨·금액 표시·페이지·URL 동기화·CSV 가 1차와 같다', async () => {
     const rows = [
       header(11),
@@ -314,6 +378,61 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
       if (url === '/api/v1/schedules/10/versions') return versions
       return undefined
     }
+
+  it('#726 서버가 제공한 원천 사건만 회차 상태 옆에 표시한다', async () => {
+    const response = detail()
+    response.lines![0].sourceStatusEventId = 901
+    response.lines![0].lineStatus = 'HOLD'
+    renderAt('/schedules/11?month=2026-07', baseHandler(response))
+    expect(await screen.findByText('원천 사건 #901')).toBeInTheDocument()
+    expect(screen.getByText('보류')).toBeInTheDocument()
+    expect(screen.getAllByText(/원천 사건 #/)).toHaveLength(1)
+  })
+
+  it('#726 서버 확정 차단 사유를 버튼 설명으로 표시한다', async () => {
+    renderAt('/schedules/11?month=2026-07', baseHandler(detail({ canConfirm: false, confirmBlockedReason: 'SCHEDULE_NOT_ACTIVE_PLANNED' })))
+    expect(await screen.findByText('사용 중인 예정 상태의 스케줄만 확정할 수 있습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '확정' })).toHaveAccessibleDescription('사용 중인 예정 상태의 스케줄만 확정할 수 있습니다.')
+  })
+
+  it.each([
+    { scheduleRegime: 'FOUR_YEAR_2027' as const, status: 'PLANNED' as const, code: 'FGC-IMPL-SCHEDULE_PREVIEW_ONLY', message: '4년·7년 예정판은 지급 확정 대상이 아닙니다.' },
+    { scheduleRegime: 'CURRENT' as const, status: 'CONFIRMED' as const, code: 'SCHEDULE_NOT_ACTIVE_PLANNED', message: '이미 확정된 스케줄입니다.' },
+  ])('확정 차단 코드를 숨기고 상태 사유를 한 번 표시한다: $status', async ({ scheduleRegime, status, code, message }) => {
+    renderAt('/schedules/11?month=2026-07', baseHandler(detail({ canConfirm: false, confirmBlockedReason: code, scheduleRegime, status })))
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.getAllByText(message)).toHaveLength(1)
+    expect(screen.queryByText(code, { exact: false })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+  })
+
+  it('#726 상세 조회 실패를 0원 합계로 표시하지 않고 작업을 차단한다', async () => {
+    renderAt('/schedules/11?month=2026-07', () => { throw new Error('상세 조회 실패') })
+    await screen.findAllByText('상세 조회 실패')
+    expect(screen.queryByText('0원')).not.toBeInTheDocument()
+    expect(screen.getByText('자료 없음')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /CSV 내보내기/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+  })
+
+  it('#726 재조회 실패는 기존 결과와 함께 알리고 재시도 성공 전까지 처리하지 않는다', async () => {
+    let failed = false
+    const { client, actions } = renderAt('/schedules/11?month=2026-07', (url) => {
+      if (url === '/api/v1/schedules/11' && failed) throw new Error('최신 상태 조회 실패')
+      return baseHandler()(url)
+    })
+    await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+    failed = true
+    await act(async () => { await client.invalidateQueries({ queryKey: ['schedules', 'detail', '11'] }) })
+    expect(await screen.findByText('최신 상태 조회 실패')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '새 버전 만들기' })).toBeDisabled()
+    expect(screen.queryByRole('link', { name: '1번 회차 지급 등록' })).not.toBeInTheDocument()
+    failed = false
+    await actions.click(screen.getByRole('button', { name: '다시 시도' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  })
 
   it('회차의 귀속일·ID·항목을 지급 등록에 전달하고 지급예정일로 바꾸지 않는다', async () => {
     renderAt('/schedules/11?month=2026-07', baseHandler())

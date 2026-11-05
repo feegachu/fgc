@@ -9,6 +9,7 @@ import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
 import { apiClient } from '../../../lib/api/client'
 import * as evidenceApi from './api'
 import type { Evidence } from './state'
+import * as settlementState from './state'
 import { SettlementGuide } from './SettlementGuide'
 import { openSettlementGuide, closeSettlementGuide } from './entry'
 const user = {
@@ -107,13 +108,15 @@ function mount(role = 'SETTLEMENT', initialEntry = '/') {
             path: '/schedules/2',
             element: (
               <form data-guide-target="schedule.lines">
+                <section aria-labelledby="schedule-header-title">스케줄 요약</section>
+                <section aria-labelledby="schedule-versions-title">버전 이력</section>
                 실제 스케줄
                 <DirtyInput label="스케줄 메모" />
               </form>
             ),
           },
           { path: '/schedules/99', element: <section data-guide-target="schedule.lines">다른 스케줄</section> },
-          { path: '/exceptions', element: <section data-guide-target="exception.action">예외 처리</section> },
+          { path: '/exceptions', element: <><section data-guide-target="exception.filters">예외 조회</section><section data-guide-target="exception.action">예외 처리</section></> },
           { path: '/transactions/new', element: <section data-guide-target="payment.form">지급 입력</section> },
         ],
       },
@@ -122,6 +125,15 @@ function mount(role = 'SETTLEMENT', initialEntry = '/') {
   )
   render(<RouterProvider router={router} />)
   return { router, actor: userEvent.setup() }
+}
+async function reviewSchedule(actor: ReturnType<typeof userEvent.setup>) {
+  await screen.findByText('실제 스케줄')
+  await screen.findByText(/설명 [1-4]\/4/)
+  for (let index = 0; index < 3 && !screen.queryByRole('button', { name: '스케줄 확인 완료' }); index++) {
+    const next = await screen.findByRole('button', { name: '확인하고 다음 설명' })
+    await waitFor(() => expect(next).toBeEnabled())
+    await actor.click(next)
+  }
 }
 describe('FUN-088 shell guide', () => {
   it('translates the start lookup timeout into the same Korean guidance', async () => {
@@ -154,13 +166,37 @@ describe('FUN-088 shell guide', () => {
     expect(launch).toHaveFocus()
     expect(apiClient.request).not.toHaveBeenCalled()
   })
+  it('allows an explicit server recheck after target loss without advancing the paused explanation', async () => {
+    const { actor, router } = mount()
+    await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+    await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+    await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    await screen.findByText('실제 스케줄')
+    const target = document.querySelector<HTMLElement>('[aria-labelledby="schedule-header-title"]')!
+    await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
+    act(() => { target.hidden = true })
+    await screen.findByText(/안내 대상이 사라지거나 숨겨져 중단했습니다/)
+    expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeDisabled()
+    const recheck = screen.getByRole('button', { name: '현재 결과로 이어서 안내' })
+    expect(recheck).toBeEnabled()
+    const read = vi.spyOn(evidenceApi, 'readEvidence').mockRejectedValueOnce(new Error('최신 서버 결과를 확인하지 못했습니다.'))
+    await actor.click(recheck)
+    expect(read).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('alert')).toHaveTextContent('최신 서버 결과를 확인하지 못했습니다.')
+    expect(router.state.location.pathname).toBe('/schedules/2')
+    expect(screen.queryByText('전체 업무 안내 완료')).not.toBeInTheDocument()
+    expect(vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
+  })
+
   it('reads an existing contract and requires schedule acknowledgement before the payment form', async () => {
     const { actor, router } = mount()
     await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
     await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
     await actor.click(screen.getByRole('button', { name: '안내 시작' }))
     await screen.findByText('실제 스케줄')
+    await reviewSchedule(actor)
     await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
+    await reviewSchedule(actor)
     await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
     await screen.findByText('지급 입력')
     expect(router.state.location.pathname).toBe('/transactions/new')
@@ -206,9 +242,11 @@ describe('unsaved input and changed targets', () => {
     await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
     await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
     await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    await reviewSchedule(actor)
     await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
     await actor.type(screen.getByLabelText('스케줄 메모'), '저장 전 메모')
-    await actor.click(screen.getByRole('button', { name: '펼치기' }))
+    expect(screen.getByRole('button', { name: /^접기$/ })).toBeVisible()
+    await reviewSchedule(actor)
     await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
     await screen.findByRole('dialog', { name: '미저장 입력이 있습니다' })
     await actor.click(screen.getByRole('button', { name: '현재 화면 유지' }))
@@ -270,6 +308,7 @@ describe('unsaved input and changed targets', () => {
     await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
     await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
     await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    await reviewSchedule(actor)
     await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
     await act(async () => {
       await router.navigate('/contracts/9')
@@ -322,8 +361,10 @@ describe('role handoff in later stages', () => {
     await actor.type(screen.getByLabelText(/기존 지급 번호/), '3')
     await actor.click(screen.getByRole('button', { name: '안내 시작' }))
     if (cancelled) {
-      await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
-      await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+      await reviewSchedule(actor)
+    await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
+      await reviewSchedule(actor)
+    await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
     }
     if (handoff) {
       expect(await screen.findByRole('alert')).toHaveTextContent('맡기세요')
@@ -352,14 +393,16 @@ it('defaults to keeping unsaved input and rechecks before explicitly approved na
   await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
   await actor.click(screen.getByRole('button', { name: '안내 시작' }))
   await actor.type(await screen.findByLabelText('스케줄 메모'), 'keep')
-  await actor.click(screen.getByRole('button', { name: '펼치기' }))
-  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  expect(screen.getByRole('button', { name: /^접기$/ })).toBeVisible()
+  await reviewSchedule(actor)
+    await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
   await screen.findByRole('dialog', { name: '미저장 입력이 있습니다' })
   expect(screen.getByRole('button', { name: '현재 화면 유지' })).toHaveFocus()
   await actor.click(screen.getByRole('button', { name: '현재 화면 유지' }))
   expect(screen.getByLabelText('스케줄 메모')).toHaveValue('keep')
   expect(router.state.location.pathname).toBe('/schedules/2')
-  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  await reviewSchedule(actor)
+    await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
   await actor.click(await screen.findByRole('button', { name: '입력 버리고 이동' }))
   await screen.findByText('지급 입력')
   expect(router.state.location.pathname).toBe('/transactions/new')
@@ -390,11 +433,13 @@ it('pauses the target when only the query selection changes on the same screen',
   await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
   await actor.click(screen.getByRole('button', { name: '안내 시작' }))
   await screen.findByText('실제 스케줄')
-  await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
+  await reviewSchedule(actor)
+    await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
   await act(async () => {
     await router.navigate('/schedules/2?month=2026-07&tab=other')
   })
-  expect(await screen.findByRole('status')).toHaveTextContent('화면·입력이 바뀌었습니다')
+  expect(screen.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeEnabled()
+  expect(router.state.location.search).toContain('tab=other')
 })
 
 it('protects portal input through shared dirty state and does not prompt after reverting', async () => {
@@ -403,17 +448,20 @@ it('protects portal input through shared dirty state and does not prompt after r
   await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
   await actor.click(screen.getByRole('button', { name: '안내 시작' }))
   await screen.findByText('실제 스케줄')
-  await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
+  await reviewSchedule(actor)
+    await waitFor(() => expect(screen.getByRole('button', { name: '스케줄 확인 완료' })).toBeEnabled())
   act(() => useUnsavedWorkStore.getState().mark('portal-dialog', true))
-  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  await reviewSchedule(actor)
+    await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
   await screen.findByRole('dialog', { name: '미저장 입력이 있습니다' })
   await actor.click(screen.getByRole('button', { name: '현재 화면 유지' }))
   expect(router.state.location.pathname).toBe('/schedules/2')
   act(() => useUnsavedWorkStore.getState().mark('portal-dialog', false))
   await actor.type(screen.getByLabelText('스케줄 메모'), '수정했다 복원')
   await actor.clear(screen.getByLabelText('스케줄 메모'))
-  await actor.click(screen.getByRole('button', { name: '펼치기' }))
-  await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
+  expect(screen.getByRole('button', { name: /^접기$/ })).toBeVisible()
+  await reviewSchedule(actor)
+    await actor.click(screen.getByRole('button', { name: '스케줄 확인 완료' }))
   await screen.findByText('지급 입력')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
@@ -446,4 +494,37 @@ it.each([
     await screen.findByText('조회 중 화면이 바뀌었습니다. 현재 대상으로 다시 확인하세요.')
     expect(router.state.location.pathname + router.state.location.search).toBe(destination)
   }
+})
+
+
+it('rechecks server evidence after saving a terminal exception action removes explanation 5/6', async () => {
+  const read = vi.spyOn(evidenceApi, 'readEvidence').mockResolvedValue({ scheduleAcknowledged: false })
+  const decide = vi.spyOn(settlementState, 'decide').mockReturnValue({ step: 'exception.resolve', reason: '미처리 예외' })
+  const { actor, router } = mount('SETTLEMENT', '/exceptions?selected=7')
+  const form = document.createElement('div')
+  form.innerHTML = `<section data-guide-target="exception.detail">근거</section>
+    <div data-guide-target="exception.actionInput"><select><option>해결</option></select><textarea>정정 완료</textarea><input value="DOC-7" /></div>
+    <button data-guide-target="exception.actionSave">처리 저장</button>`
+  document.querySelector('#main-content')!.append(form)
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  await waitFor(() => expect(screen.queryByText('현재 서버 결과를 확인하고 있습니다.')).not.toBeInTheDocument())
+  await act(async () => { void router.navigate('/exceptions?selected=7') })
+  for (let i = 0; i < 4; i++) {
+    await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
+    await actor.click(screen.getByRole('button', { name: '확인하고 다음 설명' }))
+  }
+  await screen.findByRole('heading', { name: '처리 내용을 직접 저장하세요' })
+  await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
+  // The real action form unmounts after the server accepts a terminal action.
+  form.querySelector('button')!.onclick = () => form.remove()
+  await actor.click(screen.getByRole('button', { name: '처리 저장' }))
+  await screen.findByRole('button', { name: '다시 찾기' })
+  expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeDisabled()
+  const calls = read.mock.calls.length
+  decide.mockReturnValue({ step: 'contract.create', reason: '새 서버 결과' })
+  await actor.click(screen.getByRole('button', { name: '현재 결과로 이어서 안내' }))
+  await waitFor(() => expect(read).toHaveBeenCalledTimes(calls + 1))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/new'))
+  expect(vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
 })
