@@ -1810,7 +1810,7 @@ FGC — 설계사
 
 - 읽기·쓰기: `validation_run`, `validation_target`
 - 연결: `cap_check`, `arbitrage_check`, `journal_header`, `reconciliation_run`, `exception_case`
-- API: `POST /api/v1/validation-runs/{id}/execute`, `POST /api/v1/validation-runs/{id}/finalize`
+- API (인터페이스정의서 §4-2, §4-4-4): IF-API-47 `GET /api/v1/validation-runs/{id}`(상세, `restartability`, `retries`), IF-API-49 `GET /api/v1/validation-runs/{id}/progress`, IF-API-50 `GET /api/v1/validation-runs/{id}/finalize-checklist`, IF-API-48 `POST /api/v1/validation-runs/{id}/execute`, IF-API-82 `POST /api/v1/validation-runs/{id}/restart`, IF-API-51 `POST /api/v1/validation-runs/{id}/finalize`
 
 **관련 요구사항** FUN-041, FUN-042, FUN-043, FUN-044 / 2차 확장 FUN-045
 
@@ -3193,7 +3193,7 @@ v3.0 버전명은 유지한다. 이전 §8-2~8-4의 집계·화면 ID·배치는
 
 기존 월통합검증 목록·실행·확정은 그대로. 실패 상세에 [실패 지점부터 재시작]을 둔다. 버튼은 서버 restartability.allowed=true이고 canProcess일 때만 활성이다. 막힌 이유, 체크포인트 유무, 완료/남은 대상 수, 실패 시각을 표시한다. 완료/남은 대상 수는 지금은 제공하지 않아 `자료 없음`으로 보인다. 내부 배치 직렬화 값은 노출하지 않는다.
 
-확인창: 검증월/회차/원래 실행 번호/실패 단계/재시작 사유*. 수락 202는 '재시작 요청을 접수했습니다. 실제 진행 상태를 확인합니다.'이고 성공이 아니다. 기존 progress 조회로 진행을 갱신한다. 이력표 '재시도 이력': 번호, 요청자, 요청 시각, 사유, 대상 단계, 이전 실행, 새 실행, 시작, 종료, 상태. 중복 클릭 잠금, 409 후 재조회. 완료 후 최종 확정은 기존 권한/8조건 별도. 시험 CT-V01.
+확인창: 검증월/회차/원래 실행 번호/실패 단계/재시작 사유*. 수락 202는 '재시작 요청을 접수했습니다. 실제 진행 상태를 확인합니다.'를 보인다. 요청 접수에 성공했다는 뜻이고 재시작이 끝났다는 뜻은 아니다. 기존 progress 조회로 진행을 갱신한다. 이력표 '재시도 이력': 번호, 요청자, 요청 시각, 사유, 대상 단계, 이전 실행, 새 실행, 시작, 종료, 상태. 중복 클릭 잠금, 409 후 재조회. 완료 후 최종 확정은 기존 권한/8조건 별도. 시험 CT-V01.
 
 ### 10-6. CLAW-W01 환수 후보·계산·PDF
 
