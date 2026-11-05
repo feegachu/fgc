@@ -429,5 +429,37 @@
         "instruction": "기간·계약 등 조건으로 환수 검토 대상을 조회하고 한 건의 근거를 확인하세요. 검토 대상은 확정된 환수채무가 아닙니다. 계산·PDF 생성은 권한과 서버 조건을 확인한 뒤 기존 버튼으로 직접 수행합니다."
       }
     ]
+  },
+  {
+    "screenId": "CONT-W02",
+    "variant": "preview",
+    "title": "분급 예정 생성",
+    "page": "schedule/SchedulePreviewForm.tsx",
+    "steps": [
+      {
+        "targetId": "schedule.preview.input",
+        "instruction": "지급단계와 선택 정책·실제 회차를 확인하고 생성 사유를 입력하세요. 4년·7년 예정은 지급 확정 대상이 아닙니다."
+      },
+      {
+        "targetId": "schedule.preview.submit",
+        "instruction": "실제 예정 생성 또는 새 버전 만들기 버튼을 누르세요. 서버 성공 결과를 확인한 후 다음을 눌러 안내를 완료합니다."
+      }
+    ]
+  },
+  {
+    "screenId": "SCHE-W02",
+    "variant": "preview",
+    "title": "분급 예정 생성",
+    "page": "schedule/SchedulePreviewForm.tsx",
+    "steps": [
+      {
+        "targetId": "schedule.preview.input",
+        "instruction": "지급단계와 선택 정책·실제 회차를 확인하고 생성 사유를 입력하세요. 4년·7년 예정은 지급 확정 대상이 아닙니다."
+      },
+      {
+        "targetId": "schedule.preview.submit",
+        "instruction": "실제 예정 생성 또는 새 버전 만들기 버튼을 누르세요. 서버 성공 결과를 확인한 후 다음을 눌러 안내를 완료합니다."
+      }
+    ]
   }
 ]
