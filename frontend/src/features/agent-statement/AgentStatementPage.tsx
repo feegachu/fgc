@@ -9,7 +9,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
-import { date, int, rate, today, won } from '../../lib/format'
+import { date, int, month as formatMonth, rate, today, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
 import { policyCodeLabel } from '../policies/labels'
@@ -184,7 +184,7 @@ export default function AgentStatementPage() {
       />
       {!ready ? (
         <p className="ast-state" role="status">
-          조회할 설계사를 선택하세요.
+          설계사를 고른 뒤 조회를 누르세요.
         </p>
       ) : (
         <>
@@ -359,7 +359,7 @@ function DetailPanel({
                 <Row label="수수료 항목" value={entry.commissionItemName} />
                 <Row label="회차" value={entry.installmentNo == null ? '-' : `${entry.installmentNo}회`} />
                 <Row label="기준 설명" value={detail?.basis.dateBasis[entry.entryType]} />
-                <Row label="정책 관리번호" value={entry.policyVersionId == null ? '-' : String(entry.policyVersionId)} />
+                <Row label="적용 정책" value={entry.policyName ? `${entry.policyName} v${entry.policyVersionNo}` : '-'} />
                 <Row label="원천" value={`${SOURCE_LABELS[entry.source.entityType] ?? '원천 자료'} ${entry.source.id}번`} />
               </dl>
             </section>
@@ -395,6 +395,7 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 }
 
 function evidenceValue(key: string, value: string | number) {
+  if (key === 'settlementMonth') return formatMonth(value)
   if (AMOUNT_KEYS.includes(key)) return won(value)
   if (PERCENT_KEYS.includes(key)) return `${rate(value)}%`
   if (CODE_VALUE_KEYS.includes(key)) return policyCodeLabel(String(value))

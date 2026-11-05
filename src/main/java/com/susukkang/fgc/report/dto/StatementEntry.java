@@ -1,5 +1,6 @@
 package com.susukkang.fgc.report.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -14,12 +15,14 @@ public record StatementEntry(
         String contractNo,
         String commissionItemCode,
         String commissionItemName,
-        Integer installmentNo,
+        @Schema(nullable = true) Integer installmentNo,
         LocalDate basisDate,
         String statusCode,
         String statusLabel,
-        BigDecimal amount,
-        Long policyVersionId,
+        @Schema(nullable = true) BigDecimal amount,
+        @Schema(nullable = true) Long policyVersionId,
+        @Schema(nullable = true) String policyName,
+        @Schema(nullable = true) Integer policyVersionNo,
         Source source,
         String dataStatus
 ) {

@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
  */
 public final class ValidationFailureText {
     private static final Pattern REQUEST_NUMBER = Pattern.compile("요청번호 [\\w.-]+", Pattern.CANON_EQ);
+    private static final Pattern CONTRACT_NUMBER = Pattern.compile("\\bFGC-[A-Z0-9]+-\\d{6}-\\d+\\b");
     /** 영문 3자 이상, 키=값, 괄호 안 5자리 오류 코드(SQLSTATE). */
     private static final Pattern DEVELOPER_TEXT = Pattern.compile("[A-Za-z_]{3,}|[A-Za-z_]+=|\\(\\d{5}\\)");
 
@@ -24,6 +25,7 @@ public final class ValidationFailureText {
     }
 
     private static boolean isDeveloperText(String text) {
-        return DEVELOPER_TEXT.matcher(REQUEST_NUMBER.matcher(text).replaceAll("")).find();
+        String withoutNumbers = CONTRACT_NUMBER.matcher(REQUEST_NUMBER.matcher(text).replaceAll("")).replaceAll("");
+        return DEVELOPER_TEXT.matcher(withoutNumbers).find();
     }
 }

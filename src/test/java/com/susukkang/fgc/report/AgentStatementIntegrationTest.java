@@ -102,6 +102,17 @@ class AgentStatementIntegrationTest {
     }
 
     @Test
+    void entryCarriesTheAppliedPolicyNameAndVersionWithItsId() throws Exception {
+        JsonNode entry = data(mine("month=" + MONTH + "&size=1")).path("items").path("content").get(0);
+        long policyVersionId = entry.path("policyVersionId").asLong();
+        assertThat(policyVersionId).isPositive();
+        assertThat(entry.path("policyName").asText()).isEqualTo(jdbc.queryForObject(
+                "SELECT policy_name FROM fgc.policy_version WHERE policy_version_id = ?", String.class, policyVersionId));
+        assertThat(entry.path("policyVersionNo").asInt()).isEqualTo(jdbc.queryForObject(
+                "SELECT version_no FROM fgc.policy_version WHERE policy_version_id = ?", Integer.class, policyVersionId));
+    }
+
+    @Test
     void heldAdjustmentAndClawbackAreSeparatedWithoutDoubleCounting() throws Exception {
         Long item = id("SELECT min(commission_item_id) FROM fgc.commission_transaction WHERE recipient_agent_id = ?", ownAgent);
         // 시드 DB에는 운영 스케줄이 없으므로 본인 계약에 보류 회차 한 줄을 직접 만든다.
@@ -180,6 +191,11 @@ class AgentStatementIntegrationTest {
         assertThat(adjustment.path("summary").path("adjustment").path("count").asLong()).isEqualTo(1);
         assertThat(adjustment.path("summary").path("adjustment").path("amount").decimalValue()).isEqualByComparingTo("-5000");
         assertThat(adjustment.path("summary").path("payment").path("count").asLong()).isZero();
+        // 정책이 없는 건은 이름과 판도 null이다. 스키마가 nullable로 적는 경우다.
+        JsonNode adjustmentEntry = adjustment.path("items").path("content").get(0);
+        assertThat(adjustmentEntry.path("policyVersionId").isNull()).isTrue();
+        assertThat(adjustmentEntry.path("policyName").isNull()).isTrue();
+        assertThat(adjustmentEntry.path("policyVersionNo").isNull()).isTrue();
 
         JsonNode clawback = data(mine("month=" + MONTH + "&entryType=CLAWBACK"));
         assertThat(clawback.path("summary").path("clawback").path("count").asLong()).isEqualTo(1);

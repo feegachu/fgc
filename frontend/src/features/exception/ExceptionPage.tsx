@@ -118,14 +118,6 @@ export function ExceptionPage() {
       ),
     },
     {
-      key: 'reason',
-      label: '상세 원인',
-      align: 'center',
-      width: '8.5rem',
-      cellClassName: 'exception-disclosure-cell',
-      render: (row) => <Disclosure preview={row.reasonLabel || '-'} singleLine />,
-    },
-    {
       key: 'severity',
       label: '심각도',
       sortKey: 'severity',
@@ -137,14 +129,6 @@ export function ExceptionPage() {
           {row.severityLabel ?? '-'}
         </StatusBadge>
       ),
-    },
-    {
-      key: 'contract',
-      label: '계약',
-      sortKey: 'contractNo',
-      sortable: true,
-      width: '12rem',
-      render: (row) => row.contractNo ?? '-',
     },
     {
       key: 'title',
@@ -172,6 +156,22 @@ export function ExceptionPage() {
       sortable: true,
       width: '6rem',
       render: (row) => row.assigneeLoginId ?? '미배정',
+    },
+    {
+      key: 'contract',
+      label: '계약',
+      sortKey: 'contractNo',
+      sortable: true,
+      width: '12rem',
+      render: (row) => row.contractNo ?? '-',
+    },
+    {
+      key: 'reason',
+      label: '상세 원인',
+      align: 'center',
+      width: '8.5rem',
+      cellClassName: 'exception-disclosure-cell',
+      render: (row) => <Disclosure preview={row.reasonLabel || '-'} singleLine />,
     },
     {
       key: 'detectedAt',

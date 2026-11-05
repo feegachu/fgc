@@ -67,7 +67,7 @@ export default function ValidationRunListPage() {
     {
       key: 'type',
       label: '실행 유형',
-      width: '7rem',
+      width: '5.5rem',
       render: (r) => (
         <CategoryBadge value={r.runType} optionCount={3}>
           {dash(r.runTypeLabel)}
@@ -77,14 +77,14 @@ export default function ValidationRunListPage() {
     {
       key: 'status',
       label: '상태',
-      width: '7rem',
+      width: '5.75rem',
       align: 'center',
       render: (r) => <RunStatusBadge status={r.status} label={r.statusLabel} />,
     },
     {
       key: 'progress',
       label: '진행',
-      width: '9.5rem',
+      width: '8.5rem',
       cellClassName: 'tabular-nums',
       render: (r) => progressText(r.currentStep),
     },
@@ -93,7 +93,7 @@ export default function ValidationRunListPage() {
       label: '실행자',
       sortKey: 'triggeredBy',
       sortable: true,
-      width: '6rem',
+      width: '5rem',
       render: (r) => dash(r.triggeredBy),
     },
     {
@@ -101,55 +101,52 @@ export default function ValidationRunListPage() {
       label: '시작',
       sortKey: 'startedAt',
       sortable: true,
-      width: '8.5rem',
+      width: '7rem',
       cellClassName: 'tabular-nums',
-      render: (r) => dateTime(r.startedAt),
+      render: (r) => <CellDisclosure preview={dateTime(r.startedAt)} />,
     },
     {
       key: 'completed',
       label: '완료',
       sortKey: 'completedAt',
       sortable: true,
-      width: '8.5rem',
+      width: '7rem',
       cellClassName: 'tabular-nums',
-      render: (r) => dateTime(r.completedAt),
+      render: (r) => <CellDisclosure preview={dateTime(r.completedAt)} />,
     },
     {
       key: 'finalized',
       label: '확정자, 확정시각',
       sortKey: 'finalizedAt',
       sortable: true,
-      width: '10.5rem',
+      width: '9rem',
       render: (r) => (
         <CellDisclosure
-          singleLine
           preview={<span className="tabular-nums">{finalizedText(r)}</span>}
           full={finalizedText(r)}
         />
       ),
     },
     {
+      key: 'open',
+      label: '상세',
+      width: '5.5rem',
+      cellClassName: 'vrun-open-cell',
+      align: 'left',
+      render: (r) => <OpenLink run={r} />,
+    },
+    {
       key: 'failure',
       label: '실패 사유',
-      width: '14rem',
       render: (r) =>
         r.status === 'FAILED' ? (
           <CellDisclosure
-            singleLine
             preview={<span className="vrun-failure-text">{failureText(r.failureMessage, r.currentStep)}</span>}
             full={failureText(r.failureMessage, r.currentStep)}
           />
         ) : (
           '-'
         ),
-    },
-    {
-      key: 'open',
-      label: '상세',
-      width: '6rem',
-      cellClassName: 'vrun-open-cell',
-      align: 'left',
-      render: (r) => <OpenLink run={r} />,
     },
   ]
 
