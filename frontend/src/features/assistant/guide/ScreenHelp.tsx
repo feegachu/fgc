@@ -143,6 +143,17 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
     setBusy(true)
     try { await action() } finally { setBusy(false) }
   }
+  // 다시 시작, 다시 찾기를 누르면 그 자리 버튼이 꺼진 [이전]으로 바뀌어 포커스가 갇힌다. 끝나면 패널의 첫 활성 버튼으로 옮긴다.
+  const refocus = useRef(false)
+  useEffect(() => {
+    if (busy || !refocus.current) return
+    refocus.current = false
+    const panel = card.current
+    const active = document.activeElement
+    if (active !== document.body && !panel?.contains(active)) return // 그새 패널 밖으로 옮긴 포커스는 뺏지 않는다.
+    const next = panel?.querySelector<HTMLButtonElement>('.payment-guide-actions button:not(:disabled)') ?? panel?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+    next?.focus()
+  }, [busy])
   useEffect(() => {
     const other = (event: Event) => {
       if ((event as CustomEvent).detail !== trigger) { runtime.stop(); setOpen(false); saveGuide?.deactivate() }
@@ -155,6 +166,7 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
     closeSettlementGuide(); saveGuide?.activate(); setOpen(true); setFolded(false)
     void run(() => runtime.start({ workflowId: `screen.${screenId.toLowerCase()}${variant ? `.${variant}` : ''}`, stepId: 'help.0', guideVersion: '3.0', entityRefs: [], clientContextRevision: String(revision.current), serverStateVersion: null }))
   }
+  const restart = () => { refocus.current = true; start() }
   const paused = ['PAUSED', 'ERROR'].includes(snapshot.status)
   const complete = snapshot.status === 'COMPLETED'
   const failedPath = validation && runStatus === 'FAILED'
@@ -183,7 +195,7 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
           {needsFinalization && !complete && <p role="status">{finalizeState.savedId !== null ? '서버의 최종 확정을 확인했습니다. 다음으로 완료를 확인하세요.' : '검증 계산 완료와 최종 확정은 다릅니다. 실제 확정의 서버 결과를 기다리고 있습니다.'}</p>}
           {paused && <p role="status">{snapshot.status === 'ERROR' ? '시스템 오류가 발생했습니다. 잠시 후 다시 시작하세요.' : targetMessages[snapshot.reasonCode ?? ''] ?? '안내 대상을 표시할 수 없습니다. 대상 선택·탭·권한을 확인한 후 다시 찾으세요.'}</p>}
           <div className="payment-guide-actions">
-            {complete ? <><Button onClick={staleCompletion ? start : close}>{staleCompletion ? '다시 시작' : '안내 마치기'}</Button>{!staleCompletion && <Button variant="secondary" disabled={busy} onClick={start}>다시 보기</Button>}</> : snapshot.status === 'ERROR' ? <Button disabled={busy} onClick={start}>다시 시작</Button> : paused ? <Button disabled={busy} onClick={() => void run(() => runtime.resume())}>다시 찾기</Button> : <>
+            {complete ? <><Button onClick={staleCompletion ? restart : close}>{staleCompletion ? '다시 시작' : '안내 마치기'}</Button>{!staleCompletion && <Button variant="secondary" disabled={busy} onClick={restart}>다시 보기</Button>}</> : snapshot.status === 'ERROR' ? <Button disabled={busy} onClick={restart}>다시 시작</Button> : paused ? <Button disabled={busy} onClick={() => { refocus.current = true; void run(() => runtime.resume()) }}>다시 찾기</Button> : <>
               <Button disabled={busy || index <= 0} onClick={() => void run(() => runtime.previous())}>이전</Button>
               <Button disabled={busy || !snapshot.target || !nextReady} onClick={() => void run(() => runtime.next())}>{saveGuide ? '다음' : '설명 확인 · 다음'}</Button>
             </>}
