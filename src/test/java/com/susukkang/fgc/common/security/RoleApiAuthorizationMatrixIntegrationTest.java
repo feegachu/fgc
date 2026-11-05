@@ -344,7 +344,8 @@ class RoleApiAuthorizationMatrixIntegrationTest {
             "/api/v1/clawbacks/candidates/1", "/api/v1/contracts/1/journals", "/api/v1/contracts/1/schedules",
             "/api/v1/contracts/1/transactions", "/api/v1/dashboard/summary", "/api/v1/exceptions", "/api/v1/journals",
             "/api/v1/policies", "/api/v1/reconciliations", "/api/v1/reports/agents/1/statements", "/api/v1/schedules",
-            "/api/v1/validation-runs", "/api/v1/arbitrage-checks", "/api/v1/acquisition-cost-checks"})
+            "/api/v1/validation-runs", "/api/v1/arbitrage-checks", "/api/v1/acquisition-cost-checks",
+            "/api/v1/home/summary", "/api/v1/exceptions/counts"})
     void internalReadsStayClosedForAgent(String url) throws Exception {
         mvc.perform(asActor(Actor.AGENT, request(GET, url)))
                 .andExpect(status().isForbidden())

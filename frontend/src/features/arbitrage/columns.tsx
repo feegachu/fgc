@@ -4,6 +4,7 @@ import { present } from './utils'
 import { StatusBadge } from '../../components/StatusBadge'
 import { date, int } from '../../lib/format'
 import type { ArbitrageRow } from './api'
+import { plannedBasisPresentation } from './planned-basis'
 export const columns: TableColumn<ArbitrageRow>[] = [
   {
     key: 'contract',
@@ -53,12 +54,21 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   {
     key: 'planned',
-    label: '지급예정액',
+    label: '지급예정액·계산 기준',
     sortKey: 'plannedCommissionAmount',
     sortable: true,
-    width: '8.5rem',
+    width: '12rem',
     align: 'number',
-    render: (r) => <ArbitrageAmount value={r.plannedCommissionAmount} />,
+    render: (r) => {
+      const basis = plannedBasisPresentation(r.plannedCommissionBasis)
+      return (
+        <>
+          <ArbitrageAmount value={r.plannedCommissionAmount} />
+          <span className="arb-planned-basis">{basis.label}</span>
+          <small style={{ display: 'block', whiteSpace: 'normal' }}>{basis.description}</small>
+        </>
+      )
+    },
   },
   {
     key: 'refund',

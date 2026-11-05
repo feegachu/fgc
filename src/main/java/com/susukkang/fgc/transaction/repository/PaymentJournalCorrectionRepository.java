@@ -39,7 +39,7 @@ public class PaymentJournalCorrectionRepository {
                 WHERE n.commission_transaction_id = :newId AND o.commission_transaction_id = :oldId
                 """).setParameter("newId", newId).setParameter("oldId", oldId).executeUpdate();
         entityManager.createNativeQuery("""
-                UPDATE fgc.transaction_attribution n SET schedule_line_id = o.schedule_line_id,
+                UPDATE fgc.transaction_attribution n SET schedule_line_id = COALESCE(o.schedule_line_id, n.schedule_line_id),
                     agent_id = o.agent_id, source_agent_code = o.source_agent_code
                 FROM fgc.transaction_attribution o
                 WHERE n.commission_transaction_id = :newId AND o.commission_transaction_id = :oldId

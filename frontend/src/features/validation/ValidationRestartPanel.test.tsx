@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ValidationRestartPanel } from './ValidationRestartPanel'
@@ -7,6 +7,7 @@ import { apiClient } from '../../lib/api/client'
 import { ApiError } from '../../lib/api/errors'
 const clients: QueryClient[] = []
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   clients.splice(0).forEach((c) => c.clear())
 })
@@ -87,3 +88,34 @@ it('shows the original target step and does not call a failed unstarted retry wa
   expect(screen.getByText('기동 안 됨')).toBeInTheDocument()
   expect(screen.queryByText('기동 대기')).not.toBeInTheDocument()
 })
+
+
+it.each(['ACCEPTED', 'LAUNCHING', 'RUNNING'])(
+  '완료된 실행에서도 %s 이력이 최종 상태가 될 때까지 조회하고 이후 중단한다', async (state) => {
+    vi.useFakeTimers()
+    let historyCalls = 0
+    const row = { retryId: 9, failedStep: 6, previousBatchExecutionId: 101, batchExecutionId: 102,
+      requestedBy: 1, reason: '지연된 이력 커밋', requestedAt: '2026-11-05T00:00:00Z' }
+    vi.spyOn(apiClient, 'request').mockImplementation((async (path: string) => {
+      if (path.endsWith('/restartability')) return { data: { allowed: false }, requestId: null }
+      if (path.endsWith('/retries')) {
+        historyCalls += 1
+        return { data: [{ ...row, state: historyCalls === 1 ? state : 'SUCCEEDED' }], requestId: null }
+      }
+      throw new Error(`Unexpected write: ${path}`)
+    }) as typeof apiClient.request)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    clients.push(client)
+    render(<QueryClientProvider client={client}>
+      <ValidationRestartPanel id="7" status="COMPLETED" waiting={false} canProcess onAccepted={vi.fn()} />
+    </QueryClientProvider>)
+    await act(async () => { await vi.advanceTimersByTimeAsync(50) })
+    expect(historyCalls).toBe(1)
+    expect(screen.queryByRole('button', { name: '실패 지점부터 재시작' })).not.toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100) })
+    expect(historyCalls).toBe(2)
+    expect(screen.getByText('완료')).toBeVisible()
+    await act(async () => { await vi.advanceTimersByTimeAsync(6000) })
+    expect(historyCalls).toBe(2)
+  },
+)

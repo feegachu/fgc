@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, Link, RouterProvider } from 'react-router'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
-import type { DashboardSummary } from '../features/dashboard/api'
+import type { DashboardSummary, HomeSummary } from '../features/dashboard/api'
 import { Button } from '../components/Button'
 import { Field } from '../components/Field'
 import { StatusBadge } from '../components/StatusBadge'
@@ -37,6 +37,31 @@ import './designPreview.css'
 
 if (!import.meta.env.DEV) throw new Error('Design preview is only available in the development server.')
 
+const homeSummary: HomeSummary = {
+  asOf: '2026-11-04',
+  agents: { registered: 560, active: 540, terminated: 40 },
+  branches: [
+    { organizationId: 1, name: '예시 강동지사', agentCount: 47, activeContractCount: 980, attentionCount: 6 },
+    { organizationId: 2, name: '예시 마포지사', agentCount: 45, activeContractCount: 960, attentionCount: 3 },
+  ],
+  attentionTotal: 9,
+  attentionAgents: [
+    {
+      agentId: 1,
+      name: '예시 설계사',
+      code: 'PREVIEW-FC-001',
+      branch: '예시 강동지사',
+      status: 'ACTIVE',
+      statusLabel: '활동',
+      contractCount: 12,
+      reasons: [
+        { code: 'OPEN_EXCEPTION', label: '미처리 예외', count: 2 },
+        { code: 'NEAR_LIMIT', label: '한도 근접', count: 1 },
+      ],
+    },
+  ],
+  basis: '디자인 미리보기 예시 값입니다.',
+}
 const summary: DashboardSummary = {
   month: '2026-07-01',
   capViolation: 3,
@@ -105,6 +130,14 @@ globalThis.fetch = async (input, init) => {
       error: null,
       requestId: 'design-preview',
     })
+  if (url.pathname === '/api/v1/exceptions/counts')
+    return Response.json({
+      data: { total: summary.openException, bySeverity: [], byType: [] },
+      error: null,
+      requestId: 'design-preview',
+    })
+  if (url.pathname === '/api/v1/home/summary')
+    return Response.json({ data: homeSummary, error: null, requestId: 'design-preview' })
   const data = designPreviewData(url)
   if (data !== undefined) return Response.json({ data, error: null, requestId: 'design-preview' })
   return Response.json(
