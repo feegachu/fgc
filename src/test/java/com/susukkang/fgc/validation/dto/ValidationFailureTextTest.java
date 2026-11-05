@@ -20,6 +20,13 @@ class ValidationFailureTextTest {
     }
 
     @Test
+    void contractNumberIsNotDeveloperTextLikeTheScreenRule() {
+        String sentence = "계약 FGC-FGL01-202607-0001 자료를 확인하세요.";
+        assertThat(ValidationFailureText.forResponse(sentence)).isEqualTo(sentence);
+        assertThat(ValidationFailureText.forResponse("FGC-VRUN-003 계약 FGC-FGL01-202607-0001")).isNull();
+    }
+
+    @Test
     void returnsNullWhenNoUserSentenceRemains() {
         assertThat(ValidationFailureText.forResponse(OLD_RAW_MESSAGE)).isNull();
         assertThat(ValidationFailureText.forResponse(null)).isNull();

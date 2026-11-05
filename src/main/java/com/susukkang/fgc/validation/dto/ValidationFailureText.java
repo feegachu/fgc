@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
  */
 public final class ValidationFailureText {
     private static final Pattern REQUEST_NUMBER = Pattern.compile("요청번호 [\\w.-]+");
+    private static final Pattern CONTRACT_NUMBER = Pattern.compile("\\bFGC-[A-Z0-9]+-\\d{6}-\\d+\\b");
     private static final Pattern DEVELOPER_TEXT = Pattern.compile("[A-Za-z_]{3,}");
 
     private ValidationFailureText() {
@@ -29,6 +30,7 @@ public final class ValidationFailureText {
     }
 
     private static boolean isDeveloperText(String part) {
-        return DEVELOPER_TEXT.matcher(REQUEST_NUMBER.matcher(part).replaceAll("")).find();
+        String withoutNumbers = CONTRACT_NUMBER.matcher(REQUEST_NUMBER.matcher(part).replaceAll("")).replaceAll("");
+        return DEVELOPER_TEXT.matcher(withoutNumbers).find();
     }
 }
