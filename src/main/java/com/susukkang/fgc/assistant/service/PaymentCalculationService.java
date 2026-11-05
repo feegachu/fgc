@@ -29,6 +29,7 @@ import java.util.*;
 public class PaymentCalculationService {
     private final CommissionPaymentService payments;
     private final ObjectMapper mapper;
+    private final AssistantCalculationSources sources;
     private static final Set<String> CAP_MONEY = Set.of("basePremiumAmount", "refund12mAmount", "complianceDeductionAmount", "limitAmount", "existingIncludedAmount", "candidateAmount", "includedAmount", "remainingAmount");
     private static final Set<String> CAP_IDS = Set.of("contractId", "capRuleSetId", "capCheckId");
 
@@ -36,6 +37,7 @@ public class PaymentCalculationService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PaymentCalculationSnapshot calculate(PaymentCalculationRequest request) {
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) requireProcessing();
+        if ((request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL && request.kind()==PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE) || Set.of(PaymentCalculationRequest.Kind.EXPECTED_COMMISSION, PaymentCalculationRequest.Kind.CAP_STATUS, PaymentCalculationRequest.Kind.RECONCILIATION_DIFFERENCE).contains(request.kind())) return sources.calculate(request);
         if (request.mode() != PaymentCalculationRequest.Mode.EXISTING ||
                 !Set.of(PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE, PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE).contains(request.kind()))
             return result(request, "UNSUPPORTED", null, Map.of(), List.of(), null, List.of(), List.of(), "이 계산은 여기서 볼 수 없어요.");
@@ -77,14 +79,14 @@ public class PaymentCalculationService {
             Map<String, String> amounts, List<Map<String, Object>> previews, Boolean confirmable,
             List<PaymentCalculationSnapshot.Reason> blockers, List<String> missing, String message) {
         Map<String, String> scope = new LinkedHashMap<>();
-        List<PaymentCalculationSnapshot.Source> sources = List.of();
+        List<PaymentCalculationSnapshot.Source> sourceRefs = List.of();
         if (payment != null) {
             scope.put("paymentId", string(payment.paymentId())); scope.put("settlementMonth", payment.settlementMonth() == null ? null : payment.settlementMonth().toString().substring(0, 7));
             scope.put("paymentStage", string(payment.paymentStage()));
-            sources = List.of(new PaymentCalculationSnapshot.Source("payment:" + payment.paymentId(), "PAYMENT", "저장된 지급 및 귀속 자료", string(payment.updatedAt()), string(payment.paymentId())));
+            sourceRefs = List.of(new PaymentCalculationSnapshot.Source("payment:" + payment.paymentId(), "PAYMENT", "저장된 지급 및 귀속 자료", string(payment.updatedAt()), string(payment.paymentId())));
         }
         return new PaymentCalculationSnapshot(UUID.randomUUID().toString(), request.kind().name(), request.mode().name(), status, request.clientRevision(), false, true, "ACTUAL", "KRW", payment == null ? null : string(payment.status()), scope, amounts, previews, confirmable, blockers, missing,
-                basis(payment, previews, sources),
+                basis(payment, previews, sourceRefs),
                 new PaymentCalculationSnapshot.Recommendation(false, null, null, message, List.of("SERVER_VALIDITY_PROOF_REQUIRED")), OffsetDateTime.now(), null);
     }
     private PaymentCalculationSnapshot.Basis basis(CommissionPaymentResponse payment,
