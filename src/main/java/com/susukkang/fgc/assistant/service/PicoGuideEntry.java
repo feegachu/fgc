@@ -32,6 +32,9 @@ final class PicoGuideEntry {
         if (steps.isEmpty()) return null;
         boolean paymentGuide = catalog.paymentDefinitions().stream().anyMatch(guide -> guide.workflowId().equals(definition.workflowId()));
         if (paymentGuide) {
+            if (payment == null && request.entityRefs().isEmpty() && definition.requiredSlots() != null && definition.requiredSlots().isEmpty())
+                return new ValidatedGuide(definition.workflowId(), steps.getFirst().stepId(), definition.guideVersion(),
+                        List.of(), request.clientContextRevision(), null);
             if (payment == null || payment.status() != CommissionPaymentStatus.DRAFT || payment.fingerprint() == null) return null;
             String step = paymentStep(definition, true);
             if (steps.stream().noneMatch(value -> value.stepId().equals(step))) return null;

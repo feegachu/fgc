@@ -62,9 +62,11 @@ export async function askPico(
     const payment = findGuide(guide.workflowId, '1.0')
     const workflow = findWorkflowGuide(guide.workflowId, '1.0')
     if (payment) {
-      if (!findStep(guide.workflowId, '1.0', guide.stepId) || !paymentRef || guide.entityRefs.length !== 1 ||
+      const newDraft = !paymentRef && guide.entityRefs.length === 0 && guide.serverStateVersion == null &&
+        payment.requiredSlots.length === 0 && guide.stepId === payment.steps[0].stepId
+      if (!newDraft && (!findStep(guide.workflowId, '1.0', guide.stepId) || !paymentRef || guide.entityRefs.length !== 1 ||
         guide.entityRefs[0].type !== 'PAYMENT' || guide.entityRefs[0].id !== paymentRef.id ||
-        !/^[a-f0-9]{64}$/.test(guide.serverStateVersion ?? '')) throw new Error('INVALID_PICO_GUIDE')
+        !/^[a-f0-9]{64}$/.test(guide.serverStateVersion ?? ''))) throw new Error('INVALID_PICO_GUIDE')
     } else if (!workflow || guide.entityRefs.length || guide.serverStateVersion != null ||
       ![...workflow.steps, ...workflowHelpSteps(guide.workflowId)].some((step) => step.stepId === guide.stepId)) throw new Error('INVALID_PICO_GUIDE')
   } else if (data.validatedGuide != null) throw new Error('INVALID_PICO_GUIDE')

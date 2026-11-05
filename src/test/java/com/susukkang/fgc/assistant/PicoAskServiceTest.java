@@ -42,11 +42,13 @@ class PicoAskServiceTest {
         assertThat(result.validatedGuide().entityRefs()).isEqualTo(input.entityRefs());
         verify(contexts,times(2)).read(77L);
     }
-    @Test void guideStartWithoutStoredTargetAsksForContextRatherThanInventingAnId() {
+    @Test void newDraftGuideStartsAtScopeWithoutInventingAStoredPayment() {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.START_GUIDE,"작성한 지급 건을 확인하세요.",List.of("payment.draft:overview")));
         var result=service.ask(request("이어서 안내해줘"));
-        assertThat(result.decision()).isEqualTo(Decision.ASK_CLARIFICATION);
-        assertThat(result.validatedGuide()).isNull();
+        assertThat(result.decision()).isEqualTo(Decision.START_GUIDE);
+        assertThat(result.validatedGuide().stepId()).isEqualTo("payment.scope");
+        assertThat(result.validatedGuide().entityRefs()).isEmpty();
+        assertThat(result.validatedGuide().serverStateVersion()).isNull();
         verifyNoInteractions(contexts);
     }
     @Test void generalGuideStartUsesOnlyRegisteredRoleAllowedEntry() {
@@ -57,6 +59,15 @@ class PicoAskServiceTest {
         assertThat(result.validatedGuide().stepId()).isEqualTo(catalog.definitions().stream().filter(g->g.workflowId().equals("contract.find")).findFirst().orElseThrow().steps().getFirst().stepId());
         assertThat(result.validatedGuide().entityRefs()).isEmpty();
         assertThat(result.validatedGuide().serverStateVersion()).isNull();
+    }
+    @Test void confirmationWithoutAPaymentOffersTheDraftPrerequisiteInsteadOfInventingAStoredTarget() {
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.confirm"),false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.START_GUIDE,"확정 절차를 함께 살펴보세요.",List.of("payment.confirm:overview")));
+        var result=service.ask(request("지급 확정 안내 시작해줘"));
+        assertThat(result.decision()).isEqualTo(Decision.ASK_CLARIFICATION);
+        assertThat(result.validatedGuide()).isNull();
+        assertThat(result.message()).contains("초안 작성 안내");
+        verifyNoInteractions(contexts);
     }
     @Test void preservesMeaningAndRedactsUserAuthoredPrivatePatternsInBothStages() {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer("초안 저장은 지급 확정과 구분됩니다.","payment.draft:overview"));

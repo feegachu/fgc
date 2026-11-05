@@ -12,7 +12,7 @@ import java.util.*;
 @Component
 public class PicoGuideCatalog {
     @JsonIgnoreProperties(ignoreUnknown=true)
-    public record Definition(String workflowId,String guideVersion,String title,String description,String capability,List<String> keywords,List<Step> steps,boolean enabled,List<String> roles) {}
+    public record Definition(String workflowId,String guideVersion,String title,String description,String capability,List<String> keywords,List<Step> steps,boolean enabled,List<String> roles,List<String> requiredSlots) {}
     @JsonIgnoreProperties(ignoreUnknown=true)
     public record Step(String stepId,String screenId,String targetId,String title,String instruction,String completionRuleId,List<Next> next,List<String> roles) {}
     public record Next(String conditionId,String stepId) {}

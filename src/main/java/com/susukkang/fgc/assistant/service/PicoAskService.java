@@ -234,7 +234,7 @@ public class PicoAskService {
             if (output.decision() == Decision.START_GUIDE) {
                 var entry = PicoGuideEntry.resolve(catalog, request, references, authorities, paymentSnapshot);
                 if (entry == null) return fixed(request, Decision.ASK_CLARIFICATION,
-                        "안내할 업무나 현재 대상을 먼저 확인해주세요. 저장된 지급 건을 선택하거나 원하는 업무를 구체적으로 알려주세요.", references, "GUIDE_CONTEXT_REQUIRED");
+                        "안내에 필요한 대상이나 선행 작업을 확인해주세요. 새 지급은 초안 작성 안내부터 시작하고, 저장된 지급은 해당 건을 선택해 다시 질문해주세요.", references, "GUIDE_CONTEXT_REQUIRED");
                 return new PicoAskResponse(Decision.START_GUIDE, output.message(), "1.0", request.clientContextRevision(),
                         references.stream().map(c -> new Evidence(c.chunkId(), c.workflowId(), c.stepId(), c.title())).toList(), entry, Source.AI, null);
             }

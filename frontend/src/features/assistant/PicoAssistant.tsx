@@ -612,6 +612,11 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                               onClick={() => { const guide = entry.reply.validatedGuide!; useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(guide.workflowId!, guide.stepId); setOpen(false) }}>
                               이 업무 안내 시작, {findWorkflowGuide(entry.reply.validatedGuide.workflowId!, '1.0')?.title}
                             </button>
+                          ) : entry.reply.validatedGuide.entityRefs?.length === 0 ? (
+                            <button type="button" className="button button-secondary" disabled={!isCurrentLiveReply(entry)}
+                              onClick={() => { const guide = entry.reply.validatedGuide!; useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(guide.workflowId!, guide.stepId); setOpen(false) }}>
+                              이 업무 안내 시작, {findGuide(entry.reply.validatedGuide.workflowId!, '1.0')?.title}
+                            </button>
                           ) : <PicoGuideStartButton workflowId={entry.reply.validatedGuide.workflowId!}
                             validatedGuide={entry.reply.validatedGuide} contextRevision={entry.reply.contextRevision!}
                             canProcess={canProcess} sourceContextAvailable={entry.hasPaymentContext} contextValid={isCurrentLiveReply(entry)} />

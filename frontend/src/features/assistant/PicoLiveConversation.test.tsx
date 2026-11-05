@@ -305,6 +305,23 @@ it('starts a state-validated answer at the server-selected precheck instead of t
   expect(request.mock.calls.map(([path]) => path)).toEqual(['/api/v1/ai/pico/ask', '/api/v1/ai/pico/guides/prepare', '/api/v1/ai/pico/guides/start'])
 })
 
+it('starts an unsaved draft at scope without requiring an existing payment or making a start-grant request', async () => {
+  observePayment({ paymentId: null, saved: false, formValid: false })
+  const request = vi.spyOn(apiClient, 'request').mockImplementation((async (_path, options) => {
+    const body = options!.body as Record<string, unknown>
+    return envelope({ ...reply, decision: 'START_GUIDE', contextRevision: body.clientContextRevision,
+      validatedGuide: { workflowId: 'payment.draft', stepId: 'payment.scope', guideVersion: '1.0', entityRefs: [],
+        clientContextRevision: body.clientContextRevision, serverStateVersion: null } })
+  }) as typeof apiClient.request)
+  render(<PicoAssistant canProcess />)
+  await open()
+  await send()
+  await userEvent.click(await screen.findByRole('button', { name: /이 업무 안내 시작/ }))
+  expect(useWorkflowGuide.getState().request).toMatchObject({ id: 'payment.draft', stepId: 'payment.scope' })
+  expect(request).toHaveBeenCalledTimes(1)
+  expect(request.mock.calls[0][1]?.body).toMatchObject({ entityRefs: [] })
+})
+
 it('keeps a completed answer actionable after a temporary ready refresh finishes', async () => {
   observePayment()
   mockResponse()
