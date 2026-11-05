@@ -16,11 +16,18 @@ import type { Selection, Evidence, Decision } from './state'
 import { guideGet, readEvidence } from './api'
 import { destinations, settlementCatalog, titles, FLOW_VERSION } from './catalog'
 import './settlement.css'
+import '../../transaction/payment-guide.css'
+import { Modal } from '../../../components/Modal'
 import guideMascot from '../assets/pico-guide.png'
 import { useWorkflowGuide } from '../workflow-state'
 
 const id = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
+function failureText(failure: unknown, fallback: string) {
+  return failure instanceof DOMException && failure.name === 'TimeoutError'
+    ? '최신 상태 조회가 5초 안에 끝나지 않았습니다. 잠시 후 다시 확인하세요.'
+    : failure instanceof Error ? failure.message : fallback
+}
 export function SettlementGuide({ user, month }: { user: ShellUser; month: string | null }) {
   const open = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   useEffect(() => () => closeSettlementGuide(), [user.loginId])
@@ -40,9 +47,11 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   const [collapsed, setCollapsed] = useState(false)
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('')
+  const [leave, setLeave] = useState<(() => void) | null>(null)
+  const stayButton = useRef<HTMLButtonElement>(null)
   const [snapshot, setSnapshot] = useState<GuideSnapshot | null>(null)
   const card = useRef<HTMLElement | null>(null)
-  const position = useSpotlight(snapshot?.target ?? null, card)
+  const position = useSpotlight(!collapsed ? (snapshot?.target ?? null) : null, card)
   const runtime = useRef<GuideRuntime<Evidence> | null>(null)
   const request = useRef<AbortController | null>(null)
   const epoch = useRef(0)
@@ -95,11 +104,16 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   useEffect(() => {
     const target = runtime.current?.getSnapshot().target
     if (!target) return
-    target.classList.add('settlement-spotlight')
+    target.classList.add('settlement-scroll-target')
     const observer = new MutationObserver(() => runtime.current?.contextChanged())
-    observer.observe(document.getElementById('main-content')!, { childList: true, subtree: true })
+    observer.observe(document.getElementById('main-content')!, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'inert', 'aria-hidden', 'class', 'style', 'data-guide-target'],
+    })
     return () => {
-      target.classList.remove('settlement-spotlight')
+      target.classList.remove('settlement-scroll-target')
       observer.disconnect()
     }
   }, [snapshot])
@@ -108,6 +122,15 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     const path = current.current.location.pathname
     const params = new URLSearchParams(current.current.location.search)
     const next = { ...base }
+    if (params.get('month') && params.get('month') !== base.month)
+      throw new Error('기준월이 바뀌었습니다. 현재 월에서 새 안내를 시작하세요.')
+    if (path === '/transactions' && id(params.get('selectedId'))) {
+      const selected = id(params.get('selectedId'))
+      if (next.paymentId && next.paymentId !== selected)
+        throw new Error('다른 지급 건을 선택했습니다. 새 안내를 시작하세요.')
+      next.paymentId = selected
+    }
+    if (path === '/schedules' && id(params.get('selectedId'))) next.scheduleId = id(params.get('selectedId'))
     const contract = path.match(/^\/contracts\/(\d+)$/)?.[1]
     if (contract) {
       if (next.contractId && next.contractId !== Number(contract))
@@ -116,6 +139,8 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     }
     if (path === '/transactions/new') {
       const context = getPaymentGuideObserver()?.readContext()
+      if (context?.entityRefs.some((ref) => ref.type === 'CONTRACT' && next.contractId && ref.id !== next.contractId))
+        throw new Error('다른 계약을 선택했습니다. 현재 대상으로 새 안내를 시작하세요.')
       const payment = context?.entityRefs.find((ref) => ref.type === 'PAYMENT')?.id
       if (payment) {
         if (next.paymentId && next.paymentId !== payment)
@@ -137,7 +162,13 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     if (schedule) next.scheduleId = Number(schedule)
     return next
   }
-  async function show(base: Selection, initial = false, acknowledge = false, replacePayment = false) {
+  async function show(
+    base: Selection,
+    initial = false,
+    acknowledge = false,
+    replacePayment = false,
+    allowDiscard = false,
+  ) {
     request.current?.abort()
     const controller = new AbortController(),
       token = ++epoch.current
@@ -179,10 +210,16 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       const paymentContext = getPaymentGuideObserver()?.readContext()
       const dirty = Boolean(paymentContext?.dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
       const pathNow = current.current.location.pathname
-      if (pathNow !== destination.path.split('?')[0] && dirty) {
-        throw new Error(
-          '미저장 입력이 있습니다. 현재 화면에서 저장하거나 입력을 보존한 뒤 다시 확인하세요. 안내 이동은 취소했습니다.',
-        )
+      const destinationUrl = new URL(destination.path, 'https://guide.local')
+      const currentParams = new URLSearchParams(current.current.location.search)
+      const needsNavigation =
+        pathNow !== destinationUrl.pathname ||
+        [...destinationUrl.searchParams].some(([key, value]) => currentParams.get(key) !== value)
+      if (needsNavigation && dirty && !allowDiscard) {
+        setLeave(() => () => {
+          void show(base, initial, acknowledge, replacePayment, true)
+        })
+        return
       }
       const handoff = handoffFor(result.step, user.roleCode ?? '', user.canProcess)
       setContractLabel(evidence.contract?.contractNo ?? '')
@@ -210,7 +247,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         screenId: screenFor(current.current.location.pathname)?.id ?? '',
         role: current.current.user.roleCode ?? '',
         entityRefs: refs,
-        clientContextRevision: String(token),
+        clientContextRevision: `${token}:${current.current.location.pathname}${current.current.location.search}`,
         serverStateVersion: null,
         dirty: false,
       })
@@ -248,18 +285,27 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       })
       runtime.current = runner
       runner.observe(() => setSnapshot(runner.getSnapshot()))
-      if (
-        destination.screen === 'CONT-W02' &&
-        current.current.location.pathname === destination.path.split('?')[0] &&
-        new URLSearchParams(current.current.location.search).get('tab') !== 'schedules'
-      )
+      // A screen ID alone cannot distinguish another entity or a different tab on the same route.
+      if (needsNavigation) {
+        if (allowDiscard) useUnsavedWorkStore.setState({ owners: {} })
         await navigate(destination.path)
+        while (
+          current.current.location.pathname !== destinationUrl.pathname ||
+          [...destinationUrl.searchParams].some(
+            ([key, value]) => new URLSearchParams(current.current.location.search).get(key) !== value,
+          )
+        ) {
+          signal.throwIfAborted()
+          await new Promise((resolve) => setTimeout(resolve, 20))
+        }
+      }
+      if (signal.aborted || token !== epoch.current) return
       await runner.start({
         workflowId: catalog.workflowId,
         guideVersion: FLOW_VERSION,
         stepId: result.step,
         entityRefs: refs,
-        clientContextRevision: String(token),
+        clientContextRevision: context().clientContextRevision,
         serverStateVersion: null,
       })
       if (
@@ -270,19 +316,15 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       if (result.complete) await runner.next()
     } catch (failure) {
       if (!controller.signal.aborted && token === epoch.current)
-        setError(
-          failure instanceof DOMException && failure.name === 'TimeoutError'
-            ? '최신 상태 조회가 5초 안에 끝나지 않았습니다. 잠시 후 다시 확인하세요.'
-            : failure instanceof Error
-              ? failure.message
-              : '최신 상태를 확인하지 못했습니다.',
-        )
+        setError(failureText(failure, '최신 상태를 확인하지 못했습니다.'))
     } finally {
       if (token === epoch.current) setBusy(false)
     }
   }
   async function start() {
     const controller = new AbortController()
+    const startLocation = current.current.location.pathname + current.current.location.search
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(5000)])
     request.current?.abort()
     request.current = controller
     setBusy(true)
@@ -292,7 +334,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       if (paymentNo) {
         const paymentId = id(paymentNo)
         if (!paymentId) throw new Error('올바른 지급 번호를 입력하세요.')
-        const payment = await readPayment(String(paymentId), controller.signal)
+        const payment = await readPayment(String(paymentId), signal)
         const contracts = [...new Set(payment.attributions?.map((row) => row.contractId))]
         if (contracts.length !== 1 || !contracts[0]) throw new Error('하나의 계약에 귀속된 지급 건을 선택하세요.')
         base.contractId = contracts[0]
@@ -300,160 +342,215 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       } else if (contractNo.trim()) {
         const page = await guideGet<ContractPage>(
           `/contracts?contractNo=${encodeURIComponent(contractNo.trim())}&page=1&size=20`,
-          controller.signal,
+          signal,
         )
         const exact = page.content?.filter((item) => item.contractNo === contractNo.trim())
         if (exact?.length !== 1 || !exact[0].contractId) throw new Error('정확한 기존 계약번호를 입력하세요.')
         base.contractId = exact[0].contractId
       }
-      controller.signal.throwIfAborted()
+      signal.throwIfAborted()
+      if (startLocation !== current.current.location.pathname + current.current.location.search)
+        throw new Error('조회 중 화면이 바뀌었습니다. 현재 대상으로 다시 시작하세요.')
       await show(base, true)
     } catch (failure) {
-      if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : '시작할 수 없습니다.')
+      if (!controller.signal.aborted) setError(failureText(failure, '시작할 수 없습니다.'))
     } finally {
       setBusy(false)
     }
   }
-  function revisit(path: string) {
+  function revisit(path: string, allowDiscard = false) {
     const dirty =
       Boolean(getPaymentGuideObserver()?.readContext().dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
-    if (dirty) {
-      setError('미저장 입력이 있어 이동을 취소했습니다. 먼저 현재 화면에서 저장하세요.')
+    if (dirty && !allowDiscard) {
+      setLeave(() => () => revisit(path, true))
       return
     }
+    if (allowDiscard) useUnsavedWorkStore.setState({ owners: {} })
     runtime.current?.pause('USER_NAVIGATION')
     setCollapsed(true)
     void navigate(path)
   }
   return (
     <>
-    {position.box && !collapsed && snapshot?.target && <div className="payment-guide-spotlight" style={position.box} aria-hidden="true" />}
-    <aside
-      ref={card}
-      style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
-      className="settlement-guide"
-      data-guide-anchored={Boolean(snapshot?.target && !collapsed)}
-      aria-label="전체 업무 가이드"
-      aria-busy={busy}
-    >
-      <header>
-        <img src={guideMascot} alt="" className="settlement-guide-mascot" width="40" height="40" />
-        <strong>전체 업무 가이드</strong>
-        {selection && (
-          <button type="button" onClick={() => setCollapsed((value) => !value)}>
-            {collapsed ? '펼치기' : '접기'}
+      {!collapsed && position.box && snapshot?.target && (
+        <div className="payment-guide-spotlight settlement-guide-spotlight" aria-hidden="true" style={position.box} />
+      )}
+      <aside
+        ref={card}
+        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
+        className="settlement-guide"
+        data-guide-anchored={Boolean(snapshot?.target && !collapsed)}
+        aria-label="전체 업무 가이드"
+        aria-busy={busy}
+      >
+        <header>
+          <img
+            src={guideMascot}
+            alt=""
+            className="settlement-guide-mascot"
+            width="32"
+            height="32"
+          />
+          <strong>전체 업무 가이드</strong>
+          {selection && (
+            <button type="button" onClick={() => setCollapsed((value) => !value)}>
+              {collapsed ? '펼치기' : '접기'}
+            </button>
+          )}
+          <button type="button" onClick={close}>
+            종료
           </button>
+        </header>
+        {!collapsed && (
+          <p>
+            {month} · {(selection?.stage ?? stage) === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'} ·{' '}
+            {contractLabel || '새 업무'}
+          </p>
         )}
-        <button type="button" onClick={close}>
-          종료
-        </button>
-      </header>
-      {!collapsed && (
-        <div className="payment-guide-progress" aria-hidden="true">{STEPS.map((step, index) => <span key={step} className={index < STEPS.indexOf(decision?.step ?? 'contract.create') ? 'is-done' : step === decision?.step ? 'is-current' : ''} />)}</div>
-      )}
-      {!collapsed && (
-        <p>
-          {month}, {(selection?.stage ?? stage) === 'GA_TO_FC' ? 'GA→설계사' : '원수사→GA'},{' '}
-          {contractLabel || '새 업무'}
-        </p>
-      )}
-      {collapsed && selection ? (
-        <button disabled={busy} onClick={() => void show(selection)}>
-          현재 결과로 이어서 안내
-        </button>
-      ) : !selection ? (
-        <>
-          <label>
-            지급단계
-            <select value={stage} onChange={(event) => setStage(event.target.value as Selection['stage'])}>
-              <option value="GA_TO_FC">GA→설계사</option>
-              <option value="INSURER_TO_GA">원수사→GA</option>
-            </select>
-          </label>
-          <label>
-            기존 계약번호 (새 계약은 비워두세요)
-            <input value={contractNo} onChange={(event) => setContractNo(event.target.value)} disabled={!!paymentNo} />
-          </label>
-          <label>
-            기존 지급 번호로 이어서 안내 (선택)
-            <input inputMode="numeric" value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} />
-          </label>
-          <button className="button button-primary" disabled={busy} onClick={() => void start()}>
-            안내 시작
+        {collapsed && selection ? (
+          <button disabled={busy} onClick={() => void show(selection)}>
+            현재 결과로 이어서 안내
           </button>
-        </>
-      ) : (
-        <>
-          <p>{decision ? `${STEPS.indexOf(decision.step) + 1}/9, ${titles[STEPS.indexOf(decision.step)]}` : ''}</p>
-          <p>{decision?.reason}</p>
-          {snapshot?.status === 'PAUSED' || snapshot?.status === 'ERROR' ? (
-            <p role="status">안내 대상을 확인하지 못했거나 화면이나 입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
-          ) : null}
-          {snapshot?.status === 'COMPLETED' ? (
-            <strong>전체 업무 안내 완료</strong>
-          ) : (
-            <div className="settlement-guide-actions">
-              {decision?.step === 'schedule.review' && (
-                <button className="pico-guide-next" disabled={busy} onClick={() => void show(selection, false, true)}>
-                  스케줄 확인 완료
-                </button>
-              )}
-              <button className="pico-guide-next" disabled={busy} onClick={() => void show(selection)}>
-                현재 결과로 이어서 안내
-              </button>
-            </div>
-          )}
-          {decision?.step === 'validation.execute' && !user.canProcess && (
-            <button onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>월 검증 결과 선택</button>
-          )}
-          {decision?.step === 'exception.resolve' &&
-            !handoffFor('exception.resolve', user.roleCode ?? '', user.canProcess) && (
+        ) : !selection ? (
+          <>
+            <label>
+              지급단계
+              <select
+                disabled={busy}
+                value={stage}
+                onChange={(event) => setStage(event.target.value as Selection['stage'])}
+              >
+                <option value="GA_TO_FC">GA → 설계사</option>
+                <option value="INSURER_TO_GA">보험사 → GA</option>
+              </select>
+            </label>
+            <label>
+              기존 계약번호 (새 계약은 비워두세요)
+              <input
+                value={contractNo}
+                onChange={(event) => setContractNo(event.target.value)}
+                disabled={busy || !!paymentNo}
+              />
+            </label>
+            <label>
+              기존 지급 번호로 이어서 안내 (선택)
+              <input
+                disabled={busy}
+                inputMode="numeric"
+                value={paymentNo}
+                onChange={(event) => setPaymentNo(event.target.value)}
+              />
+            </label>
+            <button className="button button-primary" disabled={busy} onClick={() => void start()}>
+              안내 시작
+            </button>
+          </>
+        ) : (
+          <>
+            <p>{decision ? `${STEPS.indexOf(decision.step) + 1}/9 · ${titles[STEPS.indexOf(decision.step)]}` : ''}</p>
+            <p>{decision?.reason}</p>
+            {busy && <p role="status">현재 서버 결과를 확인하고 있습니다.</p>}
+            {!busy && (snapshot?.status === 'PAUSED' || snapshot?.status === 'ERROR') ? (
+              <p role="status">안내 대상을 확인하지 못했거나 화면·입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
+            ) : null}
+            {snapshot?.status === 'COMPLETED' ? (
+              <strong>전체 업무 안내 완료</strong>
+            ) : (
               <div className="settlement-guide-actions">
-                <label>
-                  정정 후 지급 번호
-                  <input
-                    inputMode="numeric"
-                    value={replacementNo}
-                    onChange={(event) => setReplacementNo(event.target.value)}
-                  />
-                </label>
-                <button
-                  disabled={busy}
-                  onClick={() => {
-                    const paymentId = id(replacementNo)
-                    if (!paymentId) {
-                      setError('정정 후 확정된 지급 번호를 입력하세요.')
-                      return
-                    }
-                    void show(replacementSelection(selection, paymentId), false, false, true)
-                  }}
-                >
-                  정정 지급으로 이어서 안내
-                </button>
-                <button onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
-                  새 월 검증 선택/생성
-                </button>
-                <button onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
-                  월 검증 다시 확인
-                </button>
-                <button onClick={() => revisit(destinations(selection)['reconciliation.review'].path)}>
-                  대사 결과 다시 선택
+                {decision?.step === 'schedule.review' && (
+                  <button disabled={busy} onClick={() => void show(selection, false, true)}>
+                    스케줄 확인 완료
+                  </button>
+                )}
+                <button disabled={busy} onClick={() => void show(selection)}>
+                  현재 결과로 이어서 안내
                 </button>
               </div>
             )}
-          <details>
-            <summary>전체 9단계 보기</summary>
-            <ol>
-              {titles.map((title) => (
-                <li key={title}>{title}</li>
-              ))}
-            </ol>
-          </details>
-        </>
-      )}
-      {error && <p role="alert">{error}</p>}
-      {!collapsed && <small>안내는 저장, 실행, 확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>}
-    </aside>
+            {decision?.step === 'validation.execute' && !user.canProcess && (
+              <button disabled={busy} onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
+                월 검증 결과 선택
+              </button>
+            )}
+            {decision?.step === 'exception.resolve' &&
+              !handoffFor('exception.resolve', user.roleCode ?? '', user.canProcess) && (
+                <div className="settlement-guide-actions">
+                  <label>
+                    정정 후 지급 번호
+                    <input
+                      inputMode="numeric"
+                      disabled={busy}
+                      value={replacementNo}
+                      onChange={(event) => setReplacementNo(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      const paymentId = id(replacementNo)
+                      if (!paymentId) {
+                        setError('정정 후 확정된 지급 번호를 입력하세요.')
+                        return
+                      }
+                      void show(replacementSelection(selection, paymentId), false, false, true)
+                    }}
+                  >
+                    정정 지급으로 이어서 안내
+                  </button>
+                  <button disabled={busy} onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
+                    새 월 검증 선택·생성
+                  </button>
+                  <button disabled={busy} onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
+                    월 검증 다시 확인
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => revisit(destinations(selection)['reconciliation.review'].path)}
+                  >
+                    대사 결과 다시 선택
+                  </button>
+                </div>
+              )}
+            <details>
+              <summary>전체 9단계 보기</summary>
+              <ol>
+                {titles.map((title) => (
+                  <li key={title}>{title}</li>
+                ))}
+              </ol>
+            </details>
+          </>
+        )}
+        {error && <p role="alert">{error}</p>}
+        {!collapsed && (
+          <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
+        )}
+      </aside>
+      <Modal
+        open={leave !== null}
+        title="미저장 입력이 있습니다"
+        onClose={() => setLeave(null)}
+        initialFocusRef={stayButton}
+        footer={
+          <>
+            <button className="button button-secondary" ref={stayButton} onClick={() => setLeave(null)}>
+              현재 화면 유지
+            </button>
+            <button
+              className="button button-primary"
+              onClick={() => {
+                const proceed = leave
+                setLeave(null)
+                proceed?.()
+              }}
+            >
+              입력 버리고 이동
+            </button>
+          </>
+        }
+      >
+        <p>이동하면 현재 화면의 미저장 입력이 사라질 수 있습니다. 저장을 대신 실행하지 않습니다.</p>
+      </Modal>
     </>
   )
 }

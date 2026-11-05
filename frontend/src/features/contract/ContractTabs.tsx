@@ -1,8 +1,9 @@
+import { returnLink } from '../transaction/payment-entry'
 import { useRef } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
@@ -10,9 +11,11 @@ import type { TableColumn } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date, int, month, won } from '../../lib/format'
+import { ContractAcquisitionCost } from '../acquisition-cost/ContractAcquisitionCost'
 import { CapDetailModal } from '../cap/CapDetailModal'
 import { Amount, CapStatus, CapUsage } from '../cap/badges'
 import { JOURNAL_TYPE } from '../ledger/labels'
+import { SchedulePreviewForm } from '../schedule/SchedulePreviewForm'
 import { ScheduleStatusBadge } from '../schedule/badges'
 import { LINE_STATUS, PAYMENT_STAGE, responseLabel } from '../schedule/labels'
 import {
@@ -143,6 +146,13 @@ export function ContractTabs({
               <CapTab id={id} />
             ) : name === 'arbitrage' ? (
               <ArbitrageTab id={id} />
+            ) : name === 'acquisition' ? (
+              <>
+                <PanelHeading title="계약체결비용 한도">
+                  선지급과 유지관리 예정 금액을 한도와 각각 비교합니다. 예정 스케줄 생성과 별개입니다.
+                </PanelHeading>
+                <ContractAcquisitionCost contractId={id} contractNo={contract.contractNo} />
+              </>
             ) : name === 'ledger' ? (
               <LedgerTab id={id} />
             ) : (
@@ -225,7 +235,7 @@ function SchedulesTab({ id }: { id: string }) {
   return (
     <>
       <PanelHeading title="예상 스케줄" legacy>
-        지급단계별 현재 운영 스케줄과 회차를 조회합니다.
+        지급단계별 운영·예정 스케줄과 회차를 조회합니다.
       </PanelHeading>
       <div className="contract-tab-body">
         <div className="contract-detail-schedule-stages">
@@ -239,6 +249,7 @@ function SchedulesTab({ id }: { id: string }) {
 
 function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA_TO_FC' }) {
   const query = useQuery(contractSchedulesQuery(id, stage))
+  const location = useLocation()
   return (
     <section data-guide-feature={guideFeatureId('contract.schedule-stage', stage)} aria-label={PAYMENT_STAGE[stage]} className="contract-tab-section">
       <QueryContent query={query}>
@@ -249,17 +260,27 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
                 <h3 className="surface-title">{PAYMENT_STAGE[stage]}</h3>
                 <p>
                   {data.headers?.[0]
-                    ? `버전 ${data.headers[0].scheduleVersionNo ?? '-'}, ${int(data.headers[0].lineCount ?? data.lines?.length)}회차`
-                    : '현재 운영 스케줄이 없습니다.'}
+                    ? `버전 ${data.headers[0].scheduleVersionNo ?? '-'}, ${int(data.headers[0].installmentCount)}회차, ${int(data.headers[0].lineCount)}행`
+                    : '생성된 스케줄이 없습니다.'}
                 </p>
               </div>
             </header>
+            {data.headers
+              ?.filter((header) => header.schedulePurpose === 'SIMULATION')
+              .map((header) => (
+                <p key={header.scheduleHeaderId}>
+                  <Link data-guide-feature="contract.schedule.preview-detail" to={returnLink(`/schedules/${header.scheduleHeaderId}`, `${location.pathname}${location.search}`)}>
+                    예정판 v{header.scheduleVersionNo} · {header.installmentCount}회차 상세 보기
+                  </Link>
+                </p>
+              ))}
+            <SchedulePreviewForm context={data.previewContext} contractId={id} stage={stage} />
             <DataTable
               viewportClassName="contract-tab-viewport"
               caption={`${PAYMENT_STAGE[stage]} 예상 스케줄`}
               columns={scheduleColumns}
               rows={data.lines ?? []}
-              rowKey={(row) => String(row.lineNo ?? data.lines!.indexOf(row))}
+              rowKey={(row) => String(row.scheduleLineId ?? row.lineNo ?? data.lines!.indexOf(row))}
               emptyMessage="조회된 스케줄 회차가 없습니다."
             />
           </>
