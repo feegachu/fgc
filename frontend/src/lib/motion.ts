@@ -42,7 +42,7 @@ export function useTween(target: number[], durationMs = 500, fromZero = false): 
     const start = performance.now()
     let frame = 0
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs)
+      const t = Math.min(1, Math.max(0, (now - start) / durationMs)) // rAF 시각이 start보다 앞설 수 있다
       const next = t >= 1 ? to : to.map((v, i) => from[i] + (v - from[i]) * easeOutCubic(t))
       currentRef.current = next
       setValue(next)

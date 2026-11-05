@@ -2,6 +2,7 @@ package com.susukkang.fgc.dashboard.dto;
 
 import com.susukkang.fgc.common.code.ValidationRunStatus;
 import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.validation.dto.ValidationFailureText;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -40,7 +41,7 @@ public record RecentValidationRunResponse(
                 DateUtil.toSeoul(row.completedAt()),
                 DateUtil.toSeoul(row.finalizedAt()),
                 row.finalizedBy(),
-                row.failureMessage()
+                ValidationFailureText.forResponse(row.failureMessage())
         );
     }
 }

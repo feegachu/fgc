@@ -195,7 +195,7 @@ export function ValidationRestartPanel({
       )}
       {status === 'FAILED' && (
         <p>
-          체크포인트: {state.data?.checkpointAvailable ? '있음' : '확인 필요'} · 완료 대상:{' '}
+          이어서 처리할 지점: {state.data?.checkpointAvailable ? '있음' : '확인 필요'} · 완료 대상:{' '}
           {state.data?.completedCount ?? '자료 없음'} · 남은 대상: {state.data?.remainingCount ?? '자료 없음'} · 실패
           시각:{' '}
           {state.data?.failedAt

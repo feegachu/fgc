@@ -44,6 +44,6 @@ public record ValidationRunProgressResponse(
                 TOTAL_STEPS,
                 row.getCurrentStep() * 100 / TOTAL_STEPS,
                 status == ValidationRunStatus.FAILED ? row.getCurrentStep() : null,
-                row.getFailureMessage(), requestId, attemptId);
+                ValidationFailureText.forResponse(row.getFailureMessage()), requestId, attemptId);
     }
 }

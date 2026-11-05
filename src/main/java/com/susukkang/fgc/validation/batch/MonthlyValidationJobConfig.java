@@ -1,5 +1,6 @@
 package com.susukkang.fgc.validation.batch;
 
+import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.validation.batch.contract.ArbitrageCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.CapCheckBatchPort;
 import com.susukkang.fgc.validation.batch.contract.JournalPostingPort;
@@ -37,6 +38,7 @@ public class MonthlyValidationJobConfig {
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
+    private final FgcMessageResolver fgcMessageResolver;
     private final ValidationTargetSelectionService validationTargetSelectionService;
     private final ArbitrageCheckBatchPort arbitrageCheckBatchPort;
     private final ValidationRunScheduleService validationRunScheduleService;
@@ -170,6 +172,7 @@ public class MonthlyValidationJobConfig {
     // @Bean 메서드마다 "new ValidationRunStepProgressListener(번호, ..., 서비스)"를 반복해서 쓰지 않으려고 뽑아 둔 헬퍼
     private ValidationRunStepProgressListener progressListener(int stepNo, boolean initialStep) {
         return new ValidationRunStepProgressListener(
-                stepNo, initialStep, validationRunBatchLifecycleService, validationRunBatchAuditService);
+                stepNo, initialStep, validationRunBatchLifecycleService, validationRunBatchAuditService,
+                fgcMessageResolver);
     }
 }
