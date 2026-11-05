@@ -2,7 +2,7 @@ import { SaveGuide } from './save-guide'
 import { StrictMode, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useSearchParams } from 'react-router'
 import { ScreenHelp } from './ScreenHelp'
@@ -14,6 +14,20 @@ beforeEach(() => {
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
+it('explains the five-second preparation timeout and offers an explicit retry without a fallback target', async () => {
+  vi.useFakeTimers()
+  try {
+    render(<main id="main-content"><ScreenHelp screenId="CONT-W01" /></main>)
+    fireEvent.click(screen.getByRole('button', { name: '도움말' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(5001) })
+    expect(screen.getByRole('status')).toHaveTextContent('안내 영역이 5초 안에 준비되지 않았습니다.')
+    expect(screen.getByRole('button', { name: '다시 찾기' })).toBeEnabled()
+    expect(document.querySelector('.payment-guide-spotlight')).toBeNull()
+  } finally {
+    cleanup()
+    vi.useRealTimers()
+  }
+})
 it('strict-mode help only explains, preserves input and restores focus on Escape', async () => {
   const user = userEvent.setup()
   const write = vi.fn()
