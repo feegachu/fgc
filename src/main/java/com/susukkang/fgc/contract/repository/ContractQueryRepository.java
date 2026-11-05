@@ -254,7 +254,7 @@ public class ContractQueryRepository {
     private BooleanBuilder filters(ContractSearchCondition condition) {
         BooleanBuilder where = new BooleanBuilder();
         var c = insuranceContract;
-        where.and(agentScope.contractPredicate(c.contractId, c.agentId));
+        where.and(agentScope.contractPredicate(c.agentId, condition == null ? null : condition.getAgentId()));
         if (condition == null) return where;
         // LIKE의 %, _와 PostgreSQL 기본 역슬래시 이스케이프 의미를 기존 그대로 보존한다.
         if (condition.getContractNo() != null && !condition.getContractNo().isEmpty())

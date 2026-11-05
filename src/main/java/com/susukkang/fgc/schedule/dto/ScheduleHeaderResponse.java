@@ -24,6 +24,19 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleHeaderResponse {
+    private Long contractId;
+    private Long policyVersionId;
+    private Integer installmentCount;
+    private Integer maxInstallmentNo;
+    public boolean getCanConfirm() {
+        return "CURRENT".equals(scheduleRegime) && "OPERATIONAL".equals(schedulePurpose)
+                && Boolean.TRUE.equals(activeYn) && status == ScheduleHeaderStatus.PLANNED;
+    }
+    public String getConfirmBlockedReason() {
+        if (!"CURRENT".equals(scheduleRegime)) return "FGC-IMPL-SCHEDULE_PREVIEW_ONLY";
+        return getCanConfirm() ? null : "SCHEDULE_NOT_ACTIVE_PLANNED";
+    }
+
     private Long scheduleHeaderId; // 스케줄 헤더 ID
     private String contractNo; // 화면에 표시할 계약 번호
     private String insurerName; // 보험회사명
@@ -54,7 +67,7 @@ public class ScheduleHeaderResponse {
     }
 
     private Boolean activeYn; // 현재 사용 여부
-    private Integer lineCount; // 전체 회차 수
+    private Integer lineCount; // 전체 행 수
     private BigDecimal expectedTotal; // 예상 총액
     private String policyVersionLabel; // 정책 버전 표시값
     private String generationReason; //생성 사유

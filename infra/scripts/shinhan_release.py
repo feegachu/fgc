@@ -121,6 +121,13 @@ def unprotected_sql(root):
             f"WHERE login_id IN ({accounts}) AND account_status = 'ACTIVE' AND password_hash IN ({hashes});")
 
 
+def missing_accounts_sql():
+    """Demo accounts without a row. Their 401 proves nothing, so any name here stops the deploy (SRC-065)."""
+    names = ", ".join(f"('{name}')" for name in SEED_ACCOUNTS)
+    return (f"SELECT coalesce(string_agg(v.name, ',' ORDER BY v.name), '') FROM (VALUES {names}) AS v(name) "
+            "WHERE NOT EXISTS (SELECT 1 FROM fgc.app_user u WHERE u.login_id = v.name);")
+
+
 def published_logins(root):
     """(account, login body with the published demo password). The deploy sends each and requires a refusal."""
     seed = pathlib.Path(root) / "src/main/resources/db/demo/V3__seed_demo_data.sql"
@@ -149,11 +156,14 @@ def main():
     p.add_argument("root")
     p = commands.add_parser("published-logins")
     p.add_argument("root")
+    commands.add_parser("missing-accounts-sql")
     args = parser.parse_args()
     if args.command == "origin":
         print("\n".join(public_origin(args.url)))
     elif args.command == "unprotected-sql":
         print(unprotected_sql(args.root))
+    elif args.command == "missing-accounts-sql":
+        print(missing_accounts_sql())
     elif args.command == "published-logins":
         print("\n".join(f"{name}\t{body}" for name, body in published_logins(args.root)))
     elif args.command == "promote":

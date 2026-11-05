@@ -6,6 +6,7 @@ import com.susukkang.fgc.common.code.FeeComponentType;
 import com.susukkang.fgc.common.code.PolicyType;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.policy.code.AcquisitionCostParameter;
 import com.susukkang.fgc.policy.code.ScheduleEligibilityParameter;
 import com.susukkang.fgc.policy.dto.PolicyDraft;
 import com.susukkang.fgc.policy.dto.PolicyDraft.CommissionRuleDraft;
@@ -330,6 +331,8 @@ public class PolicyDraftValidator {
             // 현재 ZeroTolerancePolicy는 0원·0일만 구현한다. 다른 값의 저장으로 지원 범위를 가장하지 않는다.
             case RECONCILIATION_TOLERANCE -> Set.of("TOLERANCE_AMOUNT_KRW", "TOLERANCE_DAYS").contains(parameter.key())
                     && value.isNumber() && value.decimalValue().signum() == 0;
+            case FOUR_YEAR_COMMISSION, SEVEN_YEAR_COMMISSION ->
+                    AcquisitionCostParameter.accepts(parameter.key(), value, parameter.description());
             default -> false;
         };
     }
