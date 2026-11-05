@@ -12,7 +12,7 @@ import java.util.*;
 @Component
 public class PicoGuideCatalog {
     @JsonIgnoreProperties(ignoreUnknown=true)
-    public record Definition(String workflowId,String guideVersion,String title,String description,String capability,List<String> keywords,List<Step> steps,boolean enabled,List<String> roles) {}
+    public record Definition(String workflowId,String guideVersion,String title,String description,String capability,List<String> keywords,List<Step> steps,boolean enabled,List<String> roles,List<String> requiredSlots) {}
     @JsonIgnoreProperties(ignoreUnknown=true)
     public record Step(String stepId,String screenId,String targetId,String title,String instruction,String completionRuleId,List<Next> next,List<String> roles) {}
     public record Next(String conditionId,String stepId) {}
@@ -102,6 +102,10 @@ public class PicoGuideCatalog {
     private static boolean validRoles(List<String> roles) { return roles != null && !roles.isEmpty() && ROLES.containsAll(roles); }
     public List<Step> allowedSteps(Definition guide, Collection<String> roles) {
         return guide.steps().stream().filter(step -> step.roles().stream().anyMatch(roles::contains)).toList();
+    }
+    public List<Step> allowedHelpSteps(Definition guide, Collection<String> roles) {
+        return help.getOrDefault(guide.workflowId(), List.of()).stream()
+                .filter(step -> step.roles().stream().anyMatch(roles::contains)).toList();
     }
     public List<Chunk> chunks(Definition guide, String query, Collection<String> roles) {
         var chunks = new ArrayList<>(chunks(guide, roles));

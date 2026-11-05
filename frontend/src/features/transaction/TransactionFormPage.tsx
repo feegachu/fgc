@@ -133,6 +133,7 @@ function TransactionForm({
   const help = useRef<HTMLButtonElement>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [initialWorkflowId, setInitialWorkflowId] = useState<string | null>(null)
+  const [initialGuideStepId, setInitialGuideStepId] = useState<string | undefined>()
   const [guideRevision, setGuideRevision] = useState(0)
   const [guideSaved, setGuideSaved] = useState(Boolean(initialId))
   const fullFlow = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
@@ -337,9 +338,10 @@ function TransactionForm({
     modalOpen,
   })
 
-  useEffect(() => connectPaymentGuideLaunch((id) => {
+  useEffect(() => connectPaymentGuideLaunch((id, stepId) => {
     useWorkflowGuide.getState().clear()
     setInitialWorkflowId(id)
+    setInitialGuideStepId(stepId)
     setHelpOpen(true)
   }), [])
   useEffect(() => {
@@ -957,6 +959,7 @@ function TransactionForm({
       {helpOpen && (
         <PaymentGuide
           initialWorkflowId={initialWorkflowId}
+          initialStepId={initialGuideStepId}
           root={root}
           modalOpen={modalOpen}
           confirmed={confirmed}
