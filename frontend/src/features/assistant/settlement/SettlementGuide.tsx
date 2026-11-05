@@ -61,9 +61,12 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     (!!routeContract && !!selection.contractId && Number(routeContract) !== selection.contractId) ||
     (!!routeSchedule && !!selection.scheduleId && Number(routeSchedule) !== selection.scheduleId)
   )
-  const detailedPayment = decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
+  const detailedPayment = !busy && decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
   const walkthrough = usePaymentWalkthrough(detailedPayment, month, selection?.stage, selection?.contractId)
-  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending)
+  // show() can navigate from the just-saved editor to the same route with its new ID.
+  // Bind only after that transition has finished: the old editor is replaced while
+  // its saved draft loads, which is not loss of a target in the new explanation.
+  const explanation = useWorkflowWalkthrough(busy ? undefined : decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
   const position = useSpotlight(!collapsed ? activeTarget : null, card)
@@ -513,7 +516,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
                     스케줄 확인 완료
                   </button>
                 )}
-                {!detailedPayment && (!detailedWorkflow || explanation.last || !explanation.target) && <button disabled={busy || (detailedWorkflow && explanation.status === 'PAUSED')} onClick={() => void show(selection)}>
+                {!detailedPayment && (!detailedWorkflow || explanation.last || !explanation.target) && <button disabled={busy} onClick={() => void show(selection)}>
                   현재 결과로 이어서 안내
                 </button>}
               </div>

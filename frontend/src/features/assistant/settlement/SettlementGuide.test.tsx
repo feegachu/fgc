@@ -165,6 +165,28 @@ describe('FUN-088 shell guide', () => {
     expect(launch).toHaveFocus()
     expect(apiClient.request).not.toHaveBeenCalled()
   })
+  it('allows an explicit server recheck after target loss without advancing the paused explanation', async () => {
+    const { actor, router } = mount()
+    await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+    await actor.type(screen.getByLabelText(/기존 계약번호/), 'C1')
+    await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+    await screen.findByText('실제 스케줄')
+    const target = document.querySelector<HTMLElement>('[aria-labelledby="schedule-header-title"]')!
+    await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
+    act(() => { target.hidden = true })
+    await screen.findByText(/안내 대상이 사라지거나 숨겨져 중단했습니다/)
+    expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeDisabled()
+    const recheck = screen.getByRole('button', { name: '현재 결과로 이어서 안내' })
+    expect(recheck).toBeEnabled()
+    const read = vi.spyOn(evidenceApi, 'readEvidence').mockRejectedValueOnce(new Error('최신 서버 결과를 확인하지 못했습니다.'))
+    await actor.click(recheck)
+    expect(read).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('alert')).toHaveTextContent('최신 서버 결과를 확인하지 못했습니다.')
+    expect(router.state.location.pathname).toBe('/schedules/2')
+    expect(screen.queryByText('전체 업무 안내 완료')).not.toBeInTheDocument()
+    expect(vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
+  })
+
   it('reads an existing contract and requires schedule acknowledgement before the payment form', async () => {
     const { actor, router } = mount()
     await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
