@@ -944,6 +944,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions/options": {
         parameters: {
             query?: never;
@@ -986,6 +1002,26 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["journalCorrection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/home/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 관리자 홈 GA·설계사 현황 (IF-API-68)
+         * @description 기준일의 등록·활동·해촉 설계사 수, 지점별 설계사·유효 계약 수, 확인할 설계사 상위 10명을 돌려준다. asOf 생략 시 오늘(Asia/Seoul)을 쓴다. 전체 설계사 검색은 IF-API-07 을 쓴다.
+         */
+        get: operations["homeSummary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2221,6 +2257,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseExceptionCountsResponse: {
+            data?: components["schemas"]["ExceptionCountsResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseExceptionOptionsResponse: {
             data?: components["schemas"]["ExceptionOptionsResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2233,6 +2274,11 @@ export interface components {
         };
         ApiResponseFinalizeValidationRunResponse: {
             data?: components["schemas"]["FinalizeValidationRunResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseHomeSummaryResponse: {
+            data?: components["schemas"]["HomeSummaryResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2696,12 +2742,12 @@ export interface components {
             userId?: number;
         };
         Basis: {
-            asOfDate?: string;
-            lines?: components["schemas"]["AssistantAttributionLine"][];
-            policyVersionIds?: string[];
-            rounding?: components["schemas"]["Rounding"];
-            ruleIds?: string[];
             sourceRefs?: components["schemas"]["AssistantCalculationSource"][];
+            rounding?: components["schemas"]["Rounding"];
+            asOfDate?: string;
+            policyVersionIds?: string[];
+            ruleIds?: string[];
+            lines?: components["schemas"]["AssistantAttributionLine"][];
         };
         Blocker: {
             code?: string;
@@ -4133,6 +4179,12 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        ExceptionCountsResponse: {
+            bySeverity?: components["schemas"]["ExceptionSeverityCountResponse"][];
+            byType?: components["schemas"]["ExceptionTypeSummaryResponse"][];
+            /** Format: int64 */
+            total?: number;
+        };
         ExceptionOccurrenceResponse: {
             /** Format: date-time */
             detectedAt?: string;
@@ -4160,6 +4212,13 @@ export interface components {
             severities?: components["schemas"]["Option"][];
             types?: components["schemas"]["Option"][];
             validationMonths?: string[];
+        };
+        ExceptionSeverityCountResponse: {
+            /** Format: int64 */
+            count?: number;
+            /** @enum {string} */
+            severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
+            severityLabel?: string;
         };
         ExceptionSummary: {
             /** Format: int64 */
@@ -4287,6 +4346,54 @@ export interface components {
         HeldAmount: {
             after?: number;
             before?: number;
+        };
+        HomeAgentCounts: {
+            /** Format: int64 */
+            active?: number;
+            /** Format: int64 */
+            registered?: number;
+            /** Format: int64 */
+            terminated?: number;
+        };
+        HomeAttentionAgent: {
+            activeYn?: boolean;
+            /** Format: int64 */
+            agentId?: number;
+            branch?: string;
+            code?: string;
+            /** Format: int64 */
+            contractCount?: number;
+            name?: string;
+            reasons?: components["schemas"]["HomeAttentionReason"][];
+            status?: string;
+            statusLabel?: string;
+        };
+        HomeAttentionReason: {
+            code?: string;
+            /** Format: int64 */
+            count?: number;
+            label?: string;
+        };
+        HomeBranch: {
+            /** Format: int64 */
+            activeContractCount?: number;
+            /** Format: int64 */
+            agentCount?: number;
+            /** Format: int64 */
+            attentionCount?: number;
+            name?: string;
+            /** Format: int64 */
+            organizationId?: number;
+        };
+        HomeSummaryResponse: {
+            agents?: components["schemas"]["HomeAgentCounts"];
+            /** Format: date */
+            asOf?: string;
+            attentionAgents?: components["schemas"]["HomeAttentionAgent"][];
+            /** Format: int64 */
+            attentionTotal?: number;
+            basis?: string;
+            branches?: components["schemas"]["HomeBranch"][];
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -4849,46 +4956,47 @@ export interface components {
             value: components["schemas"]["JsonNode"];
         };
         PaymentCalculationRequest: {
-            candidate?: components["schemas"]["JsonNode"];
-            /** Format: int64 */
-            clientRevision: number;
             contractVersion: string;
             /** @enum {string} */
             kind: "EXPECTED_COMMISSION" | "ATTRIBUTION_BALANCE" | "CAP_STATUS" | "PAYMENT_CANDIDATE" | "RECONCILIATION_DIFFERENCE" | "ARBITRAGE_EXCESS" | "JOURNAL_CORRECTION_REVIEW";
             /** @enum {string} */
             mode: "EXISTING" | "HYPOTHETICAL";
             scope?: components["schemas"]["Scope"];
+            candidate?: components["schemas"]["JsonNode"];
+            /** Format: int64 */
+            clientRevision: number;
         };
         PaymentCalculationSnapshot: {
-            amounts?: {
-                [key: string]: string;
-            };
-            basis?: components["schemas"]["Basis"];
-            blockers?: components["schemas"]["Reason"][];
-            /** Format: date-time */
-            calculatedAt?: string;
             calculationId?: string;
-            capPreview?: {
-                [key: string]: unknown;
-            }[];
+            kind?: string;
+            mode?: string;
+            status?: string;
             /** Format: int64 */
             clientRevision?: number;
-            confirmable?: boolean;
-            currency?: string;
+            synthetic?: boolean;
+            snapshotOnly?: boolean;
             evidenceKind?: string;
-            kind?: string;
-            missingInputs?: string[];
-            mode?: string;
+            currency?: string;
             paymentStatus?: string;
-            recommendation?: components["schemas"]["Recommendation"];
             resolvedScope?: {
                 [key: string]: string;
             };
-            snapshotOnly?: boolean;
-            status?: string;
-            synthetic?: boolean;
+            amounts?: {
+                [key: string]: string;
+            };
+            capPreview?: {
+                [key: string]: unknown;
+            }[];
+            confirmable?: boolean;
+            blockers?: components["schemas"]["Reason"][];
+            missingInputs?: string[];
+            basis?: components["schemas"]["Basis"];
+            recommendation?: components["schemas"]["Recommendation"];
+            /** Format: date-time */
+            calculatedAt?: string;
             /** @description Always null in snapshot-only phase; not a server proof */
             validity?: Record<string, never> | null;
+            lines?: components["schemas"]["AssistantCalculationLine"][];
         };
         PaymentEvidence: {
             attributedAmount?: number;
@@ -5362,8 +5470,8 @@ export interface components {
         };
         Reason: {
             code?: string;
-            contractId?: string;
             message?: string;
+            contractId?: string;
             transactionAttributionId?: string;
         };
         RecentExceptionResponse: {
@@ -5404,10 +5512,10 @@ export interface components {
         };
         Recommendation: {
             allowed?: boolean;
+            targetId?: string;
+            suggestedAmount?: string;
             reason?: string;
             requiredChecks?: string[];
-            suggestedAmount?: string;
-            targetId?: string;
         };
         ReconciliationExceptionBulkCreateResponse: {
             /** Format: int64 */
@@ -5710,10 +5818,10 @@ export interface components {
             reversalOfId?: number;
         };
         Rounding: {
-            aggregation?: string;
-            mode?: string;
             /** Format: int32 */
             scale?: number;
+            mode?: string;
+            aggregation?: string;
         };
         Ruleset: {
             /** Format: date */
@@ -5873,6 +5981,19 @@ export interface components {
         };
         Scope: {
             paymentId?: string;
+            contractId?: string;
+            settlementMonth?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            /** Format: int32 */
+            installmentNo?: number;
+            commissionItemId?: string;
+            beneficiaryAgentId?: string;
+            /** Format: date */
+            asOfDate?: string;
+            reconciliationResultId?: string;
+            /** @enum {string} */
+            aggregation?: "SINGLE_LINE" | "MONTH_TOTAL";
         };
         Source: {
             entityType?: string;
@@ -6064,6 +6185,24 @@ export interface components {
             selectionStatusLabel?: string;
             /** Format: int64 */
             validationTargetId?: number;
+        };
+        AssistantCalculationLine: {
+            cashflowType?: string;
+            sourceId?: string;
+            contractId?: string;
+            commissionItemId?: string;
+            beneficiaryAgentId?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            attributionDate?: string;
+            dueDate?: string;
+            basisCode?: string;
+            basisAmount?: string;
+            calculationType?: string;
+            ratePct?: string;
+            expectedAmount?: string;
+            ruleId?: string;
+            status?: string;
         };
     };
     responses: never;
@@ -6701,6 +6840,8 @@ export interface operations {
                 selectedId?: number;
                 /** @description 소속 조직 ID */
                 organizationId?: number;
+                /** @description 지점 ID. 이 지점과 바로 아래 팀 소속 설계사를 찾는다(FUN-080 관리자 홈) */
+                branchId?: number;
                 /** @description 설계사 코드 또는 이름 검색어 */
                 keyword?: string;
                 /**
@@ -7698,6 +7839,29 @@ export interface operations {
             };
         };
     };
+    counts: {
+        parameters: {
+            query?: {
+                status?: string;
+                validationMonth?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionCountsResponse"];
+                };
+            };
+        };
+    };
     options: {
         parameters: {
             query?: never;
@@ -7766,6 +7930,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseJournalCorrectionActionResponse"];
+                };
+            };
+        };
+    };
+    homeSummary: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 현황 기준일(yyyy-MM-dd). 생략하면 오늘
+                 * @example 2026-11-04
+                 */
+                asOf?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseHomeSummaryResponse"];
                 };
             };
         };

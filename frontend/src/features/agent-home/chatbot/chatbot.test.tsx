@@ -91,6 +91,8 @@ const pickHealth = async () => {
   await userEvent.click(await screen.findByRole('button', { name: /건강보험/ }))
 }
 const result = async () => screen.findByRole('region', { name: '참고 순위 1위' }, { timeout: 9000 })
+// 말풍선마다 붙는 피코 모션 이름(PicoMotion 의 data-pico-motion)
+const motions = () => [...document.querySelectorAll('[data-pico-motion]')].map((el) => el.getAttribute('data-pico-motion'))
 
 describe('FUN-079 상품 추천 AI 챗봇', () => {
   it('1단계에 최신 뉴스 제목이 나오고 누르면 원문 기사를 새 탭으로 연다', async () => {
@@ -113,9 +115,13 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
 
   it('정상: 선별 → 1위 카드·순위 표·요약이 나온다', async () => {
     renderModal()
+    await screen.findByRole('button', { name: /건강보험/ })
+    expect(motions()).toEqual(['wave'])
     await pickHealth()
     expect(await screen.findByText('내 조건에 맞는 상품을 선별하고 있어요')).toBeInTheDocument()
+    expect(motions()).toEqual(['hat'])
     const hero = await result()
+    expect(motions()).toEqual(['glasses'])
     expect(within(hero).getByText('상품1')).toBeInTheDocument()
     expect(within(hero).getByText('650,000원')).toBeInTheDocument()
     expect(screen.getAllByRole('row')).toHaveLength(6)
@@ -288,6 +294,7 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     renderModal()
     await pickHealth()
     expect(await screen.findByText('답변을 찾지 못했어요', undefined, { timeout: 9000 })).toBeInTheDocument()
+    expect(motions()).toEqual(['worried'])
   })
 
   it('계산 기준이 설정되지 않았으면 관리자에게 알리라고 하고 다른 카테고리는 권하지 않는다', async () => {

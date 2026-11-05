@@ -73,7 +73,12 @@ export function ValidationRestartPanel({
   const history = useQuery({
     queryKey: ['validation-retries', id, status],
     queryFn: async () => (await apiClient.request<Retry[]>(`/api/v1/validation-runs/${id}/retries`)).data,
-    refetchInterval: status === 'FAILED' || status === 'RUNNING' ? 2000 : false,
+    // The run and retry completion are committed separately; keep polling an active retry.
+    refetchInterval: (query) =>
+      status === 'FAILED' || status === 'RUNNING' ||
+      query.state.data?.some((retry) => ['ACCEPTED', 'LAUNCHING', 'RUNNING'].includes(retry.state))
+        ? 2000
+        : false,
   })
   const mutation = useMutation({
     mutationFn: async () => {
