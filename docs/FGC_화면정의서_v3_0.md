@@ -1810,7 +1810,7 @@ FGC — 설계사
 
 - 읽기·쓰기: `validation_run`, `validation_target`
 - 연결: `cap_check`, `arbitrage_check`, `journal_header`, `reconciliation_run`, `exception_case`
-- API (인터페이스정의서 §4-2, §4-4-4): IF-API-47 `GET /api/v1/validation-runs/{id}`(상세, `restartability`, `retries`), IF-API-49 `GET /api/v1/validation-runs/{id}/progress`, IF-API-50 `GET /api/v1/validation-runs/{id}/finalize-checklist`, IF-API-48 `POST /api/v1/validation-runs/{id}/execute`, IF-API-82 `POST /api/v1/validation-runs/{id}/restart`, IF-API-51 `POST /api/v1/validation-runs/{id}/finalize`
+- API (인터페이스정의서 §4-2, §4-4-4): IF-API-47 `GET /api/v1/validation-runs/{id}`(상세. 응답에 `restartability`, `retries`도 있으나 화면은 아래 별도 경로를 쓴다), `GET /api/v1/validation-runs/{id}/restartability`, `GET /api/v1/validation-runs/{id}/retries`(IF-API ID 없는 별도 읽기 경로), IF-API-49 `GET /api/v1/validation-runs/{id}/progress`, IF-API-50 `GET /api/v1/validation-runs/{id}/finalize-checklist`, IF-API-48 `POST /api/v1/validation-runs/{id}/execute`, IF-API-82 `POST /api/v1/validation-runs/{id}/restart`, IF-API-51 `POST /api/v1/validation-runs/{id}/finalize`
 
 **관련 요구사항** FUN-041, FUN-042, FUN-043, FUN-044 / 2차 확장 FUN-045
 
