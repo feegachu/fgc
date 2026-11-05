@@ -7,11 +7,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.susukkang.fgc.ai.service.LlmGateway.ToolSpec;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse;
 import com.susukkang.fgc.compare.dto.CompareRankingResponse.Item;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -96,8 +99,14 @@ final class CompareAskTools {
         public String name;
     }
 
-    /** 도구가 돌려준 값 하나가 가리키는 대상. ranks 는 값이 속한 순위(차이는 두 순위), biggerRank 는 차이에서 값이 큰 쪽(같거나 아니면 0). */
-    private record Fact(List<Integer> ranks, Set<Metric> metrics, int biggerRank) {
+    /** 값이 한 상품의 금액인지, 두 상품의 차이인지. */
+    private enum Kind { ABSOLUTE, DIFF }
+
+    /**
+     * 도구가 돌려준 값 하나가 가리키는 대상. ranks 는 값이 속한 순위(차이는 두 순위), biggerRank 는 차이에서 값이 큰 쪽(같거나 아니면 0).
+     * kind 로 한 상품의 금액과 차이를 나눠, 차이를 한 상품의 금액처럼(또는 그 반대로) 쓴 문장을 막는다.
+     */
+    private record Fact(Kind kind, List<Integer> ranks, Set<Metric> metrics, int biggerRank) {
     }
 
     private final CompareRankingResponse ranking;
@@ -143,7 +152,7 @@ final class CompareAskTools {
             row.put("항목", e.label());
             row.put("규칙", e.rule());
             if (e.value() != null) {
-                row.put("금액", remember(won(e.value()), List.of(item.rank()), metricsOf(e.label()), 0));
+                row.put("금액", remember(won(e.value()), Kind.ABSOLUTE, List.of(item.rank()), metricsOf(e.label()), 0));
             }
         }
         return node.toString();
@@ -169,7 +178,7 @@ final class CompareAskTools {
     private void putDiff(ObjectNode diff, String label, Metric metric, Item a, Item b, long av, long bv) {
         ObjectNode row = diff.putObject(label);
         int bigger = av == bv ? 0 : av > bv ? a.rank() : b.rank();
-        row.put("금액", remember(won(Math.abs(av - bv)), List.of(a.rank(), b.rank()), EnumSet.of(metric), bigger));
+        row.put("금액", remember(won(Math.abs(av - bv)), Kind.DIFF, List.of(a.rank(), b.rank()), EnumSet.of(metric), bigger));
         row.put("값이 더 큰 쪽", bigger == 0 ? "같음" : bigger + "위");
     }
 
@@ -189,20 +198,28 @@ final class CompareAskTools {
         List<Integer> self = List.of(item.rank());
         node.put("순위", item.rank() + "위");
         node.put("상품", item.insurer() + " " + item.product());
-        node.put(NET_LABEL, remember(won(item.conservativeNet()), self, EnumSet.of(Metric.NET), 0));
-        node.put(CAPPED_LABEL, remember(won(item.cappedReceipt()), self, EnumSet.of(Metric.CAPPED), 0));
-        node.put(EXPECTED_LABEL, remember(won(item.expectedReceipt()), self, EnumSet.of(Metric.EXPECTED), 0));
-        node.put(CLAWBACK_LABEL, remember(won(item.clawbackExposure()), self, EnumSet.of(Metric.CLAWBACK), 0));
-        node.put(CARRY_LABEL, remember(won(item.carryover()), self, EnumSet.of(Metric.CARRY), 0));
+        node.put(NET_LABEL, remember(won(item.conservativeNet()), Kind.ABSOLUTE, self, EnumSet.of(Metric.NET), 0));
+        node.put(CAPPED_LABEL, remember(won(item.cappedReceipt()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CAPPED), 0));
+        node.put(EXPECTED_LABEL, remember(won(item.expectedReceipt()), Kind.ABSOLUTE, self, EnumSet.of(Metric.EXPECTED), 0));
+        node.put(CLAWBACK_LABEL, remember(won(item.clawbackExposure()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CLAWBACK), 0));
+        node.put(CARRY_LABEL, remember(won(item.carryover()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CARRY), 0));
         if (item.capImpactPct() != null) {
-            node.put(CAP_IMPACT_LABEL, remember("%.1f%%".formatted(item.capImpactPct()), self, EnumSet.of(Metric.CAP_IMPACT), 0));
+            node.put(CAP_IMPACT_LABEL, remember(percent(item.capImpactPct()), Kind.ABSOLUTE, self, EnumSet.of(Metric.CAP_IMPACT), 0));
         }
         return node;
     }
 
+    /**
+     * 한도 영향은 화면과 같게 소수 첫째 자리에서 절사한다(인터페이스정의서 capImpactPct, 화면정의서 공통규칙 3).
+     * 99.96% 를 100.0% 로 올리면 화면(99.9%)과 다른 숫자가 나가고 한도를 다 쓴 것처럼 읽힌다.
+     */
+    static String percent(double pct) {
+        return BigDecimal.valueOf(pct).setScale(1, RoundingMode.DOWN).toPlainString() + UNIT_PERCENT;
+    }
+
     /** 도구가 돌려주는 값을 기억하고 그대로 돌려준다. */
-    private String remember(String value, List<Integer> ranks, Set<Metric> metrics, int biggerRank) {
-        factsByValue.computeIfAbsent(value, k -> new ArrayList<>()).add(new Fact(ranks, metrics, biggerRank));
+    private String remember(String value, Kind kind, List<Integer> ranks, Set<Metric> metrics, int biggerRank) {
+        factsByValue.computeIfAbsent(value, k -> new ArrayList<>()).add(new Fact(kind, ranks, metrics, biggerRank));
         return value;
     }
 
@@ -231,8 +248,9 @@ final class CompareAskTools {
         return ranking.items().stream().filter(i -> i.rank() == rank).findFirst().orElse(null);
     }
 
-    private static String won(long amount) {
-        return "%,d원".formatted(amount);
+    /** 기본 Locale 에 따라 천 단위 구분자가 바뀌지 않게 Locale.ROOT 로 고정한다(답변 대조 키와 같아야 한다). */
+    static String won(long amount) {
+        return String.format(Locale.ROOT, "%,d원", amount);
     }
 
     private static String error(String message) {
@@ -282,16 +300,23 @@ final class CompareAskTools {
         if (facts == null) {
             return "VALUE_NOT_FROM_TOOL";
         }
+        // '보다'·'차이'가 있는 문장의 금액은 두 상품의 차이여야 하고, 없는 문장의 금액은 한 상품의 금액이어야 한다.
+        String sentence = sentenceAround(text, at);
+        Kind expected = sentence.contains("보다") || sentence.contains("차이") ? Kind.DIFF : Kind.ABSOLUTE;
+        List<Fact> sameKind = facts.stream().filter(f -> f.kind() == expected).toList();
+        if (sameKind.isEmpty()) {
+            return "VALUE_KIND_MISMATCH";
+        }
         int subject = nearestRankBefore(text, at);
         Set<Metric> metrics = nearestMetricsBefore(text, at);
         if (subject == 0 || metrics.isEmpty()) {
             return "VALUE_PAIR_MISMATCH";
         }
         boolean paired = false;
-        for (Fact fact : facts) {
+        for (Fact fact : sameKind) {
             if (fact.ranks().contains(subject) && fact.metrics().stream().anyMatch(metrics::contains)) {
                 paired = true;
-                if (directionHolds(sentenceAround(text, at), fact)) {
+                if (directionHolds(sentence, fact)) {
                     return null;
                 }
             }

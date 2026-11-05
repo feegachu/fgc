@@ -148,12 +148,15 @@ public class LlmGateway {
      * 그 뒤에는 도구를 끄고 답을 받는다. 라운드마다 ai_call_log 1행을 남긴다. 실패·건너뜀이면 FGC-AI-001 을 던진다.
      */
     public <T> T callWithTools(LlmRequest request, Class<T> outputType, List<ToolSpec> tools, ToolRunner runner, int maxToolCalls) {
-        precheck(request);
         List<ResponseInputItem> items = new ArrayList<>();
         items.add(ResponseInputItem.ofEasyInputMessage(EasyInputMessage.builder()
                 .role(EasyInputMessage.Role.USER).content(request.data()).build()));
         int toolCalls = 0;
+        // 라운드마다 앞선 내용을 통째로 다시 보내므로, 보내는 입력 크기는 도구 호출·결과를 더한 누적값이다.
+        long inputChars = request.data().length();
         while (true) {
+            // 분당 호출 상한은 질문 수가 아니라 외부 호출 수 기준이고(IF-EXT-03), 입력 크기 상한도 라운드마다 실제로 보내는 크기에 건다.
+            precheck(request, inputChars);
             boolean toolsOpen = toolCalls < maxToolCalls;
             long started = System.nanoTime();
             List<ResponseInputItem> sent = List.copyOf(items);
@@ -182,6 +185,7 @@ public class LlmGateway {
             record(request, AiCallStatus.SUCCESS, null, response.usage().orElse(null), elapsedMs(started));
             for (ResponseFunctionToolCall call : calls) {
                 String result = runTool(runner, call);
+                inputChars += call.arguments().length() + result.length();
                 items.add(ResponseInputItem.ofFunctionCall(call));
                 items.add(ResponseInputItem.ofFunctionCallOutput(
                         ResponseInputItem.FunctionCallOutput.builder().callId(call.callId()).output(result).build()));
@@ -202,13 +206,18 @@ public class LlmGateway {
 
     /** 외부 호출 전 공통 검사. 건너뛰면 ai_call_log 를 남기고 FGC-AI-001 을 던진다. */
     private void precheck(LlmRequest request) {
+        precheck(request, request.data().length());
+    }
+
+    /** inputChars 는 이번 호출로 보낼 입력 크기(도구 라운드는 누적값)다. */
+    private void precheck(LlmRequest request, long inputChars) {
         if (client == null) {
             throw skipped(request, "NO_API_KEY");
         }
         if (Instant.now().isBefore(disabledUntil)) {
             throw skipped(request, "AI_DISABLED");
         }
-        if (request.data().length() > properties.maxInputChars()) {
+        if (inputChars > properties.maxInputChars()) {
             throw skipped(request, "INPUT_TOO_LARGE");
         }
         if (overMinuteLimit(currentUserId())) {

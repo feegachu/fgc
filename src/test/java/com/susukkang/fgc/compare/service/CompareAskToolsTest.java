@@ -57,6 +57,36 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("한 상품의 금액을 차이처럼, 차이를 한 상품의 금액처럼 쓴 문장은 거절한다")
+    void absoluteAndDifferenceAreNotInterchangeable() {
+        // 1위 684,000원, 3위 550,000원, 차이 134,000원
+        CompareAskTools tools = toolsWith("compare", PAIR_1_3);
+
+        assertThat(tools.verify("1위 가보험 든든건강이 3위 다보험 편한건강보다 보수적 순수령액이 550,000원 많아요."))
+                .isEqualTo("VALUE_KIND_MISMATCH");
+        assertThat(tools.verify("3위 다보험 편한건강의 보수적 순수령액은 134,000원이에요.")).isEqualTo("VALUE_KIND_MISMATCH");
+        assertThat(tools.verify("1위 가보험 든든건강이 3위 다보험 편한건강보다 보수적 순수령액이 134,000원 많아요.")).isNull();
+        assertThat(tools.verify("1위와 3위의 보수적 순수령액 차이는 134,000원이에요.")).isNull();
+        assertThat(tools.verify("3위 다보험 편한건강의 보수적 순수령액은 550,000원이에요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("한도 영향은 화면처럼 소수 첫째 자리에서 절사해 준다(99.96% → 99.9%)")
+    void capImpactIsTruncatedLikeTheScreen() {
+        Item item = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 99.96, null, List.of());
+        CompareRankingResponse base = ranking();
+        CompareRankingResponse one = new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                base.warnings(), null, List.of(item), List.of(), CompareRankingFilters.NONE);
+        CompareAskTools tools = new CompareAskTools(one);
+
+        assertThat(tools.run("get_item", RANK_1)).contains("99.9%").doesNotContain("100.0%");
+        assertThat(tools.verify("1위 가보험 든든건강의 한도 영향은 99.9%예요.")).isNull();
+        assertThat(tools.verify("1위 가보험 든든건강의 한도 영향은 100.0%예요.")).isEqualTo("VALUE_NOT_FROM_TOOL");
+        assertThat(CompareAskTools.percent(90.0)).isEqualTo("90.0%");
+    }
+
+    @Test
     @DisplayName("explain_term 은 등록된 용어 설명만 돌려준다")
     void explainTermReturnsRegisteredTerms() {
         CompareAskTools tools = new CompareAskTools(ranking());
