@@ -2542,31 +2542,34 @@ export interface components {
         ArbitrageCheckView: {
             /** Format: int64 */
             arbitrageCheckId?: number;
-            /** Format: date */
-            asOfDate?: string;
-            candidateType?: string;
             /** Format: int64 */
             contractId?: number;
-            /** Format: int32 */
-            contractMonthNo?: number;
             contractNo?: string;
-            cumulativePaidPremium?: number;
-            decisionReason?: string;
-            includedSurrenderValueAmount?: number;
-            netDifferenceAmount?: number;
-            paidCommissionAmount?: number;
             /** @enum {string} */
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
-            paymentStageLabel?: string;
+            /** Format: date */
+            asOfDate?: string;
+            /** Format: int32 */
+            contractMonthNo?: number;
+            cumulativePaidPremium?: number;
+            paidCommissionAmount?: number;
             plannedCommissionAmount?: number;
-            projectedExcessAmount?: number;
+            /** @description 저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다. */
+            plannedCommissionBasis?: string | null;
+            includedSurrenderValueAmount?: number;
+            netDifferenceAmount?: number;
+            /** @description 예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다. */
+            projectedExcessAmount?: number | null;
+            candidateType?: string;
             refundAdditionAppliedYn?: boolean;
             /** @enum {string} */
-            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
-            resultStatusLabel?: string;
-            /** @enum {string} */
             surrenderValueSourceType?: "ACTUAL" | "EXPECTED_TABLE" | "NOT_APPLICABLE";
+            /** @enum {string} */
+            resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
+            decisionReason?: string;
+            paymentStageLabel?: string;
             surrenderValueSourceTypeLabel?: string;
+            resultStatusLabel?: string;
         };
         ArbitrageSearchResponse: {
             items?: components["schemas"]["PageResponseArbitrageCheckView"];
