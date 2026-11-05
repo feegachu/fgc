@@ -1,0 +1,47 @@
+name: fgc-monitoring
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=15d]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./targets.json:/etc/prometheus/targets.json:ro
+      - ./secrets/scrape-token:/run/secrets/scrape-token:ro
+      - prometheus-data:/prometheus
+    ports: ["127.0.0.1:19090:9090"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    restart: unless-stopped
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    command: [--config.file=/etc/blackbox.yml]
+    volumes: ["./blackbox.yml:/etc/blackbox.yml:ro"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    restart: unless-stopped
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./secrets/webhook-url:/run/secrets/webhook-url:ro
+      - alertmanager-data:/alertmanager
+    ports: ["127.0.0.1:19093:9093"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-password
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./secrets/grafana-password:/run/secrets/grafana-password:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["127.0.0.1:13000:3000"]
+    restart: unless-stopped
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:

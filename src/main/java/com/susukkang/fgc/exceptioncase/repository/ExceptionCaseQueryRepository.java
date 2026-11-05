@@ -7,6 +7,7 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionAssigneeRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchRow;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCountRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionOccurrenceRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryRow;
 import jakarta.persistence.EntityManager;
@@ -214,17 +215,23 @@ public class ExceptionCaseQueryRepository {
                 (OffsetDateTime) row[12])).getResultList();
     }
 
+    /** IF-API-43 요약과 IF-API-69 집계가 함께 쓰는 유형·심각도별 건수. 조건은 목록 count 와 같은 buildWhere 로 만든다. */
+    @SuppressWarnings({"java:S2077", "unchecked"})
+    public List<ExceptionCountRow> countByTypeAndSeverity(ExceptionCaseSearchDTO criteria, List<ExceptionStatus> statuses) {
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        Query query = entityManager.createNativeQuery("SELECT ec.exception_type, ec.severity, COUNT(*) " + FROM_SQL
+                + buildWhere(criteria, statuses, parameters)
+                + " GROUP BY ec.exception_type, ec.severity ORDER BY ec.exception_type, ec.severity");
+        parameters.forEach(query::setParameter);
+        return ((List<Object[]>) query.getResultList()).stream()
+                .map(row -> new ExceptionCountRow((String) row[0], (String) row[1], ((Number) row[2]).longValue()))
+                .toList();
+    }
+
     /** 검색 조건과 독립적인 전체 미처리 요약이다. */
     public List<ExceptionTypeSummaryRow> countOpenByType() {
-        return entityManager.createQuery("""
-                SELECT new com.susukkang.fgc.exceptioncase.dto.ExceptionTypeSummaryRow(
-                    cast(e.exceptionType as String), count(e))
-                  FROM ExceptionCase e
-                 WHERE e.status IN :statuses
-                 GROUP BY e.exceptionType ORDER BY e.exceptionType
-                """, ExceptionTypeSummaryRow.class)
-                .setParameter("statuses", ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER))
-                .getResultList();
+        return ExceptionTypeSummaryRow.sumByType(countByTypeAndSeverity(new ExceptionCaseSearchDTO(),
+                ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER)));
     }
 
     public List<String> findReasonCodes() {
