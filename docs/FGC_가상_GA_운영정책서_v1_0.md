@@ -931,7 +931,7 @@ FGC의 법규준수용 차익거래 검증은 `GA_TO_FC`를 기본 지급단계�
 
 같은 지급 의무의 기지급분은 예정액에 중복해서 남기지 않는다(#754). 각 적격 회차의 잔여액은 `max(0, 원 단위 예정액 − 같은 의무의 유효 확정 PAYMENT 귀속액 합계)`이며 회차별로 계산한 뒤 합산한다. 다른 회차의 초과 지급을 이월하여 차감하지 않는다. 일반 DEDUCTION은 현재 순누적 수수료에는 반영하지만 그 자체로 예정 의무를 되살리는 지급 취소로 보지 않는다.
 
-동일 의무는 같은 계약·지급단계·항목·수취인 및 회차가 모순되지 않는 직접 `schedule_line_id`, 또는 미대체 COMPLETED/FINALIZED 대사의 MATCHED/AMOUNT_DIFFERENCE 결과에서 예정·실제 원천이 각각 하나인 연결로 확인한다. 여러 실행에서 같은 연결이 반복되어도 귀속액은 한 번만 반영한다. 연결이 서로 충돌하거나 연결 없이 월·항목만 겹치는 지급은 추정 차감하지 않는다. 이 경우 `planned_commission_amount`는 미차감 상한이며 `calculation_snapshot`에 `plannedCommissionBasis=UNRESOLVED_UPPER_BOUND_V1`과 `unresolvedPlannedAttributionIds`를 남기고, 사전 모니터링 초과액은 null로 둔다. 현재 지급분이 초과하지 않으면 REVIEW_REQUIRED와 자료 확인 예외를 남기고, 이미 현재 지급분으로 CANDIDATE이면 그 판정을 유지하면서 자료 확인 예외도 남긴다. 적용대상 아님 판정은 바꾸지 않는다.
+동일 의무는 같은 계약·지급단계·항목·수취인 및 회차가 모순되지 않는 직접 `schedule_line_id`, 또는 미대체 COMPLETED/FINALIZED 대사의 MATCHED/AMOUNT_DIFFERENCE 결과에서 예정·실제 원천이 각각 하나인 연결로 확인한다. 여러 실행에서 같은 연결이 반복되어도 귀속액은 한 번만 반영한다. 연결이 서로 충돌하거나 연결 없이 월·항목만 겹치는 지급은 추정 차감하지 않는다. 회차가 알려진 미연결 지급은 항목·수취인·회차가 적격 회차와 일치하면 귀속월이 지급예정월과 달라도 검토 대상이다. 비활성 이전 버전 회차에 연결된 지급도 현재 적격 회차와 항목·수취인·회차가 같으면 차감하지 않고 검토 대상으로 남기며, 이전 직접 연결과 현재 대사 연결이 서로 다른 회차를 가리키는 경우도 같다. 이 경우 `planned_commission_amount`는 미차감 상한이며 `calculation_snapshot`에 `plannedCommissionBasis=UNRESOLVED_UPPER_BOUND_V1`과 `unresolvedPlannedAttributionIds`를 남기고, 사전 모니터링 초과액은 null로 둔다. 현재 지급분이 초과하지 않으면 REVIEW_REQUIRED와 자료 확인 예외를 남기고, 이미 현재 지급분으로 CANDIDATE이면 그 판정을 유지하면서 자료 확인 예외도 남긴다. 적용대상 아님 판정은 바꾸지 않는다.
 
 역분개로 CANCELLED가 된 원 지급은 잔여액 소비에서 빠지고, 재기표한 지급은 CONFIRMED일 때만 소비한다. 취소/대체의 트랜잭션이 완료된 뒤 재검증한 결과에 적용하며 기존 확정 결과·스케줄·지급 원천을 이 집계가 덮어쓰지 않는다. 지나간 예정일만으로 미지급 잔액을 제거하지 않는다.
 
