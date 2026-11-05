@@ -22,7 +22,7 @@ class PaymentCalculationServiceTest {
     PaymentCalculationService service;
     @BeforeEach void setup() {
         payments = mock(CommissionPaymentService.class);
-        service = new PaymentCalculationService(payments, new ObjectMapper().findAndRegisterModules(), mock(com.susukkang.fgc.assistant.service.AssistantCalculationSources.class),mock(com.susukkang.fgc.assistant.service.AssistantPaymentCandidate.class));
+        service = new PaymentCalculationService(payments, new ObjectMapper().findAndRegisterModules(), mock(com.susukkang.fgc.assistant.service.AssistantCalculationSources.class),mock(com.susukkang.fgc.assistant.service.AssistantPaymentCandidate.class),mock(com.susukkang.fgc.assistant.service.CalculationProofService.class));
         role("SETTLEMENT");
     }
     @AfterEach void cleanup() { SecurityContextHolder.clearContext(); }
