@@ -1,0 +1,6 @@
+[
+  {
+    "targets": ["api:8080"],
+    "labels": {"environment": "prod", "site": "shinhan"}
+  }
+]
