@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ArbitrageRow } from './api'
 import { ArbitrageAmount } from './badges'
+import { plannedBasisPresentation } from './planned-basis'
 
 const STORAGE_KEY = 'fgc:arbitrage:amount-view:v2'
 const views = [
@@ -21,6 +22,7 @@ function initialView(): View {
 
 export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
   const [view, setView] = useState(initialView)
+  const planned = plannedBasisPresentation(row.plannedCommissionBasis)
   const metrics = [
     { key: 'paid', label: '확정 수수료 순액', value: row.paidCommissionAmount },
     { key: 'refund', label: '합산 해약환급금', value: row.includedSurrenderValueAmount },
@@ -142,7 +144,7 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
         <dl className="arb-amount-reference">
           <div>
             <dt>
-              <span className="arb-amount-reference-label">참고</span>지급예정액
+              <span className="arb-amount-reference-label">참고</span>{planned.label}
             </dt>
             <dd>
               <ArbitrageAmount value={row.plannedCommissionAmount} />
@@ -157,6 +159,7 @@ export function ArbitrageAmountSummary({ row }: { row: ArbitrageRow }) {
             </dd>
           </div>
         </dl>
+        <p className="arb-planned-description">{planned.description}</p>
       </div>
     </section>
   )

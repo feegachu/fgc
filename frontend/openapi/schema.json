@@ -1199,6 +1199,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseExceptionCountsResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionCountsResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseExceptionOptionsResponse" : {
         "properties" : {
           "data" : {
@@ -1231,6 +1245,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/FinalizeValidationRunResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseHomeSummaryResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/HomeSummaryResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -2107,34 +2135,43 @@
         "type" : "object"
       },
       "ArbitrageCheckView" : {
+        "type" : "object",
         "properties" : {
           "arbitrageCheckId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "asOfDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "candidateType" : {
-            "type" : "string"
+            "type" : "integer",
+            "format" : "int64"
           },
           "contractId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "contractMonthNo" : {
-            "format" : "int32",
-            "type" : "integer"
+            "type" : "integer",
+            "format" : "int64"
           },
           "contractNo" : {
             "type" : "string"
           },
+          "paymentStage" : {
+            "type" : "string",
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ]
+          },
+          "asOfDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "contractMonthNo" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "cumulativePaidPremium" : {
             "type" : "number"
           },
-          "decisionReason" : {
-            "type" : "string"
+          "paidCommissionAmount" : {
+            "type" : "number"
+          },
+          "plannedCommissionAmount" : {
+            "type" : "number"
+          },
+          "plannedCommissionBasis" : {
+            "type" : [ "string", "null" ],
+            "description" : "저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다."
           },
           "includedSurrenderValueAmount" : {
             "type" : "number"
@@ -2142,41 +2179,37 @@
           "netDifferenceAmount" : {
             "type" : "number"
           },
-          "paidCommissionAmount" : {
-            "type" : "number"
+          "projectedExcessAmount" : {
+            "type" : [ "number", "null" ],
+            "description" : "예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다."
           },
-          "paymentStage" : {
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+          "candidateType" : {
+            "type" : "string"
+          },
+          "refundAdditionAppliedYn" : {
+            "type" : "boolean"
+          },
+          "surrenderValueSourceType" : {
+            "type" : "string",
+            "enum" : [ "ACTUAL", "EXPECTED_TABLE", "NOT_APPLICABLE" ]
+          },
+          "resultStatus" : {
+            "type" : "string",
+            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ]
+          },
+          "decisionReason" : {
             "type" : "string"
           },
           "paymentStageLabel" : {
             "type" : "string"
           },
-          "plannedCommissionAmount" : {
-            "type" : "number"
-          },
-          "projectedExcessAmount" : {
-            "type" : "number"
-          },
-          "refundAdditionAppliedYn" : {
-            "type" : "boolean"
-          },
-          "resultStatus" : {
-            "enum" : [ "CLEAR", "CANDIDATE", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+          "surrenderValueSourceTypeLabel" : {
             "type" : "string"
           },
           "resultStatusLabel" : {
             "type" : "string"
-          },
-          "surrenderValueSourceType" : {
-            "enum" : [ "ACTUAL", "EXPECTED_TABLE", "NOT_APPLICABLE" ],
-            "type" : "string"
-          },
-          "surrenderValueSourceTypeLabel" : {
-            "type" : "string"
           }
-        },
-        "type" : "object"
+        }
       },
       "ArbitrageSearchResponse" : {
         "properties" : {
@@ -5811,6 +5844,27 @@
         },
         "type" : "object"
       },
+      "ExceptionCountsResponse" : {
+        "properties" : {
+          "bySeverity" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionSeverityCountResponse"
+            },
+            "type" : "array"
+          },
+          "byType" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionTypeSummaryResponse"
+            },
+            "type" : "array"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ExceptionOccurrenceResponse" : {
         "properties" : {
           "detectedAt" : {
@@ -5898,6 +5952,22 @@
               "type" : "string"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionSeverityCountResponse" : {
+        "properties" : {
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "severity" : {
+            "enum" : [ "INFO", "WARNING", "HIGH", "CRITICAL" ],
+            "type" : "string"
+          },
+          "severityLabel" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -6227,6 +6297,130 @@
           },
           "before" : {
             "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAgentCounts" : {
+        "properties" : {
+          "active" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "registered" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "terminated" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAttentionAgent" : {
+        "properties" : {
+          "activeYn" : {
+            "type" : "boolean"
+          },
+          "agentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "branch" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "contractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeAttentionReason"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "statusLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAttentionReason" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeBranch" : {
+        "properties" : {
+          "activeContractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "agentCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "attentionCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeSummaryResponse" : {
+        "properties" : {
+          "agents" : {
+            "$ref" : "#/components/schemas/HomeAgentCounts"
+          },
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "attentionAgents" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeAttentionAgent"
+            },
+            "type" : "array"
+          },
+          "attentionTotal" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "basis" : {
+            "type" : "string"
+          },
+          "branches" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeBranch"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -11313,6 +11507,15 @@
             "type" : "integer"
           }
         }, {
+          "description" : "지점 ID. 이 지점과 바로 아래 팀 소속 설계사를 찾는다(FUN-080 관리자 홈)",
+          "in" : "query",
+          "name" : "branchId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
           "description" : "설계사 코드 또는 이름 검색어",
           "in" : "query",
           "name" : "keyword",
@@ -12931,6 +13134,40 @@
         "tags" : [ "exception-case-controller" ]
       }
     },
+    "/api/v1/exceptions/counts" : {
+      "get" : {
+        "operationId" : "counts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "validationMonth",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionCountsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-case-controller" ]
+      }
+    },
     "/api/v1/exceptions/options" : {
       "get" : {
         "operationId" : "options",
@@ -13021,6 +13258,37 @@
           }
         },
         "tags" : [ "exception-case-controller" ]
+      }
+    },
+    "/api/v1/home/summary" : {
+      "get" : {
+        "description" : "기준일의 등록·활동·해촉 설계사 수, 지점별 설계사·유효 계약 수, 확인할 설계사 상위 10명을 돌려준다. asOf 생략 시 오늘(Asia/Seoul)을 쓴다. 전체 설계사 검색은 IF-API-07 을 쓴다.",
+        "operationId" : "homeSummary",
+        "parameters" : [ {
+          "description" : "현황 기준일(yyyy-MM-dd). 생략하면 오늘",
+          "example" : "2026-11-04",
+          "in" : "query",
+          "name" : "asOf",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseHomeSummaryResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "관리자 홈 GA·설계사 현황 (IF-API-68)",
+        "tags" : [ "업무 대시보드" ]
       }
     },
     "/api/v1/journals" : {

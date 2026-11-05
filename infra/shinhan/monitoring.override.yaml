@@ -1,0 +1,7 @@
+# Merge with the EXISTING application compose/release.env on the server.
+# Requires an already verified image containing #674; this does not add that code.
+services:
+  api:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,monitoring
+      FGC_MONITORING_SCRAPE_TOKEN: ${FGC_MONITORING_SCRAPE_TOKEN:?Provide the production scrape token}
