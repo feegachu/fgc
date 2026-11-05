@@ -46,7 +46,7 @@ SELECT shared_blks_hit + shared_blks_read AS blks, shared_blks_read AS blks_read
 
 \echo == 커밋, WAL (DB 생성부터 누계) ==
 SELECT d.xact_commit, d.xact_rollback, d.tup_inserted, d.tup_updated, w.wal_records, pg_size_pretty(w.wal_bytes) AS wal,
-       w.wal_write, w.wal_sync, round((w.wal_sync_time / 1000)::numeric, 1) AS wal_sync_s
+       w.wal_write, w.wal_sync, round((w.wal_sync_time / 1000)::numeric, 1) AS wal_sync_s, w.stats_reset, now() AS reported_at
   FROM pg_stat_database d CROSS JOIN pg_stat_wal w
  WHERE d.datname = current_database();
 
