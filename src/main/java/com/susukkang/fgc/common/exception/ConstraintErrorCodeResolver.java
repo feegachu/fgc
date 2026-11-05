@@ -33,7 +33,17 @@ public class ConstraintErrorCodeResolver {
     private static final Map<String, FgcErrorCode> CONSTRAINT_MAPPING =
             createConstraintMapping();
 
+    private static final String CHARACTER_NOT_IN_REPERTOIRE = "22021";
+
     public Optional<FgcErrorCode> resolve(Throwable throwable) {
+        // 2026-11-04 yslee - #677 ZAP API scan 이 찾은 NUL 문자 입력 500 처리
+        // 기존 코드: 제약 이름만 오류코드로 바꿨다.
+        // 문제: 문자열의 NUL(0x00)은 PostgreSQL 이 22021 로 거절하는데 제약 이름이 없어 FGC-COMMON-500 이 됐다.
+        // 개선: 입력 오류로 돌려준다.
+        if (hasSqlState(throwable, CHARACTER_NOT_IN_REPERTOIRE)) {
+            return Optional.of(FgcErrorCode.COMMON_002);
+        }
+
         Optional<String> constraintName = extractConstraintName(throwable);
         if (constraintName.isPresent()) {
             FgcErrorCode exact = CONSTRAINT_MAPPING.get(constraintName.get());
@@ -75,6 +85,15 @@ public class ConstraintErrorCodeResolver {
         }
 
         return Optional.empty();
+    }
+
+    private static boolean hasSqlState(Throwable throwable, String sqlState) {
+        for (Throwable current = throwable; current != null; current = current.getCause()) {
+            if (current instanceof PSQLException psqlException && sqlState.equals(psqlException.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Map<String, FgcErrorCode> createConstraintMapping() {
