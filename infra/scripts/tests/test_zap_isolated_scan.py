@@ -58,9 +58,16 @@ class ZapTargetGuard(unittest.TestCase):
                 f"#!/bin/sh\necho \"$*\" >> '{calls.as_posix()}'\n"
                 f"case \"$*\" in {failing_call}*) exit 1;; esac\n", encoding="utf-8")
             stub.chmod(0o755)
+            # API 가 뜨지 않는 경로를 기다리지 않고 돌린다.
+            for name, body in (("curl", "printf 502"), ("sleep", ":"), ("seq", "echo 1")):
+                other = pathlib.Path(stub_dir) / name
+                other.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
+                other.chmod(0o755)
+            # Git 의 bin/bash.exe 는 PATH 앞에 usr/bin 을 붙여 위 스텁을 가린다. 실제 bash 를 바로 부른다.
+            shell = pathlib.Path(BASH).parents[1] / "usr/bin/bash.exe" if os.name == "nt" else pathlib.Path(BASH)
             env = {**os.environ, "API_IMAGE": "api", "WEB_IMAGE": "web",
-                   "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}"}
-            result = subprocess.run([BASH, str(SCRIPT), "up"], env=env, capture_output=True,
+                   "PATH": f"{stub_dir}{os.pathsep}{shell.parent}{os.pathsep}{os.environ['PATH']}"}
+            result = subprocess.run([str(shell), str(SCRIPT), "up"], env=env, capture_output=True,
                                     text=True, encoding="utf-8", stdin=subprocess.DEVNULL, timeout=60)
             return result, calls.read_text(encoding="utf-8")
 
@@ -69,6 +76,26 @@ class ZapTargetGuard(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stderr)
         self.assertIn("rm -fv fgc-zap-web", calls)
         self.assertIn("network rm", calls)
+
+    def test_up_keeps_the_logs_then_removes_what_it_made_when_the_api_never_becomes_ready(self):
+        result, calls = self.run_up("no-such-call")
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertLess(calls.index("logs --tail 40 fgc-zap-api"), calls.index("rm -fv fgc-zap-web"))
+        self.assertIn("network rm", calls)
+
+    def test_baseline_target_stays_loopback_whatever_scan_path_the_caller_set(self):
+        with tempfile.TemporaryDirectory() as stub_dir:
+            calls = pathlib.Path(stub_dir) / "calls"
+            stub = pathlib.Path(stub_dir) / "docker"
+            stub.write_text(f"#!/bin/sh\necho \"$*\" >> '{calls.as_posix()}'\n", encoding="utf-8")
+            stub.chmod(0o755)
+            env = {**os.environ, "SCAN_PATH": "@evil.example", "ZAP_TARGET": "http://127.0.0.1:18770",
+                   "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}"}
+            subprocess.run([BASH, str(SCRIPT), "baseline"], env=env, capture_output=True,
+                           text=True, encoding="utf-8", stdin=subprocess.DEVNULL, timeout=60)
+            recorded = calls.read_text(encoding="utf-8")
+        self.assertIn("zap-baseline.py -t http://127.0.0.1:18770 ", recorded)
+        self.assertNotIn("evil.example", recorded)
 
     def test_up_leaves_a_running_stack_alone_when_the_network_already_exists(self):
         result, calls = self.run_up("network create")

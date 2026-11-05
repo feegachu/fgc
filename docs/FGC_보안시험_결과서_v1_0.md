@@ -25,7 +25,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 코드 기준 | develop `a2371010` (이 PR이 마지막으로 merge한 커밋). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
+| 코드 기준 | develop `a2371010` (이 결과를 잰 커밋. 그 뒤 병합분은 RC에서 다시 잡는다). 통합 시험은 이 커밋을 merge한 PR head의 CI로 돌렸다 |
 | 이미지 기준 | 게시 이미지 `sha-69f77eff` (api `sha256:beaf2532…`, web `sha256:1cef1ee3…`). 이 PR의 조치 전 상태다. 그 뒤 develop의 #773(화면), #831(지급 보류, V79), #835(지급 재개, 상태 미리보기)는 이미지에 없고 의존성, `Containerfile`, nginx 변경은 없다 |
 | RC | `r2.0.0-rc1` 미발행. 미확인 |
 | 시험 환경 | Testcontainers PostgreSQL 17, Windows 11 로컬 / GitHub Actions |

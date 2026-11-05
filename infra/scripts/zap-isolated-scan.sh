@@ -2,7 +2,7 @@
 # OWASP ZAP 스캔. 격리 로컬 전용 (TER-009, #677).
 # 공유 개발계, 신한 서버, 외부 주소에는 돌리지 않는다. 대상이 이 PC 의 loopback 이 아니면 docker 를 부르기 전에 거부한다.
 #
-#   up        자체 PostgreSQL + API + web 을 전용 네트워크로 띄우고 web 만 127.0.0.1:$ZAP_PORT 에 연다
+#   up        자체 PostgreSQL + API + web 을 전용 네트워크로 띄우고 web 만 127.0.0.1:$ZAP_PORT 에 연다. 이전 스택이 남아 있으면 지우지 않고 실패하니 먼저 down 한다
 #   baseline  수동 관찰 스캔(공격 요청 없음)
 #   api       /v3/api-docs 기반 능동 스캔(공격 요청을 보낸다). 로그인 토큰을 붙여 업무 API 까지 본다
 #   down      컨테이너, 네트워크, 볼륨 삭제. 능동 스캔이 쓴 자료도 함께 사라진다
@@ -34,7 +34,7 @@ root=$(pwd -W 2>/dev/null || pwd) # Windows 의 docker 는 C:/ 형식 경로를 
 out=$root/build/zap
 zap_image=${ZAP_IMAGE:-ghcr.io/zaproxy/zaproxy:stable}
 network=fgc-zap
-python=$(command -v python3 || command -v python)
+python=$(command -v python || command -v python3) # Windows 의 python3 별칭은 Python Install Manager 를 불러 저장소 안에 Python/ 을 만든다
 
 up() {
     : "${API_IMAGE:?API_IMAGE 를 지정하세요}" "${WEB_IMAGE:?WEB_IMAGE 를 지정하세요}"
@@ -73,6 +73,9 @@ up() {
     done
     docker logs --tail 40 fgc-zap-api >&2
     echo "API 가 뜨지 않았습니다." >&2
+    # 이 함수 안에서 건 ERR trap 은 return 1 로 끝날 때 돌지 않으니 직접 지운다.
+    trap - ERR
+    down
     return 1
 }
 
@@ -103,12 +106,12 @@ scan() {
     fi
     # API scan 은 문서의 servers 주소로 공격 요청을 보낸다. 문서가 무엇을 적든 대상에 고정한다.
     [[ "$name" == zap-api-scan ]] && set -- "$@" -O "$zap_url"
-    trap "chmod go-rwx '$out'; exit 130" INT TERM # 중단돼도 보고서 폴더를 열어 두지 않는다
+    trap "chmod go-rwx '$out'; exit 130" HUP INT TERM # 중단돼도 보고서 폴더를 열어 두지 않는다
     chmod a+rwx "$out" # 컨테이너의 zap 사용자가 보고서를 쓰는 동안만 연다
     docker run --rm ${zap_network[@]+"${zap_network[@]}"} --memory=1500m -v "$out:/zap/wrk:rw" \
         -e "ZAP_AUTH_HEADER_VALUE=${ZAP_AUTH_HEADER_VALUE:-}" "$zap_image" \
         "$name.py" -t "$zap_url${SCAN_PATH:-}" -I -J "$name.json" -r "$name.html" "$@" || status=$?
-    trap - INT TERM
+    trap - HUP INT TERM
     chmod go-rwx "$out"
     summarize "$name"
     return "$status"
@@ -125,7 +128,8 @@ login_token() {
 case "$command" in
     up) up ;;
     down) down ;;
-    baseline) scan zap-baseline -m 2 -z "-Xmx768m -silent" ;;
+    # 호출자 환경의 SCAN_PATH 가 대상 뒤에 붙으면 @evil.example 처럼 loopback 검사를 우회한다. api 는 아래에서 값을 정한다.
+    baseline) SCAN_PATH= scan zap-baseline -m 2 -z "-Xmx768m -silent" ;;
     api)
         # 대입을 나눠야 set -e 가 로그인 실패에서 멈춘다. 빈 토큰으로 스캔하면 인증 API 를 못 본 채 통과로 보인다.
         token=$(login_token)
