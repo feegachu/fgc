@@ -73,7 +73,7 @@ class AssistantCalculationSourcesTest {
     void schedule(String... amounts) {
         var lines=new ArrayList<ScheduleLineResponse>();int seq=0;
         for(String amount:amounts) lines.add(ScheduleLineResponse.builder().contractId(3L).commissionItemId(4L).beneficiaryAgentId(5L).lineNo(++seq).installmentNo(seq).dueDate(LocalDate.of(2026,10,9)).attributionDate(LocalDate.of(2026,10,8)).expectedAmount(new BigDecimal(amount)).lineStatus("PLANNED").cashflowType("PAYMENT").ruleRef(6L).build());
-        when(schedules.selectByContractIdAndPaymentStage(3L,PaymentStage.GA_TO_FC)).thenReturn(new ScheduleDetailResponse(7L,ScheduleHeaderResponse.builder().generatedAt(OffsetDateTime.now()).build(),lines));
+        when(schedules.selectByContractIdAndPaymentStage(3L,PaymentStage.GA_TO_FC)).thenReturn(ScheduleDetailResponse.builder().scheduleHeaderId(7L).header(ScheduleHeaderResponse.builder().generatedAt(OffsetDateTime.now()).build()).lines(lines).build());
     }
     @Test void explicitMonthAggregationAndExactInstallmentUseStoredLinesOnly() {
         schedule("0.50","0.50");var monthly=service.calculate(expected(PaymentCalculationRequest.Scope.Aggregation.MONTH_TOTAL,null));
