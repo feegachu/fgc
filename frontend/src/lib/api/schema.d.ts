@@ -5960,7 +5960,7 @@ export interface components {
         ScheduleHeaderResponse: {
             activeYn?: boolean;
             canConfirm?: boolean;
-            /** @description 확정 차단 코드. 확정 가능한 CURRENT 운영판은 null; 예정판은 FGC-IMPL-SCHEDULE_PREVIEW_ONLY */
+            /** @description 확정 차단 코드. 확정 가능하면 null; 확정 불가 CURRENT는 SCHEDULE_NOT_ACTIVE_PLANNED; 4·7년 예정판은 FGC-IMPL-SCHEDULE_PREVIEW_ONLY */
             confirmBlockedReason?: string | null;
             /** Format: int64 */
             contractId?: number;
