@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -65,12 +66,18 @@ public class Dar012Runner implements ApplicationRunner {
             boolean completed = batch.status() == BatchStatus.COMPLETED;
             verification.put("partial", !completed);
             if (completed) {
-                verification.put("answerKeyComparison", verifier.compareWithAnswerKey(generated.plan(), properties.validationMonth(), batch.validationRunId()));
+                List<Dar012Verifier.ScenarioResult> answerKey = verifier.compareWithAnswerKey(generated.plan(), properties.validationMonth(), batch.validationRunId());
+                List<Dar012Verifier.ConsistencyCheck> aggregates = verifier.checkAggregateConsistency(properties.validationMonth(), batch.validationRunId());
+                verification.put("answerKeyComparison", answerKey);
                 verification.put("representativeClawback", verifier.checkRepresentativeClawback(generated.plan()));
-                verification.put("aggregateConsistency", verifier.checkAggregateConsistency(properties.validationMonth(), batch.validationRunId()));
+                verification.put("aggregateConsistency", aggregates);
                 verification.put("contractDetailSample", verifier.checkContractDetailSample(batch.validationRunId()));
                 verification.put("queryTimings", verifier.measureQueries(properties.validationMonth(), batch.validationRunId(),
                         properties.queryRepeats()));
+                if (hasMismatch(answerKey, aggregates)) {
+                    exitCode = 1;
+                    log.error("DAR-012 정답표나 집계가 맞지 않는다. 결과 파일의 answerKeyComparison, aggregateConsistency를 본다.");
+                }
             } else {
                 exitCode = 1;
                 log.error("월 통합검증이 {} 로 끝나 정답표 비교를 건너뛴다. 결과 파일에는 partial=true 로 남긴다.", batch.status());
@@ -84,7 +91,12 @@ public class Dar012Runner implements ApplicationRunner {
         System.exit(SpringApplication.exit(context, () -> finalExitCode));
     }
 
-    /** 테스트와 실행기가 같은 경로를 쓴다. 중복 검사 → 기본 시드 확인 → 정책 확인 → 계획 → 적재 → 출력 순서다. */
+    static boolean hasMismatch(List<Dar012Verifier.ScenarioResult> answerKey, List<Dar012Verifier.ConsistencyCheck> aggregates) {
+        return answerKey.stream().anyMatch(result -> result.matched() != result.inScope())
+                || aggregates.stream().anyMatch(check -> !check.consistent());
+    }
+
+    /** 테스트와 실행기가 같은 경로를 쓴다. 중복 검사 → 기본 시드 확인 → 출력 경로 확인 → 정책 확인 → 계획 → 적재 → 출력 순서다. */
     public record Generated(Path metadataFile, Dar012Plan plan) {}
 
     public static Generated generate(Dar012Loader loader, Dar012Properties p) throws java.io.IOException {
@@ -92,6 +104,7 @@ public class Dar012Runner implements ApplicationRunner {
         LocalDate windowEnd = p.baseDate().withDayOfMonth(1).minusDays(1);
         loader.assertNotLoaded(p.datasetId());
         loader.assertFreshBaseline();
+        Dar012ReportWriter.assertWritable(p.outputDir());
         Dar012Loader.PolicyRefs policy = loader.readPolicy(windowStart, windowEnd);
         Dar012Plan plan = Dar012Planner.plan(p.datasetId(), p.seed(), p.contracts(), p.baseDate(), policy.inputs());
         Dar012Loader.LoadResult result = loader.load(plan, policy);

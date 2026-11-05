@@ -70,6 +70,12 @@ public final class Dar012ReportWriter {
         return meta;
     }
 
+    /** 적재는 커밋되고 같은 데이터셋의 재적재는 거부된다. 결과를 못 쓸 경로면 적재 전에 멈춘다. */
+    static void assertWritable(Path outputDir) throws IOException {
+        Files.createDirectories(outputDir);
+        Files.delete(Files.createTempFile(outputDir, "dar012-", ".tmp"));
+    }
+
     public static Path write(Dar012Plan plan, Path outputDir, String agent01PreviousAgentCode) throws IOException {
         Files.createDirectories(outputDir);
         Path json = outputDir.resolve(plan.datasetId() + ".json");
