@@ -1,4 +1,4 @@
-import { GUIDE_ID } from './catalog'
+import { TARGET_ID } from './catalog'
 
 export class GuideFailure extends Error {
   readonly reasonCode: string
@@ -25,7 +25,7 @@ export class GuideTargets {
   }
 
   register(registration: GuideTargetRegistration): () => void {
-    if (!GUIDE_ID.test(registration.targetId)) throw new GuideFailure('INVALID_TARGET_ID')
+    if (!TARGET_ID.test(registration.targetId)) throw new GuideFailure('INVALID_TARGET_ID')
     const key = this.key(registration.screenId, registration.guideVersion, registration.targetId)
     if (this.registrations.has(key)) throw new GuideFailure('DUPLICATE_TARGET_REGISTRATION')
     const copy = { ...registration }

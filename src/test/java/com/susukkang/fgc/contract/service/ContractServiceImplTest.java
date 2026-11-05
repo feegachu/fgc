@@ -157,6 +157,7 @@ class ContractServiceImplTest {
     @Test
     @DisplayName("작업이 여럿인 사건의 후속 상태는 가장 급한 작업을 따르고 요약은 성공 행, 오류 코드는 실패 행에만 붙는다")
     void followUpTakesTheMostUrgentJobAndSummaryOnlyOnSuccess() {
+        given(agentScope.currentAgentId()).willReturn(null); // 내부 역할. 목의 기본값 0L은 AGENT로 읽힌다.
         given(insuranceContractRepository.existsById(21L)).willReturn(true);
         OffsetDateTime at = OffsetDateTime.parse("2026-07-10T00:00:00+09:00");
         given(contractStatusEventRepository.findByContractIdOrderByEffectiveAtAscEventSeqAsc(21L)).willReturn(List.of(

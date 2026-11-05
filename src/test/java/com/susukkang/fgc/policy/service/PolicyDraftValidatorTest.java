@@ -248,6 +248,30 @@ class PolicyDraftValidatorTest {
     }
 
     @Test
+    void installmentPolicyAcceptsOnlyTheAcquisitionCostKeysWithTheirSource() {
+        ObjectNode json = baseDraft().put("policyType", "FOUR_YEAR_COMMISSION");
+        json.put("feeRegimeCode", "FOUR_YEAR_2027");
+        ObjectNode basis = MAPPER.createObjectNode().put("key", "ACQUISITION_COST_BASIS").put("value", "MONTHLY_EQUIVALENT_FIRST_PREMIUM");
+        ObjectNode rate = MAPPER.createObjectNode().put("key", "ACQUISITION_COST_RATE_PCT").put("value", 3000)
+                .put("description", "가상 GA 정책(PROJECT_ASSUMPTION)");
+        array(json, "parameters").add(basis).add(rate);
+        assertThatCode(() -> validator.validate(draft(json))).doesNotThrowAnyException();
+
+        rate.put("value", 0);
+        assertInvalid(json, "parameters[1].value");
+        rate.put("value", "3000");
+        assertInvalid(json, "parameters[1].value");
+        // 값의 출처를 적지 않은 기준율은 받지 않는다. 규정 수치처럼 보이면 안 된다.
+        rate.put("value", 3000).putNull("description");
+        assertInvalid(json, "parameters[1].value");
+        rate.put("description", "가상 GA 정책(PROJECT_ASSUMPTION)");
+        basis.put("value", "ANNUAL_PREMIUM");
+        assertInvalid(json, "parameters[0].value");
+        basis.put("value", "MONTHLY_EQUIVALENT_FIRST_PREMIUM").put("key", "COMMON_COST_RATE_PCT");
+        assertInvalid(json, "parameters[0].value");
+    }
+
+    @Test
     void enforcesArbitrageValueTypesAndExistingBounds() {
         ObjectNode json = baseDraft().put("policyType", "ARBITRAGE");
         ObjectNode parameter = MAPPER.createObjectNode().put("key", "ARBITRAGE_REFUND_ADDITION_MONTHS").put("value", 36);

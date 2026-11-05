@@ -49,6 +49,8 @@ for (const startMode of ['existing', 'new'] as const) {
       await page.getByRole('button', { name: '스케줄 재생성', exact: true }).click()
       await successful(regenerated)
     }
+    // URL은 React 화면 전환보다 먼저 바뀔 수 있다. 저장·재생성 후 상세 화면의 준비를 확인한다.
+    await expect(page.getByRole('main').getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
     await guide.getByRole('button', { name: '현재 결과로 이어서 안내' }).click()
     await expect(page).toHaveURL(/\/schedules\/\d+/)
     await expect(guide).toContainText('2/9')
@@ -83,6 +85,7 @@ for (const startMode of ['existing', 'new'] as const) {
     await page.getByRole('dialog').getByRole('button', { name: '확정 실행' }).click()
     expect((await successful(confirming)).status).toBe('CONFIRMED')
     await expect(page).toHaveURL(/\/transactions\?/)
+    await expect(page.getByRole('main').getByRole('heading', { name: '수수료 지급 건 목록', exact: true })).toBeVisible()
     await next.click()
     await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
     const creating = responseFor(page, '/validation-runs')

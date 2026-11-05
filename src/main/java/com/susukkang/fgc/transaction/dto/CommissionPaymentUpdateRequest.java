@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -43,6 +44,8 @@ public record CommissionPaymentUpdateRequest(
         Long allocationPolicyVersion,
         @NotNull List<@NotNull @Valid CommissionPaymentAttributionRequest> attributions,
         @Size(max = 500) String evidenceRef,
-        @Size(max = 1000) String note
+        @Size(max = 1000) String note,
+        // #753: IF-API-21 응답의 updatedAt 원문. 조회 뒤 다른 저장이 있었는지 잠금 후 비교한다.
+        @NotNull OffsetDateTime expectedUpdatedAt
 ) {
 }
