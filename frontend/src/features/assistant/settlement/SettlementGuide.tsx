@@ -509,11 +509,11 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
             ) : (
               <div className="settlement-guide-actions">
                 {decision?.step === 'schedule.review' && (!detailedWorkflow || explanation.last) && (
-                  <button disabled={busy || (detailedWorkflow && explanation.status === 'PAUSED')} onClick={() => void show(selection, false, true)}>
+                  <button disabled={busy} onClick={() => void show(selection, false, true)}>
                     스케줄 확인 완료
                   </button>
                 )}
-                {!detailedPayment && (!detailedWorkflow || explanation.last || !explanation.target) && <button disabled={busy || (detailedWorkflow && explanation.status === 'PAUSED')} onClick={() => void show(selection)}>
+                {!detailedPayment && (!detailedWorkflow || explanation.last || !explanation.target) && <button disabled={busy} onClick={() => void show(selection)}>
                   현재 결과로 이어서 안내
                 </button>}
               </div>
