@@ -51,6 +51,36 @@ class PaymentCalculationIntegrationTest {
     }
 
     @MockitoSpyBean com.susukkang.fgc.assistant.service.CalculationDependencyFingerprint fingerprints;
+    @Test void hypotheticalBodyContractAndNullAttributionFallbackBecomeStaleWhenTheSourceChanges() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            try {
+                long bodyContract=copyCandidateContract();
+                var input=candidateRequest("NEW_PAYMENT","100000");
+                var payment=(com.fasterxml.jackson.databind.node.ObjectNode)input.candidate().get("payment");
+                payment.put("contractId",Long.toString(bodyContract));
+                var rows=(com.fasterxml.jackson.databind.node.ArrayNode)payment.get("attributions");
+                var first=(com.fasterxml.jackson.databind.node.ObjectNode)rows.get(0);
+                first.put("amount","50000");
+                var fallback=first.deepCopy();fallback.putNull("contractId");rows.add(fallback);
+                var result=calculations.calculateVerified(input);
+                assertThat(result.validity()).isNotNull();
+                jdbc.update("UPDATE fgc.insurance_contract SET updated_at=updated_at+INTERVAL '1 second' WHERE contract_id=?",bodyContract);
+                assertThat(calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),input)).status()).isEqualTo("STALE");
+            } finally {status.setRollbackOnly();}
+        });
+    }
+    @Test void candidateIncludesOtherContractsOfTheRecipientForFirstContractRules() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            try {
+                var input=candidateRequest("NEW_PAYMENT","100000");
+                var result=calculations.calculateVerified(input);
+                assertThat(result.validity()).isNotNull();
+                long another=copyCandidateContract();
+                assertThat(another).isNotEqualTo(contractId);
+                assertThat(calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),input)).status()).isEqualTo("STALE");
+            } finally {status.setRollbackOnly();}
+        });
+    }
     @Test void unrelatedNoticeAndOtherContractUpdatesKeepTheCurrentFingerprint() {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             try {

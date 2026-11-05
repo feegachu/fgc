@@ -50,10 +50,19 @@ public class CalculationDependencyFingerprint {
         WITH initial_contracts AS (
             SELECT unnest(CAST(:contractIds AS bigint[])) AS id
             UNION SELECT contract_id FROM fgc.transaction_attribution WHERE commission_transaction_id = :paymentId
+            UNION SELECT source_contract_id FROM fgc.commission_transaction WHERE commission_transaction_id = :paymentId
             UNION SELECT contract_id FROM fgc.reconciliation_result WHERE reconciliation_result_id = :resultId
+        ), recipients AS (
+            SELECT unnest(CAST(:agentIds AS bigint[])) AS id
+            UNION SELECT recipient_agent_id FROM fgc.commission_transaction WHERE commission_transaction_id = :paymentId
+            UNION SELECT agent_id FROM fgc.insurance_contract WHERE contract_id IN (SELECT id FROM initial_contracts)
+        ), dependent_contracts AS (
+            SELECT id FROM initial_contracts
+            UNION SELECT contract_id FROM fgc.insurance_contract
+                WHERE :includeAgentContracts = true AND agent_id IN (SELECT id FROM recipients)
         ), roots AS (
             SELECT COALESCE(array_agg(DISTINCT id ORDER BY id) FILTER (WHERE id IS NOT NULL), ARRAY[]::bigint[]) AS ids
-            FROM initial_contracts
+            FROM dependent_contracts
         ), payments AS (
             SELECT COALESCE(array_agg(DISTINCT commission_transaction_id ORDER BY commission_transaction_id), ARRAY[]::bigint[]) AS ids
             FROM (
@@ -95,9 +104,14 @@ public class CalculationDependencyFingerprint {
 
     public String current(PaymentCalculationRequest request) {
         var contracts = new TreeSet<Long>();
+        var agents = new TreeSet<Long>();
         var scope = request.scope();
         if (scope != null && scope.contractId() != null) contracts.add(Long.parseLong(scope.contractId()));
+        if (scope != null && scope.beneficiaryAgentId() != null) agents.add(Long.parseLong(scope.beneficiaryAgentId()));
         if (request.candidate() != null) {
+            var payment = request.candidate().path("payment");
+            if (payment.hasNonNull("contractId")) contracts.add(Long.parseLong(payment.path("contractId").asText()));
+            if (payment.hasNonNull("agentId")) agents.add(Long.parseLong(payment.path("agentId").asText()));
             var rows = request.candidate().path("payment").path("attributions");
             if (rows.isArray()) for (var row : rows) {
                 var id = row.path("contractId");
@@ -105,8 +119,12 @@ public class CalculationDependencyFingerprint {
             }
         }
         String ids = "{" + contracts.stream().map(Object::toString).collect(java.util.stream.Collectors.joining(",")) + "}";
+        String agentIds = "{" + agents.stream().map(Object::toString).collect(java.util.stream.Collectors.joining(",")) + "}";
         String fingerprint = (String) entityManager.createNativeQuery(SCOPED_DEPENDENCIES)
                 .setParameter("contractIds", ids)
+                .setParameter("agentIds", agentIds)
+                // REG-20 first-contract carry-forward reads the recipient's other contracts too.
+                .setParameter("includeAgentContracts", request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE)
                 .setParameter("paymentId", scope == null || scope.paymentId() == null ? 0L : Long.parseLong(scope.paymentId()))
                 .setParameter("resultId", scope == null || scope.reconciliationResultId() == null ? 0L : Long.parseLong(scope.reconciliationResultId()))
                 .setHint("jakarta.persistence.query.timeout", 5000).getSingleResult();
