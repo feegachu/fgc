@@ -39,7 +39,7 @@ class ScheduleRegenerationBatchItemServiceTest {
 
     @Test
     void linksNewlyCreatedHeadersToTheValidationRun() {
-        given(scheduleService.generateSchedulesByContractId(10L))
+        given(scheduleService.generateSchedulesForValidation(10L))
                 .willReturn(new ScheduleGenerationResult(List.of(200L, 201L), 24));
 
         service.process(10L, 118L);
@@ -49,9 +49,9 @@ class ScheduleRegenerationBatchItemServiceTest {
 
     @Test
     void doesNotCallLinkWhenNoHeadersWereCreated() {
-        // 활성 스케줄이 이미 있어 generateSchedulesByContractId()가 새 헤더를 안 만드는 경우 —
+        // 활성 스케줄이 이미 있어 generateSchedulesForValidation()가 새 헤더를 안 만드는 경우 —
         // linkHeadersToValidationRun 호출 자체가 없어야 한다(빈 IN절 UPDATE 방지).
-        given(scheduleService.generateSchedulesByContractId(10L))
+        given(scheduleService.generateSchedulesForValidation(10L))
                 .willReturn(new ScheduleGenerationResult(List.of(), 0));
 
         service.process(10L, 118L);
