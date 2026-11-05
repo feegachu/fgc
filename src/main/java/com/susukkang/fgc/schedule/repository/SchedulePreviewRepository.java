@@ -9,6 +9,28 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SchedulePreviewRepository {
     private final JdbcTemplate jdbc;
+    /** 현행 경로는 유지하고 명시된 4/7년 상품만 예정 생성으로 보낸다. */
+    public boolean isInstallmentContract(Long contract) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT EXISTS(SELECT 1 FROM fgc.insurance_contract c
+            JOIN fgc.product_offering po USING(product_offering_id)
+            WHERE c.contract_id=? AND po.fee_regime_code IN ('FOUR_YEAR_2027','SEVEN_YEAR_2029'))
+            """, Boolean.class, contract));
+    }
+    /** 헤더 생성 자체는 계산 원천 변경이 아니다. */
+    public String calculationVersion(Long contract) {
+        return jdbc.queryForObject("""
+            SELECT md5((to_jsonb(c) - 'updated_at')::text || ':' || (to_jsonb(po) - 'updated_at')::text)
+            FROM fgc.insurance_contract c JOIN fgc.product_offering po USING(product_offering_id)
+            WHERE c.contract_id=?
+            """, String.class, contract);
+    }
+    public boolean hasCalculation(Long header, String fingerprint) {
+        return header != null && Boolean.TRUE.equals(jdbc.queryForObject("""
+            SELECT EXISTS(SELECT 1 FROM fgc.audit_log WHERE action_code='SCHEDULE_PREVIEW_CALCULATED'
+              AND entity_type='SCHEDULE' AND entity_id=? AND after_value->>'fingerprint'=?)
+            """, Boolean.class, String.valueOf(header), fingerprint));
+    }
     public boolean lockRequest(String key) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(hashtextextended(?,0))", Boolean.class, "schedule-preview:" + key));
     }
