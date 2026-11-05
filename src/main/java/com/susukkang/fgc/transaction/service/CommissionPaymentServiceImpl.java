@@ -430,7 +430,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
       failures.add(unresolvedViolationFailure(first));
     }
-    GateFailure statusHold = statusHoldFailure(paymentId, first);
+    GateFailure statusHold = statusHoldFailure(paymentId, first, candidate);
     if (statusHold != null) {
       failures.add(statusHold);
     }
@@ -1322,10 +1322,14 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     /** FUN-028: 환수(차감) 건은 대상이 아니다. 저장하는 예외 이력은 없고 409 로만 차단한다. */
     private GateFailure statusHoldFailure(Long paymentId, ConfirmationData first) {
+        return statusHoldFailure(paymentId, first, null);
+    }
+
+    private GateFailure statusHoldFailure(Long paymentId, ConfirmationData first, PaymentCandidateProjection candidate) {
         if (isClawback(first)) {
             return null;
         }
-        List<com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker> blockers = paymentHoldGate.blockers(paymentId);
+        List<com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker> blockers = candidate == null ? paymentHoldGate.blockers(paymentId) : paymentHoldGate.blockers(paymentId, candidate);
         if (blockers == null || blockers.isEmpty()) {
             return null;
         }

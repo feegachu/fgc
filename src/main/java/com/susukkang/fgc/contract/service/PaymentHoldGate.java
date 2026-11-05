@@ -8,6 +8,8 @@ import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.PaymentHoldRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import com.susukkang.fgc.transaction.domain.PaymentCandidateProjection;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -57,11 +59,23 @@ public class PaymentHoldGate {
     }
 
     public List<Blocker> blockers(Long paymentId) {
-        List<Blocker> blockers = new ArrayList<>(jdbc.query(BLOCKERS,
-                (rs, row) -> new Blocker(rs.getString("code"), rs.getLong("ref_id")), paymentId, paymentId, paymentId));
-        if (blockers.isEmpty()) {
-            blockers.addAll(currentStatusBlockers(paymentId));
+        return blockers(paymentId, null);
+    }
+
+    /** 후보 CTE는 SELECT 안에서만 적용한다. 대체 초안의 OPEN_HOLD는 원본 ID로 보존한다. */
+    public List<Blocker> blockers(Long paymentId, PaymentCandidateProjection candidate) {
+        List<Blocker> blockers;
+        if (candidate == null) {
+            blockers = new ArrayList<>(jdbc.query(BLOCKERS,
+                    (rs, row) -> new Blocker(rs.getString("code"), rs.getLong("ref_id")), paymentId, paymentId, paymentId));
+        } else {
+            var parameters = candidate.parameters();
+            parameters.put("paymentId", paymentId);
+            blockers = new ArrayList<>(new NamedParameterJdbcTemplate(jdbc).query(
+                    candidate.sql(BLOCKERS.replace("?", ":paymentId")), parameters,
+                    (rs, row) -> new Blocker(rs.getString("code"), rs.getLong("ref_id"))));
         }
+        if (blockers.isEmpty()) blockers.addAll(currentStatusBlockers(paymentId, candidate));
         return blockers;
     }
 
@@ -82,11 +96,20 @@ public class PaymentHoldGate {
     }
 
     /** 보류·중단 상태 사건이 있는 계약만 판단한다(없는 계약은 지급 대상이라 정책 해석도 하지 않는다). */
-    private List<Blocker> currentStatusBlockers(Long paymentId) {
-        List<Long> contractIds = jdbc.queryForList("""
+    private List<Blocker> currentStatusBlockers(Long paymentId, PaymentCandidateProjection candidate) {
+        String sql = """
                 SELECT DISTINCT ta.contract_id FROM fgc.transaction_attribution ta
                  WHERE ta.commission_transaction_id = ? AND ta.contract_id IS NOT NULL
-                """, Long.class, paymentId);
+                """;
+        List<Long> contractIds;
+        if (candidate == null) {
+            contractIds = jdbc.queryForList(sql, Long.class, paymentId);
+        } else {
+            var parameters = candidate.parameters();
+            parameters.put("paymentId", paymentId);
+            contractIds = new NamedParameterJdbcTemplate(jdbc).queryForList(
+                    candidate.sql(sql.replace("?", ":paymentId")), parameters, Long.class);
+        }
         List<Blocker> blockers = new ArrayList<>();
         for (Long contractId : contractIds) {
             List<ContractStatusEvent> timeline = events.findByContractIdOrderByEffectiveAtAscEventSeqAsc(contractId);
@@ -94,7 +117,10 @@ public class PaymentHoldGate {
                 continue;
             }
             ContractStatusEvent latest = timeline.get(timeline.size() - 1);
-            for (ContractStatusEffect effect : rule.decide(latest, holds.openHeldPaymentIds(contractId))) {
+            List<ContractStatusEffect> effects = candidate == null
+                    ? rule.decide(latest, holds.openHeldPaymentIds(contractId))
+                    : rule.decideCandidate(latest, holds.openHeldPaymentIds(contractId), candidate);
+            for (ContractStatusEffect effect : effects) {
                 if (effect.entityType() == EntityType.PAYMENT && paymentId.equals(effect.entityId())
                         && "HELD".equals(effect.nextState())) {
                     blockers.add(new Blocker("CURRENT_STATUS", latest.getContractStatusEventId()));

@@ -12,6 +12,9 @@ import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.policy.service.ScheduleEligibilityPolicyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import com.susukkang.fgc.transaction.domain.PaymentCandidateProjection;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,11 +64,23 @@ public class ContractStatusPaymentRule {
      */
     @Transactional(readOnly = true)
     public List<ContractStatusEffect> decide(ContractStatusEvent event, Set<Long> heldPaymentIds) {
+        return decideFromSource(event, heldPaymentIds, null);
+    }
+
+    /** 실제 지급과 동일한 상태 규칙에 저장하지 않은 후보 귀속을 전달한다. */
+    @Transactional(readOnly = true)
+    public List<ContractStatusEffect> decideCandidate(ContractStatusEvent event, Set<Long> heldPaymentIds,
+                                                    PaymentCandidateProjection candidate) {
+        return decideFromSource(event, heldPaymentIds, candidate);
+    }
+
+    private List<ContractStatusEffect> decideFromSource(ContractStatusEvent event, Set<Long> heldPaymentIds,
+                                                      PaymentCandidateProjection candidate) {
         Long contractId = event.getContractId();
         LocalDate contractDate = jdbc.queryForObject(
                 "SELECT contract_date FROM fgc.insurance_contract WHERE contract_id = ?", LocalDate.class, contractId);
         Long policyVersionId = policies.resolve(contractDate);
-        return judge(timeline(event), point(event), policyVersionId, lines(contractId), payments(contractId), heldPaymentIds);
+        return judge(timeline(event), point(event), policyVersionId, lines(contractId), payments(contractId, candidate), heldPaymentIds);
     }
 
     /**
@@ -148,15 +163,20 @@ public class ContractStatusPaymentRule {
      * 차감 건과 설계사 단위 귀속은 판단하지 않는다.
      */
     private List<Payment> payments(Long contractId) {
+        return payments(contractId, null);
+    }
+
+    private List<Payment> payments(Long contractId, PaymentCandidateProjection candidate) {
         Map<Long, Payment> payments = new LinkedHashMap<>();
         Map<Long, BigDecimal> attributed = new LinkedHashMap<>();
-        jdbc.query("""
+        String sql = """
                 SELECT ct.commission_transaction_id, ct.status, ta.attributed_amount, ta.attribution_date
                   FROM fgc.commission_transaction ct
                   JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
                  WHERE ta.contract_id = ? AND ta.attribution_scope = 'CONTRACT' AND ct.cashflow_type = 'PAYMENT'
                  ORDER BY ct.commission_transaction_id, ta.attribution_date
-                """, rs -> {
+                """;
+        RowCallbackHandler reader = rs -> {
             Long id = rs.getLong("commission_transaction_id");
             Payment payment = payments.get(id);
             if (payment == null) {
@@ -166,7 +186,15 @@ public class ContractStatusPaymentRule {
             }
             attributed.merge(id, rs.getBigDecimal("attributed_amount"), BigDecimal::add);
             payment.attributionDates().add(rs.getObject("attribution_date", LocalDate.class));
-        }, contractId);
+        };
+        if (candidate == null) {
+            jdbc.query(sql, reader, contractId);
+        } else {
+            var parameters = candidate.parameters();
+            parameters.put("contractId", contractId);
+            new NamedParameterJdbcTemplate(jdbc).query(
+                    candidate.sql(sql.replace("?", ":contractId")), parameters, reader);
+        }
         return payments.values().stream()
                 .map(payment -> new Payment(payment.transactionId(), payment.status(),
                         attributed.get(payment.transactionId()), payment.attributionDates()))
