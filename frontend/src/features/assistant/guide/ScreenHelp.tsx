@@ -161,7 +161,7 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
     <button type="button" ref={setTrigger} className="button button-secondary" aria-expanded={open} onClick={open ? close : start}>도움말</button>
     {open && !modal && createPortal(<>
       {!folded && position.box && !paused && !complete && <div className="payment-guide-spotlight" aria-hidden="true" style={position.box} />}
-      <section ref={card} className="payment-guide-card" aria-label={`${definition.title} 도움말`} style={folded ? { left: 16, top: 16 } : position.card}>
+      <section ref={card} className="payment-guide-card" aria-label={`${definition.title} 도움말`} style={folded ? { left: 16, top: 16, right: 'auto', bottom: 'auto' } : position.card}>
         <header className="payment-guide-header">
           <img className="payment-guide-mascot" src={`${import.meta.env.BASE_URL}images/brand/agent-mascot.png`} width="40" height="40" alt="" />
           <span>{saveGuide ? `${action} 가이드` : '화면 사용법'} · {Math.max(1, index + 1)}/{definition.steps.length}</span>

@@ -3,6 +3,8 @@ package com.susukkang.fgc.common.exception;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 
 import java.util.List;
 
@@ -40,6 +42,14 @@ class ConstraintErrorCodeResolverTest {
         );
 
         assertThat(resolver.resolve(exception)).isEmpty();
+    }
+
+    @Test
+    void mapsNulCharacterRejectionToInputError() {
+        PSQLException rejected = new PSQLException(new ServerErrorMessage("C22021\0Minvalid byte sequence\0"));
+
+        assertThat(resolver.resolve(new RuntimeException("outer", rejected)))
+                .contains(FgcErrorCode.COMMON_002);
     }
 
     @ParameterizedTest
