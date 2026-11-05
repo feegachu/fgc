@@ -6,7 +6,7 @@ import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
-/** Conservative authoritative dependency set. Unrelated financial changes may invalidate a preview too. */
+/** Contract/payment-scoped dependencies; shared policies and unknown relationships stay conservative. */
 @Repository
 @RequiredArgsConstructor
 public class CalculationDependencyFingerprint {
@@ -51,6 +51,9 @@ public class CalculationDependencyFingerprint {
             SELECT unnest(CAST(:contractIds AS bigint[])) AS id
             UNION SELECT contract_id FROM fgc.transaction_attribution WHERE commission_transaction_id = :paymentId
             UNION SELECT source_contract_id FROM fgc.commission_transaction WHERE commission_transaction_id = :paymentId
+            UNION SELECT contract_id FROM fgc.exception_case
+                WHERE source_entity_type = 'COMMISSION_TRANSACTION'
+                  AND source_entity_id = CAST(:paymentId AS text)
             UNION SELECT contract_id FROM fgc.reconciliation_result WHERE reconciliation_result_id = :resultId
         ), recipients AS (
             SELECT unnest(CAST(:agentIds AS bigint[])) AS id
