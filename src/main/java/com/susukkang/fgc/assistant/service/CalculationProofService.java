@@ -103,7 +103,7 @@ public class CalculationProofService {
             owner(),
             Long.toString(paymentId),
             null,
-            dependencies.current(),
+            dependencies.forPayment(paymentId),
             now,
             now.plusSeconds(300),
             null));
@@ -113,7 +113,7 @@ public class CalculationProofService {
     Grant grant = grant(token, Purpose.PRECHECK);
     if (!Objects.equals(grant.paymentId(), Long.toString(paymentId))
         || !clock.instant().isBefore(grant.expires())
-        || !grant.dependency().equals(dependencies.current())) throw stale();
+        || !grant.dependency().equals(dependencies.forPayment(paymentId))) throw stale();
     return at(grant.expires());
   }
 
@@ -158,7 +158,7 @@ public class CalculationProofService {
     return input.kind() == PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE
             && input.mode() == PaymentCalculationRequest.Mode.HYPOTHETICAL
         ? "NO_BUSINESS_DEPENDENCIES"
-        : dependencies.current();
+        : dependencies.current(input);
   }
 
   private String inputFingerprint(PaymentCalculationRequest request) {
