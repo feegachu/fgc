@@ -428,3 +428,13 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 1px;
 }
+
+/* Preserve preview inputs while the current schedule is being refreshed. */
+.schedule-preview-availability {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.schedule-source-event { display: block; margin-top: 0.25rem; white-space: nowrap; }

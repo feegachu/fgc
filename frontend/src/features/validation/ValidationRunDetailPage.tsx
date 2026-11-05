@@ -600,7 +600,7 @@ function ChecklistSection({
         {data.conditions?.map((condition) => {
           const to = condition.passed ? null : safeInternalLink(condition.linkUrl)
           return (
-            <div className="vrun-checklist-item" key={condition.no}>
+            <div className="vrun-checklist-item" data-guide-condition={condition.no} key={condition.no}>
               <div className="vrun-checklist-label">
                 <CellDisclosure preview={`${condition.no}. ${condition.label}`} />
               </div>

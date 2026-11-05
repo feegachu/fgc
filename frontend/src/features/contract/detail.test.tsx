@@ -166,6 +166,15 @@ describe('CONT-W02 계약 상세', () => {
     expect(events.map((row) => row.eventSeq)).toEqual([9, 3, 2])
   })
 
+  it('운영판 없이 예정판만 있으면 계약 탭에서도 지급 확정 제외를 표시한다', async () => {
+    renderAt('/contracts/1?tab=schedules', (url) => {
+      if (!url.includes('/schedules?')) return
+      return { headers: [{ scheduleHeaderId: 10, schedulePurpose: 'SIMULATION', scheduleVersionNo: 1, installmentCount: 48, lineCount: 48 }], lines: [] }
+    })
+    await waitFor(() => expect(screen.getAllByText('예정 결과 · 지급 확정 대상이 아닙니다.')).toHaveLength(2))
+    expect(screen.getAllByText('버전 1, 48회차, 48행')).toHaveLength(2)
+  })
+
   it('스케줄 deep link에서도 두 지급단계를 함께 표시하고 기존 읽기 전용 버전 요약을 유지한다', async () => {
     renderAt('/contracts/1?tab=schedules&stage=GA_TO_FC', (url) => {
       if (!url.includes('/schedules?')) return

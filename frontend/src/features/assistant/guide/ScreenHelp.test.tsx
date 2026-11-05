@@ -8,6 +8,7 @@ import { MemoryRouter, useSearchParams } from 'react-router'
 import { ScreenHelp } from './ScreenHelp'
 import { FilterBar } from '../../../components/FilterBar'
 import definitions from './screen-help.json'
+import guideMascot from '../assets/pico-guide.png'
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ x: 10, y: 10, width: 100, height: 40 }] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
@@ -21,6 +22,7 @@ it('strict-mode help only explains, preserves input and restores focus on Escape
     <button data-guide-target="contract.new" onClick={write}>신규 등록</button>
   </main></MemoryRouter></StrictMode>)
   await user.click(screen.getByRole('button', { name: '도움말' }))
+  expect(document.querySelector('.payment-guide-mascot')).toHaveAttribute('src', guideMascot)
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
   await user.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
   expect(write).not.toHaveBeenCalled()
@@ -32,7 +34,7 @@ it('strict-mode help only explains, preserves input and restores focus on Escape
 it('a duplicate live target pauses rather than highlighting an arbitrary element', async () => {
   render(<MemoryRouter><main id="main-content"><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters"/><section data-guide-target="contract.filters"/></main></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
-  expect(await screen.findByText(/대상을 표시할 수 없습니다/)).toBeVisible()
+  expect(await screen.findByText(/안내 대상이 여러 곳/)).toBeVisible()
   expect(document.body).not.toHaveTextContent('DUPLICATE_TARGET')
 })
 it('FilterBar forwards the target to its actual form', () => {
@@ -134,13 +136,52 @@ it('withdraws a highlight when a target becomes hidden through style changes', a
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
   act(() => { document.querySelector<HTMLElement>('[data-guide-target="contract.filters"]')!.style.display = 'none' })
-  expect(await screen.findByText(/대상을 표시할 수 없습니다/)).toBeVisible()
+  expect(await screen.findByText(/안내 대상이 숨겨지거나/)).toBeVisible()
   expect(document.body).not.toHaveTextContent('TARGET_CHANGED')
   expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()
 })
 it('does not run an unregistered screen variant', () => {
   render(<ScreenHelp screenId="CONT-W01" variant="unknown" />)
   expect(screen.getByRole('button', { name: '도움말' })).toBeDisabled()
+})
+
+it('recovers after a duplicate is removed without changing input or writing', async () => {
+  const write = vi.fn()
+  render(<main id="main-content"><ScreenHelp screenId="CONT-W01" />
+    <section data-guide-target="contract.filters"><input aria-label="보존 검색" defaultValue="keep" /></section>
+    <section data-guide-target="contract.filters" data-testid="duplicate" />
+    <button data-guide-target="contract.new" onClick={write}>등록</button>
+  </main>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  expect(await screen.findByText(/안내 대상이 여러 곳/)).toBeVisible()
+  act(() => screen.getByTestId('duplicate').remove())
+  await userEvent.click(screen.getByRole('button', { name: '다시 찾기' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  expect(screen.getByLabelText('보존 검색')).toHaveValue('keep')
+  expect(write).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByRole('button', { name: '종료' }))
+  expect(screen.getByRole('button', { name: '도움말' })).toHaveFocus()
+})
+
+it('keeps a folded card away from a top-left target and preserves input through reopening', async () => {
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(390)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(844)
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(358)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(80)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(16, 16, 358, 100))
+  render(<main id="main-content"><ScreenHelp screenId="CONT-W01" />
+    <section data-guide-target="contract.filters"><input aria-label="접기 입력" defaultValue="draft" /></section>
+  </main>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  await userEvent.click(screen.getByRole('button', { name: '접기' }))
+  const card = screen.getByRole('region', { name: '보험계약 목록 도움말' })
+  await waitFor(() => expect(card).toHaveStyle({ top: '140px', bottom: 'auto' }))
+  expect(document.querySelector('.payment-guide-spotlight')).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: '펼치기' }))
+  expect(screen.getByLabelText('접기 입력')).toHaveValue('draft')
+  await userEvent.keyboard('{Escape}')
+  expect(screen.getByRole('button', { name: '도움말' })).toHaveFocus()
 })
 
 it.each([['EXCP-W01', 'selected'], ['RPT-W02', 'entryKey'], ['LEDG-W01', 'selected']])('keeps %s help on row selection, but resets it when the month changes', async (screenId, selectionParam) => {
@@ -155,7 +196,9 @@ it.each([['EXCP-W01', 'selected'], ['RPT-W02', 'entryKey'], ['LEDG-W01', 'select
   render(<MemoryRouter initialEntries={['/?month=2026-07']}><Page /></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
-  const step = screen.getByText(/화면 사용법 · 1\//).textContent
+  const hasSecondStep = definitions.find(entry => entry.screenId === screenId && !entry.variant)!.steps.length > 1
+  if (hasSecondStep) await userEvent.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
+  const step = (await screen.findByText(hasSecondStep ? /화면 사용법 · 2\// : /화면 사용법 · 1\//)).textContent
   await userEvent.click(screen.getByRole('button', { name: '행 선택' }))
   expect(screen.getByText(step!)).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: '월 변경' }))

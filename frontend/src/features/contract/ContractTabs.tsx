@@ -264,6 +264,9 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
                     ? `버전 ${data.headers[0].scheduleVersionNo ?? '-'}, ${int(data.headers[0].installmentCount)}회차, ${int(data.headers[0].lineCount)}행`
                     : '생성된 스케줄이 없습니다.'}
                 </p>
+                {data.headers?.[0]?.schedulePurpose === 'SIMULATION' && (
+                  <p>예정 결과 · 지급 확정 대상이 아닙니다.</p>
+                )}
               </div>
             </header>
             {data.headers

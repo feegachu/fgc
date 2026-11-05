@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, RefObject } from 'react'
 
+const HIGHLIGHT_PADDING = 10
+
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>) {
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
@@ -45,7 +47,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const cardWidth = Math.min(360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
         let rect = target?.isConnected ? target.getBoundingClientRect() : null
         // A resize can push the coach offscreen. A position-only change can be user scroll.
-        if (!resize && rect && measuredTarget
+        if (rect && measuredTarget
           && (rect.width !== measuredTarget.width || rect.height !== measuredTarget.height)) {
           preparedWidth = null
         }
@@ -66,26 +68,59 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         }
         measuredTarget = rect
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+        const naturalHeight = Math.max(card.current?.offsetHeight || 0, card.current?.scrollHeight || 0)
+        const cardHeight = Math.min(naturalHeight || 460, 460, height / 2)
+        const topBoundary = headerBottom + 8
+        let cardLeft = rect ? Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)) : 0
+        let cardTop = rect ? rect.bottom + 24 : 0
+        let maxHeight = Math.min(460, height / 2)
+        if (rect && cardTop + cardHeight > height - 12) {
+          if (rect.top - 24 - cardHeight >= topBoundary) {
+            cardTop = rect.top - 24 - cardHeight
+          } else if (rect.right + 24 + cardWidth <= workspaceRight - 12) {
+            cardLeft = rect.right + 24
+            cardTop = Math.max(topBoundary, Math.min(rect.top, height - cardHeight - 12))
+          } else if (rect.left - 24 - cardWidth >= cardLeftBoundary + 12) {
+            cardLeft = rect.left - 24 - cardWidth
+            cardTop = Math.max(topBoundary, Math.min(rect.top, height - cardHeight - 12))
+          } else {
+            // Keep the target uncovered even when neither side fits a full card.
+            // The card scrolls internally in the larger free vertical slot.
+            const below = Math.max(0, height - 12 - rect.bottom - 24)
+            const above = Math.max(0, rect.top - 24 - topBoundary)
+            maxHeight = Math.min(maxHeight, Math.max(below, above))
+            cardTop = above > below ? topBoundary : rect.bottom + 24
+          }
+        }
+        // A fixed card cannot be scrolled back into view. Keep its controls reachable
+        // even when ordinary user scrolling moves the highlighted target offscreen.
+        const availableHeight = Math.max(0, height - topBoundary - 12)
+        if (maxHeight < Math.min(160, availableHeight)) {
+          // An oversized target leaves no usable slot: use the documented bottom card.
+          maxHeight = Math.min(460, height / 2, availableHeight)
+          cardTop = height - Math.min(cardHeight, maxHeight) - 12
+        }
+        maxHeight = Math.min(maxHeight, availableHeight)
+        cardTop = Math.max(topBoundary, Math.min(cardTop, height - Math.min(cardHeight, maxHeight) - 12))
         const box = rect ? {
-          left: Math.max(workspaceLeft, rect.left - 8),
-          top: Math.max(headerBottom + 8, rect.top - 8),
-          width: Math.max(0, Math.min(workspaceRight, rect.right + 8) - Math.max(workspaceLeft, rect.left - 8)),
-          height: Math.max(0, Math.min(height, rect.bottom + 8) - Math.max(headerBottom + 8, rect.top - 8)),
+          left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
+          top: Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
+          width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
+          height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
         } : null
         setPosition({
           box: box?.width && box.height ? box : null,
           card: rect ? {
-            left: Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)),
-            top: rect.bottom + 24,
+            left: cardLeft, top: cardTop, maxHeight, overflowY: 'auto',
             right: 'auto', bottom: 'auto', width: cardWidth,
           } : { left: 'auto', top: 'auto', right: 16, bottom: 16, width: cardWidth },
         })
       })
     }
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
-      // A result panel can move the target without resizing the target itself.
-      // Re-align on layout changes, while ordinary user scroll only updates the attachment.
-      preparedWidth = null
+      // The coach resizes while its placement changes. Re-measure it without scrolling
+      // the user's page back to the old target. Real target/viewport size changes are
+      // detected in measure(), independently of this observer notification.
       measure()
     })
     if (target) resize?.observe(target)

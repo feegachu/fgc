@@ -115,6 +115,8 @@ export class PaymentGuideObserver {
     this.acknowledgements.clear()
     this.emit()
   }
+  readWalkthroughInput = (): PaymentGuideInput | null => this.input ? structuredClone(this.input) : null
+
   readContext = (): GuideContext => {
     const input = this.requireInput()
     const contracts = [...new Set(input.rows.map((row) => row.contractId).filter(Boolean))]

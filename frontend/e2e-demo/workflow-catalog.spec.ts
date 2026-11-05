@@ -138,13 +138,13 @@ async function expectHighlight(page: Page, step: Step, target: Locator) {
     const actual = await spotlight.boundingBox()
     const expected = await target.evaluate((element) => {
       const box = element.getBoundingClientRect()
-      // The approved coach design uses an 8px halo clipped to the workspace below its header.
+      // Screen definition §10-8 requires a 10px halo, clipped below the fixed header.
       const workspace = document.getElementById('main-content')?.getBoundingClientRect()
       const leftBoundary = Math.max(0, workspace?.left ?? 0)
       const rightBoundary = Math.min(document.documentElement.clientWidth, workspace?.right || document.documentElement.clientWidth)
       const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
-      const left = Math.max(leftBoundary, box.left - 8), top = Math.max(headerBottom + 8, box.top - 8)
-      return { x: left, y: top, width: Math.max(0, Math.min(rightBoundary, box.right + 8) - left), height: Math.max(0, Math.min(window.innerHeight, box.bottom + 8) - top) }
+      const left = Math.max(leftBoundary, box.left - 10), top = Math.max(headerBottom + 8, box.top - 10)
+      return { x: left, y: top, width: Math.max(0, Math.min(rightBoundary, box.right + 10) - left), height: Math.max(0, Math.min(window.innerHeight, box.bottom + 10) - top) }
     })
     return actual ? Math.max(...(['x', 'y', 'width', 'height'] as const).map((key) => Math.abs(actual[key] - expected[key]))) : Infinity
   }, { message: `${step.stepId} must highlight ${step.targetId}` }).toBeLessThan(3)
