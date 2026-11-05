@@ -294,7 +294,7 @@ final class CompareAskTools {
         return paired ? "DIRECTION_MISMATCH" : "DIRECTION_NOT_FROM_TOOL";
     }
 
-    /** 글에서 보험사·상품 이름으로 언급된 순위 집합. 답에는 순위 번호를 쓸 수 없으므로 이름으로만 찾는다. */
+    /** 글에서 보험사·상품 이름(줄인 이름 포함)으로 언급된 순위 집합. 답에는 순위 번호를 쓸 수 없으므로 이름으로만 찾는다. */
     Set<Integer> ranksMentioned(String text) {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
         Set<Integer> ranks = new HashSet<>();
@@ -360,18 +360,16 @@ final class CompareAskTools {
 
     /**
      * 글에서 이 상품을 가리킨 첫 위치. 없으면 -1.
-     * 상품 이름으로 찾는다. 보험사 이름은 결과 안에 그 보험사 상품이 하나뿐일 때만 그 상품을 가리킨다고 본다
-     * (가보험이 상품을 둘 내면 '가보험'만으로는 어느 상품인지 모른다). 상품 이름이 다른 보험사 상품과 같으면 보험사 이름도 함께 있어야 한다.
+     * 상품 이름은 질문을 읽을 때와 같은 규칙({@link ProductNames})으로 찾는다. 그래서 질문을 따라 '든든 건강보험'처럼 줄여 쓴 답도 그 상품으로 본다.
+     * 보험사 이름은 결과 안에 그 보험사 상품이 하나뿐일 때만 그 상품을 가리킨다고 본다(가보험이 상품을 둘 내면 '가보험'만으로는 어느 상품인지 모른다).
      */
     private int firstMention(String part, Item item) {
         if (item == null) {
             return -1;
         }
-        boolean productUnique = ranking.items().stream().filter(o -> same(o.product(), item.product())).count() == 1;
+        int product = ProductNames.find(ranking.items(), part).stream()
+                .filter(m -> m.rank() == item.rank()).mapToInt(ProductNames.Mention::at).findFirst().orElse(-1);
         boolean insurerUnique = ranking.items().stream().filter(o -> same(o.insurer(), item.insurer())).count() == 1;
-        // 같은 이름의 상품이 여럿이면 '보험사 상품' 꼴로 붙여 쓴 경우만 이 상품이다.
-        int product = productUnique ? indexOf(part, item.product())
-                : Math.max(indexOf(part, item.insurer() + " " + item.product()), indexOf(part, item.insurer() + item.product()));
         int insurer = insurerUnique ? indexOf(part, item.insurer()) : -1;
         if (product < 0) {
             return insurer;

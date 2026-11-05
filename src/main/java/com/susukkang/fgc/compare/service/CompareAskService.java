@@ -302,61 +302,12 @@ public class CompareAskService {
         return List.copyOf(ranks);
     }
 
-    /** 카테고리 화면 이름(정기보험·연금저축보험 등). 줄여 부른 상품 이름이 이것과 같으면 카테고리를 말한 것인지 상품을 말한 것인지 알 수 없다. */
-    private static final java.util.Set<String> CATEGORY_NAMES = CompareRankingService.CATEGORY_LABELS.values().stream()
-            .map(CompareAskService::squeeze).collect(java.util.stream.Collectors.toUnmodifiableSet());
-
     /**
-     * 질문에 상품 이름이 들어 있는 순위. 전체 이름을 적었으면 그 상품이고, 줄여 부른 이름은 다른 상품과 같은 이름이 아닐 때만 인정한다.
-     * 긴 이름부터 맞춰 질문에서 그 부분을 지운 뒤 다음 이름을 찾는다. 그래서 '변액 연금저축보험'을 물으면 그 안에 든 '연금저축보험'은 따로 맞지 않는다.
-     * 보험사만 다르고 전체 이름이 같은 상품은 이름만으로 고를 수 없으므로 어느 순위로도 읽지 않는다(그 부분은 질문에서 지운다).
-     * 줄여 부른 이름이 카테고리 화면 이름과 같으면 줄인 이름으로는 읽지 않는다.
+     * 질문에 상품 이름이 들어 있는 순위(긴 이름으로 맞은 순서). 규칙은 {@link ProductNames} 하나를 AI 답 검사와 함께 쓴다.
+     * 전체 이름, 겹치지 않는 줄인 이름('든든 건강보험')을 인정하고, 카테고리 이름과 같은 줄인 이름·보험사 없이 쓴 같은 이름의 상품은 읽지 않는다.
      */
     private static List<Integer> namedRanks(List<CompareRankingResponse.Item> items, String question) {
-        String remaining = squeeze(question);
-        record Named(int rank, String token, boolean ambiguous) {
-        }
-        List<Named> candidates = new java.util.ArrayList<>();
-        for (CompareRankingResponse.Item item : items) {
-            String key = productKey(item.product());
-            String full = fullName(item.product());
-            boolean fullUnique = items.stream().filter(o -> full.equals(fullName(o.product()))).count() == 1;
-            boolean keyUnique = items.stream().filter(o -> key.equals(productKey(o.product()))).count() == 1;
-            if (full.length() >= 2 && remaining.contains(full)) {
-                candidates.add(new Named(item.rank(), full, !fullUnique));
-            } else if (key.length() >= 2 && keyUnique && !CATEGORY_NAMES.contains(key) && remaining.contains(key)) {
-                // '가상 정기보험 K'를 줄인 '정기보험'은 카테고리 이름과 같아 상품으로 읽지 않는다(전체 이름을 적으면 읽는다).
-                candidates.add(new Named(item.rank(), key, false));
-            }
-        }
-        candidates.sort(java.util.Comparator.comparingInt((Named n) -> n.token().length()).reversed());
-        List<Integer> ranks = new java.util.ArrayList<>();
-        for (Named n : candidates) {
-            if (remaining.contains(n.token())) {
-                if (!n.ambiguous()) {
-                    ranks.add(n.rank());
-                }
-                remaining = remaining.replace(n.token(), "|");
-            }
-        }
-        return ranks;
-    }
-
-    private static String fullName(String product) {
-        return product == null ? "" : squeeze(product.strip());
-    }
-
-    /** 설계사는 '든든 건강보험'처럼 줄여 부르므로, '가상' 접두어와 끝의 한 글자 구분자(A·B·C)를 떼고 공백 없이 비교한다. */
-    private static String productKey(String product) {
-        if (product == null) {
-            return "";
-        }
-        String name = product.strip().replaceFirst("^가상\\s*", "").replaceFirst("\\s+[A-Za-z]$", "");
-        return squeeze(name);
-    }
-
-    private static String squeeze(String text) {
-        return text.replaceAll("\\s+", "");
+        return ProductNames.find(items, question).stream().map(ProductNames.Mention::rank).toList();
     }
 
     /** 두 상품을 직접 견준다. 앞선 순위를 기준으로 뒤 순위의 차이를 말한다. */

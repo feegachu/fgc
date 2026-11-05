@@ -222,4 +222,30 @@ class CompareAskToolsTest {
         assertThat(tools.ranksMentioned("나보험 튼튼건강은 편한건강보다 환수 부담이 작아요.")).containsExactlyInAnyOrder(2, 3);
         assertThat(tools.ranksMentioned("가보험 상품이 앞섰어요.")).containsExactly(1);
     }
+
+    /** 시드 형태 이름. 환수 노출액: 든든(1위) 50,000원, 장기(2위) 16,000원 → 장기 건강보험이 더 작다. */
+    static CompareRankingResponse seedNamedRanking() {
+        CompareRankingResponse base = ranking();
+        return new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(), base.categoryLabel(), base.asOf(),
+                base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(), base.warnings(), null, List.of(
+                        new Item(1, 1, "가보험", "가상 든든 건강보험 C", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of()),
+                        new Item(2, 2, "나보험", "가상 장기 건강보험 E", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of()),
+                        new Item(3, 3, "다보험", "가상 튼튼 건강보험 F", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of())),
+                List.of(), CompareRankingFilters.NONE);
+    }
+
+    @Test
+    @DisplayName("질문을 따라 줄여 쓴 상품 이름('든든 건강보험')도 질문과 같은 규칙으로 찾아 방향을 검사한다")
+    void shortenedSeedNamesInAnswerAreChecked() {
+        CompareAskTools compared = new CompareAskTools(seedNamedRanking());
+        compared.run("compare", "{\"rankA\":1,\"rankB\":2}");
+
+        assertThat(compared.ranksMentioned("든든 건강보험이 장기 건강보험보다 환수 부담이 더 작아요.")).containsExactlyInAnyOrder(1, 2);
+        assertThat(compared.verify("든든 건강보험이 장기 건강보험보다 환수 부담이 더 작아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(compared.verify("장기 건강보험이 든든 건강보험보다 환수 부담이 더 작아요.")).isNull();
+        assertThat(compared.verify("든든건강보험보다 장기건강보험이 환수 부담이 더 작아요.")).isNull();
+
+        CompareAskTools notCompared = new CompareAskTools(seedNamedRanking());
+        assertThat(notCompared.verify("장기 건강보험이 든든 건강보험보다 환수 부담이 더 작아요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+    }
 }

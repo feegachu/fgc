@@ -73,7 +73,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("LLM 호출이 실패해도 순위 질문에는 서버 값으로 답한다")
     void rankQuestionFallsBackWhenGatewayFails() {
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
 
         assertThat(service.ask("1위와 2위 차이가 뭐야?", twoItems()).answer()).contains("1위는 가보험 든든건강");
     }
@@ -222,7 +222,7 @@ class CompareAskServiceTest {
         llmReturns(true, "비교 결과와 이월 같은 용어를 설명해 드려요.");
         assertThat(service.ask(question, threeItems()).answer()).isEqualTo("비교 결과와 이월 같은 용어를 설명해 드려요.");
 
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
         assertThat(service.ask(question, threeItems()).answer()).startsWith("이월:").doesNotContain("1위는");
     }
 
@@ -283,14 +283,14 @@ class CompareAskServiceTest {
         assertThat(ok.source()).isEqualTo("LLM");
         assertThat(ok.answer()).isEqualTo("협회가 공시한 등급끼리의 차이예요.");
 
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
         assertThat(service.ask(question, threeItems()).answer()).startsWith("협회 수수료 등급:").doesNotContain("1위는");
     }
 
     @Test
     @DisplayName("순위 단어 없이 상품 이름 둘로만 물어도 순위 질문으로 보고 두 상품의 이월 예정액을 서버 값으로 답한다")
     void twoProductNamesWithoutRankWordAreRankQuestion() {
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
 
         CompareAskResponse response = service.ask("튼튼건강이랑 편한건강 중 이월 예정액이 어느 쪽이 더 커?", threeItems());
 
@@ -309,6 +309,8 @@ class CompareAskServiceTest {
 
         assertThat(CompareAskService.askedRanks(items, "튼튼건강 순위가 왜 이래?")).isEmpty();
         assertThat(CompareAskService.askedRanks(items, "튼튼건강이랑 편한건강 비교해줘")).containsExactly(3);
+        // 보험사를 붙여 쓰면 어느 상품인지 알 수 있다(AI 답 검사와 같은 규칙).
+        assertThat(CompareAskService.askedRanks(items, "나보험 튼튼건강 순위가 왜 이래?")).containsExactly(2);
     }
 
     private static CompareRankingResponse threeItems() {
@@ -360,6 +362,13 @@ class CompareAskServiceTest {
         output.answer = answer;
         when(gateway.call(any(), eq(CompareAskService.Output.class))).thenReturn(output);
         when(gateway.callWithTools(any(), eq(CompareAskService.Output.class), any(), any(), anyInt())).thenReturn(output);
+    }
+
+    /** 모델 호출이 실패한다. 순위 결과가 있으면 도구 경로(callWithTools)를 타므로 두 경로를 모두 실패시킨다. */
+    private void gatewayFails() {
+        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        when(gateway.callWithTools(any(), eq(CompareAskService.Output.class), any(), any(), anyInt()))
+                .thenThrow(new IllegalStateException("down"));
     }
 
     /** 모델이 도구를 (이름, 인자 JSON) 순서대로 부른 뒤 답하는 것을 흉내 낸다. */
@@ -427,6 +436,24 @@ class CompareAskServiceTest {
 
         assertThat(response.source()).isEqualTo("LLM");
         assertThat(response.answer()).endsWith(" 나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.");
+    }
+
+    @Test
+    @DisplayName("질문을 따라 줄여 쓴 상품 이름의 AI 답도 방향과 다른 상품 언급을 검사한다")
+    void shortenedNamesInAiAnswerAreChecked() {
+        String question = "든든 건강보험이랑 장기 건강보험 중 환수 부담이 작은 건?";
+        CompareRankingResponse seed = CompareAskToolsTest.seedNamedRanking();
+
+        llmCallsTools(true, "든든 건강보험이 장기 건강보험보다 환수 부담이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+        assertThat(service.ask(question, seed).source()).as("반대 방향").isEqualTo("RULE");
+
+        llmCallsTools(true, "튼튼 건강보험은 환수 부담이 중간이에요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+        assertThat(service.ask(question, seed).source()).as("질문하지 않은 상품").isEqualTo("RULE");
+
+        llmCallsTools(true, "장기 건강보험이 든든 건강보험보다 환수 부담이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+        CompareAskResponse ok = service.ask(question, seed);
+        assertThat(ok.source()).isEqualTo("LLM");
+        assertThat(ok.answer()).startsWith("1위는 가보험 가상 든든 건강보험 C").endsWith(" 장기 건강보험이 든든 건강보험보다 환수 부담이 더 작아요.");
     }
 
     @Test
@@ -606,7 +633,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("LLM 호출이 실패해도 용어 질문에는 용어 설명으로 답한다")
     void gatewayFailureUsesGlossary() {
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
 
         CompareAskResponse response = service.ask("환수가 뭐예요?", null);
 
@@ -617,7 +644,7 @@ class CompareAskServiceTest {
     @Test
     @DisplayName("용어에 해당하지 않는 질문은 LLM 이 실패하면 안내 문장을 준다")
     void unknownQuestionGetsGuidance() {
-        when(gateway.call(any(), eq(CompareAskService.Output.class))).thenThrow(new IllegalStateException("down"));
+        gatewayFails();
 
         assertThat(service.ask("가입 권유 문구 써줘", ranking()).answer()).isEqualTo(CompareAskService.FALLBACK);
     }
