@@ -191,6 +191,11 @@ class AgentStatementIntegrationTest {
         assertThat(adjustment.path("summary").path("adjustment").path("count").asLong()).isEqualTo(1);
         assertThat(adjustment.path("summary").path("adjustment").path("amount").decimalValue()).isEqualByComparingTo("-5000");
         assertThat(adjustment.path("summary").path("payment").path("count").asLong()).isZero();
+        // 정책이 없는 건은 이름과 판도 null이다. 스키마가 nullable로 적는 경우다.
+        JsonNode adjustmentEntry = adjustment.path("items").path("content").get(0);
+        assertThat(adjustmentEntry.path("policyVersionId").isNull()).isTrue();
+        assertThat(adjustmentEntry.path("policyName").isNull()).isTrue();
+        assertThat(adjustmentEntry.path("policyVersionNo").isNull()).isTrue();
 
         JsonNode clawback = data(mine("month=" + MONTH + "&entryType=CLAWBACK"));
         assertThat(clawback.path("summary").path("clawback").path("count").asLong()).isEqualTo(1);

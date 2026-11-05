@@ -36,13 +36,17 @@ it('a duplicate live target pauses rather than highlighting an arbitrary element
   expect(await screen.findByText(/대상을 표시할 수 없습니다/)).toBeVisible()
   expect(document.body).not.toHaveTextContent('DUPLICATE_TARGET')
 })
-it('an adapter failure is reported as a system error, not as a missing target', async () => {
-  vi.spyOn(GuideTargets.prototype, 'prepare').mockRejectedValue(new Error('boom'))
+it('an adapter failure is reported as a system error and a restart really retries', async () => {
+  vi.spyOn(GuideTargets.prototype, 'prepare').mockRejectedValueOnce(new Error('boom'))
   render(<MemoryRouter><main id="main-content"><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters" /></main></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   expect(await screen.findByText(/시스템 오류가 발생했습니다/)).toBeVisible()
   expect(screen.queryByText(/대상을 표시할 수 없습니다/)).not.toBeInTheDocument()
   expect(document.body).not.toHaveTextContent('ADAPTER_FAILED')
+  expect(screen.queryByRole('button', { name: '다시 찾기' })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: '다시 시작' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+  expect(screen.queryByText(/시스템 오류가 발생했습니다/)).not.toBeInTheDocument()
 })
 it('FilterBar forwards the target to its actual form', () => {
   render(<FilterBar data-guide-target="test.filters" onSubmit={() => {}}>필터</FilterBar>)

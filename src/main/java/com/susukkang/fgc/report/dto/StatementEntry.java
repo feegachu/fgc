@@ -1,5 +1,6 @@
 package com.susukkang.fgc.report.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -20,8 +21,8 @@ public record StatementEntry(
         String statusLabel,
         BigDecimal amount,
         Long policyVersionId,
-        String policyName,
-        Integer policyVersionNo,
+        @Schema(nullable = true) String policyName,
+        @Schema(nullable = true) Integer policyVersionNo,
         Source source,
         String dataStatus
 ) {
