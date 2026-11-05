@@ -1,0 +1,23 @@
+# Enable explicitly alongside the deployment profile. Never expose env/configprops.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+logging:
+  structured:
+    format:
+      console: ecs
+
+fgc:
+  monitoring:
+    scrape-token: ${FGC_MONITORING_SCRAPE_TOKEN:}

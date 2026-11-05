@@ -32,6 +32,7 @@ class PaymentJournalCorrectionIntegrationTest {
     @Autowired com.susukkang.fgc.reconciliation.repository.ReconciliationRunHistoryRepository history;
     @Autowired org.springframework.transaction.support.TransactionTemplate transactions;
     @Autowired com.susukkang.fgc.validation.batch.contract.JournalPostingPort posting;
+    @Autowired com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository arbitrage;
     private Long contractId;
     private Long validationRunId;
     private PaymentStage paymentStage = PaymentStage.GA_TO_FC;
@@ -39,11 +40,16 @@ class PaymentJournalCorrectionIntegrationTest {
     @Test
     void repostCancelsOldPaymentAndMatchesReplacementWithoutDuplicateAndResolvesException() {
         Fixture f = fixture();
+        assertThat(arbitrage.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC,
+                TEST_MONTH.plusMonths(1))).isEqualByComparingTo("50000");
         var result = corrections.reverseAndRepost(command(f, "100000"));
+        assertThat(arbitrage.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC,
+                TEST_MONTH.plusMonths(1))).isEqualByComparingTo("0");
         assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CANCELLED);
         Long replacement = id("SELECT replacement_payment_id FROM fgc.payment_journal_correction WHERE original_payment_id=?", f.payment());
         assertThat(payments.get(replacement).status()).isEqualTo(CommissionPaymentStatus.CONFIRMED);
         assertThat(payments.get(replacement).amount()).isEqualByComparingTo("100000");
+        assertThat(id("SELECT schedule_line_id FROM fgc.transaction_attribution WHERE commission_transaction_id=?", replacement)).isNotNull();
         assertThat(jdbcTemplate.queryForMap("SELECT source_entity_id, revision_no, status FROM fgc.journal_header WHERE journal_header_id=?",
                 result.repostedJournalHeaderId())).containsEntry("source_entity_id", replacement.toString())
                 .containsEntry("revision_no", 1).containsEntry("status", "POSTED");
@@ -82,6 +88,8 @@ class PaymentJournalCorrectionIntegrationTest {
     void reverseOnlyCancelsPaymentAndRetainsUnresolvedMismatch() {
         Fixture f = fixture();
         corrections.reverse(new ReverseJournalCommand(f.journal(), "지급 취소", "548", 1L));
+        assertThat(arbitrage.sumPlannedCommissionAmount(contractId, PaymentStage.GA_TO_FC,
+                TEST_MONTH.plusMonths(1))).isEqualByComparingTo("100000");
         assertThat(payments.get(f.payment()).status()).isEqualTo(CommissionPaymentStatus.CANCELLED);
         assertThat(id("SELECT replacement_payment_id FROM fgc.payment_journal_correction WHERE original_payment_id=?", f.payment())).isNull();
         Long current = id("SELECT reconciliation_run_id FROM fgc.reconciliation_run WHERE corrects_reconciliation_run_id=?", f.run());

@@ -944,6 +944,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exceptions/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exceptions/options": {
         parameters: {
             query?: never;
@@ -986,6 +1002,26 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["journalCorrection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/home/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 관리자 홈 GA·설계사 현황 (IF-API-68)
+         * @description 기준일의 등록·활동·해촉 설계사 수, 지점별 설계사·유효 계약 수, 확인할 설계사 상위 10명을 돌려준다. asOf 생략 시 오늘(Asia/Seoul)을 쓴다. 전체 설계사 검색은 IF-API-07 을 쓴다.
+         */
+        get: operations["homeSummary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2221,6 +2257,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseExceptionCountsResponse: {
+            data?: components["schemas"]["ExceptionCountsResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseExceptionOptionsResponse: {
             data?: components["schemas"]["ExceptionOptionsResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2233,6 +2274,11 @@ export interface components {
         };
         ApiResponseFinalizeValidationRunResponse: {
             data?: components["schemas"]["FinalizeValidationRunResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseHomeSummaryResponse: {
+            data?: components["schemas"]["HomeSummaryResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -4133,6 +4179,12 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        ExceptionCountsResponse: {
+            bySeverity?: components["schemas"]["ExceptionSeverityCountResponse"][];
+            byType?: components["schemas"]["ExceptionTypeSummaryResponse"][];
+            /** Format: int64 */
+            total?: number;
+        };
         ExceptionOccurrenceResponse: {
             /** Format: date-time */
             detectedAt?: string;
@@ -4160,6 +4212,13 @@ export interface components {
             severities?: components["schemas"]["Option"][];
             types?: components["schemas"]["Option"][];
             validationMonths?: string[];
+        };
+        ExceptionSeverityCountResponse: {
+            /** Format: int64 */
+            count?: number;
+            /** @enum {string} */
+            severity?: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
+            severityLabel?: string;
         };
         ExceptionSummary: {
             /** Format: int64 */
@@ -4287,6 +4346,54 @@ export interface components {
         HeldAmount: {
             after?: number;
             before?: number;
+        };
+        HomeAgentCounts: {
+            /** Format: int64 */
+            active?: number;
+            /** Format: int64 */
+            registered?: number;
+            /** Format: int64 */
+            terminated?: number;
+        };
+        HomeAttentionAgent: {
+            activeYn?: boolean;
+            /** Format: int64 */
+            agentId?: number;
+            branch?: string;
+            code?: string;
+            /** Format: int64 */
+            contractCount?: number;
+            name?: string;
+            reasons?: components["schemas"]["HomeAttentionReason"][];
+            status?: string;
+            statusLabel?: string;
+        };
+        HomeAttentionReason: {
+            code?: string;
+            /** Format: int64 */
+            count?: number;
+            label?: string;
+        };
+        HomeBranch: {
+            /** Format: int64 */
+            activeContractCount?: number;
+            /** Format: int64 */
+            agentCount?: number;
+            /** Format: int64 */
+            attentionCount?: number;
+            name?: string;
+            /** Format: int64 */
+            organizationId?: number;
+        };
+        HomeSummaryResponse: {
+            agents?: components["schemas"]["HomeAgentCounts"];
+            /** Format: date */
+            asOf?: string;
+            attentionAgents?: components["schemas"]["HomeAttentionAgent"][];
+            /** Format: int64 */
+            attentionTotal?: number;
+            basis?: string;
+            branches?: components["schemas"]["HomeBranch"][];
         };
         /** @description 보험회사(원수사) 기준정보 */
         InsurerResponse: {
@@ -6733,6 +6840,8 @@ export interface operations {
                 selectedId?: number;
                 /** @description 소속 조직 ID */
                 organizationId?: number;
+                /** @description 지점 ID. 이 지점과 바로 아래 팀 소속 설계사를 찾는다(FUN-080 관리자 홈) */
+                branchId?: number;
                 /** @description 설계사 코드 또는 이름 검색어 */
                 keyword?: string;
                 /**
@@ -7730,6 +7839,29 @@ export interface operations {
             };
         };
     };
+    counts: {
+        parameters: {
+            query?: {
+                status?: string;
+                validationMonth?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExceptionCountsResponse"];
+                };
+            };
+        };
+    };
     options: {
         parameters: {
             query?: never;
@@ -7798,6 +7930,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseJournalCorrectionActionResponse"];
+                };
+            };
+        };
+    };
+    homeSummary: {
+        parameters: {
+            query?: {
+                /**
+                 * @description 현황 기준일(yyyy-MM-dd). 생략하면 오늘
+                 * @example 2026-11-04
+                 */
+                asOf?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseHomeSummaryResponse"];
                 };
             };
         };

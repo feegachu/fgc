@@ -51,6 +51,20 @@ public class ArbitrageJdbcBaseline {
         parameters.put("asOfDate", asOfDate);
         return jdbc.selectOne("com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline.sumPlannedCommissionAmount", parameters);
     }
+    public PlannedCommissionSummary plannedCommissionSummary(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
+        var parameters = new HashMap<String, Object>();
+        parameters.put("contractId", contractId);
+        parameters.put("paymentStage", paymentStage);
+        parameters.put("asOfDate", asOfDate);
+        return jdbc.selectOne("com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline.plannedCommissionSummary", parameters);
+    }
+    public CommissionBalanceSnapshot commissionBalanceSnapshot(Long contractId, PaymentStage paymentStage, LocalDate asOfDate) {
+        var parameters = new HashMap<String, Object>();
+        parameters.put("contractId", contractId);
+        parameters.put("paymentStage", paymentStage);
+        parameters.put("asOfDate", asOfDate);
+        return jdbc.selectOne("com.susukkang.fgc.arbitrage.baseline.ArbitrageJdbcBaseline.commissionBalanceSnapshot", parameters);
+    }
     public List<ArbitrageRefundRateCandidate> selectRefundRateCandidates(ArbitrageCalculationSource source, LocalDate asOfDate) {
         var parameters = new HashMap<String, Object>();
         parameters.put("source", source);
