@@ -61,12 +61,12 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     (!!routeContract && !!selection.contractId && Number(routeContract) !== selection.contractId) ||
     (!!routeSchedule && !!selection.scheduleId && Number(routeSchedule) !== selection.scheduleId)
   )
-  const detailedPayment = !busy && decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
-  const walkthrough = usePaymentWalkthrough(detailedPayment, month, selection?.stage, selection?.contractId)
+  const detailedPayment = decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
+  const walkthrough = usePaymentWalkthrough(detailedPayment && !busy, month, selection?.stage, selection?.contractId)
   // show() can navigate from the just-saved editor to the same route with its new ID.
   // Bind only after that transition has finished: the old editor is replaced while
   // its saved draft loads, which is not loss of a target in the new explanation.
-  const explanation = useWorkflowWalkthrough(busy ? undefined : decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending)
+  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
   const position = useSpotlight(!collapsed ? activeTarget : null, card)
