@@ -153,6 +153,18 @@ class CompareAskServiceTest {
     }
 
     @Test
+    @DisplayName("다른 상품 이름 안에 든 짧은 이름은 따로 맞지 않는다(변액 연금저축보험 ⊃ 연금저축보험)")
+    void nameContainedInAnotherNameIsNotMatchedSeparately() {
+        Item o = new Item(1, 1, "가보험", "가상 연금저축보험 O", 700_000, 650_000, 0, 16_000, 634_000, 90.5, null, List.of());
+        Item pItem = new Item(2, 2, "나보험", "가상 변액 연금저축보험 P", 600_000, 580_000, 0, 30_000, 550_000, 80.0, null, List.of());
+        List<Item> items = List.of(o, pItem);
+
+        assertThat(CompareAskService.askedRanks(items, "변액 연금저축보험은 왜 이 순위야?")).containsExactly(2);
+        assertThat(CompareAskService.askedRanks(items, "가상 변액 연금저축보험 P 왜 이래?")).containsExactly(2);
+        assertThat(CompareAskService.askedRanks(items, "연금저축보험이랑 변액 연금저축보험 비교해줘")).containsExactly(1, 2);
+    }
+
+    @Test
     @DisplayName("두 순위 비교 답변은 이월 예정액을 0원이어도 서버 값으로 보여 준다")
     void pairAnswerIncludesCarryoverEvenWhenZero() {
         assertThat(CompareAskService.rankAnswer(threeItems().items(), "2위랑 3위 이월액 비교해줘"))

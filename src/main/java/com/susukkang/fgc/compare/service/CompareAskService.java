@@ -191,18 +191,38 @@ public class CompareAskService {
             }
         }
         // 상품 이름(예: 튼튼건강)으로 물어도 같은 순위로 읽는다. 서버 문장과 AI 데이터가 같은 상품 쌍을 가리키게 한다.
-        String squeezed = squeeze(question);
+        ranks.addAll(namedRanks(items, question));
+        return ranks.stream().limit(2).toList();
+    }
+
+    /**
+     * 질문에 상품 이름이 들어 있는 순위. 전체 이름을 적었으면 그 상품이고, 줄여 부른 이름은 다른 상품과 같은 이름이 아닐 때만 인정한다.
+     * 긴 이름부터 맞춰 질문에서 그 부분을 지운 뒤 다음 이름을 찾는다. 그래서 '변액 연금저축보험'을 물으면 그 안에 든 '연금저축보험'은 따로 맞지 않는다.
+     */
+    private static List<Integer> namedRanks(List<CompareRankingResponse.Item> items, String question) {
+        String remaining = squeeze(question);
+        record Named(int rank, String token) {
+        }
+        List<Named> candidates = new java.util.ArrayList<>();
         for (CompareRankingResponse.Item item : items) {
             String key = productKey(item.product());
-            // 같은 이름이 여러 상품에 걸리면 어느 상품인지 알 수 없으므로 지정하지 않은 것으로 본다.
-            boolean unique = items.stream().filter(o -> key.equals(productKey(o.product()))).count() == 1;
             String full = item.product() == null ? "" : squeeze(item.product().strip());
-            // 전체 이름을 그대로 적었으면 그 상품이다. 줄여 부른 이름은 다른 상품과 겹치지 않을 때만 인정한다.
-            if ((full.length() >= 2 && squeezed.contains(full)) || (key.length() >= 2 && unique && squeezed.contains(key))) {
-                ranks.add(item.rank());
+            boolean unique = items.stream().filter(o -> key.equals(productKey(o.product()))).count() == 1;
+            if (full.length() >= 2 && remaining.contains(full)) {
+                candidates.add(new Named(item.rank(), full));
+            } else if (key.length() >= 2 && unique && remaining.contains(key)) {
+                candidates.add(new Named(item.rank(), key));
             }
         }
-        return ranks.stream().limit(2).toList();
+        candidates.sort(java.util.Comparator.comparingInt((Named n) -> n.token().length()).reversed());
+        List<Integer> ranks = new java.util.ArrayList<>();
+        for (Named n : candidates) {
+            if (remaining.contains(n.token())) {
+                ranks.add(n.rank());
+                remaining = remaining.replace(n.token(), "|");
+            }
+        }
+        return ranks;
     }
 
     /** 설계사는 '든든 건강보험'처럼 줄여 부르므로, '가상' 접두어와 끝의 한 글자 구분자(A·B·C)를 떼고 공백 없이 비교한다. */
