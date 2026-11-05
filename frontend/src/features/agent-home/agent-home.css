@@ -19,7 +19,6 @@
 
   & p, & h2, & h3, & ul { margin: 0; padding: 0; }
   & ul { list-style: none; }
-  & > .button { justify-self: end; } /* 도움말이 격자 칸을 가득 채우지 않게 한다. */
   & :is(.ah-panel, .ah-seg, .ah-chip, .ah-donut-legend) button,
   & .ah-retry {
     font: inherit;

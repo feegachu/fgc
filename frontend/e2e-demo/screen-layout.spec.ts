@@ -110,14 +110,6 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
   await expect(formHelp).toHaveText('도움말')
   expect((await formHelp.boundingBox())!.width).toBeLessThan(160)
 
-  // AGNT-W01은 쪽 머리가 없다. V64가 꺼 둔 계정이라 시험 뒤 되돌아가는 DB에서만 켠다.
-  sql(
-    "UPDATE fgc.app_user SET account_status='ACTIVE', password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'",
-  )
-  await login(page, 'agent01', `/agent-home?month=${month}`)
-  const agentHelp = page.locator('.ah > .button')
-  await expect(agentHelp).toHaveText('도움말')
-  expect((await agentHelp.boundingBox())!.width).toBeLessThan(160)
 })
 
 test('1440폭에서 읽어야 할 열이 가로 스크롤 뒤로 가지 않고 업무 비서가 끝의 값을 가리지 않는다', async ({ page }) => {

@@ -6,6 +6,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useSearchParams } from 'react-router'
 import { ScreenHelp } from './ScreenHelp'
+import { GuideTargets } from './targets'
 import { FilterBar } from '../../../components/FilterBar'
 import definitions from './screen-help.json'
 beforeEach(() => {
@@ -34,6 +35,14 @@ it('a duplicate live target pauses rather than highlighting an arbitrary element
   await userEvent.click(screen.getByRole('button', { name: '도움말' }))
   expect(await screen.findByText(/대상을 표시할 수 없습니다/)).toBeVisible()
   expect(document.body).not.toHaveTextContent('DUPLICATE_TARGET')
+})
+it('an adapter failure is reported as a system error, not as a missing target', async () => {
+  vi.spyOn(GuideTargets.prototype, 'prepare').mockRejectedValue(new Error('boom'))
+  render(<MemoryRouter><main id="main-content"><ScreenHelp screenId="CONT-W01" /><section data-guide-target="contract.filters" /></main></MemoryRouter>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  expect(await screen.findByText(/시스템 오류가 발생했습니다/)).toBeVisible()
+  expect(screen.queryByText(/대상을 표시할 수 없습니다/)).not.toBeInTheDocument()
+  expect(document.body).not.toHaveTextContent('ADAPTER_FAILED')
 })
 it('FilterBar forwards the target to its actual form', () => {
   render(<FilterBar data-guide-target="test.filters" onSubmit={() => {}}>필터</FilterBar>)
