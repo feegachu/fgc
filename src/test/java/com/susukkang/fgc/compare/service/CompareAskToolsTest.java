@@ -71,6 +71,21 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("차이 값은 문장이 가리키는 두 순위가 서버가 계산한 두 순위와 같을 때만 통과한다")
+    void differenceMustMatchBothRanks() {
+        // compare(1,3)만 호출: 차이 134,000원
+        CompareAskTools tools = toolsWith("compare", PAIR_1_3);
+
+        assertThat(tools.verify("2위 나보험 튼튼건강은 1위 가보험 든든건강보다 보수적 순수령액이 134,000원 많아요."))
+                .isEqualTo("VALUE_PAIR_MISMATCH");
+        assertThat(tools.verify("2위와 1위의 보수적 순수령액 차이는 134,000원이에요.")).isEqualTo("VALUE_PAIR_MISMATCH");
+        assertThat(tools.verify("2위 나보험 튼튼건강은 3위 다보험 편한건강보다 보수적 순수령액이 134,000원 적어요."))
+                .isEqualTo("VALUE_PAIR_MISMATCH");
+        assertThat(tools.verify("1위 가보험 든든건강의 보수적 순수령액이 134,000원 많아요.")).isEqualTo("VALUE_KIND_MISMATCH");
+        assertThat(tools.verify("1위와 3위의 보수적 순수령액 차이는 134,000원이에요.")).isNull();
+    }
+
+    @Test
     @DisplayName("한도 영향은 화면처럼 소수 첫째 자리에서 절사해 준다(99.96% → 99.9%)")
     void capImpactIsTruncatedLikeTheScreen() {
         Item item = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 99.96, null, List.of());

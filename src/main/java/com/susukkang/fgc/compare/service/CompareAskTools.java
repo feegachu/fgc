@@ -13,6 +13,7 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -307,6 +308,9 @@ final class CompareAskTools {
         if (sameKind.isEmpty()) {
             return "VALUE_KIND_MISMATCH";
         }
+        if (expected == Kind.DIFF) {
+            return verifyDifference(text, at, sentence, sameKind);
+        }
         int subject = nearestRankBefore(text, at);
         Set<Metric> metrics = nearestMetricsBefore(text, at);
         if (subject == 0 || metrics.isEmpty()) {
@@ -322,6 +326,50 @@ final class CompareAskTools {
             }
         }
         return paired ? "DIRECTION_MISMATCH" : "VALUE_PAIR_MISMATCH";
+    }
+
+    /**
+     * 차이 값은 그 문장이 가리키는 두 순위가 서버가 계산한 두 순위와 정확히 같을 때만 인정한다.
+     * 한쪽 순위만 맞거나 다른 순위와 비교한 문장(예: compare(1,3)의 차이를 "2위가 1위보다"로 쓴 문장)은 거절한다.
+     */
+    private String verifyDifference(String text, int at, String sentence, List<Fact> facts) {
+        Set<Metric> metrics = nearestMetricsBefore(text, at);
+        Set<Integer> mentioned = ranksMentionedIn(sentence);
+        if (metrics.isEmpty() || mentioned.size() != 2) {
+            return "VALUE_PAIR_MISMATCH";
+        }
+        boolean paired = false;
+        for (Fact fact : facts) {
+            if (new HashSet<>(fact.ranks()).equals(mentioned) && fact.metrics().stream().anyMatch(metrics::contains)) {
+                paired = true;
+                if (directionHolds(sentence, fact)) {
+                    return null;
+                }
+            }
+        }
+        return paired ? "DIRECTION_MISMATCH" : "VALUE_PAIR_MISMATCH";
+    }
+
+    /** 한 문장에서 순위 표기(N위) 또는 보험사·상품 이름으로 언급된 순위 집합. */
+    private Set<Integer> ranksMentionedIn(String sentence) {
+        Set<Integer> ranks = new HashSet<>();
+        Matcher labels = RANK_LABEL.matcher(sentence);
+        while (labels.find()) {
+            int rank = Integer.parseInt(labels.group(1));
+            if (find(rank) != null) {
+                ranks.add(rank);
+            }
+        }
+        for (Item item : ranking.items()) {
+            if (mentions(sentence, item.product()) || mentions(sentence, item.insurer())) {
+                ranks.add(item.rank());
+            }
+        }
+        return ranks;
+    }
+
+    private static boolean mentions(String sentence, String name) {
+        return name != null && !name.isBlank() && sentence.contains(Normalizer.normalize(name, Normalizer.Form.NFKC));
     }
 
     /** 금액 앞에서 가장 가까이 언급된 상품(순위 표기 또는 이름)의 순위. 없으면 0. 앞 문장에서 이어 말한 것도 센다. */
