@@ -1,4 +1,4 @@
-import { safeSourceUrl } from './management'
+import { ACQUISITION_COST_RATE, ACQUISITION_COST_SOURCE, safeSourceUrl } from './management'
 import type { DraftDocument } from './management'
 
 export type DraftErrors = Record<string, string>
@@ -86,5 +86,12 @@ export function validateDraft(draft: DraftDocument): DraftErrors {
     refs.add(ref)
     if (source.url && !safeSourceUrl(source.url)) errors[prefix + 'url'] = 'http 또는 https 링크를 입력하세요.'
   })
+  const acquisitionRate = draft.parameters.find((parameter) => parameter.key === ACQUISITION_COST_RATE)
+  if (acquisitionRate) {
+    if (!(Number(acquisitionRate.value) > 0))
+      errors[`parameters.${ACQUISITION_COST_RATE}`] = '0보다 큰 기준율을 입력하세요.'
+    if (!acquisitionRate.description.trim())
+      errors[`parameters.${ACQUISITION_COST_SOURCE}`] = '값의 출처를 입력하세요.'
+  }
   return errors
 }
