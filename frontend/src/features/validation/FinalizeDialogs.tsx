@@ -1,3 +1,6 @@
+import { useSyncExternalStore } from 'react'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import type { SaveGuide } from '../assistant/guide/save-guide'
 import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 
@@ -7,6 +10,8 @@ import { Modal } from '../../components/Modal'
  * 완료 모달은 닫을 때까지 남겨 성공 피드백이 보이게 하고, 닫으면 최신 상태를 다시 불러온다.
  */
 export function FinalizeDialogs({
+  saveGuide,
+  allowed = true,
   confirming,
   finalized,
   pending,
@@ -16,6 +21,8 @@ export function FinalizeDialogs({
   onConfirm,
   onClosed,
 }: {
+  allowed?: boolean
+  saveGuide?: SaveGuide
   confirming: boolean
   finalized: boolean
   pending: boolean
@@ -25,6 +32,7 @@ export function FinalizeDialogs({
   onConfirm: () => void
   onClosed: () => void
 }) {
+  const savedId = useSyncExternalStore(saveGuide?.subscribe ?? noSubscribe, saveGuide?.getSnapshot ?? noSnapshot).savedId
   return (
     <>
       <Modal
@@ -38,13 +46,14 @@ export function FinalizeDialogs({
             <Button data-guide-feature="features.validation.finalize-dialogs.button" variant="secondary" disabled={pending} onClick={onCancel}>
               취소
             </Button>
-            <Button data-guide-feature="features.validation.finalize-dialogs.button-2" loading={pending} onClick={onConfirm}>
+            <Button data-guide-feature="features.validation.finalize-dialogs.button-2" data-guide-target="validation.finalizeSubmit" loading={pending && savedId === null} disabled={pending || !allowed} onClick={onConfirm}>
               확정
             </Button>
           </>
         }
       >
-        <p className="vrun-modal-description">
+        {saveGuide && <ScreenHelp screenId="VRUN-W02" variant="finalize" saveGuide={saveGuide} outcome="finalization" />}
+        <p data-guide-target="validation.finalizeWarning" className="vrun-modal-description">
           확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
         </p>
         <div className="vrun-modal-points">
@@ -86,3 +95,7 @@ export function FinalizeDialogs({
     </>
   )
 }
+
+const noSubscribe = () => () => {}
+const noSnapshot = () => emptySnapshot
+const emptySnapshot = { savedId: null, valid: false, pending: false, error: '' }

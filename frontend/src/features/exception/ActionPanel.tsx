@@ -1,5 +1,7 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { SaveGuide } from '../assistant/guide/save-guide'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import type { FormEvent } from 'react'
 import { Button } from '../../components/Button'
@@ -131,21 +133,46 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const [reason, setReason] = useState('')
   const [evidenceRef, setEvidenceRef] = useState('')
   const [error, setError] = useState('')
+  const [needsRefresh, setNeedsRefresh] = useState(false)
+  const [saveGuide] = useState(() => new SaveGuide())
+  const saved = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId !== null
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const actions = availableActions(item.status, item.type)
+  const valid = actions.some(action => action.type === actionType) && Boolean(reason.trim()) && reason.trim().length <= 1000
+  const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, reason, evidenceRef])
+  useEffect(() => { saveGuide.update(context, valid) }, [saveGuide, context, valid])
   const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]))
   const mutation = useMutation({
-    mutationFn: () => postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }),
+    mutationFn: () => { saveGuide.begin(); return postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }) },
     meta: { errorToast: false },
-    onSuccess: (action) => {
+    onSuccess: async (action) => {
       clearUnsaved()
+      let continueGuide: boolean
+      try {
+        if (action.actionType !== actionType || action.fromStatus !== item.status || !['NEW', 'IN_REVIEW', 'RESOLVED', 'REJECTED'].includes(action.toStatus ?? '') || !Number.isSafeInteger(action.actionSeq) || Number(action.actionSeq) <= 0) throw new Error('서버 처리 결과의 조치와 상태를 확인하지 못했습니다.')
+        continueGuide = mounted.current ? await saveGuide.saved(Number(action.actionSeq)) : false
+      } catch {
+        // The POST already succeeded: never expose a retry for an unverified receipt.
+        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 처리 이력을 확인한 뒤 화면을 다시 여세요.'
+        if (mounted.current) {
+          setNeedsRefresh(true)
+          saveGuide.fail(message)
+          setError(message)
+          toast(message, 'warning')
+        }
+        void client.invalidateQueries({ queryKey: ['exceptions', 'search'] })
+        return
+      }
       applyActionToCache(client, item.exceptionCaseId!, action)
+      if (!mounted.current) return
       setActionType('')
       setReason('')
       setEvidenceRef('')
       toast('처리 내용이 저장되었습니다.', 'success')
       // 원장 정정 예외는 검토 시작(재검토)에 성공한 직후 정정 모달을 바로 연다.
       if (
-        item.type === JOURNAL_CORRECTION_TYPE &&
+        continueGuide && item.type === JOURNAL_CORRECTION_TYPE &&
         (action.actionType === 'START_REVIEW' || action.actionType === 'REOPEN') &&
         action.toStatus === 'IN_REVIEW'
       ) {
@@ -154,17 +181,21 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
     },
     onError: (caught) => {
       const message = errorText(caught as Error, '처리 내용을 저장하지 못했습니다.')
+      saveGuide.fail(message)
       setError(message)
       toast(message, 'error')
     },
   })
   function submit(event: FormEvent) {
     event.preventDefault()
+    if (needsRefresh || mutation.isPending) return
     setError('')
-    mutation.mutate()
+    if (valid) mutation.mutate()
   }
   return (
-    <form data-guide-feature="features.exception.action-panel.form" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
+    <form data-guide-feature="features.exception.action-panel.form" data-guide-scope="exception-action" className="exception-action-form" onSubmit={submit} aria-label="예외 처리">
+      <ScreenHelp screenId="EXCP-W01" variant="action" saveGuide={saveGuide} outcome="processing" />
+      <fieldset data-guide-target="exception.actionInput" disabled={mutation.isPending || needsRefresh} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 'var(--space-3)' }}>
       <Field label="조치" required>
         <select data-guide-feature="features.exception.action-panel.select" className="select-control" value={actionType} onChange={(event) => setActionType(event.target.value)}>
           <option value="">조치를 선택하세요</option>
@@ -192,16 +223,18 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
           onChange={(event) => setEvidenceRef(event.target.value)}
         />
       </Field>
+      </fieldset>
       {error && (
         <p className="field-error exception-action-error" role="alert">
           {error}
         </p>
       )}
       <Button data-guide-feature="features.exception.action-panel.button"
+        data-guide-target="exception.actionSave"
         type="submit"
         className="exception-action-submit"
-        loading={mutation.isPending}
-        disabled={!actionType || !reason.trim()}
+        loading={mutation.isPending && !saved}
+        disabled={!valid || mutation.isPending || needsRefresh}
       >
         처리 저장
       </Button>

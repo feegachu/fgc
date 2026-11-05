@@ -190,11 +190,6 @@
   font-size: 0.75rem;
 }
 
-.vrun-run-table .table-cell-disclosure,
-.vrun-target-table .table-cell-disclosure {
-  font-size: 0.75rem;
-}
-
 .vrun-failure-text {
   color: var(--color-status-error-text);
 }

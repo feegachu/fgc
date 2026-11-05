@@ -75,6 +75,9 @@ class ScheduleServiceTest {
     private ScheduleQueryRepository scheduleQueryRepository;
 
     @Mock
+    private com.susukkang.fgc.schedule.repository.SchedulePreviewRepository previews;
+
+    @Mock
     private ScheduleWriteRepository scheduleWriteRepository;
 
     @Mock
@@ -97,6 +100,12 @@ class ScheduleServiceTest {
 
     @Mock
     private ScheduleReviewService scheduleReviewService;
+
+    @Mock
+    private com.susukkang.fgc.contract.service.PaymentHoldFollowUpProcessor paymentHoldFollowUpProcessor;
+
+    @Mock
+    private com.susukkang.fgc.contract.service.PaymentHoldGate paymentHoldGate;
 
     @InjectMocks
     private ScheduleService scheduleService;

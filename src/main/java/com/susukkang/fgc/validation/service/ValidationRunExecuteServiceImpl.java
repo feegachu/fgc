@@ -32,9 +32,7 @@ public class ValidationRunExecuteServiceImpl implements ValidationRunExecuteServ
             // "수정 불가 — 확정된 검증 결과입니다. 새 실행을 만드세요." (§3-2)
             throw new FgcBusinessException(FgcErrorCode.VRUN_003);
         }
-        boolean monthlyRestart = run.getStatus() == ValidationRunStatus.FAILED
-                && !ValidationRunType.MANUAL_CONTRACT.name().equals(run.getRunType());
-        if (run.getStatus() != ValidationRunStatus.CREATED && !monthlyRestart) {
+        if (run.getStatus() != ValidationRunStatus.CREATED) {
             throw new FgcBusinessException(FgcErrorCode.VRUN_004,
                     Map.of("from", run.getStatus().label(), "to", ValidationRunStatus.RUNNING.label()));
         }

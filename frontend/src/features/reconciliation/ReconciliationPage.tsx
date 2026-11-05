@@ -1,3 +1,7 @@
+import { errorText } from '../../lib/format'
+import { SaveGuide } from '../assistant/guide/save-guide'
+import { useRunGuide } from '../assistant/guide/useRunGuide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
@@ -286,8 +290,10 @@ export default function ReconciliationPage() {
       void Promise.allSettled(inFlight).then(() => client.invalidateQueries({ queryKey }))
     }
   }, [client, runId, status])
+  const [executionGuide] = useState(() => new SaveGuide())
   const execution = useMutation({
-    mutationFn: createRun,
+    mutationFn: (input: RunInput) => { executionGuide.begin(); return createRun(input) },
+    onError: (error) => executionGuide.fail(errorText(error)),
     meta: { errorToast: false },
     onSuccess: (data, input) => {
       if (data.status === 'RUNNING' || data.status === 'CREATED')
@@ -342,16 +348,18 @@ export default function ReconciliationPage() {
     },
   ]
   return (
-    <div className="reco-react-page">
+    <div className="reco-react-page list-page">
       <header className="page-header">
+        <ScreenHelp screenId="RECO-W01" saveGuide={executionGuide} outcome="execution" />
         <h1 className="page-title">대사 실행/결과</h1>
       </header>
-      <section data-guide-feature="features.reconciliation.reconciliation-page.section" className="surface reco-react-run">
-        <header className="surface-header reco-react-panel-header">
-          <h2 className="surface-title">대사 실행</h2>
-        </header>
+      <section data-guide-feature="features.reconciliation.reconciliation-page.section" data-guide-target="reconciliation.filters" className="surface reco-react-run" aria-label="대사 실행 조건">
         <RunFilters
-          key={JSON.stringify({ ...criteria, sort: '' })}
+          guide={executionGuide}
+          observedId={runId}
+          observedStatus={status}
+          resultReady={results.isSuccess && !results.isFetching}
+          queryError={history.isError || results.isError ? '서버 결과 조회에 실패했습니다. 다시 조회하세요.' : ''}
           criteria={criteria}
           pending={execution.isPending}
           canProcess={canProcess}
@@ -525,6 +533,7 @@ export default function ReconciliationPage() {
 }
 
 function RunFilters({
+  guide, observedId, observedStatus, resultReady, queryError,
   criteria,
   pending,
   canProcess,
@@ -533,6 +542,11 @@ function RunFilters({
   bulkDisabled,
   onBulk,
 }: {
+  guide: SaveGuide
+  observedId: string
+  observedStatus?: string
+  resultReady: boolean
+  queryError: string
   criteria: Criteria
   pending: boolean
   canProcess: boolean
@@ -546,8 +560,17 @@ function RunFilters({
     stage: criteria.stage,
     insurer: criteria.insurer,
   })
+  const scope = JSON.stringify([criteria.month, criteria.stage, criteria.insurer])
+  const [previousScope, setPreviousScope] = useState(scope)
+  if (scope !== previousScope) {
+    setPreviousScope(scope)
+    setFields({ month: criteria.month, stage: criteria.stage, insurer: criteria.insurer })
+  }
   const insurers = useInsurerOptions()
   const insurer = insurers.data?.find((row) => String(row.insurerId) === fields.insurer)
+  const inputValid = Boolean(canProcess && fields.month && fields.stage && fields.insurer && insurer && insurer.activeYn !== false)
+  const matches = fields.month === criteria.month && fields.stage === criteria.stage && fields.insurer === criteria.insurer
+  useRunGuide(guide, JSON.stringify(fields), inputValid, matches ? observedId : '', matches ? ((observedStatus === 'COMPLETED' || observedStatus === 'FINALIZED') && !resultReady ? 'RUNNING' : observedStatus) : undefined, queryError)
   const tabCount = useWorkspaceStore((state) => state.tabs.length)
   const [monthAction, setMonthAction] = useState<{ kind: 'search' | 'run'; input: RunInput } | null>(null)
   const submit = (kind: 'search' | 'run') => {
@@ -571,6 +594,7 @@ function RunFilters({
               조회
             </Button>
             <Button data-guide-feature="features.reconciliation.reconciliation-page.button-3"
+              data-guide-target="reconciliation.execute"
               loading={pending}
               disabled={
                 !canProcess ||
@@ -711,7 +735,7 @@ function RunSummary({ summary }: { summary?: Summary }) {
           guideId="reconciliation.kpi.difference"
           label="차액 합계"
           zero={summary?.differenceTotal === 0}
-          value={summary ? <Money value={summary.differenceTotal} difference unit={false} /> : EMPTY}
+          value={summary ? <Money value={summary.differenceTotal} difference unit={false} animate /> : EMPTY}
           unit="원"
           tone={summary?.differenceTotal === 0 ? 'success' : 'error'}
           footer="실제 지급액에서 예상 지급액을 뺀 합계"

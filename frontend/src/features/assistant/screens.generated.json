@@ -82,6 +82,15 @@
     "icon": "payments"
   },
   {
+    "id": "RPT-W02",
+    "path": "/agent/statements",
+    "title": "설계사 수수료 명세",
+    "menuTitle": "수수료 명세",
+    "menu": "/agent/statements",
+    "section": "contracts",
+    "icon": "payments"
+  },
+  {
     "id": "SCHE-W02",
     "path": "/schedules/:id",
     "title": "예상 스케줄 상세",
@@ -110,6 +119,14 @@
     "path": "/arbitrage-checks",
     "title": "차익거래 검증",
     "menu": "/arbitrage-checks",
+    "section": "compliance",
+    "icon": "fact_check"
+  },
+  {
+    "id": "ACQC-W01",
+    "path": "/acquisition-cost-checks",
+    "title": "계약체결비용 한도",
+    "menu": "/acquisition-cost-checks",
     "section": "compliance",
     "icon": "fact_check"
   },
