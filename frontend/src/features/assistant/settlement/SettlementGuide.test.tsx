@@ -9,6 +9,7 @@ import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
 import { apiClient } from '../../../lib/api/client'
 import * as evidenceApi from './api'
 import type { Evidence } from './state'
+import * as settlementState from './state'
 import { SettlementGuide } from './SettlementGuide'
 import { openSettlementGuide, closeSettlementGuide } from './entry'
 const user = {
@@ -493,4 +494,37 @@ it.each([
     await screen.findByText('조회 중 화면이 바뀌었습니다. 현재 대상으로 다시 확인하세요.')
     expect(router.state.location.pathname + router.state.location.search).toBe(destination)
   }
+})
+
+
+it('rechecks server evidence after saving a terminal exception action removes explanation 5/6', async () => {
+  const read = vi.spyOn(evidenceApi, 'readEvidence').mockResolvedValue({ scheduleAcknowledged: false })
+  const decide = vi.spyOn(settlementState, 'decide').mockReturnValue({ step: 'exception.resolve', reason: '미처리 예외' })
+  const { actor, router } = mount('SETTLEMENT', '/exceptions?selected=7')
+  const form = document.createElement('div')
+  form.innerHTML = `<section data-guide-target="exception.detail">근거</section>
+    <div data-guide-target="exception.actionInput"><select><option>해결</option></select><textarea>정정 완료</textarea><input value="DOC-7" /></div>
+    <button data-guide-target="exception.actionSave">처리 저장</button>`
+  document.querySelector('#main-content')!.append(form)
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  await waitFor(() => expect(screen.queryByText('현재 서버 결과를 확인하고 있습니다.')).not.toBeInTheDocument())
+  await act(async () => { void router.navigate('/exceptions?selected=7') })
+  for (let i = 0; i < 4; i++) {
+    await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
+    await actor.click(screen.getByRole('button', { name: '확인하고 다음 설명' }))
+  }
+  await screen.findByRole('heading', { name: '처리 내용을 직접 저장하세요' })
+  await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
+  // The real action form unmounts after the server accepts a terminal action.
+  form.querySelector('button')!.onclick = () => form.remove()
+  await actor.click(screen.getByRole('button', { name: '처리 저장' }))
+  await screen.findByRole('button', { name: '다시 찾기' })
+  expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeDisabled()
+  const calls = read.mock.calls.length
+  decide.mockReturnValue({ step: 'contract.create', reason: '새 서버 결과' })
+  await actor.click(screen.getByRole('button', { name: '현재 결과로 이어서 안내' }))
+  await waitFor(() => expect(read).toHaveBeenCalledTimes(calls + 1))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/new'))
+  expect(vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
 })
