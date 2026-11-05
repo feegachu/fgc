@@ -246,6 +246,49 @@ describe('AGNT-W01 포트폴리오', () => {
   })
 })
 
+describe('AGNT-W01 로딩·권한·늦은 응답 (#714 DoD)', () => {
+  it('홈 조회가 끝나기 전에는 불러오는 중만 보이고 0건 지표를 그리지 않는다', async () => {
+    home = () => new Promise(() => {})
+    renderHome()
+    expect(await screen.findByText('불러오는 중입니다.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('신규 계약 건수')).not.toBeInTheDocument()
+    expect(screen.queryByText('0건')).not.toBeInTheDocument()
+  })
+
+  it('홈 조회가 500으로 실패하면 0건이 아니라 오류와 다시 시도를 보여 준다', async () => {
+    home = async () => {
+      throw new ApiError(null, 'req-500', 500)
+    }
+    renderHome()
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('신규 계약 건수')).not.toBeInTheDocument()
+    expect(screen.queryByText('0건')).not.toBeInTheDocument()
+  })
+
+  it('필터를 연달아 바꿨을 때 늦게 도착한 이전 응답이 최신 조건의 화면을 덮어쓰지 않는다', async () => {
+    const pending: Record<string, (value: unknown) => void> = {}
+    const base = home
+    home = (path) => {
+      if (path.includes('insurerType=NON_LIFE')) return new Promise((resolve) => (pending.nonLife = resolve))
+      if (path.includes('insurerType=LIFE')) return new Promise((resolve) => (pending.life = resolve))
+      return base(path)
+    }
+    renderHome()
+    const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
+    await userEvent.click(within(panel).getByRole('button', { name: '손해' }))
+    await waitFor(() => expect(pending.nonLife).toBeDefined())
+    await userEvent.click(within(panel).getByRole('button', { name: '생명' }))
+    await waitFor(() => expect(pending.life).toBeDefined())
+    pending.life(envelope(baseHome({ range: { from: '2024-02-01', to: '2026-07-31' } })))
+    await waitFor(() => expect(panel).toHaveTextContent('2024-02-01'))
+    pending.nonLife(envelope(baseHome({ range: { from: '2020-03-01', to: '2026-07-31' } })))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(panel).toHaveTextContent('2024-02-01')
+    expect(panel).not.toHaveTextContent('2020-03-01')
+  })
+})
+
 describe('상품 추천 AI', () => {
   it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
     renderHome()
