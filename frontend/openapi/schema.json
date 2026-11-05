@@ -10302,7 +10302,7 @@
             "type" : "integer"
           },
           "policyName" : {
-            "type" : "string"
+            "type" : [ "string", "null" ]
           },
           "policyVersionId" : {
             "format" : "int64",
@@ -10310,7 +10310,7 @@
           },
           "policyVersionNo" : {
             "format" : "int32",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "source" : {
             "$ref" : "#/components/schemas/Source"

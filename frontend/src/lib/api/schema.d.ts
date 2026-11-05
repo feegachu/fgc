@@ -6130,11 +6130,11 @@ export interface components {
             entryType?: string;
             /** Format: int32 */
             installmentNo?: number;
-            policyName?: string;
+            policyName?: string | null;
             /** Format: int64 */
             policyVersionId?: number;
             /** Format: int32 */
-            policyVersionNo?: number;
+            policyVersionNo?: number | null;
             source?: components["schemas"]["Source"];
             statusCode?: string;
             statusLabel?: string;
