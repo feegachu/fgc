@@ -41,7 +41,7 @@ async function prepare(page: Page, guide: Guide, account: string): Promise<Prepa
   if (guide.workflowId === 'schedule.detail') {
     const original = await seedContract(page)
     // The baseline contract has no operational GA_TO_FC schedule. Create the required real fixture explicitly.
-    const headers = await api(page, `/contracts/${original.contractId}/schedules/regenerate?reason=E2E-catalog-guide-fixture`, {})
+    const headers = await api(page, `/contracts/${original.contractId}/schedules/regenerate`, { reason: 'E2E-catalog-guide-fixture' })
     expect(headers.length, 'Schedule preparation must create a real header before UI verification.').toBeGreaterThan(0)
     await login(page, account, `/schedules?month=${month}&contractNo=FGC-FGL01-202607-0001&stage=GA_TO_FC`)
     await page.getByRole('table').locator('tbody a[href^="/schedules/"]').first().click()

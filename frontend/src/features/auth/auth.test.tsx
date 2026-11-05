@@ -97,6 +97,13 @@ describe('AUTH-W01 로그인', () => {
     expect(screen.queryByText(reason)).not.toBeInTheDocument()
   })
 
+  it('로그인 시도 제한(nginx 429)은 비밀번호 오류와 다른 안내를 보여 준다', async () => {
+    vi.mocked(apiClient.login).mockRejectedValue(new ApiError(null, null, 429))
+    const { actions } = renderAt()
+    await enterCredentials(actions)
+    expect(await screen.findByRole('alert')).toHaveTextContent(authMessages.tooManyAttempts)
+  })
+
   it('500의 내부 메시지와 오류 코드 대신 요청 ID만 표시한다', async () => {
     vi.mocked(apiClient.login).mockRejectedValue(
       new ApiError({ code: 'FGC-COMMON-500', message: 'internal details' }, 'trace-404', 500),

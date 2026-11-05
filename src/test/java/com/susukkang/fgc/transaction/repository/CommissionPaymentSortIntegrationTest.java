@@ -16,6 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** #604 수수료 지급 건 목록: 허용 컬럼의 양방향 정렬을 DB 의 같은 정렬과 비교한다. */
+// FUN-085: 범위 검사는 인증 문맥이 없으면 전체 범위로 풀지 않는다. 내부 조회 역할로 호출한다.
+@org.springframework.security.test.context.support.WithMockUser(roles = "SETTLEMENT")
 @SpringBootTest
 @Transactional
 class CommissionPaymentSortIntegrationTest {
