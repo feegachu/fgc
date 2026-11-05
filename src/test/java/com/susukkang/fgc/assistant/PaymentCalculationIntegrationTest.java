@@ -1,4 +1,5 @@
 package com.susukkang.fgc.assistant;
+import static org.mockito.Mockito.verify;
 
 import com.susukkang.fgc.assistant.dto.PaymentCalculationRequest;
 import com.susukkang.fgc.assistant.service.PaymentCalculationService;
@@ -79,7 +80,7 @@ class PaymentCalculationIntegrationTest {
         assertThat(checked.token()).isNull();assertThat(checked.result()).isEqualTo(expected);
         assertThat(jdbc.queryForObject("SELECT 1",Integer.class)).isEqualTo(1);
         assertThat(counts()).isEqualTo(before);
-        org.mockito.Mockito.verify(fingerprints).current();
+        verify(fingerprints).current();
     }
 
     @BeforeEach void createOwnedCommittedDraft() {
@@ -269,14 +270,14 @@ class PaymentCalculationIntegrationTest {
         assertThat(same.confirmable()).isEqualTo(expected.confirmable());assertThat(same.blockers().stream().map(com.susukkang.fgc.assistant.dto.PaymentCalculationSnapshot.Reason::code).toList()).containsExactlyElementsOf(expected.blockers().stream().map(com.susukkang.fgc.transaction.dto.TransactionPrecheckResponse.Blocker::code).toList());
         var changed=calculations.calculate(candidateRequest("REPLACE_DRAFT","120000"));
         assertThat(changed.evidenceKind()).isEqualTo("HYPOTHETICAL");assertThat(changed.validity()).isNull();assertThat(changed.recommendation().allowed()).isFalse();
-        assertThat(changed.capPreview()).anySatisfy(row->assertThat(row.get("candidateAmount")).isEqualTo("120000"));
+        assertThat(changed.capPreview()).anySatisfy(row->assertThat(row).containsEntry("candidateAmount", "120000"));
         assertThat(paymentRow()).isEqualTo(source);assertThat(attributionRows()).isEqualTo(rows);assertThat(counts()).isEqualTo(before);
     }
     @Test void hypotheticalNewCandidateIsNotAddedTwiceOrPersisted() {
         var before=counts();var source=paymentRow();var rows=attributionRows();
         var result=calculations.calculate(candidateRequest("NEW_PAYMENT","100000"));
         assertThat(result.evidenceKind()).isEqualTo("HYPOTHETICAL");assertThat(result.resolvedScope()).isEmpty();
-        assertThat(result.capPreview()).anySatisfy(row->assertThat(row.get("candidateAmount")).isEqualTo("100000"));
+        assertThat(result.capPreview()).anySatisfy(row->assertThat(row).containsEntry("candidateAmount", "100000"));
         assertThat(counts()).isEqualTo(before);assertThat(paymentRow()).isEqualTo(source);assertThat(attributionRows()).isEqualTo(rows);
     }
     @Test void hypotheticalCannotReplaceNonDraftPayment() {

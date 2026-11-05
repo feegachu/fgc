@@ -166,13 +166,33 @@ export function validateStatusEvent(event: StatusEventDraft, now: string, codes:
 }
 
 // 서울은 일광절약시간이 없어 +09:00으로 고정해 보낸다.
+export const seoulOffsetDateTime = (value: string) => `${value}:00+09:00`
+
 export const statusEventRequest = (event: StatusEventDraft): NonNullable<ContractUpdateRequest['statusEvent']> => ({
-  effectiveAt: `${event.effectiveAt}:00+09:00`,
-  receivedAt: `${event.receivedAt}:00+09:00`,
+  effectiveAt: seoulOffsetDateTime(event.effectiveAt),
+  receivedAt: seoulOffsetDateTime(event.receivedAt),
   // validateStatusEvent가 서버 statusReasonCodes 안의 값인지 확인한 뒤에만 보낸다.
   reasonCode: event.reasonCode as NonNullable<ContractUpdateRequest['statusEvent']>['reasonCode'],
   reason: event.reason.trim(),
 })
+
+/** IF-API-64 효력일시 입력 검사. 최신 사건 효력일시 하한은 서버만 안다. */
+export function previewEffectiveAtError(value: string, now: string) {
+  if (!validDateTime(value)) return '올바른 일시를 입력해 주세요.'
+  return value > now ? '효력일시는 현재 시각보다 늦을 수 없습니다.' : undefined
+}
+
+/**
+ * CONT-W02 영향 미리보기에서 넘긴 수정 초안. 지금 고를 수 없는 상태나 형식이 틀린 일시는 버린다.
+ * 초안일 뿐이며 저장은 기존 [저장]에서 최신 상태로 다시 검증한다.
+ */
+export function statusDraftFrom(state: unknown, allowed: readonly string[]) {
+  const draft = (state as { statusDraft?: { contractStatus?: unknown; effectiveAt?: unknown } } | null)?.statusDraft
+  const contractStatus = allowed.find((status) => status === draft?.contractStatus)
+  if (!contractStatus) return undefined
+  const effectiveAt = typeof draft?.effectiveAt === 'string' && validDateTime(draft.effectiveAt) ? draft.effectiveAt : ''
+  return { contractStatus: contractStatus as ContractDraft['contractStatus'], effectiveAt }
+}
 
 // 서버 ContractServiceImpl#hasScheduleImpactingChanges와 같은 필드다. 저장 뒤 안내는 응답의 재생성 결과로 한다.
 const scheduleFields = [

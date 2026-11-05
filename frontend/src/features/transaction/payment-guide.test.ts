@@ -178,11 +178,9 @@ describe('payment guide server evidence', () => {
     response = { ...draft, status: 'CONFIRMED' }
     expect((await read()).confirmed).toBe(false)
   })
-  it('binds all attributed contracts and rejects unsafe IDs without picking a first row', () => {
+  it('preserves all distinct contracts and rejects unsafe IDs', () => {
     observer.update({ ...input, rows: [...input.rows, { ...input.rows[0], key: 2, contractId: '4' }] })
-    expect(observer.readContext().entityRefs).toEqual([
-      { type: 'PAYMENT', id: 77 }, { type: 'CONTRACT', id: 3 }, { type: 'CONTRACT', id: 4 },
-    ])
+    expect(observer.readContext().entityRefs).toEqual([{ type: 'PAYMENT', id: 77 }, { type: 'CONTRACT', id: 3 }, { type: 'CONTRACT', id: 4 }])
     observer.update({ ...input, paymentId: '9007199254740993' })
     expect(() => observer.readContext()).toThrow('INVALID_ENTITY_REFS')
   })
@@ -234,6 +232,18 @@ describe('step-specific input guidance', () => {
   })
 })
 
+ it('requires server evidence for all contracts and invalidates a changed second row', async () => {
+   const multi = { ...draft, attributions: [{ ...draft.attributions![0], amount: 100 }, { ...draft.attributions![0], contractId: 4, amount: 100 }] }
+   input = { ...input, rows: draftRows(multi) }
+   observer.update(input)
+   response = multi
+   expect((await read()).attributionsReady).toBe(true)
+   expect(observer.acceptPrecheck(observer.begin('precheck'), multi, passed, multi)).toBe(true)
+   expect((await read()).prechecked).toBe(true)
+   observer.update({ ...input, dirty: true, rows: input.rows.map((row, i) => i === 1 ? { ...row, amount: '99' } : row) })
+   expect((await read()).prechecked).toBe(false)
+   expect((await read()).attributionsReady).toBe(false)
+ })
 it('selects precheck only for a valid current saved payment and otherwise requires save', async () => {
   const context = observer.readContext()
   const state = await read()

@@ -50,8 +50,11 @@ export const contractQuery = (id: number | undefined) =>
     queryFn: ({ signal }) => data<Schemas['ContractDetailResponse']>('/api/v1/contracts/' + id, { signal }),
     enabled: id != null && id > 0,
   })
-export const saveDraft = (id: string | null, body: PaymentPayload) =>
-  data<Payment>(id ? path(id) : '/api/v1/transactions', { method: id ? 'PUT' : 'POST', body })
+export const saveDraft = (id: string | null, body: PaymentPayload, expectedUpdatedAt?: string) =>
+  data<Payment>(id ? path(id) : '/api/v1/transactions', {
+    method: id ? 'PUT' : 'POST',
+    body: id ? { ...body, expectedUpdatedAt } : body,
+  })
 export const precheckPayment = async (id: string): Promise<Precheck> => {
   let token: string | undefined
   const result = await data<Precheck>(path(id, '/precheck'), { method: 'POST', onResponseHeaders: headers => { token = headers.get('X-FGC-Precheck-Token') ?? undefined } })

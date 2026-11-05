@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class ContractStatusFollowUpService {
 
-    // shortcut: 5번 시도(처리 중 중단 포함)하면 자동 재시도를 멈추고 같은 계약의 뒤 사건도 기다린다. 수동 재시도 화면이 생기면 그 경로로 푼다.
+    // 5번 시도(처리 중 중단 포함)하면 자동 재시도를 멈추고 같은 계약의 뒤 사건도 기다린다. 이력 조회가 소진으로 보여 주고, 다시 돌리는 일은 운영 Runbook(#676) 절차다.
     static final int MAX_ATTEMPTS = 5;
     private static final int MAX_JOBS_PER_RUN = 100;
     private static final int FAILURE_REASON_MAX_LENGTH = 2000;
@@ -144,5 +144,11 @@ public class ContractStatusFollowUpService {
     static String failureReason(RuntimeException failure) {
         String reason = errorCode(failure) + (failure.getMessage() == null ? "" : ": " + failure.getMessage());
         return reason.length() <= FAILURE_REASON_MAX_LENGTH ? reason : reason.substring(0, FAILURE_REASON_MAX_LENGTH);
+    }
+
+    /** {@link #failureReason}이 남긴 이력에서 오류 코드만 꺼낸다. 메시지는 내부 정보가 섞일 수 있어 응답에 내보내지 않는다. */
+    static String errorCodeOf(String failureReason) {
+        int end = failureReason.indexOf(": ");
+        return end < 0 ? failureReason : failureReason.substring(0, end);
     }
 }

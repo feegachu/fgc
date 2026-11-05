@@ -33,6 +33,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class MonthlyValidationJobConfig {
 
     // Tasklet 안에서 실제 업무 로직을 부를 때 필요한 서비스 2개
+    private final org.springframework.jdbc.core.JdbcTemplate retryJdbc;
     private final ValidationRunCreateService validationRunCreateService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
@@ -59,6 +60,7 @@ public class MonthlyValidationJobConfig {
                                      Step exceptionGenerationStep) {
         return new JobBuilder("MonthlyValidationJob", jobRepository)
                 .validator(new MonthlyValidationJobParametersValidator())
+                .listener(new ValidationRetryListener(retryJdbc))
                 .listener(new MonthlyValidationJobExecutionListener(validationRunBatchLifecycleService))
                 .start(createRunStep)
                 .next(selectTargetStep)

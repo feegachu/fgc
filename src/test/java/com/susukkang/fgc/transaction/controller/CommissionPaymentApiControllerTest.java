@@ -1,4 +1,5 @@
 package com.susukkang.fgc.transaction.controller;
+import static org.mockito.Mockito.times;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.common.security.AuthenticatedSessions;
@@ -109,7 +110,7 @@ class CommissionPaymentApiControllerTest {
         mockMvc.perform(post("/api/v1/transactions/101/precheck").with(user("settlement01").roles("SETTLEMENT")).with(csrf()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.confirmable").value(true))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().doesNotExist("X-FGC-Precheck-Token"));
-        verify(commissionPaymentService,org.mockito.Mockito.times(2)).precheck(101L);
+        verify(commissionPaymentService,times(2)).precheck(101L);
     }
 
     @Test
@@ -227,6 +228,37 @@ class CommissionPaymentApiControllerTest {
                 .andExpect(jsonPath("$.data.commissionTransactionId").value(101))
                 .andExpect(jsonPath("$.data.settlementMonth").value("2026-07-01"))
                 .andExpect(jsonPath("$.data.attributions[0].attributionDate").value("2026-07-10"));
+    }
+
+    @Test
+    void settlementRoleCannotUpdateWithoutExpectedUpdatedAt() throws Exception {
+        java.util.Map<String, Object> values = objectMapper.readValue(
+                validUpdateJson(), new com.fasterxml.jackson.core.type.TypeReference<>() {
+                });
+        values.remove("expectedUpdatedAt");
+
+        mockMvc.perform(put("/api/v1/transactions/101")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(values)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("expectedUpdatedAt"));
+    }
+
+    @Test
+    void staleUpdateRespondsConflictWithPaymentCode() throws Exception {
+        given(commissionPaymentService.update(eq(101L), any())).willThrow(
+                new com.susukkang.fgc.common.exception.FgcBusinessException(
+                        com.susukkang.fgc.common.exception.FgcErrorCode.TRAN_010));
+
+        mockMvc.perform(put("/api/v1/transactions/101")
+                        .with(user("settlement01").roles("SETTLEMENT"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateJson()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("FGC-TRAN-010"));
     }
 
     @Test
@@ -447,6 +479,7 @@ class CommissionPaymentApiControllerTest {
                 new com.fasterxml.jackson.core.type.TypeReference<>() {
                 }
         );
+        values.put("expectedUpdatedAt", "2026-07-01T00:00:00.123456Z");
         return objectMapper.writeValueAsString(values);
     }
 

@@ -14,7 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 @PreAuthorize(Roles.CAN_PROCESS)
 public class AssistantPrecheckProofController {
     private final AssistantPrecheckProofService service;
-    public record VerifyRequest(@NotBlank @Pattern(regexp="[1-9][0-9]{0,18}") String paymentId,@NotBlank @Size(max=100) String precheckToken) {}
+    public record VerifyRequest(@NotBlank @Pattern(regexp="[1-9]\\d{0,18}") String paymentId,@NotBlank @Size(max=100) String precheckToken) {}
     @PostMapping("/revalidate")
     @Operation(summary="현재 지급의 실제 사전검증 증표 확인",description="계산 증표로 대체할 수 없습니다. 금융 상태를 변경하지 않습니다.")
     public ApiResponse<AssistantPrecheckProofService.Verification> verify(@RequestBody @Valid VerifyRequest request) {

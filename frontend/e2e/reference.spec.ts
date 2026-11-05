@@ -40,6 +40,7 @@ for (const roleCode of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN'])
           commissionRules: [{ commissionRuleId: 1, ratePct: '650.123456', fixedAmount: -1234 }],
           capRuleSets: [],
           refundRateTables: [],
+          references: [{ ref: 'REG-08', registryTitle: '테스트 규정', detailTitle: '근거 설명 확인', explanation: '이 정책 버전에 저장된 설명' }],
         }
       else
         data = {
@@ -73,9 +74,13 @@ for (const roleCode of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN'])
     await expect(longCode).toHaveText(longPolicyCode)
     await expect(policyTable.locator('details, summary')).toHaveCount(0)
     await expect(page.getByRole('radio', { name: 'POL-1 v1 선택', exact: true })).toBeChecked()
-    await page.getByRole('button', { name: 'REG-08' }).click()
-    await expect(page.getByRole('tooltip')).toContainText('REG-08')
+    await expect(policyTable.getByRole('columnheader', { name: '근거', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /근거 표시/ })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '정책 등록', exact: false })).toHaveCount(roleCode === 'COMPLIANCE' ? 0 : 1)
     await expect(page.getByRole('button', { name: /수정|저장|삭제/, exact: true })).toHaveCount(0)
+    await page.getByRole('tab', { name: '관리 상세', exact: true }).click()
+    await page.getByRole('tab', { name: '근거 자료', exact: true }).click()
+    await page.getByRole('button', { name: 'REG-08 근거 정보', exact: true }).click()
+    await expect(page.getByRole('tooltip')).toContainText('근거 설명 확인')
   })
 }
