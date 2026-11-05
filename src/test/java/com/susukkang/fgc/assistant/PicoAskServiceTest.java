@@ -359,6 +359,57 @@ class PicoAskServiceTest {
             assertThat(service.ask(request("초안 저장 방법")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
         }
     }
+    @Test void normalizesInlineProcedureListMarkersOnlyWhenConsecutive() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+            .thenReturn(answer("다음 순서로 진행하세요: 1) 지급 대상을 확인하고 2) 근거를 확인한 후 3) 초안을 저장하세요.","payment.draft:overview"));
+        var reply = service.ask(request("초안 저장 순서"));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        assertThat(reply.message()).isEqualTo("다음 순서로 진행하세요: 지급 대상을 확인하고 근거를 확인한 후 초안을 저장하세요.");
+        for (var message : List.of("먼저 1) 확인하고 3) 저장하세요.", "먼저 1. 지급액은 50000원입니다. 2. 저장하세요.",
+                "금액은 1. 2. 3. 4. 5. 6. 7. 8. 9. 입니다.", "요율은 1.5 입니다. 2.5 도 있습니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"payment.draft:overview"));
+            assertThat(service.ask(request("초안 저장 순서")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
+    @Test void modelEvidenceOmitsAreaNumbersWhileTheNumberGuardStillRejectsThem() throws Exception {
+        role("GA_ADMIN");
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+                .thenReturn(new PicoAskService.GuideSelection(List.of("clawback.review"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer("환수 화면의 후보 근거 영역을 확인하세요.","clawback.review:overview"));
+        var reply = service.ask(request("환수 후보 근거는 어디에서 보나요?"));
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        var prompts = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),any());
+        var evidence = new ObjectMapper().readTree(prompts.getAllValues().getLast().data()).path("evidence").toString();
+        assertThat(evidence).contains("후보 근거").doesNotContainPattern("[\\u2460-\\u2473]");
+        // 근거에서 뺐을 뿐 검사는 그대로다. 모델이 스스로 쓴 번호와 금액 우회는 계속 거절한다.
+        for (var message : List.of("③ 후보 근거 영역을 확인하세요.", "환수액은 ①억 원입니다.")) {
+            when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(answer(message,"clawback.review:overview"));
+            assertThat(service.ask(request("환수 후보 근거는 어디에서 보나요?")).fallbackReason()).as(message).isEqualTo("INVALID_AI_OUTPUT");
+        }
+    }
+    /** 번호는 모델 입력에서만 뺀다. 응답 근거 제목은 등록 원문이어야 화면 소제목과 맞춰 볼 수 있다(인터페이스 §4-4-7). */
+    @Test void citedEvidenceKeepsTheRegisteredTitleWhileTheModelSeesItWithoutAreaNumbers() throws Exception {
+        role("GA_ADMIN");
+        var question = "환수 후보 근거는 어디에서 보나요?";
+        var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("clawback.review")).findFirst().orElseThrow();
+        var numbered = catalog.chunks(guide, question, List.of("GA_ADMIN")).stream()
+                .filter(chunk -> chunk.title().contains("③")).findFirst().orElseThrow();
+        when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
+                .thenReturn(new PicoAskService.GuideSelection(List.of("clawback.review"), false));
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer("환수 화면의 후보 근거 영역을 확인하세요.", numbered.chunkId()));
+
+        var reply = service.ask(request(question));
+
+        assertThat(reply.source()).isEqualTo(Source.AI);
+        assertThat(reply.evidenceRefs()).extracting(Evidence::title).containsExactly(numbered.title());
+        var prompts = ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway,times(2)).call(prompts.capture(),any());
+        assertThat(new ObjectMapper().readTree(prompts.getAllValues().getLast().data()).path("evidence").toString())
+                .contains("후보 근거").doesNotContainPattern("[\u2460-\u2473]");
+    }
     @Test void sharedCatalogRegistersBothApprovedSavedDraftBranches() {
         var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("payment.confirm")).findFirst().orElseThrow();
         var scope = guide.steps().stream().filter(step -> step.stepId().equals("payment.scope")).findFirst().orElseThrow();
