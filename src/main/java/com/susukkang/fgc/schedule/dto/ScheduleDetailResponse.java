@@ -18,6 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class ScheduleDetailResponse {
+    private SchedulePreviewContext previewContext;
     /** 헤더 1건과 라인 N건을 하나의 상세 응답으로 묶는 루트 식별자. */
     @JsonIgnore
     private Long scheduleHeaderId;

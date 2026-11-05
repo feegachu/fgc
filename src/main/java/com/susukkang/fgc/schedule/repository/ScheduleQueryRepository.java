@@ -55,7 +55,7 @@ public class ScheduleQueryRepository {
              sh.paymentStage, sh.scheduleRegime,
                    sh.schedulePurpose, sh.scheduleVersionNo, sh.status, sh.activeYn, sh.generatedAt,
                    sh.generationReason, COUNT(sl.scheduleLineId), SUM(sl.expectedAmount),
-                   pv.policyCode, pv.versionNo
+                   pv.policyCode, pv.versionNo, sh.contractId, sh.policyVersionId, COUNT(DISTINCT sl.installmentNo), MAX(sl.installmentNo)
               FROM ScheduleHeader sh
               JOIN InsuranceContract c ON c.contractId = sh.contractId
               JOIN PolicyVersion pv ON pv.policyVersionId = sh.policyVersionId
@@ -76,7 +76,9 @@ public class ScheduleQueryRepository {
              WHERE EXISTS (SELECT 1 FROM ScheduleHeader t
                             WHERE t.scheduleHeaderId = :scheduleHeaderId
                               AND t.contractId = sh.contractId
-                              AND t.paymentStage = sh.paymentStage)
+                              AND t.paymentStage = sh.paymentStage
+                              AND t.schedulePurpose = sh.schedulePurpose
+                              AND (t.scenarioCode = sh.scenarioCode OR (t.scenarioCode IS NULL AND sh.scenarioCode IS NULL)))
             """ + GROUP_BY + " ORDER BY sh.scheduleVersionNo DESC, sh.scheduleHeaderId DESC";
     private static final String DETAIL_QUERY = HEADER_SELECT_DETAIL + LINE_JOIN
             + " WHERE sh.scheduleHeaderId = :scheduleHeaderId" + GROUP_BY + ", i.insurerName, p.productName";
@@ -267,7 +269,8 @@ public class ScheduleQueryRepository {
                         Expressions.nullExpression(String.class), Expressions.nullExpression(String.class),
                         sh.paymentStage, sh.scheduleRegime, sh.schedulePurpose, sh.scheduleVersionNo,
                         sh.status, sh.activeYn, sh.generatedAt, sh.generationReason,
-                        sl.scheduleLineId.count(), sl.expectedAmount.sumAggregate(), pv.policyCode, pv.versionNo)
+                        sl.scheduleLineId.count(), sl.expectedAmount.sumAggregate(), pv.policyCode, pv.versionNo,
+                        sh.contractId, sh.policyVersionId, sl.installmentNo.countDistinct(), sl.installmentNo.max())
                 .from(sh).join(c).on(c.contractId.eq(sh.contractId))
                 .join(pv).on(pv.policyVersionId.eq(sh.policyVersionId))
                 .leftJoin(sl).on(sl.scheduleHeaderId.eq(sh.scheduleHeaderId))
@@ -290,6 +293,10 @@ public class ScheduleQueryRepository {
     private static ScheduleHeaderResponse toHeader(Object[] row) {
         BigDecimal expectedTotal = (BigDecimal) row[13];
         return ScheduleHeaderResponse.builder()
+                .contractId((Long) row[16])
+                .policyVersionId((Long) row[17])
+                .installmentCount(((Long) row[18]).intValue())
+                .maxInstallmentNo((Integer) row[19])
                 .scheduleHeaderId((Long) row[0])
                 .contractNo((String) row[1])
                 .insurerName((String) row[2])
@@ -314,12 +321,13 @@ public class ScheduleQueryRepository {
         List<ScheduleLineResponse> lines = entityManager.createQuery("""
                 SELECT sl.lineNo, sl.installmentNo, sl.contractMonthNo, sl.dueDate, ci.itemName, a.agentName,
                        sl.basisCode, sl.basisAmount, sl.calculationType, sl.ratePct, sl.expectedAmount,
-                       sl.lineStatus, sl.sourceCommissionRuleId, c.contractId, c.contractDate, sl.beneficiaryAgentId, sl.commissionItemId, ci.cashflowType
+                       sl.lineStatus, sl.sourceCommissionRuleId, c.contractId, c.contractDate, sl.beneficiaryAgentId, sl.commissionItemId, ci.cashflowType, sl.scheduleLineId, cr.feeComponentType, sl.fixedAmount
                   FROM ScheduleLine sl
                   JOIN ScheduleHeader sh ON sh.scheduleHeaderId = sl.scheduleHeaderId
                   JOIN InsuranceContract c ON c.contractId = sh.contractId
                   LEFT JOIN Agent a ON a.agentId = sl.beneficiaryAgentId
                   LEFT JOIN CommissionItem ci ON ci.commissionItemId = sl.commissionItemId
+                  LEFT JOIN CommissionRule cr ON cr.commissionRuleId = sl.sourceCommissionRuleId
                  WHERE sl.scheduleHeaderId = :scheduleHeaderId
                  ORDER BY sl.lineNo
                 """, Object[].class)
@@ -330,6 +338,9 @@ public class ScheduleQueryRepository {
                         .beneficiaryAgentId((Long) row[15])
                         .commissionItemId((Long) row[16])
                         .cashflowType((String) row[17])
+                        .scheduleLineId((Long) row[18])
+                        .feeComponentType(row[19] == null ? null : row[19].toString())
+                        .fixedAmount((BigDecimal) row[20])
                         .attributionDate(((LocalDate) row[14]).plusMonths(((Integer) row[2]) - 1L))
                         .lineNo((Integer) row[0])
                         .installmentNo((Integer) row[1])

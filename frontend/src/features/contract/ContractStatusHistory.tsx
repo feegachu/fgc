@@ -307,6 +307,7 @@ export function ContractStatusHistory({ id }: { id: string }) {
   return (
     <section
       data-guide-feature="features.contract.contract-tabs.section-3"
+      data-guide-target="contract.statusHistory"
       className="contract-history-panel"
       aria-labelledby="contract-history-title"
     >
