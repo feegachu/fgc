@@ -1,3 +1,6 @@
+import { SaveGuide } from '../assistant/guide/save-guide'
+import { useRunGuide } from '../assistant/guide/useRunGuide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router'
@@ -61,6 +64,7 @@ function DetailError({ error, onRetry }: { error: Error; onRetry: () => void }) 
   return (
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
+        <ScreenHelp screenId="VRUN-W02" />
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
@@ -151,8 +155,18 @@ function DetailBody({
     }
   }, [progress.errorUpdateCount, progress.dataUpdatedAt, progress.error, progress.isSuccess, progress.isError])
 
+  const [executionGuide] = useState(() => new SaveGuide())
+  const [finalizeGuide] = useState(() => new SaveGuide())
+  useRunGuide(executionGuide, id, Boolean(status), id, status, progress.isError ? '진행률 조회에 실패했습니다. 서버 결과를 다시 확인하세요.' : status === 'FAILED' ? failureMessage || '검증 실행 실패' : '')
+  useEffect(() => {
+    if (status === 'FINALIZED' && finalizeGuide.getSnapshot().savedId === null) {
+      finalizeGuide.begin()
+      void finalizeGuide.saved(id).catch(error => finalizeGuide.fail(String(error)))
+    }
+  }, [finalizeGuide, id, status])
+
   const execute = useMutation({
-    mutationFn: () => executeRun(id),
+    mutationFn: () => { executionGuide.begin(); return executeRun(id) },
     meta: { errorToast: false },
     onMutate: () => ({ restarting: false, attemptId: progress.data?.attemptId ?? 0 }),
     onSuccess: (_response, _variables, before) => {
@@ -162,7 +176,7 @@ function DetailBody({
       setAttemptWaitGeneration((value) => value + 1)
       toast('검증 실행을 시작했습니다. 진행률을 2초 간격으로 갱신합니다.', 'info')
     },
-    onError: (error) => toast(errorText(error as Error, '실행 요청에 실패했습니다.'), 'error'),
+    onError: (error) => { executionGuide.fail(errorText(error)); toast(errorText(error), 'error') },
   })
 
   const link = (path: string) => (shellMonth ? withMonth(path, shellMonth) : path)
@@ -170,10 +184,12 @@ function DetailBody({
   return (
     <div className="vrun-page vrun-detail-page">
       <header className="page-header">
+        <ScreenHelp screenId="VRUN-W02" saveGuide={executionGuide} finalizeGuide={finalizeGuide} runStatus={status} outcome="execution" />
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 상세/확정</h1>
         </div>
         <RunPicker currentId={id} link={link} />
+        <Link data-guide-feature="validation.restart" data-guide-target="validation.restart" className="button button-secondary" to={link('/validation-runs')}>신규 실행 만들기</Link>
       </header>
 
       {/* 확정 불가역 경고 — 업무·규제 제약이므로 화면 설명문과 달리 남긴다 (운영정책서 제43조) */}
@@ -262,7 +278,7 @@ function DetailBody({
             {/* FAILED 월 실행은 같은 실행의 실패 지점부터 재시작한다(FUN-045). */}
             <Button data-guide-feature="features.validation.validation-run-detail-page.button-3"
               className="vrun-row-button"
-              aria-describedby="execute-action-note"
+              data-guide-target="validation.execute" aria-describedby="execute-action-note"
               loading={execute.isPending}
               disabled={!canProcess || !canExecute || (executed && !finished)}
               onClick={() => execute.mutate()}
@@ -337,10 +353,12 @@ function DetailBody({
       <ChecklistSection status={status} checklist={checklist} />
 
       <FinalizeSection
+        finalizeGuide={finalizeGuide}
         id={id}
         status={status}
         canFinalize={canFinalize}
-        checklist={checklist.data}
+        runType={header.runType}
+        checklist={checklist.isError || checklist.isFetching ? undefined : checklist.data}
         validationMonth={formatMonth(header.validationMonth)}
         runNo={header.runNo}
         onDone={() => {
@@ -609,7 +627,7 @@ function ChecklistSection({
     )
   }
   return (
-    <section data-guide-feature="features.validation.validation-run-detail-page.section-7" className="surface" aria-labelledby="vrun-checklist-title">
+    <section data-guide-feature="features.validation.validation-run-detail-page.section-7" data-guide-target="validation.checklist" className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
           ⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)
@@ -633,6 +651,8 @@ function newKey(id: string) {
 }
 
 function FinalizeSection({
+  finalizeGuide,
+  runType,
   id,
   status,
   canFinalize,
@@ -642,7 +662,9 @@ function FinalizeSection({
   onDone,
   onFailed,
 }: {
+  finalizeGuide: SaveGuide
   id: string
+  runType?: string
   status?: string
   canFinalize: boolean
   checklist?: FinalizeChecklist
@@ -653,30 +675,42 @@ function FinalizeSection({
 }) {
   const [confirming, setConfirming] = useState(false)
   const [finalized, setFinalized] = useState(false)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const supportedType = runType === 'MONTHLY' || runType === 'PRE_CONFIRM'
+  const finalizable = supportedType && canFinalize && status === 'COMPLETED' && checklist?.passed === true
+  useEffect(() => { finalizeGuide.update(id, finalizable) }, [finalizeGuide, id, finalizable])
   // 멱등키는 성공하거나 FGC-VRUN-006(다른 실행에 귀속된 키)을 받을 때까지 같은 값으로 재시도한다.
   const key = useRef<string | null>(null)
   const mutation = useMutation({
     mutationFn: () => {
+      finalizeGuide.begin()
       key.current ??= newKey(id)
       return finalizeRun(id, key.current)
     },
     meta: { errorToast: false },
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      if (result.status === 'FINALIZED') onDone()
+      if (!mounted.current) return
+      if (result.status !== 'FINALIZED') throw new Error('서버의 최종 확정 상태를 확인하지 못했습니다.')
+      if (!(await finalizeGuide.saved(id)) || !mounted.current) return
       setConfirming(false)
       setFinalized(true)
     },
     onError: (error) => {
+      finalizeGuide.fail(errorText(error))
       if (error instanceof ApiError && error.code === 'FGC-VRUN-006') key.current = null
-      setConfirming(false)
+      if (!finalizeGuide.isActive()) setConfirming(false)
       toast(errorText(error as Error, '검증 실행 확정에 실패했습니다.'), 'error', 5000)
       onFailed()
     },
   })
   const passed = checklist?.passed === true
-  const enabled = canFinalize && status === 'COMPLETED' && passed && !mutation.isPending
+  const enabled = finalizable && !mutation.isPending
   let reason = ''
   if (!canFinalize) reason = '확정은 GA관리자와 시스템관리자만 할 수 있습니다.'
   else if (status === 'FINALIZED') reason = '이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.'
+  else if (!supportedType) reason = '월 전체를 계산한 월간·확정전 실행만 최종 확정할 수 있습니다.'
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
   else if (!passed) reason = '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
   return (
@@ -714,6 +748,8 @@ function FinalizeSection({
         </Button>
       </div>
       <FinalizeDialogs
+        saveGuide={finalizeGuide}
+        allowed={finalizable}
         confirming={confirming}
         finalized={finalized}
         pending={mutation.isPending}

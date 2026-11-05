@@ -63,7 +63,7 @@ try {
   // Only the disposable copy is mutated; tracked application and test files stay untouched.
   cpSync(join(root, 'src'), join(workspace, 'src'), { recursive: true })
   summary.baseline = permissionTest('permission-baseline', 'passed')
-  const guard = "const enabled = canFinalize && status === 'COMPLETED' && passed && !mutation.isPending"
+  const guard = "const finalizable = supportedType && canFinalize && status === 'COMPLETED' && checklist?.passed === true"
   const original = source.toString('utf8')
   assert.equal(original.split(guard).length, 2, 'Expected exactly one permission guard; update the mutation explicitly if code changes')
   writeFileSync(join(workspace, sourcePath), original.replace(guard, guard.replace('canFinalize && ', '')))

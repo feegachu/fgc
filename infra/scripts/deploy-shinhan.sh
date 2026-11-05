@@ -32,6 +32,7 @@ docker run --rm --network none --entrypoint cat "${images[1]}" \
 python3 "$helper" verify "$release"
 cp "$root/infra/shinhan/compose.yaml" "$release/compose.yaml"
 cp "$root/infra/shinhan/nginx-guard.conf" "$release/nginx/guard.conf"
+cp "$root/infra/shinhan/nginx-http.conf" "$release/nginx/http.conf"
 compose=(docker compose --project-directory "$state" --env-file "$state/.env" --env-file "$release/release.env" -f "$release/compose.yaml")
 "${compose[@]}" config --quiet
 # SRC-065: this server is public and the demo seed passwords are published in the repository.
@@ -88,7 +89,7 @@ if [[ -n "$unprotected" ]]; then
     false
 fi
 # SRC-065: the hash check misses a published password hashed again, and an unknown account's 401 proves nothing.
-# Each demo account must refuse it. A same-origin request reaches the API directly while the web is stopped;
+# Every demo account must exist and refuse it. A same-origin request reaches the API directly while the web is stopped;
 # bodies go through stdin, so the password reaches neither argv nor this log.
 refused_by_api() {
     local code
@@ -97,6 +98,11 @@ refused_by_api() {
         -H 'Content-Type: application/json' -H 'X-FGC-Client: web' -d @- <<< "$1")
     [[ "$code" == 401 ]]
 }
+missing=$(python3 "$helper" missing-accounts-sql | db_query)
+if [[ -n "$missing" ]]; then
+    echo "Demo accounts have no row, so their refusal proves nothing: $missing. Public web stays stopped; check the database and rerun (SRC-065)." >&2
+    false
+fi
 while IFS=$'\t' read -r account body; do
     if ! refused_by_api "$body"; then
         echo "Published seed password was not refused for $account. Public web stays stopped; protect it and rerun (SRC-065)." >&2

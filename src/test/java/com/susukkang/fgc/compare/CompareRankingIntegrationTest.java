@@ -126,6 +126,16 @@ class CompareRankingIntegrationTest {
     }
 
     @Test
+    void agentIdInTheRankBodyIsIgnored() throws Exception {
+        Long otherAgent = jdbc.queryForObject("SELECT agent_id FROM fgc.agent WHERE agent_code = 'A-FC-002'", Long.class);
+        JsonNode own = data(post(RANK, agentToken, "{\"categoryCode\":\"HEALTH_PROTECTION\"}").andExpect(status().isOk()));
+        JsonNode claimed = data(post(RANK, agentToken, "{\"categoryCode\":\"HEALTH_PROTECTION\",\"agentId\":" + otherAgent + "}")
+                .andExpect(status().isOk()));
+        assertThat(claimed.path("basePremium")).isEqualTo(own.path("basePremium"));
+        assertThat(claimed.path("capSummary")).isEqualTo(own.path("capSummary"));
+    }
+
+    @Test
     void onlyAgentsCanUseTheCompareChat() throws Exception {
         post(RANK, token("gaadmin"), "{\"categoryCode\":\"HEALTH_PROTECTION\"}").andExpect(status().isForbidden());
     }

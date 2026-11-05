@@ -451,7 +451,7 @@ describe('CONT-W02 사건 영향 패널', () => {
 
   it.each([
     [401, 'FGC-AUTH-001', '로그인이 필요합니다.'],
-    [403, 'FGC-AUTH-005', '본인 담당 자료만 조회·처리할 수 있습니다.'],
+    [403, 'FGC-AUTH-005', '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.'],
     [404, 'FGC-COMMON-004', '요청한 자료를 찾을 수 없습니다.'],
     [409, 'FGC-CONT-003', '최신 상태와 달라졌습니다.'],
     [422, 'FGC-IMPL-POLICY_MISSING', '적용할 정책을 찾지 못했습니다.'],
@@ -563,7 +563,7 @@ describe('CONT-W02 사건 영향 패널', () => {
     const { client, actions } = renderHistory((url) => {
       if (url === HISTORY_URL) {
         if (denied)
-          throw new ApiError({ code: 'FGC-AUTH-005', message: '본인 담당 자료만 조회할 수 있습니다.' }, 'req-5', 403)
+          throw new ApiError({ code: 'FGC-AUTH-005', message: '본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.' }, 'req-5', 403)
         return [event()]
       }
       return page([])
@@ -571,7 +571,7 @@ describe('CONT-W02 사건 영향 패널', () => {
     await openPanel(actions)
     denied = true
     await refetchHistory(client)
-    expect(await screen.findByRole('alert')).toHaveTextContent('본인 담당 자료만 조회할 수 있습니다.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.')
     expect(screen.queryByRole('table', { name: '상태 사건' })).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
   })

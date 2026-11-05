@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useReferenceDate } from '../reference/utils'
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
@@ -236,6 +237,7 @@ export function BasePage() {
   return (
     <div className="base-page">
       <header className="page-header base-page-header">
+        <ScreenHelp screenId="BASE-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">기준정보 조회</h1>
         </div>
@@ -243,7 +245,7 @@ export function BasePage() {
           기본 조회 기준일<strong>{defaultDate}</strong>
         </p>
       </header>
-      <div className="base-workspace">
+      <div data-guide-target="base.overview" className="base-workspace">
         <ReferenceTabs tabs={tabs} active={tab} onChange={changeTab} label="기준정보 유형" panelClassName="base-panel">
           <BaseFilters
             key={`${tab}:${params.toString()}:${defaultDate}`}
