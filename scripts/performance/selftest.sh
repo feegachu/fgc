@@ -19,7 +19,8 @@ expect 'PER-003: 미검증' "$(per003_verdict 90000 100000 600 COMPLETED)"
 expect 'PER-003: 미충족' "$(per003_verdict 100000 3000 601 COMPLETED)"
 expect 'PER-003: 실패' "$(per003_verdict 500000 12000 10 FAILED)"
 expect 'PER-003: 미충족' "$(per003_verdict 149999 5000 601 COMPLETED)"
-expect 'PER-003: 판정 대상 아님' "$(per003_verdict 150000 5000 601 COMPLETED)"
+expect '600초 목표 초과, 참고' "$(per003_verdict 150000 5000 601 COMPLETED)"
+expect '측정값만 남긴다' "$(per003_verdict 150000 5000 600 COMPLETED)"
 
 cat >"$tmp/stats.csv" <<'CSV'
 10:00:00,fgc-perf-app,392.96%,1.5GiB / 2GiB
@@ -31,6 +32,9 @@ expect 'fgc-perf-db: 표본 1개, CPU 평균 12%, 최대 12%, 메모리 최대 1
 
 printf '10:00:00,3000,40\n10:00:30,1200,60\n' >"$tmp/host.csv"
 expect '호스트: 표본 2개, CPU 평균 50%, 사용 가능 메모리 최소 1200 MB' "$(host_summary "$tmp/host.csv")"
+window=$(batch_window_summary "$tmp/stats.csv" "$tmp/host.csv" 10:00:05 10:00:30)
+expect 'fgc-perf-app: 표본 1개, CPU 평균 7%' "$window"
+expect '호스트: 표본 1개, CPU 평균 60%' "$window"
 
 cat >"$tmp/gc.log" <<'LOG'
 [0.026s][info][gc] Using G1
@@ -59,5 +63,10 @@ expect '늘어난 표: cap_check 5 -> 8 (+3)' "$(rerun_verdict "$tmp/before.csv"
 expect 'PER-007 신규 생성: 업무 키 표 0건 (충족)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
 printf 'schedule_line,11\ncap_check,5\nagent,3\n' >"$tmp/after.csv"
 expect 'PER-007 신규 생성: 업무 키 표 1건 (미충족)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
+printf 'transaction_attribution,10\nvalidation_run,1\nbatch_step_execution,8\n' >"$tmp/before.csv"
+printf 'transaction_attribution,10\nvalidation_run,2\nbatch_step_execution,16\nauth_refresh_token,2\n' >"$tmp/after.csv"
+expect 'PER-007 신규 생성: 업무 키 표 0건 (충족)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
+printf 'transaction_attribution,12\nvalidation_run,1\nbatch_step_execution,8\n' >"$tmp/after.csv"
+expect 'PER-007 신규 생성: 업무 키 표 2건 (미충족)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
 
 [ "$fails" -eq 0 ] && echo "selftest 통과" || { echo "selftest 실패 $fails건"; exit 1; }

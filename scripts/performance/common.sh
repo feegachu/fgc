@@ -17,8 +17,9 @@ JAR=build/libs/fgc-0.0.1-SNAPSHOT.jar
 JVM_OPTS="-Xms256m -Xmx1024m -XX:MaxMetaspaceSize=384m" # infra/shinhan/compose.yaml의 api와 같은 값
 # compose db의 shm_size와 맞춘다. Docker 기본 64MB면 1만2천 계약에서 병렬 쿼리가 SQLState 53100으로 실패했다(결과서 4-2).
 DB_SHM=256m
-# PER-007 "지급 건, 정산, 스케줄"의 업무 키 표. 같은 월을 다시 돌려도 늘면 안 된다.
-PER007_KEYED_TABLES="schedule_header schedule_line journal_header journal_line commission_transaction exception_case"
+# PER-007에서 실행마다 쌓이는 것이 설계인 표. 이 밖의 표가 늘면 미충족이라 새 표나 지급 귀속행도 빠지지 않는다.
+# auth_refresh_token은 k6 setup의 로그인 기록이다(계정당 1행).
+PER007_HISTORY_TABLES='^(cap_check|cap_check_detail|arbitrage_check|reconciliation_(run|result|match)|exception_occurrence|audit_log|auth_refresh_token|validation_.*|batch_.*)$'
 
 psql_db() { docker exec -i "$DB" psql -h 127.0.0.1 -U fgc -d fgc -v ON_ERROR_STOP=1 "$@"; }
 
@@ -128,6 +129,13 @@ stats_summary() {
   }' "$1" | sort
 }
 
+# PER-003 병목 지표: 기동, 적재, 검증 조회를 뺀 배치 시간대만 요약한다. 표본 시각은 호스트, 배치 시각은 KST라 호스트도 KST여야 한다.
+batch_window_summary() { # batch_window_summary <stats.csv> <host.csv> <시작 HH:MM:SS> <끝 HH:MM:SS>
+  echo "배치 구간 $3~$4:"
+  awk -F, -v s="$3" -v e="$4" '$1 >= s && $1 <= e' "$1" | stats_summary -
+  awk -F, -v s="$3" -v e="$4" '$1 >= s && $1 <= e' "$2" | host_summary -
+}
+
 # host.csv(시각,사용 가능 MB,CPU%)를 요약한다.
 host_summary() {
   awk -F, '$2 != "" { n++; c += $3; if (min == "" || $2 + 0 < min) min = $2 + 0 }
@@ -170,7 +178,11 @@ per003_verdict() {
   elif [ "$rows" -lt "$PER003_MIN_ROWS" ]; then
     echo "PER-003: 미검증 ($measured. 스케줄 $PER003_MIN_ROWS행 미만, 외삽하지 않음)"
   elif [ "$rows" -ge "$PER003_MAX_ROWS" ]; then
-    echo "PER-003: 판정 대상 아님 ($measured. 측정값만 남긴다)"
+    if [ "$seconds" -le "$PER003_SECONDS" ]; then
+      echo "PER-003: 판정 대상 아님 ($measured. 측정값만 남긴다)"
+    else
+      echo "PER-003: 판정 대상 아님 ($measured. ${PER003_SECONDS}초 목표 초과, 참고)"
+    fi
   elif [ "$seconds" -le "$PER003_SECONDS" ]; then
     echo "PER-003: 충족 ($measured <= ${PER003_SECONDS}초)"
   else
@@ -188,12 +200,11 @@ per007_explain_verdict() {
     }' "$1"
 }
 
-# 재실행 전후 행 수 비교. 늘어난 표를 모두 적고, 업무 키 표가 늘었으면 미충족으로 적는다(PER-007, #673 시나리오 3).
+# 재실행 전후 행 수 비교. 늘어난 표를 모두 적고, 실행 이력 표 밖의 표가 늘었으면 미충족으로 적는다(PER-007, #673 시나리오 3).
 rerun_verdict() {
-  awk -F, -v keyed="$PER007_KEYED_TABLES" '
-    BEGIN { n = split(keyed, k, " "); for (i = 1; i <= n; i++) iskey[k[i]] = 1 }
+  awk -F, -v history="$PER007_HISTORY_TABLES" '
     NR == FNR { before[$1] = $2; next }
-    { d = $2 - before[$1]; if (d != 0) { printf "늘어난 표: %s %d -> %d (+%d)%s\n", $1, before[$1], $2, d, $1 in iskey ? " [업무 키 표]" : ""; if ($1 in iskey) bad += d } }
+    { d = $2 - before[$1]; if (d != 0) { key = $1 !~ history; printf "늘어난 표: %s %d -> %d (+%d)%s\n", $1, before[$1], $2, d, key ? " [업무 키 표]" : ""; if (key) bad += d } }
     END { printf "PER-007 신규 생성: 업무 키 표 %d건 (%s)\n", bad, bad == 0 ? "충족" : "미충족" }
   ' "$1" "$2"
 }

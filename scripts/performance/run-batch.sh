@@ -28,6 +28,8 @@ docker rm -f "$APP" >/dev/null
 psql_db -f - <scripts/performance/sql/batch-report.sql 2>&1 | tee "$RUN_DIR/report.txt" || true
 IFS='|' read -r rows contracts seconds status < <(psql_db -At -f - <scripts/performance/sql/batch-verdict.sql 2>/dev/null | tr -d '\r') || true
 per003_verdict "${rows:-0}" "${contracts:-0}" "${seconds:-0}" "${status:-NONE}" | tee "$RUN_DIR/verdict.txt"
+IFS='|' read -r from to < <(psql_db -At -c "SELECT to_char(start_time, 'HH24:MI:SS'), to_char(end_time, 'HH24:MI:SS') FROM fgc.batch_job_execution ORDER BY job_execution_id LIMIT 1" 2>/dev/null | tr -d '\r') || true
+if [ -n "${to:-}" ]; then batch_window_summary "$RUN_DIR/stats.csv" "$RUN_DIR/host.csv" "$from" "$to" | tee -a "$RUN_DIR/resources.txt"; fi
 
 if [ "$code" -eq 0 ]; then
   psql_db -f - <scripts/performance/sql/per007-explain.sql >"$RUN_DIR/per007-explain.txt"

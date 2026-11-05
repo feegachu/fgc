@@ -29,11 +29,13 @@ record_conditions
 start_app SPRING_PROFILES_ACTIVE=prod FGC_BATCH_DAILYCHANGEDCONTRACT_ENABLED=false \
   "FGC_JWT_SECRET=$(head -c 48 /dev/urandom | base64 | tr -d '[:space:]')"
 trap 'stop_stats; docker rm -fv "$APP" "$K6" >/dev/null 2>&1 || true' EXIT
+started=
 for _ in $(seq 1 150); do
-  docker logs "$APP" 2>&1 | grep -q 'Started .* in ' && break
-  [ "$(docker inspect -f '{{.State.Running}}' "$APP")" = true ] || { docker logs --tail 40 "$APP"; echo "API가 뜨지 않았다" >&2; exit 1; }
+  if docker logs "$APP" 2>&1 | grep -q 'Started .* in '; then started=1; break; fi
+  [ "$(docker inspect -f '{{.State.Running}}' "$APP")" = true ] || break
   sleep 2
 done
+[ -n "$started" ] || { docker logs --tail 40 "$APP"; echo "API가 뜨지 않았다" >&2; exit 1; }
 
 run_k6() { # run_k6 <시나리오> <로그 파일>
   docker rm -f "$K6" >/dev/null 2>&1 || true

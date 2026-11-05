@@ -9,7 +9,9 @@ const SCENARIO = __ENV.SCENARIO;
 const MONTH = __ENV.MONTH;
 const AS_OF = `${MONTH}-28`;
 const SCHEDULE_ROWS = Number(__ENV.SCHEDULE_ROWS);
-const PER_004_ROWS = 100000; // PER-004 원문 "100,000건 기준"
+// 판정 단계: 10만 행 이상 15만 행 미만(DAR-012 3,600계약). common.sh의 PER003_*와 같다(결과서 3절).
+const VERDICT_MIN_ROWS = 100000;
+const VERDICT_MAX_ROWS = 150000;
 const P95_PER_004_005 = 3000; // PER-004, PER-005 원문
 const P95_PER_001 = 2000; // PER-001 원문
 
@@ -111,6 +113,7 @@ function total(path, token) {
 }
 
 // PER-004 "집계값이 상세 합계와 일치": 홈 KPI 6종을 목록 API의 건수와 맞춰 본다.
+// journalImbalance는 홈이 전체, 상세가 이 실행 범위라 0건일 때만 같은 값이다. 범위 차이는 여기서 보지 못한다(결과서 4-1).
 function checkKpis(token, runId) {
   const kpi = get('setup', `/api/v1/dashboard/summary?month=${MONTH}`, token).json('data');
   const reconRuns = get('setup', `/api/v1/reconciliations?month=${MONTH}&page=1&size=100`, token).json('data.content');
@@ -121,7 +124,7 @@ function checkKpis(token, runId) {
       .json('data.items.totalElements'),
     reconMismatch: reconRuns.filter((r) => r.validationRunId === runId).reduce((sum, r) => sum + r.exceptionCount, 0),
     journalImbalance: get('setup', `/api/v1/journals/imbalances?validationRunId=${runId}`, token).json('data.totalCount'),
-    openException: total('/api/v1/exceptions?page=1&size=1', token),
+    openException: total('/api/v1/exceptions?status=OPEN&page=1&size=1', token),
   };
   for (const [key, value] of Object.entries(detail)) {
     console.log(`KPI ${key}: 홈 ${kpi[key]}, 상세 ${value}`);
@@ -211,6 +214,7 @@ export function rerun(d) {
     'rerun 기동 202': (r) => r.status === 202,
   });
   let status;
+  let errors = 0;
   do {
     sleep(10);
     const res = http.get(`${BASE}/api/v1/validation-runs/${id}/progress`, { headers: auth(token), tags: { name: 'progress' } });
@@ -218,10 +222,19 @@ export function rerun(d) {
       token = login(__ENV.FGC_PERF_USER); // 배치가 access TTL(30분)보다 오래 걸릴 때
       continue;
     }
+    if (res.status !== 200) {
+      if (++errors >= 30) status = `HTTP_${res.status}`; // 5분 동안 조회가 실패하면 maxDuration까지 기다리지 않는다
+      continue;
+    }
+    errors = 0;
     status = res.json('data.status');
   } while (status === 'CREATED' || status === 'RUNNING' || status === undefined);
   console.log(`재실행 validationRunId=${id}, 상태 ${status}`);
   check(status, { 'rerun COMPLETED': (s) => s === 'COMPLETED' });
+  // PER-007 "동일 요청": 끝난 실행을 다시 기동해도 거절되고 새 행이 없다. 행 수는 run-k6.sh가 이 호출 뒤에 센다.
+  check(http.post(`${BASE}/api/v1/validation-runs/${id}/execute`, null, { headers: auth(token) }), {
+    'rerun 같은 실행 재요청 거절': (r) => r.status >= 400 && r.status < 500,
+  });
 }
 
 function apiTable(metrics) {
@@ -239,8 +252,12 @@ function verdicts(metrics) {
   const p95 = (name) => metrics[`http_req_duration{name:${name}}`].values['p(95)'];
   const failed = (key) => metrics[key] && metrics[key].values.rate;
   const data = `스케줄 ${SCHEDULE_ROWS}행`;
+  const verdict = (ok) => {
+    if (SCHEDULE_ROWS < VERDICT_MIN_ROWS) return '미검증(10만 건 미만, 외삽하지 않음)';
+    if (SCHEDULE_ROWS >= VERDICT_MAX_ROWS) return `판정 단계 아님(측정값만, 목표 ${ok ? '안' : '초과'})`;
+    return ok ? '충족' : '미충족';
+  };
   if (SCENARIO === 'dashboard') {
-    const verdict = (ok) => (SCHEDULE_ROWS < PER_004_ROWS ? '미검증(10만 건 미만, 외삽하지 않음)' : ok ? '충족' : '미충족');
     const home = Object.keys(HOME_APIS);
     const kpi = metrics.kpi_consistent.values.rate;
     const searched = metrics.agent_searchable.values.rate;
@@ -255,8 +272,8 @@ function verdicts(metrics) {
     const rate = failed('http_req_failed{scenario:concurrent}');
     const ok005 = rate < 0.01 && worst < P95_PER_004_005;
     return [
-      `PER-005: ${ok005 ? '충족' : '미충족'}. ${data}, 오류율 ${(rate * 100).toFixed(3)}%, API별 p95 최대 ${worst.toFixed(0)}ms`,
-      `PER-001: ${worst < P95_PER_001 ? '충족' : '미충족'}(읽기 API만). ${data}, API별 p95 최대 ${worst.toFixed(0)}ms`,
+      `PER-005: ${verdict(ok005)}. ${data}, 오류율 ${(rate * 100).toFixed(3)}%, API별 p95 최대 ${worst.toFixed(0)}ms`,
+      `PER-001: ${verdict(worst < P95_PER_001)}(읽기 API만). ${data}, API별 p95 최대 ${worst.toFixed(0)}ms`,
     ];
   }
   return [];
