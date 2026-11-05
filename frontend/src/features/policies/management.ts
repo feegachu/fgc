@@ -1,5 +1,6 @@
 import { createContext } from 'react'
 import type { Policy, PolicyDetail } from './api'
+import { policySeedText } from './labels'
 
 // Editable UI values are converted to the API contract in writeApi.ts.
 export const policyTypes = {
@@ -37,7 +38,7 @@ export function refLabel(ref: string, versions?: Pick<Policy, 'policyVersionId' 
     return next ? `다음 정책 버전 ${next.policyCode} v${next.versionNo}` : '다음 정책 버전'
   }
   const doc = /^docs\/(?:\d+_|FGC_)?(.+?)(?:_v\d+(?:_\d+)*)?\.md(?:#(.+))?$/.exec(ref)
-  return doc ? [doc[1].replaceAll('_', ' '), doc[2]].filter(Boolean).join(' ') : ref
+  return doc ? [doc[1].replaceAll('_', ' '), doc[2]].filter(Boolean).join(' ') : policySeedText(ref)
 }
 export const actionLabels = {
   SUBMIT: '제출',
