@@ -34,6 +34,11 @@ final class AnswerNumberGuard {
         return !DIGIT.matcher(normalized).find() && !KOREAN_AMOUNT.matcher(normalized).find();
     }
 
+    /** 구백만원·삼십퍼센트처럼 한글 숫자로 쓴 금액·비율이 있는지. 이미 NFKC 로 정규화한 글을 받는다. */
+    static boolean hasKoreanAmount(String normalizedText) {
+        return KOREAN_AMOUNT.matcher(normalizedText).find();
+    }
+
     private static String normalize(String text) {
         return Normalizer.normalize(text, Normalizer.Form.NFKC);
     }
