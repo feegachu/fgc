@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * 설명 : 상품 비교 챗봇 /ask 가 실제 모델에서 어떤 비율로 LLM 답·규칙 대체·거절이 되는지 잰다(#889 선행 측정, 비용 발생).
- * FGC_LLM_LIVE=true 일 때만 돈다. 질문 수만큼만 호출하고(상한 FGC_EVAL_MAX_CALLS), 키와 요청 원문은 출력하지 않는다.
+ * FGC_LLM_LIVE=true 일 때만 돈다. 실제 모델 요청 수(도구 라운드 포함)가 상한 FGC_EVAL_MAX_CALLS(기본 200)를 넘지 않게 돌고, 키와 요청 원문은 출력하지 않는다.
  * 결과는 build/ai-eval/ask-measure/result.md 에 남는다. 순위 데이터는 평가용 가상 데이터(fun-079.json demo)다.
  */
 @EnabledIfEnvironmentVariable(named = "FGC_LLM_LIVE", matches = "true")
@@ -31,6 +31,9 @@ class CompareAskMeasureLiveTest {
 
     private record Q(String kind, String text) {
     }
+
+    /** 질문 하나가 보낼 수 있는 최대 모델 요청 수(도구 4회 + 최종 1회). 상한은 질문 수가 아니라 실제 요청 수로 건다. */
+    private static final int MOST_REQUESTS_PER_QUESTION = 5;
 
     private static final List<Q> QUESTIONS = List.of(
             new Q("순위", "1위가 어떤 상품이야?"),
@@ -72,7 +75,8 @@ class CompareAskMeasureLiveTest {
     void askOutcomesAgainstTheConfiguredModel() throws IOException {
         LlmProperties properties = AnswerEvalHarness.configuredProperties();
         assertThat(properties.apiKey() != null && !properties.apiKey().isBlank()).as("OPENAI_API_KEY 설정 여부(값은 출력하지 않는다)").isTrue();
-        int maxCalls = Integer.parseInt(System.getenv().getOrDefault("FGC_EVAL_MAX_CALLS", "60"));
+        // 실제 모델 요청 수 상한. 질문 하나가 최대 5회 요청하므로 기본값은 현재 질문 전체를 돌 수 있게 잡는다.
+        int maxCalls = Integer.parseInt(System.getenv().getOrDefault("FGC_EVAL_MAX_CALLS", "200"));
         CompareRankingResponse ranking = AnswerEvalHarness.MAPPER.treeToValue(
                 AnswerEvalHarness.MAPPER.readTree(new org.springframework.core.io.ClassPathResource("ai-eval/answers/fun-079.json")
                         .getInputStream()).get("rankings").get("demo"), CompareRankingResponse.class);
@@ -88,7 +92,7 @@ class CompareAskMeasureLiveTest {
             CompareAskService service = new CompareAskService(harness.gateway());
             int done = 0;
             for (Q q : QUESTIONS) {
-                if (harness.gateway().calls() + 1 > maxCalls) {
+                if (harness.gateway().modelRequests() + MOST_REQUESTS_PER_QUESTION > maxCalls) {
                     break;
                 }
                 appender.list.clear();
@@ -103,7 +107,7 @@ class CompareAskMeasureLiveTest {
                 }
                 done++;
             }
-            write(properties.model(), harness.gateway().calls(), done, outcomes, rows, details);
+            write(properties.model(), harness.gateway().modelRequests(), done, outcomes, rows, details);
         } finally {
             logger.detachAppender(appender);
         }
@@ -128,7 +132,7 @@ class CompareAskMeasureLiveTest {
 
     private static void write(String model, int calls, int questions, Map<String, Integer> outcomes, List<String[]> rows,
             List<String> details) throws IOException {
-        StringBuilder md = new StringBuilder("# /ask 실측 (").append(model).append(", 질문 ").append(questions).append("개, 호출 ")
+        StringBuilder md = new StringBuilder("# /ask 실측 (").append(model).append(", 질문 ").append(questions).append("개, 모델 요청 ")
                 .append(calls).append("회)\n\n## 결과 분포\n\n| 결과 | 건수 |\n|---|---|\n");
         outcomes.forEach((k, v) -> md.append("| ").append(k).append(" | ").append(v).append(" |\n"));
         md.append("\n## 질문별\n\n| 구분 | 질문 | source | 결과 | 답 |\n|---|---|---|---|---|\n");

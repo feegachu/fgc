@@ -225,8 +225,14 @@ public class LlmGateway {
         }
     }
 
+    /** 모델에 요청을 실제로 보내기 직전에 한 번 불린다(도구 라운드도 한 번씩). 평가용 게이트웨이가 실제 요청 수를 세는 데 쓴다. */
+    protected void beforeModelRequest() {
+        // 운영에서는 할 일이 없다.
+    }
+
     /** 외부 호출 1회. 실패 사유를 분류해 ai_call_log 에 남기고 FGC-AI-001 로 바꿔 던진다. */
     private <T> StructuredResponse<T> send(LlmRequest request, long started, Supplier<StructuredResponse<T>> action) {
+        beforeModelRequest();
         try {
             return action.get();
         } catch (OpenAIServiceException e) {

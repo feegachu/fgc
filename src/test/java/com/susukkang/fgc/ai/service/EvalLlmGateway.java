@@ -38,6 +38,7 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
     private Map<String, JsonNode> saved;
     private Map<String, JsonNode> outputs = new LinkedHashMap<>();
     private int calls;
+    private int modelRequests;
     private int caseCalls;
     private int caseFailures;
 
@@ -145,8 +146,19 @@ public class EvalLlmGateway extends LlmGateway implements AutoCloseable {
         return outputs;
     }
 
+    /** 질문(서비스 호출) 수. 도구 경로는 질문 하나가 모델 요청 여러 번이므로 실제 요청 수는 {@link #modelRequests()} 로 본다. */
     public int calls() {
         return calls;
+    }
+
+    /** 모델에 실제로 보낸 요청 수(도구 라운드 포함). 저장 답변 재생은 세지 않는다. */
+    public int modelRequests() {
+        return modelRequests;
+    }
+
+    @Override
+    protected void beforeModelRequest() {
+        modelRequests++;
     }
 
     public int caseCalls() {

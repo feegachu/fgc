@@ -84,8 +84,11 @@ final class CompareAskTools {
     private static final List<String> BIGGER_WORDS = List.of("많", "높", "크");
     private static final List<String> SMALLER_WORDS = List.of("적", "낮", "작");
     /** 확정 추천·유리함 단정은 참고 순위 원칙에 어긋난다(FUN-079). 거절 안내에 쓰는 '추천' 자체는 막지 않는다. */
-    private static final List<String> RECOMMEND_PHRASES = List.of("추천합니다", "추천드립니다", "추천해요", "추천해 드려요", "권합니다", "권해요",
-            "이득이 되", "이득이에요", "유리한 선택", "유리해요", "가장 좋", "팔면 좋", "선택하세요", "선택하시는 게");
+    // 정규식으로 넓히면 '추천드리지 않아요' 같은 거절 안내까지 막으므로, 같은 뜻의 변형을 문구로 하나씩 더한다.
+    private static final List<String> RECOMMEND_PHRASES = List.of("추천합니다", "추천드립니다", "추천드려요", "추천해요", "추천해 드려요",
+            "추천해드려요", "추천할게요", "추천해 드릴게요", "추천해드릴게요", "권합니다", "권해요", "권해 드려요", "권해드려요",
+            "이득이 되", "이득이에요", "유리한 선택", "유리해요", "가장 좋", "팔면 좋", "선택하세요", "선택하시는 게",
+            "더 낫습니다", "더 나아요", "좋은 선택이에요", "좋은 선택입니다");
 
     public static class RankArgs {
         public int rank;
@@ -287,7 +290,64 @@ final class CompareAskTools {
                 return reason;
             }
         }
+        return verifyComparisonsWithoutAmount(normalized, masked);
+    }
+
+    /**
+     * 금액·비율 없이 두 상품의 많고 적음만 말한 문장('3위 편한건강이 2위 튼튼건강보다 환수 부담이 더 작아요')도 방향을 본다.
+     * 두 순위·항목이 같은 compare 결과가 있으면 그 방향과 대조하고, 없으면 도구가 근거를 주지 않은 주장이므로 거절한다.
+     * 금액이 든 문장은 verifyNumber 가 이미 봤다. 항목 이름이 없으면 무엇을 견줬는지 알 수 없어 보지 않는다.
+     */
+    private String verifyComparisonsWithoutAmount(String normalized, String masked) {
+        int start = 0;
+        Matcher ends = SENTENCE_END.matcher(normalized);
+        while (start < normalized.length()) {
+            int end = ends.find() ? ends.start() : normalized.length();
+            String reason = verifyComparisonSentence(normalized.substring(start, end), masked.substring(start, end));
+            if (reason != null) {
+                return reason;
+            }
+            start = end == normalized.length() ? end : ends.end();
+        }
         return null;
+    }
+
+    private String verifyComparisonSentence(String sentence, String maskedSentence) {
+        int pivot = sentence.indexOf("보다");
+        if (pivot <= 0 || hasAmount(maskedSentence)) {
+            return null;
+        }
+        String predicate = sentence.substring(pivot).replace("보수적", " ");
+        boolean saysBigger = BIGGER_WORDS.stream().anyMatch(predicate::contains);
+        boolean saysSmaller = SMALLER_WORDS.stream().anyMatch(predicate::contains);
+        Set<Integer> mentioned = ranksMentionedIn(sentence);
+        Set<Metric> metrics = nearestMetricsBefore(sentence, sentence.length());
+        if (saysBigger == saysSmaller || mentioned.size() != 2 || metrics.isEmpty()) {
+            return null;
+        }
+        boolean paired = false;
+        for (List<Fact> facts : factsByValue.values()) {
+            for (Fact fact : facts) {
+                if (fact.kind() == Kind.DIFF && new HashSet<>(fact.ranks()).equals(mentioned)
+                        && fact.metrics().stream().anyMatch(metrics::contains)) {
+                    paired = true;
+                    if (directionHolds(sentence, fact)) {
+                        return null;
+                    }
+                }
+            }
+        }
+        return paired ? "DIRECTION_MISMATCH" : "DIRECTION_NOT_FROM_TOOL";
+    }
+
+    private static boolean hasAmount(String maskedSentence) {
+        Matcher m = NUMBER.matcher(maskedSentence);
+        while (m.find()) {
+            if (UNIT_WON.equals(m.group(2)) || UNIT_PERCENT.equals(m.group(2))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String verifyNumber(String text, int at, String number, String unit) {

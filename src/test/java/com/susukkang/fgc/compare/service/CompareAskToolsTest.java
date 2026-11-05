@@ -201,6 +201,38 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("같은 뜻의 추천 표현 변형도 거절하고, 추천하지 않는다는 안내는 통과시킨다")
+    void recommendationVariantsAreRejectedButRefusalsPass() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        for (String text : List.of("1위 가보험 든든건강을 추천드려요.", "1위 상품을 추천할게요.", "1위 상품을 추천해 드릴게요.",
+                "1위 상품이 더 낫습니다.", "1위 상품이 좋은 선택이에요.")) {
+            assertThat(tools.verify(text)).as(text).isEqualTo("RECOMMENDATION");
+        }
+        assertThat(tools.verify("특정 상품을 추천드리지 않아요.")).isNull();
+        assertThat(tools.verify("특정 상품을 추천해 드리기는 어려워요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("금액 없이 많고 적음만 말한 비교 문장도 compare 결과의 방향과 맞아야 하고, compare 를 부르지 않았으면 거절한다")
+    void comparisonWithoutAmountMustMatchToolDirection() {
+        // 환수 노출액: 2위 16,000원, 3위 30,000원 → 2위가 더 작다
+        String wrong = "3위 다보험 편한건강이 2위 나보험 튼튼건강보다 환수 부담이 더 작아요.";
+        String right = "2위 나보험 튼튼건강이 3위 다보험 편한건강보다 환수 부담이 더 작아요.";
+
+        CompareAskTools compared = toolsWith("compare", PAIR_2_3);
+        assertThat(compared.verify(wrong)).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(compared.verify(right)).isNull();
+        assertThat(compared.verify("3위 다보험 편한건강보다 2위 나보험 튼튼건강이 환수 부담이 더 작아요.")).isNull();
+
+        CompareAskTools notCompared = toolsWith("get_item", RANK_2, "get_item", RANK_3);
+        assertThat(notCompared.verify(right)).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+
+        // 상품 하나만 말하거나 항목 이름이 없는 문장은 방향을 확인할 수 없어 보지 않는다.
+        assertThat(notCompared.verify("나보험 튼튼건강은 환수 부담이 작은 편이에요.")).isNull();
+    }
+
+    @Test
     @DisplayName("전각 숫자로 쓴 금액도 정규화해 도구 값과 대조한다")
     void fullWidthDigitsAreNormalized() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);
