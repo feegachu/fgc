@@ -47,7 +47,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const cardWidth = Math.min(360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
         let rect = target?.isConnected ? target.getBoundingClientRect() : null
         // A resize can push the coach offscreen. A position-only change can be user scroll.
-        if (!resize && rect && measuredTarget
+        if (rect && measuredTarget
           && (rect.width !== measuredTarget.width || rect.height !== measuredTarget.height)) {
           preparedWidth = null
         }
@@ -118,9 +118,9 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       })
     }
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
-      // A result panel can move the target without resizing the target itself.
-      // Re-align on layout changes, while ordinary user scroll only updates the attachment.
-      preparedWidth = null
+      // The coach resizes while its placement changes. Re-measure it without scrolling
+      // the user's page back to the old target. Real target/viewport size changes are
+      // detected in measure(), independently of this observer notification.
       measure()
     })
     if (target) resize?.observe(target)

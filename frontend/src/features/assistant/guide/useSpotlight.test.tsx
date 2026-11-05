@@ -11,6 +11,35 @@ function Card({ target }: { target: HTMLElement | null }) {
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
+it('keeps user scrolling free when the guide card resizes after following an offscreen target', () => {
+  vi.useFakeTimers()
+  let resized: (() => void) | undefined
+  vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resized = callback } observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+  const target = document.createElement('button')
+  document.body.append(target)
+  let top = 100
+  vi.spyOn(target, 'getBoundingClientRect').mockImplementation(() => new DOMRect(300, top, 100, 40))
+  const reveal = vi.fn()
+  target.scrollIntoView = reveal
+  try {
+    render(<Card target={target} />)
+    act(() => { vi.advanceTimersByTime(80) })
+    scroll.mockClear(); reveal.mockClear()
+    top = -300
+    fireEvent.scroll(window)
+    act(() => { vi.advanceTimersByTime(40) })
+    for (let index = 0; index < 3; index++) {
+      act(() => { resized?.(); vi.advanceTimersByTime(80) })
+    }
+    expect(scroll).not.toHaveBeenCalled()
+    expect(reveal).not.toHaveBeenCalled()
+    expect(screen.getByRole('region', { name: 'Guide card' })).toHaveAttribute('data-box', 'null')
+  } finally { target.remove() }
+})
+
 it.each([
   { initialTop: 8, height: 32, cardTop: '124px' },
   { initialTop: 400, height: 200, cardTop: '344px' },
