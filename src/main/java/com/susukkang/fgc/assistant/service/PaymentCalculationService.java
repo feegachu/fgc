@@ -38,7 +38,7 @@ public class PaymentCalculationService {
     @PreAuthorize(Roles.ANY_ROLE)
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public PaymentCalculationSnapshot calculateVerified(PaymentCalculationRequest request) {
-        return proofs.issue(request,calculate(request));
+        return proofs.issue(request,calculateSnapshot(request));
     }
     @PreAuthorize(Roles.ANY_ROLE)
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
@@ -50,6 +50,10 @@ public class PaymentCalculationService {
     @PreAuthorize(Roles.ANY_ROLE)
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PaymentCalculationSnapshot calculate(PaymentCalculationRequest request) {
+        return calculateSnapshot(request);
+    }
+
+    private PaymentCalculationSnapshot calculateSnapshot(PaymentCalculationRequest request) {
         if (request.kind() == PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE) requireProcessing();
         if(request.kind()==PaymentCalculationRequest.Kind.PAYMENT_CANDIDATE && request.mode()==PaymentCalculationRequest.Mode.HYPOTHETICAL) {
             var checked=candidates.calculate(request);
