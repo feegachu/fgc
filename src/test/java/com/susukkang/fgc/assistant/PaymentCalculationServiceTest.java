@@ -22,7 +22,7 @@ class PaymentCalculationServiceTest {
     PaymentCalculationService service;
     @BeforeEach void setup() {
         payments = mock(CommissionPaymentService.class);
-        service = new PaymentCalculationService(payments, new ObjectMapper().findAndRegisterModules());
+        service = new PaymentCalculationService(payments, new ObjectMapper().findAndRegisterModules(), mock(com.susukkang.fgc.assistant.service.AssistantCalculationSources.class));
         role("SETTLEMENT");
     }
     @AfterEach void cleanup() { SecurityContextHolder.clearContext(); }
@@ -56,8 +56,6 @@ class PaymentCalculationServiceTest {
         assertThat(result.status()).isEqualTo("INSUFFICIENT_DATA"); assertThat(result.amounts()).isEmpty();
     }
     @Test void missingScopeAndUnsupportedModesDoNotReadSources() {
-        var request = request(PaymentCalculationRequest.Kind.EXPECTED_COMMISSION);
-        assertThat(service.calculate(request).status()).isEqualTo("UNSUPPORTED");
         assertThat(service.calculate(new PaymentCalculationRequest("assistant.v1", PaymentCalculationRequest.Kind.ATTRIBUTION_BALANCE, PaymentCalculationRequest.Mode.EXISTING, null, null, 0L)).status()).isEqualTo("INSUFFICIENT_DATA");
         verifyNoInteractions(payments);
     }
@@ -91,7 +89,7 @@ class PaymentCalculationServiceTest {
         assertThat(request).isNotNull();
     }
     @Test void unsupportedCalculationKindIsReportedBeforeCandidateValidation() {
-        var request = new PaymentCalculationRequest("assistant.v1", PaymentCalculationRequest.Kind.CAP_STATUS,
+        var request = new PaymentCalculationRequest("assistant.v1", PaymentCalculationRequest.Kind.ARBITRAGE_EXCESS,
                 PaymentCalculationRequest.Mode.EXISTING, new PaymentCalculationRequest.Scope("77"),
                 new ObjectMapper().createObjectNode().put("amount", "100000"), 0L);
         assertThat(service.calculate(request).status()).isEqualTo("UNSUPPORTED");

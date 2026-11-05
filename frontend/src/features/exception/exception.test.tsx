@@ -411,6 +411,34 @@ describe('EXCP-W01 예외함', () => {
     )
   })
 
+  it('저장된 설명과 처리 사유의 스크립트는 글자로만 보이고 실행되지 않는다 (SER-004)', async () => {
+    const payload = '<img src=x onerror="alert(1)"><script>alert(2)</script>'
+    searchResponse = () =>
+      search([
+        {
+          ...baseCase,
+          description: payload,
+          actions: [
+            {
+              actionSeq: 1,
+              actionTypeLabel: '담당 배정',
+              fromStatusLabel: '신규',
+              toStatusLabel: '신규',
+              reason: payload,
+              actionByLoginId: 'settle01',
+              actionAt: '2026-07-11T00:30:00+09:00',
+            },
+          ],
+        },
+      ])
+    const { actions } = renderPage()
+    await actions.click(within(await table()).getByRole('button', { name: '11' }))
+    expect(await screen.findByText(payload, { selector: '.exception-history-reason' })).toBeInTheDocument()
+    expect(screen.getByText(payload, { selector: 'dd' })).toBeInTheDocument()
+    expect(document.querySelector('img[src="x"]')).toBeNull()
+    expect(document.querySelector('#root script, main script, [onerror]')).toBeNull()
+  })
+
   it('사유 없이는 저장할 수 없고, 저장하면 이력과 상태가 갱신된다', async () => {
     postResponse = (path, body) => {
       expect(path).toBe('/api/v1/exceptions/11/actions')
@@ -667,9 +695,12 @@ it.each(['status', 'sequence', 'pending refresh'])('committed action with %s mis
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
 })
 
-it('committed correction with an invalid receipt refreshes and cannot be posted twice', async () => {
+it.each([
+  { actionSeq: 2, repostedJournalHeaderId: 0 },
+  ...[undefined, null, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '2'].map(actionSeq => ({ actionSeq, repostedJournalHeaderId: 72 })),
+])('committed correction with an invalid receipt %j refreshes and cannot be posted twice', async (receipt) => {
   searchResponse = () => search([correctionCase])
-  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 0, toStatus: 'RESOLVED' })
+  postResponse = () => ({ actionType: 'CORRECT', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, toStatus: 'RESOLVED', ...receipt })
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
@@ -789,4 +820,15 @@ it('gives different exception summary types distinct guide targets and preserves
   }
   expect(screen.getByRole('link', { name: '새 예외 1건' })).not.toHaveAttribute('data-guide-feature')
   expect(document.querySelector('[data-guide-feature="features.exception.exception-page.link-3"]')).toBeNull()
+})
+
+it('preserves a newer cached action when an older guide acknowledgement arrives', () => {
+  const client = new QueryClient()
+  const newer = { actionSeq: 2, toStatus: 'RESOLVED' as const }
+  client.setQueryData(['exceptions', 'search'], search([{ ...baseCase, status: 'RESOLVED', actions: [newer] }]))
+  applyActionToCache(client, 11, { actionSeq: 1, toStatus: 'IN_REVIEW' })
+  const item = client.getQueryData<ExceptionSearchResult>(['exceptions', 'search'])!.content![0]
+  expect(item.status).toBe('RESOLVED')
+  expect(item.actions).toEqual([newer])
+  client.clear()
 })
