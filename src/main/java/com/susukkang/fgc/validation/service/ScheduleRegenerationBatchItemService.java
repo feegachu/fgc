@@ -34,7 +34,7 @@ public class ScheduleRegenerationBatchItemService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ScheduleGenerationResult process(Long contractId, Long validationRunId) {
         ScheduleGenerationResult result =
-                scheduleService.generateSchedulesByContractId(contractId);
+                scheduleService.generateSchedulesForValidation(contractId);
 
         if (!result.scheduleHeaderIds().isEmpty()) {
             scheduleWriteRepository.linkHeadersToValidationRun(

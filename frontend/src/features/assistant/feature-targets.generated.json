@@ -365,6 +365,11 @@
     "element": "select"
   },
   {
+    "id": "contract.panel.acquisition",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "section"
+  },
+  {
     "id": "contract.panel.arbitrage",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
@@ -403,6 +408,16 @@
     "id": "contract.schedule-stage.insurer_to_ga",
     "file": "features/contract/ContractTabs.tsx",
     "element": "section"
+  },
+  {
+    "id": "contract.schedule.preview-detail",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "contract.tab.acquisition",
+    "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
   },
   {
     "id": "contract.tab.arbitrage",
@@ -563,6 +578,86 @@
     "id": "exception.summary.refund_table_missing",
     "file": "features/exception/ExceptionPage.tsx",
     "element": "Link"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.button",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.button-2",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.button-3",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.input",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.search-select",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.section",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.section-2",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.select",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.select-2",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.select-3",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-page.select-4",
+    "file": "features/acquisition-cost/AcquisitionCostPage.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-result.button",
+    "file": "features/acquisition-cost/AcquisitionCostResult.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.acquisition-cost.acquisition-cost-result.section",
+    "file": "features/acquisition-cost/AcquisitionCostResult.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.acquisition-cost.contract-acquisition-cost.button",
+    "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.acquisition-cost.contract-acquisition-cost.link",
+    "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.acquisition-cost.contract-acquisition-cost.select",
+    "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
+    "element": "select"
   },
   {
     "id": "features.agent-home.agent-home-page.button",
@@ -3010,6 +3105,11 @@
     "element": "summary"
   },
   {
+    "id": "navigation.menu.acqc-w01",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "Link"
+  },
+  {
     "id": "navigation.menu.agnt-w01",
     "file": "app/shell/Sidebar.tsx",
     "element": "Link"
@@ -3231,6 +3331,16 @@
   },
   {
     "id": "policy.draft-input.feeregimerules.sourcerefs",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.parameters.acquisition_cost_rate_pct",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
+    "id": "policy.draft-input.parameters.acquisition_cost_source",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "input"
   },
@@ -3563,6 +3673,31 @@
     "id": "reference.tab.versions",
     "file": "features/reference/ReferenceUI.tsx",
     "element": "button"
+  },
+  {
+    "id": "schedule.preview.form",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "form"
+  },
+  {
+    "id": "schedule.preview.reason",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "schedule.preview.refresh",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "schedule.preview.region",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "section"
+  },
+  {
+    "id": "schedule.preview.submit",
+    "file": "features/schedule/SchedulePreviewForm.tsx",
+    "element": "Button"
   },
   {
     "id": "validation.restart",

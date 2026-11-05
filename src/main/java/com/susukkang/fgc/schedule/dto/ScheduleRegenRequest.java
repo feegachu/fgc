@@ -18,4 +18,9 @@ public class ScheduleRegenRequest {
     @NotBlank
     @Size(max = 40)
     private String reason;
+    private com.susukkang.fgc.schedule.code.ScheduleRegime regime;
+    @jakarta.validation.constraints.Positive
+    private Long policyVersionId;
+    @Size(max = 100)
+    private String expectedSourceVersion;
 }

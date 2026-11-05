@@ -157,6 +157,7 @@ describe('CONT-W02 계약 상세', () => {
             scheduleHeaderId: fc ? 10 : 20,
             scheduleVersionNo: 2,
             lineCount: 1,
+            installmentCount: 1,
             status: 'CONFIRMED',
             statusLabel: '서버 확정',
           },
@@ -183,7 +184,7 @@ describe('CONT-W02 계약 상세', () => {
     expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
     expect(await screen.findByRole('cell', { name: 'GA' })).toBeInTheDocument()
     expect(screen.queryByLabelText('지급단계')).toBeNull()
-    expect(within(fc).getByText('버전 2, 1회차')).toBeInTheDocument()
+    expect(within(fc).getByText('버전 2, 1회차, 1행')).toBeInTheDocument()
     expect(within(fc).queryByRole('link')).not.toBeInTheDocument()
     expect(within(fc).queryByText('서버 확정')).not.toBeInTheDocument()
   })
@@ -203,6 +204,22 @@ describe('CONT-W02 계약 상세', () => {
     await act(() => router.navigate(-1))
     expect(screen.getByRole('tab', { name: '기본정보' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'contract-panel-basic')
+  })
+
+  it('계약체결비용 탭은 선택할 때만 결과를 조회하고 검증을 만들지 않는다', async () => {
+    const { actions } = renderAt('/contracts/1', (url) => {
+      if (url.startsWith('/api/v1/acquisition-cost-checks?'))
+        return { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }
+      return undefined
+    })
+    const tab = await screen.findByRole('tab', { name: '계약체결비용' })
+    expect(requested.filter(({ url }) => url.includes('acquisition-cost-checks'))).toHaveLength(0)
+    await actions.click(tab)
+    expect(await screen.findByText(/이 검증이 없어도 예정 스케줄 생성과 조회는 할 수 있습니다/)).toBeInTheDocument()
+    const calls = requested.filter(({ url }) => url.includes('acquisition-cost-checks'))
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toContain('contractId=1')
+    expect(calls[0].options?.method).toBeUndefined()
   })
 
   it('CAP는 두 단계를 별개로 표시하고 공통 계산근거 모달을 URL과 함께 열고 닫는다', async () => {
@@ -396,7 +413,7 @@ describe('CONT-W02 계약 상세', () => {
       if (url.includes('/schedules?')) return { headers: [], lines: [] }
     })
     await actions.click(await screen.findByRole('button', { name: '스케줄 재생성' }))
-    await waitFor(() => expect(screen.getAllByText('현재 운영 스케줄이 없습니다.')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('생성된 스케줄이 없습니다.')).toHaveLength(2))
     expect(router.state.location.search).toBe('?tab=schedules')
     expect(calls('/schedules/regenerate?reason=CONTRACT_DETAIL_MANUAL')[0].options?.method).toBe('POST')
     expect(messages()).toContain('예상 스케줄을 새 버전으로 재생성했습니다.')

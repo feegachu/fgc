@@ -1,6 +1,7 @@
 import { SaveGuide } from '../assistant/guide/save-guide'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 import { errorText } from '../../lib/format'
 import { screenMessage } from '../../lib/screenText'
 import { useQueryClient } from '@tanstack/react-query'
@@ -12,6 +13,10 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { apiClient, ApiError } from '../../lib/api/client'
 import { ClawbackTargets, CommissionRow, DraftInput, DraftSelect } from './PolicyDraftFields'
 import {
+  ACQUISITION_COST_BASIS,
+  ACQUISITION_COST_RATE,
+  ACQUISITION_COST_SOURCE,
+  MONTHLY_EQUIVALENT_FIRST_PREMIUM,
   conditionOptions,
   emptyCommission,
   emptyDraft,
@@ -111,6 +116,7 @@ export function PolicyDraftEditor({
       ? [{ id: 'commissionRules' as const, label: '수수료 규칙', count: draft.commissionRules.length }]
       : []),
     ...(installment ? [{ id: 'feeRegimeRules' as const, label: '분급 룰셋', count: draft.feeRegimeRules.length }] : []),
+    ...(installment ? [{ id: 'parameters' as const, label: '계약체결비용 기준', count: draft.parameters.length }] : []),
     ...(draft.policyType === 'SCHEDULE_ELIGIBILITY'
       ? [{ id: 'parameters' as const, label: '상태별 지급조건', count: draft.parameters.length }]
       : []),
@@ -119,6 +125,17 @@ export function PolicyDraftEditor({
       : []),
     { id: 'sourceDetails', label: '근거 자료', count: draft.sourceDetails.length },
   ]
+  const acquisitionRate = draft.parameters.find((parameter) => parameter.key === ACQUISITION_COST_RATE)
+  const setAcquisitionCost = (rate: string, description: string) =>
+    set(
+      'parameters',
+      rate.trim() || description.trim()
+        ? [
+            { key: ACQUISITION_COST_BASIS, value: MONTHLY_EQUIVALENT_FIRST_PREMIUM, description: '기준금액' },
+            { key: ACQUISITION_COST_RATE, value: rate.trim() === '' ? '' : Number(rate), description },
+          ]
+        : [],
+    )
   const close = () => {
     if (saving.current) return
     if (dirty) setDiscard(true)
@@ -126,7 +143,11 @@ export function PolicyDraftEditor({
   }
   function focusError(path: string) {
     const group = sectionFor(path)
-    setSection(sections.some((item) => item.id === group) ? group : 'basic')
+    // 저장 중 잠긴 fieldset 안의 입력과 아직 그리지 않은 구역의 입력에는 focus가 먹지 않으므로 먼저 화면에 반영한다.
+    flushSync(() => {
+      setBusy(false)
+      setSection(sections.some((item) => item.id === group) ? group : 'basic')
+    })
     const parameter = /^parameters\.(\d+)\./.exec(path)
     const focusPath = parameter ? `parameters.${draft.parameters[Number(parameter[1])]?.key}` : path
     requestAnimationFrame(() => focusPolicyField(focusPath))
@@ -605,7 +626,32 @@ export function PolicyDraftEditor({
               </Button>
             </>
           )}
-          {section === 'parameters' && (
+          {section === 'parameters' && installment && (
+            <>
+              <p className="policy-section-description">
+                계약체결비용 한도 검증의 기준금액을 정합니다. 규정이 정한 고정값이 아니므로 값의 출처를 함께 적습니다. 비워 두면 한도 검증은 검토 필요로 남고 예정 스케줄 생성에는 영향이 없습니다.
+              </p>
+              <DraftInput
+                path={`parameters.${ACQUISITION_COST_RATE}`}
+                label="월납환산 초회보험료 대비 기준율(%)"
+                type="number"
+                min={0}
+                step="any"
+                errors={errors}
+                value={String(acquisitionRate?.value ?? '')}
+                onChange={(value) => setAcquisitionCost(value, acquisitionRate?.description ?? '')}
+              />
+              <DraftInput
+                path={`parameters.${ACQUISITION_COST_SOURCE}`}
+                label="값의 출처"
+                maxLength={500}
+                errors={errors}
+                value={acquisitionRate?.description ?? ''}
+                onChange={(value) => setAcquisitionCost(String(acquisitionRate?.value ?? ''), value)}
+              />
+            </>
+          )}
+          {section === 'parameters' && !installment && (
             <>
               <p className="policy-section-description">
                 적용할 지급조건을 고릅니다. 각 조건의 적용 근거는 근거 자료에서 연결하세요.
