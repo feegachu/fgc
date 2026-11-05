@@ -293,17 +293,6 @@
     ]
   },
   {
-    "screenId": "AGNT-W01",
-    "title": "설계사 포트폴리오",
-    "page": "agent-home/AgentHomePage.tsx",
-    "steps": [
-      {
-        "targetId": "agent.overview",
-        "instruction": "본인 계약과 판매 현황을 확인하세요. 이 도움말은 내부 정산·확정 권한을 제공하지 않습니다."
-      }
-    ]
-  },
-  {
     "screenId": "POL-W01",
     "variant": "editor",
     "title": "정책 초안 작성",
