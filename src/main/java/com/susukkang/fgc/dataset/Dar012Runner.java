@@ -96,7 +96,8 @@ public class Dar012Runner implements ApplicationRunner {
     /** #635 인수조건: 정답표, 홈, 설계사 소계, 계약 상세가 일치하고 대표 설계사의 환수 사례가 계산된다. */
     static boolean hasMismatch(List<Dar012Verifier.ScenarioResult> answerKey, List<Dar012Verifier.ConsistencyCheck> aggregates,
                                List<Dar012Verifier.DetailSample> details, Dar012Verifier.ClawbackCheck clawback) {
-        return answerKey.stream().anyMatch(result -> result.matched() != result.inScope())
+        return answerKey.stream().noneMatch(result -> result.inScope() > 0) // 한 건도 비교하지 못한 실행은 통과가 아니다
+                || answerKey.stream().anyMatch(result -> result.matched() != result.inScope())
                 || aggregates.stream().anyMatch(check -> !check.consistent())
                 || details.stream().anyMatch(sample -> sample.matched() != sample.sampled())
                 || clawback.estimatedAmount() == null || clawback.estimatedAmount().signum() <= 0

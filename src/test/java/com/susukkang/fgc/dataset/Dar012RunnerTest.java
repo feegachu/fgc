@@ -40,6 +40,12 @@ class Dar012RunnerTest {
     }
 
     @Test
+    void aRunThatComparedNothingAgainstTheAnswerKeyFails() {
+        assertThat(Dar012Runner.hasMismatch(List.of(), List.of(CONSISTENT), List.of(SAME_DETAIL), CALCULATED)).isTrue();
+        assertThat(mismatch(new Dar012Verifier.ScenarioResult("REC", 0, 0, List.of()), CONSISTENT, SAME_DETAIL, CALCULATED)).isTrue();
+    }
+
+    @Test
     void aRepresentativeClawbackThatWasNotCalculatedFailsTheRun() {
         for (var clawback : List.of(
                 new Dar012Verifier.ClawbackCheck("C-1", BigDecimal.TEN, BigDecimal.ZERO, List.of()),
