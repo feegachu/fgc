@@ -1,4 +1,3 @@
-import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useOutletContext } from 'react-router'
@@ -23,13 +22,9 @@ import {
   trendSeries,
 } from './model'
 import type { InsurerKind, Period } from './model'
-import { PriorityContracts } from './PriorityContracts'
 import { ChatbotModal } from './chatbot/ChatbotModal'
 import { PicoMotion } from './mascot/PicoMotion'
 import './agent-home.css'
-import workflowGuides from '../assistant/workflow-guides.v1.json'
-import { useWorkflowGuide } from '../assistant/workflow-state'
-import { guideFeatureId } from '../assistant/feature-ids'
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: 6, label: '6개월' },
@@ -139,22 +134,6 @@ function AgentHomeContent({ month }: { month: string }) {
   return (
     <div className="ah">
       <h1 className="visually-hidden">포트폴리오</h1>
-      <ScreenHelp screenId="AGNT-W01" />
-      {import.meta.env.VITE_ASSISTANT_AI === 'true' && (
-        <details className="surface" style={{ padding: 12, marginBottom: 12 }}>
-          <summary data-guide-feature="agent.guide-menu.open" style={{ cursor: 'pointer' }}>업무 안내</summary>
-          <nav aria-label="본인 업무 안내" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            {workflowGuides.filter((guide) => guide.enabled && guide.roles.includes('AGENT')).map((guide) => (
-              <button data-guide-feature={guideFeatureId('agent.guide-menu', guide.workflowId)} key={guide.workflowId} type="button" className="button button-secondary"
-                onClick={(event) => {
-                  const menu = event.currentTarget.closest('details')
-                  if (menu) menu.open = false
-                  useWorkflowGuide.getState().start(guide.workflowId)
-                }}>{guide.title}</button>
-            ))}
-          </nav>
-        </details>
-      )}
       {error ? (
         <div role="alert" className="empty-state">
           <p>{errorText(error, '포트폴리오를 불러오지 못했습니다.')}</p>
@@ -180,7 +159,6 @@ function AgentHomeContent({ month }: { month: string }) {
             near={near}
             review={review}
           />
-          <PriorityContracts home={summary.data} />
           <Charts
             home={chartData}
             focusHome={focusData}
