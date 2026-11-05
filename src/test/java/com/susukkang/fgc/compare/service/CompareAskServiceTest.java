@@ -130,6 +130,45 @@ class CompareAskServiceTest {
         assertThat(service.ask("2순위인 이유 알려줘", null).source()).isEqualTo("OUT_OF_SCOPE");
     }
 
+    private static CompareRankingResponse threeItems() {
+        CompareRankingResponse two = twoItems();
+        Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());
+        return new CompareRankingResponse(two.rankResultId(), two.status(), two.categoryCode(), two.categoryLabel(), two.asOf(),
+                two.ruleVersion(), two.policyVersion(), two.basePremium(), two.clawbackMonth(), two.warnings(), null,
+                List.of(two.items().get(0), two.items().get(1), third), List.of(), CompareRankingFilters.NONE);
+    }
+
+    @Test
+    @DisplayName("순위 둘을 물으면 1위가 아니라 그 두 상품을 직접 견준다")
+    void twoRanksAreComparedDirectly() {
+        String text = CompareAskService.rankAnswer(threeItems().items(), "3위랑 2위를 비교해줘");
+
+        assertThat(text).contains("2위는 나보험 튼튼건강", "3위는 다보험 편한건강",
+                "2위보다 보수적 순수령액이 84,000원 적어요", "환수 노출액은 2위보다 14,000원 더 커요")
+                .doesNotContain("1위보다");
+    }
+
+    @Test
+    @DisplayName("순위 번호는 중복 없이 작은 순서로 최대 둘까지 읽고 범위 밖 번호는 버린다")
+    void askedRanksAreDistinctSortedAndInRange() {
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "3위랑 2위, 2위, 9위")).containsExactly(2, 3);
+        assertThat(CompareAskService.askedRanks(threeItems().items(), "9위 이유")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("순위 둘을 물으면 LLM 에도 그 두 상품의 비교 근거를 준다")
+    void askedPairIsSentToModel() {
+        llmReturns(true, "나보험 튼튼건강은 환수 부담이 더 작아요.");
+
+        CompareAskResponse response = service.ask("3위랑 2위를 비교해줘", threeItems());
+
+        org.mockito.ArgumentCaptor<LlmGateway.LlmRequest> captor = org.mockito.ArgumentCaptor.forClass(LlmGateway.LlmRequest.class);
+        verify(gateway).call(captor.capture(), eq(CompareAskService.Output.class));
+        assertThat(captor.getValue().data()).contains("[질문이 가리킨 비교]", "2위보다 보수적 순수령액이 84,000원 적어요");
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).startsWith("2위는 나보험 튼튼건강").endsWith("환수 부담이 더 작아요.");
+    }
+
     private void llmReturns(Boolean inScope, String answer) {
         CompareAskService.Output output = new CompareAskService.Output();
         output.inScope = inScope;
@@ -196,6 +235,30 @@ class CompareAskServiceTest {
         llmReturns(false, "");
 
         assertThat(service.ask("1000000000원이면 2순위는?", twoItems()).answer()).doesNotContain(CompareAskService.PERSONAL_INFO);
+    }
+
+    @ParameterizedTest
+    @DisplayName("모델이 거절해도 용어 질문은 용어 설명으로 답한다")
+    @ValueSource(strings = {"협회등급이 뭐야?", "순수령액이 어떻게 되는거지", "이월이 뭐예요"})
+    void glossaryQuestionIsAnsweredEvenWhenModelRefuses(String question) {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask(question, null);
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).doesNotContain(CompareAskService.OUT_OF_SCOPE);
+    }
+
+    @ParameterizedTest
+    @DisplayName("모델이 거절해도 챗봇 소개 질문은 소개 문장으로 답한다")
+    @ValueSource(strings = {"너는 뭘 알려주는거야", "니 역할은 뭐니", "너는 누구야"})
+    void introQuestionIsAnsweredEvenWhenModelRefuses(String question) {
+        llmReturns(false, "");
+
+        CompareAskResponse response = service.ask(question, ranking());
+
+        assertThat(response.source()).isEqualTo("RULE");
+        assertThat(response.answer()).isEqualTo(CompareAskService.INTRO);
     }
 
     @Test
