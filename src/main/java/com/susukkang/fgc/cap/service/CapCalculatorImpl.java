@@ -153,7 +153,7 @@ public class CapCalculatorImpl implements CapCalculator {
                     : ruleItem.getInclusionStatus();
             String reason = ruleItem != null
                     ? evidenceMissing
-                        ? "제외 요건의 건별 증빙이 연결되지 않아 사람 판단이 필요하다"
+                        ? "제외 요건의 건별 증빙이 회차 금액을 채우지 못해 사람 판단이 필요하다"
                         : ruleItem.getDecisionReason()
                     : "1,200% 룰셋에 분류되지 않은 수수료 항목이라 사람 판단이 필요하다";
             String itemCode = ruleItem != null ? ruleItem.getItemCode() : null;

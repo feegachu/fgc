@@ -65,13 +65,24 @@ public class JournalQueryRepository {
 
     /** 화면 정렬 key(LEDG-W01 분개 목록) → 표현식. 차변·대변 합계는 목록과 같은 헤더 라인 합계 식이다. */
     private static final Map<String, ComparableExpressionBase<?>> SORTABLE = Map.of(
-            "journalNo", journalHeader.journalNo,
+            "journalNo", journalNoNumericOrder(),
             "journalDate", journalHeader.journalDate,
             "contractNo", insuranceContract.contractNo,
             DEBIT_TOTAL, lineTotal(journalLine.debitAmount),
             CREDIT_TOTAL, lineTotal(journalLine.creditAmount));
     public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("journalDate", false);
+
+    /**
+     * 분개번호 정렬식. 일련번호가 1만을 넘으면 5자리가 되어 문자열 그대로는 10000번이 9999번보다 앞선다.
+     * 형식에 맞는 번호는 일련번호를 9자리로 채워 달, 일련번호 순으로 비교하고 형식 밖 번호는 그대로 둔다.
+     */
+    private static ComparableExpressionBase<String> journalNoNumericOrder() {
+        return Expressions.stringTemplate("""
+                case when {0} like 'JV-____-__-%'
+                     then concat(substring({0}, 1, 11), lpad(substring({0}, 12), 9, '0'))
+                     else {0} end""", journalHeader.journalNo);
+    }
 
     private static ComparableExpressionBase<BigDecimal> lineTotal(
             com.querydsl.core.types.dsl.NumberPath<BigDecimal> amount) {

@@ -3,15 +3,16 @@ import type { AgentHome, HomeParams } from './api'
 export type Period = 6 | 12 | 'all'
 export type InsurerKind = 'all' | 'LIFE' | 'NON_LIFE'
 
-export const CATEGORY_COLORS = ['#0046ff', '#4f86b8', '#64978A', '#C19562', '#94a3b8']
-export const INSURER_COLORS = ['#4f86b8', '#4e9a8c', '#d19a45', '#c9677f', '#7a9e4f', '#d4784f', '#5aa0b5', '#a8a04a']
+// 그래프 색은 개편 전(#739)의 채도 낮은 팔레트다(#839). 다섯째는 분류 밖(기타)용 회색이다.
+export const CATEGORY_COLORS = ['#9a82b5', '#a493b8', '#86a89c', '#c9ae8f', '#94a3b8']
+export const INSURER_COLORS = ['#7f9fba', '#84ada3', '#caae7e', '#c492a0', '#a0b388', '#c99d88', '#8bb0bc', '#bbb589']
 
-/** 계약 상태 4종의 순서와 색(다른 화면의 상태색과 같다). 청약, 부활 등은 가까운 상태로 묶는다. */
+/** 계약 상태 4종의 순서와 색. 청약, 부활 등은 가까운 상태로 묶는다. */
 export const STATUS_DEFS = [
-  { key: 'ACTIVE', label: '정상', color: '#15803d' },
-  { key: 'UNPAID', label: '미납', color: '#b45309' },
-  { key: 'LAPSED', label: '실효', color: '#b91c1c' },
-  { key: 'END', label: '해지/종료', color: '#94a3b8' },
+  { key: 'ACTIVE', label: '정상', color: '#78a98a' },
+  { key: 'UNPAID', label: '미납', color: '#d1ad74' },
+  { key: 'LAPSED', label: '실효', color: '#c98a8a' },
+  { key: 'END', label: '해지/종료', color: '#b8c0cc' },
 ] as const
 /** 서버 상태 코드를 목업의 4종으로 묶는다. 상태 이력이 없어 서버가 UNKNOWN 으로 센 계약은 끝(해지·종료)에 섞지 않고 따로 둔다. */
 export const STATUS_GROUP: Record<string, (typeof STATUS_DEFS)[number]['key']> = {
