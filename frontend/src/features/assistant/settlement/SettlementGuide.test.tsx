@@ -417,3 +417,33 @@ it('protects portal input through shared dirty state and does not prompt after r
   await screen.findByText('지급 입력')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
+
+it.each([
+  ['/contracts/1?month=2026-07', true],
+  ['/contracts/1?month=2026-08', false],
+  ['/contracts/9?month=2026-07', false],
+] as const)('handles location changes during evidence lookup: %s', async (destination, allowed) => {
+  const { actor, router } = mount()
+  await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
+  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
+  await screen.findByLabelText('계약 입력')
+  await waitFor(() => expect(screen.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeEnabled())
+  await act(async () => { await router.navigate('/contracts/1') })
+  const original = evidenceApi.readEvidence
+  let finish: (() => void) | undefined
+  vi.spyOn(evidenceApi, 'readEvidence').mockImplementationOnce(async (...args) => {
+    await new Promise<void>(resolve => { finish = resolve })
+    return original(...args)
+  })
+  await actor.click(screen.getByRole('button', { name: '현재 결과로 이어서 안내' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  await act(async () => { await router.navigate(destination) })
+  await act(async () => { finish?.() })
+  if (allowed) {
+    await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/2'))
+    expect(screen.queryByText('조회 중 화면이 바뀌었습니다. 현재 대상으로 다시 확인하세요.')).not.toBeInTheDocument()
+  } else {
+    await screen.findByText('조회 중 화면이 바뀌었습니다. 현재 대상으로 다시 확인하세요.')
+    expect(router.state.location.pathname + router.state.location.search).toBe(destination)
+  }
+})
