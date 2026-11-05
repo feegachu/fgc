@@ -370,6 +370,8 @@ describe('상품 추천 AI', () => {
   it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
     renderHome()
     const launcher = await screen.findByRole('button', { name: '상품 추천 AI' })
+    // 메인 화면 런처의 피코는 가만히 있는 모션이다
+    expect(launcher.querySelector('[data-pico-motion]')).toHaveAttribute('data-pico-motion', 'still')
     await userEvent.click(launcher)
     const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
     expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
