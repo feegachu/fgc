@@ -1,0 +1,5 @@
+# Health monitoring only; does not scrape an API without #674 instrumentation.
+services:
+  prometheus:
+    volumes:
+      - ./shinhan/health-only.prometheus.yml:/etc/prometheus/prometheus.yml:ro

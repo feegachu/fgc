@@ -1,6 +1,383 @@
 {
   "components" : {
     "schemas" : {
+      "Accepted" : {
+        "properties" : {
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "previousBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "validationRunId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostBasis" : {
+        "properties" : {
+          "amount" : {
+            "description" : "기준액(원). 입력이 부족하면 null",
+            "type" : [ "number", "null" ]
+          },
+          "basisCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "description" : {
+            "description" : "정책에 등록한 값의 출처 설명",
+            "type" : [ "string", "null" ]
+          },
+          "premiumAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "ratePct" : {
+            "type" : [ "number", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostCheckRequest" : {
+        "properties" : {
+          "contractId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "paymentStage" : {
+            "description" : "검증할 지급단계. 두 단계의 한도 검증을 합치지 않는다.",
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "contractId", "paymentStage" ],
+        "type" : "object"
+      },
+      "AcquisitionCostCheckResponse" : {
+        "properties" : {
+          "acquisitionCost" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostBasis"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "acquisitionCostCheckId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "basicDocumentDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentVersion" : {
+            "type" : "string"
+          },
+          "calcRuleVersion" : {
+            "type" : "string"
+          },
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "contractDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "exclusions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostExclusionLine"
+            },
+            "type" : "array"
+          },
+          "feeRegimeCode" : {
+            "type" : "string"
+          },
+          "indirectSupportAmount" : {
+            "description" : "유지관리 총액에 포함된 간접지원경비. 별도 한도를 두지 않는다",
+            "type" : [ "number", "null" ]
+          },
+          "insurerName" : {
+            "type" : "string"
+          },
+          "limitPolicy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostPolicyRef"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "lineGroups" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostLineGroup"
+            },
+            "type" : "array"
+          },
+          "maintenance" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostItem"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "offeringVersion" : {
+            "type" : "string"
+          },
+          "paymentPolicy" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostPolicyRef"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "paymentStageLabel" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostReason"
+            },
+            "type" : "array"
+          },
+          "resultStatus" : {
+            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+            "type" : "string"
+          },
+          "resultStatusLabel" : {
+            "type" : "string"
+          },
+          "salesStartDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "scheduleHeaderId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "scheduleVersionNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "unclassifiedAmount" : {
+            "description" : "분류하지 못해 판정에 넣지 않은 금액",
+            "type" : [ "number", "null" ]
+          },
+          "upfront" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/AcquisitionCostItem"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostCheckSearchCondition" : {
+        "properties" : {
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contractNo" : {
+            "type" : "string"
+          },
+          "insurerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "resultStatus" : {
+            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+            "type" : "string"
+          },
+          "sort" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostExclusionLine" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "evidenceRef" : {
+            "type" : [ "string", "null" ]
+          },
+          "excluded" : {
+            "type" : "boolean"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "itemCode" : {
+            "type" : "string"
+          },
+          "itemName" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostItem" : {
+        "properties" : {
+          "baseAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "calculatedAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "exceededFromInstallmentNo" : {
+            "description" : "누적이 처음 한도를 넘는 회차",
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "limitAmount" : {
+            "type" : [ "number", "null" ]
+          },
+          "limitCode" : {
+            "type" : "string"
+          },
+          "limitPct" : {
+            "type" : [ "number", "null" ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
+            "type" : "string"
+          },
+          "statusLabel" : {
+            "type" : "string"
+          },
+          "usagePct" : {
+            "type" : [ "number", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostLineGroup" : {
+        "properties" : {
+          "amount" : {
+            "type" : "number"
+          },
+          "bucket" : {
+            "type" : "string"
+          },
+          "bucketLabel" : {
+            "type" : "string"
+          },
+          "feeComponentType" : {
+            "type" : [ "string", "null" ]
+          },
+          "installmentFrom" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "installmentTo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "itemCode" : {
+            "type" : "string"
+          },
+          "itemName" : {
+            "type" : "string"
+          },
+          "lineCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostPolicyRef" : {
+        "properties" : {
+          "policyCode" : {
+            "type" : "string"
+          },
+          "policyName" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "regulationRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "sourceClass" : {
+            "type" : "string"
+          },
+          "sourceClassLabel" : {
+            "type" : "string"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "versionNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AcquisitionCostReason" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ActiveMonthlyRunResponse" : {
         "properties" : {
           "exists" : {
@@ -430,6 +807,34 @@
         "required" : [ "data", "error", "requestId" ],
         "type" : "object"
       },
+      "ApiResponseAccepted" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Accepted"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseAcquisitionCostCheckResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AcquisitionCostCheckResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseActiveMonthlyRunResponse" : {
         "properties" : {
           "data" : {
@@ -682,6 +1087,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseContractStatusPreviewResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ContractStatusPreviewResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseContractTransactionTabResponse" : {
         "properties" : {
           "data" : {
@@ -780,6 +1199,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseExceptionCountsResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionCountsResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseExceptionOptionsResponse" : {
         "properties" : {
           "data" : {
@@ -812,6 +1245,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/FinalizeValidationRunResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseHomeSummaryResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/HomeSummaryResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -1063,6 +1510,23 @@
         },
         "type" : "object"
       },
+      "ApiResponseListRetry" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Retry"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseListScheduleHeaderResponse" : {
         "properties" : {
           "data" : {
@@ -1099,6 +1563,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/MeResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponsePageResponseAcquisitionCostCheckResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseAcquisitionCostCheckResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -1193,6 +1671,20 @@
         },
         "type" : "object"
       },
+      "ApiResponsePageResponseContractStatusEffectResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseContractStatusEffectResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponsePageResponseContractView" : {
         "properties" : {
           "data" : {
@@ -1264,7 +1756,6 @@
         "type" : "object"
       },
       "ApiResponsePaymentCalculationSnapshot" : {
-        "type" : "object",
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/PaymentCalculationSnapshot"
@@ -1275,7 +1766,8 @@
           "requestId" : {
             "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "ApiResponsePicoAskResponse" : {
         "properties" : {
@@ -1393,6 +1885,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/ReconciliationRunSearchResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseRestartability" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Restartability"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -1677,8 +2183,13 @@
           "plannedCommissionAmount" : {
             "type" : "number"
           },
+          "plannedCommissionBasis" : {
+            "description" : "저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다.",
+            "type" : [ "string", "null" ]
+          },
           "projectedExcessAmount" : {
-            "type" : "number"
+            "description" : "예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다.",
+            "type" : [ "number", "null" ]
           },
           "refundAdditionAppliedYn" : {
             "type" : "boolean"
@@ -1748,6 +2259,57 @@
         },
         "type" : "object"
       },
+      "AssistantCalculationLine" : {
+        "properties" : {
+          "attributionDate" : {
+            "type" : "string"
+          },
+          "basisAmount" : {
+            "type" : "string"
+          },
+          "basisCode" : {
+            "type" : "string"
+          },
+          "beneficiaryAgentId" : {
+            "type" : "string"
+          },
+          "calculationType" : {
+            "type" : "string"
+          },
+          "cashflowType" : {
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "dueDate" : {
+            "type" : "string"
+          },
+          "expectedAmount" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "ratePct" : {
+            "type" : "string"
+          },
+          "ruleId" : {
+            "type" : "string"
+          },
+          "sourceId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AssistantCalculationSource" : {
         "properties" : {
           "entityId" : {
@@ -1763,6 +2325,28 @@
             "type" : "string"
           },
           "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AssistantCalculationValidity" : {
+        "properties" : {
+          "calculatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "dependencyFingerprint" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "inputFingerprint" : {
+            "type" : "string"
+          },
+          "stateToken" : {
             "type" : "string"
           }
         },
@@ -1917,39 +2501,39 @@
         "type" : "object"
       },
       "Basis" : {
-        "type" : "object",
         "properties" : {
-          "sourceRefs" : {
-            "type" : "array",
+          "asOfDate" : {
+            "type" : "string"
+          },
+          "lines" : {
             "items" : {
-              "$ref" : "#/components/schemas/AssistantCalculationSource"
-            }
+              "$ref" : "#/components/schemas/AssistantAttributionLine"
+            },
+            "type" : "array"
+          },
+          "policyVersionIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "rounding" : {
             "$ref" : "#/components/schemas/Rounding"
           },
-          "asOfDate" : {
-            "type" : "string"
-          },
-          "policyVersionIds" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
           "ruleIds" : {
-            "type" : "array",
             "items" : {
               "type" : "string"
-            }
+            },
+            "type" : "array"
           },
-          "lines" : {
-            "type" : "array",
+          "sourceRefs" : {
             "items" : {
-              "$ref" : "#/components/schemas/AssistantAttributionLine"
-            }
+              "$ref" : "#/components/schemas/AssistantCalculationSource"
+            },
+            "type" : "array"
           }
-        }
+        },
+        "type" : "object"
       },
       "Blocker" : {
         "properties" : {
@@ -2062,6 +2646,25 @@
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "CalculationRevalidationRequest" : {
+        "properties" : {
+          "calculationId" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/PaymentCalculationRequest"
+          },
+          "stateToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "calculationId", "input", "stateToken" ],
         "type" : "object"
       },
       "CapAgentSummaryResponse" : {
@@ -2881,6 +3484,31 @@
         },
         "type" : "object"
       },
+      "ClawbackLine" : {
+        "properties" : {
+          "appliedRatePct" : {
+            "type" : "number"
+          },
+          "basisAmount" : {
+            "type" : "number"
+          },
+          "clawbackAmount" : {
+            "type" : "number"
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "transactionAttributionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ClawbackNoticeDocumentRequest" : {
         "properties" : {
           "calculationVersion" : {
@@ -2926,6 +3554,47 @@
           "version" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ClawbackReview" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "candidate" : {
+            "type" : "boolean"
+          },
+          "elapsedMonths" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ClawbackLine"
+            },
+            "type" : "array"
+          },
+          "policyCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "policyVersionNo" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCodes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -4368,6 +5037,40 @@
         },
         "type" : "object"
       },
+      "ContractStatusEffectResponse" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "entityId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "entityType" : {
+            "type" : "string"
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "previousState" : {
+            "type" : [ "string", "null" ]
+          },
+          "processingJob" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "reasonCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ContractStatusEventProcessingResponse" : {
         "properties" : {
           "errorCode" : {
@@ -4487,6 +5190,85 @@
           },
           "sourceSystem" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ContractStatusPreviewRequest" : {
+        "properties" : {
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "effectiveAt", "eventType" ],
+        "type" : "object"
+      },
+      "ContractStatusPreviewResponse" : {
+        "properties" : {
+          "clawbackReview" : {
+            "$ref" : "#/components/schemas/ClawbackReview"
+          },
+          "contractId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "currentStatus" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "effectiveAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
+            "type" : "string"
+          },
+          "excludedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
+          },
+          "heldAmount" : {
+            "$ref" : "#/components/schemas/HeldAmount"
+          },
+          "paidAmount" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PaidAmount"
+            },
+            "type" : "array"
+          },
+          "payments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewPayment"
+            },
+            "type" : "array"
+          },
+          "pendingFollowUps" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "resumedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
+          },
+          "snapshotAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "stoppedLines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PreviewLine"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -4841,6 +5623,21 @@
         },
         "type" : "object"
       },
+      "EventFollowUp" : {
+        "properties" : {
+          "jobs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FollowUpJob"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "EvidenceItem" : {
         "properties" : {
           "label" : {
@@ -5139,6 +5936,27 @@
         },
         "type" : "object"
       },
+      "ExceptionCountsResponse" : {
+        "properties" : {
+          "bySeverity" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionSeverityCountResponse"
+            },
+            "type" : "array"
+          },
+          "byType" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionTypeSummaryResponse"
+            },
+            "type" : "array"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ExceptionOccurrenceResponse" : {
         "properties" : {
           "detectedAt" : {
@@ -5230,6 +6048,22 @@
         },
         "type" : "object"
       },
+      "ExceptionSeverityCountResponse" : {
+        "properties" : {
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "severity" : {
+            "enum" : [ "INFO", "WARNING", "HIGH", "CRITICAL" ],
+            "type" : "string"
+          },
+          "severityLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ExceptionSummary" : {
         "properties" : {
           "comparedFinalizedRunId" : {
@@ -5278,6 +6112,65 @@
             "type" : "string"
           },
           "typeLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FeeRegimeResolution" : {
+        "properties" : {
+          "basicDocumentDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentVersion" : {
+            "type" : "string"
+          },
+          "candidateOfferingIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "candidateRulesetIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "contractDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "declaredFeeRegimeCode" : {
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reasonCode" : {
+            "enum" : [ "UNKNOWN_REGIME", "CONTRACT_OUTSIDE_SALES_PERIOD", "OFFERING_NOT_UNIQUE", "NOT_APPLICABLE", "CURRENT_BUT_ELIGIBLE", "REGIME_NOT_ELIGIBLE", "FOUR_YEAR_AFTER_SPECIAL_PERIOD", "SEVEN_YEAR_IN_SPECIAL_PERIOD", "RULESET_MISSING", "RULESET_AMBIGUOUS", "RULESET_FLAGGED", "RULESET_LIMIT_MISSING", "COMMISSION_RULE_INVALID", "RULESET_SELECTED" ],
+            "type" : "string"
+          },
+          "regRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "rulesetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesStartDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "SELECTED", "NOT_APPLICABLE", "REVIEW_REQUIRED" ],
             "type" : "string"
           }
         },
@@ -5346,6 +6239,50 @@
         "required" : [ "feeRegimeCode", "maxInstallments", "salesStartDateFrom", "sourceRefs" ],
         "type" : "object"
       },
+      "FeeRegimeRulesetSelection" : {
+        "properties" : {
+          "limits" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RulesetLimit"
+            },
+            "type" : "array"
+          },
+          "resolution" : {
+            "$ref" : "#/components/schemas/FeeRegimeResolution"
+          },
+          "ruleset" : {
+            "$ref" : "#/components/schemas/Ruleset"
+          },
+          "selected" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "FeeRegimeSchedulePolicy" : {
+        "properties" : {
+          "commissionPolicy" : {
+            "$ref" : "#/components/schemas/ResolvedCommissionPolicy"
+          },
+          "selected" : {
+            "type" : "boolean"
+          },
+          "selection" : {
+            "$ref" : "#/components/schemas/FeeRegimeRulesetSelection"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "versionNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "FinalizeChecklistConditionResponse" : {
         "properties" : {
           "count" : {
@@ -5410,6 +6347,172 @@
           "status" : {
             "enum" : [ "PENDING", "SUCCEEDED", "FAILED", "NOT_REQUIRED" ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FollowUpJob" : {
+        "properties" : {
+          "attemptCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "job" : {
+            "type" : "string"
+          },
+          "lastAttemptAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "maxAttempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextRetryAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HeldAmount" : {
+        "properties" : {
+          "after" : {
+            "type" : "number"
+          },
+          "before" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAgentCounts" : {
+        "properties" : {
+          "active" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "registered" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "terminated" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAttentionAgent" : {
+        "properties" : {
+          "activeYn" : {
+            "type" : "boolean"
+          },
+          "agentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "branch" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "contractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeAttentionReason"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "statusLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAttentionReason" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeBranch" : {
+        "properties" : {
+          "activeContractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "agentCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "attentionCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeSummaryResponse" : {
+        "properties" : {
+          "agents" : {
+            "$ref" : "#/components/schemas/HomeAgentCounts"
+          },
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "attentionAgents" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeAttentionAgent"
+            },
+            "type" : "array"
+          },
+          "attentionTotal" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "basis" : {
+            "type" : "string"
+          },
+          "branches" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeBranch"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -6183,6 +7286,36 @@
         },
         "type" : "object"
       },
+      "PageResponseAcquisitionCostCheckResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AcquisitionCostCheckResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageResponseAgentResponse" : {
         "properties" : {
           "content" : {
@@ -6368,6 +7501,36 @@
           "content" : {
             "items" : {
               "$ref" : "#/components/schemas/CommissionPaymentListResponse"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageResponseContractStatusEffectResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ContractStatusEffectResponse"
             },
             "type" : "array"
           },
@@ -6603,6 +7766,18 @@
         },
         "type" : "object"
       },
+      "PaidAmount" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ParameterDraft" : {
         "properties" : {
           "description" : {
@@ -6623,124 +7798,124 @@
         "type" : "object"
       },
       "PaymentCalculationRequest" : {
-        "type" : "object",
         "properties" : {
-          "contractVersion" : {
-            "type" : "string",
-            "minLength" : 1,
-            "pattern" : "assistant\\.v1"
-          },
-          "kind" : {
-            "type" : "string",
-            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ]
-          },
-          "mode" : {
-            "type" : "string",
-            "enum" : [ "EXISTING", "HYPOTHETICAL" ]
-          },
-          "scope" : {
-            "$ref" : "#/components/schemas/Scope"
-          },
           "candidate" : {
             "$ref" : "#/components/schemas/JsonNode"
           },
           "clientRevision" : {
-            "type" : "integer",
             "format" : "int64",
             "maximum" : 9007199254740991,
-            "minimum" : 0
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "contractVersion" : {
+            "minLength" : 1,
+            "pattern" : "assistant\\.v1",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "EXPECTED_COMMISSION", "ATTRIBUTION_BALANCE", "CAP_STATUS", "PAYMENT_CANDIDATE", "RECONCILIATION_DIFFERENCE", "ARBITRAGE_EXCESS", "JOURNAL_CORRECTION_REVIEW" ],
+            "type" : "string"
+          },
+          "mode" : {
+            "enum" : [ "EXISTING", "HYPOTHETICAL" ],
+            "type" : "string"
+          },
+          "scope" : {
+            "$ref" : "#/components/schemas/Scope"
           }
         },
-        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ]
+        "required" : [ "clientRevision", "contractVersion", "kind", "mode" ],
+        "type" : "object"
       },
       "PaymentCalculationSnapshot" : {
-        "type" : "object",
         "properties" : {
+          "amounts" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "basis" : {
+            "$ref" : "#/components/schemas/Basis"
+          },
+          "blockers" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Reason"
+            },
+            "type" : "array"
+          },
+          "calculatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "calculationId" : {
+            "type" : "string"
+          },
+          "capPreview" : {
+            "items" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "array"
+          },
+          "clientRevision" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "confirmable" : {
+            "type" : "boolean"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "evidenceKind" : {
             "type" : "string"
           },
           "kind" : {
             "type" : "string"
           },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantCalculationLine"
+            },
+            "type" : "array"
+          },
+          "missingInputs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
           "mode" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "clientRevision" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "synthetic" : {
-            "type" : "boolean"
-          },
-          "snapshotOnly" : {
-            "type" : "boolean"
-          },
-          "evidenceKind" : {
-            "type" : "string"
-          },
-          "currency" : {
             "type" : "string"
           },
           "paymentStatus" : {
             "type" : "string"
           },
-          "resolvedScope" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          },
-          "amounts" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            }
-          },
-          "capPreview" : {
-            "type" : "array",
-            "items" : {
-              "type" : "object",
-              "additionalProperties" : { }
-            }
-          },
-          "confirmable" : {
-            "type" : "boolean"
-          },
-          "blockers" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/Reason"
-            }
-          },
-          "missingInputs" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "basis" : {
-            "$ref" : "#/components/schemas/Basis"
-          },
           "recommendation" : {
             "$ref" : "#/components/schemas/Recommendation"
           },
-          "calculatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
+          "resolvedScope" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "snapshotOnly" : {
+            "type" : "boolean"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "synthetic" : {
+            "type" : "boolean"
           },
           "validity" : {
             "$ref" : "#/components/schemas/AssistantCalculationValidity"
-          },
-          "lines" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/AssistantCalculationLine"
-            }
           }
-        }
+        },
+        "type" : "object"
       },
       "PaymentEvidence" : {
         "properties" : {
@@ -7484,6 +8659,73 @@
         },
         "type" : "object"
       },
+      "PreviewLine" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "commissionItemName" : {
+            "type" : "string"
+          },
+          "dueDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextDueDate" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "previousState" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "scheduleLineId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PreviewPayment" : {
+        "properties" : {
+          "amount" : {
+            "type" : [ "number", "null" ]
+          },
+          "commissionTransactionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "nextState" : {
+            "type" : "string"
+          },
+          "previousState" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ProcessingEffect" : {
         "properties" : {
           "failureReason" : {
@@ -7502,6 +8744,27 @@
           "validationRunId" : {
             "format" : "int64",
             "type" : [ "integer", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "ProcessingSummary" : {
+        "properties" : {
+          "changedScheduleLines" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excludedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "heldPayments" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "resumedPayments" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -7633,21 +8896,21 @@
         "type" : "object"
       },
       "Reason" : {
-        "type" : "object",
         "properties" : {
           "code" : {
-            "type" : "string"
-          },
-          "message" : {
             "type" : "string"
           },
           "contractId" : {
             "type" : "string"
           },
+          "message" : {
+            "type" : "string"
+          },
           "transactionAttributionId" : {
             "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "RecentExceptionResponse" : {
         "properties" : {
@@ -7738,27 +9001,27 @@
         "type" : "object"
       },
       "Recommendation" : {
-        "type" : "object",
         "properties" : {
           "allowed" : {
             "type" : "boolean"
-          },
-          "targetId" : {
-            "type" : "string"
-          },
-          "suggestedAmount" : {
-            "type" : "string"
           },
           "reason" : {
             "type" : "string"
           },
           "requiredChecks" : {
-            "type" : "array",
             "items" : {
               "type" : "string"
-            }
+            },
+            "type" : "array"
+          },
+          "suggestedAmount" : {
+            "type" : "string"
+          },
+          "targetId" : {
+            "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "ReconciliationExceptionBulkCreateResponse" : {
         "properties" : {
@@ -8211,6 +9474,191 @@
         },
         "type" : "object"
       },
+      "ResolvedCommissionPolicy" : {
+        "properties" : {
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "policyType" : {
+            "enum" : [ "CURRENT_COMMISSION", "FOUR_YEAR_COMMISSION", "SEVEN_YEAR_COMMISSION", "CAP_1200", "ALLOCATION", "REFUND_RATE", "CLAWBACK", "RECONCILIATION_TOLERANCE", "SCHEDULE_ELIGIBILITY", "ARBITRAGE" ],
+            "type" : "string"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "rules" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ResolvedCommissionRule"
+            },
+            "type" : "array"
+          },
+          "scheduleRegime" : {
+            "enum" : [ "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ResolvedCommissionRule" : {
+        "properties" : {
+          "agentRankCode" : {
+            "enum" : [ "FC", "TEAM_LEADER", "BRANCH_MANAGER", "DIVISION_HEAD" ],
+            "type" : "string"
+          },
+          "basisCode" : {
+            "type" : "string"
+          },
+          "calculationType" : {
+            "enum" : [ "FIXED", "RATE" ],
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "commissionRuleId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "equalMonthlyYn" : {
+            "type" : "boolean"
+          },
+          "feeComponentType" : {
+            "enum" : [ "CURRENT", "UPFRONT", "MAINTENANCE", "LONG_TERM_MAINTENANCE", "INCENTIVE", "SETTLEMENT_SUPPORT", "NEWCOMER_SUPPORT", "COMMON_COST", "OTHER" ],
+            "type" : "string"
+          },
+          "fixedAmount" : {
+            "type" : "number"
+          },
+          "installmentFrom" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "installmentTo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "insurerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "organizationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "paymentConditionCode" : {
+            "type" : "string"
+          },
+          "priorityNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "productOfferingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ratePct" : {
+            "type" : "number"
+          },
+          "roundingMode" : {
+            "enum" : [ "UP", "DOWN", "CEILING", "FLOOR", "HALF_UP", "HALF_DOWN", "HALF_EVEN", "UNNECESSARY" ],
+            "type" : "string"
+          },
+          "roundingScale" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Restartability" : {
+        "properties" : {
+          "allowed" : {
+            "type" : "boolean"
+          },
+          "checkpointAvailable" : {
+            "type" : "boolean"
+          },
+          "completedCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedStateVersion" : {
+            "type" : "string"
+          },
+          "failedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failedStep" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lastFailedBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "reasonCode" : {
+            "type" : "string"
+          },
+          "remainingCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Retry" : {
+        "properties" : {
+          "batchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "errorCode" : {
+            "type" : "string"
+          },
+          "failedStep" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "finishedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "previousBatchExecutionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "requestedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "requestedBy" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "retryId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ReverseJournalRequest" : {
         "properties" : {
           "evidenceRef" : {
@@ -8241,19 +9689,86 @@
         "type" : "object"
       },
       "Rounding" : {
-        "type" : "object",
         "properties" : {
-          "scale" : {
-            "type" : "integer",
-            "format" : "int32"
+          "aggregation" : {
+            "type" : "string"
           },
           "mode" : {
             "type" : "string"
           },
-          "aggregation" : {
-            "type" : "string"
+          "scale" : {
+            "format" : "int32",
+            "type" : "integer"
           }
-        }
+        },
+        "type" : "object"
+      },
+      "Ruleset" : {
+        "properties" : {
+          "basicDocumentDateFrom" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentDateTo" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "basicDocumentVersion" : {
+            "type" : "string"
+          },
+          "feeRegimeCode" : {
+            "type" : "string"
+          },
+          "longTermMaintenanceFrom" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "longTermMaintenanceTo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxInstallments" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "policyVersionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "rulesetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "salesStartDateFrom" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "salesStartDateTo" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "RulesetLimit" : {
+        "properties" : {
+          "includesIndirectExpense" : {
+            "type" : "boolean"
+          },
+          "limitCode" : {
+            "type" : "string"
+          },
+          "limitPct" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
       },
       "ScheduleDetailResponse" : {
         "properties" : {
@@ -8492,6 +10007,17 @@
         },
         "type" : "object"
       },
+      "SchedulePreviewContext" : {
+        "properties" : {
+          "expectedSourceVersion" : {
+            "type" : "string"
+          },
+          "policy" : {
+            "$ref" : "#/components/schemas/FeeRegimeSchedulePolicy"
+          }
+        },
+        "type" : "object"
+      },
       "ScheduleRegenRequest" : {
         "properties" : {
           "expectedSourceVersion" : {
@@ -8558,50 +10084,50 @@
         "type" : "object"
       },
       "Scope" : {
-        "type" : "object",
         "properties" : {
-          "paymentId" : {
-            "type" : "string",
-            "pattern" : "[1-9]\\d{0,18}"
-          },
-          "contractId" : {
-            "type" : "string",
-            "pattern" : "[1-9]\\d{0,18}"
-          },
-          "settlementMonth" : {
-            "type" : "string",
-            "pattern" : "\\d{4}-\\d{2}"
-          },
-          "paymentStage" : {
-            "type" : "string",
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ]
-          },
-          "installmentNo" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 1
-          },
-          "commissionItemId" : {
-            "type" : "string",
-            "pattern" : "[1-9]\\d{0,18}"
-          },
-          "beneficiaryAgentId" : {
-            "type" : "string",
-            "pattern" : "[1-9]\\d{0,18}"
+          "aggregation" : {
+            "enum" : [ "SINGLE_LINE", "MONTH_TOTAL" ],
+            "type" : "string"
           },
           "asOfDate" : {
-            "type" : "string",
-            "format" : "date"
+            "format" : "date",
+            "type" : "string"
+          },
+          "beneficiaryAgentId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "contractId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "paymentId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
           },
           "reconciliationResultId" : {
-            "type" : "string",
-            "pattern" : "[1-9]\\d{0,18}"
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
           },
-          "aggregation" : {
-            "type" : "string",
-            "enum" : [ "SINGLE_LINE", "MONTH_TOTAL" ]
+          "settlementMonth" : {
+            "pattern" : "\\d{4}-\\d{2}",
+            "type" : "string"
           }
-        }
+        },
+        "type" : "object"
       },
       "Source" : {
         "properties" : {
@@ -8857,6 +10383,27 @@
         },
         "type" : "object"
       },
+      "ValidationRestartRequest" : {
+        "properties" : {
+          "expectedBatchExecutionId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "expectedStateVersion" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedBatchExecutionId", "expectedStateVersion", "reason" ],
+        "type" : "object"
+      },
       "ValidationRunDetailResponse" : {
         "properties" : {
           "arbitrageSummary" : {
@@ -9082,1359 +10629,6 @@
           }
         },
         "type" : "object"
-      },
-      "AssistantCalculationLine" : {
-        "type" : "object",
-        "properties" : {
-          "sourceId" : {
-            "type" : "string"
-          },
-          "contractId" : {
-            "type" : "string"
-          },
-          "commissionItemId" : {
-            "type" : "string"
-          },
-          "beneficiaryAgentId" : {
-            "type" : "string"
-          },
-          "installmentNo" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "attributionDate" : {
-            "type" : "string"
-          },
-          "dueDate" : {
-            "type" : "string"
-          },
-          "basisCode" : {
-            "type" : "string"
-          },
-          "basisAmount" : {
-            "type" : "string"
-          },
-          "calculationType" : {
-            "type" : "string"
-          },
-          "ratePct" : {
-            "type" : "string"
-          },
-          "expectedAmount" : {
-            "type" : "string"
-          },
-          "ruleId" : {
-            "type" : "string"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "cashflowType" : {
-            "type" : "string"
-          }
-        }
-      },
-      "AssistantCalculationValidity" : {
-        "type" : "object",
-        "properties" : {
-          "stateToken" : {
-            "type" : "string"
-          },
-          "calculatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "expiresAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "inputFingerprint" : {
-            "type" : "string"
-          },
-          "dependencyFingerprint" : {
-            "type" : "string"
-          }
-        }
-      },
-      "CalculationRevalidationRequest" : {
-        "type" : "object",
-        "properties" : {
-          "calculationId" : {
-            "type" : "string",
-            "maxLength" : 100,
-            "minLength" : 0
-          },
-          "stateToken" : {
-            "type" : "string",
-            "maxLength" : 100,
-            "minLength" : 0
-          },
-          "input" : {
-            "$ref" : "#/components/schemas/PaymentCalculationRequest"
-          }
-        },
-        "required" : [ "calculationId", "input", "stateToken" ]
-      },
-      "Accepted" : {
-        "properties" : {
-          "batchExecutionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "previousBatchExecutionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "retryId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "status" : {
-            "type" : "string"
-          },
-          "validationRunId" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostBasis" : {
-        "properties" : {
-          "amount" : {
-            "description" : "기준액(원). 입력이 부족하면 null",
-            "type" : [ "number", "null" ]
-          },
-          "basisCode" : {
-            "type" : [ "string", "null" ]
-          },
-          "description" : {
-            "description" : "정책에 등록한 값의 출처 설명",
-            "type" : [ "string", "null" ]
-          },
-          "premiumAmount" : {
-            "type" : [ "number", "null" ]
-          },
-          "ratePct" : {
-            "type" : [ "number", "null" ]
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostCheckRequest" : {
-        "properties" : {
-          "contractId" : {
-            "exclusiveMinimum" : 0,
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "paymentStage" : {
-            "description" : "검증할 지급단계. 두 단계의 한도 검증을 합치지 않는다.",
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
-            "type" : "string"
-          }
-        },
-        "required" : [ "contractId", "paymentStage" ],
-        "type" : "object"
-      },
-      "AcquisitionCostCheckResponse" : {
-        "properties" : {
-          "acquisitionCost" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/AcquisitionCostBasis"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "acquisitionCostCheckId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "basicDocumentDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "basicDocumentVersion" : {
-            "type" : "string"
-          },
-          "calcRuleVersion" : {
-            "type" : "string"
-          },
-          "checkedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "contractDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "contractId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "contractNo" : {
-            "type" : "string"
-          },
-          "exclusions" : {
-            "items" : {
-              "$ref" : "#/components/schemas/AcquisitionCostExclusionLine"
-            },
-            "type" : "array"
-          },
-          "feeRegimeCode" : {
-            "type" : "string"
-          },
-          "indirectSupportAmount" : {
-            "description" : "유지관리 총액에 포함된 간접지원경비. 별도 한도를 두지 않는다",
-            "type" : [ "number", "null" ]
-          },
-          "insurerName" : {
-            "type" : "string"
-          },
-          "limitPolicy" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/AcquisitionCostPolicyRef"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "lineGroups" : {
-            "items" : {
-              "$ref" : "#/components/schemas/AcquisitionCostLineGroup"
-            },
-            "type" : "array"
-          },
-          "maintenance" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/AcquisitionCostItem"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "offeringVersion" : {
-            "type" : "string"
-          },
-          "paymentPolicy" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/AcquisitionCostPolicyRef"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "paymentStage" : {
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
-            "type" : "string"
-          },
-          "paymentStageLabel" : {
-            "type" : "string"
-          },
-          "productName" : {
-            "type" : "string"
-          },
-          "reasons" : {
-            "items" : {
-              "$ref" : "#/components/schemas/AcquisitionCostReason"
-            },
-            "type" : "array"
-          },
-          "resultStatus" : {
-            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
-            "type" : "string"
-          },
-          "resultStatusLabel" : {
-            "type" : "string"
-          },
-          "salesStartDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "scheduleHeaderId" : {
-            "format" : "int64",
-            "type" : [ "integer", "null" ]
-          },
-          "scheduleVersionNo" : {
-            "format" : "int32",
-            "type" : [ "integer", "null" ]
-          },
-          "unclassifiedAmount" : {
-            "description" : "분류하지 못해 판정에 넣지 않은 금액",
-            "type" : [ "number", "null" ]
-          },
-          "upfront" : {
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/AcquisitionCostItem"
-            }, {
-              "type" : "null"
-            } ]
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostCheckSearchCondition" : {
-        "properties" : {
-          "contractId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "contractNo" : {
-            "type" : "string"
-          },
-          "insurerId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "paymentStage" : {
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
-            "type" : "string"
-          },
-          "resultStatus" : {
-            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
-            "type" : "string"
-          },
-          "sort" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostExclusionLine" : {
-        "properties" : {
-          "amount" : {
-            "type" : "number"
-          },
-          "evidenceRef" : {
-            "type" : [ "string", "null" ]
-          },
-          "excluded" : {
-            "type" : "boolean"
-          },
-          "installmentNo" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "itemCode" : {
-            "type" : "string"
-          },
-          "itemName" : {
-            "type" : "string"
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "scheduleLineId" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostItem" : {
-        "properties" : {
-          "baseAmount" : {
-            "type" : [ "number", "null" ]
-          },
-          "calculatedAmount" : {
-            "type" : [ "number", "null" ]
-          },
-          "exceededFromInstallmentNo" : {
-            "description" : "누적이 처음 한도를 넘는 회차",
-            "format" : "int32",
-            "type" : [ "integer", "null" ]
-          },
-          "label" : {
-            "type" : "string"
-          },
-          "limitAmount" : {
-            "type" : [ "number", "null" ]
-          },
-          "limitCode" : {
-            "type" : "string"
-          },
-          "limitPct" : {
-            "type" : [ "number", "null" ]
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "status" : {
-            "enum" : [ "NORMAL", "VIOLATION", "REVIEW_REQUIRED", "NOT_APPLICABLE" ],
-            "type" : "string"
-          },
-          "statusLabel" : {
-            "type" : "string"
-          },
-          "usagePct" : {
-            "type" : [ "number", "null" ]
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostLineGroup" : {
-        "properties" : {
-          "amount" : {
-            "type" : "number"
-          },
-          "bucket" : {
-            "type" : "string"
-          },
-          "bucketLabel" : {
-            "type" : "string"
-          },
-          "feeComponentType" : {
-            "type" : [ "string", "null" ]
-          },
-          "installmentFrom" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "installmentTo" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "itemCode" : {
-            "type" : "string"
-          },
-          "itemName" : {
-            "type" : "string"
-          },
-          "lineCount" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostPolicyRef" : {
-        "properties" : {
-          "policyCode" : {
-            "type" : "string"
-          },
-          "policyName" : {
-            "type" : "string"
-          },
-          "policyVersionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "regulationRefs" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          },
-          "sourceClass" : {
-            "type" : "string"
-          },
-          "sourceClassLabel" : {
-            "type" : "string"
-          },
-          "sourceRefs" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          },
-          "versionNo" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "AcquisitionCostReason" : {
-        "properties" : {
-          "code" : {
-            "type" : "string"
-          },
-          "message" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponseAccepted" : {
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/Accepted"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponseAcquisitionCostCheckResponse" : {
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/AcquisitionCostCheckResponse"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponseContractStatusPreviewResponse" : {
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/ContractStatusPreviewResponse"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponseListRetry" : {
-        "properties" : {
-          "data" : {
-            "items" : {
-              "$ref" : "#/components/schemas/Retry"
-            },
-            "type" : "array"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponsePageResponseAcquisitionCostCheckResponse" : {
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/PageResponseAcquisitionCostCheckResponse"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponsePageResponseContractStatusEffectResponse" : {
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/PageResponseContractStatusEffectResponse"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ApiResponseRestartability" : {
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/Restartability"
-          },
-          "error" : {
-            "$ref" : "#/components/schemas/ApiError"
-          },
-          "requestId" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ClawbackLine" : {
-        "properties" : {
-          "appliedRatePct" : {
-            "type" : "number"
-          },
-          "basisAmount" : {
-            "type" : "number"
-          },
-          "clawbackAmount" : {
-            "type" : "number"
-          },
-          "commissionItemName" : {
-            "type" : "string"
-          },
-          "installmentNo" : {
-            "format" : "int32",
-            "type" : [ "integer", "null" ]
-          },
-          "transactionAttributionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "ClawbackReview" : {
-        "properties" : {
-          "amount" : {
-            "type" : [ "number", "null" ]
-          },
-          "candidate" : {
-            "type" : "boolean"
-          },
-          "elapsedMonths" : {
-            "format" : "int32",
-            "type" : [ "integer", "null" ]
-          },
-          "lines" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ClawbackLine"
-            },
-            "type" : "array"
-          },
-          "policyCode" : {
-            "type" : [ "string", "null" ]
-          },
-          "policyVersionId" : {
-            "format" : "int64",
-            "type" : [ "integer", "null" ]
-          },
-          "policyVersionNo" : {
-            "format" : "int32",
-            "type" : [ "integer", "null" ]
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "reasonCodes" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          }
-        },
-        "type" : "object"
-      },
-      "ContractStatusEffectResponse" : {
-        "properties" : {
-          "amount" : {
-            "type" : [ "number", "null" ]
-          },
-          "entityId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "entityType" : {
-            "type" : "string"
-          },
-          "nextState" : {
-            "type" : "string"
-          },
-          "policyVersionId" : {
-            "format" : "int64",
-            "type" : [ "integer", "null" ]
-          },
-          "previousState" : {
-            "type" : [ "string", "null" ]
-          },
-          "processingJob" : {
-            "type" : "string"
-          },
-          "reason" : {
-            "type" : [ "string", "null" ]
-          },
-          "reasonCode" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ContractStatusPreviewRequest" : {
-        "properties" : {
-          "effectiveAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "eventType" : {
-            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
-            "type" : "string"
-          }
-        },
-        "required" : [ "effectiveAt", "eventType" ],
-        "type" : "object"
-      },
-      "ContractStatusPreviewResponse" : {
-        "properties" : {
-          "clawbackReview" : {
-            "$ref" : "#/components/schemas/ClawbackReview"
-          },
-          "contractId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "currentStatus" : {
-            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
-            "type" : "string"
-          },
-          "effectiveAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "eventType" : {
-            "enum" : [ "APPLIED", "ACTIVE", "UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED", "MATURED" ],
-            "type" : "string"
-          },
-          "excludedLines" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PreviewLine"
-            },
-            "type" : "array"
-          },
-          "heldAmount" : {
-            "$ref" : "#/components/schemas/HeldAmount"
-          },
-          "paidAmount" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PaidAmount"
-            },
-            "type" : "array"
-          },
-          "payments" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PreviewPayment"
-            },
-            "type" : "array"
-          },
-          "pendingFollowUps" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "resumedLines" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PreviewLine"
-            },
-            "type" : "array"
-          },
-          "snapshotAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "stoppedLines" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PreviewLine"
-            },
-            "type" : "array"
-          }
-        },
-        "type" : "object"
-      },
-      "EventFollowUp" : {
-        "properties" : {
-          "jobs" : {
-            "items" : {
-              "$ref" : "#/components/schemas/FollowUpJob"
-            },
-            "type" : "array"
-          },
-          "status" : {
-            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "FeeRegimeResolution" : {
-        "properties" : {
-          "basicDocumentDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "basicDocumentVersion" : {
-            "type" : "string"
-          },
-          "candidateOfferingIds" : {
-            "items" : {
-              "format" : "int64",
-              "type" : "integer"
-            },
-            "type" : "array"
-          },
-          "candidateRulesetIds" : {
-            "items" : {
-              "format" : "int64",
-              "type" : "integer"
-            },
-            "type" : "array"
-          },
-          "contractDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "declaredFeeRegimeCode" : {
-            "type" : "string"
-          },
-          "policyVersionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "reasonCode" : {
-            "enum" : [ "UNKNOWN_REGIME", "CONTRACT_OUTSIDE_SALES_PERIOD", "OFFERING_NOT_UNIQUE", "NOT_APPLICABLE", "CURRENT_BUT_ELIGIBLE", "REGIME_NOT_ELIGIBLE", "FOUR_YEAR_AFTER_SPECIAL_PERIOD", "SEVEN_YEAR_IN_SPECIAL_PERIOD", "RULESET_MISSING", "RULESET_AMBIGUOUS", "RULESET_FLAGGED", "RULESET_LIMIT_MISSING", "COMMISSION_RULE_INVALID", "RULESET_SELECTED" ],
-            "type" : "string"
-          },
-          "regRefs" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          },
-          "rulesetId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "salesStartDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "status" : {
-            "enum" : [ "SELECTED", "NOT_APPLICABLE", "REVIEW_REQUIRED" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "FeeRegimeRulesetSelection" : {
-        "properties" : {
-          "limits" : {
-            "items" : {
-              "$ref" : "#/components/schemas/RulesetLimit"
-            },
-            "type" : "array"
-          },
-          "resolution" : {
-            "$ref" : "#/components/schemas/FeeRegimeResolution"
-          },
-          "ruleset" : {
-            "$ref" : "#/components/schemas/Ruleset"
-          },
-          "selected" : {
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "FeeRegimeSchedulePolicy" : {
-        "properties" : {
-          "commissionPolicy" : {
-            "$ref" : "#/components/schemas/ResolvedCommissionPolicy"
-          },
-          "selected" : {
-            "type" : "boolean"
-          },
-          "selection" : {
-            "$ref" : "#/components/schemas/FeeRegimeRulesetSelection"
-          },
-          "sourceRefs" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          },
-          "versionNo" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "FollowUpJob" : {
-        "properties" : {
-          "attemptCount" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "errorCode" : {
-            "type" : [ "string", "null" ]
-          },
-          "job" : {
-            "type" : "string"
-          },
-          "lastAttemptAt" : {
-            "format" : "date-time",
-            "type" : [ "string", "null" ]
-          },
-          "maxAttempts" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "nextRetryAt" : {
-            "format" : "date-time",
-            "type" : [ "string", "null" ]
-          },
-          "status" : {
-            "enum" : [ "EXHAUSTED", "FAILED", "PROCESSING", "PENDING", "SUCCEEDED", "NOT_REQUIRED" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "HeldAmount" : {
-        "properties" : {
-          "after" : {
-            "type" : "number"
-          },
-          "before" : {
-            "type" : "number"
-          }
-        },
-        "type" : "object"
-      },
-      "PageResponseAcquisitionCostCheckResponse" : {
-        "properties" : {
-          "content" : {
-            "items" : {
-              "$ref" : "#/components/schemas/AcquisitionCostCheckResponse"
-            },
-            "type" : "array"
-          },
-          "page" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "size" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "sort" : {
-            "type" : "string"
-          },
-          "totalElements" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "totalPages" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "PageResponseContractStatusEffectResponse" : {
-        "properties" : {
-          "content" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ContractStatusEffectResponse"
-            },
-            "type" : "array"
-          },
-          "page" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "size" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "sort" : {
-            "type" : "string"
-          },
-          "totalElements" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "totalPages" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "PaidAmount" : {
-        "properties" : {
-          "amount" : {
-            "type" : [ "number", "null" ]
-          },
-          "paymentStage" : {
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "PreviewLine" : {
-        "properties" : {
-          "amount" : {
-            "type" : [ "number", "null" ]
-          },
-          "commissionItemName" : {
-            "type" : "string"
-          },
-          "dueDate" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "installmentNo" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "nextDueDate" : {
-            "format" : "date",
-            "type" : [ "string", "null" ]
-          },
-          "nextState" : {
-            "type" : "string"
-          },
-          "paymentStage" : {
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
-            "type" : "string"
-          },
-          "previousState" : {
-            "type" : "string"
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "reasonCode" : {
-            "type" : "string"
-          },
-          "scheduleLineId" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "PreviewPayment" : {
-        "properties" : {
-          "amount" : {
-            "type" : [ "number", "null" ]
-          },
-          "commissionTransactionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "nextState" : {
-            "type" : "string"
-          },
-          "previousState" : {
-            "type" : "string"
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "reasonCode" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ProcessingSummary" : {
-        "properties" : {
-          "changedScheduleLines" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "excludedCount" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "heldPayments" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "resumedPayments" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "ResolvedCommissionPolicy" : {
-        "properties" : {
-          "paymentStage" : {
-            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
-            "type" : "string"
-          },
-          "policyType" : {
-            "enum" : [ "CURRENT_COMMISSION", "FOUR_YEAR_COMMISSION", "SEVEN_YEAR_COMMISSION", "CAP_1200", "ALLOCATION", "REFUND_RATE", "CLAWBACK", "RECONCILIATION_TOLERANCE", "SCHEDULE_ELIGIBILITY", "ARBITRAGE" ],
-            "type" : "string"
-          },
-          "policyVersionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "rules" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ResolvedCommissionRule"
-            },
-            "type" : "array"
-          },
-          "scheduleRegime" : {
-            "enum" : [ "CURRENT", "FOUR_YEAR_2027", "SEVEN_YEAR_2029" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ResolvedCommissionRule" : {
-        "properties" : {
-          "agentRankCode" : {
-            "enum" : [ "FC", "TEAM_LEADER", "BRANCH_MANAGER", "DIVISION_HEAD" ],
-            "type" : "string"
-          },
-          "basisCode" : {
-            "type" : "string"
-          },
-          "calculationType" : {
-            "enum" : [ "FIXED", "RATE" ],
-            "type" : "string"
-          },
-          "commissionItemId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "commissionRuleId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "equalMonthlyYn" : {
-            "type" : "boolean"
-          },
-          "feeComponentType" : {
-            "enum" : [ "CURRENT", "UPFRONT", "MAINTENANCE", "LONG_TERM_MAINTENANCE", "INCENTIVE", "SETTLEMENT_SUPPORT", "NEWCOMER_SUPPORT", "COMMON_COST", "OTHER" ],
-            "type" : "string"
-          },
-          "fixedAmount" : {
-            "type" : "number"
-          },
-          "installmentFrom" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "installmentTo" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "insurerId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "organizationId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "paymentConditionCode" : {
-            "type" : "string"
-          },
-          "priorityNo" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "productOfferingId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "ratePct" : {
-            "type" : "number"
-          },
-          "roundingMode" : {
-            "enum" : [ "UP", "DOWN", "CEILING", "FLOOR", "HALF_UP", "HALF_DOWN", "HALF_EVEN", "UNNECESSARY" ],
-            "type" : "string"
-          },
-          "roundingScale" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "Restartability" : {
-        "properties" : {
-          "allowed" : {
-            "type" : "boolean"
-          },
-          "checkpointAvailable" : {
-            "type" : "boolean"
-          },
-          "completedCount" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "expectedStateVersion" : {
-            "type" : "string"
-          },
-          "failedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "failedStep" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "lastFailedBatchExecutionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "reasonCode" : {
-            "type" : "string"
-          },
-          "remainingCount" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "Retry" : {
-        "properties" : {
-          "batchExecutionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "errorCode" : {
-            "type" : "string"
-          },
-          "failedStep" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "finishedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "previousBatchExecutionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "requestedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "requestedBy" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "retryId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "startedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "state" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "Ruleset" : {
-        "properties" : {
-          "basicDocumentDateFrom" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "basicDocumentDateTo" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "basicDocumentVersion" : {
-            "type" : "string"
-          },
-          "feeRegimeCode" : {
-            "type" : "string"
-          },
-          "longTermMaintenanceFrom" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "longTermMaintenanceTo" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "maxInstallments" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "policyVersionId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "rulesetId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "salesStartDateFrom" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "salesStartDateTo" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "sourceRefs" : {
-            "items" : {
-              "type" : "string"
-            },
-            "type" : "array"
-          }
-        },
-        "type" : "object"
-      },
-      "RulesetLimit" : {
-        "properties" : {
-          "includesIndirectExpense" : {
-            "type" : "boolean"
-          },
-          "limitCode" : {
-            "type" : "string"
-          },
-          "limitPct" : {
-            "type" : "number"
-          }
-        },
-        "type" : "object"
-      },
-      "SchedulePreviewContext" : {
-        "properties" : {
-          "expectedSourceVersion" : {
-            "type" : "string"
-          },
-          "policy" : {
-            "$ref" : "#/components/schemas/FeeRegimeSchedulePolicy"
-          }
-        },
-        "type" : "object"
-      },
-      "ValidationRestartRequest" : {
-        "properties" : {
-          "expectedBatchExecutionId" : {
-            "exclusiveMinimum" : 0,
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "expectedStateVersion" : {
-            "maxLength" : 200,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "reason" : {
-            "maxLength" : 500,
-            "minLength" : 0,
-            "type" : "string"
-          }
-        },
-        "required" : [ "expectedBatchExecutionId", "expectedStateVersion", "reason" ],
-        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -10447,6 +10641,127 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/acquisition-cost-checks" : {
+      "get" : {
+        "description" : "저장한 결과를 최신순으로 돌려줍니다. 조회만으로 검증을 만들지 않습니다.",
+        "operationId" : "searchAcquisitionCostChecks",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "condition",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/AcquisitionCostCheckSearchCondition"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseAcquisitionCostCheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "FUN-062 계약체결비용 한도 검증 결과 목록",
+        "tags" : [ "acquisition-cost-check-controller" ]
+      },
+      "post" : {
+        "description" : "계약의 활성 예정 스케줄을 정책 기준으로 판정해 결과를 저장합니다. 자료가 부족하면 오류가 아니라 금액 null과 REVIEW_REQUIRED로 저장합니다. 같은 Idempotency-Key 재요청은 최초 결과를 돌려줍니다.",
+        "operationId" : "requestAcquisitionCostCheck",
+        "parameters" : [ {
+          "description" : "검증 요청의 멱등키",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AcquisitionCostCheckRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAcquisitionCostCheckResponse"
+                }
+              }
+            },
+            "description" : "검증 결과"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
+                }
+              }
+            },
+            "description" : "멱등키 충돌 또는 같은 요청 처리 중"
+          }
+        },
+        "summary" : "FUN-062 계약체결비용 한도 검증 요청",
+        "tags" : [ "acquisition-cost-check-controller" ]
+      }
+    },
+    "/api/v1/acquisition-cost-checks/{id}" : {
+      "get" : {
+        "operationId" : "getAcquisitionCostCheck",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAcquisitionCostCheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "FUN-062 계약체결비용 한도 검증 결과 상세",
+        "tags" : [ "acquisition-cost-check-controller" ]
+      }
+    },
     "/api/v1/agent/me/contract-checks" : {
       "post" : {
         "description" : "종결 또는 후속 확인을 기록합니다. Idempotency-Key 와 expectedContextVersion 이 필요합니다.",
@@ -10914,8 +11229,6 @@
     },
     "/api/v1/assistant/calculations" : {
       "post" : {
-        "tags" : [ "payment-calculation-controller" ],
-        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
         "description" : "기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.",
         "operationId" : "calculate",
         "requestBody" : {
@@ -10930,16 +11243,48 @@
         },
         "responses" : {
           "200" : {
-            "description" : "OK",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
                 }
               }
-            }
+            },
+            "description" : "OK"
           }
-        }
+        },
+        "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
+        "tags" : [ "payment-calculation-controller" ]
+      }
+    },
+    "/api/v1/assistant/calculations/revalidate" : {
+      "post" : {
+        "description" : "변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.",
+        "operationId" : "revalidate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CalculationRevalidationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "계산 입력·의존성·사용자·만료 재검증",
+        "tags" : [ "payment-calculation-controller" ]
       }
     },
     "/api/v1/audit-logs" : {
@@ -11226,6 +11571,15 @@
           "description" : "소속 조직 ID",
           "in" : "query",
           "name" : "organizationId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "지점 ID. 이 지점과 바로 아래 팀 소속 설계사를 찾는다(FUN-080 관리자 홈)",
+          "in" : "query",
+          "name" : "branchId",
           "required" : false,
           "schema" : {
             "format" : "int64",
@@ -12592,6 +12946,96 @@
         "tags" : [ "계약" ]
       }
     },
+    "/api/v1/contracts/{id}/status-events/preview" : {
+      "post" : {
+        "operationId" : "previewContractStatusEvent",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ContractStatusPreviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseContractStatusPreviewResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "계약" ]
+      }
+    },
+    "/api/v1/contracts/{id}/status-events/{eventId}/effects" : {
+      "get" : {
+        "operationId" : "getContractStatusEventEffects",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "eventId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseContractStatusEffectResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "계약" ]
+      }
+    },
     "/api/v1/contracts/{id}/transactions" : {
       "get" : {
         "operationId" : "getContractTransactions",
@@ -12760,6 +13204,40 @@
         "tags" : [ "exception-case-controller" ]
       }
     },
+    "/api/v1/exceptions/counts" : {
+      "get" : {
+        "operationId" : "counts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "validationMonth",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionCountsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-case-controller" ]
+      }
+    },
     "/api/v1/exceptions/options" : {
       "get" : {
         "operationId" : "options",
@@ -12850,6 +13328,37 @@
           }
         },
         "tags" : [ "exception-case-controller" ]
+      }
+    },
+    "/api/v1/home/summary" : {
+      "get" : {
+        "description" : "기준일의 등록·활동·해촉 설계사 수, 지점별 설계사·유효 계약 수, 확인할 설계사 상위 10명을 돌려준다. asOf 생략 시 오늘(Asia/Seoul)을 쓴다. 전체 설계사 검색은 IF-API-07 을 쓴다.",
+        "operationId" : "homeSummary",
+        "parameters" : [ {
+          "description" : "현황 기준일(yyyy-MM-dd). 생략하면 오늘",
+          "example" : "2026-11-04",
+          "in" : "query",
+          "name" : "asOf",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseHomeSummaryResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "관리자 홈 GA·설계사 현황 (IF-API-68)",
+        "tags" : [ "업무 대시보드" ]
       }
     },
     "/api/v1/journals" : {
@@ -14949,247 +15458,6 @@
         },
         "summary" : "검증 실행 진행률 조회 (IF-API-49)",
         "tags" : [ "검증 실행" ]
-      }
-    },
-    "/api/v1/assistant/calculations/revalidate" : {
-      "post" : {
-        "tags" : [ "payment-calculation-controller" ],
-        "summary" : "계산 입력·의존성·사용자·만료 재검증",
-        "description" : "변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.",
-        "operationId" : "revalidate",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/CalculationRevalidationRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/acquisition-cost-checks" : {
-      "get" : {
-        "description" : "저장한 결과를 최신순으로 돌려줍니다. 조회만으로 검증을 만들지 않습니다.",
-        "operationId" : "searchAcquisitionCostChecks",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "condition",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/AcquisitionCostCheckSearchCondition"
-          }
-        }, {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : 1,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        }, {
-          "in" : "query",
-          "name" : "size",
-          "required" : false,
-          "schema" : {
-            "default" : 20,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePageResponseAcquisitionCostCheckResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "FUN-062 계약체결비용 한도 검증 결과 목록",
-        "tags" : [ "acquisition-cost-check-controller" ]
-      },
-      "post" : {
-        "description" : "계약의 활성 예정 스케줄을 정책 기준으로 판정해 결과를 저장합니다. 자료가 부족하면 오류가 아니라 금액 null과 REVIEW_REQUIRED로 저장합니다. 같은 Idempotency-Key 재요청은 최초 결과를 돌려줍니다.",
-        "operationId" : "requestAcquisitionCostCheck",
-        "parameters" : [ {
-          "description" : "검증 요청의 멱등키",
-          "in" : "header",
-          "name" : "Idempotency-Key",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/AcquisitionCostCheckRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "201" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseAcquisitionCostCheckResponse"
-                }
-              }
-            },
-            "description" : "검증 결과"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiFailureResponse"
-                }
-              }
-            },
-            "description" : "멱등키 충돌 또는 같은 요청 처리 중"
-          }
-        },
-        "summary" : "FUN-062 계약체결비용 한도 검증 요청",
-        "tags" : [ "acquisition-cost-check-controller" ]
-      }
-    },
-    "/api/v1/acquisition-cost-checks/{id}" : {
-      "get" : {
-        "operationId" : "getAcquisitionCostCheck",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseAcquisitionCostCheckResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "FUN-062 계약체결비용 한도 검증 결과 상세",
-        "tags" : [ "acquisition-cost-check-controller" ]
-      }
-    },
-    "/api/v1/contracts/{id}/status-events/preview" : {
-      "post" : {
-        "operationId" : "previewContractStatusEvent",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ContractStatusPreviewRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseContractStatusPreviewResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "계약" ]
-      }
-    },
-    "/api/v1/contracts/{id}/status-events/{eventId}/effects" : {
-      "get" : {
-        "operationId" : "getContractStatusEventEffects",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        }, {
-          "in" : "path",
-          "name" : "eventId",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        }, {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : 1,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        }, {
-          "in" : "query",
-          "name" : "size",
-          "required" : false,
-          "schema" : {
-            "default" : 20,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponsePageResponseContractStatusEffectResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [ "계약" ]
       }
     },
     "/api/v1/validation-runs/{id}/restart" : {

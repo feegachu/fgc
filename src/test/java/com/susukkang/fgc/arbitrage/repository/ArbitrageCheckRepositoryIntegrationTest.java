@@ -36,6 +36,32 @@ class ArbitrageCheckRepositoryIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Test
+    void readsStoredPlannedBasisForListAndHistoryWithoutRewritingOldResults() {
+        TestReference reference = testReference();
+        Long runId = insertValidationRun();
+        List<String> bases = java.util.Arrays.asList(null, "REMAINING_V1", "UNRESOLVED_UPPER_BOUND_V1", "FUTURE_BASIS_V2");
+        for (int i = 0; i < bases.size(); i++) {
+            insertArbitrageCheck(runId, reference.contractId(), TEST_MONTH.atDay(i + 1),
+                    PaymentStage.GA_TO_FC, ArbitrageCheckStatus.CLEAR, "stored basis", bases.get(i));
+        }
+        var before = jdbcTemplate.queryForList("SELECT arbitrage_check_id, planned_commission_amount, calculation_snapshot::text FROM fgc.arbitrage_check WHERE validation_run_id=? ORDER BY arbitrage_check_id", runId);
+        var condition = new ArbitrageCheckSearchCondition(TEST_MONTH, null, PaymentStage.GA_TO_FC, null, reference.contractNo());
+        var listed = arbitrageCheckRepository.selectByCondition(condition, 0, 20);
+        var history = arbitrageCheckRepository.selectByContractId(reference.contractId(), PaymentStage.GA_TO_FC);
+        for (int i = 0; i < bases.size(); i++) {
+            LocalDate expectedDate = TEST_MONTH.atDay(i + 1);
+            String expectedBasis = bases.get(i);
+            for (var rows : List.of(listed, history)) {
+                assertThat(rows).filteredOn(row -> expectedDate.equals(row.getAsOfDate())).singleElement().satisfies(row -> {
+                    assertThat(row.getPlannedCommissionBasis()).isEqualTo(expectedBasis);
+                    assertThat(row.getPlannedCommissionAmount()).isEqualByComparingTo("100000");
+                });
+            }
+        }
+        assertThat(jdbcTemplate.queryForList("SELECT arbitrage_check_id, planned_commission_amount, calculation_snapshot::text FROM fgc.arbitrage_check WHERE validation_run_id=? ORDER BY arbitrage_check_id", runId)).isEqualTo(before);
+    }
+
     /** #604 허용 컬럼의 양방향 정렬을 DB 의 같은 정렬과 비교한다. 같은 값(동률)과 비어 있는 값을 섞는다. */
     @Test
     void sortsByEachAllowedColumnInBothDirectionsAcrossPages() {
@@ -349,6 +375,12 @@ class ArbitrageCheckRepositoryIntegrationTest {
             PaymentStage paymentStage,
             ArbitrageCheckStatus status,
             String decisionReason) {
+        insertArbitrageCheck(validationRunId, contractId, asOfDate, paymentStage, status, decisionReason, null);
+    }
+
+    private void insertArbitrageCheck(Long validationRunId, Long contractId, LocalDate asOfDate,
+                                     PaymentStage paymentStage, ArbitrageCheckStatus status,
+                                     String decisionReason, String basis) {
         jdbcTemplate.update("""
                 INSERT INTO fgc.arbitrage_check (
                     validation_run_id, contract_id, payment_stage, as_of_date,
@@ -360,7 +392,7 @@ class ArbitrageCheckRepositoryIntegrationTest {
                 ) VALUES (
                     ?, ?, ?, ?, 1, ?, ?, ?, 0, false,
                     'NOT_APPLICABLE', ?, false, ?,
-                    jsonb_build_object('decisionReason', ?::text)
+                    jsonb_strip_nulls(jsonb_build_object('decisionReason', ?::text, 'plannedCommissionBasis', ?::text))
                 )
                 """,
                 validationRunId,
@@ -372,7 +404,8 @@ class ArbitrageCheckRepositoryIntegrationTest {
                 new BigDecimal("100000.00"),
                 new BigDecimal("500000.00"),
                 status.name(),
-                decisionReason
+                decisionReason,
+                basis
         );
     }
 
