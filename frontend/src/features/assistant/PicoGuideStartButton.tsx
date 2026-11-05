@@ -4,6 +4,7 @@ import { useGuideRuntime } from './guide-runtime'
 import { startPicoGuide } from './pico-guide-api'
 import { isEntityId } from './guards'
 import { useWorkflowGuide } from './workflow-state'
+import type { components } from '../../lib/api/schema'
 
 export function PicoGuideStartButton({
   workflowId,
@@ -11,12 +12,14 @@ export function PicoGuideStartButton({
   canProcess,
   contextValid = true,
   sourceContextAvailable = true,
+  validatedGuide,
 }: {
   workflowId: string
   contextRevision: string
   canProcess: boolean
   contextValid?: boolean
   sourceContextAvailable?: boolean
+  validatedGuide?: components['schemas']['PicoValidatedGuide']
 }) {
   const settlementActive = useWorkflowGuide((state) => state.settlementActive)
   const observation = useGuideRuntime((state) => state.observation)
@@ -32,7 +35,7 @@ export function PicoGuideStartButton({
       lock.current = false
       setBusy(false)
     },
-    [observation, contextRevision, workflowId, canProcess, contextValid, sourceContextAvailable],
+    [observation, contextRevision, workflowId, canProcess, contextValid, sourceContextAvailable, validatedGuide],
   )
   const definition = findGuide(workflowId, '1.0')
   if (!definition) return null
@@ -54,7 +57,9 @@ export function PicoGuideStartButton({
                   ? '현재 입력이 저장본과 다릅니다. 기존 수정 저장 버튼으로 저장한 뒤 다시 질문해주세요.'
                   : !sourceContextAvailable
                     ? '질문 당시 저장된 지급 상태를 확인하지 못했습니다. 현재 화면에서 다시 질문해주세요.'
-                    : ''
+                    : validatedGuide?.stepId === 'payment.precheck' && !observation.formValid
+                      ? '현재 입력의 필수 항목을 확인한 뒤 다시 질문해주세요.'
+                      : ''
   const message = unavailable || notice
   async function start() {
     if (lock.current || unavailable || !observation?.paymentId || !definition) return
@@ -65,13 +70,14 @@ export function PicoGuideStartButton({
     setBusy(true)
     setNotice('')
     try {
-      await startPicoGuide(
-        { workflowId, guideVersion: '1.0', paymentId: captured.paymentId!, clientContextRevision: contextRevision },
+      const started = await startPicoGuide(
+        { workflowId, guideVersion: '1.0', paymentId: captured.paymentId!, clientContextRevision: contextRevision,
+          ...(validatedGuide ? { stepId: validatedGuide.stepId, serverStateVersion: validatedGuide.serverStateVersion ?? undefined } : {}) },
         abort.signal,
       )
       if (abort.signal.aborted || useGuideRuntime.getState().observation !== captured) return
       if (useWorkflowGuide.getState().settlementActive) throw new Error('GUIDE_ALREADY_ACTIVE')
-      if (!launchPaymentGuide(definition.workflowId) && (import.meta.env.VITE_ASSISTANT_AI === 'true' || !useGuideRuntime.getState().start(definition.workflowId))) throw new Error('GUIDE_NOT_READY')
+      if (!launchPaymentGuide(definition.workflowId, validatedGuide ? started.stepId : undefined) && (started.stepId !== 'payment.scope' || import.meta.env.VITE_ASSISTANT_AI === 'true' || !useGuideRuntime.getState().start(definition.workflowId))) throw new Error('GUIDE_NOT_READY')
     } catch {
       if (!abort.signal.aborted)
         setNotice('지급 상태와 권한을 다시 확인해야 합니다. 현재 화면에서 안내 시작을 다시 선택해주세요.')
