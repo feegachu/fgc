@@ -56,7 +56,7 @@ public class AgentHomeService {
     static final int PRIORITY_LIMIT = 20;
     static final String UNKNOWN = "UNKNOWN";
     /** 사람 확인이 필요한 상태 사건. 프로젝트 가정이며 정상화(ACTIVE)·청약 단계는 후보로 만들지 않는다. */
-    static final List<String> REVIEW_EVENT_STATUSES = List.of("UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED");
+    public static final List<String> REVIEW_EVENT_STATUSES = List.of("UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED");
     private static final Set<String> PERIODS = Set.of("6", "12", "ALL");
     private static final Set<String> INSURER_TYPES = Set.of("ALL", "LIFE", "NON_LIFE");
     private static final Map<String, String> CATEGORY_LABEL = Map.of(
@@ -94,17 +94,17 @@ public class AgentHomeService {
             throw invalid("insurerId");
         }
 
-        Range range = range(agentId, today, asOf, period);
+        Range range = range(agentId, asOf, period);
         OffsetDateTime asOfEnd = asOf.plusDays(1).atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime();
         List<String> warnings = new ArrayList<>();
 
-        List<PortfolioRow> rows = repository.portfolio(agentId, today, range.from(), range.to(), asOfEnd,
+        List<PortfolioRow> rows = repository.portfolio(agentId, range.from(), range.to(), asOfEnd,
                 "ALL".equals(insurerType) ? null : insurerType, insurerId);
         Portfolio portfolio = portfolio(rows, range, asOf, today, warnings);
         MyCommission commission = commission(agentId, asOf);
 
         OffsetDateTime recentFrom = asOf.minusDays(recentEventDays).atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime();
-        List<Candidate> candidates = repository.candidates(agentId, today, asOf, asOfEnd, recentFrom,
+        List<Candidate> candidates = repository.candidates(agentId, asOf, asOfEnd, recentFrom,
                 REVIEW_EVENT_STATUSES, PRIORITY_LIMIT);
         List<PriorityContract> priority = candidates.stream().map(c -> priority(c, asOf)).toList();
         int total = candidates.isEmpty() ? 0 : (int) candidates.get(0).total();
@@ -115,9 +115,9 @@ public class AgentHomeService {
     }
 
     /** 6/12 는 asOf 월을 포함한 N개월의 첫날~asOf, ALL 은 본인 최초 계약일~asOf. */
-    private Range range(long agentId, LocalDate today, LocalDate asOf, String period) {
+    private Range range(long agentId, LocalDate asOf, String period) {
         if ("ALL".equals(period)) {
-            LocalDate first = repository.firstContractDate(agentId, today).orElse(asOf);
+            LocalDate first = repository.firstContractDate(agentId).orElse(asOf);
             return new Range(first.isAfter(asOf) ? asOf : first, asOf);
         }
         return new Range(asOf.withDayOfMonth(1).minusMonths(Integer.parseInt(period) - 1L), asOf);

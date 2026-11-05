@@ -75,13 +75,26 @@ test('CONT-W03 상태 변경 뒤 CONT-W02 이력과 후속 상태, 영향을 실
   const other = sql(
     `SELECT min(c.contract_id) FROM fgc.insurance_contract c JOIN fgc.agent a USING (agent_id) WHERE a.agent_code <> 'A-FC-001'`,
   )
+  // FUN-085: 같은 사건의 영향이어도 AGENT에게는 본인 지급 건과 본인 회차만 보인다. 위 9001~9004는 본인 것이 아니다.
+  const ownPayment = sql(
+    `SELECT min(ct.commission_transaction_id) FROM fgc.commission_transaction ct
+       JOIN fgc.agent a ON a.agent_id = ct.recipient_agent_id WHERE a.agent_code = 'A-FC-001'`,
+  )
+  sql(`INSERT INTO fgc.contract_status_event_effect(contract_status_event_id, processing_job, entity_type, entity_id,
+              previous_state, next_state, amount, policy_version_id, reason_code, reason)
+       VALUES (${event}, 'PaymentHoldJob', 'PAYMENT', ${ownPayment}, 'DRAFT', 'HELD', 5000, NULL, 'STATUS_UNPAID', '귀속일 시점 미납이라 보류합니다.')`)
   await login(page, 'agent01', `/contracts/${contract}`)
   await page.getByRole('button', { name: '사건 2 영향 보기' }).click()
   const own = page.getByRole('dialog', { name: '사건 2 영향' })
-  await expect(own.getByRole('row', { name: /지급 건 #9001/ })).toContainText('지급 보류')
+  await expect(own.getByRole('heading', { name: '영향 1건' })).toBeVisible()
+  await expect(own.getByRole('row', { name: new RegExp(`지급 건 #${ownPayment}`) })).toContainText('지급 보류')
+  await expect(own).not.toContainText('#9001')
+  await expect(own).not.toContainText('#9003')
   await page.screenshot({ path: testInfo.outputPath('real-status-effects-agent.png') })
   await own.getByRole('button', { name: '닫기', exact: true }).click()
+  // 이력의 영향 건수는 남의 행까지 세므로 AGENT에게 보이지 않는다.
+  await expect(page.getByRole('table', { name: '상태 사건' })).not.toContainText('지급 보류 1건')
   await page.goto(`contracts/${other}`)
-  await expect(page.getByRole('alert')).toContainText('본인 담당 자료만')
+  await expect(page.getByRole('alert')).toContainText('본인 데이터만')
   await expect(page.getByRole('table', { name: '상태 사건' })).toHaveCount(0)
 })

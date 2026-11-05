@@ -1,3 +1,4 @@
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation } from 'react-router'
@@ -122,11 +123,11 @@ const columns = (back: string): TableColumn<ScheduleHeader>[] => [
   },
   {
     key: 'lines',
-    label: '회차 수',
+    label: '회차 / 행 수',
     sortable: true,
     width: '5.5rem',
     align: 'left',
-    render: (row) => int(row.lineCount),
+    render: (row) => `${int(row.installmentCount)}회 · ${int(row.lineCount)}행`,
   },
   {
     key: 'total',
@@ -200,6 +201,7 @@ export default function ScheduleListPage() {
   return (
     <div className="schedule-list-page">
       <header className="page-header schedule-page-header">
+        <ScreenHelp screenId="SCHE-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">예상 스케줄 목록</h1>
         </div>
@@ -221,7 +223,7 @@ export default function ScheduleListPage() {
         onReset={() => search(DEFAULT_FILTERS)}
       />
 
-      <section data-guide-feature="features.schedule.schedule-list-page.section" className="surface schedule-results-card" aria-labelledby="schedule-results-title">
+      <section data-guide-feature="features.schedule.schedule-list-page.section" data-guide-target="schedule.results" className="surface schedule-results-card" aria-labelledby="schedule-results-title">
         <ListHeader
           className="schedule-results-header"
           total={data ? data.totalElements ?? 0 : null}
@@ -308,7 +310,7 @@ function ScheduleFilter({
       </option>
     ))
   return (
-    <FilterBar
+    <FilterBar data-guide-target="schedule.filters"
       className="schedule-filter-bar"
       wrapFields={false}
       resetFirst
@@ -342,7 +344,21 @@ function ScheduleFilter({
           <label className="filter-field-label" htmlFor="schedule-filter-regime">
             적용 체계
           </label>
-          <select data-guide-feature="features.schedule.schedule-list-page.select-2" className="select-control" {...bind('regime')}>
+          <select data-guide-feature="features.schedule.schedule-list-page.select-2"
+            className="select-control"
+            {...bind('regime')}
+            onChange={(event) => {
+              const regime = event.target.value
+              const next = {
+                ...filters,
+                contractNo: filters.contractNo.trim(),
+                regime,
+                purpose: regime === 'FOUR_YEAR_2027' || regime === 'SEVEN_YEAR_2029' ? 'SIMULATION' : DEFAULT_PURPOSE,
+              }
+              setFilters(next)
+              onSearch(next)
+            }}
+          >
             <option value="">전체</option>
             {options(SCHEDULE_REGIME)}
           </select>

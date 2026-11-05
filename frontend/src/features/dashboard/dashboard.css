@@ -415,8 +415,127 @@
   height: 1.75rem;
 }
 
+/* 기준 정산월과 영역별 갱신 시각 */
+.dashboard-basis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+.region-updated {
+  color: var(--color-text-tertiary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+.region-error {
+  min-height: 8rem;
+  gap: var(--space-2);
+  padding: var(--space-5);
+}
+.kpi-retry {
+  margin-left: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.kpi-retry:disabled {
+  color: var(--color-text-tertiary);
+  cursor: default;
+}
+
+/* GA·설계사 현황 */
+.agent-overview {
+  min-width: 0;
+}
+.agent-overview-header {
+  flex-wrap: wrap;
+  padding-block: var(--space-2);
+}
+.agent-overview-basis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.agent-overview-date {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.agent-overview-date .field-label {
+  margin: 0;
+  white-space: nowrap;
+}
+.agent-overview-date input {
+  min-height: 2rem;
+}
+.agent-overview-loading {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.agent-overview-body,
+.agent-search {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.agent-search {
+  border-top: 1px solid var(--color-border-subtle);
+}
+.agent-overview-tables {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.agent-overview-tables > * {
+  min-width: 0;
+}
+.agent-overview-subtitle {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+.agent-overview-total {
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+.agent-overview-note {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+/* 공통 표의 최소 폭(42rem)은 나란히 놓인 좁은 표에 맞지 않는다. 더 좁아지면 표 안에서 가로로 움직인다. */
+.agent-overview .agent-branch-table {
+  min-width: 24rem;
+}
+.agent-overview .agent-attention-table {
+  min-width: 36rem;
+}
+.agent-search .filter-bar.search-conditions {
+  padding: 0;
+}
+.agent-overview td.agent-reason-cell {
+  height: auto;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 @media (max-width: 74.9375rem) {
-  .dashboard-main-grid {
+  .dashboard-main-grid,
+  .agent-overview-tables {
     grid-template-columns: 1fr;
   }
   .dashboard-skeleton-kpis {

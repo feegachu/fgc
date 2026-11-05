@@ -1,0 +1,8 @@
+# DAR-012 600인 합성 데이터셋 생성기 전용 프로필(시드명세 §50). 기본·test·배포 환경에서는 켜지 않는다.
+# 실행: gradlew generateDar012 -Pdar012.dataset-id=D12-1K -Pdar012.contracts=1000
+server:
+  port: 0                       # 적재 후 바로 종료하므로 포트를 점유하지 않는다
+fgc:
+  batch:
+    daily-changed-contract:
+      enabled: false            # 생성 중에 예약 배치가 끼어들지 않게 한다

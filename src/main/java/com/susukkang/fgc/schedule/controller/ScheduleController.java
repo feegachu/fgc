@@ -52,7 +52,7 @@ public class ScheduleController {
             rows.add(CsvExportWriter.row(
                     schedule.getContractNo(), schedule.getPaymentStageLabel(), schedule.getScheduleRegimeLabel(),
                     schedule.getSchedulePurposeLabel(), schedule.getStatusLabel(), schedule.getPolicyVersionLabel(),
-                    schedule.getScheduleVersionNo(), schedule.getLineCount(), schedule.getExpectedTotal(),
+                    schedule.getScheduleVersionNo(), schedule.getInstallmentCount(), schedule.getExpectedTotal(),
                     Boolean.TRUE.equals(schedule.getActiveYn()) ? "사용중" : "미사용",
                     schedule.getGenerationReason(), schedule.getGeneratedAt()
             ));
@@ -76,7 +76,7 @@ public class ScheduleController {
             rows.add(CsvExportWriter.row(
                     line.getLineNo(), line.getInstallmentNo(), line.getContractMonthNo(), line.getDueDate(),
                     line.getCommissionItemName(), line.getRecipientName(), line.getBasisCode(), line.getBasisAmount(),
-                    line.getCalculationType(), line.getRatePct(), line.getExpectedAmount(), line.getLineStatus(), line.getRuleRef()
+                    line.getCalculationType(), line.getRatePct(), line.getExpectedAmount(), line.getLineStatus(), line.getRuleRef(), line.getFixedAmount()
             ));
         }
         String filename = "예상스케줄_" + detail.getHeader().getContractNo() + "_v"
@@ -85,7 +85,7 @@ public class ScheduleController {
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(CsvExportWriter.write(List.of(
-                        "줄번호", "회차", "계약차월", "지급예정일", "수수료 항목", "수령자", "기준코드", "기준금액", "계산방식", "요율", "예상금액", "상태", "수수료 규칙 ID"
+                        "줄번호", "회차", "계약차월", "지급예정일", "수수료 항목", "수령자", "기준코드", "기준금액", "계산방식", "요율", "예상금액", "상태", "수수료 규칙 ID", "정액"
                 ), rows));
     }
 
@@ -99,7 +99,10 @@ public class ScheduleController {
      */
     @GetMapping("/{scheduleHeaderId}")
     public ApiResponse<ScheduleDetailResponse> getScheduleLineById(@PathVariable Long scheduleHeaderId) {
-        return ApiResponse.success(scheduleService.selectScheduleDetailById(scheduleHeaderId));
+        var detail = scheduleService.selectScheduleDetailById(scheduleHeaderId);
+        if (detail.getHeader().getContractId() != null)
+            detail.setPreviewContext(scheduleService.previewContext(detail.getHeader().getContractId(), detail.getHeader().getPaymentStage()));
+        return ApiResponse.success(detail);
     }
 
     /** 같은 계약의 선택한 지급단계에서 사용 중인 운영 스케줄 헤더 ID를 반환한다. */
@@ -128,7 +131,10 @@ public class ScheduleController {
     @PostMapping("/{id}/regenerate")
     public ApiResponse<ScheduleRegenResponse> regenerate(
             @PathVariable Long id,
-            @Valid @RequestBody ScheduleRegenRequest request) {
+            @Valid @RequestBody ScheduleRegenRequest request,
+            @RequestHeader(name = "Idempotency-Key", required = false) String key) {
+        if (request.getRegime() != null && request.getRegime() != com.susukkang.fgc.schedule.code.ScheduleRegime.CURRENT)
+            return ApiResponse.success(scheduleService.regeneratePreview(id, request, key));
         return ApiResponse.success(scheduleService.regenerateSchedules(id, request.getReason()));
     }
 

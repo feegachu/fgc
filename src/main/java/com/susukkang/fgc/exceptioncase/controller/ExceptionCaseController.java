@@ -10,6 +10,7 @@ import com.susukkang.fgc.exceptioncase.dto.ExceptionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionActionResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchResponse;
+import com.susukkang.fgc.exceptioncase.dto.ExceptionCountsResponse;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionOptionsResponse;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionRequest;
 import com.susukkang.fgc.exceptioncase.dto.JournalCorrectionActionResponse;
@@ -17,10 +18,12 @@ import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import com.susukkang.fgc.exceptioncase.service.JournalCorrectionExceptionActionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 /**
@@ -58,6 +61,19 @@ public class ExceptionCaseController {
             criteria.setStatus(ExceptionStatus.OPEN_FILTER);
         }
         return ApiResponse.success(exceptionCaseService.search(criteria, page, size));
+    }
+
+    /**
+     * IF-API-69 유형·심각도별 건수. status 가 없으면 미처리(OPEN), 빈 값이면 전체로 IF-API-43 과 같게 푼다.
+     * 숫자를 누르면 같은 status·validationMonth 의 예외함이 열리므로 설계사(AGENT)에게는 열지 않는다(FUN-085).
+     */
+    @GetMapping("/counts")
+    @PreAuthorize(Roles.ANY_ROLE)
+    public ApiResponse<ExceptionCountsResponse> counts(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate validationMonth) {
+        return ApiResponse.success(exceptionCaseService.counts(
+                status == null ? ExceptionStatus.OPEN_FILTER : status, validationMonth));
     }
 
     /** IF-API-43A 예외함 필터 선택지(유형·상세 원인·심각도·담당자·검증월)를 한 번에 돌려준다. */

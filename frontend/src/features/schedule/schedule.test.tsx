@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
@@ -32,6 +32,7 @@ const header = (scheduleHeaderId: number, overrides: Partial<ScheduleHeader> = {
   statusLabel: '예정',
   activeYn: true,
   lineCount: 2,
+  installmentCount: 2,
   expectedTotal: 1500000,
   policyVersionLabel: 'POL-2026-07 v3',
   generationReason: '최초 생성',
@@ -97,12 +98,13 @@ function renderAt(path: string, handler: Handler, roleCode = 'SETTLEMENT') {
     return envelope(result)
   })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return { router, actions: userEvent.setup() }
+  return { router, client, actions: userEvent.setup() }
 }
 const calls = (prefix: string) => requested.filter(({ url }) => url.startsWith(prefix))
 const query = (url: string) => Object.fromEntries(new URLSearchParams(url.split('?')[1]))
@@ -220,10 +222,9 @@ describe('SCHE-W01 예상 스케줄 목록', () => {
 
     await actions.type(screen.getByLabelText('계약번호'), '  C-9 ')
     await actions.selectOptions(screen.getByLabelText('적용 체계'), 'FOUR_YEAR_2027')
-    await actions.click(screen.getByRole('button', { name: /조회/ }))
     await waitFor(() =>
       expect(router.state.location.search).toBe(
-        '?month=2026-07&stage=GA_TO_FC&status=PLANNED&contractNo=C-9&regime=FOUR_YEAR_2027&purpose=OPERATIONAL',
+        '?month=2026-07&stage=GA_TO_FC&status=PLANNED&contractNo=C-9&regime=FOUR_YEAR_2027&purpose=SIMULATION',
       ),
     )
 
@@ -489,4 +490,161 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     await waitFor(() => expect(blob).toHaveBeenCalledWith('/api/v1/schedules/11/export.csv', expect.anything()))
     await waitFor(() => expect(toasts()).toContain('회차 표 CSV를 내려받았습니다.'))
   })
+})
+
+describe('FUN-037 4년 예정', () => {
+  it('확정·지급을 막고 서버 정책으로 재생성하며 재시도 멱등키를 유지한다', async () => {
+    const current: ScheduleDetail = {
+      ...detail({
+        contractId: 600,
+        scheduleRegime: 'FOUR_YEAR_2027',
+        schedulePurpose: 'SIMULATION',
+        canConfirm: false,
+        installmentCount: 48,
+      }),
+      previewContext: {
+        expectedSourceVersion: 'source-1',
+        policy: {
+          versionNo: 3,
+          sourceRefs: ['REG-03'],
+          commissionPolicy: { policyVersionId: 70 },
+          selection: {
+            resolution: { status: 'SELECTED', declaredFeeRegimeCode: 'FOUR_YEAR_2027' },
+            ruleset: { maxInstallments: 48 },
+          },
+        },
+      },
+    }
+    let attempts = 0
+    const { actions, router } = renderAt(
+      '/schedules/11?returnTo=%2Fschedules%3Fregime%3DFOUR_YEAR_2027%26purpose%3DSIMULATION',
+      (url, options) => {
+        if (url.endsWith('/versions')) return [current.header]
+        if (url === '/api/v1/schedules/11/regenerate' && options?.method === 'POST') {
+          if (++attempts === 1) throw new Error('일시적인 연결 오류')
+          return { scheduleHeaderId: 12, versionNo: 2 }
+        }
+        if (url === '/api/v1/schedules/11' || url === '/api/v1/schedules/12') return current
+      },
+    )
+    await screen.findByText('4년 예정 스케줄')
+    expect(screen.getByRole('button', { name: '확정' })).toBeDisabled()
+    expect(
+      screen.queryAllByRole('link').filter((link) => link.getAttribute('href')?.includes('/transactions/new')),
+    ).toHaveLength(0)
+    await actions.type(screen.getByLabelText('생성 사유'), '승인 정책 반영')
+    await actions.click(screen.getByRole('button', { name: '4년 예정 새 버전 만들기' }))
+    await screen.findByRole('alert')
+    await actions.click(screen.getByRole('button', { name: '생성 결과 다시 확인' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/12'))
+    expect(new URLSearchParams(router.state.location.search).get('returnTo')).toBe(
+      '/schedules?regime=FOUR_YEAR_2027&purpose=SIMULATION&selectedId=12',
+    )
+    const requests = calls('/api/v1/schedules/11/regenerate')
+    expect(requests).toHaveLength(2)
+    expect(requests[0].options?.body).toEqual({
+      reason: '승인 정책 반영',
+      regime: 'FOUR_YEAR_2027',
+      policyVersionId: 70,
+      expectedSourceVersion: 'source-1',
+    })
+    expect(requests[0].options?.idempotencyKey).toBeTruthy()
+    expect(requests[1].options?.idempotencyKey).toBe(requests[0].options?.idempotencyKey)
+  })
+})
+
+
+it('4년 정액 정책은 실제 정액·정책 회차 수를 표시하고 취소판은 재생성을 제공하지 않는다', async () => {
+  const data = detail({ contractId: 600, scheduleRegime: 'FOUR_YEAR_2027', schedulePurpose: 'SIMULATION', status: 'CANCELLED', installmentCount: 12, lineCount: 24 })
+  data.lines = [{ ...data.lines![0], calculationType: 'FIXED', ratePct: undefined, fixedAmount: 12345 }]
+  renderAt('/schedules/11', url => url === '/api/v1/schedules/11' ? data : [])
+  await screen.findByText('스케줄 번호 11')
+  expect(screen.getByRole('cell', { name: '12,345원' })).toBeVisible()
+  expect(screen.getByText(/정책 정의 12회차 · 24행/)).toBeVisible()
+  expect(screen.queryByRole('button', { name: '4년 예정 새 버전 만들기' })).not.toBeInTheDocument()
+})
+
+it('regeneration help validates reason and waits for new server version before navigation', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  const { router, actions } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return { scheduleHeaderId: 12, versionNo: 3 }
+    if (url === '/api/v1/schedules/12') return { ...detail(), header: header(12, { scheduleVersionNo: 3 }) }
+    if (url === '/api/v1/schedules/12/versions') return [header(12, { scheduleVersionNo: 3 })]
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const modal = within(screen.getByRole('dialog', { name: '새 버전 만들기' }))
+  await actions.click(modal.getByRole('button', { name: '도움말' }))
+  const next = () => modal.getByRole('button', { name: '다음' })
+  expect(next()).toBeDisabled()
+  await actions.type(modal.getByLabelText(/생성 사유/), '가이드 재생성 검증')
+  await waitFor(() => expect(next()).toBeEnabled())
+  await actions.click(next())
+  expect(calls('/api/v1/schedules/11/regenerate')).toHaveLength(0)
+  expect(next()).toBeDisabled()
+  await actions.click(modal.getByRole('button', { name: '새 버전 만들기' }))
+  await waitFor(() => expect(next()).toBeEnabled())
+  expect(router.state.location.pathname).toBe('/schedules/11')
+  await actions.click(next())
+  expect(await modal.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  await actions.click(modal.getByRole('button', { name: '안내 마치기' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/12'))
+})
+
+it.each([
+  {},
+  { scheduleHeaderId: 0, versionNo: 3 },
+  { scheduleHeaderId: 11, versionNo: 3 },
+  { scheduleHeaderId: 12, versionNo: 2 },
+])('locks a committed regeneration with an invalid receipt %j but permits closing', async (receipt) => {
+  const { actions, client } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return receipt
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  client.setQueryData(['schedules', 'receipt-check'], [])
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
+  const submit = within(dialog).getByRole('button', { name: '새 버전 만들기' })
+  await actions.type(within(dialog).getByLabelText(/생성 사유/), '원천 변경')
+  await actions.click(submit)
+  expect(await within(dialog).findByText(/다시 생성하지 말고 목록에서/)).toBeVisible()
+  expect(submit).toBeDisabled()
+  expect(within(dialog).getByLabelText(/생성 사유/)).toBeDisabled()
+  expect(client.getQueryState(['schedules', 'receipt-check'])?.isInvalidated).toBe(true)
+  await actions.click(submit)
+  expect(calls('/api/v1/schedules/11/regenerate')).toHaveLength(1)
+  await actions.click(within(dialog).getByRole('button', { name: '취소' }))
+  expect(dialog).not.toBeInTheDocument()
+})
+
+it('blocks every close path while the new schedule version is being created', async () => {
+  let finish!: (value: unknown) => void
+  const { actions } = renderAt('/schedules/11', (url) => {
+    if (url.endsWith('/regenerate')) return new Promise(resolve => { finish = resolve })
+    if (url === '/api/v1/schedules/11') return detail({ scheduleVersionNo: 2 })
+    if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
+    return undefined
+  })
+  await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
+  const dialog = await screen.findByRole('dialog', { name: '새 버전 만들기' })
+  await actions.type(within(dialog).getByLabelText(/생성 사유/), '원천 변경')
+  await actions.click(within(dialog).getByRole('button', { name: '새 버전 만들기' }))
+  await waitFor(() => expect(finish).toBeDefined())
+  await actions.click(within(dialog).getByRole('button', { name: '창 닫기' }))
+  await actions.keyboard('{Escape}')
+  expect(dialog).toBeVisible()
+  expect(within(dialog).getByRole('button', { name: '취소' })).toBeDisabled()
+  // Reject the request to restore the ordinary close/retry flow without creating a new version.
+  await act(async () => finish({ scheduleHeaderId: 0 }))
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: '취소' })).toBeEnabled())
+  await actions.click(within(dialog).getByRole('button', { name: '취소' }))
+  expect(dialog).not.toBeInTheDocument()
 })

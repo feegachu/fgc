@@ -691,6 +691,19 @@
         "next": []
       },
       {
+        "stepId": "help.0c634634daacd33231122fd50dfa7b68",
+        "screenId": "CONT-W02",
+        "targetId": "schedule.preview.form",
+        "title": "보험계약 상세, 생성 사유",
+        "instruction": "보험계약 상세 화면의 ‘생성 사유’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.0dc9dd177781492ce6c49289666ebc76",
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-tabs.button",
@@ -735,6 +748,34 @@
         "next": []
       },
       {
+        "stepId": "help.238bdef3e5e6258a0bcd5ccebb43cc8a",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.acquisition-cost-result.section",
+        "title": "보험계약 상세, 계산 근거",
+        "instruction": "보험계약 상세 화면의 ‘계산 근거’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.2c1b7f219d0cf08c36db50e8c6a68946",
+        "screenId": "CONT-W02",
+        "targetId": "schedule.preview.submit",
+        "title": "보험계약 상세, 생성 사유",
+        "instruction": "보험계약 상세 화면의 ‘생성 사유’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.2ca9c87a0c10256f7fed68b0dcad142a",
         "screenId": "CONT-W02",
         "targetId": "features.contract.status-history.effects",
@@ -774,6 +815,21 @@
         "roles": [
           "SYSTEM_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.4dd62046ec1a00a75773b0eaf47fc379",
+        "screenId": "CONT-W02",
+        "targetId": "contract.tab.acquisition",
+        "title": "보험계약 상세, 계약체결비용",
+        "instruction": "보험계약 상세 화면의 ‘계약체결비용’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -867,6 +923,36 @@
         "next": []
       },
       {
+        "stepId": "help.67ecf48ee6c756a0e824094fcf87cbb6",
+        "screenId": "CONT-W02",
+        "targetId": "contract.schedule.preview-detail",
+        "title": "보험계약 상세, 예정판 v · 회차 상세 보기",
+        "instruction": "보험계약 상세 화면의 ‘예정판 v · 회차 상세 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.682085dd2cbb413ec8c498f8610e3c80",
+        "screenId": "CONT-W02",
+        "targetId": "contract.panel.acquisition",
+        "title": "보험계약 상세, 계약체결비용",
+        "instruction": "보험계약 상세 화면의 ‘계약체결비용’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.6c165d9922e2855fe3ef6cb9a1961b41",
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-status-preview.event-type",
@@ -925,6 +1011,21 @@
         "next": []
       },
       {
+        "stepId": "help.92a30c52e377623c36c07803cbe1aff4",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.contract-acquisition-cost.select",
+        "title": "보험계약 상세, 지급단계",
+        "instruction": "보험계약 상세 화면의 ‘지급단계’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.943a30c0e997d6db611e6278656e2124",
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-status-preview.reload",
@@ -944,6 +1045,19 @@
         "targetId": "features.contract.contract-status-preview.edit",
         "title": "보험계약 상세, 계약 수정으로 이동",
         "instruction": "보험계약 상세 화면의 ‘계약 수정으로 이동’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.993b26b1d298bf9055c4c48123d5d579",
+        "screenId": "CONT-W02",
+        "targetId": "schedule.preview.reason",
+        "title": "보험계약 상세, 생성 사유",
+        "instruction": "보험계약 상세 화면의 ‘생성 사유’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -1011,6 +1125,21 @@
         "next": []
       },
       {
+        "stepId": "help.a57006a92416b21836b7cfd8f08a742a",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.contract-acquisition-cost.link",
+        "title": "보험계약 상세, 전체 결과 보기",
+        "instruction": "보험계약 상세 화면의 ‘전체 결과 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.a88a7473a530b35a69cd8980640ed321",
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-status-preview.retry",
@@ -1067,11 +1196,39 @@
         "next": []
       },
       {
+        "stepId": "help.b299e3eca7867ee9e76d8c378fc45b1f",
+        "screenId": "CONT-W02",
+        "targetId": "schedule.preview.refresh",
+        "title": "보험계약 상세, 최신 입력 다시 조회",
+        "instruction": "보험계약 상세 화면의 ‘최신 입력 다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.bd8b42852c9d91f4e5f345342b20b25a",
         "screenId": "CONT-W02",
         "targetId": "features.cap.cap-detail-modal.link",
         "title": "보험계약 상세, 예외 목록 보기",
         "instruction": "보험계약 상세 화면의 ‘예외 목록 보기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.bd9fcd6c40c6831f2f81206ce9aa43e2",
+        "screenId": "CONT-W02",
+        "targetId": "schedule.preview.region",
+        "title": "보험계약 상세, 예정 생성",
+        "instruction": "보험계약 상세 화면의 ‘예정 생성’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -1108,6 +1265,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c70672fb93325fc959306b256c9d1156",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.contract-acquisition-cost.button",
+        "title": "보험계약 상세, 검증 요청",
+        "instruction": "보험계약 상세 화면의 ‘검증 요청’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -1202,6 +1372,21 @@
         "targetId": "features.contract.contract-tabs.section-3",
         "title": "보험계약 상세, 상태이력",
         "instruction": "보험계약 상세 화면의 ‘상태이력’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f76c6d5c7af5b8f6dd16401ac13f96f0",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.acquisition-cost-result.button",
+        "title": "보험계약 상세, 다시 조회 / 다시 시도",
+        "instruction": "보험계약 상세 화면의 ‘다시 조회 / 다시 시도’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -1546,6 +1731,19 @@
         "next": []
       },
       {
+        "stepId": "help.299a0268fc99be167143d4407a737153",
+        "screenId": "SCHE-W02",
+        "targetId": "schedule.preview.refresh",
+        "title": "예상 스케줄 상세, 최신 입력 다시 조회",
+        "instruction": "예상 스케줄 상세 화면의 ‘최신 입력 다시 조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.3e548f489ce816f504a95e48307b1cb2",
         "screenId": "SCHE-W02",
         "targetId": "features.schedule.schedule-detail-page.schedule-stage",
@@ -1557,6 +1755,32 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.460a0779d65d247cc07e2f9e531d9a1d",
+        "screenId": "SCHE-W02",
+        "targetId": "schedule.preview.reason",
+        "title": "예상 스케줄 상세, 생성 사유",
+        "instruction": "예상 스케줄 상세 화면의 ‘생성 사유’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.60ef71c84cfacdbba0be0dc1ba9a425b",
+        "screenId": "SCHE-W02",
+        "targetId": "schedule.preview.form",
+        "title": "예상 스케줄 상세, 생성 사유",
+        "instruction": "예상 스케줄 상세 화면의 ‘생성 사유’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -1598,6 +1822,21 @@
         "roles": [
           "SYSTEM_ADMIN",
           "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.a52e09b100690fd025a73add806d0ef6",
+        "screenId": "SCHE-W02",
+        "targetId": "schedule.preview.region",
+        "title": "예상 스케줄 상세, 예정 생성",
+        "instruction": "예상 스케줄 상세 화면의 ‘예정 생성’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
         ],
         "next": []
       },
@@ -1669,6 +1908,19 @@
           "GA_ADMIN",
           "SETTLEMENT",
           "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e22b2239061c7146c37508e5f40e3812",
+        "screenId": "SCHE-W02",
+        "targetId": "schedule.preview.submit",
+        "title": "예상 스케줄 상세, 생성 사유",
+        "instruction": "예상 스케줄 상세 화면의 ‘생성 사유’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
         ],
         "next": []
       },
@@ -8140,6 +8392,21 @@
         "next": []
       },
       {
+        "stepId": "help.189f45094e9742225d58b0aaed11f730",
+        "screenId": "VRUN-W02",
+        "targetId": "validation.restart",
+        "title": "월 통합검증 상세, 신규 실행 만들기",
+        "instruction": "월 통합검증 상세 화면의 ‘신규 실행 만들기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.3c11c70b7f7815f502c40c1b66878368",
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.link-3",
@@ -8685,6 +8952,51 @@
     "workflowId": "dashboard.review",
     "steps": [
       {
+        "stepId": "help.00e5b64669bb6724676ec6eb6b21297b",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.as-of",
+        "title": "업무 대시보드, 현황 기준일",
+        "instruction": "업무 대시보드 화면의 ‘현황 기준일’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.036e33d217f8044c9a6c3aae288fd74e",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.registered",
+        "title": "업무 대시보드, 등록 설계사",
+        "instruction": "업무 대시보드 화면의 ‘등록 설계사’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.0e8bcda8b28e29e1d7051a59a4c16c15",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.active",
+        "title": "업무 대시보드, 활동 설계사",
+        "instruction": "업무 대시보드 화면의 ‘활동 설계사’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.101eef17743b425610e31f18c7b9b2ca",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.dashboard-page.settlement-guide",
@@ -8730,6 +9042,36 @@
         "next": []
       },
       {
+        "stepId": "help.5a0dd6dd7c9684c40a530476e8240c2a",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.dashboard-page.open-retry",
+        "title": "업무 대시보드, 미처리 예외 다시 불러오기",
+        "instruction": "업무 대시보드 화면의 ‘미처리 예외 다시 불러오기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.60e12e3677581b5d87c0dc6809f2bbfa",
+        "screenId": "DASH-W01",
+        "targetId": "components.filter-bar.button-2",
+        "title": "업무 대시보드, 초기화",
+        "instruction": "업무 대시보드 화면의 ‘초기화’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.63d8d223cf3821e7243678825817a0cb",
         "screenId": "DASH-W01",
         "targetId": "components.data-table.input",
@@ -8760,11 +9102,41 @@
         "next": []
       },
       {
+        "stepId": "help.6a5598305b2dbe307dc4eb34b9cd17c3",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.search",
+        "title": "업무 대시보드, 설계사 찾기",
+        "instruction": "업무 대시보드 화면의 ‘설계사 찾기’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.755030ddf650712209817cdbb4f3306f",
         "screenId": "DASH-W01",
         "targetId": "dashboard.kpi.journal",
         "title": "업무 대시보드, 원장 불균형",
         "instruction": "업무 대시보드 화면의 ‘원장 불균형’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.7865c30c2e9f3360b1aed5b5ae1ab0db",
+        "screenId": "DASH-W01",
+        "targetId": "components.pagination.button-5",
+        "title": "업무 대시보드, 마지막",
+        "instruction": "업무 대시보드 화면의 ‘마지막’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8795,6 +9167,21 @@
         "targetId": "dashboard.kpi.arbitrage",
         "title": "업무 대시보드, 차익거래 검토대상",
         "instruction": "업무 대시보드 화면의 ‘차익거래 검토대상’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.7dad79635f4491d34799f645061fa48f",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.branch",
+        "title": "업무 대시보드, 지점",
+        "instruction": "업무 대시보드 화면의 ‘지점’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8955,11 +9342,56 @@
         "next": []
       },
       {
+        "stepId": "help.a872359a03e78164e9312c4ea63c169b",
+        "screenId": "DASH-W01",
+        "targetId": "components.filter-bar.button",
+        "title": "업무 대시보드, 조회",
+        "instruction": "업무 대시보드 화면의 ‘조회’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.acd31dec46d45115a9bef15b7aca21ad",
         "screenId": "DASH-W01",
         "targetId": "dashboard.kpi-link.journal",
         "title": "업무 대시보드, 원장 불균형",
         "instruction": "업무 대시보드 화면의 ‘원장 불균형’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ba8bb93ddca6bd57b593a83f7b8d75eb",
+        "screenId": "DASH-W01",
+        "targetId": "components.pagination.button-4",
+        "title": "업무 대시보드, 다음 5페이지 / 다음 페이지",
+        "instruction": "업무 대시보드 화면의 ‘다음 5페이지 / 다음 페이지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.c8b8f07e498e9c872359679892f7aa8b",
+        "screenId": "DASH-W01",
+        "targetId": "components.pagination.button",
+        "title": "업무 대시보드, 처음",
+        "instruction": "업무 대시보드 화면의 ‘처음’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -8985,6 +9417,81 @@
         "next": []
       },
       {
+        "stepId": "help.c9f1317264c090c54f5ed7b876ff98ad",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.attention",
+        "title": "업무 대시보드, 확인할 설계사",
+        "instruction": "업무 대시보드 화면의 ‘확인할 설계사’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ce285f315026f3fdb699fd19e6e27fa2",
+        "screenId": "DASH-W01",
+        "targetId": "components.filter-bar.form",
+        "title": "업무 대시보드, 조회 조건",
+        "instruction": "업무 대시보드 화면의 ‘조회 조건’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.ce5802a8c20458a501e131dfd671a21d",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.terminated",
+        "title": "업무 대시보드, 해촉 설계사",
+        "instruction": "업무 대시보드 화면의 ‘해촉 설계사’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cefd0521111cfc68a3deffa4b5add8be",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.keyword",
+        "title": "업무 대시보드, 이름 또는 코드",
+        "instruction": "업무 대시보드 화면의 ‘이름 또는 코드’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d7678691710dca3781b17532b2aedd40",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.branches",
+        "title": "업무 대시보드, 지점별 현황",
+        "instruction": "업무 대시보드 화면의 ‘지점별 현황’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.e7831fa35027a7e90df436b2b736c0ae",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.risk-composition.link",
@@ -9000,11 +9507,56 @@
         "next": []
       },
       {
+        "stepId": "help.ebaa4fcde8264a2bec96565548e71124",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.section",
+        "title": "업무 대시보드, GA·설계사 현황",
+        "instruction": "업무 대시보드 화면의 ‘GA·설계사 현황’ 영역 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f34ac70b2f2e103f422833c975429996",
+        "screenId": "DASH-W01",
+        "targetId": "components.pagination.button-2",
+        "title": "업무 대시보드, 이전 5페이지 / 이전 페이지",
+        "instruction": "업무 대시보드 화면의 ‘이전 5페이지 / 이전 페이지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.f4f52ad59307bf27cccf1703db3a611e",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.dashboard-page.button",
         "title": "업무 대시보드, 다시 시도",
         "instruction": "업무 대시보드 화면의 ‘다시 시도’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f99d3eb2e94aeece1c1294f97a975430",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-overview.contracts-link",
+        "title": "업무 대시보드, ( ) 계약 목록 열기",
+        "instruction": "업무 대시보드 화면의 ‘( ) 계약 목록 열기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -14687,6 +15239,19 @@
         "next": []
       },
       {
+        "stepId": "help.1243a963ce40a8b0939509ca0bb1b408",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-keep",
+        "title": "수수료 지급 등록, 입력 유지",
+        "instruction": "수수료 지급 등록 화면의 ‘입력 유지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1444d47ea0e956e0261267998d052765",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.link-2",
@@ -15095,6 +15660,32 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "수수료 지급 등록 화면의 ‘GA 수기지급’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cb3fcc3ea67660d37237d20c6ca2eba6",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload",
+        "title": "수수료 지급 등록, 최신 지급 건 다시 불러오기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 지급 건 다시 불러오기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d15f0ec3b6b4a0005848533aed794662",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-apply",
+        "title": "수수료 지급 등록, 최신 정보로 바꾸기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 정보로 바꾸기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15251,6 +15842,19 @@
         "next": []
       },
       {
+        "stepId": "help.1243a963ce40a8b0939509ca0bb1b408",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-keep",
+        "title": "수수료 지급 등록, 입력 유지",
+        "instruction": "수수료 지급 등록 화면의 ‘입력 유지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1444d47ea0e956e0261267998d052765",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.link-2",
@@ -15659,6 +16263,32 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "수수료 지급 등록 화면의 ‘GA 수기지급’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cb3fcc3ea67660d37237d20c6ca2eba6",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload",
+        "title": "수수료 지급 등록, 최신 지급 건 다시 불러오기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 지급 건 다시 불러오기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d15f0ec3b6b4a0005848533aed794662",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-apply",
+        "title": "수수료 지급 등록, 최신 정보로 바꾸기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 정보로 바꾸기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -15815,6 +16445,19 @@
         "next": []
       },
       {
+        "stepId": "help.1243a963ce40a8b0939509ca0bb1b408",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-keep",
+        "title": "수수료 지급 등록, 입력 유지",
+        "instruction": "수수료 지급 등록 화면의 ‘입력 유지’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.1444d47ea0e956e0261267998d052765",
         "screenId": "TRAN-W02",
         "targetId": "features.transaction.transaction-form-page.link-2",
@@ -16223,6 +16866,32 @@
         "targetId": "features.transaction.transaction-form-page.source-type",
         "title": "수수료 지급 등록, GA 수기지급",
         "instruction": "수수료 지급 등록 화면의 ‘GA 수기지급’ 입력 항목 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.cb3fcc3ea67660d37237d20c6ca2eba6",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload",
+        "title": "수수료 지급 등록, 최신 지급 건 다시 불러오기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 지급 건 다시 불러오기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.d15f0ec3b6b4a0005848533aed794662",
+        "screenId": "TRAN-W02",
+        "targetId": "features.transaction.transaction-form-page.btn-reload-apply",
+        "title": "수수료 지급 등록, 최신 정보로 바꾸기",
+        "instruction": "수수료 지급 등록 화면의 ‘최신 정보로 바꾸기’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
