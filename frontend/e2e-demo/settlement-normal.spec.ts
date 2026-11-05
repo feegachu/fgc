@@ -7,12 +7,15 @@ test.use({ video: 'off' })
 test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단계 없이 최종 확정 (한 번의 안내)', async ({ page }, info) => {
   const errors: string[] = []
   const writes: string[] = []
+  const proofReads: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  // Every browser POST except sign-in, so no guide write can hide outside a path filter.
+  // Keep every business POST; only the exact read-only proof endpoint is recorded separately.
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname
-    if (request.method() === 'POST' && path.startsWith('/api/v1/') && !path.startsWith('/api/v1/auth/'))
-      writes.push(path)
+    if (request.method() === 'POST' && path.startsWith('/api/v1/') && !path.startsWith('/api/v1/auth/')) {
+      if (path === '/api/v1/assistant/prechecks/revalidate') proofReads.push(path)
+      else writes.push(path)
+    }
   })
   // api() signs in the same demo admin separately and one account keeps one session, so read setup data first.
   await page.goto('login')
@@ -93,6 +96,8 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   await page.getByRole('dialog').getByRole('button', { name: '확정 실행' }).click()
   expect((await successful(confirming)).status).toBe('CONFIRMED')
   await expect(page).toHaveURL(/\/transactions\?/)
+  // The address can update before the route commits; resume only after the payment list is rendered.
+  await expect(page.getByRole('heading', { name: '수수료 지급 건 목록', exact: true })).toBeVisible()
 
   await next.click()
   await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
@@ -158,6 +163,7 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   await expect(guide).toContainText('전체 업무 안내 완료')
   expect(sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${rid}`)).toBe('FINALIZED')
   expect(errors).toEqual([])
+  expect(proofReads).toContain('/api/v1/assistant/prechecks/revalidate')
   // The user's own button clicks are the only business writes; the guide added none.
   expect(writes).toEqual([
     '/api/v1/contracts',
@@ -170,7 +176,7 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   ])
   await info.attach('normal-flow-completed', { body: await page.screenshot(), contentType: 'image/png' })
   await info.attach('normal-flow-evidence', {
-    body: JSON.stringify({ cid, pid, rid, reconId, results: results.summary, open: open.totalElements, writes, errors }),
+    body: JSON.stringify({ cid, pid, rid, reconId, results: results.summary, open: open.totalElements, writes, proofReads, errors }),
     contentType: 'application/json',
   })
 })

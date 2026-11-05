@@ -299,7 +299,10 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
       </p>
       {log.reason && <p className="audit-reason">{reason}</p>}
       {/* 자동 기록을 번역한 사유의 원문은 코드라 사용자가 쓴 사유에만 원문을 보인다. */}
-      {log.reason && reason !== log.reason && reason === screenMessage(log.reason) && (
+      {log.reason &&
+        !['VALIDATION_RUN_FAILED', 'VALIDATION_RUN_CREATION_FAILED'].includes(log.actionCode ?? '') &&
+        reason !== log.reason &&
+        reason === screenMessage(log.reason) && (
         <details className="audit-reason-original">
           <summary data-guide-feature="features.audit.audit-log-page.summary">사유 원문 보기</summary>
           <p>{log.reason}</p>

@@ -64,8 +64,10 @@ beforeEach(() => {
   mutation = (path) => (path.endsWith('/precheck') ? precheckResult : path.endsWith('/confirm') ? { ...saved, status: 'CONFIRMED' } : saved)
   useToastStore.setState({ messages: [] })
   vi.spyOn(apiClient, 'request').mockImplementation((async (path: string, options: RequestOptions = {}) => {
+    if (path === '/api/v1/assistant/prechecks/revalidate') return envelope({paymentId:'77',verified:true,expiresAt:'2099-01-01T00:00:00Z'})
     if (options.method && options.method !== 'GET') {
       const data = await mutation(path, options)
+      if(path.endsWith('/precheck') && data && typeof data==='object' && 'confirmable' in data && data.confirmable===true) options.onResponseHeaders?.(new Headers({'X-FGC-Precheck-Token':'actual-proof'}))
       if (data && typeof data === 'object' && 'commissionTransactionId' in data) draftResponse = data as Payment
       // The real precheck response includes its payment ID; retain explicit mismatches for negative tests.
       return envelope(path.endsWith('/precheck') && data && typeof data === 'object'
@@ -125,7 +127,7 @@ function mount(path = '/app/transactions/new?month=2026-07', canProcess = true, 
 }
 const button = (id: string) => document.getElementById(id) as HTMLButtonElement
 const writes = () =>
-  vi.mocked(apiClient.request).mock.calls.filter(([, options]) => ['POST', 'PUT'].includes(options?.method ?? ''))
+  vi.mocked(apiClient.request).mock.calls.filter(([path, options]) => path.startsWith('/api/v1/transactions') && ['POST', 'PUT'].includes(options?.method ?? ''))
 async function fillNew(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => expect(screen.getByLabelText(/수령 설계사/)).toBeEnabled())
   await selectOption(user, screen.getByLabelText(/수령 설계사/), '1')

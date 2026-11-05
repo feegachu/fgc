@@ -72,7 +72,9 @@ for (const multi of [false, true]) {
     await expect(card.getByRole('heading', { name: '사전검증을 실행하세요' })).toBeVisible()
     const checking = responseFor(page, `/transactions/${id}/precheck`)
     await page.locator('#btn-precheck').click()
-    const check = await successful(checking)
+    const checkingResponse = await checking
+    expect(checkingResponse.headers()['x-fgc-precheck-token']).toBeTruthy()
+    const check = await successful(Promise.resolve(checkingResponse))
     expect(check.paymentId).toBe(id)
     expect(check.confirmable).toBe(true)
     expect(check.blockers).toEqual([])

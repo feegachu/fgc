@@ -29,10 +29,12 @@ const parameterValueLabels: Record<string, string> = {
   false: '아니오',
   MONTHLY_EQUIVALENT_FIRST_PREMIUM_X12: '월납환산 초회보험료 × 12',
 }
-export const policyParameterLabel = (key: string) => parameterLabels[key] ?? '설정 항목'
+// 저장값으로 찾으므로 __proto__ 같은 상속 속성이 라벨로 나오지 않게 한다.
+const label = (labels: Record<string, string>, key: string) => (Object.hasOwn(labels, key) ? labels[key] : undefined)
+export const policyParameterLabel = (key: string) => label(parameterLabels, key) ?? '설정 항목'
 export function policyParameterValue(value: unknown) {
   const text = String(value)
-  return parameterValueLabels[text] ?? (isDeveloperText(text) ? '확인 필요' : text)
+  return label(parameterValueLabels, text) ?? (isDeveloperText(text) ? '확인 필요' : text)
 }
 
 /**
@@ -61,7 +63,7 @@ const policyCodeLabels: Record<string, string> = {
   FIRST_CONTRACT_CARRY_FORWARD: '최초계약 이월',
   APPROVED_ALLOCATION: '승인배부',
   MANUAL_REVIEW: '수동검토',
-  NEWCOMER_NON_CONTRACT: '신인 지원 제외',
+  NEWCOMER_NON_CONTRACT: '신인 지원 계약 미귀속',
   PAY_IF_ACTIVE_ON_DUE_DATE: '지급예정일 정상 계약',
   NOT_APPLICABLE: '해당 없음',
   TOTAL_PAID: '총 지급액',
@@ -70,5 +72,5 @@ const policyCodeLabels: Record<string, string> = {
   PAID_ATTRIBUTED_AMOUNT: '확정 지급 귀속액',
 }
 export function policyCodeLabel(code?: string | null) {
-  return code ? (policyCodeLabels[code] ?? '확인 필요') : '-'
+  return code ? (label(policyCodeLabels, code) ?? '확인 필요') : '-'
 }

@@ -64,11 +64,11 @@ public class AgentStatementService {
     }
 
     public StatementDetail detailMine(String entryKey) {
-        return detail(mineAgentId(), entryKey);
+        return detail(mineAgentId(), entryKey, FgcErrorCode.AUTH_005);
     }
 
     public StatementDetail detailForAgent(long agentId, String entryKey) {
-        return detail(internalAgentId(agentId), entryKey);
+        return detail(internalAgentId(agentId), entryKey, FgcErrorCode.COMMON_004);
     }
 
     private StatementListResponse list(long agentId, String month, String contractNo, Long commissionItemId,
@@ -102,15 +102,15 @@ public class AgentStatementService {
                 basis(yearMonth));
     }
 
-    private StatementDetail detail(long agentId, String entryKey) {
+    private StatementDetail detail(long agentId, String entryKey, FgcErrorCode whenAbsent) {
         Matcher key = decode(entryKey);
         String entryType = key.group(1);
         if (!AgentStatementRepository.ENTRY_TYPES.contains(entryType)) {
             throw invalid("entryKey");
         }
-        // 남의 원천이거나 없는 키는 같은 404 로 답해 존재 여부가 드러나지 않게 한다.
+        // 남의 원천이거나 없는 키는 같은 오류로 답해 존재 여부가 드러나지 않게 한다. 본인 경로는 FUN-085대로 403이다(계약, 지급 상세와 같음).
         Row row = repository.find(agentId, entryType, Long.parseLong(key.group(2)), Long.parseLong(key.group(3)))
-                .orElseThrow(() -> new FgcBusinessException(FgcErrorCode.COMMON_004));
+                .orElseThrow(() -> new FgcBusinessException(whenAbsent));
         return new StatementDetail(entry(row), evidence(row), basis(YearMonth.from(row.basisMonth())));
     }
 

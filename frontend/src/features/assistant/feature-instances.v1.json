@@ -101,12 +101,6 @@
     "schedule",
     "effects"
   ],
-  "agent.guide-menu": [
-    "agent.portfolio",
-    "agent.contract.find",
-    "agent.contract.detail",
-    "agent.payments"
-  ],
   "policy.draft-input": [
     "basicdocumentversion",
     "clawbackrules.clawbackratepct",

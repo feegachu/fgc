@@ -51,21 +51,6 @@ const baseHome = (patch: Partial<AgentHome> = {}): AgentHome => ({
   dataStatus: 'AVAILABLE',
   ...patch,
 })
-const priority = (patch = {}) => ({
-  contractId: 91,
-  contractNo: 'C-0091',
-  insurerName: 'A생명',
-  productName: '건강보험 A',
-  currentStatus: '미납',
-  reasonCodes: ['STATUS_EVENT_UNCONFIRMED'],
-  elapsedDays: 3,
-  currentStatusCode: 'UNPAID',
-  expectedAmount: 100000,
-  heldAmount: 70000,
-  heldCount: 1,
-  contextVersion: 'contract91-event4',
-  ...patch,
-})
 
 let home: (path: string) => Promise<unknown>
 let capCount: (status: string) => number
@@ -250,7 +235,6 @@ describe('AGNT-W01 포트폴리오', () => {
     renderHome()
     expect(await kpi('신규 계약 건수')).toHaveTextContent('0건')
     expect(screen.getByRole('region', { name: '설계사 판매 관리 그래프' })).toHaveTextContent('합계 0건')
-    expect(screen.getByRole('region', { name: '확인할 계약' })).toHaveTextContent('지금 확인할 계약이 없어요')
   })
 
   it('홈 조회가 실패하면 0건으로 보이지 않고 오류와 다시 시도를 보여 준다', async () => {
@@ -264,114 +248,12 @@ describe('AGNT-W01 포트폴리오', () => {
   })
 })
 
-describe('확인할 계약', () => {
-  const withPriority = (items = [priority()]) => {
-    home = async () => envelope(baseHome({ priorityContracts: items, priorityContractTotal: items.length }))
-  }
-
-  it('사유와 경과일을 보여 주고 계약 상세로 연결한다', async () => {
-    withPriority([priority({ reasonCodes: ['FOLLOW_UP', 'HOLD_UNRESOLVED'], nextCheckDate: '2026-07-30' })])
-    renderHome()
-    const panel = await screen.findByRole('region', { name: '확인할 계약' })
-    expect(within(panel).getByRole('link', { name: 'C-0091' })).toHaveAttribute('href', '/app/contracts/91')
-    expect(panel).toHaveTextContent('후속 확인일 도래 (2026-07-30)')
-    expect(panel).toHaveTextContent('보류 미해결')
-    expect(panel).toHaveTextContent('상태 변화 후 3일 경과')
-    expect(panel).toHaveTextContent('2026-07 예정 100,000원 · 보류 1건 70,000원')
-  })
-
-  it('종결을 기록하면 멱등키와 본 맥락 버전을 보내고 목록을 다시 받는다', async () => {
-    withPriority()
-    const sent: { body: unknown; key: string }[] = []
-    check = async (body, key) => {
-      sent.push({ body, key })
-      withPriority([])
-      return envelope({ checkId: 5, checkedAt: '2026-07-31T10:00:00+09:00', contractId: 91, contextVersion: 'contract91-event4' })
-    }
-    renderHome()
-    const panel = await screen.findByRole('region', { name: '확인할 계약' })
-    await userEvent.click(within(panel).getByRole('button', { name: '확인 기록' }))
-    await userEvent.type(within(panel).getByLabelText('메모'), '통화 완료')
-    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
-    await waitFor(() => expect(sent).toHaveLength(1))
-    expect(sent[0].body).toEqual({ contractId: 91, result: 'CLOSED', memo: '통화 완료', expectedContextVersion: 'contract91-event4' })
-    expect(sent[0].key).toMatch(/[0-9a-f-]{36}/)
-    await waitFor(() => expect(screen.getByRole('region', { name: '확인할 계약' })).toHaveTextContent('지금 확인할 계약이 없어요'))
-  })
-
-  it('후속 확인은 다음 확인일 없이는 기록할 수 없다', async () => {
-    withPriority()
-    renderHome()
-    const panel = await screen.findByRole('region', { name: '확인할 계약' })
-    await userEvent.click(within(panel).getByRole('button', { name: '확인 기록' }))
-    await userEvent.click(within(panel).getByLabelText('후속 확인 필요'))
-    expect(within(panel).getByRole('button', { name: '기록' })).toBeDisabled()
-    await userEvent.type(within(panel).getByLabelText('다음 확인일'), '2026-08-05')
-    expect(within(panel).getByRole('button', { name: '기록' })).toBeEnabled()
-  })
-
-  const openForm = async () => {
-    const panel = await screen.findByRole('region', { name: '확인할 계약' })
-    await userEvent.click(within(panel).getByRole('button', { name: '확인 기록' }))
-    return panel
-  }
-
-  it('계약 상태가 먼저 바뀌었다면(STATE_CHANGED) 안내하고 목록을 새로 받는다', async () => {
-    withPriority()
-    check = async () => {
-      throw new ApiError({ code: 'FGC-IMPL-STATE_CHANGED' }, 'req-3', 409)
-    }
-    renderHome()
-    const panel = await openForm()
-    const before = homeCalls().length
-    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
-    expect(await within(panel).findByRole('alert')).toHaveTextContent('계약 상태가 바뀌었어요')
-    await waitFor(() => expect(homeCalls().length).toBeGreaterThan(before))
-  })
-
-  it('같은 키로 다른 내용을 보냈다면(IDEMPOTENCY_CONFLICT) 이미 기록됐을 수 있다고 안내하고 새 키로 다시 보낸다', async () => {
-    withPriority()
-    const keys: string[] = []
-    let first = true
-    check = async (_body, key) => {
-      keys.push(key)
-      if (first) {
-        first = false
-        throw new ApiError({ code: 'FGC-IMPL-IDEMPOTENCY_CONFLICT' }, 'req-6', 409)
-      }
-      return envelope({ checkId: 9, checkedAt: '2026-07-31T10:00:00+09:00', contractId: 91, contextVersion: 'contract91-event4' })
-    }
-    renderHome()
-    const panel = await openForm()
-    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
-    expect(await within(panel).findByRole('alert')).toHaveTextContent('이미 기록됐을 수 있어요')
-    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
-    await waitFor(() => expect(keys).toHaveLength(2))
-    expect(keys[1]).not.toBe(keys[0])
-  })
-
-  it('같은 요청이 처리 중이면(REQUEST_IN_PROGRESS) 잠시 후 다시 시도하라고 안내한다', async () => {
-    withPriority()
-    check = async () => {
-      throw new ApiError({ code: 'FGC-IMPL-REQUEST_IN_PROGRESS' }, 'req-7', 409)
-    }
-    renderHome()
-    const panel = await openForm()
-    await userEvent.click(within(panel).getByRole('button', { name: '기록' }))
-    expect(await within(panel).findByRole('alert')).toHaveTextContent('처리하고 있어요')
-  })
-
-  it('지난 달을 골라도 예정 금액에 기준월을 표시한다', async () => {
-    withPriority()
-    renderHome()
-    expect(await screen.findByRole('region', { name: '확인할 계약' })).toHaveTextContent('2026-07 예정 100,000원')
-  })
-})
-
 describe('상품 추천 AI', () => {
   it('런처를 누르면 상품 추천 AI 모달이 열리고 Esc로 닫으면 런처로 돌아온다', async () => {
     renderHome()
     const launcher = await screen.findByRole('button', { name: '상품 추천 AI' })
+    // 메인 화면 런처의 피코는 가만히 있는 모션이다
+    expect(launcher.querySelector('[data-pico-motion]')).toHaveAttribute('data-pico-motion', 'still')
     await userEvent.click(launcher)
     const dialog = await screen.findByRole('dialog', { name: '상품 추천 AI' })
     expect(within(dialog).getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()

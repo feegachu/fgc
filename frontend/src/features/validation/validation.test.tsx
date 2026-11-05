@@ -158,7 +158,12 @@ describe('스텝 규칙', () => {
   it('실패 사유의 오류코드는 화면에 보이지 않고, 읽을 문장이 없으면 실패한 단계로 안내한다', () => {
     expect(failureText('FGC-VRUN-003', 5)).toBe('5단계에서 실패했습니다.')
     expect(failureText('FGC-VRUN-003 | FGC-COMMON-500', 0)).toBe('처리 중 오류로 실패했습니다.')
-    expect(failureText('FGC-VRUN-003 | 스케줄 회차가 중복되었습니다.', 3)).toBe('스케줄 회차가 중복되었습니다.')
+    expect(failureText('FGC-VRUN-003 | 스케줄 회차가 중복되었습니다.', 3)).toBe('3단계에서 실패했습니다.')
+    expect(failureText("SQL [SELECT '계약' || '900101-1234567']", 3)).toBe('3단계에서 실패했습니다.')
+    expect(failureText('DB 오류 (23505): id=42', 3)).toBe('3단계에서 실패했습니다.')
+    expect(failureText('스케줄 회차가 중복되었습니다. | 원장 불균형 1건이 발견되었습니다.', 3)).toBe(
+      '스케줄 회차가 중복되었습니다. | 원장 불균형 1건이 발견되었습니다.',
+    )
     expect(failureText('배치가 실패했습니다', 8)).toBe('배치가 실패했습니다')
     expect(failureText('한도 검증 보류 — 적용 가능한 1,200% 룰셋이 없습니다. 정책을 확인하세요.', 4)).toBe(
       '한도 검증을 보류합니다. 적용 가능한 1,200% 룰셋이 없습니다. 정책을 확인하세요.',
@@ -166,7 +171,7 @@ describe('스텝 규칙', () => {
     expect(failureText('journal_no 월간 일련번호 상한(99999) 초과, year=2026', 6)).toBe('6단계에서 실패했습니다.')
     expect(failureText('validation_run 5 은 이미 기동됨(status=RUNNING)', 2)).toBe('2단계에서 실패했습니다.')
     expect(failureText('could not execute statement [ERROR: e2e] | 원장 불균형 1건이 발견되었습니다.', 6)).toBe(
-      '원장 불균형 1건이 발견되었습니다.',
+      '6단계에서 실패했습니다.',
     )
     expect(failureText('2단계 처리 중 오류가 발생했습니다. 요청번호 20261104-abcdef를 담당자에게 알려주세요.', 2)).toBe(
       '2단계 처리 중 오류가 발생했습니다. 요청번호 20261104-abcdef를 담당자에게 알려주세요.',

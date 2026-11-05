@@ -1199,6 +1199,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseExceptionCountsResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ExceptionCountsResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseExceptionOptionsResponse" : {
         "properties" : {
           "data" : {
@@ -1231,6 +1245,20 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/FinalizeValidationRunResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseHomeSummaryResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/HomeSummaryResponse"
           },
           "error" : {
             "$ref" : "#/components/schemas/ApiError"
@@ -2035,6 +2063,20 @@
         },
         "type" : "object"
       },
+      "ApiResponseVerification" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Verification"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseVoid" : {
         "properties" : {
           "data" : { },
@@ -2155,8 +2197,13 @@
           "plannedCommissionAmount" : {
             "type" : "number"
           },
+          "plannedCommissionBasis" : {
+            "description" : "저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다.",
+            "type" : [ "string", "null" ]
+          },
           "projectedExcessAmount" : {
-            "type" : "number"
+            "description" : "예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다.",
+            "type" : [ "number", "null" ]
           },
           "refundAdditionAppliedYn" : {
             "type" : "boolean"
@@ -2226,6 +2273,57 @@
         },
         "type" : "object"
       },
+      "AssistantCalculationLine" : {
+        "properties" : {
+          "attributionDate" : {
+            "type" : "string"
+          },
+          "basisAmount" : {
+            "type" : "string"
+          },
+          "basisCode" : {
+            "type" : "string"
+          },
+          "beneficiaryAgentId" : {
+            "type" : "string"
+          },
+          "calculationType" : {
+            "type" : "string"
+          },
+          "cashflowType" : {
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "type" : "string"
+          },
+          "contractId" : {
+            "type" : "string"
+          },
+          "dueDate" : {
+            "type" : "string"
+          },
+          "expectedAmount" : {
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "ratePct" : {
+            "type" : "string"
+          },
+          "ruleId" : {
+            "type" : "string"
+          },
+          "sourceId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AssistantCalculationSource" : {
         "properties" : {
           "entityId" : {
@@ -2241,6 +2339,28 @@
             "type" : "string"
           },
           "version" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AssistantCalculationValidity" : {
+        "properties" : {
+          "calculatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "dependencyFingerprint" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "inputFingerprint" : {
+            "type" : "string"
+          },
+          "stateToken" : {
             "type" : "string"
           }
         },
@@ -2540,6 +2660,25 @@
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "CalculationRevalidationRequest" : {
+        "properties" : {
+          "calculationId" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/PaymentCalculationRequest"
+          },
+          "stateToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "calculationId", "input", "stateToken" ],
         "type" : "object"
       },
       "CapAgentSummaryResponse" : {
@@ -5811,6 +5950,27 @@
         },
         "type" : "object"
       },
+      "ExceptionCountsResponse" : {
+        "properties" : {
+          "bySeverity" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionSeverityCountResponse"
+            },
+            "type" : "array"
+          },
+          "byType" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExceptionTypeSummaryResponse"
+            },
+            "type" : "array"
+          },
+          "total" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "ExceptionOccurrenceResponse" : {
         "properties" : {
           "detectedAt" : {
@@ -5898,6 +6058,22 @@
               "type" : "string"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ExceptionSeverityCountResponse" : {
+        "properties" : {
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "severity" : {
+            "enum" : [ "INFO", "WARNING", "HIGH", "CRITICAL" ],
+            "type" : "string"
+          },
+          "severityLabel" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -6227,6 +6403,130 @@
           },
           "before" : {
             "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAgentCounts" : {
+        "properties" : {
+          "active" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "registered" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "terminated" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAttentionAgent" : {
+        "properties" : {
+          "activeYn" : {
+            "type" : "boolean"
+          },
+          "agentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "branch" : {
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "contractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeAttentionReason"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "statusLabel" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeAttentionReason" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeBranch" : {
+        "properties" : {
+          "activeContractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "agentCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "attentionCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "HomeSummaryResponse" : {
+        "properties" : {
+          "agents" : {
+            "$ref" : "#/components/schemas/HomeAgentCounts"
+          },
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "attentionAgents" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeAttentionAgent"
+            },
+            "type" : "array"
+          },
+          "attentionTotal" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "basis" : {
+            "type" : "string"
+          },
+          "branches" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HomeBranch"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -7589,6 +7889,12 @@
           "kind" : {
             "type" : "string"
           },
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AssistantCalculationLine"
+            },
+            "type" : "array"
+          },
           "missingInputs" : {
             "items" : {
               "type" : "string"
@@ -7620,8 +7926,7 @@
             "type" : "boolean"
           },
           "validity" : {
-            "description" : "Always null in snapshot-only phase; not a server proof",
-            "type" : [ "object", "null" ]
+            "$ref" : "#/components/schemas/AssistantCalculationValidity"
           }
         },
         "type" : "object"
@@ -9794,8 +10099,45 @@
       },
       "Scope" : {
         "properties" : {
+          "aggregation" : {
+            "enum" : [ "SINGLE_LINE", "MONTH_TOTAL" ],
+            "type" : "string"
+          },
+          "asOfDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "beneficiaryAgentId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "commissionItemId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "contractId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "installmentNo" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
           "paymentId" : {
-            "pattern" : "[1-9][0-9]{0,18}",
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "paymentStage" : {
+            "enum" : [ "INSURER_TO_GA", "GA_TO_FC" ],
+            "type" : "string"
+          },
+          "reconciliationResultId" : {
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "settlementMonth" : {
+            "pattern" : "\\d{4}-\\d{2}",
             "type" : "string"
           }
         },
@@ -10307,6 +10649,37 @@
             "type" : "integer"
           }
         },
+        "type" : "object"
+      },
+      "Verification" : {
+        "properties" : {
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "paymentId" : {
+            "type" : "string"
+          },
+          "verified" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "VerifyRequest" : {
+        "properties" : {
+          "paymentId" : {
+            "minLength" : 1,
+            "pattern" : "[1-9]\\d{0,18}",
+            "type" : "string"
+          },
+          "precheckToken" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "paymentId", "precheckToken" ],
         "type" : "object"
       }
     },
@@ -10908,7 +11281,7 @@
     },
     "/api/v1/assistant/calculations" : {
       "post" : {
-        "description" : "ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.",
+        "description" : "기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.",
         "operationId" : "calculate",
         "requestBody" : {
           "content" : {
@@ -10934,6 +11307,66 @@
         },
         "summary" : "저장된 지급의 읽기 전용 계산 스냅샷",
         "tags" : [ "payment-calculation-controller" ]
+      }
+    },
+    "/api/v1/assistant/calculations/revalidate" : {
+      "post" : {
+        "description" : "변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.",
+        "operationId" : "revalidate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CalculationRevalidationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePaymentCalculationSnapshot"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "계산 입력·의존성·사용자·만료 재검증",
+        "tags" : [ "payment-calculation-controller" ]
+      }
+    },
+    "/api/v1/assistant/prechecks/revalidate" : {
+      "post" : {
+        "description" : "계산 증표로 대체할 수 없습니다. 금융 상태를 변경하지 않습니다.",
+        "operationId" : "verify",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VerifyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVerification"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "현재 지급의 실제 사전검증 증표 확인",
+        "tags" : [ "assistant-precheck-proof-controller" ]
       }
     },
     "/api/v1/audit-logs" : {
@@ -11220,6 +11653,15 @@
           "description" : "소속 조직 ID",
           "in" : "query",
           "name" : "organizationId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "지점 ID. 이 지점과 바로 아래 팀 소속 설계사를 찾는다(FUN-080 관리자 홈)",
+          "in" : "query",
+          "name" : "branchId",
           "required" : false,
           "schema" : {
             "format" : "int64",
@@ -12844,6 +13286,40 @@
         "tags" : [ "exception-case-controller" ]
       }
     },
+    "/api/v1/exceptions/counts" : {
+      "get" : {
+        "operationId" : "counts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "validationMonth",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExceptionCountsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "exception-case-controller" ]
+      }
+    },
     "/api/v1/exceptions/options" : {
       "get" : {
         "operationId" : "options",
@@ -12934,6 +13410,37 @@
           }
         },
         "tags" : [ "exception-case-controller" ]
+      }
+    },
+    "/api/v1/home/summary" : {
+      "get" : {
+        "description" : "기준일의 등록·활동·해촉 설계사 수, 지점별 설계사·유효 계약 수, 확인할 설계사 상위 10명을 돌려준다. asOf 생략 시 오늘(Asia/Seoul)을 쓴다. 전체 설계사 검색은 IF-API-07 을 쓴다.",
+        "operationId" : "homeSummary",
+        "parameters" : [ {
+          "description" : "현황 기준일(yyyy-MM-dd). 생략하면 오늘",
+          "example" : "2026-11-04",
+          "in" : "query",
+          "name" : "asOf",
+          "required" : false,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseHomeSummaryResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "관리자 홈 GA·설계사 현황 (IF-API-68)",
+        "tags" : [ "업무 대시보드" ]
       }
     },
     "/api/v1/journals" : {
@@ -14545,7 +15052,16 @@
                 }
               }
             },
-            "description" : "사전검증 결과 (차단 사유가 있어도 200 + blockers[])"
+            "description" : "사전검증 결과 (차단 사유가 있어도 200 + blockers[])",
+            "headers" : {
+              "X-FGC-Precheck-Token" : {
+                "description" : "confirmable=true이고 차단 사유가 없을 때만 발급되는 사용자·세션·대상·의존성에 묶인 5분 증표",
+                "schema" : {
+                  "type" : "string"
+                },
+                "style" : "simple"
+              }
+            }
           },
           "400" : {
             "content" : {

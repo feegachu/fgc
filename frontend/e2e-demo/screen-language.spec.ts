@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { readFileSync } from 'node:fs'
-import type { Browser, Locator, Page } from '@playwright/test'
+import { test as plainTest, type Browser, type Locator, type Page } from '@playwright/test'
 import { matchPath } from 'react-router'
 import { canOpen, screens } from '../src/app/screens'
 import { test, expect, login, api, completeMonthly, sql } from './fixtures'
@@ -316,7 +316,7 @@ function transferTable(visits: Visit[]) {
   ].join('\n')
 }
 
-test('검사 규칙은 코드를 잡고 업무 표기는 통과시킨다', () => {
+plainTest('검사 규칙은 코드를 잡고 업무 표기는 통과시킨다', () => {
   const flagged = (text: string, route = '/contracts') => {
     const found: Finding[] = []
     scan(text, '시험', route, found)
@@ -341,7 +341,7 @@ const guideTexts = (value: unknown, key = ''): string[] =>
         ? Object.entries(value).flatMap(([name, item]) => guideTexts(item, name))
         : []
 
-test('화면 도움말과 업무 안내의 모든 단계 문구에 개발 용어가 없다', () => {
+plainTest('화면 도움말과 업무 안내의 모든 단계 문구에 개발 용어가 없다', () => {
   const found: Finding[] = []
   for (const [catalog, content] of Object.entries({ screenHelp, workflowGuides, paymentGuides, workflowHelp }))
     // 정책 화면 안내는 그 화면의 근거 표시 이름을 그대로 부른다(화면정의서 :336).

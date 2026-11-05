@@ -11,6 +11,7 @@ export interface RequestOptions {
   headers?: HeadersInit
   body?: unknown
   signal?: AbortSignal
+  onResponseHeaders?: (headers: Headers) => void
   idempotencyKey?: string
 }
 // springdoc marks response properties optional; successful token responses require these fields.
@@ -112,7 +113,10 @@ export function createApiClient(env: ClientEnvironment) {
     return retry
   }
   async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiEnvelope<T>> {
-    return readEnvelope<T>(await responseFor(path, options, 'application/json'))
+    const response = await responseFor(path, options, 'application/json')
+    const envelope = await readEnvelope<T>(response)
+    options.onResponseHeaders?.(new Headers(response.headers))
+    return envelope
   }
   async function requestBlob(path: string, options: RequestOptions = {}) {
     const response = await responseFor(path, options, 'text/csv')

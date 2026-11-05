@@ -33,6 +33,8 @@ export interface BaseCriteria {
   keyword?: string
   insurerId?: string
   organizationId?: string
+  /** 설계사 조회 전용: 이 지점과 아래 팀 소속. organizationId 는 그 조직 소속만 찾는다. */
+  branchId?: string
   includeTerminated?: boolean
   includeExpired?: boolean
   includeHistorical?: boolean
