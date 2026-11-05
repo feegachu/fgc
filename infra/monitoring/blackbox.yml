@@ -1,0 +1,8 @@
+modules:
+  http_health:
+    prober: http
+    timeout: 4s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      fail_if_body_not_matches_regexp: ['"status"\s*:\s*"UP"']

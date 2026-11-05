@@ -37,6 +37,12 @@ public interface ArbitrageCheckQueries {
             PaymentStage paymentStage,
             LocalDate asOfDate);
 
+    // 동일 SQL 스냅샷의 잔여액과 차감할 수 없는 지급 원천을 함께 조회한다.
+    PlannedCommissionSummary plannedCommissionSummary(Long contractId, PaymentStage paymentStage, LocalDate asOfDate);
+
+    // 정정 커밋 전/후의 기지급액과 잔여액을 섞지 않는 단일 조회.
+    CommissionBalanceSnapshot commissionBalanceSnapshot(Long contractId, PaymentStage paymentStage, LocalDate asOfDate);
+
     // 계약 상품과 계약차월에 적용 가능한 예상 환급률표 후보를 조회한다
     List<ArbitrageRefundRateCandidate> selectRefundRateCandidates(
             ArbitrageCalculationSource source,
