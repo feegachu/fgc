@@ -321,6 +321,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/prechecks/revalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 현재 지급의 실제 사전검증 증표 확인
+         * @description 계산 증표로 대체할 수 없습니다. 금융 상태를 변경하지 않습니다.
+         */
+        post: operations["verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-logs": {
         parameters: {
             query?: never;
@@ -2570,6 +2590,11 @@ export interface components {
         };
         ApiResponseValidationRunSearchResponse: {
             data?: components["schemas"]["ValidationRunSearchResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseVerification: {
+            data?: components["schemas"]["Verification"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -6240,6 +6265,16 @@ export interface components {
             /** Format: int64 */
             validationTargetId?: number;
         };
+        Verification: {
+            /** Format: date-time */
+            expiresAt?: string;
+            paymentId?: string;
+            verified?: boolean;
+        };
+        VerifyRequest: {
+            paymentId: string;
+            precheckToken: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -6683,6 +6718,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponsePaymentCalculationSnapshot"];
+                };
+            };
+        };
+    };
+    verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVerification"];
                 };
             };
         };
@@ -9130,6 +9189,8 @@ export interface operations {
             /** @description 사전검증 결과 (차단 사유가 있어도 200 + blockers[]) */
             200: {
                 headers: {
+                    /** @description confirmable=true이고 차단 사유가 없을 때만 발급되는 사용자·세션·대상·의존성에 묶인 5분 증표 */
+                    "X-FGC-Precheck-Token"?: string;
                     [name: string]: unknown;
                 };
                 content: {

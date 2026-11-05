@@ -131,15 +131,27 @@ public class CalculationProofService {
   private String put(Grant grant) {
     synchronized (grants) {
       grants.entrySet().removeIf(entry -> !clock.instant().isBefore(entry.getValue().expires()));
-      if (grants.size() >= 1000
-          || grants.values().stream().filter(value -> value.owner().equals(grant.owner())).count()
-              >= 32) throw new FgcBusinessException(FgcErrorCode.IMPL_REQUEST_IN_PROGRESS);
+      if (grants.values().stream().filter(value -> value.owner().equals(grant.owner())).count()
+          >= 32) {
+        evictOldest(grant.owner());
+      }
+      if (grants.size() >= 1000) {
+        evictOldest(null);
+      }
       byte[] bytes = new byte[32];
       random.nextBytes(bytes);
       String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
       grants.put(token, grant);
       return token;
     }
+  }
+
+  private void evictOldest(String owner) {
+    grants.entrySet().stream()
+        .filter(entry -> owner == null || entry.getValue().owner().equals(owner))
+        .min(Comparator.comparing(entry -> entry.getValue().issued()))
+        .map(Map.Entry::getKey)
+        .ifPresent(grants::remove);
   }
 
   private String dependency(PaymentCalculationRequest input) {

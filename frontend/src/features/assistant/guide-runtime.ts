@@ -25,7 +25,7 @@ export interface PaymentObservation {
   formValid: boolean
   saved: boolean
   busy: boolean
-  precheck: 'NONE' | 'PASSED_WITHOUT_TOKEN' | 'REJECTED'
+  precheck: 'NONE' | 'PASSED_WITHOUT_TOKEN' | 'PASSED_WITH_TOKEN' | 'REJECTED'
   modalOpen: boolean
 }
 export interface LocalGuide {

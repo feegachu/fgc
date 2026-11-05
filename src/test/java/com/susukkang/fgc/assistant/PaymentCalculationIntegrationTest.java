@@ -1,4 +1,5 @@
 package com.susukkang.fgc.assistant;
+import static org.mockito.Mockito.verify;
 
 import com.susukkang.fgc.assistant.dto.PaymentCalculationRequest;
 import com.susukkang.fgc.assistant.service.PaymentCalculationService;
@@ -47,6 +48,39 @@ class PaymentCalculationIntegrationTest {
         jdbc.update("UPDATE fgc.commission_transaction SET amount=amount+1 WHERE commission_transaction_id=?",paymentId);
         var stale=calculations.revalidate(new com.susukkang.fgc.assistant.dto.CalculationRevalidationRequest(result.calculationId(),result.validity().stateToken(),request));
         assertThat(stale.status()).isEqualTo("STALE");assertThat(stale.amounts()).isEmpty();assertThat(stale.recommendation().allowed()).isFalse();
+    }
+
+    @MockitoSpyBean com.susukkang.fgc.assistant.service.CalculationDependencyFingerprint fingerprints;
+    @Autowired com.susukkang.fgc.assistant.service.AssistantPrecheckProofService precheckProofs;
+    @Test void dependencyQueryIsRepeatableAndMeasuresSeedCost() {
+        var transaction=new TransactionTemplate(transactionManager);
+        transaction.setReadOnly(true);transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        var durations=new ArrayList<Long>();
+        transaction.executeWithoutResult(status->{
+            String expected=null;
+            for(int i=0;i<5;i++) {
+                long started=System.nanoTime();String actual=fingerprints.current();durations.add(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
+                assertThat(actual).matches("[0-9a-f]{64}");if(expected!=null)assertThat(actual).isEqualTo(expected);expected=actual;
+            }
+        });
+        System.out.println("#733 dependency SHA256 query seed timings(ms): "+durations);
+    }
+
+    @Test void failedProofSqlRollsBackBeforeFreshPrecheckWithoutBusinessWrites() {
+        var expected=payments.precheck(paymentId);
+        assertThat(expected.confirmable()).as("fixture permits a real precheck proof attempt").isTrue();
+        var before=counts();
+        doAnswer(invocation -> {
+            assertThat(jdbc.queryForObject("SHOW transaction_read_only",String.class)).isEqualTo("on");
+            assertThat(jdbc.queryForObject("SHOW transaction_isolation",String.class)).isEqualTo("repeatable read");
+            jdbc.execute("SELECT 1 / 0");
+            return invocation.callRealMethod();
+        }).when(fingerprints).current();
+        var checked=precheckProofs.check(paymentId);
+        assertThat(checked.token()).isNull();assertThat(checked.result()).isEqualTo(expected);
+        assertThat(jdbc.queryForObject("SELECT 1",Integer.class)).isEqualTo(1);
+        assertThat(counts()).isEqualTo(before);
+        verify(fingerprints).current();
     }
 
     @BeforeEach void createOwnedCommittedDraft() {
