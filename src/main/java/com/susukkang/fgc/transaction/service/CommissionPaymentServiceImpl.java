@@ -3,27 +3,27 @@ package com.susukkang.fgc.transaction.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susukkang.fgc.audit.service.AuditLogService;
-import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import com.susukkang.fgc.base.repository.AgentRepository;
 import com.susukkang.fgc.cap.dto.CapCalculationCommand;
 import com.susukkang.fgc.cap.dto.CapCalculationResult;
+import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
+import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.dto.CapExceptionCreateCommand;
 import com.susukkang.fgc.cap.dto.CapValidationRequest;
 import com.susukkang.fgc.cap.dto.CapValidationResult;
-import com.susukkang.fgc.cap.dto.CapCheckDetailInsertRow;
-import com.susukkang.fgc.cap.dto.CapCheckDetailLine;
 import com.susukkang.fgc.cap.repository.CapCheckWriteRepository;
-import com.susukkang.fgc.cap.service.CapCalculator;
+import com.susukkang.fgc.cap.repository.CapExceptionRepository;
 import com.susukkang.fgc.cap.service.CapApplicabilityPolicy;
+import com.susukkang.fgc.cap.service.CapCalculator;
 import com.susukkang.fgc.cap.service.CapExceptionService;
 import com.susukkang.fgc.cap.service.CapValidator;
 import com.susukkang.fgc.common.code.AgentRankCode;
 import com.susukkang.fgc.common.code.AttributionMethod;
 import com.susukkang.fgc.common.code.CapResultStatus;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
-import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.ExceptionSeverity;
 import com.susukkang.fgc.common.code.ExceptionType;
+import com.susukkang.fgc.common.code.ExclusionType;
 import com.susukkang.fgc.common.code.InclusionDecisionStatus;
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.code.ProtectionType;
@@ -33,6 +33,7 @@ import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.util.MoneyUtil;
 import com.susukkang.fgc.common.web.PageResponse;
+import com.susukkang.fgc.exceptioncase.service.ExceptionCaseService;
 import com.susukkang.fgc.policy.service.CommissionPolicyService;
 import com.susukkang.fgc.transaction.domain.AttributedContractNo;
 import com.susukkang.fgc.transaction.domain.CapCheckCommand;
@@ -46,17 +47,10 @@ import com.susukkang.fgc.transaction.domain.ConfirmationData;
 import com.susukkang.fgc.transaction.domain.ContractReference;
 import com.susukkang.fgc.transaction.domain.ExceptionCaseCommand;
 import com.susukkang.fgc.transaction.domain.ExistingIncludedDetail;
+import com.susukkang.fgc.transaction.domain.PaymentCandidateProjection;
 import com.susukkang.fgc.transaction.dto.*;
 import com.susukkang.fgc.transaction.repository.CommissionPaymentQueryRepository;
 import com.susukkang.fgc.transaction.repository.CommissionPaymentWriteRepository;
-import com.susukkang.fgc.cap.repository.CapExceptionRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -66,7 +60,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * 설명 : 수수료 지급 건 등록·수정·확정 서비스
@@ -88,6 +87,9 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     // FUN-061·운영정책서 제51조 "지급 건과 계약귀속" — 등록·수정·확정과 같은 트랜잭션에서 감사행을 남긴다.
     // after JSON 에 지급단계·포함/제외 판단·정착지원금 귀속·배부정책·증빙(REG-20·22)을 함께 담는다.
+    private static final String FIELD = "field";
+    private static final String REASON = "reason";
+    private static final String REASON_CODE = "reasonCode";
     private static final String AUDIT_ENTITY_TYPE = "COMMISSION_PAYMENT";
     private static final String AUDIT_PAYMENT_CREATED = "PAYMENT_CREATED";
     private static final String AUDIT_PAYMENT_UPDATED = "PAYMENT_UPDATED";
@@ -221,7 +223,8 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     @PreAuthorize(Roles.CAN_REVERSE_JOURNAL)
     public CommissionPaymentResponse confirmJournalCorrection(Long paymentId, String correctionGroupKey) {
         if (!writeRepository.isJournalCorrectionReplacement(paymentId, correctionGroupKey)) {
-            throw new FgcBusinessException(FgcErrorCode.COMMON_002, Map.of("field", "correctionGroupKey"));
+      throw new FgcBusinessException(
+          FgcErrorCode.COMMON_002, Map.of(FIELD, "correctionGroupKey"));
         }
         return confirmPayment(paymentId, "JC:" + correctionGroupKey);
     }
@@ -351,7 +354,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         confirmedValue.put("status", CommissionPaymentStatus.CONFIRMED);
         confirmedValue.put("idempotencyKey", normalizedIdempotencyKey);
         confirmedValue.put("capExclusions", capExclusions(attributions));
-        confirmedValue.put("capChecks", capChecks.stream().map(this::capCheckAuditSummary).toList());
+    confirmedValue.put("capChecks", capChecks.stream().map(this::capCheckAuditSummary).toList());
         auditLogService.record(AuditLogService.AuditEvent.builder()
                 .actionCode(AUDIT_PAYMENT_CONFIRMED)
                 .entityType(AUDIT_ENTITY_TYPE)
@@ -377,135 +380,211 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     // confirm은 첫 실패에서 차단하지만 미리보기는 모든 차단 사유를 blockers[]로 수집한다.
     @Transactional(readOnly = true)
     public TransactionPrecheckResponse precheck(Long paymentId) {
-        List<ConfirmationData> attributions = requireConfirmationData(paymentId, false);
-        ConfirmationData first = attributions.get(0);
-        // [의도된 차이] 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005(409)로 먼저 끊는다.
-        // 그래서 "비DRAFT + 미해결 CAP_VIOLATION" 엣지케이스는 confirm=CAP_003(422) / precheck=TRAN_005(409)로
-        // 갈리며, 이는 수용한다: precheck에서 CAP_003은 던지지 않고 blockers로 수집하는 사유라 검사 순서를
-        // confirm과 맞춰도 비DRAFT 응답은 409 그대로이고, 완전 일치의 유일한 방법(CAP_003을 422로 던지기)은
-        // IF-API-24의 "차단 사유는 200 + blockers[]" 계약을 깬다. "판정 일치" 원칙의 범위는 DRAFT 건의
-        // 게이트 판정이며, DRAFT 건에서는 두 경로가 같은 판정 메서드로 항상 같은 결과를 낸다.
-        requireDraft(first);
-
-        List<GateFailure> failures = new ArrayList<>();
-        if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
-            failures.add(unresolvedViolationFailure(first));
-        }
-        GateFailure statusHold = statusHoldFailure(paymentId, first);
-        if (statusHold != null) {
-            failures.add(statusHold);
-        }
-        failures.addAll(requiredValueFailures(attributions));
-
-        List<TransactionPrecheckResponse.CapPreviewItem> previews = new ArrayList<>();
-        Map<CapGroupKey, CapEvaluation> evaluations = new LinkedHashMap<>();
-        if (first.totalAttributedAmount() != null) {
-            Map<Long, String> contractNos = queryRepository.findAttributedContractNumbers(paymentId)
-                    .stream()
-                    .collect(Collectors.toMap(
-                            AttributedContractNo::contractId,
-                            AttributedContractNo::contractNo
-                    ));
-            for (ConfirmationData data : attributions) {
-                failures.addAll(attributionFailures(data));
-                if (isClawback(data)) continue;
-                if (isNonContractNewcomerAttribution(data)) {
-                    GateFailure newcomerFailure = newcomerSupportEligibilityFailure(data);
-                    if (newcomerFailure != null) {
-                        failures.add(newcomerFailure);
-                    }
-                    continue;
-                }
-                if (data.contractId() == null || data.attributedAmount() == null) {
-                    continue;
-                }
-                if (isOutsideCapScope(data)) {
-                    continue;
-                }
-                if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
-                    CapCalculationResult calculation = calculateLimit(data.contractId(), data.paymentStage(),
-                            data.attributionDate(), null);
-                    CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
-                    evaluations.put(new CapGroupKey(data.contractId(), data.paymentStage()),
-                            new CapEvaluation(data, null, calculation, check));
-                    continue;
-                }
-                if (CapCandidateExclusion.isOutsideFirstYear(data) || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
-                    continue;
-                }
-                CapRuleSnapshot rule = queryRepository.findCapRuleSnapshot(
-                        paymentId,
-                        data.transactionAttributionId()
-                );
-                boolean applicableCapRuleSetExists = queryRepository.existsApplicableCapRuleSet(
-                        paymentId,
-                        data.transactionAttributionId()
-                );
-                GateFailure ruleFailure = capRuleFailure(rule, data, applicableCapRuleSetExists);
-                if (ruleFailure != null) {
-                    failures.add(ruleFailure);
-                }
-                if (rule == null) {
-                    continue;
-                }
-                CapCalculationResult calculation = calculateLimit(
-                        data.contractId(),
-                        data.paymentStage(),
-                        data.attributionDate(),
-                        rule.complianceEvidenceAmount()
-                );
-                GateFailure consistencyFailure = ruleConsistencyFailure(rule, calculation, data);
-                if (consistencyFailure != null) {
-                    failures.add(consistencyFailure);
-                }
-                CapValidationResult actualValidation = capValidator.validate(new CapValidationRequest(
-                        calculation.limitAmount(),
-                        calculation.annualizedLimitBase(),
-                        rule.warningUsagePct(),
-                        rule.existingIncludedAmount(),
-                        currentIncludedAmount(attributions, data),
-                        InclusionDecisionStatus.INCLUDED
-                ));
-                CapValidationResult validation = mergeScheduleAndActualValidation(
-                        calculation,
-                        actualValidation,
-                        rule.warningUsagePct()
-                );
-                // 룰 판정 불일치·룰셋 불일치(CAP_002) 행은 confirm이 계산에 도달하지 못하는 행이다.
-                // CapValidator는 귀속 스냅샷만 보므로 정책 드리프트 시 NORMAL로 계산될 수 있는데,
-                // 게이지 수치는 참고용으로 남기되 판정만은 검토필요로 강제해 "정상" 오인을 막는다.
-                if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
-                        || ruleFailure != null || consistencyFailure != null) {
-                    validation = new CapValidationResult(
-                            validation.limitAmount(),
-                            validation.candidateIncludedAmount(),
-                            validation.includedAmount(),
-                            validation.remainingAmount(),
-                            validation.usagePct(),
-                            CapResultStatus.REVIEW_REQUIRED
-                    );
-                }
-                CapCheckCommand check = buildCapCheck(data, rule, calculation, validation, attributions);
-                evaluations.merge(new CapGroupKey(data.contractId(), data.paymentStage()),
-                        new CapEvaluation(data, rule, calculation, check), this::stricterCapEvaluation);
-                GateFailure resultFailure = capResultFailure(data, check);
-                if (resultFailure != null) {
-                    failures.add(resultFailure);
-                }
-            }
-            for (CapEvaluation evaluation : evaluations.values()) {
-                previews.add(TransactionPrecheckResponse.CapPreviewItem.from(evaluation.check(), evaluation.rule(),
-                        contractNos.get(evaluation.data().contractId())));
-            }
-        }
-        return new TransactionPrecheckResponse(
-                paymentId,
-                previews,
-                toBlockers(failures),
-                failures.isEmpty(),
-                capExclusions(attributions)
-        );
+        return evaluatePrecheck(paymentId,requireConfirmationData(paymentId,false),null);
     }
+
+  @Override
+  @PreAuthorize(Roles.CAN_PROCESS)
+  @Transactional(
+      readOnly = true,
+      isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+  public TransactionPrecheckResponse precheckCandidate(
+      CommissionPaymentCreateRequest request, Long replacedPaymentId) {
+    if (replacedPaymentId != null)
+      requireDraft(requireConfirmationData(replacedPaymentId, false).getFirst());
+    PreparedPayment prepared =
+        buildCommand(
+            replacedPaymentId,
+            request.sourceType(),
+            request.sourceBusinessKey(),
+            request.contractId(),
+            request.agentId(),
+            request.commissionItemId(),
+            request.amount(),
+            request.settlementMonth(),
+            request.cashflowType(),
+            request.scheduledPaymentDate(),
+            request.paymentStage(),
+            request.allocationPolicyVersion(),
+            request.attributions(),
+            request.evidenceRef(),
+            request.note());
+    long id = replacedPaymentId == null ? 0L : replacedPaymentId;
+    var candidate =
+        PaymentCandidateProjection.from(
+            id, prepared.payment(), prepared.attributions(), objectMapper);
+    return evaluatePrecheck(
+        id, queryRepository.findCandidateConfirmationData(candidate), candidate);
+  }
+
+  private TransactionPrecheckResponse evaluatePrecheck(
+      Long paymentId, List<ConfirmationData> attributions, PaymentCandidateProjection candidate) {
+    if (attributions.isEmpty()) invalid("attributions", "귀속 자료를 확인하세요.");
+    ConfirmationData first = attributions.get(0);
+    // [의도된 차이] 비DRAFT는 미리보기 대상 자체가 아니라 TRAN_005(409)로 먼저 끊는다.
+    // 그래서 "비DRAFT + 미해결 CAP_VIOLATION" 엣지케이스는 confirm=CAP_003(422) / precheck=TRAN_005(409)로
+    // 갈리며, 이는 수용한다: precheck에서 CAP_003은 던지지 않고 blockers로 수집하는 사유라 검사 순서를
+    // confirm과 맞춰도 비DRAFT 응답은 409 그대로이고, 완전 일치의 유일한 방법(CAP_003을 422로 던지기)은
+    // IF-API-24의 "차단 사유는 200 + blockers[]" 계약을 깬다. "판정 일치" 원칙의 범위는 DRAFT 건의
+    // 게이트 판정이며, DRAFT 건에서는 두 경로가 같은 판정 메서드로 항상 같은 결과를 낸다.
+    requireDraft(first);
+
+    List<GateFailure> failures = new ArrayList<>();
+    if (!isClawback(first) && hasBlockingUnresolvedViolation(paymentId, attributions)) {
+      failures.add(unresolvedViolationFailure(first));
+    }
+    GateFailure statusHold = statusHoldFailure(paymentId, first, candidate);
+    if (statusHold != null) {
+      failures.add(statusHold);
+    }
+    failures.addAll(requiredValueFailures(attributions));
+
+    List<TransactionPrecheckResponse.CapPreviewItem> previews = new ArrayList<>();
+    Map<CapGroupKey, CapEvaluation> evaluations = new LinkedHashMap<>();
+    if (first.totalAttributedAmount() != null) {
+      Map<Long, String> contractNos =
+          (candidate == null
+                  ? queryRepository.findAttributedContractNumbers(paymentId)
+                  : queryRepository.findAttributedContractNumbers(paymentId, candidate))
+              .stream()
+                  .collect(
+                      Collectors.toMap(
+                          AttributedContractNo::contractId, AttributedContractNo::contractNo));
+      for (ConfirmationData data : attributions) {
+        evaluatePrecheckAttribution(
+            paymentId, data, attributions, candidate, failures, evaluations);
+      }
+      for (CapEvaluation evaluation : evaluations.values()) {
+        previews.add(
+            TransactionPrecheckResponse.CapPreviewItem.from(
+                evaluation.check(),
+                evaluation.rule(),
+                contractNos.get(evaluation.data().contractId())));
+      }
+    }
+    return new TransactionPrecheckResponse(
+        candidate == null ? paymentId : null,
+        previews,
+        candidate == null
+            ? toBlockers(failures)
+            : toBlockers(failures).stream()
+                .map(
+                    row ->
+                        new TransactionPrecheckResponse.Blocker(
+                            row.code(), row.message(), row.contractId(), null))
+                .toList(),
+        failures.isEmpty(),
+        capExclusions(attributions));
+  }
+
+  private void evaluatePrecheckAttribution(
+      Long paymentId,
+      ConfirmationData data,
+      List<ConfirmationData> attributions,
+      PaymentCandidateProjection candidate,
+      List<GateFailure> failures,
+      Map<CapGroupKey, CapEvaluation> evaluations) {
+    failures.addAll(attributionFailures(data));
+    if (isClawback(data)) return;
+    if (isNonContractNewcomerAttribution(data)) {
+      GateFailure newcomerFailure = newcomerSupportEligibilityFailure(data);
+      if (newcomerFailure != null) {
+        failures.add(newcomerFailure);
+      }
+      return;
+    }
+    if (data.contractId() == null || data.attributedAmount() == null) {
+      return;
+    }
+    if (isOutsideCapScope(data)) {
+      return;
+    }
+    if (CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
+      CapCalculationResult calculation =
+          calculateLimit(data.contractId(), data.paymentStage(), data.attributionDate(), null);
+      CapCheckCommand check = buildNotApplicableCheck(data, calculation, attributions);
+      evaluations.put(
+          new CapGroupKey(data.contractId(), data.paymentStage()),
+          new CapEvaluation(data, null, calculation, check));
+      return;
+    }
+    if (CapCandidateExclusion.isOutsideFirstYear(data)
+        || CapCandidateExclusion.hasInvalidPaymentDate(data)) {
+      return;
+    }
+    evaluatePrecheckCap(paymentId, data, attributions, candidate, failures, evaluations);
+  }
+
+  private void evaluatePrecheckCap(
+      Long paymentId,
+      ConfirmationData data,
+      List<ConfirmationData> attributions,
+      PaymentCandidateProjection candidate,
+      List<GateFailure> failures,
+      Map<CapGroupKey, CapEvaluation> evaluations) {
+    CapRuleSnapshot rule =
+        (candidate == null
+            ? queryRepository.findCapRuleSnapshot(paymentId, data.transactionAttributionId())
+            : queryRepository.findCapRuleSnapshot(
+                paymentId, data.transactionAttributionId(), candidate));
+    boolean applicableCapRuleSetExists =
+        (candidate == null
+            ? queryRepository.existsApplicableCapRuleSet(paymentId, data.transactionAttributionId())
+            : queryRepository.existsApplicableCapRuleSet(
+                paymentId, data.transactionAttributionId(), candidate));
+    GateFailure ruleFailure = capRuleFailure(rule, data, applicableCapRuleSetExists);
+    if (ruleFailure != null) {
+      failures.add(ruleFailure);
+    }
+    if (rule == null) {
+      return;
+    }
+    CapCalculationResult calculation =
+        calculateLimit(
+            data.contractId(),
+            data.paymentStage(),
+            data.attributionDate(),
+            rule.complianceEvidenceAmount());
+    GateFailure consistencyFailure = ruleConsistencyFailure(rule, calculation, data);
+    if (consistencyFailure != null) {
+      failures.add(consistencyFailure);
+    }
+    CapValidationResult actualValidation =
+        capValidator.validate(
+            new CapValidationRequest(
+                calculation.limitAmount(),
+                calculation.annualizedLimitBase(),
+                rule.warningUsagePct(),
+                rule.existingIncludedAmount(),
+                currentIncludedAmount(attributions, data),
+                InclusionDecisionStatus.INCLUDED));
+    CapValidationResult validation =
+        mergeScheduleAndActualValidation(calculation, actualValidation, rule.warningUsagePct());
+    // 룰 판정 불일치·룰셋 불일치(CAP_002) 행은 confirm이 계산에 도달하지 못하는 행이다.
+    // CapValidator는 귀속 스냅샷만 보므로 정책 드리프트 시 NORMAL로 계산될 수 있는데,
+    // 게이지 수치는 참고용으로 남기되 판정만은 검토필요로 강제해 "정상" 오인을 막는다.
+    if (data.inclusionDecisionStatus() == InclusionDecisionStatus.REVIEW_REQUIRED
+        || ruleFailure != null
+        || consistencyFailure != null) {
+      validation =
+          new CapValidationResult(
+              validation.limitAmount(),
+              validation.candidateIncludedAmount(),
+              validation.includedAmount(),
+              validation.remainingAmount(),
+              validation.usagePct(),
+              CapResultStatus.REVIEW_REQUIRED);
+    }
+    CapCheckCommand check = buildCapCheck(data, rule, calculation, validation, attributions);
+    evaluations.merge(
+        new CapGroupKey(data.contractId(), data.paymentStage()),
+        new CapEvaluation(data, rule, calculation, check),
+        this::stricterCapEvaluation);
+    GateFailure resultFailure = capResultFailure(data, check);
+    if (resultFailure != null) {
+      failures.add(resultFailure);
+    }
+  }
 
     @Override
     public PageResponse<CommissionPaymentListResponse> search(CommissionPaymentSearchCondition condition, int page, int size) {
@@ -538,7 +617,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         return new FgcBusinessException(
                 FgcErrorCode.COMMON_002,
                 field,
-                Map.of("field", field),
+                Map.of(FIELD, field),
                 detail
         );
     }
@@ -1246,15 +1325,29 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
 
     /** FUN-028: 환수(차감) 건은 대상이 아니다. 저장하는 예외 이력은 없고 409 로만 차단한다. */
     private GateFailure statusHoldFailure(Long paymentId, ConfirmationData first) {
+        return statusHoldFailure(paymentId, first, null);
+    }
+
+    private GateFailure statusHoldFailure(Long paymentId, ConfirmationData first, PaymentCandidateProjection candidate) {
         if (isClawback(first)) {
             return null;
         }
-        List<com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker> blockers = paymentHoldGate.blockers(paymentId);
+        List<com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker> blockers = candidate == null ? paymentHoldGate.blockers(paymentId) : paymentHoldGate.blockers(paymentId, candidate);
         if (blockers == null || blockers.isEmpty()) {
             return null;
         }
-        return new GateFailure(first, null, null, null, null, FgcErrorCode.IMPL_PAYMENT_HELD,
-                Map.of("blockers", blockers.stream().map(com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker::label).toList()));
+    return new GateFailure(
+        first,
+        null,
+        null,
+        null,
+        null,
+        FgcErrorCode.IMPL_PAYMENT_HELD,
+        Map.of(
+            "blockers",
+            blockers.stream()
+                .map(com.susukkang.fgc.contract.service.PaymentHoldGate.Blocker::label)
+                .toList()));
     }
 
     private GateFailure unresolvedViolationFailure(ConfirmationData first) {
@@ -1400,16 +1493,29 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 && !isOutsideCapScope(data)
                 && !CapApplicabilityPolicy.isBeforeEffectiveDate(data.paymentStage(), data.contractDate())) {
             String paymentDate = Objects.toString(data.scheduledPaymentDate(), "미입력");
-            failures.add(new GateFailure(
-                    data, ExceptionType.CAP_REVIEW_REQUIRED, CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
-                    "HIGH", "초년도 밖 지급일 확인 필요",
-                    "초년도 밖 귀속은 지급예정일도 초년도 종료일 이후여야 합니다. 귀속일: " + data.attributionDate()
-                            + ", 지급예정일: " + paymentDate + ", 초년도 종료일(미포함): " + data.contractDate().plusMonths(12),
-                    FgcErrorCode.CAP_002,
-                    Map.of("reasonCode", CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
-                            "attributionDate", data.attributionDate().toString(), "scheduledPaymentDate", paymentDate,
-                            "firstYearEndExclusive", data.contractDate().plusMonths(12).toString())
-            ));
+      failures.add(
+          new GateFailure(
+              data,
+              ExceptionType.CAP_REVIEW_REQUIRED,
+              CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+              "HIGH",
+              "초년도 밖 지급일 확인 필요",
+              "초년도 밖 귀속은 지급예정일도 초년도 종료일 이후여야 합니다. 귀속일: "
+                  + data.attributionDate()
+                  + ", 지급예정일: "
+                  + paymentDate
+                  + ", 초년도 종료일(미포함): "
+                  + data.contractDate().plusMonths(12),
+              FgcErrorCode.CAP_002,
+              Map.of(
+                  REASON_CODE,
+                  CapCandidateExclusion.INVALID_PAYMENT_DATE_REASON_CODE,
+                  "attributionDate",
+                  data.attributionDate().toString(),
+                  "scheduledPaymentDate",
+                  paymentDate,
+                  "firstYearEndExclusive",
+                  data.contractDate().plusMonths(12).toString())));
         }
         return failures;
     }
@@ -1556,12 +1662,25 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         for (ConfirmationData excluded : attributions) {
             if (!Objects.equals(excluded.contractId(), data.contractId()) || excluded.paymentStage() != data.paymentStage()
                     || !CapCandidateExclusion.isOutsideFirstYear(excluded) || isClawback(excluded)) continue;
-            rows.add(CapCheckDetailInsertRow.builder().capCheckId(check.getCapCheckId()).detailSeq(excludedSeq++)
-                    .commissionItemId(excluded.commissionItemId()).itemCode(excluded.itemCode()).itemName(excluded.itemName())
-                    .transactionAttributionId(excluded.transactionAttributionId()).classificationSnapshot("EXCLUDED")
-                    .amount(roundedAttributedAmount(excluded)).decisionReason(CapCandidateExclusion.EXCLUSION_REASON
-                            + " (귀속일 " + excluded.attributionDate() + ", 종료일 " + excluded.contractDate().plusMonths(12) + ")")
-                    .evidenceRef(excluded.evidenceRef()).build());
+      rows.add(
+          CapCheckDetailInsertRow.builder()
+              .capCheckId(check.getCapCheckId())
+              .detailSeq(excludedSeq++)
+              .commissionItemId(excluded.commissionItemId())
+              .itemCode(excluded.itemCode())
+              .itemName(excluded.itemName())
+              .transactionAttributionId(excluded.transactionAttributionId())
+              .classificationSnapshot("EXCLUDED")
+              .amount(roundedAttributedAmount(excluded))
+              .decisionReason(
+                  CapCandidateExclusion.EXCLUSION_REASON
+                      + " (귀속일 "
+                      + excluded.attributionDate()
+                      + ", 종료일 "
+                      + excluded.contractDate().plusMonths(12)
+                      + ")")
+              .evidenceRef(excluded.evidenceRef())
+              .build());
         }
         capCheckWriteRepository.insertCapCheckDetails(rows);
     }
@@ -1655,7 +1774,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                         "attributionDate", row.attributionDate().toString(),
                         "firstYearStartInclusive", row.firstYearStartInclusive().toString(),
                         "firstYearEndExclusive", row.firstYearEndExclusive().toString(),
-                        "reasonCode", row.reasonCode(), "reason", row.reason())).toList());
+                        REASON_CODE, row.reasonCode(), REASON, row.reason())).toList());
         snapshot.put("actualIncludedAmount", rule.existingIncludedAmount()
                 .add(result.candidateIncludedAmount()));
         snapshot.put("effectiveIncludedAmount", result.includedAmount());
@@ -1692,21 +1811,23 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
     private Map<String, Object> notApplicableCandidateSnapshot(ConfirmationData row, String reasonCode, String reason) {
         Map<String, Object> candidate = new LinkedHashMap<>();
         candidate.put("transactionAttributionId", row.transactionAttributionId());
-        candidate.put("attributionDate", row.attributionDate() == null ? null : row.attributionDate().toString());
-        candidate.put("amount", row.attributedAmount() == null ? null : roundedAttributedAmount(row));
+    candidate.put(
+        "attributionDate", row.attributionDate() == null ? null : row.attributionDate().toString());
+    candidate.put("amount", row.attributedAmount() == null ? null : roundedAttributedAmount(row));
         candidate.put("cashflowType", row.cashflowType());
         candidate.put("classification", row.inclusionDecisionStatus());
-        candidate.put("reasonCode", reasonCode);
-        candidate.put("reason", reason);
+        candidate.put(REASON_CODE, reasonCode);
+        candidate.put(REASON, reason);
         return candidate;
     }
 
     private CapCheckCommand buildNotApplicableCheck(ConfirmationData data, CapCalculationResult calculation,
                                                    List<ConfirmationData> attributions) {
         Map<String, Object> snapshot = new LinkedHashMap<>(calculation.calculationSnapshot());
-        Map<?, ?> applicability = snapshot.get("applicability") instanceof Map<?, ?> decision ? decision : Map.of();
-        String reasonCode = Objects.toString(applicability.get("reasonCode"), null);
-        String reason = Objects.toString(applicability.get("reason"),
+    Map<?, ?> applicability =
+        snapshot.get("applicability") instanceof Map<?, ?> decision ? decision : Map.of();
+        String reasonCode = Objects.toString(applicability.get(REASON_CODE), null);
+        String reason = Objects.toString(applicability.get(REASON),
                 Objects.toString(snapshot.get("notApplicableReason"), "적용대상 아님"));
         snapshot.put("candidateAttributions", attributions.stream()
                 .filter(row -> java.util.Objects.equals(row.contractId(), data.contractId())
@@ -2197,7 +2318,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         throw new FgcBusinessException(
                 FgcErrorCode.COMMON_002,
                 field,
-                Map.of("field", field),
+                Map.of(FIELD, field),
                 detail
         );
     }

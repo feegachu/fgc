@@ -26,7 +26,7 @@ it('기존 비교형 저장값이 있어도 목록형을 첫 번째 기본 보�
   expect(document.querySelectorAll('.arb-amount-list > div')).toHaveLength(4)
 })
 
-it('비교형은 현재 금액을 초과액 위의 막대로 비교하고 전체 예정액은 참고 영역에 분리한다', async () => {
+it('비교형은 현재 금액을 초과액 위의 막대로 비교하고 계산 기준 미기록 예정액은 참고 영역에 분리한다', async () => {
   const user = userEvent.setup()
   render(<ArbitrageAmountSummary row={row} />)
   await user.click(screen.getByRole('button', { name: '비교형' }))
@@ -37,7 +37,7 @@ it('비교형은 현재 금액을 초과액 위의 막대로 비교하고 전체
     summary.querySelector('.arb-amount-bars')!.compareDocumentPosition(summary.querySelector('.arb-amount-excess')!) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy()
-  expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent('지급예정액850,000원')
+  expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent('지급예정액 (기준 미기록)850,000원')
   expect(summary.querySelector('.arb-amount-reference')).toHaveTextContent(
     '지급예정 포함 초과액 (모니터링, 판정에 쓰지 않음)1,390,000원',
   )
@@ -70,7 +70,26 @@ it('누락된 금액을 0원으로 바꾸지 않고 음수의 부호와 막대 �
   await user.click(screen.getByRole('button', { name: '비교형' }))
   expect(screen.getByText('-1,234원')).toHaveClass('is-negative-amount')
   expect(screen.getByText('-987원')).toHaveClass('is-negative-amount')
-  expect(document.querySelector('.arb-amount-reference')).toHaveTextContent('지급예정액-')
+  expect(document.querySelector('.arb-amount-reference')).toHaveTextContent('지급예정액 (기준 미기록)-')
   expect(document.querySelector('.arb-amount-fill.is-negative')).toHaveStyle({ left: '0%' })
   expect(document.querySelectorAll('.arb-amount-zero')).toHaveLength(3)
+})
+
+
+it.each([
+  ['REMAINING_V1', '잔여 지급예정액', '유효 확정 지급액을 차감한'],
+  ['UNRESOLVED_UPPER_BOUND_V1', '지급예정액 상한', '확정된 잔여액으로 해석하지'],
+  [undefined, '지급예정액 (기준 미기록)', '과거 결과'],
+  [null, '지급예정액 (기준 미기록)', '과거 결과'],
+  ['FUTURE_BASIS_V2', '지급예정액 (기준 확인 필요)', '해석할 수 없는 계산 기준'],
+])('저장 기준 %s의 의미를 모든 금액 보기에서 유지한다', async (basis, label, description) => {
+  const user = userEvent.setup()
+  render(<ArbitrageAmountSummary row={{ ...row, plannedCommissionBasis: basis, plannedCommissionAmount: 50000, projectedExcessAmount: null }} />)
+  for (const mode of ['목록형', '비교형', '카드형']) {
+    await user.click(screen.getByRole('button', { name: mode }))
+    const reference = document.querySelector('.arb-amount-reference')!
+    expect(reference).toHaveTextContent(`${label}50,000원`)
+    expect(reference).toHaveTextContent('지급예정 포함 초과액 (모니터링, 판정에 쓰지 않음)-')
+    expect(screen.getByText(description!, { exact: false })).toBeVisible()
+  }
 })

@@ -73,7 +73,7 @@ export function PaymentCalculationPanel({
         data.kind !== kind ||
         data.currency !== 'KRW' ||
         data.resolvedScope?.paymentId !== observation.paymentId ||
-        data.validity != null
+        (data.validity != null && (!data.validity.stateToken || !data.validity.expiresAt))
       )
         throw new Error('INVALID_SNAPSHOT')
       if (Object.values(data.amounts ?? {}).some((value) => value != null && !isWonAmount(value)))

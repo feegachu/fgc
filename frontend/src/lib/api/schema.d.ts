@@ -292,9 +292,29 @@ export interface paths {
         put?: never;
         /**
          * 저장된 지급의 읽기 전용 계산 스냅샷
-         * @description ATTRIBUTION_BALANCE 및 DRAFT PAYMENT_CANDIDATE EXISTING만 지원. validity=null, 추천/가이드 완료 증표 없음. 금융 상태 변경 없음.
+         * @description 기존 조회·가상 후보 계산. 서버 계산 증표를 발급하지만 실제 사전검증·확정 증표와 구분. 금융 상태 변경 없음.
          */
         post: operations["calculate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/calculations/revalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계산 입력·의존성·사용자·만료 재검증
+         * @description 변경/만료는 STALE로 반환하고 추천을 차단합니다. 증표 변조는 409, 다른 소유자는 403입니다.
+         */
+        post: operations["revalidate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2605,7 +2625,10 @@ export interface components {
             paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
             paymentStageLabel?: string;
             plannedCommissionAmount?: number;
-            projectedExcessAmount?: number;
+            /** @description 저장 당시 예정액 계산 기준. REMAINING_V1은 잔여액, UNRESOLVED_UPPER_BOUND_V1은 미차감 상한이며 과거 미기록은 null이다. */
+            plannedCommissionBasis?: string | null;
+            /** @description 예정 포함 사전 모니터링 초과액. 연결 불명확 등으로 계산할 수 없으면 null이며 지급분 판정에는 사용하지 않는다. */
+            projectedExcessAmount?: number | null;
             refundAdditionAppliedYn?: boolean;
             /** @enum {string} */
             resultStatus?: "CLEAR" | "CANDIDATE" | "REVIEW_REQUIRED" | "NOT_APPLICABLE";
@@ -2633,12 +2656,39 @@ export interface components {
             originalAmount?: string;
             roundedAmount?: string;
         };
+        AssistantCalculationLine: {
+            attributionDate?: string;
+            basisAmount?: string;
+            basisCode?: string;
+            beneficiaryAgentId?: string;
+            calculationType?: string;
+            cashflowType?: string;
+            commissionItemId?: string;
+            contractId?: string;
+            dueDate?: string;
+            expectedAmount?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            ratePct?: string;
+            ruleId?: string;
+            sourceId?: string;
+            status?: string;
+        };
         AssistantCalculationSource: {
             entityId?: string;
             sourceId?: string;
             sourceType?: string;
             title?: string;
             version?: string;
+        };
+        AssistantCalculationValidity: {
+            /** Format: date-time */
+            calculatedAt?: string;
+            dependencyFingerprint?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            inputFingerprint?: string;
+            stateToken?: string;
         };
         /** @description 변경 내용 비교 행 — before/after JSON 의 리프 경로 하나 */
         AuditDiffEntry: {
@@ -2742,12 +2792,12 @@ export interface components {
             userId?: number;
         };
         Basis: {
-            sourceRefs?: components["schemas"]["AssistantCalculationSource"][];
-            rounding?: components["schemas"]["Rounding"];
             asOfDate?: string;
-            policyVersionIds?: string[];
-            ruleIds?: string[];
             lines?: components["schemas"]["AssistantAttributionLine"][];
+            policyVersionIds?: string[];
+            rounding?: components["schemas"]["Rounding"];
+            ruleIds?: string[];
+            sourceRefs?: components["schemas"]["AssistantCalculationSource"][];
         };
         Blocker: {
             code?: string;
@@ -2797,6 +2847,11 @@ export interface components {
             installmentNo?: number;
             /** Format: int64 */
             transactionAttributionId?: number;
+        };
+        CalculationRevalidationRequest: {
+            calculationId: string;
+            input: components["schemas"]["PaymentCalculationRequest"];
+            stateToken: string;
         };
         CapAgentSummaryResponse: {
             agentCode?: string;
@@ -4956,47 +5011,46 @@ export interface components {
             value: components["schemas"]["JsonNode"];
         };
         PaymentCalculationRequest: {
+            candidate?: components["schemas"]["JsonNode"];
+            /** Format: int64 */
+            clientRevision: number;
             contractVersion: string;
             /** @enum {string} */
             kind: "EXPECTED_COMMISSION" | "ATTRIBUTION_BALANCE" | "CAP_STATUS" | "PAYMENT_CANDIDATE" | "RECONCILIATION_DIFFERENCE" | "ARBITRAGE_EXCESS" | "JOURNAL_CORRECTION_REVIEW";
             /** @enum {string} */
             mode: "EXISTING" | "HYPOTHETICAL";
             scope?: components["schemas"]["Scope"];
-            candidate?: components["schemas"]["JsonNode"];
-            /** Format: int64 */
-            clientRevision: number;
         };
         PaymentCalculationSnapshot: {
-            calculationId?: string;
-            kind?: string;
-            mode?: string;
-            status?: string;
-            /** Format: int64 */
-            clientRevision?: number;
-            synthetic?: boolean;
-            snapshotOnly?: boolean;
-            evidenceKind?: string;
-            currency?: string;
-            paymentStatus?: string;
-            resolvedScope?: {
-                [key: string]: string;
-            };
             amounts?: {
                 [key: string]: string;
             };
+            basis?: components["schemas"]["Basis"];
+            blockers?: components["schemas"]["Reason"][];
+            /** Format: date-time */
+            calculatedAt?: string;
+            calculationId?: string;
             capPreview?: {
                 [key: string]: unknown;
             }[];
+            /** Format: int64 */
+            clientRevision?: number;
             confirmable?: boolean;
-            blockers?: components["schemas"]["Reason"][];
-            missingInputs?: string[];
-            basis?: components["schemas"]["Basis"];
-            recommendation?: components["schemas"]["Recommendation"];
-            /** Format: date-time */
-            calculatedAt?: string;
-            /** @description Always null in snapshot-only phase; not a server proof */
-            validity?: Record<string, never> | null;
+            currency?: string;
+            evidenceKind?: string;
+            kind?: string;
             lines?: components["schemas"]["AssistantCalculationLine"][];
+            missingInputs?: string[];
+            mode?: string;
+            paymentStatus?: string;
+            recommendation?: components["schemas"]["Recommendation"];
+            resolvedScope?: {
+                [key: string]: string;
+            };
+            snapshotOnly?: boolean;
+            status?: string;
+            synthetic?: boolean;
+            validity?: components["schemas"]["AssistantCalculationValidity"];
         };
         PaymentEvidence: {
             attributedAmount?: number;
@@ -5470,8 +5524,8 @@ export interface components {
         };
         Reason: {
             code?: string;
-            message?: string;
             contractId?: string;
+            message?: string;
             transactionAttributionId?: string;
         };
         RecentExceptionResponse: {
@@ -5512,10 +5566,10 @@ export interface components {
         };
         Recommendation: {
             allowed?: boolean;
-            targetId?: string;
-            suggestedAmount?: string;
             reason?: string;
             requiredChecks?: string[];
+            suggestedAmount?: string;
+            targetId?: string;
         };
         ReconciliationExceptionBulkCreateResponse: {
             /** Format: int64 */
@@ -5818,10 +5872,10 @@ export interface components {
             reversalOfId?: number;
         };
         Rounding: {
+            aggregation?: string;
+            mode?: string;
             /** Format: int32 */
             scale?: number;
-            mode?: string;
-            aggregation?: string;
         };
         Ruleset: {
             /** Format: date */
@@ -5980,20 +6034,20 @@ export interface components {
             status?: "PLANNED" | "CONFIRMED" | "MATCHED" | "ADJUSTED" | "HOLD" | "CANCELLED" | "RESTARTED";
         };
         Scope: {
-            paymentId?: string;
-            contractId?: string;
-            settlementMonth?: string;
-            /** @enum {string} */
-            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
-            /** Format: int32 */
-            installmentNo?: number;
-            commissionItemId?: string;
-            beneficiaryAgentId?: string;
-            /** Format: date */
-            asOfDate?: string;
-            reconciliationResultId?: string;
             /** @enum {string} */
             aggregation?: "SINGLE_LINE" | "MONTH_TOTAL";
+            /** Format: date */
+            asOfDate?: string;
+            beneficiaryAgentId?: string;
+            commissionItemId?: string;
+            contractId?: string;
+            /** Format: int32 */
+            installmentNo?: number;
+            paymentId?: string;
+            /** @enum {string} */
+            paymentStage?: "INSURER_TO_GA" | "GA_TO_FC";
+            reconciliationResultId?: string;
+            settlementMonth?: string;
         };
         Source: {
             entityType?: string;
@@ -6185,24 +6239,6 @@ export interface components {
             selectionStatusLabel?: string;
             /** Format: int64 */
             validationTargetId?: number;
-        };
-        AssistantCalculationLine: {
-            cashflowType?: string;
-            sourceId?: string;
-            contractId?: string;
-            commissionItemId?: string;
-            beneficiaryAgentId?: string;
-            /** Format: int32 */
-            installmentNo?: number;
-            attributionDate?: string;
-            dueDate?: string;
-            basisCode?: string;
-            basisAmount?: string;
-            calculationType?: string;
-            ratePct?: string;
-            expectedAmount?: string;
-            ruleId?: string;
-            status?: string;
         };
     };
     responses: never;
@@ -6613,6 +6649,30 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PaymentCalculationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePaymentCalculationSnapshot"];
+                };
+            };
+        };
+    };
+    revalidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalculationRevalidationRequest"];
             };
         };
         responses: {

@@ -49,8 +49,13 @@ public class FgcJwtAuthenticationConverter {
         FgcUserDetails user = (FgcUserDetails) userDetailsService.loadUserByUsername(jwt.getSubject());
         accountStatusChecker.check(user);
         requireActiveSession(jwt, user.getUserId());
-        return UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities());
+        var authentication=UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities());
+        authentication.setDetails(new SessionIdentity(sessionId(jwt).toString()));
+        return authentication;
     }
+
+    /** Server-validated login identity; no access/refresh token value is retained. */
+    public record SessionIdentity(String id) implements java.io.Serializable {}
 
     private void requireActiveSession(Jwt jwt, Long userId) {
         AuthRefreshToken latest = refreshTokenRepository
