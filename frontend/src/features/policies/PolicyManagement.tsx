@@ -11,6 +11,7 @@ import { DataTable } from '../../components/DataTable'
 import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { date, dateTime, errorText, rate, won, today } from '../../lib/format'
+import { policyParameterLabel, policyParameterValue, policySeedText } from './labels'
 import { screenMessage } from '../../lib/screenText'
 import { ReferenceTabs } from '../reference/ReferenceUI'
 import { useAuth } from '../auth/useAuth'
@@ -168,7 +169,7 @@ export function PolicyManagement({
         </div>
         <div>
           <dt>승인 근거 문서</dt>
-          <dd>{detail.approvalEvidenceRef || '-'}</dd>
+          <dd>{policySeedText(detail.approvalEvidenceRef)}</dd>
         </div>
       </dl>
       <div data-guide-target="policy.actions" className="policy-action-bar">
@@ -568,7 +569,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
         return (
           <article className="policy-condition-card" key={parameter.key}>
             <header>
-              <h4>{option?.label ?? acquisitionCostLabels[parameter.key] ?? parameter.key}</h4>
+              <h4>{option?.label ?? acquisitionCostLabels[parameter.key] ?? policyParameterLabel(parameter.key)}</h4>
               <StatusBadge tone="info">{acquisitionCostLabels[parameter.key] ? '계약체결비용 기준' : '지급조건'}</StatusBadge>
             </header>
             <strong>
@@ -578,7 +579,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
                   ? option.valueLabel
                   : parameter.value === MONTHLY_EQUIVALENT_FIRST_PREMIUM
                     ? '월납환산 초회보험료'
-                    : String(parameter.value)}
+                    : policyParameterValue(parameter.value)}
             </strong>
             <p>{parameter.description}</p>
           </article>

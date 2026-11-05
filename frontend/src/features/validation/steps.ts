@@ -1,4 +1,5 @@
 import type { StatusTone } from '../../components/StatusBadge'
+import { isDeveloperText, screenMessage } from '../../lib/screenText'
 
 /**
  * 운영정책서 제43조 10단계 이름 — DB 가 아니라 화면 상수다(화면정의서 :1400~1409).
@@ -66,18 +67,21 @@ export const progressText = (currentStep?: number | null) => {
   return `${step}/10 단계 (${step * 10}%)`
 }
 
-const ERROR_CODE = /^FGC-[A-Z0-9]+(?:-[A-Z0-9]+)*$/
-
 /**
- * 실패 사유는 Step 예외 메시지를 ' | '로 이은 값이다. 업무 예외는 메시지로 오류코드만 남기므로
- * 코드 조각은 빼고(화면정의서 공통규칙 10), 읽을 문장이 하나도 없으면 실패한 단계로 안내한다.
+ * 실패 사유는 서버가 사용자 문장을 ' | '로 이은 값이다. 옛 실행에는 예외 원문과 오류 코드가 섞여 있다.
+ * 조각을 골라 살리지 않고 전체가 사용자 문장일 때만 보인다(화면정의서 공통규칙 10). SQL의 || 도 잘려 원문 조각이 남기 때문이다.
+ * 아니면 실패한 단계로 안내한다.
  */
 export function failureText(message?: string | null, failedStep?: number | null) {
-  const sentences = (message ?? '')
-    .split('|')
-    .map((part) => part.trim())
-    .filter((part) => part && !ERROR_CODE.test(part))
-  if (sentences.length) return sentences.join(' | ')
+  const text = message?.trim()
+  if (text && !isDeveloperText(text)) {
+    return text
+      .split('|')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map(screenMessage)
+      .join(' | ')
+  }
   return failedStep && failedStep >= 1 && failedStep <= STEP_NAMES.length
     ? `${failedStep}단계에서 실패했습니다.`
     : '처리 중 오류로 실패했습니다.'

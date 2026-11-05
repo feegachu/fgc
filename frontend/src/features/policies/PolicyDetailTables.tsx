@@ -6,7 +6,7 @@ import { StatusBadge, CategoryBadge } from '../../components/StatusBadge'
 import { EvidenceLink } from '../../components/EvidenceLink'
 import { date, int, isNegative, rate, won } from '../../lib/format'
 import type { PolicyDetail } from './api'
-import { policyAgentRankLabel, policyCodeLabel } from './labels'
+import { policyAgentRankLabel, policyCodeLabel, policySeedText } from './labels'
 import { screenMessage } from '../../lib/screenText'
 import { channelLabels } from '../base/columns'
 
@@ -247,7 +247,9 @@ export function RefundTables({ rows }: { rows: NonNullable<PolicyDetail['refundR
           <dt>원천 문서</dt>
           <dd>
             {table.sourceDocumentRef ? (
-              <EvidenceLink label={table.sourceDocumentRef}>{table.sourceDocumentRef}</EvidenceLink>
+              <EvidenceLink label={policySeedText(table.sourceDocumentRef)}>
+                {policySeedText(table.sourceDocumentRef)}
+              </EvidenceLink>
             ) : (
               '-'
             )}

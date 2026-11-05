@@ -3,6 +3,7 @@ package com.susukkang.fgc.validation.batch.daily;
 import com.susukkang.fgc.arbitrage.service.ArbitrageCheckBatchItemService;
 import com.susukkang.fgc.cap.service.CapCheckService;
 import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
+import com.susukkang.fgc.common.exception.FgcMessageResolver;
 import com.susukkang.fgc.contract.repository.ContractStatusEventRepository;
 import com.susukkang.fgc.contract.repository.InsuranceContractRepository;
 import com.susukkang.fgc.exceptioncase.repository.ExceptionCaseRepository;
@@ -55,6 +56,7 @@ public class DailyChangedContractJobConfig {
     private final ValidationRunTransitionService validationRunTransitionService;
     private final ValidationRunBatchLifecycleService validationRunBatchLifecycleService;
     private final ValidationRunBatchAuditService validationRunBatchAuditService;
+    private final FgcMessageResolver fgcMessageResolver;
     private final BatchWatermarkRepository batchWatermarkRepository;
     private final InsuranceContractRepository insuranceContractRepository;
     private final ScheduleService scheduleService;
@@ -170,6 +172,7 @@ public class DailyChangedContractJobConfig {
 
     private ValidationRunStepProgressListener progressListener(int stepNo, boolean initialStep) {
         return new ValidationRunStepProgressListener(
-                stepNo, initialStep, validationRunBatchLifecycleService, validationRunBatchAuditService);
+                stepNo, initialStep, validationRunBatchLifecycleService, validationRunBatchAuditService,
+                fgcMessageResolver);
     }
 }
