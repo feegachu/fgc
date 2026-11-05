@@ -226,6 +226,8 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                 row("IF-60A 후보", POST, "/api/v1/assistant/calculations", calculation("PAYMENT_CANDIDATE"), PROCESS),
                 row("IF-60A 잔액 재검증", POST, "/api/v1/assistant/calculations/revalidate", revalidation("ATTRIBUTION_BALANCE"), INTERNAL),
                 row("IF-60A 후보 재검증", POST, "/api/v1/assistant/calculations/revalidate", revalidation("PAYMENT_CANDIDATE"), PROCESS),
+                row("IF-60A 실제 사전검증 증표", POST, "/api/v1/assistant/prechecks/revalidate",
+                        "{\"paymentId\":\"999999999\",\"precheckToken\":\"unknown-token\"}", PROCESS),
                 row("IF-60B 조회", POST, "/api/v1/ai/pico/guides/prepare", guide("payment.amount.review"), INTERNAL),
                 row("IF-60B 처리", POST, "/api/v1/ai/pico/guides/prepare", guide("payment.confirm"), PROCESS),
                 row("IF-60C 조회", POST, "/api/v1/ai/pico/guides/start", guide("payment.amount.review"), INTERNAL),
