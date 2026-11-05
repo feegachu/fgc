@@ -1,0 +1,118 @@
+.acq-page {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+.acq-panel {
+  min-width: 0;
+}
+.acq-result,
+.acq-basis,
+.acq-contract,
+.acq-request-body {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+}
+.acq-contract {
+  padding: var(--space-4);
+}
+.acq-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.acq-contract-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.acq-contract-actions .field-helper {
+  margin: 0;
+}
+.acq-reasons {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+  list-style: disc inside;
+}
+.acq-limits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-3);
+}
+.acq-limit {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+.acq-limit header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.acq-limit h3,
+.acq-basis h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.acq-limit p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.acq-limit dl,
+.acq-facts {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+/* 넓은 계약 상세에서 이름과 값이 멀어지지 않게 나눈다. 좁은 분할 화면에서는 한 줄씩이다. */
+.acq-facts {
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  column-gap: var(--space-6);
+}
+.acq-limit dl > div,
+.acq-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.acq-limit dt,
+.acq-facts dt {
+  flex: none;
+  color: var(--color-text-secondary);
+}
+.acq-limit dd,
+.acq-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.acq-basis .data-table {
+  min-width: 0;
+}
+.acq-cell-sub {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.acq-failure {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+.acq-failure p {
+  margin: 0;
+}
