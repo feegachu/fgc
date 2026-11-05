@@ -9,6 +9,8 @@ import { STEPS } from './state'
 
 // Check the actual catalogs against JSX declarations, scoped to their owning screen.
 // Runtime tests cover conditional visibility and duplicate mounted instances.
+const parsedSources = new Map<string, { source: string; ast: ts.SourceFile }>()
+const bindingCounts = new Map<string, number>()
 function sourceFiles(domain: string) {
   const dir = resolve(import.meta.dirname, '../..', domain)
   return readdirSync(dir).filter(name => name.endsWith('.tsx') && !name.includes('.test.')).map(name => resolve(dir, name))
@@ -26,8 +28,17 @@ function countBinding(sources: string[], selector: string) {
   )
   let count = 0
   for (const file of sources) {
-    const source = readFileSync(file, 'utf8')
-    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const key = `${file}\0${selector}`
+    const cached = bindingCounts.get(key)
+    if (cached !== undefined) { count += cached; continue }
+    let parsed = parsedSources.get(file)
+    if (!parsed) {
+      const source = readFileSync(file, 'utf8')
+      parsed = { source, ast: ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX) }
+      parsedSources.set(file, parsed)
+    }
+    const { source, ast } = parsed
+    const before = count
     const visit = (node: ts.Node) => {
       if (ts.isJsxAttribute(node) && node.name.getText(ast) === name && literalMatches(node.initializer)) {
         if (!tail) count++
@@ -71,6 +82,7 @@ function countBinding(sources: string[], selector: string) {
       ts.forEachChild(node, visit)
     }
     visit(ast)
+    bindingCounts.set(key, count - before)
   }
   return count
 }
