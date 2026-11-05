@@ -17,6 +17,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  assistant-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit
+      - name: Scoped conversation, current-state entry and payment observer regression
+        run: npx vitest run src/features/transaction/transaction-form.test.tsx src/features/transaction/payment-guide.test.ts src/features/assistant/PicoLiveConversation.test.tsx src/features/assistant/PicoGuideStartButton.test.tsx --maxWorkers=2
+      - name: Normal frontend build and generated API check
+        run: npm run build && npm run check:api
   assistant-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -44,7 +64,7 @@ jobs:
           path: build/test-results/test/TEST-*.xml
           retention-days: 1
   verify-guide-api:
-    needs: assistant-regression
+    needs: [assistant-regression, assistant-ui]
     if: github.event_name == 'workflow_dispatch' && inputs.confirm_paid_call == true
     runs-on: ubuntu-latest
     timeout-minutes: 12
