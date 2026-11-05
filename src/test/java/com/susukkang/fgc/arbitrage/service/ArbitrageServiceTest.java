@@ -6,7 +6,7 @@ import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSearchCondition;
 import com.susukkang.fgc.arbitrage.dto.ArbitrageCheckSummary;
 import com.susukkang.fgc.audit.service.AuditLogService;
 import com.susukkang.fgc.clawback.service.ClawbackCandidateCaptureService;
-import com.susukkang.fgc.arbitrage.dto.ConfirmedCommissionSummary;
+import com.susukkang.fgc.arbitrage.dto.PlannedCommissionSummary;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckRequest;
 import com.susukkang.fgc.arbitrage.dto.ReArbitrageCheckResponse;
 import com.susukkang.fgc.arbitrage.repository.ArbitrageCheckRepository;
@@ -89,10 +89,10 @@ class ArbitrageServiceTest {
         ArbitrageCalculationSource source = calculationSource(
                 new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
         given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
-        given(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(new BigDecimal("400000"));
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal("900000"), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(new BigDecimal("400000"), List.of())));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
         given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -131,10 +131,10 @@ class ArbitrageServiceTest {
         ArbitrageCalculationSource source = calculationSource(
                 new BigDecimal("1200000"), 12, false, BigDecimal.ZERO);
         given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("900000", "0"));
-        given(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(new BigDecimal("400000"));
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal("900000"), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(new BigDecimal("400000"), List.of())));
         given(validationRunCreateService.create(any())).willReturn(validationRun(100L));
         given(validationRunRepository.transitionToRunning(100L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(100L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -201,10 +201,10 @@ class ArbitrageServiceTest {
         LocalDate asOfDate = LocalDate.of(2026, 7, 31);
         ArbitrageCalculationSource source = calculationSource(null, null, false, null);
         given(arbitrageCheckRepository.selectCalculationSource(10L, asOfDate)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(confirmed("0", "0"));
-        given(arbitrageCheckRepository.sumPlannedCommissionAmount(
-                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(BigDecimal.ZERO);
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(
+                10L, PaymentStage.GA_TO_FC, asOfDate)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal("0"), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(BigDecimal.ZERO, List.of())));
         given(validationRunCreateService.create(any())).willReturn(validationRun(101L));
         given(validationRunRepository.transitionToRunning(101L, ValidationRunStatus.CREATED, ValidationRunStatus.RUNNING)).willReturn(1);
         given(validationRunRepository.updateCurrentStep(101L, 5, ValidationRunStatus.RUNNING)).willReturn(1);
@@ -368,15 +368,68 @@ class ArbitrageServiceTest {
                 "현재 확정 수수료와 해약환급금이 누적 납입보험료를 초과합니다.");
     }
 
+    @Test
+    void unresolvedPlannedSourceRequiresReviewWithoutInventingProjectedExcess() throws Exception {
+        var row = checkExisting(calculationSource(new BigDecimal("100000"), 12, false, BigDecimal.ZERO),
+                "50000", "100000", LocalDate.of(2026, 7, 31), List.of(77L));
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
+        assertThat(row.getPlannedCommissionAmount()).isEqualByComparingTo("100000");
+        var snapshot = new ObjectMapper().readTree(row.getCalculationSnapshot());
+        assertThat(snapshot.get("projectedExcessAmount").isNull()).isTrue();
+        assertThat(snapshot.get("plannedCommissionBasis").asText()).isEqualTo("UNRESOLVED_UPPER_BOUND_V1");
+        assertThat(snapshot.get("unresolvedPlannedAttributionIds").get(0).asLong()).isEqualTo(77L);
+        verify(exceptionCaseRepository).insertArbitrageReviewCase(
+                org.mockito.ArgumentMatchers.eq("DATA_QUALITY"), org.mockito.ArgumentMatchers.eq(100L),
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(200L),
+                org.mockito.ArgumentMatchers.eq("GA_TO_FC"), any(), org.mockito.ArgumentMatchers.contains("귀속행: [77]"));
+        verify(exceptionCaseRepository, never()).insertArbitrageCandidate(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void unresolvedMonitoringSourceCannotSuppressCurrentPaidCandidate() throws Exception {
+        var row = checkExisting(calculationSource(new BigDecimal("100000"), 12, false, BigDecimal.ZERO),
+                "150000", "100000", LocalDate.of(2026, 7, 31), List.of(77L));
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.CANDIDATE);
+        assertThat(row.getNetDifferenceAmount()).isEqualByComparingTo("50000");
+        assertThat(new ObjectMapper().readTree(row.getCalculationSnapshot()).get("projectedExcessAmount").isNull()).isTrue();
+        verify(exceptionCaseRepository).insertArbitrageCandidate(any(), any(), any(), any(), any());
+        verify(exceptionCaseRepository).insertArbitrageReviewCase(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void existingMissingFinancialDataReasonIsPreservedAndUnknownProjectionIsNull() throws Exception {
+        var row = checkExisting(calculationSource(null, null, false, BigDecimal.ZERO),
+                "50000", "100000", LocalDate.of(2026, 7, 31), List.of(77L));
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.REVIEW_REQUIRED);
+        var snapshot = new ObjectMapper().readTree(row.getCalculationSnapshot());
+        assertThat(snapshot.get("projectedExcessAmount").isNull()).isTrue();
+        assertThat(snapshot.get("decisionReason").asText()).isEqualTo("기준일 이하 계약 금융 스냅샷이 없습니다.");
+    }
+
+    @Test
+    void unresolvedMonitoringDoesNotMakeNonRegulatedContractApplicable() {
+        var source = calculationSource(null, null, false, BigDecimal.ZERO);
+        source.setProtectionType("SAVINGS");
+        var row = checkExisting(source, "50000", "100000", LocalDate.of(2026, 7, 31), List.of(77L));
+        assertThat(row.getResultStatus()).isEqualTo(ArbitrageCheckStatus.NOT_APPLICABLE);
+        verifyNoInteractions(exceptionCaseRepository);
+    }
+
     private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(ArbitrageCalculationSource source, String paid, String planned) {
         return checkExisting(source, paid, planned, LocalDate.of(2026, 7, 31));
     }
 
     private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(
             ArbitrageCalculationSource source, String paid, String planned, LocalDate date) {
+        return checkExisting(source, paid, planned, date, List.of());
+    }
+
+    private com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO checkExisting(
+            ArbitrageCalculationSource source, String paid, String planned, LocalDate date, List<Long> unresolved) {
         given(arbitrageCheckRepository.selectCalculationSource(10L, date)).willReturn(source);
-        given(arbitrageCheckRepository.sumConfirmedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(confirmed(paid, "0"));
-        given(arbitrageCheckRepository.sumPlannedCommissionAmount(10L, PaymentStage.GA_TO_FC, date)).willReturn(new BigDecimal(planned));
+        given(arbitrageCheckRepository.commissionBalanceSnapshot(10L, PaymentStage.GA_TO_FC, date)).willReturn(
+                new com.susukkang.fgc.arbitrage.dto.CommissionBalanceSnapshot(new BigDecimal(paid), BigDecimal.ZERO,
+                        new PlannedCommissionSummary(new BigDecimal(planned), unresolved)));
         given(arbitrageCheckRepository.insertArbitrageCheck(any())).willAnswer(invocation -> {
             invocation.<com.susukkang.fgc.arbitrage.dto.ArbitrageCheckInsertDTO>getArgument(0).setArbitrageCheckId(200L);
             return 1;
@@ -412,11 +465,5 @@ class ArbitrageServiceTest {
         return row;
     }
 
-    private ConfirmedCommissionSummary confirmed(String payment, String deduction) {
-        ConfirmedCommissionSummary summary = new ConfirmedCommissionSummary();
-        summary.setConfirmedPaymentAmount(new BigDecimal(payment));
-        summary.setConfirmedDeductionAmount(new BigDecimal(deduction));
-        summary.setPaidCommissionAmount(new BigDecimal(payment).subtract(new BigDecimal(deduction)));
-        return summary;
-    }
+
 }
