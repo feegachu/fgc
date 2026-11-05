@@ -223,7 +223,7 @@ function CorrectionBody({
     onSuccess: async (done) => {
       clearUnsaved()
       try {
-        if (done.actionType !== 'CORRECT' || done.originalJournalHeaderId !== journal.journalHeaderId || done.toStatus !== 'RESOLVED' || !Number.isSafeInteger(done.reversalJournalHeaderId) || Number(done.reversalJournalHeaderId) <= 0 || !Number.isSafeInteger(done.repostedJournalHeaderId) || Number(done.repostedJournalHeaderId) <= 0) throw new Error('서버 원장 정정 결과를 확인하지 못했습니다.')
+        if (!Number.isSafeInteger(done.actionSeq) || Number(done.actionSeq) <= 0 || done.actionType !== 'CORRECT' || done.originalJournalHeaderId !== journal.journalHeaderId || done.toStatus !== 'RESOLVED' || !Number.isSafeInteger(done.reversalJournalHeaderId) || Number(done.reversalJournalHeaderId) <= 0 || !Number.isSafeInteger(done.repostedJournalHeaderId) || Number(done.repostedJournalHeaderId) <= 0) throw new Error('서버 원장 정정 결과를 확인하지 못했습니다.')
         if (mounted.current) await saveGuide.saved(Number(done.repostedJournalHeaderId))
       } catch {
         const message = '서버 정정 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 실행하지 말고 정정 이력을 확인한 뒤 화면을 다시 여세요.'
