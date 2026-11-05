@@ -309,6 +309,25 @@ class CompareAskServiceTest {
     }
 
     @Test
+    @DisplayName("같은 보험사 상품이 더 있어도, 질문한 두 상품만 말한 맞는 답은 버리지 않는다")
+    void sharedInsurerDoesNotDropCorrectAnswer() {
+        CompareRankingResponse base = ranking();
+        CompareRankingResponse shared = new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                base.warnings(), null, List.of(
+                        new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of()),
+                        new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of()),
+                        new Item(3, 3, "가보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of())),
+                List.of(), CompareRankingFilters.NONE);
+        llmCallsTools(true, "나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.", "compare", "{\"rankA\":1,\"rankB\":2}");
+
+        CompareAskResponse response = service.ask("1위랑 2위 비교해줘", shared);
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).endsWith(" 나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.");
+    }
+
+    @Test
     @DisplayName("도구를 부르지 않고 금액을 쓰면 서버 문장으로 대체한다")
     void amountWithoutToolCallIsReplaced() {
         llmReturns(true, "1위 가보험 든든건강의 보수적 순수령액은 684,000원이에요.");

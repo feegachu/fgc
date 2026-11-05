@@ -171,6 +171,49 @@ class CompareAskToolsTest {
         assertThat(tools.verify("나보험 튼튼건강이 다보험 편한건강보다 앞섰어요.")).isNull();
     }
 
+    /** 가보험이 상품 둘(1위 든든건강, 3위 편한건강)을 낸 결과. 환수 노출액: 1위 50,000원, 2위 16,000원. */
+    private static CompareAskTools sharedInsurerTools(String... nameAndArgs) {
+        CompareRankingResponse base = ranking();
+        Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of());
+        Item third = new Item(3, 3, "가보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());
+        CompareAskTools tools = new CompareAskTools(new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                base.warnings(), null, List.of(first, second, third), List.of(), CompareRankingFilters.NONE));
+        for (int i = 0; i < nameAndArgs.length; i += 2) {
+            tools.run(nameAndArgs[i], nameAndArgs[i + 1]);
+        }
+        return tools;
+    }
+
+    @Test
+    @DisplayName("보험사가 상품을 둘 이상 내면 보험사 이름만으로는 상품을 가리키지 않아, 틀린 방향의 비교 문장도 검사된다")
+    void sharedInsurerNameDoesNotPointToEveryProduct() {
+        CompareAskTools tools = sharedInsurerTools("compare", "{\"rankA\":1,\"rankB\":2}");
+
+        assertThat(tools.ranksMentioned("가보험 든든건강이 나보험 튼튼건강보다 환수 노출액이 더 작아요.")).containsExactlyInAnyOrder(1, 2);
+        assertThat(tools.verify("가보험 든든건강이 나보험 튼튼건강보다 환수 노출액이 더 작아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강이 가보험 든든건강보다 환수 노출액이 더 작아요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강보다 나보험 튼튼건강이 환수 노출액이 더 작아요.")).isNull();
+        // 상품이 둘인 보험사 이름만으로는 어느 상품인지 모른다. 상품이 하나뿐인 보험사 이름은 그 상품이다.
+        assertThat(tools.ranksMentioned("가보험 상품이 앞섰어요.")).isEmpty();
+        assertThat(tools.ranksMentioned("나보험 상품이 뒤따랐어요.")).containsExactly(2);
+    }
+
+    @Test
+    @DisplayName("보험사만 다르고 이름이 같은 상품은 '보험사 상품' 꼴로 붙여 써야 그 상품으로 본다")
+    void sameProductNameNeedsInsurer() {
+        CompareRankingResponse base = ranking();
+        Item first = new Item(1, 1, "가보험", "튼튼건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 0, 16_000, 634_000, 80.0, null, List.of());
+        CompareAskTools tools = new CompareAskTools(new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                base.warnings(), null, List.of(first, second), List.of(), CompareRankingFilters.NONE));
+
+        assertThat(tools.ranksMentioned("튼튼건강은 환수 부담이 작아요.")).isEmpty();
+        assertThat(tools.ranksMentioned("나보험 튼튼건강은 환수 부담이 작아요.")).containsExactly(2);
+    }
+
     @Test
     @DisplayName("답에서 언급한 상품은 보험사·상품 이름으로 찾는다")
     void ranksMentionedByName() {

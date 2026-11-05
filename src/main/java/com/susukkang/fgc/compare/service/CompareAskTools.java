@@ -358,17 +358,33 @@ final class CompareAskTools {
         return behind.size() == 1 ? behind.get(0) : 0;
     }
 
-    private static int firstMention(String part, Item item) {
-        int best = -1;
-        if (item != null) {
-            for (String name : new String[] {item.product(), item.insurer()}) {
-                int at = name == null || name.isBlank() ? -1 : part.indexOf(Normalizer.normalize(name, Normalizer.Form.NFKC));
-                if (at >= 0 && (best < 0 || at < best)) {
-                    best = at;
-                }
-            }
+    /**
+     * 글에서 이 상품을 가리킨 첫 위치. 없으면 -1.
+     * 상품 이름으로 찾는다. 보험사 이름은 결과 안에 그 보험사 상품이 하나뿐일 때만 그 상품을 가리킨다고 본다
+     * (가보험이 상품을 둘 내면 '가보험'만으로는 어느 상품인지 모른다). 상품 이름이 다른 보험사 상품과 같으면 보험사 이름도 함께 있어야 한다.
+     */
+    private int firstMention(String part, Item item) {
+        if (item == null) {
+            return -1;
         }
-        return best;
+        boolean productUnique = ranking.items().stream().filter(o -> same(o.product(), item.product())).count() == 1;
+        boolean insurerUnique = ranking.items().stream().filter(o -> same(o.insurer(), item.insurer())).count() == 1;
+        // 같은 이름의 상품이 여럿이면 '보험사 상품' 꼴로 붙여 쓴 경우만 이 상품이다.
+        int product = productUnique ? indexOf(part, item.product())
+                : Math.max(indexOf(part, item.insurer() + " " + item.product()), indexOf(part, item.insurer() + item.product()));
+        int insurer = insurerUnique ? indexOf(part, item.insurer()) : -1;
+        if (product < 0) {
+            return insurer;
+        }
+        return insurer >= 0 && insurer < product ? insurer : product;
+    }
+
+    private static int indexOf(String part, String name) {
+        return name == null || name.isBlank() ? -1 : part.indexOf(Normalizer.normalize(name, Normalizer.Form.NFKC));
+    }
+
+    private static boolean same(String a, String b) {
+        return a != null && a.equals(b);
     }
 
     /** 모델이 읽을 상품 목록(금액 없음). 금액은 도구로만 얻는다. */
