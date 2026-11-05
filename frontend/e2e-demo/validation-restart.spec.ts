@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, login, api, responseFor, successful, sql } from './fixtures'
+import { test, expect, login, api, responseFor, successful, sql, password } from './fixtures'
 
 test.use({ video: 'off' })
 
@@ -126,13 +126,51 @@ test('FUN-045 실제 서버: 6단계 실패 → 사유 입력 → 동일 실행 
 })
 
 for (const account of ['audit01', 'gaadmin']) {
-  test(`FUN-045 실제 서버: ${account} 읽기 역할은 실패 이력만 조회하고 재시작 불가`, async ({ page }, info) => {
-    const { id } = await failedMonthly(page)
+  test(`FUN-045 실제 서버: ${account} 읽기 역할은 실패 이력만 조회하고 재시작 불가`, async ({ page, request }, info) => {
+    const { id, state } = await failedMonthly(page)
     await login(page, account, `/validation-runs/${id}?month=2026-07`)
     const panel = page.getByRole('region', { name: '실패 지점 재시작', exact: true })
     await expect(panel.getByRole('button', { name: '실패 지점부터 재시작' })).toBeDisabled()
     await expect(panel).toContainText('재시작은 정산담당자와 시스템관리자만 할 수 있습니다.')
     expect(await api(page, `/validation-runs/${id}/retries`)).toEqual([])
     await info.attach(`actual-server-${account}-read-only`, { body: await page.screenshot(), contentType: 'image/png' })
+    // Authenticate only after the browser assertions; duplicate login may revoke its session.
+    const origin = new URL(page.url()).origin
+    const auth = await request.post(`${origin}/api/v1/auth/login`, {
+      data: { loginId: account, password }, headers: { Origin: origin, 'X-FGC-Client': 'web' },
+    })
+    expect(auth.ok()).toBe(true)
+    const token = (await auth.json()).data.accessToken
+    const denied = await request.post(`${origin}/api/v1/validation-runs/${id}/restart`, {
+      headers: { Authorization: `Bearer ${token}`, Origin: origin, 'X-FGC-Client': 'web', 'Idempotency-Key': randomUUID() },
+      data: { expectedBatchExecutionId: state.lastFailedBatchExecutionId,
+        expectedStateVersion: state.expectedStateVersion, reason: '권한 거부 시험' },
+    })
+    expect(denied.status()).toBe(403)
+    expect(sql(`SELECT count(*) FROM fgc.validation_run_retry WHERE validation_run_id=${id}`)).toBe('0')
   })
 }
+
+
+test('FUN-045 실제 서버: 빈 사유 400·지난 상태 409는 재시도 행을 만들지 않는다', async ({ page, request }) => {
+  const { id, state } = await failedMonthly(page)
+  const origin = new URL(page.url()).origin
+  const auth = await request.post(`${origin}/api/v1/auth/login`, {
+    data: { loginId: 'admin', password }, headers: { Origin: origin, 'X-FGC-Client': 'web' },
+  })
+  expect(auth.ok()).toBe(true)
+  const token = (await auth.json()).data.accessToken
+  for (const probe of [
+    { reason: '   ', version: state.expectedStateVersion, status: 400 },
+    { reason: '변경 전 상태로 요청', version: `stale-${state.expectedStateVersion}`, status: 409 },
+  ]) {
+    const rejected = await request.post(`${origin}/api/v1/validation-runs/${id}/restart`, {
+      headers: { Authorization: `Bearer ${token}`, Origin: origin, 'X-FGC-Client': 'web', 'Idempotency-Key': randomUUID() },
+      data: { expectedBatchExecutionId: state.lastFailedBatchExecutionId,
+        expectedStateVersion: probe.version, reason: probe.reason },
+    })
+    expect(rejected.status()).toBe(probe.status)
+    expect(sql(`SELECT count(*) FROM fgc.validation_run_retry WHERE validation_run_id=${id}`)).toBe('0')
+    expect(sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${id}`)).toBe('FAILED')
+  }
+})
