@@ -63,7 +63,9 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   )
   const detailedPayment = decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
   const walkthrough = usePaymentWalkthrough(detailedPayment, month, selection?.stage, selection?.contractId)
-  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending)
+  // Wait for navigation and the destination's server-loaded target before observing
+  // explanations; the previous form can unmount during a normal draft-to-saved reload.
+  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
   const position = useSpotlight(!collapsed ? activeTarget : null, card)

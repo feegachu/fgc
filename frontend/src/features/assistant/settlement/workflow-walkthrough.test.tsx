@@ -76,3 +76,22 @@ it('explains returned results rather than searching for inputs after successful 
   expect(workflowWalkthrough('contract.create', '/contracts/4', false)[0].id).toBe('saved')
   expect(workflowWalkthrough('payment.confirm', '/transactions', false)[0].selector).toContain('payment.results')
 })
+
+it('waits for destination loading before observing a replacement payment form', async () => {
+  document.querySelector('main')!.innerHTML = '<section data-guide-target="payment.scope">old draft</section>'
+  const { result, rerender } = renderHook(({ observing }) =>
+    useWorkflowWalkthrough('payment.precheck', '/transactions/new', false, false, observing),
+  { initialProps: { observing: false } })
+  expect(result.current.step?.title).toBe('저장한 지급 대상을 확인하세요')
+  expect(result.current.target).toBeNull()
+  await act(async () => { document.querySelector('main')!.innerHTML = '' })
+  await act(async () => {
+    document.querySelector('main')!.innerHTML = '<section data-guide-target="payment.scope">saved payment</section>'
+  })
+  rerender({ observing: true })
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  expect(result.current.target).toHaveTextContent('saved payment')
+  // A genuine disappearance after loading must still pause, not silently recover.
+  await act(async () => { document.querySelector('main')!.innerHTML = '' })
+  await waitFor(() => expect(result.current.status).toBe('PAUSED'))
+})
