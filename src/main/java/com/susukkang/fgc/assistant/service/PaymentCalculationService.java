@@ -79,14 +79,14 @@ public class PaymentCalculationService {
             Map<String, String> amounts, List<Map<String, Object>> previews, Boolean confirmable,
             List<PaymentCalculationSnapshot.Reason> blockers, List<String> missing, String message) {
         Map<String, String> scope = new LinkedHashMap<>();
-        List<PaymentCalculationSnapshot.Source> sources = List.of();
+        List<PaymentCalculationSnapshot.Source> sourceRefs = List.of();
         if (payment != null) {
             scope.put("paymentId", string(payment.paymentId())); scope.put("settlementMonth", payment.settlementMonth() == null ? null : payment.settlementMonth().toString().substring(0, 7));
             scope.put("paymentStage", string(payment.paymentStage()));
-            sources = List.of(new PaymentCalculationSnapshot.Source("payment:" + payment.paymentId(), "PAYMENT", "저장된 지급 및 귀속 자료", string(payment.updatedAt()), string(payment.paymentId())));
+            sourceRefs = List.of(new PaymentCalculationSnapshot.Source("payment:" + payment.paymentId(), "PAYMENT", "저장된 지급 및 귀속 자료", string(payment.updatedAt()), string(payment.paymentId())));
         }
         return new PaymentCalculationSnapshot(UUID.randomUUID().toString(), request.kind().name(), request.mode().name(), status, request.clientRevision(), false, true, "ACTUAL", "KRW", payment == null ? null : string(payment.status()), scope, amounts, previews, confirmable, blockers, missing,
-                basis(payment, previews, sources),
+                basis(payment, previews, sourceRefs),
                 new PaymentCalculationSnapshot.Recommendation(false, null, null, message, List.of("SERVER_VALIDITY_PROOF_REQUIRED")), OffsetDateTime.now(), null);
     }
     private PaymentCalculationSnapshot.Basis basis(CommissionPaymentResponse payment,
