@@ -108,6 +108,29 @@ class JournalSearchQueryRepositoryIntegrationTest {
     }
 
     @Test
+    void journalNoSortsBySequenceNumberWithinAndAcrossMonths() {
+        Long contractId = anyContractId();
+        // 분개일을 같게 두어 번호 정렬만 본다. 입력 순서가 기대 순서와 같아지지 않게 섞는다.
+        LocalDate date = LocalDate.of(3001, 1, 15);
+        for (String journalNo : List.of("JV-3001-02-0001", "JV-3001-01-10000", "TEST-NUMBER-1",
+                "JV-3001-01-0002", "JV-3000-12-10001", "JV-3001-01-9999")) {
+            insertHeader(contractId, date, journalNo, "ADJUSTMENT");
+        }
+        List<String> ascending = List.of("JV-3000-12-10001", "JV-3001-01-0002", "JV-3001-01-9999",
+                "JV-3001-01-10000", "JV-3001-02-0001", "TEST-NUMBER-1");
+
+        assertThat(journalNosSorted(date, true, 0, 10)).containsExactlyElementsOf(ascending);
+        assertThat(journalNosSorted(date, false, 0, 10)).containsExactlyElementsOf(ascending.reversed());
+        assertThat(journalNosSorted(date, true, 2, 2)).containsExactly("JV-3001-01-9999", "JV-3001-01-10000");
+    }
+
+    private List<String> journalNosSorted(LocalDate date, boolean ascending, int offset, int limit) {
+        return journalQueryRepository.search(date, date, null, null, null, null, null, offset, limit,
+                        new com.susukkang.fgc.common.web.ListSort("journalNo", ascending))
+                .stream().map(JournalListRow::getJournalNo).toList();
+    }
+
+    @Test
     void searchByContractIdReturnsHeaderWithLineTotals() {
         Long contractId = anyContractId();
         Long headerId = insertBalancedDraftJournal(contractId, LocalDate.of(2026, 8, 1), "TEST-SEARCH-0001");
