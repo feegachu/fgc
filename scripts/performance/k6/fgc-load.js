@@ -113,7 +113,7 @@ function total(path, token) {
 }
 
 // PER-004 "집계값이 상세 합계와 일치": 홈 KPI 6종을 목록 API의 건수와 맞춰 본다.
-// journalImbalance는 홈이 전체, 상세가 이 실행 범위라 0건일 때만 같은 값이다. 범위 차이는 여기서 보지 못한다(결과서 4-1).
+// journalImbalance는 홈이 전체, 상세가 이 실행 범위라 범위가 달라 일치 판정에 넣지 않고 값만 남긴다(결과서 4-1).
 function checkKpis(token, runId) {
   const kpi = get('setup', `/api/v1/dashboard/summary?month=${MONTH}`, token).json('data');
   const reconRuns = get('setup', `/api/v1/reconciliations?month=${MONTH}&page=1&size=100`, token).json('data.content');
@@ -127,8 +127,8 @@ function checkKpis(token, runId) {
     openException: total('/api/v1/exceptions?status=OPEN&page=1&size=1', token),
   };
   for (const [key, value] of Object.entries(detail)) {
-    console.log(`KPI ${key}: 홈 ${kpi[key]}, 상세 ${value}`);
-    kpiConsistent.add(kpi[key] === value);
+    console.log(`KPI ${key}: 홈 ${kpi[key]}, 상세 ${value}${key === 'journalImbalance' ? ' (범위가 달라 미검증)' : ''}`);
+    if (key !== 'journalImbalance') kpiConsistent.add(kpi[key] === value);
   }
   // FUN-080 "홈의 예외 건수와 같은 조건의 예외함 건수가 같다"
   const counts = get('setup', HOME_APIS.exception_counts(), token).json('data.total');
@@ -208,11 +208,11 @@ export function rerun(d) {
     JSON.stringify({ validationMonth: MONTH, runType: 'MONTHLY' }),
     { headers: { ...auth(token), ...json } },
   );
-  check(created, { 'rerun 생성 201': (r) => r.status === 201 });
+  // check를 먼저 남겨야 fail로 멈춰도 임계값(checks rate==1)이 넘어 k6가 99로 끝난다.
+  if (!check(created, { 'rerun 생성 201': (r) => r.status === 201 })) fail(`재실행 생성 실패: ${created.status}`);
   const id = created.json('data.validationRunId');
-  check(http.post(`${BASE}/api/v1/validation-runs/${id}/execute`, null, { headers: auth(token) }), {
-    'rerun 기동 202': (r) => r.status === 202,
-  });
+  const started = http.post(`${BASE}/api/v1/validation-runs/${id}/execute`, null, { headers: auth(token) });
+  if (!check(started, { 'rerun 기동 202': (r) => r.status === 202 })) fail(`재실행 기동 실패: ${started.status}`);
   let status;
   let errors = 0;
   do {
@@ -270,10 +270,12 @@ function verdicts(metrics) {
   if (SCENARIO === 'concurrent') {
     const worst = Math.max(...ALL_APIS.map(p95));
     const rate = failed('http_req_failed{scenario:concurrent}');
+    const scenario = metrics['http_req_failed{scenario:concurrent}'].values;
+    const requests = scenario.passes + scenario.fails; // setup 요청을 뺀 수. 오류율의 분모와 같다
     const ok005 = rate < 0.01 && worst < P95_PER_004_005;
     return [
-      `PER-005: ${verdict(ok005)}. ${data}, 오류율 ${(rate * 100).toFixed(3)}%, API별 p95 최대 ${worst.toFixed(0)}ms`,
-      `PER-001: ${verdict(worst < P95_PER_001)}(읽기 API만). ${data}, API별 p95 최대 ${worst.toFixed(0)}ms`,
+      `PER-005: ${verdict(ok005)}. ${data}, 시나리오 요청 ${requests}건, 오류율 ${(rate * 100).toFixed(3)}%, API별 p95 최대 ${worst.toFixed(0)}ms`,
+      `PER-001 부분 검증(읽기 API만, 등록 수정 미측정): ${verdict(worst < P95_PER_001)}. ${data}, API별 p95 최대 ${worst.toFixed(0)}ms`,
     ];
   }
   return [];

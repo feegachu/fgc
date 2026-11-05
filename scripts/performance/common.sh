@@ -166,7 +166,8 @@ collect_app() {
 }
 
 # per003_verdict <스케줄 행> <처리 계약> <배치 초> <배치 상태>. 판정 단위는 스케줄 행이다(결과서 3절).
-# 계약 10만 건은 재지 않았고 외삽하지 않는다. PER003_MAX_ROWS 이상인 단계(DAR-012 1만2천)는 측정값만 남긴다.
+# 원문 기준은 10만 행 이상 전부에 적용한다. PER003_MAX_ROWS는 3,600계약 단계를 고르는 RC 수용 기준이고 PM 판단이다(팀 공유 전).
+# 계약 10만 건은 재지 않았고 외삽하지 않는다.
 PER003_MIN_ROWS=100000
 PER003_MAX_ROWS=150000
 PER003_SECONDS=600
@@ -177,16 +178,15 @@ per003_verdict() {
     echo "PER-003: 실패 (배치 $status, $measured)"
   elif [ "$rows" -lt "$PER003_MIN_ROWS" ]; then
     echo "PER-003: 미검증 ($measured. 스케줄 $PER003_MIN_ROWS행 미만, 외삽하지 않음)"
-  elif [ "$rows" -ge "$PER003_MAX_ROWS" ]; then
-    if [ "$seconds" -le "$PER003_SECONDS" ]; then
-      echo "PER-003: 판정 대상 아님 ($measured. 측정값만 남긴다)"
-    else
-      echo "PER-003: 판정 대상 아님 ($measured. ${PER003_SECONDS}초 목표 초과, 참고)"
-    fi
-  elif [ "$seconds" -le "$PER003_SECONDS" ]; then
-    echo "PER-003: 충족 ($measured <= ${PER003_SECONDS}초)"
   else
-    echo "PER-003: 미충족 ($measured > ${PER003_SECONDS}초)"
+    local result=미충족
+    [ "$seconds" -gt "$PER003_SECONDS" ] || result=충족
+    echo "PER-003 원문(스케줄 $PER003_MIN_ROWS행 이상, ${PER003_SECONDS}초 이내): $result ($measured)"
+    if [ "$rows" -lt "$PER003_MAX_ROWS" ]; then
+      echo "PER-003 수용 단계($PER003_MIN_ROWS~$PER003_MAX_ROWS행 미만, PM 판단, 팀 공유 전): $result"
+    else
+      echo "PER-003 수용 단계: 해당 없음($PER003_MAX_ROWS행 이상)"
+    fi
   fi
 }
 
@@ -200,11 +200,11 @@ per007_explain_verdict() {
     }' "$1"
 }
 
-# 재실행 전후 행 수 비교. 늘어난 표를 모두 적고, 실행 이력 표 밖의 표가 늘었으면 미충족으로 적는다(PER-007, #673 시나리오 3).
+# 재실행 전후 행 수 비교. 변한 표를 모두 적고, 실행 이력 표 밖의 표가 변했으면 미충족으로 적는다. 증가와 감소를 서로 상쇄하지 않는다(PER-007, #673 시나리오 3).
 rerun_verdict() {
   awk -F, -v history="$PER007_HISTORY_TABLES" '
     NR == FNR { before[$1] = $2; next }
-    { d = $2 - before[$1]; if (d != 0) { key = $1 !~ history; printf "늘어난 표: %s %d -> %d (+%d)%s\n", $1, before[$1], $2, d, key ? " [업무 키 표]" : ""; if (key) bad += d } }
+    { d = $2 - before[$1]; if (d != 0) { key = $1 !~ history; printf "%s 표: %s %d -> %d (%+d)%s\n", (d > 0 ? "늘어난" : "줄어든"), $1, before[$1], $2, d, (key ? " [업무 키 표]" : ""); if (key) bad += (d > 0 ? d : -d) } }
     END { printf "PER-007 신규 생성: 업무 키 표 %d건 (%s)\n", bad, bad == 0 ? "충족" : "미충족" }
   ' "$1" "$2"
 }

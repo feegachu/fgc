@@ -14,13 +14,15 @@ expect() { # expect <기대 문자열> <실제>
 
 # PER-003 경계: 10만 건과 600초
 expect 'PER-003: 미검증' "$(per003_verdict 99999 3000 100 COMPLETED)"
-expect 'PER-003: 충족' "$(per003_verdict 100000 3000 600 COMPLETED)"
+expect '600초 이내): 충족' "$(per003_verdict 100000 3000 600 COMPLETED)"
+expect '팀 공유 전): 충족' "$(per003_verdict 100000 3000 600 COMPLETED)"
 expect 'PER-003: 미검증' "$(per003_verdict 90000 100000 600 COMPLETED)"
-expect 'PER-003: 미충족' "$(per003_verdict 100000 3000 601 COMPLETED)"
+expect '600초 이내): 미충족' "$(per003_verdict 100000 3000 601 COMPLETED)"
 expect 'PER-003: 실패' "$(per003_verdict 500000 12000 10 FAILED)"
-expect 'PER-003: 미충족' "$(per003_verdict 149999 5000 601 COMPLETED)"
-expect '600초 목표 초과, 참고' "$(per003_verdict 150000 5000 601 COMPLETED)"
-expect '측정값만 남긴다' "$(per003_verdict 150000 5000 600 COMPLETED)"
+expect '팀 공유 전): 미충족' "$(per003_verdict 149999 5000 601 COMPLETED)"
+expect '600초 이내): 미충족' "$(per003_verdict 334012 12000 1994 COMPLETED)"
+expect '수용 단계: 해당 없음' "$(per003_verdict 334012 12000 1994 COMPLETED)"
+expect '600초 이내): 충족' "$(per003_verdict 150000 5000 600 COMPLETED)"
 
 cat >"$tmp/stats.csv" <<'CSV'
 10:00:00,fgc-perf-app,392.96%,1.5GiB / 2GiB
@@ -67,6 +69,10 @@ printf 'transaction_attribution,10\nvalidation_run,1\nbatch_step_execution,8\n' 
 printf 'transaction_attribution,10\nvalidation_run,2\nbatch_step_execution,16\nauth_refresh_token,2\n' >"$tmp/after.csv"
 expect 'PER-007 신규 생성: 업무 키 표 0건 (충족)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
 printf 'transaction_attribution,12\nvalidation_run,1\nbatch_step_execution,8\n' >"$tmp/after.csv"
+expect 'PER-007 신규 생성: 업무 키 표 2건 (미충족)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
+printf 'schedule_line,10\njournal_line,10\n' >"$tmp/before.csv"
+printf 'schedule_line,11\njournal_line,9\n' >"$tmp/after.csv" # 증가와 감소가 상쇄되지 않는다
+expect '줄어든 표: journal_line 10 -> 9 (-1)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
 expect 'PER-007 신규 생성: 업무 키 표 2건 (미충족)' "$(rerun_verdict "$tmp/before.csv" "$tmp/after.csv")"
 
 [ "$fails" -eq 0 ] && echo "selftest 통과" || { echo "selftest 실패 $fails건"; exit 1; }

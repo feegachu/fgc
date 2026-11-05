@@ -38,10 +38,10 @@ SELECT count(*) AS statements, sum(calls) AS calls, round((sum(total_exec_time) 
   FROM pg_stat_statements;
 
 \echo == 블록을 많이 읽는 SQL 상위 5 (건별 순차 스캔 찾기) ==
-SELECT shared_blks_hit AS blks_hit, calls, round((total_exec_time / 1000)::numeric, 1) AS total_s,
+SELECT shared_blks_hit + shared_blks_read AS blks, shared_blks_read AS blks_read, calls, round((total_exec_time / 1000)::numeric, 1) AS total_s,
        left(regexp_replace(query, '\s+', ' ', 'g'), 120) AS query
   FROM pg_stat_statements
- ORDER BY shared_blks_hit DESC
+ ORDER BY shared_blks_hit + shared_blks_read DESC
  LIMIT 5;
 
 \echo == 커밋, WAL (DB 생성부터 누계) ==

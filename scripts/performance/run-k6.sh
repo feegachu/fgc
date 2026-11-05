@@ -26,9 +26,9 @@ SQL
 
 record_conditions
 # prod 프로필은 서명 키가 있어야 뜬다. 이 실행에서만 쓰는 임의 값이다.
+trap 'stop_stats; docker rm -fv "$APP" "$K6" >/dev/null 2>&1 || true' EXIT
 start_app SPRING_PROFILES_ACTIVE=prod FGC_BATCH_DAILYCHANGEDCONTRACT_ENABLED=false \
   "FGC_JWT_SECRET=$(head -c 48 /dev/urandom | base64 | tr -d '[:space:]')"
-trap 'stop_stats; docker rm -fv "$APP" "$K6" >/dev/null 2>&1 || true' EXIT
 started=
 for _ in $(seq 1 150); do
   if docker logs "$APP" 2>&1 | grep -q 'Started .* in '; then started=1; break; fi
