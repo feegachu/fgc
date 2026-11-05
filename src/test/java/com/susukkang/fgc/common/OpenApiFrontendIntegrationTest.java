@@ -93,6 +93,13 @@ class OpenApiFrontendIntegrationTest {
         assertThat(statementSource.path("properties").has("id")).isTrue();
         assertThat(statementSource.path("properties").has("sourceId")).isFalse();
         assertThat(schemas.path("AssistantCalculationSource").path("properties").has("sourceId")).isTrue();
+        // #649/#650: documented nulls must survive server export and TypeScript generation.
+        assertThat(schemas.path("ScheduleHeaderResponse").path("properties").path("confirmBlockedReason")
+                .path("type").toString()).contains("null");
+        assertThat(schemas.path("ScheduleLineResponse").path("properties").path("sourceStatusEventId")
+                .path("type").toString()).contains("null");
+        assertThat(schemas.path("ScheduleRegenRequest").path("properties").path("reason")
+                .path("minLength").asInt()).isEqualTo(1);
         // Origin is environment-specific, not part of the API type contract.
         root.putArray("servers").addObject().put("url", "/");
         Path output = Path.of("frontend/openapi/schema.json");
