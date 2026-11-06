@@ -56,6 +56,40 @@ export interface StatementDetail {
   basis: StatementBasis
 }
 
+export interface StatementAgentOverview {
+  agentId: number
+  agentCode: string
+  agentName: string
+  branchId: number
+  branchName: string
+  organizationName: string
+  contractCount: number
+  entryCount: number
+  paymentAmount: number
+  heldAmount: number
+  adjustmentAmount: number
+  clawbackAmount: number
+  missingAmountCount: number
+}
+
+export function statementOverviewQuery(filters: StatementFilters, enabled: boolean) {
+  const { month, contractNo, commissionItemId, entryType } = filters
+  return queryOptions({
+    queryKey: ['agent-statements', 'overview', { month, contractNo, commissionItemId, entryType }],
+    enabled,
+    queryFn: async ({ signal }) => {
+      const query = new URLSearchParams({ month })
+      if (contractNo) query.set('contractNo', contractNo)
+      if (commissionItemId) query.set('commissionItemId', commissionItemId)
+      if (entryType) query.set('entryType', entryType)
+      const response = await apiClient.request<StatementAgentOverview[]>(`/api/v1/reports/agents/statements/overview?${query}`, { signal })
+      if (!Array.isArray(response.data)) throw new ApiError(null, response.requestId, 500)
+      return response.data
+    },
+    meta: { errorToast: false },
+  })
+}
+
 export const PAGE_SIZE = 20
 /** 서버(AgentStatementRepository.SORT_KEYS)와 같은 정렬 key. 상태·내역 구분은 순서 기준이 없어도 서버가 허용한다. */
 export const STATEMENT_SORT_KEYS = [

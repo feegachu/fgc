@@ -1,6 +1,72 @@
 {
   "components" : {
     "schemas" : {
+      "ApiResponseListStatementAgentOverview" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StatementAgentOverview"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "StatementAgentOverview" : {
+        "properties" : {
+          "adjustmentAmount" : {
+            "type" : "number"
+          },
+          "agentCode" : {
+            "type" : "string"
+          },
+          "agentId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "agentName" : {
+            "type" : "string"
+          },
+          "branchId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "branchName" : {
+            "type" : "string"
+          },
+          "clawbackAmount" : {
+            "type" : "number"
+          },
+          "contractCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "entryCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "heldAmount" : {
+            "type" : "number"
+          },
+          "missingAmountCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "organizationName" : {
+            "type" : "string"
+          },
+          "paymentAmount" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
       "Accepted" : {
         "properties" : {
           "batchExecutionId" : {
@@ -10958,6 +11024,62 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/reports/agents/statements/overview" : {
+      "get" : {
+        "operationId" : "overview",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "month",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "contractNo",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "commissionItemId",
+            "required" : false,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "entryType",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListStatementAgentOverview"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "지점·설계사별 수수료 명세 요약(내부)",
+        "tags" : [
+          "설계사 수수료 명세"
+        ]
+      }
+    },
     "/api/v1/acquisition-cost-checks" : {
       "get" : {
         "description" : "저장한 결과를 최신순으로 돌려줍니다. 조회만으로 검증을 만들지 않습니다.",

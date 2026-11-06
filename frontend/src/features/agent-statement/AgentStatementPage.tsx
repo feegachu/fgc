@@ -15,6 +15,7 @@ import { useAgentOptions, useCommissionItems } from '../base/api'
 import { policyCodeLabel } from '../policies/labels'
 import { sourceOptions } from '../transaction/list-api'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { StatementExplorer, StatementViewSwitch } from './StatementExplorer'
 import {
   ENTRY_TYPE_OPTIONS,
   InvalidStatementAgentIdError,
@@ -24,6 +25,7 @@ import {
   statementDetailQuery,
   statementError,
   statementListQuery,
+  statementOverviewQuery,
   STATEMENT_SORT_KEYS,
 } from './api'
 import type { EntryType, StatementBasis, StatementDetail, StatementEntry, StatementFilters, StatementSummary } from './api'
@@ -74,11 +76,17 @@ const SOURCE_LABELS: Record<string, string> = {
 export default function AgentStatementPage() {
   const { month, user, revised } = useOutletContext<ShellContext>()
   const isAgent = user.roleCode === 'AGENT'
+  const [mode, setMode] = useState<'before' | 'after'>('after')
+  const enhanced = !isAgent && mode === 'after'
+  const [view, setView] = useState<'tree' | 'table'>('tree')
   const defaultMonth = month || today().slice(0, 7)
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params, defaultMonth)
   // 본인 화면에는 설계사 선택이 없다. 내부 조회에서만 agentId 를 고른다.
-  const agentId = isAgent ? null : filters.agentId || null
+  const overview = useQuery(statementOverviewQuery(filters, enhanced))
+  const overviewRows = overview.isError ? [] : overview.data ?? []
+  const agentId = isAgent ? null : filters.agentId || (enhanced && overviewRows[0] ? String(overviewRows[0].agentId) : null)
+  const selectedAgent = overviewRows.find(row => String(row.agentId) === agentId)
   const entryKey = params.get('entryKey') ?? ''
   const ready = isAgent || agentId !== null
   // 조회 조건이 같으면 입력 중인 필터를 지우지 않도록, entryKey 를 뺀 정규화한 조건을 key 로 쓴다.
@@ -162,42 +170,52 @@ export default function AgentStatementPage() {
   return (
     <div className="ast-page">
       <header className="page-header">
-        {!isAgent && <ScreenHelp screenId="RPT-W02" />}
         <div className="page-header-copy">
           <h1 className="page-title">설계사 수수료 명세</h1>
           {!isAgent && !revised && (
             <p className="ast-lede">설계사를 선택해 본인 귀속 기준 명세를 조회합니다.</p>
           )}
         </div>
+        <div className="page-header-actions">
+        {!isAgent && <div className="ast-comparison" role="group" aria-label="수수료 명세 화면 비교">
+          {(['before', 'after'] as const).map(value => <Button key={value} variant={mode === value ? 'primary' : 'secondary'} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'before' ? '수정 전' : '수정 후'}</Button>)}
+        </div>}
+        {!isAgent && <ScreenHelp screenId="RPT-W02" />}
+        </div>
       </header>
       <StatementFiltersBar
-        key={`${filterKey}:${resetCount}`}
-        initial={filters}
+        key={`${filterKey}:${resetCount}:${enhanced ? agentId : ''}`}
+        initial={enhanced ? { ...filters, agentId: agentId ?? '' } : filters}
         isAgent={isAgent}
         agents={(agents.data ?? []).map((row) => [String(row.agentId), `${row.agentCode} · ${row.agentName}`])}
         items={(items.data ?? []).map((row) => [String(row.commissionItemId), row.itemName ?? '-'])}
         onSearch={(next) => apply({ ...next, contractNo: next.contractNo.trim(), page: 1 })}
         onReset={() => {
           setResetCount((count) => count + 1)
-          apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: filters.agentId })
+          apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: enhanced ? '' : filters.agentId })
         }}
       />
-      {!ready ? (
+      {ready && <SummaryCards summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />}
+      {enhanced && view === 'tree' && (overview.isPending || overview.isError ? <div className="surface ast-state" role={overview.isError ? 'alert' : 'status'}>
+        {overview.isError ? statementError(overview.error) : '지점과 설계사 명세를 불러오는 중입니다.'}
+        {overview.isError && <Button variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
+      </div> : overviewRows.length ? <StatementExplorer key={`${filters.month}:${filters.contractNo}:${filters.commissionItemId}:${filters.entryType}`} viewControl={<StatementViewSwitch value={view} onChange={setView} />} rows={overviewRows} selectedId={agentId} onSelect={id => apply({ ...filters, agentId: id, page: 1 })} /> : <p className="surface ast-state" role="status">조회 조건에 해당하는 설계사가 없습니다.</p>)}
+      {enhanced && view === 'table' && !ready && <div className="surface surface-header"><span>조회할 명세가 없습니다.</span><StatementViewSwitch value={view} onChange={setView} /></div>}
+      {!ready && !enhanced ? (
         <p className="ast-state" role="status">
           설계사를 고른 뒤 조회를 누르세요.
         </p>
-      ) : (
+      ) : ready ? (
         <>
-          <SummaryCards
-            summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />
           <section data-guide-feature="features.agent-statement.agent-statement-page.list-panel" data-guide-target="statement.results" className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
             <header className="surface-header">
               <h2 className="surface-title" id="ast-list-title">
-                명세 내역
+                {enhanced && view === 'tree' ? `${selectedAgent?.agentName ?? '선택한 설계사'} · 상세 명세` : '명세 내역'}
               </h2>
-              <span className="ast-count">
-                <span className="tabular-nums">{int(total)}</span>건 · 한 화면 20행
-              </span>
+              <div className="ast-list-tools">
+                <span className="ast-count"><span className="tabular-nums">{int(total)}</span>건 · 한 화면 20행</span>
+                {enhanced && view === 'table' && <StatementViewSwitch value={view} onChange={setView} />}
+              </div>
             </header>
             <DataTable
               className="ast-table"
@@ -245,7 +263,7 @@ export default function AgentStatementPage() {
             />
           )}
         </>
-      )}
+      ) : null}
     </div>
   )
 }

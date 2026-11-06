@@ -1,5 +1,6 @@
 package com.susukkang.fgc.report.service;
 
+import com.susukkang.fgc.report.dto.StatementAgentOverview;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +53,16 @@ public class AgentStatementService {
     private final AgentStatementRepository repository;
     private final AgentDataScopeService scope;
     private final ObjectMapper objectMapper;
+
+    public List<StatementAgentOverview> overview(
+            String month, String contractNo, Long commissionItemId, String entryType) {
+        if (scope.currentAgentId() != null) throw new FgcBusinessException(FgcErrorCode.AUTH_003);
+        YearMonth yearMonth = requireMonth(month);
+        if (entryType != null && !AgentStatementRepository.ENTRY_TYPES.contains(entryType)) throw invalid("entryType");
+        String contract = contractNo == null || contractNo.isBlank() ? null : contractNo.trim();
+        if (contract != null && contract.length() > MAX_CONTRACT_NO_LENGTH) throw invalid("contractNo");
+        return repository.overview(new Filter(0, yearMonth.atDay(1), contract, commissionItemId, entryType));
+    }
 
     public StatementListResponse listMine(String month, String contractNo, Long commissionItemId, String entryType,
                                           String sort, int page, int size) {

@@ -465,7 +465,7 @@ export function ContractPaymentForm({
               <Field label="원천유형">
                 <input value="GA 수기지급" readOnly />
               </Field>
-              <Field label="정산월" required helper="상단 기준 정산월을 따릅니다.">
+              <Field label="정산월" required>
                 <input type="month" value={settlementMonth} readOnly />
               </Field>
               <Field label="회차" required>
@@ -505,7 +505,6 @@ export function ContractPaymentForm({
               <Field
                 label="귀속일"
                 required
-                helper="모든 귀속행에 적용됩니다."
                 error={
                   attributionDate && (!validDate(attributionDate) || !attributionDate.startsWith(`${month}-`))
                     ? '기준 정산월 안에서 선택하세요.'
@@ -701,9 +700,6 @@ export function ContractPaymentForm({
               <span className="transaction-panel-meta">{chosen ? `${chosen}회차` : '회차 선택'}</span>
             </header>
             <div className="surface-body">
-              <p className="transaction-panel-meta">
-                귀속행과 같은 순서입니다. 행을 누르면 검증 결과를 볼 수 있습니다.
-              </p>
               <ol className="contract-payment-preview-list">
                 {visible.map((line, index) => (
                   <li key={line.scheduleLineId}>
@@ -730,18 +726,61 @@ export function ContractPaymentForm({
               {!visible.length && (
                 <p className="transaction-panel-meta">계약과 회차를 선택하면 예상 스케줄이 표시됩니다.</p>
               )}
-              <div className="contract-payment-preview-total">
-                <span>선택한 행의 예상금액 합계</span>
-                <strong>
-                  {selected.some((line) => line.expectedAmount == null)
-                    ? '금액 확인 필요'
-                    : `${int(selected.reduce((sum, line) => sum + (scheduleAmount(line) ?? 0), 0))}원`}
-                </strong>
-              </div>
-              <p className="transaction-panel-meta" role="status">
-                {selected.filter((line) => done(line.scheduleLineId!)).length}/{selected.length}행 확정 완료
-              </p>
             </div>
+            <section className="contract-payment-preview-actions" data-guide-target="payment.batch.actions">
+              <div className="transaction-action-list">
+                <Button
+                  variant="secondary"
+                  loading={busy === 'save'}
+                  disabled={
+                    !!busy ||
+                    !canProcess ||
+                    !header ||
+                    !selected.length ||
+                    selected.length > 200 ||
+                    !balanced ||
+                    !datesReady ||
+                    clean ||
+                    editingLocked ||
+                    schedules.isFetching ||
+                    detail.isFetching ||
+                    items.isFetching
+                  }
+                  onClick={() => void save()}
+                >
+                  임시저장
+                </Button>
+                <Button
+                  variant="secondary"
+                  loading={busy === 'precheck'}
+                  disabled={!!busy || !canProcess || !clean || !balanced || !remaining.length || uncertain}
+                  onClick={() => void precheck()}
+                >
+                  사전검증
+                </Button>
+                <Button
+                  loading={busy === 'confirm'}
+                  disabled={!!busy || !canProcess || !allChecked || uncertain}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  확정
+                </Button>
+                {uncertain && Object.keys(saved).length > 0 && (
+                  <Button variant="secondary" loading={busy === 'reload'} onClick={() => void reconcile()}>
+                    확정 결과 다시 확인
+                  </Button>
+                )}
+              </div>
+              {selected.length > 200 && (
+                <p className="field-error">한 번에 200행까지 등록할 수 있습니다. 등록할 행을 나눠 선택하세요.</p>
+              )}
+              {error && (
+                <p role="alert" className="field-error">
+                  {error}
+                </p>
+              )}
+              {uncertain && <Link to={returnTo}>지급 목록에서 저장·확정 결과 확인</Link>}
+            </section>
           </section>
           <ContractPaymentGates
             rows={selected.length}
@@ -762,61 +801,6 @@ export function ContractPaymentForm({
             error=""
             contracts={contracts.data}
           />
-          <section className="surface surface-body transaction-action-panel" data-guide-target="payment.batch.actions">
-            <div className="transaction-action-list">
-              <Button
-                variant="secondary"
-                loading={busy === 'save'}
-                disabled={
-                  !!busy ||
-                  !canProcess ||
-                  !header ||
-                  !selected.length ||
-                  selected.length > 200 ||
-                  !balanced ||
-                  !datesReady ||
-                  clean ||
-                  editingLocked ||
-                  schedules.isFetching ||
-                  detail.isFetching ||
-                  items.isFetching
-                }
-                onClick={() => void save()}
-              >
-                임시저장 (검증 없음)
-              </Button>
-              <Button
-                variant="secondary"
-                loading={busy === 'precheck'}
-                disabled={!!busy || !canProcess || !clean || !balanced || !remaining.length || uncertain}
-                onClick={() => void precheck()}
-              >
-                사전검증
-              </Button>
-              <Button
-                loading={busy === 'confirm'}
-                disabled={!!busy || !canProcess || !allChecked || uncertain}
-                onClick={() => setConfirmOpen(true)}
-              >
-                확정
-              </Button>
-              {uncertain && Object.keys(saved).length > 0 && (
-                <Button variant="secondary" loading={busy === 'reload'} onClick={() => void reconcile()}>
-                  확정 결과 다시 확인
-                </Button>
-              )}
-            </div>
-            <p className="transaction-panel-meta">임시저장 → 사전검증 → 확정 순서로 진행합니다.</p>
-            {selected.length > 200 && (
-              <p className="field-error">한 번에 200행까지 등록할 수 있습니다. 등록할 행을 나눠 선택하세요.</p>
-            )}
-            {error && (
-              <p role="alert" className="field-error">
-                {error}
-              </p>
-            )}
-            {uncertain && <Link to={returnTo}>지급 목록에서 저장·확정 결과 확인</Link>}
-          </section>
         </div>
       </ResizableSplit>
       <Modal

@@ -1,5 +1,6 @@
 package com.susukkang.fgc.report.repository;
 
+import com.susukkang.fgc.report.dto.StatementAgentOverview;
 import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.SqlSort;
@@ -160,6 +161,61 @@ public class AgentStatementRepository {
             """;
 
     private final EntityManager entityManager;
+
+    /** 한 요청으로 전체 설계사를 조회하며, 개별 명세와 동일한 CTE/귀속 범위를 재사용한다. */
+    public List<StatementAgentOverview> overview(Filter filter) {
+        StringBuilder aggregate = new StringBuilder(ENTRIES_CTE.replace(":agentId", "a.agent_id"))
+                .append("""
+                        SELECT count(DISTINCT e.contract_id) AS contracts, count(*) AS entries,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'PAYMENT'), 0) AS payment,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'HELD'), 0) AS held,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'ADJUSTMENT'), 0) AS adjustment,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'CLAWBACK'), 0) AS clawback,
+                               count(*) FILTER (WHERE e.amount IS NULL) AS missing
+                        """).append(JOINS);
+        Map<String, Object> params = where(aggregate, filter);
+        params.remove(AGENT_ID);
+        String sql = """
+                SELECT a.agent_id, a.agent_code, a.agent_name,
+                       COALESCE(b.organization_id, o.organization_id),
+                       COALESCE(b.organization_name, o.organization_name), o.organization_name,
+                       s.contracts, s.entries, s.payment, s.held, s.adjustment, s.clawback, s.missing
+                  FROM fgc.agent a
+                  JOIN fgc.organization o ON o.organization_id = a.organization_id
+                  LEFT JOIN LATERAL (
+                    WITH RECURSIVE ancestors AS (
+                      SELECT organization_id, parent_id, organization_name, organization_type,
+                             ARRAY[organization_id] AS path, 0 AS depth
+                        FROM fgc.organization WHERE organization_id = a.organization_id
+                      UNION ALL
+                      SELECT p.organization_id, p.parent_id, p.organization_name, p.organization_type,
+                             x.path || p.organization_id, x.depth + 1
+                        FROM fgc.organization p JOIN ancestors x ON p.organization_id = x.parent_id
+                       WHERE NOT p.organization_id = ANY(x.path)
+                    )
+                    SELECT organization_id, organization_name FROM ancestors
+                     WHERE organization_type = 'BRANCH' ORDER BY depth LIMIT 1
+                  ) b ON TRUE
+                  CROSS JOIN LATERAL (
+                """ + aggregate + """
+                  ) s
+                 WHERE s.entries > 0 OR (a.appointment_date <= :monthEnd
+                     AND (a.termination_date IS NULL OR a.termination_date >= :month))
+                 ORDER BY s.entries > 0 DESC, COALESCE(b.organization_name, o.organization_name),
+                          a.agent_name, a.agent_id
+                """;
+        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(sql);
+        params.forEach(query::setParameter);
+        query.setParameter("monthEnd", filter.month().withDayOfMonth(filter.month().lengthOfMonth()));
+        return query.getResultList().stream().map(result -> {
+            Object[] c = (Object[]) result;
+            return new StatementAgentOverview(
+                    ((Number) c[0]).longValue(), (String) c[1], (String) c[2], ((Number) c[3]).longValue(),
+                    (String) c[4], (String) c[5], ((Number) c[6]).longValue(), ((Number) c[7]).longValue(),
+                    (BigDecimal) c[8], (BigDecimal) c[9], (BigDecimal) c[10], (BigDecimal) c[11],
+                    ((Number) c[12]).longValue());
+        }).toList();
+    }
 
     /** 목록·합계가 같이 쓰는 필터. month 는 그 달 1일이다. */
     public record Filter(long agentId, LocalDate month, String contractNo, Long commissionItemId, String entryType) {
