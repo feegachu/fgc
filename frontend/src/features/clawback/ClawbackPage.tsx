@@ -95,7 +95,7 @@ export default function ClawbackPage() {
         }}
         onReset={() => apply(defaultCriteria(month ?? ''))}
         actions={
-          <Button data-guide-feature="features.clawback.clawback-page.button" variant="secondary" disabled={busy} onClick={() => void query.refetch()}>
+          <Button data-guide-feature="features.clawback.clawback-page.button" variant="secondary" disabled={busy} onClick={() => { void query.refetch(); if (selected) void detail.refetch() }}>
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
