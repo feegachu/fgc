@@ -9871,7 +9871,8 @@
             "type" : "boolean"
           },
           "confirmBlockedReason" : {
-            "type" : "string"
+            "description" : "확정 차단 코드. 확정 가능하면 null; 확정 불가 CURRENT는 SCHEDULE_NOT_ACTIVE_PLANNED; 4·7년 예정판은 FGC-IMPL-SCHEDULE_PREVIEW_ONLY",
+            "type" : [ "string", "null" ]
           },
           "contractId" : {
             "format" : "int64",
@@ -10028,8 +10029,9 @@
             "type" : "integer"
           },
           "sourceStatusEventId" : {
+            "description" : "현재 회차 상태와 일치하는 실제 원천 사건 ID. 근거 없음 또는 최신 결과 불일치는 null",
             "format" : "int64",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           }
         },
         "type" : "object"
@@ -10048,18 +10050,21 @@
       "ScheduleRegenRequest" : {
         "properties" : {
           "expectedSourceVersion" : {
+            "description" : "명시적 4년·7년 생성 시 필수인 previewContext 원천 토큰. 불일치 시 409",
             "maxLength" : 100,
             "minLength" : 0,
             "type" : "string"
           },
           "policyVersionId" : {
+            "description" : "명시적 FOUR_YEAR_2027/SEVEN_YEAR_2029 생성 시 필수인 승인·활성 정책 ID",
             "exclusiveMinimum" : 0,
             "format" : "int64",
             "type" : "integer"
           },
           "reason" : {
+            "description" : "생성 사유. 공백만 있는 값은 허용하지 않음",
             "maxLength" : 40,
-            "minLength" : 0,
+            "minLength" : 1,
             "type" : "string"
           },
           "regime" : {

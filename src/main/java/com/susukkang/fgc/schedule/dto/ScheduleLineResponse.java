@@ -21,6 +21,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class ScheduleLineResponse {
     private Long scheduleLineId;
+    @io.swagger.v3.oas.annotations.media.Schema(nullable = true, description = "현재 회차 상태와 일치하는 실제 원천 사건 ID. 근거 없음 또는 최신 결과 불일치는 null")
     private Long sourceStatusEventId;
     private String feeComponentType;
     private BigDecimal fixedAmount;

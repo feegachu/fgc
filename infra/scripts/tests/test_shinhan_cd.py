@@ -286,7 +286,7 @@ fi
         self.assertEqual(json.loads((state / "current-promotion.json").read_text())["source_build"], 12)
         pulls = [line for line in log.splitlines() if line.startswith("pull ")]
         self.assertEqual(pulls, ["pull " + API, "pull " + WEB])
-        self.assertIn("SPRING_PROFILES_ACTIVE: prod", (state / "compose.yaml").read_text())
+        self.assertIn("SPRING_PROFILES_ACTIVE: ${FGC_SPRING_PROFILES_ACTIVE:-prod}", (state / "compose.yaml").read_text())
         self.assertIn("/etc/nginx/conf.d/fgc-http.conf:ro", (state / "compose.yaml").read_text())
         self.assertIn("shm_size: 256m", (state / "compose.yaml").read_text(encoding="utf-8"))
         self.assertIn("limit_req_zone", (state / "nginx/http.conf").read_text(encoding="utf-8"))
