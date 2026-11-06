@@ -1,5 +1,5 @@
 import { SettlementGuide } from '../../features/assistant/settlement/SettlementGuide'
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
@@ -28,6 +28,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const location = useLocation()
   const navigate = useNavigate()
   const current = screenFor(location.pathname)
+  const [picoLauncherHost, setPicoLauncherHost] = useState<HTMLDivElement | null>(null)
   const month = useWorkspaceStore((state) => state.month)
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
@@ -96,6 +97,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <WorkspaceTabs activeId={current?.id} />
           )}
           <div className="app-header-actions">
+            {current?.id === 'SCHE-W02' && <div ref={setPicoLauncherHost} />}
             <div className="app-header-field">
               <span className="app-header-field-label">기준 정산월</span>
               {month && (
@@ -122,7 +124,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
       </div>
       {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (
         <Suspense fallback={null}>
-          <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} />
+          <AssistantDemoMount user={user} loggingOut={loggingOut} screenId={current?.id} screenContext={location.pathname + location.search} launcherHost={current?.id === 'SCHE-W02' ? picoLauncherHost : null} />
           {!loggingOut && import.meta.env.VITE_ASSISTANT_AI === 'true' && <WorkspaceGuide user={user} />}
         </Suspense>
       )}
