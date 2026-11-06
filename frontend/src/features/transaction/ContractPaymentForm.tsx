@@ -10,7 +10,7 @@ import { apiClient } from '../../lib/api/client'
 import { int } from '../../lib/format'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useEntityChoices } from '../base/selection'
-import { contractSchedulesQuery } from '../contract/api'
+import { contractSchedulesQuery, validDate } from '../contract/api'
 import { scheduleDetailQuery, type ScheduleLine } from '../schedule/api'
 import {
   confirmPayment,
@@ -22,7 +22,8 @@ import {
   type PaymentPayload,
   type Precheck,
 } from './form-api'
-import { GatePanel, CapPanel } from './ConfirmationPanels'
+import { CapPanel } from './ConfirmationPanels'
+import { ContractPaymentGates } from './ContractPaymentGates'
 import { ScreenWalkthrough } from '../assistant/guide/ScreenWalkthrough'
 import type { ScreenHelpStep } from '../assistant/guide/ScreenHelp'
 
@@ -37,7 +38,7 @@ const helpSteps: ScreenHelpStep[] = [
     targetId: 'payment.batch.lines',
     title: '설계사별 귀속행',
     instruction: '설계사별 수수료와 금액을 수정합니다.',
-    interaction: '귀속합계를 위쪽 지급 금액과 맞추세요.',
+    interaction: '오른쪽 예상 스케줄과 같은 순서로 비교하세요.',
   },
   {
     targetId: 'payment.batch.actions',
@@ -46,8 +47,15 @@ const helpSteps: ScreenHelpStep[] = [
     interaction: '결과를 확인하고 확정을 진행하세요.',
   },
 ].map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true }))
-type Edit = { amount: string; item: string; date: string; due: string }
+type Edit = { amount: string; item: string }
 type Saved = { payment: Payment; fingerprint: string }
+
+const scheduleAmount = (line: ScheduleLine) =>
+  line.expectedAmount == null
+    ? undefined
+    : line.cashflowType === 'DEDUCTION'
+      ? Math.abs(line.expectedAmount)
+      : line.expectedAmount
 
 function payload(
   line: ScheduleLine,
@@ -113,13 +121,14 @@ export function ContractPaymentForm({
   const client = useQueryClient()
   const [contractId, setContractId] = useState(initialContractId)
   const [stage, setStage] = useState<'GA_TO_FC' | 'INSURER_TO_GA'>('GA_TO_FC')
-  const [settlementMonth, setMonth] = useState(month)
+  const settlementMonth = month
+  const monthStart = `${month}-01`
+  const monthEnd = `${month}-${new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()}`
+  const [attributionDate, setAttributionDate] = useState(monthStart)
+  const [paymentDate, setPaymentDate] = useState(monthStart)
   const [installment, setInstallment] = useState('')
   const [excluded, setExcluded] = useState<number[]>([])
   const [edits, setEdits] = useState<Record<number, Partial<Edit>>>({})
-  const [amount, setAmount] = useState<string | null>(null)
-  const [itemId, setItemId] = useState('')
-  const [flow, setFlow] = useState('')
   const [evidence, setEvidence] = useState('')
   const [busy, setBusy] = useState('')
   const lock = useRef(false)
@@ -172,35 +181,34 @@ export function ContractPaymentForm({
     ['PLANNED', 'CONFIRMED', 'RESTARTED'].includes(line.lineStatus ?? '') && !!line.scheduleLineId
   const selected = visible.filter((line) => eligible(line) && !excluded.includes(line.scheduleLineId!))
   const values = (line: ScheduleLine): Edit => ({
-    amount: String(line.expectedAmount ?? ''),
+    amount: String(scheduleAmount(line) ?? ''),
     item: String(line.commissionItemId ?? ''),
-    date: line.attributionDate ?? '',
-    due: line.dueDate ?? '',
     ...edits[line.scheduleLineId!],
   })
   const items = useEntityChoices(
     'items',
     { asOf: `${settlementMonth}-01` },
-    [itemId, ...selected.map((line) => values(line).item)],
+    visible.map((line) => values(line).item),
     !!settlementMonth,
     (item) => stage !== 'INSURER_TO_GA' || item.itemCode !== 'NEWCOMER_SUPPORT',
     stage,
   )
+  const itemSource = { ...items.source, label: (item: (typeof items.data)[number]) => item.itemName ?? '수수료 항목' }
+  const datesReady = [attributionDate, paymentDate].every((date) => validDate(date) && date.startsWith(`${month}-`))
   const rowPayload = (line: ScheduleLine) => {
+    if (!datesReady) throw new Error('귀속일과 지급 예정일을 기준 정산월 안에서 선택하세요.')
     const edit = values(line)
     if (!/^\d+$/.test(edit.amount)) throw new Error('귀속금액을 0원 이상 원 단위로 입력하세요.')
     const item = items.data.find((item) => String(item.commissionItemId) === edit.item)
     if (!item) throw new Error('검색 결과에서 수수료 항목을 선택하세요.')
-    const cashflowType = flow || item.cashflowType || line.cashflowType
-    if (item.cashflowType && item.cashflowType !== cashflowType)
-      throw new Error('수수료 항목과 금액 흐름을 맞춰 주세요.')
+    const cashflowType = item.cashflowType || line.cashflowType
     return payload(
       {
         ...line,
         expectedAmount: Number(edit.amount),
         commissionItemId: Number(edit.item),
-        attributionDate: edit.date,
-        dueDate: edit.due,
+        attributionDate,
+        dueDate: paymentDate,
         cashflowType,
       },
       Number(contractId),
@@ -210,8 +218,10 @@ export function ContractPaymentForm({
     )
   }
   const total = selected.reduce((sum, line) => sum + Number(values(line).amount || 0), 0)
-  const expected = amount ?? String(total)
-  const balanced = /^\d+$/.test(expected) && Number.isSafeInteger(total) && Number(expected) === total
+  const balanced =
+    selected.length > 0 &&
+    Number.isSafeInteger(total) &&
+    selected.every((line) => /^\d+$/.test(values(line).amount) && Number.isSafeInteger(Number(values(line).amount)))
   const fingerprint = (line: ScheduleLine) => {
     try {
       return JSON.stringify(rowPayload(line))
@@ -239,8 +249,8 @@ export function ContractPaymentForm({
     setInstallment('')
     setExcluded([])
     setEdits({})
-    setAmount(null)
-    setItemId('')
+    setAttributionDate(monthStart)
+    setPaymentDate(monthStart)
     setChecks({})
     setError('')
     setSelectedResult('')
@@ -455,16 +465,8 @@ export function ContractPaymentForm({
               <Field label="원천유형">
                 <input value="GA 수기지급" readOnly />
               </Field>
-              <Field label="정산월" required>
-                <input
-                  disabled={scopeLocked}
-                  type="month"
-                  value={settlementMonth}
-                  onChange={(event) => {
-                    setMonth(event.target.value)
-                    reset()
-                  }}
-                />
+              <Field label="정산월" required helper="상단 기준 정산월을 따릅니다.">
+                <input type="month" value={settlementMonth} readOnly />
               </Field>
               <Field label="회차" required>
                 <select
@@ -474,7 +476,6 @@ export function ContractPaymentForm({
                     setInstallment(event.target.value)
                     setEdits({})
                     setExcluded([])
-                    setAmount(null)
                     setChecks({})
                   }}
                 >
@@ -489,58 +490,6 @@ export function ContractPaymentForm({
                   )}
                 </select>
               </Field>
-              <Field label="수수료 항목 일괄 적용" helper="행별로 다른 항목도 선택할 수 있습니다.">
-                <SearchSelect
-                  disabled={editingLocked}
-                  value={itemId}
-                  source={items.source}
-                  selected={items.data.find((row) => String(row.commissionItemId) === itemId)}
-                  placeholder="수수료 항목 이름/검색"
-                  onSelect={(value, row) => {
-                    items.remember(row)
-                    setItemId(value)
-                    if (value) {
-                      setEdits((previous) => ({
-                        ...previous,
-                        ...Object.fromEntries(
-                          selected.map((line) => [
-                            line.scheduleLineId!,
-                            { ...previous[line.scheduleLineId!], item: value },
-                          ]),
-                        ),
-                      }))
-                      setChecks({})
-                    }
-                  }}
-                />
-              </Field>
-              <Field label="금액 (원)" required helper="아래 귀속금액 합계와 맞춰 주세요.">
-                <input
-                  disabled={editingLocked}
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={expected}
-                  onChange={(event) => {
-                    setAmount(event.target.value)
-                    setChecks({})
-                  }}
-                />
-              </Field>
-              <Field label="흐름">
-                <select
-                  disabled={editingLocked}
-                  value={flow}
-                  onChange={(event) => {
-                    setFlow(event.target.value)
-                    setChecks({})
-                  }}
-                >
-                  <option value="">행별 수수료 항목 기준</option>
-                  <option value="PAYMENT">지급</option>
-                  <option value="DEDUCTION">차감</option>
-                </select>
-              </Field>
               <Field label="증빙">
                 <input
                   disabled={editingLocked}
@@ -549,6 +498,49 @@ export function ContractPaymentForm({
                   placeholder="문서번호, 링크"
                   onChange={(event) => {
                     setEvidence(event.target.value)
+                    setChecks({})
+                  }}
+                />
+              </Field>
+              <Field
+                label="귀속일"
+                required
+                helper="모든 귀속행에 적용됩니다."
+                error={
+                  attributionDate && (!validDate(attributionDate) || !attributionDate.startsWith(`${month}-`))
+                    ? '기준 정산월 안에서 선택하세요.'
+                    : undefined
+                }
+              >
+                <input
+                  type="date"
+                  min={monthStart}
+                  max={monthEnd}
+                  disabled={editingLocked}
+                  value={attributionDate}
+                  onChange={(event) => {
+                    setAttributionDate(event.target.value)
+                    setChecks({})
+                  }}
+                />
+              </Field>
+              <Field
+                label="지급 예정일"
+                required
+                error={
+                  paymentDate && (!validDate(paymentDate) || !paymentDate.startsWith(`${month}-`))
+                    ? '기준 정산월 안에서 선택하세요.'
+                    : undefined
+                }
+              >
+                <input
+                  type="date"
+                  min={monthStart}
+                  max={monthEnd}
+                  disabled={editingLocked}
+                  value={paymentDate}
+                  onChange={(event) => {
+                    setPaymentDate(event.target.value)
                     setChecks({})
                   }}
                 />
@@ -591,19 +583,26 @@ export function ContractPaymentForm({
             <div className="data-table-viewport">
               <table className="data-table contract-payment-table">
                 <caption className="visually-hidden">계약의 지급 귀속행</caption>
+                <colgroup>
+                  <col className="batch-col-select" />
+                  <col className="batch-col-number" />
+                  <col className="batch-col-agent" />
+                  <col />
+                  <col className="batch-col-amount" />
+                  <col className="batch-col-status" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>선택</th>
+                    <th>#</th>
                     <th>설계사</th>
                     <th>수수료 항목</th>
-                    <th>귀속일</th>
-                    <th>지급 예정일</th>
                     <th>귀속금액</th>
                     <th>처리 상태</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((line) => {
+                  {visible.map((line, index) => {
                     const key = line.scheduleLineId!,
                       edit = values(line),
                       selectedItem = items.data.find((item) => String(item.commissionItemId) === edit.item)
@@ -623,37 +622,24 @@ export function ContractPaymentForm({
                             }}
                           />
                         </td>
-                        <td>{line.recipientName ?? (stage === 'INSURER_TO_GA' ? 'GA' : '대상 확인 필요')}</td>
+                        <td>{index + 1}</td>
+                        <td>
+                          <span className="contract-payment-agent" title={line.recipientName ?? ''}>
+                            {line.recipientName ?? (stage === 'INSURER_TO_GA' ? 'GA' : '대상 확인 필요')}
+                          </span>
+                        </td>
                         <td>
                           <SearchSelect
                             disabled={editingLocked || !eligible(line)}
                             aria-label={`${line.recipientName} 수수료 항목 ${key}`}
                             value={edit.item}
-                            source={items.source}
+                            source={itemSource}
                             selected={selectedItem}
                             placeholder="수수료 항목 검색"
                             onSelect={(value, row) => {
                               items.remember(row)
                               editRow(key, { item: value })
                             }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            aria-label={`귀속일 ${key}`}
-                            disabled={editingLocked || !eligible(line)}
-                            type="date"
-                            value={edit.date}
-                            onChange={(event) => editRow(key, { date: event.target.value })}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            aria-label={`지급 예정일 ${key}`}
-                            disabled={editingLocked || !eligible(line)}
-                            type="date"
-                            value={edit.due}
-                            onChange={(event) => editRow(key, { due: event.target.value })}
                           />
                         </td>
                         <td>
@@ -689,15 +675,16 @@ export function ContractPaymentForm({
                   })}
                   {!visible.length && (
                     <tr>
-                      <td colSpan={7}>계약과 회차를 선택하면 귀속행이 자동으로 채워집니다.</td>
+                      <td colSpan={6}>계약과 회차를 선택하면 귀속행이 자동으로 채워집니다.</td>
                     </tr>
                   )}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <th colSpan={5}>귀속금액 합계</th>
+                    <th colSpan={4}>귀속금액 합계</th>
                     <td colSpan={2}>
-                      {int(total)}원 {!balanced && <span className="field-error">지급 금액과 다릅니다.</span>}
+                      {int(total)}원{' '}
+                      {selected.length > 0 && !balanced && <span className="field-error">귀속금액을 확인하세요.</span>}
                     </td>
                   </tr>
                 </tfoot>
@@ -706,25 +693,69 @@ export function ContractPaymentForm({
           </section>
         </div>
         <div className="transaction-form-column">
-          <div className="surface surface-body">
-            <Field label="검증 결과를 볼 귀속행">
-              <select value={String(currentResult ?? '')} onChange={(event) => setSelectedResult(event.target.value)}>
-                {selected.map((line) => (
-                  <option key={line.scheduleLineId} value={line.scheduleLineId}>
-                    {line.recipientName ?? 'GA'} ·{' '}
-                    {items.data.find((item) => String(item.commissionItemId) === values(line).item)?.itemName ??
-                      line.commissionItemName}
-                  </option>
+          <section className="surface contract-payment-preview" aria-labelledby="contract-payment-preview-title">
+            <header className="surface-header transaction-surface-header">
+              <h2 className="surface-title" id="contract-payment-preview-title">
+                설계사별 예상 스케줄
+              </h2>
+              <span className="transaction-panel-meta">{chosen ? `${chosen}회차` : '회차 선택'}</span>
+            </header>
+            <div className="surface-body">
+              <p className="transaction-panel-meta">
+                귀속행과 같은 순서입니다. 행을 누르면 검증 결과를 볼 수 있습니다.
+              </p>
+              <ol className="contract-payment-preview-list">
+                {visible.map((line, index) => (
+                  <li key={line.scheduleLineId}>
+                    <button
+                      type="button"
+                      className="contract-payment-preview-row"
+                      disabled={!selected.some((row) => row.scheduleLineId === line.scheduleLineId)}
+                      aria-pressed={line.scheduleLineId === currentResult}
+                      onClick={() => setSelectedResult(String(line.scheduleLineId))}
+                    >
+                      <span className="contract-payment-preview-number">{index + 1}</span>
+                      <span className="contract-payment-preview-person">
+                        <strong title={line.recipientName ?? 'GA'}>{line.recipientName ?? 'GA'}</strong>
+                        <span>{line.commissionItemName ?? '항목 확인 필요'}</span>
+                      </span>
+                      <span className="contract-payment-preview-amount">
+                        {line.cashflowType === 'DEDUCTION' && '차감 '}
+                        {line.expectedAmount == null ? '금액 미정' : `${int(scheduleAmount(line))}원`}
+                      </span>
+                    </button>
+                  </li>
                 ))}
-              </select>
-            </Field>
-            <p>
-              <span role="status">
+              </ol>
+              {!visible.length && (
+                <p className="transaction-panel-meta">계약과 회차를 선택하면 예상 스케줄이 표시됩니다.</p>
+              )}
+              <div className="contract-payment-preview-total">
+                <span>선택한 행의 예상금액 합계</span>
+                <strong>
+                  {selected.some((line) => line.expectedAmount == null)
+                    ? '금액 확인 필요'
+                    : `${int(selected.reduce((sum, line) => sum + (scheduleAmount(line) ?? 0), 0))}원`}
+                </strong>
+              </div>
+              <p className="transaction-panel-meta" role="status">
                 {selected.filter((line) => done(line.scheduleLineId!)).length}/{selected.length}행 확정 완료
-              </span>
-            </p>
-          </div>
-          <GatePanel result={checks[currentResult!] ?? null} />
+              </p>
+            </div>
+          </section>
+          <ContractPaymentGates
+            rows={selected.length}
+            inputsReady={selected.length > 0 && selected.every((line) => !!fingerprint(line))}
+            amountsReady={balanced}
+            savedRows={
+              selected.filter(
+                (line) => !!fingerprint(line) && saved[line.scheduleLineId!]?.fingerprint === fingerprint(line),
+              ).length
+            }
+            checks={selected.map((line) => checks[line.scheduleLineId!])}
+            confirmedRows={selected.filter((line) => done(line.scheduleLineId!)).length}
+            uncertain={uncertain}
+          />
           <CapPanel
             result={checks[currentResult!] ?? null}
             pending={busy === 'precheck'}
@@ -743,6 +774,7 @@ export function ContractPaymentForm({
                   !selected.length ||
                   selected.length > 200 ||
                   !balanced ||
+                  !datesReady ||
                   clean ||
                   editingLocked ||
                   schedules.isFetching ||
