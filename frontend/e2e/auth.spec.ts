@@ -109,6 +109,24 @@ test('쿠키 만료 후 재진입 시 로그인으로 이동하고 경로를 보
   expect(new URL(page.url()).searchParams.get('redirect')).toBe('/contracts?month=2026-07')
 })
 
+test('오래 자리를 비운 뒤 다시 열면 쿠키가 있어도 자동 로그아웃한다', async ({ page }) => {
+  await authFixture(page)
+  await page.goto('login?redirect=%2Fcontracts%3Fmonth%3D2026-07')
+  await login(page)
+  await expect(page.getByRole('heading', { name: '보험계약 목록', level: 1, exact: true })).toBeVisible()
+  const refreshes: string[] = []
+  const loggedOut = page.waitForRequest('**/api/v1/auth/logout')
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/v1/auth/refresh')) refreshes.push(request.url())
+  })
+  await page.evaluate(() => localStorage.setItem('fgc.lastActivityAt', String(Date.now() - 31 * 60_000)))
+  await page.reload()
+  await loggedOut
+  await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
+  await expect(page.getByText('오랫동안 사용하지 않아 자동으로 로그아웃되었습니다.')).toBeVisible()
+  expect(refreshes).toEqual([])
+})
+
 test('두 브라우저의 중복 로그인: A 안내·경로 보존, B 정상, A 재로그인 복귀', async ({ browser, baseURL }) => {
   const a = await browser.newContext({ baseURL })
   const b = await browser.newContext({ baseURL })

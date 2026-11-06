@@ -166,7 +166,7 @@ export function createApiClient(env: ClientEnvironment) {
   }
   // Don't redirect the login page back to itself on a missing refresh cookie.
   function isLoginPage() { return routerPath(env.location, env.base).split(/[?#]/)[0] === '/login' }
-  return { request, requestBlob, requestPdf, restoreSession, login, logout, isLoginPage }
+  return { request, requestBlob, requestPdf, restoreSession, extendSession: () => refresh(), login, logout, isLoginPage }
 }
 export const apiClient = createApiClient({
   fetch: (...args) => globalThis.fetch(...args),

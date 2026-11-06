@@ -108,7 +108,7 @@ public class AuthTokenController {
         RefreshResult result = authTokenService.refresh(refreshToken);
         if (result.error() != null) {
             // 무효가 된 쿠키를 브라우저에 남겨 두면 화면이 갱신을 반복 시도한다.
-            response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie("", Duration.ZERO).toString());
+            response.addHeader(HttpHeaders.SET_COOKIE, expiredRefreshCookie().toString());
             throw new FgcBusinessException(result.error());
         }
         return issued(result.tokens(), response);
@@ -121,7 +121,7 @@ public class AuthTokenController {
             HttpServletResponse response) {
         requireTrustedClient(request);
         authTokenService.logout(refreshToken);
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie("", Duration.ZERO).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, expiredRefreshCookie().toString());
         return ApiResponse.success();
     }
 
@@ -155,20 +155,23 @@ public class AuthTokenController {
     }
 
     private static ApiResponse<TokenResponse> issued(IssuedTokens tokens, HttpServletResponse response) {
-        response.addHeader(HttpHeaders.SET_COOKIE,
-                refreshCookie(tokens.refreshToken(), tokens.refreshTokenMaxAge()).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(tokens.refreshToken()).toString());
         return ApiResponse.success(new TokenResponse(
                 tokens.accessToken(), AuthTokenService.TOKEN_TYPE, tokens.expiresInSeconds()));
     }
 
-    private static ResponseCookie refreshCookie(String value, Duration maxAge) {
+    /** Max-Age 없는 세션 쿠키라 브라우저를 닫으면 사라진다. 다시 열었을 때 이전 사용자로 복원되지 않게 한다. */
+    private static ResponseCookie refreshCookie(String value) {
         return ResponseCookie.from(REFRESH_COOKIE, value)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Strict")
                 .path(REFRESH_COOKIE_PATH)
-                .maxAge(maxAge)
                 .build();
+    }
+
+    private static ResponseCookie expiredRefreshCookie() {
+        return refreshCookie("").mutate().maxAge(Duration.ZERO).build();
     }
 
     /**
