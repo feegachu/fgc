@@ -527,6 +527,8 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     expect(regen.options).toMatchObject({ method: 'POST', body: { reason: '2026-07 정책 개정' } })
     expect(toasts()).toContain('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.')
     await waitFor(() => expect(currentVersion()).toHaveTextContent('v3'))
+    // 버전 이력이 상세보다 먼저 올 수 있다. 상세까지 읽어 버튼이 켜진 뒤에 누른다.
+    await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
 
     await actions.click(screen.getByRole('button', { name: '확정' }))
     const confirm = await screen.findByRole('dialog', { name: '이 스케줄을 확정할까요?' })
