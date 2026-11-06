@@ -1599,6 +1599,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transactions/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 계약별 지급 초안 일괄 등록 */
+        post: operations["createContractPaymentBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transactions/{paymentId}": {
         parameters: {
             query?: never;
@@ -2276,6 +2293,11 @@ export interface components {
         };
         ApiResponseClawbackNoticeDocumentResponse: {
             data?: components["schemas"]["ClawbackNoticeDocumentResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseListCommissionPaymentResponse: {
+            data?: components["schemas"]["CommissionPaymentResponse"][];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3513,6 +3535,9 @@ export interface components {
             inclusionDecisionReason?: string;
             /** @enum {string} */
             inclusionDecisionStatus?: "INCLUDED" | "EXCLUDED" | "REVIEW_REQUIRED";
+        };
+        CommissionPaymentBatchRequest: {
+            payments: components["schemas"]["CommissionPaymentCreateRequest"][];
         };
         CommissionPaymentCreateRequest: {
             /** Format: int64 */
@@ -9172,6 +9197,57 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseCommissionPaymentResponse"];
+                };
+            };
+            /** @description 필수값·귀속·증빙 검증 실패 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+            /** @description 정산담당자 권한 없음 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+            /** @description 지급 건 자연키 중복 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    createContractPaymentBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommissionPaymentBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description DRAFT 등록 성공 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListCommissionPaymentResponse"];
                 };
             };
             /** @description 필수값·귀속·증빙 검증 실패 */

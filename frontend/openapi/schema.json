@@ -990,6 +990,23 @@
         },
         "type" : "object"
       },
+      "ApiResponseListCommissionPaymentResponse" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CommissionPaymentResponse"
+            },
+            "type" : "array"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseCommissionPaymentResponse" : {
         "properties" : {
           "data" : {
@@ -3923,6 +3940,22 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "CommissionPaymentBatchRequest" : {
+        "properties" : {
+          "payments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CommissionPaymentCreateRequest"
+            },
+            "maxItems" : 200,
+            "minItems" : 1,
+            "type" : "array"
+          }
+        },
+        "required" : [
+          "payments"
+        ],
         "type" : "object"
       },
       "CommissionPaymentCreateRequest" : {
@@ -15140,6 +15173,67 @@
         },
         "summary" : "수수료 지급 건 DRAFT 등록",
         "tags" : [ "수수료 지급 건" ]
+      }
+    },
+    "/api/v1/transactions/batch" : {
+      "post" : {
+        "operationId" : "createContractPaymentBatch",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CommissionPaymentBatchRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListCommissionPaymentResponse"
+                }
+              }
+            },
+            "description" : "DRAFT 등록 성공"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
+                }
+              }
+            },
+            "description" : "필수값·귀속·증빙 검증 실패"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
+                }
+              }
+            },
+            "description" : "정산담당자 권한 없음"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiFailureResponse"
+                }
+              }
+            },
+            "description" : "지급 건 자연키 중복"
+          }
+        },
+        "summary" : "계약별 지급 초안 일괄 등록",
+        "tags" : [
+          "수수료 지급 건"
+        ]
       }
     },
     "/api/v1/transactions/{paymentId}" : {

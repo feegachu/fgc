@@ -19,3 +19,5 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+.payment-registration-comparison { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--color-border-default); border-radius: 8px; background: var(--color-fgc-surface); }
+.payment-registration-comparison .button { min-width: 76px; }
