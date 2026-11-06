@@ -152,6 +152,40 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("순위 표기와 상품 이름이 같은 문장에서 서로 다른 상품을 가리키면 거절한다")
+    void rankLabelAndNameMustPointAtTheSameProduct() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("1위는 나보험 튼튼건강이에요. 환수 부담이 작아서 앞섰어요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 가보험 든든건강이에요. 환수 부담이 작아서 앞섰어요.")).isNull();
+        // 한쪽이 다른 쪽에 포함되면 어긋난 말이 아니다.
+        assertThat(tools.verify("1위는 가보험 든든건강이고 나보험 튼튼건강과 함께 비교했어요.")).isNull();
+        assertThat(tools.verify("1위 가보험 든든건강과 3위 편한건강은 환수 부담이 달라요.")).isNull();
+        assertThat(tools.verify("1위와 2위는 나보험 튼튼건강과 다보험 편한건강이에요.")).isEqualTo("RANK_MISMATCH");
+    }
+
+    @Test
+    @DisplayName("'한도에 걸렸다'는 말한 상품 모두에 이월이 있어야 맞고, 섞인 주장은 판단하지 않는다")
+    void capStateClaimsNeedEveryMentionedProductToCarryOver() {
+        CompareRankingResponse base = ranking();
+        Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 100_000, 16_000, 634_000, 80.0, null, List.of());
+        Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());
+        CompareAskTools tools = new CompareAskTools(new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                base.warnings(), null, List.of(first, second, third), List.of(), CompareRankingFilters.NONE));
+        tools.run("get_item", RANK_1);
+
+        assertThat(tools.verify("모든 상품이 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강 모두 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸렸어요.")).isNull();
+        assertThat(tools.verify("모든 상품이 한도를 초과하지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 한도를 초과하지 않았어요.")).isNull();
+        // 서로 다른 주장이 한 문장에 섞이면 판단하지 않는다.
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸렸고 가보험 든든건강은 걸리지 않았어요.")).isNull();
+    }
+
+    @Test
     @DisplayName("금액·비율이 든 문장만 빼고 나머지 설명을 남긴다")
     void onlyNumberSentencesAreDropped() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);

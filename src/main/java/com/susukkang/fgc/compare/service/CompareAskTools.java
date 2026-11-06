@@ -82,8 +82,10 @@ final class CompareAskTools {
     /** '한도에 걸렸다·도달했다·초과했다' 처럼 한도에 닿았다는 주장. 조사가 없는 '한도 초과 시'(설명)는 잡지 않는다. */
     private static final Pattern CAP_HIT = Pattern.compile("한도(?:에|를|까지)\\s*(?:걸|도달|초과|넘|닿)(?!는|하는)");
     /** 상품을 짚지 않은 문장은 "모든/전체 상품"처럼 전체를 말할 때만 상태 주장으로 본다(용어 설명의 "한도를 넘는 금액은…"은 제외). */
-    private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체|상품");
+    private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체");
     private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
+    /** 한 문장에 한도 도달 표현이 둘 이상이면('1위는 걸렸고 2위는 걸리지 않았어요') 주장이 섞여 있어 판단하지 않는다. */
+    private static final Pattern CAP_VERB = Pattern.compile("걸리|걸려|걸렸|걸린|도달|초과|넘|닿");
     private static final Pattern NEGATION = Pattern.compile("않|없|못|아니");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
     /** '커요'는 '크다'의 활용이라 '크'로는 잡히지 않는다. */
@@ -321,7 +323,10 @@ final class CompareAskTools {
         while (start < normalized.length()) {
             int end = ends.find() ? ends.start() : normalized.length();
             String sentence = normalized.substring(start, end);
-            String reason = verifySuperlative(sentence);
+            String reason = verifyRankNames(sentence);
+            if (reason == null) {
+                reason = verifySuperlative(sentence);
+            }
             if (reason == null) {
                 reason = verifyCapState(sentence);
             }
@@ -388,9 +393,59 @@ final class CompareAskTools {
         if (mentioned.isEmpty() && !ALL_SCOPE.matcher(sentence).find()) {
             return null;
         }
-        boolean anyCarry = scope.stream().anyMatch(item -> item.carryover() > 0);
+        if (countMatches(CAP_VERB, sentence) > 1) {
+            return null;
+        }
         boolean negated = NEGATION.matcher(sentence.substring(hit.end())).find();
-        return negated == anyCarry ? "CAP_STATE_MISMATCH" : null;
+        // 걸렸다는 말은 말한 상품 모두에 이월이 있어야 맞고, 걸리지 않았다는 말은 하나도 없어야 맞다.
+        boolean holds = negated ? scope.stream().noneMatch(item -> item.carryover() > 0)
+                : scope.stream().allMatch(item -> item.carryover() > 0);
+        return holds ? null : "CAP_STATE_MISMATCH";
+    }
+
+    private static int countMatches(Pattern pattern, String text) {
+        Matcher m = pattern.matcher(text);
+        int count = 0;
+        while (m.find()) {
+            count++;
+        }
+        return count;
+    }
+
+    /**
+     * 같은 문장에 순위 표기('1위')와 상품 이름이 함께 있으면 둘이 같은 상품을 가리켜야 한다.
+     * 한쪽이 다른 쪽에 포함되면('1위는 가보험이고 나보험보다…') 맞는 말로 보고, 서로 어긋나면 틀린 말이다.
+     */
+    private String verifyRankNames(String sentence) {
+        String normalized = Normalizer.normalize(sentence, Normalizer.Form.NFKC);
+        Set<Integer> byLabel = ranksByLabel(normalized);
+        Set<Integer> byName = ranksByName(normalized);
+        if (byLabel.isEmpty() || byName.isEmpty() || byLabel.containsAll(byName) || byName.containsAll(byLabel)) {
+            return null;
+        }
+        return "RANK_MISMATCH";
+    }
+
+    private Set<Integer> ranksByLabel(String normalized) {
+        Set<Integer> ranks = new HashSet<>();
+        Matcher label = RANK_LABEL.matcher(normalized);
+        while (label.find()) {
+            int rank = Integer.parseInt(label.group(1));
+            if (find(rank) != null) {
+                ranks.add(rank);
+            }
+        }
+        return ranks;
+    }
+
+    private Set<Integer> ranksByName(String normalized) {
+        Set<Integer> ranks = new HashSet<>();
+        for (Item item : ranking.items()) {
+            if (nameMention(normalized, item) >= 0) {
+                ranks.add(item.rank());
+            }
+        }
+        return ranks;
     }
 
     private String verifyComparisonSentence(String sentence) {
@@ -494,11 +549,7 @@ final class CompareAskTools {
         if (item == null) {
             return -1;
         }
-        int product = ProductNames.find(ranking.items(), part).stream()
-                .filter(m -> m.rank() == item.rank()).mapToInt(ProductNames.Mention::at).findFirst().orElse(-1);
-        boolean insurerUnique = ranking.items().stream().filter(o -> same(o.insurer(), item.insurer())).count() == 1;
-        int insurer = insurerUnique ? indexOf(part, item.insurer()) : -1;
-        int best = earliest(product, insurer);
+        int best = nameMention(part, item);
         Matcher label = RANK_LABEL.matcher(part);
         while (label.find()) {
             if (Integer.parseInt(label.group(1)) == item.rank()) {
@@ -506,6 +557,15 @@ final class CompareAskTools {
             }
         }
         return best;
+    }
+
+    /** 순위 표기를 빼고 이름(상품·보험사)만으로 찾은 첫 위치. 없으면 -1. */
+    private int nameMention(String part, Item item) {
+        int product = ProductNames.find(ranking.items(), part).stream()
+                .filter(m -> m.rank() == item.rank()).mapToInt(ProductNames.Mention::at).findFirst().orElse(-1);
+        boolean insurerUnique = ranking.items().stream().filter(o -> same(o.insurer(), item.insurer())).count() == 1;
+        int insurer = insurerUnique ? indexOf(part, item.insurer()) : -1;
+        return earliest(product, insurer);
     }
 
     /** 두 위치 중 먼저 나온 것. 음수(없음)는 건너뛴다. 둘 다 없으면 -1. */
