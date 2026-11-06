@@ -413,39 +413,52 @@ final class CompareAskTools {
     }
 
     /**
-     * 같은 문장에 순위 표기('1위')와 상품 이름이 함께 있으면 둘이 같은 상품을 가리켜야 한다.
-     * 한쪽이 다른 쪽에 포함되면('1위는 가보험이고 나보험보다…') 맞는 말로 보고, 서로 어긋나면 틀린 말이다.
+     * 같은 문장에서 순위 표기('1위') 뒤에 나온 상품 이름이 그 순위의 상품이어야 한다. 집합이 아니라 짝을 본다(순위를 맞바꾼 문장 거절).
+     * 표기 사이에 이름이 없는 연속 표기('1위와 2위는 A와 B')는 한 묶음으로 보고 순서대로 짝짓는다.
+     * 묶음보다 이름이 적으면('1위보다 2위가 A') 누구를 가리키는지 알 수 없으니 판단하지 않는다.
      */
     private String verifyRankNames(String sentence) {
         String normalized = Normalizer.normalize(sentence, Normalizer.Form.NFKC);
-        Set<Integer> byLabel = ranksByLabel(normalized);
-        Set<Integer> byName = ranksByName(normalized);
-        if (byLabel.isEmpty() || byName.isEmpty() || byLabel.containsAll(byName) || byName.containsAll(byLabel)) {
-            return null;
-        }
-        return "RANK_MISMATCH";
-    }
-
-    private Set<Integer> ranksByLabel(String normalized) {
-        Set<Integer> ranks = new HashSet<>();
+        List<int[]> labels = new ArrayList<>();
         Matcher label = RANK_LABEL.matcher(normalized);
         while (label.find()) {
             int rank = Integer.parseInt(label.group(1));
             if (find(rank) != null) {
-                ranks.add(rank);
+                labels.add(new int[] {rank, label.start(), label.end()});
             }
         }
-        return ranks;
+        int i = 0;
+        while (i < labels.size()) {
+            int j = i;
+            while (j + 1 < labels.size() && namesInOrder(normalized.substring(labels.get(j)[2], labels.get(j + 1)[1])).isEmpty()) {
+                j++;
+            }
+            int regionEnd = j + 1 < labels.size() ? labels.get(j + 1)[1] : normalized.length();
+            List<Integer> names = namesInOrder(normalized.substring(labels.get(j)[2], regionEnd));
+            int size = j - i + 1;
+            if (names.size() >= size) {
+                for (int k = 0; k < size; k++) {
+                    if (names.get(k) != labels.get(i + k)[0]) {
+                        return "RANK_MISMATCH";
+                    }
+                }
+            }
+            i = j + 1;
+        }
+        return null;
     }
 
-    private Set<Integer> ranksByName(String normalized) {
-        Set<Integer> ranks = new HashSet<>();
+    /** 글에서 이름(상품·보험사)으로 가리킨 순위를 처음 나온 순서대로. 순위 표기는 보지 않는다. */
+    private List<Integer> namesInOrder(String part) {
+        List<int[]> found = new ArrayList<>();
         for (Item item : ranking.items()) {
-            if (nameMention(normalized, item) >= 0) {
-                ranks.add(item.rank());
+            int at = nameMention(part, item);
+            if (at >= 0) {
+                found.add(new int[] {at, item.rank()});
             }
         }
-        return ranks;
+        found.sort((x, y) -> Integer.compare(x[0], y[0]));
+        return found.stream().map(f -> f[1]).toList();
     }
 
     private String verifyComparisonSentence(String sentence) {

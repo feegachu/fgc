@@ -162,6 +162,13 @@ class CompareAskToolsTest {
         assertThat(tools.verify("1위는 가보험 든든건강이고 나보험 튼튼건강과 함께 비교했어요.")).isNull();
         assertThat(tools.verify("1위 가보험 든든건강과 3위 편한건강은 환수 부담이 달라요.")).isNull();
         assertThat(tools.verify("1위와 2위는 나보험 튼튼건강과 다보험 편한건강이에요.")).isEqualTo("RANK_MISMATCH");
+        // 순위를 맞바꾸거나, 포함 관계여도 1위를 다른 상품이라고 한 문장은 짝이 틀린 말이다.
+        assertThat(tools.verify("1위는 나보험 튼튼건강이고 2위는 가보험 든든건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 나보험 튼튼건강이고 가보험 든든건강과 비교했어요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 가보험 든든건강이고 2위는 나보험 튼튼건강이에요.")).isNull();
+        assertThat(tools.verify("1위와 2위는 가보험 든든건강과 나보험 튼튼건강이에요.")).isNull();
+        // 이름이 묶음보다 적으면 판단하지 않는다.
+        assertThat(tools.verify("1위보다 2위가 나보험 튼튼건강이에요.")).isNull();
     }
 
     @Test
