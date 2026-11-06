@@ -2,6 +2,9 @@ package com.susukkang.fgc.dashboard.controller;
 
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
+import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.dashboard.dto.DashboardCommissionResponse;
 import com.susukkang.fgc.dashboard.dto.DashboardSummaryResponse;
 import com.susukkang.fgc.dashboard.dto.DashboardSummaryResult;
 import com.susukkang.fgc.dashboard.service.DashboardService;
@@ -50,23 +53,28 @@ public class DashboardController {
             @Parameter(description = "기준월(yyyy-MM). 생략하면 이번 달", example = "2026-07")
             @RequestParam(required = false) String month) {
 
-        // month 미입력 시 화면정의서 DASH-W01 "기본값은 이번 달" 규칙에 따라 오늘이 속한 달을 쓴다.
-        // month가 있을 때만 형식을 검증한다 — "2026-07" → LocalDate(그 달 1일, 2026-07-01)로 변환.
-        LocalDate targetMonth;
-        if (month == null) {
-            targetMonth = YearMonth.now().atDay(1);
-        } else {
-            try {
-                targetMonth = YearMonth.parse(month).atDay(1);
-            } catch (DateTimeException e) {
-                throw new FgcBusinessException(FgcErrorCode.COMMON_002, "month", Map.of("field", "month"), null);
-            }
-        }
-
-        DashboardSummaryResult result = dashboardService.summarize(targetMonth);
+        DashboardSummaryResult result = dashboardService.summarize(targetMonth(month));
 
         DashboardSummaryResponse response = DashboardSummaryResponse.from(result);
 
         return ApiResponse.success(response);
+    }
+
+    @Operation(summary = "최근 6개월 수수료 조회",
+            description = "선택한 정산월까지 최근 6개월의 확정 지급을 계약 귀속액 기준으로 집계한다. 지급이 없는 월은 0원으로 반환한다.")
+    @GetMapping("/monthly-commissions")
+    @PreAuthorize(Roles.ANY_ROLE)
+    public ApiResponse<DashboardCommissionResponse> monthlyCommissions(
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.monthlyCommissions(targetMonth(month)));
+    }
+
+    /** 명시된 기준월은 보존하고 생략 시에는 서울 시간대의 이번 달을 선택한다. */
+    private LocalDate targetMonth(String month) {
+        try {
+            return (month == null ? YearMonth.now(DateUtil.SEOUL_ZONE) : YearMonth.parse(month)).atDay(1);
+        } catch (DateTimeException e) {
+            throw new FgcBusinessException(FgcErrorCode.COMMON_002, "month", Map.of("field", "month"), null);
+        }
     }
 }

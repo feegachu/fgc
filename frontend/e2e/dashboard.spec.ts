@@ -6,139 +6,125 @@ const unavailable = {
   status: 500,
   json: { data: null, error: { code: 'FGC-COMMON-500', message: '처리 중 오류가 발생했습니다.' }, requestId: 'dashboard-fixture' },
 }
-const agentRow = (index: number) => ({
-  agentId: index,
-  agentName: `설계사${index}`,
-  agentCode: `D12-A-${String(index).padStart(4, '0')}`,
-  organizationName: '가상지점 01 1팀',
-  agentStatusLabel: index === 600 ? '해촉' : '활동',
-})
-const home = {
-  asOf: '2026-11-04',
-  agents: { registered: 560, active: 540, terminated: 40 },
+const branches = {
+  month: '2026-07-01', asOf: '2026-07-31',
   branches: Array.from({ length: 12 }, (_, index) => ({
-    organizationId: index + 1,
-    name: `가상지점 ${String(index + 1).padStart(2, '0')}`,
-    agentCount: 46,
-    activeContractCount: 1000,
-    attentionCount: index === 0 ? 10 : 0,
+    organizationId: index + 1, name: `가상지점 ${String(index + 1).padStart(2, '0')}`,
+    registeredAgents: 46, activeAgents: 42, newContracts: 20, validContracts: 1000,
+    gaAmount: 9000000 - index * 100000, agentAmount: 6000000, openExceptions: index === 0 ? 10 : 0,
   })),
-  attentionTotal: 10,
-  attentionAgents: Array.from({ length: 10 }, (_, index) => ({
-    agentId: index + 1,
-    name: `설계사${index + 1}`,
-    code: `D12-A-${String(index + 1).padStart(4, '0')}`,
-    branch: '가상지점 01',
-    status: index === 9 ? 'TERMINATED' : 'ACTIVE',
-    statusLabel: index === 9 ? '해촉' : '활동',
-    contractCount: 20 - index,
-    reasons: [
-      { code: 'OPEN_EXCEPTION', label: '미처리 예외', count: 2 },
-      { code: 'NEAR_LIMIT', label: '한도 근접', count: 1 },
-      { code: 'RECENT_STATUS_CHANGE', label: '최근 상태 변화', count: 1 },
-    ],
-  })),
-  basis: '유효 계약은 기준일 상태가 정상, 미납, 부활인 계약입니다.',
 }
+const commissions = { months: [
+  { month: '2026-06-01', gaAmount: 12000000, agentAmount: 8000000 },
+  { month: '2026-07-01', gaAmount: 15000000, agentAmount: 10000000 },
+] }
 
-async function session(page: Page, overrides: { home?: boolean; counts?: boolean } = {}) {
+async function session(page: Page, overrides: { branches?: boolean; counts?: boolean } = {}) {
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
     const path = url.pathname
     if (path.endsWith('/auth/refresh'))
       return route.fulfill({ json: envelope({ accessToken: 'dashboard-fixture', tokenType: 'Bearer', expiresIn: 1800 }) })
     if (path.endsWith('/auth/me'))
-      return route.fulfill({
-        json: envelope({ loginId: 'settle01', userName: '정산 담당자', roleCode: 'SETTLEMENT', canProcess: true, demoMonth: '2026-07' }),
-      })
+      return route.fulfill({ json: envelope({ loginId: 'settle01', userName: '정산 담당자', roleCode: 'SETTLEMENT', canProcess: true, demoMonth: '2026-07' }) })
     if (path.endsWith('/dashboard/summary'))
-      return route.fulfill({
-        json: envelope({
-          month: '2026-07-01',
-          capViolation: 3,
-          capWarning: 2,
-          arbitrageCandidate: 6,
-          reconMismatch: 29,
-          journalImbalance: 0,
-          openException: 41,
-          recentExceptions: [],
-          recentRuns: [],
-        }),
-      })
+      return route.fulfill({ json: envelope({
+        month: '2026-07-01', capViolation: 3, capWarning: 2, arbitrageCandidate: 6,
+        reconMismatch: 29, journalImbalance: 0, openException: 41,
+        recentExceptions: [1, 2, 3].map(id => ({
+          exceptionCaseId: id, severity: 'HIGH', severityLabel: '높음', exceptionType: 'CAP_VIOLATION',
+          contractNo: `C-${id}`, title: `예외-${id}`, status: 'NEW', statusLabel: '신규', createdAt: '2026-07-10T15:30:00Z',
+        })), recentRuns: [],
+      }) })
     if (path.endsWith('/exceptions/counts'))
       return route.fulfill(overrides.counts === false ? unavailable : { json: envelope({ total: 41, bySeverity: [], byType: [] }) })
-    if (path.endsWith('/home/summary'))
-      return route.fulfill(overrides.home === false ? unavailable : { json: envelope(home) })
-    if (path.endsWith('/base/agents')) {
-      const keyword = url.searchParams.get('keyword')
-      if (keyword === '없는사람')
-        return route.fulfill({ json: envelope({ content: [], page: 1, size: 10, totalElements: 0, totalPages: 0 }) })
-      const content = keyword ? [agentRow(600)] : Array.from({ length: 10 }, (_, index) => agentRow(index + 1))
-      return route.fulfill({
-        json: envelope({ content, page: 1, size: 10, totalElements: keyword ? 1 : 600, totalPages: keyword ? 1 : 60 }),
-      })
+    if (path.endsWith('/dashboard/branches'))
+      return route.fulfill(overrides.branches === false ? unavailable : { json: envelope(branches) })
+    if (path.endsWith('/dashboard/monthly-commissions'))
+      return route.fulfill({ json: envelope(commissions) })
+    if (path.endsWith('/dashboard/branch-details')) {
+      const current = Number(url.searchParams.get('page'))
+      return route.fulfill({ json: envelope({
+        content: [{ id: current, label: `설계사-${current}`, detail: `A-00${current}`, status: 'ACTIVE' }],
+        page: current, size: 10, totalPages: 2, totalElements: 11,
+      }) })
     }
     return route.fulfill({ json: envelope({ content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 }) })
   })
 }
 
-test('FUN-080 현황 영역은 기존 배치 아래에 더해지고 준비 중이나 자료 영역을 만들지 않는다', async ({ page }) => {
+test('관리자 최종 화면은 이전 설정과 관계없이 두 막대 차트와 KPI를 표시한다', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fgc.ui-revision.v1', 'before'))
   await session(page)
   await page.goto('?month=2026-07')
   await expect(page.getByRole('region', { name: '주요 검증 지표' }).getByRole('link')).toHaveCount(6)
-  await expect(page.getByRole('heading', { name: '최근 예외' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /변경 전|변경 후/ })).toHaveCount(0)
+  const monthly = page.getByRole('region', { name: '월별 수수료' })
+  await expect(monthly.getByText('15,000,000원', { exact: true })).toBeVisible()
+  await expect(monthly.getByText('전월 대비 25.0% 증가')).toHaveCount(2)
+  const region = page.getByRole('region', { name: '지점별 현황' })
+  await expect(region.getByRole('button', { name: /수수료 상세 보기/ })).toHaveCount(12)
   await expect(page.getByRole('heading', { name: '검증 항목별 건수 비중' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '최근 통합검증 실행' })).toBeVisible()
-  const region = page.getByRole('region', { name: 'GA·설계사 현황' })
-  await expect(region.getByRole('region', { name: '등록 설계사' })).toContainText('560')
-  await expect(region.getByRole('table', { name: '확인할 설계사 상위 10명' }).getByRole('row')).toHaveCount(11)
-  await expect(page.getByText('기준 정산월 2026년 7월')).toBeVisible()
-  await expect(region.getByLabel('현황 기준일')).toBeVisible()
-  await expect(page.getByText(/자료마당|공지|문의|준비 중/)).toHaveCount(0)
-  // 첫 화면의 검증 지표가 현황보다 위에 남는다.
+  await expect(page.getByRole('link', { name: '보험GA협회 홈페이지 열기 (새 탭)' })).toHaveAttribute('href', 'https://www.igaa.or.kr/')
   const kpiBox = await page.getByRole('region', { name: '주요 검증 지표' }).boundingBox()
-  const overviewBox = await region.boundingBox()
-  expect(kpiBox!.y).toBeLessThan(overviewBox!.y)
+  const branchBox = await region.boundingBox()
+  expect(kpiBox!.y).toBeLessThan(branchBox!.y)
+  const table = page.getByRole('table', { name: '최근 예외 목록' })
+  await expect(table.getByRole('row')).toHaveCount(3)
+  await expect(table.getByRole('link')).toHaveText(['예외-1', '예외-2'])
+  await expect(table.getByRole('link')).toHaveText(['예외-2', '예외-3'], { timeout: 7000 })
+  expect(await table.locator('..').evaluate(el => el.scrollHeight - el.clientHeight)).toBe(0)
 })
 
-test('현황 오류는 그 영역에만 재시도를 보이고 0을 지어내지 않는다', async ({ page }) => {
-  await session(page, { home: false, counts: false })
+test('지점 조회 오류는 해당 영역에서 재시도하고 다른 지표를 유지한다', async ({ page }) => {
+  const state = { branches: false, counts: false }
+  await session(page, state)
   await page.goto('?month=2026-07')
-  const region = page.getByRole('region', { name: 'GA·설계사 현황' })
+  const region = page.getByRole('region', { name: '지점별 현황' })
   await expect(region.getByRole('alert')).toContainText('처리 중 오류가 발생했습니다.')
-  await expect(region.getByRole('button', { name: '다시 시도' })).toBeVisible()
-  await expect(region.getByRole('region', { name: '등록 설계사' })).toHaveCount(0)
+  await expect(region.getByRole('button', { name: /상세 보기/ })).toHaveCount(0)
   const kpis = page.getByRole('region', { name: '주요 검증 지표' })
   await expect(kpis.getByRole('link', { name: '1,200% 위반 3건' })).toBeVisible()
   await expect(kpis.getByRole('button', { name: '미처리 예외 다시 불러오기' })).toBeVisible()
   await expect(kpis.getByRole('link', { name: /미처리 예외/ })).toHaveCount(0)
+  state.branches = true
+  await region.getByRole('button', { name: '다시 시도' }).click()
+  await expect(region.getByRole('button', { name: /수수료 상세 보기/ })).toHaveCount(12)
 })
 
-test('설계사 찾기는 키보드로 끝까지 쓸 수 있고 고른 설계사의 계약 목록을 연다', async ({ page }) => {
+test('지표와 막대는 키보드로 선택하고 지점 상세 페이지를 넘길 수 있다', async ({ page }) => {
   await session(page)
   await page.goto('?month=2026-07')
-  const search = page.getByRole('region', { name: '설계사 찾기' })
-  await expect(search.getByRole('table')).toHaveCount(0)
-  await search.getByLabel('이름 또는 코드').fill('없는사람')
-  await search.getByLabel('이름 또는 코드').press('Enter')
-  await expect(search.getByText('조건에 맞는 설계사가 없습니다')).toBeVisible()
-  await search.getByLabel('이름 또는 코드').fill('D12-A-0600')
-  await search.getByLabel('이름 또는 코드').press('Enter')
-  const link = search.getByRole('link', { name: '설계사600 (D12-A-0600) 계약 목록 열기' })
-  await link.focus()
+  const region = page.getByRole('region', { name: '지점별 현황' })
+  await region.getByRole('button', { name: '설계사', exact: true }).focus()
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL(/\/contracts\?agentId=600&contractDateTo=\d{4}-\d{2}-\d{2}&month=2026-07/)
+  const branch = region.getByRole('button', { name: '가상지점 01 설계사 상세 보기' })
+  await branch.focus()
+  const request = page.waitForRequest('**/dashboard/branch-details?month=2026-07&organizationId=1&metric=AGENTS&page=1')
+  await page.keyboard.press('Enter')
+  await request
+  const dialog = page.getByRole('dialog', { name: '가상지점 01 · 설계사 상세' })
+  await expect(dialog.getByText('설계사-1')).toBeVisible()
+  await dialog.getByRole('button', { name: '2', exact: true }).click()
+  await expect(dialog.getByText('설계사-2')).toBeVisible()
+  await expect(dialog.getByRole('group', { name: '지점 상세 페이지 이동' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(branch).toBeFocused()
 })
 
-test('모바일 폭에서 페이지가 가로로 넘치지 않는다', async ({ page }) => {
+test('지점이 많은 모바일 화면도 페이지가 가로로 넘치지 않는다', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await session(page)
   await page.goto('?month=2026-07')
-  const region = page.getByRole('region', { name: 'GA·설계사 현황' })
-  await expect(region.getByRole('table', { name: '확인할 설계사 상위 10명' })).toBeVisible()
-  await region.getByLabel('지점', { exact: true }).selectOption({ label: '가상지점 01' })
-  await region.getByRole('button', { name: '조회' }).click()
-  await expect(region.getByRole('table', { name: '설계사 검색 결과' })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
+  const region = page.getByRole('region', { name: '지점별 현황' })
+  await expect(region.getByRole('button', { name: /수수료 상세 보기/ })).toHaveCount(12)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
+  await region.getByRole('button', { name: '설계사', exact: true }).click()
+  await region.getByRole('button', { name: '가상지점 01 설계사 상세 보기' }).click()
+  const dialog = page.getByRole('dialog', { name: '가상지점 01 · 설계사 상세' })
+  await expect(dialog.getByText('설계사-1')).toBeVisible()
+  const bounds = await dialog.boundingBox()
+  expect(bounds!.x).toBeGreaterThanOrEqual(0)
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
 })

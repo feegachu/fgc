@@ -296,6 +296,127 @@ class HomeSummaryApiIntegrationTest {
         return mvc.perform(asOf == null ? request : request.param("asOf", asOf));
     }
 
+    @Test
+    void branchMetricsAndDetailsUseTheSameTeamAndHistoricalContractScope() throws Exception {
+        mvc.perform(get("/api/v1/dashboard/branches").param("month", "1999-06").with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.asOf").value(AS_OF))
+                .andExpect(jsonPath("$.data.branches[?(@.organizationId == " + branchA + ")].registeredAgents").value(contains(4)))
+                .andExpect(jsonPath("$.data.branches[?(@.organizationId == " + branchA + ")].activeAgents").value(contains(1)))
+                .andExpect(jsonPath("$.data.branches[?(@.organizationId == " + branchA + ")].newContracts").value(contains(0)))
+                .andExpect(jsonPath("$.data.branches[?(@.organizationId == " + branchA + ")].validContracts").value(contains(6)))
+                .andExpect(jsonPath("$.data.branches[?(@.organizationId == " + branchA + ")].openExceptions").value(contains(5)));
+        for (var metricAndCount : List.of(new String[]{"AGENTS", "4"}, new String[]{"CONTRACTS", "6"}, new String[]{"EXCEPTIONS", "5"})) {
+            mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06")
+                            .param("organizationId", String.valueOf(branchA)).param("metric", metricAndCount[0])
+                            .with(user(principal("SETTLEMENT"))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.totalElements").value(Integer.parseInt(metricAndCount[1])));
+        }
+        for (int i = 0; i < 12; i++) agent("IT-H-PAGE-" + i, "추가설계사", branchA, "1999-01-01", null, "ACTIVE", true);
+        for (String page : List.of("2", "99")) {
+            mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06")
+                            .param("organizationId", String.valueOf(branchA)).param("metric", "AGENTS").param("page", page)
+                            .with(user(principal("SETTLEMENT"))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(16))
+                    .andExpect(jsonPath("$.data.page").value(2))
+                    .andExpect(jsonPath("$.data.totalPages").value(2))
+                    .andExpect(jsonPath("$.data.content.length()").value(6));
+        }
+    }
+
+    @Test
+    void branchCommissionsSumOnlyTheirConfirmedContractAttributions() throws Exception {
+        long first = jdbc.queryForObject("SELECT contract_id FROM fgc.insurance_contract WHERE contract_no='IT-H-C1'", Long.class);
+        long second = jdbc.queryForObject("SELECT contract_id FROM fgc.insurance_contract WHERE contract_no='IT-H-C8'", Long.class);
+        branchPayment(first, second, "1999-06-01", "INSURER_TO_GA", "PAYMENT", true, 300, 700);
+        branchPayment(first, second, "1999-06-01", "GA_TO_FC", "PAYMENT", true, 100, 200);
+        branchPayment(first, second, "1999-06-01", "GA_TO_FC", "PAYMENT", false, 1000, 2000);
+        branchPayment(first, second, "1999-06-01", "INSURER_TO_GA", "DEDUCTION", true, 20, 30);
+        branchPayment(first, second, "1999-07-01", "INSURER_TO_GA", "PAYMENT", true, 900, 900);
+        mvc.perform(get("/api/v1/dashboard/branches").param("month", "1999-06").with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.branches[?(@.organizationId == " + branchA + ")].gaAmount").value(contains(300.0)))
+                .andExpect(jsonPath("$.data.branches[?(@.organizationId == " + branchA + ")].agentAmount").value(contains(100.0)));
+        mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06")
+                        .param("organizationId", String.valueOf(branchA)).param("metric", "COMMISSIONS")
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].label").value("IT-H-C1"))
+                .andExpect(jsonPath("$.data.content[0].value").value(300))
+                .andExpect(jsonPath("$.data.content[0].secondaryValue").value(100));
+    }
+
+    @Test
+    void branchEndpointsRejectAgentRoleAndInvalidInput() throws Exception {
+        for (String path : List.of("branches", "branch-details", "monthly-commissions")) {
+            mvc.perform(get("/api/v1/dashboard/" + path).param("month", "1999-06")
+                            .param("organizationId", String.valueOf(branchA)).param("metric", "AGENTS")
+                            .with(user(principal("AGENT"))))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(get("/api/v1/dashboard/branches").param("month", "bad").with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06").param("organizationId", "0")
+                        .param("metric", "AGENTS").with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    /** FGC-FUN-080: 필수 입력과 열거형·숫자 바인딩 오류는 동일한 입력 오류 계약을 지킨다. */
+    @ParameterizedTest
+    @ValueSource(strings = {"metric=BAD", "page=0", "page=abc", "month=bad", "month", "organizationId=0", "organizationId=abc"})
+    void branchDetailsRejectInvalidOrMissingParameters(String invalid) throws Exception {
+        var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
+        params.set("month", "1999-06");
+        params.set("organizationId", String.valueOf(branchA));
+        params.set("metric", "AGENTS");
+        String[] fieldAndValue = invalid.split("=", 2);
+        if (fieldAndValue.length == 1) params.remove(fieldAndValue[0]);
+        else params.set(fieldAndValue[0], fieldAndValue[1]);
+        mvc.perform(get("/api/v1/dashboard/branch-details").params(params).with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+    }
+
+    /** FGC-FUN-080: 없는 지점은 요청 페이지와 관계없이 빈 첫 페이지를 반환한다. */
+    @Test
+    void missingBranchReturnsEmptyFirstPage() throws Exception {
+        mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06")
+                        .param("organizationId", String.valueOf(Long.MAX_VALUE)).param("metric", "AGENTS").param("page", "99")
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(0))
+                .andExpect(jsonPath("$.data.totalElements").value(0))
+                .andExpect(jsonPath("$.data.content").isEmpty());
+    }
+
+    /** FGC-FUN-080: 미래 정산월의 인원·유효 계약 기준일은 서울의 오늘을 넘지 않는다. */
+    @Test
+    void futureBranchMonthUsesTodayInSeoul() throws Exception {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        mvc.perform(get("/api/v1/dashboard/branches").param("month", java.time.YearMonth.from(today).plusMonths(1).toString())
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.asOf").value(today.toString()));
+    }
+
+    private void branchPayment(long first, long second, String month, String stage, String flow, boolean confirmed, int firstAmount, int secondAmount) {
+        long payment = jdbc.queryForObject("""
+                INSERT INTO fgc.commission_transaction(payment_stage, source_type, source_business_key,
+                    recipient_agent_id, commission_item_id, settlement_month, amount, cashflow_type, status)
+                VALUES (?, 'GA_MANUAL_PAYMENT', ?, ?, (SELECT MIN(commission_item_id) FROM fgc.commission_item), CAST(? AS date), ?, ?, 'DRAFT')
+                RETURNING commission_transaction_id
+                """, Long.class, stage, "IT-BRANCH-" + java.util.UUID.randomUUID(), agent1, month, firstAmount + secondAmount, flow);
+        jdbc.update("""
+                INSERT INTO fgc.transaction_attribution(commission_transaction_id, attribution_seq, attribution_scope,
+                    contract_id, attribution_date, attribution_month, attributed_amount, inclusion_status_snapshot, attribution_method)
+                VALUES (?, 1, 'CONTRACT', ?, CAST(? AS date), CAST(? AS date), ?, 'INCLUDED', 'DIRECT'),
+                       (?, 2, 'CONTRACT', ?, CAST(? AS date), CAST(? AS date), ?, 'INCLUDED', 'DIRECT')
+                """, payment, first, month, month, firstAmount, payment, second, month, month, secondAmount);
+        if (confirmed) jdbc.update("UPDATE fgc.commission_transaction SET status='CONFIRMED' WHERE commission_transaction_id=?", payment);
+    }
+
     private MockHttpServletRequestBuilder agents() {
         return get("/api/v1/base/agents").param("asOf", AS_OF).with(user(principal("SETTLEMENT")));
     }
