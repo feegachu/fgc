@@ -3,6 +3,7 @@ package com.susukkang.fgc.contract.dto;
 import com.susukkang.fgc.common.code.ContractStatus;
 import com.susukkang.fgc.common.code.PaymentCycleCode;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -50,12 +51,15 @@ public class ContractUpdateRequest implements ContractInput {
     private PaymentCycleCode paymentCycleCode; // 보험료 납입 주기
     @NotNull
     @PositiveOrZero
+    @Digits(integer = 11, fraction = 2)
     private BigDecimal premiumPerCycleAmount; // 주기 보험료
     @NotNull
     @PositiveOrZero
+    @Digits(integer = 11, fraction = 2)
     private BigDecimal firstPremiumAmount; // 초회 보험료
     @NotNull
     @PositiveOrZero
+    @Digits(integer = 11, fraction = 2)
     private BigDecimal monthlyEquivalentFirstPremium; //월납 환산 보험료
     @NotNull
     @Positive

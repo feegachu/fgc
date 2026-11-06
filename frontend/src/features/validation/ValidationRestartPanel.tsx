@@ -4,7 +4,7 @@ import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { apiClient } from '../../lib/api/client'
 import { ApiError } from '../../lib/api/errors'
-import { errorText } from '../../lib/format'
+import { dateTime, errorText } from '../../lib/format'
 
 export interface Restartability {
   allowed: boolean
@@ -154,13 +154,9 @@ export function ValidationRestartPanel({
           <caption>재시도 이력</caption>
           <thead>
             <tr>
-              <th>번호</th>
-              <th>요청자</th>
               <th>요청 시각</th>
               <th>사유</th>
               <th>대상 단계</th>
-              <th>이전 실행</th>
-              <th>새 실행</th>
               <th>시작</th>
               <th>종료</th>
               <th>상태</th>
@@ -169,23 +165,11 @@ export function ValidationRestartPanel({
           <tbody>
             {history.data.map((r) => (
               <tr key={r.retryId}>
-                <td>{r.retryId}</td>
-                <td>{r.requestedBy}</td>
-                <td>{new Date(r.requestedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
+                <td>{dateTime(r.requestedAt)}</td>
                 <td>{r.reason}</td>
                 <td>{r.failedStep}단계</td>
-                <td>{r.previousBatchExecutionId}</td>
-                <td>{r.batchExecutionId ?? unstartedExecutionLabels[r.state] ?? '자료 없음'}</td>
-                <td>
-                  {r.startedAt
-                    ? new Date(r.startedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-                    : '자료 없음'}
-                </td>
-                <td>
-                  {r.finishedAt
-                    ? new Date(r.finishedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
-                    : '자료 없음'}
-                </td>
+                <td>{r.startedAt ? dateTime(r.startedAt) : unstartedExecutionLabels[r.state] ?? '자료 없음'}</td>
+                <td>{r.finishedAt ? dateTime(r.finishedAt) : '자료 없음'}</td>
                 <td>
                   {retryLabels[r.state] ?? '상태 확인 필요'}
                   {r.errorCode ? ' — 실행 실패' : ''}
