@@ -109,6 +109,7 @@ const arbitrageItems: ArbitrageRow[] = [
 export function designPreviewData(url: URL): unknown {
   const path = url.pathname
   if (path === '/api/v1/auth/me') return designPreviewUser
+  if (path === '/api/v1/base/agents') return { ...page, content: [] }
   const capDetail = /^\/api\/v1\/cap-checks\/(\d+)\/details$/.exec(path)
   if (capDetail) {
     const capCheck = capItems.find((row) => row.capCheckId === Number(capDetail[1]))

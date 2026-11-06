@@ -102,3 +102,10 @@ export const columns: TableColumn<ArbitrageRow>[] = [
   },
   { key: 'status', label: '판정', width: '7rem', align: 'center', render: (r) => <ArbitrageBadge row={r} /> },
 ]
+
+export const compactColumns = columns.map((column): TableColumn<ArbitrageRow> => column.key === 'planned' ? {
+  ...column,
+  label: '지급예정액',
+  width: '8rem',
+  render: (row) => <ArbitrageAmount value={row.plannedCommissionAmount} />,
+} : column)

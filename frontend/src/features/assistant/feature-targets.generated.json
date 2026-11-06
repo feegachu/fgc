@@ -35,6 +35,16 @@
     "element": "Link"
   },
   {
+    "id": "app.shell.sidebar.revision-after",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "button"
+  },
+  {
+    "id": "app.shell.sidebar.revision-before",
+    "file": "app/shell/Sidebar.tsx",
+    "element": "button"
+  },
+  {
     "id": "app.shell.workspace-tabs.button",
     "file": "app/shell/WorkspaceTabs.tsx",
     "element": "button"
@@ -422,6 +432,26 @@
   {
     "id": "contract.tab.schedules",
     "file": "features/contract/ContractTabs.tsx",
+    "element": "button"
+  },
+  {
+    "id": "dashboard.chart-view.branch-agents",
+    "file": "features/dashboard/ChartViewSelector.tsx",
+    "element": "button"
+  },
+  {
+    "id": "dashboard.chart-view.branch-commissions",
+    "file": "features/dashboard/ChartViewSelector.tsx",
+    "element": "button"
+  },
+  {
+    "id": "dashboard.chart-view.branch-contracts",
+    "file": "features/dashboard/ChartViewSelector.tsx",
+    "element": "button"
+  },
+  {
+    "id": "dashboard.chart-view.branch-exceptions",
+    "file": "features/dashboard/ChartViewSelector.tsx",
     "element": "button"
   },
   {
@@ -1695,6 +1725,21 @@
     "element": "KpiCard"
   },
   {
+    "id": "features.dashboard.agent-status-panel.section",
+    "file": "features/dashboard/AgentStatusPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.branch.bar-detail",
+    "file": "features/dashboard/AgentStatusPanel.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.dashboard.branch.contract-link",
+    "file": "features/dashboard/AgentStatusPanel.tsx",
+    "element": "Link"
+  },
+  {
     "id": "features.dashboard.dashboard-page.button",
     "file": "features/dashboard/RegionStatus.tsx",
     "element": "button"
@@ -1703,6 +1748,11 @@
     "id": "features.dashboard.dashboard-page.composition",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "section"
+  },
+  {
+    "id": "features.dashboard.dashboard-page.ga-association",
+    "file": "features/dashboard/DashboardPage.tsx",
+    "element": "a"
   },
   {
     "id": "features.dashboard.dashboard-page.link",
@@ -1748,6 +1798,36 @@
     "id": "features.dashboard.dashboard-page.settlement-guide",
     "file": "features/dashboard/DashboardPage.tsx",
     "element": "button"
+  },
+  {
+    "id": "features.dashboard.exception-ticker.all",
+    "file": "features/dashboard/RecentExceptionTicker.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.exception-ticker.detail",
+    "file": "features/dashboard/RecentExceptionTicker.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.dashboard.exception-ticker.section",
+    "file": "features/dashboard/RecentExceptionTicker.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.dashboard.exception-ticker.table",
+    "file": "features/dashboard/RecentExceptionTicker.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.dashboard.monthly-commissions.month",
+    "file": "features/dashboard/MonthlyCommissions.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.dashboard.monthly-commissions.section",
+    "file": "features/dashboard/MonthlyCommissions.tsx",
+    "element": "section"
   },
   {
     "id": "features.dashboard.risk-composition.link",

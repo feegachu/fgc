@@ -57,7 +57,7 @@ export function ExceptionPage() {
   const [params, setParams] = useSearchParams()
   const filters = filtersFromParams(params)
   const selectedId = params.get('selected')
-  const { month } = useOutletContext<ShellContext>()
+  const { month, revised = false } = useOutletContext<ShellContext>()
   const search = useQuery(exceptionSearchQueryOptions(filters))
   const options = useQuery(exceptionOptionsQueryOptions())
   const data = search.data
@@ -215,7 +215,7 @@ export function ExceptionPage() {
   ]
 
   return (
-    <div className="exception-page">
+    <div className={`exception-page${revised ? ' list-page' : ''}`}>
       <header className="page-header">
         <ScreenHelp screenId="EXCP-W01" />
         <div className="page-header-copy">

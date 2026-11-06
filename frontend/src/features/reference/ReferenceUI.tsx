@@ -20,6 +20,7 @@ export function ReferenceTabs<T extends string>({
   active,
   onChange,
   children,
+  actions,
   panelClassName = '',
   label = '조회 항목',
 }: {
@@ -27,47 +28,60 @@ export function ReferenceTabs<T extends string>({
   active: T
   onChange: (id: T) => void
   children: ReactNode
+  actions?: ReactNode
   panelClassName?: string
   label?: string
 }) {
   const id = useId()
+  const tabList = (
+    <div className="tab-list" role="tablist" aria-label={label}>
+      {tabs.map((tab, index) => (
+        <button
+          data-guide-feature={guideFeatureId('reference.tab', tab.id)}
+          className="tab-button"
+          key={tab.id}
+          id={`${id}-${tab.id}`}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.id}
+          aria-controls={`${id}-panel`}
+          tabIndex={active === tab.id ? 0 : -1}
+          onClick={() => onChange(tab.id)}
+          onKeyDown={(event) => {
+            const next =
+              event.key === 'ArrowRight'
+                ? (index + 1) % tabs.length
+                : event.key === 'ArrowLeft'
+                  ? (index + tabs.length - 1) % tabs.length
+                  : event.key === 'Home'
+                    ? 0
+                    : event.key === 'End'
+                      ? tabs.length - 1
+                      : null
+            if (next !== null) {
+              event.preventDefault()
+              onChange(tabs[next].id)
+              document.getElementById(`${id}-${tabs[next].id}`)?.focus()
+            }
+          }}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
   return (
     <>
-      <div className="tab-list" role="tablist" aria-label={label}>
-        {tabs.map((tab, index) => (
-          <button data-guide-feature={guideFeatureId('reference.tab', tab.id)}
-            className="tab-button"
-            key={tab.id}
-            id={`${id}-${tab.id}`}
-            type="button"
-            role="tab"
-            aria-selected={active === tab.id}
-            aria-controls={`${id}-panel`}
-            tabIndex={active === tab.id ? 0 : -1}
-            onClick={() => onChange(tab.id)}
-            onKeyDown={(event) => {
-              const next =
-                event.key === 'ArrowRight'
-                  ? (index + 1) % tabs.length
-                  : event.key === 'ArrowLeft'
-                    ? (index + tabs.length - 1) % tabs.length
-                    : event.key === 'Home'
-                      ? 0
-                      : event.key === 'End'
-                        ? tabs.length - 1
-                        : null
-              if (next !== null) {
-                event.preventDefault()
-                onChange(tabs[next].id)
-                document.getElementById(`${id}-${tabs[next].id}`)?.focus()
-              }
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-      <section data-guide-feature={guideFeatureId('reference.panel', active)}
+      {actions ? (
+        <div className="reference-tabs-toolbar">
+          {tabList}
+          <div className="reference-tabs-actions">{actions}</div>
+        </div>
+      ) : (
+        tabList
+      )}
+      <section
+        data-guide-feature={guideFeatureId('reference.panel', active)}
         id={`${id}-panel`}
         className={`tab-panel ${panelClassName}`}
         role="tabpanel"

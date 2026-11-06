@@ -17,6 +17,9 @@ import { OPEN_STATUS } from '../exception/api'
 import { dashboardSummaryQueryOptions, openExceptionCountsQueryOptions } from './api'
 import type { RecentException, RecentRun } from './api'
 import { AgentOverview } from './AgentOverview'
+import { AgentStatusPanel } from './AgentStatusPanel'
+import { MonthlyCommissions } from './MonthlyCommissions'
+import { RecentExceptionTicker } from './RecentExceptionTicker'
 import { DashboardSkeleton } from './DashboardSkeleton'
 import { RegionError, UpdatedAt } from './RegionStatus'
 import { RiskComposition, type CompositionItem } from './RiskComposition'
@@ -25,17 +28,18 @@ import { exceptionStatusTone, runStatusTone, severityTone } from './tones'
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
 
 export function DashboardPage() {
-  const { month } = useOutletContext<ShellContext>()
+  const { month, revised = false } = useOutletContext<ShellContext>()
   if (!month) return null
-  return <DashboardContent month={month} />
+  return <DashboardContent month={month} revised={revised} />
 }
 
-function DashboardContent({ month }: { month: string }) {
+function DashboardContent({ month, revised }: { month: string; revised: boolean }) {
   const { data, error, isPending, isFetching, dataUpdatedAt, refetch } = useQuery({
     ...dashboardSummaryQueryOptions(month),
     meta: { errorToast: false },
   })
   const openCounts = useQuery(openExceptionCountsQueryOptions())
+  const summaryReady = !error && !isPending
   const href = (path: string, params: Record<string, string> = {}) => {
     const search = new URLSearchParams(params).toString()
     return withMonth(search ? `${path}?${search}` : path, month)
@@ -69,7 +73,14 @@ function DashboardContent({ month }: { month: string }) {
       render: (e) => (
         <CellDisclosure
           singleLine
-          preview={<Link data-guide-feature="features.dashboard.dashboard-page.link" to={href('/exceptions', { contractNo: e.contractNo ?? '' })}>{screenMessage(e.title)}</Link>}
+          preview={
+            <Link
+              data-guide-feature="features.dashboard.dashboard-page.link"
+              to={href('/exceptions', { contractNo: e.contractNo ?? '' })}
+            >
+              {screenMessage(e.title)}
+            </Link>
+          }
           full={screenMessage(e.title)}
         />
       ),
@@ -131,7 +142,7 @@ function DashboardContent({ month }: { month: string }) {
         color: 'success',
         label: '원장 불균형',
         value: data.journalImbalance,
-        footer: '기표 전 0건 필수',
+        footer: revised ? '전체 기간 · 기표 전 0건 필수' : '기표 전 0건 필수',
         tone: data.journalImbalance === 0 ? 'success' : 'error',
         to: href('/journals'),
       },
@@ -143,7 +154,8 @@ function DashboardContent({ month }: { month: string }) {
         footer: openCounts.isError ? (
           <>
             <span role="alert">불러오지 못했습니다</span>
-            <button data-guide-feature="features.dashboard.dashboard-page.open-retry"
+            <button
+              data-guide-feature="features.dashboard.dashboard-page.open-retry"
               type="button"
               className="kpi-retry"
               aria-label="미처리 예외 다시 불러오기"
@@ -158,6 +170,8 @@ function DashboardContent({ month }: { month: string }) {
           '미처리 예외가 없습니다'
         ) : openCounts.isPending ? (
           '불러오는 중'
+        ) : revised ? (
+          '전체 기간 · 신규 + 검토중'
         ) : (
           '신규 + 검토중'
         ),
@@ -166,13 +180,94 @@ function DashboardContent({ month }: { month: string }) {
       },
     ] as const)
 
-  const compositionItems: CompositionItem[] = kpis?.filter((kpi) => kpi.id !== 'open').map((kpi) => ({
-    key: kpi.id,
-    label: kpi.label,
-    value: kpi.value ?? 0,
-    color: kpi.color,
-    to: kpi.to,
-  })) ?? []
+  const compositionItems: CompositionItem[] =
+    kpis
+      ?.filter((kpi) => kpi.id !== 'open')
+      .map((kpi) => ({
+        key: kpi.id,
+        label: kpi.label,
+        value: kpi.value ?? 0,
+        color: kpi.color,
+        to: kpi.to,
+      })) ?? []
+
+  const priorityPanel = (
+    <section
+      data-guide-feature="features.dashboard.dashboard-page.section-2"
+      className="surface"
+      aria-labelledby="priority-title"
+    >
+      <header className="surface-header">
+        <h2 id="priority-title" className="surface-title">
+          최근 예외
+        </h2>
+        <Link
+          data-guide-feature="features.dashboard.dashboard-page.link-3"
+          className="run-list-link"
+          to={href('/exceptions')}
+        >
+          예외함 전체 보기
+        </Link>
+      </header>
+      <div className="priority-table">
+        <DataTable
+          caption="최근 예외 목록"
+          columns={exceptionColumns}
+          rows={data?.recentExceptions ?? []}
+          rowKey={(e) => String(e.exceptionCaseId)}
+          emptyMessage={EMPTY_MESSAGE}
+        />
+      </div>
+    </section>
+  )
+  const compositionPanel = (
+    <section
+      data-guide-feature="features.dashboard.dashboard-page.composition"
+      className="surface risk-composition-card"
+      aria-labelledby="composition-title"
+    >
+      <header className="surface-header">
+        <h2 id="composition-title" className="surface-title">
+          검증 항목별 건수 비중
+        </h2>
+      </header>
+      <RiskComposition items={compositionItems} />
+      {!revised && (
+        <p className="risk-composition-note">
+          미처리 예외는 일부 항목과 겹쳐 비중에서 제외했습니다. 항목마다 세는 단위가 달라 건수의 단순 비율로 표시합니다.
+        </p>
+      )}
+    </section>
+  )
+  const runsPanel = (
+    <section
+      data-guide-feature="features.dashboard.dashboard-page.section-3"
+      className="surface run-list-card"
+      aria-labelledby="run-list-title"
+    >
+      <div className="run-list-header">
+        <h2 id="run-list-title" className="run-list-title">
+          최근 통합검증 실행
+        </h2>
+        <Link
+          data-guide-feature="features.dashboard.dashboard-page.link-4"
+          className="run-list-link"
+          to={href('/validation-runs')}
+        >
+          실행 목록
+        </Link>
+      </div>
+      {data?.recentRuns?.length ? (
+        <div className="run-list-body">
+          {data.recentRuns.map((run) => (
+            <RunRow key={run.validationRunId} run={run} to={href(`/validation-runs/${run.validationRunId}`)} />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">{EMPTY_MESSAGE}</div>
+      )}
+    </section>
+  )
 
   return (
     <div className="dashboard-page">
@@ -181,22 +276,19 @@ function DashboardContent({ month }: { month: string }) {
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>
-        <div className="page-header-actions">
-          <button data-guide-feature="features.dashboard.dashboard-page.settlement-guide"
-            type="button"
-            className="button button-secondary"
-            data-guide-target="dashboard.guide"
-            onClick={openSettlementGuide}
-          >
-            전체 업무 가이드
-          </button>
-        </div>
+        {!revised && (
+          <div className="page-header-actions">
+            <SettlementGuideEntry />
+          </div>
+        )}
       </header>
-      <p className="dashboard-basis">
-        <span>기준 정산월 {monthText(month)}</span>
-        <span>미처리 예외와 원장 불균형은 정산월과 상관없이 전체 건수입니다.</span>
-        {!error && <UpdatedAt at={dataUpdatedAt} />}
-      </p>
+      {!revised && (
+        <p className="dashboard-basis">
+          <span>기준 정산월 {monthText(month)}</span>
+          <span>미처리 예외와 원장 불균형은 정산월과 상관없이 전체 건수입니다.</span>
+          {!error && <UpdatedAt at={dataUpdatedAt} />}
+        </p>
+      )}
       {error ? (
         <RegionError
           error={error}
@@ -208,104 +300,156 @@ function DashboardContent({ month }: { month: string }) {
       ) : isPending ? (
         <DashboardSkeleton />
       ) : (
-        <>
-          <section data-guide-feature="features.dashboard.dashboard-page.section" className="kpi-grid kpi-group" aria-label="주요 검증 지표">
-            {kpis?.map((kpi) => {
-              const card = (
-                <KpiCard
-                  guideId={guideFeatureId('dashboard.kpi', kpi.id)}
-                  label={kpi.label}
-                  value={kpi.value ?? '-'}
-                  unit={kpi.value == null ? undefined : '건'}
-                  footer={<span className="kpi-comparison">{kpi.footer}</span>}
-                  tone={kpi.tone}
-                  zero={kpi.value === 0}
-                />
-              )
-              // 아직 받지 못한 건수는 0으로 보이지 않고, 숫자가 없으면 눌러서 갈 조건도 없다.
-              return kpi.value == null ? (
-                <div key={kpi.label} className="kpi-card-link" data-kpi={kpi.id}>
-                  {card}
-                </div>
-              ) : (
-                <Link data-guide-feature={guideFeatureId('dashboard.kpi-link', kpi.id)}
-                  key={kpi.label}
-                  to={kpi.to}
-                  className="kpi-card-link"
-                  data-kpi={kpi.id}
-                  data-zero={kpi.value === 0}
-                  data-attention={kpi.tone === 'error' && kpi.value > 0}
-                  aria-label={`${kpi.label} ${int(kpi.value)}건`}
-                >
-                  {card}
-                </Link>
-              )
-            })}
-          </section>
-          <div className="dashboard-main-grid">
-            <section data-guide-feature="features.dashboard.dashboard-page.section-2" className="surface" aria-labelledby="priority-title">
-              <header className="surface-header">
-                <h2 id="priority-title" className="surface-title">
-                  최근 예외
-                </h2>
-                <Link data-guide-feature="features.dashboard.dashboard-page.link-3" className="run-list-link" to={href('/exceptions')}>
-                  예외함 전체 보기
-                </Link>
-              </header>
-              <div className="priority-table">
-                <DataTable
-                  caption="최근 예외 목록"
-                  columns={exceptionColumns}
-                  rows={data?.recentExceptions ?? []}
-                  rowKey={(e) => String(e.exceptionCaseId)}
-                  emptyMessage={EMPTY_MESSAGE}
-                />
+        <section
+          data-guide-feature="features.dashboard.dashboard-page.section"
+          className="kpi-grid kpi-group"
+          aria-label="주요 검증 지표"
+        >
+          {kpis?.map((kpi) => {
+            const card = (
+              <KpiCard
+                guideId={guideFeatureId('dashboard.kpi', kpi.id)}
+                label={kpi.label}
+                value={kpi.value ?? '-'}
+                unit={kpi.value == null ? undefined : '건'}
+                footer={<span className="kpi-comparison">{kpi.footer}</span>}
+                tone={kpi.tone}
+                zero={kpi.value === 0}
+              />
+            )
+            // 아직 받지 못한 건수는 0으로 보이지 않고, 숫자가 없으면 눌러서 갈 조건도 없다.
+            return kpi.value == null ? (
+              <div key={kpi.label} className="kpi-card-link" data-kpi={kpi.id}>
+                {card}
               </div>
-            </section>
-            <div className="dashboard-side-column">
-              <section data-guide-feature="features.dashboard.dashboard-page.composition"
-                className="surface risk-composition-card" aria-labelledby="composition-title"
+            ) : (
+              <Link
+                data-guide-feature={guideFeatureId('dashboard.kpi-link', kpi.id)}
+                key={kpi.label}
+                to={kpi.to}
+                className="kpi-card-link"
+                data-kpi={kpi.id}
+                data-zero={kpi.value === 0}
+                data-attention={kpi.tone === 'error' && kpi.value > 0}
+                aria-label={`${kpi.label} ${int(kpi.value)}건`}
               >
-                <header className="surface-header">
-                  <h2 id="composition-title" className="surface-title">검증 항목별 건수 비중</h2>
-                </header>
-                <RiskComposition items={compositionItems} />
-                <p className="risk-composition-note">
-                  미처리 예외는 일부 항목과 겹쳐 비중에서 제외했습니다. 항목마다 세는 단위가 달라 건수의 단순 비율로 표시합니다.
-                </p>
-              </section>
-              <section data-guide-feature="features.dashboard.dashboard-page.section-3" className="surface run-list-card" aria-labelledby="run-list-title">
-                <div className="run-list-header">
-                  <h2 id="run-list-title" className="run-list-title">
-                    최근 통합검증 실행
-                  </h2>
-                  <Link data-guide-feature="features.dashboard.dashboard-page.link-4" className="run-list-link" to={href('/validation-runs')}>
-                    실행 목록
-                  </Link>
-                </div>
-                {data?.recentRuns?.length ? (
-                  <div className="run-list-body">
-                    {data.recentRuns.map((run) => (
-                      <RunRow
-                        key={run.validationRunId}
-                        run={run}
-                        to={href(`/validation-runs/${run.validationRunId}`)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="empty-state">{EMPTY_MESSAGE}</div>
-                )}
-              </section>
-            </div>
-          </div>
-        </>
+                {card}
+              </Link>
+            )
+          })}
+        </section>
       )}
-      <AgentOverview month={month} />
+      {(summaryReady || revised) && (
+        <div className="dashboard-main-grid">
+          <div className="dashboard-main-column">
+            {revised ? (
+              <>
+                <MonthlyCommissions key={month} month={month} />
+                <div className="dashboard-insight-grid">
+                  {summaryReady && compositionPanel}
+                  <AgentStatusPanel month={month} />
+                </div>
+              </>
+            ) : (
+              summaryReady && priorityPanel
+            )}
+          </div>
+          <div className="dashboard-side-column">
+            {summaryReady && (
+              <>
+                {revised ? (
+                  <RecentExceptionTicker rows={data?.recentExceptions ?? []} month={month} />
+                ) : (
+                  compositionPanel
+                )}
+                {runsPanel}
+              </>
+            )}
+            {revised && (
+              <div className="dashboard-support-cards">
+                <SettlementGuideEntry card />
+                <AssociationEntry />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {!revised && <AgentOverview month={month} />}
     </div>
   )
 }
 
+function SettlementGuideEntry({ card = false }: { card?: boolean }) {
+  return (
+    <button
+      data-guide-feature="features.dashboard.dashboard-page.settlement-guide"
+      type="button"
+      className={card ? 'dashboard-guide-card' : 'button button-secondary'}
+      data-guide-target="dashboard.guide"
+      onClick={openSettlementGuide}
+      aria-label="전체 업무 가이드"
+    >
+      {card ? (
+        <>
+          <span className="dashboard-guide-eyebrow">정산 업무가 궁금한가요?</span>
+          <strong>
+            전체 업무
+            <br />
+            가이드
+          </strong>
+          <span className="dashboard-guide-caption">계약부터 최종 확정까지</span>
+          <span className="dashboard-guide-start">
+            시작하기 <span aria-hidden="true">→</span>
+          </span>
+          <svg className="dashboard-guide-art" viewBox="0 0 96 80" aria-hidden="true">
+            <path d="M10 51 48 30l38 21-38 22Z" fill="#92dfc0" />
+            <path d="m10 43 38-21 38 21-38 22Z" fill="#2cae85" />
+            <path d="M16 44v7l32 18v-7Z" fill="#d8f5e9" />
+            <path d="M10 30 48 9l38 21-38 22Z" fill="#a8ebd1" />
+            <path d="m10 30 38 22v9L10 40Z" fill="#45bf97" />
+            <path d="m48 52 38-22v10L48 61Z" fill="#74d4b3" />
+            <path d="m30 19 38 22v15l-6-1-6 8V47L18 26Z" fill="#f5fffb" />
+          </svg>
+        </>
+      ) : (
+        '전체 업무 가이드'
+      )}
+    </button>
+  )
+}
+
+function AssociationEntry() {
+  return (
+    <a
+      className="dashboard-guide-card dashboard-association-card"
+      data-guide-feature="features.dashboard.dashboard-page.ga-association"
+      href="https://www.igaa.or.kr/"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="보험GA협회 홈페이지 열기 (새 탭)"
+    >
+      <span className="dashboard-guide-eyebrow">GA 업계 소식과 자료</span>
+      <strong>
+        보험GA협회
+        <br />
+        바로가기
+      </strong>
+      <span className="dashboard-guide-caption">업계 소식과 제도 안내</span>
+      <span className="dashboard-guide-start">
+        방문하기 <span aria-hidden="true">↗</span>
+      </span>
+      <svg className="dashboard-guide-art" viewBox="0 0 80 72" aria-hidden="true">
+        <path d="M9 29 34 13l25 16v5H9Z" fill="#4773d0" />
+        <path d="M13 34h42v25H13Z" fill="#d4e2ff" />
+        <path d="M18 35v22m16-22v22m16-22v22" stroke="#7398e1" strokeWidth="6" />
+        <path d="M8 58h52v7H8Z" fill="#4773d0" />
+        <path d="m59 32 16 6v12c0 10-16 18-16 18S43 60 43 50V38Z" fill="#83b5e7" />
+        <path d="m59 37 11 4v9c0 7-11 13-11 13S48 57 48 50v-9Z" fill="#2d5cae" />
+        <path d="m53 49 4 4 8-9" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </a>
+  )
+}
 
 const RUN_STEPS = 10
 
