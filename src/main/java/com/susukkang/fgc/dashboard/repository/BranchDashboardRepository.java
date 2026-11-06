@@ -1,6 +1,7 @@
 package com.susukkang.fgc.dashboard.repository;
 
 import com.susukkang.fgc.common.util.DateUtil;
+import com.susukkang.fgc.common.code.ExceptionStatus;
 import com.susukkang.fgc.common.web.PageResponse;
 import com.susukkang.fgc.dashboard.dto.BranchDashboardResponse;
 import com.susukkang.fgc.dashboard.dto.BranchDashboardResponse.BranchMetrics;
@@ -53,7 +54,7 @@ public class BranchDashboardRepository {
                   FROM fgc.exception_case ec LEFT JOIN contracts c ON c.contract_id = ec.contract_id
                   LEFT JOIN fgc.agent a ON a.agent_id = ec.agent_id
                   LEFT JOIN org_branch ob ON ob.origin_id = a.organization_id
-                 WHERE ec.status IN ('NEW', 'IN_REVIEW')
+                 WHERE ec.status IN (:openStatuses)
             )
             """;
 
@@ -63,7 +64,7 @@ public class BranchDashboardRepository {
                            COUNT(*) FILTER (WHERE agent_status = 'ACTIVE' AND active_yn) AS active FROM agents GROUP BY branch_id
                 ), contract_totals AS (
                     SELECT branch_id, COUNT(*) FILTER (WHERE is_new) AS new_count,
-                           COUNT(*) FILTER (WHERE contract_date <= :asOf AND as_of_status IN ('ACTIVE', 'UNPAID', 'REVIVED'))
+                           COUNT(*) FILTER (WHERE contract_date <= :asOf AND as_of_status IN (:validStatuses))
                                AS valid_count FROM contracts GROUP BY branch_id
                 ), payment_totals AS (
                     SELECT branch_id, SUM(ga_amount) AS ga_amount, SUM(agent_amount) AS agent_amount FROM payments GROUP BY branch_id
@@ -97,7 +98,7 @@ public class BranchDashboardRepository {
                 UNION ALL
                 SELECT contract_id, contract_no, CAST(contract_date AS text), as_of_status, NULL::numeric, NULL::numeric
                   FROM contracts WHERE :metric = 'CONTRACTS' AND branch_id = :branch AND (is_new OR (
-                    contract_date <= :asOf AND as_of_status IN ('ACTIVE', 'UNPAID', 'REVIVED')
+                    contract_date <= :asOf AND as_of_status IN (:validStatuses)
                 ))
                 UNION ALL
                 SELECT exception_case_id, title, COALESCE(contract_no, ''), status, NULL::numeric, NULL::numeric
@@ -107,15 +108,19 @@ public class BranchDashboardRepository {
     private static final String DETAIL_COUNT = DETAIL_ROWS + " SELECT COUNT(*) FROM detail_rows";
     private static final String DETAIL_PAGE = DETAIL_ROWS + " SELECT * FROM detail_rows ORDER BY id DESC LIMIT 10 OFFSET :offset";
 
+    /** 선택 월말을 서울 오늘로 제한하고 공통 유효·미처리 상태를 SQL 파라미터로 바인딩한다. */
     private MapSqlParameterSource parameters(LocalDate month) {
         LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
         LocalDate asOf = month.plusMonths(1).minusDays(1);
         if (asOf.isAfter(today)) asOf = today;
         return new MapSqlParameterSource("month", month).addValue("nextMonth", month.plusMonths(1))
                 .addValue("asOf", asOf).addValue("pastDate", asOf.isBefore(today))
+                .addValue("validStatuses", HomeSummaryQueryRepository.VALID_CONTRACT_STATUSES)
+                .addValue("openStatuses", ExceptionStatus.dbStatuses(ExceptionStatus.OPEN_FILTER).stream().map(Enum::name).toList())
                 .addValue("asOfEnd", asOf.plusDays(1).atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
     }
 
+    /** 지점과 하위 팀의 인원·계약·확정 지급·미처리 예외를 동일 원천 CTE에서 집계한다. */
     public BranchDashboardResponse summary(LocalDate month) {
         var params = parameters(month);
         var rows = jdbc.query(SUMMARY, params, (rs, index) -> new BranchMetrics(rs.getLong("organization_id"),
@@ -125,6 +130,7 @@ public class BranchDashboardRepository {
         return new BranchDashboardResponse(month, (LocalDate) params.getValue("asOf"), rows);
     }
 
+    /** 요약과 같은 지점·지표·월 범위의 상세를 반환하며 요청 페이지를 유효 범위로 제한한다. */
     public PageResponse<BranchDetailRow> details(LocalDate month, long organizationId, BranchMetric metric, int requestedPage) {
         var params = parameters(month).addValue("branch", organizationId).addValue("metric", metric.name());
         long total = jdbc.queryForObject(DETAIL_COUNT, params, Long.class);

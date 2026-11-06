@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { useId, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useId, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import { DataTable } from '../../components/DataTable'
@@ -69,6 +69,7 @@ const metrics: Record<BranchMetric, MetricDefinition> = {
 const compact = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 })
 const valueOf = (row: BranchMetrics, key: AmountKey) => row[key] ?? 0
 
+/** 같은 월의 지점별 네 지표를 막대로 비교하고 선택 지점·지표의 상세를 연결한다. */
 export function AgentStatusPanel({ month }: { month: string }) {
   const [metric, setMetric] = useState<BranchMetric>('COMMISSIONS')
   const [hovered, setHovered] = useState<number | null>(null)
@@ -253,6 +254,7 @@ export function AgentStatusPanel({ month }: { month: string }) {
   )
 }
 
+/** 요약과 같은 범위의 지점 상세를 10건씩 조회한다. 페이지 로딩 중 이전 자료임을 표시하고 이동 위치의 포커스를 보존한다. */
 function BranchDetails({
   branch,
   month,
@@ -267,7 +269,8 @@ function BranchDetails({
   onClose: () => void
 }) {
   const [page, setPage] = useState(1)
-  const query = useQuery(branchDetailsQuery(month, branch.organizationId!, metric, page))
+  const paginationRef = useRef<HTMLDivElement>(null)
+  const query = useQuery({ ...branchDetailsQuery(month, branch.organizationId!, metric, page), placeholderData: keepPreviousData })
   const definition = metrics[metric]
   const status = (row: BranchDetailRow) => {
     const labels: Record<string, string> =
@@ -336,18 +339,27 @@ function BranchDetails({
         />
       ) : query.data ? (
         <>
+          {query.isPlaceholderData && <p role="status">{page}페이지를 불러오는 중입니다. 현재 {query.data.page}페이지입니다.</p>}
+          <div aria-busy={query.isPlaceholderData} inert={query.isPlaceholderData}>
           <DataTable
             caption={`${branch.name} ${definition.label} 상세 내역`}
             columns={columns}
             rows={query.data.content ?? []}
             rowKey={(row) => String(row.id)}
           />
+          </div>
+          <div ref={paginationRef} className="branch-detail-pagination" role="group" aria-label="지점 상세 페이지 이동" tabIndex={-1}>
           <ListPagination
             page={query.data.page ?? page}
             totalPages={query.data.totalPages ?? 1}
             label="지점 상세 내역 페이지"
-            onPageChange={setPage}
+            onPageChange={next => {
+              // A selected page becomes a span; keep keyboard focus at the pagination instead of removing it.
+              paginationRef.current?.focus()
+              setPage(next)
+            }}
           />
+          </div>
         </>
       ) : (
         <p role="status" className="empty-state">

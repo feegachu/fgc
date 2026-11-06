@@ -32,6 +32,7 @@ const sourceTones: Record<string, StatusTone> = {
   GA_POLICY: 'neutral',
   PROJECT_ASSUMPTION: 'warning',
 }
+/** 정책 탭과 적용 기준일·작업 버튼을 함께 배치하며 기존 권한·정책 조회 흐름을 유지한다. */
 export function PoliciesPage() {
   const { revised = false } = useOutletContext<ShellContext>()
   const { user } = useAuth()

@@ -349,14 +349,19 @@ describe('DASH-W01 업무 대시보드', () => {
     const { actions } = renderDashboard()
     const region = await screen.findByRole('region', { name: '월별 수수료' })
     expect(await within(region).findByText('15,000,000원')).toBeInTheDocument()
-    expect(within(region).getAllByText('전월 대비 25% 증가')).toHaveLength(2)
+    expect(within(region).getAllByText('전월 대비 25.0% 증가')).toHaveLength(2)
     const june = within(region).getByRole('button', { name: /2026년 6월, GA 수령액/ })
     await actions.hover(june)
     expect(within(region).getByText('12,000,000원')).toBeInTheDocument()
     expect(within(region).queryByRole('group', { name: /보기 방식/ })).not.toBeInTheDocument()
   })
 
-  it('지표를 바꾸면 선택한 지점·지표·정산월의 상세 목록과 다음 페이지를 조회한다', async () => {
+  it('지표를 바꾸면 상세 목록을 조회하고 페이지 로딩·완료 후에도 페이지 이동 위치에 초점을 유지한다', async () => {
+    const pending = deferred<unknown>()
+    const request = vi.mocked(apiClient.request).getMockImplementation()!
+    vi.mocked(apiClient.request).mockImplementation(((path: string, options: unknown) =>
+      path.includes('/branch-details') && path.endsWith('page=2') ? pending.promise : request(path, options as never)
+    ) as typeof apiClient.request)
     const { actions } = renderDashboard()
     const region = await overview()
     await within(region).findByRole('button', { name: '강동지사 수수료 상세 보기' })
@@ -366,8 +371,14 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(await within(dialog).findByText('상세-1')).toBeInTheDocument()
     expect(callsTo('/branch-details').at(-1)).toBe('/api/v1/dashboard/branch-details?month=2026-07&organizationId=11&metric=AGENTS&page=1')
     await actions.click(within(dialog).getByRole('button', { name: '2' }))
+    const pagination = within(dialog).getByRole('group', { name: '지점 상세 페이지 이동' })
+    expect(pagination).toHaveFocus()
+    expect(within(dialog).getByRole('status')).toHaveTextContent('2페이지를 불러오는 중입니다. 현재 1페이지입니다.')
+    expect(within(dialog).getByText('상세-1')).toBeInTheDocument()
+    pending.resolve(envelope({ content: [{ id: 2, label: '상세-2', detail: 'A-002', status: 'ACTIVE' }], page: 2, totalPages: 2, totalElements: 11, size: 10 }))
     expect(await within(dialog).findByText('상세-2')).toBeInTheDocument()
     expect(callsTo('/branch-details').at(-1)).toContain('metric=AGENTS&page=2')
+    expect(pagination).toHaveFocus()
     await actions.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })

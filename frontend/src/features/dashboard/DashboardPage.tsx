@@ -27,12 +27,14 @@ import { exceptionStatusTone, runStatusTone, severityTone } from './tones'
 
 const EMPTY_MESSAGE = '조건에 맞는 자료가 없습니다.'
 
+/** 셸의 기준월과 내부 사용자 화면 범위를 대시보드 조회에 전달한다. */
 export function DashboardPage() {
   const { month, revised = false } = useOutletContext<ShellContext>()
   if (!month) return null
   return <DashboardContent month={month} revised={revised} />
 }
 
+/** 검증·미처리 집계를 독립적으로 조회하고 확정 관리자 배치와 업무 화면 연결을 제공한다. */
 function DashboardContent({ month, revised }: { month: string; revised: boolean }) {
   const { data, error, isPending, isFetching, dataUpdatedAt, refetch } = useQuery({
     ...dashboardSummaryQueryOptions(month),
@@ -379,6 +381,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
   )
 }
 
+/** 기존 업무 가이드를 실행한다. 관리자 홈에서는 지원 카드 형태로 표시한다. */
 function SettlementGuideEntry({ card = false }: { card?: boolean }) {
   return (
     <button
@@ -418,6 +421,7 @@ function SettlementGuideEntry({ card = false }: { card?: boolean }) {
   )
 }
 
+/** 보험GA협회 공식 사이트를 새 탭으로 연결하며 별도 상담 기능을 만들지 않는다. */
 function AssociationEntry() {
   return (
     <a

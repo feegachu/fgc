@@ -11,6 +11,7 @@ import { commissionChange, previousMonth } from './commission-trend'
 
 const compactAmount = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 })
 
+/** 선택 월 합계·전월 증감과 최근 6개월 확정 계약 귀속 수수료를 표시한다. */
 export function MonthlyCommissions({ month }: { month: string }) {
   const query = useQuery(monthlyCommissionsQueryOptions(month))
   const current = query.data?.months?.find((row) => row.month?.slice(0, 7) === month)
@@ -54,6 +55,7 @@ export function MonthlyCommissions({ month }: { month: string }) {
   )
 }
 
+/** 금액은 기존 KPI 모션으로 표시하고 비교할 수 없는 전월 값은 임의 비율로 만들지 않는다. */
 function CommissionTotal({ label, value, previous }: { label: string; value?: number; previous?: number }) {
   const change = commissionChange(value, previous)
   return (
@@ -70,6 +72,7 @@ function CommissionTotal({ label, value, previous }: { label: string; value?: nu
   )
 }
 
+/** 수령·지급 금액을 공통 축에 표시하고 hover·focus한 월의 실제 금액을 제공한다. */
 function CommissionChart({ months }: { months: MonthlyCommission[] }) {
   const [hovered, setHovered] = useState<number | null>(null)
   const [focused, setFocused] = useState<number | null>(null)

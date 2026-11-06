@@ -7,6 +7,7 @@ import { withMonth } from '../../stores/workspace'
 import type { RecentException } from './api'
 import { exceptionStatusTone, severityTone } from './tones'
 
+/** 두 예외 행을 유지하며 한 행씩 위로 순환한다. 조작 중·백그라운드·동작 줄이기 설정에서는 자동 진행을 멈춘다. */
 export function RecentExceptionTicker({ rows, month }: { rows: RecentException[]; month: string }) {
   const [index, setIndex] = useState(0)
   const [sliding, setSliding] = useState(false)

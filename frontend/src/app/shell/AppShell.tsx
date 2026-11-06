@@ -25,6 +25,7 @@ export interface ShellContext {
   month: string | null
   revised?: boolean
 }
+/** 내부 사용자에게 확정 관리자 UI를 적용하고 AGENT 전용 셸의 화면 범위를 유지한다. */
 export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultMonth: string }) {
   const location = useLocation()
   const navigate = useNavigate()

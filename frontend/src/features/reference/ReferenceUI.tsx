@@ -15,6 +15,7 @@ export function QueryState({ loading, error }: { loading?: boolean; error?: Erro
     )
   return loading ? <p role="status">불러오는 중…</p> : null
 }
+/** 활성 탭의 접근성·선택 동작을 유지하면서 선택적 작업 영역을 같은 줄에 배치한다. */
 export function ReferenceTabs<T extends string>({
   tabs,
   active,

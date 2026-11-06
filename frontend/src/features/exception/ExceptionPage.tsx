@@ -53,6 +53,7 @@ function filtersFromParams(params: URLSearchParams): ExceptionFilters {
   }
 }
 
+/** 기존 예외 필터·조치 흐름을 유지하고 관리자 목록 헤더 간격을 공통 목록에 맞춘다. */
 export function ExceptionPage() {
   const [params, setParams] = useSearchParams()
   const filters = filtersFromParams(params)

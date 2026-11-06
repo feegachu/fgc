@@ -18,6 +18,7 @@ export interface ChartView {
   icon: keyof typeof paths
 }
 
+/** 지표 선택을 아이콘 버튼과 이동 표시자로 제공하며 접근 가능한 이름·선택 상태를 유지한다. */
 export function ChartViewSelector({
   views,
   selected,

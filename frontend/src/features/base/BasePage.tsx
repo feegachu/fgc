@@ -136,6 +136,7 @@ function BaseFilters({
     </>
   )
 }
+/** 기준정보 탭과 기준일·도움말을 같은 도구 행에 배치하고 기존 조회 조건을 유지한다. */
 export function BasePage() {
   const { revised = false } = useOutletContext<ShellContext>()
   const defaultDate = useReferenceDate()

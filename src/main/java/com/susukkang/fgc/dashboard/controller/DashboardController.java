@@ -69,6 +69,7 @@ public class DashboardController {
         return ApiResponse.success(dashboardService.monthlyCommissions(targetMonth(month)));
     }
 
+    /** 명시된 기준월은 보존하고 생략 시에는 서울 시간대의 이번 달을 선택한다. */
     private LocalDate targetMonth(String month) {
         try {
             return (month == null ? YearMonth.now(DateUtil.SEOUL_ZONE) : YearMonth.parse(month)).atDay(1);

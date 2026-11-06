@@ -107,5 +107,11 @@ export const compactColumns = columns.map((column): TableColumn<ArbitrageRow> =>
   ...column,
   label: '지급예정액',
   width: '8rem',
-  render: (row) => <ArbitrageAmount value={row.plannedCommissionAmount} />,
+  render: (row) => {
+    const basis = plannedBasisPresentation(row.plannedCommissionBasis)
+    return <span style={{ position: 'relative' }} title={`${basis.label}. ${basis.description}`}>
+      <ArbitrageAmount value={row.plannedCommissionAmount} />
+      <span className="visually-hidden">{basis.label}. {basis.description}</span>
+    </span>
+  },
 } : column)
