@@ -22,35 +22,80 @@ test('FUN-080 home: 미처리 숫자를 누르면 같은 건수의 예외함이 
   await expect(page.locator('.exception-page .list-header-total').first()).toHaveText(`총 ${expected.toLocaleString('ko-KR')}건`)
 })
 
-test('FUN-080 home: 현황 숫자는 DB 와 같고 검색한 설계사의 계약 목록이 열린다', async ({ page }) => {
-  const registered = Number(sql(`SELECT count(*) FROM fgc.agent
-    WHERE appointment_date <= CURRENT_DATE AND (termination_date IS NULL OR termination_date >= CURRENT_DATE)`))
-  const contracts = Number(sql(`SELECT count(*) FROM fgc.insurance_contract c JOIN fgc.agent a ON a.agent_id = c.agent_id
-    WHERE a.agent_code = 'A-FC-001' AND c.contract_date <= CURRENT_DATE`))
-  expect(contracts).toBeGreaterThan(0)
+test('FUN-080 home: 월별 수수료와 여섯 달 막대는 DB의 확정 계약 귀속 금액과 같다', async ({ page }) => {
+  const amounts: { month: string; ga: number; agent: number }[] = JSON.parse(sql(`
+    SELECT json_agg(row_to_json(t)) FROM (
+      SELECT to_char(m.month, 'YYYY-MM') AS month,
+             coalesce(sum(ta.attributed_amount) FILTER (WHERE ct.payment_stage = 'INSURER_TO_GA'), 0) AS ga,
+             coalesce(sum(ta.attributed_amount) FILTER (WHERE ct.payment_stage = 'GA_TO_FC'), 0) AS agent
+        FROM generate_series(DATE '2026-02-01', DATE '2026-07-01', INTERVAL '1 month') m(month)
+        LEFT JOIN fgc.commission_transaction ct ON ct.settlement_month = m.month
+          AND ct.status = 'CONFIRMED' AND ct.cashflow_type = 'PAYMENT'
+        LEFT JOIN fgc.transaction_attribution ta ON ta.commission_transaction_id = ct.commission_transaction_id
+          AND ta.attribution_scope = 'CONTRACT'
+       GROUP BY m.month ORDER BY m.month
+    ) t`))
+  expect(amounts).toHaveLength(6)
+  const current = amounts[5]
+  expect(current.ga).toBeGreaterThan(0)
+  expect(current.agent).toBeGreaterThan(0)
+  const money = (value: number) => `${value.toLocaleString('ko-KR')}원`
 
   await login(page, 'settle01', '/?month=2026-07')
-  const region = page.getByRole('region', { name: 'GA·설계사 현황' })
-  await expect(region.getByRole('region', { name: '등록 설계사' })).toContainText(String(registered))
-  await expect(page.getByText('기준 정산월 2026년 7월')).toBeVisible()
-  await expect(region.getByText(/^갱신 \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)).toBeVisible()
-
-  const search = region.getByRole('region', { name: '설계사 찾기' })
-  await search.getByLabel('이름 또는 코드').fill('A-FC-001')
-  await search.getByRole('button', { name: '조회' }).click()
-  await search.getByRole('link', { name: /A-FC-001/ }).click()
-
-  await expect(page).toHaveURL(/\/contracts\?agentId=\d+&contractDateTo=\d{4}-\d{2}-\d{2}&month=2026-07/)
-  await expect(page.locator('.contract-results-card .list-header-total')).toHaveText(`총 ${contracts}건`)
-  await expect(page.getByRole('table', { name: '보험계약 검색 결과' }).getByRole('row').nth(1)).toContainText('김정산')
+  const region = page.getByRole('region', { name: '월별 수수료' })
+  await expect(region.locator('.commission-total').filter({ hasText: 'GA 수령액' }).locator('strong')).toHaveText(money(current.ga))
+  await expect(region.locator('.commission-total').filter({ hasText: '설계사 지급액' }).locator('strong')).toHaveText(money(current.agent))
+  for (const row of amounts) {
+    const [year, month] = row.month.split('-')
+    await expect(region.getByRole('button', {
+      name: `${year}년 ${Number(month)}월, GA 수령액 ${money(row.ga)}, 설계사 지급액 ${money(row.agent)}`,
+      exact: true,
+    })).toBeVisible()
+  }
 })
 
-test('FUN-080 home: 해촉 설계사도 검색으로 찾는다', async ({ page }) => {
+test('FUN-080 home: 지점 인원과 상세는 하위 팀을 포함하며 계약 상세로 이동한다', async ({ page }) => {
+  const agents: { agent_code: string; agent_name: string }[] = JSON.parse(sql(`
+    WITH RECURSIVE branch AS (
+      SELECT organization_id FROM fgc.organization WHERE organization_code = 'FGC-B0101'
+      UNION ALL
+      SELECT o.organization_id FROM fgc.organization o JOIN branch b ON o.parent_id = b.organization_id
+    )
+    SELECT json_agg(row_to_json(t)) FROM (
+      SELECT a.agent_code, a.agent_name FROM fgc.agent a JOIN branch b USING (organization_id)
+       WHERE a.appointment_date <= DATE '2026-07-31'
+         AND (a.termination_date IS NULL OR a.termination_date >= DATE '2026-07-31')
+       ORDER BY a.agent_id DESC
+    ) t`))
+  expect(agents.length).toBeGreaterThan(0)
+  expect(agents.map(agent => agent.agent_code)).toContain('A-FC-001')
+
   await login(page, 'settle01', '/?month=2026-07')
-  const search = page.getByRole('region', { name: '설계사 찾기' })
-  await search.getByLabel('이름 또는 코드').fill('최해촉')
-  await search.getByRole('button', { name: '조회' }).click()
-  const row = search.getByRole('table', { name: '설계사 검색 결과' }).getByRole('row').nth(1)
-  await expect(row).toContainText('A-FC-004')
-  await expect(row).toContainText('해촉')
+  const region = page.getByRole('region', { name: '지점별 현황' })
+  await region.getByRole('button', { name: '설계사', exact: true }).click()
+  await expect(region.getByText('2026-07-31', { exact: true })).toBeVisible()
+  const branch = region.getByRole('button', { name: '강동지사 설계사 상세 보기' })
+  await expect(branch.locator('strong')).toHaveText(`${agents.length}명`)
+  await branch.click()
+  const dialog = page.getByRole('dialog', { name: '강동지사 · 설계사 상세' })
+  const rows = dialog.getByRole('table', { name: '강동지사 설계사 상세 내역' }).locator('tbody tr')
+  await expect(rows).toHaveCount(Math.min(agents.length, 10))
+  for (const [index, agent] of agents.slice(0, 10).entries()) {
+    await expect(rows.nth(index)).toContainText(agent.agent_code)
+    await expect(rows.nth(index)).toContainText(agent.agent_name)
+  }
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+
+  await region.getByRole('button', { name: '계약', exact: true }).click()
+  await region.getByRole('button', { name: '강동지사 계약 상세 보기' }).click()
+  const contractDialog = page.getByRole('dialog', { name: '강동지사 · 계약 상세' })
+  const contractLink = contractDialog.getByRole('link').first()
+  await expect(contractLink).toHaveAttribute('href', /^\/contracts\/\d+\?month=2026-07$/)
+  const contractNo = await contractLink.innerText()
+  const href = await contractLink.getAttribute('href')
+  await contractLink.click()
+  await expect(page).toHaveURL(new URL(href!, page.url()).href)
+  await expect(page.getByRole('heading', { name: '보험계약 상세', exact: true })).toBeVisible()
+  await expect(page.locator('.page-content')).toContainText(contractNo)
 })

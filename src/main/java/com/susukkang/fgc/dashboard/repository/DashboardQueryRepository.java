@@ -1,6 +1,8 @@
 package com.susukkang.fgc.dashboard.repository;
 
 import com.susukkang.fgc.common.code.ExceptionStatus;
+import com.susukkang.fgc.dashboard.dto.DashboardCommissionResponse;
+import com.susukkang.fgc.dashboard.dto.DashboardCommissionResponse.MonthlyCommission;
 import com.susukkang.fgc.dashboard.dto.RecentExceptionRow;
 import com.susukkang.fgc.dashboard.dto.RecentValidationRunRow;
 import com.susukkang.fgc.exceptioncase.dto.ExceptionCaseSearchDTO;
@@ -11,6 +13,7 @@ import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -30,6 +33,41 @@ public class DashboardQueryRepository {
 
     private final EntityManager entityManager;
     private final ExceptionCaseQueryRepository exceptionCaseQueryRepository;
+
+    public DashboardCommissionResponse findMonthlyCommissions(LocalDate month) {
+        // Split payments are summed from their contract attributions, never repeated header amounts.
+        List<?> results = entityManager.createNativeQuery("""
+                WITH months AS (
+                    SELECT CAST(generate_series(CAST(:fromMonth AS date), CAST(:month AS date),
+                                                INTERVAL '1 month') AS date) AS month
+                ), amounts AS (
+                    SELECT ct.settlement_month AS month,
+                           SUM(ta.attributed_amount) FILTER (WHERE ct.payment_stage = 'INSURER_TO_GA') AS ga_amount,
+                           SUM(ta.attributed_amount) FILTER (WHERE ct.payment_stage = 'GA_TO_FC') AS agent_amount
+                      FROM fgc.commission_transaction ct
+                      JOIN fgc.transaction_attribution ta USING (commission_transaction_id)
+                     WHERE ct.settlement_month >= :fromMonth
+                       AND ct.settlement_month <= :month
+                       AND ct.status = 'CONFIRMED'
+                       AND ct.cashflow_type = 'PAYMENT'
+                       AND ta.attribution_scope = 'CONTRACT'
+                     GROUP BY ct.settlement_month
+                )
+                SELECT m.month, COALESCE(a.ga_amount, 0), COALESCE(a.agent_amount, 0)
+                  FROM months m LEFT JOIN amounts a USING (month)
+                 ORDER BY m.month
+                """)
+                .setParameter("month", month)
+                .setParameter("fromMonth", month.minusMonths(5))
+                .getResultList();
+
+        List<MonthlyCommission> months = results.stream()
+                .map(Object[].class::cast)
+                .map(row -> new MonthlyCommission(((java.sql.Date) row[0]).toLocalDate(),
+                        (BigDecimal) row[1], (BigDecimal) row[2]))
+                .toList();
+        return new DashboardCommissionResponse(months);
+    }
 
     public long countCapViolation(LocalDate month) {
         return countCapByStatus(month, "VIOLATION");

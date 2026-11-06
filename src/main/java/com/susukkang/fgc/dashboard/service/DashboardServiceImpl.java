@@ -1,5 +1,6 @@
 package com.susukkang.fgc.dashboard.service;
 
+import com.susukkang.fgc.dashboard.dto.DashboardCommissionResponse;
 import com.susukkang.fgc.dashboard.dto.DashboardKpiCounts;
 import com.susukkang.fgc.dashboard.dto.DashboardSummaryResult;
 import com.susukkang.fgc.dashboard.dto.RecentExceptionRow;
@@ -44,5 +45,10 @@ public class DashboardServiceImpl implements DashboardService {
         List<RecentValidationRunRow> recentValidationRuns = dashboardQueryRepository.findRecentValidationRuns(RECENT_VALIDATION_RUN_LIMIT);
 
         return new DashboardSummaryResult(month, kpis, recentExceptions, recentValidationRuns);
+    }
+
+    @Override
+    public DashboardCommissionResponse monthlyCommissions(LocalDate month) {
+        return dashboardQueryRepository.findMonthlyCommissions(month);
     }
 }

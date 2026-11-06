@@ -39,7 +39,7 @@ public class HomeSummaryService {
 
     private static final int ATTENTION_LIMIT = 10;
     /** 유지 계약(운영정책서 2단계 대상 선별 기준 #474, SRC-023 별표15 제26조). 미납은 납입최고기간이 끝나기 전까지 유지다. */
-    private static final List<String> VALID_CONTRACT_STATUSES = List.of("ACTIVE", "UNPAID", "REVIVED");
+    private static final List<String> VALID_CONTRACT_STATUSES = HomeSummaryQueryRepository.VALID_CONTRACT_STATUSES;
 
     /** 업무 규칙이 아니라 가상 GA 정책이다. 미처리 예외, 한도 근접, 최근 상태 변화 순으로 앞에 두고 코드로 동률을 푼다. */
     private static final Comparator<AgentRow> ATTENTION_ORDER = Comparator

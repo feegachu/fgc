@@ -40,6 +40,54 @@ class DashboardServiceIntegrationTest {
                 Long.class, contractNo);
     }
 
+    @Test
+    void monthlyCommissionsFillSixMonthsAndSumOnlyConfirmedPaymentAttributions() {
+        LocalDate month = LocalDate.of(2097, 2, 1);
+        Long first = contractId("FGC-FGL01-202607-0001");
+        Long second = contractId("FGC-FGL01-202607-0002");
+        insertCommission(month, "INSURER_TO_GA", "PAYMENT", true, first, 300, second, 700);
+        insertCommission(month, "GA_TO_FC", "PAYMENT", true, first, 125, second, 75);
+        insertCommission(month, "GA_TO_FC", "PAYMENT", false, first, 900, second, 100);
+        insertCommission(month, "INSURER_TO_GA", "DEDUCTION", true, first, 20, second, 80);
+        insertCommission(month.minusMonths(1), "INSURER_TO_GA", "PAYMENT", true, first, 200, second, 800);
+        insertCommission(month.minusMonths(6), "INSURER_TO_GA", "PAYMENT", true, first, 400, second, 600);
+        insertCommission(month.plusMonths(1), "GA_TO_FC", "PAYMENT", true, first, 400, second, 600);
+
+        var months = dashboardService.monthlyCommissions(month).months();
+        assertThat(months).hasSize(6);
+        assertThat(months.getFirst().month()).isEqualTo(month.minusMonths(5));
+        assertThat(months.getFirst().gaAmount()).isEqualByComparingTo("0");
+        assertThat(months.getFirst().agentAmount()).isEqualByComparingTo("0");
+        assertThat(months.get(4).month()).isEqualTo(month.minusMonths(1));
+        assertThat(months.get(4).gaAmount()).isEqualByComparingTo("1000");
+        assertThat(months.get(4).agentAmount()).isEqualByComparingTo("0");
+        assertThat(months.getLast().month()).isEqualTo(month);
+        assertThat(months.getLast().gaAmount()).isEqualByComparingTo("1000");
+        assertThat(months.getLast().agentAmount()).isEqualByComparingTo("200");
+    }
+
+    private void insertCommission(LocalDate month, String stage, String flow, boolean confirmed,
+                                  Long first, int firstAmount, Long second, int secondAmount) {
+        Long payment = jdbcTemplate.queryForObject("""
+                INSERT INTO fgc.commission_transaction (payment_stage, source_type, source_business_key,
+                    recipient_agent_id, commission_item_id, settlement_month, amount, cashflow_type, status)
+                VALUES (?, ?, ?, (SELECT MIN(agent_id) FROM fgc.agent),
+                    (SELECT MIN(commission_item_id) FROM fgc.commission_item), ?, ?, ?, 'DRAFT')
+                RETURNING commission_transaction_id
+                """, Long.class, stage, stage.equals("GA_TO_FC") ? "GA_CONFIRMED_PAYMENT" : "GA_MANUAL_PAYMENT",
+                "IT-DASH-" + java.util.UUID.randomUUID(), month, firstAmount + secondAmount, flow);
+        jdbcTemplate.update("""
+                INSERT INTO fgc.transaction_attribution (commission_transaction_id, attribution_seq,
+                    attribution_scope, contract_id, attribution_date, attribution_month, attributed_amount,
+                    inclusion_status_snapshot, attribution_method)
+                VALUES (?, 1, 'CONTRACT', ?, ?, ?, ?, 'INCLUDED', 'DIRECT'),
+                       (?, 2, 'CONTRACT', ?, ?, ?, ?, 'INCLUDED', 'DIRECT')
+                """, payment, first, month, month, firstAmount, payment, second, month, month, secondAmount);
+        if (confirmed) {
+            jdbcTemplate.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id = ?", payment);
+        }
+    }
+
     private Long capRuleSetId(String paymentStage) {
         // 판정 결과 집계만 검증하므로 동일 지급단계의 외래키용 룰셋 한 건을 고정해서 선택한다.
         return jdbcTemplate.queryForObject("""
