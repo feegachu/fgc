@@ -51,7 +51,10 @@ class PicoAskServiceTest {
             "스케줄을 다시 생성했어요.", "계약 내용을 수정했어요.", "환수 통지를 발행했어요.",
             "지급을 보류했어요.", "지급을 재개했어요.",
             "저장했으니 다음 화면을 확인하세요.", "확정했고 목록에서 확인하세요.",
-            "검증을 통과했으므로 다음으로 진행하세요.", "처리됐는데 결과를 확인하세요."
+            "검증을 통과했으므로 다음으로 진행하세요.", "처리됐는데 결과를 확인하세요.",
+            "지급 확정 완료, 목록에서 확인하세요.", "확정 처리 완료: 목록을 확인하세요.",
+            "지급 확정 완료 - 다음 단계를 진행하세요.", "지급 확정 완료\n목록에서 확인하세요.",
+            "지급 확정 완료\r\n목록에서 확인하세요.", "지급 확정 완료 '목록에서 확인하세요.'"
     })
     void rejectsParaphrasedBusinessSuccessClaims(String message) {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
@@ -76,7 +79,8 @@ class PicoAskServiceTest {
             "승인되었는지 먼저 확인하세요.", "안내 완료입니다.", "설명 완료!", "답변을 완료했어요.",
             "처리 완료 여부를 확인하세요.", "화면에서 '완료'를 선택하세요.",
             "처리 상태가 완료인지 확인하세요.", "정책은 제출 상태인지 확인하세요.",
-            "등록을 마쳤다면 다음 절차를 확인하세요."
+            "등록을 마쳤다면 다음 절차를 확인하세요.", "확정 완료 후 지급하세요.",
+            "화면에서 '완료'\n항목을 선택하세요.", "화면이 '완료'인지 확인하세요."
     })
     void keepsConditionalGuidanceAndInstructions(String message) {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))

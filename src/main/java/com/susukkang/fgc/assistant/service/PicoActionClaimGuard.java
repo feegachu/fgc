@@ -21,6 +21,8 @@ final class PicoActionClaimGuard {
             "고", "으니", "으니까", "으므로", "는데", "지만");
     private static final List<String> STATE_ENDINGS = List.of("입니다", "예요", "이에요", "에요");
     private static final List<String> PRESENTATION = List.of("설명", "설명을", "안내", "안내를", "답변", "답변을");
+    private static final String QUOTES = "'‘’\"“”`";
+    private static final List<String> LABEL_REFERENCE = List.of("을", "를", "로", "으로", "에서", "항목", "인지", "이면", "일 때", "여부");
 
     private PicoActionClaimGuard() { }
 
@@ -32,13 +34,23 @@ final class PicoActionClaimGuard {
         for (int position = text.indexOf(action); position >= 0;
                 position = text.indexOf(action, position + action.length())) {
             String prefix = text.substring(0, position).stripTrailing();
-            if (action.equals(COMPLETE) && PRESENTATION.stream().anyMatch(prefix::endsWith)) continue;
-            String tail = afterModifiers(text.substring(position + action.length()).stripLeading());
+            String rawTail = text.substring(position + action.length());
+            if (action.equals(COMPLETE) && (PRESENTATION.stream().anyMatch(prefix::endsWith)
+                    || quotedLabel(prefix, rawTail))) continue;
+            String tail = afterModifiers(rawTail.stripLeading());
             String predicate = withoutCompletionWords(tail);
             if (pastAssertion(predicate) || stateAssertion(predicate, action)
-                    || nominalAssertion(tail, action)) return true;
+                    || nominalAssertion(tail, action, rawTail)) return true;
         }
         return false;
+    }
+
+    private static boolean quotedLabel(String prefix, String rawTail) {
+        if (prefix.isEmpty() || QUOTES.indexOf(prefix.charAt(prefix.length() - 1)) < 0) return false;
+        String closing = rawTail.stripLeading();
+        if (closing.isEmpty() || QUOTES.indexOf(closing.charAt(0)) < 0) return false;
+        String reference = closing.substring(1).stripLeading();
+        return LABEL_REFERENCE.stream().anyMatch(reference::startsWith);
     }
 
     private static String afterModifiers(String tail) {
@@ -64,12 +76,18 @@ final class PicoActionClaimGuard {
         return tail;
     }
 
-    private static boolean nominalAssertion(String tail, String action) {
+    private static boolean nominalAssertion(String tail, String action, String rawTail) {
         String afterProcess = tail.startsWith(PROCESS) ? tail.substring(PROCESS.length()).stripLeading() : tail;
-        if (!action.equals(COMPLETE) && !afterProcess.startsWith(COMPLETE)) return false;
-        String predicate = withoutCompletionWords(tail);
-        return hasEnding(predicate, "", STATE_ENDINGS) || predicate.isEmpty()
-                || ".!?。…".indexOf(predicate.charAt(0)) >= 0;
+        String suffix;
+        if (afterProcess.startsWith(COMPLETE)) suffix = afterProcess.substring(COMPLETE.length());
+        else if (action.equals(COMPLETE)) suffix = rawTail;
+        else return false;
+        String predicate = suffix.stripLeading();
+        String whitespace = suffix.substring(0, suffix.length() - predicate.length());
+        boolean lineBreak = whitespace.codePoints().anyMatch(code -> code == '\n' || code == '\r'
+                || Character.getType(code) == Character.LINE_SEPARATOR
+                || Character.getType(code) == Character.PARAGRAPH_SEPARATOR);
+        return hasEnding(predicate, "", STATE_ENDINGS) || lineBreak || boundary(predicate, 0);
     }
 
     private static boolean pastAssertion(String tail) {
