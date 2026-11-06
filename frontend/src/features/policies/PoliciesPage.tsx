@@ -22,7 +22,7 @@ const tabs = [
   { id: 'versions', label: '정책 버전' },
   { id: 'management', label: '관리 상세' },
   { id: 'commission', label: '수수료 규칙' },
-  { id: 'cap', label: '1,200% 룰셋' },
+  { id: 'cap', label: '1,200% 한도 규칙' },
   { id: 'refund', label: '예상 해약환급률표' },
 ] as const
 const sourceTones: Record<string, StatusTone> = {
@@ -73,7 +73,7 @@ export function PoliciesPage() {
       <header className="page-header policy-page-header">
         <ScreenHelp screenId="POL-W01" />
         <div className="page-header-copy">
-          <h1 className="page-title">정책/룰셋 관리</h1>
+          <h1 className="page-title">정책 관리</h1>
           <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
         <div data-guide-target="policy.filters" className="policy-header-actions">
@@ -158,18 +158,11 @@ export function PoliciesPage() {
                       className="policy-row-select"
                       type="radio"
                       name="policy-version"
-                      aria-label={`${r.policyCode} v${r.versionNo} 선택`}
+                      aria-label={`${r.policyName} v${r.versionNo} 선택`}
                       checked={id === r.policyVersionId}
                       onChange={() => patch({ policyVersionId: String(r.policyVersionId) })}
                     />
                   ),
-                },
-                {
-                  key: 'code',
-                  label: '정책코드',
-                  width: '12.5rem',
-                  cellClassName: 'tabular-nums policy-disclosure-cell',
-                  render: (r) => <ReferenceText value={r.policyCode} limit={22} singleLine />,
                 },
                 {
                   key: 'name',
@@ -242,7 +235,7 @@ export function PoliciesPage() {
                 <span>
                   선택한 정책{' '}
                   <strong>
-                    {selected.policyCode}, v{selected.versionNo}
+                    {selected.policyName} v{selected.versionNo}
                   </strong>
                 </span>
                 <Button data-guide-feature="features.policies.policies-page.button-6" variant="secondary" onClick={() => patch({ tab: 'management', policyVersionId: String(id) })}>

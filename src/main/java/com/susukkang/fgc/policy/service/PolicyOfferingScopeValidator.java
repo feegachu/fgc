@@ -73,7 +73,7 @@ public class PolicyOfferingScopeValidator {
             }
             if (matches.size() != 1) {
                 throw invalid(field + PRODUCT_OFFERING_ID,
-                        "이 판매버전의 판매개시일·기초서류에 적용되는 분급 룰셋이 정확히 하나여야 합니다.");
+                        "이 판매버전의 판매개시일·기초서류에 적용되는 분급 규칙이 정확히 하나여야 합니다.");
             }
             PolicyDraftValidator.validateCommissionRegimeBound(rule, matches.getFirst(), field);
         }

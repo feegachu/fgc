@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
+import { EvidenceLink } from '../../components/EvidenceLink'
 import { KpiCardContent } from '../../components/KpiCard'
 import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
@@ -18,6 +19,7 @@ import { QueryState } from '../reference/ReferenceUI'
 import { ARBITRAGE_SORT_KEYS, arbitrageListQuery, criteriaFromParams } from './api'
 import type { Criteria, ArbitrageRow } from './api'
 import { columns } from './columns'
+import { UPPER_BOUND_NOTE } from './planned-basis'
 import { ArbitrageBadge } from './badges'
 import { ArbitrageDetail } from './ArbitrageDetail'
 import { RecheckModal } from './RecheckModal'
@@ -117,7 +119,7 @@ export default function ArbitragePage() {
           <select data-guide-feature="features.arbitrage.arbitrage-page.select-2" className="select-control" value={criteria.stage} onChange={(e) => patch({ stage: e.target.value })}>
             <option value="GA_TO_FC">GA→설계사</option>
             <option value="">전체</option>
-            <option value="INSURER_TO_GA">원수사→GA</option>
+            <option value="INSURER_TO_GA">보험회사→GA</option>
           </select>
         </Field>
         <Field variant="filter" className="arb-filter-insurer" label="보험회사">
@@ -178,7 +180,10 @@ export default function ArbitragePage() {
         <section data-guide-feature="features.arbitrage.arbitrage-page.section-2" className="surface arb-list-panel" aria-labelledby="arb-list-title">
           <ListHeader className="arb-panel-header" total={query.data?.items?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title" id="arb-list-title">
-              ③ 계약별 판정
+              계약별 판정{' '}
+              <EvidenceLink icon="help" label="지급예정액 상한 설명">
+                {UPPER_BOUND_NOTE}
+              </EvidenceLink>
             </h2>
           </ListHeader>
           {busy || query.error ? (
@@ -212,7 +217,7 @@ export default function ArbitragePage() {
         <section data-guide-feature="features.arbitrage.arbitrage-page.section-3" className="surface arb-detail-panel" aria-labelledby="arb-detail-title">
           <header className="surface-header arb-panel-header">
             <h2 className="surface-title" id="arb-detail-title">
-              ④ 상세
+              상세
             </h2>
             {selected && !query.error ? <ArbitrageBadge row={selected} /> : null}
           </header>

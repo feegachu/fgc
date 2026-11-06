@@ -131,7 +131,7 @@ function DashboardContent({ month }: { month: string }) {
         color: 'success',
         label: '원장 불균형',
         value: data.journalImbalance,
-        footer: '기표 전 0건 필수',
+        footer: '확정 전 0건이어야 합니다',
         tone: data.journalImbalance === 0 ? 'success' : 'error',
         to: href('/journals'),
       },
@@ -271,7 +271,7 @@ function DashboardContent({ month }: { month: string }) {
                 </header>
                 <RiskComposition items={compositionItems} />
                 <p className="risk-composition-note">
-                  미처리 예외는 일부 항목과 겹쳐 비중에서 제외했습니다. 항목마다 세는 단위가 달라 건수의 단순 비율로 표시합니다.
+                  미처리 예외는 제외한 비중입니다.
                 </p>
               </section>
               <section data-guide-feature="features.dashboard.dashboard-page.section-3" className="surface run-list-card" aria-labelledby="run-list-title">
@@ -314,8 +314,8 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const progress = Math.max(0, Math.min(100, step * 10))
   return (
     <Link data-guide-feature="features.dashboard.dashboard-page.link-5" className="run-row" to={to}>
-      <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}회차`}</strong>
-      <span className="run-meta">{`${step}/${RUN_STEPS} 단계, 실행 ${run.triggeredBy ?? '-'}`}</span>
+      <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}차 실행`}</strong>
+      <span className="run-meta">{`${step}/${RUN_STEPS} 단계`}</span>
       <StatusBadge tone={runStatusTone(run.status)}>{run.statusLabel ?? '-'}</StatusBadge>
       <span
         className="run-steps"

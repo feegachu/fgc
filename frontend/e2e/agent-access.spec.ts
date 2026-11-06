@@ -32,7 +32,7 @@ async function agentFixture(page: Page, commission = 300000) {
     const contract = {
       contractId: 1, contractNo: 'FGC-FGL01-202607-0001', insurerName: '가상생명', productName: 'GOLDEN 상품',
       contractDate: '2026-07-10', monthlyEquivalentFirstPremium: 100000, contractStatus: 'ACTIVE',
-      contractStatusLabel: '정상', agentIdName: 'A-FC-001 김정산', agentName: '김정산', dataOrigin: 'MANUAL',
+      contractStatusLabel: '정상', agentIdName: '김정산 (A-FC-001)', agentName: '김정산', dataOrigin: 'MANUAL',
     }
     if (path === '/api/v1/contracts') return fulfill({ content: [contract], totalPages: 1, totalElements: 1, page: 1, size: 20 })
     if (path === '/api/v1/transactions') return fulfill({

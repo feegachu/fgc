@@ -215,7 +215,7 @@ function Snapshot({
           <p className="ah-profile-name">{name ? `${name}님` : '설계사님'}</p>
         </div>
       </article>
-      <h2 className="ah-heading">이번달 현황</h2>
+      <h2 className="ah-heading">이번 달 현황</h2>
       <div className="ah-kpis kpi-group" role="region" aria-label="이번 달 현황">
         <article className="ah-kpi kpi-card kpi-card-info" aria-label="신규 계약 건수">
           <KpiCardContent
@@ -346,7 +346,7 @@ function Charts({
         <div>
           <h2 className="ah-panel-title">설계사 판매 관리</h2>
           <p className="ah-panel-sub">{`${label}, ${kindLabel(kind)}`}</p>
-          <p className="ah-panel-sub">{`기준일 ${home.asOf} · 집계 기간 ${range?.from ?? '-'} ~ ${range?.to ?? '-'} · 분모 계약 ${home.portfolio?.contractCount ?? 0}건`}</p>
+          <p className="ah-panel-sub">{`기준일 ${home.asOf}, 집계 기간 ${range?.from ?? '-'} ~ ${range?.to ?? '-'}, 계약 ${home.portfolio?.contractCount ?? 0}건`}</p>
         </div>
         <div className="ah-controls">
           <Segmented label="기간" options={PERIODS} value={period} onChange={onPeriod} />

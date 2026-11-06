@@ -171,7 +171,7 @@ it('도움말은 실제 서버 성공 이후 완료를 표시하고 안내 종�
   expect(Object.keys(useUnsavedWorkStore.getState().owners)).toHaveLength(0)
   expect(screen.getByTestId('location')).toHaveTextContent('/contracts/600')
   fireEvent.click(screen.getByRole('button', { name: '다음' }))
-  await screen.findByText('서버 저장 확인 · 가이드 완료')
+  await screen.findByText('저장 완료')
   fireEvent.click(screen.getByRole('button', { name: '안내 마치기' }))
   await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/schedules/11'))
 })

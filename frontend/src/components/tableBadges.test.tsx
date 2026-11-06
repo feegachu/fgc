@@ -15,10 +15,10 @@ it('표의 전체 선택지가 4종 이상이면 배지로, 3종 이하면 텍�
     { key: 'origin', label: '출처', render: () => <DataOriginBadge code="SEED" /> },
     {
       key: 'source',
-      label: '원천유형',
+      label: '자료 구분',
       render: () => (
         <CategoryBadge value="INSURER_STATEMENT" optionCount={7} tablePresentation="text">
-          원수사 명세
+          보험회사 명세
         </CategoryBadge>
       ),
     },
@@ -50,7 +50,7 @@ it('표의 전체 선택지가 4종 이상이면 배지로, 3종 이하면 텍�
   }
   expect(scope.getByText('서버/계약 상태')).toHaveAttribute('data-table-presentation', 'dot')
   expect(scope.getByText('미계산')).toHaveAttribute('data-table-presentation', 'dot')
-  for (const label of ['세 가지 유형', '초기 자료', '긴급', '원수사 명세']) {
+  for (const label of ['세 가지 유형', '기존 자료', '긴급', '보험회사 명세']) {
     expect(scope.getByText(label)).toHaveAttribute('data-table-presentation', 'text')
   }
 })

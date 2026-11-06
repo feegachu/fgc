@@ -604,7 +604,7 @@ public class ContractServiceImpl implements ContractService {
         )) {
             throw validationException(
                     AGENT_ID_FIELD,
-                    "계약일 기준 활동 중인 FC 직급의 모집설계사만 선택할 수 있습니다."
+                    "계약일 기준 활동 중인 모집 설계사만 선택할 수 있습니다."
             );
         }
 
@@ -796,7 +796,7 @@ public class ContractServiceImpl implements ContractService {
         // 1. 상태가 같으면 일반 수정이며 사건을 받지 않는다
         if (!statusChanged) {
             if (event != null) {
-                throw validationException("statusEvent", "상태를 바꾸지 않는 수정에는 상태 사건을 보내지 않습니다.");
+                throw validationException("statusEvent", "상태를 바꾸지 않는 수정에는 상태 변경을 보내지 않습니다.");
             }
             return;
         }
@@ -843,7 +843,7 @@ public class ContractServiceImpl implements ContractService {
                 .map(ContractStatusEvent::getEffectiveAt)
                 .orElseGet(() -> contractDate.atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
         if (effectiveAt.isBefore(earliest)) {
-            throw eventOrder(field, "효력일시는 최신 사건의 효력일시 " + earliest + " 이후여야 합니다.");
+            throw eventOrder(field, "효력일시는 최신 상태 변경의 효력일시 " + earliest + " 이후여야 합니다.");
         }
     }
 
@@ -1005,7 +1005,7 @@ public class ContractServiceImpl implements ContractService {
                     contractId,
                     paymentStage,
                     exception.getDetail() == null
-                            ? "적용 가능한 1,200% 룰셋이 없습니다."
+                            ? "적용 가능한 1,200% 한도 규칙이 없습니다."
                             : exception.getDetail()
             );
         }

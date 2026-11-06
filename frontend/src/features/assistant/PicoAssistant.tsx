@@ -129,7 +129,7 @@ function CalculationCard({ result, current }: { result: CalculationResult; curre
           {source.title} (v{source.version})
         </p>
       ))}
-      {result.missingInputs.length > 0 && <p>전체 지급 후보, 귀속, 원천 근거를 먼저 확인해야 합니다.</p>}
+      {result.missingInputs.length > 0 && <p>전체 지급 후보, 귀속, 근거를 먼저 확인해야 합니다.</p>}
       <p>{result.recommendation.reason}</p>
       <small>합성 자료, 입력값 반영/실제 지급 없음</small>
     </section>
@@ -163,7 +163,7 @@ function PicoContextLine({ screenId, paymentId }: { screenId: string; paymentId:
   const title = screens.find((screen) => screen.id === screenId)?.title ?? '공통 화면'
   return (
     <p className="pico-context">
-      현재 화면 {title}, 대상 {paymentId ? `지급 번호 ${paymentId}` : '선택 없음'}, 기준월 {month ?? '선택 없음'}
+      현재 화면 {title}, 대상 {paymentId ? '선택한 지급 건' : '선택 없음'}, 기준월 {month ?? '선택 없음'}
     </p>
   )
 }
@@ -578,7 +578,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                     </div>
                     <div className="pico-welcome-foot">
                       <Symbol name="menu_book" />
-                      승인된 업무 가이드를 바탕으로 안내해요.
+                      업무 안내를 바탕으로 답해요.
                     </div>
                   </div>
                 )}
@@ -597,13 +597,13 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
                         <div className="pico-answer-author">
                           <img src={guide} alt="피코" />
                           <b>피코</b>
-                          <span>{entry.reply.source === 'AI' ? 'AI 가이드 답변' : '시스템 안내'}</span>
+                          <span>{entry.reply.source === 'AI' ? 'AI 답변' : '안내'}</span>
                         </div>
                         <p>{entry.reply.message}</p>
                         {entry.reply.evidenceRefs?.map((source) => (
                           <div className="pico-source" key={source.chunkId}>
                             <Symbol name="menu_book" />
-                            {source.title} (v{entry.reply.guideVersion})
+                            {source.title}
                           </div>
                         ))}
                         {entry.reply.decision === 'START_GUIDE' && entry.reply.validatedGuide && (
@@ -818,7 +818,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
             </form>
             <small>
               {aiEnabled
-                ? '승인된 업무 가이드 기준, 실제 계산과 처리는 업무 화면에서 확인'
+                ? '업무 안내 기준, 실제 계산과 처리는 업무 화면에서 확인'
                 : observed
                   ? '시연 질문은 합성 자료, 저장된 지급 계산은 별도 조회, 실제 AI 미연결'
                   : '합성 데이터 시연, 실제 AI/계약/지급과 연결되지 않습니다.'}

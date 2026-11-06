@@ -213,9 +213,9 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(within(table).getByText('C-0001')).toBeInTheDocument()
     // UTC 15:30 은 Asia/Seoul 로 다음 날 00:30 이다.
     expect(within(table).getByText('2026-07-11 00:30')).toBeInTheDocument()
-    const run = screen.getByRole('link', { name: /2026년 7월 2회차/ })
+    const run = screen.getByRole('link', { name: /2026년 7월 2차 실행/ })
     expect(within(run).getByRole('progressbar', { name: '검증 진행률' })).toHaveAttribute('aria-valuenow', '40')
-    expect(run).toHaveTextContent('4/10 단계, 실행 settle01')
+    expect(run).toHaveTextContent('4/10 단계')
   })
 
   it('도넛과 범례의 hover·focus로 항목·건수·비중을 확인하며 기준월 링크를 유지한다', async () => {
@@ -290,7 +290,7 @@ describe('DASH-W01 업무 대시보드', () => {
       'href',
       '/app/exceptions?contractNo=C-0001&month=2026-07',
     )
-    expect(screen.getByRole('link', { name: /2026년 7월 2회차/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /2026년 7월 2차 실행/ })).toHaveAttribute(
       'href',
       '/app/validation-runs/77?month=2026-07',
     )
@@ -416,7 +416,9 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(first).toHaveTextContent('미처리 예외 2건, 한도 근접 1건')
     expect(within(attention).getByRole('link', { name: '최해촉 (A-FC-004) 계약 목록 열기' })).toHaveTextContent('최해촉 (해촉)')
     expect(within(attention).getByRole('link', { name: '박중지 (A-FC-009) 계약 목록 열기' })).toHaveTextContent('박중지 (사용 중지)')
-    expect(within(region).getByText(home.basis!)).toBeInTheDocument()
+    expect(within(region).queryByText(home.basis!)).not.toBeInTheDocument()
+    await actions.click(within(region).getByRole('button', { name: '현황 집계 기준' }))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(home.basis!)
     await actions.click(within(attention).getByRole('link', { name: '김정산 (A-FC-001) 계약 목록 열기' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/app/contracts'))
     expect(new URLSearchParams(router.state.location.search).get('agentId')).toBe('1')

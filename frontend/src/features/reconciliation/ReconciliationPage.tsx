@@ -350,7 +350,7 @@ export default function ReconciliationPage() {
   return (
     <div className="reco-react-page list-page">
       <header className="page-header">
-        <ScreenHelp screenId="RECO-W01" saveGuide={executionGuide} outcome="execution" />
+        {canProcess ? <ScreenHelp screenId="RECO-W01" saveGuide={executionGuide} outcome="execution" /> : <ScreenHelp screenId="RECO-W01" variant="reader" />}
         <h1 className="page-title">대사 실행/결과</h1>
       </header>
       <section data-guide-feature="features.reconciliation.reconciliation-page.section" data-guide-target="reconciliation.filters" className="surface reco-react-run" aria-label="대사 실행 조건">
@@ -359,7 +359,7 @@ export default function ReconciliationPage() {
           observedId={runId}
           observedStatus={status}
           resultReady={results.isSuccess && !results.isFetching}
-          queryError={history.isError || results.isError ? '서버 결과 조회에 실패했습니다. 다시 조회하세요.' : ''}
+          queryError={history.isError || results.isError ? '결과를 불러오지 못했습니다. 다시 조회하세요.' : ''}
           criteria={criteria}
           pending={execution.isPending}
           canProcess={canProcess}
@@ -425,7 +425,7 @@ export default function ReconciliationPage() {
                   value={type}
                   onChange={(e) => update({ resultType: e.target.value, resultPage: '' }, { resetPage: false })}
                 >
-                  <option value="">전체 (11종)</option>
+                  <option value="">전체</option>
                   {Object.entries(RESULT_TYPE).map(([code, label]) => (
                     <option key={code} value={code}>
                       {label}

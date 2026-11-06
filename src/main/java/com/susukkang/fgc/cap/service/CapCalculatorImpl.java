@@ -83,7 +83,7 @@ public class CapCalculatorImpl implements CapCalculator {
                             "contractId", command.contractId(),
                             "paymentStage", command.paymentStage().name()
                     ),
-                    "적용 가능한 1,200% 룰셋이 없습니다."
+                    "적용 가능한 1,200% 한도 규칙이 없습니다."
             );
         }
 
@@ -155,7 +155,7 @@ public class CapCalculatorImpl implements CapCalculator {
                     ? evidenceMissing
                         ? "제외 요건의 건별 증빙이 회차 금액을 채우지 못해 사람 판단이 필요하다"
                         : ruleItem.getDecisionReason()
-                    : "1,200% 룰셋에 분류되지 않은 수수료 항목이라 사람 판단이 필요하다";
+                    : "1,200% 한도 규칙에 분류되지 않은 수수료 항목이라 사람 판단이 필요하다";
             String itemCode = ruleItem != null ? ruleItem.getItemCode() : null;
             String itemName = ruleItem != null ? ruleItem.getItemName() : null;
 

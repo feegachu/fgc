@@ -88,16 +88,6 @@ const columns = (back: string, refreshing: boolean): TableColumn<ScheduleHeader>
     ),
   },
   {
-    key: 'purpose',
-    // 태그 컬럼은 머리글과 값을 함께 가운데 정렬한다.
-    label: '용도',
-    width: '6.5rem',
-    align: 'center',
-    render: (row) => (
-      <ClassificationBadge label={responseLabel(row.schedulePurposeLabel, SCHEDULE_PURPOSE, row.schedulePurpose)} />
-    ),
-  },
-  {
     key: 'version',
     label: '버전',
     sortable: true,
@@ -124,11 +114,11 @@ const columns = (back: string, refreshing: boolean): TableColumn<ScheduleHeader>
   },
   {
     key: 'lines',
-    label: '회차 / 행 수',
+    label: '회차 수',
     sortable: true,
     width: '5.5rem',
     align: 'left',
-    render: (row) => `${row.installmentCount == null ? '회차 자료 없음' : `${int(row.installmentCount)}회`} · ${row.lineCount == null ? '행 수 자료 없음' : `${int(row.lineCount)}행`}`,
+    render: (row) => (row.installmentCount == null ? '회차 자료 없음' : `${int(row.installmentCount)}회`),
   },
   {
     key: 'total',
@@ -255,7 +245,7 @@ export default function ScheduleListPage() {
             <span className="material-symbols-rounded" aria-hidden="true">
               warning
             </span>
-            <p>같은 계약과 지급단계에 사용 중인 운영 스케줄이 중복되었습니다. 데이터 확인이 필요합니다.</p>
+            <p>같은 계약과 지급단계에 사용 중인 실제 지급용 스케줄이 중복되었습니다. 자료 확인이 필요합니다.</p>
           </div>
         )}
 

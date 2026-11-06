@@ -200,7 +200,7 @@ public class CapExceptionServiceImpl implements CapExceptionService {
         }
         if (command.policyVersionId() == null) throw new IllegalArgumentException("정책 버전 ID가 없습니다.");
         if (command.paymentStage() == null) throw new IllegalArgumentException("지급 단계가 없습니다.");
-        if (command.capRuleSetId() == null) throw new IllegalArgumentException("한도 룰셋 ID가 없습니다.");
+        if (command.capRuleSetId() == null) throw new IllegalArgumentException("한도 규칙 ID가 없습니다.");
         if (command.resultStatus() == null) throw new IllegalArgumentException("한도 판정 결과가 없습니다.");
         if (command.resultStatus() == CapResultStatus.WARNING
                 || command.resultStatus() == CapResultStatus.VIOLATION) {

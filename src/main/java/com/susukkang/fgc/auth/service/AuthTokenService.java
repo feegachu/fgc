@@ -98,7 +98,7 @@ public class AuthTokenService {
                 user.getUserId(), RevokedReason.SUPERSEDED, now);
         if (superseded > 0) {
             auditListener.recordTokenEvent("LOGIN_SUPERSEDED", user.getUserId(), user.getUsername(),
-                    "무효화된 이전 로그인 " + superseded + "건");
+                    "종료된 이전 로그인 " + superseded + "건");
         }
         IssuedTokens tokens = issue(user, UUID.randomUUID(), now.plus(refreshTokenTtl), now);
         auditListener.recordTokenEvent("LOGIN_SUCCESS", user.getUserId(), user.getUsername(), null);
@@ -153,7 +153,7 @@ public class AuthTokenService {
             int revoked = refreshTokenRepository.revokeActiveByUserId(
                     token.getUserId(), RevokedReason.REUSE_DETECTED, now);
             auditListener.recordTokenEvent("REFRESH_REUSE_DETECTED", token.getUserId(), loginId,
-                    "회전된 Refresh 재사용 — 활성 로그인 " + revoked + "건 무효화");
+                    "이미 쓴 로그인 정보 재사용, 활성 로그인 " + revoked + "건 종료");
         }
         return RefreshResult.rejected(FgcErrorCode.AUTH_002);
     }

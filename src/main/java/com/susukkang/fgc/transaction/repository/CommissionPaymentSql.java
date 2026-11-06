@@ -58,16 +58,16 @@ final class CommissionPaymentSql {
             SELECT ct.commission_transaction_id,
                            ct.payment_stage,
                            CASE ct.payment_stage
-                               WHEN 'INSURER_TO_GA' THEN '원수사→GA'
+                               WHEN 'INSURER_TO_GA' THEN '보험회사→GA'
                                WHEN 'GA_TO_FC' THEN 'GA→설계사'
                            END AS payment_stage_label,
                            ct.source_type,
                            CASE ct.source_type
-                               WHEN 'INSURER_STATEMENT' THEN '원수사 명세'
+                               WHEN 'INSURER_STATEMENT' THEN '보험회사 명세'
                                WHEN 'GA_MANUAL_PAYMENT' THEN 'GA 수기지급'
                                WHEN 'GA_CONFIRMED_PAYMENT' THEN 'GA 확정지급'
                                WHEN 'ADJUSTMENT' THEN '조정'
-                               WHEN 'ALLOCATION_POOL' THEN '공통비 풀'
+                               WHEN 'ALLOCATION_POOL' THEN '공통비'
                                WHEN 'CLAWBACK' THEN '환수'
                                WHEN 'RECOVERY' THEN '회수'
                            END AS source_type_label,

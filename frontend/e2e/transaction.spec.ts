@@ -126,7 +126,7 @@ async function installApi(
           json: envelope({
             paymentId: 101,
             confirmable: false,
-            blockers: [{ code: 'FGC-TRAN-002', message: '귀속행을 입력하세요.' }],
+            blockers: [{ code: 'FGC-TRAN-002', message: '귀속 내역을 입력하세요.' }],
             capPreview: [],
           }),
         })
@@ -338,7 +338,7 @@ test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경�
   await page.getByRole('link', { name: '지급 등록', exact: true }).click()
   expect(new URL(page.url()).searchParams.has('attributionDate')).toBe(false)
   await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), '1')
-  const attributionDate = page.getByLabel('1번 귀속행 귀속일', { exact: true })
+  const attributionDate = page.getByLabel('1번 귀속 내역 귀속일', { exact: true })
   await expect(attributionDate).toHaveValue('')
   await page.locator('#btn-save').click()
   await expect(attributionDate).toHaveAttribute('aria-invalid', 'true')
@@ -347,13 +347,13 @@ test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경�
   ).toHaveLength(0)
   await info.attach('귀속일 필수 입력', { body: await page.screenshot(), contentType: 'image/png' })
   await attributionDate.fill('2027-07-10')
-  await page.getByRole('button', { name: '귀속행 추가', exact: true }).click()
-  await selectEntity(page, page.getByLabel('2번 귀속행 계약번호', { exact: true }), '1')
-  const secondDate = page.getByLabel('2번 귀속행 귀속일', { exact: true })
+  await page.getByRole('button', { name: '귀속 내역 추가', exact: true }).click()
+  await selectEntity(page, page.getByLabel('2번 귀속 내역 계약번호', { exact: true }), '1')
+  const secondDate = page.getByLabel('2번 귀속 내역 귀속일', { exact: true })
   await expect(secondDate).toHaveValue('')
   await page.locator('#btn-save').click()
   await expect(secondDate).toHaveAttribute('aria-invalid', 'true')
-  await page.getByRole('button', { name: '2번 귀속행 삭제', exact: true }).click()
+  await page.getByRole('button', { name: '2번 귀속 내역 삭제', exact: true }).click()
   await page.locator('#btn-save').click()
   await expect(page.locator('#btn-precheck')).toBeEnabled()
   expect(fixture.payment()).toMatchObject({
@@ -369,7 +369,7 @@ async function enterDraft(page: Page, amount: number, count: number) {
   await page.locator('#bizKey').fill('E2E-MULTI-CONTRACT')
   await page.locator('#amount').fill(String(amount))
   for (let index = 0; index < count; index++) {
-    await page.getByRole('button', { name: '귀속행 추가' }).click()
+    await page.getByRole('button', { name: '귀속 내역 추가' }).click()
     const row = page
       .locator('#attr-body tr')
       .filter({ has: page.locator('[data-contract-id]') })
@@ -567,7 +567,7 @@ test('초안의 자동 보정된 귀속값은 수정 저장 후에만 검증한�
   })
   await page.goto('transactions/new?id=101&month=2026-07')
   await expect(page.locator('#btn-save')).toBeEnabled()
-  await expect(page.getByLabel('1번 귀속행 산입 판정')).toHaveValue('INCLUDED')
+  await expect(page.getByLabel('1번 귀속 내역 산입 판정')).toHaveValue('INCLUDED')
   await expect(page.locator('#btn-precheck')).toBeDisabled()
   await expect(page.getByText(/귀속 입력을 조정/)).toBeVisible()
   await page.locator('#btn-save').click()
@@ -610,7 +610,7 @@ test('빈 저장 초안은 빈 귀속표로 보여 주고 서버 입력 오류�
   await page.locator('#btn-precheck').click()
   await expect(page.locator('#btn-confirm')).toBeEnabled()
   await page.locator('#btn-confirm').click()
-  await expect(page.getByRole('dialog')).toContainText('귀속행을 입력하세요.')
+  await expect(page.getByRole('dialog')).toContainText('귀속 내역을 입력하세요.')
   await expect(page.getByRole('dialog')).not.toContainText('FGC-TRAN-002')
   await expect(page.locator('#btn-confirm-submit')).toHaveCount(0)
 })

@@ -136,7 +136,7 @@ function RequestCheckModal({ onClose, onDone }: { onClose: () => void; onDone: (
       }
     >
       <div className="acq-request-body">
-        <p>활성 예정 스케줄을 정책 기준으로 판정해 결과를 저장합니다. 금액과 요율은 입력하지 않습니다.</p>
+        <p>사용 중인 예상 스케줄을 정책 기준으로 판정해 결과를 저장합니다. 금액과 요율은 입력하지 않습니다.</p>
         <Field label="계약" required error={submitted && !contractId ? '계약을 고르세요.' : undefined}>
           <SearchSelect
             data-guide-feature="features.acquisition-cost.acquisition-cost-page.search-select"
@@ -165,7 +165,7 @@ function RequestCheckModal({ onClose, onDone }: { onClose: () => void; onDone: (
             }}
           >
             <option value="GA_TO_FC">GA→설계사</option>
-            <option value="INSURER_TO_GA">원수사→GA</option>
+            <option value="INSURER_TO_GA">보험회사→GA</option>
           </select>
         </Field>
         {mutation.error && (
@@ -219,7 +219,7 @@ export default function AcquisitionCostPage() {
         <div className="page-header-copy">
           <h1 className="page-title">계약체결비용 한도 검증</h1>
           <p className="page-description">
-            선지급과 유지관리 예정 금액을 계약체결비용 한도와 각각 비교합니다. 예정 스케줄 생성과 별개이며, 이 검증 없이도 예정 생성과 조회는 할 수 있습니다.
+            선지급과 유지관리 예정 금액을 계약체결비용 한도와 각각 비교합니다.
           </p>
         </div>
         <div className="page-header-actions">
@@ -261,7 +261,7 @@ export default function AcquisitionCostPage() {
           >
             <option value="">전체</option>
             <option value="GA_TO_FC">GA→설계사</option>
-            <option value="INSURER_TO_GA">원수사→GA</option>
+            <option value="INSURER_TO_GA">보험회사→GA</option>
           </select>
         </Field>
         <Field variant="filter" label="보험회사">

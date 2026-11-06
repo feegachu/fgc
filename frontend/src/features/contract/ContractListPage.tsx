@@ -38,7 +38,7 @@ import {
 } from './api'
 import type { ContractCriteria, ContractSummary } from './api'
 import { contractStatusLabels } from './labels'
-import { ContractStatusBadge, DataOriginBadge } from './badges'
+import { ContractStatusBadge } from './badges'
 import { contractErrorText } from './detailState'
 import './legacy.css'
 import './list.css'
@@ -134,13 +134,6 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     render: (row) =>
       row.capResultStatus ? <CapStatus code={row.capResultStatus} label={row.capResultStatusLabel} /> : '-',
   },
-  {
-    key: 'origin',
-    label: '데이터 출처',
-    width: '5.5rem',
-    align: 'center',
-    render: (row) => <DataOriginBadge code={row.dataOrigin} label={row.dataOriginLabel} />,
-  },
 ]
 
 export default function ContractListPage() {
@@ -151,6 +144,7 @@ export default function ContractListPage() {
   const navigate = useContextNavigation()
   const location = useLocation()
   const back = location.pathname + location.search
+  const isAgent = useAuth().user?.roleCode === 'AGENT'
   const exporting = useMutation({
     mutationFn: () => exportCsv(listCsvPath(criteria), { filename: 'contracts.csv', notifyError: false }),
     meta: { errorToast: false },
@@ -164,7 +158,7 @@ export default function ContractListPage() {
   return (
     <div className="contract-list-page list-page">
       <header className="page-header contract-page-header">
-        <ScreenHelp screenId="CONT-W01" />
+        {canProcess || isAgent ? <ScreenHelp screenId="CONT-W01" /> : <ScreenHelp screenId="CONT-W01" variant="reader" />}
         <h1 className="page-title">보험계약 목록</h1>
         <div className="page-header-actions">
           <Button data-guide-feature="features.contract.contract-list-page.button" variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>

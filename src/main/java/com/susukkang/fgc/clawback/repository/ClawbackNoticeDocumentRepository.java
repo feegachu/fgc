@@ -70,12 +70,12 @@ public class ClawbackNoticeDocumentRepository {
     /** 계약자 개인정보는 읽지 않는다. 계약번호·보험회사·상품·설계사·원인만 표시한다. */
     public record NoticeHeader(String contractNo, String insurerName, String productName, String agentCode,
                                String agentName, String triggerStatus, OffsetDateTime triggerEffectiveAt,
-                               String policyCode, String policyName, int policyVersionNo) { }
+                               String policyName, int policyVersionNo) { }
 
     public NoticeHeader findHeader(long caseId, long policyVersionId) {
         return jdbc.queryForObject("""
                 SELECT ic.contract_no, i.insurer_name, p.product_name, a.agent_code, a.agent_name,
-                       se.new_status, se.effective_at, pv.policy_code, pv.policy_name, pv.version_no
+                       se.new_status, se.effective_at, pv.policy_name, pv.version_no
                   FROM fgc.clawback_case cc
                   JOIN fgc.insurance_contract ic ON ic.contract_id = cc.contract_id
                   JOIN fgc.insurer i ON i.insurer_id = ic.insurer_id
@@ -87,7 +87,7 @@ public class ClawbackNoticeDocumentRepository {
                  WHERE cc.clawback_case_id = ?
                 """, (rs, n) -> new NoticeHeader(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
                 rs.getString(5), rs.getString(6), rs.getObject(7, OffsetDateTime.class), rs.getString(8),
-                rs.getString(9), rs.getInt(10)), policyVersionId, caseId);
+                rs.getInt(9)), policyVersionId, caseId);
     }
 
     public Map<Long, String> findItemNames() {

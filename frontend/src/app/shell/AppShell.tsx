@@ -117,7 +117,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         </main>
         <SettlementGuide user={user} month={month} />
         {!location.pathname.startsWith('/agent-home') && (
-          <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
+          <footer className="app-footer">FGC 수수료 정산 검증 시스템</footer>
         )}
       </div>
       {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (

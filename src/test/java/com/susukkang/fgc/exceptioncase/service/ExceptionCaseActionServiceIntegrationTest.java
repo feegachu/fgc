@@ -216,7 +216,7 @@ class ExceptionCaseActionServiceIntegrationTest {
         exceptionCaseService.action(
                 exceptionCaseId,
                 new ExceptionActionRequest(
-                        ExceptionActionType.FALSE_POSITIVE, "오탐으로 판단했습니다.", "DOC-REOPEN-REJECT"),
+                        ExceptionActionType.FALSE_POSITIVE, "예외 아님으로 판단했습니다.", "DOC-REOPEN-REJECT"),
                 userId,
                 loginId);
 

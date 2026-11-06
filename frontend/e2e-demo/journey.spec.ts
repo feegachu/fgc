@@ -87,7 +87,7 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
   await page.locator('#bizKey').fill(`E2E-418-PAYMENT-${amount}`)
   await page.locator('#amount').fill(String(amount))
   for (let index = 0; index < contracts.length; index++) {
-    await page.getByRole('button', { name: '귀속행 추가' }).click()
+    await page.getByRole('button', { name: '귀속 내역 추가' }).click()
     const row = page
       .locator('#attr-body tr')
       .filter({ has: page.locator('[data-contract-id]') })
@@ -106,9 +106,9 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
   expect(precheck.confirmable).toBe(expectedConfirmable)
   await expect(page.locator('#gate-list .transaction-gate-label')).toHaveText([
     '1. 작성중으로 저장, 통과',
-    '2. 귀속행 입력, 통과',
+    '2. 귀속 내역 입력, 통과',
     '3. 귀속합계와 지급액 일치, 통과',
-    '4. 검토필요 귀속 해소, 통과',
+    '4. 검토 필요 귀속 정리, 통과',
     `5. 1,200% 사전검증, ${expectedConfirmable ? '통과' : '차단'}`,
     `6. 모두 통과하면 확정, ${expectedConfirmable ? '통과' : '미확인'}`,
   ])
@@ -222,7 +222,7 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
   await expect(page.locator('.vrun-progress-value')).toHaveText('8/10 단계 (80%)')
   for (let index = 0; index < 8; index++) await expect(steps.nth(index)).toContainText('완료')
   for (let index = 8; index < 10; index++) {
-    await expect(steps.nth(index)).toContainText('사람이 수행')
+    await expect(steps.nth(index)).toContainText('담당자 처리')
     await expect(steps.nth(index)).toContainText('대기')
   }
   const checklist = await api(page, `/validation-runs/${run.validationRunId}/finalize-checklist`)
