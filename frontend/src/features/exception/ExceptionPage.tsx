@@ -132,14 +132,6 @@ export function ExceptionPage() {
       ),
     },
     {
-      key: 'contract',
-      label: '계약',
-      sortKey: 'contractNo',
-      sortable: true,
-      width: '12rem',
-      render: (row) => row.contractNo ?? '-',
-    },
-    {
       key: 'title',
       label: '내용',
       sortKey: 'title',
@@ -165,6 +157,14 @@ export function ExceptionPage() {
       sortable: true,
       width: '6rem',
       render: (row) => row.assigneeLoginId ?? '미배정',
+    },
+    {
+      key: 'contract',
+      label: '계약',
+      sortKey: 'contractNo',
+      sortable: true,
+      width: '12rem',
+      render: (row) => row.contractNo ?? '-',
     },
     {
       key: 'reason',
