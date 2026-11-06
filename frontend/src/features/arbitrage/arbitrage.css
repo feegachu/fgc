@@ -584,3 +584,9 @@
   line-height: 1.6;
   margin: 0.75rem 0 0;
 }
+
+/* 금액만 노출하고 기존 근거 컨트롤로 hover·focus·클릭 설명을 제공한다. */
+.arb-planned-amount .evidence-trigger {
+  color: inherit;
+  font: inherit;
+}

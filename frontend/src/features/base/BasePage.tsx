@@ -1,7 +1,8 @@
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useReferenceDate } from '../reference/utils'
 import { useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useOutletContext, useSearchParams } from 'react-router'
+import type { ShellContext } from '../../app/shell/AppShell'
 import { DataTable } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
@@ -135,7 +136,9 @@ function BaseFilters({
     </>
   )
 }
+/** 기준정보 탭과 기준일·도움말을 같은 도구 행에 배치하고 기존 조회 조건을 유지한다. */
 export function BasePage() {
+  const { revised = false } = useOutletContext<ShellContext>()
   const defaultDate = useReferenceDate()
   const [params, setParams] = useSearchParams()
   const tab = tabs.find((t) => t.id === params.get('tab'))?.id ?? 'organization'
@@ -234,19 +237,25 @@ export function BasePage() {
       return next
     })
   }
+  const dateSummary = (
+    <p className="base-as-of-summary">
+      기본 조회 기준일<strong>{defaultDate}</strong>
+    </p>
+  )
   return (
     <div className="base-page">
       <header className="page-header base-page-header">
-        <ScreenHelp screenId="BASE-W01" />
+        {!revised && <ScreenHelp screenId="BASE-W01" />}
         <div className="page-header-copy">
           <h1 className="page-title">기준정보 조회</h1>
         </div>
-        <p className="base-as-of-summary">
-          기본 조회 기준일<strong>{defaultDate}</strong>
-        </p>
+        {!revised && dateSummary}
       </header>
       <div data-guide-target="base.overview" className="base-workspace">
-        <ReferenceTabs tabs={tabs} active={tab} onChange={changeTab} label="기준정보 유형" panelClassName="base-panel">
+        <ReferenceTabs
+          tabs={tabs} active={tab} onChange={changeTab} label="기준정보 유형" panelClassName="base-panel"
+          actions={revised ? <>{dateSummary}<ScreenHelp screenId="BASE-W01" /></> : undefined}
+        >
           <BaseFilters
             key={`${tab}:${params.toString()}:${defaultDate}`}
             tab={tab}

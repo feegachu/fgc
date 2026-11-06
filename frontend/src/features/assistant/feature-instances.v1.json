@@ -79,6 +79,12 @@
     "sources",
     "history"
   ],
+  "dashboard.chart-view": [
+    "branch-commissions",
+    "branch-agents",
+    "branch-contracts",
+    "branch-exceptions"
+  ],
   "dashboard.kpi": [
     "cap-violation",
     "cap-warning",

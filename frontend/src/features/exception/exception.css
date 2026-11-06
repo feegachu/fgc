@@ -512,6 +512,10 @@
   gap: var(--space-4);
 }
 
+[data-ui-revision='after'] .exception-page > .exception-summary-grid {
+  margin-top: 0;
+}
+
 /* 공통 filter-bar 위에 폭만 얹는다 — 예전에는 인라인 min-width 였다. */
 .exception-filter-fields {
   flex: 1 1 auto;
