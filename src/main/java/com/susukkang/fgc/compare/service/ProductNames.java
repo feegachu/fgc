@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
  */
 final class ProductNames {
 
-    /** 상품 하나를 가리킨 곳. at 은 원래 글에서 처음 나온 위치다. */
-    record Mention(int rank, int at) {
+    /** 상품 하나를 가리킨 곳. at·end 는 원래 글에서 처음 나온 곳의 시작과 끝(끝은 포함하지 않는다)이다. */
+    record Mention(int rank, int at, int end) {
     }
 
     /** 카테고리 화면 이름. 줄여 부른 상품 이름이 이것과 같으면 카테고리를 말한 것인지 상품을 말한 것인지 알 수 없다. */
@@ -70,7 +70,7 @@ final class ProductNames {
         }
         candidates.sort(Comparator.comparingInt((Candidate c) -> c.token().length()).reversed());
 
-        Map<Integer, Integer> firstAt = new LinkedHashMap<>();
+        Map<Integer, int[]> firstAt = new LinkedHashMap<>();
         for (Candidate c : candidates) {
             int from = 0;
             int found;
@@ -84,12 +84,12 @@ final class ProductNames {
                     used[i] = true;
                 }
                 if (!c.ambiguous()) {
-                    firstAt.merge(c.rank(), origin.get(found), Math::min);
+                    firstAt.merge(c.rank(), new int[] {origin.get(found), origin.get(end - 1) + 1}, (a, b) -> b[0] < a[0] ? b : a);
                 }
             }
         }
         List<Mention> mentions = new ArrayList<>();
-        firstAt.forEach((rank, at) -> mentions.add(new Mention(rank, at)));
+        firstAt.forEach((rank, span) -> mentions.add(new Mention(rank, span[0], span[1])));
         return mentions;
     }
 

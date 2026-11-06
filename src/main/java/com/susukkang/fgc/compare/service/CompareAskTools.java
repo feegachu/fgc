@@ -84,7 +84,7 @@ final class CompareAskTools {
     /** 상품을 짚지 않은 문장은 "모든/전체 상품"처럼 전체를 말할 때만 상태 주장으로 본다(용어 설명의 "한도를 넘는 금액은…"은 제외). */
     private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체");
     private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
-    /** 한 문장에 한도 도달 표현이 둘 이상이면('1위는 걸렸고 2위는 걸리지 않았어요') 주장이 섞여 있어 판단하지 않는다. */
+    /** 한도 도달 표현. 한 문장에서 긍정과 부정이 섞이면('1위는 걸렸고 2위는 걸리지 않았어요') 주장이 섞여 있어 판단하지 않는다. */
     private static final Pattern CAP_VERB = Pattern.compile("걸리|걸려|걸렸|걸린|도달|초과|넘|닿");
     private static final Pattern NEGATION = Pattern.compile("않|없|못|아니");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
@@ -393,29 +393,40 @@ final class CompareAskTools {
         if (mentioned.isEmpty() && !ALL_SCOPE.matcher(sentence).find()) {
             return null;
         }
-        if (countMatches(CAP_VERB, sentence) > 1) {
+        // 도달 표현마다 뒤따르는 부분에서 부정을 본다. 같은 주장의 반복은 함께 검사하고, 긍정과 부정이 섞이면 판단하지 않는다.
+        Set<Boolean> polarities = new HashSet<>();
+        Matcher verb = CAP_VERB.matcher(sentence);
+        List<int[]> verbs = new ArrayList<>();
+        while (verb.find()) {
+            verbs.add(new int[] {verb.start(), verb.end()});
+        }
+        for (int k = 0; k < verbs.size(); k++) {
+            int to = k + 1 < verbs.size() ? verbs.get(k + 1)[0] : sentence.length();
+            polarities.add(NEGATION.matcher(sentence.substring(verbs.get(k)[1], to)).find());
+        }
+        if (polarities.size() != 1) {
             return null;
         }
-        boolean negated = NEGATION.matcher(sentence.substring(hit.end())).find();
+        boolean negated = polarities.iterator().next();
         // 걸렸다는 말은 말한 상품 모두에 이월이 있어야 맞고, 걸리지 않았다는 말은 하나도 없어야 맞다.
         boolean holds = negated ? scope.stream().noneMatch(item -> item.carryover() > 0)
                 : scope.stream().allMatch(item -> item.carryover() > 0);
         return holds ? null : "CAP_STATE_MISMATCH";
     }
 
-    private static int countMatches(Pattern pattern, String text) {
-        Matcher m = pattern.matcher(text);
-        int count = 0;
-        while (m.find()) {
-            count++;
-        }
-        return count;
+    /** 이름(상품·보험사)이 글에서 차지한 곳. 끝은 포함하지 않는다. */
+    private record Span(int rank, int at, int end) {
     }
 
+    private static final Pattern AFTER_PARTICLE = Pattern.compile("^\\s*(?:은|는|이|가|인|의)?\\s*");
+    private static final Pattern BEFORE_PARTICLE = Pattern.compile("\\s*(?:은|는|이|가|도|만|인)?\\s*$");
+    /** '1위예요', '1위이고', '1위,'처럼 순위 표기로 절이 끝나는 꼴. '2위보다'는 비교 기준이라 여기에 들지 않는다. */
+    private static final Pattern CLAUSE_END = Pattern.compile("^\\s*(?:이고|이며|이면서|이에요|예요|입니다|이었|였|이야|야|이다|이지만|이라|[,.!?]|$)");
+
     /**
-     * 같은 문장에서 순위 표기('1위') 뒤에 나온 상품 이름이 그 순위의 상품이어야 한다. 집합이 아니라 짝을 본다(순위를 맞바꾼 문장 거절).
-     * 표기 사이에 이름이 없는 연속 표기('1위와 2위는 A와 B')는 한 묶음으로 보고 순서대로 짝짓는다.
-     * 묶음보다 이름이 적으면('1위보다 2위가 A') 누구를 가리키는지 알 수 없으니 판단하지 않는다.
+     * 순위 표기('1위')에 바로 붙은 상품 이름이 그 순위의 상품이어야 한다. 집합이 아니라 짝을 본다.
+     * 표기 바로 뒤('1위는 A', '1위인 A')와, 표기로 절이 끝날 때 바로 앞('A가 1위예요')의 이름만 짝으로 본다. 접속 표현이 끼면 짝이 아니다.
+     * 표기 사이에 이름이 없는 연속 표기('1위와 2위는 A와 B')는 한 묶음으로 보고 순서대로 짝짓고, 묶음보다 이름이 적으면 판단하지 않는다.
      */
     private String verifyRankNames(String sentence) {
         String normalized = Normalizer.normalize(sentence, Normalizer.Form.NFKC);
@@ -427,38 +438,79 @@ final class CompareAskTools {
                 labels.add(new int[] {rank, label.start(), label.end()});
             }
         }
+        if (labels.isEmpty()) {
+            return null;
+        }
+        List<Span> spans = nameSpans(normalized);
         int i = 0;
         while (i < labels.size()) {
             int j = i;
-            while (j + 1 < labels.size() && namesInOrder(normalized.substring(labels.get(j)[2], labels.get(j + 1)[1])).isEmpty()) {
+            while (j + 1 < labels.size() && namesBetween(spans, labels.get(j)[2], labels.get(j + 1)[1]).isEmpty()) {
                 j++;
             }
-            int regionEnd = j + 1 < labels.size() ? labels.get(j + 1)[1] : normalized.length();
-            List<Integer> names = namesInOrder(normalized.substring(labels.get(j)[2], regionEnd));
             int size = j - i + 1;
-            if (names.size() >= size) {
-                for (int k = 0; k < size; k++) {
-                    if (names.get(k) != labels.get(i + k)[0]) {
-                        return "RANK_MISMATCH";
-                    }
-                }
+            String reason = size == 1 ? checkSingleLabel(normalized, spans, labels.get(i))
+                    : checkEnumeration(spans, labels.subList(i, j + 1), j + 1 < labels.size() ? labels.get(j + 1)[1] : normalized.length());
+            if (reason != null) {
+                return reason;
             }
             i = j + 1;
         }
         return null;
     }
 
-    /** 글에서 이름(상품·보험사)으로 가리킨 순위를 처음 나온 순서대로. 순위 표기는 보지 않는다. */
-    private List<Integer> namesInOrder(String part) {
-        List<int[]> found = new ArrayList<>();
-        for (Item item : ranking.items()) {
-            int at = nameMention(part, item);
-            if (at >= 0) {
-                found.add(new int[] {at, item.rank()});
+    private static String checkSingleLabel(String normalized, List<Span> spans, int[] label) {
+        Set<Integer> candidates = new HashSet<>();
+        Matcher after = AFTER_PARTICLE.matcher(normalized.substring(label[2]));
+        if (after.find()) {
+            int at = label[2] + after.end();
+            spans.stream().filter(span -> span.at() == at).forEach(span -> candidates.add(span.rank()));
+        }
+        if (CLAUSE_END.matcher(normalized.substring(label[2])).find()) {
+            Matcher before = BEFORE_PARTICLE.matcher(normalized.substring(0, label[1]));
+            if (before.find()) {
+                int end = before.start();
+                spans.stream().filter(span -> span.end() == end).forEach(span -> candidates.add(span.rank()));
             }
         }
-        found.sort((x, y) -> Integer.compare(x[0], y[0]));
-        return found.stream().map(f -> f[1]).toList();
+        return !candidates.isEmpty() && !candidates.contains(label[0]) ? "RANK_MISMATCH" : null;
+    }
+
+    private static String checkEnumeration(List<Span> spans, List<int[]> group, int regionEnd) {
+        List<Span> names = namesBetween(spans, group.get(group.size() - 1)[2], regionEnd);
+        if (names.size() < group.size()) {
+            return null;
+        }
+        for (int k = 0; k < group.size(); k++) {
+            if (names.get(k).rank() != group.get(k)[0]) {
+                return "RANK_MISMATCH";
+            }
+        }
+        return null;
+    }
+
+    /** from~to 사이에 통째로 들어 있는 이름을 나온 순서대로. 같은 순위는 한 번만 담는다. */
+    private static List<Span> namesBetween(List<Span> spans, int from, int to) {
+        List<Span> inside = new ArrayList<>(spans.stream().filter(span -> span.at() >= from && span.end() <= to).toList());
+        inside.sort((x, y) -> Integer.compare(x.at(), y.at()));
+        Set<Integer> seen = new HashSet<>();
+        return inside.stream().filter(span -> seen.add(span.rank())).toList();
+    }
+
+    /** 글에서 상품·보험사 이름이 나온 곳(보험사는 결과 안에 그 보험사 상품이 하나뿐일 때만). */
+    private List<Span> nameSpans(String normalized) {
+        List<Span> spans = new ArrayList<>();
+        for (ProductNames.Mention mention : ProductNames.find(ranking.items(), normalized)) {
+            spans.add(new Span(mention.rank(), mention.at(), mention.end()));
+        }
+        for (Item item : ranking.items()) {
+            boolean unique = ranking.items().stream().filter(o -> same(o.insurer(), item.insurer())).count() == 1;
+            int at = unique ? indexOf(normalized, item.insurer()) : -1;
+            if (at >= 0) {
+                spans.add(new Span(item.rank(), at, at + Normalizer.normalize(item.insurer(), Normalizer.Form.NFKC).length()));
+            }
+        }
+        return spans;
     }
 
     private String verifyComparisonSentence(String sentence) {
