@@ -18,7 +18,7 @@ import { useInsurerOptions } from '../base/api'
 import { QueryState } from '../reference/ReferenceUI'
 import { ARBITRAGE_SORT_KEYS, arbitrageListQuery, criteriaFromParams } from './api'
 import type { Criteria, ArbitrageRow } from './api'
-import { columns } from './columns'
+import { columns, compactColumns } from './columns'
 import { UPPER_BOUND_NOTE } from './planned-basis'
 import { ArbitrageBadge } from './badges'
 import { ArbitrageDetail } from './ArbitrageDetail'
@@ -47,7 +47,7 @@ const summaryCards = [
   },
 ] as const
 export default function ArbitragePage() {
-  const { month, user } = useOutletContext<ShellContext>()
+  const { month, user, revised } = useOutletContext<ShellContext>()
   const [params, setParams] = useSearchParams()
   const criteria = criteriaFromParams(params, month ?? '')
   const query = useQuery({ ...arbitrageListQuery(criteria), enabled: Boolean(criteria.month) })
@@ -194,7 +194,7 @@ export default function ArbitragePage() {
             <DataTable
               caption="조회 조건에 해당하는 계약별 차익거래 판정"
               className="arb-list-table"
-              columns={columns}
+              columns={revised ? compactColumns : columns}
               {...sortBinding(criteria.sort, ARBITRAGE_SORT_KEYS, (sort) => patch({ sort }))}
               rows={rows}
               rowKey={(row) => String(row.arbitrageCheckId)}

@@ -106,9 +106,11 @@ const arbitrageItems: ArbitrageRow[] = [
   },
 ]
 
+/** 개발용 화면 미리보기에 합성 데이터만 제공하며 실제 고객·계약 API를 호출하지 않는다. */
 export function designPreviewData(url: URL): unknown {
   const path = url.pathname
   if (path === '/api/v1/auth/me') return designPreviewUser
+  if (path === '/api/v1/base/agents') return { ...page, content: [] }
   const capDetail = /^\/api\/v1\/cap-checks\/(\d+)\/details$/.exec(path)
   if (capDetail) {
     const capCheck = capItems.find((row) => row.capCheckId === Number(capDetail[1]))

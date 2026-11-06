@@ -27,6 +27,7 @@ const groups = [
   { id: 'ledger', title: '원장/대사', icon: 'menu_book', paths: ['/journals', '/reconciliations'] },
   { id: 'admin', title: '관리', icon: 'settings', paths: ['/base', '/policies', '/audit-logs'] },
 ]
+/** 권한에 맞는 업무 메뉴와 접힘 상태를 표시한다. 회의용 시안 전환은 제공하지 않는다. */
 export function Sidebar({
   user,
   current,
@@ -205,4 +206,5 @@ export function Sidebar({
     </aside>
   )
 }
+
 import { guideFeatureId } from '../../features/assistant/feature-ids'

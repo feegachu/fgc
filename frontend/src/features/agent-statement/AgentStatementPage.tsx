@@ -61,7 +61,7 @@ const EVIDENCE_VALUE_LABELS: Record<string, Record<string, string>> = {
 const CODE_VALUE_KEYS = ['attributionMethod', 'paymentConditionCode', 'basisCode', 'calculationType']
 
 export default function AgentStatementPage() {
-  const { month, user } = useOutletContext<ShellContext>()
+  const { month, user, revised } = useOutletContext<ShellContext>()
   const isAgent = user.roleCode === 'AGENT'
   const defaultMonth = month || today().slice(0, 7)
   const [params, setParams] = useSearchParams()
@@ -154,7 +154,7 @@ export default function AgentStatementPage() {
         {!isAgent && <ScreenHelp screenId="RPT-W02" />}
         <div className="page-header-copy">
           <h1 className="page-title">설계사 수수료 명세</h1>
-          {!isAgent && (
+          {!isAgent && !revised && (
             <p className="ast-lede">설계사를 선택해 본인 귀속 기준 명세를 조회합니다.</p>
           )}
         </div>

@@ -8,7 +8,8 @@ import { PolicyDraftEditor } from './PolicyDraftEditor'
 import { PolicyManagement } from './PolicyManagement'
 import { PolicyPreviewContext } from './management'
 import './policies.css'
-import { useSearchParams } from 'react-router'
+import { useOutletContext, useSearchParams } from 'react-router'
+import type { ShellContext } from '../../app/shell/AppShell'
 import { DataTable } from '../../components/DataTable'
 import { ListHeader } from '../../components/ListHeader'
 import { Field } from '../../components/Field'
@@ -31,7 +32,9 @@ const sourceTones: Record<string, StatusTone> = {
   GA_POLICY: 'neutral',
   PROJECT_ASSUMPTION: 'warning',
 }
+/** 정책 탭과 적용 기준일·작업 버튼을 함께 배치하며 기존 권한·정책 조회 흐름을 유지한다. */
 export function PoliciesPage() {
+  const { revised = false } = useOutletContext<ShellContext>()
   const { user } = useAuth()
   const preview = useContext(PolicyPreviewContext)
   const cache = useQueryClient()
@@ -68,30 +71,33 @@ export function PoliciesPage() {
     void cache.invalidateQueries({ queryKey: ['policies'] })
     patch({ tab: 'management', policyVersionId: String(nextId) })
   }
+  const headerActions = (
+    <div data-guide-target="policy.filters" className="policy-header-actions">
+      <Field className="policy-date-field" variant="filter" label="적용 기준일">
+        <input data-guide-feature="features.policies.policies-page.input" type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
+      </Field>
+      <Button data-guide-feature="features.policies.policies-page.button" variant="secondary" onClick={() => patch({ asOf: defaultDate, policyVersionId: null })}>
+        <span className="material-symbols-rounded" aria-hidden="true">
+          restart_alt
+        </span>
+        초기화
+      </Button>
+      {['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
+        <Button data-guide-feature="features.policies.policies-page.button-2" onClick={() => setCreating(true)}>
+          <span aria-hidden="true">＋</span> 정책 등록
+        </Button>
+      )}
+    </div>
+  )
   return (
     <div className="policy-page">
       <header className="page-header policy-page-header">
-        <ScreenHelp screenId="POL-W01" />
+        {!revised && <ScreenHelp screenId="POL-W01" />}
         <div className="page-header-copy">
           <h1 className="page-title">정책 관리</h1>
           <p className="policy-page-description">정책의 적용 기준과 규칙을 확인하고, 초안부터 활성화까지 관리합니다.</p>
         </div>
-        <div data-guide-target="policy.filters" className="policy-header-actions">
-          <Field className="policy-date-field" variant="filter" label="적용 기준일">
-            <input data-guide-feature="features.policies.policies-page.input" type="date" value={asOf} onChange={(e) => patch({ asOf: e.target.value, policyVersionId: null })} />
-          </Field>
-          <Button data-guide-feature="features.policies.policies-page.button" variant="secondary" onClick={() => patch({ asOf: defaultDate, policyVersionId: null })}>
-            <span className="material-symbols-rounded" aria-hidden="true">
-              restart_alt
-            </span>
-            초기화
-          </Button>
-          {['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(user?.roleCode ?? '') && (
-            <Button data-guide-feature="features.policies.policies-page.button-2" onClick={() => setCreating(true)}>
-              <span aria-hidden="true">＋</span> 정책 등록
-            </Button>
-          )}
-        </div>
+        {!revised && headerActions}
       </header>
       {preview && (
         <div className="policy-preview-banner">
@@ -113,6 +119,7 @@ export function PoliciesPage() {
         <ReferenceTabs
           panelClassName="surface policy-tab-panel"
           label="정책 상세 구분"
+          actions={revised ? <>{headerActions}<ScreenHelp screenId="POL-W01" /></> : undefined}
           tabs={tabs}
           active={active}
           onChange={(tab) => patch({ tab, ...(id !== undefined ? { policyVersionId: String(id) } : {}) })}

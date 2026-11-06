@@ -655,6 +655,9 @@ describe('FUN-037 4년 예정', () => {
     expect(
       screen.queryAllByRole('link').filter((link) => link.getAttribute('href')?.includes('/transactions/new')),
     ).toHaveLength(0)
+    await actions.click(screen.getByRole('button', { name: /^새 버전 만들기$/ }))
+    expect(screen.getByLabelText('생성 사유')).toHaveFocus()
+    expect(attempts).toBe(0)
     await actions.type(screen.getByLabelText('생성 사유'), '승인 정책 반영')
     await actions.click(screen.getByRole('button', { name: '4년 예정 새 버전 만들기' }))
     await screen.findByRole('alert')

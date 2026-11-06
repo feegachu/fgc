@@ -11,6 +11,7 @@ import { errorText } from '../../lib/format'
 import { returnLink, safeReturnTo } from '../transaction/payment-entry'
 import { generatePreview, REASON_MAX } from './api'
 import type { PaymentStage, PreviewContext } from './api'
+import './schedule.css'
 
 type Props = { context?: PreviewContext; contractId: string; stage: PaymentStage; scheduleId?: string }
 // 서버 AcquisitionCostCheckService.regimeReason 과 같은 문장이다.
@@ -121,11 +122,13 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
   }
 
   return (
-    <section data-guide-feature="schedule.preview.region" data-guide-scope className="surface schedule-detail-card" aria-label={`${stage} ${years} 예정 생성`}>
-      <h3 className="surface-title">{unresolvedRegime && !uncertain ? '적용 체계·정책 검토 필요' : `${years} 예정 스케줄`}</h3>
-      {canProcess && (scheduleId
-        ? <ScreenHelp screenId="SCHE-W02" variant="preview" saveGuide={saveGuide} />
-        : <ScreenHelp screenId="CONT-W02" variant="preview" saveGuide={saveGuide} />)}
+    <section data-guide-feature="schedule.preview.region" data-guide-scope className="surface schedule-detail-card schedule-preview-card" aria-label={`${stage} ${years} 예정 생성`}>
+      <header className="schedule-preview-header">
+        <h3 className="surface-title">{unresolvedRegime && !uncertain ? '적용 체계·정책 검토 필요' : `${years} 예정 스케줄`}</h3>
+        {canProcess && (scheduleId
+          ? <ScreenHelp screenId="SCHE-W02" variant="preview" saveGuide={saveGuide} />
+          : <ScreenHelp screenId="CONT-W02" variant="preview" saveGuide={saveGuide} />)}
+      </header>
       <p>정책에 정의된 회차와 금액으로 생성합니다. 지급 확정 대상이 아닙니다.</p>
       {uncertain ? <p>생성 결과를 확인합니다.</p> : ready ? (
         <p>적용 정책 v{policy?.versionNo}, 최대 {policy?.selection?.ruleset?.maxInstallments}회차</p>
@@ -136,8 +139,8 @@ function PreviewSession({ context, contractId, stage, scheduleId }: Props) {
           : '장기유지 계산 미준비: 정책 구간 또는 수수료 규칙이 없습니다. 정의된 일반 예정만 생성하며 장기유지 금액을 0원으로 채우지 않습니다.'}</p>
       )}
       {canProcess && (
-        <form data-guide-feature="schedule.preview.form" onSubmit={(event) => { event.preventDefault(); submit() }}>
-          <label data-guide-target="schedule.preview.input">
+        <form data-guide-feature="schedule.preview.form" className="schedule-preview-form" onSubmit={(event) => { event.preventDefault(); submit() }}>
+          <label className="filter-field" data-guide-target="schedule.preview.input">
             생성 사유
             <input data-guide-feature="schedule.preview.reason" className="field-control" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={REASON_MAX} required disabled={mutation.isPending || uncertain} />
           </label>

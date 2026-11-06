@@ -47,21 +47,21 @@ async function coveredAtScrollEnd(page: Page) {
 }
 
 /** 제목이 왼쪽 끝에서, 도움말 버튼이 오른쪽 끝에서 떨어진 픽셀. 머리가 아직 없으면 null. */
-const headerLayout = (page: Page, selector: string, titleSelector: string) =>
+const headerLayout = (page: Page, selector: string, titleSelector: string, helpSelector = selector) =>
   page.evaluate(
-    ([headerSelector, title]) => {
+    ([headerSelector, title, helpContainerSelector]) => {
       const header = document.querySelector(headerSelector)
       const heading = header?.querySelector(title)
-      const help = [...(header?.querySelectorAll('button') ?? [])].find((button) => button.textContent?.trim() === '도움말')
-      if (!header || !heading || !help) return null
+      const helpContainer = document.querySelector(helpContainerSelector)
+      const help = [...(helpContainer?.querySelectorAll('button') ?? [])].find((button) => button.textContent?.trim() === '도움말')
+      if (!header || !heading || !helpContainer || !help) return null
       const box = header.getBoundingClientRect()
-      const padding = parseFloat(getComputedStyle(header).paddingRight)
       return {
-        titleFromLeft: Math.round(heading.getBoundingClientRect().left - box.left - padding),
-        helpFromRight: Math.round(box.right - padding - help.getBoundingClientRect().right),
+        titleFromLeft: Math.round(heading.getBoundingClientRect().left - box.left - parseFloat(getComputedStyle(header).paddingLeft)),
+        helpFromRight: Math.round(helpContainer.getBoundingClientRect().right - parseFloat(getComputedStyle(helpContainer).paddingRight) - help.getBoundingClientRect().right),
       }
     },
-    [selector, titleSelector],
+    [selector, titleSelector, helpSelector],
   )
 
 test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자를 가득 채우지 않는다', async ({ page }) => {
@@ -76,8 +76,6 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
 
   for (const route of [
     './',
-    'base',
-    'policies',
     'contracts/new',
     `contracts/${contract}`,
     'contracts',
@@ -96,6 +94,27 @@ test('쪽 제목은 왼쪽 끝에, 도움말은 오른쪽 끝에 있고 격자�
   ]) {
     await page.goto(`${route}?month=${month}`)
     await expect.poll(() => headerLayout(page, '.page-header', '.page-title'), { message: route }).toEqual(atEdges)
+  }
+
+  // 관리자 기준정보·정책 화면은 기준일과 도움말이 탭과 같은 줄에 있다 (#907).
+  for (const [route, dateSelector] of [
+    ['base', '.base-as-of-summary'],
+    ['policies', '.policy-date-field input'],
+  ]) {
+    await page.goto(`${route}?month=${month}`)
+    await expect.poll(() => headerLayout(page, '.page-header', '.page-title', '.reference-tabs-toolbar'), { message: route }).toEqual(atEdges)
+    await expect.poll(() => page.evaluate((selector) => {
+      const toolbar = document.querySelector('.reference-tabs-toolbar')
+      const tabs = toolbar?.querySelector('[role="tablist"]')
+      const help = toolbar?.querySelector('.screen-help-trigger')
+      const date = toolbar?.querySelector(selector)
+      if (!tabs || !help || !date) return null
+      const center = (element: Element) => {
+        const rect = element.getBoundingClientRect()
+        return rect.top + rect.height / 2
+      }
+      return Math.max(Math.abs(center(tabs) - center(help)), Math.abs(center(date) - center(help)))
+    }, dateSelector), { message: `${route}: 탭·기준일·도움말 세로 정렬` }).toBeLessThanOrEqual(1)
   }
 
   // VRUN-W01은 도움말이 쪽 머리가 아니라 새 실행 만들기 머리에 있다.

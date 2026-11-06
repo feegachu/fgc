@@ -409,6 +409,31 @@ class CompareAskServiceTest {
     }
 
     @Test
+    @DisplayName("AI 답에 금액 문장이 섞여 있으면 그 문장만 빼고 나머지 설명을 서버 문장 뒤에 붙인다")
+    void sentencesWithAmountsAreDroppedAndTheRestKept() {
+        llmCallsTools(true, "가보험 든든건강은 환수 부담이 작아요. 보수적 순수령액은 684,000원이에요. 그래서 앞섰어요.",
+                "get_item", "{\"rank\":1}");
+
+        CompareAskResponse response = service.ask("왜 1위야?", ranking());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).startsWith("1위는 가보험 든든건강예요. 보수적 순수령액은 684,000원이에요.")
+                .endsWith(" 가보험 든든건강은 환수 부담이 작아요. 그래서 앞섰어요.");
+        assertThat(response.answer().indexOf("684,000원")).isEqualTo(response.answer().lastIndexOf("684,000원"));
+    }
+
+    @Test
+    @DisplayName("AI 답에 순위 표기만 있고 금액이 없으면 그대로 쓴다")
+    void rankLabelsInAiTextAreKept() {
+        llmCallsTools(true, "1위인 가보험 든든건강은 환수 부담이 작아서 앞섰어요.", "get_item", "{\"rank\":1}");
+
+        CompareAskResponse response = service.ask("1위가 어떤 상품이야?", ranking());
+
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).endsWith(" 1위인 가보험 든든건강은 환수 부담이 작아서 앞섰어요.");
+    }
+
+    @Test
     @DisplayName("질문이 두 상품을 가리키면 AI 문장이 다른 상품을 말할 때 서버 문장으로 대체한다")
     void aiTextAboutOtherProductIsReplaced() {
         llmCallsTools(true, "가보험 든든건강은 환수 부담이 가장 작아요.", "compare", "{\"rankA\":2,\"rankB\":3}");

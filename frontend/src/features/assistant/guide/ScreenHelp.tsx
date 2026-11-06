@@ -24,11 +24,18 @@ const targetMessages: Record<string, string> = {
 type HelpProps = { screenId: string; variant?: string; saveGuide?: SaveGuide; finalizeGuide?: SaveGuide; runStatus?: string; outcome?: 'execution' | 'processing' | 'finalization' | 'correction' }
 import '../../transaction/payment-guide.css'
 
+function HelpIcon() {
+  return <svg className="screen-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4m0 3h.01" />
+  </svg>
+}
+
 /** Read-only guide orchestration; existing business handlers own all writes and report save outcomes. */
 export function ScreenHelp(props: HelpProps) {
   const { screenId, variant } = props
   const routed = useInRouterContext()
-  if (!definitions.some((entry) => entry.screenId === screenId && entry.variant === variant)) return <button type="button" className="button button-secondary" disabled title="등록된 도움말 버전을 찾을 수 없습니다.">도움말</button>
+  if (!definitions.some((entry) => entry.screenId === screenId && entry.variant === variant)) return <button type="button" className="button button-secondary screen-help-trigger" disabled title="등록된 도움말 버전을 찾을 수 없습니다."><HelpIcon />도움말</button>
   return routed ? <RoutedScreenHelp {...props} /> : <ScreenHelpSession {...props} />
 }
 function RoutedScreenHelp(props: HelpProps) {
@@ -179,7 +186,7 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
     || (needsFinalization ? finalizeState.savedId !== null && !finalizeState.pending
       : !saveState.pending && (index === 0 ? saveState.valid || saveState.savedId !== null : saveState.savedId !== null))
   return <>
-    <button type="button" ref={setTrigger} className="button button-secondary" aria-expanded={open} onClick={open ? close : start}>도움말</button>
+    <button type="button" ref={setTrigger} className="button button-secondary screen-help-trigger" aria-expanded={open} onClick={open ? close : start}><HelpIcon />도움말</button>
     {open && !modal && createPortal(<>
       {!folded && position.box && !paused && !complete && <div className="payment-guide-spotlight" aria-hidden="true" style={position.box} />}
       <section ref={card} className="payment-guide-card" aria-label={`${definition.title} 도움말`} data-guide-anchored={Boolean(snapshot.target && !modal)} style={position.card}>

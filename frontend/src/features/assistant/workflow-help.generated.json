@@ -8958,11 +8958,56 @@
         "next": []
       },
       {
+        "stepId": "help.4c96856c7cd3147f199dbc2718f4fd8c",
+        "screenId": "DASH-W01",
+        "targetId": "dashboard.chart-view.branch-contracts",
+        "title": "업무 대시보드, 계약",
+        "instruction": "‘계약’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.4cf15f3cbf447bd946bd92e465397600",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.exception-ticker.section",
+        "title": "업무 대시보드, 최근 예외",
+        "instruction": "‘최근 예외’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.5a0dd6dd7c9684c40a530476e8240c2a",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.dashboard-page.open-retry",
         "title": "업무 대시보드, 미처리 예외 다시 불러오기",
         "instruction": "‘미처리 예외 다시 불러오기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.5d38d0e46c9112a35201988730c89890",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.agent-status-panel.section",
+        "title": "업무 대시보드, 지점별 현황",
+        "instruction": "‘지점별 현황’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -9023,6 +9068,21 @@
         "targetId": "features.dashboard.agent-overview.search",
         "title": "업무 대시보드, 설계사 찾기",
         "instruction": "‘설계사 찾기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.726775b8e051beba5e858141db7ce6a3",
+        "screenId": "DASH-W01",
+        "targetId": "components.modal.button",
+        "title": "업무 대시보드, 창 닫기",
+        "instruction": "‘창 닫기’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -9258,6 +9318,21 @@
         "next": []
       },
       {
+        "stepId": "help.9c27cdb862a039f4a28d0d6176393934",
+        "screenId": "DASH-W01",
+        "targetId": "dashboard.chart-view.branch-agents",
+        "title": "업무 대시보드, 설계사",
+        "instruction": "‘설계사’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.a872359a03e78164e9312c4ea63c169b",
         "screenId": "DASH-W01",
         "targetId": "components.filter-bar.button",
@@ -9278,6 +9353,36 @@
         "targetId": "dashboard.kpi-link.journal",
         "title": "업무 대시보드, 원장 불균형",
         "instruction": "‘원장 불균형’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.b2fdd30c86c3744b63666e322d486d8f",
+        "screenId": "DASH-W01",
+        "targetId": "dashboard.chart-view.branch-exceptions",
+        "title": "업무 대시보드, 예외",
+        "instruction": "‘예외’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.b705d197aaea1755e3aa843e2348c115",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.dashboard-page.ga-association",
+        "title": "업무 대시보드, 보험GA협회 홈페이지 열기 (새 탭)",
+        "instruction": "‘보험GA협회 홈페이지 열기 (새 탭)’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -9393,6 +9498,21 @@
         "next": []
       },
       {
+        "stepId": "help.d207a1cecd0b8f0c0c68444b8a389be7",
+        "screenId": "DASH-W01",
+        "targetId": "dashboard.chart-view.branch-commissions",
+        "title": "업무 대시보드, 수수료",
+        "instruction": "‘수수료’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.d7678691710dca3781b17532b2aedd40",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.agent-overview.branches",
@@ -9408,11 +9528,41 @@
         "next": []
       },
       {
+        "stepId": "help.d9750f1253a63cff07865e5559c24916",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.monthly-commissions.section",
+        "title": "업무 대시보드, 월별 수수료",
+        "instruction": "‘월별 수수료’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.e7831fa35027a7e90df436b2b736c0ae",
         "screenId": "DASH-W01",
         "targetId": "features.dashboard.risk-composition.link",
         "title": "업무 대시보드, 건, 비중",
         "instruction": "‘건, 비중’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.e9e3da0844f0b5d2125f44ead8c329d1",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.exception-ticker.all",
+        "title": "업무 대시보드, 전체 보기",
+        "instruction": "‘전체 보기’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -9473,6 +9623,21 @@
         "targetId": "features.dashboard.agent-overview.contracts-link",
         "title": "업무 대시보드, ( ) 계약 목록 열기",
         "instruction": "‘( ) 계약 목록 열기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.f9ea4a35d42c8d46363524cc2e20f897",
+        "screenId": "DASH-W01",
+        "targetId": "features.dashboard.monthly-commissions.month",
+        "title": "업무 대시보드, , GA 수령액 , 설계사 지급액",
+        "instruction": "‘, GA 수령액 , 설계사 지급액’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

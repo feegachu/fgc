@@ -144,7 +144,6 @@ export default function ContractListPage() {
   const navigate = useContextNavigation()
   const location = useLocation()
   const back = location.pathname + location.search
-  const isAgent = useAuth().user?.roleCode === 'AGENT'
   const exporting = useMutation({
     mutationFn: () => exportCsv(listCsvPath(criteria), { filename: 'contracts.csv', notifyError: false }),
     meta: { errorToast: false },
@@ -158,7 +157,7 @@ export default function ContractListPage() {
   return (
     <div className="contract-list-page list-page">
       <header className="page-header contract-page-header">
-        {canProcess || isAgent ? <ScreenHelp screenId="CONT-W01" /> : <ScreenHelp screenId="CONT-W01" variant="reader" />}
+        {canProcess ? <ScreenHelp screenId="CONT-W01" /> : <ScreenHelp screenId="CONT-W01" variant="reader" />}
         <h1 className="page-title">보험계약 목록</h1>
         <div className="page-header-actions">
           <Button data-guide-feature="features.contract.contract-list-page.button" variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>

@@ -81,6 +81,7 @@ async function downloadCsv(page: Page, name: string) {
 
 for (const seven of [false, true]) {
   test(`SCHE DoD CT-S0${seven ? 2 : 1}: 실제 승인 정책 ${seven ? 84 : 48}회차·CSV·새 판·복귀`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 1280, height: 720 })
     const fixture = await preview(seven)
     const count = seven ? 84 : 48
     const lineCount = seven ? 102 : 48
@@ -103,6 +104,15 @@ for (const seven of [false, true]) {
     await row.getByRole('link', { name: '회차 보기' }).click()
     const table = page.getByRole('table', { name: '회차별 예상 지급 금액' })
     await expect(table.locator('tbody tr')).toHaveCount(lineCount)
+    const pico = page.locator('.app-header').getByRole('button', { name: '업무 비서 AI 열기, 피코' })
+    const firstRow = table.locator('tbody tr').first().getByRole('cell')
+    await expect(pico).toBeVisible()
+    await expect(firstRow.nth(1)).toHaveText('1')
+    await expect(firstRow.nth(2)).toHaveText(seven ? '24,000원' : '45,000원')
+    await expect(firstRow.nth(1)).toBeInViewport()
+    await expect(firstRow.nth(2)).toBeInViewport()
+    const total = page.getByText(`예상 총액 ${fixture.detail.header.expectedTotal.toLocaleString('ko-KR')}원`, { exact: true })
+    await expect(total).toBeInViewport()
     await expect(table).toContainText(seven ? '2036-02-02' : '2031-02-02')
     await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
     await expect(page.locator('a[href*="/transactions/new"]')).toHaveCount(0)
