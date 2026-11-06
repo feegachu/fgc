@@ -94,6 +94,27 @@ final class CompareAskTools {
             Pattern.compile("^[지진]도?는?\\s*(?:않|못|아니)"),
             Pattern.compile("^[은는]?\\s*(?:적|일|경우|상태)(?:이|가|은|는|도)?\\s*(?:전혀\\s*)?(?:없|아니)"));
 
+    private static final Pattern ANY_NEGATION = Pattern.compile("않|없|못|아니");
+    /** '한도를 넘어 받지 못한 금액이 있어요'처럼 못 받은 금액이 있다는 말. 부정어가 있어도 한도에 걸렸다는 긍정 주장이다. */
+    private static final Pattern UNRECEIVED_AMOUNT_EXISTS = Pattern.compile("(?:못|않)[^,.!?]{0,10}?(?:금액|수수료|분)(?:이|은)?\\s*있");
+    private static final int POSITIVE = 0;
+    private static final int NEGATED = 1;
+    private static final int UNCLEAR = 2;
+
+    /**
+     * 도달 표현 뒤의 말이 그 표현을 긍정하는지 부정하는지. 바로 뒤에서 부정이 확인되면 부정, 구간에 부정어가 하나도 없으면 긍정이다.
+     * 부정어가 있는데 바로 뒤가 아니면(활용형을 못 알아본 경우 포함) 긍정인지 부정인지 정규식으로 가를 수 없어 판단 불가로 둔다.
+     */
+    private static int polarityAfter(String rest) {
+        if (negatedRightAfter(rest)) {
+            return NEGATED;
+        }
+        if (!ANY_NEGATION.matcher(rest).find() || UNRECEIVED_AMOUNT_EXISTS.matcher(rest).find()) {
+            return POSITIVE;
+        }
+        return UNCLEAR;
+    }
+
     /** 도달 표현 바로 뒤에서 그 표현을 부정하는지. 뒤쪽 다른 서술어의 '못'·'없'은 도달 표현의 부정이 아니다. */
     private static boolean negatedRightAfter(String rest) {
         Matcher tail = NEGATION_TAIL.matcher(rest);
@@ -438,7 +459,7 @@ final class CompareAskTools {
             return null;
         }
         // 도달 표현마다 뒤따르는 부분에서 부정을 본다. 같은 주장의 반복은 함께 검사하고, 긍정과 부정이 섞이면 판단하지 않는다.
-        Set<Boolean> polarities = new HashSet<>();
+        Set<Integer> polarities = new HashSet<>();
         Matcher verb = CAP_VERB.matcher(sentence);
         List<int[]> verbs = new ArrayList<>();
         while (verb.find()) {
@@ -446,12 +467,16 @@ final class CompareAskTools {
         }
         for (int k = 0; k < verbs.size(); k++) {
             int to = k + 1 < verbs.size() ? verbs.get(k + 1)[0] : sentence.length();
-            polarities.add(negatedRightAfter(sentence.substring(verbs.get(k)[1], to)));
+            polarities.add(polarityAfter(sentence.substring(verbs.get(k)[1], to)));
+        }
+        // 긍정인지 부정인지 가를 수 없으면 맞는 말인지 알 수 없으므로 거절한다(서버 문장으로 대체되는 안전한 쪽).
+        if (polarities.contains(UNCLEAR)) {
+            return "CAP_STATE_MISMATCH";
         }
         if (polarities.size() != 1) {
             return null;
         }
-        boolean negated = polarities.iterator().next();
+        boolean negated = polarities.iterator().next() == NEGATED;
         // 걸렸다는 말은 말한 상품 모두에 이월이 있어야 맞고, 걸리지 않았다는 말은 하나도 없어야 맞다.
         boolean holds = negated ? scope.stream().noneMatch(item -> item.carryover() > 0)
                 : scope.stream().allMatch(item -> item.carryover() > 0);

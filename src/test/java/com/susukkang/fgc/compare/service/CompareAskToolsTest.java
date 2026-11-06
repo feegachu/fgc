@@ -214,7 +214,8 @@ class CompareAskToolsTest {
         assertThat(tools.verify("나보험 튼튼건강은 한도에 걸렸고 가보험 든든건강은 걸리지 않았어요.")).isNull();
         // 도달 표현과 무관한 뒤쪽 서술어의 '못'·'없'은 부정이 아니다(#919).
         assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어 받지 못한 금액이 있어요.")).isNull();
-        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸려 받지 못하고 다음 달로 넘어가요.")).isNull();
+        // 부정어가 바로 뒤가 아니면 긍정인지 부정인지 알 수 없어 거절한다(안전한 쪽). 못 받은 금액이 '있다'는 말만 긍정으로 읽는다.
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸려 받지 못하고 다음 달로 넘어가요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도에 걸리지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도에 걸리지는 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도를 초과한 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
@@ -223,7 +224,13 @@ class CompareAskToolsTest {
         assertThat(tools.verify("가보험 든든건강은 한도를 초과해 이번 달에 더 받을 수 있는 금액이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("가보험 든든건강은 한도를 넘어 이번 달 지급분이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("가보험 든든건강은 한도에 도달해 이번 달 추가 수수료가 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
-        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과해 이번 달에 더 받을 수 있는 금액이 없어요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과해 이번 달에 더 받을 수 있는 금액이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        // 허용 목록 밖의 활용형 부정도 틀린 주장을 통과시키지 않는다(#925 리뷰). 이월이 있는 상품에 대해 '안 걸렸다'고 하면 거절한다.
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘기지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘긴 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과된 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어선 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과할 일이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
         // 활용이 낀 부정도 부정이다(#925 리뷰).
         assertThat(tools.verify("가보험 든든건강은 한도를 넘어서지 않았어요.")).isNull();
         assertThat(tools.verify("가보험 든든건강은 한도에 걸려 있지 않아요.")).isNull();
