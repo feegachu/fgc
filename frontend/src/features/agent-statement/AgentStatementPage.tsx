@@ -9,6 +9,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { KpiCard } from '../../components/KpiCard'
 import { date, int, month as formatMonth, rate, today, won } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
@@ -194,7 +195,7 @@ export default function AgentStatementPage() {
           apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: enhanced ? '' : filters.agentId })
         }}
       />
-      {ready && <SummaryCards summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />}
+      {ready && <SummaryCards summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} dashboardStyle={enhanced} />}
       {enhanced && view === 'tree' && (overview.isPending || overview.isError ? <div className="surface ast-state" role={overview.isError ? 'alert' : 'status'}>
         {overview.isError ? statementError(overview.error) : '지점과 설계사 명세를 불러오는 중입니다.'}
         {overview.isError && <Button variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
@@ -282,11 +283,13 @@ function SummaryCards({
   basis,
   loading,
   failed,
+  dashboardStyle = false,
 }: {
   summary?: StatementSummary
   basis?: StatementBasis
   loading: boolean
   failed: boolean
+  dashboardStyle?: boolean
 }) {
   const cards: [EntryType, keyof StatementSummary, string, string][] = [
     ['PAYMENT', 'payment', '지급', '확정된 본인 귀속 지급'],
@@ -294,6 +297,28 @@ function SummaryCards({
     ['ADJUSTMENT', 'adjustment', '조정', '정정·역분개로 반영된 금액(차감은 음수)'],
     ['CLAWBACK', 'clawback', '환수', '환수 계산액이며 실제 회수 완료액이 아닙니다'],
   ]
+  if (dashboardStyle) {
+    return (
+      <section data-guide-feature="features.agent-statement.agent-statement-page.summary" className="kpi-grid kpi-group ast-dashboard-summary" aria-label="유형별 요약">
+        {cards.map(([type, key, label, note]) => {
+          const bucket = failed ? undefined : summary?.[key]
+          return <KpiCard
+            key={type}
+            guideId={undefined}
+            label={label}
+            value={bucket ? bucket.amount : failed ? '조회 실패' : loading ? '…' : '-'}
+            unit={bucket ? '원' : undefined}
+            format={int}
+            zero={bucket?.amount === 0}
+            footer={<span className="kpi-comparison" title={note}>
+              {bucket ? `${int(bucket.count)}건` : ''}
+              {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}
+            </span>}
+          />
+        })}
+      </section>
+    )
+  }
   return (
     <section data-guide-feature="features.agent-statement.agent-statement-page.summary" className="ast-summary" aria-label="유형별 요약">
       {cards.map(([type, key, label, note]) => {

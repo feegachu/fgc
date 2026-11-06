@@ -21,6 +21,12 @@
 .ast-filter { align-items: flex-end; }
 .ast-filter-fields { flex: 1 1 auto; }
 
+.app-shell .page-content .ast-page > .ast-dashboard-summary { --kpi-columns: 4; }
+.ast-dashboard-summary .kpi-value { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 74.9375rem) {
+  .app-shell .page-content .ast-page > .ast-dashboard-summary { --kpi-columns: 2; }
+}
+
 /* 조회 버튼은 요약 막대와 같은 흰색으로 맞춘다. */
 .ast-filter .button-primary { background: var(--color-bg-surface); }
 .ast-filter .button-primary:hover { background: var(--color-bg-subtle); }
