@@ -83,7 +83,10 @@ class Client:
                 text, status = response.read(), response.status
         except urllib.error.HTTPError as error:
             text, status = error.read(), error.code
-        data = json.loads(text.decode()) if text else {}
+        try:
+            data = json.loads(text.decode()) if text else {}
+        except ValueError:
+            sys.exit(f'{method} {path}: {status} 응답이 JSON이 아닙니다')
         if status == 401 and not path.endswith('/auth/login'):
             self.login()
             return self.call(method, path, body, headers)
@@ -115,6 +118,7 @@ class Loader:
     def __init__(self, settle, admin):
         self.s, self.admin, self.today = settle, admin, datetime.date.today().isoformat()
         self.counters = {'contracts': 0, 'payments': 0, 'skipped': 0, 'statusChanges': 0}
+        self.drafts = {}
 
     def pages(self, path):
         rows, page = [], 1
@@ -173,6 +177,13 @@ class Loader:
                 result.append((stage, line))
         return result
 
+    def draft_of(self, key, month):
+        """앞선 실행이 등록만 하고 멈췄으면 그 초안을 이어서 확정한다."""
+        if month not in self.drafts:
+            rows = self.pages(f'/api/v1/transactions?settlementMonth={month}&status=DRAFT')
+            self.drafts[month] = {row['sourceBusinessKey']: row['commissionTransactionId'] for row in rows}
+        return self.drafts[month].get(key)
+
     def pay_line(self, stage, line, contract_id, month, amount=None, confirm=True, suffix='', keep_rejected=False):
         key = f"GA-{month.replace('-', '')}-L{line['scheduleLineId']}{suffix}"
         paid = line['expectedAmount'] if amount is None else amount
@@ -184,12 +195,15 @@ class Loader:
                               'inclusionDecisionStatus': 'INCLUDED', 'inclusionDecisionReason': '스케줄 기준 지급', 'exclusionType': 'NONE'}]})
         if status == 409:
             self.counters['skipped'] += 1
-            return None
-        if status != 201:
+            payment = self.draft_of(key, month) if confirm else None
+            if payment is None:
+                return None
+        elif status != 201:
             print(f'  지급 등록 실패 {key}: {status} {json.dumps(data, ensure_ascii=False)[:200]}')
             return None
-        payment = data['data']['commissionTransactionId']
-        self.counters['payments'] += 1
+        else:
+            payment = data['data']['commissionTransactionId']
+            self.counters['payments'] += 1
         if confirm:
             # 시드에는 일부러 한도를 넘게 만든 계약이 있다. 미리 검사해 예외를 늘리지 않고 초안을 지운다.
             check = self.s.ok('POST', f'/api/v1/transactions/{payment}/precheck', {})
@@ -236,11 +250,17 @@ class Loader:
                 'attributions': [{'amount': amount, 'attributionDate': date, 'exclusionType': 'NONE', 'evidenceRef': f'{month} 지급 품의', **attribution}]})
             if status == 409:
                 self.counters['skipped'] += 1
+                payment = self.draft_of(key, month)
+                if payment is None:
+                    return
             elif status != 201:
                 print(f"  지급 등록 실패 {key}: {status} {json.dumps(data, ensure_ascii=False)[:240]}")
+                return
             else:
                 self.counters['payments'] += 1
-                status, data = self.s.call('POST', f"/api/v1/transactions/{data['data']['commissionTransactionId']}/confirm", {}, idem())
+                payment = data['data']['commissionTransactionId']
+            if payment:
+                status, data = self.s.call('POST', f'/api/v1/transactions/{payment}/confirm', {}, idem())
                 # 11월 정착지원금은 계약 보험료에 비해 커서 1,200% 한도에 걸린다. 시연에서 예외함으로 감액하는 장면이다.
                 if status != 200:
                     print(f"  확정 거절 {key}: {data.get('error', {}).get('message', '')[:90]}")
