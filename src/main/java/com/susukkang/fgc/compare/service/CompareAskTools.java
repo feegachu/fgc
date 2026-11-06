@@ -334,6 +334,9 @@ final class CompareAskTools {
                 reason = verifySuperlative(sentence);
             }
             if (reason == null) {
+                reason = verifyLeadClaim(sentence);
+            }
+            if (reason == null) {
                 reason = verifyCapState(sentence);
             }
             if (reason != null) {
@@ -342,6 +345,24 @@ final class CompareAskTools {
             start = end == normalized.length() ? end : ends.end();
         }
         return null;
+    }
+
+    /** 항목 없이 '가장 앞섰다'고만 쓴 문장('A가 가장 앞섰어요'). 순위는 종합 결과라서 이렇게 말할 수 있는 상품은 1위뿐이다(#919 C-R1). */
+    private static final Pattern LEAD_CLAIM = Pattern.compile("(?:가장|제일|(?:맨|제)\\s*먼저)\\s*(?:앞섰|앞서|앞선|앞서는|우수|상위)");
+
+    private String verifyLeadClaim(String sentence) {
+        if (!LEAD_CLAIM.matcher(sentence).find() || CONDITIONAL.matcher(sentence).find() || sentence.contains("다면")) {
+            return null;
+        }
+        Matcher lead = LEAD_CLAIM.matcher(sentence);
+        lead.find();
+        // 환수·이월 같은 항목을 앞에 붙인 말은 그 항목만의 이야기라 항목별 검사(최상급)에 맡긴다.
+        if (!metricsIn(sentence.substring(0, lead.start())).isEmpty()) {
+            return null;
+        }
+        Set<Integer> mentioned = ranksMentioned(sentence);
+        int top = ranking.items().stream().mapToInt(Item::rank).min().orElse(1);
+        return mentioned.size() == 1 && !mentioned.contains(top) ? "LEAD_MISMATCH" : null;
     }
 
     private String verifySuperlative(String sentence) {

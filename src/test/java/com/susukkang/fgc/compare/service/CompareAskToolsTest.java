@@ -234,6 +234,19 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("항목 없이 가장 앞섰다고만 쓴 문장은 1위 상품에만 맞다")
+    void leadClaimMustPointAtTheTopProduct() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("나보험 튼튼건강이 가장 앞섰어요.")).isEqualTo("LEAD_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강이 가장 앞섰어요.")).isNull();
+        assertThat(tools.verify("1위 가보험 든든건강이 가장 앞서요.")).isNull();
+        // 가정이거나 둘 이상을 견주는 문장, 항목을 붙인 문장은 판단하지 않는다.
+        assertThat(tools.verify("나보험 튼튼건강이 가장 앞선다면 좋겠지만 순위는 참고용이에요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 나보험 튼튼건강보다 가장 앞섰어요.")).isNull();
+    }
+
+    @Test
     @DisplayName("서버 내부 도구를 언급하는 답은 거절한다")
     void internalToolMentionsAreRejected() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);

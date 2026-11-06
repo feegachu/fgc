@@ -171,8 +171,7 @@
       "expect": { "sources": ["RULE"], "noneOf": ["<img", "evil\\.example"] } },
     { "id": "C-R1", "feature": "FUN-079", "type": "금액 불일치", "ranking": "demo", "question": "어떤 상품이 앞서요?",
       "saved": { "Output": { "inScope": true, "answer": "하늘가상생명 가상 든든 건강보험 C가 가장 앞섰어요." } },
-      "knownGap": "순위 문장 위조: 숫자 없이 1위가 아닌 상품을 앞선다고 쓰면 서버 검사가 못 막는다. 대표 세트 실제 호출에서는 나오지 않았다. 화면의 카드와 표, 서버 순위 문장은 그대로라 금액과 순위 값은 바뀌지 않는다. CompareAskService 의 검사 부분을 고치는 #849 병합 뒤 처리한다",
-      "expect": { "sources": ["LLM"] } },
+      "expect": { "sources": ["RULE"], "noneOf": ["가장 앞섰어요"] } },
 
     { "id": "C-X1", "feature": "FUN-079", "type": "정상", "ranking": "demo", "question": "1위가 왜 1위야?",
       "saved": { "ToolCalls": [{ "name": "get_item", "arguments": "{\"rank\":1}" }],
