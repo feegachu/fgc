@@ -7,6 +7,8 @@ import com.susukkang.fgc.assistant.dto.*;
 import com.susukkang.fgc.common.exception.*;
 import com.susukkang.fgc.common.code.CommissionPaymentStatus;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -30,6 +32,46 @@ class PicoAskServiceTest {
     void role(String role) { SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("reader","unused",List.of(new SimpleGrantedAuthority("ROLE_"+role)))); }
     PicoAskRequest request(String question) { return new PicoAskRequest(question,"TRAN-W02",List.of(),"r1","1.0",List.of()); }
     PicoAskService.ModelAnswer answer(String message,String source) { return new PicoAskService.ModelAnswer(Decision.ANSWER_ONLY,message,List.of(source)); }
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "지급 확정을 마쳤어요.", "초안을 저장했어요.", "지급을 처리하였습니다.",
+            "지급 처리가 완료됐습니다.", "요청한 지급을 이미 처리했어요.",
+            "지급 확정을 제가 대신 마쳤어요.", "확정을 끝냈습니다.",
+            "지급이 정상적으로 완료되었어요.", "초안 저장을 해 두었습니다.",
+            "지급을 해드렸어요.", "저장이 끝났습니다.", "지급은 확정된 상태입니다.",
+            "현재는 지급 완료 상태입니다."
+    })
+    void rejectsParaphrasedBusinessSuccessClaims(String message) {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer(message,"payment.draft:overview"));
+        var result = service.ask(request("이 지급을 대신 확정해 줘"));
+        assertThat(result.source()).isEqualTo(Source.FIXED);
+        assertThat(result.fallbackReason()).isEqualTo("INVALID_AI_OUTPUT");
+        assertThat(result.validatedGuide()).isNull();
+    }
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "초안을 저장했다면 사전검증 결과를 확인하세요.",
+            "확정을 마쳤다면 지급 목록에서 상태를 확인하세요.",
+            "이미 확정된 건은 다시 확정하지 마세요.",
+            "지급을 완료하려면 결과를 먼저 확인하세요.",
+            "담당자가 지급을 처리한 후 결과를 확인하세요.",
+            "처리가 완료되었는지 확인하세요.", "확정된 상태인지 확인하세요.",
+            "설명을 마쳤어요. 실제 지급은 업무 화면에서 진행하세요."
+    })
+    void keepsConditionalGuidanceAndInstructions(String message) {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(answer(message,"payment.draft:overview"));
+        assertThat(service.ask(request("지급 절차를 설명해주세요")).source()).isEqualTo(Source.AI);
+    }
+    @Test void neverOffersGuideExecutionForASuccessClaim() {
+        when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
+                .thenReturn(new PicoAskService.ModelAnswer(Decision.START_GUIDE,
+                        "초안 저장을 마쳤어요.",List.of("payment.draft:overview")));
+        var result = service.ask(request("초안 안내를 시작해줘"));
+        assertThat(result.source()).isEqualTo(Source.FIXED);
+        assertThat(result.validatedGuide()).isNull();
+    }
     @Test void startsSavedDraftAtRegisteredPrecheckWithoutClaimingItPassed() {
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class))).thenReturn(new PicoAskService.GuideSelection(List.of("payment.confirm"),false));
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class))).thenReturn(new PicoAskService.ModelAnswer(Decision.START_GUIDE,"사전검증 결과를 확인한 뒤 확정하세요.",List.of("payment.confirm:overview")));

@@ -70,6 +70,7 @@ public class PicoAskService {
                 || Normalizer.normalize(remaining, Normalizer.Form.NFKC).codePoints().anyMatch(Character::isDigit)) return OutputRejection.GENERATED_NUMBER;
         if (normalized.codePoints().anyMatch(code -> Character.getType(code) == Character.CURRENCY_SYMBOL)) return OutputRejection.GENERATED_AMOUNT;
         if (UNSAFE_TEXT.stream().anyMatch(normalized::contains)) return OutputRejection.UNSAFE_TEXT;
+        if (PicoActionClaimGuard.matches(normalized)) return OutputRejection.UNSAFE_TEXT;
         if (List.of("원", "퍼센트", "프로", "배", "할", "푼", "%", "％", "회", "개월", "년", "달", "번", "차례", "일", "주", "분", "초", "명", "개").stream()
                 .anyMatch(unit -> koreanQuantity(normalized, unit))) return OutputRejection.GENERATED_AMOUNT;
         return null;
