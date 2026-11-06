@@ -174,6 +174,15 @@ class CompareAskToolsTest {
         assertThat(tools.verify("든든건강이 1위이고 튼튼건강이 2위예요.")).isNull();
         assertThat(tools.verify("든든건강이 1위이고 튼튼건강은 환수 부담이 더 작아요.")).isNull();
         assertThat(tools.verify("가보험 든든건강이 1위예요.")).isNull();
+        // 표기와 이름 사이에 말이 낀 꼴도 같은 절의 첫 이름과 짝을 본다(#911 리뷰).
+        assertThat(tools.verify("1위 상품은 나보험 튼튼건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 바로 나보험 튼튼건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위를 차지한 상품은 나보험 튼튼건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위 상품은 가보험 든든건강이에요.")).isNull();
+        assertThat(tools.verify("1위는 바로 가보험 든든건강이에요.")).isNull();
+        // 접속 표현이 끼거나 비교 상대로 쓰인 이름은 짝이 아니다.
+        assertThat(tools.verify("1위는 환수 부담이 작지만 나보험 튼튼건강은 보수적 순수령액이 작아요.")).isNull();
+        assertThat(tools.verify("1위는 환수 부담이 작아서 나보험 튼튼건강보다 앞서요.")).isNull();
         // 이름이 묶음보다 적으면 판단하지 않는다.
         assertThat(tools.verify("1위보다 2위가 나보험 튼튼건강이에요.")).isNull();
     }

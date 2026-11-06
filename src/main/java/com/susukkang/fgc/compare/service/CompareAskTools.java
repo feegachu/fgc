@@ -449,7 +449,7 @@ final class CompareAskTools {
                 j++;
             }
             int size = j - i + 1;
-            String reason = size == 1 ? checkSingleLabel(normalized, spans, labels.get(i))
+            String reason = size == 1 ? checkSingleLabel(normalized, spans, labels.get(i), j + 1 < labels.size() ? labels.get(j + 1)[1] : normalized.length())
                     : checkEnumeration(spans, labels.subList(i, j + 1), j + 1 < labels.size() ? labels.get(j + 1)[1] : normalized.length());
             if (reason != null) {
                 return reason;
@@ -459,7 +459,13 @@ final class CompareAskTools {
         return null;
     }
 
-    private static String checkSingleLabel(String normalized, List<Span> spans, int[] label) {
+    /** 표기와 이름 사이에 이 말이 끼면 같은 대상을 말한 것이 아니라 다른 절이다('1위이고 튼튼건강이 2위', '1위는 작지만 B는'). */
+    private static final Pattern CLAUSE_BREAK = Pattern.compile("이고|이며|이면서|지만|반면|비해|하고|하며|고\\s|며\\s|서\\s|[,;.!?]");
+    /** 이름 바로 뒤에 이 말이 오면 그 이름은 비교·나열의 상대라서 순위의 주인이 아니다('1위는 … B보다 앞서요'). */
+    private static final Pattern NAME_IS_PARTNER = Pattern.compile("^\\s*(?:보다|와|과|랑|및)");
+    private static final int MAX_FILLER_GAP = 16;
+
+    private static String checkSingleLabel(String normalized, List<Span> spans, int[] label, int regionEnd) {
         Set<Integer> candidates = new HashSet<>();
         Matcher after = AFTER_PARTICLE.matcher(normalized.substring(label[2]));
         if (after.find()) {
@@ -472,6 +478,14 @@ final class CompareAskTools {
                 int end = before.start();
                 spans.stream().filter(span -> span.end() == end).forEach(span -> candidates.add(span.rank()));
             }
+        }
+        if (candidates.isEmpty()) {
+            // 바로 붙은 이름이 없으면('1위 상품은 A', '1위는 바로 A') 같은 절 안의 첫 이름과 짝짓는다. 접속 표현이 끼거나 비교 상대로 쓰인 이름은 짝이 아니다.
+            spans.stream().filter(span -> span.at() >= label[2] && span.end() <= regionEnd).min((x, y) -> Integer.compare(x.at(), y.at()))
+                    .filter(span -> span.at() - label[2] <= MAX_FILLER_GAP)
+                    .filter(span -> !CLAUSE_BREAK.matcher(normalized.substring(label[2], span.at())).find())
+                    .filter(span -> !NAME_IS_PARTNER.matcher(normalized.substring(span.end())).find())
+                    .ifPresent(span -> candidates.add(span.rank()));
         }
         return !candidates.isEmpty() && !candidates.contains(label[0]) ? "RANK_MISMATCH" : null;
     }
