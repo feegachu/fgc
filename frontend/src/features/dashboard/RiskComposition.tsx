@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
+import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { int, rate } from '../../lib/format'
 import { useDrawn } from '../../lib/motion'
 import { CIRCUMFERENCE, RADIUS, donutSegments } from './donut'
@@ -103,7 +104,7 @@ export function RiskComposition({ items }: { items: CompositionItem[] }) {
               >
                 <span className={`risk-swatch risk-color-${item.color}`} aria-hidden="true" />
                 <span className="risk-legend-label">{item.label}</span>
-                <span className="risk-legend-value tabular-nums">{int(item.value)}건</span>
+                <span className="risk-legend-value tabular-nums"><AnimatedNumber value={item.value} />건</span>
                 <span className="risk-legend-share tabular-nums">{sharePct}</span>
                 <span className="risk-legend-bar" aria-hidden="true">
                   <span
