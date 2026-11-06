@@ -86,6 +86,8 @@ final class CompareAskTools {
     private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
     /** 한도 도달 표현. 한 문장에서 긍정과 부정이 섞이면('1위는 걸렸고 2위는 걸리지 않았어요') 주장이 섞여 있어 판단하지 않는다. */
     private static final Pattern CAP_VERB = Pattern.compile("걸리|걸려|걸렸|걸린|도달|초과|넘|닿");
+    /** 답에 서버 내부 도구를 드러내는 말('도구를 통해 제공하며', 'get_item'). 설계사에게는 의미 없는 내부 구현이라 답으로 내보내지 않는다. */
+    private static final Pattern TOOL_MENTION = Pattern.compile("도구|get_item|explain_term|compare\\s*\\(|함수\\s*호출");
     /** 도달 표현 바로 뒤에 붙은 부정('걸리지 않았어요', '넘지는 못했어요', '걸린 적이 없어요'). 뒤쪽 다른 서술어의 '못'·'없'은 도달 표현의 부정이 아니다. */
     private static final Pattern NEGATION = Pattern.compile("^(?:[하한])?(?:[지진](?:는)?\\s*(?:않|못|아니)|(?:[은는])?\\s*(?:적|일|경우)(?:이|은|는|도)?\\s*(?:전혀\\s*)?없)");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
@@ -253,6 +255,9 @@ final class CompareAskTools {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
         if (RECOMMEND_PHRASES.stream().anyMatch(normalized::contains)) {
             return "RECOMMENDATION";
+        }
+        if (TOOL_MENTION.matcher(normalized).find()) {
+            return "TOOL_MENTION";
         }
         // 금액·비율은 서버 문장이 맡는다. 보험사·상품 이름 안의 숫자, 용어 '1,200% 룰', 표시 중인 범위의 순위 표기('1위')만 예외다.
         if (!AnswerNumberGuard.allowed(withoutRankLabels(normalized), CompareSummaryService.names(ranking))) {

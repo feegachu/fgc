@@ -234,6 +234,17 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("서버 내부 도구를 언급하는 답은 거절한다")
+    void internalToolMentionsAreRejected() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("이 챗봇은 도구를 통해 비교 값을 제공하며 순위를 설명해요.")).isEqualTo("TOOL_MENTION");
+        assertThat(tools.verify("get_item 으로 값을 확인했어요.")).isEqualTo("TOOL_MENTION");
+        assertThat(tools.verify("compare(1, 2) 결과를 보면 앞서요.")).isEqualTo("TOOL_MENTION");
+        assertThat(tools.verify("이 챗봇은 비교 결과와 기본 용어를 안내해요.")).isNull();
+    }
+
+    @Test
     @DisplayName("특정 상품을 권하는 표현은 거절하고, 추천하지 않는다는 안내는 막지 않는다")
     void recommendationsAreRejected() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);
