@@ -296,7 +296,7 @@ class Loader:
         return done
 
     def finalize(self, run):
-        if self.s.ok('GET', f'/api/v1/validation-runs/{run}').get('status') == 'FINALIZED':
+        if self.s.ok('GET', f'/api/v1/validation-runs/{run}')['header'].get('status') == 'FINALIZED':
             return
         status, data = self.admin.call('POST', f'/api/v1/validation-runs/{run}/finalize', {}, idem())
         print(f"  실행 {run} 확정 {'완료' if status == 200 else '보류: ' + str(data.get('error', {}).get('message', ''))[:160]}")
