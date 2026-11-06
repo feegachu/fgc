@@ -114,7 +114,7 @@ def contract_number(index, month, offering):
 class Loader:
     def __init__(self, settle, admin):
         self.s, self.admin, self.today = settle, admin, datetime.date.today().isoformat()
-        self.counters = {'contracts': 0, 'payments': 0, 'skipped': 0}
+        self.counters = {'contracts': 0, 'payments': 0, 'skipped': 0, 'statusChanges': 0}
 
     def pages(self, path):
         rows, page = [], 1
@@ -254,20 +254,23 @@ class Loader:
         for due_month, date, number in SETTLEMENT_SUPPORT:
             if due_month == month and date <= self.today:
                 contract = self.s.ok('GET', f"/api/v1/contracts/{contracts[number]['contractId']}")
-                submit(f"GA-{month.replace('-', '')}-SETTLEMENT", SETTLEMENT_ITEM, contract['agentId'], 210000, date, {
+                submit(f"GA-{month.replace('-', '')}-SETTLE", SETTLEMENT_ITEM, contract['agentId'], 210000, date, {
                     'contractId': contract['contractId'], 'attributionMethod': 'SETTLEMENT_SUPPORT_MONTHLY', 'allocationBasis': 'EQUAL_SPLIT_BY_NEW_CONTRACT',
                     'inclusionDecisionStatus': 'INCLUDED', 'inclusionDecisionReason': '경력 설계사 정착지원금을 그 달 신계약에 안분'})
         for due_month, date in NEWCOMER_SUPPORT:
             if due_month == month and date <= self.today:
-                submit(f"GA-{month.replace('-', '')}-NEWCOMER", NEWCOMER_ITEM, agents['A-FC-003']['agentId'], 300000, date, {
+                submit(f"GA-{month.replace('-', '')}-NEW", NEWCOMER_ITEM, agents['A-FC-003']['agentId'], 300000, date, {
                     'attributionMethod': 'NEWCOMER_NON_CONTRACT', 'exclusionType': 'NEW_AGENT_SUPPORT',
                     'inclusionDecisionStatus': 'EXCLUDED', 'inclusionDecisionReason': '신인 활동지원비는 계약 귀속 대상이 아님'})
 
-    def run_month(self, month, run_type='MONTHLY'):
+    def run_month(self, month):
         runs = self.s.ok('GET', f'/api/v1/validation-runs?validationMonth={month}&page=1&size=50')
-        rows = [r for r in (runs.get('content') or []) if str(r.get('validationMonth', '')).startswith(month) and r.get('runType') == run_type]
+        rows = [r for r in (runs.get('content') or []) if str(r.get('validationMonth', '')).startswith(month) and r.get('runType') == 'MONTHLY']
         if any(r.get('status') in ('COMPLETED', 'FINALIZED') for r in rows):
             return next(r['validationRunId'] for r in rows if r.get('status') in ('COMPLETED', 'FINALIZED'))
+        return self.execute(month, 'MONTHLY')
+
+    def execute(self, month, run_type):
         created = self.s.ok('POST', '/api/v1/validation-runs', {'runType': run_type, 'validationMonth': month})
         run = created['validationRunId']
         self.s.ok('POST', f'/api/v1/validation-runs/{run}/execute', {})
@@ -316,6 +319,8 @@ class Loader:
         status, data = self.s.call('PUT', f"/api/v1/contracts/{contract['contractId']}", body, idem())
         if status != 200:
             print(f"  상태 변경 실패 {number} {new_status}: {status} {data.get('error', {}).get('message', '')[:120]}")
+        else:
+            self.counters['statusChanges'] += 1
 
 
 # 시연에서 처리할 오류. 그 외 회차는 전부 일치한다.
@@ -358,8 +363,10 @@ def main():
         for event_month, number, status, when, reason in EVENTS:
             if event_month == month:
                 loader.status_event(number, status, when, reason)
-    print('상태 변경 후속 처리(밤 일 배치가 하는 일)')
-    loader.run_month('2026-11', 'MANUAL_CONTRACT')
+    # 환수 후보는 밤 일 배치가 만든다. 이번에 넣은 상태 변경이 있을 때만 그 일을 지금 돌린다.
+    if loader.counters['statusChanges']:
+        print('상태 변경 후속 처리')
+        loader.execute('2026-11', 'MANUAL_CONTRACT')
     print('월 통합검증')
     runs.update({month: loader.run_month(month) for month in PAID_MONTHS})
     print('지난 달 정리')
