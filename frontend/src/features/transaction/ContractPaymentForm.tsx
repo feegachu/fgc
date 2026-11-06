@@ -653,7 +653,7 @@ export function ContractPaymentForm({
                           />
                         </td>
                         <td>
-                          <Button variant="ghost" onClick={() => setSelectedResult(String(key))}>
+                          <Button variant="ghost" title={checks[key]?.blockers?.map(blocker => blocker.message).filter(Boolean).join(' / ')} onClick={() => setSelectedResult(String(key))}>
                             {done(key)
                               ? '확정 완료'
                               : checks[key]
@@ -713,7 +713,7 @@ export function ContractPaymentForm({
                       <span className="contract-payment-preview-number">{index + 1}</span>
                       <span className="contract-payment-preview-person">
                         <strong title={line.recipientName ?? 'GA'}>{line.recipientName ?? 'GA'}</strong>
-                        <span>{line.commissionItemName ?? '항목 확인 필요'}</span>
+                        <span title={line.commissionItemName ?? '항목 확인 필요'}>{line.commissionItemName ?? '항목 확인 필요'}</span>
                       </span>
                       <span className="contract-payment-preview-amount">
                         {line.cashflowType === 'DEDUCTION' && '차감 '}

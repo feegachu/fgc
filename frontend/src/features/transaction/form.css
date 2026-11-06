@@ -111,14 +111,15 @@
   margin: 0;
 }
 .contract-payment-preview-list li + li {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 .contract-payment-preview-row {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 6px 8px;
+  min-height: 34px;
   text-align: left;
   border: 1px solid var(--color-border-default);
   border-radius: 8px;
@@ -146,30 +147,34 @@
 .contract-payment-preview-person {
   flex: 1;
   min-width: 0;
-  display: grid;
-  gap: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
 }
 .contract-payment-preview-person strong {
+  flex-shrink: 0;
+  max-width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .contract-payment-preview-person > span {
   color: var(--color-text-secondary);
-  word-break: keep-all;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .contract-payment-preview-amount {
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 /* Actions stay directly below the compact schedule preview. */
 .contract-payment-preview-actions {
   border-top: 1px solid var(--color-border-default);
-  padding: 12px 16px 16px;
+  padding: 8px 12px 10px;
 }
 .contract-payment-editor .contract-payment-preview-actions .transaction-action-list {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -179,6 +184,13 @@
   padding-inline: 8px;
   white-space: nowrap;
 }
+.contract-payment-editor :is(.contract-payment-preview, .contract-payment-gates) > .surface-header {
+  padding: 12px 14px 8px;
+}
+.contract-payment-preview > .surface-body { padding: 4px 12px 10px; }
+.contract-payment-gates > .surface-body { padding: 0 14px 8px; }
+.contract-payment-gates .transaction-gate-step { padding-block: 7px; align-items: center; }
+.contract-payment-gates .transaction-gate-fail .transaction-gate-detail { color: var(--color-status-error-text); }
 @media (max-width: 36rem) {
   .contract-payment-editor .contract-payment-preview-actions .transaction-action-list { grid-template-columns: 1fr; }
 }
