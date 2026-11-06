@@ -71,7 +71,8 @@ class Client:
         self.login()
 
     def call(self, method, path, body=None, headers=None):
-        head = {'Accept': 'application/json', 'Origin': self.base, 'X-FGC-Client': 'web'}
+        # 신한 앞단(Cloudflare)은 파이썬 기본 User-Agent를 403(1010)으로 막는다. 도구 이름을 밝힌다.
+        head = {'Accept': 'application/json', 'Origin': self.base, 'X-FGC-Client': 'web', 'User-Agent': 'fgc-demo-loader/1.0'}
         if self.token:
             head['Authorization'] = 'Bearer ' + self.token
         if body is not None:

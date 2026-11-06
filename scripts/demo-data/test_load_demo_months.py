@@ -1,7 +1,9 @@
 import datetime
+import json
 import unittest
+from unittest import mock
 
-from load_demo_months import COMMON_COST, CONTRACTS, EVENTS, SETTLEMENT_SUPPORT, Loader, anomaly, contract_number
+from load_demo_months import COMMON_COST, CONTRACTS, EVENTS, SETTLEMENT_SUPPORT, Client, Loader, anomaly, contract_number
 
 
 NUMBERS = {contract_number(index, row[0], row[2]) for index, row in enumerate(CONTRACTS, start=1)}
@@ -26,6 +28,16 @@ class FakeServer:
 
 def run(status):
     return {'validationRunId': 7, 'validationMonth': '2026-09-01', 'runType': 'MONTHLY', 'status': status}
+
+
+class Requests(unittest.TestCase):
+    def test_requests_name_the_tool_because_the_edge_blocks_the_python_default(self):
+        response = mock.MagicMock(status=200)
+        response.__enter__.return_value = response
+        response.read.return_value = json.dumps({'data': {'accessToken': 'token'}}).encode()
+        with mock.patch('urllib.request.urlopen', return_value=response) as opened:
+            Client('https://example.test', 'id', 'pw')
+        self.assertEqual(opened.call_args.args[0].get_header('User-agent'), 'fgc-demo-loader/1.0')
 
 
 class MonthRuns(unittest.TestCase):
