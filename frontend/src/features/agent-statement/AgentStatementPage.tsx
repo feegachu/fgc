@@ -86,14 +86,13 @@ export default function AgentStatementPage() {
   const overview = useQuery(statementOverviewQuery(filters, enhanced))
   const overviewRows = overview.isError ? [] : overview.data ?? []
   const agentId = isAgent ? null : filters.agentId || (enhanced && overviewRows[0] ? String(overviewRows[0].agentId) : null)
-  const selectedAgent = overviewRows.find(row => String(row.agentId) === agentId)
   const entryKey = params.get('entryKey') ?? ''
   const ready = isAgent || agentId !== null
   // 조회 조건이 같으면 입력 중인 필터를 지우지 않도록, entryKey 를 뺀 정규화한 조건을 key 로 쓴다.
   const filterKey = filterParams(filters, !isAgent).toString()
   const [resetCount, setResetCount] = useState(0)
   const list = useQuery(statementListQuery(filters, agentId, ready))
-  const detail = useQuery(statementDetailQuery(entryKey, agentId, ready))
+  const detail = useQuery(statementDetailQuery(entryKey, agentId, ready && (!enhanced || view === 'table')))
   const asOf = `${filters.month || defaultMonth}-01`
   const agents = useAgentOptions(asOf, '', !isAgent)
   const items = useCommissionItems(asOf)
@@ -205,12 +204,12 @@ export default function AgentStatementPage() {
         <p className="ast-state" role="status">
           설계사를 고른 뒤 조회를 누르세요.
         </p>
-      ) : ready ? (
+      ) : ready && (!enhanced || view === 'table') ? (
         <>
           <section data-guide-feature="features.agent-statement.agent-statement-page.list-panel" data-guide-target="statement.results" className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
             <header className="surface-header">
               <h2 className="surface-title" id="ast-list-title">
-                {enhanced && view === 'tree' ? `${selectedAgent?.agentName ?? '선택한 설계사'} · 상세 명세` : '명세 내역'}
+                명세 내역
               </h2>
               <div className="ast-list-tools">
                 <span className="ast-count"><span className="tabular-nums">{int(total)}</span>건 · 한 화면 20행</span>

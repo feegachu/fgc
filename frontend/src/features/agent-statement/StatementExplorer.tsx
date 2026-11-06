@@ -20,13 +20,7 @@ export function StatementExplorer({
   const activeBranch = branches.some(([id]) => id === branch) ? branch : (selected?.branchId ?? branches[0]?.[0])
   const visible = rows.filter((row) => row.branchId === activeBranch)
   return (
-    <section className="surface ast-explorer" aria-label="지점 및 설계사 명세 탐색">
-      <header className="surface-header">
-        <div>
-          <h2 className="surface-title">지점별 · 설계사별 명세</h2>
-        </div>
-        {viewControl}
-      </header>
+    <section className="surface ast-explorer" data-guide-target="statement.results" data-guide-feature="features.agent-statement.agent-statement-page.list-panel" aria-label="지점 및 설계사 명세 탐색">
       <div className="ast-explorer-columns">
         <nav className="ast-branch-tree" aria-label="지점과 설계사 목록">
           {branches.map(([id, name]) => (
@@ -74,10 +68,13 @@ export function StatementExplorer({
           ))}
         </nav>
         <div className="ast-agent-area">
-          <h3>
-            {branches.find(([id]) => id === activeBranch)?.[1]}{' '}
-            <span className="ast-muted">설계사 {visible.length}명</span>
-          </h3>
+          <div className="ast-agent-area-heading">
+            <h3>
+              {branches.find(([id]) => id === activeBranch)?.[1]}{' '}
+              <span className="ast-muted">설계사 {visible.length}명</span>
+            </h3>
+            {viewControl}
+          </div>
           <div className="ast-agent-cards">
             {visible.map((row) => (
               <button
@@ -117,10 +114,6 @@ export function StatementExplorer({
           </div>
         </div>
       </div>
-      <p className="ast-explorer-note">
-        계약 수는 조회한 명세에 연결된 계약을 중복 없이 셉니다. 소속은 현재 등록 기준이며, 환수는 실제 회수액이 아닌
-        계산액입니다.
-      </p>
     </section>
   )
 }

@@ -150,7 +150,6 @@
 
 .ast-comparison { display: flex; gap: .375rem; }
 .ast-explorer { overflow: hidden; }
-.ast-explorer .surface-header { gap: 1rem; flex-wrap: wrap; align-items: center; padding-block: 1rem; }
 .ast-view-switch { position: relative; display: flex; background: #f3f6fa; border: 1px solid #e0e7ef; border-radius: .375rem; padding: .125rem; margin-top: .25rem; flex-shrink: 0; }
 .ast-view-switch button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2rem; padding: .375rem; border: 0; border-radius: .25rem; background: transparent; color: #66798d; cursor: pointer; }
 .ast-view-switch .material-symbols-rounded { font-size: 1.125rem; }
@@ -167,7 +166,8 @@
 .ast-branch-tree button[aria-current] { background: #dce9f8; color: #194f86; font-weight: 600; }
 .ast-branch-tree .material-symbols-rounded { font-size: 1.125rem; flex-shrink: 0; }
 .ast-agent-area { padding: 1.25rem; min-width: 0; max-height: 32rem; overflow: auto; }
-.ast-agent-area h3 { margin: 0 0 1rem; font-size: 1rem; color: #253f5e; }
+.ast-agent-area-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.ast-agent-area h3 { margin: 0; font-size: 1rem; color: #253f5e; }
 .ast-agent-area h3 > span { margin-left: .5rem; }
 .ast-agent-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: .875rem; }
 .ast-agent-card { display: flex; flex-direction: column; gap: .625rem; border: 1px solid #dae4f0; border-radius: .75rem; padding: 1rem; background: white; color: #304963; text-align: left; font: inherit; cursor: pointer; }
@@ -178,7 +178,6 @@
 .ast-agent-card-metric { display: flex; justify-content: space-between; gap: .5rem; font-size: .875rem; }
 .ast-agent-card-metric strong { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ast-agent-card-extra { border-top: 1px solid #e1e8f1; padding-top: .625rem; font-size: .75rem; color: #667b96; line-height: 1.7; }
-.ast-explorer-note { padding: .875rem 1.25rem; margin: 0; border-top: 1px solid #e1e8f1; color: #667b96; font-size: .75rem; }
 .ast-explorer button:focus-visible { outline: 2px solid #194f86; outline-offset: 2px; }
 @media (max-width: 48rem) {
   .ast-explorer-columns { grid-template-columns: minmax(0, 1fr); }
