@@ -80,7 +80,9 @@ final class CompareAskTools {
     /** '가장 큰/높은/많은'(최댓값) 또는 '가장 작은/낮은/적은'(최솟값) 주장. */
     private static final Pattern SUPERLATIVE = Pattern.compile("가장\\s*(큰|크|커|높|많|작은|작|낮|적)");
     /** '한도에 걸렸다·도달했다·초과했다' 처럼 한도에 닿았다는 주장. 조사가 없는 '한도 초과 시'(설명)는 잡지 않는다. */
-    private static final Pattern CAP_HIT = Pattern.compile("한도(?:에|를|까지)\\s*(?:걸|도달|초과|넘|닿)");
+    private static final Pattern CAP_HIT = Pattern.compile("한도(?:에|를|까지)\\s*(?:걸|도달|초과|넘|닿)(?!는|하는)");
+    /** 상품을 짚지 않은 문장은 "모든/전체 상품"처럼 전체를 말할 때만 상태 주장으로 본다(용어 설명의 "한도를 넘는 금액은…"은 제외). */
+    private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체|상품");
     private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
     private static final Pattern NEGATION = Pattern.compile("않|없|못|아니");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
@@ -383,6 +385,9 @@ final class CompareAskTools {
         Set<Integer> mentioned = ranksMentioned(sentence);
         List<Item> scope = ranking.items().stream()
                 .filter(item -> mentioned.isEmpty() || mentioned.contains(item.rank())).toList();
+        if (mentioned.isEmpty() && !ALL_SCOPE.matcher(sentence).find()) {
+            return null;
+        }
         boolean anyCarry = scope.stream().anyMatch(item -> item.carryover() > 0);
         boolean negated = NEGATION.matcher(sentence.substring(hit.end())).find();
         return negated == anyCarry ? "CAP_STATE_MISMATCH" : null;

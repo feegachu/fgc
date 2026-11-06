@@ -147,6 +147,8 @@ class CompareAskToolsTest {
         // 조사 없는 '한도 초과 시'나 조건 설명은 상태 주장이 아니다.
         assertThat(tools.verify("한도 초과 시 이월 예정액이 생겨요.")).isNull();
         assertThat(tools.verify("한도를 초과하면 이월돼요.")).isNull();
+        // 용어 설명의 관계절은 상태 주장이 아니다(실측에서 오탐).
+        assertThat(tools.verify("이 한도를 넘는 금액은 이월 예정액으로 따로 계산돼요.")).isNull();
     }
 
     @Test
