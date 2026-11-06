@@ -26,27 +26,78 @@ import { CapPanel } from './ConfirmationPanels'
 import { ContractPaymentGates } from './ContractPaymentGates'
 import { ScreenWalkthrough } from '../assistant/guide/ScreenWalkthrough'
 import type { ScreenHelpStep } from '../assistant/guide/ScreenHelp'
+import { PaymentAmountHighlights } from './PaymentAmountHighlights'
 
-const helpSteps: ScreenHelpStep[] = [
+const helpSteps: ScreenHelpStep[] = ([
   {
     targetId: 'payment.batch.scope',
     title: '지급 계약 건',
     instruction: '계약과 회차를 고르면 귀속행이 채워집니다.',
-    interaction: '수수료 항목과 지급 금액을 확인하세요.',
+    interaction: '계약 선택부터 지급 확정까지 차례로 진행합니다.',
+    presentation: { side: 'right' },
+    advanceAfterMs: 2200,
+  },
+  {
+    targetId: 'payment.batch.contract',
+    title: '지급할 계약 선택',
+    instruction: '계약번호를 검색하고 지급할 계약을 선택하세요.',
+    interaction: '선택한 계약의 예상 스케줄과 귀속행을 불러옵니다.',
+    presentation: { side: 'right', includeLabel: true },
+    openControl: true,
+    advanceOnSelection: true,
+  },
+  {
+    targetId: 'payment.batch.installment',
+    title: '정산월과 회차 확인',
+    instruction: '계약월은 1회차, 다음 달은 2회차로 맞춥니다.',
+    interaction: '기준 정산월에 해당하는 회차를 확인하세요.',
+    presentation: { side: 'right', includeLabel: true },
+  },
+  {
+    targetId: 'payment.batch.expected',
+    title: '설계사별 예상 금액',
+    instruction: '네모로 표시된 예상 수수료를 확인하세요.',
+    interaction: '다음을 누르면 같은 행의 귀속금액과 비교합니다.',
+    presentation: { side: 'left' },
+    overlay: <PaymentAmountHighlights phase="expected" />,
   },
   {
     targetId: 'payment.batch.lines',
     title: '설계사별 귀속행',
-    instruction: '설계사별 수수료와 금액을 수정합니다.',
-    interaction: '오른쪽 예상 스케줄과 같은 순서로 비교하세요.',
+    instruction: '네모가 같은 행의 귀속금액으로 이동합니다.',
+    interaction: '예상 금액과 다른 행을 확인하고 지급액을 입력하세요.',
+    presentation: { side: 'right' },
+    overlay: <PaymentAmountHighlights phase="attribution" />,
   },
   {
-    targetId: 'payment.batch.actions',
-    title: '저장·사전검증·확정',
-    instruction: '임시저장 후 모든 행을 사전검증합니다.',
-    interaction: '결과를 확인하고 확정을 진행하세요.',
+    targetId: 'payment.batch.save',
+    title: '임시저장',
+    instruction: '귀속금액을 확인하고 임시저장을 누르세요.',
+    interaction: '작성중으로 저장되며, 지급은 확정되지 않습니다.',
+    presentation: { side: 'left', sideBoundary: '.transaction-form-column' },
   },
-].map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true }))
+  {
+    targetId: 'payment.batch.precheck',
+    title: '사전검증',
+    instruction: '임시저장 후 사전검증을 누르세요.',
+    interaction: '차단된 행은 아래 점검표에서 원인을 확인합니다.',
+    presentation: { side: 'left', sideBoundary: '.transaction-form-column' },
+  },
+  {
+    targetId: 'payment.precheck.result',
+    title: '확정 전 6단계 점검',
+    instruction: '저장·귀속·금액·한도 검증 결과를 차례로 확인하세요.',
+    interaction: '확인 필요 항목을 수정하고 다시 저장·검증합니다.',
+    presentation: { side: 'left' },
+  },
+  {
+    targetId: 'payment.batch.confirm',
+    title: '지급 확정',
+    instruction: '검증을 통과하면 확정을 누르세요.',
+    interaction: '확인창에서 대상 행과 총액을 확인한 뒤 확정합니다.',
+    presentation: { side: 'left', sideBoundary: '.transaction-form-column' },
+  },
+] satisfies Omit<ScreenHelpStep, 'group' | 'details'>[]).map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true }))
 type Edit = { amount: string; item: string }
 type Saved = { payment: Payment; fingerprint: string }
 
@@ -173,9 +224,11 @@ export function ContractPaymentForm({
   const installments = [...new Set(lines.map((line) => line.installmentNo).filter((n): n is number => n != null))].sort(
     (a, b) => a - b,
   )
-  const chosen =
-    installment ||
-    String(lines.find((line) => line.dueDate?.startsWith(settlementMonth))?.installmentNo ?? installments[0] ?? '')
+  const contractMonth = contracts.data.find(row => String(row.contractId) === contractId)?.contractDate?.slice(0, 7)
+  const monthIndex = (value: string) => Number(value.slice(0, 4)) * 12 + Number(value.slice(5, 7))
+  const currentInstallment = contractMonth ? monthIndex(settlementMonth) - monthIndex(contractMonth) + 1 : undefined
+  const automaticInstallment = currentInstallment ?? lines.find(line => line.dueDate?.startsWith(settlementMonth))?.installmentNo
+  const chosen = installment || (automaticInstallment != null && installments.includes(automaticInstallment) ? String(automaticInstallment) : '')
   const visible = lines.filter((line) => String(line.installmentNo) === chosen)
   const eligible = (line: ScheduleLine) =>
     ['PLANNED', 'CONFIRMED', 'RESTARTED'].includes(line.lineStatus ?? '') && !!line.scheduleLineId
@@ -437,6 +490,7 @@ export function ContractPaymentForm({
             >
               <Field label="계약" required>
                 <SearchSelect
+                  data-guide-target="payment.batch.contract"
                   disabled={scopeLocked}
                   value={contractId}
                   source={contracts.source}
@@ -470,6 +524,7 @@ export function ContractPaymentForm({
               </Field>
               <Field label="회차" required>
                 <select
+                  data-guide-target="payment.batch.installment"
                   disabled={scopeLocked || !installments.length}
                   value={chosen}
                   onChange={(event) => {
@@ -479,6 +534,7 @@ export function ContractPaymentForm({
                     setChecks({})
                   }}
                 >
+                  {installments.length > 0 && !chosen && <option value="">정산월에 해당하는 회차 없음</option>}
                   {installments.length ? (
                     installments.map((value) => (
                       <option key={value} value={value}>
@@ -643,6 +699,7 @@ export function ContractPaymentForm({
                         </td>
                         <td>
                           <input
+                            data-payment-attribution={key}
                             aria-label={`귀속금액 ${key}`}
                             disabled={editingLocked || !eligible(line)}
                             type="number"
@@ -693,43 +750,46 @@ export function ContractPaymentForm({
         </div>
         <div className="transaction-form-column">
           <section className="surface contract-payment-preview" aria-labelledby="contract-payment-preview-title">
-            <header className="surface-header transaction-surface-header">
-              <h2 className="surface-title" id="contract-payment-preview-title">
-                설계사별 예상 스케줄
-              </h2>
-              <span className="transaction-panel-meta">{chosen ? `${chosen}회차` : '회차 선택'}</span>
-            </header>
-            <div className="surface-body">
-              <ol className="contract-payment-preview-list">
-                {visible.map((line, index) => (
-                  <li key={line.scheduleLineId}>
-                    <button
-                      type="button"
-                      className="contract-payment-preview-row"
-                      disabled={!selected.some((row) => row.scheduleLineId === line.scheduleLineId)}
-                      aria-pressed={line.scheduleLineId === currentResult}
-                      onClick={() => setSelectedResult(String(line.scheduleLineId))}
-                    >
-                      <span className="contract-payment-preview-number">{index + 1}</span>
-                      <span className="contract-payment-preview-person">
-                        <strong title={line.recipientName ?? 'GA'}>{line.recipientName ?? 'GA'}</strong>
-                        <span title={line.commissionItemName ?? '항목 확인 필요'}>{line.commissionItemName ?? '항목 확인 필요'}</span>
-                      </span>
-                      <span className="contract-payment-preview-amount">
-                        {line.cashflowType === 'DEDUCTION' && '차감 '}
-                        {line.expectedAmount == null ? '금액 미정' : `${int(scheduleAmount(line))}원`}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-              {!visible.length && (
-                <p className="transaction-panel-meta">계약과 회차를 선택하면 예상 스케줄이 표시됩니다.</p>
-              )}
+            <div data-guide-target="payment.batch.expected">
+              <header className="surface-header transaction-surface-header">
+                <h2 className="surface-title" id="contract-payment-preview-title">
+                  설계사별 예상 스케줄
+                </h2>
+                <span className="transaction-panel-meta">{chosen ? `${chosen}회차` : '회차 선택'}</span>
+              </header>
+              <div className="surface-body">
+                <ol className="contract-payment-preview-list">
+                  {visible.map((line, index) => (
+                    <li key={line.scheduleLineId}>
+                      <button
+                        type="button"
+                        className="contract-payment-preview-row"
+                        disabled={!selected.some((row) => row.scheduleLineId === line.scheduleLineId)}
+                        aria-pressed={line.scheduleLineId === currentResult}
+                        onClick={() => setSelectedResult(String(line.scheduleLineId))}
+                      >
+                        <span className="contract-payment-preview-number">{index + 1}</span>
+                        <span className="contract-payment-preview-person">
+                          <strong title={line.recipientName ?? 'GA'}>{line.recipientName ?? 'GA'}</strong>
+                          <span title={line.commissionItemName ?? '항목 확인 필요'}>{line.commissionItemName ?? '항목 확인 필요'}</span>
+                        </span>
+                        <span className="contract-payment-preview-amount" data-payment-expected={line.scheduleLineId} data-expected-amount={scheduleAmount(line) ?? ''}>
+                          {line.cashflowType === 'DEDUCTION' && '차감 '}
+                          {line.expectedAmount == null ? '금액 미정' : `${int(scheduleAmount(line))}원`}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+                {!visible.length && (
+                  <p className="transaction-panel-meta">계약과 회차를 선택하면 예상 스케줄이 표시됩니다.</p>
+                )}
+              </div>
             </div>
             <section className="contract-payment-preview-actions" data-guide-target="payment.batch.actions">
               <div className="transaction-action-list">
                 <Button
+                  data-guide-target="payment.batch.save"
                   variant="secondary"
                   loading={busy === 'save'}
                   disabled={
@@ -751,6 +811,7 @@ export function ContractPaymentForm({
                   임시저장
                 </Button>
                 <Button
+                  data-guide-target="payment.batch.precheck"
                   variant="secondary"
                   loading={busy === 'precheck'}
                   disabled={!!busy || !canProcess || !clean || !balanced || !remaining.length || uncertain}
@@ -759,6 +820,7 @@ export function ContractPaymentForm({
                   사전검증
                 </Button>
                 <Button
+                  data-guide-target="payment.batch.confirm"
                   loading={busy === 'confirm'}
                   disabled={!!busy || !canProcess || !allChecked || uncertain}
                   onClick={() => setConfirmOpen(true)}

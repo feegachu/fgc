@@ -47,6 +47,7 @@ const finalizedText = (run: ValidationRun) =>
   run.finalizedAt ? `${run.finalizedBy ?? '-'}, ${dateTime(run.finalizedAt)}` : '-'
 
 export default function ValidationRunListPage() {
+  const [saveGuide] = useState(() => new SaveGuide())
   const { params, update } = useSearchParamsState(FILTER_KEYS)
   const criteria = normalizeCriteria(params)
   const runs = useQuery(runsQuery(criteria))
@@ -157,9 +158,10 @@ export default function ValidationRunListPage() {
         <div className="page-header-copy">
           <h1 className="page-title">월 통합검증 실행 목록</h1>
         </div>
+        <div className="page-header-actions"><ScreenHelp screenId="VRUN-W01" saveGuide={saveGuide} /></div>
       </header>
 
-      <CreateSection />
+      <CreateSection saveGuide={saveGuide} />
 
       <section data-guide-feature="features.validation.validation-run-list-page.section" className="surface" aria-labelledby="vrun-list-title">
         <ListHeader total={runs.data?.totalElements ?? 0} pageSize={20}>
@@ -212,7 +214,7 @@ function OpenLink({ run }: { run: ValidationRun }) {
 }
 
 /** ① 새 실행 만들기 — 검증월 기본값은 셸 기준월, 활성 월간 실행 여부는 선택한 검증월로 판정한다. */
-function CreateSection() {
+function CreateSection({ saveGuide }: { saveGuide: SaveGuide }) {
   const { month: shellMonth } = useOutletContext<ShellContext>()
   const canProcess = usePermission('canProcess')
   const navigate = useNavigate()
@@ -225,7 +227,6 @@ function CreateSection() {
   const active = useQuery({ ...activeMonthlyQuery(month), enabled: monthOk })
   const hasActive = active.data?.exists === true
   const blockedByActive = runType === 'MONTHLY' && hasActive
-  const [saveGuide] = useState(() => new SaveGuide())
   const savedId = useSyncExternalStore(saveGuide.subscribe, saveGuide.getSnapshot).savedId
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
@@ -253,7 +254,6 @@ function CreateSection() {
   return (
     <section data-guide-feature="features.validation.validation-run-list-page.section-2" data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
       <header className="surface-header">
-        <ScreenHelp screenId="VRUN-W01" saveGuide={saveGuide} />
         <h2 className="surface-title" id="vrun-create-title">
           ① 새 실행 만들기
         </h2>

@@ -5,10 +5,11 @@ import { useGuideScrollLock } from './useGuideScrollLock'
 const HIGHLIGHT_PADDING = 10
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
-  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean }) {
+  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string }) {
   useGuideScrollLock(card)
   const full = Boolean(presentation), preferredSide = presentation?.side
   const includeLabel = presentation?.includeLabel
+  const sideBoundary = presentation?.sideBoundary
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -116,7 +117,8 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         if (full && target?.isConnected) {
           const rect = targetRect()
           const popupWidth = includeLabel ? target.matches('input[type="date"]') ? 300 : 280 : 0
-          const context = new DOMRect(rect.left, rect.top, Math.max(rect.width, popupWidth), rect.height)
+          const panel = sideBoundary ? target.closest(sideBoundary)?.getBoundingClientRect() : undefined
+          const context = new DOMRect(panel?.left ?? rect.left, rect.top, Math.max(panel?.width ?? rect.width, popupWidth), rect.height)
           const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
           const topBoundary = headerBottom + 16
           const rightRoom = workspaceRight - context.right - 36
@@ -259,6 +261,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide, includeLabel])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary])
   return position
 }

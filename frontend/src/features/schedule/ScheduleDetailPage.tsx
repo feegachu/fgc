@@ -1,4 +1,4 @@
-import { policyCodeLabel } from '../policies/labels'
+import { ScheduleLinesTable } from './ScheduleLinesTable'
 import { SchedulePreviewForm } from './SchedulePreviewForm'
 import { SaveGuide } from '../assistant/guide/save-guide'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
@@ -10,11 +10,10 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router'
 import { paymentEntryHref, safeReturnTo } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
-import { CategoryBadge } from '../../components/StatusBadge'
 import { Modal } from '../../components/Modal'
 import { ApiError } from '../../lib/api/client'
 import { exportCsv } from '../../lib/exportCsv'
-import { date, dateTime, errorText, int, isNegative, rate, won } from '../../lib/format'
+import { dateTime, errorText, int, isNegative, won } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { usePermission } from '../auth/useAuth'
 import {
@@ -26,13 +25,11 @@ import {
   scheduleDetailQuery,
   scheduleVersionsQuery,
 } from './api'
-import type { ScheduleHeader, ScheduleLine } from './api'
+import type { ScheduleHeader } from './api'
 import { ActiveBadge, ClassificationBadge, RegimeEvidence, ScheduleStatusBadge } from './badges'
 import {
-  CALCULATION_TYPE,
   EMPTY,
   generationReason,
-  LINE_STATUS,
   PAYMENT_STAGE,
   responseLabel,
   SCHEDULE_PURPOSE,
@@ -86,6 +83,7 @@ function ScheduleDetailView({ id }: { id: string }) {
   const versions = useQuery({ ...scheduleVersionsQuery(id), enabled: detail.isSuccess })
   const header = detail.data?.header
   const lines = detail.data?.lines ?? []
+  const [infoTab, setInfoTab] = useState<'info' | 'versions'>('info')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [regenerateOpen, setRegenerateOpen] = useState(false)
   const previewForm = useRef<HTMLFieldSetElement>(null)
@@ -213,26 +211,42 @@ function ScheduleDetailView({ id }: { id: string }) {
             <span className="tabular-nums">스케줄 번호 {header ? value(header.scheduleHeaderId) : '-'}</span>
           </h2>
           {/* 지급단계는 이동 컨트롤이다(화면정의서 SCHE-W02, IF-API-28C). */}
-          <div className="filter-field schedule-stage-field">
-            <label className="filter-field-label" htmlFor="schedule-stage">
-              지급단계
-            </label>
-            <select data-guide-feature="features.schedule.schedule-detail-page.schedule-stage"
-              className="select-control"
-              id="schedule-stage"
-              value={header?.paymentStage ?? 'GA_TO_FC'}
-              disabled={unavailable || previewOnly || !header?.paymentStage || moving.isPending}
-              aria-busy={moving.isPending || undefined}
-              onChange={(event) => {
-                if (event.target.value !== header?.paymentStage) moving.mutate(event.target.value)
-              }}
-            >
-              <option value="GA_TO_FC">{PAYMENT_STAGE.GA_TO_FC}</option>
-              <option value="INSURER_TO_GA">{PAYMENT_STAGE.INSURER_TO_GA}</option>
-            </select>
+          <div className="schedule-info-actions">
+            <div className="schedule-info-tabs" role="tablist" aria-label="스케줄 정보 보기"
+              onKeyDown={event => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+                event.preventDefault()
+                const next = event.key === 'Home' ? 'info' : event.key === 'End' ? 'versions' : infoTab === 'info' ? 'versions' : 'info'
+                setInfoTab(next)
+                document.getElementById(`schedule-${next}-tab`)?.focus()
+              }}>
+              {(['info', 'versions'] as const).map(tab => <button type="button" role="tab" key={tab}
+                id={`schedule-${tab}-tab`} aria-controls={`schedule-${tab}-panel`} aria-selected={infoTab === tab}
+                tabIndex={infoTab === tab ? 0 : -1} onClick={() => setInfoTab(tab)}>
+                {tab === 'info' ? '기준정보' : '버전비교'}
+              </button>)}
+            </div>
+            <div className="filter-field schedule-stage-field">
+              <label className="filter-field-label" htmlFor="schedule-stage">
+                지급단계
+              </label>
+              <select data-guide-feature="features.schedule.schedule-detail-page.schedule-stage"
+                className="select-control"
+                id="schedule-stage"
+                value={header?.paymentStage ?? 'GA_TO_FC'}
+                disabled={unavailable || previewOnly || !header?.paymentStage || moving.isPending}
+                aria-busy={moving.isPending || undefined}
+                onChange={(event) => {
+                  if (event.target.value !== header?.paymentStage) moving.mutate(event.target.value)
+                }}
+              >
+                <option value="GA_TO_FC">{PAYMENT_STAGE.GA_TO_FC}</option>
+                <option value="INSURER_TO_GA">{PAYMENT_STAGE.INSURER_TO_GA}</option>
+              </select>
+            </div>
           </div>
         </header>
-        <div className="surface-body">
+        <div className="surface-body" role="tabpanel" id="schedule-info-panel" aria-labelledby="schedule-info-tab" hidden={infoTab !== 'info'}>
           {header ? (
             <HeaderSummary header={header} />
           ) : (
@@ -242,6 +256,82 @@ function ScheduleDetailView({ id }: { id: string }) {
               onRetry={validId && detail.isError ? retry : undefined}
             />
           )}
+        </div>
+        <div role="tabpanel" id="schedule-versions-panel" aria-labelledby="schedule-versions-tab" hidden={infoTab !== 'versions'}>
+          <section data-guide-feature="features.schedule.schedule-detail-page.section-3" className="schedule-version-panel" aria-labelledby="schedule-versions-title">
+            <header className="surface-header">
+              <h2 className="surface-title" id="schedule-versions-title">
+                버전 비교
+              </h2>
+              <p className="schedule-detail-note">지난 버전은 지우지 않고 남겨 둡니다</p>
+            </header>
+            <div
+              className="data-table-viewport schedule-version-viewport"
+              tabIndex={0}
+              role="region"
+              aria-label="스케줄 버전 비교 표"
+            >
+              <table data-guide-feature="features.schedule.schedule-detail-page.table-2" className="data-table schedule-version-table" aria-busy={versions.isFetching}>
+                <caption className="visually-hidden">같은 계약의 스케줄 버전 이력</caption>
+                <colgroup>
+                  {['no', 'status', 'active', 'policy', 'reason', 'generated', 'lines', 'total'].map((name) => (
+                    <col key={name} className={`schedule-version-col-${name}`} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col" className="is-left">
+                      버전
+                    </th>
+                    <th scope="col" className="is-center">
+                      상태
+                    </th>
+                    <th scope="col" className="is-center">
+                      사용중
+                    </th>
+                    <th scope="col">정책버전</th>
+                    <th scope="col">생성 사유</th>
+                    <th scope="col">생성 일시</th>
+                    <th scope="col" className="is-left">
+                      회차 수
+                    </th>
+                    <th scope="col" className="is-number">
+                      예상 총액
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.isError ? (
+                    <StateRow columns={8}>
+                      <InlineState
+                        message={errorText(versions.error, '버전 이력을 불러오지 못했습니다.')}
+                        error
+                        onRetry={() => void versions.refetch()}
+                      />
+                    </StateRow>
+                  ) : !versions.data ? (
+                    <StateRow columns={8}>
+                      <InlineState message="버전 이력을 불러오는 중입니다." />
+                    </StateRow>
+                  ) : versions.data.length === 0 ? (
+                    <StateRow columns={8}>
+                      <p className="schedule-inline-state is-empty" role="status">
+                        같은 계약의 스케줄 버전이 없습니다.
+                      </p>
+                    </StateRow>
+                  ) : (
+                    versions.data.map((version) => (
+                      <VersionRow
+                        key={version.scheduleHeaderId}
+                        version={version}
+                        current={String(version.scheduleHeaderId) === id}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+        </div>
+      </section>
         </div>
       </section>
 
@@ -257,127 +347,22 @@ function ScheduleDetailView({ id }: { id: string }) {
             줄마다 원 단위로 반올림(5 이상 올림)한 뒤 더합니다
           </p>
         </header>
-        <div
-          className="data-table-viewport schedule-line-viewport"
-          tabIndex={0}
-          role="region"
-          aria-label="회차별 예상 금액 표"
-        >
-          <table data-guide-feature="features.schedule.schedule-detail-page.table" className="data-table schedule-line-table" aria-busy={detail.isFetching}>
-            <caption className="visually-hidden">회차별 예상 지급 금액</caption>
-            <colgroup>
-              {[
-                'no',
-                'installment',
-                'expected',
-                'month',
-                'due',
-                'item',
-                'recipient',
-                'basis',
-                'amount',
-                'calc',
-                'rate',
-                'status',
-                'rule',
-                'action',
-              ].map((name) => (
-                <col key={name} className={`schedule-line-col-${name}`} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col" className="is-left">
-                  줄
-                </th>
-                <th scope="col" className="is-left">
-                  회차
-                </th>
-                <th scope="col" className="is-number">
-                  예상금액
-                </th>
-                <th scope="col" className="is-left">
-                  계약차월
-                </th>
-                <th scope="col">지급예정일</th>
-                <th scope="col">수수료 항목</th>
-                <th scope="col">수령자</th>
-                <th scope="col">기준코드</th>
-                <th scope="col" className="is-number">
-                  기준금액
-                </th>
-                <th scope="col" className="is-left">
-                  계산방식
-                </th>
-                <th scope="col" className="is-left">
-                  요율 / 정액
-                </th>
-                <th scope="col" className="is-center">
-                  상태
-                </th>
-                {/* IF-API-28 ruleRef — 규칙 5 "근거 없는 숫자는 화면에 띄우지 않습니다" */}
-                <th scope="col" className="is-left">
-                  적용 규칙 번호
-                </th>
-                <th scope="col">지급 등록</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!header ? (
-                <StateRow columns={14}>
-                  <InlineState
-                    message={loadError ?? '예상 스케줄을 불러오는 중입니다.'}
-                    error={Boolean(loadError)}
-                    onRetry={validId && detail.isError ? retry : undefined}
-                  />
-                </StateRow>
-              ) : lines.length === 0 ? (
-                <StateRow columns={14}>
-                  <p className="schedule-inline-state is-empty" role="status">
-                    등록된 회차가 없습니다.
-                  </p>
-                </StateRow>
-              ) : (
-                lines.map((line, index) => (
-                  <LineRow
-                    key={line.lineNo ?? index}
-                    line={line}
-                    paymentHref={
-                      canProcess && !unavailable && !previewOnly && line.contractId && line.commissionItemId
-                        ? paymentEntryHref(
-                            {
-                              contractId: String(line.contractId),
-                              agentId: line.beneficiaryAgentId == null ? undefined : String(line.beneficiaryAgentId),
-                              commissionItemId: String(line.commissionItemId),
-                              attributionDate: line.attributionDate,
-                              paymentStage: header.paymentStage,
-                              cashflowType: line.cashflowType === 'DEDUCTION' ? 'DEDUCTION' : 'PAYMENT',
-                              amount:
-                                line.expectedAmount == null ? undefined : String(Math.abs(Number(line.expectedAmount))),
-                            },
-                            location.pathname + location.search,
-                            line.attributionDate?.slice(0, 7),
-                          )
-                        : undefined
-                    }
-                  />
-                ))
-              )}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={2}>
-                  합계 (<span className="tabular-nums">{int(lines.length)}</span>줄)
-                </td>
-                {/* 합계는 서버가 줄별 반올림 금액을 더한 expectedTotal 을 그대로 쓴다(화면에서 다시 계산하지 않는다). */}
-                <td className="is-number tabular-nums">
-                  <Money amount={header?.expectedTotal} />
-                </td>
-                <td colSpan={11} />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <ScheduleLinesTable
+          lines={header ? lines : []}
+          total={header?.expectedTotal}
+          emptyMessage={!header ? <InlineState message={loadError ?? '예상 스케줄을 불러오는 중입니다.'} error={Boolean(loadError)} onRetry={validId && detail.isError ? retry : undefined} /> : '등록된 회차가 없습니다.'}
+          paymentHref={line => canProcess && !unavailable && !previewOnly && line.contractId && line.commissionItemId
+            ? paymentEntryHref({
+                contractId: String(line.contractId),
+                agentId: line.beneficiaryAgentId == null ? undefined : String(line.beneficiaryAgentId),
+                commissionItemId: String(line.commissionItemId),
+                attributionDate: line.attributionDate,
+                paymentStage: header?.paymentStage,
+                cashflowType: line.cashflowType === 'DEDUCTION' ? 'DEDUCTION' : 'PAYMENT',
+                amount: line.expectedAmount == null ? undefined : String(Math.abs(Number(line.expectedAmount))),
+              }, location.pathname + location.search, line.attributionDate?.slice(0, 7))
+            : undefined}
+        />
       </section>
 
       {hasActiveVersion && header?.contractId && header.paymentStage && (
@@ -391,80 +376,7 @@ function ScheduleDetailView({ id }: { id: string }) {
         </fieldset>
       )}
       {previewOnly && header && <p role="status">정책 정의 {header.installmentCount ?? '-'}회차 · {header.lineCount ?? '-'}행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.</p>}
-      <section data-guide-feature="features.schedule.schedule-detail-page.section-3" className="surface schedule-detail-card" aria-labelledby="schedule-versions-title">
-        <header className="surface-header">
-          <h2 className="surface-title" id="schedule-versions-title">
-            버전 비교
-          </h2>
-          <p className="schedule-detail-note">지난 버전은 지우지 않고 남겨 둡니다</p>
-        </header>
-        <div
-          className="data-table-viewport schedule-version-viewport"
-          tabIndex={0}
-          role="region"
-          aria-label="스케줄 버전 비교 표"
-        >
-          <table data-guide-feature="features.schedule.schedule-detail-page.table-2" className="data-table schedule-version-table" aria-busy={versions.isFetching}>
-            <caption className="visually-hidden">같은 계약의 스케줄 버전 이력</caption>
-            <colgroup>
-              {['no', 'status', 'active', 'policy', 'reason', 'generated', 'lines', 'total'].map((name) => (
-                <col key={name} className={`schedule-version-col-${name}`} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col" className="is-left">
-                  버전
-                </th>
-                <th scope="col" className="is-center">
-                  상태
-                </th>
-                <th scope="col" className="is-center">
-                  사용중
-                </th>
-                <th scope="col">정책버전</th>
-                <th scope="col">생성 사유</th>
-                <th scope="col">생성 일시</th>
-                <th scope="col" className="is-left">
-                  회차 수
-                </th>
-                <th scope="col" className="is-number">
-                  예상 총액
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {versions.isError ? (
-                <StateRow columns={8}>
-                  <InlineState
-                    message={errorText(versions.error, '버전 이력을 불러오지 못했습니다.')}
-                    error
-                    onRetry={() => void versions.refetch()}
-                  />
-                </StateRow>
-              ) : !versions.data ? (
-                <StateRow columns={8}>
-                  <InlineState message="버전 이력을 불러오는 중입니다." />
-                </StateRow>
-              ) : versions.data.length === 0 ? (
-                <StateRow columns={8}>
-                  <p className="schedule-inline-state is-empty" role="status">
-                    같은 계약의 스케줄 버전이 없습니다.
-                  </p>
-                </StateRow>
-              ) : (
-                versions.data.map((version) => (
-                  <VersionRow
-                    key={version.scheduleHeaderId}
-                    version={version}
-                    current={String(version.scheduleHeaderId) === id}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+
 
       {header && (
         <ConfirmModal
@@ -565,52 +477,6 @@ function HeaderSummary({ header }: { header: ScheduleHeader }) {
         <dd>{join(generationReason(header.generationReason), dateTime(header.generatedAt))}</dd>
       </div>
     </dl>
-  )
-}
-
-function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: string }) {
-  return (
-    <tr>
-      <td className="is-left tabular-nums">{int(line.lineNo)}</td>
-      <td className="is-left tabular-nums">{int(line.installmentNo)}</td>
-      <td className="is-number tabular-nums">
-        <Money amount={line.expectedAmount} />
-      </td>
-      <td className="is-left tabular-nums">{int(line.contractMonthNo)}</td>
-      <td>{date(line.dueDate)}</td>
-      <td>
-        <Text content={line.commissionItemName} />
-      </td>
-      <td>
-        <Text content={line.recipientName} />
-      </td>
-      <td>
-        <CategoryBadge value={line.basisCode} optionCount={1}>
-          <Text content={policyCodeLabel(line.basisCode)} />
-        </CategoryBadge>
-      </td>
-      <td className="is-number tabular-nums">
-        <Money amount={line.basisAmount} />
-      </td>
-      <td className="is-left">
-        <CategoryBadge value={line.calculationType} optionCount={2}>
-          {responseLabel(null, CALCULATION_TYPE, line.calculationType)}
-        </CategoryBadge>
-      </td>
-      <td className="is-left tabular-nums">{line.calculationType === 'FIXED' ? <Money amount={line.fixedAmount} /> : line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
-      <td className="is-center">
-        <ScheduleStatusBadge code={line.lineStatus} label={responseLabel(null, LINE_STATUS, line.lineStatus)} />
-        {line.sourceStatusEventId != null && <small className="schedule-source-event">원천 사건 #{line.sourceStatusEventId}</small>}
-      </td>
-      <td className="is-left tabular-nums">{line.ruleRef == null ? EMPTY : int(line.ruleRef)}</td>
-      <td>
-        {paymentHref && (
-          <Link data-guide-feature="features.schedule.schedule-detail-page.link-2" className="button button-ghost" to={paymentHref} aria-label={`${line.lineNo}번 회차 지급 등록`}>
-            지급 등록
-          </Link>
-        )}
-      </td>
-    </tr>
   )
 }
 

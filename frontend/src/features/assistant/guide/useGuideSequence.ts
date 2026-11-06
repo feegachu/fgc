@@ -14,7 +14,7 @@ export function useGuideSequence<T>(steps: readonly T[], key: string, identify: 
     go, next: () => go(index + 1), previous: () => go(index - 1) }
 }
 
-type Behavior = Pick<ScreenHelpStep, 'onEnter' | 'openControl' | 'advanceOnSelection'>
+type Behavior = Pick<ScreenHelpStep, 'onEnter' | 'openControl' | 'advanceOnSelection' | 'advanceAfterMs'>
 /** Presentation and selection only; never clicks save/execute/confirm controls. */
 export function useGuideStep(step: Behavior | undefined, target: HTMLElement | null, next: () => void, enabled: boolean) {
   const advance = useRef(next)
@@ -22,6 +22,11 @@ export function useGuideStep(step: Behavior | undefined, target: HTMLElement | n
   useEffect(() => {
     if (enabled) return step?.onEnter?.()
   }, [step, enabled])
+  useEffect(() => {
+    if (!enabled || !target || !step?.advanceAfterMs) return
+    const timer = window.setTimeout(() => advance.current(), step.advanceAfterMs)
+    return () => clearTimeout(timer)
+  }, [step, target, enabled])
   useEffect(() => {
     if (!enabled || !target || !step?.openControl) return
     const timer = window.setTimeout(() => {

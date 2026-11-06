@@ -184,13 +184,39 @@
   padding-inline: 8px;
   white-space: nowrap;
 }
-.contract-payment-editor :is(.contract-payment-preview, .contract-payment-gates) > .surface-header {
+.contract-payment-editor :is(.contract-payment-preview > [data-guide-target], .contract-payment-gates) > .surface-header {
   padding: 12px 14px 8px;
 }
-.contract-payment-preview > .surface-body { padding: 4px 12px 10px; }
+.contract-payment-preview > [data-guide-target] > .surface-body { padding: 4px 12px 10px; }
 .contract-payment-gates > .surface-body { padding: 0 14px 8px; }
 .contract-payment-gates .transaction-gate-step { padding-block: 7px; align-items: center; }
 .contract-payment-gates .transaction-gate-fail .transaction-gate-detail { color: var(--color-status-error-text); }
+.payment-amount-guide-box {
+  position: fixed;
+  z-index: calc(var(--z-overlay, 80) - 1);
+  pointer-events: none;
+  border: 2px solid var(--color-fgc-blue);
+  border-radius: 7px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-fgc-blue) 15%, transparent);
+  transition: left 900ms ease-in-out, top 900ms ease-in-out, width 900ms ease-in-out, height 900ms ease-in-out;
+}
+.payment-amount-guide-box > span {
+  position: absolute;
+  right: 3px;
+  bottom: calc(100% + 2px);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--color-fgc-blue);
+  color: white;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.payment-amount-guide-box[data-comparing='true'][data-matching='false'] {
+  border-style: dashed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .payment-amount-guide-box { transition: none; }
+}
 @media (max-width: 36rem) {
   .contract-payment-editor .contract-payment-preview-actions .transaction-action-list { grid-template-columns: 1fr; }
 }

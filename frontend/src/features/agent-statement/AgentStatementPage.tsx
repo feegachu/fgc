@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -16,6 +16,7 @@ import { useAgentOptions, useCommissionItems } from '../base/api'
 import { policyCodeLabel } from '../policies/labels'
 import { sourceOptions } from '../transaction/list-api'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import type { ScreenHelpStep } from '../assistant/guide/ScreenHelp'
 import { StatementExplorer, StatementViewSwitch } from './StatementExplorer'
 import {
   ENTRY_TYPE_OPTIONS,
@@ -75,11 +76,39 @@ const SOURCE_LABELS: Record<string, string> = {
 }
 
 export default function AgentStatementPage() {
-  const { month, user, revised } = useOutletContext<ShellContext>()
+  const { month, user, revised, helpVersion } = useOutletContext<ShellContext>()
   const isAgent = user.roleCode === 'AGENT'
   const [mode, setMode] = useState<'before' | 'after'>('after')
   const enhanced = !isAgent && mode === 'after'
   const [view, setView] = useState<'tree' | 'table'>('tree')
+  const currentView = useRef(view)
+  useEffect(() => { currentView.current = view }, [view])
+  const helpSteps = useMemo<ScreenHelpStep[]>(() => [
+    {
+      targetId: 'statement.filters',
+      title: '조회 조건',
+      instruction: '기준월과 설계사, 계약번호로 조회 범위를 정합니다.',
+      interaction: '조건을 선택하고 조회를 누르세요.',
+    },
+    {
+      targetId: 'features.agent-statement.agent-statement-page.summary',
+      attribute: 'data-guide-feature',
+      title: '지급·보류·조정·환수',
+      instruction: '선택한 지사·설계사의 합계를 확인합니다.',
+      interaction: '지사는 전체 합계, 설계사는 개인 통계입니다.',
+    },
+    {
+      targetId: 'statement.results',
+      title: '지점과 설계사 명세',
+      instruction: '트리에서 지점·설계사별 내역을 확인합니다.',
+      interaction: '표에서는 계약별 금액과 근거를 볼 수 있습니다.',
+      onEnter: () => {
+        const original = currentView.current
+        const timer = window.setInterval(() => setView(previous => previous === 'tree' ? 'table' : 'tree'), 3000)
+        return () => { clearInterval(timer); setView(original) }
+      },
+    },
+  ].map(step => ({ ...step, group: '설계사 수수료 명세', details: [], concise: true } as ScreenHelpStep)), [])
   const defaultMonth = month || today().slice(0, 7)
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params, defaultMonth)
@@ -192,7 +221,7 @@ export default function AgentStatementPage() {
         {!isAgent && <div className="ast-comparison" role="group" aria-label="수수료 명세 화면 비교">
           {(['before', 'after'] as const).map(value => <Button key={value} variant={mode === value ? 'primary' : 'secondary'} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'before' ? '수정 전' : '수정 후'}</Button>)}
         </div>}
-        {!isAgent && <ScreenHelp screenId="RPT-W02" />}
+        {!isAgent && <ScreenHelp screenId="RPT-W02" walkthrough={enhanced && helpVersion === 'after' ? helpSteps : undefined} />}
         </div>
       </header>
       <StatementFiltersBar
