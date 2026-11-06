@@ -89,7 +89,7 @@ final class CompareAskTools {
     /** 답에 서버 내부 도구를 드러내는 말('도구를 통해 제공하며', 'get_item'). 설계사에게는 의미 없는 내부 구현이라 답으로 내보내지 않는다. */
     private static final Pattern TOOL_MENTION = Pattern.compile("도구|get_item|explain_term|compare\\s*\\(|함수\\s*호출");
     /** 도달 표현 바로 뒤에 붙은 부정('걸리지 않았어요', '넘지는 못했어요', '걸린 적이 없어요'). 뒤쪽 다른 서술어의 '못'·'없'은 도달 표현의 부정이 아니다. */
-    private static final Pattern NEGATION = Pattern.compile("^(?:[하한])?(?:[지진](?:는)?\\s*(?:않|못|아니)|(?:[은는])?\\s*(?:적|일|경우)(?:이|은|는|도)?\\s*(?:전혀\\s*)?없|[해어아]\\s*[^,.!?]{0,20}?(?:금액|수수료|분)(?:이|은|도)?\\s*(?:전혀\\s*)?없)");
+    private static final Pattern NEGATION = Pattern.compile("^(?:[하한])?(?:[지진](?:는)?\\s*(?:않|못|아니)|(?:[은는])?\\s*(?:적|일|경우)(?:이|은|는|도)?\\s*(?:전혀\\s*)?없|(?:[해어아]|(?<=한))\\s*[^,.!?]{0,20}?(?:금액|수수료|분)(?:이|가|은|도)?\\s*(?:전혀\\s*)?없)");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
     /** '커요'는 '크다'의 활용이라 '크'로는 잡히지 않는다. */
     private static final List<String> BIGGER_WORDS = List.of("많", "높", "크", "커");

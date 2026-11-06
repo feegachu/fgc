@@ -222,6 +222,8 @@ class CompareAskToolsTest {
         // 연결 어미 뒤에서 '~할 금액이 없다'로 부정하는 꼴도 부정이다(실측에서 나온 표현).
         assertThat(tools.verify("가보험 든든건강은 이월 예정액이 없어서 한도를 초과해 수수료를 받을 금액이 없어요.")).isNull();
         assertThat(tools.verify("나보험 튼튼건강은 한도를 초과해 수수료를 받을 금액이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 한도를 초과한 수수료가 없기 때문에 이월 예정액이 없어요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과한 수수료가 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
     }
 
     @Test
