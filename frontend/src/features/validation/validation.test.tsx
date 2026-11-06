@@ -436,7 +436,7 @@ describe('VRUN-W02 상세·실행·확정', () => {
     })
     renderAt('/app/validation-runs/7')
     const line = await screen.findByText(/이어서 처리할 지점: 있음/)
-    await waitFor(() => expect(line).toHaveTextContent('실패 시각: 2026-07-31 10:00'))
+    await waitFor(() => expect(line).toHaveTextContent('실패 시각: 2026. 7. 31.'))
     expect(line).not.toHaveTextContent('완료 대상')
     expect(line).not.toHaveTextContent('남은 대상')
     expect(line).not.toHaveTextContent('자료 없음')
