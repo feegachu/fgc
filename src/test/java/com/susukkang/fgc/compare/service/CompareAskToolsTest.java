@@ -231,6 +231,9 @@ class CompareAskToolsTest {
         assertThat(tools.verify("나보험 튼튼건강은 한도를 초과된 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어선 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도를 초과할 일이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        // 못 받은 금액이 있다는 말이 뒤에 붙어도 앞쪽의 다른 부정을 덮지 않는다.
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘긴 적은 없지만 아직 받지 못한 금액이 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘기지 않았고 받지 못한 금액이 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
         // 활용이 낀 부정도 부정이다(#925 리뷰).
         assertThat(tools.verify("가보험 든든건강은 한도를 넘어서지 않았어요.")).isNull();
         assertThat(tools.verify("가보험 든든건강은 한도에 걸려 있지 않아요.")).isNull();

@@ -96,7 +96,7 @@ final class CompareAskTools {
 
     private static final Pattern ANY_NEGATION = Pattern.compile("않|없|못|아니");
     /** '한도를 넘어 받지 못한 금액이 있어요'처럼 못 받은 금액이 있다는 말. 부정어가 있어도 한도에 걸렸다는 긍정 주장이다. */
-    private static final Pattern UNRECEIVED_AMOUNT_EXISTS = Pattern.compile("(?:못|않)[^,.!?]{0,10}?(?:금액|수수료|분)(?:이|은)?\\s*있");
+    private static final Pattern UNRECEIVED_AMOUNT_EXISTS = Pattern.compile("(?:못|않)(?:(?!않|없|못|아니)[^,.!?]){0,10}?(?:금액|수수료|분)(?:이|은)?\\s*있");
     private static final int POSITIVE = 0;
     private static final int NEGATED = 1;
     private static final int UNCLEAR = 2;
@@ -109,10 +109,9 @@ final class CompareAskTools {
         if (negatedRightAfter(rest)) {
             return NEGATED;
         }
-        if (!ANY_NEGATION.matcher(rest).find() || UNRECEIVED_AMOUNT_EXISTS.matcher(rest).find()) {
-            return POSITIVE;
-        }
-        return UNCLEAR;
+        // 못 받은 금액이 있다는 말은 긍정이지만, 그 말을 걷어 내고도 부정어가 남으면 다른 부정이 있는 것이라 가를 수 없다.
+        String stripped = UNRECEIVED_AMOUNT_EXISTS.matcher(rest).replaceAll("");
+        return ANY_NEGATION.matcher(stripped).find() ? UNCLEAR : POSITIVE;
     }
 
     /** 도달 표현 바로 뒤에서 그 표현을 부정하는지. 뒤쪽 다른 서술어의 '못'·'없'은 도달 표현의 부정이 아니다. */
