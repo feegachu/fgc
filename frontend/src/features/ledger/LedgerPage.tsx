@@ -99,19 +99,19 @@ const columns: TableColumn<Journal>[] = [
     ),
   },
   {
-    key: 'source',
-    label: '원천',
-    width: '10rem',
-    render: (row) =>
-      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} ${row.sourceEntityId ?? EMPTY}`),
-  },
-  {
     key: 'contract',
     label: '계약',
     sortKey: 'contractNo',
     sortable: true,
     width: '12rem',
     render: (row) => text(row.contractNo || row.contractId),
+  },
+  {
+    key: 'source',
+    label: '원천',
+    width: '10rem',
+    render: (row) =>
+      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} ${row.sourceEntityId ?? EMPTY}`),
   },
   {
     key: 'debit',
