@@ -75,6 +75,8 @@ final class CompareAskTools {
     private static final String CAP_IMPACT_LABEL = "한도 영향";
     private static final String ERROR = "error";
     private static final String UNIT_PERCENT = "%";
+    /** '1위'처럼 순위를 말하는 표기. 소수점·쉼표 뒤의 숫자(금액 일부)는 순위로 보지 않는다. */
+    private static final Pattern RANK_LABEL = Pattern.compile("(?<![\\d,.])(\\d{1,3})\\s*위(?!\\d)");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
     /** '커요'는 '크다'의 활용이라 '크'로는 잡히지 않는다. */
     private static final List<String> BIGGER_WORDS = List.of("많", "높", "크", "커");
@@ -241,11 +243,44 @@ final class CompareAskTools {
         if (RECOMMEND_PHRASES.stream().anyMatch(normalized::contains)) {
             return "RECOMMENDATION";
         }
-        // 금액·비율·순위 번호는 서버 문장이 맡는다. 보험사·상품 이름 안의 숫자와 용어 '1,200% 룰'만 예외다.
-        if (!AnswerNumberGuard.allowed(text, CompareSummaryService.names(ranking))) {
+        // 금액·비율은 서버 문장이 맡는다. 보험사·상품 이름 안의 숫자, 용어 '1,200% 룰', 표시 중인 범위의 순위 표기('1위')만 예외다.
+        if (!AnswerNumberGuard.allowed(withoutRankLabels(normalized), CompareSummaryService.names(ranking))) {
             return "NUMBER_GUARD";
         }
         return verifyComparisons(normalized);
+    }
+
+    /**
+     * 금액·비율 같은 숫자가 든 문장만 빼고 남은 문장을 돌려준다(#910). 모델이 지침을 어기고 금액을 한 문장에 써도 답 전체를 버리지 않는다.
+     * 금액은 서버 문장이 보여 주므로 뺀 문장은 사용자에게 나가지 않는다. 남은 문장은 {@link #verify}로 다시 검증해야 한다.
+     * 문장이 하나도 없거나 모두 빠졌으면 빈 문자열이다.
+     */
+    String keepNumberFreeSentences(String text) {
+        List<String> kept = new ArrayList<>();
+        int start = 0;
+        Matcher ends = SENTENCE_END.matcher(text);
+        while (start < text.length()) {
+            int end = ends.find() ? ends.start() : text.length();
+            String sentence = text.substring(start, end);
+            String normalized = Normalizer.normalize(sentence, Normalizer.Form.NFKC);
+            if (!sentence.isBlank()
+                    && AnswerNumberGuard.allowed(withoutRankLabels(normalized), CompareSummaryService.names(ranking))) {
+                kept.add(sentence.strip());
+            }
+            start = end == text.length() ? end : ends.end();
+        }
+        return String.join(" ", kept);
+    }
+
+    /** 표시 중인 순위(1위~) 범위 안의 'N위' 표기를 지운다. 범위 밖 순위(9위 등)는 남겨 숫자 검증이 막는다. 이미 NFKC 로 정규화한 글을 받는다. */
+    private String withoutRankLabels(String normalized) {
+        Matcher m = RANK_LABEL.matcher(normalized);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            m.appendReplacement(out, find(Integer.parseInt(m.group(1))) != null ? " " : Matcher.quoteReplacement(m.group()));
+        }
+        m.appendTail(out);
+        return out.toString();
     }
 
     /**
@@ -294,7 +329,7 @@ final class CompareAskTools {
         return paired ? "DIRECTION_MISMATCH" : "DIRECTION_NOT_FROM_TOOL";
     }
 
-    /** 글에서 보험사·상품 이름(줄인 이름 포함)으로 언급된 순위 집합. 답에는 순위 번호를 쓸 수 없으므로 이름으로만 찾는다. */
+    /** 글에서 보험사·상품 이름(줄인 이름 포함)이나 순위 표기('3위')로 언급된 순위 집합. */
     Set<Integer> ranksMentioned(String text) {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
         Set<Integer> ranks = new HashSet<>();
@@ -371,10 +406,22 @@ final class CompareAskTools {
                 .filter(m -> m.rank() == item.rank()).mapToInt(ProductNames.Mention::at).findFirst().orElse(-1);
         boolean insurerUnique = ranking.items().stream().filter(o -> same(o.insurer(), item.insurer())).count() == 1;
         int insurer = insurerUnique ? indexOf(part, item.insurer()) : -1;
-        if (product < 0) {
-            return insurer;
+        int best = earliest(product, insurer);
+        Matcher label = RANK_LABEL.matcher(part);
+        while (label.find()) {
+            if (Integer.parseInt(label.group(1)) == item.rank()) {
+                return earliest(best, label.start());
+            }
         }
-        return insurer >= 0 && insurer < product ? insurer : product;
+        return best;
+    }
+
+    /** 두 위치 중 먼저 나온 것. 음수(없음)는 건너뛴다. 둘 다 없으면 -1. */
+    private static int earliest(int a, int b) {
+        if (a < 0) {
+            return b;
+        }
+        return b >= 0 && b < a ? b : a;
     }
 
     private static int indexOf(String part, String name) {

@@ -92,14 +92,47 @@ class CompareAskToolsTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "가보험 든든건강의 보수적 순수령액은 684,000원이에요.",  // 도구가 준 금액이어도 AI 문장에는 쓰지 않는다
-            "1위 가보험 든든건강은 환수 부담이 작아요.",            // 순위 번호
+            "9위 상품은 환수 부담이 작아요.",                      // 표시 범위 밖 순위 번호
             "가보험 든든건강의 한도 영향은 90.5%예요.",            // 비율
             "가보험 든든건강의 보수적 순수령액은 ６８４,０００원이에요.", // 전각 숫자
             "가보험 든든건강의 보수적 순수령액은 육십팔만원이에요.",     // 한글 금액
             "상품은 3개 있어요."})
-    @DisplayName("AI 문장의 숫자(금액·순위 번호·비율·전각·한글 금액)는 도구 값이어도 거절한다")
+    @DisplayName("AI 문장의 금액·비율·범위 밖 순위·전각·한글 금액은 도구 값이어도 거절한다")
     void numbersInAiTextAreRejected(String text) {
         assertThat(toolsWith("get_item", RANK_1).verify(text)).isEqualTo("NUMBER_GUARD");
+    }
+
+    @Test
+    @DisplayName("표시 중인 범위의 순위 표기('1위')는 AI 문장에 써도 통과한다")
+    void rankLabelsInsideTheShownRangeAreAllowed() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("1위 가보험 든든건강은 환수 부담이 작아서 앞섰어요.")).isNull();
+        assertThat(tools.verify("3위인 이유는 환수 노출액 때문이에요.")).isNull();
+        assertThat(tools.verify("4위 상품은 없어요.")).isEqualTo("NUMBER_GUARD");
+        assertThat(tools.verify("11위까지 있어요.")).isEqualTo("NUMBER_GUARD");
+    }
+
+    @Test
+    @DisplayName("순위 표기로 쓴 비교 문장도 방향이 서버 값과 맞아야 한다")
+    void rankLabelComparisonsKeepTheDirectionCheck() {
+        CompareAskTools tools = toolsWith("compare", PAIR_2_3);
+
+        assertThat(tools.verify("3위는 2위보다 보수적 순수령액이 적어요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 보수적 순수령액이 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(toolsWith("get_item", RANK_2).verify("3위는 2위보다 보수적 순수령액이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+    }
+
+    @Test
+    @DisplayName("금액·비율이 든 문장만 빼고 나머지 설명을 남긴다")
+    void onlyNumberSentencesAreDropped() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.keepNumberFreeSentences("1위는 든든건강이에요. 보수적 순수령액은 684,000원이에요. 환수가 작아서 앞섰어요."))
+                .isEqualTo("1위는 든든건강이에요. 환수가 작아서 앞섰어요.");
+        assertThat(tools.keepNumberFreeSentences("순수령액은 684,000원이에요. 한도 영향은 90.5%예요.")).isEmpty();
+        assertThat(tools.keepNumberFreeSentences("환수가 작아서 앞섰어요.")).isEqualTo("환수가 작아서 앞섰어요.");
+        assertThat(tools.keepNumberFreeSentences("9위 상품은 없어요. 환수가 작아요.")).isEqualTo("환수가 작아요.");
     }
 
     @Test
