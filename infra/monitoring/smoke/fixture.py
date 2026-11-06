@@ -47,6 +47,8 @@ class Handler(BaseHTTPRequestHandler):
             mode = self.path.lstrip('/')
             if mode == 'batch-failed':
                 failed = int(time.time())
+            elif mode == 'healthy':
+                failed = 0
         self.send_response(200)
         self.end_headers()
 ThreadingHTTPServer(('0.0.0.0', 8080), Handler).serve_forever()

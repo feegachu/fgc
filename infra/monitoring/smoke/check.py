@@ -42,6 +42,19 @@ count = lambda: sum((a['labels']['alertname'] == 'FgcBatchFailed' and a['status'
 before = count()
 time.sleep(20)
 assert count() == before == 1
-(Path(__file__).resolve().parents[1] / 'smoke-results.json').write_text(json.dumps({'alerts': results, 'duplicates': 0, 'grafana': 'healthy'}, indent=2))
+# Recovery resets only the synthetic failure; production retains failure history.
+recovery_started = time.time()
+urllib.request.urlopen(urllib.request.Request(BASE + '/healthy', data=b'', method='POST'), timeout=5).close()
+names = {r['alert'] for r in results}
+def resolved():
+    return names <= {a['labels']['alertname'] for e in get(BASE + '/events')
+                     if e['at'] >= recovery_started for a in e['payload']['alerts']
+                     if a['status'] == 'resolved'}
+wait(resolved, seconds=90)
+def cleared():
+    active = get('http://127.0.0.1:19090/api/v1/alerts')['data']['alerts']
+    return not any(a['labels']['alertname'] in names for a in active)
+wait(cleared)
+(Path(__file__).resolve().parents[1] / 'smoke-results.json').write_text(json.dumps({'alerts': results, 'duplicates': 0, 'grafana': 'healthy', 'resolved': sorted(names), 'remaining_alerts': 0, 'environment': 'isolated-synthetic'}, indent=2))
 print(json.dumps(results))
-print('PASS: alerts <60s, duplicate suppression, Grafana')
+print('PASS: alerts <60s, duplicate suppression, resolved delivery, no remaining alerts, Grafana')
