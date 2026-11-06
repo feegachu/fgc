@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.containsString;
 
@@ -86,6 +87,36 @@ class AgentHomeIntegrationTest {
         long life = data(home("period=ALL&insurerType=LIFE&asOf=" + today)).path("portfolio").path("contractCount").asLong();
         long nonLife = data(home("period=ALL&insurerType=NON_LIFE&asOf=" + today)).path("portfolio").path("contractCount").asLong();
         assertThat(life + nonLife).isEqualTo(all);
+    }
+
+    @Test
+    void allPeriodRejectsAWindowLongerThan1200CalendarMonths() throws Exception {
+        LocalDate first = jdbc.queryForObject(
+                "SELECT min(contract_date) FROM fgc.insurance_contract WHERE agent_id = ?", LocalDate.class, ownAgent);
+        LocalDate lastAllowed = first.withDayOfMonth(1).plusMonths(1199);
+
+        home("period=ALL&asOf=" + lastAllowed.plusMonths(1))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                .andExpect(jsonPath("$.error.field").value("asOf"));
+
+        JsonNode accepted = data(home("period=ALL&asOf=" + lastAllowed).andExpect(status().isOk()));
+        assertThat(accepted.path("range").path("from").asText()).isEqualTo(first.toString());
+        assertThat(accepted.path("range").path("to").asText()).isEqualTo(lastAllowed.toString());
+        assertThat(accepted.path("portfolio").path("monthly")).hasSize(1200);
+    }
+
+    @Test
+    void rejectsExpandedYearsBeforeDateArithmeticOrPortfolioQueries() throws Exception {
+        for (String asOf : new String[]{"+290000-01-01", "-999999999-01-01"}) {
+            mvc.perform(get("/api/v1/agent/me/home")
+                            .param("period", "ALL")
+                            .param("asOf", asOf)
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + agentToken))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"))
+                    .andExpect(jsonPath("$.error.field").value("asOf"));
+        }
     }
 
     @Test
