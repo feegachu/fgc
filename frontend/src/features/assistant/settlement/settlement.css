@@ -106,3 +106,14 @@ body:has([role='dialog']) .settlement-guide-spotlight {
 .settlement-guide button.pico-guide-next:hover:not(:disabled) { background: #205c91; }
 .settlement-guide button.pico-guide-next:disabled { background: #eaf0f5; border-color: #eaf0f5; color: #8fa1b5; opacity: 1; }
 .settlement-guide header button { border-color: transparent; background: transparent; color: #7891a5; font-size: 12px; }
+.settlement-guide.screen-step-guide {
+  max-height: min(560px, 65dvh);
+  font: inherit;
+}
+.settlement-guide.screen-step-guide .screen-step-summary {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-fgc-ink);
+}
+.settlement-guide.screen-step-guide .screen-step-count { font-size: 13px; }
+.settlement-guide.screen-step-guide .screen-step-context { font-size: 11px; }

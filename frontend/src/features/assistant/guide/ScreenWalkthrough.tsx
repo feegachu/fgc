@@ -8,6 +8,7 @@ import type { ScreenHelpStep } from './ScreenHelp'
 import { useSpotlight } from './useSpotlight'
 import { useGuideSequence, useGuideStep } from './useGuideSequence'
 import { GuideFieldPicker } from './GuideFieldPicker'
+import { GuideStepContent } from './GuideStepContent'
 
 const identify = (step: ScreenHelpStep) => step.targetId
 
@@ -129,17 +130,10 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
           <Button variant="ghost" data-walkthrough-close onClick={close}>종료</Button>
         </header>
         {!folded && (step ? <>
-          <progress className="screen-step-progress" max={session.length} value={index + 1} aria-label="도움말 진행" />
-          <p className="screen-step-group">{step.group}</p>
-          <span className="visually-hidden" role="status">{index + 1}/{session.length} {step.title}</span>
-          <h2>{step.title}</h2>
-          {step.concise ? <p className="screen-step-summary"><span>{step.instruction}</span><span>{step.interaction}</span></p> : <p>{step.instruction}</p>}
-          {!target && <p role="status">화면 구성이 바뀌어 이 요소가 숨겨졌습니다. 다음 설명을 보거나, 필요한 탭·상세를 연 뒤 도움말을 다시 열어 주세요.</p>}
-          {!step.concise && <>
-            <dl className="screen-step-details">{step.details.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.text}</dd></div>)}</dl>
-            <p className="screen-step-interaction"><strong>화면에서 할 수 있는 일</strong>{step.interaction}</p>
-            {index === 0 && <p className="screen-step-context">현재 표시된 요소를 안내합니다. 다른 탭이나 상세에서도 도움말을 다시 열어 보세요.</p>}
-          </>}
+          <GuideStepContent step={step} index={index} total={session.length}>
+            {!target && <p role="status">화면 구성이 바뀌어 이 요소가 숨겨졌습니다. 다음 설명을 보거나, 필요한 탭·상세를 연 뒤 도움말을 다시 열어 주세요.</p>}
+          </GuideStepContent>
+          {!step.concise && index === 0 && <p className="screen-step-context">현재 표시된 요소를 안내합니다. 다른 탭이나 상세에서도 도움말을 다시 열어 보세요.</p>}
           <div className="payment-guide-actions">
             <Button variant="secondary" disabled={index === 0} onClick={sequence.previous}>이전</Button>
             <Button className="screen-step-next" onClick={() => sequence.last ? close() : sequence.next()}>{sequence.last ? '안내 마치기' : '다음'}</Button>

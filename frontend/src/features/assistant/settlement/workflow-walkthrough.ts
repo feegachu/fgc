@@ -113,7 +113,7 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
     : path.startsWith('/schedules/') ? 'SCHE-W02'
       : path === '/transactions/new' ? 'TRAN-W02' : path === '/transactions' ? 'TRAN-W01'
         : path === '/validation-runs' ? 'VRUN-W01' : path.startsWith('/validation-runs/') ? 'VRUN-W02'
-          : path === '/reconciliation' ? 'RECO-W01' : path === '/exceptions' ? 'EXCP-W01' : ''
+          : path === '/reconciliations' ? 'RECO-W01' : path === '/exceptions' ? 'EXCP-W01' : ''
   const page = getScreenWalkthrough(screenId)
   return instructions.map(instruction => {
     const shared = page.find(entry => guideSelector(entry) === instruction.selector)
