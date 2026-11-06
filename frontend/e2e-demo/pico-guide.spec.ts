@@ -105,7 +105,7 @@ for (const width of [1440, 390]) {
     for (const id of ['btn-save', 'btn-precheck', 'btn-confirm']) {
       const action = page.locator(`#${id}`)
       // 화면 맨 아래의 버튼도 스크롤하면 피코에 가리지 않아야 한다(.page-content 아래 여백).
-      await action.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+      await action.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }))
       await expect(action).toBeInViewport()
       expect(await action.evaluate((element) => {
         const box = element.getBoundingClientRect()
