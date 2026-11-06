@@ -32,8 +32,6 @@ export interface ScreenHelpStep {
   presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string }
   openControl?: boolean
   advanceOnSelection?: boolean
-  advanceAfterMs?: number
-  overlay?: ReactNode
   /** Presentation lifecycle only: replay a card or start/stop a chart preview. */
   onEnter?: () => void | (() => void)
   attribute?: 'data-guide-target' | 'data-guide-feature'
