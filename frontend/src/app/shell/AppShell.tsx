@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
-import { useUiRevision } from '../../stores/uiRevision'
 import { useErrorTitleStore } from '../../stores/errorTitle'
 import { MonthSelector } from '../../components/MonthSelector'
 import { canOpen, screenFor } from '../screens'
@@ -33,8 +32,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const month = useWorkspaceStore((state) => state.month)
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
-  const revision = useUiRevision((state) => state.revision)
-  const revised = user.roleCode !== 'AGENT' && revision === 'after'
+  const revised = user.roleCode !== 'AGENT'
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)

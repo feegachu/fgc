@@ -35,16 +35,6 @@
     "element": "Link"
   },
   {
-    "id": "app.shell.sidebar.revision-after",
-    "file": "app/shell/Sidebar.tsx",
-    "element": "button"
-  },
-  {
-    "id": "app.shell.sidebar.revision-before",
-    "file": "app/shell/Sidebar.tsx",
-    "element": "button"
-  },
-  {
     "id": "app.shell.workspace-tabs.button",
     "file": "app/shell/WorkspaceTabs.tsx",
     "element": "button"

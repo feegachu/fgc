@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router'
 import { useSidebarStore } from '../../stores/sidebar'
-import { useUiRevision } from '../../stores/uiRevision'
 import { canOpen, screens } from '../screens'
 import type { ScreenDefinition } from '../screens'
 export interface ShellUser {
@@ -123,7 +122,6 @@ export function Sidebar({
           </span>
         </button>
       </div>
-      {user.roleCode !== 'AGENT' && <UiRevisionSelector collapsed={collapsed} />}
       <nav className="sidebar-nav" aria-label="주요 업무 메뉴">
         <ul className="sidebar-nav-list">
           {link('/')}
@@ -208,18 +206,4 @@ export function Sidebar({
   )
 }
 
-function UiRevisionSelector({ collapsed }: { collapsed: boolean }) {
-  const { revision, setRevision } = useUiRevision()
-  return (
-    <div className="sidebar-revision" role="group" aria-label="화면 비교" data-revision={revision}>
-      <span className="sidebar-revision-thumb" aria-hidden="true" />
-      <button data-guide-feature="app.shell.sidebar.revision-before" type="button" aria-label="변경 전" aria-pressed={revision === 'before'} onClick={() => setRevision('before')}>
-        {collapsed ? '전' : '변경 전'}
-      </button>
-      <button data-guide-feature="app.shell.sidebar.revision-after" type="button" aria-label="변경 후" aria-pressed={revision === 'after'} onClick={() => setRevision('after')}>
-        {collapsed ? '후' : '변경 후'}
-      </button>
-    </div>
-  )
-}
 import { guideFeatureId } from '../../features/assistant/feature-ids'

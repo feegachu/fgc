@@ -63,8 +63,6 @@
     "app.shell.sidebar.button-2": "OWN_OR_INTERNAL_READ",
     "app.shell.sidebar.button-3": "OWN_OR_INTERNAL_READ",
     "app.shell.sidebar.fgc": "OWN_OR_INTERNAL_READ",
-    "app.shell.sidebar.revision-after": "INTERNAL_READ",
-    "app.shell.sidebar.revision-before": "INTERNAL_READ",
     "app.shell.workspace-tabs.button": "OWN_OR_INTERNAL_READ",
     "app.shell.workspace-tabs.button-2": "OWN_OR_INTERNAL_READ",
     "app.shell.workspace-tabs.button-3": "OWN_OR_INTERNAL_READ",

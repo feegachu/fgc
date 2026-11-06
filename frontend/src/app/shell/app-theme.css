@@ -41,52 +41,6 @@ html:has(.app-shell.app-theme) body {
   color: var(--color-nav-text-default);
 }
 
-.sidebar-revision {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0 var(--space-3) var(--space-2);
-  padding: 3px;
-  border: 1px solid #c6d7ff;
-  border-radius: 8px;
-  background: #e9effb;
-}
-.sidebar-revision-thumb {
-  position: absolute;
-  inset: 3px auto 3px 3px;
-  width: calc(50% - 3px);
-  border-radius: 5px;
-  background: #fff;
-  box-shadow: 0 1px 3px #17334b26;
-  transition: transform 180ms ease;
-}
-.sidebar-revision[data-revision='after'] .sidebar-revision-thumb {
-  transform: translateX(100%);
-}
-.sidebar-revision button {
-  position: relative;
-  min-width: 0;
-  min-height: 1.75rem;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: #435777;
-  font-size: 0.75rem;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.sidebar-revision button[aria-pressed='true'] {
-  color: #1d4ed8;
-  font-weight: 700;
-}
-.sidebar-revision button:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
-}
-.is-sidebar-collapsed .sidebar-revision {
-  margin-inline: var(--space-1);
-}
-
 [data-ui-revision='after'] .page-header {
   align-items: center;
   gap: var(--space-2);
@@ -171,9 +125,6 @@ html:has(.app-shell.app-theme) body {
   [data-ui-revision='after'] .page-header:has(> .screen-help-trigger) > .page-header-actions {
     width: auto;
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sidebar-revision-thumb { transition: none; }
 }
 :root .sidebar-brand button:focus-visible {
   outline-color: var(--color-nav-text-default);
