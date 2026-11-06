@@ -92,14 +92,138 @@ class CompareAskToolsTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "가보험 든든건강의 보수적 순수령액은 684,000원이에요.",  // 도구가 준 금액이어도 AI 문장에는 쓰지 않는다
-            "1위 가보험 든든건강은 환수 부담이 작아요.",            // 순위 번호
+            "9위 상품은 환수 부담이 작아요.",                      // 표시 범위 밖 순위 번호
             "가보험 든든건강의 한도 영향은 90.5%예요.",            // 비율
             "가보험 든든건강의 보수적 순수령액은 ６８４,０００원이에요.", // 전각 숫자
             "가보험 든든건강의 보수적 순수령액은 육십팔만원이에요.",     // 한글 금액
             "상품은 3개 있어요."})
-    @DisplayName("AI 문장의 숫자(금액·순위 번호·비율·전각·한글 금액)는 도구 값이어도 거절한다")
+    @DisplayName("AI 문장의 금액·비율·범위 밖 순위·전각·한글 금액은 도구 값이어도 거절한다")
     void numbersInAiTextAreRejected(String text) {
         assertThat(toolsWith("get_item", RANK_1).verify(text)).isEqualTo("NUMBER_GUARD");
+    }
+
+    @Test
+    @DisplayName("표시 중인 범위의 순위 표기('1위')는 AI 문장에 써도 통과한다")
+    void rankLabelsInsideTheShownRangeAreAllowed() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("1위 가보험 든든건강은 환수 부담이 작아서 앞섰어요.")).isNull();
+        assertThat(tools.verify("3위인 이유는 환수 노출액 때문이에요.")).isNull();
+        assertThat(tools.verify("4위 상품은 없어요.")).isEqualTo("NUMBER_GUARD");
+        assertThat(tools.verify("11위까지 있어요.")).isEqualTo("NUMBER_GUARD");
+    }
+
+    @Test
+    @DisplayName("순위 표기로 쓴 비교 문장도 방향이 서버 값과 맞아야 한다")
+    void rankLabelComparisonsKeepTheDirectionCheck() {
+        CompareAskTools tools = toolsWith("compare", PAIR_2_3);
+
+        assertThat(tools.verify("3위는 2위보다 보수적 순수령액이 적어요.")).isNull();
+        assertThat(tools.verify("3위는 2위보다 보수적 순수령액이 많아요.")).isEqualTo("DIRECTION_MISMATCH");
+        assertThat(toolsWith("get_item", RANK_2).verify("3위는 2위보다 보수적 순수령액이 적어요.")).isEqualTo("DIRECTION_NOT_FROM_TOOL");
+    }
+
+    @Test
+    @DisplayName("'가장 크다/작다'는 상품 하나를 말하면 서버 값의 최댓값·최솟값과 맞아야 한다")
+    void superlativeClaimsFollowTheServerValues() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("가보험 든든건강이 보수적 순수령액이 가장 커요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강이 보수적 순수령액이 가장 커요.")).isEqualTo("SUPERLATIVE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강이 환수 노출액이 가장 작아요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 환수 노출액이 가장 작아요.")).isEqualTo("SUPERLATIVE_MISMATCH");
+        // 상품이 둘 이상이거나 항목을 알 수 없으면 판단하지 않는다.
+        assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강이 가장 커요.")).isNull();
+        assertThat(tools.verify("보수적 순수령액이 가장 큰 순서로 정해졌어요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("이월이 없으면 '한도에 걸렸다'는 말을 거절하고, 걸리지 않았다는 말은 통과한다")
+    void capStateClaimsFollowTheCarryover() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("가보험 든든건강은 한도에 걸려 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("세 상품 모두 한도를 초과하지 않았어요.")).isNull();
+        // 조사 없는 '한도 초과 시'나 조건 설명은 상태 주장이 아니다.
+        assertThat(tools.verify("한도 초과 시 이월 예정액이 생겨요.")).isNull();
+        assertThat(tools.verify("한도를 초과하면 이월돼요.")).isNull();
+        // 용어 설명의 관계절은 상태 주장이 아니다(실측에서 오탐).
+        assertThat(tools.verify("이 한도를 넘는 금액은 이월 예정액으로 따로 계산돼요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("순위 표기와 상품 이름이 같은 문장에서 서로 다른 상품을 가리키면 거절한다")
+    void rankLabelAndNameMustPointAtTheSameProduct() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("1위는 나보험 튼튼건강이에요. 환수 부담이 작아서 앞섰어요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 가보험 든든건강이에요. 환수 부담이 작아서 앞섰어요.")).isNull();
+        // 한쪽이 다른 쪽에 포함되면 어긋난 말이 아니다.
+        assertThat(tools.verify("1위는 가보험 든든건강이고 나보험 튼튼건강과 함께 비교했어요.")).isNull();
+        assertThat(tools.verify("1위 가보험 든든건강과 3위 편한건강은 환수 부담이 달라요.")).isNull();
+        assertThat(tools.verify("1위와 2위는 나보험 튼튼건강과 다보험 편한건강이에요.")).isEqualTo("RANK_MISMATCH");
+        // 순위를 맞바꾸거나, 포함 관계여도 1위를 다른 상품이라고 한 문장은 짝이 틀린 말이다.
+        assertThat(tools.verify("1위는 나보험 튼튼건강이고 2위는 가보험 든든건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 나보험 튼튼건강이고 가보험 든든건강과 비교했어요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 가보험 든든건강이고 2위는 나보험 튼튼건강이에요.")).isNull();
+        assertThat(tools.verify("1위와 2위는 가보험 든든건강과 나보험 튼튼건강이에요.")).isNull();
+        // 이름이 순위 표기 앞에 오는 꼴도 짝을 본다(#911 리뷰).
+        assertThat(tools.verify("나보험 튼튼건강이 1위예요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 1위, 가보험 든든건강은 2위예요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 1위, 나보험 튼튼건강은 2위예요.")).isNull();
+        assertThat(tools.verify("든든건강이 1위이고 튼튼건강이 2위예요.")).isNull();
+        assertThat(tools.verify("든든건강이 1위이고 튼튼건강은 환수 부담이 더 작아요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 1위예요.")).isNull();
+        // 표기와 이름 사이에 말이 낀 꼴도 같은 절의 첫 이름과 짝을 본다(#911 리뷰).
+        assertThat(tools.verify("1위 상품은 나보험 튼튼건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위는 바로 나보험 튼튼건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위를 차지한 상품은 나보험 튼튼건강이에요.")).isEqualTo("RANK_MISMATCH");
+        assertThat(tools.verify("1위 상품은 가보험 든든건강이에요.")).isNull();
+        assertThat(tools.verify("1위는 바로 가보험 든든건강이에요.")).isNull();
+        // 접속 표현이 끼거나 비교 상대로 쓰인 이름은 짝이 아니다.
+        assertThat(tools.verify("1위는 환수 부담이 작지만 나보험 튼튼건강은 보수적 순수령액이 작아요.")).isNull();
+        assertThat(tools.verify("1위는 환수 부담이 작아서 나보험 튼튼건강보다 앞서요.")).isNull();
+        // 연결 어미(인데·이므로·이라·이나)로 이어진 문장도 앞 이름과 짝을 본다(#911 리뷰).
+        assertThat(tools.verify("가보험 든든건강이 1위인데 나보험 튼튼건강은 2위예요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 1위이므로 나보험 튼튼건강은 2위예요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 1위이나 나보험 튼튼건강은 환수 부담이 더 커요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강이 1위인데 가보험 든든건강은 2위예요.")).isEqualTo("RANK_MISMATCH");
+        // 이름이 묶음보다 적으면 판단하지 않는다.
+        assertThat(tools.verify("1위보다 2위가 나보험 튼튼건강이에요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("'한도에 걸렸다'는 말한 상품 모두에 이월이 있어야 맞고, 섞인 주장은 판단하지 않는다")
+    void capStateClaimsNeedEveryMentionedProductToCarryOver() {
+        CompareRankingResponse base = ranking();
+        Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
+        Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 100_000, 16_000, 634_000, 80.0, null, List.of());
+        Item third = new Item(3, 3, "다보험", "편한건강", 600_000, 580_000, 0, 30_000, 550_000, 70.0, null, List.of());
+        CompareAskTools tools = new CompareAskTools(new CompareRankingResponse(base.rankResultId(), base.status(), base.categoryCode(),
+                base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
+                base.warnings(), null, List.of(first, second, third), List.of(), CompareRankingFilters.NONE));
+        tools.run("get_item", RANK_1);
+
+        assertThat(tools.verify("모든 상품이 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강 모두 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸렸어요.")).isNull();
+        assertThat(tools.verify("모든 상품이 한도를 초과하지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 한도를 초과하지 않았어요.")).isNull();
+        // 같은 주장을 반복한 문장은 함께 검사하고, 서로 다른 주장이 한 문장에 섞이면 판단하지 않는다.
+        assertThat(tools.verify("가보험 든든건강은 한도에 걸렸고 초과했어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸렸고 가보험 든든건강은 걸리지 않았어요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("금액·비율이 든 문장만 빼고 나머지 설명을 남긴다")
+    void onlyNumberSentencesAreDropped() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.keepNumberFreeSentences("1위는 든든건강이에요. 보수적 순수령액은 684,000원이에요. 환수가 작아서 앞섰어요."))
+                .isEqualTo("1위는 든든건강이에요. 환수가 작아서 앞섰어요.");
+        assertThat(tools.keepNumberFreeSentences("순수령액은 684,000원이에요. 한도 영향은 90.5%예요.")).isEmpty();
+        assertThat(tools.keepNumberFreeSentences("환수가 작아서 앞섰어요.")).isEqualTo("환수가 작아서 앞섰어요.");
+        assertThat(tools.keepNumberFreeSentences("9위 상품은 없어요. 환수가 작아요.")).isEqualTo("환수가 작아요.");
     }
 
     @Test
