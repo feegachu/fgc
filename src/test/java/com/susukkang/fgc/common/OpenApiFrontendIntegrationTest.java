@@ -58,6 +58,11 @@ class OpenApiFrontendIntegrationTest {
         assertThat(paths.has("/api/v1/auth/login")).isTrue();
         assertThat(paths.has("/api/v1/auth/refresh")).isTrue();
         assertThat(paths.has("/api/v1/contracts")).isTrue();
+        for (String amount : java.util.List.of("value", "secondaryValue")) {
+            assertThat(root.path("components").path("schemas").path("BranchDetailRow")
+                    .path("properties").path(amount).path("type").toString())
+                    .contains("\"number\"", "\"null\"");
+        }
         assertThat(paths.path("/api/v1/ai/compare-chat/ask").path("post").path("operationId").asText()).isEqualTo("ask");
         assertThat(paths.path("/api/v1/ai/pico/ask").path("post").path("operationId").asText()).isEqualTo("picoAsk");
         assertThat(paths.path("/api/v1/policies").has("post")).isTrue();

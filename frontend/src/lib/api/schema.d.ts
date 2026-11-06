@@ -928,6 +928,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/branch-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 선택한 지점의 지표별 상세 내역 */
+        get: operations["dashboardBranchDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 지점별 인원·계약·수수료·예외 현황
+         * @description 하위 팀을 지점에 포함한다. 인원·유효 계약은 정산월 말(미래는 오늘) 기준, 수수료·신규 계약은 정산월, 미처리 예외는 현재 상태 기준이다.
+         */
+        get: operations["dashboardBranchSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/monthly-commissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 최근 6개월 수수료 조회
+         * @description 선택한 정산월까지 최근 6개월의 확정 지급을 계약 귀속액 기준으로 집계한다. 지급이 없는 월은 0원으로 반환한다.
+         */
+        get: operations["monthlyCommissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboard/summary": {
         parameters: {
             query?: never;
@@ -2192,6 +2249,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseBranchDashboardResponse: {
+            data?: components["schemas"]["BranchDashboardResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseCalculation: {
             data?: components["schemas"]["Calculation"];
             error?: components["schemas"]["ApiError"];
@@ -2279,6 +2341,11 @@ export interface components {
         };
         ApiResponseCreateValidationRunResponse: {
             data?: components["schemas"]["CreateValidationRunResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseDashboardCommissionResponse: {
+            data?: components["schemas"]["DashboardCommissionResponse"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2430,6 +2497,11 @@ export interface components {
         };
         ApiResponsePageResponseAuditLogResponse: {
             data?: components["schemas"]["PageResponseAuditLogResponse"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponsePageResponseBranchDetailRow: {
+            data?: components["schemas"]["PageResponseBranchDetailRow"];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2831,6 +2903,39 @@ export interface components {
             message?: string;
             /** Format: int64 */
             transactionAttributionId?: number;
+        };
+        BranchDashboardResponse: {
+            /** Format: date */
+            asOf?: string;
+            branches?: components["schemas"]["BranchMetrics"][];
+            /** Format: date */
+            month?: string;
+        };
+        BranchDetailRow: {
+            detail?: string;
+            /** Format: int64 */
+            id?: number;
+            label?: string;
+            secondaryValue?: number | null;
+            status?: string;
+            value?: number | null;
+        };
+        BranchMetrics: {
+            /** Format: int64 */
+            activeAgents?: number;
+            agentAmount?: number;
+            gaAmount?: number;
+            name?: string;
+            /** Format: int64 */
+            newContracts?: number;
+            /** Format: int64 */
+            openExceptions?: number;
+            /** Format: int64 */
+            organizationId?: number;
+            /** Format: int64 */
+            registeredAgents?: number;
+            /** Format: int64 */
+            validContracts?: number;
         };
         Bucket: {
             amount?: number;
@@ -4120,6 +4225,9 @@ export interface components {
             /** Format: int64 */
             validationRunId?: number;
         };
+        DashboardCommissionResponse: {
+            months?: components["schemas"]["MonthlyCommission"][];
+        };
         DashboardSummaryResponse: {
             /** Format: int64 */
             arbitrageCandidate?: number;
@@ -4767,6 +4875,12 @@ export interface components {
             roleCode?: string;
             userName?: string;
         };
+        MonthlyCommission: {
+            agentAmount?: number;
+            gaAmount?: number;
+            /** Format: date */
+            month?: string;
+        };
         NewsHeadline: {
             link?: string;
             publishedAt?: string;
@@ -4871,6 +4985,18 @@ export interface components {
         };
         PageResponseAuditLogResponse: {
             content?: components["schemas"]["AuditLogResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageResponseBranchDetailRow: {
+            content?: components["schemas"]["BranchDetailRow"][];
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -7875,6 +8001,75 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseContractTransactionTabResponse"];
+                };
+            };
+        };
+    };
+    dashboardBranchDetails: {
+        parameters: {
+            query: {
+                month: string;
+                organizationId: number;
+                metric: "COMMISSIONS" | "AGENTS" | "CONTRACTS" | "EXCEPTIONS";
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseBranchDetailRow"];
+                };
+            };
+        };
+    };
+    dashboardBranchSummary: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBranchDashboardResponse"];
+                };
+            };
+        };
+    };
+    monthlyCommissions: {
+        parameters: {
+            query?: {
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseDashboardCommissionResponse"];
                 };
             };
         };

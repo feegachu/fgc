@@ -115,6 +115,9 @@
 .reco-react-result-table td {
   padding-inline: 0.5rem;
 }
+[data-ui-revision='after'] .reco-react-result-table {
+  min-width: 63.5rem;
+}
 .reco-react-result-table td:nth-child(5),
 .reco-react-result-table th:nth-child(5) {
   padding-right: 0.25rem;

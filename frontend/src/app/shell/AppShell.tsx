@@ -23,7 +23,9 @@ const WorkspaceGuide = lazy(() => import('../../features/assistant/WorkspaceGuid
 export interface ShellContext {
   user: ShellUser
   month: string | null
+  revised?: boolean
 }
+/** 내부 사용자에게 확정 관리자 UI를 적용하고 AGENT 전용 셸의 화면 범위를 유지한다. */
 export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultMonth: string }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -32,6 +34,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const month = useWorkspaceStore((state) => state.month)
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
+  const revised = user.roleCode !== 'AGENT'
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)
@@ -78,6 +81,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
     <div
       className={`app-shell app-theme is-sidebar-ready ${collapsed ? 'is-sidebar-collapsed' : ''} ${user.roleCode === 'AGENT' ? 'is-agent' : ''}`}
       data-kpi-style="summary"
+      data-ui-revision={revised ? 'after' : undefined}
     >
       <a data-guide-feature="app.shell.app-shell.a" className="skip-link" href="#main-content">
         본문으로 건너뛰기
@@ -114,12 +118,21 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         </header>
         <main id="main-content" data-guide-page={current?.id} data-guide-pathname={location.pathname} className="app-main" tabIndex={-1}>
           <div className="page-content">
-            <Outlet context={{ user, month } satisfies ShellContext} />
+            <Outlet context={{ user, month, revised } satisfies ShellContext} />
           </div>
         </main>
         <SettlementGuide user={user} month={month} />
         {!location.pathname.startsWith('/agent-home') && (
-          <footer className="app-footer">FGC 수수료 정산 검증 시스템 v2.0</footer>
+          <footer className="app-footer">
+            {revised ? (
+              <>
+                <p className="app-footer-company">
+                  <span>FGC</span><span>팀 수수깡</span><span>사업자등록번호: 000-00-00000 (가상)</span>
+                </p>
+                <p>Copyright © {new Date().getFullYear()} FGC. All rights reserved.</p>
+              </>
+            ) : 'FGC 수수료 정산 검증 시스템 v2.0'}
+          </footer>
         )}
       </div>
       {(import.meta.env.VITE_ASSISTANT_AI === 'true' || import.meta.env.VITE_ASSISTANT_DEMO === 'true') && (

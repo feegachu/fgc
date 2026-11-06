@@ -905,6 +905,21 @@
         },
         "type" : "object"
       },
+      "ApiResponseBranchDashboardResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BranchDashboardResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+
       "ApiResponseCalculation" : {
         "properties" : {
           "data" : {
@@ -1157,6 +1172,21 @@
         },
         "type" : "object"
       },
+      "ApiResponseDashboardCommissionResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/DashboardCommissionResponse"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+
       "ApiResponseDashboardSummaryResponse" : {
         "properties" : {
           "data" : {
@@ -1615,6 +1645,21 @@
         },
         "type" : "object"
       },
+      "ApiResponsePageResponseBranchDetailRow" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PageResponseBranchDetailRow"
+          },
+          "error" : {
+            "$ref" : "#/components/schemas/ApiError"
+          },
+          "requestId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+
       "ApiResponsePageResponseClawbackCandidateResponse" : {
         "properties" : {
           "data" : {
@@ -2568,6 +2613,90 @@
         },
         "type" : "object"
       },
+      "BranchDashboardResponse" : {
+        "properties" : {
+          "asOf" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "branches" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BranchMetrics"
+            },
+            "type" : "array"
+          },
+          "month" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+
+      "BranchDetailRow" : {
+        "properties" : {
+          "detail" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "secondaryValue" : {
+            "type" : [ "number", "null" ]
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : [ "number", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+
+      "BranchMetrics" : {
+        "properties" : {
+          "activeAgents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "agentAmount" : {
+            "type" : "number"
+          },
+          "gaAmount" : {
+            "type" : "number"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "newContracts" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "openExceptions" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "organizationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "registeredAgents" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "validContracts" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+
       "Bucket" : {
         "properties" : {
           "amount" : {
@@ -5592,6 +5721,18 @@
         },
         "type" : "object"
       },
+      "DashboardCommissionResponse" : {
+        "properties" : {
+          "months" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MonthlyCommission"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+
       "DashboardSummaryResponse" : {
         "properties" : {
           "arbitrageCandidate" : {
@@ -7215,6 +7356,22 @@
         "required" : [ "demoMonth" ],
         "type" : "object"
       },
+      "MonthlyCommission" : {
+        "properties" : {
+          "agentAmount" : {
+            "type" : "number"
+          },
+          "gaAmount" : {
+            "type" : "number"
+          },
+          "month" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+
       "NewsHeadline" : {
         "properties" : {
           "link" : {
@@ -7420,6 +7577,37 @@
         },
         "type" : "object"
       },
+      "PageResponseBranchDetailRow" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BranchDetailRow"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "type" : "string"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+
       "PageResponseClawbackCandidateResponse" : {
         "properties" : {
           "content" : {
@@ -13189,6 +13377,117 @@
         "tags" : [ "계약" ]
       }
     },
+    "/api/v1/dashboard/branch-details" : {
+      "get" : {
+        "operationId" : "dashboardBranchDetails",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "month",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "organizationId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "metric",
+          "required" : true,
+          "schema" : {
+            "enum" : [ "COMMISSIONS", "AGENTS", "CONTRACTS", "EXCEPTIONS" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePageResponseBranchDetailRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "선택한 지점의 지표별 상세 내역",
+        "tags" : [ "branch-dashboard-controller" ]
+      }
+    },
+
+    "/api/v1/dashboard/branches" : {
+      "get" : {
+        "description" : "하위 팀을 지점에 포함한다. 인원·유효 계약은 정산월 말(미래는 오늘) 기준, 수수료·신규 계약은 정산월, 미처리 예외는 현재 상태 기준이다.",
+        "operationId" : "dashboardBranchSummary",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "month",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBranchDashboardResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "지점별 인원·계약·수수료·예외 현황",
+        "tags" : [ "branch-dashboard-controller" ]
+      }
+    },
+
+    "/api/v1/dashboard/monthly-commissions" : {
+      "get" : {
+        "description" : "선택한 정산월까지 최근 6개월의 확정 지급을 계약 귀속액 기준으로 집계한다. 지급이 없는 월은 0원으로 반환한다.",
+        "operationId" : "monthlyCommissions",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseDashboardCommissionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "최근 6개월 수수료 조회",
+        "tags" : [ "업무 대시보드" ]
+      }
+    },
+
     "/api/v1/dashboard/summary" : {
       "get" : {
         "description" : "기준월의 KPI 6종(위반/주의/재정거래/대사불일치/전표불균형/미처리예외)과 최근 예외 5건, 최근 검증실행 3건을 함께 돌려준다. month 생략 시 이번 달을 기본값으로 쓴다.",
