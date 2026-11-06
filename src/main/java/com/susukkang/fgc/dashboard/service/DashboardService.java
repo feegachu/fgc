@@ -1,5 +1,6 @@
 package com.susukkang.fgc.dashboard.service;
 
+import com.susukkang.fgc.dashboard.dto.DashboardCommissionResponse;
 import com.susukkang.fgc.dashboard.dto.DashboardSummaryResult;
 
 import java.time.LocalDate;
@@ -16,4 +17,6 @@ public interface DashboardService {
      * @param month 기준월 — 그 달 1일로 받음
      */
     DashboardSummaryResult summarize(LocalDate month);
+
+    DashboardCommissionResponse monthlyCommissions(LocalDate month);
 }
