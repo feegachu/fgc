@@ -4,7 +4,7 @@ import { Button } from '../../components/Button'
 import { Modal } from '../../components/Modal'
 import { apiClient } from '../../lib/api/client'
 import { ApiError } from '../../lib/api/errors'
-import { dateTime, errorText } from '../../lib/format'
+import { errorText } from '../../lib/format'
 
 export interface Restartability {
   allowed: boolean
@@ -171,16 +171,20 @@ export function ValidationRestartPanel({
               <tr key={r.retryId}>
                 <td>{r.retryId}</td>
                 <td>{r.requestedBy}</td>
-                <td>{dateTime(r.requestedAt)}</td>
+                <td>{new Date(r.requestedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
                 <td>{r.reason}</td>
                 <td>{r.failedStep}단계</td>
                 <td>{r.previousBatchExecutionId}</td>
                 <td>{r.batchExecutionId ?? unstartedExecutionLabels[r.state] ?? '자료 없음'}</td>
                 <td>
-                  {r.startedAt ? dateTime(r.startedAt) : '자료 없음'}
+                  {r.startedAt
+                    ? new Date(r.startedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+                    : '자료 없음'}
                 </td>
                 <td>
-                  {r.finishedAt ? dateTime(r.finishedAt) : '자료 없음'}
+                  {r.finishedAt
+                    ? new Date(r.finishedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+                    : '자료 없음'}
                 </td>
                 <td>
                   {retryLabels[r.state] ?? '상태 확인 필요'}
@@ -197,7 +201,9 @@ export function ValidationRestartPanel({
           {state.data?.completedCount != null && ` · 완료 대상: ${state.data.completedCount}`}
           {state.data?.remainingCount != null && ` · 남은 대상: ${state.data.remainingCount}`}
           {' · 실패 시각: '}
-          {state.data?.failedAt ? dateTime(state.data.failedAt) : '자료 없음'}
+          {state.data?.failedAt
+            ? new Date(state.data.failedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+            : '자료 없음'}
         </p>
       )}
       <Modal
@@ -226,8 +232,8 @@ export function ValidationRestartPanel({
         }
       >
         <p>
-          검증월 {month || '자료 없음'} / {runNo ?? '자료 없음'}차 실행의 {approval?.failedStep}단계부터 이어 처리합니다.
-          요청 접수는 처리 완료가 아닙니다.
+          검증월 {month || '자료 없음'} / {runNo ?? '자료 없음'}회차 / 원래 검증 실행 {id}의 {approval?.failedStep}
+          단계부터 이어 처리합니다. 요청 접수는 처리 완료가 아닙니다.
         </p>
         <label>
           재시작 사유
