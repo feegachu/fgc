@@ -183,6 +183,11 @@ class CompareAskToolsTest {
         // 접속 표현이 끼거나 비교 상대로 쓰인 이름은 짝이 아니다.
         assertThat(tools.verify("1위는 환수 부담이 작지만 나보험 튼튼건강은 보수적 순수령액이 작아요.")).isNull();
         assertThat(tools.verify("1위는 환수 부담이 작아서 나보험 튼튼건강보다 앞서요.")).isNull();
+        // 연결 어미(인데·이므로·이라·이나)로 이어진 문장도 앞 이름과 짝을 본다(#911 리뷰).
+        assertThat(tools.verify("가보험 든든건강이 1위인데 나보험 튼튼건강은 2위예요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 1위이므로 나보험 튼튼건강은 2위예요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 1위이나 나보험 튼튼건강은 환수 부담이 더 커요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강이 1위인데 가보험 든든건강은 2위예요.")).isEqualTo("RANK_MISMATCH");
         // 이름이 묶음보다 적으면 판단하지 않는다.
         assertThat(tools.verify("1위보다 2위가 나보험 튼튼건강이에요.")).isNull();
     }

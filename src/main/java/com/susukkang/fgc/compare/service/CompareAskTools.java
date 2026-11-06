@@ -421,7 +421,7 @@ final class CompareAskTools {
     private static final Pattern AFTER_PARTICLE = Pattern.compile("^\\s*(?:은|는|이|가|인|의)?\\s*");
     private static final Pattern BEFORE_PARTICLE = Pattern.compile("\\s*(?:은|는|이|가|도|만|인)?\\s*$");
     /** '1위예요', '1위이고', '1위,'처럼 순위 표기로 절이 끝나는 꼴. '2위보다'는 비교 기준이라 여기에 들지 않는다. */
-    private static final Pattern CLAUSE_END = Pattern.compile("^\\s*(?:이고|이며|이면서|이에요|예요|입니다|이었|였|이야|야|이다|이지만|이라|[,.!?]|$)");
+    private static final Pattern CLAUSE_END = Pattern.compile("^\\s*(?:이고|이며|이면서|이에요|예요|입니다|이었|였|이야|야|이다|이지만|이라|인데|이므로|이니|이나|[,.!?]|$)");
 
     /**
      * 순위 표기('1위')에 바로 붙은 상품 이름이 그 순위의 상품이어야 한다. 집합이 아니라 짝을 본다.
@@ -460,7 +460,7 @@ final class CompareAskTools {
     }
 
     /** 표기와 이름 사이에 이 말이 끼면 같은 대상을 말한 것이 아니라 다른 절이다('1위이고 튼튼건강이 2위', '1위는 작지만 B는'). */
-    private static final Pattern CLAUSE_BREAK = Pattern.compile("이고|이며|이면서|지만|반면|비해|하고|하며|고\\s|며\\s|서\\s|[,;.!?]");
+    private static final Pattern CLAUSE_BREAK = Pattern.compile("이고|이며|이면서|지만|반면|비해|하고|하며|인데|이므로|이니|이라|이나|라\\s|고\\s|며\\s|서\\s|[,;.!?]");
     /** 이름 바로 뒤에 이 말이 오면 그 이름은 비교·나열의 상대라서 순위의 주인이 아니다('1위는 … B보다 앞서요'). */
     private static final Pattern NAME_IS_PARTNER = Pattern.compile("^\\s*(?:보다|와|과|랑|및)");
     private static final int MAX_FILLER_GAP = 16;
