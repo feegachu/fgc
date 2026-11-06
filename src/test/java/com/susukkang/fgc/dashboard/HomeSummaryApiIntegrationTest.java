@@ -314,11 +314,15 @@ class HomeSummaryApiIntegrationTest {
                     .andExpect(jsonPath("$.data.totalElements").value(Integer.parseInt(metricAndCount[1])));
         }
         for (int i = 0; i < 12; i++) agent("IT-H-PAGE-" + i, "추가설계사", branchA, "1999-01-01", null, "ACTIVE", true);
-        mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06")
-                        .param("organizationId", String.valueOf(branchA)).param("metric", "AGENTS").param("page", "2")
-                        .with(user(principal("SETTLEMENT"))))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(16))
-                .andExpect(jsonPath("$.data.content.length()").value(6));
+        for (String page : List.of("2", "99")) {
+            mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06")
+                            .param("organizationId", String.valueOf(branchA)).param("metric", "AGENTS").param("page", page)
+                            .with(user(principal("SETTLEMENT"))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(16))
+                    .andExpect(jsonPath("$.data.page").value(2))
+                    .andExpect(jsonPath("$.data.totalPages").value(2))
+                    .andExpect(jsonPath("$.data.content.length()").value(6));
+        }
     }
 
     @Test
@@ -345,7 +349,7 @@ class HomeSummaryApiIntegrationTest {
 
     @Test
     void branchEndpointsRejectAgentRoleAndInvalidInput() throws Exception {
-        for (String path : List.of("branches", "branch-details")) {
+        for (String path : List.of("branches", "branch-details", "monthly-commissions")) {
             mvc.perform(get("/api/v1/dashboard/" + path).param("month", "1999-06")
                             .param("organizationId", String.valueOf(branchA)).param("metric", "AGENTS")
                             .with(user(principal("AGENT"))))
@@ -356,6 +360,45 @@ class HomeSummaryApiIntegrationTest {
         mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06").param("organizationId", "0")
                         .param("metric", "AGENTS").with(user(principal("SETTLEMENT"))))
                 .andExpect(status().isBadRequest());
+    }
+
+    /** FGC-FUN-080: 필수 입력과 열거형·숫자 바인딩 오류는 동일한 입력 오류 계약을 지킨다. */
+    @ParameterizedTest
+    @ValueSource(strings = {"metric=BAD", "page=0", "page=abc", "month=bad", "month", "organizationId=0", "organizationId=abc"})
+    void branchDetailsRejectInvalidOrMissingParameters(String invalid) throws Exception {
+        var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
+        params.set("month", "1999-06");
+        params.set("organizationId", String.valueOf(branchA));
+        params.set("metric", "AGENTS");
+        String[] fieldAndValue = invalid.split("=", 2);
+        if (fieldAndValue.length == 1) params.remove(fieldAndValue[0]);
+        else params.set(fieldAndValue[0], fieldAndValue[1]);
+        mvc.perform(get("/api/v1/dashboard/branch-details").params(params).with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("FGC-COMMON-002"));
+    }
+
+    /** FGC-FUN-080: 없는 지점은 요청 페이지와 관계없이 빈 첫 페이지를 반환한다. */
+    @Test
+    void missingBranchReturnsEmptyFirstPage() throws Exception {
+        mvc.perform(get("/api/v1/dashboard/branch-details").param("month", "1999-06")
+                        .param("organizationId", String.valueOf(Long.MAX_VALUE)).param("metric", "AGENTS").param("page", "99")
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(0))
+                .andExpect(jsonPath("$.data.totalElements").value(0))
+                .andExpect(jsonPath("$.data.content").isEmpty());
+    }
+
+    /** FGC-FUN-080: 미래 정산월의 인원·유효 계약 기준일은 서울의 오늘을 넘지 않는다. */
+    @Test
+    void futureBranchMonthUsesTodayInSeoul() throws Exception {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        mvc.perform(get("/api/v1/dashboard/branches").param("month", java.time.YearMonth.from(today).plusMonths(1).toString())
+                        .with(user(principal("SETTLEMENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.asOf").value(today.toString()));
     }
 
     private void branchPayment(long first, long second, String month, String stage, String flow, boolean confirmed, int firstAmount, int secondAmount) {

@@ -2646,13 +2646,13 @@
             "type" : "string"
           },
           "secondaryValue" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           },
           "status" : {
             "type" : "string"
           },
           "value" : {
-            "type" : "number"
+            "type" : [ "number", "null" ]
           }
         },
         "type" : "object"

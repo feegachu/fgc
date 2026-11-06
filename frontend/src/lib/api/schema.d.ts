@@ -2916,9 +2916,9 @@ export interface components {
             /** Format: int64 */
             id?: number;
             label?: string;
-            secondaryValue?: number;
+            secondaryValue?: number | null;
             status?: string;
-            value?: number;
+            value?: number | null;
         };
         BranchMetrics: {
             /** Format: int64 */

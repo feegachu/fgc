@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { readFileSync } from 'node:fs'
-import { test as plainTest, type Browser, type Locator, type Page } from '@playwright/test'
+import { test as plainTest, type Browser, type Locator, type Page, type Request } from '@playwright/test'
 import { matchPath } from 'react-router'
 import { canOpen, screens } from '../src/app/screens'
 import { test, expect, login, api, completeMonthly, sql } from './fixtures'
@@ -12,6 +12,10 @@ import workflowHelp from '../src/features/assistant/workflow-help.generated.json
 // 실사용자 화면에 개발 용어나 코드가 보이면 실패한다 (#755, SRC-074, 화면정의서 공통규칙 10).
 // 역할마다 갈 수 있는 모든 라우트를 돌고 목록은 첫 행의 상세까지 연다.
 // 저장, 실행, 확정 버튼은 누르지 않는다. 데이터는 시험 준비에서만 쓴다.
+// This read-only crawl records text/transfer artifacts and failure screenshots.
+// Continuous video adds encoding work for hundreds of page scans without extra assertions.
+test.use({ video: 'off' })
+
 const month = '2026-07'
 const accounts = [
   { role: 'SETTLEMENT', loginId: 'settle01' },
@@ -62,6 +66,7 @@ interface Visit {
   role: string
   route: string
   requests: number
+  measuredRequests: number
   js: number
   css: number
   font: number
@@ -89,13 +94,43 @@ function scan(text: string, role: string, route: string, findings: Finding[]) {
   }
 }
 
-const inFlight = new WeakMap<Page, Set<unknown>>()
+// Chrome can omit terminal events for fetches interrupted by document navigation.
+// Those requests no longer describe the visible document and must not delay its scan.
+function pendingRequests<T>(isMainNavigation: (request: T) => boolean) {
+  const pending = new Set<T>()
+  return {
+    pending,
+    started(request: T) {
+      if (isMainNavigation(request)) pending.clear()
+      pending.add(request)
+    },
+    finished(request: T) { pending.delete(request) },
+  }
+}
+
+plainTest('문서 이동 후 이전 요청은 기다리지 않고 새 문서·하위 프레임 요청은 기다린다', () => {
+  const tracker = pendingRequests<{ main?: boolean }>((request) => request.main === true)
+  const oldFetch = {}, navigation = { main: true }, currentFetch = {}, iframe = {}
+  tracker.started(oldFetch)
+  tracker.started(navigation)
+  tracker.started(currentFetch)
+  tracker.started(iframe)
+  tracker.finished(oldFetch) // A late event from the previous document cannot clear new work.
+  expect([...tracker.pending]).toEqual([navigation, currentFetch, iframe])
+  tracker.finished(navigation)
+  tracker.finished(iframe)
+  expect([...tracker.pending]).toEqual([currentFetch])
+  tracker.finished(currentFetch)
+  expect(tracker.pending.size).toBe(0)
+})
+
+const inFlight = new WeakMap<Page, Set<Request>>()
 function trackRequests(page: Page) {
-  const requests = new Set<unknown>()
-  inFlight.set(page, requests)
-  page.on('request', (request) => requests.add(request))
-  page.on('requestfinished', (request) => requests.delete(request))
-  page.on('requestfailed', (request) => requests.delete(request))
+  const requests = pendingRequests<Request>((request) => request.isNavigationRequest() && request.frame() === page.mainFrame())
+  inFlight.set(page, requests.pending)
+  page.on('request', requests.started)
+  page.on('requestfinished', requests.finished)
+  page.on('requestfailed', requests.finished)
 }
 /** 화면 안에서 탭이나 행을 바꾸면 networkidle이 다시 오지 않아 진행 중 요청을 직접 센다. */
 async function settle(page: Page) {
@@ -159,6 +194,7 @@ async function walkRole(
   trackRequests(page)
   let current: Visit | null = null
   const sizes: Promise<unknown>[] = []
+  const responseVisits = new WeakMap<Request, Visit>()
   page.on('console', (message) => {
     // 로그인 전 갱신 토큰 확인은 401이 정상이다.
     if (message.type() === 'error' && !(current?.route === '/login' && message.text().includes('status of 401')))
@@ -169,12 +205,18 @@ async function walkRole(
     const visit = current
     if (!visit) return
     visit.requests += 1
-    const type = response.request().resourceType()
+    responseVisits.set(response.request(), visit)
+  })
+  // sizes() waits for completion: asking at response headers can wait forever
+  // when navigation interrupts the body. Only completed requests are measurable.
+  page.on('requestfinished', (request) => {
+    const visit = responseVisits.get(request)
+    if (!visit) return
+    const type = request.resourceType()
     sizes.push(
-      response
-        .request()
-        .sizes()
+      request.sizes()
         .then(({ responseBodySize }) => {
+          visit.measuredRequests += 1
           const bytes = Math.max(0, responseBodySize)
           if (type === 'script') visit.js += bytes
           else if (type === 'stylesheet') visit.css += bytes
@@ -183,14 +225,15 @@ async function walkRole(
           else if (type === 'fetch' || type === 'xhr') {
             visit.api += bytes
             if (!visit.largestApi || bytes > visit.largestApi.bytes)
-              visit.largestApi = { url: pathnameOf(response.url()), bytes }
+              visit.largestApi = { url: pathnameOf(request.url()), bytes }
           }
         })
         .catch(() => undefined),
     )
   })
   const begin = (route: string) => {
-    current = { role, route, requests: 0, js: 0, css: 0, font: 0, image: 0, api: 0, largestApi: null, consoleErrors: [] }
+    console.log(`[screen-language] ${role} ${route}`)
+    current = { role, route, requests: 0, measuredRequests: 0, js: 0, css: 0, font: 0, image: 0, api: 0, largestApi: null, consoleErrors: [] }
     return current
   }
   const finish = async () => {
@@ -297,6 +340,7 @@ function transferTable(visits: Visit[]) {
       visit.role,
       visit.route,
       visit.requests,
+      visit.requests - visit.measuredRequests,
       kb(visit.js),
       kb(visit.css),
       kb(visit.font),
@@ -308,10 +352,10 @@ function transferTable(visits: Visit[]) {
   )
   return [
     '실서버 시험은 Vite 개발 서버를 쓴다. JS, CSS는 번들 전 크기이고 같은 역할이 이미 받은 파일은 0이다.',
-    '합격선이 아니라 기록이다(KB). 배포본 크기는 빌드 산출물로 따로 잰다.',
+    '합격선이 아니라 기록이다(KB). 배포본 크기는 빌드 산출물로 따로 잰다. 본문 수신 중 이동·취소되거나 측정에 실패한 요청은 미측정 건수로 표시하며 0바이트로 판정하지 않는다.',
     '',
-    '역할 | 라우트 | 요청 수 | JS | CSS | 글꼴 | 이미지 | API | 가장 큰 API 응답 | 콘솔 오류',
-    '--- | --- | --- | --- | --- | --- | --- | --- | --- | ---',
+    '역할 | 라우트 | 요청 수 | 미측정 요청 수 | JS | CSS | 글꼴 | 이미지 | API | 가장 큰 API 응답 | 콘솔 오류',
+    '--- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---',
     ...rows,
   ].join('\n')
 }
