@@ -32,7 +32,8 @@ services:
       db:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: ${FGC_SPRING_PROFILES_ACTIVE:-prod}
+      FGC_MONITORING_SCRAPE_TOKEN: ${FGC_MONITORING_SCRAPE_TOKEN:-}
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fgc?currentSchema=fgc
       SPRING_DATASOURCE_USERNAME: fgc
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
