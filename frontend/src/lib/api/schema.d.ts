@@ -5960,7 +5960,8 @@ export interface components {
         ScheduleHeaderResponse: {
             activeYn?: boolean;
             canConfirm?: boolean;
-            confirmBlockedReason?: string;
+            /** @description 확정 차단 코드. 확정 가능하면 null; 확정 불가 CURRENT는 SCHEDULE_NOT_ACTIVE_PLANNED; 4·7년 예정판은 FGC-IMPL-SCHEDULE_PREVIEW_ONLY */
+            confirmBlockedReason?: string | null;
             /** Format: int64 */
             contractId?: number;
             contractNo?: string;
@@ -6026,17 +6027,25 @@ export interface components {
             ruleRef?: number;
             /** Format: int64 */
             scheduleLineId?: number;
-            /** Format: int64 */
-            sourceStatusEventId?: number;
+            /**
+             * Format: int64
+             * @description 현재 회차 상태와 일치하는 실제 원천 사건 ID. 근거 없음 또는 최신 결과 불일치는 null
+             */
+            sourceStatusEventId?: number | null;
         };
         SchedulePreviewContext: {
             expectedSourceVersion?: string;
             policy?: components["schemas"]["FeeRegimeSchedulePolicy"];
         };
         ScheduleRegenRequest: {
+            /** @description 명시적 4년·7년 생성 시 필수인 previewContext 원천 토큰. 불일치 시 409 */
             expectedSourceVersion?: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description 명시적 FOUR_YEAR_2027/SEVEN_YEAR_2029 생성 시 필수인 승인·활성 정책 ID
+             */
             policyVersionId?: number;
+            /** @description 생성 사유. 공백만 있는 값은 허용하지 않음 */
             reason: string;
             /** @enum {string} */
             regime?: "CURRENT" | "FOUR_YEAR_2027" | "SEVEN_YEAR_2029";
