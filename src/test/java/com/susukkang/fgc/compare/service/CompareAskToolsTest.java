@@ -212,6 +212,13 @@ class CompareAskToolsTest {
         // 같은 주장을 반복한 문장은 함께 검사하고, 서로 다른 주장이 한 문장에 섞이면 판단하지 않는다.
         assertThat(tools.verify("가보험 든든건강은 한도에 걸렸고 초과했어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도에 걸렸고 가보험 든든건강은 걸리지 않았어요.")).isNull();
+        // 도달 표현과 무관한 뒤쪽 서술어의 '못'·'없'은 부정이 아니다(#919).
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어 받지 못한 금액이 있어요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸려 받지 못하고 다음 달로 넘어가요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸리지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도에 걸리지는 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강은 한도를 초과한 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("가보험 든든건강은 한도를 초과하지 못했어요.")).isNull();
     }
 
     @Test

@@ -86,7 +86,8 @@ final class CompareAskTools {
     private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
     /** 한도 도달 표현. 한 문장에서 긍정과 부정이 섞이면('1위는 걸렸고 2위는 걸리지 않았어요') 주장이 섞여 있어 판단하지 않는다. */
     private static final Pattern CAP_VERB = Pattern.compile("걸리|걸려|걸렸|걸린|도달|초과|넘|닿");
-    private static final Pattern NEGATION = Pattern.compile("않|없|못|아니");
+    /** 도달 표현 바로 뒤에 붙은 부정('걸리지 않았어요', '넘지는 못했어요', '걸린 적이 없어요'). 뒤쪽 다른 서술어의 '못'·'없'은 도달 표현의 부정이 아니다. */
+    private static final Pattern NEGATION = Pattern.compile("^(?:[하한])?(?:[지진](?:는)?\\s*(?:않|못|아니)|(?:[은는])?\\s*(?:적|일|경우)(?:이|은|는|도)?\\s*(?:전혀\\s*)?없)");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
     /** '커요'는 '크다'의 활용이라 '크'로는 잡히지 않는다. */
     private static final List<String> BIGGER_WORDS = List.of("많", "높", "크", "커");
