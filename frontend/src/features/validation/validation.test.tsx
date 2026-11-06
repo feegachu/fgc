@@ -610,6 +610,7 @@ it('finalize help rejects a non-FINALIZED response and waits for acknowledgement
   }
   const { actions } = renderAt('/app/validation-runs/7')
   await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(screen.getByRole('button', { name: '확정' }))
   const modal = within(await screen.findByRole('dialog', { name: '이 검증 실행을 확정할까요?' }))
   await actions.click(modal.getByRole('button', { name: '도움말' }))
@@ -653,6 +654,7 @@ it('the detail help waits for the real finalization result before completing', a
   handlers['POST /api/v1/validation-runs/7/finalize'] = () => ({ status: 'FINALIZED' })
   const { actions } = renderAt('/app/validation-runs/7?month=2026-07')
   await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
+  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(await screen.findByRole('button', { name: '도움말' }))
   const next = () => screen.getByRole('button', { name: '다음' })
   for (let i = 0; i < 3; i++) { await waitFor(() => expect(next()).toBeEnabled()); await actions.click(next()) }
@@ -715,6 +717,7 @@ it('stops the creation spinner while help acknowledgement keeps duplicate submis
   const { actions } = renderAt('/app/validation-runs?month=2026-07')
   const create = await screen.findByRole('button', { name: /실행 생성/ })
   await waitFor(() => expect(create).toBeEnabled())
+  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   await actions.click(screen.getByRole('button', { name: '다음' }))

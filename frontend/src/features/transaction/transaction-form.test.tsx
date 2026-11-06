@@ -109,7 +109,7 @@ function mount(path = '/app/transactions/new?month=2026-07', canProcess = true, 
   const router = createMemoryRouter(
     [
       {
-        element: <Outlet context={{ user: { canProcess, roleCode: canProcess ? 'SETTLEMENT' : 'COMPLIANCE' }, month }} />,
+        element: <Outlet context={{ user: { canProcess, roleCode: canProcess ? 'SETTLEMENT' : 'COMPLIANCE' }, month, helpVersion: 'before' }} />,
         children: [
           { path: '/transactions/new', element: <TransactionFormPage /> },
           { path: '/transactions', element: <h1>지급 목록 결과</h1> },

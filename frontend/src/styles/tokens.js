@@ -1,6 +1,9 @@
 // CSS variable → Tailwind mapping. Values remain in variables.css.
 export default {
   colors: {
+    'fgc-blue': 'var(--color-fgc-blue)',
+    'fgc-ink': 'var(--color-fgc-ink)',
+    'fgc-surface': 'var(--color-fgc-surface)',
     'blue-50': 'var(--color-blue-50)',
     'blue-100': 'var(--color-blue-100)',
     'blue-500': 'var(--color-blue-500)',

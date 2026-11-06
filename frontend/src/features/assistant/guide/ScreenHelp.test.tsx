@@ -10,6 +10,11 @@ import { GuideTargets } from './targets'
 import { FilterBar } from '../../../components/FilterBar'
 import definitions from './screen-help.json'
 import guideMascot from '../assets/pico-guide.png'
+// The original walkthrough remains available through the sidebar's before mode.
+vi.mock('react-router', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-router')>(),
+  useOutletContext: () => ({ helpVersion: 'before' }),
+}))
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ x: 10, y: 10, width: 100, height: 40 }] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })

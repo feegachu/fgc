@@ -40,8 +40,8 @@ export function MonthlyCommissions({ month }: { month: string }) {
         ) : query.data ? (
           <div className="commission-overview">
             <div className="commission-totals">
-              <CommissionTotal label="GA 수령액" value={current?.gaAmount} previous={previous?.gaAmount} />
-              <CommissionTotal label="설계사 지급액" value={current?.agentAmount} previous={previous?.agentAmount} />
+              <div data-guide-target="dashboard.commissions.ga"><CommissionTotal label="GA 수령액" value={current?.gaAmount} previous={previous?.gaAmount} /></div>
+              <div data-guide-target="dashboard.commissions.agent"><CommissionTotal label="설계사 지급액" value={current?.agentAmount} previous={previous?.agentAmount} /></div>
             </div>
             <CommissionChart months={query.data.months ?? []} />
           </div>
@@ -76,13 +76,13 @@ function CommissionTotal({ label, value, previous }: { label: string; value?: nu
 function CommissionChart({ months }: { months: MonthlyCommission[] }) {
   const [hovered, setHovered] = useState<number | null>(null)
   const [focused, setFocused] = useState<number | null>(null)
-  if (!months.length) return <p className="empty-state">표시할 월별 수수료가 없습니다.</p>
   const active = hovered ?? focused
   const current = active == null ? undefined : months[active]
-  const max = Math.max(...months.flatMap((row) => [row.gaAmount ?? 0, row.agentAmount ?? 0])) || 10000
+  const max = Math.max(0, ...months.flatMap((row) => [row.gaAmount ?? 0, row.agentAmount ?? 0])) || 10000
 
   return (
-    <div className="commission-chart">
+    <div className="commission-chart" data-guide-target="dashboard.commissions.chart">
+      {!months.length ? <p className="empty-state">표시할 월별 수수료가 없습니다.</p> : <>
       <div className="commission-chart-summary" aria-live="polite" aria-atomic="true">
         {current && <span className="commission-active-month">{monthText(current.month?.slice(0, 7) ?? '')}</span>}
         <span className="commission-series-value">
@@ -133,6 +133,7 @@ function CommissionChart({ months }: { months: MonthlyCommission[] }) {
           </div>
         </div>
       </div>
+      </>}
     </div>
   )
 }

@@ -49,6 +49,7 @@ import {
 import type { FormValues } from './form-model'
 import { connectPaymentGuide, PaymentGuideObserver } from './payment-guide'
 import { PaymentGuide } from './PaymentGuide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import './transaction.css'
 import './form.css'
 
@@ -132,6 +133,12 @@ function TransactionForm({
   const root = useRef<HTMLDivElement>(null)
   const help = useRef<HTMLButtonElement>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const helpVersion = useOutletContext<ShellContext | null>()?.helpVersion ?? 'after-v2'
+  const [openedHelpVersion, setOpenedHelpVersion] = useState(helpVersion)
+  if (openedHelpVersion !== helpVersion) {
+    setOpenedHelpVersion(helpVersion)
+    setHelpOpen(false)
+  }
   const [initialWorkflowId, setInitialWorkflowId] = useState<string | null>(null)
   const [initialGuideStepId, setInitialGuideStepId] = useState<string | undefined>()
   const [guideRevision, setGuideRevision] = useState(0)
@@ -588,7 +595,7 @@ function TransactionForm({
           <h1 className="page-title">지급 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
-          <button data-guide-feature="features.transaction.transaction-form-page.button-2"
+          <ScreenHelp screenId="TRAN-W02" disabled={fullFlow || helpOpen} triggerRef={help} legacyTrigger={<button data-guide-feature="features.transaction.transaction-form-page.button-2"
             ref={help}
             type="button"
             className="button button-secondary"
@@ -598,7 +605,7 @@ function TransactionForm({
             onClick={() => { useWorkflowGuide.getState().clear(); setInitialWorkflowId(null); setHelpOpen(true) }}
           >
             도움말
-          </button>
+          </button>} />
           <Link data-guide-feature="features.transaction.transaction-form-page.link-2" className="button button-secondary" to={returnTo}>
             <span className="material-symbols-rounded" aria-hidden="true">
               arrow_back

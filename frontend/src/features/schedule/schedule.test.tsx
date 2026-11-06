@@ -695,6 +695,7 @@ it('regeneration help validates reason and waits for new server version before n
     return undefined
   })
   await screen.findByText('스케줄 번호 11')
+  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
   const modal = within(screen.getByRole('dialog', { name: '새 버전 만들기' }))
   await actions.click(modal.getByRole('button', { name: '도움말' }))

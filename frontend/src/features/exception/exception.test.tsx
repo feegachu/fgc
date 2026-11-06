@@ -547,6 +547,7 @@ describe('EXCP-W01 예외함', () => {
     const { actions } = renderPage()
     await actions.click(within(await table()).getByRole('button', { name: '12' }))
     // 원장 정정 예외의 처리 폼에는 일반 조치만 나온다.
+    if (guided) await actions.click(screen.getByRole('radio', { name: '수정 전' }))
     const actionSelect = await screen.findByLabelText(/조치/)
     expect(within(actionSelect).queryByRole('option', { name: '해결' })).toBeNull()
     expect(within(actionSelect).getByRole('option', { name: '오탐' })).toBeInTheDocument()
@@ -637,6 +638,7 @@ it('action help requires a real action sequence and preserves input for a failed
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
+  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(form.getByRole('button', { name: '도움말' }))
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
@@ -737,6 +739,7 @@ it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a co
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
   await actions.type(form.getByLabelText(/처리 사유/), '원천 확인')
   if (guided) {
+    await actions.click(screen.getByRole('radio', { name: '수정 전' }))
     await actions.click(form.getByRole('button', { name: '도움말' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
     await actions.click(screen.getByRole('button', { name: '다음' }))
@@ -764,6 +767,7 @@ it('invalidates a completed correction when help is unmounted before acknowledge
   postResponse = () => ({ actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 72 })
   const { actions, unmount } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
+  await actions.click(screen.getByRole('radio', { name: '수정 전' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
   const dialog = within(await screen.findByRole('dialog'))
   await dialog.findByText(/J-0070/)

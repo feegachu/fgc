@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'reco-fixture' })
 const result = {
@@ -15,6 +16,26 @@ const result = {
   matches: [],
   detailSnapshot: { paymentStage: 'GA_TO_FC' },
 }
+
+test('수정 후 대사 도움말은 목록과 비교 창을 실제 실행 없이 설명한다', async ({ page }) => {
+  await historyFixture(page)
+  await page.route('**/api/v1/reconciliations/42/results?**', route => route.fulfill({ json: envelope({
+    summary: { resultCount: 1, matchedCount: 0, exceptionCount: 1, expectedTotal: 12000, actualTotal: 11000, differenceTotal: -1000 },
+    items: { content: [result], page: 1, totalPages: 1 },
+  }) }))
+  await page.goto('reconciliations?month=2026-07&runId=42')
+  await expect(page.getByRole('button', { name: '대사 결과 7 비교 보기' })).toBeVisible()
+  await chooseDetailedHelp(page)
+  const writes: string[] = []
+  page.on('request', request => { if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url()) })
+  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
+  await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()
+  const modal = page.getByRole('dialog', { name: '대사 비교 상세' })
+  const titles = await readDetailedHelp(page, modal.getByRole('button', { name: '도움말', exact: true }), 5)
+  expect(titles).toContain('실제 지급 원천')
+  await expect(modal).toBeVisible()
+  expect(writes).toEqual([])
+})
 
 async function historyFixture(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/**', async (route) => {

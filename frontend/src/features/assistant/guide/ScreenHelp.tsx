@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { createPortal } from 'react-dom'
-import { useInRouterContext, useLocation } from 'react-router'
+import { useInRouterContext, useLocation, useOutletContext } from 'react-router'
+import type { ShellContext } from '../../../app/shell/AppShell'
 import { Button } from '../../../components/Button'
+import { Modal } from '../../../components/Modal'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from '../settlement/entry'
 import { GuideRuntime } from './runtime'
 import { GuideTargets } from './targets'
@@ -21,8 +24,28 @@ const targetMessages: Record<string, string> = {
   PREPARATION_TIMEOUT: '안내 영역이 5초 안에 준비되지 않았습니다. 화면 로딩이 끝났는지 확인하고 필요한 탭이나 상세를 연 후 다시 찾으세요.',
   TARGET_VERSION_OR_REGISTRATION_MISSING: '현재 화면과 도움말 버전이 맞지 않습니다. 입력을 보존한 뒤 화면을 다시 열어 주세요.',
 }
-type HelpProps = { screenId: string; variant?: string; saveGuide?: SaveGuide; finalizeGuide?: SaveGuide; runStatus?: string; outcome?: 'execution' | 'processing' | 'finalization' | 'correction' }
+export interface ScreenHelpStep {
+  targetId: string
+  selector?: string
+  anchor?: 'start'
+  concise?: boolean
+  attribute?: 'data-guide-target' | 'data-guide-feature'
+  scope?: 'shell'
+  group: string
+  title: string
+  instruction: string
+  details: readonly { label: string; text: string }[]
+  interaction: string
+}
+type HelpProps = { screenId: string; variant?: string; walkthrough?: readonly ScreenHelpStep[]; saveGuide?: SaveGuide; finalizeGuide?: SaveGuide; runStatus?: string; outcome?: 'execution' | 'processing' | 'finalization' | 'correction' }
 import '../../transaction/payment-guide.css'
+import './screen-help.css'
+import { ScreenOverview } from './ScreenOverview'
+import { snapshotScreen } from './screen-snapshot'
+import type { ScreenSnapshot } from './screen-snapshot'
+import { screenOverviews, targetTitles } from './screen-overviews'
+import { ScreenWalkthrough } from './ScreenWalkthrough'
+import { screenWalkthroughs } from './screen-walkthroughs'
 
 function HelpIcon() {
   return <svg className="screen-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -32,11 +55,96 @@ function HelpIcon() {
 }
 
 /** Read-only guide orchestration; existing business handlers own all writes and report save outcomes. */
-export function ScreenHelp(props: HelpProps) {
+export function ScreenHelp({ details, walkthrough, legacyTrigger, disabled, triggerRef, ...props }: HelpProps & { details?: ReactNode; legacyTrigger?: ReactNode; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement> }) {
   const { screenId, variant } = props
   const routed = useInRouterContext()
-  if (!definitions.some((entry) => entry.screenId === screenId && entry.variant === variant)) return <button type="button" className="button button-secondary screen-help-trigger" disabled title="등록된 도움말 버전을 찾을 수 없습니다."><HelpIcon />도움말</button>
-  return routed ? <RoutedScreenHelp {...props} /> : <ScreenHelpSession {...props} />
+  const helpVersion = useOutletContext<ShellContext | null>()?.helpVersion ?? 'after-v2'
+  const definition = definitions.find((entry) => entry.screenId === screenId && entry.variant === variant)
+  if (!definition) return <button type="button" className="button button-secondary screen-help-trigger" disabled title="등록된 도움말 버전을 찾을 수 없습니다."><HelpIcon />도움말</button>
+  if (helpVersion === 'after-v2') return <ScreenHelpDetails key={`${screenId}.${variant ?? ''}`} definition={definition} disabled={disabled} triggerRef={triggerRef}>{details}</ScreenHelpDetails>
+  if (helpVersion === 'after') {
+    const tour = <ScreenWalkthrough title={definition.title} steps={walkthrough ?? screenWalkthroughs[variant ? `${screenId}.${variant}` : screenId] ?? []} disabled={disabled} triggerRef={triggerRef} />
+    return routed ? <RoutedWalkthrough screenId={screenId}>{tour}</RoutedWalkthrough> : tour
+  }
+  return <Fragment key={helpVersion}>
+    {legacyTrigger ?? (routed ? <RoutedScreenHelp {...props} /> : <ScreenHelpSession {...props} />)}
+  </Fragment>
+}
+
+function RoutedWalkthrough({ screenId, children }: { screenId: string; children: ReactNode }) {
+  const location = useLocation()
+  const context = new URLSearchParams(location.search)
+  const selectionParams: Record<string, string[]> = {
+    'CONT-W02': ['tab', 'capCheckId'], 'EXCP-W01': ['selected'], 'AUDT-W01': ['selected'],
+    'CAP-W01': ['capCheckId'], 'POL-W01': ['policyVersionId', 'tab', 'section'],
+    'TRAN-W01': ['selectedId'], 'SCHE-W01': ['selectedId'], 'RPT-W02': ['entryKey'],
+    'LEDG-W01': ['selected'], 'RECO-W01': ['resultId'], 'RECO-W02': ['resultId'],
+  }
+  selectionParams[screenId]?.forEach(key => context.delete(key))
+  context.sort()
+  return <Fragment key={`${location.pathname}?${context}`}>{children}</Fragment>
+}
+
+function ScreenHelpDetails({ definition, children, disabled, triggerRef }: { definition: typeof definitions[number]; children?: ReactNode; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement> }) {
+  const { title, screenId, variant } = definition
+  const [open, setOpen] = useState(false)
+  const [snapshot, setSnapshot] = useState<ScreenSnapshot | null>(null)
+  const [captureRoot, setCaptureRoot] = useState<HTMLElement | null>(null)
+  const [previewFailed, setPreviewFailed] = useState(false)
+  useEffect(() => {
+    if (!open || !captureRoot) return
+    const controller = new AbortController()
+    let timer: number | undefined
+    // Paint the modal before starting preview work, including on slower devices.
+    const frame = requestAnimationFrame(() => {
+      timer = window.setTimeout(() => {
+        const areas = screenOverviews[variant ? `${screenId}.${variant}` : screenId]
+          ?? definition.steps.map(step => ({
+            selector: `[data-guide-target="${step.targetId}"]`,
+            title: targetTitles[step.targetId] ?? title,
+            description: step.instruction,
+          }))
+        void snapshotScreen(captureRoot, areas, controller.signal).then(result => {
+          if (!controller.signal.aborted) setSnapshot(result)
+        }).catch(() => {
+          if (!controller.signal.aborted) setPreviewFailed(true)
+        })
+      }, 0)
+    })
+    return () => { controller.abort(); cancelAnimationFrame(frame); window.clearTimeout(timer) }
+  }, [open, captureRoot, definition, screenId, variant, title])
+  return <>
+    <button
+      type="button"
+      ref={triggerRef}
+      className="button button-secondary screen-help-trigger"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      disabled={disabled}
+      onClick={(event) => {
+        document.dispatchEvent(new CustomEvent('fgc-screen-help-open', { detail: event.currentTarget }))
+        closeSettlementGuide()
+        if (!children) {
+          const root = event.currentTarget.closest<HTMLElement>('[data-guide-scope], [role="dialog"]')
+            ?? document.querySelector<HTMLElement>('#main-content > .page-content')
+            ?? document.getElementById('main-content')
+            ?? event.currentTarget.parentElement!
+          setCaptureRoot(root)
+        }
+        setOpen(true)
+      }}
+    >
+      <HelpIcon />도움말
+    </button>
+    <Modal open={open} title={`${title} 도움말`} className="screen-help-modal" onClose={() => {
+      setOpen(false); setCaptureRoot(null); setSnapshot(null); setPreviewFailed(false)
+    }}>
+      {children ?? (snapshot ? <ScreenOverview snapshot={snapshot} title={title} />
+        : <p className="screen-help-loading" role={previewFailed ? 'alert' : 'status'}>
+          {previewFailed ? '화면 미리보기를 불러오지 못했습니다. 도움말을 다시 열어 주세요.' : '화면 안내를 준비하고 있습니다.'}
+        </p>)}
+    </Modal>
+  </>
 }
 function RoutedScreenHelp(props: HelpProps) {
   const { screenId, saveGuide } = props
@@ -56,9 +164,10 @@ function RoutedScreenHelp(props: HelpProps) {
   if (screenId === 'CONT-W02') { context.delete('tab'); context.delete('capCheckId') }
   return <ScreenHelpSession key={`${location.pathname}?${context}`} {...props} />
 }
-function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runStatus, outcome }: HelpProps) {
+function ScreenHelpSession({ screenId, variant, walkthrough, saveGuide, finalizeGuide, runStatus, outcome }: HelpProps) {
   const action = outcome === 'correction' ? '정정' : outcome === 'execution' ? '실행' : outcome === 'processing' ? '처리' : outcome === 'finalization' ? '확정' : '저장'
-  const definition = definitions.find((entry) => entry.screenId === screenId && entry.variant === variant)!
+  const baseDefinition = definitions.find((entry) => entry.screenId === screenId && entry.variant === variant)!
+  const definition = useMemo(() => walkthrough ? { ...baseDefinition, steps: walkthrough } : baseDefinition, [baseDefinition, walkthrough])
   // Usage help has no business capabilities; screen/action permissions remain with the page.
   const role = 'READER'
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null)
@@ -90,7 +199,10 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
     const targets = new GuideTargets()
     for (const step of guide.steps) targets.register({
       screenId, guideVersion: guide.guideVersion, targetId: step.targetId,
-      root: () => trigger?.closest<HTMLElement>('[data-guide-scope]') ?? trigger?.closest<HTMLElement>('[role="dialog"]') ?? document.getElementById('main-content'),
+      attribute: walkthrough?.find(item => item.targetId === step.targetId)?.attribute,
+      root: () => walkthrough?.find(item => item.targetId === step.targetId)?.scope === 'shell'
+        ? trigger?.closest<HTMLElement>('.app-shell') ?? null
+        : trigger?.closest<HTMLElement>('[data-guide-scope]') ?? trigger?.closest<HTMLElement>('[role="dialog"]') ?? document.getElementById('main-content'),
       prepare: async (signal) => {
         if (signal.aborted) return
         // Only registered tab controls; never click a business action.
@@ -116,11 +228,11 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
       openScreen: async (requested) => { if (requested !== screenId) throw new Error('SCREEN_UNAVAILABLE') },
       confirmLeave: async () => false,
     })
-  }, [definition, role, screenId, variant, trigger, saveGuide, finalizeGuide, validation])
+  }, [definition, role, screenId, variant, trigger, saveGuide, finalizeGuide, validation, walkthrough])
   const saveState = useSyncExternalStore(saveGuide?.subscribe ?? noSubscribe, saveGuide?.getSnapshot ?? noSnapshot)
   const finalizeState = useSyncExternalStore(finalizeGuide?.subscribe ?? noSubscribe, finalizeGuide?.getSnapshot ?? noSnapshot)
   const snapshot = useSyncExternalStore(runtime.observe.bind(runtime), runtime.getSnapshot)
-  const position = useSpotlight(open && !modal ? snapshot.target : null, card)
+  const position = useSpotlight(open && !modal ? snapshot.target : null, card, Boolean(walkthrough))
   const close = () => { runtime.stop(); setOpen(false); saveGuide?.deactivate(); trigger?.focus() }
   useEffect(() => () => runtime.stop(), [runtime])
   useEffect(() => () => saveGuide?.deactivate(false), [saveGuide])
@@ -180,6 +292,10 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
   const failedPath = validation && runStatus === 'FAILED'
   const staleCompletion = complete && saveGuide && (validation ? !failedPath && finalizeState.savedId === null : saveState.savedId === null)
   const index = definition.steps.findIndex((step) => step.targetId === snapshot.step?.targetId)
+  const detailStep = walkthrough?.[index]
+  useEffect(() => {
+    if (walkthrough && card.current) card.current.scrollTop = 0
+  }, [walkthrough, index])
   const needsFinalization = validation && snapshot.step?.targetId === 'validation.finalize'
   const nextReady = !saveGuide || (validation && ['validation.restart', 'validation.checklist'].includes(snapshot.step?.targetId ?? ''))
     || (validation && snapshot.step?.targetId === 'validation.execute' && failedPath)
@@ -188,24 +304,35 @@ function ScreenHelpSession({ screenId, variant, saveGuide, finalizeGuide, runSta
   return <>
     <button type="button" ref={setTrigger} className="button button-secondary screen-help-trigger" aria-expanded={open} onClick={open ? close : start}><HelpIcon />도움말</button>
     {open && !modal && createPortal(<>
-      {!folded && position.box && !paused && !complete && <div className="payment-guide-spotlight" aria-hidden="true" style={position.box} />}
-      <section ref={card} className="payment-guide-card" aria-label={`${definition.title} 도움말`} data-guide-anchored={Boolean(snapshot.target && !modal)} style={position.card}>
+      {!folded && position.box && !paused && !complete && <div className={`payment-guide-spotlight${walkthrough ? ' screen-step-spotlight' : ''}`} aria-hidden="true" style={position.box} />}
+      <section ref={card} className={`payment-guide-card${walkthrough ? ' screen-step-guide' : ''}`} aria-label={`${definition.title} 도움말`} data-help-target={snapshot.step?.targetId} data-guide-anchored={Boolean(snapshot.target && !modal)} style={position.card}>
         <header className="payment-guide-header">
           <img className="payment-guide-mascot" src={guideMascot} width="40" height="40" alt="" />
-          <span>{saveGuide ? `${action} 가이드` : '화면 사용법'} · {Math.max(1, index + 1)}/{definition.steps.length}</span>
+          <span className={walkthrough ? 'screen-step-count' : undefined}>{walkthrough ? '화면 요소 안내' : saveGuide ? `${action} 가이드` : '화면 사용법'} · {Math.max(1, index + 1)}/{definition.steps.length}</span>
           <Button variant="ghost" onClick={() => setFolded(!folded)}>{folded ? '펼치기' : '접기'}</Button>
           <Button variant="ghost" onClick={close}>종료</Button>
         </header>
         {!folded && <>
-          <h2>{staleCompletion ? '실행 결과 변경 · 다시 확인' : complete ? (validation ? (failedPath ? '신규 실행 절차 안내 완료' : '서버 확정 확인 · 가이드 완료') : saveGuide ? `서버 ${action} 확인 · 가이드 완료` : '화면 사용법 안내 완료') : definition.title}</h2>
+          {walkthrough && <>
+            <progress className="screen-step-progress" max={definition.steps.length} value={Math.max(1, index + 1)} aria-label="도움말 진행" />
+            <p className="screen-step-group">{detailStep?.group ?? '화면 요소를 찾고 있습니다'}</p>
+            <span className="visually-hidden" role="status">{detailStep && `${index + 1}/${definition.steps.length} ${detailStep.title}`}</span>
+          </>}
+          <h2>{detailStep && !complete ? detailStep.title : staleCompletion ? '실행 결과 변경 · 다시 확인' : complete ? (validation ? (failedPath ? '신규 실행 절차 안내 완료' : '서버 확정 확인 · 가이드 완료') : saveGuide ? `서버 ${action} 확인 · 가이드 완료` : '화면 사용법 안내 완료') : definition.title}</h2>
           <p>{validation && complete && !staleCompletion ? (failedPath ? '실행 실패를 확인했습니다. 신규 실행 만들기로 이동해 새 검증을 생성하세요. 기존 실행을 최종 확정한 것이 아닙니다.' : `이 검증 실행의 서버 확정 결과를 확인했습니다. 검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.`) : staleCompletion ? '입력·선택 대상 또는 서버 결과가 바뀌었습니다. 현재 조건으로 안내를 다시 시작하세요.' : complete ? (saveGuide ? (outcome === 'correction' ? `서버 역분개·재기표 성공과 새 분개 번호 ${saveState.savedId}를 확인했습니다. 안내를 마치면 정정 이력을 갱신합니다. 재검증·재대사는 별도로 실행하세요.` : outcome === 'processing' ? `선택한 예외의 서버 처리 순번 ${saveState.savedId}를 확인했습니다. 원천 정정·재검증·재대사 완료와는 별개입니다. 안내를 마치면 처리 이력을 갱신합니다.` : outcome === 'finalization' ? `이 검증 실행의 서버 확정 결과를 확인했습니다. 검증 결과 잠금이며 실제 송금·회계 마감이 아닙니다.` : outcome === 'execution' ? `서버 실행 번호 ${saveState.savedId}의 완료 결과를 확인했습니다. 불일치 해소와 최종 확정은 별도 절차입니다.` : `서버에서 저장한 번호 ${saveState.savedId}를 확인했습니다. 안내를 마치면 저장 결과 화면으로 이동합니다.`) : '설명 확인을 마쳤습니다. 실제 저장·실행·확정 결과는 해당 업무 화면에서 확인하세요.') : outcome === 'execution' && saveState.savedId !== null && index <= 1 ? '이미 완료된 실행의 서버 결과를 확인했습니다. 다시 실행하지 않고 다음으로 진행하세요.' : snapshot.step?.instruction}</p>
           {saveGuide && !complete && !needsFinalization && <p role="status">{saveState.error || (saveState.pending ? `서버 ${action} 결과를 기다리고 있습니다.` : saveState.savedId !== null ? `서버 ${action} 성공 · ${outcome === 'processing' ? '처리 순번' : '번호'} ${saveState.savedId}. 다음을 눌러 완료를 확인하세요.` : index === 0 ? (saveState.valid ? '필수 입력과 형식 조건을 충족했습니다.' : '필수 입력·형식을 확인하세요. 입력 조건이 충족되어야 다음으로 진행할 수 있습니다.') : `강조된 실제 ${action} 버튼을 누르세요. 서버 완료 결과를 확인해야 다음으로 진행할 수 있습니다.`)}</p>}
           {needsFinalization && !complete && <p role="status">{finalizeState.savedId !== null ? '서버의 최종 확정을 확인했습니다. 다음으로 완료를 확인하세요.' : '검증 계산 완료와 최종 확정은 다릅니다. 실제 확정의 서버 결과를 기다리고 있습니다.'}</p>}
           {paused && <p role="status">{snapshot.status === 'ERROR' ? '시스템 오류가 발생했습니다. 잠시 후 다시 시작하세요.' : targetMessages[snapshot.reasonCode ?? ''] ?? '안내 대상을 표시할 수 없습니다. 대상 선택·탭·권한을 확인한 후 다시 찾으세요.'}</p>}
+          {detailStep && !complete && <>
+            <dl className="screen-step-details">
+              {detailStep.details.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.text}</dd></div>)}
+            </dl>
+            <p className="screen-step-interaction"><strong>화면에서 할 수 있는 일</strong>{detailStep.interaction}</p>
+          </>}
           <div className="payment-guide-actions">
             {complete ? <><Button onClick={staleCompletion ? restart : close}>{staleCompletion ? '다시 시작' : '안내 마치기'}</Button>{!staleCompletion && <Button variant="secondary" disabled={busy} onClick={restart}>다시 보기</Button>}</> : snapshot.status === 'ERROR' ? <Button disabled={busy} onClick={restart}>다시 시작</Button> : paused ? <Button disabled={busy} onClick={() => { refocus.current = true; void run(() => runtime.resume()) }}>다시 찾기</Button> : <>
-              <Button disabled={busy || index <= 0} onClick={() => void run(() => runtime.previous())}>이전</Button>
-              <Button disabled={busy || !snapshot.target || !nextReady} onClick={() => void run(() => runtime.next())}>{saveGuide ? '다음' : '설명 확인 · 다음'}</Button>
+              <Button variant={walkthrough ? 'secondary' : 'primary'} disabled={busy || index <= 0 || (Boolean(walkthrough) && !runtime.canGoBack())} onClick={() => void run(() => runtime.previous())}>이전</Button>
+              <Button className={walkthrough ? 'screen-step-next' : undefined} disabled={busy || !snapshot.target || !nextReady} onClick={() => walkthrough && index === definition.steps.length - 1 ? close() : void run(() => runtime.next())}>{walkthrough ? index === definition.steps.length - 1 ? '안내 마치기' : '다음' : saveGuide ? '다음' : '설명 확인 · 다음'}</Button>
             </>}
           </div>
         </>}

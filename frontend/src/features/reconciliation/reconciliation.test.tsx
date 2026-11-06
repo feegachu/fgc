@@ -753,6 +753,7 @@ it('execution help resets on run selection and waits for the new completed resul
     }
   })
   await screen.findByRole('option', { name: 'LIFE, 테스트생명' })
+  await user.click(screen.getByRole('radio', { name: '수정 전' }))
   await user.click(screen.getByRole('button', { name: '도움말' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   await user.click(screen.getByRole('button', { name: '다음' }))

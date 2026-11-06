@@ -1,6 +1,7 @@
 import { selectEntity } from './selectEntity'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 // #410 browser interaction fixtures; #418 can run the same demo paths against the real server
 // with TransactionScreensIntegrationTest / scripts/verify-transaction.mjs.
@@ -9,6 +10,55 @@ const contracts = [
   { contractId: 1, contractNo: 'DEMO-CONTRACT-1', productName: '종신보험', contractDate: '2026-07-10' },
   { contractId: 2, contractNo: 'DEMO-CONTRACT-2', productName: '종신보험', contractDate: '2026-07-12' },
 ]
+
+test('화면 도움말에서 지급 입력 영역을 확인해도 저장 요청을 보내지 않는다', async ({ page }) => {
+  await installApi(page)
+  await page.goto('transactions/new?month=2026-07')
+  await expect(page.locator('[data-guide-target="payment.scope"]')).toBeVisible()
+  const amount = page.getByLabel(/금액 \(원\)/)
+  await amount.fill('260000')
+  const writes: string[] = []
+  page.on('request', request => {
+    if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url())
+  })
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const help = page.getByRole('dialog', { name: '수수료 지급 등록 도움말' })
+  await expect(help.getByRole('heading', { name: '지급 건', exact: true })).toBeVisible()
+  await expect(help.getByRole('heading', { name: '계약 귀속', exact: true })).toBeVisible()
+  await expect(help.locator('.snapshot-number')).not.toHaveCount(0)
+  await page.screenshot({ path: 'test-results/help-payment-desktop.png' })
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: '도움말', exact: true })).toBeFocused()
+  const comparison = page.getByRole('radiogroup', { name: '도움말 비교' })
+  await comparison.getByRole('radio', { name: '수정 후 v2', exact: true }).focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(comparison.getByRole('radio', { name: '수정 후', exact: true })).toBeChecked()
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  await expect(page.getByRole('region', { name: '수수료 지급 등록 도움말' })).toBeVisible()
+  await comparison.getByRole('radio', { name: '수정 후', exact: true }).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('region', { name: '지급 업무 가이드' })).toHaveCount(0)
+  await expect(amount).toHaveValue('260000')
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  await expect(help).toBeVisible()
+  expect(writes).toEqual([])
+})
+
+for (const width of [1440, 390]) {
+  test(`수정 후 지급 도움말은 저장 없이 입력·귀속·검증·확정을 설명한다 (${width})`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 })
+    const fixture = await installApi(page)
+    await page.goto('transactions/new?month=2026-07')
+    const amount = page.getByLabel(/금액 \(원\)/)
+    await amount.fill('260000')
+    await chooseDetailedHelp(page)
+    const before = fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method)).length
+    const titles = await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 10)
+    expect(titles).toEqual(expect.arrayContaining(['지급 총액', '계약별 귀속', '초안 저장', '사전검증과 차단 사유', '지급 건 확정']))
+    await expect(amount).toHaveValue('260000')
+    expect(fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method)).length).toBe(before)
+  })
+}
 
 async function installApi(
   page: Page,
@@ -668,6 +718,8 @@ for (const viewport of [
     })
     await page.goto('transactions/new?id=101&month=2026-07')
     await expect(page.locator('#btn-precheck')).toBeEnabled()
+    await page.getByRole('radio', { name: '수정 후 v2', exact: true }).focus()
+    await page.keyboard.press('ArrowRight')
     const help = page.getByRole('button', { name: '도움말', exact: true })
     await help.click()
     const card = page.getByRole('region', { name: '지급 업무 가이드' })

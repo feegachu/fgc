@@ -1,9 +1,59 @@
 import { expect, test } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('policy-preview')
   await expect(page.getByRole('heading', { name: '정책/룰셋 관리' })).toBeVisible()
+})
+
+for (const width of [1440, 390]) {
+  test(`수정 후 정책 도움말은 편집 모달에서 저장 없이 읽고 Escape로 도움말만 닫는다 (${width})`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 })
+    await chooseDetailedHelp(page)
+    await page.getByRole('button', { name: '정책 등록', exact: false }).click()
+    const editor = page.getByRole('dialog')
+    await editor.getByLabel('정책코드').fill('HELP-DRAFT')
+    const trigger = editor.getByRole('button', { name: '도움말', exact: true })
+    const titles = await readDetailedHelp(page, trigger, 7)
+    expect(titles).toContain('초안 저장')
+    await expect(editor.getByLabel('정책코드')).toHaveValue('HELP-DRAFT')
+    await trigger.click()
+    await page.keyboard.press('Escape')
+    await expect(editor).toBeVisible()
+    await expect(trigger).toBeFocused()
+    await expect(page.locator('.screen-step-guide')).toHaveCount(0)
+    await expect(editor.getByLabel('정책코드')).toHaveValue('HELP-DRAFT')
+  })
+}
+
+test('화면 도움말을 닫으면 정책 입력창과 작성 내용이 유지된다', async ({ page }) => {
+  await page.getByRole('button', { name: '정책 등록', exact: false }).click()
+  const editor = page.getByRole('dialog')
+  await editor.getByLabel('정책코드').fill('HELP-KEEP')
+  await editor.getByRole('button', { name: '도움말', exact: true }).click()
+  const help = page.getByRole('dialog', { name: '정책 초안 작성 도움말' })
+  await expect(help.getByRole('list', { name: '번호별 화면 설명' }).getByRole('listitem')).toHaveCount(2)
+  await expect(help.getByRole('button', { name: '창 닫기' })).toBeFocused()
+  await page.setViewportSize({ width: 390, height: 844 })
+  const preview = help.locator('.snapshot-frame')
+  await expect(help.locator('.snapshot-number')).toHaveCount(2)
+  await expect.poll(async () => {
+    const frame = await preview.boundingBox()
+    if (!frame) return false
+    const numbers = await help.locator('.snapshot-number').all()
+    for (const number of numbers) {
+      const box = await number.boundingBox()
+      if (!box || box.x < frame.x - 1 || box.y < frame.y - 1 || box.x + box.width > frame.x + frame.width + 1 || box.y + box.height > frame.y + frame.height + 1) return false
+    }
+    return true
+  }).toBe(true)
+  await page.screenshot({ path: 'test-results/help-policy-mobile.png' })
+  await page.keyboard.press('Escape')
+  await expect(help).toHaveCount(0)
+  await expect(editor.getByLabel('정책코드')).toHaveValue('HELP-KEEP')
+  await expect(editor.getByRole('button', { name: '도움말', exact: true })).toBeFocused()
+  await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
 })
 
 test('policy list, detail, sources and timeline render without API network requests', async ({ page }) => {

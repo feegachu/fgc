@@ -12,6 +12,11 @@ import type { DraftDocument } from './management'
 import { normalizePolicyDetail } from './writeApi'
 import type { PolicyDetailResponse, PolicyWriteResult } from './writeApi'
 
+// Exercise the retained walkthrough in the sidebar's before mode.
+vi.mock('react-router', async (original) => ({
+  ...await original<typeof import('react-router')>(),
+  useOutletContext: () => ({ helpVersion: 'before' }),
+}))
 vi.mock('../auth/useAuth', () => ({
   useAuth: () => ({ user: { loginId: 'reviewer', roleCode: 'SYSTEM_ADMIN' } }),
 }))

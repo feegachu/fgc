@@ -3,13 +3,56 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useSpotlight } from './useSpotlight'
 
-function Card({ target }: { target: HTMLElement | null }) {
+function Card({ target, detailed = false }: { target: HTMLElement | null; detailed?: boolean }) {
   const card = useRef<HTMLElement>(null)
-  const position = useSpotlight(target, card)
+  const position = useSpotlight(target, card, detailed)
   return <section ref={card} aria-label="Guide card" data-box={JSON.stringify(position.box)} style={position.card}>Next</section>
 }
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
+
+it.each([0, 2, 20])('highlights columns and at most three of %i result rows without scrolling to the table end', count => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(900)
+  const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+  const table = document.createElement('table')
+  table.innerHTML = `<thead><tr><th>계약번호</th></tr></thead><tbody>${Array.from({ length: count }, (_, i) => `<tr><td>${i + 1}</td></tr>`).join('')}</tbody>`
+  document.body.append(table)
+  vi.spyOn(table, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 900, 24 + count * 40))
+  vi.spyOn(table.tHead!, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 900, 24))
+  for (const [index, row] of [...table.tBodies[0].rows].entries()) {
+    const rect = new DOMRect(100, 124 + index * 40, 900, 40)
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rect)
+    vi.spyOn(row, 'getClientRects').mockReturnValue([rect] as unknown as DOMRectList)
+  }
+  try {
+    render(<Card target={table} detailed />)
+    act(() => { vi.advanceTimersByTime(100) })
+    const box = JSON.parse(screen.getByRole('region', { name: 'Guide card' }).dataset.box!)
+    expect(box).toEqual({ left: 90, top: 90, width: 920, height: 44 + Math.min(count, 3) * 40 })
+    expect(scroll).not.toHaveBeenCalled()
+  } finally { table.remove() }
+})
+
+it.each([40, 2400])('leaves a visible top anchor still for detailed help even with %ipx of content', height => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1280)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(720)
+  const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => {})
+  const target = document.createElement('section')
+  document.body.append(target)
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(300, 100, 800, height))
+  target.scrollIntoView = vi.fn()
+  try {
+    render(<Card target={target} detailed />)
+    act(() => { vi.advanceTimersByTime(100) })
+    expect(scroll).not.toHaveBeenCalled()
+    expect(target.scrollIntoView).not.toHaveBeenCalled()
+  } finally { target.remove() }
+})
 
 it('keeps user scrolling free when the guide card resizes after following an offscreen target', () => {
   vi.useFakeTimers()

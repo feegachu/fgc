@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 const contract = {
   contractId: 1,
@@ -22,7 +23,100 @@ const contract = {
   paymentTermMonths: 120,
   updatedAt: '2026-07-01T00:00:00.123456Z',
 }
-async function fixture(page: Page, canProcess = true, totalPages = 1) {
+
+test('수정 후 계약 목록은 상단을 유지하고 입력·탭별 상세 도움말도 끝까지 읽는다', async ({ page }) => {
+  test.setTimeout(60_000) // Three screens, including the intentionally slower spotlight transitions.
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await fixture(page, true, 1, 20)
+  await page.goto('contracts?month=2026-07')
+  await expect(page.locator('tbody tr')).toHaveCount(20)
+  await chooseDetailedHelp(page)
+  const help = page.getByRole('button', { name: '도움말', exact: true })
+  const top = await page.evaluate(() => scrollY)
+  await help.click()
+  const guide = page.locator('.screen-step-guide')
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await expect(guide.getByRole('heading', { name: '계약 목록 읽기' })).toBeVisible()
+  await expect.poll(async () => {
+    const table = page.locator('[aria-labelledby="contract-results-title"] table')
+    const anchor = await table.locator('thead').boundingBox()
+    const thirdRow = await table.locator('tbody tr').nth(2).boundingBox()
+    const highlight = await page.locator('.screen-step-spotlight').boundingBox()
+    return Boolean(anchor && thirdRow && highlight && Math.abs(highlight.y - anchor.y + 10) < 2
+      && Math.abs(highlight.y + highlight.height - thirdRow.y - thirdRow.height - 10) < 2)
+  }).toBe(true)
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(top)
+  await page.screenshot({ path: 'test-results/help-list-top-anchor.png' })
+  await expect(page.locator('.screen-step-spotlight')).toHaveCSS('transition-duration', '0.7s, 0.7s, 0.7s, 0.7s')
+  await guide.getByRole('button', { name: '종료', exact: true }).click()
+  await page.getByRole('link', { name: '신규 등록', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '보험계약 등록' })).toBeVisible()
+  await page.locator('[name="contractNo"]').fill('HELP-DRAFT')
+  const writes: string[] = []
+  page.on('request', request => { if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url()) })
+  const titles = await readDetailedHelp(page, help, 8)
+  expect(titles).toContain('계약 저장')
+  await expect(page.locator('[name="contractNo"]')).toHaveValue('HELP-DRAFT')
+  expect(writes).toEqual([])
+  await page.goto('contracts/1?month=2026-07')
+  await expect(page.locator('.contract-summary-number')).toHaveText('CONT-UI-001')
+  await chooseDetailedHelp(page)
+  expect(await readDetailedHelp(page, help, 4)).toContain('계약 상태이력')
+  await page.getByRole('tab', { name: '지급/대사' }).click()
+  expect(await readDetailedHelp(page, help, 3)).toContain('계약에 연결된 지급')
+})
+test('화면 도움말은 현재 계약 목록에 번호를 붙이고 입력을 보존한다', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await fixture(page)
+  await page.goto('contracts?month=2026-07')
+  const filter = page.locator('[data-guide-target="contract.filters"]')
+  await filter.getByLabel('계약번호', { exact: true }).fill('HELP-KEEP')
+  const writes: string[] = []
+  page.on('request', request => {
+    if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url())
+  })
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const help = page.getByRole('dialog', { name: '보험계약 목록 도움말' })
+  await expect(help.getByRole('img', { name: '보험계약 목록 화면 미리보기' })).toBeVisible()
+  await expect(help.getByRole('list', { name: '번호별 화면 설명' }).getByRole('listitem')).toHaveCount(3)
+  await expect(help.locator('.snapshot-number')).toHaveCount(3)
+  await page.screenshot({ path: 'test-results/help-contract-desktop.png' })
+  await page.keyboard.press('Escape')
+  await expect(filter.getByLabel('계약번호', { exact: true })).toHaveValue('HELP-KEEP')
+  await expect(page.getByRole('button', { name: '도움말', exact: true })).toBeFocused()
+  expect(writes).toEqual([])
+})
+test('도움말은 목록이 길어도 첫 프레임에 열리고 준비 중에도 닫을 수 있다', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await fixture(page, true, 1, 20)
+  await page.goto('contracts?month=2026-07')
+  await expect(page.locator('tbody tr')).toHaveCount(20)
+  const firstFrame = await page.evaluate(async () => {
+    const trigger = document.querySelector<HTMLButtonElement>('.screen-help-trigger')!
+    const start = performance.now()
+    const painted = new Promise<{ elapsed: number; open: boolean; preparing: boolean }>(resolve => {
+      requestAnimationFrame(() => resolve({
+        elapsed: performance.now() - start,
+        open: Boolean(document.querySelector('.screen-help-modal')),
+        preparing: Boolean(document.querySelector('.screen-help-modal [role="status"]')),
+      }))
+    })
+    trigger.click()
+    return painted
+  })
+  console.log('Help first frame', firstFrame)
+  expect(firstFrame.open).toBe(true)
+  expect(firstFrame.preparing).toBe(true)
+  expect(firstFrame.elapsed).toBeLessThan(500)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const previewStart = Date.now()
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  await expect(page.locator('.snapshot-number')).toHaveCount(3)
+  console.log('Help preview ready after reopen', Date.now() - previewStart, 'ms')
+  await expect(page.getByRole('dialog')).toHaveCount(1)
+})
+async function fixture(page: Page, canProcess = true, totalPages = 1, rowCount = 1) {
   const envelope = (data: unknown) => ({ data, error: null, requestId: 'contract-browser' })
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
@@ -66,7 +160,7 @@ async function fixture(page: Page, canProcess = true, totalPages = 1) {
     }
     if (path.endsWith('/contracts'))
       return route.fulfill({
-        json: envelope({ content: [contract], page: 1, size: 20, totalPages, totalElements: totalPages > 1 ? 21 : 1 }),
+        json: envelope({ content: Array.from({ length: rowCount }, (_, index) => ({ ...contract, contractId: index + 1 })), page: 1, size: 20, totalPages, totalElements: totalPages > 1 ? 21 : rowCount }),
       })
     if (path.endsWith('/schedules'))
       return route.fulfill({

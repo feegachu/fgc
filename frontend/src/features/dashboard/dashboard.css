@@ -11,6 +11,7 @@
   .dashboard-main-column > .surface,
   .dashboard-insight-grid > .surface,
   .dashboard-side-column > .surface,
+  .dashboard-recent-panels > .surface,
   .dashboard-support-cards {
     animation: dashboard-panel-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     animation-delay: var(--panel-delay, 0ms);
@@ -19,8 +20,8 @@
   .dashboard-commissions { --panel-delay: 80ms; }
   .dashboard-insight-grid > .surface:first-child { --panel-delay: 130ms; }
   .dashboard-insight-grid > .surface:last-child { --panel-delay: 180ms; }
-  .dashboard-side-column > .surface:first-child { --panel-delay: 110ms; }
-  .dashboard-side-column > .surface:nth-child(2) { --panel-delay: 160ms; }
+  .dashboard-recent-panels > .surface:first-child { --panel-delay: 110ms; }
+  .dashboard-recent-panels > .surface:nth-child(2) { --panel-delay: 160ms; }
   .dashboard-support-cards { --panel-delay: 210ms; }
 
   .commission-bars > span,
@@ -52,7 +53,8 @@
 }
 
 .dashboard-main-column,
-.dashboard-side-column {
+.dashboard-side-column,
+.dashboard-recent-panels {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);

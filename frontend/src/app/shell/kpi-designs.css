@@ -139,7 +139,8 @@
   .kpi-group > :nth-child(n + 6) { animation-delay: 250ms; }
 
   .dashboard-main-grid > .surface,
-  .dashboard-side-column > .surface {
+  .dashboard-side-column > .surface,
+  .dashboard-recent-panels > .surface {
     animation: kpi-rise 420ms cubic-bezier(0.2, 0, 0, 1) 240ms backwards;
   }
 }

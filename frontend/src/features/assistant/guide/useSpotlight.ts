@@ -3,7 +3,7 @@ import type { CSSProperties, RefObject } from 'react'
 
 const HIGHLIGHT_PADDING = 10
 
-export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>) {
+export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false) {
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -13,10 +13,43 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     let placementFrame = 0
     let preparedWidth: number | null = null
     let measuredTarget: DOMRect | null = null
+    const targetInHeader = Boolean(target?.closest('.app-header'))
+    const heightLimit = () => Math.min(detailed ? 560 : 460, window.innerHeight * (detailed && window.innerWidth >= 768 ? 0.65 : 0.5))
+    const targetRect = () => {
+      const rect = target!.getBoundingClientRect()
+      if (!detailed || !target!.matches('table')) return rect
+      const header = target!.querySelector<HTMLElement>(':scope > thead')
+      const rows = [...target!.querySelectorAll<HTMLElement>(':scope > tbody > tr')]
+        .filter(row => row.getClientRects().length > 0).slice(0, 3)
+      const first = header ?? rows[0], last = rows.at(-1) ?? header
+      if (!first || !last) return rect
+      const viewport = target!.closest('.data-table-viewport')?.getBoundingClientRect()
+      const left = Math.max(rect.left, viewport?.left ?? rect.left)
+      const right = Math.min(rect.right, viewport?.right ?? rect.right)
+      const top = first.getBoundingClientRect().top
+      return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, last.getBoundingClientRect().bottom - top))
+    }
     const alignTarget = () => {
       if (!target?.isConnected) return
+      if (targetInHeader) return
+      if (detailed) {
+        const rect = targetRect()
+        const modalBody = target.closest<HTMLElement>('.modal-body')
+        const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0
+        const top = Math.max(0, headerBottom, modalBody?.getBoundingClientRect().top ?? 0) + 16
+        const bottom = Math.min(window.innerHeight, modalBody?.getBoundingClientRect().bottom ?? window.innerHeight) - 16
+        // Keep an already visible element still. For large panels, explain their top
+        // portion instead of scrolling to the last row to make room for the coach.
+        const visibleEnd = Math.min(rect.bottom, rect.top + Math.min(160, Math.max(0, bottom - top)))
+        const offset = rect.top < top ? rect.top - top : visibleEnd > bottom ? visibleEnd - bottom : 0
+        if (offset) {
+          if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
+          else window.scrollBy?.({ top: offset, behavior: 'instant' })
+        }
+        return
+      }
       target.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
-      const room = Math.min(460, window.innerHeight / 2) + 40
+      const room = heightLimit() + 40
       const rect = target.getBoundingClientRect()
       const modalBody = target.closest<HTMLElement>('.modal-body')
       const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0
@@ -44,8 +77,8 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const workspaceLeft = Math.max(0, workspace?.left ?? 0)
         const workspaceRight = Math.min(width, workspace?.right || width)
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
-        const cardWidth = Math.min(360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
-        let rect = target?.isConnected ? target.getBoundingClientRect() : null
+        const cardWidth = Math.min(detailed ? 420 : 360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+        let rect = target?.isConnected ? targetRect() : null
         // A resize can push the coach offscreen. A position-only change can be user scroll.
         if (rect && measuredTarget
           && (rect.width !== measuredTarget.width || rect.height !== measuredTarget.height)) {
@@ -55,7 +88,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           preparedWidth = workspaceRight - workspaceLeft
           // Leave room below the real target for the coach, including at the end of a page.
           alignTarget()
-          rect = target.getBoundingClientRect()
+          rect = targetRect()
           // The anchored card adds page scroll room in this render. Re-align once after
           // its layout commits; browser scroll anchoring can otherwise undo the first move.
           cancelAnimationFrame(placementFrame)
@@ -69,11 +102,11 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         measuredTarget = rect
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
         const naturalHeight = Math.max(card.current?.offsetHeight || 0, card.current?.scrollHeight || 0)
-        const cardHeight = Math.min(naturalHeight || 460, 460, height / 2)
+        const cardHeight = Math.min(naturalHeight || heightLimit(), heightLimit())
         const topBoundary = headerBottom + 8
         let cardLeft = rect ? Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)) : 0
         let cardTop = rect ? rect.bottom + 24 : 0
-        let maxHeight = Math.min(460, height / 2)
+        let maxHeight = heightLimit()
         if (rect && cardTop + cardHeight > height - 12) {
           if (rect.top - 24 - cardHeight >= topBoundary) {
             cardTop = rect.top - 24 - cardHeight
@@ -97,16 +130,16 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const availableHeight = Math.max(0, height - topBoundary - 12)
         if (maxHeight < Math.min(160, availableHeight)) {
           // An oversized target leaves no usable slot: use the documented bottom card.
-          maxHeight = Math.min(460, height / 2, availableHeight)
+          maxHeight = Math.min(heightLimit(), availableHeight)
           cardTop = height - Math.min(cardHeight, maxHeight) - 12
         }
         maxHeight = Math.min(maxHeight, availableHeight)
         cardTop = Math.max(topBoundary, Math.min(cardTop, height - Math.min(cardHeight, maxHeight) - 12))
         const box = rect ? {
           left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
-          top: Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
+          top: Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
           width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
-          height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
+          height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
         } : null
         setPosition({
           box: box?.width && box.height ? box : null,
@@ -129,7 +162,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     if (workspace) resize?.observe(workspace)
     // A split pane can move or resize the target without a viewport event.
     const layoutPoll = !resize && target ? window.setInterval(() => {
-      const rect = target.isConnected ? target.getBoundingClientRect() : null
+      const rect = target.isConnected ? targetRect() : null
       if (rect?.left !== measuredTarget?.left || rect?.top !== measuredTarget?.top
         || rect?.width !== measuredTarget?.width || rect?.height !== measuredTarget?.height) {
         measure()
@@ -148,6 +181,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card])
+  }, [target, card, detailed])
   return position
 }

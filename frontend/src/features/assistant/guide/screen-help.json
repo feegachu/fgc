@@ -1,5 +1,17 @@
 [
   {
+    "screenId": "TRAN-W02",
+    "title": "수수료 지급 등록",
+    "page": "transaction/TransactionFormPage.tsx",
+    "steps": [
+      { "targetId": "payment.scope", "instruction": "정산월·지급단계·수취인과 지급액을 확인합니다." },
+      { "targetId": "payment.attributions", "instruction": "계약별 귀속 금액과 귀속일·증빙을 확인합니다." },
+      { "targetId": "payment.save", "instruction": "지급 건을 초안으로 저장합니다." },
+      { "targetId": "payment.precheck", "instruction": "저장된 지급 건을 사전검증합니다." },
+      { "targetId": "payment.confirm", "instruction": "검증 조건과 권한을 충족한 지급 건을 확정합니다." }
+    ]
+  },
+  {
     "screenId": "CONT-W02",
     "variant": "agent",
     "title": "보험계약 상세",

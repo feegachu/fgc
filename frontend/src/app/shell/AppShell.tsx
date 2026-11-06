@@ -1,5 +1,5 @@
 import { SettlementGuide } from '../../features/assistant/settlement/SettlementGuide'
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore, validMonth, withMonth } from '../../stores/workspace'
 import { useSidebarStore } from '../../stores/sidebar'
@@ -14,6 +14,8 @@ import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { DraftNavigationGuard } from './DraftNavigationGuard'
 import { AgentTopbar } from './AgentTopbar'
+import { HelpComparison } from '../../features/assistant/guide/HelpComparison'
+import type { HelpVersion } from '../../features/assistant/guide/HelpComparison'
 import './kpi-designs.css'
 import './agent-theme.css'
 import './app-theme.css'
@@ -24,6 +26,7 @@ export interface ShellContext {
   user: ShellUser
   month: string | null
   revised?: boolean
+  helpVersion?: HelpVersion
 }
 /** 내부 사용자에게 확정 관리자 UI를 적용하고 AGENT 전용 셸의 화면 범위를 유지한다. */
 export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultMonth: string }) {
@@ -34,6 +37,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
   const revised = user.roleCode !== 'AGENT'
+  const [helpVersion, setHelpVersion] = useState<HelpVersion>('after-v2')
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)
@@ -92,6 +96,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
           hrefFor={(path) => (month ? withMonth(path, month) : path)}
           onLogout={() => void logout()}
           loggingOut={loggingOut}
+          helpComparison={revised && <HelpComparison version={helpVersion} onChange={setHelpVersion} />}
         />
         <header className="app-header app-header-rail">
           {user.roleCode === 'AGENT' && current?.id === 'AGNT-W01' ? (
@@ -116,7 +121,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         </header>
         <main id="main-content" data-guide-page={current?.id} data-guide-pathname={location.pathname} className="app-main" tabIndex={-1}>
           <div className="page-content">
-            <Outlet context={{ user, month, revised } satisfies ShellContext} />
+            <Outlet context={{ user, month, revised, helpVersion } satisfies ShellContext} />
           </div>
         </main>
         <SettlementGuide user={user} month={month} />

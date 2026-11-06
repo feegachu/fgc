@@ -125,7 +125,7 @@ export function AgentStatusPanel({ month }: { month: string }) {
         </span>
       </header>
       <div className="branch-dashboard-body">
-        <div className="branch-dashboard-toolbar">
+        <div className="branch-dashboard-toolbar" data-guide-target="dashboard.branches.metrics">
           <ChartViewSelector
             views={metricChoices}
             selected={metricChoices.findIndex((item) => item.metric === metric)}
@@ -151,7 +151,7 @@ export function AgentStatusPanel({ month }: { month: string }) {
             지점별 현황을 불러오는 중입니다.
           </p>
         ) : (
-          <div id={contentId} className="branch-chart-content">
+          <div id={contentId} className="branch-chart-content" data-guide-target="dashboard.branches.chart">
             <div className="branch-series-legend">
               <span>
                 <i style={{ background: '#4266db' }} />
