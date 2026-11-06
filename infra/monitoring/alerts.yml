@@ -5,18 +5,18 @@ groups:
         expr: up{job="fgc"} == 0
         for: 10s
         labels: {severity: critical}
-        annotations: {summary: 'FGC metrics scrape failed (process, network or credentials)'}
+        annotations: {summary: 'FGC 지표 수집 실패: 서버 프로세스, 네트워크 또는 인증 설정을 확인하세요.'}
       - alert: FgcHealthDown
         expr: probe_success{job="fgc-health"} == 0 or up{job="fgc-health"} == 0
         for: 10s
         labels: {severity: critical}
-        annotations: {summary: 'FGC health failed (includes DB connectivity)'}
+        annotations: {summary: 'FGC 서비스 상태 확인 실패: 애플리케이션과 DB 연결 상태를 확인하세요.'}
       - alert: FgcHighErrorRate
         expr: sum by (instance) (rate(http_server_requests_seconds_count{job="fgc",status=~"5.."}[30s])) / clamp_min(sum by (instance) (rate(http_server_requests_seconds_count{job="fgc"}[30s])), 0.001) > 0.05
         for: 10s
         labels: {severity: warning}
-        annotations: {summary: 'FGC HTTP 5xx ratio exceeds 5 percent over 30 seconds'}
+        annotations: {summary: '최근 30초간 서버 오류(HTTP 5xx) 비율이 5%를 초과했습니다.'}
       - alert: FgcBatchFailed
         expr: (time() - fgc_batch_last_failure_timestamp{job="fgc"} < 120) and (fgc_batch_last_failure_timestamp{job="fgc"} > 0)
         labels: {severity: critical}
-        annotations: {summary: 'FGC batch failure detected; inspect structured step logs'}
+        annotations: {summary: 'FGC 배치 작업 실패가 감지됐습니다. 배치 단계별 로그를 확인하세요.'}
