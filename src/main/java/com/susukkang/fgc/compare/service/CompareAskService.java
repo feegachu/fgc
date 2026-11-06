@@ -64,7 +64,7 @@ public class CompareAskService {
             data 에는 용어 설명과 상품 목록(순위·보험사·상품 이름)만 있다. 금액·한도·환수·이월 값이 필요하면 도구를 불러 얻는다:
             get_item(rank) 한 순위의 값과 근거, compare(rankA, rankB) 두 순위의 값과 차이, explain_term(name) 용어 설명.
             도구가 주지 않은 내용과 계산은 만들지 마라. 질문에 필요한 값만 불러라.
-            답에는 숫자(금액·비율·순위 번호·날짜)를 쓰지 않는다. '1,200% 룰'이라는 용어 이름만 쓸 수 있다. 순위·금액은 서버가 답 앞에 따로 붙인다.
+            답에는 금액·비율·날짜 같은 숫자를 절대 쓰지 않는다(숫자가 든 문장은 서버가 지운다). '1,200% 룰'이라는 용어 이름과 '1위' 같은 순위 표기만 쓸 수 있다. 금액은 서버가 답 앞에 따로 붙인다.
             상품은 보험사·상품 이름으로 부르고, 도구 값을 보고 어느 쪽이 더 크거나 작은지와 그 이유(한도·이월·환수)를 말로 풀어 쓴다.
             두 상품의 많고 적음을 말하려면 먼저 compare 로 두 상품을 견주고, compare 의 '값이 더 큰 쪽'에 맞게 말한다.
             질문이 두 상품이나 특정 순위를 가리키면 그 상품들만 다룬다. 다른 상품과의 비교로 바꿔 답하지 않는다.
@@ -168,8 +168,13 @@ public class CompareAskService {
                     ? fallbackAnswer(q, ranking)
                     : new CompareAskResponse(OUT_OF_SCOPE, CompareAskResponse.OUT_OF_SCOPE);
         }
-        String text = output.answer == null ? "" : output.answer.strip();
-        String rejected = tools.verify(text);
+        String original = output.answer == null ? "" : output.answer.strip();
+        // 금액·비율이 든 문장만 빼고 남은 설명을 쓴다. 금액은 서버 문장이 보여 주므로 뺀 문장은 사용자에게 나가지 않는다(#910).
+        String text = tools.keepNumberFreeSentences(original);
+        if (!text.equals(original)) {
+            log.info("AI 답변에서 숫자가 든 문장을 뺐습니다. code=SENTENCES_DROPPED kept={}", !text.isBlank());
+        }
+        String rejected = text.isBlank() && !original.isBlank() ? "NUMBER_GUARD" : tools.verify(text);
         boolean ranked = asksRanking(q, ranking);
         if (rejected == null && ranked && !staysOnAskedPair(tools, text, ranking.items(), q)) {
             rejected = "OTHER_PRODUCT";
