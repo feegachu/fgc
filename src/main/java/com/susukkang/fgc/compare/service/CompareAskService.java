@@ -94,6 +94,9 @@ public class CompareAskService {
     private static final Pattern RANK_NUMBER = Pattern.compile("(\\d{1,3})\\s*(?:순위|위|등)(?!급)", Pattern.CANON_EQ);
     /** 챗봇 자체를 묻는 질문(역할·소개·무엇을 알려 주는지). */
     private static final Pattern INTRO_QUESTION = Pattern.compile("역할|뭘 알려|무엇을 알려|뭐 하는|뭐하는|누구|소개|무슨 기능|AI야|ai야", Pattern.CANON_EQ);
+    /** 특정 순위가 아니라 순위를 정하는 방식을 묻는 질문('순위가 어떻게 정해졌어?'). 이런 질문에는 2위 같은 특정 순위의 금액 문장을 붙이지 않는다(#919). */
+    private static final Pattern CRITERIA_QUESTION = Pattern.compile("순위.{0,6}(?:어떻게|무슨|뭘|무엇).{0,6}(?:정해|정하|결정|산정|매겨|나와|나뉘)|순위.{0,4}(?:기준|방식)|(?:정하는|정해지는|매기는)\\s*(?:기준|방식)", Pattern.CANON_EQ);
+    static final String RANK_CRITERIA = "순위는 보수적 순수령액이 큰 순서로 정해요. 같으면 환수 노출액이 작은 쪽이, 그래도 같으면 상품 등록 순서가 앞서요. 순위는 참고용이라 최종 선택은 설계사님이 해요.";
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)(?!급)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = CompareSummaryService.FORBIDDEN;
 
@@ -125,7 +128,7 @@ public class CompareAskService {
             log.info("LLM 이 질문을 범위 밖(inScope=false)으로 판단했습니다. rankQuestion={}", asksRanking(q, ranking));
             // 순위 결과가 있는 상태의 순위·이유 질문은 범위 안이다. 모델이 거절해도 서버 값으로 풀어 답한다.
             // 모델이 거절해도 서버가 아는 질문(순위·용어·챗봇 소개)은 서버 문장으로 답한다.
-            return asksRanking(q, ranking) || isGlossaryQuestion(q) || INTRO_QUESTION.matcher(q).find()
+            return asksRanking(q, ranking) || isGlossaryQuestion(q) || isCriteriaQuestion(q) || INTRO_QUESTION.matcher(q).find()
                     ? fallbackAnswer(q, ranking)
                     : new CompareAskResponse(OUT_OF_SCOPE, CompareAskResponse.OUT_OF_SCOPE);
         }
@@ -165,7 +168,7 @@ public class CompareAskService {
         }
         if (Boolean.FALSE.equals(output.inScope)) {
             log.info("LLM 이 질문을 범위 밖(inScope=false)으로 판단했습니다. rankQuestion={}", asksRanking(q, ranking));
-            return asksRanking(q, ranking) || isGlossaryQuestion(q) || INTRO_QUESTION.matcher(q).find()
+            return asksRanking(q, ranking) || isGlossaryQuestion(q) || isCriteriaQuestion(q) || INTRO_QUESTION.matcher(q).find()
                     ? fallbackAnswer(q, ranking)
                     : new CompareAskResponse(OUT_OF_SCOPE, CompareAskResponse.OUT_OF_SCOPE);
         }
@@ -240,6 +243,9 @@ public class CompareAskService {
         if (asksRanking(question, ranking)) {
             return new CompareAskResponse(rankAnswer(ranking.items(), question), CompareAskResponse.RULE);
         }
+        if (hasItems(ranking) && askedRanks(ranking.items(), question).isEmpty() && isCriteriaQuestion(question)) {
+            return new CompareAskResponse(RANK_CRITERIA, CompareAskResponse.RULE);
+        }
         Optional<Term> term = GLOSSARY.stream().filter(t -> t.keywords().stream().anyMatch(question::contains)).findFirst();
         return term.map(t -> new CompareAskResponse(t.name() + ": " + t.body(), CompareAskResponse.RULE))
                 .orElseGet(() -> new CompareAskResponse(FALLBACK, CompareAskResponse.RULE));
@@ -268,8 +274,16 @@ public class CompareAskService {
         if (asked.isEmpty() && INTRO_QUESTION.matcher(question).find()) {
             return false;
         }
+        if (asked.isEmpty() && isCriteriaQuestion(question)) {
+            return false;
+        }
         boolean gradeOnly = question.contains("등급") && asked.isEmpty();
         return isRankQuestion(question) && !gradeOnly;
+    }
+
+    /** 순위를 정하는 방식을 묻는 질문. 용어를 함께 물었으면 용어 답이 먼저다. */
+    static boolean isCriteriaQuestion(String question) {
+        return CRITERIA_QUESTION.matcher(question).find() && !isGlossaryQuestion(question);
     }
 
     private static boolean hasItems(CompareRankingResponse ranking) {

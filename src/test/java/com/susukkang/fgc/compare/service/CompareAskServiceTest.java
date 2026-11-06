@@ -249,6 +249,27 @@ class CompareAskServiceTest {
     }
 
     @Test
+    @DisplayName("순위를 정하는 방식을 묻는 질문에는 특정 순위의 금액 문장을 붙이지 않는다")
+    void criteriaQuestionHasNoRankSentence() {
+        String question = "순위가 어떻게 정해졌어?";
+
+        llmReturns(true, "보수적 순수령액이 큰 순서로 정하고 같으면 환수가 작은 쪽이 앞서요.");
+        CompareAskResponse response = service.ask(question, threeItems());
+        assertThat(response.source()).isEqualTo("LLM");
+        assertThat(response.answer()).isEqualTo("보수적 순수령액이 큰 순서로 정하고 같으면 환수가 작은 쪽이 앞서요.");
+
+        llmReturns(false, "");
+        assertThat(service.ask(question, threeItems()).answer()).isEqualTo(CompareAskService.RANK_CRITERIA);
+
+        gatewayFails();
+        assertThat(service.ask(question, threeItems()).answer()).isEqualTo(CompareAskService.RANK_CRITERIA);
+
+        // 순위 번호를 함께 물으면 그 순위의 문장을 붙인다.
+        llmReturns(false, "");
+        assertThat(service.ask("2위는 순위가 어떻게 정해졌어?", threeItems()).answer()).contains("2위는 나보험");
+    }
+
+    @Test
     @DisplayName("AI가 소개 질문에 정상 답해도 순위 금액 문장을 앞에 붙이지 않는다")
     void introAnswerFromLlmHasNoRankSentence() {
         llmReturns(true, "상품 비교 결과를 풀어서 설명해 드려요.");
