@@ -267,7 +267,7 @@ export const commissionColumns: TableColumn<CommissionItem>[] = [
     label: '지급/차감',
     align: 'center',
     render: (r) => (
-      <StatusBadge kind="category" tone={r.cashflowType === 'PAYMENT' ? 'success' : 'warning'}>
+      <StatusBadge kind="category" tone={r.cashflowType === 'PAYMENT' ? 'info' : 'warning'}>
         {r.cashflowType === 'PAYMENT' ? '지급' : r.cashflowType === 'DEDUCTION' ? '차감' : '-'}
       </StatusBadge>
     ),

@@ -511,6 +511,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             {
               key: 'value',
               label: '요율 / 정액',
+              align: 'number',
               render: (r) => (r.calculationType === 'RATE' ? `${rate(r.ratePct)}%` : won(r.fixedAmount)),
             },
             { key: 'equal', label: '월 동일액', render: (r) => (r.equalMonthlyYn ? '예' : '아니오') },

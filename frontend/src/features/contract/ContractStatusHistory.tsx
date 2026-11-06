@@ -144,7 +144,7 @@ function ProcessingList({ rows, label, attempts = false }: { rows: Processing[];
 const latestByJob = (rows: Processing[] = []) => [...new Map(rows.map((row) => [row.processingJob, row])).values()]
 
 const historyColumns = (onOpen: (eventId: number) => void): TableColumn<ContractStatusEvent>[] => [
-  { key: 'seq', label: '순번', width: '3.25rem', align: 'center', render: (row) => int(row.eventSeq) },
+  { key: 'seq', label: '순번', width: '3.25rem', render: (row) => int(row.eventSeq) },
   {
     key: 'transition',
     label: '변경 전→후',
@@ -166,6 +166,7 @@ const historyColumns = (onOpen: (eventId: number) => void): TableColumn<Contract
   {
     key: 'followUp',
     label: '후속 상태',
+    align: 'center',
     width: '11.75rem',
     render: (row) => (
       <div className="contract-follow-up">

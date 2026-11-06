@@ -110,7 +110,7 @@ const columns: TableColumn<Journal>[] = [
     label: '계약',
     sortKey: 'contractNo',
     sortable: true,
-    width: '10rem',
+    width: '12rem',
     render: (row) => text(row.contractNo || row.contractId),
   },
   {

@@ -116,7 +116,6 @@ export default function AgentStatementPage() {
       label: '수수료 항목',
       sortable: true,
       width: '10rem',
-      align: 'center',
       render: (row) => row.commissionItemName || '-',
     },
     {
@@ -124,10 +123,9 @@ export default function AgentStatementPage() {
       label: '회차',
       sortable: true,
       width: '4.5rem',
-      align: 'center',
       render: (row) => (row.installmentNo == null ? '-' : `${row.installmentNo}회`),
     },
-    { key: 'basisDate', label: '기준일', sortable: true, width: '6.5rem', align: 'center', render: (row) => date(row.basisDate) },
+    { key: 'basisDate', label: '기준일', sortable: true, width: '6.5rem', render: (row) => date(row.basisDate) },
     {
       key: 'entryType',
       label: '내역 구분',
@@ -142,7 +140,7 @@ export default function AgentStatementPage() {
       label: '금액',
       sortable: true,
       width: '8rem',
-      align: 'center',
+      align: 'number',
       render: (row) =>
         row.amount == null || row.dataStatus === 'MISSING' ? <span className="ast-muted">금액 미확인</span> : won(row.amount),
     },

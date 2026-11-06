@@ -59,12 +59,13 @@ const agentColumns: TableColumn<CapAgent>[] = [
       />
     ),
   },
-  { key: 'count', label: '계약 수', align: 'left', render: (row) => `${int(row.contractCount)}건` },
+  { key: 'count', label: '계약 수', align: 'number', render: (row) => `${int(row.contractCount)}건` },
   { key: 'limit', label: '한도 합계', align: 'number', render: (row) => <Amount value={row.limitAmountTotal} /> },
   { key: 'included', label: '산입 합계', align: 'number', render: (row) => <Amount value={row.includedAmountTotal} /> },
   {
     key: 'usage',
     label: '사용률',
+    align: 'number',
     width: '14rem',
     render: (row) => <CapUsage value={row.usagePct} status={monitoringStatus(row).code} />,
   },
@@ -114,6 +115,7 @@ export default function CapListPage() {
     {
       key: 'usage',
       label: '사용률',
+      align: 'number',
       sortKey: 'usagePct',
       sortable: true,
       width: '12rem',

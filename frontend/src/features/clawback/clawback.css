@@ -130,6 +130,10 @@
   font-weight: 700;
   line-height: 1.25rem;
 }
+.claw-evidence-table .data-table {
+  min-width: 0;
+}
+
 .claw-evidence-table {
   overflow-x: auto;
 }

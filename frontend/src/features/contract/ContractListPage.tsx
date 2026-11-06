@@ -71,7 +71,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'contractNo',
     label: '계약번호',
     sortable: true,
-    width: '10rem',
+    width: '12rem',
     cellClassName: 'contract-number-cell',
     render: (row) =>
       row.contractId ? (
@@ -84,7 +84,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'insurerName',
     label: '보험회사',
     sortable: true,
-    width: '6.5rem',
+    width: '7.5rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.insurerName),
   },
@@ -96,7 +96,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.productName),
   },
-  { key: 'contractDate', label: '계약일', sortable: true, width: '5.75rem', render: (row) => date(row.contractDate) },
+  { key: 'contractDate', label: '계약일', sortable: true, width: '6.5rem', render: (row) => date(row.contractDate) },
   {
     key: 'premium',
     label: <span className="contract-premium-heading">월납환산 초회보험료</span>,
@@ -115,7 +115,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'agent',
     label: '모집 설계사',
     sortable: true,
-    width: '7rem',
+    width: '9.5rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.agentIdName),
   },

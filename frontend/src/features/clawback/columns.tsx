@@ -18,7 +18,7 @@ export const columns: TableColumn<CandidateRow>[] = [
     key: 'contractNo',
     label: '계약번호',
     sortable: true,
-    width: '10rem',
+    width: '12rem',
     cellClassName: 'tabular-nums',
     render: (r) => <span title={present(r.contractNo)}>{present(r.contractNo)}</span>,
   },

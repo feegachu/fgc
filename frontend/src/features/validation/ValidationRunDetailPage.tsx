@@ -420,7 +420,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
   const targets = detail.targets ?? []
   const columns: TableColumn<ValidationTarget>[] = [
     // 계약번호는 자르지 않는다(좁은 화면에서는 표 안에서 가로로 넘긴다).
-    { key: 'contract', label: '계약', width: '11.5rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
+    { key: 'contract', label: '계약', width: '12rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
     {
       key: 'status',
       label: '선별',

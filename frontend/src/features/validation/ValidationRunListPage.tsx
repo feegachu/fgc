@@ -132,7 +132,7 @@ export default function ValidationRunListPage() {
       label: '상세',
       width: '5.5rem',
       cellClassName: 'vrun-open-cell',
-      align: 'left',
+      align: 'center',
       render: (r) => <OpenLink run={r} />,
     },
     {
