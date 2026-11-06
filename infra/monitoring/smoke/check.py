@@ -29,7 +29,7 @@ def fire(mode, name):
     event = wait(received)
     delay = round(event['at'] - start, 2)
     assert delay < 60
-    return {'alert': name, 'seconds': delay}
+    return {'alert': name, 'seconds': delay, 'injected_at': start}
 wait(lambda: get('http://127.0.0.1:19090/api/v1/query?query=up%7Bjob%3D%22fgc%22%7D')['data']['result'][0]['value'][1] == '1')
 wait(lambda: get('http://127.0.0.1:13000/api/health')['database'] == 'ok')
 credentials = base64.b64encode(b'admin:local-smoke-only-password').decode()
@@ -46,10 +46,12 @@ assert count() == before == 1
 recovery_started = time.time()
 urllib.request.urlopen(urllib.request.Request(BASE + '/healthy', data=b'', method='POST'), timeout=5).close()
 names = {r['alert'] for r in results}
+injected = {r['alert']: r['injected_at'] for r in results}
 def resolved():
     return names <= {a['labels']['alertname'] for e in get(BASE + '/events')
-                     if e['at'] >= recovery_started for a in e['payload']['alerts']
-                     if a['status'] == 'resolved'}
+                     for a in e['payload']['alerts']
+                     if a['status'] == 'resolved'
+                     and e['at'] >= injected.get(a['labels']['alertname'], float('inf'))}
 wait(resolved, seconds=90)
 def cleared():
     active = get('http://127.0.0.1:19090/api/v1/alerts')['data']['alerts']
