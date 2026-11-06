@@ -83,9 +83,20 @@ export default function AgentStatementPage() {
   const defaultMonth = month || today().slice(0, 7)
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params, defaultMonth)
+  const branchFilterKey = JSON.stringify([filters.month, filters.contractNo, filters.commissionItemId, filters.entryType])
+  const [branchSelection, setBranchSelection] = useState<{ id: number; filterKey: string } | null>(null)
   // 본인 화면에는 설계사 선택이 없다. 내부 조회에서만 agentId 를 고른다.
   const overview = useQuery(statementOverviewQuery(filters, enhanced))
   const overviewRows = overview.isError ? [] : overview.data ?? []
+  const selectedBranchId = enhanced && view === 'tree' && branchSelection?.filterKey === branchFilterKey
+    && (overview.isPending || overview.isError || overviewRows.some(row => row.branchId === branchSelection.id)) ? branchSelection.id : null
+  const branchRows = overviewRows.filter(row => row.branchId === selectedBranchId)
+  const branchSummary: StatementSummary | undefined = selectedBranchId === null ? undefined : {
+    payment: { amount: branchRows.reduce((sum, row) => sum + row.paymentAmount, 0), count: 0 },
+    held: { amount: branchRows.reduce((sum, row) => sum + row.heldAmount, 0), count: 0 },
+    adjustment: { amount: branchRows.reduce((sum, row) => sum + row.adjustmentAmount, 0), count: 0 },
+    clawback: { amount: branchRows.reduce((sum, row) => sum + row.clawbackAmount, 0), count: 0 },
+  }
   const agentId = isAgent ? null : filters.agentId || (enhanced && overviewRows[0] ? String(overviewRows[0].agentId) : null)
   const entryKey = params.get('entryKey') ?? ''
   const ready = isAgent || agentId !== null
@@ -99,6 +110,7 @@ export default function AgentStatementPage() {
   const items = useCommissionItems(asOf)
 
   function apply(next: StatementFilters, keepEntry = false) {
+    setBranchSelection(null)
     const query = filterParams(next, !isAgent)
     if (keepEntry && entryKey) query.set('entryKey', entryKey)
     setParams(query, { replace: true })
@@ -184,8 +196,8 @@ export default function AgentStatementPage() {
         </div>
       </header>
       <StatementFiltersBar
-        key={`${filterKey}:${resetCount}:${enhanced ? agentId : ''}`}
-        initial={enhanced ? { ...filters, agentId: agentId ?? '' } : filters}
+        key={`${filterKey}:${resetCount}:${enhanced ? agentId : ''}:${selectedBranchId}`}
+        initial={enhanced ? { ...filters, agentId: selectedBranchId !== null ? '' : agentId ?? '' } : filters}
         isAgent={isAgent}
         agents={(agents.data ?? []).map((row) => [String(row.agentId), `${row.agentCode} · ${row.agentName}`])}
         items={(items.data ?? []).map((row) => [String(row.commissionItemId), row.itemName ?? '-'])}
@@ -195,11 +207,11 @@ export default function AgentStatementPage() {
           apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: enhanced ? '' : filters.agentId })
         }}
       />
-      {ready && <SummaryCards summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} dashboardStyle={enhanced} />}
+      {(ready || selectedBranchId !== null) && <SummaryCards summary={branchSummary ?? list.data?.summary} basis={list.data?.basis} loading={selectedBranchId !== null ? overview.isPending : list.isPending} failed={selectedBranchId !== null ? overview.isError : list.isError} dashboardStyle={enhanced} scopeLabel={selectedBranchId !== null ? `${branchRows[0]?.branchName ?? '지사'} 전체 합계` : undefined} />}
       {enhanced && view === 'tree' && (overview.isPending || overview.isError ? <div className="surface ast-state" role={overview.isError ? 'alert' : 'status'}>
         {overview.isError ? statementError(overview.error) : '지점과 설계사 명세를 불러오는 중입니다.'}
         {overview.isError && <Button variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
-      </div> : overviewRows.length ? <StatementExplorer key={`${filters.month}:${filters.contractNo}:${filters.commissionItemId}:${filters.entryType}`} viewControl={<StatementViewSwitch value={view} onChange={setView} />} rows={overviewRows} selectedId={agentId} onSelect={id => apply({ ...filters, agentId: id, page: 1 })} /> : <p className="surface ast-state" role="status">조회 조건에 해당하는 설계사가 없습니다.</p>)}
+      </div> : overviewRows.length ? <StatementExplorer key={`${filters.month}:${filters.contractNo}:${filters.commissionItemId}:${filters.entryType}`} viewControl={<StatementViewSwitch value={view} onChange={setView} />} rows={overviewRows} selectedId={selectedBranchId !== null ? null : agentId} selectedBranchId={selectedBranchId} onSelectBranch={id => setBranchSelection({ id, filterKey: branchFilterKey })} onSelect={id => apply({ ...filters, agentId: id, page: 1 })} /> : <p className="surface ast-state" role="status">조회 조건에 해당하는 설계사가 없습니다.</p>)}
       {enhanced && view === 'table' && !ready && <div className="surface surface-header"><span>조회할 명세가 없습니다.</span><StatementViewSwitch value={view} onChange={setView} /></div>}
       {!ready && !enhanced ? (
         <p className="ast-state" role="status">
@@ -284,12 +296,14 @@ function SummaryCards({
   loading,
   failed,
   dashboardStyle = false,
+  scopeLabel,
 }: {
   summary?: StatementSummary
   basis?: StatementBasis
   loading: boolean
   failed: boolean
   dashboardStyle?: boolean
+  scopeLabel?: string
 }) {
   const cards: [EntryType, keyof StatementSummary, string, string][] = [
     ['PAYMENT', 'payment', '지급', '확정된 본인 귀속 지급'],
@@ -310,9 +324,9 @@ function SummaryCards({
             unit={bucket ? '원' : undefined}
             format={int}
             zero={bucket?.amount === 0}
-            footer={<span className="kpi-comparison" title={note}>
-              {bucket ? `${int(bucket.count)}건` : ''}
-              {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}
+            footer={<span className="kpi-comparison" title={scopeLabel ?? note}>
+              {scopeLabel ?? <>{bucket ? `${int(bucket.count)}건` : ''}
+              {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}</>}
             </span>}
           />
         })}

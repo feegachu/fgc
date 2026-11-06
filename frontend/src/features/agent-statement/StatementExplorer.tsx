@@ -5,19 +5,22 @@ import type { StatementAgentOverview } from './api'
 export function StatementExplorer({
   rows,
   selectedId,
+  selectedBranchId,
   onSelect,
+  onSelectBranch,
   viewControl,
 }: {
   viewControl: ReactNode
   rows: StatementAgentOverview[]
   selectedId: string | null
+  selectedBranchId: number | null
   onSelect: (id: string) => void
+  onSelectBranch: (id: number) => void
 }) {
-  const [branch, setBranch] = useState<number | null>(null)
   const [closed, setClosed] = useState<number[]>([])
   const branches = [...new Map(rows.map((row) => [row.branchId, row.branchName])).entries()]
   const selected = rows.find((row) => String(row.agentId) === selectedId)
-  const activeBranch = branches.some(([id]) => id === branch) ? branch : (selected?.branchId ?? branches[0]?.[0])
+  const activeBranch = selectedBranchId ?? selected?.branchId ?? branches[0]?.[0]
   const visible = rows.filter((row) => row.branchId === activeBranch)
   return (
     <section className="surface ast-explorer" data-guide-target="statement.results" data-guide-feature="features.agent-statement.agent-statement-page.list-panel" aria-label="지점 및 설계사 명세 탐색">
@@ -28,10 +31,11 @@ export function StatementExplorer({
               <button
                 className={`ast-branch ${activeBranch === id ? 'is-active' : ''}`}
                 aria-expanded={activeBranch === id && !closed.includes(id)}
+                aria-current={selectedBranchId === id ? 'true' : undefined}
                 onClick={() => {
-                  setBranch(id)
+                  onSelectBranch(id)
                   setClosed((previous) =>
-                    activeBranch === id && !previous.includes(id)
+                    selectedBranchId === id && !previous.includes(id)
                       ? [...previous, id]
                       : previous.filter((value) => value !== id),
                   )
