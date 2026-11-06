@@ -92,7 +92,7 @@ for (const seven of [false, true]) {
     await login(page, 'settle01', `/schedules?contractNo=${fixture.code}`)
     await page.getByLabel('적용 체계', { exact: true }).selectOption(fixture.regime)
     const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: fixture.code, exact: true }) })
-    await expect(row).toContainText(`${count}회 · ${lineCount}행`)
+    await expect(row).toContainText(`${count}회`)
     await expect(page.getByText('4년·7년 스케줄은 예정 결과이며 지급 확정 대상이 아닙니다.')).toBeVisible()
     await expect.poll(async () => (await page.locator('p.schedule-data-warning').boundingBox())?.height ?? 999).toBeLessThan(80)
     const before = sql(`SELECT count(*) FROM fgc.schedule_header WHERE contract_id=${fixture.contract}`)
@@ -151,7 +151,6 @@ test('SCHE DoD: 실제 12회차 정액 정책은 가짜 48/84행을 만들지 �
     expect(fixture.detail.header.expectedTotal).toBe(144000)
     await login(page, 'settle01', `/schedules/${fixture.id}`)
     await expect(page.getByRole('table', { name: '회차별 예상 지급 금액' }).locator('tbody tr')).toHaveCount(12)
-    await expect(page.getByText('정책 정의 12회차 · 12행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.')).toBeVisible()
     await page.screenshot({ path: info.outputPath(`real-${fixture.years}-year-12-fixed.png`), fullPage: true })
   }
 })

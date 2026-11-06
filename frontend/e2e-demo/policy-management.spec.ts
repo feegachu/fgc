@@ -264,6 +264,6 @@ test('POL-W01 CT-P02 실제 제출 근거 누락은 초안의 근거 필드로 �
   expect(error.code).toBe('FGC-POL-004')
   expect(error.message).toContain('근거')
   expect(error.message).not.toContain('겹치')
-  await expect(page.getByRole('group', { name: '근거 규정' })).toBeFocused()
+  await expect(page.getByLabel('출처 자료 번호')).toBeFocused()
   await page.screenshot({ path: info.outputPath('09-real-api-missing-source.png'), fullPage: true })
 })

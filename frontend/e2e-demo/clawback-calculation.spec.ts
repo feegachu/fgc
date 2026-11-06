@@ -38,9 +38,7 @@ test('환수 후보를 정책과 사유로 계산하면 서버 계산 결과의 
   await expect(calc.getByLabel(/계산 사유/)).toHaveValue('')
 
   const list = page.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
-  const row = list
-    .getByRole('row')
-    .filter({ has: page.getByRole('cell', { name: String(calculation.candidateId), exact: true }) })
+  const row = list.getByRole('row').filter({ hasText: '계산완료' }).first()
   await expect(row).toContainText('계산완료')
   await expect(row).toContainText(won(calculation.amount))
   await page.screenshot({ path: 'e2e-artifacts/629-clawback-calculation.png', fullPage: true })

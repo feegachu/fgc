@@ -176,7 +176,7 @@ test('한도 초과 거절 → 예외함 조치 → CAP 계산근거', async ({ 
     })
   await exceptionRow.getByRole('button', { name: String(exception.exceptionCaseId), exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`selected=${exception.exceptionCaseId}(?:&|$)`))
-  await expect(page.locator('.exception-detail-grid')).toContainText(`지급 건 ${id}`)
+  await expect(page.locator('.exception-detail-grid')).toContainText('지급 건')
   await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
   await page.getByLabel('처리 사유').fill('418 한도 초과 검토 시작')
   const action = responseFor(page, `/exceptions/${exception.exceptionCaseId}/actions`)

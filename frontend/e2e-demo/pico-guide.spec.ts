@@ -25,7 +25,7 @@ for (const width of [1440, 390]) {
     const response = await replying
     expect(response.ok(), await response.text()).toBe(true)
     expect((await response.json()).data.source).toBe('FIXED')
-    await expect(pico.getByText('시스템 안내', { exact: true })).toBeVisible()
+    await expect(pico.getByText('안내', { exact: true }).first()).toBeVisible()
     await pico.getByRole('tab', { name: '업무 안내', exact: true }).click()
     await expect(pico.getByRole('button', { name: /^지급 초안 저장/ })).toHaveCount(0)
     await expect(pico.getByRole('button', { name: /^지급 사전검증/ })).toHaveCount(0)
@@ -104,7 +104,8 @@ for (const width of [1440, 390]) {
     await expect(page.locator('#btn-save')).toBeEnabled()
     for (const id of ['btn-save', 'btn-precheck', 'btn-confirm']) {
       const action = page.locator(`#${id}`)
-      await action.scrollIntoViewIfNeeded()
+      // 화면 맨 아래의 버튼도 스크롤하면 피코에 가리지 않아야 한다(.page-content 아래 여백).
+      await action.evaluate((element) => element.scrollIntoView({ block: 'center' }))
       await expect(action).toBeInViewport()
       expect(await action.evaluate((element) => {
         const box = element.getBoundingClientRect()

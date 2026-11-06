@@ -39,7 +39,7 @@ const forbidden = [
   { label: '내부 번호', pattern: /\b(?:FUN|IF-API|SRC|REG|TER|PER|DAR)-\d+/g },
   { label: '화면 ID', pattern: /\b[A-Z]{2,}-W\d\d\b/g },
   { label: '팀 내부 말', pattern: /룰셋|원수사|귀속행|상태 사건|계산판|발행판|예정판|스케줄행|매칭키|재검출|정정 묶음|오탐|프로젝트 가정|계약수동|원천유형|공통비 풀|확정전|사람이 수행|업무건|분모 계약|운영정책서|규제조문표|보정판|합성값|데모|시연/g },
-  { label: '구역 번호', pattern: /[①-⑳]/g },
+  { label: '구역 번호', pattern: /(?<!조)[①-⑳]/g }, // 제3조① 같은 조문 표기는 통과
   { label: '표 설명 말', pattern: /화면 \d+행|\d+행\b/g },
   { label: '개발 용어', pattern: /서버 (?:저장|결과|확정|실행|처리|상태)|서버의|서버에서|서버가/g },
 ]
@@ -370,9 +370,12 @@ plainTest('검사 규칙은 코드를 잡고 업무 표기는 통과시킨다', 
   }
   for (const leak of ['FGC-VRUN-003', 'MANUAL_CONTRACT', 'FINALIZED', 'validationRunId', 'journal_no', 'undefined', '[object Object]', 'IllegalStateException', 'FUN-045', 'IF-API-49', 'REG-08', 'VRUN-W02', '체크포인트', '실행 ID', '202 수락'])
     expect(flagged(`실패: ${leak} 확인`).some((match) => leak.includes(match)), leak).toBe(true)
-  for (const shown of ['FGC-FGL01-202607-0001', 'FGC-B0101', 'A-FC-001', 'JV-2026-07-0010', 'GA→설계사', 'CSV 내보내기', 'GA-CUR-2026-V1', 'CLAW-GA-VIRTUAL-2026', '2026-CURRENT-A', 'STD-SAV-A', '요청번호 20261104-abcdef'])
+  for (const shown of ['FGC-FGL01-202607-0001', 'FGC-B0101', 'A-FC-001', 'JV-2026-07-0010', 'GA→설계사', 'CSV 내보내기', '2026-CURRENT-A', '요청번호 20261104-abcdef'])
     expect(flagged(`표시: ${shown}`), shown).toEqual([])
-  expect(flagged('근거 REG-08, SRC-022', '/policies?policyVersionId=2')).toEqual([])
+  expect(flagged('근거 REG-08, SRC-022', '/policies?policyVersionId=2')).toEqual(expect.arrayContaining(['REG-08', 'SRC-022']))
+  expect(flagged('정책 CLAW-GA-VIRTUAL-2026').length).toBeGreaterThan(0)
+  expect(flagged('부칙 제3조①')).toEqual([])
+  expect(flagged('① 조회 조건')).toEqual(['①'])
   expect(flagged('BASE_COMMISSION', '/base')).toEqual([])
   expect(flagged('validationRunId', '/base')).toEqual(['validationRunId'])
 })

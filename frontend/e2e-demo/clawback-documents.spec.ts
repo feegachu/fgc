@@ -137,7 +137,7 @@ test('화면에서 정책 선택·사유 입력·환수액 계산 후 PDF를 생
     const pdf = page.getByRole('region', { name: '환수 PDF·발행 이력' })
     await expect(calc.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
     await expect(pdf.getByRole('button', { name: 'PDF 생성', exact: true })).toBeDisabled()
-    await calc.getByRole('radio', { name: /E2E-727-POLICY v1/ }).check()
+    await calc.getByRole('radio', { name: /환수 PDF 실제 API 검증 v1/ }).check()
     await calc.getByLabel(/계산 사유/).fill('등록된 환수 정책으로 계산 후 PDF 발행')
     await expect(calc.getByRole('button', { name: '환수액 계산' })).toBeEnabled()
     const calculated = responseFor(page, `/clawbacks/candidates/${seed.candidate}/calculations`)
