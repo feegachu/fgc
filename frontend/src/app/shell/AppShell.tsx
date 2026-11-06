@@ -126,7 +126,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
             <Outlet context={{ user, month, revised, helpVersion } satisfies ShellContext} />
           </div>
         </main>
-        <SettlementGuide user={user} month={month} />
+        <SettlementGuide user={user} month={month} helpVersion={helpVersion} />
         {!location.pathname.startsWith('/agent-home') && (
           <footer className="app-footer">
             {revised ? (
