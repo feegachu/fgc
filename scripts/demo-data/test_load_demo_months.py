@@ -1,7 +1,7 @@
 import datetime
 import unittest
 
-from load_demo_months import COMMON_COST, CONTRACTS, EVENTS, SETTLEMENT_SUPPORT, anomaly, contract_number
+from load_demo_months import COMMON_COST, CONTRACTS, EVENTS, SETTLEMENT_SUPPORT, Loader, anomaly, contract_number
 
 
 NUMBERS = {contract_number(index, row[0], row[2]) for index, row in enumerate(CONTRACTS, start=1)}
@@ -9,6 +9,40 @@ NUMBERS = {contract_number(index, row[0], row[2]) for index, row in enumerate(CO
 
 def line(installment=1, item='FC 기본수수료', amount=650000, due='2026-11-02'):
     return {'installmentNo': installment, 'commissionItemName': item, 'expectedAmount': amount, 'dueDate': due}
+
+
+class FakeServer:
+    def __init__(self, runs):
+        self.runs, self.calls = runs, []
+
+    def ok(self, method, path, body=None):
+        self.calls.append((method, path))
+        if method == 'GET' and path.endswith('/progress'):
+            return {'status': 'COMPLETED'}
+        if method == 'GET':
+            return {'content': self.runs}
+        return {'validationRunId': 99}
+
+
+def run(status):
+    return {'validationRunId': 7, 'validationMonth': '2026-09-01', 'runType': 'MONTHLY', 'status': status}
+
+
+class MonthRuns(unittest.TestCase):
+    def test_finished_month_is_reused(self):
+        server = FakeServer([run('COMPLETED')])
+        self.assertEqual(Loader(server, server).run_month('2026-09'), 7)
+        self.assertEqual([c for c in server.calls if c[0] == 'POST'], [])
+
+    def test_waiting_run_is_executed_instead_of_creating_one(self):
+        server = FakeServer([run('CREATED')])
+        self.assertEqual(Loader(server, server).run_month('2026-09'), 7)
+        self.assertEqual([c for c in server.calls if c[0] == 'POST'], [('POST', '/api/v1/validation-runs/7/execute')])
+
+    def test_month_without_a_run_gets_a_new_one(self):
+        server = FakeServer([])
+        self.assertEqual(Loader(server, server).run_month('2026-09'), 99)
+        self.assertEqual([c[1] for c in server.calls if c[0] == 'POST'], ['/api/v1/validation-runs', '/api/v1/validation-runs/99/execute'])
 
 
 class DemoTables(unittest.TestCase):

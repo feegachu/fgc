@@ -288,11 +288,13 @@ class Loader:
         rows = [r for r in (runs.get('content') or []) if str(r.get('validationMonth', '')).startswith(month) and r.get('runType') == 'MONTHLY']
         if any(r.get('status') in ('COMPLETED', 'FINALIZED') for r in rows):
             return next(r['validationRunId'] for r in rows if r.get('status') in ('COMPLETED', 'FINALIZED'))
-        return self.execute(month, 'MONTHLY')
+        # 만들어 두고 돌리지 않은 실행이 있으면 같은 달에 새로 만들 수 없으므로 그것을 돌린다.
+        waiting = next((r['validationRunId'] for r in rows if r.get('status') == 'CREATED'), None)
+        return self.execute(month, 'MONTHLY', waiting)
 
-    def execute(self, month, run_type):
-        created = self.s.ok('POST', '/api/v1/validation-runs', {'runType': run_type, 'validationMonth': month})
-        run = created['validationRunId']
+    def execute(self, month, run_type, run=None):
+        if run is None:
+            run = self.s.ok('POST', '/api/v1/validation-runs', {'runType': run_type, 'validationMonth': month})['validationRunId']
         self.s.ok('POST', f'/api/v1/validation-runs/{run}/execute', {})
         for _ in range(180):
             status = self.s.ok('GET', f'/api/v1/validation-runs/{run}/progress').get('status')
