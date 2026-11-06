@@ -84,10 +84,25 @@ test('보호 딥링크로 복귀하고 로그아웃 뒤 뒤로 가기로 접근�
   await expect(page.locator('.app-shell')).toHaveCount(0)
 })
 
-test('유효한 쿠키로 로그인 주소를 새로 열면 대시보드로 이동한다', async ({ page }) => {
+test('쓰던 브라우저에서 유효한 쿠키로 로그인 주소를 새로 열면 대시보드로 이동한다', async ({ page }) => {
   await authFixture(page, 'SETTLEMENT', { version: 0 }, true)
+  await page.addInitScript(() => localStorage.setItem('fgc.lastActivityAt', String(Date.now())))
   await page.goto('login')
   await expect(page.getByRole('heading', { name: '업무 대시보드' })).toBeVisible()
+})
+
+test('처음 쓰는 브라우저는 복원 요청 없이 로그인 화면을 바로 보여 준다', async ({ page }) => {
+  await authFixture(page, 'SETTLEMENT', { version: 0 }, true)
+  const refreshes: string[] = []
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/v1/auth/refresh')) refreshes.push(request.url())
+  })
+  for (const path of ['login', './']) {
+    await page.goto(path)
+    await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
+    expect(new URL(page.url()).pathname.endsWith('/login')).toBe(true)
+  }
+  expect(refreshes).toEqual([])
 })
 
 test('COMPLIANCE의 지급 등록 딥링크는 403으로 차단한다', async ({ page }) => {

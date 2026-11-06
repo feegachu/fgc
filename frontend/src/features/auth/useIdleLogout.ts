@@ -24,6 +24,9 @@ export function sessionIdleExpired(now = Date.now()) {
   return last !== null && now - last >= IDLE_LIMIT_MS
 }
 
+/** 이 브라우저에 되살릴 로그인이 남아 있을 수 있는지. 로그아웃하면 기록도 함께 지워진다. */
+export const hasSessionActivity = () => readActivity() !== null
+
 export function useIdleLogout(enabled: boolean) {
   const { logout } = useLogout()
   const onIdle = useEffectEvent(() => void logout('/login?reason=idle'))

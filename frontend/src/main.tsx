@@ -19,14 +19,18 @@ import './features/arbitrage/arbitrage.css'
 import './features/clawback/clawback.css'
 import './features/error/error.css'
 import { apiClient } from './lib/api/client'
-import { sessionIdleExpired } from './features/auth/useIdleLogout'
+import { hasSessionActivity, sessionIdleExpired } from './features/auth/useIdleLogout'
 import { clearSessionData } from './features/auth/session'
 
 // 로그인 URL을 새로 열어도 유효한 쿠키가 있으면 기존 인증을 복원한다.
 // 로그아웃·중복 로그인 안내에서는 복원하지 않으며, 비회원의 로그인 화면은 리다이렉트하지 않는다.
+// 이 브라우저에서 쓴 적이 없으면 되살릴 로그인이 없으니 왕복을 기다리지 않고 로그인 화면을 바로 그린다.
+const firstVisit = !hasSessionActivity()
+if (firstVisit && window.location.pathname + window.location.search === import.meta.env.BASE_URL)
+  await router.navigate('/login', { replace: true })
 const loginPage = apiClient.isLoginPage()
 const search = new URLSearchParams(window.location.search)
-const skipRestore = loginPage && (search.has('logout') || search.has('reason'))
+const skipRestore = loginPage && (firstVisit || search.has('logout') || search.has('reason'))
 // 오래 자리를 비운 뒤 다시 열면 쿠키가 살아 있어도 복원하지 않고 로그인을 끝낸다.
 const idle = !skipRestore && sessionIdleExpired()
 if (idle) {
