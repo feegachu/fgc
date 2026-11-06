@@ -315,7 +315,8 @@ export function PolicySources({
   offerings?: OfferingGovernance[]
   policyVersionId?: number
 }) {
-  const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref) && refLabel(ref))
+  // 번호만 있는 출처 자료도 건수와 근거 정보에는 남긴다. 번호는 보이지 않고 근거 정보에서 제목을 읽는다.
+  const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref) && !/^D-\d/.test(ref))
   const referenceInfo = (ref: string) => policyVersionId != null && (
     <EvidenceLink icon label={`${refLabel(ref) || '출처'} 근거 정보`}>
       <PolicyReferenceInfo policyVersionId={policyVersionId} refText={ref} />

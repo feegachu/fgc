@@ -48,8 +48,7 @@ function sectionFor(path: string): Section {
     : 'basic'
 }
 function focusPolicyField(path: string) {
-  // 근거 누락 오류는 서버가 sourceRefs 로 준다. 입력 칸은 규정 근거 하나다.
-  const exact = document.getElementById(`policy-${path === 'sourceRefs' ? 'regulationRefs' : path}`)
+  const exact = document.getElementById(`policy-${path}`)
   const fallback = [...document.querySelectorAll<HTMLElement>('[id^="policy-"]')].find((element) =>
     element.id.startsWith(`policy-${path}.`),
   )
@@ -805,9 +804,17 @@ export function PolicyDraftEditor({
               <RegulationRefs
                 path="regulationRefs"
                 legend="근거 규정"
-                error={errors.regulationRefs ?? errors.sourceRefs}
+                error={errors.regulationRefs}
                 value={draft.regulationRefs}
                 onChange={(value) => set('regulationRefs', value)}
+              />
+              <DraftInput
+                path="sourceRefs"
+                label="출처 자료 번호"
+                errors={errors}
+                value={draft.sourceRefs.join(',')}
+                placeholder="규정 외 근거 자료가 있으면 등록된 번호를 쉼표로 구분"
+                onChange={(value) => set('sourceRefs', value.split(','))}
               />
               {draft.sourceDetails.map((source, index) => {
                 const prefix = `sourceDetails.${index}.`
