@@ -10,6 +10,8 @@
 
 기존 격리 Compose smoke는 경보4종 60초 수신·중복 억제를 검증한다. 후속 검증은 합성 정상 복구·4종 resolved 전달·잔여 경보0도 검사하고 CI artifact에 환경과 측정값을 남긴다. 합성 DB DOWN을 실제 PostgreSQL 종료로 기록하지 않는다.
 
+2026-11-06 후속 코드 `4c5b88cf`의 로컬 격리 실측은 health25.23초·batch19.11초·5xx24.01초·scrape19.91초이며 중복0·resolved4종·잔여 경보0·Grafana12패널을 통과했다. 같은 HEAD의 [monitoring CI](https://github.com/feegachu/fgc/actions/runs/42144382465)도 성공했다. 이후 develop의 #905를 통합했으므로 최종 HEAD 전체 CI는 해당 커밋 기준으로 따로 확인한다.
+
 ### 최종 인수에 필요한 항목
 
 1. 다음 정식 배포에서 #902 설정만으로 프로필·토큰 유지, 인증·target UP·지표 수집을 확인하고 배포 전후 revision을 기록한다.

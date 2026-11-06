@@ -29,6 +29,14 @@
 
 ## API 활성화
 
+### PR 902 병합 이후 정식 배포
+
+#902가 포함된 정식 배포의 `infra/shinhan/compose.yaml`은 서버 `.env`의 `FGC_SPRING_PROFILES_ACTIVE`와 `FGC_MONITORING_SCRAPE_TOKEN`을 API에 전달한다. 서버 비공개 설정에서 프로필을 `prod,monitoring`으로 지정하고 기존 scrape 토큰을 보존한다. 프로필 값이 없으면 기본 `prod`이므로 토큰만 넣는 것으로는 전체 계측이 활성화되지 않는다.
+
+다음 승격은 기존 정식 승인 경로를 사용한다. 재배포 후 별도 임시 override 없이 두 설정이 전달되는지, 실제 revision·무인증401·전용 인증200·공개 WEB404·두 target UP·JVM/HTTP/Hikari/배치 지표를 확인하고 기록한다. 이 문서 갱신은 재배포를 실행한 증거가 아니다.
+
+### 이전 배포의 override 절차
+
 기존 API 이미지가 #674를 포함함을 확인한 뒤 기존 운영 배포 파일과 비밀값을 백업한다. `infra/shinhan/monitoring.override.yaml`을 기존 앱 compose 뒤에 병합하고, 앱 배포용 secret 환경 파일에 `FGC_MONITORING_SCRAPE_TOKEN`을 제공한다. 기존 DB/JWT/이미지 설정을 그대로 읽어야 한다.
 
 기존 운영 프로젝트의 compose 명령에 이 override를 추가하여 `config --quiet`로 검사한 뒤 API만 `up -d --no-deps api`로 갱신한다. 앱 프로필 변경은 API 재생성이 필요하며 잠깐의 중단이 발생할 수 있다. 실제 승격 파이프라인의 승인/버전 검증은 그대로 따른다. 후속 앱 배포에도 override를 포함하도록 배포 진입점을 함께 갱신해야 설정이 사라지지 않는다.
