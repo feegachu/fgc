@@ -2,7 +2,8 @@ import type { TableColumn } from '../../components/DataTable'
 import { ArbitrageBadge, ArbitrageAmount } from './badges'
 import { present } from './utils'
 import { StatusBadge } from '../../components/StatusBadge'
-import { date, int } from '../../lib/format'
+import { date, int, isNegative, won } from '../../lib/format'
+import { EvidenceLink } from '../../components/EvidenceLink'
 import type { ArbitrageRow } from './api'
 import { plannedBasisPresentation } from './planned-basis'
 export const columns: TableColumn<ArbitrageRow>[] = [
@@ -109,9 +110,13 @@ export const compactColumns = columns.map((column): TableColumn<ArbitrageRow> =>
   width: '8rem',
   render: (row) => {
     const basis = plannedBasisPresentation(row.plannedCommissionBasis)
-    return <span style={{ position: 'relative' }} title={`${basis.label}. ${basis.description}`}>
-      <ArbitrageAmount value={row.plannedCommissionAmount} />
-      <span className="visually-hidden">{basis.label}. {basis.description}</span>
-    </span>
+    return (
+      <span className={`arb-planned-amount${isNegative(row.plannedCommissionAmount) ? ' is-negative-amount' : ''}`}>
+        <EvidenceLink label={won(row.plannedCommissionAmount)}>
+          <strong>{basis.label}</strong>
+          <p>{basis.description}</p>
+        </EvidenceLink>
+      </span>
+    )
   },
 } : column)
