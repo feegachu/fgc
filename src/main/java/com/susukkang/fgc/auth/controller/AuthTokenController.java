@@ -160,7 +160,7 @@ public class AuthTokenController {
                 tokens.accessToken(), AuthTokenService.TOKEN_TYPE, tokens.expiresInSeconds()));
     }
 
-    /** Max-Age 없는 세션 쿠키라 브라우저를 닫으면 사라진다. 다시 열었을 때 이전 사용자로 복원되지 않게 한다. */
+    /** Max-Age 없는 세션 쿠키라 브라우저를 닫으면 사라진다(탭 복원 설정이면 남을 수 있어 그때는 미사용 30분 규칙이 막는다). 다시 열었을 때 이전 사용자로 복원되지 않게 한다. */
     private static ResponseCookie refreshCookie(String value) {
         return ResponseCookie.from(REFRESH_COOKIE, value)
                 .httpOnly(true)
