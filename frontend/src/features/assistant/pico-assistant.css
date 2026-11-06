@@ -70,6 +70,45 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 3px;
 }
+.pico-launcher.pico-launcher-docked {
+  position: static;
+}
+
+.pico-launcher-docked .pico-launcher-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: auto;
+  height: 2rem;
+  padding-inline: var(--space-2);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-8);
+  background: var(--color-bg-surface);
+}
+
+.pico-launcher.pico-launcher-docked .pico-launcher-button img {
+  width: 1.5rem;
+  height: 1.5rem;
+  animation: none;
+  filter: none;
+}
+
+.pico-launcher-docked .pico-launcher-hint {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: none;
+  animation: none;
+  box-shadow: none;
+}
+
+@media (max-width: 47.9375rem) {
+  .pico-launcher-docked .pico-launcher-hint {
+    display: none;
+  }
+}
+
+.pico-launcher-docked .pico-launcher-button:focus-visible,
 .pico-assistant-root button:focus-visible,
 .pico-assistant-root select:focus-visible,
 .pico-assistant-root summary:focus-visible {
