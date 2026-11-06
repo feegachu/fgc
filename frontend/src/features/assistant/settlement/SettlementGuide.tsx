@@ -22,6 +22,7 @@ import { Modal } from '../../../components/Modal'
 import { Button } from '../../../components/Button'
 import { SettlementOverview } from './SettlementOverview'
 import { GuideStepContent } from '../guide/GuideStepContent'
+import { useDemoContractNumber } from './useDemoContractNumber'
 import guideMascot from '../assets/pico-guide.png'
 import { useWorkflowGuide } from '../workflow-state'
 import { usePaymentWalkthrough } from './usePaymentWalkthrough'
@@ -78,6 +79,9 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
+  const demoNumberStep = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
+    && explanation.step?.id === 'features.contract.contract-form-page.contract-no'
+  const demoNumber = useDemoContractNumber(explanation.target, demoNumberStep && detailedWorkflow && !collapsed && !busy && !leave)
   const position = useSpotlight(!collapsed ? activeTarget : null, card, detailedWorkflow, detailedWorkflow ? explanation.step?.presentation : undefined)
   useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
   const detailedInput = useRef(false)
@@ -688,7 +692,11 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
               </section>
             ) : detailedWorkflow ? (
               <section aria-label="업무 세부 안내" aria-live="polite">
-                <GuideStepContent step={explanation.step} index={explanation.index} total={explanation.total} group={`${decision ? titles[STEPS.indexOf(decision.step)] : ''} · ${explanation.index + 1}/${explanation.total}`} />
+                <GuideStepContent step={demoNumberStep ? { ...explanation.step, concise: true,
+                  instruction: '빈 계약번호에는 기존 데모 번호의 다음 번호를 채웁니다.',
+                  interaction: '번호를 확인하고 다음을 누르세요.' } : explanation.step} index={explanation.index} total={explanation.total} group={`${decision ? titles[STEPS.indexOf(decision.step)] : ''} · ${explanation.index + 1}/${explanation.total}`} />
+                {demoNumberStep && demoNumber.pending && <p role="status">다음 데모 계약번호를 불러오고 있습니다.</p>}
+                {demoNumberStep && demoNumber.error && <div><p role="alert">{demoNumber.error}</p><Button variant="secondary" onClick={demoNumber.retry}>번호 다시 불러오기</Button></div>}
                 {!explanation.target && explanation.message && <p role="status">{explanation.message}</p>}
                 {explanation.status === 'PAUSED' && <Button variant="secondary" onClick={explanation.retry}>다시 찾기</Button>}
                 <div className="payment-guide-actions">
