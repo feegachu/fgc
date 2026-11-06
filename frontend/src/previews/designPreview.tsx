@@ -2,12 +2,13 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, Link, RouterProvider } from 'react-router'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
-import type { DashboardSummary, HomeSummary } from '../features/dashboard/api'
+import type { BranchDashboard, BranchDetailPage, DashboardCommission, DashboardSummary, HomeSummary } from '../features/dashboard/api'
 import { Button } from '../components/Button'
 import { Field } from '../components/Field'
 import { StatusBadge } from '../components/StatusBadge'
 import { ContractStatusBadge } from '../features/contract/badges'
 import CapListPage from '../features/cap/CapListPage'
+import AcquisitionCostPage from '../features/acquisition-cost/AcquisitionCostPage'
 import ArbitragePage from '../features/arbitrage/ArbitragePage'
 import { ExceptionPage } from '../features/exception/ExceptionPage'
 import ReconciliationPage from '../features/reconciliation/ReconciliationPage'
@@ -16,6 +17,7 @@ import { AgentHomePage } from '../features/agent-home/AgentHomePage'
 import ClawbackPage from '../features/clawback/ClawbackPage'
 import ContractListPage from '../features/contract/ContractListPage'
 import TransactionListPage from '../features/transaction/TransactionListPage'
+import AgentStatementPage from '../features/agent-statement/AgentStatementPage'
 import ScheduleListPage from '../features/schedule/ScheduleListPage'
 import LedgerPage from '../features/ledger/LedgerPage'
 import ValidationRunListPage from '../features/validation/ValidationRunListPage'
@@ -95,6 +97,30 @@ const summary: DashboardSummary = {
       statusLabel: '검토 중',
       createdAt: '2026-10-29T07:04:00Z',
     },
+    {
+      exceptionCaseId: 3,
+      severity: 'HIGH',
+      severityLabel: '높음',
+      exceptionType: 'ARBITRAGE_CANDIDATE',
+      exceptionTypeLabel: '차익거래 검토대상',
+      contractNo: 'PREVIEW-2026-003',
+      title: '차익거래 검토대상',
+      status: 'NEW',
+      statusLabel: '신규',
+      createdAt: '2026-10-29T07:03:00Z',
+    },
+    {
+      exceptionCaseId: 4,
+      severity: 'MEDIUM',
+      severityLabel: '주의',
+      exceptionType: 'RECON_MISMATCH',
+      exceptionTypeLabel: '대사 불일치',
+      contractNo: 'PREVIEW-2026-004',
+      title: '예상 지급액과 실제 지급액 차이',
+      status: 'IN_REVIEW',
+      statusLabel: '검토 중',
+      createdAt: '2026-10-29T07:02:00Z',
+    },
   ],
   recentRuns: [
     {
@@ -130,6 +156,43 @@ globalThis.fetch = async (input, init) => {
       error: null,
       requestId: 'design-preview',
     })
+  if (url.pathname === '/api/v1/dashboard/monthly-commissions') {
+    const selected = url.searchParams.get('month') ?? '2026-07'
+    const [year, month] = selected.split('-').map(Number)
+    const data: DashboardCommission = {
+      months: [0.7, 0.85, 0.78, 1.1, 1, 1.25].map((factor, index) => ({
+        month: new Date(Date.UTC(year, month - 6 + index, 1)).toISOString().slice(0, 10),
+        gaAmount: 12000000 * factor,
+        agentAmount: 8000000 * factor,
+      })),
+    }
+    return Response.json({ data, error: null, requestId: 'design-preview' })
+  }
+  if (url.pathname === '/api/v1/dashboard/branches') {
+    const selected = url.searchParams.get('month') ?? '2026-07'
+    const data: BranchDashboard = {
+      month: `${selected}-01`, asOf: `${selected}-28`,
+      branches: [
+        { organizationId: 1, name: '강동지사', registeredAgents: 47, activeAgents: 42, newContracts: 21, validContracts: 980, gaAmount: 9000000, agentAmount: 6000000, openExceptions: 9 },
+        { organizationId: 2, name: '마포지사', registeredAgents: 45, activeAgents: 40, newContracts: 24, validContracts: 960, gaAmount: 6000000, agentAmount: 4000000, openExceptions: 3 },
+        { organizationId: 3, name: '동부본부', registeredAgents: 1, activeAgents: 1, newContracts: 0, validContracts: 0, gaAmount: 0, agentAmount: 0, openExceptions: 0 },
+      ],
+    }
+    return Response.json({ data, error: null, requestId: 'design-preview' })
+  }
+  if (url.pathname === '/api/v1/dashboard/branch-details') {
+    const metric = url.searchParams.get('metric')
+    const organizationId = url.searchParams.get('organizationId') ?? '1'
+    const page = Number(url.searchParams.get('page') ?? '1')
+    const count = page === 1 ? 10 : 2
+    const data: BranchDetailPage = { page, size: 10, totalPages: 2, totalElements: 12, sort: 'id,desc', content: Array.from({ length: count }, (_, index) => ({
+      id: index + (page - 1) * 10 + 1,
+      label: metric === 'AGENTS' ? `예시 설계사 ${index + 1}` : metric === 'EXCEPTIONS' ? `미처리 예외 ${index + 1}` : `BRANCH-${organizationId}-${(page - 1) * 10 + index + 1}`,
+      detail: metric === 'AGENTS' ? `FC-${organizationId}-${index + 1}` : '2026-07-01',
+      status: metric === 'EXCEPTIONS' ? 'NEW' : 'ACTIVE', value: 750000, secondaryValue: 500000,
+    })) }
+    return Response.json({ data, error: null, requestId: 'design-preview' })
+  }
   if (url.pathname === '/api/v1/exceptions/counts')
     return Response.json({
       data: { total: summary.openException, bySeverity: [], byType: [] },
@@ -138,6 +201,8 @@ globalThis.fetch = async (input, init) => {
     })
   if (url.pathname === '/api/v1/home/summary')
     return Response.json({ data: homeSummary, error: null, requestId: 'design-preview' })
+  if (url.pathname === '/api/v1/acquisition-cost-checks')
+    return Response.json({ data: { content: [], totalElements: 0, totalPages: 0, page: 1, size: 20 }, error: null, requestId: 'design-preview' })
   const data = designPreviewData(url)
   if (data !== undefined) return Response.json({ data, error: null, requestId: 'design-preview' })
   return Response.json(
@@ -204,12 +269,14 @@ const router = createMemoryRouter([
       ...[
         { path: '/contracts', element: <ContractListPage /> },
         { path: '/transactions', element: <TransactionListPage /> },
+        { path: '/agent/statements', element: <AgentStatementPage /> },
         { path: '/schedules', element: <ScheduleListPage /> },
         { path: '/journals', element: <LedgerPage /> },
         { path: '/base', element: <BasePage /> },
         { path: '/audit-logs', element: <AuditLogPage /> },
         { path: '/validation-runs', element: <ValidationRunListPage /> },
         { path: '/cap-checks', element: <CapListPage /> },
+        { path: '/acquisition-cost-checks', element: <AcquisitionCostPage /> },
         { path: '/arbitrage-checks', element: <ArbitragePage /> },
         { path: '/clawbacks', element: <ClawbackPage /> },
         { path: '/exceptions', element: <ExceptionPage /> },

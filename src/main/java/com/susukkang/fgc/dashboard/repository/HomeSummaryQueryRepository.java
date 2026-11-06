@@ -21,8 +21,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class HomeSummaryQueryRepository {
 
+    /** 유지 계약: 현재 또는 기준일 당시 정상·미납·부활인 계약. */
+    public static final List<String> VALID_CONTRACT_STATUSES = List.of("ACTIVE", "UNPAID", "REVIVED");
+
     /** 소속 조직에서 가장 가까운 지점. 지점 위 조직(본부 등)에 바로 소속되면 행이 없고, 호출부가 그 조직 자체로 묶는다. */
-    private static final String ORG_BRANCH = """
+    static final String ORG_BRANCH = """
             WITH RECURSIVE org_walk AS (
                 SELECT o.organization_id AS origin_id, o.organization_id, o.parent_id, o.organization_type, 0 AS depth
                   FROM fgc.organization o

@@ -20,6 +20,13 @@ jobs:
       - name: Diagnostics
         if: failure()
         run: docker compose -p fgc-monitoring-674-test -f infra/monitoring/compose.yaml -f infra/monitoring/smoke/compose.yaml logs --tail=100
+      - name: Preserve acceptance measurements
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: monitoring-acceptance
+          path: infra/monitoring/smoke-results.json
+          if-no-files-found: warn
       - name: Remove test containers and test-only volumes
         if: always()
         run: docker compose -p fgc-monitoring-674-test -f infra/monitoring/compose.yaml -f infra/monitoring/smoke/compose.yaml down -v

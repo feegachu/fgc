@@ -53,11 +53,12 @@ function filtersFromParams(params: URLSearchParams): ExceptionFilters {
   }
 }
 
+/** 기존 예외 필터·조치 흐름을 유지하고 관리자 목록 헤더 간격을 공통 목록에 맞춘다. */
 export function ExceptionPage() {
   const [params, setParams] = useSearchParams()
   const filters = filtersFromParams(params)
   const selectedId = params.get('selected')
-  const { month } = useOutletContext<ShellContext>()
+  const { month, revised = false } = useOutletContext<ShellContext>()
   const search = useQuery(exceptionSearchQueryOptions(filters))
   const options = useQuery(exceptionOptionsQueryOptions())
   const data = search.data
@@ -214,7 +215,7 @@ export function ExceptionPage() {
   ]
 
   return (
-    <div className="exception-page">
+    <div className={`exception-page${revised ? ' list-page' : ''}`}>
       <header className="page-header">
         <ScreenHelp screenId="EXCP-W01" />
         <div className="page-header-copy">

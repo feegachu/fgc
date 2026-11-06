@@ -181,7 +181,7 @@ function RequestCheckModal({ onClose, onDone }: { onClose: () => void; onDone: (
 }
 
 export default function AcquisitionCostPage() {
-  const { user } = useOutletContext<ShellContext>()
+  const { user, revised = false } = useOutletContext<ShellContext>()
   const [params, setParams] = useSearchParams()
   const criteria = criteriaFromParams(params)
   const query = useQuery(acquisitionListQuery(criteria))
@@ -213,14 +213,16 @@ export default function AcquisitionCostPage() {
   }
   const busy = query.isLoading
   return (
-    <div className="acq-page">
+    <div className={`acq-page${revised ? ' list-page' : ''}`}>
       <header className="page-header">
         <ScreenHelp screenId="ACQC-W01" />
         <div className="page-header-copy">
           <h1 className="page-title">계약체결비용 한도 검증</h1>
-          <p className="page-description">
-            선지급과 유지관리 예정 금액을 계약체결비용 한도와 각각 비교합니다. 예정 스케줄 생성과 별개이며, 이 검증 없이도 예정 생성과 조회는 할 수 있습니다.
-          </p>
+          {!revised && (
+            <p className="page-description">
+              선지급과 유지관리 예정 금액을 계약체결비용 한도와 각각 비교합니다. 예정 스케줄 생성과 별개이며, 이 검증 없이도 예정 생성과 조회는 할 수 있습니다.
+            </p>
+          )}
         </div>
         <div className="page-header-actions">
           {user.canProcess ? (

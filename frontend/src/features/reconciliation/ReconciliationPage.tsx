@@ -4,7 +4,8 @@ import { useRunGuide } from '../assistant/guide/useRunGuide'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, useOutletContext } from 'react-router'
+import type { ShellContext } from '../../app/shell/AppShell'
 import { Button } from '../../components/Button'
 import { DataTable } from '../../components/DataTable'
 import { ListHeader } from '../../components/ListHeader'
@@ -240,8 +241,11 @@ const resultColumns: TableColumn<Result>[] = [
   },
 ]
 
+const revisedResultColumns = resultColumns.filter((column) => column.key !== 'primary' && column.key !== 'secondary')
+
 /** RECO-W01: 실행/결과는 기존 API, 이력 status 기반으로 비동기 완료를 확인한다. */
 export default function ReconciliationPage() {
+  const { revised = false } = useOutletContext<ShellContext>()
   const month = useWorkspaceStore((state) => state.month)
   const { params, update } = useSearchParamsState(FILTER_KEYS)
   const criteria = criteriaFromParams(params, month)
@@ -329,7 +333,7 @@ export default function ReconciliationPage() {
       : results.data?.items?.totalElements
   const exceptionHref = `/exceptions?type=RECONCILIATION_MISMATCH&validationMonth=${criteria.month}-01&status=ALL`
   const compareColumns: TableColumn<Result>[] = [
-    ...resultColumns,
+    ...(revised ? revisedResultColumns : resultColumns),
     {
       key: 'detail',
       label: '상세',
@@ -479,6 +483,7 @@ export default function ReconciliationPage() {
             }
             footer={
               <ResultTotals
+                trailingColumns={compareColumns.length - 8}
                 initial={!runId}
                 available={results.isSuccess}
                 filtered={!!type || onlyMismatch}
@@ -765,12 +770,14 @@ function RunSummary({ summary }: { summary?: Summary }) {
 }
 
 function ResultTotals({
+  trailingColumns,
   initial,
   available,
   filtered,
   summary,
   rows,
 }: {
+  trailingColumns: number
   initial: boolean
   available: boolean
   filtered: boolean
@@ -796,7 +803,7 @@ function ResultTotals({
       <td className="is-number tabular-nums">
         <Money value={total('differenceAmount', 'differenceTotal')} difference unit={false} />
       </td>
-      <td colSpan={4} />
+      <td colSpan={trailingColumns} />
     </tr>
   )
 }
