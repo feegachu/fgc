@@ -29,6 +29,9 @@ export interface ScreenHelpStep {
   selector?: string
   anchor?: 'start'
   concise?: boolean
+  presentation?: { side?: 'right' | 'either' }
+  /** Presentation lifecycle only: replay a card or start/stop a chart preview. */
+  onEnter?: () => void | (() => void)
   attribute?: 'data-guide-target' | 'data-guide-feature'
   scope?: 'shell'
   group: string

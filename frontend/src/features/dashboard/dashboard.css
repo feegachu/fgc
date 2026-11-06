@@ -16,6 +16,9 @@
     animation: dashboard-panel-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
     animation-delay: var(--panel-delay, 0ms);
   }
+  .dashboard-support-cards > .dashboard-guide-card {
+    animation: dashboard-panel-enter 700ms ease-out backwards;
+  }
   .dashboard-page > .kpi-grid { --panel-delay: 40ms; }
   .dashboard-commissions { --panel-delay: 80ms; }
   .dashboard-insight-grid > .surface:first-child { --panel-delay: 130ms; }

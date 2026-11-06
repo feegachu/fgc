@@ -236,6 +236,10 @@
 .payment-guide-card.screen-step-guide > p { font-size: 13px; line-height: 1.7; color: var(--color-fgc-ink); }
 .screen-step-summary > span { display: block; }
 
+body:has(.screen-step-guide[data-help-presentation='true'][data-guide-anchored='true']) .pico-launcher {
+  display: none;
+}
+
 .screen-step-details { display: grid; gap: 12px; margin: 16px 0; font-size: 12px; line-height: 1.7; }
 .screen-step-details dt { margin-bottom: 3px; color: var(--color-fgc-ink); font-weight: 700; }
 .screen-step-details dd { margin: 0; color: var(--color-text-secondary); }

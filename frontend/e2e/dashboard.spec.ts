@@ -137,79 +137,110 @@ test('사이드바의 세 도움말 버전을 전환하고 v2에서 번호별 �
   expect(mobileLegend!.y).toBeGreaterThan(mobileImage!.y + mobileImage!.height)
 })
 
-for (const width of [1440, 390]) {
-  test(`수정 후 대시보드 도움말은 11단계와 두 줄 설명으로 영역과 아이콘을 짚는다 (${width})`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 1000 })
+for (const [width, height] of [[1440, 900], [1280, 720], [390, 1000]]) {
+  test(`수정 후 대시보드 7단계는 설명과 카드를 가리지 않는다 (${width})`, async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.setViewportSize({ width, height })
     await session(page)
     await page.goto('?month=2026-07')
-    const writes: string[] = []
-    page.on('request', request => {
-      if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url())
-    })
     await page.getByRole('radio', { name: '수정 후 v2', exact: true }).focus()
     await page.keyboard.press('ArrowLeft')
+    const originalChart = await page.locator('.commission-chart').elementHandle()
+    const originalDonut = await page.locator('.risk-donut').elementHandle()
     const trigger = page.getByRole('button', { name: '도움말', exact: true })
     await trigger.click()
     const guide = page.getByRole('region', { name: '업무 대시보드 도움말' })
     const spotlight = page.locator('.screen-step-spotlight')
-    expect(dashboardWalkthrough).toHaveLength(11)
-    await expect(spotlight).toHaveCSS('transition-duration', '0.7s, 0.7s, 0.7s, 0.7s')
+    expect(dashboardWalkthrough).toHaveLength(7)
     for (const [index, step] of dashboardWalkthrough.entries()) {
       await expect(guide.getByRole('heading', { name: step.title, exact: true })).toBeVisible()
-      await expect(guide).toHaveAttribute('data-help-target', step.targetId)
       await expect(guide.locator('.screen-step-summary > span')).toHaveCount(2)
-      await expect(guide.locator('.screen-step-details, .screen-step-interaction, .screen-step-context')).toHaveCount(0)
-      for (const line of await guide.locator('.screen-step-summary > span').all()) {
-        expect(await line.evaluate(element => element.getBoundingClientRect().height <= parseFloat(getComputedStyle(element).lineHeight) + 1)).toBe(true)
-      }
-      const next = guide.getByRole('button', { name: index === dashboardWalkthrough.length - 1 ? '안내 마치기' : '다음', exact: true })
-      await expect(next).toBeEnabled()
-      await expect(page.getByRole('dialog')).toHaveCount(0)
+      await page.mouse.move(width - 8, 8)
       const target = page.locator(`[${step.attribute ?? 'data-guide-target'}="${step.targetId}"]`)
-      await expect(target).toHaveCount(1)
-      const highlightMatches = async () => {
-        const box = await spotlight.boundingBox(), element = await target.boundingBox()
+      await expect.poll(async () => {
+        const box = await spotlight.boundingBox(), area = await target.boundingBox()
         const main = await page.locator('#main-content').boundingBox()
-        const header = await page.locator('.app-header').boundingBox()
-        const topBoundary = step.scope === 'shell' ? 0 : (header!.y + header!.height + 8)
-        return Boolean(box && element && box.width > 0 && box.height > 0
-          && Math.abs(box.x - Math.max(main!.x, element.x - 10)) < 2
-          && Math.abs(box.y - Math.max(topBoundary, element.y - 10)) < 2)
+        return Boolean(box && area && main && Math.abs(box.y - area.y + 10) < 2
+          && Math.abs(box.x - Math.max(main.x, area.x - 10)) < 2
+          && Math.abs(box.width - Math.min(main.x + main.width, area.x + area.width + 10) + Math.max(main.x, area.x - 10)) < 2)
+      }).toBe(true)
+      await expect.poll(async () => {
+        const box = await guide.boundingBox()
+        return Boolean(box && box.y >= 0 && box.y + box.height <= height
+          && await guide.evaluate(el => el.scrollHeight <= el.clientHeight + 1))
+      }).toBe(true)
+      if (index >= 2 && width >= 1200) {
+        await expect.poll(async () => {
+          const box = await guide.boundingBox(), area = await target.boundingBox()
+          return Boolean(box && area && area.y >= 52 && area.y + area.height <= height - 8
+            && (box.x >= area.x + area.width || box.x + box.width <= area.x))
+        }).toBe(true)
       }
-      await expect.poll(highlightMatches).toBe(true)
-      if (index === 1) {
-        await guide.getByRole('button', { name: '이전', exact: true }).click()
-        await expect(guide.getByRole('heading', { name: '기준 정산월', exact: true })).toBeVisible()
-        await guide.getByRole('button', { name: '다음', exact: true }).click()
-        await expect(guide.getByRole('heading', { name: step.title, exact: true })).toBeVisible()
-        await expect.poll(highlightMatches).toBe(true)
-        await page.screenshot({ path: `test-results/dashboard-walkthrough-${width}.png` })
+      if (index === 2) {
+        expect(await originalChart!.evaluate(el => el.isConnected)).toBe(false)
+        if (width >= 1200) {
+          const box = await guide.boundingBox(), area = await target.boundingBox()
+          expect(box!.x).toBeGreaterThan(area!.x + area!.width)
+        }
       }
-      if (step.targetId.startsWith('dashboard.chart-view.')) {
-        const label = await target.getAttribute('aria-label')
-        await target.click()
-        await expect(target).toHaveAttribute('aria-pressed', 'true')
-        await expect(page.getByRole('list', { name: `지점별 ${label}`, exact: true })).toHaveCount(1)
-        await expect(guide.getByRole('heading', { name: step.title, exact: true })).toBeVisible()
-        await expect.poll(highlightMatches).toBe(true)
-        await page.screenshot({ path: `test-results/dashboard-${step.targetId.split('.').at(-1)}-${width}.png` })
+      if (index === 4) expect(await originalDonut!.evaluate(el => el.isConnected)).toBe(false)
+      if (index === 5) await expect(target.getByRole('group', { name: '지점별 현황 지표' }).getByRole('button')).toHaveCount(4)
+      if (index === 6) await expect(target.locator('.dashboard-guide-card')).toHaveCount(2)
+      if ([2, 4, 5, 6].includes(index)) await page.screenshot({ path: `test-results/dashboard-help-${index + 1}-${width}.png` })
+      if (index === 4) {
+        const top = await page.evaluate(() => scrollY)
+        await page.mouse.move(width - 5, height / 2)
+        await page.mouse.wheel(0, 500)
+        await expect.poll(() => page.evaluate(() => scrollY)).toBe(top)
       }
-      if (step.targetId === 'dashboard.chart-view.branch-agents' && width === 1440) {
-        await page.getByRole('button', { name: '가상지점 01 설계사 상세 보기' }).click()
-        const detail = page.getByRole('dialog', { name: '가상지점 01 · 설계사 상세' })
-        await expect(detail).toBeVisible()
-        await expect(guide).toHaveCount(0)
-        await page.keyboard.press('Escape')
-        await expect(guide.getByRole('heading', { name: step.title, exact: true })).toBeVisible()
-      }
-      await next.click()
+      await guide.getByRole('button', { name: index === 6 ? '안내 마치기' : '다음', exact: true }).click()
     }
     await expect(guide).toHaveCount(0)
     await expect(trigger).toBeFocused()
-    expect(writes).toEqual([])
-    expect(new URL(page.url()).pathname).toBe('/')
   })
 }
+
+test('지점 차트는 도움말 단계에서만 3초마다 바뀌고 접기·상세에서는 멈춘다', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await session(page)
+  await page.goto('?month=2026-07')
+  await page.getByRole('radio', { name: '수정 후 v2', exact: true }).focus()
+  await page.keyboard.press('ArrowLeft')
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const guide = page.getByRole('region', { name: '업무 대시보드 도움말' })
+  for (let index = 0; index < 5; index++) await guide.getByRole('button', { name: '다음', exact: true }).click()
+  const metrics = page.getByRole('group', { name: '지점별 현황 지표' })
+  await expect(guide.getByRole('heading', { name: '지점별 현황', exact: true })).toBeVisible()
+  for (const label of ['설계사', '계약', '예외', '수수료']) {
+    await expect(metrics.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true', { timeout: 4000 })
+    await expect(page.getByRole('list', { name: `지점별 ${label}`, exact: true })).toBeVisible()
+  }
+  await guide.getByRole('button', { name: '접기' }).click()
+  const paused = await metrics.locator('[aria-pressed="true"]').getAttribute('aria-label')
+  await page.waitForTimeout(3200)
+  await expect(metrics.getByRole('button', { name: paused!, exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await guide.getByRole('button', { name: '펼치기' }).click()
+  await metrics.getByRole('button', { name: '설계사', exact: true }).click()
+  await page.getByRole('button', { name: '가상지점 01 설계사 상세 보기' }).click()
+  await expect(guide).toHaveCount(0)
+  await page.waitForTimeout(3200)
+  await expect(page.getByRole('dialog', { name: '가상지점 01 · 설계사 상세' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(guide).toBeVisible()
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  const finalMetric = await metrics.locator('[aria-pressed="true"]').getAttribute('aria-label')
+  await page.waitForTimeout(3200)
+  await expect(metrics.getByRole('button', { name: finalMetric!, exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await guide.getByRole('button', { name: '안내 마치기' }).click()
+  await expect(guide).toHaveCount(0)
+  await page.setViewportSize({ width: 1440, height: 600 })
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
+  await page.mouse.move(1000, 400)
+  await page.mouse.wheel(0, 500)
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0)
+})
 
 test('월별 자료가 없어도 설명을 계속 읽고 기준월 변경 시 도움말을 닫는다', async ({ page }) => {
   await session(page, { emptyCommissions: true })

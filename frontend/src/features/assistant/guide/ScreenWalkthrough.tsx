@@ -46,8 +46,12 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
   const [target, setTarget] = useState<HTMLElement | null>(null)
   const [covered, setCovered] = useState(false)
   const step = session?.[index]
-  const position = useSpotlight(session && !covered && !folded ? target : null, card, true)
+  const position = useSpotlight(session && !covered && !folded ? target : null, card, true, step?.presentation)
   const close = () => { setSession(null); trigger?.focus() }
+
+  useEffect(() => {
+    if (step && !covered && !folded) return step.onEnter?.()
+  }, [step, covered, folded])
 
   useEffect(() => {
     const other = (event: Event) => {
@@ -111,6 +115,7 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
     {session && !covered && createPortal(<>
       {!folded && position.box && target && <div className="payment-guide-spotlight screen-step-spotlight" style={position.box} aria-hidden="true" />}
       <section ref={card} className="payment-guide-card screen-step-guide" aria-label={`${title} 도움말`}
+        data-help-presentation={Boolean(step?.presentation)}
         data-help-target={step?.targetId} data-guide-anchored={Boolean(target && !folded)}
         style={{ maxHeight: 'min(560px, 65dvh)', overflowY: 'auto', ...position.card }}>
         <header className="payment-guide-header">

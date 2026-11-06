@@ -23,6 +23,24 @@ const steps: ScreenHelpStep[] = ['first', 'hidden', 'duplicate', 'last'].map(tar
   targetId, group: '안내', title: `${targetId} 설명`, instruction: '현재 요소의 의미', details: [{ label: '확인할 점', text: '상태를 확인합니다.' }], interaction: '화면에서 확인합니다.',
 }))
 
+it('starts presentation only for the visible step and cleans up on fold, next and close', async () => {
+  const stop = vi.fn(), start = vi.fn(() => stop)
+  render(<main id="main-content"><ScreenWalkthrough title="재생" steps={[{ ...steps[0], onEnter: start }, steps[3]]} />
+    <div data-guide-target="first" /><div data-guide-target="last" /></main>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  expect(start).toHaveBeenCalledTimes(1)
+  await userEvent.click(screen.getByRole('button', { name: '접기' }))
+  expect(stop).toHaveBeenCalledTimes(1)
+  await userEvent.click(screen.getByRole('button', { name: '펼치기' }))
+  expect(start).toHaveBeenCalledTimes(2)
+  await userEvent.click(screen.getByRole('button', { name: '다음' }))
+  expect(stop).toHaveBeenCalledTimes(2)
+  await userEvent.click(screen.getByRole('button', { name: '이전' }))
+  await userEvent.click(screen.getByRole('button', { name: '종료' }))
+  expect(start).toHaveBeenCalledTimes(3)
+  expect(stop).toHaveBeenCalledTimes(3)
+})
+
 it('covers every remaining screen and modal with detailed, uniquely identified explanations', () => {
   const keys = definitions.filter(item => item.screenId !== 'DASH-W01').map(item => item.variant ? `${item.screenId}.${item.variant}` : item.screenId)
   expect(Object.keys(screenWalkthroughs).sort()).toEqual(keys.sort())
