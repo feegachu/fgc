@@ -2,6 +2,7 @@ import { CalculationWorkbench } from './CalculationWorkbench'
 import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import type { ShellUser } from '../../app/shell/Sidebar'
 import { findGuide, GUIDE_CATALOG } from './catalog'
 import type { AssistantContext, CalculationResult, MessageResult } from './contracts'
@@ -143,16 +144,18 @@ export function AssistantDemoMount({
   enabled = import.meta.env.VITE_ASSISTANT_DEMO === 'true' || import.meta.env.VITE_ASSISTANT_AI === 'true',
   screenId,
   screenContext,
+  launcherHost,
 }: {
   user: ShellUser
   loggingOut?: boolean
   enabled?: boolean
   screenId?: string
   screenContext?: string
+  launcherHost?: HTMLElement | null
 }) {
   if (!enabled || loggingOut || !['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'].includes(user.roleCode))
     return null
-  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} roleCode={user.roleCode} screenId={screenId} screenContext={screenContext} />
+  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} roleCode={user.roleCode} screenId={screenId} screenContext={screenContext} launcherHost={launcherHost} />
 }
 /**
  * CMN-C04: the screen/target/month the question carries (화면정의서 v3.0 :3267, #622).
@@ -167,16 +170,16 @@ function PicoContextLine({ screenId, paymentId }: { screenId: string; paymentId:
     </p>
   )
 }
-function AssistantWithGuide({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
+function AssistantWithGuide({ canProcess, roleCode, screenId, screenContext, launcherHost }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string; launcherHost?: HTMLElement | null }) {
   useEffect(() => () => useGuideRuntime.getState().reset(), [])
   return (
     <>
-      <PicoAssistant canProcess={canProcess} roleCode={roleCode} screenId={screenId} screenContext={screenContext} />
+      <PicoAssistant canProcess={canProcess} roleCode={roleCode} screenId={screenId} screenContext={screenContext} launcherHost={launcherHost} />
       <PaymentGuideOverlay />
     </>
   )
 }
-export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
+export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, launcherHost }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string; launcherHost?: HTMLElement | null }) {
   const [open, setOpen] = useState(false)
   const aiEnabled = import.meta.env.VITE_ASSISTANT_AI === 'true'
   const currentScreen = screenId ?? screenFor(window.location.pathname)?.id ?? 'CMN-C04'
@@ -430,7 +433,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
     setPlanError('')
   }
   const launcher = (
-    <div className="pico-launcher">
+    <div className={launcherHost ? 'pico-launcher pico-launcher-docked' : 'pico-launcher'}>
       <button
         id={`${panelId}-launcher`}
         className="pico-launcher-button"
@@ -451,7 +454,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }:
   )
   return (
     <div className="pico-assistant-root">
-      {!visible && launcher}
+      {!visible && (launcherHost ? createPortal(launcher, launcherHost) : launcher)}
       {visible && (
         <aside id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className="pico-panel">
           <header className="pico-panel-header">

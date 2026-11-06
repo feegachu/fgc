@@ -88,6 +88,7 @@ function ScheduleDetailView({ id }: { id: string }) {
   const lines = detail.data?.lines ?? []
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [regenerateOpen, setRegenerateOpen] = useState(false)
+  const previewForm = useRef<HTMLFieldSetElement>(null)
 
   const moving = useMutation({
     mutationFn: (stage: string) => findActiveSchedule(id, stage),
@@ -110,7 +111,19 @@ function ScheduleDetailView({ id }: { id: string }) {
     !canProcess ||
     header?.status !== 'PLANNED' ||
     header.activeYn !== true
-  const regenerateDisabled = unavailable || previewOnly || !canProcess || header?.activeYn !== true || header.status === 'CANCELLED'
+  const hasActiveVersion = header?.activeYn === true && header.status !== 'CANCELLED'
+  const previewRegime = detail.data?.previewContext?.policy?.selection?.resolution?.declaredFeeRegimeCode
+  const canOpenPreview = Boolean(header?.contractId && header.paymentStage && previewRegime === header.scheduleRegime)
+  const regenerateDisabled = unavailable || !canProcess || !hasActiveVersion || (previewOnly && !canOpenPreview)
+
+  function openRegeneration() {
+    if (!previewOnly) {
+      setRegenerateOpen(true)
+      return
+    }
+    previewForm.current?.scrollIntoView?.({ block: 'center' })
+    previewForm.current?.querySelector('input')?.focus({ preventScroll: true })
+  }
   const reasons: string[] = []
   if (header) {
     if (header.canConfirm === false && !previewOnly && header.activeYn === true && header.status === 'PLANNED') {
@@ -163,7 +176,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             variant="secondary"
             data-guide-target="schedule.generate" disabled={regenerateDisabled}
             aria-describedby={showNote ? 'schedule-action-note' : undefined}
-            onClick={() => setRegenerateOpen(true)}
+            onClick={openRegeneration}
           >
             <span className="material-symbols-rounded" aria-hidden="true">
               restart_alt
@@ -194,7 +207,7 @@ function ScheduleDetailView({ id }: { id: string }) {
       )}
 
       <section data-guide-feature="features.schedule.schedule-detail-page.section" className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
-        <header className="surface-header">
+        <header className="surface-header schedule-info-header">
           <h2 className="surface-title" id="schedule-header-title">
             스케줄 기본정보,{' '}
             <span className="tabular-nums">스케줄 번호 {header ? value(header.scheduleHeaderId) : '-'}</span>
@@ -233,10 +246,13 @@ function ScheduleDetailView({ id }: { id: string }) {
       </section>
 
       <section data-guide-feature="features.schedule.schedule-detail-page.section-2" data-guide-target="schedule.lines" className="surface schedule-detail-card" aria-labelledby="schedule-lines-title">
-        <header className="surface-header">
+        <header className="surface-header schedule-lines-header">
           <h2 className="surface-title" id="schedule-lines-title">
             회차별 예상 금액
           </h2>
+          {header && (
+            <p className="schedule-lines-total">예상 총액 <Money amount={header.expectedTotal} /></p>
+          )}
           <p className="schedule-detail-note">
             줄마다 원 단위로 반올림(5 이상 올림)한 뒤 더합니다
           </p>
@@ -253,6 +269,7 @@ function ScheduleDetailView({ id }: { id: string }) {
               {[
                 'no',
                 'installment',
+                'expected',
                 'month',
                 'due',
                 'item',
@@ -261,7 +278,6 @@ function ScheduleDetailView({ id }: { id: string }) {
                 'amount',
                 'calc',
                 'rate',
-                'expected',
                 'status',
                 'rule',
                 'action',
@@ -276,6 +292,9 @@ function ScheduleDetailView({ id }: { id: string }) {
                 </th>
                 <th scope="col" className="is-left">
                   회차
+                </th>
+                <th scope="col" className="is-number">
+                  예상금액
                 </th>
                 <th scope="col" className="is-left">
                   계약차월
@@ -292,9 +311,6 @@ function ScheduleDetailView({ id }: { id: string }) {
                 </th>
                 <th scope="col" className="is-left">
                   요율 / 정액
-                </th>
-                <th scope="col" className="is-number">
-                  예상금액
                 </th>
                 <th scope="col" className="is-center">
                   상태
@@ -350,28 +366,28 @@ function ScheduleDetailView({ id }: { id: string }) {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={10}>
+                <td colSpan={2}>
                   합계 (<span className="tabular-nums">{int(lines.length)}</span>줄)
                 </td>
                 {/* 합계는 서버가 줄별 반올림 금액을 더한 expectedTotal 을 그대로 쓴다(화면에서 다시 계산하지 않는다). */}
                 <td className="is-number tabular-nums">
                   <Money amount={header?.expectedTotal} />
                 </td>
-                <td colSpan={3} />
+                <td colSpan={11} />
               </tr>
             </tfoot>
           </table>
         </div>
       </section>
 
-      {header?.activeYn && header.status !== 'CANCELLED' && header.contractId && header.paymentStage && (
-        <fieldset disabled={unavailable} className="schedule-preview-availability">
-        <SchedulePreviewForm
-          context={detail.data?.previewContext}
-          contractId={String(header.contractId)}
-          stage={header.paymentStage}
-          scheduleId={id}
-        />
+      {hasActiveVersion && header?.contractId && header.paymentStage && (
+        <fieldset ref={previewForm} disabled={unavailable} className="schedule-preview-availability">
+          <SchedulePreviewForm
+            context={detail.data?.previewContext}
+            contractId={String(header.contractId)}
+            stage={header.paymentStage}
+            scheduleId={id}
+          />
         </fieldset>
       )}
       {previewOnly && header && <p role="status">정책 정의 {header.installmentCount ?? '-'}회차 · {header.lineCount ?? '-'}행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.</p>}
@@ -557,6 +573,9 @@ function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: stri
     <tr>
       <td className="is-left tabular-nums">{int(line.lineNo)}</td>
       <td className="is-left tabular-nums">{int(line.installmentNo)}</td>
+      <td className="is-number tabular-nums">
+        <Money amount={line.expectedAmount} />
+      </td>
       <td className="is-left tabular-nums">{int(line.contractMonthNo)}</td>
       <td>{date(line.dueDate)}</td>
       <td>
@@ -579,9 +598,6 @@ function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: stri
         </CategoryBadge>
       </td>
       <td className="is-left tabular-nums">{line.calculationType === 'FIXED' ? <Money amount={line.fixedAmount} /> : line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
-      <td className="is-number tabular-nums">
-        <Money amount={line.expectedAmount} />
-      </td>
       <td className="is-center">
         <ScheduleStatusBadge code={line.lineStatus} label={responseLabel(null, LINE_STATUS, line.lineStatus)} />
         {line.sourceStatusEventId != null && <small className="schedule-source-event">원천 사건 #{line.sourceStatusEventId}</small>}
