@@ -37,6 +37,11 @@ export function useIdleLogout(enabled: boolean) {
     })
     function touch() {
       const now = Date.now()
+      // 절전에서 깨어난 직후의 입력이 30초 판정보다 먼저 와도 시간을 다시 세지 않는다.
+      if (sessionIdleExpired(now)) {
+        onIdle()
+        return
+      }
       if (now - writtenAt >= 1000) {
         writtenAt = now
         try {

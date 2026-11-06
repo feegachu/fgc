@@ -170,6 +170,21 @@ describe('401과 세션 복구', () => {
     expect(new Headers(refreshOptions?.headers).has('Authorization')).toBe(false)
     expect(refreshOptions?.credentials).toBe('same-origin')
   })
+  it('탭끼리 refresh 가 겹치지 않게 잠금 안에서 보낸다', async () => {
+    const request = vi.fn((_name: string, callback: () => Promise<Response>) => callback())
+    vi.stubGlobal('navigator', { locks: { request } })
+    try {
+      const fetcher = vi.fn<typeof fetch>(async (path) =>
+        path === '/api/v1/auth/refresh' ? ok({ accessToken: 'new', tokenType: 'Bearer', expiresIn: 1800 }) : ok(),
+      )
+      const { client, getToken } = setup(fetcher)
+      await client.extendSession()
+      expect(request).toHaveBeenCalledWith('fgc.auth.refresh', expect.any(Function))
+      expect(getToken()).toBe('new')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
   it('refresh 이후 늦게 도착한 옛 토큰의 401은 추가 refresh 없이 재시도한다', async () => {
     const late = deferred<Response>()
     const fetcher = vi.fn<typeof fetch>(async (path, options) => {

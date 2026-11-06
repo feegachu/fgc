@@ -29,6 +29,13 @@ describe('미사용 자동 로그아웃', () => {
     expect(logout).toHaveBeenCalledWith('/login?reason=idle')
   })
 
+  it('30분이 지난 뒤 입력이 판정보다 먼저 와도 로그아웃한다', () => {
+    renderHook(() => useIdleLogout(true))
+    vi.setSystemTime(Date.now() + 31 * MINUTE) // 절전 중에는 타이머가 돌지 않는다
+    act(() => void window.dispatchEvent(new Event('pointermove')))
+    expect(logout).toHaveBeenCalledWith('/login?reason=idle')
+  })
+
   it('입력이 있으면 시간을 다시 센다', () => {
     renderHook(() => useIdleLogout(true))
     act(() => void vi.advanceTimersByTime(20 * MINUTE))

@@ -65,7 +65,9 @@ export function createApiClient(env: ClientEnvironment) {
     const currentGeneration = generation
     const pending = (async () => {
       try {
-        const response = await send('/api/v1/auth/refresh', { method: 'POST' }, 'application/json', null)
+        // 두 탭이 같은 쿠키로 동시에 회전하면 서버가 재사용으로 보고 로그인을 모두 끊는다. 한 탭씩 보낸다.
+        const rotate = () => send('/api/v1/auth/refresh', { method: 'POST' }, 'application/json', null)
+        const response = await (globalThis.navigator?.locks?.request('fgc.auth.refresh', rotate) ?? rotate())
         const { data } = await readEnvelope<TokenResponse>(response)
         if (!data?.accessToken) throw new ApiError(null, response.headers.get('X-Request-Id'), response.status)
         // Logout or a duplicate-login response must not be undone by an older refresh.
