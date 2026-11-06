@@ -37,7 +37,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
   const revised = user.roleCode !== 'AGENT'
-  const [helpVersion, setHelpVersion] = useState<HelpVersion>('after-v2')
+  const [helpVersion, setHelpVersion] = useState<HelpVersion>('after')
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)

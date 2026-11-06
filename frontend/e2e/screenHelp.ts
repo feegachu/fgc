@@ -3,9 +3,12 @@ import type { Locator, Page } from '@playwright/test'
 import { screenWalkthroughs } from '../src/features/assistant/guide/screen-walkthroughs'
 
 export async function chooseDetailedHelp(page: Page) {
-  await page.getByRole('radio', { name: '수정 후 v2', exact: true }).focus()
-  await page.keyboard.press('ArrowLeft')
-  await expect(page.getByRole('radio', { name: '수정 후', exact: true })).toBeChecked()
+  const after = page.getByRole('radio', { name: '수정 후', exact: true })
+  if (!await after.isChecked()) {
+    await page.getByRole('radio', { name: '수정 전', exact: true }).focus()
+    await page.keyboard.press('ArrowRight')
+  }
+  await expect(after).toBeChecked()
 }
 
 export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: number) {
@@ -18,6 +21,14 @@ export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: n
     const title = await card.getByRole('heading').innerText()
     expect(titles).not.toContain(title)
     titles.push(title)
+    if (await card.locator('.screen-step-summary').count()) {
+      const lines = card.locator('.screen-step-summary > span')
+      await expect(lines).toHaveCount(2)
+      for (const line of await lines.all()) {
+        expect(await line.evaluate(el => el.getBoundingClientRect().height <= parseFloat(getComputedStyle(el).lineHeight) + 1)).toBe(true)
+      }
+      await expect(card.locator('.screen-step-details, .screen-step-interaction, .screen-step-context')).toHaveCount(0)
+    }
     await expect(card.getByRole('progressbar')).toHaveAttribute('value', String(index + 1))
     await expect(page.locator('.screen-step-spotlight')).toBeVisible()
     await expect.poll(async () => {
@@ -28,7 +39,12 @@ export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: n
       const owner = card.locator('xpath=ancestor::*[@role="dialog"][1]')
       const original = (await owner.count() ? owner : page.locator('#main-content')).locator(`${selector}:visible`).first()
       if (!await original.count()) return false
-      const anchor = await original.evaluate((element, start) => {
+      const anchor = await original.evaluate((element, { start, includeLabel }) => {
+        if (includeLabel) {
+          const label = element.closest('.field')?.querySelector('.field-label')?.getBoundingClientRect()
+          const rect = element.getBoundingClientRect()
+          if (label) return { x: rect.x, y: Math.min(rect.y, label.y) }
+        }
         const table = start ? (element.matches('table') ? element : [...element.querySelectorAll('table')].find(item => item.getClientRects().length > 0)) : null
         if (table) {
           const rect = table.getBoundingClientRect()
@@ -42,7 +58,7 @@ export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: n
           : element.querySelector(':scope > .surface-header, :scope > header, :scope > h2, :scope > h3, thead')
         const target = (start && child ? child : element).getBoundingClientRect()
         return { x: target.x, y: target.y }
-      }, definition.anchor === 'start')
+      }, { start: definition.anchor === 'start', includeLabel: definition.presentation?.includeLabel })
       const box = await page.locator('.screen-step-spotlight').boundingBox()
       const main = await page.locator('#main-content').boundingBox()
       const header = await page.locator('.app-header').boundingBox()

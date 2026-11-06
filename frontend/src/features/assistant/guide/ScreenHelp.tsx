@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom'
 import { useInRouterContext, useLocation, useOutletContext } from 'react-router'
 import type { ShellContext } from '../../../app/shell/AppShell'
 import { Button } from '../../../components/Button'
-import { Modal } from '../../../components/Modal'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from '../settlement/entry'
 import { GuideRuntime } from './runtime'
 import { GuideTargets } from './targets'
@@ -27,9 +26,12 @@ const targetMessages: Record<string, string> = {
 export interface ScreenHelpStep {
   targetId: string
   selector?: string
+  firstMatch?: boolean
   anchor?: 'start'
   concise?: boolean
-  presentation?: { side?: 'right' | 'either' }
+  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean }
+  openControl?: boolean
+  advanceOnSelection?: boolean
   /** Presentation lifecycle only: replay a card or start/stop a chart preview. */
   onEnter?: () => void | (() => void)
   attribute?: 'data-guide-target' | 'data-guide-feature'
@@ -43,12 +45,8 @@ export interface ScreenHelpStep {
 type HelpProps = { screenId: string; variant?: string; walkthrough?: readonly ScreenHelpStep[]; saveGuide?: SaveGuide; finalizeGuide?: SaveGuide; runStatus?: string; outcome?: 'execution' | 'processing' | 'finalization' | 'correction' }
 import '../../transaction/payment-guide.css'
 import './screen-help.css'
-import { ScreenOverview } from './ScreenOverview'
-import { snapshotScreen } from './screen-snapshot'
-import type { ScreenSnapshot } from './screen-snapshot'
-import { screenOverviews, targetTitles } from './screen-overviews'
 import { ScreenWalkthrough } from './ScreenWalkthrough'
-import { screenWalkthroughs } from './screen-walkthroughs'
+import { getScreenWalkthrough } from './page-guides'
 
 function HelpIcon() {
   return <svg className="screen-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -58,15 +56,14 @@ function HelpIcon() {
 }
 
 /** Read-only guide orchestration; existing business handlers own all writes and report save outcomes. */
-export function ScreenHelp({ details, walkthrough, legacyTrigger, disabled, triggerRef, ...props }: HelpProps & { details?: ReactNode; legacyTrigger?: ReactNode; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement> }) {
+export function ScreenHelp({ walkthrough, legacyTrigger, disabled, triggerRef, ...props }: HelpProps & { legacyTrigger?: ReactNode; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement> }) {
   const { screenId, variant } = props
   const routed = useInRouterContext()
-  const helpVersion = useOutletContext<ShellContext | null>()?.helpVersion ?? 'after-v2'
+  const helpVersion = useOutletContext<ShellContext | null>()?.helpVersion ?? 'after'
   const definition = definitions.find((entry) => entry.screenId === screenId && entry.variant === variant)
   if (!definition) return <button type="button" className="button button-secondary screen-help-trigger" disabled title="등록된 도움말 버전을 찾을 수 없습니다."><HelpIcon />도움말</button>
-  if (helpVersion === 'after-v2') return <ScreenHelpDetails key={`${screenId}.${variant ?? ''}`} definition={definition} disabled={disabled} triggerRef={triggerRef}>{details}</ScreenHelpDetails>
   if (helpVersion === 'after') {
-    const tour = <ScreenWalkthrough title={definition.title} steps={walkthrough ?? screenWalkthroughs[variant ? `${screenId}.${variant}` : screenId] ?? []} disabled={disabled} triggerRef={triggerRef} />
+    const tour = <ScreenWalkthrough title={definition.title} steps={walkthrough ?? getScreenWalkthrough(screenId, variant)} disabled={disabled} triggerRef={triggerRef} />
     return routed ? <RoutedWalkthrough screenId={screenId}>{tour}</RoutedWalkthrough> : tour
   }
   return <Fragment key={helpVersion}>
@@ -88,67 +85,6 @@ function RoutedWalkthrough({ screenId, children }: { screenId: string; children:
   return <Fragment key={`${location.pathname}?${context}`}>{children}</Fragment>
 }
 
-function ScreenHelpDetails({ definition, children, disabled, triggerRef }: { definition: typeof definitions[number]; children?: ReactNode; disabled?: boolean; triggerRef?: Ref<HTMLButtonElement> }) {
-  const { title, screenId, variant } = definition
-  const [open, setOpen] = useState(false)
-  const [snapshot, setSnapshot] = useState<ScreenSnapshot | null>(null)
-  const [captureRoot, setCaptureRoot] = useState<HTMLElement | null>(null)
-  const [previewFailed, setPreviewFailed] = useState(false)
-  useEffect(() => {
-    if (!open || !captureRoot) return
-    const controller = new AbortController()
-    let timer: number | undefined
-    // Paint the modal before starting preview work, including on slower devices.
-    const frame = requestAnimationFrame(() => {
-      timer = window.setTimeout(() => {
-        const areas = screenOverviews[variant ? `${screenId}.${variant}` : screenId]
-          ?? definition.steps.map(step => ({
-            selector: `[data-guide-target="${step.targetId}"]`,
-            title: targetTitles[step.targetId] ?? title,
-            description: step.instruction,
-          }))
-        void snapshotScreen(captureRoot, areas, controller.signal).then(result => {
-          if (!controller.signal.aborted) setSnapshot(result)
-        }).catch(() => {
-          if (!controller.signal.aborted) setPreviewFailed(true)
-        })
-      }, 0)
-    })
-    return () => { controller.abort(); cancelAnimationFrame(frame); window.clearTimeout(timer) }
-  }, [open, captureRoot, definition, screenId, variant, title])
-  return <>
-    <button
-      type="button"
-      ref={triggerRef}
-      className="button button-secondary screen-help-trigger"
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      disabled={disabled}
-      onClick={(event) => {
-        document.dispatchEvent(new CustomEvent('fgc-screen-help-open', { detail: event.currentTarget }))
-        closeSettlementGuide()
-        if (!children) {
-          const root = event.currentTarget.closest<HTMLElement>('[data-guide-scope], [role="dialog"]')
-            ?? document.querySelector<HTMLElement>('#main-content > .page-content')
-            ?? document.getElementById('main-content')
-            ?? event.currentTarget.parentElement!
-          setCaptureRoot(root)
-        }
-        setOpen(true)
-      }}
-    >
-      <HelpIcon />도움말
-    </button>
-    <Modal open={open} title={`${title} 도움말`} className="screen-help-modal" onClose={() => {
-      setOpen(false); setCaptureRoot(null); setSnapshot(null); setPreviewFailed(false)
-    }}>
-      {children ?? (snapshot ? <ScreenOverview snapshot={snapshot} title={title} />
-        : <p className="screen-help-loading" role={previewFailed ? 'alert' : 'status'}>
-          {previewFailed ? '화면 미리보기를 불러오지 못했습니다. 도움말을 다시 열어 주세요.' : '화면 안내를 준비하고 있습니다.'}
-        </p>)}
-    </Modal>
-  </>
-}
 function RoutedScreenHelp(props: HelpProps) {
   const { screenId, saveGuide } = props
   const location = useLocation()

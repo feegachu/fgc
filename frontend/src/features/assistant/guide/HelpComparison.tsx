@@ -1,12 +1,11 @@
 import { useId } from 'react'
 import './screen-help.css'
 
-export type HelpVersion = 'before' | 'after' | 'after-v2'
+export type HelpVersion = 'before' | 'after'
 
 const versions: { value: HelpVersion; label: string }[] = [
   { value: 'before', label: '수정 전' },
   { value: 'after', label: '수정 후' },
-  { value: 'after-v2', label: '수정 후 v2' },
 ]
 
 export function HelpComparison({ version, onChange }: { version: HelpVersion; onChange: (version: HelpVersion) => void }) {

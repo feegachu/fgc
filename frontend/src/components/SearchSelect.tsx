@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, InputHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
@@ -33,6 +33,15 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
   const [keyword, setKeyword] = useState('')
   const [active, setActive] = useState(-1)
   const [position, setPosition] = useState<CSSProperties>({})
+  const [guided, setGuided] = useState(false)
+  useEffect(() => {
+    const field = anchor.current
+    const show = () => { setGuided(true); setOpen(true) }
+    const hide = () => { setGuided(false); setOpen(false); setKeyword(''); setActive(-1) }
+    field?.addEventListener('fgc-guide-open', show)
+    field?.addEventListener('fgc-guide-close', hide)
+    return () => { field?.removeEventListener('fgc-guide-open', show); field?.removeEventListener('fgc-guide-close', hide) }
+  }, [])
   const result = useInfiniteQuery({
     queryKey: ['selection-search', ...source.key, keyword],
     initialPageParam: 1,
@@ -58,9 +67,10 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
           left: Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 280) - 8)),
           width: Math.max(rect.width, 280),
           maxWidth: 'calc(100vw - 16px)',
-          ...(window.innerHeight - rect.bottom > 240
+          ...(guided || window.innerHeight - rect.bottom > 240
             ? { top: rect.bottom + 4 }
             : { bottom: window.innerHeight - rect.top + 4 }),
+          ...(guided ? { maxHeight: Math.max(100, window.innerHeight - rect.bottom - 16), overflowY: 'auto' } : {}),
         })
     }
     place()
@@ -70,13 +80,14 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
-  }, [expanded])
+  }, [expanded, guided])
   const choose = (option?: T) => {
     onSelect(option ? source.id(option) : '', option)
     anchor.current?.focus()
     setOpen(false)
     setKeyword('')
     setActive(-1)
+    if (option) queueMicrotask(() => anchor.current?.dispatchEvent(new Event('fgc-guide-selected')))
   }
   return (
     <div
@@ -141,7 +152,7 @@ export function SearchSelect<T>({ value, selected, source, onSelect, disabled, .
       />
       {expanded &&
         createPortal(
-          <div className="search-select-popup" ref={popup} style={position}>
+          <div className={`search-select-popup${guided ? ' guide-field-picker-motion' : ''}`} ref={popup} style={position}>
             <div
               id={popupId}
               role="listbox"

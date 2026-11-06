@@ -133,7 +133,7 @@ function TransactionForm({
   const root = useRef<HTMLDivElement>(null)
   const help = useRef<HTMLButtonElement>(null)
   const [helpOpen, setHelpOpen] = useState(false)
-  const helpVersion = useOutletContext<ShellContext | null>()?.helpVersion ?? 'after-v2'
+  const helpVersion = useOutletContext<ShellContext | null>()?.helpVersion ?? 'after'
   const [openedHelpVersion, setOpenedHelpVersion] = useState(helpVersion)
   if (openedHelpVersion !== helpVersion) {
     setOpenedHelpVersion(helpVersion)
@@ -634,23 +634,6 @@ function TransactionForm({
           return true
         } : undefined}
       />
-      <aside
-        className="guidance guidance-info transaction-boundary-guidance"
-        aria-labelledby="transaction-boundary-title"
-      >
-        <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
-          event
-        </span>
-        <div>
-          <h2 className="guidance-title" id="transaction-boundary-title">
-            초년도는 계약일부터 1주년 전날까지입니다
-          </h2>
-          <p className="guidance-copy">
-            계약일이 2026-07-18이면 귀속일 2027-07-17까지 초년도이고, 2027-07-18부터는 아닙니다. 회차 번호가 아닌
-            귀속일로 판단하므로 초년도 지급을 13회차로 미뤄도 한도를 피할 수 없습니다.
-          </p>
-        </div>
-      </aside>
       {(loading || referenceError) && (
         <div
           id="transaction-form-status"

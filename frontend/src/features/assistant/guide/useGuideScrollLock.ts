@@ -7,7 +7,7 @@ export function useGuideScrollLock(card: RefObject<HTMLElement | null>) {
       const guide = card.current
       if (!guide?.isConnected || !guide.getClientRects().length || event.ctrlKey) return
       const target = event.target instanceof Element ? event.target : null
-      const reader = target?.closest<HTMLElement>('.payment-guide-card, .settlement-guide, [role="dialog"]')
+      const reader = target?.closest<HTMLElement>('.payment-guide-card, .settlement-guide, [role="dialog"], .guide-field-picker, .search-select-popup')
       if (reader) {
         for (let node = target; node; node = node.parentElement) {
           const style = getComputedStyle(node)

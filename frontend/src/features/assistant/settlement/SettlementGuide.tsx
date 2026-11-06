@@ -22,6 +22,9 @@ import guideMascot from '../assets/pico-guide.png'
 import { useWorkflowGuide } from '../workflow-state'
 import { usePaymentWalkthrough } from './usePaymentWalkthrough'
 import { useWorkflowWalkthrough } from './useWorkflowWalkthrough'
+import { useGuideStep } from '../guide/useGuideSequence'
+import { GuideFieldPicker } from '../guide/GuideFieldPicker'
+import '../guide/screen-help.css'
 
 const id = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
@@ -69,7 +72,8 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
-  const position = useSpotlight(!collapsed ? activeTarget : null, card)
+  const position = useSpotlight(!collapsed ? activeTarget : null, card, detailedWorkflow, detailedWorkflow ? explanation.step?.presentation : undefined)
+  useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
   const detailedInput = useRef(false)
   useLayoutEffect(() => { detailedInput.current = detailedPayment || detailedWorkflow })
   const runtime = useRef<GuideRuntime<Evidence> | null>(null)
@@ -397,6 +401,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
   }
   return (
     <>
+      {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
       {!collapsed && position.box && activeTarget && (
         <div className="payment-guide-spotlight settlement-guide-spotlight" aria-hidden="true" style={position.box} />
       )}
@@ -477,7 +482,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
               <section aria-label="지급 초안 세부 안내" aria-live="polite">
                 <small>입력 안내 {walkthrough.index + 1}/{walkthrough.total}</small>
                 <h2>{walkthrough.step.title}</h2>
-                <p>{walkthrough.step.instruction}</p>
+                {walkthrough.step.concise ? <p className="screen-step-summary"><span>{walkthrough.step.instruction}</span><span>{walkthrough.step.interaction}</span></p> : <p>{walkthrough.step.instruction}</p>}
                 {walkthrough.message && <p role="status">{walkthrough.message}</p>}
                 {walkthrough.status === 'PAUSED' && <button onClick={walkthrough.retry}>다시 찾기</button>}
                 {walkthrough.step.id === 'save' && walkthrough.saved && <p role="status">저장 응답을 받았습니다. 서버 결과를 확인하고 다음 업무로 이동하세요.</p>}
@@ -492,7 +497,8 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
               <section aria-label="업무 세부 안내" aria-live="polite">
                 <small>설명 {explanation.index + 1}/{explanation.total}</small>
                 <h2>{explanation.step.title}</h2>
-                <p>{explanation.step.instruction}</p>
+                {explanation.step.concise ? <p className="screen-step-summary"><span>{explanation.step.instruction}</span><span>{explanation.step.interaction}</span></p> : <p>{explanation.step.instruction}</p>}
+                {explanation.step.workflowInstruction && <p>{explanation.step.workflowInstruction}</p>}
                 {explanation.message && <p role="status">{explanation.message}</p>}
                 {explanation.status === 'PAUSED' && <button onClick={explanation.retry}>다시 찾기</button>}
                 <div className="settlement-guide-actions">

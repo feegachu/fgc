@@ -6,7 +6,7 @@
 .contract-editor-fields {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.03fr);
   grid-template-areas: 'basic premium' 'agent premium';
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -20,6 +20,13 @@
 }
 .contract-editor-premium {
   grid-area: premium;
+  padding-bottom: var(--space-4);
+}
+.contract-editor .contract-form-card {
+  min-height: 0;
+}
+.contract-editor > .contract-form-actions {
+  min-height: 4rem;
 }
 .contract-form-fields .field-label .evidence {
   margin-left: var(--space-1);

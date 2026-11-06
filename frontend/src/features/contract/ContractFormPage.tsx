@@ -433,10 +433,19 @@ function ContractEditor({
                 <h2 id="contract-basic-heading" className="surface-title">
                   계약 기본
                 </h2>
-                <p>보험회사와 계약일을 먼저 선택하면 판매 가능한 상품 버전을 조회합니다.</p>
+                <p>계약일 → 보험회사 → 상품 판매버전 순서로 선택해 주세요.</p>
               </div>
             </header>
             <div className="contract-form-fields">
+              <Field label="계약일" required error={errors.contractDate} helper="미래 날짜는 선택할 수 없습니다.">
+                <input data-guide-feature="features.contract.contract-form-page.contract-date"
+                  name="contractDate"
+                  type="date"
+                  max={currentDate}
+                  value={draft.contractDate}
+                  onChange={(event) => change('contractDate', event.target.value)}
+                />
+              </Field>
               <Field label="보험회사" required error={errors.insurerId}>
                 <select data-guide-feature="features.contract.contract-form-page.insurer-id"
                   name="insurerId"
@@ -503,15 +512,6 @@ function ContractEditor({
                   autoComplete="off"
                   value={draft.contractNo}
                   onChange={(event) => change('contractNo', event.target.value)}
-                />
-              </Field>
-              <Field label="계약일" required error={errors.contractDate} helper="미래 날짜는 선택할 수 없습니다.">
-                <input data-guide-feature="features.contract.contract-form-page.contract-date"
-                  name="contractDate"
-                  type="date"
-                  max={currentDate}
-                  value={draft.contractDate}
-                  onChange={(event) => change('contractDate', event.target.value)}
                 />
               </Field>
               {original ? (
@@ -727,18 +727,18 @@ function ContractEditor({
                     ))}
                 </select>
               </Field>
-              {amountInput(
-                'premiumPerCycleAmount',
-                '주기 보험료(원)',
-                draft.paymentCycleCode === 'SINGLE'
-                  ? '일시납은 한 번 낼 실제 보험료를 입력합니다.'
-                  : '비워 두면 월납환산 초회보험료 × 납입주기로 채웁니다. 실제 청구액이 다르면 직접 고치세요.',
-              )}
               {amountInput('firstPremiumAmount', '초회 보험료(원)')}
               {amountInput(
                 'monthlyEquivalentFirstPremium',
                 '월납환산 초회보험료(원)',
                 '1,200% 한도 계산의 기준 금액입니다.',
+              )}
+              {amountInput(
+                'premiumPerCycleAmount',
+                '주기 보험료(원)',
+                draft.paymentCycleCode === 'SINGLE'
+                  ? '일시납은 한 번 낼 실제 보험료를 입력합니다.'
+                  : '월납환산 초회보험료와 납입주기로 자동 입력됩니다. 실제 청구액이 다르면 직접 고치세요.',
               )}
               {amountInput(
                 'paymentTermMonths',
@@ -770,7 +770,9 @@ function ContractEditor({
                 </strong>
                 <span>원</span>
               </div>
-              <p>월납환산 초회보험료 × 12</p>
+              <p>{draft.monthlyEquivalentFirstPremium !== '' && Number.isSafeInteger(Number(draft.monthlyEquivalentFirstPremium) * 12)
+                ? `월납환산 초회보험료 ${int(Number(draft.monthlyEquivalentFirstPremium))}원 × 12 = ${int(Number(draft.monthlyEquivalentFirstPremium) * 12)}원`
+                : '월납환산 초회보험료의 12배입니다. 예: 10만원 × 12 = 120만원'}</p>
               <p>
                 참고용 기본 계산식입니다. 실제 한도는 적용 룰셋/해약환급금 합산 등을 반영해 저장 뒤 다시 계산합니다.
               </p>
@@ -797,7 +799,7 @@ function ContractEditor({
                         ? '상태 변경 사유의 필수 항목(*)과 일시를 확인해 주세요.'
                         : '필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.'}
           </p>
-          <div className="contract-action-buttons">
+          <div className="contract-action-buttons" aria-label="계약 취소와 저장">
             {(conflict || missingToken) && (
               <Button data-guide-feature="features.contract.contract-form-page.button-3" variant="secondary" onClick={() => setConfirmReload(true)}>
                 최신 계약 다시 불러오기

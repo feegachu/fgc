@@ -32,22 +32,12 @@ test('화면 도움말을 닫으면 정책 입력창과 작성 내용이 유지�
   const editor = page.getByRole('dialog')
   await editor.getByLabel('정책코드').fill('HELP-KEEP')
   await editor.getByRole('button', { name: '도움말', exact: true }).click()
-  const help = page.getByRole('dialog', { name: '정책 초안 작성 도움말' })
-  await expect(help.getByRole('list', { name: '번호별 화면 설명' }).getByRole('listitem')).toHaveCount(2)
-  await expect(help.getByRole('button', { name: '창 닫기' })).toBeFocused()
+  const help = page.getByRole('region', { name: '정책 초안 작성 도움말' })
+  await expect(help.getByRole('button', { name: '종료', exact: true })).toBeFocused()
+  await expect(page.getByRole('dialog')).toHaveCount(1)
   await page.setViewportSize({ width: 390, height: 844 })
-  const preview = help.locator('.snapshot-frame')
-  await expect(help.locator('.snapshot-number')).toHaveCount(2)
-  await expect.poll(async () => {
-    const frame = await preview.boundingBox()
-    if (!frame) return false
-    const numbers = await help.locator('.snapshot-number').all()
-    for (const number of numbers) {
-      const box = await number.boundingBox()
-      if (!box || box.x < frame.x - 1 || box.y < frame.y - 1 || box.x + box.width > frame.x + frame.width + 1 || box.y + box.height > frame.y + frame.height + 1) return false
-    }
-    return true
-  }).toBe(true)
+  await expect(help.getByRole('heading')).toBeVisible()
+  await expect(page.locator('.screen-step-spotlight')).toBeVisible()
   await page.screenshot({ path: 'test-results/help-policy-mobile.png' })
   await page.keyboard.press('Escape')
   await expect(help).toHaveCount(0)

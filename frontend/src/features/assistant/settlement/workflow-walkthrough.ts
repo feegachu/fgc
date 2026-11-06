@@ -1,36 +1,31 @@
 import type { SettlementStep } from './state'
+import type { ScreenHelpStep } from '../guide/ScreenHelp'
+import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
 
-export interface WorkflowExplanation {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'onEnter' | 'interaction' | 'concise'>> {
   id: string
   selector: string
   title: string
   instruction: string
   input?: boolean
+  workflowInstruction?: string
 }
 const target = (id: string) => `[data-guide-target="${id}"]`
 const step = (id: string, selector: string, title: string, instruction: string, input = false): WorkflowExplanation =>
   ({ id, selector, title, instruction, input })
 const review = (id: string, title: string, instruction: string) => step(id, target(id), title, instruction)
-const field = (name: string, title: string, instruction: string) => step(name, `[name="${name}"]`, title, instruction, true)
 
 /** Explanations never execute a business operation or assert server completion. */
-export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false): WorkflowExplanation[] {
+function workflowInstructions(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false): WorkflowExplanation[] {
   switch (stage) {
     case 'contract.create':
       if (path !== '/contracts/new') return [step('saved', 'h1', '계약 저장 결과를 확인하세요', '저장된 계약 상세인지 확인하세요. 다음 버튼으로 서버의 계약과 스케줄을 조회합니다.')]
-      return [
-        field('contractDate', '계약일을 입력하세요', '상품과 정책의 적용 기준이 되는 실제 계약일을 입력하세요.'),
-        field('insurerId', '보험회사를 선택하세요', '계약의 원수 보험회사를 선택하세요.'),
-        field('productOfferingId', '판매 상품을 선택하세요', '계약일과 보험회사에 맞는 검색 결과를 선택하세요. 검색어 입력만으로 선택되지 않습니다.'),
-        field('contractNo', '계약번호를 입력하세요', '원천의 계약번호를 입력하고 중복 여부를 확인하세요.'),
-        field('agentId', '담당 설계사를 선택하세요', '검색 결과에서 실제 계약 담당 설계사를 선택하세요.'),
-        field('paymentCycleCode', '납입주기를 확인하세요', '월납·연납·일시납 등 실제 납입주기를 선택하세요.'),
-        step('premiumPerCycleAmount', '[name="premiumPerCycleAmount"]', '주기 보험료를 확인하세요', '직접 입력하거나 비워 두세요. 비워 두면 월납환산 보험료와 납입주기로 자동 계산합니다.'),
-        field('firstPremiumAmount', '초회 보험료를 입력하세요', '계약의 최초 납입 보험료를 입력하세요.'),
-        field('monthlyEquivalentFirstPremium', '월납환산 보험료를 확인하세요', '초년도 한도의 기준 금액입니다. 실제 원천 기준으로 확인하세요.'),
-        field('paymentTermMonths', '납입기간을 확인하세요', '상품 기준 납입기간을 개월 단위로 확인하세요. 자동 채워진 값도 확인합니다.'),
-        review('contract.save', '직접 계약을 저장하세요', '화면의 등록 버튼을 직접 누르세요. 오류는 입력을 수정하고, 성공 후 저장 결과를 확인합니다.'),
-      ]
+      return getScreenWalkthrough('CONT-W03')
+        .filter(entry => !entry.targetId.endsWith('next-contract-status') && !entry.targetId.endsWith('status-event-effective-at'))
+        .map(entry => ({ ...entry, id: entry.targetId, selector: guideSelector(entry),
+          input: entry.openControl || entry.targetId.endsWith('contract-no'),
+          workflowInstruction: entry.targetId === 'contract.save' ? '직접 저장한 뒤 서버의 계약과 스케줄을 확인하고 다음 업무로 이어갑니다.' : undefined,
+        }))
     case 'schedule.review':
       if (!path.startsWith('/schedules/')) return [
         review('contract.schedules', '계약의 스케줄을 선택하세요', '지급단계와 사용 중인 버전을 확인하고 회차 상세를 여세요. 결과가 없으면 원천과 생성 상태를 확인하세요.'),
@@ -108,4 +103,21 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
       review('validation.finalize', '최종 확정을 직접 실행하세요', '화면의 최종 확정 버튼과 확인창을 직접 조작하세요. 아래 결과 확인에서 서버 FINALIZED 상태일 때만 전체 안내를 완료합니다.'),
     ]
   }
+}
+
+/** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
+export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false): WorkflowExplanation[] {
+  const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
+  if (stage === 'contract.create') return instructions
+  const screenId = path.startsWith('/contracts/') ? 'CONT-W02'
+    : path.startsWith('/schedules/') ? 'SCHE-W02'
+      : path === '/transactions/new' ? 'TRAN-W02' : path === '/transactions' ? 'TRAN-W01'
+        : path === '/validation-runs' ? 'VRUN-W01' : path.startsWith('/validation-runs/') ? 'VRUN-W02'
+          : path === '/reconciliation' ? 'RECO-W01' : path === '/exceptions' ? 'EXCP-W01' : ''
+  const page = getScreenWalkthrough(screenId)
+  return instructions.map(instruction => {
+    const shared = page.find(entry => guideSelector(entry) === instruction.selector)
+    return shared ? { ...shared, ...instruction, title: shared.title, instruction: shared.instruction,
+      workflowInstruction: instruction.instruction } : instruction
+  })
 }

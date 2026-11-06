@@ -121,10 +121,10 @@ it('preserves dirty input when navigation is cancelled and only discards after a
   await userEvent.type(screen.getByRole('textbox', { name: '보험회사' }), '입력중')
   await act(() => router.navigate('/schedules?month=2026-07'))
   await screen.findByRole('dialog', { name: '저장하지 않은 입력이 있어요' })
-  await userEvent.click(screen.getByRole('button', { name: '현재 입력 유지하고 돌아가기' }))
+  await userEvent.click(screen.getByRole('button', { name: '돌아가기' }))
   expect(screen.getByRole('textbox', { name: '보험회사' })).toHaveValue('입력중')
   await act(() => router.navigate('/schedules?month=2026-07'))
-  await userEvent.click(screen.getByRole('button', { name: '입력을 버리고 이동' }))
+  await userEvent.click(screen.getByRole('button', { name: '이동' }))
   expect(await screen.findByText('스케줄 목록')).toBeInTheDocument()
 })
 it('does not start a guide outside the authenticated role', async () => {

@@ -21,7 +21,6 @@ import { AgentStatusPanel } from './AgentStatusPanel'
 import { MonthlyCommissions } from './MonthlyCommissions'
 import { RecentExceptionTicker } from './RecentExceptionTicker'
 import { DashboardSkeleton } from './DashboardSkeleton'
-import { DashboardHelpDetails } from './DashboardHelpDetails'
 import { dashboardWalkthrough } from './dashboard-walkthrough'
 import { RegionError, UpdatedAt } from './RegionStatus'
 import { RiskComposition, type CompositionItem } from './RiskComposition'
@@ -285,7 +284,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
   return (
     <div className="dashboard-page">
       <header className="page-header">
-        <ScreenHelp screenId="DASH-W01" details={revised ? <DashboardHelpDetails /> : undefined} walkthrough={revised ? walkthrough : undefined} />
+        <ScreenHelp screenId="DASH-W01" walkthrough={revised ? walkthrough : undefined} />
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>

@@ -6,6 +6,10 @@ import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from 
 import guideMascot from '../assets/pico-guide.png'
 import type { ScreenHelpStep } from './ScreenHelp'
 import { useSpotlight } from './useSpotlight'
+import { useGuideSequence, useGuideStep } from './useGuideSequence'
+import { GuideFieldPicker } from './GuideFieldPicker'
+
+const identify = (step: ScreenHelpStep) => step.targetId
 
 function visible(element: HTMLElement) {
   if (!element.isConnected || element.closest('[hidden], [inert], [aria-hidden="true"]')) return false
@@ -20,7 +24,7 @@ function resolveTarget(trigger: HTMLElement, step: ScreenHelpStep) {
   const selector = step.selector ?? `[${step.attribute ?? 'data-guide-target'}="${step.targetId}"]`
   const matches = [...(root.matches(selector) ? [root as HTMLElement] : []), ...root.querySelectorAll<HTMLElement>(selector)].filter(visible)
   // Repeated row controls are explained by their containing list, never an arbitrary row.
-  if (matches.length !== 1) return null
+  if (!matches.length || matches.length !== 1 && !step.firstMatch) return null
   const element = matches[0]
   if (step.anchor !== 'start') return element
   // Lists use their columns and first three rows; useSpotlight bounds this preview.
@@ -41,17 +45,16 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
   const [ownerDialog, setOwnerDialog] = useState<HTMLElement | null>(null)
   const card = useRef<HTMLElement | null>(null)
   const [session, setSession] = useState<readonly ScreenHelpStep[] | null>(null)
-  const [index, setIndex] = useState(0)
+  const [sessionId, setSessionId] = useState(0)
   const [folded, setFolded] = useState(false)
   const [target, setTarget] = useState<HTMLElement | null>(null)
   const [covered, setCovered] = useState(false)
-  const step = session?.[index]
+  const sequence = useGuideSequence(session ?? [], String(sessionId), identify)
+  const { index, step } = sequence
   const position = useSpotlight(session && !covered && !folded ? target : null, card, true, step?.presentation)
   const close = () => { setSession(null); trigger?.focus() }
 
-  useEffect(() => {
-    if (step && !covered && !folded) return step.onEnter?.()
-  }, [step, covered, folded])
+  useGuideStep(step, target, sequence.next, Boolean(session && !covered && !folded))
 
   useEffect(() => {
     const other = (event: Event) => {
@@ -106,13 +109,14 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
         document.dispatchEvent(new CustomEvent('fgc-screen-help-open', { detail: current }))
         closeSettlementGuide()
         const available = steps.filter(item => resolveTarget(current, item))
-        setIndex(0); setFolded(false); setCovered(false); setSession(available)
+        setSessionId(value => value + 1); setFolded(false); setCovered(false); setSession(available)
         setTarget(available[0] ? resolveTarget(current, available[0]) : null)
       }}>
       <svg className="screen-help-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4m0 3h.01" /></svg>
       도움말
     </button>
     {session && !covered && createPortal(<>
+      {!folded && step?.openControl && <GuideFieldPicker key={step.targetId} target={target} />}
       {!folded && position.box && target && <div className="payment-guide-spotlight screen-step-spotlight" style={position.box} aria-hidden="true" />}
       <section ref={card} className="payment-guide-card screen-step-guide" aria-label={`${title} 도움말`}
         data-help-presentation={Boolean(step?.presentation)}
@@ -137,8 +141,8 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
             {index === 0 && <p className="screen-step-context">현재 표시된 요소를 안내합니다. 다른 탭이나 상세에서도 도움말을 다시 열어 보세요.</p>}
           </>}
           <div className="payment-guide-actions">
-            <Button variant="secondary" disabled={index === 0} onClick={() => setIndex(index - 1)}>이전</Button>
-            <Button className="screen-step-next" onClick={() => index + 1 === session.length ? close() : setIndex(index + 1)}>{index + 1 === session.length ? '안내 마치기' : '다음'}</Button>
+            <Button variant="secondary" disabled={index === 0} onClick={sequence.previous}>이전</Button>
+            <Button className="screen-step-next" onClick={() => sequence.last ? close() : sequence.next()}>{sequence.last ? '안내 마치기' : '다음'}</Button>
           </div>
         </> : <>
           <h2>안내할 화면을 준비하고 있어요</h2>

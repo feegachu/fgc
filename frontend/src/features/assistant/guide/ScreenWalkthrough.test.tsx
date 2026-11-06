@@ -12,7 +12,7 @@ import definitions from './screen-help.json'
 import { screenWalkthroughs } from './screen-walkthroughs'
 
 vi.mock('react-router', async original => ({
-  ...await original<typeof import('react-router')>(), useOutletContext: () => ({ helpVersion: 'after' }),
+  ...await original<typeof import('react-router')>(), useOutletContext: () => null,
 }))
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{ x: 0, y: 100, width: 100, height: 40 }] as unknown as DOMRectList)
@@ -48,8 +48,13 @@ it('covers every remaining screen and modal with detailed, uniquely identified e
     expect(tour.length, key).toBeGreaterThanOrEqual(2)
     expect(new Set(tour.map(step => step.targetId)).size, key).toBe(tour.length)
     for (const step of tour) {
-      expect(step.instruction.length, `${key}/${step.targetId}`).toBeGreaterThan(30)
-      expect(step.details[0].text.length).toBeGreaterThan(25)
+      if (step.concise) {
+        expect(step.instruction.length, `${key}/${step.targetId}`).toBeLessThanOrEqual(30)
+        expect(step.details).toEqual([])
+      } else {
+        expect(step.instruction.length, `${key}/${step.targetId}`).toBeGreaterThan(30)
+        expect(step.details[0].text.length).toBeGreaterThan(25)
+      }
       expect(step.interaction).not.toBe('')
       if (step.selector) expect(() => document.querySelector(step.selector!)).not.toThrow()
     }

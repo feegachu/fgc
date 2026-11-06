@@ -5,9 +5,10 @@ import { useGuideScrollLock } from './useGuideScrollLock'
 const HIGHLIGHT_PADDING = 10
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
-  presentation?: { side?: 'right' | 'either' }) {
+  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean }) {
   useGuideScrollLock(card)
   const full = Boolean(presentation), preferredSide = presentation?.side
+  const includeLabel = presentation?.includeLabel
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -41,6 +42,10 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     const heightLimit = () => Math.min(detailed ? 560 : 460, window.innerHeight * (detailed && window.innerWidth >= 768 ? 0.65 : 0.5))
     const targetRect = () => {
       const rect = target!.getBoundingClientRect()
+      if (includeLabel) {
+        const label = target!.closest('.field')?.querySelector('.field-label')?.getBoundingClientRect()
+        if (label) return new DOMRect(rect.left, Math.min(rect.top, label.top), rect.width, rect.bottom - Math.min(rect.top, label.top))
+      }
       if (!detailed || !target!.matches('table')) return rect
       const header = target!.querySelector<HTMLElement>(':scope > thead')
       const rows = [...target!.querySelectorAll<HTMLElement>(':scope > tbody > tr')]
@@ -56,6 +61,13 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     const alignTarget = () => {
       if (!target?.isConnected) return
       if (targetInHeader) return
+      const tableViewport = target.closest<HTMLElement>('.data-table-viewport')
+      if (tableViewport && !target.matches('table')) {
+        const element = target.getBoundingClientRect(), viewport = tableViewport.getBoundingClientRect()
+        const offset = element.right > viewport.right ? element.right - viewport.right + 12
+          : element.left < viewport.left ? element.left - viewport.left - 12 : 0
+        if (offset) tableViewport.scrollBy({ left: offset, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+      }
       if (detailed) {
         const rect = targetRect()
         const modalBody = target.closest<HTMLElement>('.modal-body')
@@ -68,7 +80,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const offset = rect.top < top ? rect.top - top : visibleEnd > bottom ? visibleEnd - bottom : 0
         if (offset) {
           if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
-          else window.scrollBy?.({ top: offset, behavior: 'instant' })
+          else scrollSmoothly(offset)
         }
         return
       }
@@ -103,18 +115,22 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
         if (full && target?.isConnected) {
           const rect = targetRect()
-          const context = rect
+          const popupWidth = includeLabel ? target.matches('input[type="date"]') ? 300 : 280 : 0
+          const context = new DOMRect(rect.left, rect.top, Math.max(rect.width, popupWidth), rect.height)
           const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
           const topBoundary = headerBottom + 16
           const rightRoom = workspaceRight - context.right - 36
           const leftRoom = context.left - cardLeftBoundary - 36
-          const side = preferredSide && rightRoom >= 280 ? 'right' : preferredSide && leftRoom >= 280 ? 'left' : null
+          const side = preferredSide === 'above' ? null
+            : preferredSide === 'left' && leftRoom >= 280 ? 'left'
+              : preferredSide && rightRoom >= 280 ? 'right' : preferredSide && leftRoom >= 280 ? 'left' : null
           const cardWidth = Math.min(420, side === 'right' ? rightRoom : side === 'left' ? leftRoom : workspaceRight - cardLeftBoundary - 24)
           const maxHeight = Math.max(160, height - topBoundary - 12)
           const cardHeight = Math.min(Math.max(card.current?.scrollHeight ?? 0, card.current?.offsetHeight ?? 0) || 280, maxHeight)
           const cardLeft = side === 'right' ? context.right + 24 : side === 'left' ? context.left - cardWidth - 24
             : Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12))
-          let cardTop = side ? Math.max(topBoundary, Math.min(context.top, height - cardHeight - 12)) : context.bottom + 24
+          let cardTop = side ? Math.max(topBoundary, Math.min(context.top, height - cardHeight - 12))
+            : preferredSide === 'above' ? context.top - cardHeight - 24 : context.bottom + 24
           if (!side && cardTop + cardHeight > height - 12) cardTop = context.top - cardHeight - 24
           cardTop = Math.max(topBoundary, Math.min(cardTop, height - cardHeight - 12))
           setPosition({
@@ -130,8 +146,10 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
             preparedPresentation = `${width}:${height}`
             // Reveal the whole card, reserving a full explanation below it only on narrow screens.
             const bottom = height - 20 - (side ? 0 : cardHeight + 24)
-            const offset = context.top < topBoundary || context.height > bottom - topBoundary
-              ? context.top - topBoundary : Math.max(0, context.bottom - bottom)
+            const offset = preferredSide === 'above'
+              ? context.top < topBoundary ? context.top - topBoundary : Math.max(0, context.bottom - height + 20)
+              : context.top < topBoundary || context.height > bottom - topBoundary
+                ? context.top - topBoundary : Math.max(0, context.bottom - bottom)
             scrollSmoothly(offset)
           }
           return
@@ -241,6 +259,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide])
+  }, [target, card, detailed, full, preferredSide, includeLabel])
   return position
 }

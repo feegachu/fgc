@@ -22,20 +22,19 @@ test('화면 도움말에서 지급 입력 영역을 확인해도 저장 요청�
     if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url())
   })
   await page.getByRole('button', { name: '도움말', exact: true }).click()
-  const help = page.getByRole('dialog', { name: '수수료 지급 등록 도움말' })
-  await expect(help.getByRole('heading', { name: '지급 건', exact: true })).toBeVisible()
-  await expect(help.getByRole('heading', { name: '계약 귀속', exact: true })).toBeVisible()
-  await expect(help.locator('.snapshot-number')).not.toHaveCount(0)
+  const help = page.getByRole('region', { name: '수수료 지급 등록 도움말' })
+  await expect(help.getByRole('heading')).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.screenshot({ path: 'test-results/help-payment-desktop.png' })
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: '도움말', exact: true })).toBeFocused()
   const comparison = page.getByRole('radiogroup', { name: '도움말 비교' })
-  await comparison.getByRole('radio', { name: '수정 후 v2', exact: true }).focus()
-  await page.keyboard.press('ArrowLeft')
-  await expect(comparison.getByRole('radio', { name: '수정 후', exact: true })).toBeChecked()
-  await page.getByRole('button', { name: '도움말', exact: true }).click()
-  await expect(page.getByRole('region', { name: '수수료 지급 등록 도움말' })).toBeVisible()
   await comparison.getByRole('radio', { name: '수정 후', exact: true }).focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(comparison.getByRole('radio', { name: '수정 전', exact: true })).toBeChecked()
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  await expect(page.getByRole('region', { name: '지급 업무 가이드' })).toBeVisible()
+  await comparison.getByRole('radio', { name: '수정 전', exact: true }).focus()
   await page.keyboard.press('ArrowRight')
   await expect(page.getByRole('region', { name: '지급 업무 가이드' })).toHaveCount(0)
   await expect(amount).toHaveValue('260000')
@@ -303,6 +302,18 @@ async function installApi(
     },
   }
 }
+
+test('지급 목록 도움말은 신규 등록과 수정·삭제까지 네 단계로 안내한다', async ({ page }) => {
+  const fixture = await installApi(page, { initialDraft: {
+    commissionTransactionId: 101, status: 'DRAFT', sourceBusinessKey: 'HELP-DRAFT',
+    sourceType: 'GA_MANUAL_PAYMENT', paymentStage: 'GA_TO_FC', amount: 1000, settlementMonth: '2026-07-01',
+  } })
+  await page.goto('transactions?month=2026-07')
+  await expect(page.getByRole('button', { name: 'HELP-DRAFT 삭제', exact: true })).toBeVisible()
+  const titles = await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 4)
+  expect(titles).toEqual(['지급 조회 범위', '지급 상태와 금액', '신규 지급 등록', '지급 수정·삭제'])
+  expect(fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method))).toEqual([])
+})
 
 test('초안 삭제는 확인 후 실행하며 취소 시 목록을 유지한다', async ({ page }) => {
   const fixture = await installApi(page, {
@@ -718,8 +729,8 @@ for (const viewport of [
     })
     await page.goto('transactions/new?id=101&month=2026-07')
     await expect(page.locator('#btn-precheck')).toBeEnabled()
-    await page.getByRole('radio', { name: '수정 후 v2', exact: true }).focus()
-    await page.keyboard.press('ArrowRight')
+    await page.getByRole('radio', { name: '수정 후', exact: true }).focus()
+    await page.keyboard.press('ArrowLeft')
     const help = page.getByRole('button', { name: '도움말', exact: true })
     await help.click()
     const card = page.getByRole('region', { name: '지급 업무 가이드' })
