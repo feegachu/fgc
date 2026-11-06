@@ -3401,6 +3401,20 @@
         "next": []
       },
       {
+        "stepId": "help.77b92ea9ecb1e9aa7487b64df7625c44",
+        "screenId": "POL-W01",
+        "targetId": "policy.draft-input.sourcerefs",
+        "title": "정책, 출처 자료 번호",
+        "instruction": "‘출처 자료 번호’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.77bb97a8d2a95ccb678b04b39e34238d",
         "screenId": "POL-W01",
         "targetId": "policy.draft-select.clawbackrules.insurerid",
@@ -4917,6 +4931,20 @@
         "targetId": "policy.draft-input.feeregimerules.salesstartdatefrom",
         "title": "정책, 판매 시작일 범위, 시작",
         "instruction": "‘판매 시작일 범위, 시작’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT"
+        ],
+        "next": []
+      },
+      {
+        "stepId": "help.77b92ea9ecb1e9aa7487b64df7625c44",
+        "screenId": "POL-W01",
+        "targetId": "policy.draft-input.sourcerefs",
+        "title": "정책, 출처 자료 번호",
+        "instruction": "‘출처 자료 번호’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

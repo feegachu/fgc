@@ -710,6 +710,7 @@
     "policy.draft-input.policycode": "CAN_WRITE_POLICY",
     "policy.draft-input.sourcedetails.title": "CAN_WRITE_POLICY",
     "policy.draft-input.sourcedetails.url": "CAN_WRITE_POLICY",
+    "policy.draft-input.sourcerefs": "CAN_WRITE_POLICY",
     "policy.draft-select.clawbackrules.clawbackbasiscode": "CAN_WRITE_POLICY",
     "policy.draft-select.clawbackrules.commissionitemid": "CAN_WRITE_POLICY",
     "policy.draft-select.clawbackrules.insurerid": "CAN_WRITE_POLICY",

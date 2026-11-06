@@ -3405,6 +3405,11 @@
     "element": "input"
   },
   {
+    "id": "policy.draft-input.sourcerefs",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
     "id": "policy.draft-select.clawbackrules.clawbackbasiscode",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "select"

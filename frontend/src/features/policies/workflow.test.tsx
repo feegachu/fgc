@@ -258,7 +258,7 @@ describe('production policy workflow', () => {
     await user.click(screen.getByRole('button', { name: '제출' }))
     await user.type(screen.getByLabelText(/작업 사유/), '검토 요청')
     await user.click(screen.getByRole('button', { name: '제출 확인' }))
-    await waitFor(() => expect(screen.getByRole('group', { name: '근거 규정' })).toHaveFocus())
+    await waitFor(() => expect(screen.getByLabelText('출처 자료 번호')).toHaveFocus())
     expect(screen.getByRole('heading', { name: '정책 초안 수정' })).toBeVisible()
   })
 

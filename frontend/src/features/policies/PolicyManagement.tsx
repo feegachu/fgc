@@ -359,7 +359,7 @@ export function PolicySources({
       {missing.map((ref) => (
         <article className="policy-source-card" key={ref}>
           <div>
-            <StatusBadge>{refLabel(ref)}</StatusBadge>
+            <StatusBadge>{refLabel(ref) || '출처 자료'}</StatusBadge>
             {referenceInfo(ref)}
             <SourceStatusTags />
             <p>등록된 제목, 설명, 링크가 없습니다.</p>

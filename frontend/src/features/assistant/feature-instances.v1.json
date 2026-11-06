@@ -131,7 +131,8 @@
     "parameters.acquisition_cost_source",
     "policycode",
     "sourcedetails.title",
-    "sourcedetails.url"
+    "sourcedetails.url",
+    "sourcerefs"
   ],
   "policy.draft-select": [
     "clawbackrules.clawbackbasiscode",
