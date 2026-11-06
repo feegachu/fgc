@@ -9117,21 +9117,6 @@
         "next": []
       },
       {
-        "stepId": "help.631b57098f427676f1ef1a2d88247dae",
-        "screenId": "DASH-W01",
-        "targetId": "features.dashboard.branch.bar-detail",
-        "title": "업무 대시보드, 원",
-        "instruction": "업무 대시보드 화면의 ‘원’ 버튼이나 메뉴 위치입니다. 화면에 표시된 항목과 원천 근거를 확인하세요. 필요한 탭, 상세, 확인 창은 직접 열어주세요. 버튼 실행은 직접 진행하며, 비활성 항목은 현재 권한과 업무 상태를 확인하세요. 위치 안내는 실제 저장, 계산, 처리 완료를 뜻하지 않습니다.",
-        "completionRuleId": "USER_REVIEWED",
-        "roles": [
-          "SYSTEM_ADMIN",
-          "GA_ADMIN",
-          "SETTLEMENT",
-          "COMPLIANCE"
-        ],
-        "next": []
-      },
-      {
         "stepId": "help.63d8d223cf3821e7243678825817a0cb",
         "screenId": "DASH-W01",
         "targetId": "components.data-table.input",

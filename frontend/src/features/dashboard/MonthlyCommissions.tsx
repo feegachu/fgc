@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { won } from '../../lib/format'
 import { monthText } from '../../lib/screenText'
 import { monthlyCommissionsQueryOptions } from './api'
@@ -57,7 +59,9 @@ function CommissionTotal({ label, value, previous }: { label: string; value?: nu
   return (
     <div className="commission-total">
       <span>{label}</span>
-      <strong className="tabular-nums">{won(value)}</strong>
+      <strong className="tabular-nums">
+        {value == null ? won(value) : <AnimatedNumber value={value} format={won} />}
+      </strong>
       <small data-direction={change.direction}>
         <span aria-hidden="true">{change.direction === 'up' ? '↗ ' : change.direction === 'down' ? '↘ ' : ''}</span>
         {change.text}
@@ -102,6 +106,7 @@ function CommissionChart({ months }: { months: MonthlyCommission[] }) {
                   key={row.month}
                   type="button"
                   className="commission-month"
+                  style={{ '--bar-delay': `${index * 55}ms` } as CSSProperties}
                   data-active={index === active}
                   aria-label={`${monthText(row.month?.slice(0, 7) ?? '')}, GA 수령액 ${won(row.gaAmount)}, 설계사 지급액 ${won(row.agentAmount)}`}
                   onMouseEnter={() => setHovered(index)}

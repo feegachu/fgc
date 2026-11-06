@@ -3,6 +3,7 @@ package com.susukkang.fgc.dashboard.controller;
 import com.susukkang.fgc.common.exception.FgcBusinessException;
 import com.susukkang.fgc.common.exception.FgcErrorCode;
 import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.dashboard.dto.DashboardCommissionResponse;
 import com.susukkang.fgc.dashboard.dto.DashboardSummaryResponse;
 import com.susukkang.fgc.dashboard.dto.DashboardSummaryResult;
@@ -70,7 +71,7 @@ public class DashboardController {
 
     private LocalDate targetMonth(String month) {
         try {
-            return (month == null ? YearMonth.now() : YearMonth.parse(month)).atDay(1);
+            return (month == null ? YearMonth.now(DateUtil.SEOUL_ZONE) : YearMonth.parse(month)).atDay(1);
         } catch (DateTimeException e) {
             throw new FgcBusinessException(FgcErrorCode.COMMON_002, "month", Map.of("field", "month"), null);
         }

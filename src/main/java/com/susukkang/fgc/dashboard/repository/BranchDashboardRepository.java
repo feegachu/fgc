@@ -56,26 +56,15 @@ public class BranchDashboardRepository {
                  WHERE ec.status IN ('NEW', 'IN_REVIEW')
             )
             """;
-    private static final String VALID = "contract_date <= :asOf AND as_of_status IN ('ACTIVE', 'UNPAID', 'REVIVED')";
 
-    private MapSqlParameterSource parameters(LocalDate month) {
-        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
-        LocalDate asOf = month.plusMonths(1).minusDays(1);
-        if (asOf.isAfter(today)) asOf = today;
-        return new MapSqlParameterSource("month", month).addValue("nextMonth", month.plusMonths(1))
-                .addValue("asOf", asOf).addValue("pastDate", asOf.isBefore(today))
-                .addValue("asOfEnd", asOf.plusDays(1).atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
-    }
-
-    public BranchDashboardResponse summary(LocalDate month) {
-        var params = parameters(month);
-        var rows = jdbc.query(SOURCES + """
+    private static final String SUMMARY = SOURCES + """
                 , agent_totals AS (
                     SELECT branch_id, COUNT(*) AS registered,
                            COUNT(*) FILTER (WHERE agent_status = 'ACTIVE' AND active_yn) AS active FROM agents GROUP BY branch_id
                 ), contract_totals AS (
                     SELECT branch_id, COUNT(*) FILTER (WHERE is_new) AS new_count,
-                           COUNT(*) FILTER (WHERE %s) AS valid_count FROM contracts GROUP BY branch_id
+                           COUNT(*) FILTER (WHERE contract_date <= :asOf AND as_of_status IN ('ACTIVE', 'UNPAID', 'REVIVED'))
+                               AS valid_count FROM contracts GROUP BY branch_id
                 ), payment_totals AS (
                     SELECT branch_id, SUM(ga_amount) AS ga_amount, SUM(agent_amount) AS agent_amount FROM payments GROUP BY branch_id
                 ), exception_totals AS (
@@ -94,7 +83,42 @@ public class BranchDashboardRepository {
                         AND (o.effective_to IS NULL OR o.effective_to >= :asOf))
                     OR a.registered > 0 OR c.new_count > 0 OR c.valid_count > 0 OR p.branch_id IS NOT NULL OR e.open_count > 0
                  ORDER BY o.organization_code
-                """.formatted(VALID), params, (rs, index) -> new BranchMetrics(rs.getLong("organization_id"),
+                """;
+
+    // Metric is a bound value, never an SQL fragment supplied by a caller.
+    private static final String DETAIL_ROWS = SOURCES + """
+            , detail_rows AS (
+                SELECT contract_id AS id, contract_no AS label, '' AS detail, '' AS status,
+                       ga_amount AS value, agent_amount AS secondary_value
+                  FROM payments WHERE :metric = 'COMMISSIONS' AND branch_id = :branch
+                UNION ALL
+                SELECT agent_id, agent_name, agent_code, agent_status, NULL::numeric, NULL::numeric
+                  FROM agents WHERE :metric = 'AGENTS' AND branch_id = :branch
+                UNION ALL
+                SELECT contract_id, contract_no, CAST(contract_date AS text), as_of_status, NULL::numeric, NULL::numeric
+                  FROM contracts WHERE :metric = 'CONTRACTS' AND branch_id = :branch AND (is_new OR (
+                    contract_date <= :asOf AND as_of_status IN ('ACTIVE', 'UNPAID', 'REVIVED')
+                ))
+                UNION ALL
+                SELECT exception_case_id, title, COALESCE(contract_no, ''), status, NULL::numeric, NULL::numeric
+                  FROM exceptions WHERE :metric = 'EXCEPTIONS' AND branch_id = :branch
+            )
+            """;
+    private static final String DETAIL_COUNT = DETAIL_ROWS + " SELECT COUNT(*) FROM detail_rows";
+    private static final String DETAIL_PAGE = DETAIL_ROWS + " SELECT * FROM detail_rows ORDER BY id DESC LIMIT 10 OFFSET :offset";
+
+    private MapSqlParameterSource parameters(LocalDate month) {
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
+        LocalDate asOf = month.plusMonths(1).minusDays(1);
+        if (asOf.isAfter(today)) asOf = today;
+        return new MapSqlParameterSource("month", month).addValue("nextMonth", month.plusMonths(1))
+                .addValue("asOf", asOf).addValue("pastDate", asOf.isBefore(today))
+                .addValue("asOfEnd", asOf.plusDays(1).atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
+    }
+
+    public BranchDashboardResponse summary(LocalDate month) {
+        var params = parameters(month);
+        var rows = jdbc.query(SUMMARY, params, (rs, index) -> new BranchMetrics(rs.getLong("organization_id"),
                 rs.getString("organization_name"), rs.getLong("registered"), rs.getLong("active"),
                 rs.getLong("new_count"), rs.getLong("valid_count"), rs.getBigDecimal("ga_amount"),
                 rs.getBigDecimal("agent_amount"), rs.getLong("open_count")));
@@ -102,18 +126,12 @@ public class BranchDashboardRepository {
     }
 
     public PageResponse<BranchDetailRow> details(LocalDate month, long organizationId, BranchMetric metric, int requestedPage) {
-        String selection = switch (metric) {
-            case COMMISSIONS -> "SELECT contract_id AS id, contract_no AS label, '' AS detail, '' AS status, ga_amount AS value, agent_amount AS secondary_value FROM payments WHERE branch_id = :branch";
-            case AGENTS -> "SELECT agent_id AS id, agent_name AS label, agent_code AS detail, agent_status AS status, NULL::numeric AS value, NULL::numeric AS secondary_value FROM agents WHERE branch_id = :branch";
-            case CONTRACTS -> "SELECT contract_id AS id, contract_no AS label, CAST(contract_date AS text) AS detail, as_of_status AS status, NULL::numeric AS value, NULL::numeric AS secondary_value FROM contracts WHERE branch_id = :branch AND (is_new OR (" + VALID + "))";
-            case EXCEPTIONS -> "SELECT exception_case_id AS id, title AS label, COALESCE(contract_no, '') AS detail, status, NULL::numeric AS value, NULL::numeric AS secondary_value FROM exceptions WHERE branch_id = :branch";
-        };
-        var params = parameters(month).addValue("branch", organizationId);
-        long total = jdbc.queryForObject(SOURCES + " SELECT COUNT(*) FROM (" + selection + ") detail_rows", params, Long.class);
+        var params = parameters(month).addValue("branch", organizationId).addValue("metric", metric.name());
+        long total = jdbc.queryForObject(DETAIL_COUNT, params, Long.class);
         int totalPages = (int) ((total + 9) / 10);
-        int page = Math.min(requestedPage, Math.max(1, totalPages));
+        int page = Math.clamp(requestedPage, 1, Math.max(1, totalPages));
         params.addValue("offset", (page - 1) * 10);
-        var rows = jdbc.query(SOURCES + selection + " ORDER BY id DESC LIMIT 10 OFFSET :offset", params,
+        var rows = jdbc.query(DETAIL_PAGE, params,
                 (rs, index) -> new BranchDetailRow(rs.getLong("id"), rs.getString("label"), rs.getString("detail"),
                         rs.getString("status"), rs.getBigDecimal("value"), rs.getBigDecimal("secondary_value")));
         return new PageResponse<>(rows, page, 10, total, totalPages, "id,desc");

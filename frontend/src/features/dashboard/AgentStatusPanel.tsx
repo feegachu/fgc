@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import { DataTable } from '../../components/DataTable'
 import type { TableColumn } from '../../components/DataTable'
 import { Modal } from '../../components/Modal'
 import { ListPagination } from '../../components/ListPagination'
+import { AnimatedNumber } from '../../components/AnimatedNumber'
 import { int, won } from '../../lib/format'
 import { monthText } from '../../lib/screenText'
 import { withMonth } from '../../stores/workspace'
@@ -161,22 +163,24 @@ export function AgentStatusPanel({ month }: { month: string }) {
                 </span>
               )}
             </div>
-            <div key={metric} className="agent-branch-slide">
+            <div key={`${month}-${metric}`} className="agent-branch-slide">
               {!rows.length ? (
                 <p className="empty-state">표시할 지점이 없습니다.</p>
               ) : (
                 <ul className="branch-metric-bars" aria-label={`지점별 ${definition.label}`}>
-                  {rows.map((row) => (
+                  {rows.map((row, index) => (
                     <li key={row.organizationId}>
                       <button
                         data-guide-feature="features.dashboard.branch.bar-detail"
                         className="branch-metric-button"
+                        style={{ '--bar-delay': `${Math.min(index, 6) * 55}ms` } as CSSProperties}
                         {...buttonProps(row)}
                       >
                         <strong>
-                          {definition.unit === '원'
-                            ? `${compact.format(valueOf(row, definition.primary))}원`
-                            : format(valueOf(row, definition.primary))}
+                          <AnimatedNumber
+                            value={valueOf(row, definition.primary)}
+                            format={definition.unit === '원' ? value => `${compact.format(value)}원` : format}
+                          />
                         </strong>
                         <span className="branch-bar-pair" aria-hidden="true">
                           <span
