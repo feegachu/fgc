@@ -77,6 +77,12 @@ final class CompareAskTools {
     private static final String UNIT_PERCENT = "%";
     /** '1위'처럼 순위를 말하는 표기. 소수점·쉼표 뒤의 숫자(금액 일부)는 순위로 보지 않는다. */
     private static final Pattern RANK_LABEL = Pattern.compile("(?<![\\d,.])(\\d{1,3})\\s*위(?!\\d)");
+    /** '가장 큰/높은/많은'(최댓값) 또는 '가장 작은/낮은/적은'(최솟값) 주장. */
+    private static final Pattern SUPERLATIVE = Pattern.compile("가장\\s*(큰|크|커|높|많|작은|작|낮|적)");
+    /** '한도에 걸렸다·도달했다·초과했다' 처럼 한도에 닿았다는 주장. 조사가 없는 '한도 초과 시'(설명)는 잡지 않는다. */
+    private static final Pattern CAP_HIT = Pattern.compile("한도(?:에|를|까지)\\s*(?:걸|도달|초과|넘|닿)");
+    private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
+    private static final Pattern NEGATION = Pattern.compile("않|없|못|아니");
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+|\\n+");
     /** '커요'는 '크다'의 활용이라 '크'로는 잡히지 않는다. */
     private static final List<String> BIGGER_WORDS = List.of("많", "높", "크", "커");
@@ -247,7 +253,8 @@ final class CompareAskTools {
         if (!AnswerNumberGuard.allowed(withoutRankLabels(normalized), CompareSummaryService.names(ranking))) {
             return "NUMBER_GUARD";
         }
-        return verifyComparisons(normalized);
+        String comparison = verifyComparisons(normalized);
+        return comparison != null ? comparison : verifyClaims(normalized);
     }
 
     /**
@@ -299,6 +306,86 @@ final class CompareAskTools {
             start = end == normalized.length() ? end : ends.end();
         }
         return null;
+    }
+
+    /**
+     * 상품 하나를 두고 '가장 크다/작다', '한도에 걸렸다'고 쓴 문장은 서버 값과 맞아야 한다(#910).
+     * 숫자 없이도 틀린 말을 할 수 있어서(최댓값을 다른 상품으로 말함, 이월이 없는데 한도에 걸렸다고 말함) 순위 결과의 값으로 직접 확인한다.
+     * 상품이나 항목을 알아볼 수 없거나 가정·조건 설명이면 판단하지 않는다.
+     */
+    private String verifyClaims(String normalized) {
+        int start = 0;
+        Matcher ends = SENTENCE_END.matcher(normalized);
+        while (start < normalized.length()) {
+            int end = ends.find() ? ends.start() : normalized.length();
+            String sentence = normalized.substring(start, end);
+            String reason = verifySuperlative(sentence);
+            if (reason == null) {
+                reason = verifyCapState(sentence);
+            }
+            if (reason != null) {
+                return reason;
+            }
+            start = end == normalized.length() ? end : ends.end();
+        }
+        return null;
+    }
+
+    private String verifySuperlative(String sentence) {
+        Matcher superlative = SUPERLATIVE.matcher(sentence);
+        if (!superlative.find()) {
+            return null;
+        }
+        Set<Metric> metrics = metricsIn(sentence.substring(0, superlative.start()));
+        Set<Integer> mentioned = ranksMentioned(sentence);
+        if (metrics.isEmpty() || mentioned.size() != 1) {
+            return null;
+        }
+        boolean biggest = "큰".equals(superlative.group(1)) || "크".equals(superlative.group(1)) || "커".equals(superlative.group(1))
+                || "높".equals(superlative.group(1)) || "많".equals(superlative.group(1));
+        return holdsExtreme(mentioned.iterator().next(), metrics, biggest) ? null : "SUPERLATIVE_MISMATCH";
+    }
+
+    /** 이 순위의 값이 항목(여럿이면 어느 하나)에서 최댓값(또는 최솟값)과 같은지. 값이 같은 상품은 모두 최대·최소다. */
+    private boolean holdsExtreme(int rank, Set<Metric> metrics, boolean biggest) {
+        Item self = find(rank);
+        for (Metric metric : metrics) {
+            Double mine = valueOf(self, metric);
+            if (mine == null) {
+                return true;
+            }
+            double extreme = ranking.items().stream().map(item -> valueOf(item, metric)).filter(v -> v != null)
+                    .mapToDouble(Double::doubleValue).reduce(biggest ? Math::max : Math::min).orElse(mine);
+            if (mine == extreme) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Double valueOf(Item item, Metric metric) {
+        return switch (metric) {
+            case NET -> (double) item.conservativeNet();
+            case CAPPED -> (double) item.cappedReceipt();
+            case EXPECTED -> (double) item.expectedReceipt();
+            case CLAWBACK -> (double) item.clawbackExposure();
+            case CARRY -> (double) item.carryover();
+            case CAP_IMPACT -> item.capImpactPct() == null ? null : item.capImpactPct().doubleValue();
+        };
+    }
+
+    /** 한도에 걸렸다는 말은 말한 상품(없으면 모든 상품)에 이월 예정액이 있을 때만, 걸리지 않았다는 말은 이월이 없을 때만 맞다. */
+    private String verifyCapState(String sentence) {
+        Matcher hit = CAP_HIT.matcher(sentence);
+        if (!hit.find() || CONDITIONAL.matcher(sentence).find()) {
+            return null;
+        }
+        Set<Integer> mentioned = ranksMentioned(sentence);
+        List<Item> scope = ranking.items().stream()
+                .filter(item -> mentioned.isEmpty() || mentioned.contains(item.rank())).toList();
+        boolean anyCarry = scope.stream().anyMatch(item -> item.carryover() > 0);
+        boolean negated = NEGATION.matcher(sentence.substring(hit.end())).find();
+        return negated == anyCarry ? "CAP_STATE_MISMATCH" : null;
     }
 
     private String verifyComparisonSentence(String sentence) {

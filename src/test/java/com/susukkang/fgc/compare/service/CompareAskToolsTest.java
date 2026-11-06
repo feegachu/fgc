@@ -124,6 +124,32 @@ class CompareAskToolsTest {
     }
 
     @Test
+    @DisplayName("'가장 크다/작다'는 상품 하나를 말하면 서버 값의 최댓값·최솟값과 맞아야 한다")
+    void superlativeClaimsFollowTheServerValues() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("가보험 든든건강이 보수적 순수령액이 가장 커요.")).isNull();
+        assertThat(tools.verify("나보험 튼튼건강이 보수적 순수령액이 가장 커요.")).isEqualTo("SUPERLATIVE_MISMATCH");
+        assertThat(tools.verify("나보험 튼튼건강이 환수 노출액이 가장 작아요.")).isNull();
+        assertThat(tools.verify("가보험 든든건강이 환수 노출액이 가장 작아요.")).isEqualTo("SUPERLATIVE_MISMATCH");
+        // 상품이 둘 이상이거나 항목을 알 수 없으면 판단하지 않는다.
+        assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강이 가장 커요.")).isNull();
+        assertThat(tools.verify("보수적 순수령액이 가장 큰 순서로 정해졌어요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("이월이 없으면 '한도에 걸렸다'는 말을 거절하고, 걸리지 않았다는 말은 통과한다")
+    void capStateClaimsFollowTheCarryover() {
+        CompareAskTools tools = toolsWith("get_item", RANK_1);
+
+        assertThat(tools.verify("가보험 든든건강은 한도에 걸려 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
+        assertThat(tools.verify("세 상품 모두 한도를 초과하지 않았어요.")).isNull();
+        // 조사 없는 '한도 초과 시'나 조건 설명은 상태 주장이 아니다.
+        assertThat(tools.verify("한도 초과 시 이월 예정액이 생겨요.")).isNull();
+        assertThat(tools.verify("한도를 초과하면 이월돼요.")).isNull();
+    }
+
+    @Test
     @DisplayName("금액·비율이 든 문장만 빼고 나머지 설명을 남긴다")
     void onlyNumberSentencesAreDropped() {
         CompareAskTools tools = toolsWith("get_item", RANK_1);
