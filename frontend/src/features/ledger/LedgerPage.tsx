@@ -91,6 +91,7 @@ const columns: TableColumn<Journal>[] = [
   {
     key: 'type',
     label: '유형',
+    align: 'center',
     width: '12rem',
     render: (row) => (
       <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>

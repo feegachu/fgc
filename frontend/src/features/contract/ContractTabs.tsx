@@ -460,6 +460,7 @@ const journalColumns: TableColumn<ContractJournal>[] = [
   {
     key: 'type',
     label: '유형',
+    align: 'center',
     render: (row) => (
       <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>
         <Text value={JOURNAL_TYPE[row.journalType as keyof typeof JOURNAL_TYPE]} />

@@ -39,6 +39,7 @@ export const organizationColumns: TableColumn<Organization>[] = [
   {
     key: 'type',
     label: '유형',
+    align: 'center',
     render: (r) => (
       <>
         <CategoryBadge value={r.organizationType} optionCount={5}>

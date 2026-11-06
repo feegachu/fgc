@@ -338,7 +338,6 @@ export default function ReconciliationPage() {
       key: 'detail',
       label: '상세',
       width: '4rem',
-      align: 'center',
       render: (row) => (
         <Button data-guide-feature="features.reconciliation.reconciliation-page.button"
           variant="ghost"

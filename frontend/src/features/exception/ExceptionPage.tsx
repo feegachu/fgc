@@ -110,6 +110,7 @@ export function ExceptionPage() {
     {
       key: 'type',
       label: '유형',
+      align: 'center',
       width: '8.5rem',
       render: (row) => (
         <StatusBadge optionCount={14} kind="category" tone={typeBadgeTone(row.type)}>
