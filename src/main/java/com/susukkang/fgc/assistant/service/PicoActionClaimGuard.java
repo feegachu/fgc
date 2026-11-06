@@ -22,7 +22,7 @@ final class PicoActionClaimGuard {
         var actions = ACTION.matcher(normalizedText);
         while (actions.find()) {
             String tail = afterModifiers(normalizedText.substring(actions.end()).stripLeading());
-            if (pastAssertion(tail) || stateAssertion(tail)) return true;
+            if (pastAssertion(tail) || stateAssertion(tail, actions.group())) return true;
         }
         return false;
     }
@@ -48,8 +48,10 @@ final class PicoActionClaimGuard {
         return AUXILIARY.stream().anyMatch(stem -> hasEnding(auxiliary, stem, ENDINGS));
     }
 
-    private static boolean stateAssertion(String tail) {
+    private static boolean stateAssertion(String tail, String action) {
         if (tail.startsWith("된") || tail.startsWith("한")) tail = tail.substring(1).stripLeading();
+        // A field named 지급 상태/처리 상태 is not evidence of a completed action.
+        else if (!action.equals("확정") && !action.equals("완료")) return false;
         return hasEnding(tail, "상태", STATE_ENDINGS);
     }
 

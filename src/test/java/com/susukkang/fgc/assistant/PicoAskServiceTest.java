@@ -39,7 +39,7 @@ class PicoAskServiceTest {
             "지급 확정을 제가 대신 마쳤어요.", "확정을 끝냈습니다.",
             "지급이 정상적으로 완료되었어요.", "초안 저장을 해 두었습니다.",
             "지급을 해드렸어요.", "저장이 끝났습니다.", "지급은 확정된 상태입니다.",
-            "현재는 지급 완료 상태입니다."
+            "현재는 지급 완료 상태입니다.", "지급한 상태입니다.", "처리된 상태예요."
     })
     void rejectsParaphrasedBusinessSuccessClaims(String message) {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
@@ -57,7 +57,8 @@ class PicoAskServiceTest {
             "지급을 완료하려면 결과를 먼저 확인하세요.",
             "담당자가 지급을 처리한 후 결과를 확인하세요.",
             "처리가 완료되었는지 확인하세요.", "확정된 상태인지 확인하세요.",
-            "설명을 마쳤어요. 실제 지급은 업무 화면에서 진행하세요."
+            "설명을 마쳤어요. 실제 지급은 업무 화면에서 진행하세요.",
+            "조회 조건은 지급 상태입니다.", "목록에서 보이는 항목은 처리 상태입니다."
     })
     void keepsConditionalGuidanceAndInstructions(String message) {
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))
