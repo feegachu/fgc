@@ -163,6 +163,20 @@ class CommissionPaymentIntegrationTest {
         assertThatThrownBy(() -> commissionPaymentService.deleteDraft(created.paymentId())).isInstanceOf(FgcBusinessException.class);
     }
 
+    /** 상태 사건으로 보류된 초안을 지우면 FK 때문에 500이 났다. 보류 근거는 남기고 업무 오류로 안내한다. */
+    @Test
+    void deleteDraftOnHoldIsRejectedAsBusinessError() {
+        var created = commissionPaymentService.create(request("IT-HOLD-" + UUID.randomUUID(), new BigDecimal("1000")));
+        jdbcTemplate.update("""
+                INSERT INTO fgc.payment_hold (commission_transaction_id, contract_status_event_id, reason_code)
+                SELECT ?, min(contract_status_event_id), 'STATUS_UNPAID' FROM fgc.contract_status_event
+                """, created.paymentId());
+
+        assertThatThrownBy(() -> commissionPaymentService.deleteDraft(created.paymentId()))
+                .isInstanceOfSatisfying(FgcBusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(FgcErrorCode.TRAN_009));
+    }
+
     @Test
     void deleteDraftPreservesRejectedCapEvidenceWithoutChangingCurrentContractVerdict() {
         Long runId = checklistRun();

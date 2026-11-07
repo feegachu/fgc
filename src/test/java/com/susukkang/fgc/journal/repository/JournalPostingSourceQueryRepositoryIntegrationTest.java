@@ -159,6 +159,29 @@ class JournalPostingSourceQueryRepositoryIntegrationTest {
         assertThat(repository.findConfirmedFcPayoutSources(validationRunId, MONTH)).isEmpty();
     }
 
+    /** 소액 보험료의 반올림 0원 회차, 0원 지급 한 건 때문에 월 통합검증 6단계 전체가 실패했다(expectedAmount must be positive). */
+    @Test
+    void sourcesExcludeZeroAmountsBecauseThereIsNothingToPost() {
+        Long incomeHeader = insertScheduleHeader("INSURER_TO_GA", "PLANNED", true, "OPERATIONAL");
+        Long incomeZero = insertScheduleLine(incomeHeader, 1, MONTH, "PLANNED", null);
+        Long payoutHeader = insertScheduleHeader("GA_TO_FC", "PLANNED", true, "OPERATIONAL");
+        Long payoutZero = insertScheduleLine(payoutHeader, 1, MONTH, "PLANNED", agentId);
+        jdbcTemplate.update("UPDATE fgc.schedule_line SET fixed_amount = 0, expected_amount = 0 WHERE schedule_line_id IN (?, ?)",
+                incomeZero, payoutZero);
+        Long incomeTransaction = insertTransaction("INSURER_TO_GA", "INSURER_STATEMENT", "PAYMENT", "DRAFT",
+                MONTH, null, null, 1);
+        Long payoutTransaction = insertTransaction("GA_TO_FC", "GA_MANUAL_PAYMENT", "PAYMENT", "DRAFT",
+                MONTH, null, null, 1);
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET amount = 0 WHERE commission_transaction_id IN (?, ?)",
+                incomeTransaction, payoutTransaction);
+        jdbcTemplate.update("UPDATE fgc.transaction_attribution SET attributed_amount = 0 WHERE commission_transaction_id IN (?, ?)",
+                incomeTransaction, payoutTransaction);
+        jdbcTemplate.update("UPDATE fgc.commission_transaction SET status = 'CONFIRMED' WHERE commission_transaction_id IN (?, ?)",
+                incomeTransaction, payoutTransaction);
+
+        assertAllSourcesEmpty(validationRunId, MONTH);
+    }
+
     @Test
     void sourcesAreEmptyOutsideSelectedValidationRunAndMonth() {
         Long incomeHeader = insertScheduleHeader("INSURER_TO_GA", "PLANNED", true, "OPERATIONAL");

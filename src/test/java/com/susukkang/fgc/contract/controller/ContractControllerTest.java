@@ -194,6 +194,22 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.error.field").value("premiumPerCycleAmount"));
     }
 
+    /** 저장 칸(numeric 15,2)을 넘기는 금액이 500 대신 입력 오류로 끝나야 한다. */
+    @Test
+    @DisplayName("보험료 자릿수가 넘치면 입력 오류로 거절한다")
+    void createContractRejectsPremiumOverflow() throws Exception {
+        ContractCreateRequest request = createRequest();
+        request.setPremiumPerCycleAmount(new java.math.BigDecimal("100000000000"));
+
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("premiumPerCycleAmount"));
+    }
+
     /** FGC-FUN-002 — SYSTEM_ADMIN 은 "전부"(화면정의서 §4-1)라 계약 등록·수정도 허용된다. */
     @Test
     @DisplayName("SYSTEM_ADMIN 도 보험계약을 생성할 수 있다")

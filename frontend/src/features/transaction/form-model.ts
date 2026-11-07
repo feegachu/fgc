@@ -52,7 +52,7 @@ export function initialForm(month: string, draft?: Payment): FormValues {
     settlementMonth: draft?.settlementMonth?.slice(0, 7) ?? month,
     agentId: draft?.agentId == null ? '' : String(draft.agentId),
     commissionItemId: draft?.commissionItemId == null ? '' : String(draft.commissionItemId),
-    amount: String(draft?.amount ?? 250000),
+    amount: draft?.amount == null ? '' : String(draft.amount),
     cashflowType: draft?.cashflowType ?? 'PAYMENT',
     evidenceRef: draft?.evidenceRef ?? '',
   }
@@ -70,7 +70,7 @@ export function newRow(key: number, date: string, amount = '0'): AttributionRow 
   }
 }
 export function draftRows(draft: Payment | undefined): AttributionRow[] {
-  if (!draft) return [newRow(1, '', '250000')]
+  if (!draft) return [newRow(1, '', '')]
   return (draft.attributions ?? []).map((row, index) => ({
     key: index + 1,
     contractId: row.contractId == null ? '' : String(row.contractId),
