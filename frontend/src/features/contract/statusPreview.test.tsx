@@ -133,10 +133,10 @@ function renderPage(
 
 async function openModal(actions: ReturnType<typeof userEvent.setup>) {
   await actions.click(await screen.findByRole('button', { name: '영향 미리보기' }))
-  return screen.getByRole('dialog', { name: '상태 사건 영향 미리보기' })
+  return screen.getByRole('dialog', { name: '상태 변경 영향 미리보기' })
 }
 function fill(dialog: HTMLElement, eventType = 'TERMINATED', effectiveAt = AT) {
-  fireEvent.change(within(dialog).getByLabelText(/사건 종류/), { target: { value: eventType } })
+  fireEvent.change(within(dialog).getByLabelText(/변경 종류/), { target: { value: eventType } })
   fireEvent.change(within(dialog).getByLabelText(/효력일시/), { target: { value: effectiveAt } })
 }
 const submit = (dialog: HTMLElement) => within(dialog).getByRole('button', { name: '영향 미리보기' })
@@ -147,7 +147,7 @@ afterEach(() => {
   useAuthStore.setState({ accessToken: null, loggingOut: false })
 })
 
-describe('CONT-W02 상태 사건 영향 미리보기', () => {
+describe('CONT-W02 상태 변경 영향 미리보기', () => {
   it.each([['SETTLEMENT'], ['GA_ADMIN'], ['SYSTEM_ADMIN']])('%s 역할에 버튼을 보인다', async (roleCode) => {
     renderPage(undefined, { roleCode })
     expect(await screen.findByRole('button', { name: '영향 미리보기' })).toBeInTheDocument()
@@ -159,15 +159,15 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     expect(screen.queryByRole('button', { name: '영향 미리보기' })).not.toBeInTheDocument()
   })
 
-  it('사건 종류와 효력일시를 비우면 필드 옆 오류와 첫 오류 포커스만 보이고 호출하지 않는다', async () => {
+  it('변경 종류와 효력일시를 비우면 필드 옆 오류와 첫 오류 포커스만 보이고 호출하지 않는다', async () => {
     const { actions } = renderPage()
     const dialog = await openModal(actions)
 
     await actions.click(submit(dialog))
 
-    expect(within(dialog).getByText('사건 종류를 선택하세요.')).toBeInTheDocument()
+    expect(within(dialog).getByText('변경 종류를 선택하세요.')).toBeInTheDocument()
     expect(within(dialog).getByText('올바른 일시를 입력해 주세요.')).toBeInTheDocument()
-    expect(within(dialog).getByLabelText(/사건 종류/)).toHaveFocus()
+    expect(within(dialog).getByLabelText(/변경 종류/)).toHaveFocus()
     expect(posts()).toHaveLength(0)
   })
 
@@ -197,12 +197,12 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     expect(within(dialog).getByRole('table', { name: '바꾸지 않는 회차' })).toHaveTextContent('회차 13 근거 문구')
     expect(within(dialog).getByRole('table', { name: '미확정 지급 건 영향' })).toHaveTextContent('작성중 → 보류')
     expect(within(dialog).getByText(/변경 전 1,000원, 변경 후 4,000원/)).toBeInTheDocument()
-    expect(within(dialog).getByText(/원수사→GA 7,000원/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/보험회사→GA 7,000원/)).toBeInTheDocument()
     expect(within(dialog).getByText(/GA→설계사 5,000원/)).toBeInTheDocument()
     expect(within(dialog).getByText('예상 2,500원')).toBeInTheDocument()
-    expect(within(dialog).getByText(/CLAW-GA-VIRTUAL-2026 v1/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/적용 정책 v1/)).toBeInTheDocument()
     expect(within(dialog).getByRole('table', { name: '예상 환수액 계산 근거' })).toHaveTextContent('50.0%')
-    expect(within(dialog).getByText(/스냅샷 시각 2026-01-20 10:30:15 기준/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/계산 시각 2026-01-20 10:30:15 기준/)).toBeInTheDocument()
     expect(within(dialog).getByText(/계약 유지 확률이 아니며/)).toBeInTheDocument()
     expect(writes()).toHaveLength(0)
   })
@@ -240,7 +240,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     expect(within(dialog).getByText(/근거 없음\(회사 약정 필요\)/)).toBeInTheDocument()
     expect(within(dialog).getByText('유효한 환수 정책 없음')).toBeInTheDocument()
     expect(within(dialog).getByText(/변경 전 0원, 변경 후 0원/)).toBeInTheDocument()
-    expect(within(dialog).getByText(/원수사→GA 0원/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/보험회사→GA 0원/)).toBeInTheDocument()
     expect(within(dialog).getByText(/GA→설계사 자료 없음/)).toBeInTheDocument()
     expect(within(dialog).getByText('변경되는 예정 회차가 없습니다')).toBeInTheDocument()
     expect(within(dialog).queryByText(/예상 0원/)).not.toBeInTheDocument()
@@ -255,10 +255,10 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     await actions.click(submit(dialog))
     expect(await within(dialog).findByText('예상 0원')).toBeInTheDocument()
 
-    review = { candidate: false, amount: null, reason: '이 사건은 환수 검토 후보가 되지 않습니다.', reasonCodes: [], lines: [] }
+    review = { candidate: false, amount: null, reason: '이 변경은 환수 검토 후보가 되지 않습니다.', reasonCodes: [], lines: [] }
     fill(dialog, 'UNPAID')
     await actions.click(submit(dialog))
-    expect(await within(dialog).findByText(/해당 없음. 이 사건은 환수 검토 후보가 되지 않습니다./)).toBeInTheDocument()
+    expect(await within(dialog).findByText(/해당 없음. 이 변경은 환수 검토 후보가 되지 않습니다./)).toBeInTheDocument()
   })
 
   it('입력이 바뀌면 결과를 낡음으로 표시하고 같은 입력으로 다시 미리보면 지운다', async () => {
@@ -267,14 +267,14 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     fill(dialog)
     await actions.click(submit(dialog))
     await within(dialog).findByRole('table', { name: '멈추는 회차' })
-    expect(within(dialog).queryByText('낡음')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('최신 아님')).not.toBeInTheDocument()
 
     fireEvent.change(within(dialog).getByLabelText(/효력일시/), { target: { value: '2026-01-16T09:00' } })
 
-    expect(within(dialog).getByText('낡음')).toBeInTheDocument()
+    expect(within(dialog).getByText('최신 아님')).toBeInTheDocument()
     await actions.click(submit(dialog))
     await waitFor(() => expect(posts()).toHaveLength(2))
-    await waitFor(() => expect(within(dialog).queryByText('낡음')).not.toBeInTheDocument())
+    await waitFor(() => expect(within(dialog).queryByText('최신 아님')).not.toBeInTheDocument())
   })
 
   it('대상 계약이 바뀌면 입력이 같아도 결과를 낡음으로 표시한다', async () => {
@@ -288,7 +288,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     current = { ...contract, updatedAt: '2026-01-21T00:00:00Z' }
     await act(() => client.invalidateQueries({ queryKey: ['contracts', 'detail', '1'], exact: true }))
 
-    expect(await within(dialog).findByText('낡음')).toBeInTheDocument()
+    expect(await within(dialog).findByText('최신 아님')).toBeInTheDocument()
     expect(posts()).toHaveLength(1)
   })
 
@@ -309,7 +309,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     fireEvent.click(submit(dialog))
     await waitFor(() => expect(posts()).toHaveLength(1))
     expect(submit(dialog)).toBeDisabled()
-    fireEvent.submit(within(dialog).getByRole('form', { name: '미리볼 상태 사건' }))
+    fireEvent.submit(within(dialog).getByRole('form', { name: '미리볼 상태 변경' }))
     expect(posts()).toHaveLength(1)
     expect(within(dialog).getByRole('status')).toHaveTextContent('영향을 계산하는 중입니다.')
 
@@ -344,7 +344,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     await actions.click(submit(dialog))
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('지금 정상에서 해지(으)로 바꿀 수 없습니다')
-    expect(within(dialog).getByLabelText(/사건 종류/)).toHaveValue('TERMINATED')
+    expect(within(dialog).getByLabelText(/변경 종류/)).toHaveValue('TERMINATED')
     expect(within(dialog).getByLabelText(/효력일시/)).toHaveValue(AT)
     const details = requested.filter(({ url }) => url === '/api/v1/contracts/1').length
 
@@ -372,7 +372,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     current = { ...contract, contractStatus: 'TERMINATED', allowedNextStatuses: [], updatedAt: '2026-01-21T00:00:00Z' }
     await actions.click(within(dialog).getByRole('button', { name: '다시 조회' }))
 
-    await waitFor(() => expect(within(dialog).getByLabelText(/사건 종류/)).toHaveValue(''))
+    await waitFor(() => expect(within(dialog).getByLabelText(/변경 종류/)).toHaveValue(''))
     expect(within(dialog).getByLabelText(/효력일시/)).toHaveValue(AT)
     expect(within(dialog).getByText('끝 상태 계약이라 바꿀 수 있는 상태가 없습니다.')).toBeInTheDocument()
   })
@@ -386,7 +386,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
 
     await actions.click(submit(dialog))
 
-    expect(await within(dialog).findByText('효력일시는 최신 사건의 효력일시 이후이고 현재 시각을 넘을 수 없습니다.')).toBeInTheDocument()
+    expect(await within(dialog).findByText('효력일시는 최신 상태 변경의 효력일시 이후이고 현재 시각을 넘을 수 없습니다.')).toBeInTheDocument()
     expect(within(dialog).getByLabelText(/효력일시/)).toHaveValue(AT)
     expect(within(dialog).getByLabelText(/효력일시/)).toHaveFocus()
   })
@@ -443,7 +443,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(router.state.location.search).toBe(url)
     const reopened = await openModal(actions)
-    expect(within(reopened).getByLabelText(/사건 종류/)).toHaveValue('TERMINATED')
+    expect(within(reopened).getByLabelText(/변경 종류/)).toHaveValue('TERMINATED')
     expect(within(reopened).getByRole('table', { name: '멈추는 회차' })).toBeInTheDocument()
     expect(writes()).toHaveLength(0)
     expect(posts()).toHaveLength(1)
@@ -458,7 +458,7 @@ describe('CONT-W02 상태 사건 영향 미리보기', () => {
 
     await actions.click(within(dialog).getByRole('button', { name: '입력 초기화' }))
 
-    expect(within(dialog).getByLabelText(/사건 종류/)).toHaveValue('')
+    expect(within(dialog).getByLabelText(/변경 종류/)).toHaveValue('')
     expect(within(dialog).getByLabelText(/효력일시/)).toHaveValue('')
     expect(within(dialog).queryByRole('table', { name: '멈추는 회차' })).not.toBeInTheDocument()
     expect(writes()).toHaveLength(0)

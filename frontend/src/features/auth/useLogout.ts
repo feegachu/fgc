@@ -8,7 +8,7 @@ export function useLogout() {
   const client = useQueryClient()
   const navigate = useNavigate()
   const loggingOut = useAuthStore((state) => state.loggingOut)
-  async function logout() {
+  async function logout(done = '/login?logout') {
     if (useAuthStore.getState().loggingOut) return
     useAuthStore.getState().setLoggingOut(true)
     clearSessionData(client)
@@ -20,7 +20,7 @@ export function useLogout() {
     } finally {
       // 서버 통신이 실패해도 보호 화면과 이전 사용자의 캐시로 돌아가지 않는다.
       clearSessionData(client)
-      await navigate(failed ? '/login?logout=failed' : '/login?logout', { replace: true, flushSync: true })
+      await navigate(failed ? '/login?logout=failed' : done, { replace: true, flushSync: true })
       useAuthStore.getState().setLoggingOut(false)
     }
   }

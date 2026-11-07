@@ -9,7 +9,7 @@ import type { StatusTone } from '../../components/StatusBadge'
  */
 export const EMPTY = '-'
 
-export const PAYMENT_STAGE = { INSURER_TO_GA: '원수사→GA', GA_TO_FC: 'GA→설계사' } as const
+export const PAYMENT_STAGE = { INSURER_TO_GA: '보험회사→GA', GA_TO_FC: 'GA→설계사' } as const
 
 export const SCHEDULE_REGIME = {
   CURRENT: '현행',
@@ -17,7 +17,7 @@ export const SCHEDULE_REGIME = {
   SEVEN_YEAR_2029: '7년 분급(2029)',
 } as const
 
-export const SCHEDULE_PURPOSE = { OPERATIONAL: '운영', COMPARISON: '비교', SIMULATION: '시뮬레이션' } as const
+export const SCHEDULE_PURPOSE = { OPERATIONAL: '실제 지급용', COMPARISON: '비교용', SIMULATION: '모의 계산용' } as const
 
 export const SCHEDULE_STATUS = {
   PLANNED: '예정',
@@ -64,7 +64,7 @@ export const statusTone = (code?: string | null): StatusTone => (code && STATUS_
 export const isLocked = (code?: string | null) => code === 'CONFIRMED'
 
 export const REGIME_EVIDENCE = {
-  title: 'REG-19, 적용 체계 판정',
+  title: '적용 체계 판정 기준',
   body: '적용 체계는 계약 체결연도만으로 정하지 않습니다. 상품 판매개시일, 기초서류 버전, 판매채널을 함께 보고 정합니다.',
 }
 

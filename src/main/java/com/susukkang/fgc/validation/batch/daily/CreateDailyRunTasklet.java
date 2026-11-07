@@ -101,7 +101,7 @@ public class CreateDailyRunTasklet implements Tasklet {
                 || !ValidationRunType.MANUAL_CONTRACT.name().equals(requested.get().getRunType())
                 || requested.get().getStatus() != ValidationRunStatus.CREATED) {
             throw new IllegalStateException("validation_run " + validationRunId
-                    + " 은 수동 재실행 대상이 아닙니다(runType=계약수동·status=CREATED 이어야 함, 실제 status="
+                    + " 은 수동 재실행 대상이 아닙니다(runType=계약별·status=CREATED 이어야 함, 실제 status="
                     + (requested.isEmpty() ? "삭제됨" : requested.get().getStatus()) + ")");
         }
         lifecycleService.start(requested.get().getValidationRunId(), params);

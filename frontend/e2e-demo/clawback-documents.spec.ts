@@ -118,7 +118,7 @@ async function capture(page: Page, info: TestInfo, filename: string) {
 }
 async function download(page: Page, version: number, info: TestInfo) {
   const pending = page.waitForEvent('download')
-  await page.getByRole('button', { name: `발행판 v${version} 다운로드` }).click()
+  await page.getByRole('button', { name: `발행본 v${version} 다운로드` }).click()
   const file = await pending
   const path = info.outputPath(`edition-${version}.pdf`)
   await file.saveAs(path)
@@ -137,7 +137,7 @@ test('화면에서 정책 선택·사유 입력·환수액 계산 후 PDF를 생
     const pdf = page.getByRole('region', { name: '환수 PDF·발행 이력' })
     await expect(calc.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
     await expect(pdf.getByRole('button', { name: 'PDF 생성', exact: true })).toBeDisabled()
-    await calc.getByRole('radio', { name: /E2E-727-POLICY v1/ }).check()
+    await calc.getByRole('radio', { name: /환수 PDF 실제 API 검증 v1/ }).check()
     await calc.getByLabel(/계산 사유/).fill('등록된 환수 정책으로 계산 후 PDF 발행')
     await expect(calc.getByRole('button', { name: '환수액 계산' })).toBeEnabled()
     const calculated = responseFor(page, `/clawbacks/candidates/${seed.candidate}/calculations`)
@@ -160,7 +160,7 @@ test('화면에서 정책 선택·사유 입력·환수액 계산 후 PDF를 생
   }
 })
 
-test('CT-W02 실제 API: 응답 유실·동일 키 재시도·새 발행판·원본 해시·상태 불변', async ({ page }, info) => {
+test('CT-W02 실제 API: 응답 유실·동일 키 재시도·새 발행본·원본 해시·상태 불변', async ({ page }, info) => {
   const admin = await session('admin')
   try {
     const seed = await prepare(admin)
@@ -201,7 +201,7 @@ test('CT-W02 실제 API: 응답 유실·동일 키 재시도·새 발행판·원
     expect(second.version).toBe(2)
     expect(second.documentNo).toBe(first.documentNo)
     expect(writes[2].key).not.toBe(writes[1].key)
-    await expect(panel.getByRole('button', { name: '발행판 v2 다운로드' })).toBeVisible()
+    await expect(panel.getByRole('button', { name: '발행본 v2 다운로드' })).toBeVisible()
     expect(await download(page, 1, info)).toBe(first.sha256)
     expect(await download(page, 2, info)).toBe(second.sha256)
     expect(caseState(seed.caseId)).toBe(before)
@@ -243,11 +243,11 @@ test('CT-W02 실제 API: 원천 변경 409·재계산·과거판 보존·COMPLIA
     const stale = responseFor(page, `/clawbacks/${seed.caseId}/notice-documents`)
     await panel.getByRole('button', { name: '재발행', exact: true }).click()
     expect((await stale).status()).toBe(409)
-    await expect(panel.getByText('현재 계산판·원천과 발행 요청이 다릅니다. 다시 조회해 주세요.')).toBeVisible()
+    await expect(panel.getByText('현재 계산 결과와 근거가 발행 요청과 다릅니다. 다시 조회해 주세요.')).toBeVisible()
     await expect(panel.getByRole('button', { name: '발행 재시도' })).toBeDisabled()
     await capture(page, info, 'real-api-stale409.png')
     await panel.getByRole('button', { name: '다시 조회' }).click()
-    await expect(panel).toContainText('현재 원천과 다른 계산판')
+    await expect(panel).toContainText('현재 근거와 다른 계산')
     await expect(page.getByLabel('계약번호', { exact: true })).toHaveValue('보존할 검색 입력')
     expect(await download(page, 1, info)).toBe(first.sha256)
     const current = await data<Detail>(admin, `/api/v1/clawbacks/candidates/${seed.candidate}`)

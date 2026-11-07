@@ -26,7 +26,7 @@ export function screenMessage(value?: string | null) {
     .replace(/^(.+?)(?: — |, )/, (_, lead: string) =>
       blockedActions[lead] ? `${blockedActions[lead]}. ` : `${lead}, `,
     )
-    .replace(/\bINSURER_TO_GA\b/g, '원수사→GA')
+    .replace(/\bINSURER_TO_GA\b/g, '보험회사→GA')
     .replace(/\bGA_TO_FC\b/g, 'GA→설계사')
     .replace(/(?<=\S)·(?=\S)/g, '/')
     .replace(/\s*·\s*/g, ', ')

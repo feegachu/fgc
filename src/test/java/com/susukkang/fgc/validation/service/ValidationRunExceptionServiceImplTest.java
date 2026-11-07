@@ -26,6 +26,7 @@ class ValidationRunExceptionServiceImplTest {
     @Test
     void generatesAllExceptionSourcesAndReturnsCreatedCount() {
         Long validationRunId = 118L;
+        given(exceptionCaseRepository.insertFromValidationTargets(validationRunId)).willReturn(1L);
         given(exceptionCaseRepository.insertFromCapChecks(validationRunId)).willReturn(2L);
         given(exceptionCaseRepository.insertFromArbitrageChecks(validationRunId)).willReturn(3L);
         given(exceptionCaseRepository.insertFromReconciliationResults(validationRunId)).willReturn(4L);
@@ -34,12 +35,13 @@ class ValidationRunExceptionServiceImplTest {
         StepProcessingResult result = new ValidationRunExceptionServiceImpl(exceptionCaseRepository)
                 .generate(context(validationRunId));
 
-        assertThat(result.processedCount()).isEqualTo(14L);
+        assertThat(result.processedCount()).isEqualTo(15L);
         assertThat(result.skippedCount()).isZero();
         assertThat(result.failureCount()).isZero();
         assertThat(result.skips()).isEmpty();
 
         InOrder calls = inOrder(exceptionCaseRepository);
+        calls.verify(exceptionCaseRepository).insertFromValidationTargets(validationRunId);
         calls.verify(exceptionCaseRepository).insertFromCapChecks(validationRunId);
         calls.verify(exceptionCaseRepository).insertFromArbitrageChecks(validationRunId);
         calls.verify(exceptionCaseRepository).insertFromReconciliationResults(validationRunId);

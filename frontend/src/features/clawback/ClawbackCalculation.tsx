@@ -11,7 +11,6 @@ import { date, dateTime, errorText, int, internalErrorText, rate } from '../../l
 import { errorScreenMessage } from '../../lib/screenText'
 import { toast } from '../../stores/toasts'
 import { useUnsavedWork } from '../../stores/unsavedWork'
-import { present } from '../arbitrage/utils'
 import { usePolicyDetail } from '../policies/api'
 import { usePolicyRequest } from '../policies/usePolicyRequest'
 import { calculateCandidate } from './api'
@@ -56,7 +55,9 @@ export function ClawbackCalculation({
   const client = useQueryClient()
   const c = detail.candidate ?? {}
   const policies = detail.policyCandidates ?? []
-  const canCalculate = c.allowedActions?.includes('CALCULATE') ?? false
+  // 기지급이 없으면 서버가 422로 거절한다. 누른 뒤 실패시키지 않고 이유를 먼저 보인다.
+  const noPaidAmount = c.paidAmount === 0
+  const canCalculate = (c.allowedActions?.includes('CALCULATE') ?? false) && !noPaidAmount
   const issuingNotice = useIsMutating({ mutationKey: ['clawback', 'issue-notice', c.clawbackCaseId] }) > 0
   // 정책 후보가 하나면 미리 고르고, 여럿이면 사용자가 고른다. 계산 버튼을 누르는 것이 선택 확인이다.
   // 고른 값은 지금 후보에 있을 때만 쓴다(409 뒤 다시 불러온 후보에서 빠질 수 있다).
@@ -82,7 +83,7 @@ export function ClawbackCalculation({
       clearUnsaved()
       setReason('')
       setError('')
-      toast(`환수액을 계산했습니다. 계산판 v${int(calculation.calculationVersion)}입니다.`, 'success')
+      toast(`환수액을 계산했습니다. 계산 결과 v${int(calculation.calculationVersion)}입니다.`, 'success')
       void client.invalidateQueries({ queryKey: ['clawback'] })
     },
     onError: (caught) => {
@@ -97,7 +98,9 @@ export function ClawbackCalculation({
     setError('')
     mutation.mutate()
   }
-  const helper = !canCalculate
+  const helper = noPaidAmount
+    ? '환수할 기지급 내역이 없어 계산할 수 없습니다.'
+    : !canCalculate
     ? '계산할 수 없는 후보입니다. 위 검토 사유를 확인하세요.'
     : !policies.length
       ? '적용할 환수 정책이 없어 계산할 수 없습니다.'
@@ -147,7 +150,7 @@ export function ClawbackCalculation({
                 <span className="claw-policy-option-text">
                   <strong>{policyLabel(r)}</strong>{' '}
                   <span>
-                    {present(r.policyName)}, 유효 기간 {date(r.effectiveFrom)}
+                    유효 기간 {date(r.effectiveFrom)}
                     {r.effectiveTo ? ` ~ ${date(r.effectiveTo)}` : '부터'}
                   </span>
                 </span>
@@ -203,9 +206,9 @@ function CalculationResult({
   const candidatePolicy = detail.policyCandidates?.find((p) => p.policyVersionId === calc?.policyVersionId)
   // 계산판 응답에는 정책판 번호만 있다. 그 정책이 지금 후보에서 빠졌으면(새 판 승인 등) 정책 상세에서 코드와 판을 찾는다.
   const usedPolicy = usePolicyDetail(calc?.policyVersionId, Boolean(calc) && !candidatePolicy)
-  if (!calc) return <p className="claw-evidence-empty">저장된 계산판이 없습니다.</p>
+  if (!calc) return <p className="claw-evidence-empty">저장된 계산 결과가 없습니다.</p>
   const policy = candidatePolicy ?? usedPolicy.data?.header
-  const policyText = policy?.policyCode
+  const policyText = policy?.policyName
     ? policyLabel(policy)
     : usedPolicy.isLoading
       ? '적용 정책 확인 중'
@@ -227,12 +230,12 @@ function CalculationResult({
   return (
     <div className="claw-calculation-result">
       <p className="claw-calculation-summary">
-        최신 계산판 v{int(calc.calculationVersion)}, {dateTime(calc.calculatedAt)}, {policyText}
+        최신 계산 결과 v{int(calc.calculationVersion)}, {dateTime(calc.calculatedAt)}, {policyText}
         {elapsed}
       </p>
       {stale && (
         <p className="claw-calculation-stale" role="status">
-          계산한 뒤 원천이나 정책이 바뀌었습니다. 이 계산판은 지금 근거와 다르니 다시 계산하세요.
+          계산한 뒤 근거 자료나 정책이 바뀌었습니다. 이 계산 결과는 지금 근거와 다르니 다시 계산하세요.
         </p>
       )}
       {calc.lines?.length ? (
@@ -274,7 +277,7 @@ function CalculationResult({
       )}
       {typeof basis.reason === 'string' && basis.reason && <p className="field-helper">계산 사유: {basis.reason}</p>}
       <p className="field-helper">
-        계산 결과는 환수 확정이나 회수 완료가 아닙니다. 경과월은 계약일부터 사건일까지 다 채운 달 수이고, 환수액은
+        계산 결과는 환수 확정이나 회수 완료가 아닙니다. 경과월은 계약일부터 발생일까지 다 채운 달 수이고, 환수액은
         행마다 원 단위로 반올림합니다.
       </p>
     </div>

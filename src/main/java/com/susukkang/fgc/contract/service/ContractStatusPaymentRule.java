@@ -123,7 +123,7 @@ public class ContractStatusPaymentRule {
             worst(List.of(line.dueDate()), timeline).filter(verdict -> verdict.outcome() != Outcome.PAY)
                     .ifPresent(verdict -> notPayable.add(effect(EntityType.SCHEDULE_LINE, line.lineId(), line.status().name(),
                             EXCLUDED, line.amount(), policyVersionId, Reason.NO_RETROACTIVE,
-                            "부활은 지급 불가 기간을 소급하지 않습니다(NO_RETROACTIVE). " + verdict.explain("지급예정일"))));
+                            "부활은 지급 불가 기간을 소급하지 않습니다. " + verdict.explain("지급예정일"))));
         }
         for (Payment payment : payments) {
             if (payment.status() != CommissionPaymentStatus.DRAFT) {
@@ -132,7 +132,7 @@ public class ContractStatusPaymentRule {
             worst(payment.attributionDates(), timeline).filter(verdict -> verdict.outcome() != Outcome.PAY)
                     .ifPresent(verdict -> notPayable.add(effect(EntityType.PAYMENT, payment.transactionId(),
                             payment.status().name(), EXCLUDED, payment.amount(), policyVersionId, Reason.NO_RETROACTIVE,
-                            "부활은 지급 불가 기간을 소급하지 않습니다(NO_RETROACTIVE). " + verdict.explain("귀속일"))));
+                            "부활은 지급 불가 기간을 소급하지 않습니다. " + verdict.explain("귀속일"))));
         }
         return notPayable;
     }

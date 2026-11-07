@@ -150,7 +150,7 @@ describe('AGNT-W01 포트폴리오', () => {
   it('기준일·집계 기간·분모와 수수료 기준월을 화면에 표시한다', async () => {
     renderHome()
     const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
-    expect(panel).toHaveTextContent('기준일 2026-07-31 · 집계 기간 2025-08-01 ~ 2026-07-31 · 분모 계약 3건')
+    expect(panel).toHaveTextContent('기준일 2026-07-31, 집계 기간 2025-08-01 ~ 2026-07-31, 계약 3건')
     expect(await screen.findByLabelText('수령 예정 수수료')).toHaveTextContent('2026-07 기준')
   })
 

@@ -70,7 +70,7 @@ public class CompareRankingRepository {
     public List<RuleRow> findCommissionRules(Offering offering, AgentProfile agent, LocalDate asOf) {
         List<Object[]> rows = em.createNativeQuery("""
                 SELECT r.commission_rule_id, r.policy_version_id, r.commission_item_id, r.installment_from, r.installment_to,
-                       r.rate_pct, r.fixed_amount, ci.item_name, pv.policy_code || ' v' || pv.version_no,
+                       r.rate_pct, r.fixed_amount, ci.item_name, pv.policy_name || ' v' || pv.version_no,
                        r.product_offering_id IS NOT NULL, r.insurer_id IS NOT NULL, r.agent_rank_code IS NOT NULL,
                        r.organization_id IS NOT NULL, r.priority_no
                 FROM fgc.commission_rule r
@@ -103,7 +103,7 @@ public class CompareRankingRepository {
     @SuppressWarnings("unchecked")
     public List<ClawbackRuleResolver.RuleRow> findClawbackRules(Offering offering, LocalDate asOf) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT r.policy_version_id, pv.policy_code || ' v' || pv.version_no, r.commission_item_id,
+                SELECT r.policy_version_id, pv.policy_name || ' v' || pv.version_no, r.commission_item_id,
                        r.insurer_id IS NOT NULL, r.product_offering_id IS NOT NULL, r.elapsed_month_from, r.elapsed_month_to,
                        r.clawback_basis_code, r.clawback_rate_pct, r.condition_expression::text
                 FROM fgc.policy_version pv
@@ -125,7 +125,7 @@ public class CompareRankingRepository {
     @SuppressWarnings("unchecked")
     public Optional<CapRule> findCapRule(Offering offering, LocalDate asOf) {
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT s.premium_multiplier, pv.policy_code || ' v' || pv.version_no, s.cap_rule_set_id
+                SELECT s.premium_multiplier, pv.policy_name || ' v' || pv.version_no, s.cap_rule_set_id
                 FROM fgc.cap_rule_set s JOIN fgc.policy_version pv ON pv.policy_version_id = s.policy_version_id
                 WHERE pv.status = 'ACTIVE' AND s.payment_stage = 'GA_TO_FC'
                   AND s.contract_date_from <= :asOf AND (s.contract_date_to IS NULL OR s.contract_date_to >= :asOf)

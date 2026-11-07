@@ -38,7 +38,7 @@ import {
 } from './api'
 import type { ContractCriteria, ContractSummary } from './api'
 import { contractStatusLabels } from './labels'
-import { ContractStatusBadge, DataOriginBadge } from './badges'
+import { ContractStatusBadge } from './badges'
 import { contractErrorText } from './detailState'
 import './legacy.css'
 import './list.css'
@@ -71,7 +71,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'contractNo',
     label: '계약번호',
     sortable: true,
-    width: '10rem',
+    width: '12rem',
     cellClassName: 'contract-number-cell',
     render: (row) =>
       row.contractId ? (
@@ -84,7 +84,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'insurerName',
     label: '보험회사',
     sortable: true,
-    width: '6.5rem',
+    width: '7.5rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.insurerName),
   },
@@ -96,7 +96,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.productName),
   },
-  { key: 'contractDate', label: '계약일', sortable: true, width: '5.75rem', render: (row) => date(row.contractDate) },
+  { key: 'contractDate', label: '계약일', sortable: true, width: '6.5rem', render: (row) => date(row.contractDate) },
   {
     key: 'premium',
     label: <span className="contract-premium-heading">월납환산 초회보험료</span>,
@@ -115,7 +115,7 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     key: 'agent',
     label: '모집 설계사',
     sortable: true,
-    width: '7rem',
+    width: '9.5rem',
     cellClassName: 'contract-disclosure-cell',
     render: (row) => textCell(row.agentIdName),
   },
@@ -133,13 +133,6 @@ const columns = (back: string): TableColumn<ContractSummary>[] => [
     align: 'center',
     render: (row) =>
       row.capResultStatus ? <CapStatus code={row.capResultStatus} label={row.capResultStatusLabel} /> : '-',
-  },
-  {
-    key: 'origin',
-    label: '데이터 출처',
-    width: '5.5rem',
-    align: 'center',
-    render: (row) => <DataOriginBadge code={row.dataOrigin} label={row.dataOriginLabel} />,
   },
 ]
 
@@ -164,7 +157,7 @@ export default function ContractListPage() {
   return (
     <div className="contract-list-page list-page">
       <header className="page-header contract-page-header">
-        <ScreenHelp screenId="CONT-W01" />
+        {canProcess ? <ScreenHelp screenId="CONT-W01" /> : <ScreenHelp screenId="CONT-W01" variant="reader" />}
         <h1 className="page-title">보험계약 목록</h1>
         <div className="page-header-actions">
           <Button data-guide-feature="features.contract.contract-list-page.button" variant="secondary" loading={exporting.isPending} onClick={() => exporting.mutate()}>

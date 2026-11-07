@@ -10,7 +10,7 @@ import { Field } from '../../components/Field'
 import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
 import { apiClient, ApiError } from '../../lib/api/client'
-import { ClawbackTargets, CommissionRow, DraftInput, DraftSelect } from './PolicyDraftFields'
+import { ClawbackTargets, CommissionRow, DraftInput, DraftSelect, RegulationRefs } from './PolicyDraftFields'
 import {
   ACQUISITION_COST_BASIS,
   ACQUISITION_COST_RATE,
@@ -24,7 +24,9 @@ import {
   optionsFor,
   policyTypes,
   PolicyPreviewContext,
+  refLabel,
   regimeFor,
+  regulationTitles,
   sources,
   sourceStatusTags,
   statusLabels,
@@ -116,7 +118,7 @@ export function PolicyDraftEditor({
     ...(commission
       ? [{ id: 'commissionRules' as const, label: '수수료 규칙', count: draft.commissionRules.length }]
       : []),
-    ...(installment ? [{ id: 'feeRegimeRules' as const, label: '분급 룰셋', count: draft.feeRegimeRules.length }] : []),
+    ...(installment ? [{ id: 'feeRegimeRules' as const, label: '분급 규칙', count: draft.feeRegimeRules.length }] : []),
     ...(installment ? [{ id: 'parameters' as const, label: '계약체결비용 기준', count: draft.parameters.length }] : []),
     ...(draft.policyType === 'SCHEDULE_ELIGIBILITY'
       ? [{ id: 'parameters' as const, label: '상태별 지급조건', count: draft.parameters.length }]
@@ -226,7 +228,7 @@ export function PolicyDraftEditor({
     } catch (cause) {
       if (!mounted.current) return
       if (stored) {
-        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 목록에서 저장 결과를 확인하세요.'
+        const message = '저장은 되었지만 결과를 표시하지 못했습니다. 다시 저장하지 말고 목록에서 확인하세요.'
         saveGuide.fail(message)
         setFailure(message)
         void cache.invalidateQueries({ queryKey: ['policies'] })
@@ -264,6 +266,7 @@ export function PolicyDraftEditor({
       errors={errors}
       onChange={(v) => set(key, v)}
       disabled={key === 'policyCode' && policyId !== undefined}
+      placeholder={key === 'policyCode' ? '영문 대문자, 숫자, 하이픈으로 입력' : undefined}
     />
   )
   return (
@@ -277,7 +280,7 @@ export function PolicyDraftEditor({
       footer={
         <>
           <span className="policy-editor-footer-note">
-            {serverSaved ? '서버에 초안이 저장되었습니다. 가이드 완료를 확인해 주세요.' : preview
+            {serverSaved ? '초안이 저장되었습니다. 안내에서 다음을 누르세요.' : preview
               ? '미리보기, 변경 내용은 이 화면에서만 유지됩니다.'
               : '초안으로 저장한 후 검토를 요청할 수 있습니다.'}
           </span>
@@ -438,7 +441,7 @@ export function PolicyDraftEditor({
               <p className="policy-section-description">
                 지급 대상과 회차별 계산 방식을 설정합니다. 요율은 100%를 초과해 입력할 수 있습니다.
                 {installment &&
-                  ' 상품 판매버전을 지정하면 해당 버전의 판매개시일/기초서류에 맞는 분급 룰셋을 적용합니다.'}
+                  ' 상품 판매버전을 지정하면 해당 버전의 판매개시일/기초서류에 맞는 분급 규칙을 적용합니다.'}
               </p>
               {draft.commissionRules.map((rule, index) => (
                 <CommissionRow
@@ -517,7 +520,7 @@ export function PolicyDraftEditor({
                   <section data-guide-feature="features.policies.policy-draft-editor.section" className="policy-rule-editor" key={index}>
                     <header>
                       <h3>
-                        <span className="policy-row-number">{String(index + 1).padStart(2, '0')}</span>분급 룰셋
+                        <span className="policy-row-number">{String(index + 1).padStart(2, '0')}</span>분급 규칙
                       </h3>
                       <Button data-guide-feature="features.policies.policy-draft-editor.button-7"
                         variant="ghost"
@@ -580,13 +583,12 @@ export function PolicyDraftEditor({
                       {numeric('maxInstallments', '최대 회차', true)}
                       {numeric('longTermMaintenanceFrom', '장기유지 시작 회차')}
                       {numeric('longTermMaintenanceTo', '장기유지 끝 회차')}
-                      <DraftInput
+                      <RegulationRefs
                         path={prefix + 'sourceRefs'}
-                        label="근거 코드"
-                        errors={errors}
-                        value={rule.sourceRefs.join(',')}
-                        placeholder="REG/SRC 코드를 쉼표로 구분"
-                        onChange={(v) => update({ sourceRefs: v.split(',') })}
+                        legend="근거 규정"
+                        error={errors[prefix + 'sourceRefs']}
+                        value={rule.sourceRefs}
+                        onChange={(v) => update({ sourceRefs: v })}
                       />
                       <label className="policy-checkbox">
                         <input data-guide-feature="features.policies.policy-draft-editor.input-3"
@@ -615,7 +617,7 @@ export function PolicyDraftEditor({
               })}
               {!draft.feeRegimeRules.length && (
                 <EditorEmpty
-                  text="등록된 분급 룰셋이 없습니다."
+                  text="등록된 분급 규칙이 없습니다."
                   description="판매 시작일 범위와 최대 회차를 설정하세요."
                 />
               )}
@@ -624,7 +626,7 @@ export function PolicyDraftEditor({
                 id="policy-feeRegimeRules"
                 onClick={() => set('feeRegimeRules', [...draft.feeRegimeRules, emptyRegime(draft.policyType)])}
               >
-                + 분급 룰셋 추가
+                + 분급 규칙 추가
               </Button>
             </>
           )}
@@ -686,8 +688,8 @@ export function PolicyDraftEditor({
           {section === 'clawbackRules' && (
             <>
               <div className="policy-notice">
-                환수는 확정 지급 귀속액을 기준으로 계산합니다. 경과월은 계약일부터 사건 기준일까지 채운 개월 수이며,
-                귀속행별 원 단위 반올림 후 합산합니다. 환수율은 회사 약정 근거에 따라 직접 입력하세요.
+                환수는 확정 지급 귀속액을 기준으로 계산합니다. 경과월은 계약일부터 발생 기준일까지 채운 개월 수이며,
+                귀속 내역별 원 단위 반올림 후 합산합니다. 환수율은 회사 약정 근거에 따라 직접 입력하세요.
               </div>
               {draft.clawbackRules.map((rule, index) => {
                 const prefix = `clawbackRules.${index}.`
@@ -797,26 +799,23 @@ export function PolicyDraftEditor({
           {section === 'sourceDetails' && (
             <>
               <p className="policy-section-description">
-                정책에 사용한 REG/SRC 근거의 제목과 설명, 원문 링크를 연결하세요.
+                정책에 사용한 규정을 고르고, 근거 자료의 제목과 설명, 원문 링크를 연결하세요.
               </p>
-              <div className="policy-form-grid policy-form-grid-two">
-                <DraftInput
-                  path="regulationRefs"
-                  label="규정 근거 코드"
-                  errors={errors}
-                  value={draft.regulationRefs.join(',')}
-                  placeholder="REG 코드를 쉼표로 구분"
-                  onChange={(value) => set('regulationRefs', value.split(','))}
-                />
-                <DraftInput
-                  path="sourceRefs"
-                  label="출처 근거 코드"
-                  errors={errors}
-                  value={draft.sourceRefs.join(',')}
-                  placeholder="SRC 코드를 쉼표로 구분"
-                  onChange={(value) => set('sourceRefs', value.split(','))}
-                />
-              </div>
+              <RegulationRefs
+                path="regulationRefs"
+                legend="근거 규정"
+                error={errors.regulationRefs}
+                value={draft.regulationRefs}
+                onChange={(value) => set('regulationRefs', value)}
+              />
+              <DraftInput
+                path="sourceRefs"
+                label="출처 자료 번호"
+                errors={errors}
+                value={draft.sourceRefs.join(',')}
+                placeholder="규정 외 근거 자료가 있으면 등록된 번호를 쉼표로 구분"
+                onChange={(value) => set('sourceRefs', value.split(','))}
+              />
               {draft.sourceDetails.map((source, index) => {
                 const prefix = `sourceDetails.${index}.`
                 const update = (patch: Partial<typeof source>) =>
@@ -842,14 +841,17 @@ export function PolicyDraftEditor({
                       </Button>
                     </header>
                     <div className="policy-form-grid policy-form-grid-two">
-                      <DraftInput
+                      <DraftSelect
                         path={prefix + 'ref'}
-                        label="근거 코드"
+                        label="근거 규정"
                         required
                         errors={errors}
                         value={source.ref}
                         onChange={(v) => update({ ref: v })}
-                        placeholder="REG- 또는 SRC-"
+                        options={[
+                          ...(source.ref && !regulationTitles[source.ref] ? [{ value: source.ref, label: refLabel(source.ref) || '출처 자료' }] : []),
+                          ...optionsFor(regulationTitles),
+                        ]}
                       />
                       <DraftInput
                         path={prefix + 'title'}
