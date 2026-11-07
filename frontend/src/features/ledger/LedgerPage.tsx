@@ -91,6 +91,7 @@ const columns: TableColumn<Journal>[] = [
   {
     key: 'type',
     label: '유형',
+    align: 'center',
     width: '12rem',
     render: (row) => (
       <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>
@@ -99,19 +100,19 @@ const columns: TableColumn<Journal>[] = [
     ),
   },
   {
-    key: 'source',
-    label: '원천',
-    width: '10rem',
-    render: (row) =>
-      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} ${row.sourceEntityId ?? EMPTY}`),
-  },
-  {
     key: 'contract',
     label: '계약',
     sortKey: 'contractNo',
     sortable: true,
-    width: '10rem',
+    width: '12rem',
     render: (row) => text(row.contractNo || row.contractId),
+  },
+  {
+    key: 'source',
+    label: '원천',
+    width: '10rem',
+    render: (row) =>
+      disclose(row.sourceEntityTypeLabel || EMPTY),
   },
   {
     key: 'debit',
@@ -385,7 +386,7 @@ function DetailSummary({ detail }: { detail: JournalDetail }) {
     ['원분개', disclose(detail.reversalOfJournalNo)],
     ['역분개', disclose(detail.reversedByJournalNo)],
     ['재기표', disclose(detail.repostedJournalNo)],
-    ['정정 묶음', detail.correctionGroupKey ? '있음' : EMPTY],
+    ['정정 내역', detail.correctionGroupKey ? '있음' : EMPTY],
     ['적요', disclose(detail.description)],
   ] as const
   return (

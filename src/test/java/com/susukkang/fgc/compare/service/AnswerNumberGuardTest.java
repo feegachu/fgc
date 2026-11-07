@@ -45,6 +45,6 @@ class AnswerNumberGuardTest {
     @Test
     @DisplayName("'이'·'만' 같은 조사 뒤에 '원'으로 시작하는 낱말이 와도 금액으로 보지 않는다")
     void particlesBeforeWonWordsAreNotAmounts() {
-        assertThat(AnswerNumberGuard.allowed("환수율이 원수사 정책마다 달라요.", NAMES)).isTrue();
+        assertThat(AnswerNumberGuard.allowed("환수율이 보험회사 정책마다 달라요.", NAMES)).isTrue();
     }
 }

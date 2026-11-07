@@ -134,7 +134,7 @@ class ValidationRunScheduleServiceTest {
                         validState(20L, PaymentStage.GA_TO_FC)));
         doThrow(new FgcBusinessException(FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED,
                 "scheduleHeaderId", java.util.Map.of("reason", "DATA_QUALITY"),
-                "GA_TO_FC: 취소된 예정판은 자동 재생성하지 않습니다."))
+                "GA_TO_FC: 취소된 예상 스케줄은 자동 재생성하지 않습니다."))
                 .when(itemService).process(10L, 118L);
         given(itemService.process(20L, 118L))
                 .willReturn(new ScheduleGenerationResult(List.of(202L), 12));
@@ -152,7 +152,7 @@ class ValidationRunScheduleServiceTest {
         // 케이스를 남기지 않으면 담당자가 그 사실을 알 수 없고 대사가 엉뚱한 판정을 낸다.
         verify(exceptionCaseRepository).insertDataQualityCase(
                 118L, 10L, "예상 스케줄 생성 실패",
-                "GA_TO_FC: 취소된 예정판은 자동 재생성하지 않습니다.");
+                "GA_TO_FC: 취소된 예상 스케줄은 자동 재생성하지 않습니다.");
         verify(itemService).process(10L, 118L);
         verify(itemService).process(20L, 118L);
     }

@@ -5,7 +5,7 @@ import { Button } from '../../components/Button'
 import { QueryState } from '../reference/ReferenceUI'
 import { useCommissionItems, useInsurerOptions, useOrganizationOptions, useProductOptions } from '../base/api'
 import type { ClawbackDraft, CommissionDraft } from './management'
-import { numberValue, optionsFor } from './management'
+import { numberValue, optionsFor, regulationTitles } from './management'
 import type { DraftErrors } from './draftValidation'
 
 export function DraftInput({
@@ -26,6 +26,37 @@ export function DraftInput({
     <Field label={label} required={props.required} error={errors[path]}>
       <input data-guide-feature={guideFeatureId('policy.draft-input', path.replace(/\.\d+(?=\.|$)/g, ''))} {...props} id={`policy-${path}`} value={value} onChange={(event) => onChange(event.target.value)} />
     </Field>
+  )
+}
+/** 규정 근거는 코드 대신 이름으로 고른다. 목록에 없는 과거 참조는 값에 그대로 남는다. */
+export function RegulationRefs({
+  path,
+  legend,
+  error,
+  value,
+  onChange,
+}: {
+  path: string
+  legend: string
+  error?: string
+  value: string[]
+  onChange: (value: string[]) => void
+}) {
+  return (
+    <fieldset id={`policy-${path}`} tabIndex={-1} className="policy-span-all policy-source-status-options policy-regulation-refs">
+      <legend>{legend}</legend>
+      {Object.entries(regulationTitles).map(([code, title]) => (
+        <label key={code} className="policy-checkbox">
+          <input data-guide-feature="features.policies.policy-draft-fields.regulation-ref"
+            type="checkbox"
+            checked={value.includes(code)}
+            onChange={(event) => onChange(event.target.checked ? [...value, code] : value.filter((ref) => ref !== code))}
+          />
+          {title}
+        </label>
+      ))}
+      {error && <p role="alert" className="field-error">{error}</p>}
+    </fieldset>
   )
 }
 export function DraftSelect({
@@ -217,7 +248,7 @@ export function CommissionRow({
           errors={errors}
           value={rule.paymentStage}
           onChange={(v) => set('paymentStage', v)}
-          options={optionsFor({ INSURER_TO_GA: '원수사→GA', GA_TO_FC: 'GA→설계사' })}
+          options={optionsFor({ INSURER_TO_GA: '보험회사→GA', GA_TO_FC: 'GA→설계사' })}
         />
         <DraftSelect
           path={prefix + 'insurerId'}

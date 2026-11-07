@@ -52,7 +52,7 @@ export function initialForm(month: string, draft?: Payment): FormValues {
     settlementMonth: draft?.settlementMonth?.slice(0, 7) ?? month,
     agentId: draft?.agentId == null ? '' : String(draft.agentId),
     commissionItemId: draft?.commissionItemId == null ? '' : String(draft.commissionItemId),
-    amount: String(draft?.amount ?? 250000),
+    amount: draft?.amount == null ? '' : String(draft.amount),
     cashflowType: draft?.cashflowType ?? 'PAYMENT',
     evidenceRef: draft?.evidenceRef ?? '',
   }
@@ -70,7 +70,7 @@ export function newRow(key: number, date: string, amount = '0'): AttributionRow 
   }
 }
 export function draftRows(draft: Payment | undefined): AttributionRow[] {
-  if (!draft) return [newRow(1, '', '250000')]
+  if (!draft) return [newRow(1, '', '')]
   return (draft.attributions ?? []).map((row, index) => ({
     key: index + 1,
     contractId: row.contractId == null ? '' : String(row.contractId),
@@ -156,7 +156,7 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
   if (!insurer) requireValue(form.agentId, '수령 설계사', 'recipient')
   requireValue(form.commissionItemId, '수수료 항목', 'item')
   requireValue(form.amount, '금액', 'amount', true)
-  if (!rows.length) throw new FormValidationError('귀속행을 하나 이상 추가하세요.', 'attributions')
+  if (!rows.length) throw new FormValidationError('귀속 내역을 하나 이상 추가하세요.', 'attributions')
   const attributions: AttributionPayload[] = rows.map((raw) => {
     const row = normalizeRow(raw, insurer, newcomer)
     if (!newcomer) requireValue(row.contractId, '귀속 계약', `attr-${row.key}-contractId`)
@@ -167,7 +167,7 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
       AttributionRequest['exclusionType'],
     ]
     if ((status === 'EXCLUDED' || newcomer) && !blank(row.evidenceRef))
-      throw new FormValidationError('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.', `attr-${row.key}-evidenceRef`)
+      throw new FormValidationError('제외 귀속 내역은 제외유형과 증빙을 입력해야 합니다.', `attr-${row.key}-evidenceRef`)
     if (row.attributionMethod === 'APPROVED_ALLOCATION' && !blank(row.allocationBasis))
       throw new FormValidationError('승인배부에는 배부정책을 입력해야 합니다.', `attr-${row.key}-allocationBasis`)
     const exclusions = {
@@ -211,9 +211,9 @@ export function buildPayload(form: FormValues, rows: AttributionRow[], newcomer:
 }
 const GATES = [
   { label: '작성중으로 저장', codes: ['FGC-TRAN-005'] },
-  { label: '귀속행 입력', codes: ['FGC-TRAN-002'] },
+  { label: '귀속 내역 입력', codes: ['FGC-TRAN-002'] },
   { label: '귀속합계와 지급액 일치', codes: ['FGC-TRAN-003'] },
-  { label: '검토필요 귀속 해소', codes: ['FGC-CAP-002'] },
+  { label: '검토 필요 귀속 정리', codes: ['FGC-CAP-002'] },
   { label: '1,200% 사전검증', codes: ['FGC-CAP-001', 'FGC-CAP-003', 'FGC-CAP-004'] },
   { label: '모두 통과하면 확정', codes: [] },
 ]

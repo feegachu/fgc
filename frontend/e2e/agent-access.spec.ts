@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test'
 // UI 전용 fixture. 실제 JWT·소유권·PostgreSQL 검증은 AgentDataScopeIntegrationTest에서 수행한다.
 async function agentFixture(page: Page, commission = 300000) {
   const unexpected: string[] = []
+  await page.addInitScript(() => localStorage.setItem('fgc.lastActivityAt', String(Date.now())))
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     const fulfill = (data: unknown) => route.fulfill({ json: { data, error: null, requestId: 'agent-ui-fixture' } })
@@ -32,7 +33,7 @@ async function agentFixture(page: Page, commission = 300000) {
     const contract = {
       contractId: 1, contractNo: 'FGC-FGL01-202607-0001', insurerName: '가상생명', productName: 'GOLDEN 상품',
       contractDate: '2026-07-10', monthlyEquivalentFirstPremium: 100000, contractStatus: 'ACTIVE',
-      contractStatusLabel: '정상', agentIdName: 'A-FC-001 김정산', agentName: '김정산', dataOrigin: 'MANUAL',
+      contractStatusLabel: '정상', agentIdName: '김정산 (A-FC-001)', agentName: '김정산', dataOrigin: 'MANUAL',
     }
     if (path === '/api/v1/contracts') return fulfill({ content: [contract], totalPages: 1, totalElements: 1, page: 1, size: 20 })
     if (path === '/api/v1/transactions') return fulfill({

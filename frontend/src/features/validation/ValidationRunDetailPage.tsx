@@ -157,7 +157,7 @@ function DetailBody({
 
   const [executionGuide] = useState(() => new SaveGuide())
   const [finalizeGuide] = useState(() => new SaveGuide())
-  useRunGuide(executionGuide, id, Boolean(status), id, status, progress.isError ? '진행률 조회에 실패했습니다. 서버 결과를 다시 확인하세요.' : status === 'FAILED' ? failureMessage || '검증 실행 실패' : '')
+  useRunGuide(executionGuide, id, Boolean(status), id, status, progress.isError ? '진행률 조회에 실패했습니다. 다시 조회하세요.' : status === 'FAILED' ? failureMessage || '검증 실행 실패' : '')
   useEffect(() => {
     if (status === 'FINALIZED' && finalizeGuide.getSnapshot().savedId === null) {
       finalizeGuide.begin()
@@ -200,7 +200,6 @@ function DetailBody({
         <div>
           <p>
             <strong>확정하면 이 실행의 결과는 고칠 수 없습니다.</strong> 바로잡으려면 새 실행을 만들어야 합니다.
-            (운영정책서 제43조)
           </p>
         </div>
       </div>
@@ -208,7 +207,7 @@ function DetailBody({
       <section data-guide-feature="features.validation.validation-run-detail-page.section-2" className="surface" aria-labelledby="vrun-header-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-header-title">
-            <span className="tabular-nums">{formatMonth(header.validationMonth)}</span> {header.runNo}회차 실행
+            <span className="tabular-nums">{formatMonth(header.validationMonth)}</span> {header.runNo}차 실행
           </h2>
           <RunStatusBadge status={status} label={live?.statusLabel ?? header.statusLabel} />
         </header>
@@ -219,8 +218,8 @@ function DetailBody({
               <dd className="tabular-nums">{formatMonth(header.validationMonth)}</dd>
             </div>
             <div>
-              <dt>회차</dt>
-              <dd className="tabular-nums">{header.runNo}</dd>
+              <dt>실행 차수</dt>
+              <dd className="tabular-nums">{header.runNo}차</dd>
             </div>
             <div>
               <dt>실행 유형</dt>
@@ -256,7 +255,7 @@ function DetailBody({
       <section data-guide-feature="features.validation.validation-run-detail-page.section-3" data-guide-target="validation.progress" className="surface" aria-labelledby="vrun-stepper-title">
         <header className="surface-header">
           <h2 className="surface-title" id="vrun-stepper-title">
-            진행 단계 (운영정책서 제43조)
+            진행 단계
           </h2>
           <div className="page-header-actions">
             <Button data-guide-feature="features.validation.validation-run-detail-page.button-2"
@@ -305,13 +304,13 @@ function DetailBody({
                 : startUnconfirmed
                   ? '재시작 시도의 진행을 확인하지 못했습니다. 자동 조회를 멈췄습니다. 새로고침으로 상태를 확인하세요.'
                   : executed && !finished
-                    ? '실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.'
+                    ? '실행을 시작했습니다. 진행률을 확인하고 있습니다.'
                     : status === 'RUNNING'
                       ? '실행 중입니다. 끝나면 결과가 표시됩니다.'
                       : status === 'COMPLETED'
                         ? '계산을 마친 실행입니다. 다시 계산하려면 새 실행을 만드세요.'
                         : status === 'FAILED' && header.runType === 'MANUAL_CONTRACT'
-                          ? '계약수동 실행은 실패 지점부터 재시작할 수 없습니다. 새 실행을 만드세요.'
+                          ? '계약별 실행은 실패 지점부터 재시작할 수 없습니다. 새 실행을 만드세요.'
                           : ''}
           </p>
           {header.runType !== 'MANUAL_CONTRACT' && <ValidationRestartPanel key={id} id={id} month={header.validationMonth ?? ""} runNo={header.runNo ?? 0} status={status ?? 'CREATED'} waiting={!progress.isSuccess || !!(executed && !finished)} canProcess={canProcess} onAccepted={() => {
@@ -340,7 +339,7 @@ function DetailBody({
                   </span>
                   <span className="vrun-stepper-label">
                     <span>{name}</span>
-                    {index + 1 >= MANUAL_STEP_FROM && <span className="vrun-stepper-manual">사람이 수행</span>}
+                    {index + 1 >= MANUAL_STEP_FROM && <span className="vrun-stepper-manual">담당자 처리</span>}
                   </span>
                   <span className="visually-hidden">{STEP_STATE_TEXT[state]}</span>
                 </li>
@@ -397,7 +396,7 @@ function RunPicker({ currentId, link }: { currentId: string; link: (path: string
         >
           {(runs.data?.content ?? []).map((run) => (
             <option key={run.validationRunId} value={String(run.validationRunId)}>
-              {formatMonth(run.validationMonth)}, {run.runNo}회차, {run.statusLabel}
+              {formatMonth(run.validationMonth)}, {run.runNo}차 실행, {run.statusLabel}
             </option>
           ))}
         </select>
@@ -420,7 +419,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
   const targets = detail.targets ?? []
   const columns: TableColumn<ValidationTarget>[] = [
     // 계약번호는 자르지 않는다(좁은 화면에서는 표 안에서 가로로 넘긴다).
-    { key: 'contract', label: '계약', width: '11.5rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
+    { key: 'contract', label: '계약', width: '12rem', cellClassName: 'tabular-nums', render: (t) => t.contractNo },
     {
       key: 'status',
       label: '선별',
@@ -455,7 +454,7 @@ function TargetSection({ detail }: { detail: ValidationRunDetail }) {
     <section data-guide-feature="features.validation.validation-run-detail-page.section-4" className="surface" aria-labelledby="vrun-target-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-target-title">
-          ③ 대상 선별 결과
+          대상 선별 결과
         </h2>
         <p className="vrun-card-note">
           선정 {summary?.selectedCount ?? 0}, 제외 {summary?.excludedCount ?? 0}, 검토필요{' '}
@@ -493,7 +492,7 @@ function SummarySection({ detail, status }: { detail: ValidationRunDetail; statu
     <section data-guide-feature="features.validation.validation-run-detail-page.section-5" className="surface" aria-labelledby="vrun-summary-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-summary-title">
-          ④ 결과 요약
+          결과 요약
         </h2>
       </header>
       <div className="kpi-grid kpi-group vrun-summary-grid">
@@ -548,11 +547,11 @@ function ExceptionSection({ detail, openLink }: { detail: ValidationRunDetail; o
       </header>
       <div className="kpi-grid kpi-group vrun-exception-grid">
         <SummaryCard label="이번 실행 검출" value={summary?.detectedCount ?? 0} unit="건" />
-        <SummaryCard label="신규 업무건" value={summary?.newCount ?? 0} unit="건" />
-        <SummaryCard label="기존 업무건 재검출" value={summary?.recurringCount ?? 0} unit="건" />
+        <SummaryCard label="새 예외" value={summary?.newCount ?? 0} unit="건" />
+        <SummaryCard label="다시 나온 예외" value={summary?.recurringCount ?? 0} unit="건" />
         <SummaryCard label="해결 후 재발" value={summary?.reopenedCount ?? 0} unit="건" />
         <SummaryCard label="이번 실행 미검출" value={summary?.notDetectedCount ?? 0} unit="건" />
-        <SummaryCard label="미처리 업무건" value={summary?.openWorkItemCount ?? 0} unit="건" />
+        <SummaryCard label="미처리 예외" value={summary?.openWorkItemCount ?? 0} unit="건" />
       </div>
     </section>
   )
@@ -637,7 +636,7 @@ function ChecklistSection({
     <section data-guide-feature="features.validation.validation-run-detail-page.section-7" data-guide-target="validation.checklist" className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
-          ⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)
+          확정 조건 (8개 모두 통과해야 함)
         </h2>
         {summary.tone ? (
           <StatusBadge tone={summary.tone}>{summary.text}</StatusBadge>
@@ -699,7 +698,7 @@ function FinalizeSection({
     onSuccess: async (result) => {
       if (result.status === 'FINALIZED') onDone()
       if (!mounted.current) return
-      if (result.status !== 'FINALIZED') throw new Error('서버의 최종 확정 상태를 확인하지 못했습니다.')
+      if (result.status !== 'FINALIZED') throw new Error('최종 확정 상태를 확인하지 못했습니다.')
       if (!(await finalizeGuide.saved(id)) || !mounted.current) return
       setConfirming(false)
       setFinalized(true)
@@ -717,7 +716,7 @@ function FinalizeSection({
   let reason = ''
   if (!canFinalize) reason = '확정은 GA관리자와 시스템관리자만 할 수 있습니다.'
   else if (status === 'FINALIZED') reason = '이미 확정된 실행입니다. 결과를 바꾸려면 새 실행을 만드세요.'
-  else if (!supportedType) reason = '월 전체를 계산한 월간·확정전 실행만 최종 확정할 수 있습니다.'
+  else if (!supportedType) reason = '월 전체를 계산한 월간·확정 전 실행만 최종 확정할 수 있습니다.'
   else if (status !== 'COMPLETED') reason = '검증 계산이 끝난 실행만 확정할 수 있습니다.'
   else if (!passed) reason = '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.'
   return (
@@ -725,13 +724,12 @@ function FinalizeSection({
       <div className="vrun-finalize-row">
         <div className="vrun-finalize-copy">
           <p className="vrun-finalize-title" id="vrun-finalize-section-title">
-            ⑥ 확정
+            확정
           </p>
           <p className="field-helper vrun-finalize-guide" id="finalize-action-guide">
             위 8개 조건이 모두 통과한 실행만 확정할 수 있습니다.
             <br />
-            확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 <strong>잠깁니다</strong>.{' '}
-            <strong>검증 결과 잠금이며 실제 송금/회계 마감이 아닙니다.</strong>
+            확정하면 이 실행의 검증 결과와 그때 쓰인 규칙/계산근거가 <strong>잠깁니다</strong>.{' '}
             <br />
             <strong>되돌릴 수 없습니다.</strong> 결과를 바꾸려면 새 실행을 만드세요.
           </p>

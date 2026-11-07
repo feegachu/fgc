@@ -1217,7 +1217,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
         ExclusionType exclusionType = normalizeExclusionType(request.exclusionType());
         if (request.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
             if (paymentStage == PaymentStage.INSURER_TO_GA) {
-                invalid("attributionMethod", "원수사→GA 지급 건에는 신인 비계약 귀속을 사용할 수 없습니다.");
+                invalid("attributionMethod", "보험회사→GA 지급 건에는 신인 비계약 귀속을 사용할 수 없습니다.");
             }
             if (request.inclusionDecisionStatus() == InclusionDecisionStatus.INCLUDED) {
                 invalid("inclusionDecisionStatus", "비계약 선지급 건은 산입 확정 상태로 저장할 수 없습니다.");
@@ -1231,7 +1231,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 throw new FgcBusinessException(FgcErrorCode.TRAN_004);
             }
         } else if (exclusionType != ExclusionType.NONE) {
-            invalid("exclusionType", "산입 제외 상태가 아닌 귀속행에는 제외유형을 지정할 수 없습니다.");
+            invalid("exclusionType", "산입 제외 상태가 아닌 귀속 내역에는 제외유형을 지정할 수 없습니다.");
         }
         if (exclusionType == ExclusionType.COMPLIANCE_3PCT
                 && paymentStage != com.susukkang.fgc.common.code.PaymentStage.INSURER_TO_GA) {
@@ -1363,7 +1363,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ExceptionType.DATA_QUALITY,
                     "HIGH",
                     "귀속정보 누락",
-                    "지급 건을 확정하려면 하나 이상의 귀속행이 필요합니다.",
+                    "지급 건을 확정하려면 하나 이상의 귀속 내역이 필요합니다.",
                     FgcErrorCode.TRAN_002,
                     Map.of()
             ));
@@ -1423,7 +1423,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ExceptionType.DATA_QUALITY,
                     "HIGH",
                     "귀속계약 누락",
-                    "계약 귀속행에는 귀속계약이 필요합니다.",
+                    "계약 귀속 내역에는 귀속계약이 필요합니다.",
                     FgcErrorCode.TRAN_002,
                     Map.of()
             ));
@@ -1438,7 +1438,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ExceptionType.CAP_REVIEW_REQUIRED,
                     "HIGH",
                     "산입 판단 검토 필요",
-                    "검토필요 또는 비계약 귀속행은 자동 확정할 수 없습니다.",
+                    "검토필요 또는 비계약 귀속 내역은 자동 확정할 수 없습니다.",
                     FgcErrorCode.CAP_002,
                     Map.of()
             ));
@@ -1471,7 +1471,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ExceptionType.ALLOCATION_EVIDENCE_MISSING,
                     "HIGH",
                     "배부 근거 누락",
-                    "배부 귀속행에는 배부기준이 필요합니다.",
+                    "배부 귀속 내역에는 배부기준이 필요합니다.",
                     FgcErrorCode.TRAN_004,
                     Map.of()
             ));
@@ -1560,7 +1560,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     ExceptionType.CAP_REVIEW_REQUIRED,
                     ExceptionSeverity.HIGH.name(),
                     "산입 판단 검토 필요",
-                    "검토필요 귀속행 또는 준법경영비 증빙을 확인해야 합니다.",
+                    "검토필요 귀속 내역 또는 준법경영비 증빙을 확인해야 합니다.",
                     FgcErrorCode.CAP_002,
                     Map.of()
             );
@@ -1705,7 +1705,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                 .capCheckId(check.getCapCheckId()).detailSeq(1)
                 .commissionItemId(check.getCommissionItemId()).itemCode(check.getItemCode()).itemName(check.getItemName())
                 .classificationSnapshot("INCLUDED").amount(check.getIncludedAmount())
-                .decisionReason("기존 확정 지급액과 현재 지급 후보의 총 산입액. 환수는 포함하지 않으며 귀속행은 계산 스냅샷 참조")
+                .decisionReason("확정 지급액과 이번 지급 후보를 합한 산입액입니다. 환수는 포함하지 않습니다.")
                 .build();
     }
 
@@ -2037,9 +2037,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     "CAP_RULE_MISMATCH",
                     "HIGH",
                     "한도 정책 불일치",
-                    "지급과 계산에 쓴 한도 정책이 다릅니다(지급 룰셋 " + rule.capRuleSetId()
-                            + "번, 계산 룰셋 " + calculation.capRuleSetId()
-                            + "번). 정책 버전과 기준일을 고친 뒤 다시 검증하세요.",
+                    "지급과 계산에 쓴 한도 정책이 다릅니다. 정책 버전과 기준일을 고친 뒤 다시 검증하세요.",
                     FgcErrorCode.CAP_002,
                     Map.of()
             );
@@ -2071,10 +2069,10 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
                     missingRuleSet ? ExceptionType.POLICY_MISSING : ExceptionType.CAP_REVIEW_REQUIRED,
                     missingRuleSet ? null : "CAP_ITEM_UNCLASSIFIED",
                     "HIGH",
-                    missingRuleSet ? "1,200% 룰셋 누락" : "한도 산입 항목 미분류",
+                    missingRuleSet ? "1,200% 한도 규칙 없음" : "한도 산입 항목 미분류",
                     missingRuleSet
-                            ? "적용 가능한 활성 1,200% 룰셋이 없습니다."
-                            : "적용 룰셋에 해당 수수료 항목의 산입 기준이 없습니다.",
+                            ? "적용 가능한 활성 1,200% 한도 규칙이 없습니다."
+                            : "적용 규칙에 해당 수수료 항목의 산입 기준이 없습니다.",
                     missingRuleSet ? FgcErrorCode.CAP_004 : FgcErrorCode.CAP_002,
                     Map.of()
             );
@@ -2160,7 +2158,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             return;
         }
         if (agentId != null) {
-            invalid("agentId", "원수사→GA 지급 건에는 수령 설계사를 지정할 수 없습니다.");
+            invalid("agentId", "보험회사→GA 지급 건에는 수령 설계사를 지정할 수 없습니다.");
         }
     }
 
@@ -2175,7 +2173,7 @@ public class CommissionPaymentServiceImpl implements CommissionPaymentService {
             if (attribution.attributionMethod() == AttributionMethod.SETTLEMENT_SUPPORT_MONTHLY
                     || attribution.attributionMethod() == AttributionMethod.FIRST_CONTRACT_CARRY_FORWARD
                     || attribution.attributionMethod() == AttributionMethod.NEWCOMER_NON_CONTRACT) {
-                invalid("attributionMethod", "원수사→GA 지급 건에는 설계사 지원 귀속방식을 사용할 수 없습니다.");
+                invalid("attributionMethod", "보험회사→GA 지급 건에는 설계사 지원 귀속방식을 사용할 수 없습니다.");
             }
         }
     }

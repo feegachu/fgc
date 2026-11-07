@@ -96,7 +96,7 @@ class CapLegacyPolicyRetirementMigrationIntegrationTest {
         Long id = db.queryForObject("""
                 INSERT INTO fgc.policy_version(policy_code, policy_name, policy_type, source_class, version_no,
                     effective_from, status, created_by)
-                VALUES ('TEST-CAP-GA-OVERLAP', '중복 검증용 GA→설계사 룰셋', 'CAP_1200', 'REGULATORY', 1,
+                VALUES ('TEST-CAP-GA-OVERLAP', '중복 검증용 GA→설계사 규칙', 'CAP_1200', 'REGULATORY', 1,
                     DATE '2026-07-01', 'DRAFT', (SELECT user_id FROM fgc.app_user WHERE login_id = 'settle01'))
                 RETURNING policy_version_id""", Long.class);
         db.update("""

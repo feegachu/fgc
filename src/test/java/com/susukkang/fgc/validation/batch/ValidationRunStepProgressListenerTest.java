@@ -119,11 +119,11 @@ class ValidationRunStepProgressListenerTest {
         stepExecution.setStatus(BatchStatus.FAILED);
         FgcBusinessException failure = new FgcBusinessException(FgcErrorCode.CAP_002);
         stepExecution.addFailureException(failure);
-        given(messageResolver.resolve(FgcErrorCode.CAP_002, failure.getParams())).willReturn("적용 가능한 룰셋이 없습니다. 정책을 확인하세요.");
+        given(messageResolver.resolve(FgcErrorCode.CAP_002, failure.getParams())).willReturn("적용 가능한 규칙이 없습니다. 정책을 확인하세요.");
 
         listener.afterStep(stepExecution);
 
-        verify(lifecycleService).fail(100L, 4, parameters(), "적용 가능한 룰셋이 없습니다. 정책을 확인하세요.");
+        verify(lifecycleService).fail(100L, 4, parameters(), "적용 가능한 규칙이 없습니다. 정책을 확인하세요.");
     }
 
     @Test

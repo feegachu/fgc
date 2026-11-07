@@ -23,7 +23,7 @@ final class ScheduleBaselineSql {
                         sh.generation_reason,
                         COUNT(sl.schedule_line_id) AS line_count,
                         COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
-                        CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label
+                        CONCAT(pv.policy_name,' v',pv.version_no) AS policy_version_label
                     FROM
                         schedule_header sh
                     JOIN
@@ -78,7 +78,7 @@ final class ScheduleBaselineSql {
                     GROUP BY
                         sh.schedule_header_id,
                         c.contract_no,
-                        pv.policy_code,
+                        pv.policy_name,
                         pv.version_no
                     ORDER BY sh.schedule_header_id DESC
                     LIMIT :p5
@@ -103,7 +103,7 @@ final class ScheduleBaselineSql {
                            sh.generation_reason,
                            COUNT(sl.schedule_line_id) AS line_count,
                            COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
-                           CONCAT(pv.policy_code, ' v', pv.version_no) AS policy_version_label
+                           CONCAT(pv.policy_name, ' v', pv.version_no) AS policy_version_label
                       FROM schedule_header sh
                       JOIN insurance_contract c ON c.contract_id = sh.contract_id
                       JOIN policy_version pv ON pv.policy_version_id = sh.policy_version_id
@@ -147,7 +147,7 @@ final class ScheduleBaselineSql {
                     sql.append(" ");
                 }
                 sql.append("""
-                    GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_code, pv.version_no
+                    GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_name, pv.version_no
                     ORDER BY sh.schedule_header_id DESC
                     """);
                 sql.append(" ");
@@ -175,7 +175,7 @@ final class ScheduleBaselineSql {
                            sh.generation_reason,
                            COUNT(sl.schedule_line_id) AS line_count,
                            COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
-                           CONCAT(pv.policy_code, ' v', pv.version_no) AS policy_version_label
+                           CONCAT(pv.policy_name, ' v', pv.version_no) AS policy_version_label
                       FROM schedule_header sh
                       JOIN target t
                         ON t.contract_id = sh.contract_id
@@ -186,7 +186,7 @@ final class ScheduleBaselineSql {
                         ON pv.policy_version_id = sh.policy_version_id
                       LEFT JOIN schedule_line sl
                         ON sl.schedule_header_id = sh.schedule_header_id
-                     GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_code, pv.version_no
+                     GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_name, pv.version_no
                      ORDER BY sh.schedule_version_no DESC, sh.schedule_header_id DESC
                     """);
                 sql.append(" ");
@@ -265,7 +265,7 @@ final class ScheduleBaselineSql {
                         sh.generated_at,
                         COUNT(sl.schedule_line_id) OVER (PARTITION BY sh.schedule_header_id) AS line_count,
                         COALESCE(SUM(sl.expected_amount) OVER (PARTITION BY sh.schedule_header_id),0) AS expected_total,
-                        CONCAT(pv.policy_code,' v',pv.version_no) AS policy_version_label,
+                        CONCAT(pv.policy_name,' v',pv.version_no) AS policy_version_label,
                         -- 라인 컬럼
                         ci.cashflow_type,
                         c.contract_id,
@@ -681,7 +681,7 @@ final class ScheduleBaselineSql {
                         COUNT(sl.schedule_line_id) OVER (PARTITION BY sh.schedule_header_id) AS line_count,
                         COALESCE(SUM(sl.expected_amount) OVER (PARTITION BY sh.schedule_header_id), 0) AS expected_total,
                         CONCAT(
-                                pv.policy_code,
+                                pv.policy_name,
                                 ' v',
                                 pv.version_no
                         ) AS policy_version_label,

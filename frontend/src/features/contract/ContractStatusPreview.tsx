@@ -10,7 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/client'
 import { date, dateTimeSeconds, errorText, int, internalErrorText, rate, won } from '../../lib/format'
 import { usePermission } from '../auth/useAuth'
-import { policyLabel, reasonText } from '../clawback/labels'
+import { reasonText } from '../clawback/labels'
 import { LINE_STATUS, PAYMENT_STAGE } from '../schedule/labels'
 import { previewContractStatusEvent } from './api'
 import type { ContractDetail, ContractStatusPreview as Preview, ContractStatusPreviewRequest } from './api'
@@ -81,12 +81,12 @@ function failureOf(error: unknown): { failure?: Failure; fields?: Fields } {
     case 'FGC-IMPL-TRANSITION_DENIED':
       return {
         failure: {
-          message: `이 계약은 지금 ${String(error.params.from ?? '현재 상태')}에서 ${String(error.params.to ?? '선택한 상태')}(으)로 바꿀 수 없습니다. 최신 계약을 다시 조회해 사건을 고르세요.`,
+          message: `이 계약은 지금 ${String(error.params.from ?? '현재 상태')}에서 ${String(error.params.to ?? '선택한 상태')}(으)로 바꿀 수 없습니다. 최신 계약을 다시 조회해 변경 종류를 고르세요.`,
           conflict: true,
         },
       }
     case 'FGC-IMPL-EVENT_ORDER':
-      return { fields: { effectiveAt: '효력일시는 최신 사건의 효력일시 이후이고 현재 시각을 넘을 수 없습니다.' } }
+      return { fields: { effectiveAt: '효력일시는 최신 상태 변경의 효력일시 이후이고 현재 시각을 넘을 수 없습니다.' } }
     case 'FGC-IMPL-POLICY_MISSING':
       return { failure: { message: '계약일에 적용할 상태별 지급조건 정책을 확인할 수 없어 계산하지 않았습니다. 금액을 0원으로 보지 마세요.' } }
     case 'FGC-COMMON-004':
@@ -167,7 +167,7 @@ export function ContractStatusPreviewModal({
     event?.preventDefault()
     if (inFlight.current) return
     const validation: Fields = {
-      eventType: selected ? undefined : '사건 종류를 선택하세요.',
+      eventType: selected ? undefined : '변경 종류를 선택하세요.',
       effectiveAt: previewEffectiveAtError(effectiveAt, seoulNow()),
     }
     setFields(validation)
@@ -217,7 +217,7 @@ export function ContractStatusPreviewModal({
   return (
     <Modal
       open={open}
-      title="상태 사건 영향 미리보기"
+      title="상태 변경 영향 미리보기"
       className="modal-large contract-status-preview-modal"
       onClose={close}
       footer={
@@ -240,18 +240,18 @@ export function ContractStatusPreviewModal({
       }
     >
       <p className="contract-preview-note">
-        입력한 사건이 일어났을 때의 조건부 비교입니다. 계약 유지 확률이 아니며 아무것도 저장하지 않습니다. 실제 저장은 계약 수정에서 저장 시점의 최신
+        입력한 상태 변경이 일어났을 때의 조건부 비교입니다. 계약 유지 확률이 아니며 아무것도 저장하지 않습니다. 실제 저장은 계약 수정에서 저장 시점의 최신
         상태로 다시 검증합니다.
       </p>
       <form
         data-guide-feature="features.contract.contract-status-preview.form"
         className="contract-preview-form"
-        aria-label="미리볼 상태 사건"
+        aria-label="미리볼 상태 변경"
         noValidate
         onSubmit={(event) => void run(event)}
       >
         <Field
-          label="사건 종류"
+          label="변경 종류"
           required
           error={fields.eventType}
           helper={allowed.length ? undefined : '끝 상태 계약이라 바꿀 수 있는 상태가 없습니다.'}
@@ -264,7 +264,7 @@ export function ContractStatusPreviewModal({
             disabled={!allowed.length}
             onChange={(event) => changeInput(() => setEventType(event.target.value), 'eventType')}
           >
-            <option value="">사건을 선택하세요</option>
+            <option value="">변경 종류를 선택하세요</option>
             {allowed.map((status) => (
               <option key={status} value={status}>
                 {contractStatusLabels[status]}
@@ -276,7 +276,7 @@ export function ContractStatusPreviewModal({
           label="효력일시"
           required
           error={fields.effectiveAt}
-          helper="실제 효력 시각(한국 시간). 최신 사건의 효력일시 이후, 현재 시각 이전이어야 합니다."
+          helper="실제 효력 시각(한국 시간). 최신 상태 변경의 효력일시 이후, 현재 시각 이전이어야 합니다."
         >
           <input
             data-guide-feature="features.contract.contract-status-preview.effective-at"
@@ -344,16 +344,16 @@ function PreviewResult({ preview, stale, updating }: { preview: Preview; stale: 
     <div className="contract-preview-result" aria-busy={updating}>
       {stale && (
         <p role="status" className="contract-preview-stale">
-          <StatusBadge tone="warning">낡음</StatusBadge> 입력이나 계약이 바뀌었습니다. 이 결과는 지금 조건의 결과가 아닙니다. 다시 미리보세요.
+          <StatusBadge tone="warning">최신 아님</StatusBadge> 입력이나 계약이 바뀌었습니다. 이 결과는 지금 조건의 결과가 아닙니다. 다시 미리보세요.
         </p>
       )}
       <p className="contract-preview-basis">
         {responseLabel(contractStatusLabels, preview.currentStatus)} → {responseLabel(contractStatusLabels, preview.eventType)},
-        효력일시 {dateTimeSeconds(preview.effectiveAt)}, 스냅샷 시각 {dateTimeSeconds(preview.snapshotAt)} 기준
+        효력일시 {dateTimeSeconds(preview.effectiveAt)}, 계산 시각 {dateTimeSeconds(preview.snapshotAt)} 기준
       </p>
       {(preview.pendingFollowUps ?? 0) > 0 && (
         <p role="status" className="contract-preview-stale">
-          앞선 상태 사건의 후속 처리 {int(preview.pendingFollowUps)}건이 끝나지 않았습니다. 실제 결과가 이 비교와 달라질 수 있습니다.
+          앞선 상태 변경의 후속 처리 {int(preview.pendingFollowUps)}건이 끝나지 않았습니다. 실제 결과가 이 비교와 달라질 수 있습니다.
         </p>
       )}
       <dl className="contract-preview-summary">
@@ -433,7 +433,7 @@ function ClawbackSummary({ review }: { review: Preview['clawbackReview'] }) {
       {/* 예상액을 확정액처럼 보이지 않게 하고, 미계산을 0원으로 바꾸지 않는다. */}
       <strong>{review.amount == null ? '미계산' : `예상 ${won(review.amount)}`}</strong> {review.reason}
       {review.elapsedMonths != null && ` 경과 ${int(review.elapsedMonths)}개월.`}
-      {review.policyCode && ` 정책 ${policyLabel({ policyCode: review.policyCode, versionNo: review.policyVersionNo ?? undefined })}.`}
+      {review.policyVersionNo != null && ` 적용 정책 v${int(review.policyVersionNo)}.`}
       {codes.length > 0 && <span className="contract-preview-reasons">{codes.map(reasonText).join(', ')}</span>}
     </>
   )

@@ -40,7 +40,7 @@ export function AttributionEditor({
   const difference = (Number(amount) || 0) - sum
   const patch = (row: AttributionRow, value: Partial<AttributionRow>) =>
     onChange(rows.map((current) => (current.key === row.key ? { ...row, ...value } : current)))
-  const label = (row: AttributionRow, name: string) => `${rows.indexOf(row) + 1}번 귀속행 ${name}`
+  const label = (row: AttributionRow, name: string) => `${rows.indexOf(row) + 1}번 귀속 내역 ${name}`
   const control = (row: AttributionRow, field: keyof AttributionRow, name: string) => ({
     id: `attr-${row.key}-${field}`,
     'aria-label': label(row, name),
@@ -205,7 +205,7 @@ export function AttributionEditor({
         <Button data-guide-feature="features.transaction.attribution-editor.button"
           variant="ghost"
           disabled={disabled}
-          aria-label={`${rows.indexOf(row) + 1}번 귀속행 삭제`}
+          aria-label={`${rows.indexOf(row) + 1}번 귀속 내역 삭제`}
           onClick={() => onChange(rows.filter((current) => current.key !== row.key))}
         >
           삭제
@@ -217,7 +217,7 @@ export function AttributionEditor({
     <section data-guide-feature="features.transaction.attribution-editor.section" className="surface transaction-attribution-panel" aria-labelledby="transaction-attribution-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-attribution-title">
-          ② 귀속행, 이 돈이 어느 계약 몫인가
+          귀속 내역, 이 돈이 어느 계약 몫인가
         </h2>
         <Button data-guide-feature="features.transaction.attribution-editor.btn-add-attr"
           variant="secondary"
@@ -229,18 +229,18 @@ export function AttributionEditor({
           <span className="material-symbols-rounded" aria-hidden="true">
             add
           </span>{' '}
-          귀속행 추가
+          귀속 내역 추가
         </Button>
       </header>
       <DataTable
-        caption="지급 건에 연결할 계약별 귀속행"
+        caption="지급 건에 연결할 계약별 귀속 내역"
         className="transaction-attribution-table"
         viewportClassName="transaction-attribution-viewport"
         bodyId="attr-body"
         columns={columns}
         rows={rows}
         rowKey={(row) => String(row.key)}
-        emptyMessage="귀속행을 추가하세요."
+        emptyMessage="귀속 내역을 추가하세요."
         footer={
           <tr>
             <td colSpan={6}>귀속금액 합계</td>

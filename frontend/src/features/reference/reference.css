@@ -1,7 +1,7 @@
 .base-page {
   display: grid;
   min-width: 0;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .base-as-of-summary {
@@ -215,7 +215,7 @@
 .policy-page {
   display: grid;
   min-width: 0;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .policy-date-field {
@@ -264,7 +264,7 @@
 }
 
 .policy-version-table {
-  min-width: 73.5rem;
+  min-width: 60rem;
 }
 
 .policy-col-select {

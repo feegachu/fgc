@@ -271,8 +271,8 @@ class ChangedContractItemProcessorTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.pendingEventIds()).containsExactly(600L);
-        assertThat(result.failureReason()).isEqualTo(FgcErrorCode.CAP_004.getCode() + ": 적용 가능한 1,200% 룰셋이 없습니다.");
-        verify(scheduleService).registerCapRuleReview(9L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 룰셋이 없습니다.");
+        assertThat(result.failureReason()).isEqualTo(FgcErrorCode.CAP_004.getCode() + ": 적용 가능한 1,200% 한도 규칙이 없습니다.");
+        verify(scheduleService).registerCapRuleReview(9L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 한도 규칙이 없습니다.");
         verify(scheduleService, never()).registerCapRuleReview(eq(9L), eq(PaymentStage.INSURER_TO_GA), anyString());
     }
 
@@ -300,7 +300,7 @@ class ChangedContractItemProcessorTest {
     }
 
     private FgcBusinessException missingRuleSet() {
-        return new FgcBusinessException(FgcErrorCode.CAP_004, "paymentStage", Map.of(), "적용 가능한 1,200% 룰셋이 없습니다.");
+        return new FgcBusinessException(FgcErrorCode.CAP_004, "paymentStage", Map.of(), "적용 가능한 1,200% 한도 규칙이 없습니다.");
     }
 
     private void failCapStages(Map<PaymentStage, FgcBusinessException> failures) {

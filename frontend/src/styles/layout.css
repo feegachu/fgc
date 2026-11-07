@@ -630,6 +630,7 @@
 }
 
 .workspace-tabs {
+  scroll-padding-inline: var(--space-8);
   display: flex;
   min-width: 0;
   flex: 1;
@@ -794,7 +795,8 @@
 
 .page-header {
   display: flex;
-  align-items: flex-start;
+  min-height: 2.75rem;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
 }
@@ -814,11 +816,6 @@
 .page-content > .list-page {
   gap: var(--space-4);
 }
-.list-page > .page-header {
-  min-height: 2.75rem;
-  align-items: center;
-}
-
 .page-header-copy {
   min-width: 0;
 }
