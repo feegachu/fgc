@@ -168,7 +168,7 @@ public class ContractServiceImpl implements ContractService {
             return List.of();
         }
 
-        // FUN-085: 영향 건수는 다른 수혜자 회차와 남의 지급 건까지 센다. AGENT에게는 싣지 않고 본인 범위는 IF-API-89로 본다.
+        // FUN-085: 처리자(내부 직원)와 영향 건수는 AGENT에게 보이지 않는다. 영향 건수는 다른 수혜자 회차와 남의 지급 건까지 센다. AGENT에게는 싣지 않고 본인 범위는 IF-API-89로 본다.
         boolean withSummary = agentScope.currentAgentId() == null;
 
         // 4. 후속 작업의 현재 상태와 Job별 처리 이력을 한 번에 조회하고 상태사건 ID별로 묶기
@@ -202,7 +202,7 @@ public class ContractServiceImpl implements ContractService {
                         event.getContractStatusEventId(),
                         event.getReasonCode(),
                         event.getReasonText(),
-                        event.getRegisteredBy() == null ? null : registrants.get(event.getRegisteredBy()),
+                        !withSummary || event.getRegisteredBy() == null ? null : registrants.get(event.getRegisteredBy()),
                         event.getCreatedAt(),
                         ContractStatusEventResponse.EventFollowUp.of(jobsByEvent
                                 .getOrDefault(event.getContractStatusEventId(), List.of()).stream()

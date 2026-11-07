@@ -25,6 +25,8 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class JournalPostingSourceQueryRepository {
 
+    // 0원은 기표할 금액이 없다. 소액 보험료의 반올림 0원 회차나 0원 지급이 한 건 있어도 월 검증 전체가 멈추면 안 되므로 원천에서 뺀다.
+
     private final EntityManager entityManager;
 
     public List<ScheduleJournalSourceRow> findExpectedInsurerIncomeSources(
@@ -44,6 +46,7 @@ public class JournalPostingSourceQueryRepository {
                    AND sh.status NOT IN ('HOLD', 'CANCELLED')
                    AND sl.due_month = :validationMonth
                    AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
+                   AND sl.expected_amount > 0
                  ORDER BY sl.schedule_line_id
                 """, validationRunId, validationMonth, "schedule_line_id");
         return query.setTupleTransformer((row, aliases) -> toScheduleSource(row)).getResultList();
@@ -66,6 +69,7 @@ public class JournalPostingSourceQueryRepository {
                    AND sh.status NOT IN ('HOLD', 'CANCELLED')
                    AND sl.due_month = :validationMonth
                    AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
+                   AND sl.expected_amount > 0
                    AND sl.beneficiary_agent_id IS NOT NULL
                  ORDER BY sl.schedule_line_id
                 """, validationRunId, validationMonth, "schedule_line_id");
@@ -93,6 +97,7 @@ public class JournalPostingSourceQueryRepository {
                    AND ct.cashflow_type = 'PAYMENT'
                    AND ct.status = 'CONFIRMED'
                    AND ct.settlement_month = :validationMonth
+                   AND ct.amount > 0
                    AND NOT EXISTS (
                        SELECT 1 FROM fgc.transaction_attribution ta2
                         WHERE ta2.commission_transaction_id = ct.commission_transaction_id
@@ -123,6 +128,7 @@ public class JournalPostingSourceQueryRepository {
                    AND ct.cashflow_type = 'PAYMENT'
                    AND ct.status = 'CONFIRMED'
                    AND ct.settlement_month = :validationMonth
+                   AND ct.amount > 0
                    AND ct.recipient_agent_id IS NOT NULL
                    AND NOT EXISTS (
                        SELECT 1 FROM fgc.transaction_attribution ta2

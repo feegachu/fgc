@@ -338,6 +338,9 @@ test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경�
   await page.getByRole('link', { name: '지급 등록', exact: true }).click()
   expect(new URL(page.url()).searchParams.has('attributionDate')).toBe(false)
   await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), '1')
+  // 금액은 미리 채우지 않으므로 직접 넣는다. 이 시험은 귀속일 검사만 본다.
+  await page.locator('#amount').fill('250000')
+  await page.locator('[data-attr-amount]').first().fill('250000')
   const attributionDate = page.getByLabel('1번 귀속행 귀속일', { exact: true })
   await expect(attributionDate).toHaveValue('')
   await page.locator('#btn-save').click()
