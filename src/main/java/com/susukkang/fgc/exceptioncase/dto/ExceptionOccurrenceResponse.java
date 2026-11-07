@@ -79,7 +79,7 @@ public record ExceptionOccurrenceResponse(
     @JsonProperty("detectionLabel")
     public String detectionLabel() {
         if (reopened) return "재발·재개";
-        return newCase ? "신규" : "재검출";
+        return newCase ? "신규" : "다시 나옴";
     }
 
     /** 검출 증거의 표시 항목 한 줄. */

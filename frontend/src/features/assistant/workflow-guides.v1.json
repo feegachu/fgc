@@ -40,7 +40,7 @@
         "screenId": "CONT-W01",
         "targetId": "features.contract.contract-list-page.section-2",
         "title": "조회 결과 확인",
-        "instruction": "검색 결과의 계약번호, 설계사, 계약 상태를 확인하고 원하는 계약의 상세 링크를 직접 선택합니다. 다른 계약을 임의로 선택하지 않습니다.",
+        "instruction": "검색 결과의 계약번호, 설계사, 계약 상태를 확인하고 원하는 계약의 상세 링크를 선택합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -125,7 +125,7 @@
         "screenId": "CONT-W03",
         "targetId": "features.contract.contract-form-page.agent-id",
         "title": "설계사 선택",
-        "instruction": "해당 계약의 설계사를 검색한 뒤 목록의 항목을 직접 선택합니다.",
+        "instruction": "해당 계약의 설계사를 검색한 뒤 목록의 항목을 선택합니다.",
         "completionRuleId": "INPUT_VALID",
         "next": [
           {
@@ -161,7 +161,7 @@
         "screenId": "CONT-W03",
         "targetId": "features.contract.contract-form-page.form",
         "title": "저장 결과 확인",
-        "instruction": "입력을 검토하고 기존 저장 버튼을 직접 누릅니다. 오류가 표시되면 사유를 확인해 고치며, 저장 성공 후 이동한 계약 상세에서 저장 내용을 확인합니다. 안내 확인은 저장 성공이 아닙니다.",
+        "instruction": "입력을 검토하고 저장 버튼을 누릅니다. 오류가 표시되면 사유를 확인해 고치며, 저장 성공 후 이동한 계약 상세에서 저장 내용을 확인합니다. 안내 확인은 저장 성공이 아닙니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -192,7 +192,7 @@
         "screenId": "CONT-W02",
         "targetId": "features.contract.contract-detail-page.section",
         "title": "계약 상세 확인",
-        "instruction": "목록에서 직접 선택한 계약의 상세 내용을 확인합니다. 계약번호와 설계사 및 상태를 확인합니다.",
+        "instruction": "목록에서 선택한 계약의 상세 내용을 확인합니다. 계약번호와 설계사 및 상태를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -211,7 +211,7 @@
         "screenId": "CONT-W02",
         "targetId": "contract.tab.basic",
         "title": "기본정보 탭 선택",
-        "instruction": "기본정보 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "instruction": "기본정보 탭을 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
         "completionRuleId": "INPUT_VALID",
         "stepId": "contract.detail.step.2",
         "next": [
@@ -251,7 +251,7 @@
         "screenId": "CONT-W02",
         "targetId": "contract.tab.schedules",
         "title": "예상 스케줄 탭 선택",
-        "instruction": "예상 스케줄 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "instruction": "예상 스케줄 탭을 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
         "completionRuleId": "INPUT_VALID",
         "stepId": "contract.detail.step.4",
         "next": [
@@ -291,7 +291,7 @@
         "screenId": "CONT-W02",
         "targetId": "contract.tab.cap",
         "title": "한도 검증 탭 선택",
-        "instruction": "한도 검증 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "instruction": "한도 검증 탭을 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
         "completionRuleId": "INPUT_VALID",
         "stepId": "contract.detail.step.6",
         "next": [
@@ -331,7 +331,7 @@
         "screenId": "CONT-W02",
         "targetId": "contract.tab.arbitrage",
         "title": "차익거래 탭 선택",
-        "instruction": "차익거래 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "instruction": "차익거래 탭을 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
         "completionRuleId": "INPUT_VALID",
         "stepId": "contract.detail.step.8",
         "next": [
@@ -371,7 +371,7 @@
         "screenId": "CONT-W02",
         "targetId": "contract.tab.ledger",
         "title": "원장 탭 선택",
-        "instruction": "원장 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "instruction": "원장 탭을 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
         "completionRuleId": "INPUT_VALID",
         "stepId": "contract.detail.step.10",
         "next": [
@@ -411,7 +411,7 @@
         "screenId": "CONT-W02",
         "targetId": "contract.tab.payment",
         "title": "지급/대사 탭 선택",
-        "instruction": "지급/대사 탭을 직접 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
+        "instruction": "지급/대사 탭을 선택하세요. 탭이 선택되어야 다음 안내로 진행합니다.",
         "completionRuleId": "INPUT_VALID",
         "stepId": "contract.detail.step.12",
         "next": [
@@ -538,7 +538,7 @@
         "screenId": "SCHE-W02",
         "targetId": "features.schedule.schedule-detail-page.table",
         "title": "회차와 예상액 확인",
-        "instruction": "회차별 예정일, 항목, 예상 금액과 상태를 확인합니다. 예상액은 프로그램이 계산한 결과이며 AI가 새 금액을 만들지 않습니다.",
+        "instruction": "회차별 예정일, 항목, 예상 금액과 상태를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -558,7 +558,7 @@
         "screenId": "SCHE-W02",
         "targetId": "features.schedule.schedule-detail-page.regenerate-reason",
         "title": "재생성 사유 입력",
-        "instruction": "재생성이 필요한 경우 기존 재생성 기능을 열고 사유를 입력합니다. 권한이나 상태로 기능이 없으면 기존 오류/안내를 확인하고 이 단계는 중단합니다.",
+        "instruction": "재생성이 필요한 경우 재생성 기능을 열고 사유를 입력합니다. 권한이나 상태로 기능이 없으면 기존 오류/안내를 확인하고 이 단계는 중단합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -576,7 +576,7 @@
         "screenId": "SCHE-W02",
         "targetId": "features.schedule.schedule-detail-page.section",
         "title": "재생성 결과 재조회",
-        "instruction": "기존 확인 버튼을 직접 누른 뒤 처리 결과를 확인합니다. 상세를 다시 조회하여 회차와 적용 규칙을 확인하며 안내 종료를 재생성 성공으로 취급하지 않습니다.",
+        "instruction": "확인 버튼을 직접 누른 뒤 처리 결과를 확인합니다. 상세를 다시 조회하여 회차와 적용 규칙을 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -647,7 +647,7 @@
         "screenId": "TRAN-W01",
         "targetId": "features.transaction.transaction-list-page.section",
         "title": "지급 상세 선택",
-        "instruction": "조회 결과에서 원하는 지급 건의 계약, 금액, 상태와 원천 근거를 확인합니다. 조회 안내는 수정이나 정정 권한을 부여하지 않습니다.",
+        "instruction": "조회 결과에서 원하는 지급 건의 계약, 금액, 상태와 근거를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -680,7 +680,7 @@
         "screenId": "BASE-W01",
         "targetId": "reference.tab.organization",
         "title": "조직 탭 선택",
-        "instruction": "기준정보의 조직 탭을 직접 선택합니다. 선택한 탭의 조회 조건과 결과를 함께 확인합니다.",
+        "instruction": "기준정보의 조직 탭을 선택합니다. 선택한 탭의 조회 조건과 결과를 함께 확인합니다.",
         "completionRuleId": "INPUT_VALID",
         "next": [
           {
@@ -700,7 +700,7 @@
         "screenId": "BASE-W01",
         "targetId": "features.base.base-page.input",
         "title": "조건 입력",
-        "instruction": "조직 검색어와 기준일을 입력하고 조회 결과를 확인합니다. 보험회사, 상품, 설계사, 수수료 항목은 해당 탭을 직접 선택하여 조회할 수 있습니다.",
+        "instruction": "조직 검색어와 기준일을 입력하고 조회 결과를 확인합니다. 보험회사, 상품, 설계사, 수수료 항목은 해당 탭을 선택하여 조회할 수 있습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -715,8 +715,8 @@
   {
     "workflowId": "policy.review",
     "guideVersion": "1.0",
-    "title": "정책/룰셋 조회와 선택",
-    "description": "정책 버전 선택은 정책 목록의 행 선택 항목에서 수행합니다. 기준일과 적용 기간, 상태를 확인한 뒤 선택 정책 관리 또는 세부 룰셋 탭으로 이동합니다.",
+    "title": "정책 조회와 선택",
+    "description": "정책 버전 선택은 정책 목록의 행 선택 항목에서 수행합니다. 기준일과 적용 기간, 상태를 확인한 뒤 선택 정책 관리 또는 세부 규칙 탭으로 이동합니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -753,7 +753,7 @@
         "screenId": "POL-W01",
         "targetId": "features.policies.policies-page.policy-version",
         "title": "정책 버전 선택",
-        "instruction": "정책 버전 목록에서 원하는 행의 선택 항목을 직접 누릅니다. 선택한 버전의 상태와 적용 기간을 확인합니다.",
+        "instruction": "정책 버전 목록에서 원하는 행의 선택 항목을 누릅니다. 선택한 버전의 상태와 적용 기간을 확인합니다.",
         "completionRuleId": "INPUT_VALID",
         "next": [
           {
@@ -773,7 +773,7 @@
         "screenId": "POL-W01",
         "targetId": "features.policies.policies-page.button-6",
         "title": "선택 정책 관리로 이동",
-        "instruction": "선택 정책 관리 버튼으로 상세 관리 영역을 엽니다. 수수료 규칙, 한도 룰셋, 환급률표와 분급 규칙을 확인합니다.",
+        "instruction": "선택 정책 관리 버튼으로 상세 관리 영역을 엽니다. 수수료 규칙, 한도 규칙, 환급률표와 분급 규칙을 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -843,7 +843,7 @@
         "screenId": "POL-W01",
         "targetId": "features.policies.policy-management.actions",
         "title": "허용된 상태 동작 선택",
-        "instruction": "현재 상태와 본인 역할에 허용된 동작만 직접 선택합니다. 화면에서 표시한 권한과 작성자 본인 승인 금지 등 기존 제약을 따릅니다.",
+        "instruction": "현재 상태와 본인 역할에 허용된 동작만 선택합니다. 화면에서 표시한 권한과 작성자 본인 승인 금지 등 기존 제약을 따릅니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -862,7 +862,7 @@
         "screenId": "POL-W01",
         "targetId": "features.policies.policy-management.textarea",
         "title": "사유와 근거 확인",
-        "instruction": "열린 확인 창에서 사유 및 요구된 근거를 입력하고 기존 확인 버튼을 직접 누릅니다. 처리가 끝나면 정책 상태를 다시 확인합니다.",
+        "instruction": "열린 확인 창에서 사유 및 요구된 근거를 입력하고 확인 버튼을 누릅니다. 처리가 끝나면 정책 상태를 다시 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -914,7 +914,7 @@
         "screenId": "CAP-W01",
         "targetId": "features.cap.cap-list-page.section-2",
         "title": "한도 결과 선택",
-        "instruction": "계약별 판정 목록에서 계약과 한도 결과를 확인한 뒤 원하는 행의 계산근거 열기 버튼을 직접 누릅니다. 계산근거 창을 연 뒤 다음 안내로 진행합니다.",
+        "instruction": "계약별 판정 목록에서 계약과 한도 결과를 확인한 뒤 원하는 행의 계산근거 열기 버튼을 누릅니다. 계산근거 창을 연 뒤 다음 안내로 진행합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -934,7 +934,7 @@
         "screenId": "CAP-W01",
         "targetId": "features.cap.cap-detail-modal.section",
         "title": "근거 확인",
-        "instruction": "상세 결과의 적용 규칙과 산입 근거 및 관련 계약을 확인합니다. 이상이 있으면 원천 자료를 확인한 뒤 기존 업무 절차로 수정합니다.",
+        "instruction": "상세 결과의 적용 규칙과 산입 근거 및 관련 계약을 확인합니다. 이상이 있으면 근거 자료를 확인한 뒤 기존 업무 절차로 수정합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -987,7 +987,7 @@
         "screenId": "ARB-W01",
         "targetId": "features.arbitrage.arbitrage-page.section-2",
         "title": "검증 결과 확인",
-        "instruction": "결과의 현재 차액과 예정 포함 지표, 원천 근거를 확인하고 대상 결과를 선택합니다. 프로그램의 계산 결과를 사용합니다.",
+        "instruction": "결과의 현재 차액과 예정 포함 지표, 근거를 확인하고 대상 결과를 선택합니다. 시스템의 계산 결과를 사용합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1007,7 +1007,7 @@
         "screenId": "ARB-W01",
         "targetId": "features.arbitrage.arbitrage-page.section-3",
         "title": "관련 근거 검토",
-        "instruction": "상세 결과에서 적용 규칙과 계약, 지급, 예상 근거를 확인합니다. 조회된 계산 결과와 실제 원천 자료를 대조합니다.",
+        "instruction": "상세 결과에서 적용 규칙과 계약, 지급, 예상 근거를 확인합니다. 조회된 계산 결과와 실제 근거 자료를 대조합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1080,7 +1080,7 @@
         "screenId": "LEDG-W01",
         "targetId": "features.ledger.ledger-page.textarea",
         "title": "역분개 사유 작성",
-        "instruction": "권한과 상태가 허용하는 원분개를 선택한 뒤 기존 역분개 기능에서 사유를 입력합니다. 역분개는 별도 분개이며 원장 삭제가 아닙니다.",
+        "instruction": "권한과 상태가 허용하는 원분개를 선택한 뒤 역분개 기능에서 사유를 입력합니다. 역분개는 별도 분개이며 원장 삭제가 아닙니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1151,7 +1151,7 @@
         "screenId": "RECO-W01",
         "targetId": "features.reconciliation.reconciliation-page.section",
         "title": "실행과 목록 확인",
-        "instruction": "기존 대사 실행 기능을 직접 수행하고 실제 실행 상태와 결과 목록을 확인합니다. 요청 접수와 작업 완료를 구분합니다.",
+        "instruction": "대사 실행 기능을 수행하고 실제 실행 상태와 결과 목록을 확인합니다. 요청 접수와 작업 완료를 구분합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1205,7 +1205,7 @@
     "workflowId": "exception.resolve",
     "guideVersion": "1.0",
     "title": "예외함 원인 확인/처리",
-    "description": "예외함에서 대상 예외를 선택하고 실행 회차, 계약, 발생 원인과 원천 근거를 확인합니다. 처리 안내는 예외 처리 권한에 따릅니다.",
+    "description": "예외함에서 대상 예외를 선택하고 실행 회차, 계약, 발생 원인과 근거를 확인합니다. 처리 안내는 예외 처리 권한에 따릅니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -1242,7 +1242,7 @@
         "screenId": "EXCP-W01",
         "targetId": "features.exception.exception-page.section-2",
         "title": "예외 목록 선택",
-        "instruction": "조회 결과에서 원하는 예외를 직접 선택하여 상세와 원천 근거를 확인합니다.",
+        "instruction": "조회 결과에서 원하는 예외를 선택하여 상세와 근거를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1261,8 +1261,8 @@
         "stepId": "exception.resolve.step.3",
         "screenId": "EXCP-W01",
         "targetId": "features.exception.exception-page.section-3",
-        "title": "검출 이력과 원천 근거 확인",
-        "instruction": "선택한 예외의 검출 이력에서 발생 실행, 원인과 원천 근거를 확인합니다. 관련 업무 링크로 실제 원천 자료를 조회합니다.",
+        "title": "검출 이력과 근거 확인",
+        "instruction": "선택한 예외의 검출 이력에서 발생 실행, 원인과 근거를 확인합니다. 관련 업무 링크로 실제 근거 자료를 조회합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1282,7 +1282,7 @@
         "screenId": "EXCP-W01",
         "targetId": "features.exception.exception-page.section-4",
         "title": "처리 결과 확인",
-        "instruction": "기존 처리 패널에서 허용된 상태 전환과 사유를 입력합니다. 원천 수정과 예외 상태 변경은 구분하고 재검증 결과를 확인합니다.",
+        "instruction": "기존 처리 패널에서 허용된 상태 전환과 사유를 입력합니다. 원래 건 수정과 예외 상태 변경은 구분하고 재검증 결과를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1348,7 +1348,7 @@
         "screenId": "VRUN-W01",
         "targetId": "features.validation.validation-run-list-page.btn-create",
         "title": "실행 요청",
-        "instruction": "기존 실행 만들기 버튼을 직접 누릅니다. 요청이 접수됐다고 검증이 통과된 것은 아니며 실행 목록의 상태를 확인합니다.",
+        "instruction": "실행 만들기 버튼을 누릅니다. 요청이 접수됐다고 검증이 통과된 것은 아니며 실행 목록의 상태를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1366,7 +1366,7 @@
         "screenId": "VRUN-W01",
         "targetId": "features.validation.validation-run-list-page.section",
         "title": "실행 결과 열기",
-        "instruction": "생성된 실행을 목록에서 직접 선택합니다. 실패, 완료, 확정 상태와 실제 처리 내역을 상세에서 확인합니다.",
+        "instruction": "생성된 실행을 목록에서 선택합니다. 실패, 완료, 확정 상태와 실제 처리 내역을 상세에서 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1380,7 +1380,7 @@
     "workflowId": "validation.detail",
     "guideVersion": "1.0",
     "title": "월 통합검증 상세/확정",
-    "description": "월 통합검증 상세에서 단계별 결과, 예외, 대사, 재시작 가능 여부를 확인합니다. 확정은 별도 관리자 권한과 완료 조건이 필요하며 AI가 실행하지 않습니다.",
+    "description": "월 통합검증 상세에서 단계별 결과, 예외, 대사, 재시작 가능 여부를 확인합니다. 확정은 별도 권한과 완료 조건이 필요합니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -1397,7 +1397,7 @@
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.section-2",
         "title": "실행 상태 확인",
-        "instruction": "직접 선택한 실행의 검증월, 회차, 실행 상태를 확인합니다. 실패나 진행 중인 실행을 완료로 취급하지 않습니다.",
+        "instruction": "선택한 실행의 검증월, 회차, 실행 상태를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1437,7 +1437,7 @@
         "screenId": "VRUN-W02",
         "targetId": "features.validation.validation-run-detail-page.btn-finalize",
         "title": "확정 조건 확인",
-        "instruction": "실행 완료와 잔여 예외, 대사 상태 및 확정 권한을 확인합니다. 확정은 기존 확인 창에서 사용자가 직접 수행하고 실제 상태를 다시 조회합니다.",
+        "instruction": "실행 완료와 잔여 예외, 대사 상태 및 확정 권한을 확인합니다. 확정은 기존 확인 창에서 사용자가 수행하고 실제 상태를 다시 조회합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1451,7 +1451,7 @@
     "workflowId": "audit.review",
     "guideVersion": "1.0",
     "title": "감사로그 조회",
-    "description": "감사로그는 감사 조회 권한을 가진 사용자만 기간과 업무 동작 등 조건으로 조회합니다. 개인정보나 로그 원문을 AI에 전송하지 않습니다.",
+    "description": "감사로그는 감사 조회 권한을 가진 사용자만 기간과 업무 동작 등 조건으로 조회합니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -1484,7 +1484,7 @@
         "screenId": "AUDT-W01",
         "targetId": "features.audit.audit-log-page.section",
         "title": "감사 기록 확인",
-        "instruction": "감사 기록 목록에서 요청 시점, 동작, 대상, 결과를 확인합니다. 변경 전후 값을 보려면 원하는 기록을 직접 선택합니다. 감사 기록의 업무 식별자와 실제 업무 상태를 대조합니다.",
+        "instruction": "감사 기록 목록에서 요청 시점, 동작, 대상, 결과를 확인합니다. 변경 전후 값을 보려면 원하는 기록을 선택합니다. 감사 기록의 업무 식별자와 실제 업무 상태를 대조합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1535,7 +1535,7 @@
         "screenId": "DASH-W01",
         "targetId": "dashboard.kpi-link.cap-violation",
         "title": "한도 검증 목록으로 이동",
-        "instruction": "1,200% 위반 지표를 확인하고 관련 한도 검증 목록으로 이동하려면 이 링크를 직접 선택합니다. 집계 수치와 개별 계약의 실제 처리 상태를 구분합니다.",
+        "instruction": "1,200% 위반 지표를 확인하고 관련 한도 검증 목록으로 이동하려면 이 링크를 선택합니다. 집계 수치와 개별 계약의 실제 처리 상태를 구분합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1551,7 +1551,7 @@
     "workflowId": "agent.portfolio",
     "guideVersion": "1.0",
     "title": "설계사 포트폴리오 확인",
-    "description": "설계사 본인 계정에서 본인 범위의 포트폴리오, 계약, 지급 현황을 조회합니다. 내부 계정으로 설계사 화면을 대신 열지 않습니다.",
+    "description": "설계사 본인 계정에서 본인 범위의 포트폴리오, 계약, 지급 현황을 조회합니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -1582,7 +1582,7 @@
         "screenId": "AGNT-W01",
         "targetId": "features.agent-home.agent-home-page.commission-link",
         "title": "본인 수령 예정 수수료 확인",
-        "instruction": "본인 수령 예정 수수료와 기준월을 확인합니다. 지급 내역을 조회하려면 해당 링크를 직접 선택합니다. 예정 수수료와 실제 지급 완료 금액을 구분합니다.",
+        "instruction": "본인 수령 예정 수수료와 기준월을 확인합니다. 지급 내역을 조회하려면 해당 링크를 선택합니다. 예정 수수료와 실제 지급 완료 금액을 구분합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1612,7 +1612,7 @@
         "screenId": "CONT-W01",
         "targetId": "contract.filter.input.contractno",
         "title": "보험계약 검색/선택",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1632,7 +1632,7 @@
         "screenId": "SCHE-W01",
         "targetId": "features.schedule.schedule-list-page.input",
         "title": "예상 스케줄 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1652,7 +1652,7 @@
         "screenId": "TRAN-W01",
         "targetId": "features.transaction.transaction-list-page.f-month",
         "title": "수수료 지급 내역 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1672,7 +1672,7 @@
         "screenId": "CAP-W01",
         "targetId": "features.cap.cap-list-page.input",
         "title": "수수료 한도 검증 결과 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1692,7 +1692,7 @@
         "screenId": "ARB-W01",
         "targetId": "features.arbitrage.arbitrage-page.input",
         "title": "차익거래 검증 결과 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1712,7 +1712,7 @@
         "screenId": "LEDG-W01",
         "targetId": "ledger.filter.input.from",
         "title": "검증원장 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1732,7 +1732,7 @@
         "screenId": "RECO-W01",
         "targetId": "features.reconciliation.reconciliation-page.input-2",
         "title": "원장 대사 결과 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1752,7 +1752,7 @@
         "screenId": "VRUN-W01",
         "targetId": "features.validation.validation-run-list-page.section",
         "title": "월 통합검증 목록 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1772,7 +1772,7 @@
         "screenId": "EXCP-W01",
         "targetId": "features.exception.exception-page.f-contract",
         "title": "예외함 조회",
-        "instruction": "현재 조회 화면의 검색 조건과 원천 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
+        "instruction": "현재 조회 화면의 검색 조건과 결과를 확인합니다. 다음 안내는 다른 업무의 조회 화면으로 이동하며 실제 저장, 실행, 확정을 수행하지 않습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1893,7 +1893,7 @@
         "screenId": "CONT-W03",
         "targetId": "features.contract.contract-form-page.form",
         "title": "저장 결과 확인",
-        "instruction": "입력을 검토하고 기존 저장 버튼을 직접 누릅니다. 오류가 표시되면 사유를 확인해 고치며, 저장 성공 후 이동한 계약 상세에서 저장 내용을 확인합니다. 안내 확인은 저장 성공이 아닙니다.",
+        "instruction": "입력을 검토하고 저장 버튼을 누릅니다. 오류가 표시되면 사유를 확인해 고치며, 저장 성공 후 이동한 계약 상세에서 저장 내용을 확인합니다. 안내 확인은 저장 성공이 아닙니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -1907,7 +1907,7 @@
     "workflowId": "clawback.review",
     "guideVersion": "1.0",
     "title": "환수 후보와 근거 검토",
-    "description": "환수 화면은 후보를 조회하고 원천, 지급, 스케줄, 정책 근거를 확인한 뒤 적용 정책을 골라 환수액을 계산하는 기능입니다. 계산 결과는 환수 확정이나 회수 완료가 아닙니다.",
+    "description": "환수 화면은 후보를 조회하고 원천, 지급, 스케줄, 정책 근거를 확인한 뒤 적용 정책을 골라 환수액을 계산하는 기능입니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -1944,7 +1944,7 @@
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-page.section",
         "title": "환수 후보 선택",
-        "instruction": "후보 목록에서 처리할 계약의 후보를 직접 선택합니다. 조회 직후 기본 표시된 후보를 실제 처리 대상으로 단정하지 말고 계약과 발생 사유를 확인합니다.",
+        "instruction": "후보 목록에서 처리할 계약의 후보를 선택합니다. 조회 직후 기본 표시된 후보를 실제 처리 대상으로 단정하지 말고 계약과 발생 사유를 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1963,8 +1963,8 @@
         "stepId": "clawback.review.step.3",
         "screenId": "CLAW-W01",
         "targetId": "clawback.evidence.source",
-        "title": "원천 사건 확인",
-        "instruction": "선택한 후보의 원천 사건과 검증 근거를 확인합니다. 차익거래 검증이나 계약 사건 이력 링크로 원천 업무를 조회할 수 있습니다.",
+        "title": "상태 변경 확인",
+        "instruction": "선택한 후보의 상태 변경과 검증 근거를 확인합니다. 차익거래 검증이나 계약 상태이력 링크로 원천 업무를 조회할 수 있습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -1984,7 +1984,7 @@
         "screenId": "CLAW-W01",
         "targetId": "clawback.evidence.payment",
         "title": "연결 지급과 귀속 확인",
-        "instruction": "기지급액과 미지급액, 실제 연결 지급과 귀속을 확인합니다. 실제 금액은 프로그램의 표시 결과이며 AI가 계산하지 않습니다.",
+        "instruction": "기지급액과 미지급액, 실제 연결 지급과 귀속을 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -2004,7 +2004,7 @@
         "screenId": "CLAW-W01",
         "targetId": "clawback.evidence.schedule",
         "title": "스케줄과 정책 후보 확인",
-        "instruction": "관련 스케줄과 정책 후보, 적용 기준을 확인합니다. 정책 후보가 하나인 것을 적용 선택 완료로 취급하지 않습니다.",
+        "instruction": "관련 스케줄과 정책 후보, 적용 기준을 확인합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -2024,7 +2024,7 @@
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-detail.section-2",
         "title": "환수액 계산 확인",
-        "instruction": "계산 영역에서 적용할 정책과 최신 계산판을 확인합니다. 계산 권한이 있으면 정책을 고르고 계산 사유를 입력한 뒤 환수액 계산을 직접 누릅니다. 계산 결과는 환수 확정이나 회수 완료가 아닙니다.",
+        "instruction": "계산 영역에서 적용할 정책과 최신 계산 결과를 확인합니다. 계산 권한이 있으면 정책을 고르고 계산 사유를 입력한 뒤 환수액 계산을 누릅니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [
@@ -2040,7 +2040,7 @@
     "workflowId": "agent.contract.find",
     "guideVersion": "1.0",
     "title": "본인 계약 조회",
-    "description": "설계사 본인 범위의 계약 목록을 검색하고 계약 상세를 선택합니다. 내부 처리나 다른 설계사 조회 권한을 추가하지 않습니다.",
+    "description": "설계사 본인 범위의 계약 목록을 검색하고 계약 상세를 선택합니다.",
     "capability": "READ",
     "keywords": [],
     "roles": [
@@ -2054,7 +2054,7 @@
         "screenId": "CONT-W01",
         "targetId": "contract.filter.input.contractno",
         "title": "본인 계약 검색",
-        "instruction": "계약 검색 조건을 입력한 뒤 조회하고 본인 계약 중 확인할 계약을 직접 선택합니다.",
+        "instruction": "계약 검색 조건을 입력한 뒤 조회하고 본인 계약 중 확인할 계약을 선택합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {
@@ -2071,7 +2071,7 @@
         "screenId": "CONT-W01",
         "targetId": "features.contract.contract-list-page.section-2",
         "title": "계약 상세 선택",
-        "instruction": "실제 목록에서 원하는 계약의 상세 링크를 선택합니다. 본인 데이터 경계를 유지합니다.",
+        "instruction": "실제 목록에서 원하는 계약의 상세 링크를 선택합니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [],
         "roles": [

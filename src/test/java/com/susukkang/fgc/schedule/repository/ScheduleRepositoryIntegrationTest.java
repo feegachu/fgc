@@ -131,7 +131,7 @@ class ScheduleRepositoryIntegrationTest {
         java.util.Map<String, String> columns = java.util.Map.of(
                 "contractNo", "c.contract_no", "version", "sh.schedule_version_no",
                 "lines", "COUNT(sl.schedule_line_id)", "total", "SUM(sl.expected_amount)",
-                "policy", "pv.policy_code");
+                "policy", "pv.policy_name");
         assertThat(ScheduleQueryRepository.SORT_KEYS).containsExactlyInAnyOrderElementsOf(columns.keySet());
         for (var column : columns.entrySet()) {
             for (String direction : List.of("asc", "desc")) {
@@ -144,7 +144,7 @@ class ScheduleRepositoryIntegrationTest {
                           JOIN fgc.policy_version pv ON pv.policy_version_id = sh.policy_version_id
                           LEFT JOIN fgc.schedule_line sl ON sl.schedule_header_id = sh.schedule_header_id
                          WHERE sh.schedule_purpose = 'OPERATIONAL'
-                         GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_code
+                         GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_name
                          ORDER BY %s %s NULLS LAST, sh.schedule_header_id DESC
                         """.formatted(column.getValue(), direction), Long.class);
                 assertThat(queryRepository.selectAllByCondition(condition))

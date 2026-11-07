@@ -2265,6 +2265,11 @@
     "element": "input"
   },
   {
+    "id": "features.policies.policy-draft-fields.regulation-ref",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "input"
+  },
+  {
     "id": "features.policies.policy-draft-fields.section",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "section"
@@ -3375,11 +3380,6 @@
     "element": "input"
   },
   {
-    "id": "policy.draft-input.feeregimerules.sourcerefs",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "input"
-  },
-  {
     "id": "policy.draft-input.parameters.acquisition_cost_rate_pct",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "input"
@@ -3391,16 +3391,6 @@
   },
   {
     "id": "policy.draft-input.policycode",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "input"
-  },
-  {
-    "id": "policy.draft-input.regulationrefs",
-    "file": "features/policies/PolicyDraftFields.tsx",
-    "element": "input"
-  },
-  {
-    "id": "policy.draft-input.sourcedetails.ref",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "input"
   },
@@ -3511,6 +3501,11 @@
   },
   {
     "id": "policy.draft-select.sourceclass",
+    "file": "features/policies/PolicyDraftFields.tsx",
+    "element": "select"
+  },
+  {
+    "id": "policy.draft-select.sourcedetails.ref",
     "file": "features/policies/PolicyDraftFields.tsx",
     "element": "select"
   },

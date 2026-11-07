@@ -30,7 +30,7 @@ export class SaveGuide {
   fail(error: string) { this.publish({ pending: false, savedId: null, error }) }
   async saved(id: number | string): Promise<boolean> {
     if (this.pendingRevision !== this.revision) throw new Error('처리 중 입력 또는 선택 대상이 바뀌었습니다. 저장 결과를 다시 조회하세요.')
-    if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error('서버 저장 결과의 ID를 확인하지 못했습니다.')
+    if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error('저장 결과를 확인하지 못했습니다.')
     const acknowledged = this.active ? new Promise<boolean>((resolve) => { this.acknowledge = resolve }) : Promise.resolve(true)
     this.publish({ pending: false, savedId: id, error: '' })
     return acknowledged

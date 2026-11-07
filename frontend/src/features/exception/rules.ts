@@ -50,7 +50,7 @@ export const statusOptions = [
   { value: 'NEW', label: '신규' },
   { value: 'IN_REVIEW', label: '검토중' },
   { value: 'RESOLVED', label: '해결' },
-  { value: 'REJECTED', label: '오탐/반려' },
+  { value: 'REJECTED', label: '예외 아님/반려' },
 ]
 
 export const JOURNAL_CORRECTION_TYPE = 'JOURNAL_CORRECTION_REQUIRED'
@@ -67,7 +67,7 @@ const actionTable: { type: string; label: string; from: ExceptionStatus[]; gener
   { type: 'CANCEL', label: '취소', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'DEFER', label: '이연', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'RECONCILE_AGAIN', label: '재대사', from: ['IN_REVIEW'], generalForCorrection: false },
-  { type: 'FALSE_POSITIVE', label: '오탐', from: ['IN_REVIEW'], generalForCorrection: true },
+  { type: 'FALSE_POSITIVE', label: '예외 아님', from: ['IN_REVIEW'], generalForCorrection: true },
   { type: 'RESOLVE', label: '해결', from: ['IN_REVIEW'], generalForCorrection: false },
   { type: 'REJECT', label: '반려', from: ['IN_REVIEW'], generalForCorrection: true },
   { type: 'REOPEN', label: '재검토 시작', from: ['REJECTED'], generalForCorrection: true },

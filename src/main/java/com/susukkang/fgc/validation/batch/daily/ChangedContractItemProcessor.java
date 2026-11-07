@@ -112,7 +112,7 @@ public class ChangedContractItemProcessor implements ItemProcessor<Long, Changed
                         // 대상 단계인데 룰셋이 없다 = 설정 누락. 계약 저장 경로(ContractServiceImpl)처럼 검토 큐에
                         // 남기고(계약·단계·유형 업무키 UPSERT라 한 건 유지), 실패로 돌려 다음 날 다시 점검한다.
                         scheduleService.registerCapRuleReview(contractId, paymentStage,
-                                e.getDetail() == null ? "적용 가능한 1,200% 룰셋이 없습니다." : e.getDetail());
+                                e.getDetail() == null ? "적용 가능한 1,200% 한도 규칙이 없습니다." : e.getDetail());
                     }
                     failures.add(describe(e));
                 }

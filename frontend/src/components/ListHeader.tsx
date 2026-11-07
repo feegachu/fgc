@@ -35,11 +35,10 @@ export function ListHeader({
           {pageSize !== undefined &&
             (pageSizeOptions && onPageSizeChange ? (
               <label className="list-header-page-size">
-                화면
                 <select
                   data-guide-feature="components.list-header.select"
                   className="select-control"
-                  aria-label="화면 행 수"
+                  aria-label="한 번에 볼 건수"
                   value={pageSize}
                   onChange={(event) => onPageSizeChange(Number(event.target.value))}
                 >
@@ -49,10 +48,10 @@ export function ListHeader({
                     </option>
                   ))}
                 </select>
-                행
+                건씩
               </label>
             ) : (
-              <span className="list-header-page-size tabular-nums">화면 {int(pageSize)}행</span>
+              <span className="list-header-page-size tabular-nums">{int(pageSize)}건씩</span>
             ))}
           {actions}
         </div>

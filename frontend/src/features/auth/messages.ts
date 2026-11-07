@@ -3,6 +3,7 @@ export const authMessages = {
   invalidCredentials: '아이디 또는 비밀번호가 맞지 않습니다.',
   tooManyAttempts: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   sessionExpired: '로그인이 만료되었습니다. 다시 로그인하세요.',
+  idleLogout: '오랫동안 사용하지 않아 자동으로 로그아웃되었습니다. 다시 로그인하세요.',
   forbidden: '이 작업을 할 권한이 없습니다.',
   forbiddenHelp: '역할에 따라 볼 수 있는 화면과 누를 수 있는 버튼이 다릅니다. 필요한 권한은 GA관리자에게 요청하세요.',
   superseded: '다른 곳에서 같은 계정으로 로그인해 로그아웃되었습니다. 다시 로그인하세요.',

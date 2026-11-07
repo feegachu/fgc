@@ -273,6 +273,9 @@
 .policy-source-status-options .policy-checkbox {
   padding-top: 8px;
 }
+.policy-regulation-refs {
+  margin-bottom: 16px;
+}
 .policy-timeline {
   list-style: none;
   padding: 0 8px;

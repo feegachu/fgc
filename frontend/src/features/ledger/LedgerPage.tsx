@@ -112,7 +112,7 @@ const columns: TableColumn<Journal>[] = [
     label: '원천',
     width: '10rem',
     render: (row) =>
-      disclose(`${row.sourceEntityTypeLabel || row.sourceEntityType || EMPTY} ${row.sourceEntityId ?? EMPTY}`),
+      disclose(row.sourceEntityTypeLabel || EMPTY),
   },
   {
     key: 'debit',
@@ -386,7 +386,7 @@ function DetailSummary({ detail }: { detail: JournalDetail }) {
     ['원분개', disclose(detail.reversalOfJournalNo)],
     ['역분개', disclose(detail.reversedByJournalNo)],
     ['재기표', disclose(detail.repostedJournalNo)],
-    ['정정 묶음', detail.correctionGroupKey ? '있음' : EMPTY],
+    ['정정 내역', detail.correctionGroupKey ? '있음' : EMPTY],
     ['적요', disclose(detail.description)],
   ] as const
   return (

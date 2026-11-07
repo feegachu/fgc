@@ -65,13 +65,13 @@ function sourceLink(c: Candidate, r: Detail['sourceRefs'][number]) {
         차익거래 검증
       </ContextLink>
     )
-  if (c.contractId != null) return <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-2" to={`/contracts/${c.contractId}`}>계약 사건 이력</ContextLink>
+  if (c.contractId != null) return <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-2" to={`/contracts/${c.contractId}`}>계약 상태이력</ContextLink>
   return '-'
 }
 const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[] => [
   {
     key: 'type',
-    label: '원천',
+    label: '근거',
     render: (r) => (
       <CategoryBadge value={r.triggerType} optionCount={Object.keys(triggerLabels).length}>
         {triggerLabels[r.triggerType ?? ''] ?? present(r.triggerType)}
@@ -98,8 +98,7 @@ const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[
       />
     ),
   },
-  { key: 'open', label: '원천 열기', render: (r) => sourceLink(c, r) },
-  { key: 'id', label: '사건/검증 번호', cellClassName: 'tabular-nums', render: (r) => present(r.sourceId) },
+  { key: 'open', label: '원본 보기', render: (r) => sourceLink(c, r) },
 ]
 const paymentColumns = (
   c: Candidate,
@@ -125,7 +124,7 @@ const paymentColumns = (
   },
   {
     key: 'tx',
-    label: '지급 번호',
+    label: '지급 건',
     cellClassName: 'tabular-nums',
     // 지급 목록을 이 계약으로 거르고 해당 지급 행을 선택한 상태로 연다.
     // 지급 목록은 정산월 키가 없으면 기준 정산월로 거르므로(#752) 다른 월 지급도 보이게 전체월(빈 값)로 연다.
@@ -134,13 +133,12 @@ const paymentColumns = (
         <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-3"
           to={`/transactions?${query({ contractNo: c.contractNo, settlementMonth: '', selectedId: String(r.commissionTransactionId) })}`}
         >
-          {r.commissionTransactionId}
+          지급 건 보기
         </ContextLink>
       ) : (
-        present(r.commissionTransactionId)
+        '-'
       ),
   },
-  { key: 'id', label: '귀속 번호', cellClassName: 'tabular-nums', render: (r) => present(r.transactionAttributionId) },
 ]
 const scheduleColumns: TableColumn<Detail['scheduleLines'][number]>[] = [
   { key: 'no', label: '회차', align: 'left', render: (r) => int(r.installmentNo) },
@@ -204,8 +202,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
   return (
     <>
       <dl className="claw-detail-list">
-        <Row label="후보 번호, 계약번호">
-          {present(c.candidateId)},{' '}
+        <Row label="계약번호">
           {c.contractId != null ? (
             <ContextLink data-guide-feature="features.clawback.clawback-detail.contextlink-4" to={`/contracts/${c.contractId}`}>{present(c.contractNo)}</ContextLink>
           ) : (
@@ -225,7 +222,7 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
         </Row>
         <Row label="경과월">
           {detail.elapsedMonths == null
-            ? '계산 불가 (사건 기준일이 계약일보다 앞섬)'
+            ? '계산 불가 (발생 기준일이 계약일보다 앞섬)'
             : `${int(detail.elapsedMonths)}개월`}
         </Row>
         {/* 서버의 policyVersionId는 후보가 하나일 때 채워 주는 값이지 적용 선택 결과가 아니다(인터페이스 §4-4-5). */}
@@ -250,11 +247,11 @@ export function ClawbackDetail({ detail }: { detail: CandidateDetail }) {
       </dl>
       <Evidence
         scope="source"
-        title="원천 사건, 검증 근거"
+        title="발생 원인과 검증 근거"
         rows={detail.sourceRefs}
         columns={sourceColumns(c)}
         rowKey={(r, i) => `${r.triggerType}-${r.sourceId}-${i}`}
-        empty="연결된 원천 근거가 없습니다."
+        empty="연결된 근거가 없습니다."
       />
       <Evidence
         scope="payment"

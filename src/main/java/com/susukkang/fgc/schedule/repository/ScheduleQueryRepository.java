@@ -56,7 +56,7 @@ public class ScheduleQueryRepository {
              sh.paymentStage, sh.scheduleRegime,
                    sh.schedulePurpose, sh.scheduleVersionNo, sh.status, sh.activeYn, sh.generatedAt,
                    sh.generationReason, COUNT(sl.scheduleLineId), SUM(sl.expectedAmount),
-                   pv.policyCode, pv.versionNo, sh.contractId, sh.policyVersionId, COUNT(DISTINCT sl.installmentNo), MAX(sl.installmentNo)
+                   pv.policyName, pv.versionNo, sh.contractId, sh.policyVersionId, COUNT(DISTINCT sl.installmentNo), MAX(sl.installmentNo)
               FROM ScheduleHeader sh
               JOIN InsuranceContract c ON c.contractId = sh.contractId
               JOIN PolicyVersion pv ON pv.policyVersionId = sh.policyVersionId
@@ -72,7 +72,7 @@ public class ScheduleQueryRepository {
     private static final String LINE_JOIN = """
               LEFT JOIN ScheduleLine sl ON sl.scheduleHeaderId = sh.scheduleHeaderId
             """;
-    private static final String GROUP_BY = " GROUP BY sh.scheduleHeaderId, c.contractNo, pv.policyCode, pv.versionNo";
+    private static final String GROUP_BY = " GROUP BY sh.scheduleHeaderId, c.contractNo, pv.policyName, pv.versionNo";
     private static final String VERSIONS_QUERY = HEADER_SELECT_SIMPLE + LINE_JOIN + """
              WHERE EXISTS (SELECT 1 FROM ScheduleHeader t
                             WHERE t.scheduleHeaderId = :scheduleHeaderId
@@ -251,7 +251,7 @@ public class ScheduleQueryRepository {
             "version", scheduleHeader.scheduleVersionNo,
             "lines", scheduleLine.scheduleLineId.count(),
             "total", scheduleLine.expectedAmount.sumAggregate(),
-            "policy", policyVersion.policyCode);
+            "policy", policyVersion.policyName);
     public static final Set<String> SORT_KEYS = Set.copyOf(SORTABLE.keySet());
     public static final ListSort DEFAULT_SORT = new ListSort("scheduleHeaderId", false);
 
@@ -270,13 +270,13 @@ public class ScheduleQueryRepository {
                         Expressions.nullExpression(String.class), Expressions.nullExpression(String.class),
                         sh.paymentStage, sh.scheduleRegime, sh.schedulePurpose, sh.scheduleVersionNo,
                         sh.status, sh.activeYn, sh.generatedAt, sh.generationReason,
-                        sl.scheduleLineId.count(), sl.expectedAmount.sumAggregate(), pv.policyCode, pv.versionNo,
+                        sl.scheduleLineId.count(), sl.expectedAmount.sumAggregate(), pv.policyName, pv.versionNo,
                         sh.contractId, sh.policyVersionId, sl.installmentNo.countDistinct(), sl.installmentNo.max())
                 .from(sh).join(c).on(c.contractId.eq(sh.contractId))
                 .join(pv).on(pv.policyVersionId.eq(sh.policyVersionId))
                 .leftJoin(sl).on(sl.scheduleHeaderId.eq(sh.scheduleHeaderId))
                 .where(searchFilters(condition))
-                .groupBy(sh.scheduleHeaderId, c.contractNo, pv.policyCode, pv.versionNo)
+                .groupBy(sh.scheduleHeaderId, c.contractNo, pv.policyName, pv.versionNo)
                 .orderBy(QuerydslSort.order(sortOf(condition), SORTABLE, sh.scheduleHeaderId.desc()));
     }
 

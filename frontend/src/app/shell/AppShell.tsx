@@ -131,7 +131,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
                 </p>
                 <p>Copyright © {new Date().getFullYear()} FGC. All rights reserved.</p>
               </>
-            ) : 'FGC 수수료 정산 검증 시스템 v2.0'}
+            ) : 'FGC 수수료 정산 검증 시스템'}
           </footer>
         )}
       </div>

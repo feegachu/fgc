@@ -56,7 +56,7 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.data.content[0].scheduleRegime").value("FOUR_YEAR_2027"))
                 .andExpect(jsonPath("$.data.content[0].scheduleRegimeLabel").value("4년 분급(2027)"))
                 .andExpect(jsonPath("$.data.content[0].schedulePurpose").value("COMPARISON"))
-                .andExpect(jsonPath("$.data.content[0].schedulePurposeLabel").value("비교"))
+                .andExpect(jsonPath("$.data.content[0].schedulePurposeLabel").value("비교용"))
                 .andExpect(jsonPath("$.data.content[0].status").value("ADJUSTED"))
                 .andExpect(jsonPath("$.data.content[0].statusLabel").value("조정"));
     }
@@ -74,7 +74,7 @@ class ScheduleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.header.paymentStageLabel").value("GA→설계사"))
                 .andExpect(jsonPath("$.data.header.scheduleRegimeLabel").value("4년 분급(2027)"))
-                .andExpect(jsonPath("$.data.header.schedulePurposeLabel").value("비교"))
+                .andExpect(jsonPath("$.data.header.schedulePurposeLabel").value("비교용"))
                 .andExpect(jsonPath("$.data.header.statusLabel").value("조정"));
     }
 
@@ -101,9 +101,9 @@ class ScheduleControllerTest {
                         .with(user("viewer").roles("COMPLIANCE")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].scheduleHeaderId").value(11))
-                .andExpect(jsonPath("$.data[0].paymentStageLabel").value("원수사→GA"))
+                .andExpect(jsonPath("$.data[0].paymentStageLabel").value("보험회사→GA"))
                 .andExpect(jsonPath("$.data[0].scheduleRegimeLabel").value("7년 분급(2029)"))
-                .andExpect(jsonPath("$.data[0].schedulePurposeLabel").value("시뮬레이션"))
+                .andExpect(jsonPath("$.data[0].schedulePurposeLabel").value("모의 계산용"))
                 .andExpect(jsonPath("$.data[0].statusLabel").value("재개"))
                 .andExpect(jsonPath("$.data[1].scheduleVersionNo").value(1));
 

@@ -337,7 +337,7 @@ public class ArbitrageService {
         String reason = decision.reason();
         if (!existingReview) {
             if (!candidate) candidateType = "PLANNED_SOURCE_REVIEW_REQUIRED";
-            String monitoringReason = "지급예정액은 미차감 상한입니다. 잔액과 확정 지급의 연결을 확인할 수 없습니다. 귀속행: "
+            String monitoringReason = "지급예정액은 미차감 상한입니다. 잔액과 확정 지급의 연결을 확인할 수 없습니다. 귀속 내역: "
                     + planned.unresolvedAttributionIds();
             reason = candidate ? reason + " " + monitoringReason : monitoringReason;
         }

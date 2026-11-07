@@ -55,7 +55,7 @@ public class FeeRegimeRulesetService {
         // 승인된 정책 아래의 룰셋은 잠금 트리거로 바뀌지 않으므로, 같은 룰셋 ID는 다시 읽어도 같은 값이다
         RulesetHeader header = resolverRepository.findRulesetHeader(resolution.rulesetId())
                 .orElseThrow(() -> new IllegalStateException(
-                        "선택된 룰셋을 읽을 수 없습니다: rulesetId=" + resolution.rulesetId()));
+                        "선택된 규칙을 읽을 수 없습니다: rulesetId=" + resolution.rulesetId()));
         List<RulesetLimit> limits = resolverRepository.findRulesetLimits(resolution.rulesetId()).stream()
                 .map(row -> new RulesetLimit(row.getLimitCode(), row.getLimitPct(),
                         Boolean.TRUE.equals(row.getIncludesIndirectExpense())))

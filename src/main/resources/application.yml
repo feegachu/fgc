@@ -54,7 +54,8 @@ fgc:
   jwt:
     secret: ${FGC_JWT_SECRET:}
     access-token-ttl: 30m
-    refresh-token-ttl: 14d
+    refresh-token-ttl: 12h     # 로그인 한 번의 최대 수명. 회전해도 늘지 않는다
+    refresh-idle-ttl: 60m      # 이 시간 동안 회전이 없으면 거절. Access 30분 + 화면 미사용 자동 로그아웃 30분
   # 외부 LLM(SER-013·IF-EXT-03, OI-023). 키는 커밋하지 않는다 — 비어 있으면 AI 기능만 꺼지고 기본 업무는 그대로(FGC-AI-001).
   llm:
     # SDK 표준 이름을 먼저 보고, 기존 Podman 매니페스트(secret fgc-app)의 SPRING_AI_OPENAI_API_KEY 도 받는다.

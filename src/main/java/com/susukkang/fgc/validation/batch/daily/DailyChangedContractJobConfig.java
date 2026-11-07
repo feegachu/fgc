@@ -122,21 +122,7 @@ public class DailyChangedContractJobConfig {
         PostgresPagingQueryProvider queryProvider = new PostgresPagingQueryProvider();
         queryProvider.setSelectClause("DISTINCT c.contract_id");
         queryProvider.setFromClause("fgc.insurance_contract c");
-        queryProvider.setWhereClause("""
-                (c.updated_at > :lastProcessedAt
-                 OR EXISTS (
-                     SELECT 1
-                       FROM fgc.contract_status_event e
-                      WHERE e.contract_id = c.contract_id
-                        AND NOT EXISTS (
-                            SELECT 1
-                              FROM fgc.contract_status_event_processing p
-                             WHERE p.contract_status_event_id = e.contract_status_event_id
-                               AND p.processing_job = :jobName
-                               AND p.processing_status = 'SUCCEEDED'
-                        )
-                 ))
-                """);
+        queryProvider.setWhereClause(DailyChangedContractJobNames.CHANGED_CONTRACT_CONDITION);
         Map<String, Order> sortKeys = new LinkedHashMap<>();
         sortKeys.put("contract_id", Order.ASCENDING);
         queryProvider.setSortKeys(sortKeys);

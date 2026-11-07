@@ -88,10 +88,10 @@ export function PaymentCalculationPanel({
   }
   return (
     <details className="payment-calculation" open>
-      <summary>현재 지급 건 계산 조회 {observation.paymentId ? `(지급 번호 ${observation.paymentId})` : ''}</summary>
+      <summary>현재 지급 건 계산 조회</summary>
       <p>저장된 자료로 계산합니다. 자동 입력이나 확정은 하지 않아요.</p>
       {!observation.saved && (
-        <p role="status">현재 입력을 먼저 저장하세요. 이전 저장본의 계산 결과는 표시하지 않습니다.</p>
+        <p role="status">현재 입력을 먼저 저장하세요. 이전에 저장한 내용의 계산 결과는 표시하지 않습니다.</p>
       )}
       <div className="payment-calculation-actions">
         <button
@@ -180,7 +180,7 @@ export function PaymentCalculationPanel({
           ))}
           {result.basis?.sourceRefs?.map((source) => (
             <p key={source.sourceId}>
-              근거: {source.title}, #{source.entityId}
+              근거: {source.title}
               {source.version ? `, 갱신 ${dateTimeSeconds(source.version)}` : ''}
             </p>
           ))}
