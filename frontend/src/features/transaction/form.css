@@ -171,15 +171,16 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-/* Actions stay directly below the compact schedule preview. */
-.contract-payment-preview-actions {
-  border-top: 1px solid var(--color-border-default);
-  padding: 8px 12px 10px;
+/* Actions occupy the last cell of the payment contract fields. */
+.contract-payment-actions {
+  min-width: 0;
+  align-self: end;
 }
-.contract-payment-editor .contract-payment-preview-actions .transaction-action-list {
+.contract-payment-editor .contract-payment-actions .transaction-action-list {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
 }
-.contract-payment-preview-actions .button {
+.contract-payment-actions .button {
   min-width: 0;
   padding-inline: 8px;
   white-space: nowrap;
@@ -191,6 +192,40 @@
 .contract-payment-gates > .surface-body { padding: 0 14px 8px; }
 .contract-payment-gates .transaction-gate-step { padding-block: 7px; align-items: center; }
 .contract-payment-gates .transaction-gate-fail .transaction-gate-detail { color: var(--color-status-error-text); }
+.contract-payment-check { width: 18px; height: 18px; }
+.contract-payment-check path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: contract-payment-check-draw 450ms ease-out both;
+}
+.contract-payment-gates .transaction-gate-pass .transaction-gate-icon {
+  animation: contract-payment-check-pop 400ms ease-out both;
+}
+@keyframes contract-payment-check-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes contract-payment-check-pop {
+  from { transform: scale(.75); opacity: .3; }
+  to { transform: scale(1); opacity: 1; }
+}
+.contract-payment-comparison-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay, 80) - 2);
+  pointer-events: none;
+}
+body:has(.contract-payment-comparison-overlay) .payment-guide-spotlight.screen-step-spotlight {
+  border-color: transparent;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .contract-payment-check path,
+  .contract-payment-gates .transaction-gate-pass .transaction-gate-icon { animation: none; }
+}
+@media (max-width: 63.9375rem) {
+  .contract-payment-actions { grid-column: 1 / -1; }
+}
 @media (max-width: 36rem) {
-  .contract-payment-editor .contract-payment-preview-actions .transaction-action-list { grid-template-columns: 1fr; }
+  .contract-payment-editor .contract-payment-actions .transaction-action-list { grid-template-columns: 1fr; }
 }

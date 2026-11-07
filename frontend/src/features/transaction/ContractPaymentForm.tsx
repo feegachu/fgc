@@ -24,40 +24,50 @@ import {
 } from './form-api'
 import { CapPanel } from './ConfirmationPanels'
 import { ContractPaymentGates } from './ContractPaymentGates'
+import { ContractPaymentComparison } from './ContractPaymentComparison'
 import { ScreenWalkthrough } from '../assistant/guide/ScreenWalkthrough'
 import type { ScreenHelpStep } from '../assistant/guide/ScreenHelp'
 
 const helpSteps: ScreenHelpStep[] = ([
   {
-    targetId: 'payment.batch.scope',
-    title: '지급 계약 건',
-    instruction: '계약과 회차를 고르면 귀속행이 채워집니다.',
-    interaction: '수수료 항목과 지급 금액을 확인하세요.',
+    targetId: 'payment.batch.contract',
+    title: '지급할 계약 선택',
+    instruction: '목록에서 지급할 계약을 선택하세요.',
+    interaction: '기준 정산월까지 체결된 계약만 표시됩니다.',
+    openControl: true,
+    advanceOnSelection: true,
+    presentation: { side: 'right', includeLabel: true },
   },
   {
     targetId: 'payment.batch.lines',
     title: '설계사별 귀속행',
-    instruction: '설계사별 수수료와 금액을 수정합니다.',
-    interaction: '오른쪽 예상 스케줄과 같은 순서로 비교하세요.',
+    instruction: '같은 번호의 예상 금액과 귀속금액을 비교하세요.',
+    interaction: '네모 안의 금액을 확인하고 필요한 행을 수정하세요.',
+    presentation: { side: 'above' },
+    onEnter: () => {
+      const root = document.querySelector('.contract-payment-editor')
+      root?.dispatchEvent(new Event('fgc-payment-compare-start'))
+      return () => { root?.dispatchEvent(new Event('fgc-payment-compare-stop')) }
+    },
   },
   {
     targetId: 'payment.batch.save',
     title: '임시저장',
     instruction: '귀속금액을 확인하고 임시저장을 누르세요.',
     interaction: '작성중으로 저장되며, 지급은 확정되지 않습니다.',
-    presentation: { side: 'left', sideBoundary: '.transaction-form-column' },
+    presentation: { side: 'right' },
   },
   {
     targetId: 'payment.batch.precheck',
     title: '사전검증',
     instruction: '임시저장 후 사전검증을 누르세요.',
-    interaction: '차단된 행은 아래 점검표에서 원인을 확인합니다.',
-    presentation: { side: 'left', sideBoundary: '.transaction-form-column' },
+    interaction: '차단된 행은 오른쪽 점검표에서 원인을 확인합니다.',
+    presentation: { side: 'right' },
   },
   {
     targetId: 'payment.precheck.result',
     title: '확정 전 6단계 점검',
-    instruction: '저장·귀속·금액·한도 검증 결과를 차례로 확인하세요.',
+    instruction: '입력·금액·저장·검증 결과를 차례로 확인하세요.',
     interaction: '확인 필요 항목을 수정하고 다시 저장·검증합니다.',
     presentation: { side: 'left' },
   },
@@ -66,7 +76,7 @@ const helpSteps: ScreenHelpStep[] = ([
     title: '지급 확정',
     instruction: '검증을 통과하면 확정을 누르세요.',
     interaction: '확인창에서 대상 행과 총액을 확인한 뒤 확정합니다.',
-    presentation: { side: 'left', sideBoundary: '.transaction-form-column' },
+    presentation: { side: 'right' },
   },
 ] satisfies Omit<ScreenHelpStep, 'group' | 'details'>[]).map((step) => ({ ...step, group: '계약별 지급 등록', details: [], concise: true }))
 type Edit = { amount: string; item: string }
@@ -140,6 +150,19 @@ export function ContractPaymentForm({
   comparison: (busy: boolean) => ReactNode
   initialContractId?: string
 }) {
+  const editor = useRef<HTMLDivElement>(null)
+  const [comparing, setComparing] = useState(false)
+  useEffect(() => {
+    const root = editor.current
+    const start = () => setComparing(true)
+    const stop = () => setComparing(false)
+    root?.addEventListener('fgc-payment-compare-start', start)
+    root?.addEventListener('fgc-payment-compare-stop', stop)
+    return () => {
+      root?.removeEventListener('fgc-payment-compare-start', start)
+      root?.removeEventListener('fgc-payment-compare-stop', stop)
+    }
+  }, [])
   const client = useQueryClient()
   const [contractId, setContractId] = useState(initialContractId)
   const [stage, setStage] = useState<'GA_TO_FC' | 'INSURER_TO_GA'>('GA_TO_FC')
@@ -171,10 +194,13 @@ export function ContractPaymentForm({
   const [selectedResult, setSelectedResult] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [uncertain, setUncertain] = useState(false)
-  const contracts = useEntityChoices('contracts', {}, [contractId])
+  const contracts = useEntityChoices('contracts', { contractDateTo: monthEnd }, [contractId], true,
+    row => !!row.contractDate && row.contractDate <= monthEnd)
+  const selectedContract = contracts.data.find(row => String(row.contractId) === contractId)
+  const contractAllowed = !!selectedContract?.contractDate && selectedContract.contractDate <= monthEnd
   const schedules = useQuery({
     ...contractSchedulesQuery(contractId, stage),
-    enabled: !!contractId,
+    enabled: !!contractId && contractAllowed,
     placeholderData: undefined,
   })
   const active =
@@ -189,7 +215,7 @@ export function ContractPaymentForm({
   const header = active.length === 1 ? active[0] : undefined
   const detail = useQuery({
     ...scheduleDetailQuery(String(header?.scheduleHeaderId ?? '')),
-    enabled: !!header?.scheduleHeaderId,
+    enabled: contractAllowed && !!header?.scheduleHeaderId,
   })
   const lines = savedLines ?? detail.data?.lines ?? []
   const installments = [...new Set(lines.map((line) => line.installmentNo).filter((n): n is number => n != null))].sort(
@@ -218,6 +244,7 @@ export function ContractPaymentForm({
   const itemSource = { ...items.source, label: (item: (typeof items.data)[number]) => item.itemName ?? '수수료 항목' }
   const datesReady = [attributionDate, paymentDate].every((date) => validDate(date) && date.startsWith(`${month}-`))
   const rowPayload = (line: ScheduleLine) => {
+    if (!contractAllowed) throw new Error('기준 정산월까지 체결된 계약을 선택하세요.')
     if (!datesReady) throw new Error('귀속일과 지급 예정일을 기준 정산월 안에서 선택하세요.')
     const edit = values(line)
     if (!/^\d+$/.test(edit.amount)) throw new Error('귀속금액을 0원 이상 원 단위로 입력하세요.')
@@ -428,7 +455,8 @@ export function ContractPaymentForm({
     })
   }
   return (
-    <div className="publishing-page transaction-page transaction-form-page contract-payment-editor">
+    <div ref={editor} className="publishing-page transaction-page transaction-form-page contract-payment-editor">
+      {comparing && <ContractPaymentComparison root={editor} />}
       <header className="page-header transaction-page-header">
         <div className="page-header-copy">
           <h1 className="page-title">지급 계약 건 등록, 귀속, 확정</h1>
@@ -455,14 +483,14 @@ export function ContractPaymentForm({
             </header>
             <fieldset
               className="surface-body transaction-form-grid contract-payment-fields"
-              disabled={!!busy || uncertain}
             >
-              <Field label="계약" required>
+              <Field label="계약" required error={selectedContract && !contractAllowed ? '기준 정산월 이후의 계약입니다. 다른 계약을 선택하세요.' : undefined}>
                 <SearchSelect
+                  data-guide-target="payment.batch.contract"
                   disabled={scopeLocked}
                   value={contractId}
                   source={contracts.source}
-                  selected={contracts.data.find((row) => String(row.contractId) === contractId)}
+                  selected={selectedContract}
                   placeholder="계약번호 검색"
                   onSelect={(value, row) => {
                     contracts.remember(row)
@@ -566,6 +594,64 @@ export function ContractPaymentForm({
                   }}
                 />
               </Field>
+              <div className="contract-payment-actions" data-guide-target="payment.batch.actions">
+                <div className="transaction-action-list">
+                  <Button
+                    data-guide-target="payment.batch.save"
+                    variant="secondary"
+                    loading={busy === 'save'}
+                    disabled={
+                      !!busy ||
+                      !canProcess ||
+                      !contractAllowed ||
+                      !header ||
+                      !selected.length ||
+                      selected.length > 200 ||
+                      !balanced ||
+                      !datesReady ||
+                      clean ||
+                      editingLocked ||
+                      schedules.isFetching ||
+                      detail.isFetching ||
+                      items.isFetching
+                    }
+                    onClick={() => void save()}
+                  >
+                    임시저장
+                  </Button>
+                  <Button
+                    data-guide-target="payment.batch.precheck"
+                    variant="secondary"
+                    loading={busy === 'precheck'}
+                    disabled={!!busy || !canProcess || !clean || !balanced || !remaining.length || uncertain}
+                    onClick={() => void precheck()}
+                  >
+                    사전검증
+                  </Button>
+                  <Button
+                    data-guide-target="payment.batch.confirm"
+                    loading={busy === 'confirm'}
+                    disabled={!!busy || !canProcess || !allChecked || uncertain}
+                    onClick={() => setConfirmOpen(true)}
+                  >
+                    확정
+                  </Button>
+                  {uncertain && Object.keys(saved).length > 0 && (
+                    <Button variant="secondary" loading={busy === 'reload'} onClick={() => void reconcile()}>
+                      확정 결과 다시 확인
+                    </Button>
+                  )}
+                </div>
+                {selected.length > 200 && (
+                  <p className="field-error">한 번에 200행까지 등록할 수 있습니다. 등록할 행을 나눠 선택하세요.</p>
+                )}
+                {error && (
+                  <p role="alert" className="field-error">
+                    {error}
+                  </p>
+                )}
+                {uncertain && <Link to={returnTo}>지급 목록에서 저장·확정 결과 확인</Link>}
+              </div>
             </fieldset>
             {(schedules.isFetching || detail.isFetching) && (
               <p className="surface-body" role="status">
@@ -665,6 +751,7 @@ export function ContractPaymentForm({
                         </td>
                         <td>
                           <input
+                            data-compare-amount={`actual-${key}`}
                             aria-label={`귀속금액 ${key}`}
                             disabled={editingLocked || !eligible(line)}
                             type="number"
@@ -714,7 +801,20 @@ export function ContractPaymentForm({
           </section>
         </div>
         <div className="transaction-form-column">
-          <section className="surface contract-payment-preview" aria-labelledby="contract-payment-preview-title">
+          <ContractPaymentGates
+            rows={selected.length}
+            inputsReady={selected.length > 0 && selected.every((line) => !!fingerprint(line))}
+            amountsReady={balanced}
+            savedRows={
+              selected.filter(
+                (line) => !!fingerprint(line) && saved[line.scheduleLineId!]?.fingerprint === fingerprint(line),
+              ).length
+            }
+            checks={selected.map((line) => checks[line.scheduleLineId!])}
+            confirmedRows={selected.filter((line) => done(line.scheduleLineId!)).length}
+            uncertain={uncertain}
+          />
+          <section className="surface contract-payment-preview" data-guide-target="payment.batch.expected" aria-labelledby="contract-payment-preview-title">
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title" id="contract-payment-preview-title">
                 설계사별 예상 스케줄
@@ -737,7 +837,7 @@ export function ContractPaymentForm({
                         <strong title={line.recipientName ?? 'GA'}>{line.recipientName ?? 'GA'}</strong>
                         <span title={line.commissionItemName ?? '항목 확인 필요'}>{line.commissionItemName ?? '항목 확인 필요'}</span>
                       </span>
-                      <span className="contract-payment-preview-amount">
+                      <span className="contract-payment-preview-amount" data-compare-amount={`expected-${line.scheduleLineId}`}>
                         {line.cashflowType === 'DEDUCTION' && '차감 '}
                         {line.expectedAmount == null ? '금액 미정' : `${int(scheduleAmount(line))}원`}
                       </span>
@@ -749,77 +849,7 @@ export function ContractPaymentForm({
                 <p className="transaction-panel-meta">계약과 회차를 선택하면 예상 스케줄이 표시됩니다.</p>
               )}
             </div>
-            <section className="contract-payment-preview-actions" data-guide-target="payment.batch.actions">
-              <div className="transaction-action-list">
-                <Button
-                  data-guide-target="payment.batch.save"
-                  variant="secondary"
-                  loading={busy === 'save'}
-                  disabled={
-                    !!busy ||
-                    !canProcess ||
-                    !header ||
-                    !selected.length ||
-                    selected.length > 200 ||
-                    !balanced ||
-                    !datesReady ||
-                    clean ||
-                    editingLocked ||
-                    schedules.isFetching ||
-                    detail.isFetching ||
-                    items.isFetching
-                  }
-                  onClick={() => void save()}
-                >
-                  임시저장
-                </Button>
-                <Button
-                  data-guide-target="payment.batch.precheck"
-                  variant="secondary"
-                  loading={busy === 'precheck'}
-                  disabled={!!busy || !canProcess || !clean || !balanced || !remaining.length || uncertain}
-                  onClick={() => void precheck()}
-                >
-                  사전검증
-                </Button>
-                <Button
-                  data-guide-target="payment.batch.confirm"
-                  loading={busy === 'confirm'}
-                  disabled={!!busy || !canProcess || !allChecked || uncertain}
-                  onClick={() => setConfirmOpen(true)}
-                >
-                  확정
-                </Button>
-                {uncertain && Object.keys(saved).length > 0 && (
-                  <Button variant="secondary" loading={busy === 'reload'} onClick={() => void reconcile()}>
-                    확정 결과 다시 확인
-                  </Button>
-                )}
-              </div>
-              {selected.length > 200 && (
-                <p className="field-error">한 번에 200행까지 등록할 수 있습니다. 등록할 행을 나눠 선택하세요.</p>
-              )}
-              {error && (
-                <p role="alert" className="field-error">
-                  {error}
-                </p>
-              )}
-              {uncertain && <Link to={returnTo}>지급 목록에서 저장·확정 결과 확인</Link>}
-            </section>
           </section>
-          <ContractPaymentGates
-            rows={selected.length}
-            inputsReady={selected.length > 0 && selected.every((line) => !!fingerprint(line))}
-            amountsReady={balanced}
-            savedRows={
-              selected.filter(
-                (line) => !!fingerprint(line) && saved[line.scheduleLineId!]?.fingerprint === fingerprint(line),
-              ).length
-            }
-            checks={selected.map((line) => checks[line.scheduleLineId!])}
-            confirmedRows={selected.filter((line) => done(line.scheduleLineId!)).length}
-            uncertain={uncertain}
-          />
           <CapPanel
             result={checks[currentResult!] ?? null}
             pending={busy === 'precheck'}
