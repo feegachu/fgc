@@ -110,10 +110,12 @@ const calls = (prefix: string) => requested.filter(({ url }) => url.startsWith(p
 const query = (url: string) => Object.fromEntries(new URLSearchParams(url.split('?')[1]))
 const toasts = () => useToastStore.getState().messages.map((message) => message.message)
 // 화면에 내부 번호가 없어 지금 보고 있는 스케줄은 버전 이력의 현재 행으로 확인한다.
+// 같은 행의 정책 이름(POL-2026-07 v3)에도 v3가 있어, 행 전체가 아니라 첫 칸의 버전만 본다.
 const currentVersion = () =>
   within(screen.getByRole('table', { name: '같은 계약의 스케줄 버전 이력' }))
     .getAllByRole('row')
     .find((row) => row.getAttribute('aria-current') === 'true')
+    ?.querySelector('td')
 
 const listPage = (content: ScheduleHeader[], extra = {}) => ({
   content,
@@ -526,7 +528,8 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     const regen = calls('/api/v1/schedules/11/regenerate')[0]
     expect(regen.options).toMatchObject({ method: 'POST', body: { reason: '2026-07 정책 개정' } })
     expect(toasts()).toContain('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.')
-    await waitFor(() => expect(currentVersion()).toHaveTextContent('v3'))
+    // 새 버전 화면 전환, 상세 조회, 버전 이력 조회가 이어져 부하가 크면 5초를 넘긴다.
+    await waitFor(() => expect(currentVersion()).toHaveTextContent('v3'), { timeout: 10_000 })
     // 버전 이력이 상세보다 먼저 올 수 있다. 상세까지 읽어 버튼이 켜진 뒤에 누른다.
     await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
 
