@@ -150,7 +150,8 @@ function TransactionForm({
           agentId: entry.agentId ?? '',
           commissionItemId: entry.commissionItemId ?? '',
           paymentStage: entry.paymentStage ?? 'GA_TO_FC',
-          amount: entry.amount ?? '250000',
+          // 금액을 미리 넣으면 확인 없이 그대로 저장될 수 있어 비워 둔다.
+          amount: entry.amount ?? '',
           cashflowType: entry.cashflowType ?? 'PAYMENT',
         }
       : {}),
@@ -159,7 +160,7 @@ function TransactionForm({
     !draft && entry.contractId
       ? [
           {
-            ...newRow(1, entry.attributionDate ?? '', entry.amount ?? '250000'),
+            ...newRow(1, entry.attributionDate ?? '', entry.amount ?? ''),
             contractId: entry.contractId,
           },
         ]

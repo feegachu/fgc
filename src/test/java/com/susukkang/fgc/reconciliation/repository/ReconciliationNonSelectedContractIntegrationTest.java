@@ -88,6 +88,14 @@ class ReconciliationNonSelectedContractIntegrationTest {
     }
 
     @Test
+    void 성립_전_청약_계약은_예상에서_빠진다() {
+        Long contractId = insertContract("APPLIED");
+        Long line = insertLine(contractId, 1, MONTH.withDayOfMonth(25));
+
+        assertThat(expectedLineIds(contractId)).doesNotContain(line);
+    }
+
+    @Test
     void 최신_상태_사건이_현재_상태와_다르면_이력을_믿지_않고_예상에_남긴다() {
         Long contractId = insertContract("ACTIVE");
         insertEvent(contractId, 1, "ACTIVE", "2098-01-15 00:00+09");

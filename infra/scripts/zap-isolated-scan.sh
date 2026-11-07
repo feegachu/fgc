@@ -68,6 +68,7 @@ up() {
     # 신한 서버와 같은 guard(/actuator 404)를 붙여 실제 공개면을 본다.
     docker run -d --name fgc-zap-web --network "$network" --memory=128m -p "127.0.0.1:$port:80" \
         -e API_UPSTREAM=fgc-zap-api:8080 -v "$root/infra/shinhan/nginx-guard.conf:/etc/nginx/fgc.d/guard.conf:ro" \
+        -v "$root/infra/shinhan/nginx-http.conf:/etc/nginx/conf.d/fgc-http.conf:ro" \
         "$WEB_IMAGE" >/dev/null
     for _ in $(seq 1 90); do
         # 미인증 401 이 API 까지 연결됐다는 뜻이다. 뜨는 중에는 nginx 가 502 를 준다.

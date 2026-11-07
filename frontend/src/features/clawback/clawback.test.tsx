@@ -509,6 +509,21 @@ it('locks the button while a calculation is in flight', async () => {
   await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
 })
 
+it('새로고침하면 선택한 후보의 상세도 다시 읽어 기지급과 계산 가능 여부를 갱신한다', async () => {
+  const user = userEvent.setup()
+  let paid = 0
+  const { request } = mount('/clawbacks', (p) =>
+    p.endsWith('/candidates/42')
+      ? envelope({ ...calculable, candidate: { ...calculable.candidate, paidAmount: paid } })
+      : fixtures(p),
+  )
+  expect(await screen.findByText('환수할 기지급 내역이 없어 계산할 수 없습니다.')).toBeInTheDocument()
+  paid = 1200000
+  await user.click(screen.getByRole('button', { name: '새로고침' }))
+  await waitFor(() => expect(screen.queryByText('환수할 기지급 내역이 없어 계산할 수 없습니다.')).not.toBeInTheDocument())
+  expect(request.mock.calls.filter(([p]) => String(p).endsWith('/candidates/42')).length).toBeGreaterThanOrEqual(2)
+})
+
 it('asks for a policy choice when several policies apply', async () => {
   const user = userEvent.setup()
   const second = { ...policy, policyVersionId: 16, versionNo: 2 }

@@ -55,7 +55,9 @@ export function ClawbackCalculation({
   const client = useQueryClient()
   const c = detail.candidate ?? {}
   const policies = detail.policyCandidates ?? []
-  const canCalculate = c.allowedActions?.includes('CALCULATE') ?? false
+  // 기지급이 없으면 서버가 422로 거절한다. 누른 뒤 실패시키지 않고 이유를 먼저 보인다.
+  const noPaidAmount = c.paidAmount === 0
+  const canCalculate = (c.allowedActions?.includes('CALCULATE') ?? false) && !noPaidAmount
   const issuingNotice = useIsMutating({ mutationKey: ['clawback', 'issue-notice', c.clawbackCaseId] }) > 0
   // 정책 후보가 하나면 미리 고르고, 여럿이면 사용자가 고른다. 계산 버튼을 누르는 것이 선택 확인이다.
   // 고른 값은 지금 후보에 있을 때만 쓴다(409 뒤 다시 불러온 후보에서 빠질 수 있다).
@@ -96,7 +98,9 @@ export function ClawbackCalculation({
     setError('')
     mutation.mutate()
   }
-  const helper = !canCalculate
+  const helper = noPaidAmount
+    ? '환수할 기지급 내역이 없어 계산할 수 없습니다.'
+    : !canCalculate
     ? '계산할 수 없는 후보입니다. 위 검토 사유를 확인하세요.'
     : !policies.length
       ? '적용할 환수 정책이 없어 계산할 수 없습니다.'

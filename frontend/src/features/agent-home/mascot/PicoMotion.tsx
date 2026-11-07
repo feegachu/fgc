@@ -36,6 +36,15 @@ const STILLS: Record<PicoMotionName, string> = {
 // Rive 런타임(WASM 포함)은 모션을 실제로 그릴 때만 내려받는다.
 const PicoRive = lazy(() => import('./PicoRive'))
 
+/** 보안 헤더(CSP)가 WebAssembly 를 막는 서버에서는 어차피 실패할 내려받기를 하지 않고 정지 그림을 쓴다. */
+function canCompileWasm() {
+  try {
+    return Boolean(new WebAssembly.Module(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])))
+  } catch {
+    return false
+  }
+}
+
 /** lazy 청크(Rive·WASM) 로딩이 실패하면 렌더 에러가 되므로, 이 칸 안에서 받아 정지 그림으로 돌린다. */
 class RiveBoundary extends Component<{ fallback: ReactNode; onError: () => void; children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
@@ -65,7 +74,7 @@ function useCanAnimate(): boolean {
 
 export function PicoMotion({ motion, size, className }: { motion: PicoMotionName; size: number; className?: string }) {
   const animate = useCanAnimate()
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState(() => !canCompileWasm())
   const still = <img src={STILLS[motion]} alt="" width={size} height={size} draggable={false} />
   return (
     <span

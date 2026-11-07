@@ -134,6 +134,7 @@ async function fillNew(user: ReturnType<typeof userEvent.setup>) {
   await selectOption(user, screen.getByLabelText(/수령 설계사/), '1')
   await waitFor(() => expect(button('btn-add-attr')).toBeEnabled())
   await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
+  await user.type(screen.getByLabelText(/금액 \(원\)/), '250000')
   await user.click(button('btn-add-attr'))
   await selectOption(user, screen.getByLabelText('1번 귀속 내역 계약번호'), '3')
   await user.type(screen.getByLabelText('1번 귀속 내역 귀속일'), '2026-07-18')
@@ -149,12 +150,18 @@ async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('TRAN-W02 React form workflow', () => {
+  it('신규 지급은 금액을 미리 넣지 않는다', async () => {
+    mount()
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    expect(screen.getByLabelText(/금액 \(원\)/)).toHaveValue(null)
+  })
   it('수동 신규 첫 행과 추가 행 모두 실제 귀속일 입력 전에는 저장하지 않는다', async () => {
     const { user } = mount()
     await waitFor(() => expect(button('btn-save')).toBeEnabled())
     expect(screen.getByLabelText('1번 귀속 내역 귀속일')).toHaveValue('')
     await selectOption(user, screen.getByLabelText(/수령 설계사/), '1')
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
+    await user.type(screen.getByLabelText(/금액 \(원\)/), '250000')
     await user.click(button('btn-add-attr'))
     await selectOption(user, screen.getByLabelText('1번 귀속 내역 계약번호'), '3')
     const date = screen.getByLabelText('1번 귀속 내역 귀속일')
@@ -164,7 +171,7 @@ describe('TRAN-W02 React form workflow', () => {
     expect(writes()).toHaveLength(0)
   })
   it('회차 없는 계약 맥락은 귀속일을 비워 두고 입력 전 저장을 차단한다', async () => {
-    const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1')
+    const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1&amount=250000')
     await waitFor(() => expect(button('btn-save')).toBeEnabled())
     const date = screen.getByLabelText('1번 귀속 내역 귀속일')
     expect(date).toHaveValue('')
@@ -178,7 +185,7 @@ describe('TRAN-W02 React form workflow', () => {
   it.each(['2027-07-17', '2027-07-18'])(
     '계약 12개월 경계의 실제 귀속일 %s를 정산월과 별도로 저장한다',
     async (attributionDate) => {
-      const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1')
+      const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1&amount=250000')
       await waitFor(() => expect(button('btn-save')).toBeEnabled())
       await user.type(screen.getByLabelText('1번 귀속 내역 귀속일'), attributionDate)
       await user.click(button('btn-save'))

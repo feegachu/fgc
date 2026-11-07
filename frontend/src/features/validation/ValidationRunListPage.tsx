@@ -16,7 +16,7 @@ import { ListPagination } from '../../components/ListPagination'
 import { ListHeader } from '../../components/ListHeader'
 import { useSearchParamsState } from '../../hooks/useSearchParamsState'
 import { sortBinding } from '../../lib/tableSort'
-import { dateTime, errorText, month as formatMonth } from '../../lib/format'
+import { dateTime, errorText, month as formatMonth, today } from '../../lib/format'
 import { toast } from '../../stores/toasts'
 import { validMonth, withMonth } from '../../stores/workspace'
 import { usePermission } from '../auth/useAuth'
@@ -261,7 +261,7 @@ function CreateSection() {
       <form data-guide-feature="features.validation.validation-run-list-page.form" className="vrun-create-form search-conditions" onSubmit={submit}>
         <div className="vrun-create-month">
           <Field label="검증월" required>
-            <input data-guide-feature="features.validation.validation-run-list-page.input" type="month" disabled={mutation.isPending} value={month} onChange={(event) => setPicked(event.target.value)} />
+            <input data-guide-feature="features.validation.validation-run-list-page.input" type="month" max={today().slice(0, 7)} disabled={mutation.isPending} value={month} onChange={(event) => setPicked(event.target.value)} />
           </Field>
         </div>
         <div className="vrun-create-type">

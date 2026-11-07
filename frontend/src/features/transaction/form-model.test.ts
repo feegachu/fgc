@@ -15,7 +15,7 @@ import {
   selectContract,
 } from './form-model'
 
-const form = { ...initialForm('2026-07'), sourceBusinessKey: 'GA-MANUAL-test', agentId: '1', commissionItemId: '2' }
+const form = { ...initialForm('2026-07'), sourceBusinessKey: 'GA-MANUAL-test', agentId: '1', commissionItemId: '2', amount: '250000' }
 const row = { ...newRow(1, '2026-07-01', '250000'), contractId: '3' }
 
 describe('transaction draft and attribution contract', () => {
@@ -164,6 +164,8 @@ describe('legacy defect model regressions (#410)', () => {
   it('preserves zero saved rows but retains the default row for a new form', () => {
     expect(draftRows({ attributions: [] })).toEqual([])
     expect(draftRows(undefined)).toHaveLength(1)
+    expect(draftRows(undefined)[0].amount).toBe('')
+    expect(initialForm('2026-07').amount).toBe('')
     expect(draftRows(undefined)[0].attributionDate).toBe('')
   })
 })

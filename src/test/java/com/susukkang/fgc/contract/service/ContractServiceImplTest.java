@@ -116,6 +116,22 @@ class ContractServiceImplTest {
     private ContractServiceImpl contractService;
 
     @Test
+    @DisplayName("설계사에게는 상태 변경을 처리한 직원을 보이지 않는다")
+    void selectStatusEventsHidesRegistrantFromAgent() {
+        given(insuranceContractRepository.existsById(21L)).willReturn(true);
+        OffsetDateTime at = OffsetDateTime.parse("2026-07-10T00:00:00+09:00");
+        ContractStatusEvent event = statusEvent(101L, 1, null, ACTIVE, at, at, "FGC_MANUAL", "EVENT-1");
+        ReflectionTestUtils.setField(event, "registeredBy", 3L);
+        given(contractStatusEventRepository.findByContractIdOrderByEffectiveAtAscEventSeqAsc(21L))
+                .willReturn(List.of(event));
+        given(agentScope.currentAgentId()).willReturn(7L);
+
+        var response = contractService.selectStatusEventsByContractId(21L);
+
+        assertThat(response.getFirst().registeredBy()).isNull();
+    }
+
+    @Test
     @DisplayName("계약 상태 사건에 Job별 처리 이력을 묶고 미처리는 빈 배열로 반환한다")
     void selectStatusEventsGroupsProcessingsByEvent() {
         given(insuranceContractRepository.existsById(21L)).willReturn(true);

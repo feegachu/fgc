@@ -65,7 +65,7 @@ public class ContractController {
                     contract.getContractDate(), contract.getMonthlyEquivalentFirstPremium(), contract.getAgentIdName(),
                     contract.getContractStatus() == null ? null : contract.getContractStatus().label(),
                     contract.getCapResultStatus() == null ? null : contract.getCapResultStatus().label(),
-                    contract.getDataOrigin()
+                    contract.getDataOriginLabel()
             ));
         }
         return csvAttachment("보험계약목록", List.of(
