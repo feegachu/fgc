@@ -158,7 +158,7 @@ export function validateStatusEvent(event: StatusEventDraft, now: string, codes:
     errors['statusEvent.receivedAt'] = '접수일시는 현재 시각보다 늦을 수 없습니다.'
   if (!errors['statusEvent.effectiveAt'] && !errors['statusEvent.receivedAt'] && event.effectiveAt > event.receivedAt)
     errors['statusEvent.effectiveAt'] = '효력일시는 접수일시보다 늦을 수 없습니다.'
-  if (!codes.includes(event.reasonCode)) errors['statusEvent.reasonCode'] = '사유코드를 선택해 주세요.'
+  if (!codes.includes(event.reasonCode)) errors['statusEvent.reasonCode'] = '사유 구분을 선택해 주세요.'
   const reason = event.reason.trim()
   if (!reason) errors['statusEvent.reason'] = '사유를 입력해 주세요.'
   else if (reason.length > 2000) errors['statusEvent.reason'] = '사유는 2,000자 이내로 입력해 주세요.'

@@ -242,7 +242,7 @@ test('신규 지급의 실제 입력은 이동 취소 시 유지하고 명시적
   await expect(page.getByRole('heading', { name: '지급 건 등록, 귀속, 확정' })).toBeVisible()
   await page.locator('#bizKey').fill('UNSAVED-UI-ONLY')
   await page.getByRole('link', { name: 'FGC 업무 대시보드' }).click()
-  await expect(page.getByRole('dialog', { name: '저장하지 않은 입력이 있어요' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '저장하지 않은 입력이 있습니다' })).toBeVisible()
   await page.getByRole('button', { name: '현재 입력 유지하고 돌아가기' }).click()
   await expect(page.locator('#bizKey')).toHaveValue('UNSAVED-UI-ONLY')
   await page.getByRole('link', { name: 'FGC 업무 대시보드' }).click()

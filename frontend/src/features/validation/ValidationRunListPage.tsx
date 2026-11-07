@@ -63,7 +63,7 @@ export default function ValidationRunListPage() {
       cellClassName: 'tabular-nums',
       render: (r) => formatMonth(r.validationMonth),
     },
-    { key: 'runNo', label: '회차', sortable: true, width: '3.5rem', align: 'left', render: (r) => r.runNo },
+    { key: 'runNo', label: '실행 차수', sortable: true, width: '4.5rem', align: 'left', render: (r) => `${r.runNo}차` },
     {
       key: 'type',
       label: '실행 유형',
@@ -161,10 +161,10 @@ export default function ValidationRunListPage() {
 
       <CreateSection />
 
-      <section data-guide-feature="features.validation.validation-run-list-page.section" className="surface" aria-labelledby="vrun-list-title">
+      <section data-guide-feature="features.validation.validation-run-list-page.section" data-guide-target="validation.runs" className="surface" aria-labelledby="vrun-list-title">
         <ListHeader total={runs.data?.totalElements ?? 0} pageSize={20}>
           <h2 className="surface-title" id="vrun-list-title">
-            ② 실행 목록
+            실행 목록
           </h2>
         </ListHeader>
         <StatusFilter key={criteria.status} status={criteria.status} onSearch={(status) => update({ status })} />
@@ -204,7 +204,7 @@ function OpenLink({ run }: { run: ValidationRun }) {
     <Link data-guide-feature="features.validation.validation-run-list-page.link"
       className="button button-secondary vrun-row-button"
       to={month ? withMonth(to, month) : to}
-      aria-label={`${formatMonth(run.validationMonth)} ${run.runNo}회차 실행 열기`}
+      aria-label={`${formatMonth(run.validationMonth)} ${run.runNo}차 실행 열기`}
     >
       열기
     </Link>
@@ -236,7 +236,7 @@ function CreateSection() {
     onSuccess: async (created) => {
       void client.invalidateQueries({ queryKey: ['validation-runs'] })
       if (!mounted.current || !(await saveGuide.saved(Number(created.validationRunId))) || !mounted.current) return
-      toast(`${month} 검증월 ${created.runNo}회차 실행이 생성되었습니다.`, 'success')
+      toast(`${month} 검증월 ${created.runNo}차 실행이 생성되었습니다.`, 'success')
       const to = `/validation-runs/${created.validationRunId}`
       void navigate(shellMonth ? withMonth(to, shellMonth) : to)
     },
@@ -253,9 +253,9 @@ function CreateSection() {
   return (
     <section data-guide-feature="features.validation.validation-run-list-page.section-2" data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
       <header className="surface-header">
-        <ScreenHelp screenId="VRUN-W01" saveGuide={saveGuide} />
+        {canProcess ? <ScreenHelp screenId="VRUN-W01" saveGuide={saveGuide} /> : <ScreenHelp screenId="VRUN-W01" variant="reader" />}
         <h2 className="surface-title" id="vrun-create-title">
-          ① 새 실행 만들기
+          새 실행 만들기
         </h2>
       </header>
       <form data-guide-feature="features.validation.validation-run-list-page.form" className="vrun-create-form search-conditions" onSubmit={submit}>

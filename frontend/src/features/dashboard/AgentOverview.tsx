@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { DataTable } from '../../components/DataTable'
+import { EvidenceLink } from '../../components/EvidenceLink'
 import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
@@ -113,7 +114,7 @@ export function AgentOverview({ month }: { month: string }) {
     >
       <header className="surface-header agent-overview-header">
         <h2 id="agent-overview-title" className="surface-title">
-          GA·설계사 현황
+          GA·설계사 현황 {data?.basis && <EvidenceLink label="현황 집계 기준" icon="help">{data.basis}</EvidenceLink>}
         </h2>
         <div className="agent-overview-basis">
           <Field label="현황 기준일" className="agent-overview-date">
@@ -207,7 +208,6 @@ export function AgentOverview({ month }: { month: string }) {
               />
             </section>
           </div>
-          <p className="agent-overview-note">{data?.basis}</p>
         </div>
       )}
       <AgentSearch

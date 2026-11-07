@@ -26,7 +26,7 @@ const policies: Policy[] = [
     policyName: '가정 정책',
     versionNo: 2,
     sourceClass: 'PROJECT_ASSUMPTION',
-    sourceClassLabel: '프로젝트 가정',
+    sourceClassLabel: '자체 기준',
     regulationRefs: [],
   },
 ]
@@ -175,16 +175,16 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   expect(request.mock.calls.some(([p]) => /policies\/\d/.test(p))).toBe(false)
   expect(screen.queryByRole('columnheader', { name: /^근거$/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /근거 표시/ })).not.toBeInTheDocument()
-  expect(screen.getByText('프로젝트 가정')).toHaveClass('status-badge-warning')
+  expect(screen.getByText('자체 기준')).toHaveClass('status-badge-warning')
   await user.click(screen.getByRole('tab', { name: '관리 상세' }))
   await user.click(await screen.findByRole('tab', { name: '근거 자료' }))
-  await user.click(screen.getByRole('button', { name: 'REG-08 근거 정보' }))
+  await user.click(screen.getByRole('button', { name: '초년도 1,200%룰 근거 정보' }))
   expect(await screen.findByRole('tooltip')).toHaveTextContent('정책 근거 설명')
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
   await screen.findByText('650.1')
   expect(screen.getByText('1 ~ 12회차')).toBeVisible()
   expect(screen.getByText('-1,234')).toHaveClass('is-negative-amount')
-  await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
+  await user.click(screen.getByRole('tab', { name: '1,200% 한도 규칙' }))
   await screen.findByText('89.1')
   expect(screen.getByText('12.0')).toBeVisible()
   expect(screen.getByText('증빙 확인')).toBeVisible()
@@ -193,9 +193,9 @@ it('POL uses month first day and fetches detail lazily; preserves selection acro
   expect(screen.getByText('1,200% 한도 가산에 쓰는 값')).toBeVisible()
   expect(router.state.location.search).toContain('policyVersionId=1')
   await user.click(screen.getByRole('tab', { name: '정책 버전' }))
-  await user.click(screen.getByRole('radio', { name: 'POL-2 v2 선택' }))
+  await user.click(screen.getByRole('radio', { name: '가정 정책 v2 선택' }))
   expect(router.state.location.search).toContain('policyVersionId=2')
-  expect(screen.getByRole('radio', { name: 'POL-2 v2 선택' })).toBeChecked()
+  expect(screen.getByRole('radio', { name: '가정 정책 v2 선택' })).toBeChecked()
 })
 it('POL restores detail tab and selected id from a shared URL', async () => {
   const { request } = mount('/policies?asOf=2026-07-11&tab=refund&policyVersionId=2')
@@ -246,7 +246,7 @@ it('POL 직급을 한글로 표시하고 GA 수령과 누락·미등록 값을 �
   ])
   expect(table.querySelector('NEW_RANK')).toBeNull()
   expect(within(table).getAllByText('650.1')).toHaveLength(rankInputs.length)
-  await user.click(screen.getByRole('tab', { name: '1,200% 룰셋' }))
+  await user.click(screen.getByRole('tab', { name: '1,200% 한도 규칙' }))
   await screen.findByText('89.1')
   await user.click(screen.getByRole('tab', { name: '수수료 규칙' }))
   expect(await screen.findByText('지사장')).toBeVisible()
@@ -264,7 +264,7 @@ it('POL asOf changes query and clears selected id while retaining month/tab', as
 it('POL management shows existing read-only rules without an edit document', async () => {
   mount('/policies?tab=management&policyVersionId=1')
   expect(await screen.findByRole('table', { name: '수수료 규칙' })).toBeVisible()
-  expect(screen.getByRole('table', { name: '선택 정책의 1,200% 룰셋' })).toBeVisible()
+  expect(screen.getByRole('table', { name: '선택 정책의 1,200% 한도 규칙' })).toBeVisible()
   expect(screen.getByRole('table', { name: '보험상품 차월별 예상 해약환급률' })).toBeVisible()
   expect(screen.getByText('650.1')).toBeVisible()
   expect(screen.getByText('34.5%')).toBeVisible()

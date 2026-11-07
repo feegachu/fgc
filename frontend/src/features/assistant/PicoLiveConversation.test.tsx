@@ -65,8 +65,8 @@ it('mounts with AI opt-in, calls the server and renders AI evidence distinct fro
   await open()
   await send()
   expect(await screen.findByText(reply.message)).toBeInTheDocument()
-  expect(screen.getByText('AI 가이드 답변')).toBeInTheDocument()
-  expect(screen.getByText('지급 초안 저장 (v1.0)')).toBeInTheDocument()
+  expect(screen.getByText('AI 답변')).toBeInTheDocument()
+  expect(screen.getByText('지급 초안 저장')).toBeInTheDocument()
   expect(screen.queryByText('시연 질문 바꾸기')).not.toBeInTheDocument()
   expect(request).toHaveBeenCalledTimes(1)
   expect(request).toHaveBeenCalledWith(
@@ -87,8 +87,8 @@ it('shows fixed source explicitly when model is unavailable', async () => {
   render(<PicoAssistant canProcess />)
   await open()
   await send()
-  expect(await screen.findByText('시스템 안내')).toBeInTheDocument()
-  expect(screen.queryByText('AI 가이드 답변')).not.toBeInTheDocument()
+  expect(await screen.findByText('안내')).toBeInTheDocument()
+  expect(screen.queryByText('AI 답변')).not.toBeInTheDocument()
 })
 it('sends the previous question and AI answer when a follow-up asks where to select', async () => {
   const request = mockResponse()

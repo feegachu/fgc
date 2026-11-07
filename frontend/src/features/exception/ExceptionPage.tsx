@@ -13,9 +13,11 @@ import { ListPagination } from '../../components/ListPagination'
 import { ListHeader } from '../../components/ListHeader'
 import { StatusBadge } from '../../components/StatusBadge'
 import { dateTime, errorText, int, rateText, usageRate } from '../../lib/format'
+import { monthText } from '../../lib/screenText'
 import { formatSort, parseSort, sortBinding } from '../../lib/tableSort'
 import type { ShellContext } from '../../app/shell/AppShell'
 import { withMonth } from '../../stores/workspace'
+import { usePermission } from '../auth/useAuth'
 import { ActionPanel } from './ActionPanel'
 import { Disclosure } from './Disclosure'
 import {
@@ -55,6 +57,7 @@ function filtersFromParams(params: URLSearchParams): ExceptionFilters {
 
 /** 기존 예외 필터·조치 흐름을 유지하고 관리자 목록 헤더 간격을 공통 목록에 맞춘다. */
 export function ExceptionPage() {
+  const canHandle = usePermission('canHandleException')
   const [params, setParams] = useSearchParams()
   const filters = filtersFromParams(params)
   const selectedId = params.get('selected')
@@ -197,7 +200,7 @@ export function ExceptionPage() {
       width: '8rem',
       cellClassName: 'tabular-nums exception-disclosure-cell',
       render: (row) => {
-        const reference = sourceReference(row.sourceEntityType, row.sourceEntityId, row.contractNo)
+        const reference = sourceReference(row.sourceEntityType, row.contractNo)
         return row.sourceLink ? (
           <Disclosure
             singleLine
@@ -218,7 +221,7 @@ export function ExceptionPage() {
   return (
     <div className={`exception-page${revised ? ' list-page' : ''}`}>
       <header className="page-header">
-        <ScreenHelp screenId="EXCP-W01" />
+        {canHandle ? <ScreenHelp screenId="EXCP-W01" /> : <ScreenHelp screenId="EXCP-W01" variant="reader" />}
         <div className="page-header-copy">
           <h1 className="page-title">예외함</h1>
         </div>
@@ -316,7 +319,7 @@ export function ExceptionPage() {
               <section data-guide-feature="features.exception.exception-page.section-3" className="surface">
                 <div className="surface-header">
                   <span className="surface-title">검출 이력</span>
-                  <span className="text-secondary exception-card-note">실행별 증거는 고치거나 지울 수 없습니다</span>
+                  <span className="text-secondary exception-card-note">수정할 수 없는 기록입니다</span>
                 </div>
                 <div className="surface-body">
                   {selected ? (
@@ -329,7 +332,6 @@ export function ExceptionPage() {
               <section data-guide-feature="features.exception.exception-page.section-4" className="surface" data-guide-target="exception.action">
                 <div className="surface-header">
                   <span className="surface-title">처리</span>
-                  {selected && <span>#{selected.exceptionCaseId}</span>}
                 </div>
                 <div className="surface-body">
                   {selected ? (
@@ -342,7 +344,6 @@ export function ExceptionPage() {
               <section data-guide-feature="features.exception.exception-page.section-5" className="surface">
                 <div className="surface-header">
                   <span className="surface-title">처리 이력</span>
-                  <span className="text-secondary exception-card-note">기록만 쌓입니다. 고치거나 지울 수 없습니다</span>
                 </div>
                 <div className="surface-body">
                   {selected ? <History item={selected} /> : <p className="text-secondary exception-placeholder">-</p>}
@@ -364,12 +365,11 @@ function Occurrences({ item }: { item: ExceptionCase }) {
       {occurrences.map((occurrence) => (
         <li className="exception-history-item" key={occurrence.exceptionOccurrenceId}>
           <strong>
-            {(occurrence.validationMonth ?? '').slice(0, 7)}, {occurrence.runNo}회차, {occurrence.detectionLabel}
+            {monthText(occurrence.validationMonth)} {occurrence.runNo}차 실행, {occurrence.detectionLabel}
           </strong>
           <p className="text-secondary exception-occurrence-meta">
-            검증 실행 <span className="tabular-nums">{occurrence.validationRunId}</span>,{' '}
             <span className="tabular-nums">
-              {sourceReference(occurrence.sourceEntityType, occurrence.sourceEntityId, item.contractNo)}
+              {sourceReference(occurrence.sourceEntityType, item.contractNo)}
             </span>
           </p>
           {!!occurrence.evidenceItems?.length && (

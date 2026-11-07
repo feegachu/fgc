@@ -106,14 +106,6 @@ export const productColumns: TableColumn<Product>[] = [
     cellClassName: 'base-disclosure-cell',
     render: (r) => <ReferenceText value={r.productName} limit={28} />,
   },
-  {
-    key: 'standard',
-    label: '표준상품코드',
-    sortKey: 'standardProductCode',
-    sortable: true,
-    cellClassName: 'base-disclosure-cell',
-    render: (r) => <ReferenceText value={r.standardProductCode} limit={20} singleLine />,
-  },
   { key: 'group', label: '상품군', render: (r) => CATEGORY_LABEL[r.productGroupCode ?? ''] ?? present(r.productGroupCode) },
   {
     key: 'version',
@@ -250,12 +242,6 @@ const categories: Record<string, string> = {
   RECOVERY: '회수',
 }
 export const commissionColumns: TableColumn<CommissionItem>[] = [
-  {
-    key: 'code',
-    label: '항목코드',
-    cellClassName: 'base-disclosure-cell',
-    render: (r) => <ReferenceText value={r.itemCode} limit={18} singleLine />,
-  },
   {
     key: 'name',
     label: '항목명',

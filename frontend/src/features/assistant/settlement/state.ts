@@ -51,7 +51,7 @@ export function handoffFor(step: SettlementStep, role: string, canProcess: boole
   )
     return '현재 역할은 조회 안내만 가능합니다. 생성과 실행은 정산담당자나 시스템관리자에게 맡기세요.'
   if (step === 'exception.resolve' && !['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'].includes(role))
-    return '예외 조치와 원천 정정은 정산담당자, GA관리자, 시스템관리자에게 맡기세요. 현재 역할은 조회 안내만 가능합니다.'
+    return '예외 조치와 원래 건 정정은 정산담당자, GA관리자, 시스템관리자에게 맡기세요. 현재 역할은 조회 안내만 가능합니다.'
 }
 export interface Evidence {
   contract?: ContractDetail
@@ -107,14 +107,14 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     if (payment.status === 'CANCELLED')
       return { ...at(
         'exception.resolve',
-        '기존 지급이 취소되었습니다. 원천 정정 결과의 확정된 지급 번호를 선택한 뒤 새 월 검증을 실행하고 재대사 결과를 확인하세요.',
+        '기존 지급이 취소되었습니다. 원래 건 정정 결과의 확정된 지급 번호를 선택한 뒤 새 월 검증을 실행하고 재대사 결과를 확인하세요.',
       ), correctionPending: true }
     if (payment.status !== 'DRAFT') throw new Error('현재 지급 상태는 이 흐름에서 처리할 수 없습니다.')
     if (evidence.paymentGuide && !evidence.paymentGuide.saved)
       return at('payment.draft', '변경된 입력을 실제 저장한 뒤 이어가세요.')
     if (!evidence.paymentGuide?.prechecked)
-      return at('payment.precheck', '현재 저장본의 사전검증을 직접 실행하세요. 이전에 한 검증은 다시 쓰지 않습니다.')
-    return at('payment.confirm', '실제 확정 버튼으로 지급을 확정하세요.')
+      return at('payment.precheck', '현재 저장한 내용의 사전검증을 실행하세요. 이전에 한 검증은 다시 쓰지 않습니다.')
+    return at('payment.confirm', '확정 버튼으로 지급을 확정하세요.')
   }
   if (selection.validationRunId && selection.invalidatedValidationRunIds?.includes(selection.validationRunId))
     throw new Error('정정 전 검증 실행은 재사용할 수 없습니다. 새 월 검증을 생성하고 실행한 뒤 선택하세요.')
@@ -156,14 +156,14 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     return at(
       'validation.execute',
       run.status === 'FAILED'
-        ? '월 통합검증이 실패했습니다. 실패 원인과 기존 재시작 기능을 확인하세요.'
+        ? '월 통합검증이 실패했습니다. 실패 원인과 재시작 기능을 확인하세요.'
         : '월 통합검증 계산이 끝나지 않았습니다. 실행 전이면 실행을 누르고, 계산이 끝나면 다시 확인하세요.',
     )
   const recon = evidence.reconciliation
   if (!recon)
     return at(
       'reconciliation.review',
-      '이 검증 실행의 기존 대사 결과를 선택하세요. 필요한 실행은 업무 화면에서 직접 수행하세요.',
+      '이 검증 실행의 기존 대사 결과를 선택하세요. 필요한 실행은 업무 화면에서 수행하세요.',
     )
   if (
     !evidence.contract.insurerId ||
@@ -195,7 +195,7 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
   if (summary.exceptionCount > 0 || summary.matchedCount !== summary.resultCount || evidence.openExceptions > 0)
     return at(
       'exception.resolve',
-      '불일치나 미해결 예외가 있습니다. 원천을 정정하고 필요한 재검증과 재대사를 직접 수행한 뒤 새 결과를 선택하세요.',
+      '불일치나 미해결 예외가 있습니다. 원래 건을 정정하고 필요한 재검증과 재대사를 수행한 뒤 새 결과를 선택하세요.',
     )
   if (!['GA_ADMIN', 'SYSTEM_ADMIN'].includes(role))
     return at(
@@ -211,5 +211,5 @@ export function decide(selection: Selection, evidence: Evidence, role: string): 
     checklist.conditions.some((condition) => condition.passed !== true)
   )
     return at('validation.finalize', '최종 확정 조건 8개를 확인하고 차단 사유를 처리하세요.')
-  return at('validation.finalize', '8개 조건을 통과했습니다. 기존 최종 확정 버튼으로 직접 확정하세요.')
+  return at('validation.finalize', '8개 조건을 통과했습니다. 최종 확정 버튼으로 직접 확정하세요.')
 }

@@ -25,6 +25,7 @@ import {
   policyTypes,
   PolicyPreviewContext,
   refLabel,
+  refLabels,
   ruleCount,
   safeSourceUrl,
   sourceReferenceNotice,
@@ -52,7 +53,7 @@ const historyLabels: Record<string, string> = {
   ...actionLabels,
   CREATE: '초안 등록',
   UPDATE: '초안 수정',
-  RETIRE: '승계로 종료',
+  RETIRE: '새 버전으로 교체되어 종료',
 }
 const panels = [
   { id: 'rules', label: '설정 규칙' },
@@ -143,7 +144,7 @@ export function PolicyManagement({
           <div>
             <dt>계약일 적용 기간</dt>
             <dd>
-              {successorRef ? '정정/승계로 계산 적용에서 제외됨' : '현재 계산 적용 대상 아님'}
+              {successorRef ? '새 버전으로 교체되어 계산에서 제외' : '현재 계산 적용 대상 아님'}
               {successorRef && <small>{refLabel(successorRef, versions)}</small>}
             </dd>
           </div>
@@ -256,7 +257,7 @@ export function PolicyManagement({
                       <small>
                         {entry.actor}
                         {entry.evidenceRefs?.length
-                          ? `, ${entry.evidenceRefs.map((ref) => refLabel(ref, versions)).join(', ')}`
+                          ? entry.evidenceRefs.map((ref) => refLabel(ref, versions)).filter(Boolean).map((label) => `, ${label}`).join('')
                           : ''}
                       </small>
                     </div>
@@ -314,9 +315,10 @@ export function PolicySources({
   offerings?: OfferingGovernance[]
   policyVersionId?: number
 }) {
-  const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref))
+  // 번호만 있는 출처 자료도 건수와 근거 정보에는 남긴다. 번호는 보이지 않고 근거 정보에서 제목을 읽는다.
+  const missing = refs.filter((ref) => !sources.some((s) => s.ref === ref) && !/^D-\d/.test(ref))
   const referenceInfo = (ref: string) => policyVersionId != null && (
-    <EvidenceLink icon label={`${refLabel(ref)} 근거 정보`}>
+    <EvidenceLink icon label={`${refLabel(ref) || '출처'} 근거 정보`}>
       <PolicyReferenceInfo policyVersionId={policyVersionId} refText={ref} />
     </EvidenceLink>
   )
@@ -341,7 +343,7 @@ export function PolicySources({
             description
           </span>
           <div>
-            <StatusBadge tone={source.ref.startsWith('REG-') ? 'info' : 'neutral'}>{refLabel(source.ref)}</StatusBadge>
+            {refLabel(source.ref) && <StatusBadge tone={source.ref.startsWith('REG-') ? 'info' : 'neutral'}>{refLabel(source.ref)}</StatusBadge>}
             {referenceInfo(source.ref)}
             <SourceStatusTags tags={source.statusTags} />
             <h4>{source.title}</h4>
@@ -357,7 +359,7 @@ export function PolicySources({
       {missing.map((ref) => (
         <article className="policy-source-card" key={ref}>
           <div>
-            <StatusBadge>{refLabel(ref)}</StatusBadge>
+            <StatusBadge>{refLabel(ref) || '출처 자료'}</StatusBadge>
             {referenceInfo(ref)}
             <SourceStatusTags />
             <p>등록된 제목, 설명, 링크가 없습니다.</p>
@@ -434,7 +436,7 @@ function ReadOnlyRuleSummary({ detail }: { detail: ManagedPolicyDetail }) {
       )}
       {caps.length > 0 && (
         <section data-guide-feature="features.policies.policy-management.section-2">
-          <h3 className="policy-detail-title">1,200% 룰셋</h3>
+          <h3 className="policy-detail-title">1,200% 한도 규칙</h3>
           <CapRuleSets rows={caps} />
         </section>
       )}
@@ -475,7 +477,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             {
               key: 'stage',
               label: '지급단계',
-              render: (r) => (r.paymentStage === 'INSURER_TO_GA' ? '원수사→GA' : 'GA→설계사'),
+              render: (r) => (r.paymentStage === 'INSURER_TO_GA' ? '보험회사→GA' : 'GA→설계사'),
             },
             {
               key: 'product',
@@ -521,7 +523,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
         <section data-guide-feature="features.policies.policy-management.section-4" key={i} className="policy-regime-summary">
           <header>
             <StatusBadge tone="info">{rule.feeRegimeCode === 'FOUR_YEAR_2027' ? '4년 분급' : '7년 분급'}</StatusBadge>
-            <h4>분급 룰셋 {i + 1}</h4>
+            <h4>분급 규칙 {i + 1}</h4>
             {rule.reviewRequiredYn && <StatusBadge tone="warning">검토필요</StatusBadge>}
           </header>
           <dl className="policy-metadata">
@@ -559,7 +561,7 @@ function DraftRuleSummary({ draft, detail }: { draft: DraftDocument; detail: Man
             </div>
             <div>
               <dt>근거</dt>
-              <dd>{rule.sourceRefs.map((ref) => refLabel(ref)).join(', ') || '-'}</dd>
+              <dd>{refLabels(rule.sourceRefs).join(', ') || '-'}</dd>
             </div>
           </dl>
         </section>
@@ -749,16 +751,12 @@ function PolicyActionDialog({
     >
       <p className="policy-section-description">
         {newVersion
-          ? '기존 정책의 규칙과 근거를 복사합니다. 새 적용일 당일부터 체결한 계약에 변경 요율을 적용합니다. 그 이전 계약은 재계산할 때도 기존 버전과 요율을 유지합니다. 새 적용일은 내일 이후로 지정하며, 아직 적용 전인 미래 버전은 같은 적용일로 정정할 수 있습니다.'
+          ? '새 적용일부터 체결한 계약에만 바뀐 요율을 적용합니다. 이전 계약은 그대로입니다. 새 적용일은 내일 이후로 지정하세요.'
           : action === 'REJECT'
             ? '반려하면 작성자가 초안을 다시 수정할 수 있습니다.'
             : `아래 정책의 정보와 작업 사유를 확인한 후 ${label}하세요.`}
       </p>
       <dl className="policy-confirm-summary">
-        <div>
-          <dt>정책코드</dt>
-          <dd>{policy.policyCode}</dd>
-        </div>
         <div>
           <dt>정책명</dt>
           <dd>{policy.policyName}</dd>
@@ -776,7 +774,7 @@ function PolicyActionDialog({
           </dd>
         </div>
         <div>
-          <dt>규칙 행 수</dt>
+          <dt>규칙 수</dt>
           <dd>{detail.editDocument ? `${ruleCount(detail.editDocument)}개` : '-'}</dd>
         </div>
       </dl>
@@ -828,7 +826,7 @@ function PolicyActionDialog({
       {action === 'ACTIVATE' && (
         <p className="policy-notice policy-notice-warning">
           이 버전의 적용일 당일부터 체결한 계약에 새 기준을 적용합니다. 이전 계약은 기존 버전과 요율을 유지합니다.
-          승계에 실패하면 기존 버전을 유지합니다.
+          새 버전 적용에 실패하면 기존 버전을 유지합니다.
         </p>
       )}
     </Modal>

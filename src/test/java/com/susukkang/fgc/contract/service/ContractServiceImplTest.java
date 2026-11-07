@@ -668,7 +668,7 @@ class ContractServiceImplTest {
 
         assertThat(contractService.recheckCap(21L)).isEmpty();
 
-        verify(scheduleService).registerCapRuleReview(21L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 룰셋이 없습니다.");
+        verify(scheduleService).registerCapRuleReview(21L, PaymentStage.GA_TO_FC, "적용 가능한 1,200% 한도 규칙이 없습니다.");
         verify(auditLogService).record(any());
     }
 

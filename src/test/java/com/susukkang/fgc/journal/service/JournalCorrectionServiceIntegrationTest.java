@@ -376,12 +376,12 @@ class JournalCorrectionServiceIntegrationTest {
 
         var rejected = journalCorrectionExceptionService.createOrGet(
                 originalId,
-                new JournalCorrectionExceptionRequest("오탐 검토", "DOC-REJECTED"),
+                new JournalCorrectionExceptionRequest("예외 아님 검토", "DOC-REJECTED"),
                 ACTOR_ID);
         exceptionCaseService.action(
                 rejected.exceptionCaseId(),
                 new ExceptionActionRequest(
-                        ExceptionActionType.START_REVIEW, "오탐 여부 검토", null),
+                        ExceptionActionType.START_REVIEW, "예외 아님 여부 검토", null),
                 ACTOR_ID,
                 loginId);
         exceptionCaseService.action(

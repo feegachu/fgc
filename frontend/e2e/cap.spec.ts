@@ -104,14 +104,14 @@ test('필터 URL·계산근거·Escape 닫기·딥링크를 확인한다', async
   await expect(page).toHaveURL(/contractNo=C-2026-0001/)
   await table.getByRole('button', { name: 'C-2026-0001 계산근거 열기' }).click()
   const dialog = page.getByRole('dialog', { name: '계산근거' })
-  await expect(dialog.getByText('① 입력값')).toBeVisible()
+  await expect(dialog.getByText('입력값')).toBeVisible()
   await expect(dialog.getByRole('table', { name: '항목별 산입 내역' })).toBeVisible()
   await expect(dialog.getByRole('link', { name: '예외 목록 보기' })).toHaveAttribute('href', '/exceptions')
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
   await expect(page).not.toHaveURL(/capCheckId/)
   await page.goto('cap-checks?capCheckId=11')
-  await expect(dialog.getByText('① 입력값')).toBeVisible()
+  await expect(dialog.getByText('입력값')).toBeVisible()
 })
 
 test('잘못된 상세 딥링크는 목록을 막지 않는다', async ({ page }) => {

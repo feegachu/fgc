@@ -119,7 +119,7 @@ it('rows support keyboard activation and timeline uses stored excess without rec
   rows[1].focus()
   await user.keyboard('{Enter}')
   expect(rows[1]).toHaveAttribute('aria-selected', 'true')
-  const detail = screen.getByRole('region', { name: '④ 상세' })
+  const detail = screen.getByRole('region', { name: '상세' })
   expect(within(detail).getByText('2026-07-01, 7개월')).toBeVisible()
   const cells = within(detail).getByRole('table').querySelectorAll('tbody tr td:first-child')
   expect([...cells].map((cell) => cell.textContent)).toEqual(['2026-07-01', '2026-07-31'])
@@ -311,7 +311,7 @@ it('insurer-to-GA rows remain readable but cannot invoke the GA-only manual API'
   const { request } = mount('/arbitrage-checks?month=2026-07&stage=INSURER_TO_GA', true, (p) =>
     p.includes('/insurers')
       ? fixtures(p)
-      : result([{ ...row, paymentStage: 'INSURER_TO_GA', paymentStageLabel: '원수사→GA' }], 1, 1),
+      : result([{ ...row, paymentStage: 'INSURER_TO_GA', paymentStageLabel: '보험회사→GA' }], 1, 1),
   )
   await screen.findByText('서버 판정 근거')
   expect(screen.getByText('이 계약만 다시 검증은 GA→설계사 단계에서만 할 수 있습니다.')).toBeVisible()
@@ -329,7 +329,7 @@ it('negative money uses common minus/red and displays stored excess independentl
   for (const amount of screen.getAllByText('-1,234원')) expect(amount).toHaveClass('is-negative-amount')
   await screen.findByRole('img', { name: '기준일별 초과액 추이' })
   for (const amount of screen.getAllByText('-987원')) expect(amount).toHaveClass('is-negative-amount')
-  const stored = screen.getByRole('region', { name: '④ 상세' }).querySelector<HTMLElement>('.arb-calculation')!
+  const stored = screen.getByRole('region', { name: '상세' }).querySelector<HTMLElement>('.arb-calculation')!
   expect(within(stored).getByText('지급분 기준 초과액')).toBeVisible()
   expect(within(stored).getByText('-987원')).toHaveClass('is-negative-amount')
 })
@@ -404,7 +404,7 @@ it('판정 근거의 서버 원문은 화면에서 쉬운 말로 바꾸고 앞�
   mount(undefined, true, (path) => (path.includes('/insurers') ? fixtures(path) : result([raw], 1, 1)))
   expect(await screen.findByText('자료부족: 기준일 이전 계약 금액 자료가 없습니다.')).toBeVisible()
   expect(screen.queryByText(/금융 스냅샷/)).not.toBeInTheDocument()
-  expect(decisionReasonText('FGC-CAP-004: 적용 가능한 1,200% 룰셋이 없습니다')).toBe('적용 가능한 1,200% 룰셋이 없습니다')
+  expect(decisionReasonText('FGC-CAP-004: 적용 가능한 1,200% 한도 규칙이 없습니다')).toBe('적용 가능한 1,200% 한도 규칙이 없습니다')
   expect(decisionReasonText('FGC-CAP-002 / FGC-COMMON-004')).toBe('자동 처리 중 오류가 기록되었습니다. 계약 자료를 확인하세요.')
   expect(decisionReasonText('FGC-FGL01-202607-0001 계약 금액 확인')).toBe('FGC-FGL01-202607-0001 계약 금액 확인')
   expect(decisionReasonText('해약환급금 스냅샷 값이 없습니다.')).toBe('해약환급금 자료가 없습니다.')

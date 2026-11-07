@@ -635,7 +635,7 @@ class AuthTokenApiIntegrationTest {
                         "amount", 500000,
                         "inclusionDecisionStatus", "INCLUDED",
                         "exclusionType", "NONE",
-                        "inclusionDecisionReason", "룰셋 산입",
+                        "inclusionDecisionReason", "규칙 산입",
                         "allocationBasis", "DIRECT",
                         "evidenceRef", "EVIDENCE-001",
                         "attributionMethod", "DIRECT")))));

@@ -25,7 +25,7 @@ export const paymentCycleLabels = {
 } satisfies Record<Schema['ContractCreateRequest']['paymentCycleCode'], string>
 
 export const dataOriginLabels = {
-  SEED: '초기 자료',
+  SEED: '기존 자료',
   NORMALIZED_DB: '보험사 자료',
   MANUAL: '직접 입력',
 } satisfies Record<NonNullable<Schema['ContractView']['dataOrigin']>, string>
@@ -71,17 +71,17 @@ export const eventFollowUpLabels = {
   PENDING: '처리 대기',
   PROCESSING: '처리 중',
   FAILED: '실패, 재시도 대기',
-  EXHAUSTED: '자동 재시도 소진',
+  EXHAUSTED: '자동 처리 실패',
   SUCCEEDED: '완료',
 } satisfies Record<NonNullable<Schema['EventFollowUp']['status']>, string>
 
 /** 영향이 0건일 때 그 이유. 조회 오류나 아직 끝나지 않은 처리를 0건으로 읽지 않게 후속 상태별로 다르게 쓴다. */
 export const followUpEmptyEffects = {
-  NOT_REQUIRED: '이 사건은 후속 처리 대상이 아니라 영향이 없습니다.',
+  NOT_REQUIRED: '이 변경은 후속 처리 대상이 아니라 영향이 없습니다.',
   PENDING: '후속 처리 대기 중입니다. 처리가 끝나면 영향이 표시됩니다.',
   PROCESSING: '후속 처리 중입니다. 처리가 끝나면 영향이 표시됩니다.',
   FAILED: '후속 처리에 실패해 영향이 기록되지 않았습니다. 자동 재시도를 기다립니다.',
-  EXHAUSTED: '자동 재시도를 모두 써서 영향이 기록되지 않았습니다. 운영 담당 확인이 필요합니다.',
+  EXHAUSTED: '자동 처리에 실패해 영향이 기록되지 않았습니다. 담당자에게 문의하세요.',
   SUCCEEDED: '후속 처리를 마쳤고 바뀐 대상이 없습니다.',
 } satisfies Record<keyof typeof eventFollowUpLabels, string>
 
@@ -125,7 +125,7 @@ export const paymentStatusLabels: Record<string, string> = {
   CANCELLED: '취소',
 }
 
-export const effectEntityLabels: Record<string, string> = { PAYMENT: '지급 건', SCHEDULE_LINE: '스케줄 회차' }
+export const effectEntityLabels: Record<string, string> = { PAYMENT: '지급 건', SCHEDULE_LINE: '예상 스케줄 회차' }
 /** IF-API-89 상태. 지급 보류(payment_hold)와 회차 보류, 회차 중단은 다른 일이라 같은 말로 쓰지 않는다. */
 const effectStates: Record<string, Record<string, string>> = {
   PAYMENT: { ...paymentStatusLabels, HELD: '지급 보류', RELEASED: '보류 해제' },

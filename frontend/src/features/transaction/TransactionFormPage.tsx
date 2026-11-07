@@ -7,6 +7,7 @@ import { useWorkflowGuide } from '../assistant/workflow-state'
 import { connectPaymentGuideLaunch } from './payment-guide-launch'
 import { nameWithCode } from '../../lib/screenText'
 import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
+import { EvidenceLink } from '../../components/EvidenceLink'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -391,10 +392,10 @@ function TransactionForm({
       next.agentId = ''
       next.commissionItemId = ''
       setRows([])
-      toast('지급단계가 변경되어 수수료 항목과 귀속행을 초기화했습니다.', 'warning')
+      toast('지급단계가 변경되어 수수료 항목과 귀속 내역을 초기화했습니다.', 'warning')
     } else if (patch.agentId !== undefined && patch.agentId !== form.agentId) {
       setRows([])
-      if (rows.length) toast('수령 설계사가 변경되어 기존 귀속행을 비웠습니다. 계약을 다시 선택하세요.', 'warning')
+      if (rows.length) toast('수령 설계사가 변경되어 기존 귀속 내역을 비웠습니다. 계약을 다시 선택하세요.', 'warning')
     } else if (patch.settlementMonth !== undefined) {
       next.agentId = ''
     } else {
@@ -507,7 +508,7 @@ function TransactionForm({
         checked.paymentId !== Number(paymentId) ||
         (before && after && !observer.acceptPrecheck(operation, before, checked, after))
       )
-        throw new Error('지급 저장본이 변경되어 검증 결과를 사용할 수 없습니다. 초안을 다시 확인하세요.')
+        throw new Error('저장한 내용이 바뀌어 검증 결과를 쓸 수 없습니다. 초안을 다시 확인하세요.')
       if (!before || !after) observer.fail(operation)
       setResult(checked)
       toast(
@@ -637,12 +638,11 @@ function TransactionForm({
         </span>
         <div>
           <h2 className="guidance-title" id="transaction-boundary-title">
-            초년도는 계약일부터 1주년 전날까지입니다
+            초년도는 계약일부터 1주년 전날까지입니다{' '}
+            <EvidenceLink label="초년도 판단 기준" icon="help">
+              회차가 아니라 귀속일로 판단합니다. 13회차로 미뤄도 한도를 피할 수 없습니다.
+            </EvidenceLink>
           </h2>
-          <p className="guidance-copy">
-            계약일이 2026-07-18이면 귀속일 2027-07-17까지 초년도이고, 2027-07-18부터는 아닙니다. 회차 번호가 아닌
-            귀속일로 판단하므로 초년도 지급을 13회차로 미뤄도 한도를 피할 수 없습니다.
-          </p>
         </div>
       </aside>
       {(loading || referenceError) && (
@@ -671,7 +671,7 @@ function TransactionForm({
         </div>
       )}
       {missingEvidence && (
-        <p role="status">{newcomer ? '신규 설계사 지원 건은 모든 귀속행에 증빙을 입력해야 합니다.' : '제외 귀속행은 제외유형과 증빙을 입력해야 합니다.'}</p>
+        <p role="status">{newcomer ? '신규 설계사 지원 건은 모든 귀속 내역에 증빙을 입력해야 합니다.' : '제외 귀속 내역은 제외유형과 증빙을 입력해야 합니다.'}</p>
       )}
       {locked && !confirmed && (
         <div id="draft-lock-notice" className="guidance guidance-neutral transaction-lock-notice" role="status">
@@ -687,7 +687,7 @@ function TransactionForm({
       <ResizableSplit
         className="transaction-form-layout"
         storageKey="transaction-form-workspace"
-        label="지급 건, 귀속행과 확정 점검 카드 너비"
+        label="지급 건, 귀속 내역과 확정 점검 카드 너비"
         defaultRatio={61}
         id="main-grid"
       >
@@ -699,7 +699,7 @@ function TransactionForm({
           >
             <header className="surface-header transaction-surface-header">
               <h2 className="surface-title" id="transaction-input-title">
-                ① 지급 건
+                지급 건
               </h2>
               <span id="tx-status">
                 <StatusBadge tone={confirmed ? 'success' : 'neutral'}>
@@ -716,10 +716,10 @@ function TransactionForm({
                   onChange={(event) => changeForm({ paymentStage: event.target.value as FormValues['paymentStage'] })}
                 >
                   <option value="GA_TO_FC">GA→설계사</option>
-                  <option value="INSURER_TO_GA">원수사→GA</option>
+                  <option value="INSURER_TO_GA">보험회사→GA</option>
                 </select>
               </Field>
-              <Field label="원천유형" required error={fieldMessage('sourceType')}>
+              <Field label="자료 구분" required error={fieldMessage('sourceType')}>
                 <select data-guide-feature="features.transaction.transaction-form-page.source-type" id="sourceType" value={SOURCE_TYPE} disabled={inputDisabled} onChange={() => {}}>
                   <option value={SOURCE_TYPE}>GA 수기지급</option>
                 </select>
@@ -727,7 +727,7 @@ function TransactionForm({
               <Field
                 label="지급 관리번호"
                 required
-                helper="같은 원천유형 안에서 중복될 수 없습니다."
+                helper="같은 자료 구분 안에서 중복될 수 없습니다."
                 error={fieldMessage('bizKey')}
               >
                 <input data-guide-feature="features.transaction.transaction-form-page.biz-key"
@@ -792,7 +792,7 @@ function TransactionForm({
               <Field
                 label="금액 (원)"
                 required
-                helper="금액은 0 이상으로 입력하고 지급/차감은 흐름으로 구분합니다."
+                helper="금액은 0 이상으로 입력하세요."
                 error={fieldMessage('amount')}
               >
                 <input data-guide-feature="features.transaction.transaction-form-page.amount"
@@ -807,7 +807,7 @@ function TransactionForm({
                   onChange={(event) => changeForm({ amount: event.target.value })}
                 />
               </Field>
-              <Field label="흐름" required>
+              <Field label="지급/차감" required>
                 <select data-guide-feature="features.transaction.transaction-form-page.cashflow"
                   id="cashflow"
                   value={form.cashflowType}
@@ -820,7 +820,7 @@ function TransactionForm({
               </Field>
               <Field
                 label="증빙"
-                helper="귀속행에서 제외를 고르면 증빙이 반드시 필요합니다."
+                helper="귀속 내역에서 제외를 고르면 증빙이 반드시 필요합니다."
                 error={fieldMessage('evidence')}
               >
                 <input data-guide-feature="features.transaction.transaction-form-page.evidence"

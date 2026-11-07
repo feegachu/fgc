@@ -508,7 +508,7 @@ it('rechecks server evidence after saving a terminal exception action removes ex
   document.querySelector('#main-content')!.append(form)
   await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
   await actor.click(screen.getByRole('button', { name: '안내 시작' }))
-  await waitFor(() => expect(screen.queryByText('현재 서버 결과를 확인하고 있습니다.')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.queryByText('최신 결과를 확인하고 있습니다.')).not.toBeInTheDocument())
   await act(async () => { void router.navigate('/exceptions?selected=7') })
   for (let i = 0; i < 4; i++) {
     await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())

@@ -139,7 +139,8 @@ class ClawbackNoticeDocumentIntegrationTest {
         // 1000.4→1000 ×50% = 500. 금액·비율·정책은 계산판 snapshot 그대로다.
         String text = text(file.content());
         assertThat(text).contains("환수 통지서", document.documentNo(), contractNo, "1,000원", "50%", "500원",
-                "계약 실효", "2026-04-01", calc.policyCode());
+                "계약 실효", "2026-04-01", "통지서 검증 정책 v1");
+        assertThat(text).doesNotContain(calc.policyCode());
         assertThat(caseState(calc.caseId())).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM fgc.clawback_notice_delivery WHERE clawback_case_id=?",
                 Long.class, calc.caseId())).isZero();

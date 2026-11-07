@@ -86,7 +86,7 @@ class ContractControllerTest {
                 .productName("가상 건강보장보험 A")
                 .contractDate(LocalDate.of(2026, 8, 6))
                 .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
-                .agentIdName("FC-0001 서본부")
+                .agentIdName("서본부 (A-FC-001)")
                 .contractStatus(ACTIVE)
                 .capResultStatus(CapResultStatus.NORMAL)
                 .dataOrigin(DataOrigin.MANUAL)

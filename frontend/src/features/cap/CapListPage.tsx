@@ -192,12 +192,6 @@ export default function CapListPage() {
       align: 'number',
       render: (row) => <Amount value={row.remainingAmount} />,
     },
-    {
-      key: 'ruleset',
-      label: '룰셋 버전',
-      width: '6rem',
-      render: (row) => (row.capRuleSetId == null ? '-' : `${row.capRuleSetId}번`),
-    },
   ]
   return (
     <div className="cap-react-page list-page">

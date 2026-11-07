@@ -1,6 +1,6 @@
 export const JOURNAL_TYPE = {
-  EXPECTED_INSURER_INCOME: '예상 수입(원수사→GA)',
-  ACTUAL_INSURER_STATEMENT: '실제 명세(원수사)',
+  EXPECTED_INSURER_INCOME: '예상 수입(보험회사→GA)',
+  ACTUAL_INSURER_STATEMENT: '실제 명세(보험회사)',
   EXPECTED_FC_PAYOUT: '예상 지급(GA→설계사)',
   CONFIRMED_FC_PAYOUT: '확정 지급(GA→설계사)',
   ADJUSTMENT: '조정',

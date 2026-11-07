@@ -56,9 +56,9 @@ describe('transaction draft and attribution contract', () => {
     })
   })
   it('rejects missing rows, negative amounts, exclusion evidence and approved allocation basis', () => {
-    expect(() => buildPayload(form, [], false)).toThrow('귀속행을 하나 이상 추가하세요.')
+    expect(() => buildPayload(form, [], false)).toThrow('귀속 내역을 하나 이상 추가하세요.')
     expect(() => buildPayload({ ...form, amount: '-1' }, [row], false)).toThrow('금액')
-    expect(() => buildPayload(form, [{ ...row, decision: 'EXCLUDED:NEW_AGENT_SUPPORT' }], false)).toThrow('제외 귀속행')
+    expect(() => buildPayload(form, [{ ...row, decision: 'EXCLUDED:NEW_AGENT_SUPPORT' }], false)).toThrow('제외 귀속 내역')
     expect(() =>
       buildPayload(form, [{ ...row, attributionMethod: 'APPROVED_ALLOCATION', allocationBasis: ' ' }], false),
     ).toThrow('배부정책')

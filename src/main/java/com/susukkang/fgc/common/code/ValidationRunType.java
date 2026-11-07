@@ -19,8 +19,8 @@ public enum ValidationRunType {
     public String label() {
         return switch (this) {
             case MONTHLY -> "월간";
-            case MANUAL_CONTRACT -> "계약수동";
-            case PRE_CONFIRM -> "확정전";
+            case MANUAL_CONTRACT -> "계약별";
+            case PRE_CONFIRM -> "확정 전";
         };
     }
 
