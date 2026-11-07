@@ -23,13 +23,13 @@
 
 | 구분 | 대상 | 허용 | 조건부 허용 | 금지 | 확인 필요 |
 |---|---|---|---|---|---|
-| 백엔드 실행 의존성 (`runtimeClasspath`) | 136 | 128 | 8 | 0 | 0 |
+| 백엔드 실행 의존성 (`runtimeClasspath`) | 136 | 130 | 6 | 0 | 0 |
 | 프런트 운영 의존성 (`npm ls --omit=dev`) | 14 | 14 | 0 | 0 | 0 |
 | 실행 이미지 | 3 | 2 | 1 | 0 | 0 |
 | 폰트, 아이콘 | 4 | 4 | 0 | 0 | 0 |
 | 그림, 애니메이션 | 10 | 0 | 0 | 0 | 10 |
 
-**금지 라이선스는 없다.** 그림과 애니메이션은 팀원이 추가한 파일이라 제작 도구와 원본을 담당자에게 확인해야 한다(6장).
+**금지 라이선스는 없다.** 그림과 애니메이션은 팀원이 추가한 파일이라 제작 도구와 원본을 담당자에게 확인해야 한다(7장).
 
 ## 3. 조건부 허용 목록
 
@@ -37,10 +37,8 @@
 |---|---|---|---|
 | `ch.qos.logback:logback-classic` | 1.5.34 | EPL-1.0 OR LGPL-2.1 (이중 라이선스) | 수정하지 않고 jar로 링크 |
 | `ch.qos.logback:logback-core` | 1.5.34 | EPL-1.0 OR LGPL-2.1 (이중 라이선스) | 수정하지 않고 jar로 링크 |
-| `jakarta.annotation:jakarta.annotation-api` | 2.1.1 | EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 | 수정하지 않고 jar로 링크 |
-| `jakarta.inject:jakarta.inject-api` | 2.0.1 | EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 | 수정하지 않고 jar로 링크 |
-| `jakarta.persistence:jakarta.persistence-api` | 3.1.0 | EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 | 수정하지 않고 jar로 링크 |
-| `jakarta.transaction:jakarta.transaction-api` | 2.0.1 | EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0 | 수정하지 않고 jar로 링크 |
+| `jakarta.annotation:jakarta.annotation-api` | 2.1.1 | EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0 | 수정하지 않고 jar로 링크 |
+| `jakarta.transaction:jakarta.transaction-api` | 2.0.1 | EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0 | 수정하지 않고 jar로 링크 |
 | `org.aspectj:aspectjweaver` | 1.9.25.1 | EPL-2.0 (포함 구성요소의 Apache, BSD 고지 포함) | 수정하지 않고 jar로 링크 |
 | `org.hibernate.orm:hibernate-core` | 6.6.53.Final | LGPL-2.1 | 수정하지 않고 jar로 링크 |
 
@@ -55,7 +53,9 @@ SBOM의 라이선스는 소스 파일 고지까지 합쳐 적어 실제 배포 �
 | `org.flywaydb` (1개: flyway-database-postgresql) | NOASSERTION | Apache-2.0 |
 | `org.springframework` (12개: spring-aop, spring-aspects, spring-beans, spring-context, spring-core, spring-expression, spring-jcl, spring-jdbc, spring-orm, spring-tx, spring-web, spring-webmvc) | Apache-2.0 AND BSD-3-Clause AND EPL-1.0 AND LicenseRef-scancode-other-copyleft | Apache-2.0 |
 | `ch.qos.logback` (2개) | EPL-2.0 AND LGPL-2.1 | EPL-1.0 또는 LGPL-2.1 이중 라이선스 |
-| `jakarta.*` API (4개) | EPL-2.0 OR GPL-2.0 WITH Classpath-exception | EPL-2.0을 택해 조건부 허용 |
+| `jakarta.annotation`, `jakarta.transaction` API (2개) | EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0 | EPL-2.0을 택해 조건부 허용 |
+| `jakarta.inject` API | Apache-2.0 OR (Apache-2.0 AND EPL-2.0) | Apache-2.0 (허용) |
+| `jakarta.persistence` API | BSD-3-Clause OR EPL-2.0 | EDL-1.0(BSD-3-Clause)을 택해 허용 |
 
 ## 5. 백엔드 주요 직접 의존성
 
