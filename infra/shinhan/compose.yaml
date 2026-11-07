@@ -48,6 +48,8 @@ services:
       SPRING_FLYWAY_OUT_OF_ORDER: "${FGC_FLYWAY_OUT_OF_ORDER:-false}"
       # 상품 추천 AI 순위 산식 스위치(FUN-079 D-01, 프로젝트 가정). 비면 RULE_NOT_CONFIGURED로 순위가 나오지 않는다.
       FGC_COMPARE_RULE_VERSION: compare-net-v1
+      # 화면 기본 정산월. 시연은 11월 기준이다(Runbook 9-4). 시험의 기본값은 application.yml 그대로
+      FGC_DEMO_MONTH: "2026-11"
       FGC_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
       # Server-owned runtime secret only; absent key keeps the fixed-guide fallback.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

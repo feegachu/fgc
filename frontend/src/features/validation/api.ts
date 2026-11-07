@@ -25,7 +25,7 @@ export const RUN_STATUSES = [
 ] as const
 export const RUN_TYPES = [
   { value: 'MONTHLY', label: '월간' },
-  { value: 'MANUAL_CONTRACT', label: '계약수동' },
+  { value: 'MANUAL_CONTRACT', label: '계약별' },
 ] as const
 
 /** 서버(ValidationRunSearchImpl.SORT_KEYS)와 같은 정렬 key. 실행 유형·상태·진행·실패 사유는 순서 기준이 없어 제외한다. */

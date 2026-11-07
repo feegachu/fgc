@@ -154,9 +154,8 @@ describe('RPT-W02 설계사 수수료 명세', () => {
     expect(within(panel).getByText('GA 확정지급')).toBeInTheDocument()
     expect(within(panel).getByText('직접 귀속')).toBeInTheDocument()
     expect(within(panel).getByText('지급예정일 정상 계약')).toBeInTheDocument()
-    expect(within(panel).getByText('지급 건 번호')).toBeInTheDocument()
-    expect(within(panel).getByText('이 건이 대체한 지급 건 번호').closest('.ast-dl-row')).toHaveTextContent('5')
-    expect(within(panel).getByText('이 건을 대체한 지급 건 번호').closest('.ast-dl-row')).toHaveTextContent('9')
+    // 내부 번호는 보이지 않는다.
+    expect(within(panel).queryByText(/지급 건 번호/)).not.toBeInTheDocument()
     expect(panel).not.toHaveTextContent(/FIRST_YEAR|TRANSACTION_ATTRIBUTION|GA_CONFIRMED_PAYMENT|DIRECT/)
     expect(within(panel).getByRole('link', { name: '계약 상세 보기' })).toBeInTheDocument()
     expect(router.state.location.search).toContain('entryKey=')

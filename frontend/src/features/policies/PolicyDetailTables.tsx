@@ -73,7 +73,7 @@ export function CommissionRules({ rows }: { rows: NonNullable<PolicyDetail['comm
         },
         {
           key: 'basis',
-          label: '기준코드',
+          label: '계산 기준',
           cellClassName: 'policy-disclosure-cell',
           render: (r) => (
             <CategoryBadge value={r.basisCode} optionCount={1}>
@@ -100,7 +100,7 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
   if (!rows.length)
     return (
       <div className="empty-state policy-empty-state" role="status">
-        이 정책에는 1,200% 룰셋이 없습니다.
+        이 정책에는 1,200% 한도 규칙이 없습니다.
       </div>
     )
   return (
@@ -108,7 +108,7 @@ export function CapRuleSets({ rows }: { rows: NonNullable<PolicyDetail['capRuleS
       <DataTable
         className="policy-cap-table"
         viewportClassName="policy-detail-table-viewport"
-        caption="선택 정책의 1,200% 룰셋"
+        caption="선택 정책의 1,200% 한도 규칙"
         rows={rows}
         rowKey={(r) => String(r.capRuleSetId)}
         columns={[
@@ -240,11 +240,7 @@ export function RefundTables({ rows }: { rows: NonNullable<PolicyDetail['refundR
           </dd>
         </div>
         <div>
-          <dt>표 버전(원천 상품코드)</dt>
-          <dd>{present(table.sourceProductCode)}</dd>
-        </div>
-        <div>
-          <dt>원천 문서</dt>
+          <dt>자료 출처</dt>
           <dd>
             {table.sourceDocumentRef ? (
               <EvidenceLink label={policySeedText(table.sourceDocumentRef)}>

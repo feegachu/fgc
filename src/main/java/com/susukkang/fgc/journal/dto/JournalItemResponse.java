@@ -53,7 +53,7 @@ public record JournalItemResponse(
             return null;
         }
         return switch (sourceEntityType) {
-            case "SCHEDULE_LINE" -> "스케줄행";
+            case "SCHEDULE_LINE" -> "예상 스케줄";
             case "COMMISSION_TRANSACTION" -> "지급 건";
             case "JOURNAL_HEADER" -> "원분개";
             default -> sourceEntityType;

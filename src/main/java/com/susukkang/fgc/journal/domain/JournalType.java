@@ -19,8 +19,8 @@ public enum JournalType {
     /** 화면정의서 "분개유형 8종" 표(docs/FGC_화면정의서_v2_0.md:1118-1129)와 일치시킨다. */
     public String label() {
         return switch (this) {
-            case EXPECTED_INSURER_INCOME -> "예상 수입(원수사→GA)";
-            case ACTUAL_INSURER_STATEMENT -> "실제 명세(원수사)";
+            case EXPECTED_INSURER_INCOME -> "예상 수입(보험회사→GA)";
+            case ACTUAL_INSURER_STATEMENT -> "실제 명세(보험회사)";
             case EXPECTED_FC_PAYOUT -> "예상 지급(GA→설계사)";
             case CONFIRMED_FC_PAYOUT -> "확정 지급(GA→설계사)";
             case ADJUSTMENT -> "조정";

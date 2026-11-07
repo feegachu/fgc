@@ -144,7 +144,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
         color: 'success',
         label: '원장 불균형',
         value: data.journalImbalance,
-        footer: revised ? '전체 기간 · 기표 전 0건 필수' : '기표 전 0건 필수',
+        footer: revised ? '전체 기간, 확정 전 0건이어야 합니다' : '확정 전 0건이어야 합니다',
         tone: data.journalImbalance === 0 ? 'success' : 'error',
         to: href('/journals'),
       },
@@ -462,8 +462,8 @@ function RunRow({ run, to }: { run: RecentRun; to: string }) {
   const progress = Math.max(0, Math.min(100, step * 10))
   return (
     <Link data-guide-feature="features.dashboard.dashboard-page.link-5" className="run-row" to={to}>
-      <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}회차`}</strong>
-      <span className="run-meta">{`${step}/${RUN_STEPS} 단계, 실행 ${run.triggeredBy ?? '-'}`}</span>
+      <strong className="run-title">{`${monthText(run.validationMonth)} ${run.runNo}차 실행`}</strong>
+      <span className="run-meta">{`${step}/${RUN_STEPS} 단계`}</span>
       <StatusBadge tone={runStatusTone(run.status)}>{run.statusLabel ?? '-'}</StatusBadge>
       <span
         className="run-steps"

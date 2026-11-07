@@ -480,7 +480,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
                 <p>{walkthrough.step.instruction}</p>
                 {walkthrough.message && <p role="status">{walkthrough.message}</p>}
                 {walkthrough.status === 'PAUSED' && <button onClick={walkthrough.retry}>다시 찾기</button>}
-                {walkthrough.step.id === 'save' && walkthrough.saved && <p role="status">저장 응답을 받았습니다. 서버 결과를 확인하고 다음 업무로 이동하세요.</p>}
+                {walkthrough.step.id === 'save' && walkthrough.saved && <p role="status">저장되었습니다. 결과를 확인하고 다음 업무로 이동하세요.</p>}
                 <div className="settlement-guide-actions">
                   <button disabled={busy || walkthrough.index === 0} onClick={walkthrough.previous}>이전 설명</button>
                   {walkthrough.step.id === 'save' ? (
@@ -503,7 +503,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
             ) : <p>{decision?.reason}</p>}
             {detailedWorkflow && explanation.last && <p role="status">{decision?.reason}</p>}
             {contextMismatch && <p role="status">선택한 계약·스케줄·정산월과 현재 화면이 다릅니다. 기존 대상으로 돌아가거나 안내를 종료하고 새로 시작하세요.</p>}
-            {busy && <p role="status">현재 서버 결과를 확인하고 있습니다.</p>}
+            {busy && <p role="status">최신 결과를 확인하고 있습니다.</p>}
             {!detailedPayment && !detailedWorkflow && !busy && (snapshot?.status === 'PAUSED' || snapshot?.status === 'ERROR') ? (
               <p role="status">안내 대상을 확인하지 못했거나 화면·입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
             ) : null}

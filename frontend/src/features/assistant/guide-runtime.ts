@@ -76,7 +76,7 @@ export function completion(session: LocalGuide, observation: PaymentObservation)
         ok: observation.attributionsValid,
         reason: observation.attributionsValid
           ? '계약별 귀속과 배부 근거를 확인한 뒤 다음을 누르세요.'
-          : '귀속행의 계약, 날짜, 금액, 배부 근거를 확인하세요.',
+          : '귀속 내역의 계약, 날짜, 금액, 배부 근거를 확인하세요.',
       }
     case 'EVIDENCE_FIELDS_VALID':
       return {
@@ -91,7 +91,7 @@ export function completion(session: LocalGuide, observation: PaymentObservation)
         reason:
           observation.saved && observation.formValid
             ? '현재 입력대로 초안이 저장됐어요.'
-            : '기존 저장 버튼을 직접 눌러 성공 응답을 확인하세요.',
+            : '저장 버튼을 눌러 성공 응답을 확인하세요.',
       }
     case 'CURRENT_PRECHECK_PASSED':
       return {
@@ -101,7 +101,7 @@ export function completion(session: LocalGuide, observation: PaymentObservation)
             ? '사전검증에서 확정이 막혔습니다. 기존 결과에서 사유를 확인하세요.'
             : observation.precheck === 'PASSED_WITHOUT_TOKEN'
               ? '사전검증 결과는 화면에서 직접 확인하고, 확정은 확정 버튼으로 직접 진행하세요.'
-              : '기존 사전검증 버튼으로 결과를 확인하세요. 가이드는 검증을 실행하지 않아요.',
+              : '사전검증 버튼으로 결과를 확인하세요. 가이드는 검증을 실행하지 않아요.',
       }
     case 'PRECHECK_RESULT_ACKNOWLEDGED':
     case 'PAYMENT_CONFIRMED':

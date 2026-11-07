@@ -160,10 +160,10 @@ async function fixture(page: Page, reply: PreviewReply, { roleCode = 'SETTLEMENT
 async function openModal(page: Page, query = '') {
   await page.goto(`contracts/1${query}`)
   await page.getByRole('button', { name: '영향 미리보기' }).click()
-  return page.getByRole('dialog', { name: '상태 사건 영향 미리보기' })
+  return page.getByRole('dialog', { name: '상태 변경 영향 미리보기' })
 }
 async function fill(dialog: ReturnType<Page['getByRole']>, eventType = 'LAPSED', effectiveAt = '2026-01-15T09:00') {
-  await dialog.getByLabel('사건 종류').selectOption(eventType)
+  await dialog.getByLabel('변경 종류').selectOption(eventType)
   await dialog.getByLabel('효력일시').fill(effectiveAt)
 }
 const submit = (dialog: ReturnType<Page['getByRole']>) => dialog.getByRole('button', { name: '영향 미리보기' })
@@ -180,13 +180,13 @@ test('실효 미리보기는 회차, 보류, 기지급, 환수 근거를 보이�
   await expect(dialog.getByRole('table', { name: '미확정 지급 건 영향' })).toContainText('작성중 → 보류')
   await expect(dialog.getByText('변경 전 100,000원, 변경 후 400,000원')).toBeVisible()
   await expect(dialog.getByText('예상 250,000원')).toBeVisible()
-  await expect(dialog.getByText(/스냅샷 시각 2026-01-20 10:30:15 기준/)).toBeVisible()
+  await expect(dialog.getByText(/계산 시각 2026-01-20 10:30:15 기준/)).toBeVisible()
   expect(previews).toEqual([{ eventType: 'LAPSED', effectiveAt: '2026-01-15T09:00:00+09:00' }])
   await page.setViewportSize({ width: 1440, height: 1100 })
   await dialog.screenshot({ path: 'e2e-artifacts/731-status-preview-result.png' })
 
   await dialog.getByLabel('효력일시').fill('2026-01-16T09:00')
-  await expect(dialog.getByText('낡음')).toBeVisible()
+  await expect(dialog.getByText('최신 아님')).toBeVisible()
   await dialog.screenshot({ path: 'e2e-artifacts/731-status-preview-stale.png' })
 
   await dialog.getByRole('button', { name: '닫기', exact: true }).click()
@@ -235,7 +235,7 @@ test('전이 불가, 일자 범위, 근거 부족, 권한 없음, 서버 실패�
   await expect(dialog.getByRole('alert')).toBeHidden()
 
   await submit(dialog).click()
-  await expect(dialog.getByText('효력일시는 최신 사건의 효력일시 이후이고 현재 시각을 넘을 수 없습니다.')).toBeVisible()
+  await expect(dialog.getByText('효력일시는 최신 상태 변경의 효력일시 이후이고 현재 시각을 넘을 수 없습니다.')).toBeVisible()
   await expect(dialog.getByLabel('효력일시')).toBeFocused()
 
   await submit(dialog).click()
@@ -248,7 +248,7 @@ test('전이 불가, 일자 범위, 근거 부족, 권한 없음, 서버 실패�
   await expect(dialog.getByRole('alert')).toContainText('요청번호 status-preview-failure')
   await dialog.getByRole('button', { name: '다시 시도' }).click()
   await expect(dialog.getByRole('table', { name: '멈추는 회차' })).toBeVisible()
-  await expect(dialog.getByLabel('사건 종류')).toHaveValue('TERMINATED')
+  await expect(dialog.getByLabel('변경 종류')).toHaveValue('TERMINATED')
   await expect(dialog.getByLabel('효력일시')).toHaveValue('2026-01-15T09:00')
   expect(writes).toEqual([])
 })
@@ -298,7 +298,7 @@ test('처리 중 중복 클릭을 잠그고 입력이 바뀐 뒤 도착한 늦�
 
   await submit(dialog).click()
   await expect(dialog.getByRole('table', { name: '멈추는 회차' })).toBeVisible()
-  await expect(dialog.getByText('낡음')).toBeHidden()
+  await expect(dialog.getByText('최신 아님')).toBeHidden()
 })
 
 test('계약 수정으로 이동하면 상태와 효력일시를 초안으로 채우고 저장은 사람이 누를 때만 한다', async ({ page }) => {

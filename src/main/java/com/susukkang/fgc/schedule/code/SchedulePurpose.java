@@ -1,9 +1,9 @@
 package com.susukkang.fgc.schedule.code;
 
 public enum SchedulePurpose {
-    OPERATIONAL("운영"),
-    COMPARISON("비교"),
-    SIMULATION("시뮬레이션");
+    OPERATIONAL("실제 지급용"),
+    COMPARISON("비교용"),
+    SIMULATION("모의 계산용");
 
     private final String label;
 

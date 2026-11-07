@@ -1,6 +1,7 @@
 package com.susukkang.fgc.reconciliation.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.GaFcActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcExpectedSourceRow;
@@ -17,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
@@ -74,6 +76,25 @@ class GaFcReconciliationMatcherImplTest {
 
         assertThat(result.resultType()).isEqualTo(ReconciliationResultType.AMOUNT_DIFFERENCE);
         assertThat(result.differenceAmount()).isEqualByComparingTo("-1");
+    }
+
+    @Test
+    void 이번_달_지급예정일이_오늘_뒤인_회차는_실제가_없어도_누락으로_보지_않는다() {
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
+        assumeTrue(today.getDayOfMonth() < today.lengthOfMonth(), "월말에는 같은 달의 다음 날이 없다");
+        var dueToday = expected(11L, 501L, 1, "650000", null);
+        dueToday.setDueDate(today);
+        var dueTomorrow = expected(12L, 502L, 1, "650000", null);
+        dueTomorrow.setDueDate(today.plusDays(1));
+        dueTomorrow.setContractId(999L);
+        given(reconciliationMapper.findExpectedSources(MONTH, 3L)).willReturn(List.of(dueToday, dueTomorrow));
+        given(reconciliationMapper.findActualSources(MONTH, 3L)).willReturn(List.of());
+
+        var results = matcher.match(request());
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).resultType()).isEqualTo(ReconciliationResultType.ACTUAL_MISSING);
+        assertThat(results.get(0).dueDate()).isEqualTo(today);
     }
 
     @Test

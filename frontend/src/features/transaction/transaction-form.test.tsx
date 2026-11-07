@@ -134,9 +134,10 @@ async function fillNew(user: ReturnType<typeof userEvent.setup>) {
   await selectOption(user, screen.getByLabelText(/수령 설계사/), '1')
   await waitFor(() => expect(button('btn-add-attr')).toBeEnabled())
   await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
+  await user.type(screen.getByLabelText(/금액 \(원\)/), '250000')
   await user.click(button('btn-add-attr'))
-  await selectOption(user, screen.getByLabelText('1번 귀속행 계약번호'), '3')
-  await user.type(screen.getByLabelText('1번 귀속행 귀속일'), '2026-07-18')
+  await selectOption(user, screen.getByLabelText('1번 귀속 내역 계약번호'), '3')
+  await user.type(screen.getByLabelText('1번 귀속 내역 귀속일'), '2026-07-18')
 }
 async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
   await fillNew(user)
@@ -149,24 +150,30 @@ async function saveAndPrecheck(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('TRAN-W02 React form workflow', () => {
+  it('신규 지급은 금액을 미리 넣지 않는다', async () => {
+    mount()
+    await waitFor(() => expect(button('btn-save')).toBeEnabled())
+    expect(screen.getByLabelText(/금액 \(원\)/)).toHaveValue(null)
+  })
   it('수동 신규 첫 행과 추가 행 모두 실제 귀속일 입력 전에는 저장하지 않는다', async () => {
     const { user } = mount()
     await waitFor(() => expect(button('btn-save')).toBeEnabled())
-    expect(screen.getByLabelText('1번 귀속행 귀속일')).toHaveValue('')
+    expect(screen.getByLabelText('1번 귀속 내역 귀속일')).toHaveValue('')
     await selectOption(user, screen.getByLabelText(/수령 설계사/), '1')
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
+    await user.type(screen.getByLabelText(/금액 \(원\)/), '250000')
     await user.click(button('btn-add-attr'))
-    await selectOption(user, screen.getByLabelText('1번 귀속행 계약번호'), '3')
-    const date = screen.getByLabelText('1번 귀속행 귀속일')
+    await selectOption(user, screen.getByLabelText('1번 귀속 내역 계약번호'), '3')
+    const date = screen.getByLabelText('1번 귀속 내역 귀속일')
     expect(date).toHaveValue('')
     await user.click(button('btn-save'))
     expect(date).toHaveAttribute('aria-invalid', 'true')
     expect(writes()).toHaveLength(0)
   })
   it('회차 없는 계약 맥락은 귀속일을 비워 두고 입력 전 저장을 차단한다', async () => {
-    const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1')
+    const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1&amount=250000')
     await waitFor(() => expect(button('btn-save')).toBeEnabled())
-    const date = screen.getByLabelText('1번 귀속행 귀속일')
+    const date = screen.getByLabelText('1번 귀속 내역 귀속일')
     expect(date).toHaveValue('')
     await user.click(button('btn-save'))
     expect(date).toHaveAttribute('aria-invalid', 'true')
@@ -178,9 +185,9 @@ describe('TRAN-W02 React form workflow', () => {
   it.each(['2027-07-17', '2027-07-18'])(
     '계약 12개월 경계의 실제 귀속일 %s를 정산월과 별도로 저장한다',
     async (attributionDate) => {
-      const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1')
+      const { user } = mount('/app/transactions/new?month=2027-07&contractId=3&agentId=1&commissionItemId=1&amount=250000')
       await waitFor(() => expect(button('btn-save')).toBeEnabled())
-      await user.type(screen.getByLabelText('1번 귀속행 귀속일'), attributionDate)
+      await user.type(screen.getByLabelText('1번 귀속 내역 귀속일'), attributionDate)
       await user.click(button('btn-save'))
       await waitFor(() => expect(writes()).toHaveLength(1))
       expect(writes()[0][1]?.body).toMatchObject({
@@ -194,7 +201,7 @@ describe('TRAN-W02 React form workflow', () => {
       '/app/transactions/new?id=77&month=2026-07&contractId=7&agentId=2&commissionItemId=3&amount=1&cashflowType=DEDUCTION',
     )
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
-    expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('C-003, 상품')
+    expect(screen.getByLabelText('1번 귀속 내역 계약번호')).toHaveValue('C-003, 상품')
     expect(document.getElementById('amount')).toHaveValue(250000)
   })
   it('keeps a committed draft save when a guide read changes the revision', async () => {
@@ -233,8 +240,8 @@ describe('TRAN-W02 React form workflow', () => {
       '/app/transactions/new?month=2026-07&contractId=3&agentId=1&commissionItemId=1&attributionDate=2026-07-20&amount=150000&returnTo=%2Fcontracts%2F3',
     )
     await waitFor(() => expect(button('btn-save')).toBeEnabled())
-    expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('C-003, 상품')
-    expect(screen.getByLabelText('1번 귀속행 귀속일')).toHaveValue('2026-07-20')
+    expect(screen.getByLabelText('1번 귀속 내역 계약번호')).toHaveValue('C-003, 상품')
+    expect(screen.getByLabelText('1번 귀속 내역 귀속일')).toHaveValue('2026-07-20')
     expect(
       vi
         .mocked(apiClient.request)
@@ -350,7 +357,7 @@ describe('TRAN-W02 React form workflow', () => {
     await user.click(button('btn-precheck'))
     expect(await screen.findByText(message)).toBeVisible()
     expect(screen.queryByText('초년도 밖, 판정 대상 아님')).not.toBeInTheDocument()
-    expect(screen.getByText('4. 검토필요 귀속 해소, 차단')).toBeVisible()
+    expect(screen.getByText('4. 검토 필요 귀속 정리, 차단')).toBeVisible()
   })
 
   it('문구 없는 차단 사유도 오류코드 대신 안내 문구로 보인다', async () => {
@@ -363,7 +370,7 @@ describe('TRAN-W02 React form workflow', () => {
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
     await user.click(button('btn-precheck'))
-    expect(await screen.findByText('4. 검토필요 귀속 해소, 차단')).toBeVisible()
+    expect(await screen.findByText('4. 검토 필요 귀속 정리, 차단')).toBeVisible()
     expect(screen.getByText('확정 차단 사유를 확인하세요.')).toBeVisible()
     expect(screen.queryByText(/FGC-CAP-002/)).not.toBeInTheDocument()
   })
@@ -434,7 +441,7 @@ describe('TRAN-W02 React form workflow', () => {
   it('registers, locks the draft, previews, confirms once and returns to the list', async () => {
     const { user, router } = mount()
     const dialog = await saveAndPrecheck(user)
-    expect(screen.getByLabelText('1번 귀속행 귀속일')).toHaveValue('2026-07-18')
+    expect(screen.getByLabelText('1번 귀속 내역 귀속일')).toHaveValue('2026-07-18')
     expect(screen.getByLabelText(/금액 \(원\)/)).toBeDisabled()
     expect(button('btn-add-attr')).toBeDisabled()
     expect(screen.getByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')).toBeVisible()
@@ -485,7 +492,7 @@ describe('TRAN-W02 React form workflow', () => {
     const { user } = mount()
     const dialog = await saveAndPrecheck(user)
     expect(within(dialog).queryByRole('link', { name: '계산근거 확인' })).not.toBeInTheDocument()
-    expect(screen.getByText('4. 검토필요 귀속 해소, 차단')).toBeVisible()
+    expect(screen.getByText('4. 검토 필요 귀속 정리, 차단')).toBeVisible()
     expect(screen.getByText('5. 1,200% 사전검증, 미확인')).toBeVisible()
     mutation = () => {
       throw new ApiError({ code: 'FGC-CAP-002', message: '검토필요', params: { capCheckId: 99 } }, 'CAP-REQ', 409)
@@ -493,7 +500,7 @@ describe('TRAN-W02 React form workflow', () => {
     await user.click(within(dialog).getByRole('button', { name: '확정 시도, 예외 등록' }))
     const followUp = await within(dialog).findByRole('link', { name: '예외함에서 처리하기' })
     expect(followUp.getAttribute('href')).toContain('type=CAP_REVIEW_REQUIRED&contractNo=C-007')
-    expect(within(dialog).getByRole('link', { name: '귀속행 판정 다시 확인' }).getAttribute('href')).toContain(
+    expect(within(dialog).getByRole('link', { name: '귀속 내역 판정 다시 확인' }).getAttribute('href')).toContain(
       '/app/transactions/new?id=77',
     )
     expect(within(dialog).getByRole('link', { name: '계산근거 확인' })).toHaveAttribute(
@@ -537,13 +544,13 @@ describe('TRAN-W02 React form workflow', () => {
   it('requires attribution and evidence but allows an imbalanced draft for server precheck', async () => {
     const { user } = mount()
     await fillNew(user)
-    await selectOption(user, screen.getByLabelText('1번 귀속행 산입 판정'), 'EXCLUDED:NEW_AGENT_SUPPORT')
+    await selectOption(user, screen.getByLabelText('1번 귀속 내역 산입 판정'), 'EXCLUDED:NEW_AGENT_SUPPORT')
     expect(button('btn-save')).toBeDisabled()
-    expect(await screen.findByText('제외 귀속행은 제외유형과 증빙을 입력해야 합니다.')).toBeVisible()
+    expect(await screen.findByText('제외 귀속 내역은 제외유형과 증빙을 입력해야 합니다.')).toBeVisible()
     expect(writes()).toHaveLength(0)
-    await user.type(screen.getByLabelText('1번 귀속행 증빙'), '증빙-1')
-    await user.clear(screen.getByLabelText('1번 귀속행 귀속금액'))
-    await user.type(screen.getByLabelText('1번 귀속행 귀속금액'), '1')
+    await user.type(screen.getByLabelText('1번 귀속 내역 증빙'), '증빙-1')
+    await user.clear(screen.getByLabelText('1번 귀속 내역 귀속금액'))
+    await user.type(screen.getByLabelText('1번 귀속 내역 귀속금액'), '1')
     expect(screen.getByText('불일치, 차액 249,999원')).toBeVisible()
     await user.click(button('btn-save'))
     await screen.findByText('저장된 초안을 검증하는 동안 입력이 잠겼습니다')
@@ -553,16 +560,16 @@ describe('TRAN-W02 React form workflow', () => {
     const { user } = mount()
     await fillNew(user)
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '2')
-    expect(screen.queryByLabelText('1번 귀속행 계약번호')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('1번 귀속행 산입 판정')).toHaveValue('EXCLUDED:NEW_AGENT_SUPPORT')
-    expect(screen.getByText('신규 설계사 지원 건은 모든 귀속행에 증빙을 입력해야 합니다.')).toBeVisible()
+    expect(screen.queryByLabelText('1번 귀속 내역 계약번호')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('1번 귀속 내역 산입 판정')).toHaveValue('EXCLUDED:NEW_AGENT_SUPPORT')
+    expect(screen.getByText('신규 설계사 지원 건은 모든 귀속 내역에 증빙을 입력해야 합니다.')).toBeVisible()
     expect(button('btn-save')).toBeDisabled()
     await selectOption(user, screen.getByLabelText(/수수료 항목/), '1')
-    expect(screen.getByLabelText('1번 귀속행 계약번호')).toHaveValue('')
-    expect(screen.getByLabelText('1번 귀속행 귀속 방법')).toHaveValue('DIRECT')
+    expect(screen.getByLabelText('1번 귀속 내역 계약번호')).toHaveValue('')
+    expect(screen.getByLabelText('1번 귀속 내역 귀속 방법')).toHaveValue('DIRECT')
     await selectOption(user, screen.getByLabelText(/수령 설계사/), '2')
     await waitFor(() => expect(button('btn-add-attr')).toBeEnabled())
-    expect(screen.getByText('귀속행을 추가하세요.')).toBeVisible()
+    expect(screen.getByText('귀속 내역을 추가하세요.')).toBeVisible()
     expect(
       vi
         .mocked(apiClient.request)
@@ -576,7 +583,7 @@ describe('TRAN-W02 React form workflow', () => {
     expect(
       within(screen.getByLabelText(/수수료 항목/)).queryByRole('option', { name: '신인 지원' }),
     ).not.toBeInTheDocument()
-    expect(screen.getByText('귀속행을 추가하세요.')).toBeVisible()
+    expect(screen.getByText('귀속 내역을 추가하세요.')).toBeVisible()
   })
   it('blocks lookup failures and viewer writes, and redacts internal 500 details', async () => {
     referenceFailure = new ApiError({ code: 'FGC-COMMON-500', message: 'database secret stack trace' }, 'SAFE-REQ', 500)
@@ -693,15 +700,15 @@ describe('TRAN-W02 legacy defect regressions (#410)', () => {
   )
   it('displays an empty saved draft as empty and uses the server missing-attribution blocker', async () => {
     draftResponse = { ...saved, attributions: [] }
-    precheckResult = { confirmable: false, blockers: [{ code: 'FGC-TRAN-002', message: '귀속행 없음' }] }
+    precheckResult = { confirmable: false, blockers: [{ code: 'FGC-TRAN-002', message: '귀속 내역 없음' }] }
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
-    expect(screen.queryByLabelText('1번 귀속행 계약번호')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('1번 귀속 내역 계약번호')).not.toBeInTheDocument()
     await user.click(button('btn-precheck'))
     await waitFor(() => expect(button('btn-confirm')).toBeEnabled())
     await user.click(button('btn-confirm'))
     const dialog = await screen.findByRole('dialog', { name: '지급 건 확정' })
-    expect(within(dialog).getByText(/귀속행 없음/)).toBeVisible()
+    expect(within(dialog).getByText(/귀속 내역 없음/)).toBeVisible()
     expect(within(dialog).queryByRole('button', { name: /확정 실행|확정 시도/ })).not.toBeInTheDocument()
     expect(writes().filter(([path]) => !path.endsWith('/precheck'))).toHaveLength(0)
   })
@@ -721,7 +728,7 @@ describe('TRAN-W02 legacy defect regressions (#410)', () => {
     }
     const { user } = mount('/app/transactions/new?id=77&month=2026-07')
     await waitFor(() => expect(button('btn-save')).toBeEnabled())
-    expect(screen.getByLabelText('1번 귀속행 산입 판정')).toHaveValue('INCLUDED')
+    expect(screen.getByLabelText('1번 귀속 내역 산입 판정')).toHaveValue('INCLUDED')
     expect(button('btn-precheck')).toBeDisabled()
     expect(button('btn-confirm')).toBeDisabled()
     expect(screen.getByText(/현재 지급 단계\/항목에 맞춰 귀속 입력을 조정/)).toBeVisible()
@@ -1145,7 +1152,7 @@ describe('FUN-087 real form observer', () => {
     await waitFor(() => expect(button('btn-precheck')).toBeEnabled())
     precheckResult = { paymentId: 88, confirmable: true, blockers: [] }
     await user.click(button('btn-precheck'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('검증 결과를 사용할 수 없습니다')
+    expect(await screen.findByRole('alert')).toHaveTextContent('검증 결과를 쓸 수 없습니다')
     expect(button('btn-confirm')).toBeDisabled()
     expect((await read()).state.prechecked).toBe(false)
   })

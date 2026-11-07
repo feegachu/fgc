@@ -28,13 +28,15 @@ export function LoginPage() {
   const notice =
     search.get('reason') === 'duplicate'
       ? authMessages.superseded
-      : search.has('logout')
-        ? search.get('logout') === 'failed'
-          ? authMessages.logoutFailed
-          : authMessages.loggedOut
-        : search.has('redirect')
-          ? authMessages.sessionExpired
-          : ''
+      : search.get('reason') === 'idle'
+        ? authMessages.idleLogout
+        : search.has('logout')
+          ? search.get('logout') === 'failed'
+            ? authMessages.logoutFailed
+            : authMessages.loggedOut
+          : search.has('redirect')
+            ? authMessages.sessionExpired
+            : ''
 
   useEffect(() => {
     document.title = '로그인 | FGC'
@@ -117,7 +119,7 @@ export function LoginPage() {
         </section>
         <footer className="auth-brand-footer">
           <p>접속 기록과 주요 변경 이력은 감사로그에 안전하게 남습니다.</p>
-          <p>FGC v2.0</p>
+          <p>FGC</p>
         </footer>
       </aside>
       <section data-guide-feature="features.auth.login-page.section-2" className="auth-surface" aria-labelledby="login-title">

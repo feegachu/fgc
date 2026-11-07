@@ -168,7 +168,7 @@ public class ContractServiceImpl implements ContractService {
             return List.of();
         }
 
-        // FUN-085: 영향 건수는 다른 수혜자 회차와 남의 지급 건까지 센다. AGENT에게는 싣지 않고 본인 범위는 IF-API-89로 본다.
+        // FUN-085: 처리자(내부 직원)와 영향 건수는 AGENT에게 보이지 않는다. 영향 건수는 다른 수혜자 회차와 남의 지급 건까지 센다. AGENT에게는 싣지 않고 본인 범위는 IF-API-89로 본다.
         boolean withSummary = agentScope.currentAgentId() == null;
 
         // 4. 후속 작업의 현재 상태와 Job별 처리 이력을 한 번에 조회하고 상태사건 ID별로 묶기
@@ -202,7 +202,7 @@ public class ContractServiceImpl implements ContractService {
                         event.getContractStatusEventId(),
                         event.getReasonCode(),
                         event.getReasonText(),
-                        event.getRegisteredBy() == null ? null : registrants.get(event.getRegisteredBy()),
+                        !withSummary || event.getRegisteredBy() == null ? null : registrants.get(event.getRegisteredBy()),
                         event.getCreatedAt(),
                         ContractStatusEventResponse.EventFollowUp.of(jobsByEvent
                                 .getOrDefault(event.getContractStatusEventId(), List.of()).stream()
@@ -604,7 +604,7 @@ public class ContractServiceImpl implements ContractService {
         )) {
             throw validationException(
                     AGENT_ID_FIELD,
-                    "계약일 기준 활동 중인 FC 직급의 모집설계사만 선택할 수 있습니다."
+                    "계약일 기준 활동 중인 모집 설계사만 선택할 수 있습니다."
             );
         }
 
@@ -796,7 +796,7 @@ public class ContractServiceImpl implements ContractService {
         // 1. 상태가 같으면 일반 수정이며 사건을 받지 않는다
         if (!statusChanged) {
             if (event != null) {
-                throw validationException("statusEvent", "상태를 바꾸지 않는 수정에는 상태 사건을 보내지 않습니다.");
+                throw validationException("statusEvent", "상태를 바꾸지 않는 수정에는 상태 변경을 보내지 않습니다.");
             }
             return;
         }
@@ -843,7 +843,7 @@ public class ContractServiceImpl implements ContractService {
                 .map(ContractStatusEvent::getEffectiveAt)
                 .orElseGet(() -> contractDate.atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime());
         if (effectiveAt.isBefore(earliest)) {
-            throw eventOrder(field, "효력일시는 최신 사건의 효력일시 " + earliest + " 이후여야 합니다.");
+            throw eventOrder(field, "효력일시는 최신 상태 변경의 효력일시 " + earliest + " 이후여야 합니다.");
         }
     }
 
@@ -1005,7 +1005,7 @@ public class ContractServiceImpl implements ContractService {
                     contractId,
                     paymentStage,
                     exception.getDetail() == null
-                            ? "적용 가능한 1,200% 룰셋이 없습니다."
+                            ? "적용 가능한 1,200% 한도 규칙이 없습니다."
                             : exception.getDetail()
             );
         }

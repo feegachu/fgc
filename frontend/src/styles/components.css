@@ -548,6 +548,12 @@
   line-height: 1.125rem;
 }
 
+.filter-bar.search-conditions > .filter-actions > .button {
+  height: var(--control-height-sm);
+  min-height: var(--control-height-sm);
+  padding-block: 0;
+}
+
 .filter-bar.search-conditions > .filter-actions {
   width: auto;
   flex: 0 1 auto;
