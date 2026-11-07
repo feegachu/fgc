@@ -101,16 +101,21 @@ class Client:
     def login(self):
         self.token = None
         status, data = self.call('POST', '/api/v1/auth/login', {'loginId': self.login_id, 'password': self.password})
-        token = (data.get('data') or {}).get('accessToken') if status == 200 else None
+        payload = data.get('data')
+        token = payload.get('accessToken') if status == 200 and isinstance(payload, dict) else None
         if not token:
-            sys.exit(f'{self.login_id} 로그인 실패: {status}')
+            sys.exit(f'POST /api/v1/auth/login: {self.login_id} 로그인 실패: {status}')
         self.token = token
 
-    def ok(self, method, path, body=None, headers=None, allowed=(200, 201, 202)):
+    def ok(self, method, path, body=None, headers=None, allowed=(200, 201, 202), keys=()):
         status, data = self.call(method, path, body, headers)
         if status not in allowed:
             sys.exit(f'{method} {path} 실패: {status} {json.dumps(data, ensure_ascii=False)[:400]}')
-        return data.get('data')
+        payload = data.get('data')
+        # 꺼내 쓸 필드가 있는 응답은 모양을 먼저 확인해, 어긋나면 어느 요청인지 남기고 멈춘다.
+        if keys and not (isinstance(payload, dict) and all(k in payload for k in keys)):
+            sys.exit(f'{method} {path}: {status} 응답 형식이 다릅니다')
+        return payload
 
 
 def idem():
@@ -130,7 +135,7 @@ class Loader:
     def pages(self, path):
         rows, page = [], 1
         while True:
-            data = self.s.ok('GET', f"{path}{'&' if '?' in path else '?'}page={page}&size=100")
+            data = self.s.ok('GET', f"{path}{'&' if '?' in path else '?'}page={page}&size=100", keys=('content', 'totalPages'))
             rows += data['content']
             if page >= data['totalPages']:
                 return rows
@@ -176,7 +181,9 @@ class Loader:
             status, data = self.s.call('GET', f'/api/v1/contracts/{contract_id}/schedules?paymentStage={stage}')
             if status != 200:
                 continue
-            payload = data['data']
+            payload = data.get('data')
+            if not isinstance(payload, dict):
+                sys.exit(f'GET /api/v1/contracts/{contract_id}/schedules: {status} 응답 형식이 다릅니다')
             headers = [h for h in payload.get('headers', []) if h.get('activeYn') and h.get('schedulePurpose') == 'OPERATIONAL']
             if not headers:
                 continue

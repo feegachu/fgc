@@ -74,6 +74,20 @@ class Responses(unittest.TestCase):
                 client.call('GET', '/api/v1/x')
         self.assertIn('/api/v1/x: 200', str(stopped.exception))
 
+    def test_a_page_reply_without_content_stops_with_the_path(self):
+        replies = [self.reply(200, json.dumps({'data': {'accessToken': 'token'}})), self.reply(200, json.dumps({'data': None}))]
+        with mock.patch('urllib.request.urlopen', side_effect=replies):
+            client = Client('https://example.test', 'id', 'pw')
+            with self.assertRaises(SystemExit) as stopped:
+                client.ok('GET', '/api/v1/transactions?page=1', keys=('content', 'totalPages'))
+        self.assertIn('/api/v1/transactions?page=1: 200', str(stopped.exception))
+
+    def test_a_login_reply_with_a_list_stops(self):
+        with mock.patch('urllib.request.urlopen', return_value=self.reply(200, json.dumps({'data': ['x']}))):
+            with self.assertRaises(SystemExit) as stopped:
+                Client('https://example.test', 'id', 'pw')
+        self.assertIn('/api/v1/auth/login', str(stopped.exception))
+
     def test_a_login_reply_without_a_token_stops(self):
         with mock.patch('urllib.request.urlopen', return_value=self.reply(200, json.dumps({'data': None}))):
             with self.assertRaises(SystemExit) as stopped:
