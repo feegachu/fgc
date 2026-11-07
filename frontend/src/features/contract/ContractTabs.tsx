@@ -282,6 +282,10 @@ const scheduleColumns: TableColumn<ScheduleLine>[] = [
     ),
   },
 ]
+const revisedScheduleColumns: TableColumn<ScheduleLine>[] = [
+  ['installment', '60px'], ['amount', '120px'], ['recipient', '90px'],
+  ['item', '140px'], ['dueDate', '110px'], ['status', '90px'],
+].map(([key, width]) => ({ ...scheduleColumns.find(column => column.key === key)!, width }))
 function SchedulesTab({ id }: { id: string }) {
   return (
     <>
@@ -333,7 +337,7 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
             <DataTable
               viewportClassName="contract-tab-viewport"
               caption={`${PAYMENT_STAGE[stage]} 예상 스케줄`}
-              columns={revised && stage === 'INSURER_TO_GA' ? scheduleColumns.map(column => column.key === 'recipient'
+              columns={revised ? revisedScheduleColumns.map(column => stage === 'INSURER_TO_GA' && column.key === 'recipient'
                 ? { ...column, render: (row: ScheduleLine) => <Text value={row.recipientName?.trim() && row.recipientName.trim() !== '-' ? row.recipientName : 'GA'} /> }
                 : column) : scheduleColumns}
               rows={revised ? [...(data.lines ?? [])].sort((a, b) =>
