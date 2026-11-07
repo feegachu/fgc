@@ -9,6 +9,7 @@
 .settlement-overview-steps li { padding: 16px 18px; border: 1px solid #dbe4ef; border-radius: 12px; background: white; }
 .settlement-overview-step-heading { display: flex; align-items: center; justify-content: space-between; }
 .settlement-overview-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--color-fgc-surface); color: var(--color-fgc-blue); font-size: 23px; }
+.settlement-overview-icon > .material-symbols-rounded { display: block; font-size: 23px; }
 .settlement-overview-number { color: #7d92ac; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .settlement-overview-steps h4 { margin: 10px 0 5px; font-size: 15px; }
 .settlement-overview-steps p { margin: 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; white-space: pre-line; word-break: keep-all; }

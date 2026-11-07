@@ -106,7 +106,12 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
 }
 
 /** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
-export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false): WorkflowExplanation[] {
+export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true): WorkflowExplanation[] {
+  if (reuseContractDetail && stage === 'contract.create' && /^\/contracts\/\d+$/.test(path)) {
+    return getScreenWalkthrough('CONT-W02').map(entry => ({
+      ...entry, id: entry.targetId, selector: guideSelector(entry),
+    }))
+  }
   const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
   if (stage === 'contract.create') return instructions
   const screenId = path.startsWith('/contracts/') ? 'CONT-W02'

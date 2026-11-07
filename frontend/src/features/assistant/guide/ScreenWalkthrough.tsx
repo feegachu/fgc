@@ -118,10 +118,10 @@ export function ScreenWalkthrough({ title, steps, disabled, triggerRef }: {
     </button>
     {session && !covered && createPortal(<>
       {!folded && step?.openControl && <GuideFieldPicker key={step.targetId} target={target} />}
-      {!folded && position.box && target && <div className="payment-guide-spotlight screen-step-spotlight" style={position.box} aria-hidden="true" />}
+      {!folded && position.box && <div className="payment-guide-spotlight screen-step-spotlight" style={position.box} aria-hidden="true" />}
       <section ref={card} className="payment-guide-card screen-step-guide" aria-label={`${title} 도움말`}
         data-help-presentation={Boolean(step?.presentation)}
-        data-help-target={step?.targetId} data-guide-anchored={Boolean(target && !folded)}
+        data-help-target={step?.targetId} data-guide-anchored={Boolean((target || position.box) && !folded)}
         style={{ maxHeight: 'min(560px, 65dvh)', overflowY: 'auto', ...position.card }}>
         <header className="payment-guide-header">
           <img className="payment-guide-mascot" src={guideMascot} width="40" height="40" alt="" />

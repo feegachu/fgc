@@ -76,7 +76,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   // show() can navigate from the just-saved editor to the same route with its new ID.
   // Bind only after that transition has finished: the old editor is replaced while
   // its saved draft loads, which is not loss of a target in the new explanation.
-  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy)
+  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy, after)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
   const demoNumberStep = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
@@ -421,14 +421,14 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   return (
     <>
       {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
-      {!collapsed && position.box && activeTarget && (
+      {!collapsed && position.box && (
         <div className="payment-guide-spotlight settlement-guide-spotlight" aria-hidden="true" style={position.box} />
       )}
       <aside
         ref={card}
         style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
         className="settlement-guide"
-        data-guide-anchored={Boolean(activeTarget && !collapsed)}
+        data-guide-anchored={Boolean((activeTarget || position.box) && !collapsed)}
         aria-label="전체 업무 가이드"
         aria-busy={busy}
       >
@@ -637,7 +637,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
     <>
       <SettlementOverview open={!selection} busy={busy} error={error} onClose={close} onStart={() => void start()} />
       {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
-      {!collapsed && position.box && activeTarget && (
+      {!collapsed && position.box && (
         <div className="payment-guide-spotlight settlement-guide-spotlight screen-step-spotlight" aria-hidden="true" style={position.box} />
       )}
       {selection && <aside
@@ -645,7 +645,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
         className="settlement-guide payment-guide-card screen-step-guide"
         data-help-presentation={Boolean(explanation.step?.presentation)}
-        data-guide-anchored={Boolean(activeTarget && !collapsed)}
+        data-guide-anchored={Boolean((activeTarget || position.box) && !collapsed)}
         aria-label="전체 업무 가이드"
         aria-busy={busy}
       >

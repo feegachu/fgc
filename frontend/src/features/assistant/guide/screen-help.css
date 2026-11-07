@@ -123,6 +123,12 @@
 .payment-guide-card.screen-step-guide h2 { margin: 0 0 8px; font-size: 18px; }
 .payment-guide-card.screen-step-guide > p { font-size: 13px; line-height: 1.7; color: var(--color-fgc-ink); }
 .screen-step-summary > span { display: block; }
+.payment-guide-card.screen-step-guide {
+  transition: left 700ms ease-in-out, top 700ms ease-in-out, width 700ms ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .payment-guide-card.screen-step-guide { transition: none; }
+}
 
 .guide-field-picker {
   position: fixed;

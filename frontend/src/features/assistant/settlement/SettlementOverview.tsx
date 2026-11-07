@@ -28,7 +28,7 @@ export function SettlementOverview({ open, busy, error, onClose, onStart }: {
     </div>
     <ol className="settlement-overview-steps" aria-label="전체 업무 9단계">
       {overview.map((step, index) => <li key={STEPS[index]}>
-        <div className="settlement-overview-step-heading"><span className="material-symbols-rounded settlement-overview-icon" aria-hidden="true">{step.icon}</span><span className="settlement-overview-number">{String(index + 1).padStart(2, '0')}</span></div>
+        <div className="settlement-overview-step-heading"><span className="settlement-overview-icon" aria-hidden="true"><span className="material-symbols-rounded">{step.icon}</span></span><span className="settlement-overview-number">{String(index + 1).padStart(2, '0')}</span></div>
         <h4>{step.title}</h4><p>{step.text}</p>
       </li>)}
     </ol>

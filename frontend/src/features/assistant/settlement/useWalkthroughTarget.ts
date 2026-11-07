@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 type Observation = { key: string; target: HTMLElement | null; valid: boolean; status: 'WAITING' | 'READY' | 'PAUSED'; message: string }
 /** A paused explanation only resumes on explicit retry; no business action is executed. */
@@ -6,7 +6,7 @@ export function useWalkthroughTarget(selector: string | undefined, context: stri
   const [attempt, setAttempt] = useState(0)
   const key = `${context}:${selector}:${attempt}`
   const [observed, setObserved] = useState<Observation>()
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selector) return
     let paused = false
     let found = false
