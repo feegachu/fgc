@@ -61,6 +61,9 @@ ALTER TABLE cap_check_detail ENABLE TRIGGER trg_cap_check_detail_immutable;
 
 -- 설계사 계정 표시 이름. 시연 서버는 V73이 이미 바꿨고 그 밖의 환경에서도 같은 이름을 쓴다.
 UPDATE app_user SET user_name = '손설계' WHERE login_id = 'agent01' AND user_name = '설계사 시연 계정';
+-- agent01이 연결된 설계사 기록(A-FC-001, V64)도 같은 이름으로 맞춘다. 로그인 이름과 계약, 명세의
+-- 설계사 이름이 달라 다른 사람으로 보였다. 업무 규칙 아님, 시연 데이터 정리(PM 결정 2026-11-07).
+UPDATE agent SET agent_name = '손설계', updated_at = now() WHERE agent_code = 'A-FC-001' AND agent_name = '김정산';
 
 -- 수수료 항목 이름. FC는 화면 다른 곳에서 설계사로 부른다.
 UPDATE commission_item SET item_name = '기본수수료' WHERE item_code = 'BASE_COMMISSION' AND item_name = 'FC 기본수수료';
