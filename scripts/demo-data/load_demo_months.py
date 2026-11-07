@@ -103,7 +103,7 @@ class Client:
         status, data = self.call('POST', '/api/v1/auth/login', {'loginId': self.login_id, 'password': self.password})
         payload = data.get('data')
         token = payload.get('accessToken') if status == 200 and isinstance(payload, dict) else None
-        if not token:
+        if not isinstance(token, str) or not token:
             sys.exit(f'POST /api/v1/auth/login: {self.login_id} 로그인 실패: {status}')
         self.token = token
 
@@ -135,7 +135,10 @@ class Loader:
     def pages(self, path):
         rows, page = [], 1
         while True:
-            data = self.s.ok('GET', f"{path}{'&' if '?' in path else '?'}page={page}&size=100", keys=('content', 'totalPages'))
+            url = f"{path}{'&' if '?' in path else '?'}page={page}&size=100"
+            data = self.s.ok('GET', url, keys=('content', 'totalPages'))
+            if not isinstance(data['content'], list) or not isinstance(data['totalPages'], int):
+                sys.exit(f'GET {url}: 목록 응답 형식이 다릅니다')
             rows += data['content']
             if page >= data['totalPages']:
                 return rows

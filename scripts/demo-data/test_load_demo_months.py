@@ -82,6 +82,21 @@ class Responses(unittest.TestCase):
                 client.ok('GET', '/api/v1/transactions?page=1', keys=('content', 'totalPages'))
         self.assertIn('/api/v1/transactions?page=1: 200', str(stopped.exception))
 
+    def test_a_login_reply_with_a_number_token_stops(self):
+        with mock.patch('urllib.request.urlopen', return_value=self.reply(200, json.dumps({'data': {'accessToken': 123}}))):
+            with self.assertRaises(SystemExit) as stopped:
+                Client('https://example.test', 'id', 'pw')
+        self.assertIn('/api/v1/auth/login', str(stopped.exception))
+
+    def test_a_page_reply_with_null_content_stops_with_the_path(self):
+        replies = [self.reply(200, json.dumps({'data': {'accessToken': 'token'}})),
+                   self.reply(200, json.dumps({'data': {'content': None, 'totalPages': 1}}))]
+        with mock.patch('urllib.request.urlopen', side_effect=replies):
+            loader = Loader(Client('https://example.test', 'id', 'pw'), None)
+            with self.assertRaises(SystemExit) as stopped:
+                loader.pages('/api/v1/transactions?status=DRAFT')
+        self.assertIn('/api/v1/transactions?status=DRAFT&page=1', str(stopped.exception))
+
     def test_a_login_reply_with_a_list_stops(self):
         with mock.patch('urllib.request.urlopen', return_value=self.reply(200, json.dumps({'data': ['x']}))):
             with self.assertRaises(SystemExit) as stopped:
