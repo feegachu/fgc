@@ -409,15 +409,17 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
               <strong>{ordered[0].previousStatus ? responseLabel(contractStatusLabels, ordered[0].previousStatus, ordered[0].previousStatusLabel) : '최초'}</strong>
             </li>}
             {ordered.map((event, index) => <li key={event.eventId ?? index}>
-              <strong>{responseLabel(contractStatusLabels, event.newStatus, event.newStatusLabel)}</strong>
+              <div className="contract-history-node-heading">
+                <strong>{responseLabel(contractStatusLabels, event.newStatus, event.newStatusLabel)}</strong>
+                {event.eventId != null && <Button variant="secondary" onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
+              </div>
               <time dateTime={event.effectiveAt}>{dateTime(event.effectiveAt)}</time>
               <span>{reasonText(event)}</span>
               <FollowUpStatus event={event} />
-              {event.eventId != null && <Button variant="secondary" onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
             </li>)}
             {previewCount !== null && <li className="contract-history-demo-label"><span>도움말 예시</span></li>}
             {['미납', '실효', '해지'].slice(0, previewCount ?? 0).map(status => <li className="contract-history-demo-node" key={`demo-${status}`}>
-              <strong>{status}</strong><span>예시 상태</span>
+              <strong>{status}</strong>
             </li>)}
             {!events.length && previewCount === null && <li className="empty-state">등록된 상태이력이 없습니다.</li>}
           </ol> : <DataTable

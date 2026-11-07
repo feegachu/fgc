@@ -112,8 +112,8 @@
 .contract-history-timeline {
   list-style: none;
   margin: 0;
-  padding: 24px 20px;
-  max-height: 560px;
+  padding: 16px;
+  max-height: min(560px, calc(100dvh - 140px));
   overflow: auto;
   border: 1px solid var(--color-border-default);
   border-radius: 10px;
@@ -124,8 +124,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  padding: 0 0 28px 28px;
+  gap: 4px;
+  padding: 0 0 16px 24px;
   overflow-wrap: anywhere;
   font-size: 13px;
 }
@@ -152,8 +152,16 @@
 .contract-history-timeline li:last-child { padding-bottom: 0; }
 .contract-history-timeline li:last-child::before, .contract-history-timeline li.empty-state::after { display: none; }
 .contract-history-timeline li:last-child:not(.empty-state)::after { background: var(--color-fgc-blue); }
-.contract-history-timeline .contract-history-origin { padding-bottom: 32px; color: var(--color-text-secondary); }
-.contract-history-timeline .contract-history-demo-label { padding-block: 8px 16px; }
+.contract-history-timeline .contract-history-origin { padding-bottom: 20px; color: var(--color-text-secondary); }
+.contract-history-node-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
+}
+.contract-history-timeline .contract-history-demo-label { padding-block: 4px 12px; }
 .contract-history-timeline .contract-history-demo-label::after { display: none; }
 .contract-history-timeline .contract-history-demo-label > span {
   padding: 4px 8px;
@@ -172,7 +180,7 @@
   .contract-history-demo-node { animation: none; }
 }
 .contract-history-timeline time, .contract-history-timeline li > span { color: var(--color-text-secondary); }
-.contract-history-timeline .button { min-width: 0; height: 32px; }
+.contract-history-timeline .button { min-width: 0; height: 28px; padding: 2px 8px; font-size: 12px; }
 .contract-basis-explanation { display: block; white-space: normal; }
 .contract-detail-primary .contract-basis-explanation { display: none; }
 @media (max-width: 1400px) {

@@ -333,7 +333,9 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
             <DataTable
               viewportClassName="contract-tab-viewport"
               caption={`${PAYMENT_STAGE[stage]} 예상 스케줄`}
-              columns={scheduleColumns}
+              columns={revised && stage === 'INSURER_TO_GA' ? scheduleColumns.map(column => column.key === 'recipient'
+                ? { ...column, render: (row: ScheduleLine) => <Text value={row.recipientName?.trim() && row.recipientName.trim() !== '-' ? row.recipientName : 'GA'} /> }
+                : column) : scheduleColumns}
               rows={revised ? [...(data.lines ?? [])].sort((a, b) =>
                 (a.installmentNo ?? Number.MAX_SAFE_INTEGER) - (b.installmentNo ?? Number.MAX_SAFE_INTEGER)
                 || (a.lineNo ?? 0) - (b.lineNo ?? 0)) : data.lines ?? []}
