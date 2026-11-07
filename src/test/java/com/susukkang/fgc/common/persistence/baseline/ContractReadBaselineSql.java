@@ -17,7 +17,7 @@ final class ContractReadBaselineSql {
                         p.product_name AS product_name,
                         ic.contract_date AS contract_date,
                         ic.monthly_equivalent_first_premium AS monthly_equivalent_first_premium,
-                        CONCAT('FC-', LPAD(a.agent_id::text, 4, '0'), ' ', a.agent_name) AS agent_id_name,
+                        CONCAT(a.agent_name, ' (', a.agent_code, ')') AS agent_id_name,
                         ic.current_status AS contract_status,
                         cc.result_status AS cap_result_status,
                         ic.data_origin AS data_origin
@@ -218,7 +218,7 @@ final class ContractReadBaselineSql {
                            p.product_name AS product_name,
                            ic.contract_date AS contract_date,
                            ic.monthly_equivalent_first_premium AS monthly_equivalent_first_premium,
-                           CONCAT('FC-', LPAD(a.agent_id::text, 4, '0'), ' ', a.agent_name) AS agent_id_name,
+                           CONCAT(a.agent_name, ' (', a.agent_code, ')') AS agent_id_name,
                            ic.current_status AS contract_status,
                            cc.result_status AS cap_result_status,
                            ic.data_origin AS data_origin

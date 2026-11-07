@@ -54,7 +54,7 @@ export function PicoGuideStartButton({
               : !observation.ready
                 ? '지급 화면의 기준정보를 확인 중이거나 불러오지 못했습니다. 화면의 조회 상태를 먼저 확인하세요.'
                 : !observation.saved
-                  ? '현재 입력이 저장본과 다릅니다. 기존 수정 저장 버튼으로 저장한 뒤 다시 질문해주세요.'
+                  ? '현재 입력이 저장한 내용과 다릅니다. 수정 저장 버튼으로 저장한 뒤 다시 질문해주세요.'
                   : !sourceContextAvailable
                     ? '질문 당시 저장된 지급 상태를 확인하지 못했습니다. 현재 화면에서 다시 질문해주세요.'
                     : validatedGuide?.stepId === 'payment.precheck' && !observation.formValid

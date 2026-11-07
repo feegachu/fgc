@@ -198,20 +198,20 @@ describe('AUDT-W01 감사로그 조회', () => {
       )
     // 순서 기준이 없는 행위·대상 종류 컬럼은 정렬 버튼이 없다.
     expect(within(table).queryByRole('button', { name: '행위' })).toBeNull()
-    expect(within(table).getByRole('columnheader', { name: /정책버전/ })).toHaveAttribute('aria-sort', 'none')
-    await actions.click(within(table).getByRole('button', { name: '정책버전' }))
-    await waitFor(() => expect(lastQuery().get('sort')).toBe('policyVersionId,asc'))
+    expect(within(table).getByRole('columnheader', { name: /행위자/ })).toHaveAttribute('aria-sort', 'none')
+    await actions.click(within(table).getByRole('button', { name: '행위자' }))
+    await waitFor(() => expect(lastQuery().get('sort')).toBe('userLoginId,asc'))
     expect(lastQuery().get('page')).toBe('1')
     expect(lastQuery().get('entityType')).toBe('COMMISSION_PAYMENT')
     const params = new URLSearchParams(router.state.location.search)
     expect(params.has('selected')).toBe(false)
-    expect(within(table).getByRole('columnheader', { name: /정책버전/ })).toHaveAttribute('aria-sort', 'ascending')
-    await actions.click(within(table).getByRole('button', { name: '정책버전' }))
-    await waitFor(() => expect(router.state.location.search).toContain('sort=policyVersionId%2Cdesc'))
-    expect(within(table).getByRole('columnheader', { name: /정책버전/ })).toHaveAttribute('aria-sort', 'descending')
+    expect(within(table).getByRole('columnheader', { name: /행위자/ })).toHaveAttribute('aria-sort', 'ascending')
+    await actions.click(within(table).getByRole('button', { name: '행위자' }))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=userLoginId%2Cdesc'))
+    expect(within(table).getByRole('columnheader', { name: /행위자/ })).toHaveAttribute('aria-sort', 'descending')
     // 검색을 다시 제출해도 정렬은 유지되고, 초기화하면 서버 기본 정렬로 돌아간다.
     await actions.click(screen.getByRole('button', { name: '조회' }))
-    await waitFor(() => expect(router.state.location.search).toContain('sort=policyVersionId%2Cdesc'))
+    await waitFor(() => expect(router.state.location.search).toContain('sort=userLoginId%2Cdesc'))
     await actions.click(screen.getByRole('button', { name: '초기화' }))
     await waitFor(() => expect(router.state.location.search).not.toContain('sort='))
   })
@@ -234,10 +234,10 @@ describe('AUDT-W01 감사로그 조회', () => {
     const { router, actions } = renderAt('/audit-logs?month=2026-07', 'COMPLIANCE', [
       log(1, { actionCode: 'TOKEN_REFRESH', entityType: 'APP_USER', entityId: 'admin', userLoginId: 'admin' }),
     ])
-    await screen.findByRole('option', { name: '인증 토큰 갱신' })
+    await screen.findByRole('option', { name: '로그인 연장' })
     await actions.selectOptions(
       screen.getByLabelText('행위 종류'),
-      screen.getByRole('option', { name: '인증 토큰 갱신' }),
+      screen.getByRole('option', { name: '로그인 연장' }),
     )
     await actions.selectOptions(screen.getByLabelText('대상 종류'), screen.getByRole('option', { name: '사용자 계정' }))
     await actions.click(screen.getByRole('button', { name: '조회' }))
@@ -255,7 +255,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(within(list).getAllByRole('cell')[1]).toHaveTextContent('admin')
     expect(within(list).queryByText('TOKEN_REFRESH')).not.toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '2026-08-16 10:00:07' }))
-    expect(await screen.findAllByText('인증 토큰 갱신')).not.toHaveLength(0)
+    expect(await screen.findAllByText('로그인 연장')).not.toHaveLength(0)
     expect(screen.getByText('사용자 계정 #admin')).toBeInTheDocument()
     expect(await screen.findByText('지급 / 상태')).toBeInTheDocument()
     expect(screen.getAllByText('작성중')).toHaveLength(2)
@@ -263,7 +263,7 @@ describe('AUDT-W01 감사로그 조회', () => {
     expect(router.state.location.search).not.toContain('selected=')
     expect(screen.getByLabelText('행위 종류')).toHaveValue('TOKEN_REFRESH')
     await act(() => router.navigate(1))
-    expect(await screen.findAllByText('인증 토큰 갱신')).not.toHaveLength(0)
+    expect(await screen.findAllByText('로그인 연장')).not.toHaveLength(0)
   })
 
   it('미등록 코드는 검색과 상세에서 원문을 유지한다', async () => {

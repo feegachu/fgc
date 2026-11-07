@@ -66,6 +66,7 @@ class ReconciliationExpectedSourceQuery {
                    AND sh.status NOT IN ('HOLD', 'CANCELLED')
                    AND sl.line_status NOT IN ('HOLD', 'CANCELLED')
                    AND sl.due_month = :settlementMonth AND c.insurer_id = :insurerId
+                   AND c.current_status <> 'APPLIED' -- 성립 전 청약은 받을 돈이 아직 없다
                    AND NOT """ + ContractStatusOnDueDateSql.NON_PAYABLE_ON_DUE_DATE + """
 
                  ORDER BY sh.contract_id, sl.commission_item_id, sl.due_month,

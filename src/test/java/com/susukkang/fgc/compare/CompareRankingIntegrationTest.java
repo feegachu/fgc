@@ -69,8 +69,8 @@ class CompareRankingIntegrationTest {
 
         // 시연 가정(V72): 첫해 환수율 다온 40% < 푸른 60% < 하늘 80%. 수수료 조건이 같아도 환수 부담이 작은 보험사가 앞선다.
         assertThat(items.size()).isGreaterThanOrEqualTo(3);
-        List<String> expected = List.of("다온가상손해보험:CLAW-FGN03-DEMO-2026 v1", "푸른가상생명:CLAW-FGL06-DEMO-2026 v1",
-                "하늘가상생명:CLAW-FGL05-DEMO-2026 v1");
+        List<String> expected = List.of("다온가상손해보험:다온가상손해보험 환수율 v1", "푸른가상생명:푸른가상생명 환수율 v1",
+                "하늘가상생명:하늘가상생명 환수율 v1");
         for (int i = 0; i < expected.size(); i++) {
             JsonNode item = items.get(i);
             String policy = "";
@@ -148,9 +148,9 @@ class CompareRankingIntegrationTest {
         offeringClawbackPolicy("CLAW-COMPARE-IT-OFFERING", offerings.get(0).offeringId());
 
         assertThat(repository.findClawbackRules(offerings.get(0), today)).extracting(ClawbackRuleResolver.RuleRow::policyVersion)
-                .contains("CLAW-COMPARE-IT-OFFERING v1");
+                .contains("상품 비교 통합시험 환수율 v1");
         assertThat(repository.findClawbackRules(offerings.get(1), today)).extracting(ClawbackRuleResolver.RuleRow::policyVersion)
-                .doesNotContain("CLAW-COMPARE-IT-OFFERING v1");
+                .doesNotContain("상품 비교 통합시험 환수율 v1");
     }
 
     /** 판매버전 한 개에만 맞는 승인 환수 정책을 만든다(D-02 가상 환수율표와 같은 구간·비율). */

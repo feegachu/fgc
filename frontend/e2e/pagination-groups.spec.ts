@@ -122,7 +122,7 @@ for (const screen of screens) {
       await page.waitForLoadState('networkidle')
       await expect(pagination).toHaveCount(0)
       if (screen.id === 'cap') {
-        const size = page.getByLabel('화면 행 수')
+        const size = page.getByLabel('한 번에 볼 건수')
         await expect(size).toBeVisible()
         await size.selectOption('50')
         await expect.poll(() => new URL(page.url()).searchParams.get('size')).toBe('50')

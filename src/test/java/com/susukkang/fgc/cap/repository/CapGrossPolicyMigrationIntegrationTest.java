@@ -40,7 +40,8 @@ class CapGrossPolicyMigrationIntegrationTest {
                 assertThatThrownBy(() -> flyway(url,null).migrate()).hasStackTraceContaining("duplicate ACTIVE CAP policy");
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.policy_version",Long.class)).isEqualTo(before);
             } else {
-                flyway(url,null).migrate();
+                // V84는 판단 이유 문구만 고친다. 이 시험은 그 앞까지의 규칙 행 보존을 본다.
+                flyway(url,"82").migrate();
                 // #635 V63: 유산 REG-CAP-INS-2026-V1은 폐기(RETIRED)돼 현행 목록에서 빠진다. 나머지 순서·파라미터는 그대로다.
                 assertThat(activeRuleOrder(jdbc)).containsExactlyElementsOf(originalRuleOrder.stream()
                         .filter(rule -> !rule.startsWith("REG-CAP-INS-2026-V1:")).toList());

@@ -26,6 +26,8 @@ public class ValidationRunExceptionServiceImpl implements ExceptionGenerationPor
         Long validationRunId = context.validationRunId();
 
         long createdCount = 0;
+        // FUN-042 대상 선별에서 계산에서 뺀 계약(환급률표 없음, 상품코드 불일치, 표 중복)을 먼저 남긴다.
+        createdCount += exceptionCaseRepository.insertFromValidationTargets(validationRunId);
         createdCount += exceptionCaseRepository.insertFromCapChecks(validationRunId);
         // #498 확정된 달의 재검증이면 확정 결과와 다른 1,200% 판정을 사후 점검 건으로 남긴다(확정 달이 아니면 0건)
         createdCount += exceptionCaseRepository.insertFromFinalizedCapResultDiffs(validationRunId);

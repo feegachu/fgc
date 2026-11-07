@@ -52,6 +52,20 @@ for (const role of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN']) {
   })
 }
 
+test('read-only role finishes screen help where the write action is not available', async ({ page }) => {
+  await session(page, 'COMPLIANCE')
+  const empty = { data: { content: [], totalPages: 0, totalElements: 0 }, error: null, requestId: 'shell-fixture' }
+  for (const path of ['validation-runs', 'reconciliation', 'reconciliations', 'exceptions'])
+    await page.route(`**/api/v1/${path}**`, (route) => route.fulfill({ json: empty }))
+  for (const [path, steps] of [['contracts', 1], ['validation-runs', 1], ['reconciliations', 3], ['exceptions', 2]] as const) {
+    await page.goto(path)
+    await page.getByRole('button', { name: '도움말', exact: true }).first().click()
+    for (let step = 0; step < steps; step++) await page.getByRole('button', { name: '설명 확인 · 다음' }).click()
+    await expect(page.getByRole('heading', { name: '화면 사용법 안내 완료' })).toBeVisible()
+    await page.getByRole('button', { name: '안내 마치기' }).click()
+  }
+})
+
 test('eleventh tab is bounded and restored; month updates every tab and removes page', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 850 })
   await session(page)

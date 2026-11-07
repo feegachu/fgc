@@ -252,7 +252,7 @@ class FeeRegimeRulesetServiceIntegrationTest {
         return jdbc.queryForObject("""
                 INSERT INTO fgc.policy_version (policy_code, policy_name, policy_type, source_class,
                     version_no, effective_from, status)
-                VALUES (?, '분급 룰셋 서비스 테스트 정책', ?, 'PROJECT_ASSUMPTION', 1, DATE '2026-01-01', 'DRAFT')
+                VALUES (?, '분급 규칙 서비스 테스트 정책', ?, 'PROJECT_ASSUMPTION', 1, DATE '2026-01-01', 'DRAFT')
                 RETURNING policy_version_id
                 """, Long.class, code, policyType);
     }

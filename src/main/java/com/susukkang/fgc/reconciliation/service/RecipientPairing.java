@@ -1,5 +1,7 @@
 package com.susukkang.fgc.reconciliation.service;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -36,6 +38,17 @@ final class RecipientPairing {
 
     /** 짝 하나가 대사 결과 한 행이 된다. */
     record Pair<E, A>(List<E> expected, List<A> actual) {
+    }
+
+    /**
+     * 이번 달 회차 중 지급예정일이 오늘 뒤인 것은 실제 지급이 없어도 아직 누락이 아니다(운영정책서 제36조).
+     * 월 중간 실행과 일 배치가 그 달 뒤쪽 회차를 전부 ACTUAL_MISSING 으로 올리지 않게 대사 결과에서 뺀다.
+     * 지급예정일이 없는 회차는 사람이 봐야 하므로 그대로 두고, 미래 달 실행은 화면에서 막으므로 건드리지 않는다.
+     */
+    static <E, A> boolean notDueYet(Pair<E, A> pair, Function<E, LocalDate> dueDate, LocalDate today) {
+        return pair.actual().isEmpty() && !pair.expected().isEmpty()
+                && pair.expected().stream().map(dueDate).allMatch(date -> date != null && date.isAfter(today)
+                        && YearMonth.from(date).equals(YearMonth.from(today)));
     }
 
     /**

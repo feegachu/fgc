@@ -23,18 +23,22 @@ describe('policy UI boundaries', () => {
     expect(emptyRegime('SEVEN_YEAR_COMMISSION').longTermMaintenanceFrom).toBe('')
   })
   it('근거 코드는 저장값을 두고 문서 경로와 승계 기록만 읽기 쉬운 이름으로 보인다', () => {
-    expect(refLabel('docs/05_인터페이스정의서_v2_0.md#9-5')).toBe('인터페이스정의서 9-5')
-    expect(refLabel('docs/05_인터페이스정의서_v2_0.md')).toBe('인터페이스정의서')
-    expect(refLabel('docs/FGC_가상_GA_운영정책서_v1_0.md#제46조')).toBe('가상 GA 운영정책서 제46조')
+    expect(refLabel('docs/05_인터페이스정의서_v2_0.md#9-5')).toBe('')
+    expect(refLabel('docs/05_인터페이스정의서_v2_0.md')).toBe('')
+    expect(refLabel('docs/FGC_가상_GA_운영정책서_v1_0.md#제46조')).toBe('회사 운영정책 제46조')
     // 'policy:45'의 45는 내부 번호라 그대로 보이지 않고, 목록에서 찾으면 정책 코드와 판을 붙인다.
     expect(refLabel('policy:45')).toBe('다음 정책 버전')
-    expect(refLabel('policy:45', [{ policyVersionId: 45, policyCode: 'GA-CUR-2026', versionNo: 2 }])).toBe(
-      '다음 정책 버전 GA-CUR-2026 v2',
-    )
-    expect(refLabel('policy:45', [{ policyVersionId: 46, policyCode: 'GA-CUR-2026', versionNo: 3 }])).toBe(
-      '다음 정책 버전',
-    )
-    expect(refLabel('REG-08')).toBe('REG-08')
+    expect(refLabel('policy:45', [{ policyVersionId: 45, versionNo: 2 }])).toBe('다음 정책 버전 v2')
+    expect(refLabel('policy:45', [{ policyVersionId: 46, versionNo: 3 }])).toBe('다음 정책 버전')
+    // 규정 코드는 이름으로, 이름이 없는 출처 코드와 팀 결정 번호는 표시하지 않는다.
+    expect(refLabel('REG-08')).toBe('초년도 1,200%룰')
+    expect(refLabel('REG-99')).toBe('관련 규정')
+    expect(refLabel('SRC-022')).toBe('')
+    expect(refLabel('SRC-025 Q11')).toBe('')
+    expect(refLabel('D-01 시연 가정')).toBe('')
+    expect(refLabel('FGC 운영정책서 제48조의3')).toBe('회사 운영정책 제48조의3')
+    expect(refLabel('가상 GA 운영정책서 v1.0 제19~20조')).toBe('회사 운영정책 제19~20조')
+    expect(refLabel('원수사 판매수수료율표 2026')).toBe('보험회사 판매수수료율표 2026')
   })
   it('정책 파라미터의 저장 키와 코드값을 화면 문구로 바꾼다', () => {
     expect(policyParameterLabel('ARBITRAGE_EFFECTIVE_CONTRACT_DATE')).toBe('차익거래 적용 시작일')
@@ -53,19 +57,21 @@ describe('policy UI boundaries', () => {
   })
 
   it('시드가 남긴 승인 근거와 출처 문구의 개발 용어를 화면에서만 바꾼다', () => {
-    expect(policySeedText('시드 승인 (GOLDEN 프로파일·#332)')).toBe('시연 자료 승인, 운영 정책 승인을 대체하지 않음')
-    expect(policySeedText('데모 승인 — #475, 운영 정책 승인을 대체하지 않음')).toBe('시연 자료 승인, 운영 정책 승인을 대체하지 않음')
-    expect(policySeedText('PROJECT_ASSUMPTION — 합성값, #332 시연 커버리지 보강')).toBe('프로젝트 가정 — 합성값 시연 커버리지 보강')
-    expect(policySeedText('REG-10 시행일 보정 (코드리뷰 PR #18 반영)')).toBe('REG-10 시행일 보정')
-    expect(policySeedText('원수사 예상 해약환급률표 2026 (합성값·#332 보강)')).toBe('원수사 예상 해약환급률표 2026 (합성값 보강)')
+    expect(policySeedText('시드 승인 (GOLDEN 프로파일·#332)')).toBe('내부 승인')
+    expect(policySeedText('데모 승인 — #475, 운영 정책 승인을 대체하지 않음')).toBe('내부 승인')
+    expect(policySeedText('PROJECT_ASSUMPTION — 2026년 말 최종 FAQ 확정 시 재검증 필요')).toBe('자체 기준, 2026년 말 최종 FAQ 확정 시 재검증')
+    expect(policySeedText('PROJECT_ASSUMPTION — 합성값, #332 시연 커버리지 보강')).toBe('자체 기준 — 합성값 시연 커버리지 보강')
+    expect(policySeedText('REG-10 시행일 보정 (코드리뷰 PR #18 반영)')).toBe('준법경영비 공제 시행일 보정')
+    expect(policySeedText('보험회사 예상 해약환급률표 2026 (합성값·#332 보강)')).toBe('보험회사 예상 해약환급률표 2026 (합성값 보강)')
     // 사용자가 입력한 승인 근거는 그대로 보인다.
     expect(policySeedText('의결서-HTTP-001')).toBe('의결서-HTTP-001')
     expect(policySeedText('데모 승인서 2026-001')).toBe('데모 승인서 2026-001')
     expect(policySeedText('위원회 의결서, #123')).toBe('위원회 의결서, #123')
     expect(policySeedText(null)).toBe('-')
     expect(refLabel('운영정책서 제47조: 장기유지 61~84차월은 PROJECT_ASSUMPTION(시드값)')).toBe(
-      '운영정책서 제47조: 장기유지 61~84차월은 프로젝트 가정(가정값)',
+      '장기유지 61~84차월, 5년 이상 유지 요건을 회차로 옮긴 자체 기준',
     )
+    expect(refLabel('운영정책서 제46조: 지급 1~48차월(최초 지급회차는 PROJECT_ASSUMPTION)')).toBe('')
   })
 
   it('does not allow unsafe source links', () => {
@@ -190,14 +196,13 @@ describe('policy UI boundaries', () => {
       1,
     )
   })
-  it('allows deleting a comma one character at a time and saves cleared references as an empty list', async () => {
+  it('saves a cleared regulation choice as an empty list', async () => {
     const { user, save } = mountRegimeEditor(regimeDraft('SEVEN_YEAR_COMMISSION'))
-    await user.click(screen.getByRole('button', { name: /분급 룰셋/ }))
-    const input = screen.getByLabelText('근거 코드')
-    await user.type(input, 'SRC-A, B')
-    await user.keyboard('{Backspace}{Backspace}{Backspace}')
-    expect(input).toHaveValue('SRC-A')
-    await user.clear(input)
+    await user.click(screen.getByRole('button', { name: /분급 규칙/ }))
+    const choice = screen.getByRole('checkbox', { name: '선지급수수료' })
+    await user.click(choice)
+    expect(choice).toBeChecked()
+    await user.click(choice)
     await user.click(screen.getByRole('button', { name: '초안 저장' }))
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -206,16 +211,17 @@ describe('policy UI boundaries', () => {
       1,
     )
   })
-  it('trims, removes empty entries and deduplicates reference codes only when saving', async () => {
-    const { user, save } = mountRegimeEditor(regimeDraft('SEVEN_YEAR_COMMISSION'))
-    await user.click(screen.getByRole('button', { name: /분급 룰셋/ }))
-    const input = screen.getByLabelText('근거 코드')
-    await user.type(input, ' SRC-A, REG-B, ,SRC-A, ')
-    expect(input).toHaveValue(' SRC-A, REG-B, ,SRC-A, ')
+  it('saves regulations picked by name as codes and keeps a stored source reference', async () => {
+    const draft = regimeDraft('SEVEN_YEAR_COMMISSION')
+    draft.feeRegimeRules[0].sourceRefs = ['SRC-022']
+    const { user, save } = mountRegimeEditor(draft)
+    await user.click(screen.getByRole('button', { name: /분급 규칙/ }))
+    await user.click(screen.getByRole('checkbox', { name: '선지급수수료' }))
+    expect(screen.queryByText(/REG-|SRC-/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '초안 저장' }))
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({
-        feeRegimeRules: [expect.objectContaining({ sourceRefs: ['SRC-A', 'REG-B'] })],
+        feeRegimeRules: [expect.objectContaining({ sourceRefs: ['SRC-022', 'REG-02'] })],
       }),
       1,
     )
@@ -296,7 +302,7 @@ function regimeDraft(policyType: string): DraftDocument {
   return {
     ...emptyDraft(),
     policyCode: 'UI-REGRESSION',
-    policyName: '분급 룰셋 검증',
+    policyName: '분급 규칙 검증',
     policyType,
     sourceClass: 'PROJECT_ASSUMPTION',
     effectiveFrom: '2029-01-01',
