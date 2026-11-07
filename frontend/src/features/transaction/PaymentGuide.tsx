@@ -274,11 +274,11 @@ function GuideSession({
   }
   const waitingInstruction =
     step?.stepId === 'payment.scope'
-      ? '① 지급 건에서 정산월, 지급단계, 수령 설계사를 선택하세요. 원수사→GA는 설계사 선택이 필요 없습니다. 계약은 ② 귀속행에서 선택합니다.'
+      ? '지급 건에서 정산월, 지급단계, 수령 설계사를 선택하세요. 보험회사→GA는 설계사 선택이 필요 없습니다. 계약은 귀속 내역에서 선택합니다.'
       : step?.stepId === 'payment.amount'
-        ? '① 지급 건에서 수수료 항목과 0원 이상의 지급액을 입력하세요.'
+        ? '지급 건에서 수수료 항목과 0원 이상의 지급액을 입력하세요.'
         : step?.stepId === 'payment.attributions'
-          ? '② 귀속행 추가 후 계약번호, 귀속일, 금액을 입력하세요. 귀속금액 합계를 지급액과 맞추세요.'
+          ? '귀속 내역 추가 후 계약번호, 귀속일, 금액을 입력하세요. 귀속금액 합계를 지급액과 맞추세요.'
           : (state?.validationMessage ?? '화면의 실제 업무 버튼을 눌러 처리 결과를 확인하세요.')
   const paused = snapshot.status === 'PAUSED' || snapshot.status === 'ERROR'
   const complete = snapshot.status === 'COMPLETED'

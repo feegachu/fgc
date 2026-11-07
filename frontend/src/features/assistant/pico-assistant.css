@@ -4,16 +4,16 @@
   color: var(--color-text-primary);
 }
 .pico-launcher {
-  --pico-size: 132px;
+  --pico-size: 96px;
   position: fixed;
-  right: 28px;
-  bottom: 26px;
+  right: 16px;
+  bottom: 16px;
   /* 업무 가이드의 강조 영역과 안내 카드 아래에 두어 진행 버튼을 가리지 않는다. */
   z-index: calc(var(--z-overlay) - 3);
 }
 /* #808 review · design :131 — the last business buttons must scroll clear of the fixed launcher. */
 .app-shell:has(.pico-assistant-root) .page-content {
-  padding-bottom: calc(var(--space-8) + 120px);
+  padding-bottom: calc(var(--space-8) + 96px);
 }
 /* Adopt the agent-home AI launcher treatment without coupling page styles. */
 @property --pico-launcher-angle {
@@ -26,8 +26,8 @@
 }
 .pico-launcher .pico-launcher-hint {
   position: absolute;
-  right: 136px;
-  bottom: 46px;
+  right: 100px;
+  bottom: 34px;
   padding: 7px 11px;
   border: 1.5px solid transparent;
   border-radius: 16px;
@@ -55,8 +55,8 @@
 }
 .pico-launcher .pico-launcher-button img {
   display: block;
-  width: 128px;
-  height: 128px;
+  width: 92px;
+  height: 92px;
   max-width: none;
   object-fit: contain;
   filter: drop-shadow(0 6px 10px rgb(15 23 42 / 22%));

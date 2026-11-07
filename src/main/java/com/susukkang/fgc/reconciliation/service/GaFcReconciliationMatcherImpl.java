@@ -2,6 +2,7 @@ package com.susukkang.fgc.reconciliation.service;
 
 import com.susukkang.fgc.common.code.PaymentStage;
 import com.susukkang.fgc.common.util.MoneyUtil;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.reconciliation.domain.ReconciliationResultType;
 import com.susukkang.fgc.reconciliation.dto.GaFcActualSourceRow;
 import com.susukkang.fgc.reconciliation.dto.GaFcExpectedSourceRow;
@@ -59,6 +60,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
         Set<BaseMatchKey> keys = new LinkedHashSet<>();
         keys.addAll(expectedByKey.keySet());
         keys.addAll(actualByKey.keySet());
+        LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
 
         // 2026-08-19 hjKang - 그룹 안에서 수취인 단위로 짝을 지어 판정한다(운영정책서 제36조).
         // 기존 코드: 그룹 하나를 통째로 합산해 후보 1건을 만들었다.
@@ -74,6 +76,7 @@ public class GaFcReconciliationMatcherImpl implements GaFcReconciliationMatcher 
                                 actualByKey.getOrDefault(key, List.of()),
                                 GaFcActualSourceRow::getActualAgentId)
                         .stream()
+                        .filter(pair -> !RecipientPairing.notDueYet(pair, GaFcExpectedSourceRow::getDueDate, today))
                         .map(pair -> createCandidate(
                                 request,
                                 key,

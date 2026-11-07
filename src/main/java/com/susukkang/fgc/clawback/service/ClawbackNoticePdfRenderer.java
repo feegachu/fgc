@@ -60,9 +60,9 @@ public class ClawbackNoticePdfRenderer {
             PDType0Font font = PDType0Font.load(document, new ByteArrayInputStream(fontBytes), true);
             document.getDocumentInformation().setTitle(notice.documentNo() + " v" + notice.version());
             try (Writer writer = new Writer(document, font)) {
-                writer.text(18, MARGIN, "환수 통지서 (가상 양식)");
+                writer.text(18, MARGIN, "환수 통지서 (내부 검토용)");
                 writer.gap();
-                writer.field("문서번호", notice.documentNo() + "  /  " + notice.version() + "판");
+                writer.field("문서번호", notice.documentNo() + "  /  " + notice.version() + "번째 발행");
                 writer.field("발행일시", dateTime(notice.issuedAt()));
                 writer.gap();
                 writer.field("계약번호", notice.contractNo());
@@ -74,7 +74,7 @@ public class ClawbackNoticePdfRenderer {
                 writer.field("원인 발생일", String.valueOf(notice.eventDate()));
                 writer.gap();
                 writer.field("적용 정책", notice.policyLabel());
-                writer.field("계산판", notice.calculationVersion() + "판  /  계산일시 " + dateTime(notice.calculatedAt()));
+                writer.field("계산 차수", notice.calculationVersion() + "차  /  계산일시 " + dateTime(notice.calculatedAt()));
                 writer.field("경과월", notice.elapsedMonths() == null ? "-" : notice.elapsedMonths() + "개월");
                 writer.field("반올림", notice.rounding());
                 writer.gap();
@@ -85,7 +85,7 @@ public class ClawbackNoticePdfRenderer {
                 }
                 writer.row(true, "합계", "", "", "", won(notice.total()));
                 writer.gap();
-                writer.text(9, MARGIN, "이 문서는 FGC가 계산판 기준으로 생성한 내부 검토용 가상 양식입니다.");
+                writer.text(9, MARGIN, "이 문서는 내부 검토용입니다. 실제 통지가 아닙니다.");
                 writer.text(9, MARGIN, "실제 통지·이의·확정·회수를 의미하지 않으며, 환수율과 산식은 회사별 위촉계약 정책을 따릅니다.");
             }
             document.save(out);

@@ -77,10 +77,10 @@ class ContractTransactionProjectionServiceImplIntegrationTest {
 
         // 설계사명은 마스킹하지 않는다(코드리뷰 반영 — 화면정의서에 설계사명 마스킹
         // 근거가 없고, 다른 화면(agents API·CONT-W03)은 원문을 그대로 노출한다).
-        // 시드 이름 중 하나(김정산)가 원문 그대로 나오는지 확인.
+        // 시드 이름 중 하나(손설계, V84가 A-FC-001을 맞춤)가 원문 그대로 나오는지 확인.
         assertThat(result).flatExtracting(ContractTransactionResponse::getAttributions)
                 .extracting("agentName")
-                .contains("김정산");
+                .contains("손설계");
     }
 
     @Test

@@ -148,7 +148,7 @@ class ArbitragePersistenceComparisonTest {
         jdbc.update("UPDATE fgc.exception_case SET status = 'RESOLVED', resolved_at = clock_timestamp() WHERE exception_case_id = ?", id);
         row.setValidationRunId(insertRun());
         repository.insertArbitrageCheck(row);
-        Long redetectedId = exceptionRepository.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "재검출 근거");
+        Long redetectedId = exceptionRepository.insertArbitrageCandidate(row.getValidationRunId(), row.getContractId(), row.getArbitrageCheckId(), "GA_TO_FC", "다시 나옴 근거");
         assertThat(redetectedId).isEqualTo(id);
         assertThat(jdbc.queryForObject("SELECT status FROM fgc.exception_case WHERE exception_case_id = ?", String.class, id)).isEqualTo("NEW");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id = ?", Long.class, id)).isEqualTo(2);

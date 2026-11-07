@@ -15,7 +15,7 @@ import {
   selectContract,
 } from './form-model'
 
-const form = { ...initialForm('2026-07'), sourceBusinessKey: 'GA-MANUAL-test', agentId: '1', commissionItemId: '2' }
+const form = { ...initialForm('2026-07'), sourceBusinessKey: 'GA-MANUAL-test', agentId: '1', commissionItemId: '2', amount: '250000' }
 const row = { ...newRow(1, '2026-07-01', '250000'), contractId: '3' }
 
 describe('transaction draft and attribution contract', () => {
@@ -56,9 +56,9 @@ describe('transaction draft and attribution contract', () => {
     })
   })
   it('rejects missing rows, negative amounts, exclusion evidence and approved allocation basis', () => {
-    expect(() => buildPayload(form, [], false)).toThrow('귀속행을 하나 이상 추가하세요.')
+    expect(() => buildPayload(form, [], false)).toThrow('귀속 내역을 하나 이상 추가하세요.')
     expect(() => buildPayload({ ...form, amount: '-1' }, [row], false)).toThrow('금액')
-    expect(() => buildPayload(form, [{ ...row, decision: 'EXCLUDED:NEW_AGENT_SUPPORT' }], false)).toThrow('제외 귀속행')
+    expect(() => buildPayload(form, [{ ...row, decision: 'EXCLUDED:NEW_AGENT_SUPPORT' }], false)).toThrow('제외 귀속 내역')
     expect(() =>
       buildPayload(form, [{ ...row, attributionMethod: 'APPROVED_ALLOCATION', allocationBasis: ' ' }], false),
     ).toThrow('배부정책')
@@ -164,6 +164,8 @@ describe('legacy defect model regressions (#410)', () => {
   it('preserves zero saved rows but retains the default row for a new form', () => {
     expect(draftRows({ attributions: [] })).toEqual([])
     expect(draftRows(undefined)).toHaveLength(1)
+    expect(draftRows(undefined)[0].amount).toBe('')
+    expect(initialForm('2026-07').amount).toBe('')
     expect(draftRows(undefined)[0].attributionDate).toBe('')
   })
 })

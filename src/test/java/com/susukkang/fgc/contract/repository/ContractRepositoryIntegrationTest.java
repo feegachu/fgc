@@ -182,7 +182,7 @@ class ContractRepositoryIntegrationTest {
         assertThat(result).hasSize(1);
         assertThat(total).isEqualTo(1);
         assertThat(result.getFirst().getContractNo()).isEqualTo(contract.getContractNo());
-        assertThat(result.getFirst().getAgentIdName()).startsWith("FC-");
+        assertThat(result.getFirst().getAgentIdName()).endsWith(")").doesNotStartWith("FC-");
         assertThat(result.getFirst().getContractStatus()).isEqualTo(ACTIVE);
         assertThat(result.getFirst().getCapResultStatus()).isNull();
         assertThat(result.getFirst().getDataOrigin()).isEqualTo(DataOrigin.MANUAL);

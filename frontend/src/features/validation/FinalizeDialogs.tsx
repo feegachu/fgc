@@ -54,7 +54,7 @@ export function FinalizeDialogs({
       >
         {saveGuide && <ScreenHelp screenId="VRUN-W02" variant="finalize" saveGuide={saveGuide} outcome="finalization" />}
         <p data-guide-target="validation.finalizeWarning" className="vrun-modal-description">
-          확정하면 이 실행의 검증 결과와 그때 쓰인 룰셋/계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
+          확정하면 이 실행의 검증 결과와 그때 쓰인 규칙/계산근거가 잠깁니다. <strong>되돌릴 수 없습니다.</strong>
         </p>
         <div className="vrun-modal-points">
           <p>
@@ -71,8 +71,8 @@ export function FinalizeDialogs({
             <dd className="tabular-nums">{validationMonth}</dd>
           </div>
           <div>
-            <dt>회차</dt>
-            <dd className="tabular-nums">{runNo}</dd>
+            <dt>실행 차수</dt>
+            <dd className="tabular-nums">{runNo}차</dd>
           </div>
         </dl>
       </Modal>

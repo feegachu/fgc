@@ -498,7 +498,7 @@ class AcquisitionCostCheckIntegrationTest {
                 .andExpect(jsonPath("$.data.totalElements").value(0));
         mvc.perform(get(URL).param("contractId", String.valueOf(contractId)).param("paymentStage", "INSURER_TO_GA").with(user(settlement)))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
-                .andExpect(jsonPath("$.data.content[0].paymentStageLabel").value("원수사→GA"));
+                .andExpect(jsonPath("$.data.content[0].paymentStageLabel").value("보험회사→GA"));
         mvc.perform(get(URL).param("contractId", String.valueOf(contractId)).param("size", "2").param("page", "2")
                         .param("sort", "contractNo,asc").with(user(settlement)))
                 .andExpect(jsonPath("$.data.content.length()").value(1))
