@@ -2,7 +2,7 @@ import { useLayoutEffect, useState } from 'react'
 
 type Observation = { key: string; target: HTMLElement | null; valid: boolean; status: 'WAITING' | 'READY' | 'PAUSED'; message: string }
 /** A paused explanation only resumes on explicit retry; no business action is executed. */
-export function useWalkthroughTarget(selector: string | undefined, context: string, requiresInput = false) {
+export function useWalkthroughTarget(selector: string | undefined, context: string, requiresInput = false, requiresSelectedTab = false) {
   const [attempt, setAttempt] = useState(0)
   const key = `${context}:${selector}:${attempt}`
   const [observed, setObserved] = useState<Observation>()
@@ -27,6 +27,7 @@ export function useWalkthroughTarget(selector: string | undefined, context: stri
       const input = target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null
       const value = input?.getAttribute('role') === 'combobox' && input instanceof HTMLInputElement ? input.dataset.selectedValue : input?.value
       const valid = !!target && (!requiresInput || (!!value?.trim() && (!input?.validity || input.validity.valid)))
+        && (!requiresSelectedTab || target.getAttribute('aria-selected') === 'true')
       const status = target ? 'READY' : 'WAITING'
       const message = target ? '' : '안내 대상을 찾고 있습니다. 5초 안에 준비되지 않으면 안내를 중단합니다.'
       setObserved(previous => previous?.key === key && previous.target === target && previous.valid === valid && previous.status === status ? previous : { key, target, valid, status, message })
@@ -45,7 +46,7 @@ export function useWalkthroughTarget(selector: string | undefined, context: stri
       document.removeEventListener('change', update, true)
       window.removeEventListener('resize', update)
     }
-  }, [selector, key, requiresInput])
+  }, [selector, key, requiresInput, requiresSelectedTab])
   const current = observed?.key === key ? observed : undefined
   return { target: current?.target ?? null, valid: current?.valid ?? false, status: current?.status ?? 'WAITING', message: current?.message ?? '', retry: () => setAttempt(value => value + 1) }
 }

@@ -292,7 +292,7 @@ function StatusEffectsPanel({ id, event, onClose }: { id: string; event: Contrac
   )
 }
 
-export function ContractStatusHistory({ id }: { id: string }) {
+export function ContractStatusHistory({ id, compact = false }: { id: string; compact?: boolean }) {
   const history = useQuery({
     ...contractEventsQuery(id),
     refetchInterval: (query) => (followUpRunning(query.state.data) ? FOLLOW_UP_REFETCH_MS : false),
@@ -308,13 +308,13 @@ export function ContractStatusHistory({ id }: { id: string }) {
     <section
       data-guide-feature="features.contract.contract-tabs.section-3"
       data-guide-target="contract.statusHistory"
-      className="contract-history-panel"
+      className={`contract-history-panel${compact ? ' contract-history-compact' : ''}`}
       aria-labelledby="contract-history-title"
     >
       <header className="contract-history-panel-header">
         <div>
           <h3 id="contract-history-title">상태이력</h3>
-          <p>상태 변경과 그 처리 결과를 보여 줍니다.</p>
+          {!compact && <p>상태 변경과 그 처리 결과를 보여 줍니다.</p>}
         </div>
         <div className="contract-history-sort" role="group" aria-label="상태이력 정렬 기준">
           <Button
@@ -357,12 +357,21 @@ export function ContractStatusHistory({ id }: { id: string }) {
               </span>
             </p>
           )}
-          {followUpRunning(events) && (
+          {!compact && followUpRunning(events) && (
             <p className="contract-history-note" role="status">
               끝나지 않은 후속 처리가 있어 {FOLLOW_UP_REFETCH_MS / 1000}초마다 다시 조회합니다.
             </p>
           )}
-          <DataTable
+          {compact ? <ol className="contract-history-timeline">
+            {sortStatusEvents(events, sort).map((event, index) => <li key={event.eventId ?? index}>
+              <strong>{transition(event)}</strong>
+              <time>{dateTime(sort === 'effectiveAt' ? event.effectiveAt : event.receivedAt)}</time>
+              <span>{reasonText(event)}</span>
+              <FollowUpStatus event={event} />
+              {event.eventId != null && <Button variant="secondary" onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
+            </li>)}
+            {!events.length && <li className="empty-state">등록된 상태이력이 없습니다.</li>}
+          </ol> : <DataTable
             className="contract-history-table"
             caption="상태 사건"
             columns={columns}
@@ -370,7 +379,7 @@ export function ContractStatusHistory({ id }: { id: string }) {
             rowKey={(row) => String(row.eventId ?? `${row.sourceSystem ?? ''}-${row.sourceEventKey ?? row.eventSeq}`)}
             selectedKeys={selection ? [String(selection.eventId)] : []}
             emptyMessage="등록된 상태이력이 없습니다."
-          />
+          />}
         </>
       ) : (
         <QueryContent query={history}>{() => null}</QueryContent>

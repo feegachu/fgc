@@ -37,7 +37,7 @@ export function useWorkflowWalkthrough(stage: SettlementStep | undefined, path: 
   const steps = detail ? available?.key === key ? available.steps : [] : catalogue
   const sequence = useGuideSequence(steps, key, identify)
   const { step } = sequence
-  const observed = useWalkthroughTarget(observing ? step?.selector : undefined, key, step?.input)
+  const observed = useWalkthroughTarget(observing ? step?.selector : undefined, key, step?.input, step?.requiresSelectedTab)
   const target = observed.target
   return {
     ...sequence, target, status: observed.status, retry: observed.retry,

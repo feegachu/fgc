@@ -12,6 +12,19 @@ export const contractTabs = [
   ['payment', '지급/대사'],
 ] as const
 export type ContractTab = (typeof contractTabs)[number][0]
+export const contractTabIcons: Record<ContractTab, string> = {
+  basic: 'description', schedules: 'calendar_month', cap: 'fact_check', arbitrage: 'search',
+  acquisition: 'payments', ledger: 'menu_book', payment: 'payments',
+}
+export const contractTabDescriptions: Record<ContractTab, string> = {
+  basic: '기본정보 · 계약 조건과 보험료, 납입기간을 확인합니다.',
+  schedules: '예상 스케줄 · 회차별 수령인과 예상 지급액을 확인합니다.',
+  cap: '1,200% · 지급단계별 한도와 산입액, 최신 판정을 확인합니다.',
+  arbitrage: '차익거래 · 납입보험료와 수수료 등을 비교한 검증 결과입니다.',
+  acquisition: '계약체결비용 · 선지급·유지관리 비용의 한도를 확인합니다.',
+  ledger: '원장 · 이 계약에서 발생한 분개의 차변과 대변을 확인합니다.',
+  payment: '지급/대사 · 실제 지급 내역과 예상액의 차이를 확인합니다.',
+}
 export const contractTab = (value: string | null): ContractTab =>
   contractTabs.find(([name]) => name === value)?.[0] ?? 'basic'
 

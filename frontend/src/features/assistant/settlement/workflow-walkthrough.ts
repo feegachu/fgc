@@ -2,12 +2,13 @@ import type { SettlementStep } from './state'
 import type { ScreenHelpStep } from '../guide/ScreenHelp'
 import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
 
-export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'onEnter' | 'interaction' | 'concise'>> {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
   id: string
   selector: string
   title: string
   instruction: string
   input?: boolean
+  requiresSelectedTab?: boolean
   workflowInstruction?: string
 }
 const target = (id: string) => `[data-guide-target="${id}"]`
@@ -108,9 +109,15 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
 /** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
 export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true): WorkflowExplanation[] {
   if (reuseContractDetail && stage === 'contract.create' && /^\/contracts\/\d+$/.test(path)) {
-    return getScreenWalkthrough('CONT-W02').map(entry => ({
+    return [...getScreenWalkthrough('CONT-W02').map(entry => ({
       ...entry, id: entry.targetId, selector: guideSelector(entry),
-    }))
+    })), {
+      id: 'contract.openSchedules', selector: '#contract-tab-schedules',
+      title: '예상 스케줄로 이어가기', concise: true,
+      instruction: '예상 스케줄 탭을 눌러 생성된 회차를 확인하세요.',
+      interaction: '확인한 뒤 다음 업무로 이동하세요.', requiresSelectedTab: true,
+      presentation: { side: 'right' },
+    }]
   }
   const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
   if (stage === 'contract.create') return instructions

@@ -29,6 +29,8 @@ export interface ScreenHelpStep {
   firstMatch?: boolean
   anchor?: 'start'
   concise?: boolean
+  /** Read the current preview's one-line explanation without changing the step. */
+  liveDescriptionSelector?: string
   presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string }
   openControl?: boolean
   advanceOnSelection?: boolean
