@@ -13,8 +13,12 @@ class RecipientPairingNotDueYetTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 6);
 
     private static boolean notDueYet(List<String> actual, String... dueDates) {
+        return notDueYet(TODAY, actual, dueDates);
+    }
+
+    private static boolean notDueYet(LocalDate today, List<String> actual, String... dueDates) {
         return RecipientPairing.notDueYet(new RecipientPairing.Pair<>(Arrays.asList(dueDates), actual),
-                (Function<String, LocalDate>) date -> date == null ? null : LocalDate.parse(date), TODAY);
+                (Function<String, LocalDate>) date -> date == null ? null : LocalDate.parse(date), today);
     }
 
     @Test
@@ -34,5 +38,13 @@ class RecipientPairingNotDueYetTest {
         assertThat(notDueYet(List.of(), (String) null)).isFalse();
         assertThat(notDueYet(List.of(), "2026-12-01")).isFalse();
         assertThat(notDueYet(List.of())).isFalse();
+    }
+
+    @Test
+    void 월말_당일과_다음_달이_섞인_경계도_그대로_판정한다() {
+        // FGC-FUN-048 월 대사: 월말 당일 회차는 이미 도래했고, 다음 달 회차가 섞이면 이번 달만의 미도래가 아니다.
+        assertThat(notDueYet(LocalDate.of(2026, 11, 30), List.of(), "2026-11-30")).isFalse();
+        assertThat(notDueYet(LocalDate.of(2026, 11, 29), List.of(), "2026-11-30")).isTrue();
+        assertThat(notDueYet(List.of(), "2026-11-07", "2026-12-01")).isFalse();
     }
 }
