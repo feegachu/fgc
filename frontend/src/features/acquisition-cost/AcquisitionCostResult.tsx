@@ -6,6 +6,7 @@ import type { StatusTone } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
 import { date, dateTime, int, usageRate, won } from '../../lib/format'
 import { contractErrorText } from '../contract/detailState'
+import { refLabels } from '../policies/management'
 import type { AcquisitionCheck, AcquisitionItem } from './api'
 import { amountText, percentText, policyText } from './labels'
 import './acquisition-cost.css'
@@ -24,7 +25,7 @@ export function AcquisitionStatus({ status, label }: { status?: string; label?: 
   )
 }
 const refsText = (policy?: AcquisitionCheck['limitPolicy']) =>
-  [...(policy?.regulationRefs ?? []), ...(policy?.sourceRefs ?? [])].join(', ') || '-'
+  refLabels([...(policy?.regulationRefs ?? []), ...(policy?.sourceRefs ?? [])]).join(', ') || '-'
 
 function LimitResult({ item, indirect }: { item: AcquisitionItem; indirect?: { amount?: number | null } }) {
   const rows: [string, string][] = [
@@ -237,7 +238,6 @@ export function AcquisitionFailure({
   return (
     <div className="acq-failure" role="alert">
       <p>{message}</p>
-      {status === 422 && error instanceof ApiError && error.field && <p>확인할 항목: {error.field}</p>}
       {retry && status !== 403 && (
         <Button data-guide-feature="features.acquisition-cost.acquisition-cost-result.button" variant="secondary" onClick={status === 409 ? reload : retry}>
           {status === 409 ? '다시 조회' : '다시 시도'}

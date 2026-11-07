@@ -76,7 +76,7 @@ public enum ExceptionActionType {
             case CANCEL -> "취소";
             case DEFER -> "이연";
             case RECONCILE_AGAIN -> "재대사";
-            case FALSE_POSITIVE -> "오탐";
+            case FALSE_POSITIVE -> "예외 아님";
             case RESOLVE -> "해결";
             case REJECT -> "반려";
             case REOPEN -> "재검토 시작";

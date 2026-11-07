@@ -43,12 +43,18 @@ export function policyParameterValue(value: unknown) {
  */
 export function policySeedText(value?: string | null) {
   if (!value) return '-'
-  if (/^(?:시드 승인 \(|데모 승인 — #\d)/.test(value)) return '시연 자료 승인, 운영 정책 승인을 대체하지 않음'
+  if (/^(?:시드 승인 \(|데모 승인 — #\d)/.test(value)) return '내부 승인'
+  if (value.startsWith('REG-10 시행일 보정')) return '준법경영비 공제 시행일 보정'
+  if (value.startsWith('운영정책서 제46조:')) return ''
+  if (value.startsWith('운영정책서 제47조:')) return '장기유지 61~84차월, 5년 이상 유지 요건을 회차로 옮긴 자체 기준'
   return value
-    .replaceAll('PROJECT_ASSUMPTION', '프로젝트 가정')
+    .replace(/^PROJECT_ASSUMPTION — (.+?) 필요$/, '자체 기준, $1')
+    .replaceAll('PROJECT_ASSUMPTION', '자체 기준')
     .replaceAll('시드값', '가정값')
+    .replaceAll('원수사', '보험회사')
     .replace(/\s*\(코드리뷰 PR #\d+ 반영\)/, '')
     .replace(/, #\d+(?= 시연)|·#\d+(?= 보강)/, '')
+    .replace(/^(?:가상 GA|FGC) 운영정책서(?: v[\d.]+)?/, '회사 운영정책')
 }
 
 const policyCodeLabels: Record<string, string> = {

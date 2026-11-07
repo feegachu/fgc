@@ -30,10 +30,9 @@ const sourceLabels: Record<string, string> = {
 }
 
 /** 원천 참조를 화면 이름으로 보인다. 계약은 내부 번호 대신 계약번호를 쓰고, 모르는 유형만 'TYPE:ID' 원문으로 남긴다. */
-export function sourceReference(type?: string, id?: string, contractNo?: string) {
-  if (!type || !Object.hasOwn(sourceLabels, type)) return `${type ?? ''}:${id ?? ''}`
-  const shown = type === 'INSURANCE_CONTRACT' && contractNo ? contractNo : id
-  return `${sourceLabels[type]} ${shown ?? ''}`.trim()
+export function sourceReference(type?: string, contractNo?: string) {
+  if (!type || !Object.hasOwn(sourceLabels, type)) return '원본 보기'
+  return type === 'INSURANCE_CONTRACT' && contractNo ? `${sourceLabels[type]} ${contractNo}` : sourceLabels[type]
 }
 
 export function exceptionSummaryDescription(type?: string) {

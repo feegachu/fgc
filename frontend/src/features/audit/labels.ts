@@ -8,9 +8,9 @@ export const actionLabels = {
   LOGIN_SUCCESS: '로그인 성공',
   LOGIN_FAIL: '로그인 실패',
   LOGOUT: '로그아웃',
-  LOGIN_SUPERSEDED: '새 로그인으로 기존 로그인 무효화',
-  TOKEN_REFRESH: '인증 토큰 갱신',
-  REFRESH_REUSE_DETECTED: '갱신 토큰 재사용 탐지',
+  LOGIN_SUPERSEDED: '새 로그인으로 이전 로그인 종료',
+  TOKEN_REFRESH: '로그인 연장',
+  REFRESH_REUSE_DETECTED: '이미 쓴 로그인 정보 재사용 감지',
   CONTRACT_CREATED: '계약 등록',
   CONTRACT_UPDATED: '계약 수정',
   CONTRACT_CAP_RECHECKED: '계약 한도 재검증',
@@ -53,10 +53,10 @@ export const entityTypeLabels = {
   SCHEDULE: '지급 스케줄',
   ARBITRAGE_CHECK: '차익거래 검증',
   VALIDATION_RUN: '검증 실행',
-  BATCH_JOB_EXECUTION: '배치 작업 실행',
+  BATCH_JOB_EXECUTION: '자동 처리 실행',
   JOURNAL_HEADER: '회계전표',
   EXCEPTION_CASE: '예외 건',
-  SCHEDULE_LINE: '스케줄행',
+  SCHEDULE_LINE: '예상 스케줄',
   POLICY_VERSION: '정책 버전',
   CLAWBACK_CASE: '환수 건',
 } as const
@@ -154,13 +154,13 @@ export function diffFieldLabel(field: string): string {
     differenceAmount: '차액',
     paymentStage: '지급단계',
     // 계약 수정 감사행(ContractServiceImpl.toAuditSnapshot)의 항목
-    contractId: '계약 내부 번호',
-    insurerId: '보험사 번호',
-    productOfferingId: '상품 판매버전 번호',
+    contractId: '계약',
+    insurerId: '보험회사',
+    productOfferingId: '판매버전',
     contractNo: '계약번호',
     contractDate: '계약일',
-    agentId: '설계사 번호',
-    organizationId: '조직 번호',
+    agentId: '설계사',
+    organizationId: '조직',
     premiumPerCycleAmount: '주기 보험료',
     firstPremiumAmount: '초회보험료',
     monthlyEquivalentFirstPremium: '월납환산 초회보험료',
@@ -172,13 +172,14 @@ export function diffFieldLabel(field: string): string {
     dataOrigin: '데이터 출처',
     createdBy: '등록자',
     updatedAt: '수정 시각',
-    statusEventId: '상태 변경 번호',
+    statusEventId: '상태 변경',
   }
   return field
     .replace(/\[(\d+)]/g, (_, index: string) => `.${Number(index) + 1}번째.`)
     .split('.')
     .filter(Boolean)
-    .map((part) => fields[part] ?? part)
+    .map((part) => fields[part] ?? (part.endsWith('번째') ? part : '상세 항목'))
+    .filter((part, index, parts) => part !== parts[index - 1])
     .join(' / ')
 }
 
@@ -211,7 +212,7 @@ export function auditValueLabel(value: string | null | undefined, field?: string
     COMPLETED: '완료',
     RUNNING: '실행중',
     FAILED: '실패',
-    INSURER_TO_GA: '원수사→GA',
+    INSURER_TO_GA: '보험회사→GA',
     GA_TO_FC: 'GA→설계사',
     RATE: '요율',
     FIXED: '정액',

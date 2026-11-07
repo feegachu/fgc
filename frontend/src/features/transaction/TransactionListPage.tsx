@@ -115,7 +115,7 @@ export default function TransactionListPage() {
     { key: 'stage', label: '지급단계', width: '6.5rem', render: (row) => row.paymentStageLabel || row.paymentStage },
     {
       key: 'source',
-      label: '원천유형',
+      label: '자료 구분',
       width: '6.5rem',
       render: (row) => (
         <CategoryBadge tablePresentation="text" value={row.sourceType} optionCount={sourceOptions.length}>
@@ -166,7 +166,7 @@ export default function TransactionListPage() {
     },
     {
       key: 'flow',
-      label: '흐름',
+      label: '지급/차감',
       width: '4rem',
       align: 'center',
       render: (row) => (
@@ -197,7 +197,7 @@ export default function TransactionListPage() {
       label: '귀속 계약',
       sortable: true,
       width: '5.5rem',
-      align: 'center',
+      align: 'number',
       render: (row) =>
         (row.attributionCount ?? 0) === 0 ? (
           <StatusBadge tone="error">0건</StatusBadge>
@@ -467,7 +467,7 @@ function TransactionFilters({
         </Field>
         {select('paymentStage', 'f-stage', '지급단계', 'transaction-filter-stage', [
           ['GA_TO_FC', 'GA→설계사'],
-          ['INSURER_TO_GA', '원수사→GA'],
+          ['INSURER_TO_GA', '보험회사→GA'],
         ])}
         {select(
           'insurerId',
@@ -486,7 +486,7 @@ function TransactionFilters({
             onChange={(event) => set('contractNo', event.target.value)}
           />
         </Field>
-        {select('sourceType', 'f-source', '원천유형', 'transaction-filter-source', sourceOptions)}
+        {select('sourceType', 'f-source', '자료 구분', 'transaction-filter-source', sourceOptions)}
         {select('agentId', 'f-agent', '수령 설계사', 'transaction-filter-agent', remembered(known.agents))}
         {select('commissionItemId', 'f-item', '수수료 항목', 'transaction-filter-item', remembered(known.items))}
         {select('status', 'f-status', '상태', 'transaction-filter-status-field', statusOptions)}
@@ -497,7 +497,7 @@ function TransactionFilters({
             checked={draft.noAttributionOnly}
             onChange={(event) => setDraft((previous) => ({ ...previous, noAttributionOnly: event.target.checked }))}
           />
-          <span>귀속 0건만</span>
+          <span>귀속 안 된 건만</span>
         </label>
       </div>
     </FilterBar>

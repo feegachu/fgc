@@ -127,12 +127,9 @@
     "feeregimerules.maxinstallments",
     "feeregimerules.salesstartdatefrom",
     "feeregimerules.salesstartdateto",
-    "feeregimerules.sourcerefs",
     "parameters.acquisition_cost_rate_pct",
     "parameters.acquisition_cost_source",
     "policycode",
-    "regulationrefs",
-    "sourcedetails.ref",
     "sourcedetails.title",
     "sourcedetails.url",
     "sourcerefs"
@@ -156,7 +153,8 @@
     "parameters.revival_backfill_rule",
     "parameters.status_month_rule",
     "policytype",
-    "sourceclass"
+    "sourceclass",
+    "sourcedetails.ref"
   ],
   "policy.action": [
     "submit",

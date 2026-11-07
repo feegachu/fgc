@@ -7,18 +7,10 @@ import { Amount, CalculatedAmount, CalculationBadge } from './badges'
 import { triggerLabels } from './labels'
 export const columns: TableColumn<CandidateRow>[] = [
   {
-    key: 'candidateId',
-    label: '후보 번호',
-    sortable: true,
-    width: '6rem',
-    cellClassName: 'tabular-nums',
-    render: (r) => present(r.candidateId),
-  },
-  {
     key: 'contractNo',
     label: '계약번호',
     sortable: true,
-    width: '10rem',
+    width: '12rem',
     cellClassName: 'tabular-nums',
     render: (r) => <span title={present(r.contractNo)}>{present(r.contractNo)}</span>,
   },

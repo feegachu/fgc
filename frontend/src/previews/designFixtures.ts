@@ -24,7 +24,7 @@ const capItems: CapItem[] = Array.from({ length: 16 }, (_, index) => {
     contractId: index + 1,
     contractNo: `PREVIEW-2026-${String(index + 1).padStart(3, '0')}`,
     paymentStage,
-    paymentStageLabel: paymentStage === 'INSURER_TO_GA' ? '원수사 → GA' : 'GA → 설계사',
+    paymentStageLabel: paymentStage === 'INSURER_TO_GA' ? '보험회사 → GA' : 'GA → 설계사',
     asOfDate: '2026-07-31',
     basePremiumAmount: 100000,
     refund12mAmount: 0,
@@ -151,7 +151,7 @@ export function designPreviewData(url: URL): unknown {
       stageSummary: [
         {
           paymentStage: 'INSURER_TO_GA',
-          paymentStageLabel: '원수사 → GA',
+          paymentStageLabel: '보험회사 → GA',
           contractCount: 11,
           limitAmountTotal: 12336000,
           includedAmountTotal: 10868000,

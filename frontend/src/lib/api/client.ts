@@ -60,19 +60,23 @@ export function createApiClient(env: ClientEnvironment) {
       credentials: 'same-origin', signal: options.signal,
     })
   }
-  async function refresh(redirectOnFailure = true) {
+  async function refresh(redirectOnFailure = true, keepOnTransient = false) {
     if (refreshPromise) return refreshPromise
     const currentGeneration = generation
     const pending = (async () => {
       try {
-        const response = await send('/api/v1/auth/refresh', { method: 'POST' }, 'application/json', null)
+        // 두 탭이 같은 쿠키로 동시에 회전하면 서버가 재사용으로 보고 로그인을 모두 끊는다. 한 탭씩 보낸다.
+        const rotate = () => send('/api/v1/auth/refresh', { method: 'POST' }, 'application/json', null)
+        const response = await (globalThis.navigator?.locks?.request('fgc.auth.refresh', rotate) ?? rotate())
         const { data } = await readEnvelope<TokenResponse>(response)
         if (!data?.accessToken) throw new ApiError(null, response.headers.get('X-Request-Id'), response.status)
         // Logout or a duplicate-login response must not be undone by an older refresh.
         if (generation !== currentGeneration) throw new ApiError({ code: 'FGC-AUTH-002' }, null, 401)
         env.setToken(data.accessToken)
       } catch (error) {
-        if (generation === currentGeneration) {
+        // 미리 하는 연장은 인증 실패에서만 끝낸다. 네트워크, 서버 오류면 아직 유효한 토큰을 그대로 둔다.
+        const authFailure = error instanceof ApiError && (error.status === 401 || error.status === 403)
+        if (generation === currentGeneration && (authFailure || !keepOnTransient)) {
           if (redirectOnFailure) expire(error instanceof ApiError && error.code === 'FGC-AUTH-004')
           else env.setToken(null)
         }
@@ -166,7 +170,7 @@ export function createApiClient(env: ClientEnvironment) {
   }
   // Don't redirect the login page back to itself on a missing refresh cookie.
   function isLoginPage() { return routerPath(env.location, env.base).split(/[?#]/)[0] === '/login' }
-  return { request, requestBlob, requestPdf, restoreSession, login, logout, isLoginPage }
+  return { request, requestBlob, requestPdf, restoreSession, extendSession: () => refresh(true, true), login, logout, isLoginPage }
 }
 export const apiClient = createApiClient({
   fetch: (...args) => globalThis.fetch(...args),

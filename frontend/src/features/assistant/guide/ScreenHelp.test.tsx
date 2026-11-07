@@ -130,10 +130,10 @@ it('withdraws completion after a changed input and offers a fresh guide', async 
   act(() => { guide.begin(); void guide.saved(1) })
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   await userEvent.click(screen.getByRole('button', { name: '다음' }))
-  expect(await screen.findByText('서버 실행 확인 · 가이드 완료')).toBeVisible()
+  expect(await screen.findByText('실행 완료')).toBeVisible()
   act(() => guide.update('run:2', true))
   expect(await screen.findByText('실행 결과 변경 · 다시 확인')).toBeVisible()
-  expect(screen.queryByText('서버 실행 확인 · 가이드 완료')).not.toBeInTheDocument()
+  expect(screen.queryByText('실행 완료')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: '다시 시작' }))
   await waitFor(() => expect(screen.getByText('실행 가이드 · 1/2')).toBeVisible())
 })
@@ -180,6 +180,20 @@ it('withdraws a highlight when a target becomes hidden through style changes', a
   expect(document.body).not.toHaveTextContent('TARGET_CHANGED')
   expect(screen.queryByRole('button', { name: '설명 확인 · 다음' })).not.toBeInTheDocument()
 })
+it.each(['CONT-W01', 'VRUN-W01', 'RECO-W01', 'EXCP-W01'])('%s reader help finishes with read-only targets and no saved result', async (screenId) => {
+  const steps = definitions.find(entry => entry.screenId === screenId && entry.variant === 'reader')!.steps
+  render(<main id="main-content"><ScreenHelp screenId={screenId} variant="reader" />
+    {steps.map(step => <section key={step.targetId} data-guide-target={step.targetId} />)}
+  </main>)
+  await userEvent.click(screen.getByRole('button', { name: '도움말' }))
+  for (const step of steps) {
+    await screen.findByText(step.instruction)
+    await waitFor(() => expect(screen.getByRole('button', { name: '설명 확인 · 다음' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: '설명 확인 · 다음' }))
+  }
+  expect(await screen.findByText('화면 사용법 안내 완료')).toBeVisible()
+})
+
 it('does not run an unregistered screen variant', () => {
   render(<ScreenHelp screenId="CONT-W01" variant="unknown" />)
   expect(screen.getByRole('button', { name: '도움말' })).toBeDisabled()
@@ -262,9 +276,9 @@ it('resets reconciliation completion when a different run is selected in the sam
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: '다음' }))
   }
-  expect(await screen.findByText('서버 실행 확인 · 가이드 완료')).toBeVisible()
+  expect(await screen.findByText('실행 완료')).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: '다른 실행' }))
-  expect(screen.queryByText('서버 실행 확인 · 가이드 완료')).not.toBeInTheDocument()
+  expect(screen.queryByText('실행 완료')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: '도움말' })).toHaveAttribute('aria-expanded', 'false')
 })
 
@@ -283,15 +297,15 @@ it.each(['COMPLETED', 'FAILED'])('validation %s follows the right branch and nev
     expect(screen.getByText('실행 가이드 · 3/5')).toBeVisible()
     await userEvent.click(next())
     expect(await screen.findByText('신규 실행 절차 안내 완료')).toBeVisible()
-    expect(screen.queryByText('서버 확정 확인 · 가이드 완료')).not.toBeInTheDocument()
+    expect(screen.queryByText('확정 완료')).not.toBeInTheDocument()
   } else {
     expect(screen.getByText('실행 가이드 · 4/5')).toBeVisible()
     await userEvent.click(next())
     expect(next()).toBeDisabled()
-    expect(screen.queryByText('서버 확정 확인 · 가이드 완료')).not.toBeInTheDocument()
+    expect(screen.queryByText('확정 완료')).not.toBeInTheDocument()
     act(() => { finalization.begin(); void finalization.saved(7) })
     await waitFor(() => expect(next()).toBeEnabled())
     await userEvent.click(next())
-    expect(await screen.findByText('서버 확정 확인 · 가이드 완료')).toBeVisible()
+    expect(await screen.findByText('확정 완료')).toBeVisible()
   }
 })

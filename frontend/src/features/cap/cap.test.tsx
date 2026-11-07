@@ -19,7 +19,7 @@ const item: CapItem = {
   contractId: 3,
   contractNo: 'C-2026-0001',
   paymentStage: 'INSURER_TO_GA',
-  paymentStageLabel: '원수사→GA',
+  paymentStageLabel: '보험회사→GA',
   asOfDate: '2026-07-01',
   basePremiumAmount: 100000,
   refund12mAmount: 288000,
@@ -218,11 +218,11 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     expect(new URLSearchParams(router.state.location.search).has('page')).toBe(false)
     await user.click(screen.getByRole('button', { name: '2' }))
     await waitFor(() => expect(router.state.location.search).toContain('page=2'))
-    await user.selectOptions(screen.getByLabelText('화면 행 수'), '50')
+    await user.selectOptions(screen.getByLabelText('한 번에 볼 건수'), '50')
     await waitFor(() => expect(router.state.location.search).toContain('size=50'))
     expect(new URLSearchParams(router.state.location.search).has('page')).toBe(false)
     await router.navigate(-1)
-    await waitFor(() => expect(screen.getByLabelText('화면 행 수')).toHaveValue('10'))
+    await waitFor(() => expect(screen.getByLabelText('한 번에 볼 건수')).toHaveValue('10'))
     expect(new URLSearchParams(router.state.location.search).get('page')).toBe('2')
     expect(screen.getByLabelText('계약번호')).toHaveValue('NEW')
   })
@@ -236,7 +236,7 @@ describe('CAP-W01 URL·조회 전용 전환', () => {
     await user.click(kpi)
     await waitFor(() => expect(new URLSearchParams(router.state.location.search).has('status')).toBe(false))
     await user.click(screen.getByRole('button', { name: '초기화' }))
-    await waitFor(() => expect(screen.getByLabelText('화면 행 수')).toHaveValue('20'))
+    await waitFor(() => expect(screen.getByLabelText('한 번에 볼 건수')).toHaveValue('20'))
     expect(screen.getByLabelText('계약번호')).toHaveValue('')
   })
   it.each(['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'])('%s 역할은 읽기만 한다', async (role) => {
@@ -332,14 +332,14 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     expect(screen.queryByText('CAP_APPLICABILITY_V1')).not.toBeInTheDocument()
     expect(screen.getByText('2026-06-30')).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
-    expect(screen.queryByText('② 계산식')).not.toBeInTheDocument()
+    expect(screen.queryByText('계산식')).not.toBeInTheDocument()
     expect(screen.queryByText('저장 산입금액과 항목별 산입 합계가 일치하지 않습니다.')).not.toBeInTheDocument()
   })
   it('행·산입 버튼으로 열고 닫아도 검색/페이지가 유지된다', async () => {
     const { router, user } = renderAt('/cap-checks?month=2026-07&page=2')
     await user.click(await screen.findByRole('button', { name: 'C-2026-0001 계산근거 열기' }))
     const dialog = await screen.findByRole('dialog', { name: '계산근거' })
-    await within(dialog).findByText('① 입력값')
+    await within(dialog).findByText('입력값')
     expect(router.state.location.search).toContain('capCheckId=11')
     expect(router.state.location.search).toContain('page=2')
     await user.keyboard('{Escape}')
@@ -427,7 +427,7 @@ describe('CAP-W02 공유 모달·스냅샷', () => {
     const dialog = await screen.findByRole('dialog')
     const marker = await within(dialog).findByTitle('주의 기준 82.8%')
     expect(marker).toHaveStyle({ left: '82.857142%' })
-    expect(within(dialog).getByText('주의 기준 (1,200% 예산) 90.0%')).toBeVisible()
+    expect(within(dialog).getByText('주의 기준 90.0%')).toBeVisible()
     expect(within(dialog).getAllByText('주의').length).toBeGreaterThan(0)
   })
   it('서버 주의선 위치가 없으면 90% 선을 추정하지 않는다', async () => {
@@ -476,7 +476,7 @@ it.each(['NORMAL', 'NOT_APPLICABLE'] as const)(
       </QueryClientProvider>,
     )
     const dialog = await screen.findByRole('dialog', { name: '계산근거' })
-    const content = resultStatus === 'NORMAL' ? '① 입력값' : '한도/산입금액/사용률 계산 대상이 아닙니다.'
+    const content = resultStatus === 'NORMAL' ? '입력값' : '한도/산입금액/사용률 계산 대상이 아닙니다.'
     await within(dialog).findByText(content)
     const targetId = workflowDefinitions.find((guide) => guide.workflowId === 'cap.review')!.steps[2].targetId
     const targets = document.querySelectorAll(`[data-guide-feature="${targetId}"]`)

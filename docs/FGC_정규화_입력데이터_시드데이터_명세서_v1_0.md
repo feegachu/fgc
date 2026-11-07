@@ -115,6 +115,7 @@ src/main/resources/db/demo-agent/  시연 서버·로컬 한정(E2E 제외. 신�
   V66    agent01 활성화 — password_hash='!'인 행만 BCrypt 해시·ACTIVE (V64 이후)
   V72    상품 추천 AI(FUN-079) 시연용 예시 — 가상 보험사 3곳·상품 12개·해약환급률표(상품 자료, 새 정책버전 DRAFT→ACTIVE)와 협회 등급·비교 상품군, 가상 보험사 3곳의 보험사 전용 환수 정책(CLAWBACK, 가정). 다른 보험사 상품의 환수율은 #766 V70_1 D-02 가상 환수율표에서 읽는다
   V73    agent01 표시 이름을 '손설계'로 변경 — login_id·설계사 연결은 그대로 (V64 이후, 시연 서버·로컬 한정)
+  V83    서부본부·마포지사에 설계사 5명(본부장, 지사장, 팀장, FC 2명). 지점 비교와 관리자수수료 회차 생성용. 가상 인물이고 업무 규칙 아님
 
 src/test/resources/sql/            목표 파일(golden_expected_assertions.sql 등) — 아직 없음
 ```
@@ -845,7 +846,7 @@ GA_MANUAL_PAYMENT:202607:A-FC-001:0001
 필수 추가 칸:
 
 - `installment_no` — 원천에 회차가 있으면 반드시 넣는다. 없으면 NULL이고 대사는 `REVIEW_REQUIRED`다(V18). 확정 후에는 바꿀 수 없다. V35 백필은 그때까지의 행만 한 번 채웠으므로 **이후 시드(2차 생성기 포함)는 회차를 직접 넣어야 한다.**
-- `GA_MANUAL_PAYMENT`는 `source_contract_id`·`source_sequence`로 자연키를 만든다(V9).
+- `GA_MANUAL_PAYMENT`의 중복 기준은 `source_type`·`source_business_key` UNIQUE(`uq_commission_transaction_source`)다. V9의 `source_contract_id`·`source_sequence` 자연키는 V14가 없앴다(순번만 바꾸면 통과해 막지 못했다). 같은 계약, 설계사, 항목, 정산월의 업무상 중복은 월 대사에서 걸린다. 지급예정일까지 같으면 DUPLICATE이고, 지급예정일이 다르면 어느 지급이 예상 건의 짝인지 정할 수 없어 REVIEW_REQUIRED다(`GaFcReconciliationMatcherImpl.alignActualGroups`, SRC-080).
 
 ## 23. 계약귀속
 
@@ -1447,7 +1448,7 @@ business_date = 2026-09-10
 validation_month = 2026-08-01
 ```
 
-화면 기본 정산월은 `fgc.demo-month`(`application.yml`, 2026-07)이다. 테스트 시계 값과 다르면 테스트에서 명시한다.
+화면 기본 정산월은 `fgc.demo-month`(`application.yml`, 2026-07)이다. 시연 서버는 `FGC_DEMO_MONTH=2026-11`로 덮어쓰고 9~11월 데이터는 시드가 아니라 업무 API 로더로 쌓는다(Runbook 9-4). 테스트 시계 값과 다르면 테스트에서 명시한다.
 
 Java에서는 `Clock`을 주입하고 테스트에서 고정시계를 사용한다.
 
