@@ -60,7 +60,7 @@ class ExceptionCaseRepositoryDetectionIntegrationTest {
                 "GA_TO_FC", "RECONCILIATION_FAILED", "설계사 지급 대사 실패")).isNotEqualTo(caseId);
         Long nextRun = insertArbitrageValidationRun();
         assertThat(exceptionCaseRepository.insertReconciliationSkip(nextRun, contractId,
-                "INSURER_TO_GA", "RECONCILIATION_FAILED", "후속 실행 재검출")).isEqualTo(caseId);
+                "INSURER_TO_GA", "RECONCILIATION_FAILED", "후속 실행 다시 나옴")).isEqualTo(caseId);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM fgc.exception_occurrence WHERE exception_case_id=?", Long.class, caseId))
                 .isEqualTo(2L);

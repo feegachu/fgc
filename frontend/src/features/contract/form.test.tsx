@@ -180,7 +180,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     const { user } = renderAt()
     await ready()
     await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent('제4-32조제12항제1/2호 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('제4-32조제12항제1호, 제2호')
     expect(screen.getByRole('tooltip')).toHaveTextContent(
       '유지관리수수료/장기유지수수료의 지급 대상은 최초 모집자로 고정되지 않고',
     )
@@ -191,9 +191,9 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     expect(screen.getByRole('tooltip')).not.toHaveTextContent('별도로 관리')
     await user.click(screen.getByRole('button', { name: '모집 설계사 근거' }))
     await user.click(screen.getByRole('button', { name: '표준해약공제액 근거' }))
-    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-08, 제4-32조제5항 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('감독규정 제4-32조제5항')
     expect(screen.getByRole('tooltip')).toHaveTextContent('1,200% 한도 계산에서')
-    expect(screen.getByRole('tooltip')).toHaveTextContent('REG-12, 제4-32조제6항 [현행규정]')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('제4-32조제6항')
   })
 
   it.each(['duplicate', 'network'])('저장 실패 %s는 입력을 보존하고 다시 저장할 수 있다', async (kind) => {
@@ -443,7 +443,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     renderAt(undefined, (url) => (url.startsWith('/api/v1/base/agents') ? { content: [] } : undefined))
     await ready()
     fireEvent.change(field('계약일'), { target: { value: '2026-06-01' } })
-    expect(await screen.findByText(/바꾼 계약일에 이 설계사가 활동 중인 FC가 아닙니다/)).toBeInTheDocument()
+    expect(await screen.findByText(/바꾼 계약일에 활동 중인 설계사가 아닙니다/)).toBeInTheDocument()
     expect(field('소속 조직')).toHaveValue('')
     expect(save()).toBeDisabled()
   })
@@ -606,7 +606,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
   async function fillEvent(user: ReturnType<typeof userEvent.setup>) {
     fireEvent.change(field('효력일시'), { target: { value: '2026-10-20T00:00' } })
     fireEvent.change(field('접수일시'), { target: { value: '2026-10-27T10:00' } })
-    await selectOption(user, field('사유코드'), 'MANUAL_STATUS_CHANGE')
+    await selectOption(user, field('사유 구분'), 'MANUAL_STATUS_CHANGE')
     fireEvent.change(reason(), { target: { value: '  보험회사 해지 접수 반영  ' } })
     await ready()
   }
@@ -651,7 +651,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
         .map((option) => option.textContent),
     ).toEqual(['변경 안 함', '미납', '해지', '만기', '청약철회'])
     expect(screen.queryByRole('group', { name: '상태 변경 사유' })).not.toBeInTheDocument()
-    expect(hint()).toHaveTextContent('계약 정보만 저장(상태 사건, 스케줄 새 버전 없음)')
+    expect(hint()).toHaveTextContent('계약 정보만 저장(상태 변경, 스케줄 새 버전 없음)')
     fireEvent.change(field('계약번호'), { target: { value: 'NO-STATUS' } })
     await user.click(save())
     await screen.findByText('계약 상세')
@@ -700,7 +700,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     expect(field('접수일시').value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
     expect(save()).toBeDisabled()
     await fillEvent(user)
-    expect(hint()).toHaveTextContent('상태 사건 기록, 해당 미확정 대상 처리')
+    expect(hint()).toHaveTextContent('상태 변경 기록, 해당 미확정 대상 처리')
     expect(hint()).not.toHaveTextContent('스케줄 새 버전')
     await user.click(save())
     await user.click(await screen.findByRole('button', { name: '다시 확인' }))
@@ -749,7 +749,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
         throw new ApiError(
           {
             code: 'FGC-IMPL-EVENT_ORDER',
-            message: '저장 불가 — 효력일시는 최신 사건의 효력일시 이후여야 합니다.',
+            message: '저장 불가 — 효력일시는 최신 상태 변경의 효력일시 이후여야 합니다.',
             field: 'statusEvent.effectiveAt',
           },
           'event-order',
@@ -762,7 +762,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     await waitFor(() => expect(field('효력일시')).toHaveAttribute('aria-invalid', 'true'))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(field('효력일시')).toHaveAccessibleDescription(
-      '저장할 수 없습니다. 효력일시는 최신 사건의 효력일시 이후여야 합니다. (요청번호: event-order)',
+      '저장할 수 없습니다. 효력일시는 최신 상태 변경의 효력일시 이후여야 합니다. (요청번호: event-order)',
     )
     expect(screen.queryByText(/FGC-IMPL-EVENT_ORDER/)).not.toBeInTheDocument()
     expect(field('효력일시')).toHaveValue('2026-10-20T00:00')
@@ -811,7 +811,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     expect(field('효력일시')).not.toHaveAttribute('aria-invalid')
     fireEvent.change(field('접수일시'), { target: { value: '2026-10-27T10:00' } })
     fireEvent.change(field('효력일시'), { target: { value: '2026-10-28T00:00' } })
-    await selectOption(user, field('사유코드'), 'MANUAL_STATUS_CHANGE')
+    await selectOption(user, field('사유 구분'), 'MANUAL_STATUS_CHANGE')
     fireEvent.change(reason(), { target: { value: '보험회사 해지 접수 반영' } })
     expect(save()).toBeDisabled()
     expect(field('효력일시')).toHaveAttribute('aria-invalid', 'true')
@@ -834,7 +834,7 @@ describe('[FGC-FUN-025·026] CONT-W03 상태 변경 사건 입력', () => {
     expect(screen.getByText('이 상태에서는 바꿀 수 있는 상태가 없습니다.')).toBeInTheDocument()
   })
 
-  it('상태 사건 일시·사유코드·사유를 서버와 같은 경계로 검사하고 요청에는 서울 offset을 붙인다', () => {
+  it('상태 변경 일시·사유코드·사유를 서버와 같은 경계로 검사하고 요청에는 서울 offset을 붙인다', () => {
     const codes = ['MANUAL_STATUS_CHANGE']
     const event = {
       effectiveAt: '2026-10-20T00:00',
@@ -992,7 +992,7 @@ it('guide waits for server success and acknowledgement after failure', async () 
   await waitFor(() => expect(next()).toBeEnabled())
   expect(router.state.location.pathname).toBe('/contracts/21/edit')
   await user.click(next())
-  expect(await screen.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  expect(await screen.findByText('저장 완료')).toBeVisible()
   await user.click(screen.getByRole('button', { name: '안내 마치기' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/21'))
 })
@@ -1001,7 +1001,7 @@ it.each([undefined, 0, Number.MAX_SAFE_INTEGER + 1])('keeps the contract locked 
   const { user, writes } = renderAt(undefined, (_, options) => options?.method ? { contractId } : undefined)
   await ready()
   await user.click(save())
-  expect(await screen.findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(await screen.findByText(/저장은 되었지만 결과를 표시하지 못했습니다/)).toBeVisible()
   expect(save()).toBeDisabled()
   expect(field('계약번호')).toBeDisabled()
   fireEvent.submit(screen.getByRole('form'))

@@ -181,7 +181,7 @@ class CapRuleQueryRepositoryIntegrationTest {
         setPolicyStatus("ACTIVE");
 
         List<CapRuleItemView> expected = List.of(
-                new CapRuleItemView(includedId, baseItemId, "BASE_COMMISSION", "FC 기본수수료",
+                new CapRuleItemView(includedId, baseItemId, "BASE_COMMISSION", "기본수수료",
                         "INCLUDED", null, false, "DIRECT", "산입 조회 테스트"),
                 new CapRuleItemView(excludedId, supportItemId, "NEWCOMER_SUPPORT", "신인활동지원비",
                         "EXCLUDED", "NEWCOMER_SUPPORT", true, "NOT_APPLICABLE", "제외 조회 테스트"));

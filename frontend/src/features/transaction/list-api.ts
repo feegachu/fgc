@@ -8,11 +8,11 @@ export type PaymentRow = components['schemas']['CommissionPaymentListResponse']
 export type PaymentPage = components['schemas']['PageResponseCommissionPaymentListResponse']
 export const PAGE_SIZE = 20
 export const sourceOptions = [
-  ['INSURER_STATEMENT', '원수사 명세'],
+  ['INSURER_STATEMENT', '보험회사 명세'],
   ['GA_MANUAL_PAYMENT', 'GA 수기지급'],
   ['GA_CONFIRMED_PAYMENT', 'GA 확정지급'],
   ['ADJUSTMENT', '조정'],
-  ['ALLOCATION_POOL', '공통비 풀'],
+  ['ALLOCATION_POOL', '공통비'],
   ['CLAWBACK', '환수'],
   ['RECOVERY', '회수'],
 ] as const

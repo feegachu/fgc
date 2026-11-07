@@ -1,4 +1,4 @@
-export const PAYMENT_STAGE = { INSURER_TO_GA: '원수사→GA', GA_TO_FC: 'GA→설계사' } as const
+export const PAYMENT_STAGE = { INSURER_TO_GA: '보험회사→GA', GA_TO_FC: 'GA→설계사' } as const
 // 화면정의서 4-2 대사 결과 표기와 서버 라벨(ReconResultType)이 같다. 필터와 배지가 같은 이름을 쓴다.
 export const RESULT_TYPE = {
   MATCHED: '일치',

@@ -206,7 +206,7 @@ public class ContractStatusPreviewService {
 
     private ClawbackReview clawbackReview(ContractStatus eventType, ClawbackCandidateDetailResponse evidence) {
         if (!ClawbackCandidateWriteRepository.STATUS_EVENT_TRIGGERS.contains(eventType)) {
-            return new ClawbackReview(false, null, "이 사건은 환수 검토 후보가 되지 않습니다.", List.of(), null, null, null, null, List.of());
+            return new ClawbackReview(false, null, "이 변경은 환수 검토 후보가 되지 않습니다.", List.of(), null, null, null, null, List.of());
         }
         ClawbackCalculationService.Estimate estimate = clawback.estimate(evidence);
         Map<Long, String> itemNames = new HashMap<>();

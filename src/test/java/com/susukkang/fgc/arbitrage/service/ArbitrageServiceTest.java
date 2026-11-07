@@ -381,7 +381,7 @@ class ArbitrageServiceTest {
         verify(exceptionCaseRepository).insertArbitrageReviewCase(
                 org.mockito.ArgumentMatchers.eq("DATA_QUALITY"), org.mockito.ArgumentMatchers.eq(100L),
                 org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(200L),
-                org.mockito.ArgumentMatchers.eq("GA_TO_FC"), any(), org.mockito.ArgumentMatchers.contains("귀속행: [77]"));
+                org.mockito.ArgumentMatchers.eq("GA_TO_FC"), any(), org.mockito.ArgumentMatchers.contains("귀속 내역: [77]"));
         verify(exceptionCaseRepository, never()).insertArbitrageCandidate(any(), any(), any(), any(), any());
     }
 

@@ -10,7 +10,7 @@ class ValidationRunTypeTest {
     @Test
     void everyTypeHasALabel() {
         assertThat(ValidationRunType.MONTHLY.label()).isEqualTo("월간");
-        assertThat(ValidationRunType.MANUAL_CONTRACT.label()).isEqualTo("계약수동");
-        assertThat(ValidationRunType.PRE_CONFIRM.label()).isEqualTo("확정전");
+        assertThat(ValidationRunType.MANUAL_CONTRACT.label()).isEqualTo("계약별");
+        assertThat(ValidationRunType.PRE_CONFIRM.label()).isEqualTo("확정 전");
     }
 }

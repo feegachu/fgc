@@ -24,7 +24,7 @@ server {
 
     # css·js·html 압축 전송 (woff2·jpg 는 이미 압축돼 있어 대상 아님)
     gzip on;
-    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_types text/css application/javascript application/json image/svg+xml application/wasm;
     gzip_min_length 1024;
 
     # 공존기(#401) 주소 /app/... 북마크 호환 (#419). 상대 Location 으로 보낸다 — 절대 주소면 터널(8088)에서 :80 으로 튄다
@@ -40,6 +40,12 @@ server {
         try_files $uri =404;
     }
     location = /favicon.ico {
+        try_files $uri =404;
+    }
+    # 폰트와 이미지는 파일명에 해시가 없어 불변은 아니지만 자주 바뀌지 않는다. 화면을 열 때마다 다시 묻지 않게 한다.
+    location ~ ^/(fonts|images)/ {
+        add_header Cache-Control "public, max-age=604800";
+        include /etc/nginx/fgc-security-headers.conf;
         try_files $uri =404;
     }
 

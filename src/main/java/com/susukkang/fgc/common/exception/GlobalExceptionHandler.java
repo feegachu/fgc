@@ -19,6 +19,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -278,6 +279,12 @@ public class GlobalExceptionHandler {
      * 부작용: 로그인 상태에서 /api/** 의 오타 경로는 FGC 봉투가 아니라 Spring Boot 기본 오류 JSON 이
      * 나간다(미인증이면 그 전에 401). 봉투가 필요해지면 여기가 아니라 FgcErrorAttributes 를 넓혀야 한다.
      */
+
+    /** 화면을 옮기거나 닫아 응답을 받을 곳이 사라진 경우다. 서버 오류가 아니므로 오류 로그와 지표에 남기지 않는다. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientGone(AsyncRequestNotUsableException exception) {
+        log.debug("[{}] Client disconnected before the response: {}", RequestIdContext.current(), exception.getMessage());
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(

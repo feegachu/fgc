@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
-import type { Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 
 // UI fixture. 실제 PostgreSQL·worker·범위 검사는 ContractStatusHistoryIntegrationTest·AgentDataScopeIntegrationTest가 확인한다.
+// 화면에 내부 번호가 없어 영향 행은 응답 순서로 찾는다.
+const effectRow = (panel: Locator, index: number) => panel.getByRole('table', { name: '변경 영향' }).locator('tbody tr').nth(index)
 const envelope = (data: unknown, requestId = 'status-history-browser') => ({ data, error: null, requestId })
 const contract = {
   contractId: 1,
@@ -184,9 +186,9 @@ async function fixture(
 
 const historyRow = (page: Page, seq: number) =>
   page
-    .getByRole('table', { name: '상태 사건' })
+    .getByRole('table', { name: '상태 변경' })
     .getByRole('row')
-    .filter({ has: page.getByRole('button', { name: `사건 ${seq} 영향 보기` }) })
+    .filter({ has: page.getByRole('button', { name: `변경 ${seq} 영향 보기` }) })
 
 test('필수 열과 후속 상태를 구분하고 영향 패널에서 지급 보류와 회차 중단을 다른 라벨로 보인다', async ({
   page,
@@ -268,7 +270,7 @@ test('필수 열과 후속 상태를 구분하고 영향 패널에서 지급 보
   })
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('contracts/1')
-  const table = page.getByRole('table', { name: '상태 사건' })
+  const table = page.getByRole('table', { name: '상태 변경' })
   await expect(table).toBeVisible({ timeout: 30_000 })
   await expect(table.getByRole('columnheader')).toHaveText([
     '순번',
@@ -294,26 +296,28 @@ test('필수 열과 후속 상태를 구분하고 영향 패널에서 지급 보
   await expect(page.getByText('끝나지 않은 후속 처리가 있어 10초마다 다시 조회합니다.')).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('status-history-table.png'), fullPage: true })
 
-  await page.getByRole('button', { name: '사건 2 영향 보기' }).click()
-  const panel = page.getByRole('dialog', { name: '사건 2 영향' })
+  await page.getByRole('button', { name: '변경 2 영향 보기' }).click()
+  const panel = page.getByRole('dialog', { name: '변경 2 영향' })
   await expect(panel.getByRole('heading', { name: '영향 21건' })).toBeVisible()
-  await expect(panel.getByRole('row', { name: /지급 건 #501/ })).toContainText('지급 보류')
-  await expect(panel.getByRole('row', { name: /지급 건 #502/ })).toContainText('이력 보존, 처리 제외')
-  await expect(panel.getByRole('row', { name: /지급 건 #502/ })).toContainText('0원')
-  await expect(panel.getByRole('row', { name: /지급 건 #503/ })).toContainText('자료 없음')
-  await expect(panel.getByRole('row', { name: /스케줄 회차 #601/ })).toContainText('지급 예정 중단')
-  await expect(panel.getByRole('row', { name: /스케줄 회차 #602/ })).toContainText('회차 보류')
+  await expect(effectRow(panel, 0)).toContainText('지급 보류')
+  await expect(effectRow(panel, 1)).toContainText('이력 보존, 처리 제외')
+  await expect(effectRow(panel, 1)).toContainText('0원')
+  await expect(effectRow(panel, 2)).toContainText('자료 없음')
+  await expect(effectRow(panel, 3)).toContainText('예상 스케줄 회차')
+  await expect(effectRow(panel, 3)).toContainText('지급 예정 중단')
+  await expect(effectRow(panel, 4)).toContainText('회차 보류')
   await expect(page.getByRole('button', { name: /전체 회차 복원/ })).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('status-history-effects.png') })
   await panel.getByRole('button', { name: '2', exact: true }).click()
-  await expect(panel.getByRole('row', { name: /지급 건 #721/ })).toBeVisible()
+  await expect(panel.getByRole('table', { name: '변경 영향' }).locator('tbody tr')).toHaveCount(1)
+  await expect(effectRow(panel, 0)).toContainText('지급 건')
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
   await expect(panel).toHaveCount(0)
   await expect(historyRow(page, 2)).toHaveClass(/is-selected/)
-  await expect(page.getByRole('button', { name: '사건 2 영향 보기' })).toBeFocused()
+  await expect(page.getByRole('button', { name: '변경 2 영향 보기' })).toBeFocused()
 
-  await page.getByRole('button', { name: '사건 5 영향 보기' }).click()
-  const pending = page.getByRole('dialog', { name: '사건 5 영향' })
+  await page.getByRole('button', { name: '변경 5 영향 보기' }).click()
+  const pending = page.getByRole('dialog', { name: '변경 5 영향' })
   await expect(pending.getByText('후속 처리 대기 중입니다. 처리가 끝나면 영향이 표시됩니다.')).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('status-history-effects-pending.png') })
   expect(unexpected).toEqual([])
@@ -336,11 +340,11 @@ test('자동 재시도 소진은 운영 담당 확인 안내만 보이고 재시
   await page.goto('contracts/1')
   await expect(
     page.getByText(
-      '자동 재시도를 모두 쓴 후속 처리가 있습니다. 이 계약의 뒤 사건도 함께 멈춥니다. 운영 담당 확인이 필요합니다.',
+      '자동 처리에 실패한 건이 있습니다. 이 계약의 뒤 상태 변경도 함께 멈춥니다. 담당자에게 문의하세요.',
     ),
   ).toBeVisible()
-  await expect(historyRow(page, 2)).toContainText('자동 재시도 소진')
-  await expect(historyRow(page, 2)).toContainText('5/5회 시도, 운영 담당 확인 필요')
+  await expect(historyRow(page, 2)).toContainText('자동 처리 실패')
+  await expect(historyRow(page, 2)).toContainText('5/5회 시도, 담당자에게 문의하세요')
   await expect(page.getByRole('button', { name: /재시도/ })).toHaveCount(0)
   await expect(page.getByText(/초마다 다시 조회합니다/)).toHaveCount(0)
   const overflow = await page
@@ -381,8 +385,8 @@ test('처리 중 자동 재조회에도 사건 선택과 패널, 표와 화면 �
   const row = historyRow(page, 12)
   await expect(row).toContainText('처리 대기')
   const viewport = page.locator('.contract-history-panel .data-table-viewport')
-  await row.getByRole('button', { name: '사건 12 영향 보기' }).click()
-  const panel = page.getByRole('dialog', { name: '사건 12 영향' })
+  await row.getByRole('button', { name: '변경 12 영향 보기' }).click()
+  const panel = page.getByRole('dialog', { name: '변경 12 영향' })
   await expect(panel.getByText('후속 처리 대기 중입니다. 처리가 끝나면 영향이 표시됩니다.')).toBeVisible()
   // 클릭이 버튼을 화면 안으로 스크롤한 뒤의 위치가 기준이다.
   const scrollLeft = await viewport.evaluate((element) => element.scrollLeft)
@@ -390,7 +394,7 @@ test('처리 중 자동 재조회에도 사건 선택과 패널, 표와 화면 �
   const pageScroll = await page.evaluate(() => window.scrollY)
   expect(pageScroll).toBeGreaterThan(0)
   finished = true
-  await expect(panel.getByRole('row', { name: /스케줄 회차 #601/ })).toBeVisible({ timeout: 20_000 })
+  await expect(panel.getByRole('row', { name: /예상 스케줄 회차/ }).first()).toBeVisible({ timeout: 20_000 })
   await expect(panel).toBeVisible()
   await expect(row).toHaveClass(/is-selected/)
   await expect(row).toContainText('완료')
@@ -419,9 +423,9 @@ test('영향 조회 401은 기존 인증 복구로 다시 받고 403과 서버 �
     },
   })
   await page.goto('contracts/1')
-  await page.getByRole('button', { name: '사건 1 영향 보기' }).click()
-  const panel = page.getByRole('dialog', { name: '사건 1 영향' })
-  await expect(panel.getByRole('row', { name: /지급 건 #501/ })).toBeVisible()
+  await page.getByRole('button', { name: '변경 1 영향 보기' }).click()
+  const panel = page.getByRole('dialog', { name: '변경 1 영향' })
+  await expect(effectRow(panel, 0)).toContainText('지급 건')
   expect(calls).toBe(2)
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
 
@@ -431,8 +435,8 @@ test('영향 조회 401은 기존 인증 복구로 다시 받고 403과 서버 �
   ] as const) {
     mode = next
     await page.reload()
-    await page.getByRole('button', { name: '사건 1 영향 보기' }).click()
-    const reopened = page.getByRole('dialog', { name: '사건 1 영향' })
+    await page.getByRole('button', { name: '변경 1 영향 보기' }).click()
+    const reopened = page.getByRole('dialog', { name: '변경 1 영향' })
     await expect(reopened.getByRole('alert')).toContainText(message)
     await expect(reopened.getByRole('alert')).not.toContainText('SQL 내부 상세')
     await expect(reopened.getByRole('table')).toHaveCount(0)
@@ -463,13 +467,13 @@ test('AGENT는 본인 계약의 영향을 보고 다른 계약 직접 접근은 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('contracts/1')
   await expect(page.getByRole('tab')).toHaveCount(1)
-  await page.getByRole('button', { name: '사건 2 영향 보기' }).click()
-  const panel = page.getByRole('dialog', { name: '사건 2 영향' })
-  await expect(panel.getByRole('row', { name: /지급 건 #501/ })).toContainText('지급 보류')
+  await page.getByRole('button', { name: '변경 2 영향 보기' }).click()
+  const panel = page.getByRole('dialog', { name: '변경 2 영향' })
+  await expect(effectRow(panel, 0)).toContainText('지급 보류')
   await page.screenshot({ path: testInfo.outputPath('status-history-agent.png') })
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
   await page.goto('contracts/2')
   await expect(page.getByRole('alert')).toContainText('본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.')
-  await expect(page.getByRole('table', { name: '상태 사건' })).toHaveCount(0)
+  await expect(page.getByRole('table', { name: '상태 변경' })).toHaveCount(0)
   expect(unexpected).toEqual([])
 })

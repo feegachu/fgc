@@ -1,5 +1,5 @@
 .policy-page {
-  gap: 20px;
+  gap: var(--space-4);
 }
 .policy-page .policy-page-header {
   gap: 24px;
@@ -272,6 +272,9 @@
 }
 .policy-source-status-options .policy-checkbox {
   padding-top: 8px;
+}
+.policy-regulation-refs {
+  margin-bottom: 16px;
 }
 .policy-timeline {
   list-style: none;

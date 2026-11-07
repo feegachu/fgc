@@ -171,9 +171,9 @@ describe('DASH-W01 업무 대시보드', () => {
     expect(within(table).queryByText('C-0001')).not.toBeInTheDocument()
     expect(within(table).getByRole('link', { name: '한도 초과 계약' })).toHaveAttribute('href', '/app/exceptions?contractNo=C-0001&month=2026-07')
     expect(table.querySelector('time')).toBeNull()
-    const run = screen.getByRole('link', { name: /2026년 7월 2회차/ })
+    const run = screen.getByRole('link', { name: /2026년 7월 2차 실행/ })
     expect(within(run).getByRole('progressbar', { name: '검증 진행률' })).toHaveAttribute('aria-valuenow', '40')
-    expect(run).toHaveTextContent('4/10 단계, 실행 settle01')
+    expect(run).toHaveTextContent('4/10 단계')
   })
 
   it('도넛과 범례의 hover·focus로 항목·건수·비중을 확인하며 기준월 링크를 유지한다', async () => {
@@ -248,7 +248,7 @@ describe('DASH-W01 업무 대시보드', () => {
       'href',
       '/app/exceptions?contractNo=C-0001&month=2026-07',
     )
-    expect(screen.getByRole('link', { name: /2026년 7월 2회차/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /2026년 7월 2차 실행/ })).toHaveAttribute(
       'href',
       '/app/validation-runs/77?month=2026-07',
     )

@@ -85,7 +85,7 @@ function jobNotes(job: FollowUpJob) {
     case 'FAILED':
       return [`${tries}, 다음 재시도 ${dateTime(job.nextRetryAt)}`, `실패 사유: ${followUpFailureText(job.errorCode)}`]
     case 'EXHAUSTED':
-      return [`${tries}, 운영 담당 확인 필요`, `실패 사유: ${followUpFailureText(job.errorCode)}`]
+      return [`${tries}, 담당자에게 문의하세요`, `실패 사유: ${followUpFailureText(job.errorCode)}`]
     case 'PENDING':
       return job.attemptCount ? [`${tries}, 다음 실행 대기`] : []
     case 'SUCCEEDED':
@@ -144,7 +144,7 @@ function ProcessingList({ rows, label, attempts = false }: { rows: Processing[];
 const latestByJob = (rows: Processing[] = []) => [...new Map(rows.map((row) => [row.processingJob, row])).values()]
 
 const historyColumns = (onOpen: (eventId: number) => void): TableColumn<ContractStatusEvent>[] => [
-  { key: 'seq', label: '순번', width: '3.25rem', align: 'center', render: (row) => int(row.eventSeq) },
+  { key: 'seq', label: '순번', width: '3.25rem', render: (row) => int(row.eventSeq) },
   {
     key: 'transition',
     label: '변경 전→후',
@@ -153,7 +153,7 @@ const historyColumns = (onOpen: (eventId: number) => void): TableColumn<Contract
       <>
         {transition(row)}
         <span className="contract-follow-up-note">
-          {sourceSystemLabels[row.sourceSystem ?? ''] ?? '계약 상태 사건'}
+          {sourceSystemLabels[row.sourceSystem ?? ''] ?? '계약 상태 변경'}
         </span>
       </>
     ),
@@ -166,6 +166,7 @@ const historyColumns = (onOpen: (eventId: number) => void): TableColumn<Contract
   {
     key: 'followUp',
     label: '후속 상태',
+    align: 'center',
     width: '11.75rem',
     render: (row) => (
       <div className="contract-follow-up">
@@ -184,7 +185,7 @@ const historyColumns = (onOpen: (eventId: number) => void): TableColumn<Contract
         data-guide-feature="features.contract.status-history.effects"
         variant="ghost"
         disabled={row.eventId == null}
-        aria-label={`사건 ${int(row.eventSeq)} 영향 보기`}
+        aria-label={`변경 ${int(row.eventSeq)} 영향 보기`}
         onClick={() => onOpen(row.eventId!)}
       >
         영향 보기
@@ -198,7 +199,7 @@ const effectColumns: TableColumn<ContractStatusEffect>[] = [
     key: 'target',
     label: '대상',
     width: '9rem',
-    render: (row) => `${effectEntityLabels[row.entityType ?? ''] ?? '확인 필요'} #${row.entityId ?? '-'}`,
+    render: (row) => effectEntityLabels[row.entityType ?? ''] ?? '확인 필요',
   },
   { key: 'previous', label: '이전 상태', width: '7rem', render: (row) => effectStateLabel(row, row.previousState) },
   {
@@ -218,12 +219,6 @@ const effectColumns: TableColumn<ContractStatusEffect>[] = [
     align: 'number',
     render: (row) => (row.amount == null ? NO_DATA : <Amount value={row.amount} />),
   },
-  {
-    key: 'policy',
-    label: '정책',
-    width: '7rem',
-    render: (row) => (row.policyVersionId == null ? NO_DATA : `정책 버전 #${row.policyVersionId}`),
-  },
   { key: 'reason', label: '처리/제외 사유', width: '20rem', render: (row) => row.reason || NO_DATA },
 ]
 
@@ -234,7 +229,7 @@ function StatusEffectsPanel({ id, event, onClose }: { id: string; event: Contrac
   return (
     <Modal
       open
-      title={`사건 ${int(event.eventSeq)} 영향`}
+      title={`변경 ${int(event.eventSeq)} 영향`}
       className="modal-large"
       onClose={onClose}
       footer={
@@ -273,7 +268,7 @@ function StatusEffectsPanel({ id, event, onClose }: { id: string; event: Contrac
             )}
             <DataTable
               className="contract-effects-table"
-              caption="사건 영향"
+              caption="변경 영향"
               columns={effectColumns}
               rows={data.content ?? []}
               rowKey={(row) => `${row.entityType}-${row.entityId}-${row.processingJob}`}
@@ -282,7 +277,7 @@ function StatusEffectsPanel({ id, event, onClose }: { id: string; event: Contrac
             <ListPagination
               page={page}
               totalPages={data.totalPages ?? 1}
-              label="사건 영향 페이지"
+              label="변경 영향 페이지"
               onPageChange={setPage}
             />
           </>
@@ -352,8 +347,7 @@ export function ContractStatusHistory({ id }: { id: string }) {
                 warning
               </span>
               <span className="guidance-copy">
-                자동 재시도를 모두 쓴 후속 처리가 있습니다. 이 계약의 뒤 사건도 함께 멈춥니다. 운영 담당 확인이
-                필요합니다.
+                자동 처리에 실패한 건이 있습니다. 이 계약의 뒤 상태 변경도 함께 멈춥니다. 담당자에게 문의하세요.
               </span>
             </p>
           )}
@@ -364,7 +358,7 @@ export function ContractStatusHistory({ id }: { id: string }) {
           )}
           <DataTable
             className="contract-history-table"
-            caption="상태 사건"
+            caption="상태 변경"
             columns={columns}
             rows={sortStatusEvents(events, sort)}
             rowKey={(row) => String(row.eventId ?? `${row.sourceSystem ?? ''}-${row.sourceEventKey ?? row.eventSeq}`)}
