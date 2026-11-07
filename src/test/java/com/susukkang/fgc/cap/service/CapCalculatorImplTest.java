@@ -580,6 +580,41 @@ class CapCalculatorImplTest {
         assertThat(result.resultStatus()).isEqualTo(CapResultStatus.WARNING);
     }
 
+    // FUN-030: 2027 4년 분급(선지급 600,000 + 유지관리 월 45,000)과 2029 7년 분급(선지급 600,000 + 유지관리 월 24,000)의
+    // 첫 12개월을 같은 초년도 한도 엔진에 넣으면 운영정책서와 시드 명세의 예시(1,140,000원 95% 경고, 888,000원 74% 정상)가 나온다.
+    // 엔진만 확인한다. 4년, 7년 예정판(SIMULATION)을 화면에서 이 엔진에 연결하는 것은 발표 뒤 과제다(SRC-080).
+    @ParameterizedTest(name = "{0} 계약, 유지관리 월 {1}원: 산입 {2}원, 사용률 {3}%, {4}")
+    @CsvSource({
+            "2027-03-02, 45000, 1140000, 95, WARNING",
+            "2029-03-02, 24000, 888000, 74, NORMAL"
+    })
+    void appliesTheSameFirstYearEngineToFourAndSevenYearInstallments(
+            LocalDate contractDate, String monthlyMaintenance, String included, String usagePct, CapResultStatus status) {
+        Long upfront = 21L;
+        Long maintenance = 22L;
+        when(capContractQueryRepository.findCapViewByContractId(CONTRACT_ID))
+                .thenReturn(contract(contractDate, new BigDecimal("100000"), false));
+        when(capRuleQueryRepository.findApplicableRuleSet(eq("GA_TO_FC"), any(), any(), any(), any()))
+                .thenReturn(ruleSet("GA_TO_FC", BigDecimal.ZERO, "STANDARD_DEDUCTION_80"));
+        when(capRuleQueryRepository.findRuleItems(CAP_RULE_SET_ID))
+                .thenReturn(List.of(includedItem(upfront, "UPFRONT_COMMISSION"), includedItem(maintenance, "MAINTENANCE_COMMISSION")));
+        List<ScheduleAmountView> firstYear = new java.util.ArrayList<>();
+        firstYear.add(scheduleLine(200L, upfront, 1, "600000"));
+        for (int month = 1; month <= 12; month++) {
+            firstYear.add(scheduleLine(300L + month, maintenance, month, monthlyMaintenance));
+        }
+        when(capScheduleAmountQueryRepository.findFirstYearScheduleAmounts(anyLong(), anyString(), anyInt()))
+                .thenReturn(firstYear);
+
+        CapCalculationResult result = capCalculator.calculate(CapCalculationCommand.realtime(
+                CONTRACT_ID, PaymentStage.GA_TO_FC, contractDate));
+
+        assertThat(result.limitAmount()).isEqualByComparingTo("1200000");
+        assertThat(result.includedAmount()).isEqualByComparingTo(included);
+        assertThat(result.usagePct()).isEqualByComparingTo(usagePct);
+        assertThat(result.resultStatus()).isEqualTo(status);
+    }
+
     // 환급률표 조회는 검증실행일이 아니라 계약일을 기준으로 한다
     // (MONTHLY 재검증의 asOfDate는 계약일보다 뒤일 수 있으나, REG-19상 기준일은 계약 체결일이다)
     @Test
