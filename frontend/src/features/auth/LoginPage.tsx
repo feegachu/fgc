@@ -28,13 +28,15 @@ export function LoginPage() {
   const notice =
     search.get('reason') === 'duplicate'
       ? authMessages.superseded
-      : search.has('logout')
-        ? search.get('logout') === 'failed'
-          ? authMessages.logoutFailed
-          : authMessages.loggedOut
-        : search.has('redirect')
-          ? authMessages.sessionExpired
-          : ''
+      : search.get('reason') === 'idle'
+        ? authMessages.idleLogout
+        : search.has('logout')
+          ? search.get('logout') === 'failed'
+            ? authMessages.logoutFailed
+            : authMessages.loggedOut
+          : search.has('redirect')
+            ? authMessages.sessionExpired
+            : ''
 
   useEffect(() => {
     document.title = '로그인 | FGC'

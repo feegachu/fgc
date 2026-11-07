@@ -12,10 +12,14 @@ import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 
@@ -31,6 +35,7 @@ public class DailyChangedContractJobTrigger {
 
     private final Job dailyChangedContractJob;
     private final JobLauncher jobLauncher;
+    private final NamedParameterJdbcTemplate jdbcTemplate;
 
     @Value("${fgc.batch.daily-changed-contract.triggered-by-user-id}")
     private long scheduledTriggeredByUserId;
@@ -69,7 +74,26 @@ public class DailyChangedContractJobTrigger {
         }
         // 스케줄러 스레드는 결과를 기다리는 호출자가 없다 — launch() 안의 로깅으로 충분하다.
         // 특정 행을 지정하지 않는다 — CreateDailyRunTasklet이 "오늘" 기준으로 알아서 찾는다.
+        // 처리할 계약이 없는 날 빈 실행 행이 쌓이면 월 통합검증 목록과 대시보드를 가린다.
+        if (!hasChangedContracts()) {
+            log.info("변경된 계약이 없어 일 배치 실행을 만들지 않습니다.");
+            return;
+        }
         launch(null, scheduledTriggeredByUserId, RequestIdContext.generate());
+    }
+
+    boolean hasChangedContracts() {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM fgc.insurance_contract c WHERE """ + DailyChangedContractJobNames.CHANGED_CONTRACT_CONDITION + """
+                )
+                """, new MapSqlParameterSource()
+                .addValue("lastProcessedAt", jdbcTemplate.queryForObject(
+                        "SELECT last_processed_at FROM fgc.batch_watermark WHERE job_name = :jobName AND step_name = :stepName",
+                        Map.of("jobName", DailyChangedContractJobNames.JOB_NAME,
+                                "stepName", DailyChangedContractJobNames.CHANGED_CONTRACT_STEP_NAME),
+                        OffsetDateTime.class))
+                .addValue("jobName", DailyChangedContractJobNames.JOB_NAME), Boolean.class));
     }
 
     /**

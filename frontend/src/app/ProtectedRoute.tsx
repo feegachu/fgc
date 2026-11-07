@@ -1,10 +1,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../features/auth/useAuth'
 import { AuthStatus } from '../features/auth/AuthStatus'
+import { useIdleLogout } from '../features/auth/useIdleLogout'
 
 export function ProtectedRoute() {
   const location = useLocation()
   const auth = useAuth()
+  useIdleLogout(Boolean(auth.user))
   if (auth.loggingOut) return <AuthStatus />
   if (!auth.accessToken) {
     const redirect = encodeURIComponent(location.pathname + location.search + location.hash)

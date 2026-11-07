@@ -55,6 +55,8 @@ public class CommissionPaymentWriteRepository {
                     SELECT 1 FROM fgc.payment_journal_correction
                     WHERE original_payment_id = :id OR replacement_payment_id = :id
                     UNION ALL
+                    SELECT 1 FROM fgc.payment_hold WHERE commission_transaction_id = :id
+                    UNION ALL
                     SELECT 1 FROM fgc.journal_header
                     WHERE source_entity_type = 'COMMISSION_TRANSACTION' AND source_entity_id = CAST(:id AS text)
                     UNION ALL
