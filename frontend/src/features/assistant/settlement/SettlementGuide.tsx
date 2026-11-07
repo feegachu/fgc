@@ -701,7 +701,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                 {explanation.status === 'PAUSED' && <Button variant="secondary" onClick={explanation.retry}>다시 찾기</Button>}
                 <div className="payment-guide-actions">
                   <Button variant="secondary" disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전</Button>
-                  <Button className="screen-step-next" disabled={busy || !explanation.ready} onClick={() => explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음'}</Button>
+                  <Button className="screen-step-next" disabled={busy || !explanation.ready} onClick={() => explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
                 </div>
               </section>
             ) : <p>{decision?.reason}</p>}

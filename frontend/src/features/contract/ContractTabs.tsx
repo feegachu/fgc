@@ -334,7 +334,9 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
               viewportClassName="contract-tab-viewport"
               caption={`${PAYMENT_STAGE[stage]} 예상 스케줄`}
               columns={scheduleColumns}
-              rows={data.lines ?? []}
+              rows={revised ? [...(data.lines ?? [])].sort((a, b) =>
+                (a.installmentNo ?? Number.MAX_SAFE_INTEGER) - (b.installmentNo ?? Number.MAX_SAFE_INTEGER)
+                || (a.lineNo ?? 0) - (b.lineNo ?? 0)) : data.lines ?? []}
               rowKey={(row) => String(row.scheduleLineId ?? row.lineNo ?? data.lines!.indexOf(row))}
               emptyMessage="조회된 스케줄 회차가 없습니다."
             />

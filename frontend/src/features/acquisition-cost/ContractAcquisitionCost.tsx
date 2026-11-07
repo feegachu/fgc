@@ -8,9 +8,14 @@ import { usePermission } from '../auth/useAuth'
 import { contractAcquisitionQuery, useRequestAcquisitionCheck } from './api'
 import type { AcquisitionRequest } from './api'
 import { AcquisitionCostResult, AcquisitionFailure } from './AcquisitionCostResult'
+import { ContractAcquisitionTable } from './ContractAcquisitionTable'
 
 /** 계약 상세의 작은 영역(스크럼 4차). 이 계약의 최근 결과만 보이고, 목록과 이력은 ACQC-W01에서 본다. */
 export function ContractAcquisitionCost({ contractId, contractNo, concise = false }: { contractId: string; contractNo?: string; concise?: boolean }) {
+  return concise ? <ContractAcquisitionTable contractId={contractId} /> : <LegacyContractAcquisitionCost contractId={contractId} contractNo={contractNo} />
+}
+
+function LegacyContractAcquisitionCost({ contractId, contractNo }: { contractId: string; contractNo?: string }) {
   const canProcess = usePermission('canProcess')
   const [stage, setStage] = useState<AcquisitionRequest['paymentStage']>('GA_TO_FC')
   const query = useQuery(contractAcquisitionQuery(contractId, stage))
@@ -63,7 +68,7 @@ export function ContractAcquisitionCost({ contractId, contractNo, concise = fals
       ) : latest ? (
         <AcquisitionCostResult check={latest} />
       ) : (
-        <p className="empty-state">{concise ? '이 지급단계의 검증 결과가 없습니다.' : '이 지급단계의 검증 결과가 없습니다. 이 검증이 없어도 예정 스케줄 생성과 조회는 할 수 있습니다.'}</p>
+        <p className="empty-state">이 지급단계의 검증 결과가 없습니다. 이 검증이 없어도 예정 스케줄 생성과 조회는 할 수 있습니다.</p>
       )}
     </div>
   )

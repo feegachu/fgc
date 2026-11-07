@@ -10,6 +10,7 @@ export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'prese
   input?: boolean
   requiresSelectedTab?: boolean
   workflowInstruction?: string
+  nextLabel?: string
 }
 const target = (id: string) => `[data-guide-target="${id}"]`
 const step = (id: string, selector: string, title: string, instruction: string, input = false): WorkflowExplanation =>
@@ -119,6 +120,11 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
       presentation: { side: 'right' },
     }]
   }
+  if (reuseContractDetail && stage === 'schedule.review' && path === '/schedules') {
+    return [...getScreenWalkthrough('SCHE-W01').map(entry => ({
+      ...entry, id: entry.targetId, selector: guideSelector(entry),
+    })), paymentHandoff('[data-guide-target="schedule.results"]')]
+  }
   const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
   if (stage === 'contract.create') return instructions
   const screenId = path.startsWith('/contracts/') ? 'CONT-W02'
@@ -127,9 +133,26 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
         : path === '/validation-runs' ? 'VRUN-W01' : path.startsWith('/validation-runs/') ? 'VRUN-W02'
           : path === '/reconciliations' ? 'RECO-W01' : path === '/exceptions' ? 'EXCP-W01' : ''
   const page = getScreenWalkthrough(screenId)
-  return instructions.map(instruction => {
+  const explanations = instructions.map(instruction => {
+    if (reuseContractDetail && stage === 'schedule.review' && instruction.id === 'schedule.versions') {
+      return { ...instruction, selector: '#schedule-versions-tab', title: '버전 비교', concise: true,
+        instruction: '버전비교 탭에서 생성 이력과 사용 중인 버전을 확인하세요.',
+        interaction: '확인한 뒤 수수료 지급으로 이어갑니다.', requiresSelectedTab: true }
+    }
     const shared = page.find(entry => guideSelector(entry) === instruction.selector)
     return shared ? { ...shared, ...instruction, title: shared.title, instruction: shared.instruction,
       workflowInstruction: instruction.instruction } : instruction
   })
+  return reuseContractDetail && stage === 'schedule.review' && path.startsWith('/schedules/')
+    ? [...explanations, paymentHandoff('[data-guide-target="schedule.lines"]')]
+    : explanations
+}
+
+function paymentHandoff(selector: string): WorkflowExplanation {
+  return {
+    id: 'schedule.openPayments', selector, title: '수수료 지급으로 이어가기', concise: true,
+    instruction: '예상 회차와 금액을 확인했다면 지급 등록으로 이동하세요.',
+    interaction: '아래 수수료 지급 버튼을 누르면 확인한 계약으로 이어집니다.',
+    nextLabel: '수수료 지급으로 이동', presentation: { side: 'left' },
+  }
 }
