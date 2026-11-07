@@ -9,7 +9,7 @@ import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
-import { dateTime, int } from '../../lib/format'
+import { date, dateTime, int } from '../../lib/format'
 import { nameWithCode } from '../../lib/screenText'
 import { Amount } from '../cap/badges'
 import { contractEventsQuery, contractStatusEffectsQuery } from './api'
@@ -42,6 +42,13 @@ type Processing = NonNullable<ContractStatusEvent['processings']>[number]
 type Summary = NonNullable<Processing['summary']>
 
 const NO_DATA = '자료 없음'
+// Guide-only dates: keep the base day where possible, clamping at month end.
+function previewDate(base: string, months: number) {
+  if (base === '-') return undefined
+  const [year, month, day] = base.split('-').map(Number)
+  const lastDay = new Date(Date.UTC(year, month - 1 + months + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(year, month - 1 + months, Math.min(day, lastDay))).toISOString().slice(0, 10)
+}
 const followUpTones: Record<string, StatusTone> = {
   NOT_REQUIRED: 'neutral',
   PENDING: 'info',
@@ -341,6 +348,7 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
   const denied = history.error instanceof ApiError && history.error.status === 403
   const events = denied ? undefined : history.data
   const ordered = sortStatusEvents(events ?? [], compact ? 'effectiveAt' : sort)
+  const previewBase = [...ordered].reverse().map(event => date(event.effectiveAt)).find(value => value !== '-') ?? '-'
   const opened = selection?.open ? events?.find((event) => event.eventId === selection.eventId) : undefined
   return (
     <section
@@ -408,7 +416,7 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
             {!!ordered.length && <li className="contract-history-origin">
               <strong>{ordered[0].previousStatus ? responseLabel(contractStatusLabels, ordered[0].previousStatus, ordered[0].previousStatusLabel) : '최초'}</strong>
             </li>}
-            {ordered.map((event, index) => <li key={event.eventId ?? index}>
+            {ordered.map((event, index) => <li className="contract-history-event" key={event.eventId ?? index}>
               <div className="contract-history-node-heading">
                 <strong>{responseLabel(contractStatusLabels, event.newStatus, event.newStatusLabel)}</strong>
                 {event.eventId != null && <Button variant="secondary" onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
@@ -418,9 +426,13 @@ export function ContractStatusHistory({ id, compact = false }: { id: string; com
               <FollowUpStatus event={event} />
             </li>)}
             {previewCount !== null && <li className="contract-history-demo-label"><span>도움말 예시</span></li>}
-            {['미납', '실효', '해지'].slice(0, previewCount ?? 0).map(status => <li className="contract-history-demo-node" key={`demo-${status}`}>
-              <strong>{status}</strong>
-            </li>)}
+            {['미납', '실효', '해지'].slice(0, previewCount ?? 0).map((status, index) => {
+              const exampleDate = previewDate(previewBase, index + 1)
+              return <li className="contract-history-demo-node" key={`demo-${status}`}>
+                <strong>{status}</strong>
+                {exampleDate ? <time dateTime={exampleDate}>{exampleDate}</time> : <span>{index + 1}개월 뒤</span>}
+              </li>
+            })}
             {!events.length && previewCount === null && <li className="empty-state">등록된 상태이력이 없습니다.</li>}
           </ol> : <DataTable
             className="contract-history-table"
