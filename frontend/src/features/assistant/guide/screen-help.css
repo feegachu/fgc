@@ -143,6 +143,10 @@
 .guide-field-picker button:focus-visible { outline: 2px solid var(--color-fgc-blue); }
 .guide-field-picker [role='option'] { display: block; width: 100%; padding: 8px 12px; text-align: left; }
 .guide-field-picker [aria-selected='true'], .guide-field-picker [aria-pressed='true'] { background: var(--color-fgc-blue); color: white; }
+.guide-field-picker button:is([aria-selected='true'], [aria-pressed='true']):hover:not(:disabled) {
+  background: var(--color-fgc-ink);
+  color: white;
+}
 .guide-field-picker header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; }
 .guide-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; }
 .guide-calendar-grid > span { font-size: 12px; padding: 4px; }
