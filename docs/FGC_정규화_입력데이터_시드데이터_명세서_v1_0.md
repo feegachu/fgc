@@ -846,7 +846,7 @@ GA_MANUAL_PAYMENT:202607:A-FC-001:0001
 필수 추가 칸:
 
 - `installment_no` — 원천에 회차가 있으면 반드시 넣는다. 없으면 NULL이고 대사는 `REVIEW_REQUIRED`다(V18). 확정 후에는 바꿀 수 없다. V35 백필은 그때까지의 행만 한 번 채웠으므로 **이후 시드(2차 생성기 포함)는 회차를 직접 넣어야 한다.**
-- `GA_MANUAL_PAYMENT`의 중복 기준은 `source_type`·`source_business_key` UNIQUE(`uq_commission_transaction_source`)다. V9의 `source_contract_id`·`source_sequence` 자연키는 V14가 없앴다(순번만 바꾸면 통과해 막지 못했다). 같은 계약, 설계사, 항목, 정산월의 업무상 중복은 월 대사에서 DUPLICATE로 검출한다(SRC-080).
+- `GA_MANUAL_PAYMENT`의 중복 기준은 `source_type`·`source_business_key` UNIQUE(`uq_commission_transaction_source`)다. V9의 `source_contract_id`·`source_sequence` 자연키는 V14가 없앴다(순번만 바꾸면 통과해 막지 못했다). 같은 계약, 설계사, 항목, 정산월의 업무상 중복은 월 대사에서 걸린다. 지급예정일까지 같으면 DUPLICATE이고, 지급예정일이 다르면 어느 지급이 예상 건의 짝인지 정할 수 없어 REVIEW_REQUIRED다(`GaFcReconciliationMatcherImpl.alignActualGroups`, SRC-080).
 
 ## 23. 계약귀속
 
