@@ -31,7 +31,7 @@ export interface ScreenHelpStep {
   concise?: boolean
   /** Read the current preview's one-line explanation without changing the step. */
   liveDescriptionSelector?: string
-  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string }
+  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean }
   openControl?: boolean
   advanceOnSelection?: boolean
   /** Presentation lifecycle only: replay a card or start/stop a chart preview. */

@@ -5,11 +5,12 @@ import { useGuideScrollLock } from './useGuideScrollLock'
 const HIGHLIGHT_PADDING = 10
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
-  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string }) {
+  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean }) {
   useGuideScrollLock(card)
   const full = Boolean(presentation), preferredSide = presentation?.side
   const includeLabel = presentation?.includeLabel
   const sideBoundary = presentation?.sideBoundary
+  const preserveCardPosition = presentation?.preserveCardPosition
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -135,16 +136,21 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
             : preferredSide === 'above' ? context.top - cardHeight - 24 : context.bottom + 24
           if (!side && cardTop + cardHeight > height - 12) cardTop = context.top - cardHeight - 24
           cardTop = Math.max(topBoundary, Math.min(cardTop, height - cardHeight - 12))
-          setPosition({
+          setPosition(previous => ({
             box: {
               left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
               top: Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
               width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
               height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
             },
-            card: { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, maxHeight, overflowY: 'auto' },
-          })
-          if (preparedPresentation !== `${width}:${height}` && !targetInHeader) {
+            card: preserveCardPosition && previous.box && typeof previous.card.left === 'number' && typeof previous.card.top === 'number' && typeof previous.card.width === 'number'
+              ? { ...previous.card,
+                left: Math.max(cardLeftBoundary + 12, Math.min(previous.card.left, workspaceRight - Number(previous.card.width) - 12)),
+                top: Math.max(topBoundary, Math.min(previous.card.top, height - cardHeight - 12)),
+                width: Math.min(Number(previous.card.width), workspaceRight - cardLeftBoundary - 24), maxHeight }
+              : { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, maxHeight, overflowY: 'auto' },
+          }))
+          if (preparedPresentation !== `${width}:${height}` && !targetInHeader && !preserveCardPosition) {
             preparedPresentation = `${width}:${height}`
             // Reveal the whole card, reserving a full explanation below it only on narrow screens.
             const bottom = height - 20 - (side ? 0 : cardHeight + 24)
@@ -261,6 +267,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition])
   return position
 }

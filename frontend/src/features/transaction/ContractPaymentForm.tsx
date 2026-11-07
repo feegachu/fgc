@@ -55,7 +55,7 @@ const helpSteps: ScreenHelpStep[] = ([
     title: '임시저장',
     instruction: '귀속금액을 확인하고 임시저장을 누르세요.',
     interaction: '작성중으로 저장되며, 지급은 확정되지 않습니다.',
-    presentation: { side: 'right' },
+    presentation: { side: 'right', preserveCardPosition: true },
   },
   {
     targetId: 'payment.batch.precheck',
@@ -455,7 +455,7 @@ export function ContractPaymentForm({
     })
   }
   return (
-    <div ref={editor} className="publishing-page transaction-page transaction-form-page contract-payment-editor">
+    <div ref={editor} className={`publishing-page transaction-page transaction-form-page contract-payment-editor${comparing ? ' is-comparing' : ''}`}>
       {comparing && <ContractPaymentComparison root={editor} />}
       <header className="page-header transaction-page-header">
         <div className="page-header-copy">

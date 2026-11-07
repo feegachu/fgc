@@ -17,6 +17,14 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
       frame = 0
       const width = window.innerWidth
       const height = window.innerHeight
+      const input = container.querySelector('[data-compare-amount^="actual-"]')?.getBoundingClientRect()
+      if (input) {
+        for (const [name, value] of [['width', input.width], ['height', input.height]] as const) {
+          const property = `--comparison-amount-${name}`
+          const size = `${value}px`
+          if (container.style.getPropertyValue(property) !== size) container.style.setProperty(property, size)
+        }
+      }
       const box = (element: Element, key: string, padding: number): Box | null => {
         if (!element.getClientRects().length) return null
         const rect = element.getBoundingClientRect()
@@ -45,7 +53,7 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
         return bounds ? [bounds] : []
       })
       const amounts = [...container.querySelectorAll<HTMLElement>('[data-compare-amount]')].flatMap(element => {
-        const bounds = box(element, element.dataset.compareAmount!, 3)
+        const bounds = box(element, element.dataset.compareAmount!, 5)
         return bounds ? [bounds] : []
       })
       const next = { width, height, panels, amounts }
@@ -64,6 +72,8 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
       cancelAnimationFrame(frame)
       resize.disconnect()
       mutation.disconnect()
+      container.style.removeProperty('--comparison-amount-width')
+      container.style.removeProperty('--comparison-amount-height')
       window.removeEventListener('resize', schedule)
       window.removeEventListener('scroll', schedule, true)
     }
@@ -75,12 +85,14 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
       <defs>
         <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={geometry.width} height={geometry.height}>
           <rect width="100%" height="100%" fill="white" />
-          {geometry.panels.map(({ key, ...bounds }) => <rect key={key} {...bounds} rx="10" fill="black" />)}
+          {geometry.panels.map(({ key, ...bounds }) => <rect key={key} className="contract-comparison-panel-reveal" {...bounds} rx="10" fill="black" />)}
         </mask>
       </defs>
       <rect width="100%" height="100%" fill="#17334b38" mask={`url(#${maskId})`} />
-      {geometry.panels.map(({ key, ...bounds }) => <rect key={key} {...bounds} rx="10" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />)}
-      {geometry.amounts.map(({ key, ...bounds }) => <rect key={key} {...bounds} rx="5" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />)}
+      {geometry.panels.map(({ key, ...bounds }) => <rect key={key} className="contract-comparison-panel-reveal" {...bounds} rx="10" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />)}
+      <g>
+        {geometry.amounts.map(({ key, ...bounds }) => <rect key={key} className="contract-comparison-amount-reveal" {...bounds} rx="5" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />)}
+      </g>
     </svg>,
     document.body,
   )

@@ -215,13 +215,37 @@
   z-index: calc(var(--z-overlay, 80) - 2);
   pointer-events: none;
 }
+.contract-payment-editor.is-comparing .contract-payment-preview-amount {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  width: var(--comparison-amount-width, 120px);
+  min-height: var(--comparison-amount-height, 32px);
+  max-width: 45%;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: white;
+}
+.contract-comparison-panel-reveal {
+  animation: contract-comparison-reveal 1100ms 150ms ease-in-out both;
+}
+.contract-comparison-amount-reveal {
+  animation: contract-comparison-reveal 1000ms 1450ms ease-in-out both;
+}
+@keyframes contract-comparison-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 body:has(.contract-payment-comparison-overlay) .payment-guide-spotlight.screen-step-spotlight {
   border-color: transparent;
   box-shadow: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .contract-payment-check path,
-  .contract-payment-gates .transaction-gate-pass .transaction-gate-icon { animation: none; }
+  .contract-payment-gates .transaction-gate-pass .transaction-gate-icon,
+  .contract-comparison-panel-reveal,
+  .contract-comparison-amount-reveal { animation: none; }
 }
 @media (max-width: 63.9375rem) {
   .contract-payment-actions { grid-column: 1 / -1; }
