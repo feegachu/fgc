@@ -1,6 +1,8 @@
 import datetime
+import io
 import json
 import unittest
+import urllib.error
 from unittest import mock
 
 from load_demo_months import COMMON_COST, CONTRACTS, EVENTS, SETTLEMENT_SUPPORT, Client, Loader, anomaly, contract_number
@@ -38,6 +40,45 @@ class Requests(unittest.TestCase):
         with mock.patch('urllib.request.urlopen', return_value=response) as opened:
             Client('https://example.test', 'id', 'pw')
         self.assertEqual(opened.call_args.args[0].get_header('User-agent'), 'fgc-demo-loader/1.0')
+
+
+class Responses(unittest.TestCase):
+    @staticmethod
+    def reply(status, text):
+        response = mock.MagicMock(status=status)
+        response.__enter__.return_value = response
+        response.read.return_value = text.encode()
+        return response
+
+    def test_expired_token_logs_in_again_even_when_the_401_body_is_not_json(self):
+        login = self.reply(200, json.dumps({'data': {'accessToken': 'token'}}))
+        replies = [login, urllib.error.HTTPError('u', 401, 'expired', {}, io.BytesIO(b'<html>')), login, self.reply(200, json.dumps({'data': {'ok': 1}}))]
+        with mock.patch('urllib.request.urlopen', side_effect=replies):
+            client = Client('https://example.test', 'id', 'pw')
+            self.assertEqual(client.call('GET', '/api/v1/x'), (200, {'data': {'ok': 1}}))
+
+    def test_a_second_401_after_logging_in_again_stops_instead_of_looping(self):
+        login = self.reply(200, json.dumps({'data': {'accessToken': 'token'}}))
+        expired = lambda: urllib.error.HTTPError('u', 401, 'expired', {}, io.BytesIO(b'{}'))
+        with mock.patch('urllib.request.urlopen', side_effect=[login, expired(), login, expired()]):
+            client = Client('https://example.test', 'id', 'pw')
+            with self.assertRaises(SystemExit) as stopped:
+                client.call('GET', '/api/v1/x')
+        self.assertIn('401', str(stopped.exception))
+
+    def test_a_reply_that_is_not_an_object_stops_with_the_path_and_status(self):
+        replies = [self.reply(200, json.dumps({'data': {'accessToken': 'token'}})), self.reply(200, '[]')]
+        with mock.patch('urllib.request.urlopen', side_effect=replies):
+            client = Client('https://example.test', 'id', 'pw')
+            with self.assertRaises(SystemExit) as stopped:
+                client.call('GET', '/api/v1/x')
+        self.assertIn('/api/v1/x: 200', str(stopped.exception))
+
+    def test_a_login_reply_without_a_token_stops(self):
+        with mock.patch('urllib.request.urlopen', return_value=self.reply(200, json.dumps({'data': None}))):
+            with self.assertRaises(SystemExit) as stopped:
+                Client('https://example.test', 'id', 'pw')
+        self.assertIn('로그인 실패', str(stopped.exception))
 
 
 class MonthRuns(unittest.TestCase):

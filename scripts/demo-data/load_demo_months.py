@@ -70,7 +70,7 @@ class Client:
         self.token = None
         self.login()
 
-    def call(self, method, path, body=None, headers=None):
+    def call(self, method, path, body=None, headers=None, retried=False):
         # 신한 앞단(Cloudflare)은 파이썬 기본 User-Agent를 403(1010)으로 막는다. 도구 이름을 밝힌다.
         head = {'Accept': 'application/json', 'Origin': self.base, 'X-FGC-Client': 'web', 'User-Agent': 'fgc-demo-loader/1.0'}
         if self.token:
@@ -84,21 +84,27 @@ class Client:
                 text, status = response.read(), response.status
         except urllib.error.HTTPError as error:
             text, status = error.read(), error.code
+        # 만료된 토큰의 401은 본문이 무엇이든 다시 로그인하고 한 번 더 보낸다.
+        if status == 401 and not path.endswith('/auth/login'):
+            if retried:
+                sys.exit(f'{method} {path}: 다시 로그인해도 401입니다')
+            self.login()
+            return self.call(method, path, body, headers, True)
         try:
             data = json.loads(text.decode()) if text else {}
         except ValueError:
             sys.exit(f'{method} {path}: {status} 응답이 JSON이 아닙니다')
-        if status == 401 and not path.endswith('/auth/login'):
-            self.login()
-            return self.call(method, path, body, headers)
+        if not isinstance(data, dict):
+            sys.exit(f'{method} {path}: {status} 응답 형식이 다릅니다')
         return status, data
 
     def login(self):
         self.token = None
         status, data = self.call('POST', '/api/v1/auth/login', {'loginId': self.login_id, 'password': self.password})
-        if status != 200:
+        token = (data.get('data') or {}).get('accessToken') if status == 200 else None
+        if not token:
             sys.exit(f'{self.login_id} 로그인 실패: {status}')
-        self.token = data['data']['accessToken']
+        self.token = token
 
     def ok(self, method, path, body=None, headers=None, allowed=(200, 201, 202)):
         status, data = self.call(method, path, body, headers)
