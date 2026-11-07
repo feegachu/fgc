@@ -181,6 +181,7 @@ export function PoliciesPage() {
                 {
                   key: 'type',
                   label: '유형',
+                  align: 'center',
                   width: '9rem',
                   render: (r) => (
                     <CategoryBadge value={r.policyType} optionCount={10}>

@@ -1,5 +1,5 @@
 .policy-page {
-  gap: 20px;
+  gap: var(--space-4);
 }
 .policy-page .policy-page-header {
   gap: 24px;

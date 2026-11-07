@@ -197,7 +197,7 @@ export default function TransactionListPage() {
       label: '귀속 계약',
       sortable: true,
       width: '5.5rem',
-      align: 'center',
+      align: 'number',
       render: (row) =>
         (row.attributionCount ?? 0) === 0 ? (
           <StatusBadge tone="error">0건</StatusBadge>

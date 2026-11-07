@@ -102,7 +102,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'targetCount',
     sortable: true,
     width: '4.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => int(row.targetCount),
   },
   {
@@ -111,7 +111,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'matchedCount',
     sortable: true,
     width: '4.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => int(row.matchedCount),
   },
   {
@@ -120,7 +120,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'exceptionCount',
     sortable: true,
     width: '4.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => int(row.exceptionCount),
   },
   {
@@ -129,7 +129,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'matchRatePct',
     sortable: true,
     width: '5.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => (row.matchRatePct == null ? EMPTY : `${Number(row.matchRatePct).toFixed(1)}%`),
   },
   {
@@ -143,11 +143,10 @@ const historyColumns: TableColumn<Run>[] = [
   },
   {
     key: 'period',
-    label: '시작, 완료',
-    sortKey: 'startedAt',
-    sortable: true,
-    width: '11rem',
-    render: (row) => `${dateTime(row.startedAt)}, ${dateTime(row.completedAt)}`,
+    label: '완료',
+    // 서버 정렬 목록에 완료 시각이 없어 시작 시각으로 정렬되므로 정렬을 걸지 않는다.
+    width: '9.5rem',
+    render: (row) => dateTime(row.completedAt),
   },
 ]
 const resultColumns: TableColumn<Result>[] = [
@@ -338,7 +337,6 @@ export default function ReconciliationPage() {
       key: 'detail',
       label: '상세',
       width: '4rem',
-      align: 'left',
       render: (row) => (
         <Button data-guide-feature="features.reconciliation.reconciliation-page.button"
           variant="ghost"

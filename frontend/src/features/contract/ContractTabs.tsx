@@ -49,7 +49,8 @@ const Text = ({ value }: { value: unknown }) => <CellDisclosure singleLine previ
 const transactionLabels: Record<string, string> = { DRAFT: '작성중', CONFIRMED: '확정', CANCELLED: '취소' }
 const statusTones: Record<string, StatusTone> = {
   RUNNING: 'info',
-  DRAFT: 'info',
+  DRAFT: 'neutral',
+  POSTED: 'success',
   COMPLETED: 'success',
   SUCCESS: 'success',
   SUCCEEDED: 'success',
@@ -69,7 +70,7 @@ function ResultStatus({
   labels?: Record<string, string>
 }) {
   return (
-    <StatusBadge optionCount={Object.keys(labels).length} tone={statusTones[code ?? ''] ?? 'neutral'}>
+    <StatusBadge tablePresentation="dot" tone={statusTones[code ?? ''] ?? 'neutral'}>
       {responseLabel(label, labels, code)}
     </StatusBadge>
   )
@@ -330,6 +331,7 @@ function CapTab({ id }: { id: string }) {
     {
       key: 'usage',
       label: '사용률',
+      align: 'number',
       render: (row) => (
         <CapUsage
           value={row.result?.usagePct == null ? undefined : String(row.result.usagePct)}
@@ -341,6 +343,7 @@ function CapTab({ id }: { id: string }) {
     {
       key: 'basis',
       label: '계산근거',
+      align: 'center',
       render: (row) => (
         <Button data-guide-feature="features.contract.contract-tabs.button-5"
           variant="ghost"
@@ -465,6 +468,7 @@ const journalColumns: TableColumn<ContractJournal>[] = [
   {
     key: 'type',
     label: '유형',
+    align: 'center',
     render: (row) => (
       <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>
         <Text value={JOURNAL_TYPE[row.journalType as keyof typeof JOURNAL_TYPE]} />

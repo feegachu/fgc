@@ -147,7 +147,6 @@ const columns = (back: string, refreshing: boolean): TableColumn<ScheduleHeader>
     key: 'action',
     label: '상세',
     width: '6.5rem',
-    align: 'left',
     render: (row) =>
       hasId(row) ? (
         <ContextLink data-guide-feature="features.schedule.schedule-list-page.context-link-2"

@@ -453,7 +453,7 @@ function ChatbotLauncher({ open, onOpen, onClose }: { open: boolean; onOpen: () 
         aria-expanded={open}
         onClick={onOpen}
       >
-        <PicoMotion motion="still" size={128} className="ah-launcher-mascot" />
+        <PicoMotion motion="still" size={92} className="ah-launcher-mascot" />
         <span className="ah-launcher-label">상품 추천 AI</span>
       </button>
       {open && <ChatbotModal onClose={onClose} />}

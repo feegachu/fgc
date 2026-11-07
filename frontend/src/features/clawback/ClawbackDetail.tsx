@@ -88,6 +88,7 @@ const sourceColumns = (c: Candidate): TableColumn<Detail['sourceRefs'][number]>[
   {
     key: 'status',
     label: '상태',
+    align: 'center',
     render: (r) => (
       <StatusValue
         value={r.status}
@@ -111,6 +112,7 @@ const paymentColumns = (
   {
     key: 'status',
     label: '상태',
+    align: 'center',
     render: (r) => (
       <StatusValue
         value={r.status}
@@ -144,6 +146,7 @@ const scheduleColumns: TableColumn<Detail['scheduleLines'][number]>[] = [
   {
     key: 'status',
     label: '상태',
+    align: 'center',
     render: (r) => (
       <StatusValue
         value={r.lineStatus}

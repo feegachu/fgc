@@ -91,6 +91,7 @@ const columns: TableColumn<Journal>[] = [
   {
     key: 'type',
     label: '유형',
+    align: 'center',
     width: '12rem',
     render: (row) => (
       <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>
@@ -99,19 +100,19 @@ const columns: TableColumn<Journal>[] = [
     ),
   },
   {
+    key: 'contract',
+    label: '계약',
+    sortKey: 'contractNo',
+    sortable: true,
+    width: '12rem',
+    render: (row) => text(row.contractNo || row.contractId),
+  },
+  {
     key: 'source',
     label: '원천',
     width: '10rem',
     render: (row) =>
       disclose(row.sourceEntityTypeLabel || EMPTY),
-  },
-  {
-    key: 'contract',
-    label: '계약',
-    sortKey: 'contractNo',
-    sortable: true,
-    width: '10rem',
-    render: (row) => text(row.contractNo || row.contractId),
   },
   {
     key: 'debit',
