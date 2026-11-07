@@ -56,6 +56,7 @@ public class AuthTokenService {
     private final AuthAuditListener auditListener;
     private final Duration accessTokenTtl;
     private final Duration refreshTokenTtl;
+    private final Duration refreshIdleTtl;
     private final AccountStatusUserDetailsChecker accountStatusChecker = new AccountStatusUserDetailsChecker();
 
     public AuthTokenService(JwtEncoder jwtEncoder,
@@ -64,7 +65,8 @@ public class AuthTokenService {
                             FgcUserDetailsService userDetailsService,
                             AuthAuditListener auditListener,
                             @Value("${fgc.jwt.access-token-ttl}") Duration accessTokenTtl,
-                            @Value("${fgc.jwt.refresh-token-ttl}") Duration refreshTokenTtl) {
+                            @Value("${fgc.jwt.refresh-token-ttl}") Duration refreshTokenTtl,
+                            @Value("${fgc.jwt.refresh-idle-ttl}") Duration refreshIdleTtl) {
         this.jwtEncoder = jwtEncoder;
         this.refreshTokenRepository = refreshTokenRepository;
         this.appUserRepository = appUserRepository;
@@ -72,11 +74,11 @@ public class AuthTokenService {
         this.auditListener = auditListener;
         this.accessTokenTtl = accessTokenTtl;
         this.refreshTokenTtl = refreshTokenTtl;
+        this.refreshIdleTtl = refreshIdleTtl;
     }
 
     /** 발급 결과. refreshToken 은 원문 — 쿠키로만 내보내고 응답 본문·로그에 싣지 않는다. */
-    public record IssuedTokens(String accessToken, long expiresInSeconds,
-                               String refreshToken, Duration refreshTokenMaxAge) {
+    public record IssuedTokens(String accessToken, long expiresInSeconds, String refreshToken) {
     }
 
     /** tokens 와 error 중 하나만 있다. */
@@ -129,6 +131,10 @@ public class AuthTokenService {
         if (!token.getExpiresAt().isAfter(now)) {
             return RefreshResult.rejected(FgcErrorCode.AUTH_002);
         }
+        // 화면의 미사용 자동 로그아웃(30분)을 건너뛴 쿠키도 서버가 막는다. 쓰는 동안에는 화면이 먼저 회전해 여기 걸리지 않는다.
+        if (token.getIssuedAt().plus(refreshIdleTtl).isBefore(now)) {
+            return RefreshResult.rejected(FgcErrorCode.AUTH_002);
+        }
         FgcUserDetails user;
         try {
             user = (FgcUserDetails) userDetailsService.loadUserByUsername(loginId);
@@ -139,7 +145,7 @@ public class AuthTokenService {
 
         token.revoke(RevokedReason.ROTATED, now);
         refreshTokenRepository.flush();
-        // 로그인 단위의 수명(14일)은 회전해도 늘리지 않는다 — 처음 로그인한 시점부터 센다.
+        // 로그인 단위의 수명(12시간)은 회전해도 늘리지 않는다 — 처음 로그인한 시점부터 센다.
         IssuedTokens tokens = issue(user, token.getSessionId(), token.getExpiresAt(), now);
         auditListener.recordTokenEvent("TOKEN_REFRESH", user.getUserId(), loginId, null);
         return new RefreshResult(tokens, null);
@@ -207,8 +213,7 @@ public class AuthTokenService {
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
 
-        return new IssuedTokens(accessToken, accessTokenTtl.toSeconds(), rawRefresh,
-                Duration.between(now, refreshExpiresAt));
+        return new IssuedTokens(accessToken, accessTokenTtl.toSeconds(), rawRefresh);
     }
 
     private String loginIdOf(Long userId) {

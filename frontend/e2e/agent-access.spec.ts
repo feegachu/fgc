@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test'
 // UI 전용 fixture. 실제 JWT·소유권·PostgreSQL 검증은 AgentDataScopeIntegrationTest에서 수행한다.
 async function agentFixture(page: Page, commission = 300000) {
   const unexpected: string[] = []
+  await page.addInitScript(() => localStorage.setItem('fgc.lastActivityAt', String(Date.now())))
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     const fulfill = (data: unknown) => route.fulfill({ json: { data, error: null, requestId: 'agent-ui-fixture' } })
