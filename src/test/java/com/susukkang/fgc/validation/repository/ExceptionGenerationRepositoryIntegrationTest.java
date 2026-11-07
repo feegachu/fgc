@@ -126,6 +126,49 @@ class ExceptionGenerationRepositoryIntegrationTest {
         assertRecurringDetections(resolvedCaseId, changedRejectedCaseId, unchangedRejectedCaseId);
     }
 
+    @Test
+    void createsReviewExceptionsForTargetsLeftOutOfCalculation() {
+        // FUN-042: 환급률표 없음, 상품코드 불일치, 표 중복으로 계산에서 뺀 계약은 예외함에 남고, 다시 돌려도 새로 생기지 않는다.
+        List<Long> contractIds = jdbcTemplate.queryForList("""
+                SELECT contract_id
+                  FROM fgc.insurance_contract
+                 ORDER BY contract_id
+                 LIMIT 4
+                """, Long.class);
+        assertThat(contractIds).hasSize(4);
+        Long validationRunId = insertValidationRun();
+        insertTarget(validationRunId, contractIds.get(0), "REVIEW_REQUIRED", "예상 해약환급률표 없음");
+        insertTarget(validationRunId, contractIds.get(1), "REVIEW_REQUIRED", "상품코드 불일치");
+        insertTarget(validationRunId, contractIds.get(2), "REVIEW_REQUIRED", "예상 해약환급률표 중복");
+        insertTarget(validationRunId, contractIds.get(3), "SELECTED", null);
+
+        assertThat(exceptionCaseRepository.insertFromValidationTargets(validationRunId)).isEqualTo(3L);
+
+        List<Map<String, Object>> exceptions = jdbcTemplate.queryForList("""
+                SELECT exception_type, severity, source_entity_type, contract_id, agent_id
+                  FROM fgc.exception_case
+                 WHERE validation_run_id = ?
+                 ORDER BY contract_id
+                """, validationRunId);
+        assertThat(exceptions).extracting(row -> row.get("exception_type"))
+                .containsExactly("REFUND_TABLE_MISSING", "PRODUCT_CODE_MISMATCH", "POLICY_DUPLICATE");
+        assertThat(exceptions).allSatisfy(row -> {
+            assertThat(row).containsEntry("severity", "WARNING").containsEntry("source_entity_type", "INSURANCE_CONTRACT");
+            assertThat(row.get("agent_id")).isNotNull();
+        });
+        assertThat(exceptionCaseRepository.insertFromValidationTargets(validationRunId)).isZero();
+    }
+
+    private void insertTarget(Long validationRunId, Long contractId, String status, String reason) {
+        jdbcTemplate.update("""
+                INSERT INTO fgc.validation_target
+                    (validation_run_id, contract_id, product_offering_id, selection_status, selection_reason, snapshot)
+                SELECT ?, contract_id, product_offering_id, ?, ?, jsonb_build_object('refundRateCandidateCount', 0)
+                  FROM fgc.insurance_contract
+                 WHERE contract_id = ?
+                """, validationRunId, status, reason, contractId);
+    }
+
     private void assertRecurringDetections(Long resolvedCaseId, Long changedRejectedCaseId,
                                           Long unchangedRejectedCaseId) {
         Map<String, Object> rerunSummary = jdbcTemplate.queryForMap("""

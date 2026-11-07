@@ -430,6 +430,45 @@ public interface ExceptionCaseRepository extends JpaRepository<ExceptionCase, Lo
             """, nativeQuery = true)
     long insertFromArbitrageChecks(@Param("validationRunId") Long validationRunId);
 
+    /**
+     * 월 검증 8단계: 대상 선별에서 예상 해약환급률표를 하나로 정하지 못해 REVIEW_REQUIRED가 된 계약을 예외로 남긴다(FUN-042).
+     * 이 계약은 1,200%, 차익거래, 대사 계산에서 빠지므로 예외함에서 원인을 처리하게 한다. 사유 문구는 선별 SQL
+     * ({@code ValidationTargetRepository.insertTargets})이 정한 세 값이다. 근거에는 실행마다 바뀌지 않는 선별
+     * 스냅샷만 넣어, 같은 원인을 다시 검출해도 같은 업무건에 이력만 더해진다(V24).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    @Query(value = """
+            SELECT COUNT(*) FILTER (WHERE recorded.new_case)
+              FROM (
+                  SELECT vt.validation_run_id, vt.contract_id, vt.selection_reason, vt.snapshot, ic.agent_id,
+                         CASE vt.selection_reason
+                             WHEN '예상 해약환급률표 없음' THEN 'REFUND_TABLE_MISSING'
+                             WHEN '상품코드 불일치' THEN 'PRODUCT_CODE_MISMATCH'
+                             WHEN '예상 해약환급률표 중복' THEN 'POLICY_DUPLICATE'
+                             ELSE 'DATA_QUALITY'
+                         END AS detected_type
+                    FROM fgc.validation_target vt
+                    JOIN fgc.insurance_contract ic ON ic.contract_id = vt.contract_id
+                   WHERE vt.validation_run_id = :validationRunId
+                     AND vt.selection_status = 'REVIEW_REQUIRED'
+              ) target
+              JOIN fgc.validation_run vr ON vr.validation_run_id = target.validation_run_id
+              CROSS JOIN LATERAL fgc.record_exception_detection(
+                  CONCAT(target.detected_type, ':', TO_CHAR(vr.validation_month, 'YYYY-MM'),
+                         ':CONTRACT:', target.contract_id, ':VALIDATION_TARGET'),
+                  target.detected_type,
+                  target.detected_type,
+                  'WARNING',
+                  target.validation_run_id, target.contract_id, target.agent_id, NULL,
+                  'INSURANCE_CONTRACT', CAST(target.contract_id AS varchar),
+                  CONCAT('월 검증 계산에서 뺀 계약: ', COALESCE(target.selection_reason, '대상 확인 필요')),
+                  CONCAT('적용할 예상 해약환급률표를 하나로 정하지 못해 이번 실행의 1,200%, 차익거래, 대사 계산에서 뺐습니다. 사유: ',
+                         COALESCE(target.selection_reason, '대상 확인 필요')),
+                  target.snapshot
+              ) recorded
+            """, nativeQuery = true)
+    long insertFromValidationTargets(@Param("validationRunId") Long validationRunId);
+
     /** 월 검증 8단계: 이번 실행의 대사 불일치(MATCHED 제외) 전부를 한 번에 탐지·기록한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     @Query(value = """
