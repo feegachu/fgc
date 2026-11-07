@@ -5,6 +5,7 @@ const won = (value: number) => `${value.toLocaleString('ko-KR')}원`
 // FUN-055, IF-API-85: 시연 데이터의 환수 후보를 실제 서버에서 정책과 사유로 계산한다.
 test('환수 후보를 정책과 사유로 계산하면 서버 계산판의 항목과 합계를 보여 준다', async ({ page }) => {
   await login(page, 'settle01', '/clawbacks?month=2026-07')
+  await page.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' }).getByRole('button', { name: /환수 상세 보기/ }).first().click()
   const calc = page.getByRole('region', { name: '환수 계산' })
   await expect(calc).toBeVisible()
   // 정책 후보가 하나라 미리 골라 두지만, 사유를 쓰기 전에는 계산하지 않는다.

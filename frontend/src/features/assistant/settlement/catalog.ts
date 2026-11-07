@@ -13,23 +13,26 @@ export const titles = [
   '최종 확정',
 ]
 export const FLOW_VERSION = '3.0.1'
-export function destinations(selection: Selection) {
+export type WorkflowDestination = 'schedule-list' | 'payment-list' | 'payment-form' | 'validation-list'
+export function destinations(selection: Selection, destination?: WorkflowDestination) {
   const query = (path: string, extra: Record<string, string> = {}) =>
     `${path}?${new URLSearchParams({ month: selection.month, ...extra })}`
   return {
     'contract.create': { screen: 'CONT-W03', target: 'contract.form', path: query('/contracts/new') },
-    'schedule.review': selection.scheduleId
+    'schedule.review': destination === 'schedule-list'
+      ? { screen: 'SCHE-W01', target: 'schedule.results', path: query('/schedules') }
+      : selection.scheduleId
       ? { screen: 'SCHE-W02', target: 'schedule.lines', path: query(`/schedules/${selection.scheduleId}`) }
       : {
           screen: 'CONT-W02',
           target: 'contract.schedules',
           path: query(`/contracts/${selection.contractId}`, { tab: 'schedules' }),
         },
-    'payment.draft': {
-      screen: 'TRAN-W02',
-      target: 'payment.form',
-      path: query('/transactions/new', selection.paymentId ? { id: String(selection.paymentId) } : {}),
-    },
+    'payment.draft': destination === 'payment-list'
+      ? { screen: 'TRAN-W01', target: 'payment.results', path: query('/transactions') }
+      : destination === 'payment-form'
+        ? { screen: 'TRAN-W02', target: 'payment.batch.contract', path: query('/transactions/new', { guideMode: 'after', ...(selection.contractId ? { contractId: String(selection.contractId) } : {}) }) }
+        : { screen: 'TRAN-W02', target: 'payment.form', path: query('/transactions/new', selection.paymentId ? { id: String(selection.paymentId) } : {}) },
     'payment.precheck': {
       screen: 'TRAN-W02',
       target: 'payment.precheck',
@@ -40,7 +43,7 @@ export function destinations(selection: Selection) {
       target: 'payment.confirm',
       path: query('/transactions/new', { id: String(selection.paymentId) }),
     },
-    'validation.execute': selection.validationRunId
+    'validation.execute': selection.validationRunId && destination !== 'validation-list'
       ? {
           screen: 'VRUN-W02',
           target: 'validation.progress',
@@ -73,8 +76,8 @@ export function destinations(selection: Selection) {
     },
   } satisfies Record<SettlementStep, { screen: string; target: string; path: string }>
 }
-export function settlementCatalog(selection: Selection): GuideDefinition {
-  const routes = destinations(selection)
+export function settlementCatalog(selection: Selection, destination?: WorkflowDestination): GuideDefinition {
+  const routes = destinations(selection, destination)
   return {
     workflowId: 'settlement.end_to_end',
     guideVersion: FLOW_VERSION,

@@ -41,7 +41,7 @@ import './validation.css'
  * [막을 것] 같은 달에 진행 중(생성됨·실행중)인 월간 실행이 있으면 새로 만들 수 없다 —
  * 화면에서 버튼을 끄고, 서버(409 FGC-VRUN-001)가 최종 방어한다.
  */
-const FILTER_KEYS = { status: '', sort: '', page: '' }
+const FILTER_KEYS = { validationMonth: '', status: '', sort: '', page: '' }
 const dash = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const finalizedText = (run: ValidationRun) =>
   run.finalizedAt ? `${run.finalizedBy ?? '-'}, ${dateTime(run.finalizedAt)}` : '-'
@@ -169,7 +169,7 @@ export default function ValidationRunListPage() {
             ② 실행 목록
           </h2>
         </ListHeader>
-        <StatusFilter key={criteria.status} status={criteria.status} onSearch={(status) => update({ status })} />
+        <StatusFilter key={`${criteria.validationMonth}:${criteria.status}`} validationMonth={criteria.validationMonth ?? ''} status={criteria.status} onSearch={(validationMonth, status) => update({ validationMonth, status })} />
         {runs.isError && (
           <p className="field-error" role="alert">
             {errorText(runs.error as Error, '실행 목록을 불러오지 못했습니다.')}
@@ -215,6 +215,7 @@ function OpenLink({ run }: { run: ValidationRun }) {
 
 /** ① 새 실행 만들기 — 검증월 기본값은 셸 기준월, 활성 월간 실행 여부는 선택한 검증월로 판정한다. */
 function CreateSection({ saveGuide }: { saveGuide: SaveGuide }) {
+  const [showCreateHint, setShowCreateHint] = useState(false)
   const { month: shellMonth } = useOutletContext<ShellContext>()
   const canProcess = usePermission('canProcess')
   const navigate = useNavigate()
@@ -251,6 +252,13 @@ function CreateSection({ saveGuide }: { saveGuide: SaveGuide }) {
     event.preventDefault()
     if (monthOk && canProcess && !blockedByActive && !mutation.isPending) mutation.mutate()
   }
+  const createDisabled = !canProcess || !monthOk || blockedByActive || mutation.isPending
+  const createHint = !canProcess
+    ? '실행 생성은 정산담당자와 시스템관리자만 할 수 있습니다.'
+    : !monthOk ? '검증월을 선택해 주세요.'
+      : mutation.isPending ? '실행을 생성하고 있습니다. 잠시 기다려 주세요.'
+        : blockedByActive ? '선택한 검증월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.'
+          : '선택한 검증월과 실행 유형으로 새 검증 실행을 만듭니다. 같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.'
   return (
     <section data-guide-feature="features.validation.validation-run-list-page.section-2" data-guide-target="validation.create" className="surface" aria-labelledby="vrun-create-title">
       <header className="surface-header">
@@ -276,35 +284,47 @@ function CreateSection({ saveGuide }: { saveGuide: SaveGuide }) {
           </Field>
         </div>
         {/* 실행 생성은 SETTLEMENT (화면정의서 :1379, IF-API-45). 해당 월에 활성 MONTHLY 가 있으면 비활성 */}
+        <div className="vrun-finalize-trigger"
+          tabIndex={createDisabled ? 0 : undefined}
+          aria-label={createDisabled ? '실행 생성 불가 사유' : undefined}
+          aria-describedby="create-hint"
+          onMouseEnter={() => setShowCreateHint(true)}
+          onMouseLeave={() => setShowCreateHint(false)}
+          onFocus={() => setShowCreateHint(true)}
+          onBlur={() => setShowCreateHint(false)}
+          onKeyDown={event => { if (event.key === 'Escape') setShowCreateHint(false) }}
+        >
         <Button data-guide-feature="features.validation.validation-run-list-page.btn-create"
           type="submit"
           data-guide-target="validation.createSubmit"
           id="btn-create"
           aria-describedby="create-hint"
           loading={mutation.isPending && savedId === null}
-          disabled={!canProcess || !monthOk || blockedByActive || mutation.isPending}
+          disabled={createDisabled}
         >
           <span className="material-symbols-rounded" aria-hidden="true">
             add
           </span>
           실행 생성
         </Button>
-        <p className="field-helper vrun-create-hint" id="create-hint">
-          {!canProcess
-            ? '실행 생성은 정산담당자와 시스템관리자만 할 수 있습니다.'
-            : blockedByActive
-              ? '선택한 검증월에 진행 중인 월간 실행이 있어 새로 만들 수 없습니다.'
-              : '같은 달에 진행 중인 월간 실행이 있으면 새로 만들 수 없습니다.'}
-        </p>
+        <div className="vrun-finalize-tooltip" id="create-hint" role="tooltip" hidden={!showCreateHint}>{createHint}</div>
+        </div>
       </form>
     </section>
   )
 }
 
-function StatusFilter({ status, onSearch }: { status: string; onSearch: (status: string) => void }) {
+function StatusFilter({ validationMonth, status, onSearch }: { validationMonth: string; status: string; onSearch: (validationMonth: string, status: string) => void }) {
+  const [draftMonth, setDraftMonth] = useState(validationMonth)
   const [draft, setDraft] = useState(status)
   return (
-    <FilterBar className="vrun-filter-bar" embedded onSubmit={() => onSearch(draft)}>
+    <FilterBar className="vrun-filter-bar" embedded onSubmit={() => onSearch(draftMonth, draft)}>
+      <div className="filter-field vrun-filter-status">
+        <label className="filter-field-label" htmlFor="f-validation-month">검증월</label>
+        <input className="field-control" id="f-validation-month" type="month" value={draftMonth}
+          aria-label="검증월 (비워두면 전체 월)"
+          onChange={(event) => setDraftMonth(event.target.value)} />
+      </div>
       <div className="filter-field vrun-filter-status">
         <label className="filter-field-label" htmlFor="f-status">
           상태

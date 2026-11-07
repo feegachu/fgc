@@ -2,8 +2,6 @@ import { test, expect, type Page } from '@playwright/test'
 
 async function expandDetail(page: Page) {
   await page.setViewportSize({ width: 1600, height: 1000 })
-  const divider = page.getByRole('separator', { name: '환수 검토 후보 목록과 상세 너비' })
-  for (let step = 0; step < 3; step++) await divider.press('Shift+ArrowLeft')
   await page
     .getByRole('region', { name: '환수 PDF·발행 이력' })
     .getByRole('table')
@@ -11,6 +9,39 @@ async function expandDetail(page: Page) {
       if (table.parentElement) table.parentElement.scrollLeft = 0
     })
 }
+
+async function openDetail(page: Page) {
+  await page.getByRole('button', { name: 'CLW-727-001 환수 상세 보기 · 후보 42' }).click()
+  await expect(page.getByRole('dialog', { name: '환수 상세 · CLW-727-001' })).toBeVisible()
+}
+
+test('전체 너비 표에서 계약번호로 상세를 열고 좁은 화면에서도 모달 안에서 읽는다', async ({ page }, info) => {
+  await installApi(page)
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await page.goto('/clawbacks?month=2026-07&contractNo=CLW-727')
+  const table = page.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
+  await expect(table).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('separator', { name: '환수 검토 후보 목록과 상세 너비' })).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('clawback-table.png'), fullPage: true })
+  const trigger = table.getByRole('button', { name: /환수 상세 보기/ })
+  await trigger.focus()
+  await trigger.press('Enter')
+  const dialog = page.getByRole('dialog', { name: '환수 상세 · CLW-727-001' })
+  await expect(dialog).toBeVisible()
+  for (const size of [{ width: 1440, height: 900 }, { width: 375, height: 740 }]) {
+    await page.setViewportSize(size)
+    await expect.poll(async () => {
+      const box = await dialog.boundingBox()
+      return !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= size.width && box.y + box.height <= size.height
+    }).toBe(true)
+    await expect(dialog.getByRole('button', { name: '닫기', exact: true })).toBeVisible()
+    await page.screenshot({ path: info.outputPath(`clawback-modal-${size.width}.png`) })
+  }
+  await dialog.getByRole('button', { name: '닫기', exact: true }).click()
+  await expect(trigger).toBeFocused()
+  await expect(page).toHaveURL(/contractNo=CLW-727/)
+})
 
 // 브라우저 상호작용 검증용 API 응답. 실제 DB/PDF 금액·해시 검증은 CT-W02 통합 시험과 구분한다.
 async function installApi(
@@ -135,8 +166,9 @@ test('PDF 발행 응답 유실 재시도·새 키 재발행·정확한 과거판
   const { writes, documents } = await installApi(page, { loseResponse: true })
   await page.goto('/clawbacks?month=2026-07&contractNo=CLW-727')
   const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-  await expect(panel.getByRole('button', { name: 'PDF 생성', exact: true })).toBeEnabled()
   await page.getByLabel('계약번호', { exact: true }).fill('아직 조회하지 않은 입력')
+  await openDetail(page)
+  await expect(panel.getByRole('button', { name: 'PDF 생성', exact: true })).toBeEnabled()
   await panel.getByRole('button', { name: 'PDF 생성', exact: true }).click()
   await panel.getByRole('button', { name: '발행 재시도' }).click()
   await expect(panel.getByText(/PDF 발행 완료/)).toContainText('발행판 v1')
@@ -162,6 +194,7 @@ test('stale 409는 재발행을 잠그고 다시 조회해도 검색 입력을 �
   await page.goto('/clawbacks?month=2026-07')
   const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
   await page.getByLabel('계약번호', { exact: true }).fill('입력 유지')
+  await openDetail(page)
   await panel.getByRole('button', { name: 'PDF 생성', exact: true }).click()
   await expect(panel.getByText('현재 계산판·원천과 발행 요청이 다릅니다. 다시 조회해 주세요.')).toBeVisible()
   await expect(panel.getByRole('button', { name: '발행 재시도' })).toBeDisabled()
@@ -175,6 +208,7 @@ test('stale 409는 재발행을 잠그고 다시 조회해도 검색 입력을 �
 test('COMPLIANCE 읽기 전용·없는 PDF 파일의 JSON을 저장하지 않는다', async ({ page }, info) => {
   await installApi(page, { reader: true, missingFile: true })
   await page.goto('/clawbacks?month=2026-07')
+  await openDetail(page)
   const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
   await expect(panel.getByRole('table', { name: '환수 PDF 발행 이력' })).toBeVisible()
   await expect(panel.getByRole('button', { name: /PDF 생성|재발행/ })).toHaveCount(0)
@@ -190,6 +224,7 @@ test('COMPLIANCE 읽기 전용·없는 PDF 파일의 JSON을 저장하지 않는
 test('GA_ADMIN은 공통 canProcess가 false여도 IF73 권한으로 발행한다', async ({ page }) => {
   await installApi(page, { gaAdmin: true })
   await page.goto('/clawbacks?month=2026-07')
+  await openDetail(page)
   const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
   await panel.getByRole('button', { name: 'PDF 생성', exact: true }).click()
   await expect(panel.getByText(/PDF 발행 완료/)).toContainText('발행판 v1')

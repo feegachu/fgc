@@ -1,4 +1,6 @@
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { ScreenWalkthrough } from '../assistant/guide/ScreenWalkthrough'
+import { getScreenWalkthrough } from '../assistant/guide/page-guides'
 import { nameWithCode } from '../../lib/screenText'
 import { useState } from 'react'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
@@ -10,7 +12,8 @@ import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { ListHeader } from '../../components/ListHeader'
-import { ResizableSplit } from '../../components/ResizableSplit'
+import { Modal } from '../../components/Modal'
+import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { today } from '../../lib/format'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useInsurerOptions, useProductOptions } from '../base/api'
@@ -38,6 +41,8 @@ const draftOf = (criteria: Criteria): Draft => {
 export default function ClawbackPage() {
   const { month, user } = useOutletContext<ShellContext>()
   const calculating = useIsMutating({ mutationKey: ['clawback', 'calculate'] }) > 0
+  const issuing = useIsMutating({ mutationKey: ['clawback', 'issue-notice'] }) > 0
+  const processing = calculating || issuing
   const [params, setParams] = useSearchParams()
   const criteria = criteriaFromParams(params, month ?? '')
   const source = JSON.stringify(criteria)
@@ -51,10 +56,17 @@ export default function ClawbackPage() {
   // 전체 설계사 이력은 많을 수 있어 선택 목록을 열거나 URL에 설계사 조건이 있을 때만 조회한다.
   const [agentsRequested, setAgentsRequested] = useState(Boolean(criteria.agentId))
   const agents = useAgentOptions(asOf, '', agentsRequested, true, true)
-  const [selection, setSelection] = useState<{ source: string; id: number } | null>(null)
+  const [selection, setSelection] = useState<{ source: string; row: CandidateRow } | null>(null)
+  const [confirmClose, setConfirmClose] = useState(false)
   const rows = query.data?.content ?? []
-  const selected = rows.find((row) => selection?.source === source && row.candidateId === selection.id) ?? rows[0]
+  const selected = selection?.source === source
+    ? rows.find((row) => row.candidateId === selection.row.candidateId) ?? selection.row : undefined
   const detail = useQuery({ ...candidateDetailQuery(selected?.candidateId), enabled: selected?.candidateId != null })
+  function closeDetail() {
+    if (processing) return
+    if (Object.keys(useUnsavedWorkStore.getState().owners).length) setConfirmClose(true)
+    else setSelection(null)
+  }
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraftState({
       source,
@@ -219,61 +231,53 @@ export default function ClawbackPage() {
         </Field>
       </FilterBar>
       <QueryState error={insurers.error} />
-      <ResizableSplit
-        className="claw-content-grid"
-        storageKey="clawback-workspace"
-        label="환수 검토 후보 목록과 상세 너비"
-        defaultRatio={58}
-      >
-        <section data-guide-feature="features.clawback.clawback-page.section" className="surface claw-list-panel" aria-labelledby="claw-list-title">
-          <ListHeader className="claw-panel-header" total={query.data?.totalElements ?? 0} pageSize={20}>
-            <h2 className="surface-title" id="claw-list-title">
-              ② 환수 검토 후보
-            </h2>
-          </ListHeader>
-          {busy || query.error ? (
-            <div className="empty-state">
-              <QueryState loading={busy && !query.error} error={query.error} />
-            </div>
-          ) : rows.length === 0 ? (
-            <p className="empty-state">조건에 맞는 환수 검토 대상이 없습니다.</p>
-          ) : (
-            <DataTable
-              caption="검색 조건에 해당하는 환수 검토 후보"
-              className="claw-list-table"
-              columns={columns}
-              {...sortBinding(criteria.sort, CLAWBACK_SORT_KEYS, (sort) => apply({ sort, page: 1 }))}
-              rows={rows}
-              rowKey={(row) => String(row.candidateId)}
-              selectedKeys={selected ? [String(selected.candidateId)] : []}
-              onRowActivate={(row: CandidateRow) => {
-                if (row.candidateId != null) setSelection({ source, id: row.candidateId })
-              }}
-              rowClassName={() => 'claw-result-row'}
-              rowLabel={(row) => `후보 ${row.candidateId} 상세 보기`}
-            />
-          )}
-          {!query.error && (
-            <ListPagination
-              className="claw-pagination-footer"
-              label="환수 검토 후보 페이지"
-              page={query.data?.page ?? criteria.page}
-              totalPages={query.data?.totalPages ?? 0}
-              onPageChange={(page) => apply({ page })}
-            />
-          )}
-        </section>
-        <section data-guide-feature="features.clawback.clawback-page.section-2" className="surface claw-detail-panel" aria-labelledby="claw-detail-title">
+      <section data-guide-feature="features.clawback.clawback-page.section" className="surface claw-list-panel" aria-labelledby="claw-list-title">
+        <ListHeader className="claw-panel-header" total={query.data?.totalElements ?? 0} pageSize={20}>
+          <h2 className="surface-title" id="claw-list-title">
+            환수 검토 후보
+          </h2>
+        </ListHeader>
+        {busy || query.error ? (
+          <div className="empty-state">
+            <QueryState loading={busy && !query.error} error={query.error} />
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="empty-state">조건에 맞는 환수 검토 대상이 없습니다.</p>
+        ) : (
+          <DataTable
+            caption="검색 조건에 해당하는 환수 검토 후보"
+            className="claw-list-table"
+            columns={columns((row) => setSelection({ source, row }))}
+            {...sortBinding(criteria.sort, CLAWBACK_SORT_KEYS, (sort) => apply({ sort, page: 1 }))}
+            rows={rows}
+            rowKey={(row) => String(row.candidateId)}
+            selectedKeys={selected ? [String(selected.candidateId)] : []}
+          />
+        )}
+        {!query.error && (
+          <ListPagination
+            className="claw-pagination-footer"
+            label="환수 검토 후보 페이지"
+            page={query.data?.page ?? criteria.page}
+            totalPages={query.data?.totalPages ?? 0}
+            onPageChange={(page) => apply({ page })}
+          />
+        )}
+      </section>
+      <Modal open={selected != null} title={`환수 상세 · ${selected?.contractNo ?? '계약 확인'}`}
+        className="modal-large claw-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
+        footer={<Button variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button>}>
+        <section data-guide-feature="features.clawback.clawback-page.section-2" className="claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
-            <h2 className="surface-title" id="claw-detail-title">
-              ③ 후보 근거, ④ 계산
-            </h2>
-            {selected && !query.error ? <CalculationBadge row={selected} /> : null}
+            <h3 className="surface-title" id="claw-detail-title">후보 근거 · 환수 계산</h3>
+            <div className="claw-detail-actions">
+              {selected && <CalculationBadge row={detail.data?.candidate ?? selected} />}
+              <ScreenWalkthrough title="환수 상세" steps={getScreenWalkthrough('CLAW-W01').slice(2)} disabled={processing} />
+            </div>
           </header>
           <div className="surface-body claw-detail-body">
-            {!selected || query.error || busy ? (
-              <p className="claw-detail-placeholder">왼쪽 목록에서 후보 한 건을 고르세요.</p>
-            ) : detail.isLoading || detail.error ? (
+            {processing && <p role="status" className="field-helper">요청을 처리하고 있습니다. 완료 후 창을 닫을 수 있습니다.</p>}
+            {detail.isLoading || detail.error ? (
               <div className="empty-state">
                 <QueryState loading={detail.isLoading} error={detail.error} />
                 {detail.error ? (
@@ -289,14 +293,19 @@ export default function ClawbackPage() {
                   key={`${selected?.candidateId}:${detail.data.latestCalculation?.calculationVersion}:${detail.data.candidate?.sourceVersion}`}
                   detail={detail.data}
                   roleCode={user.roleCode}
-                  refreshing={detail.isFetching || calculating}
+                  refreshing={detail.isFetching || processing}
                   onRefresh={() => detail.refetch()}
                 />
               </>
             ) : null}
           </div>
         </section>
-      </ResizableSplit>
+      </Modal>
+      <Modal open={confirmClose} title="작성 중인 내용을 닫을까요?" onClose={() => setConfirmClose(false)}
+        footer={<><Button variant="secondary" onClick={() => setConfirmClose(false)}>계속 작성</Button>
+          <Button onClick={() => { setConfirmClose(false); setSelection(null) }}>입력 버리고 닫기</Button></>}>
+        <p>입력한 계산 사유가 저장되지 않았습니다. 창을 닫으면 작성 중인 내용이 사라집니다.</p>
+      </Modal>
     </div>
   )
 }

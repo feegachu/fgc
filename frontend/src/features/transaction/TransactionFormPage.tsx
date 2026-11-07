@@ -59,17 +59,21 @@ export default function TransactionFormPage() {
   const { user, month } = useOutletContext<ShellContext>()
   const [params] = useSearchParams()
   const id = params.get('id')
-  const [mode, setMode] = useState<'before' | 'after'>(() => settlementEntry() ? 'before' : 'after')
+  const revisedGuide = params.get('guideMode') === 'after'
+  const [mode, setMode] = useState<'before' | 'after'>(() => settlementEntry() && !revisedGuide ? 'before' : 'after')
   const [pendingMode, setPendingMode] = useState<'before' | 'after' | null>(null)
   const fullFlow = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   const legacyEntry = !!id || params.has('commissionItemId') || params.has('amount')
   useEffect(() => {
-    if (!fullFlow || mode === 'before') return
-    if (Object.keys(useUnsavedWorkStore.getState().owners).length) setPendingMode('before')
-    else setMode('before')
-  }, [fullFlow, mode])
+    if (!fullFlow || revisedGuide || mode === 'before') return
+    const timer = window.setTimeout(() => {
+      if (Object.keys(useUnsavedWorkStore.getState().owners).length) setPendingMode('before')
+      else setMode('before')
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [fullFlow, mode, revisedGuide])
   const cancelMode = () => { setPendingMode(null); if (fullFlow) closeSettlementGuide() }
-  const actualMode = legacyEntry ? 'before' : mode
+  const actualMode = legacyEntry ? 'before' : fullFlow && revisedGuide ? 'after' : mode
   const comparison = (busy: boolean) => <div role="group" aria-label="지급 등록 방식 비교" className="payment-registration-comparison">{(['before', 'after'] as const).map(value => <Button key={value} variant={actualMode === value ? 'primary' : 'secondary'} aria-pressed={actualMode === value} disabled={busy || legacyEntry || !!fullFlow} onClick={() => {
     if (value === actualMode) return
     if (Object.keys(useUnsavedWorkStore.getState().owners).length) setPendingMode(value)

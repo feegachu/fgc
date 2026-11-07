@@ -10,6 +10,13 @@
  * 공통 컴포넌트(components.css)의 디자인을 여기에 다시 복사하지 않는다 — 폭·간격만 얹는다.
  */
 
+.vrun-text-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  white-space: nowrap;
+}
+
 .vrun-page {
   display: grid;
   min-width: 0;
@@ -458,6 +465,29 @@
   max-width: 40rem;
 }
 
+.vrun-finalize-trigger { position: relative; }
+.vrun-finalize-trigger > .button:disabled { pointer-events: none; }
+.vrun-finalize-trigger:focus-visible { outline: 2px solid #324f85; outline-offset: 3px; border-radius: 0.75rem; }
+.vrun-finalize-tooltip {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 0.5rem);
+  right: 0;
+  width: 24rem;
+  max-width: min(24rem, 85vw);
+  padding: 0.875rem 1rem;
+  border: 1px solid #dce3ef;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #24344c;
+  box-shadow: 0 6px 24px #24344c26;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.vrun-finalize-tooltip p { margin-top: 0.25rem; }
+.vrun-finalize-tooltip ul { margin: 0.5rem 0 0; padding-left: 1.125rem; }
+.vrun-detail-page[data-presentation='after'] .vrun-finalize-trigger > .button { width: 100%; }
+
 .vrun-finalize-title {
   font-size: 0.875rem;
   font-weight: 700;
@@ -526,4 +556,210 @@
 /* 표가 넓어도 화면 전체가 아니라 표 영역 안에서 스크롤되도록 그리드 항목의 최소 폭을 푼다. */
 .vrun-page > * {
   min-width: 0;
+}
+
+/* After preview: presentation timing never changes the server execution state. */
+.vrun-replay-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #d5e1f2;
+  border-radius: 12px;
+  background: #f4f7fc;
+}
+.vrun-replay-toolbar strong { color: #194d83; font-size: 0.85rem; }
+.vrun-replay-toolbar p { margin: 0.25rem 0 0; color: var(--color-text-secondary); font-size: 0.8rem; }
+.vrun-replay-toolbar button[aria-pressed='true'] { background: #194d83; color: white; border-color: #194d83; }
+.vrun-results-layout,
+.vrun-finalize-sidebar { display: contents; }
+.vrun-detail-page[data-presentation='after'] .vrun-results-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(22rem, 1fr);
+  grid-template-areas: 'summary summary' 'targets checklist' 'exceptions checklist';
+  grid-template-rows: auto auto 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+.vrun-detail-page[data-presentation='after'] .vrun-mid-grid { display: contents; }
+.vrun-detail-page[data-presentation='after'] [aria-labelledby='vrun-summary-title'] { grid-area: summary; }
+.vrun-detail-page[data-presentation='after'] [aria-labelledby='vrun-target-title'] { grid-area: targets; }
+.vrun-detail-page[data-presentation='after'] [aria-labelledby='vrun-exception-title'] { grid-area: exceptions; align-self: end; }
+.vrun-detail-page[data-presentation='after'] .vrun-finalize-sidebar {
+  display: grid;
+  grid-area: checklist;
+  grid-template-rows: 1fr auto;
+  align-self: stretch;
+  align-items: start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.vrun-detail-page[data-presentation='after'] .vrun-results-layout > * { min-width: 0; }
+.vrun-detail-page[data-presentation='after'] [aria-labelledby='vrun-checklist-title'] > .surface-header { flex-wrap: wrap; gap: 0.5rem; }
+.vrun-detail-page[data-presentation='after'] [aria-labelledby='vrun-checklist-title'] > .surface-body { padding: 0 1rem 0.5rem; }
+.vrun-detail-page[data-presentation='after'] .vrun-checklist { gap: 0; padding: 0; }
+.vrun-detail-page[data-presentation='after'] .vrun-checklist-item {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  padding: 0.8rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-default);
+  border-radius: 0;
+  align-items: center;
+}
+.vrun-detail-page[data-presentation='after'] .vrun-checklist-item:last-child { border-bottom: 0; }
+.vrun-detail-page[data-presentation='after'] .vrun-checklist-label { font-weight: 600; overflow-wrap: anywhere; }
+.vrun-condition-icon { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; color: white; font-size: 1.15rem; }
+.vrun-condition-icon.is-pass { background: var(--color-status-success-solid); }
+.vrun-condition-icon.is-fail { background: var(--color-status-error-solid); }
+.vrun-condition-icon.is-pending { background: var(--color-bg-subtle, #f1f5f9); color: var(--color-text-secondary); font-size: 0.9rem; }
+.vrun-condition-cross { display: block; width: 1rem; height: 1rem; }
+.vrun-condition-fail { color: var(--color-status-error-text); }
+.vrun-detail-page[data-presentation='after'] .vrun-checklist-result { font-size: 0.75rem; white-space: nowrap; }
+.vrun-detail-page[data-presentation='after'] .vrun-finalize-row { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+.vrun-detail-page[data-presentation='after'] .vrun-finalize-copy { max-width: none; }
+.vrun-detail-page[data-presentation='after'] .vrun-finalize-row > .button { width: 100%; }
+@media (max-width: 75rem) {
+  .vrun-detail-page[data-presentation='after'] .vrun-results-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'summary' 'targets' 'exceptions' 'checklist';
+    grid-template-rows: auto;
+  }
+}
+.app-shell .page-content .vrun-detail-page .vrun-dashboard-kpis {
+  --kpi-columns: 6;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+  border: 0;
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+}
+.app-shell .page-content .vrun-dashboard-kpis > .kpi-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0.875rem 1.125rem;
+}
+.app-shell .page-content .vrun-dashboard-kpis > .kpi-card::before { display: none; }
+.app-shell .page-content .vrun-dashboard-kpis .kpi-value-row { justify-content: flex-start; }
+.app-shell .page-content .vrun-dashboard-kpis .kpi-value[data-zero='true'] { color: #767676; }
+.app-shell .page-content .vrun-dashboard-kpis .kpi-card-error .kpi-value:not([data-zero='true']) { color: var(--color-status-error-text); }
+.app-shell .page-content .vrun-detail-page [aria-labelledby='vrun-exception-title'] .vrun-dashboard-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 75rem) {
+  .app-shell .page-content .vrun-detail-page .vrun-dashboard-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .app-shell .page-content .vrun-detail-page .vrun-dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-shell .page-content .vrun-detail-page [aria-labelledby='vrun-exception-title'] .vrun-dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.vrun-detail-page[data-presentation='after'] .vrun-mid-grid > * { min-width: 0; }
+.vrun-detail-page[data-presentation='after'] .vrun-table-viewport { max-height: 18rem; }
+.vrun-detail-page[data-presentation='after'] .vrun-stepper-step::after {
+  background: var(--color-border-default);
+}
+.vrun-step-connection {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 0.875rem;
+  width: 100%;
+  height: 3px;
+  background: var(--color-status-success-solid);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 950ms ease-in-out 300ms;
+}
+.vrun-step-connection.is-filled { transform: scaleX(1); }
+.vrun-detail-page[data-presentation='after'] .vrun-stepper-dot {
+  z-index: 2;
+  transition: background-color 400ms ease, border-color 400ms ease;
+}
+.vrun-check-mark { width: 1rem; height: 1rem; overflow: visible; }
+.vrun-check-mark path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 25;
+  animation: vrun-draw-check 480ms ease-out both;
+}
+.vrun-step-spinner {
+  position: absolute;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid rgb(255 255 255 / 35%);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: vrun-buffer 1000ms linear infinite;
+}
+.vrun-detail-page[data-presentation='after'] .fgc-stepper__step--running[data-buffering='false'] .vrun-stepper-dot {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border-default);
+  color: var(--color-text-secondary);
+}
+.vrun-result-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+}
+.vrun-result-card {
+  padding: 1rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  min-width: 0;
+  background: #f8faff;
+}
+.vrun-result-label { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; color: #365581; font-weight: 600; }
+.vrun-result-step { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; background: #e9eef7; border-radius: 50%; font-size: 0.75rem; }
+.vrun-result-number { margin: 0.65rem 0 0.35rem; font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrun-result-number small { font-size: 0.8rem; font-weight: 400; color: var(--color-text-secondary); }
+.vrun-result-note { margin: 0; font-size: 0.8rem; color: var(--color-text-secondary); }
+.vrun-result-wait { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--color-text-secondary); }
+.vrun-result-reveal { animation: vrun-result-enter 650ms ease-out both; }
+.vrun-target-reveal { animation: vrun-result-enter 600ms ease-out both; }
+.vrun-row-delay-1 { animation-delay: 110ms; }
+.vrun-row-delay-2 { animation-delay: 220ms; }
+.vrun-row-delay-3 { animation-delay: 330ms; }
+.vrun-row-delay-4 { animation-delay: 440ms; }
+.vrun-row-delay-5 { animation-delay: 550ms; }
+.vrun-row-delay-6 { animation-delay: 660ms; }
+.vrun-row-delay-7 { animation-delay: 770ms; }
+.vrun-row-delay-8 { animation-delay: 880ms; }
+.vrun-row-delay-9 { animation-delay: 990ms; }
+.vrun-row-delay-10 { animation-delay: 1100ms; }
+.vrun-row-delay-11 { animation-delay: 1210ms; }
+.vrun-row-delay-12 { animation-delay: 1320ms; }
+.vrun-exception-cards {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+}
+.vrun-exception-card { display: flex; flex-direction: column; justify-content: space-between; gap: 0.75rem; padding: 1rem; border: 1px solid var(--color-border-default); border-radius: 12px; }
+.vrun-exception-card > span { color: var(--color-text-secondary); font-size: 0.8rem; }
+.vrun-exception-card strong { font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.vrun-exception-card small { font-size: 0.8rem; font-weight: 400; }
+.vrun-exception-card.is-primary { background: #edf3fb; border-color: #d5e1f2; color: #194d83; }
+@keyframes vrun-draw-check { from { stroke-dashoffset: 25; } to { stroke-dashoffset: 0; } }
+@keyframes vrun-buffer { to { transform: rotate(360deg); } }
+@keyframes vrun-result-enter { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 75rem) { .vrun-exception-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 40rem) {
+  .vrun-result-cards { grid-template-columns: 1fr; }
+  .vrun-exception-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrun-step-connection, .vrun-detail-page[data-presentation='after'] .vrun-stepper-dot { transition: none; }
+  .vrun-check-mark path, .vrun-step-spinner, .vrun-result-reveal, .vrun-target-reveal { animation: none; }
+
+
 }

@@ -2,7 +2,7 @@ import { useLayoutEffect, useState } from 'react'
 
 type Observation = { key: string; target: HTMLElement | null; valid: boolean; status: 'WAITING' | 'READY' | 'PAUSED'; message: string }
 /** A paused explanation only resumes on explicit retry; no business action is executed. */
-export function useWalkthroughTarget(selector: string | undefined, context: string, requiresInput = false, requiresSelectedTab = false) {
+export function useWalkthroughTarget(selector: string | undefined, context: string, requiresInput = false, requiresSelectedTab = false, scope?: 'shell', firstMatch = false) {
   const [attempt, setAttempt] = useState(0)
   const key = `${context}:${selector}:${attempt}`
   const [observed, setObserved] = useState<Observation>()
@@ -17,8 +17,9 @@ export function useWalkthroughTarget(selector: string | undefined, context: stri
     }
     const update = () => {
       if (paused) return
-      const nodes = document.getElementById('main-content')?.querySelectorAll<HTMLElement>(selector)
-      if (nodes && nodes.length > 1) { pause('안내 대상이 중복되어 중단했습니다. 화면을 확인하고 다시 찾기를 눌러주세요.'); return }
+      const root = scope === 'shell' ? document.querySelector('.app-shell') : document.getElementById('main-content')
+      const nodes = root?.querySelectorAll<HTMLElement>(selector)
+      if (nodes && nodes.length > 1 && !firstMatch) { pause('안내 대상이 중복되어 중단했습니다. 화면을 확인하고 다시 찾기를 눌러주세요.'); return }
       const candidate = nodes?.[0]
       const style = candidate ? getComputedStyle(candidate) : null
       const target = candidate && !candidate.closest('[hidden], [inert], [aria-hidden="true"]') && candidate.getClientRects().length && style?.display !== 'none' && style?.visibility !== 'hidden' ? candidate : null
@@ -46,7 +47,7 @@ export function useWalkthroughTarget(selector: string | undefined, context: stri
       document.removeEventListener('change', update, true)
       window.removeEventListener('resize', update)
     }
-  }, [selector, key, requiresInput, requiresSelectedTab])
+  }, [selector, key, requiresInput, requiresSelectedTab, scope, firstMatch])
   const current = observed?.key === key ? observed : undefined
   return { target: current?.target ?? null, valid: current?.valid ?? false, status: current?.status ?? 'WAITING', message: current?.message ?? '', retry: () => setAttempt(value => value + 1) }
 }

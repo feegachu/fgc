@@ -39,6 +39,7 @@ export const RUN_SORT_KEYS = [
 ] as const
 
 export interface RunCriteria {
+  validationMonth?: string
   status: string
   page: number
   /** 비어 있으면 서버 기본(검증월·회차 내림차순) */
@@ -48,8 +49,10 @@ export interface RunCriteria {
 /** 1차 화면과 같이 알 수 없는 status 는 전체로, page 는 1~최대 범위로 보정한다. */
 export function normalizeCriteria(params: URLSearchParams): RunCriteria {
   const status = params.get('status') ?? ''
+  const validationMonth = params.get('validationMonth') ?? ''
   const page = Number.parseInt(params.get('page') ?? '', 10)
   return {
+    validationMonth: /^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(validationMonth) ? validationMonth : '',
     status: RUN_STATUSES.some((item) => item.value === status) ? status : '',
     sort: formatSort(parseSort(params.get('sort'), RUN_SORT_KEYS)),
     page: Number.isNaN(page) ? 1 : Math.max(1, Math.min(page, MAX_PAGE)),
@@ -68,6 +71,7 @@ export const runsQuery = (criteria: RunCriteria, size = PAGE_SIZE) =>
     queryFn: ({ signal }) => {
       const query = new URLSearchParams({ page: String(criteria.page), size: String(size) })
       if (criteria.status) query.set('status', criteria.status)
+      if (criteria.validationMonth) query.set('month', criteria.validationMonth)
       if (criteria.sort) query.set('sort', criteria.sort)
       return get<ValidationRunPage>(`/api/v1/validation-runs?${query}`, signal)
     },

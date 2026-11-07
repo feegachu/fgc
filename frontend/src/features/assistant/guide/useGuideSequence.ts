@@ -14,11 +14,18 @@ export function useGuideSequence<T>(steps: readonly T[], key: string, identify: 
     go, next: () => go(index + 1), previous: () => go(index - 1) }
 }
 
-type Behavior = Pick<ScreenHelpStep, 'onEnter' | 'openControl' | 'advanceOnSelection'>
+type Behavior = Pick<ScreenHelpStep, 'onEnter' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent'>
 /** Presentation and selection only; never clicks save/execute/confirm controls. */
 export function useGuideStep(step: Behavior | undefined, target: HTMLElement | null, next: () => void, enabled: boolean) {
   const advance = useRef(next)
   useEffect(() => { advance.current = next }, [next])
+  useEffect(() => {
+    if (!enabled || !target || !step?.advanceOnEvent) return
+    let timer = 0
+    const completed = () => { clearTimeout(timer); timer = window.setTimeout(() => advance.current(), 350) }
+    target.addEventListener(step.advanceOnEvent, completed)
+    return () => { clearTimeout(timer); target.removeEventListener(step.advanceOnEvent!, completed) }
+  }, [enabled, target, step?.advanceOnEvent])
   useEffect(() => {
     if (enabled) return step?.onEnter?.()
   }, [step, enabled])

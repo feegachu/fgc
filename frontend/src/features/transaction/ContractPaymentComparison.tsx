@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useState, type RefObject } from 'react'
+import { useId, useEffect, useLayoutEffect, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 
 type Box = { key: string; x: number; y: number; width: number; height: number }
@@ -7,6 +7,12 @@ type Geometry = { width: number; height: number; panels: Box[]; amounts: Box[] }
 /** The comparison is visual only; it never copies an expected amount into a payment. */
 export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivElement | null> }) {
   const maskId = useId()
+  const [phase, setPhase] = useState<'waiting' | 'expected' | 'actual'>('waiting')
+  useEffect(() => {
+    const show = setTimeout(() => setPhase('expected'), 1450)
+    const move = setTimeout(() => setPhase('actual'), 3000)
+    return () => { clearTimeout(show); clearTimeout(move) }
+  }, [])
   const [geometry, setGeometry] = useState<Geometry | null>(null)
 
   useLayoutEffect(() => {
@@ -25,13 +31,19 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
           if (container.style.getPropertyValue(property) !== size) container.style.setProperty(property, size)
         }
       }
-      const box = (element: Element, key: string, padding: number): Box | null => {
+      const box = (element: Element, key: string, padding: number, rowLimit?: number): Box | null => {
         if (!element.getClientRects().length) return null
         const rect = element.getBoundingClientRect()
         let left = Math.max(0, rect.left - padding)
         let top = Math.max(0, rect.top - padding)
         let right = Math.min(width, rect.right + padding)
         let bottom = Math.min(height, rect.bottom + padding)
+        if (rowLimit) {
+          const rows = [...element.querySelectorAll<HTMLElement>('tbody > tr, ol > li')]
+            .filter(row => row.getClientRects().length > 0).slice(0, rowLimit)
+          const last = rows.at(-1)?.getBoundingClientRect()
+          if (last) bottom = Math.min(bottom, last.bottom + padding)
+        }
         // Keep outlines inside their scroll viewport, including horizontally scrolled tables.
         for (let parent = element.parentElement; parent; parent = parent.parentElement) {
           const style = getComputedStyle(parent)
@@ -49,13 +61,18 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
       }
       const panels = ['payment.batch.lines', 'payment.batch.expected'].flatMap(key => {
         const element = container.querySelector(`[data-guide-target="${key}"]`)
-        const bounds = element && box(element, key, 6)
+        const bounds = element && box(element, key, 6, 3)
         return bounds ? [bounds] : []
       })
-      const amounts = [...container.querySelectorAll<HTMLElement>('[data-compare-amount]')].flatMap(element => {
-        const bounds = box(element, element.dataset.compareAmount!, 5)
-        return bounds ? [bounds] : []
-      })
+      const amounts: Box[] = []
+      // Match one actual input to its expected schedule line, never by display order alone.
+      for (const element of [...container.querySelectorAll<HTMLElement>('[data-compare-amount^="actual-"]')].slice(0, 3)) {
+        const key = element.dataset.compareAmount!.slice('actual-'.length)
+        const expected = container.querySelector('[data-compare-amount="expected-' + key + '"]')
+        const actualBox = box(element, 'actual-' + key, 5)
+        const expectedBox = expected && box(expected, 'expected-' + key, 5)
+        if (actualBox && expectedBox) { amounts.push(expectedBox, actualBox); break }
+      }
       const next = { width, height, panels, amounts }
       setGeometry(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
     }
@@ -90,9 +107,13 @@ export function ContractPaymentComparison({ root }: { root: RefObject<HTMLDivEle
       </defs>
       <rect width="100%" height="100%" fill="#17334b38" mask={`url(#${maskId})`} />
       {geometry.panels.map(({ key, ...bounds }) => <rect key={key} className="contract-comparison-panel-reveal" {...bounds} rx="10" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />)}
-      <g>
-        {geometry.amounts.map(({ key, ...bounds }) => <rect key={key} className="contract-comparison-amount-reveal" {...bounds} rx="5" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />)}
-      </g>
+      {phase !== 'waiting' && geometry.amounts.length === 2 && (() => {
+        const bounds = geometry.amounts[phase === 'actual' ? 1 : 0]
+        return <rect className="contract-comparison-moving-amount"
+          style={{ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }}
+          rx="5" fill="none" stroke="var(--color-fgc-blue)" strokeWidth="2" />
+      })()}
+
     </svg>,
     document.body,
   )

@@ -199,6 +199,10 @@
 .app-shell[data-kpi-style='summary'] .page-content .kpi-card::before {
   display: none;
 }
+/* 선택 테두리도 카드의 둥근 형태를 따르도록 한다. */
+.app-shell[data-kpi-style='summary'] .page-content .exception-summary-card {
+  border-radius: 0.75rem;
+}
 .app-shell[data-kpi-style='summary'] .page-content .kpi-value-row {
   justify-content: flex-start;
 }

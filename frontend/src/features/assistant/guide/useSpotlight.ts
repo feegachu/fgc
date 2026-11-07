@@ -5,12 +5,13 @@ import { useGuideScrollLock } from './useGuideScrollLock'
 const HIGHLIGHT_PADDING = 10
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
-  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean }) {
+  presentation?: { side?: 'right' | 'left' | 'above' | 'below' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number }) {
   useGuideScrollLock(card)
   const full = Boolean(presentation), preferredSide = presentation?.side
   const includeLabel = presentation?.includeLabel
   const sideBoundary = presentation?.sideBoundary
   const preserveCardPosition = presentation?.preserveCardPosition
+  const rowLimit = presentation?.rowLimit
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -47,6 +48,12 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       if (includeLabel) {
         const label = target!.closest('.field')?.querySelector('.field-label')?.getBoundingClientRect()
         if (label) return new DOMRect(rect.left, Math.min(rect.top, label.top), rect.width, rect.bottom - Math.min(rect.top, label.top))
+      }
+      if (rowLimit && !target!.matches('table')) {
+        const rows = [...target!.querySelectorAll<HTMLElement>('tbody > tr, ol > li')]
+          .filter(row => row.getClientRects().length > 0).slice(0, rowLimit)
+        const last = rows.at(-1)?.getBoundingClientRect()
+        if (last) return new DOMRect(rect.left, rect.top, rect.width, Math.max(0, Math.min(rect.bottom, last.bottom) - rect.top))
       }
       if (!detailed || !target!.matches('table')) return rect
       const header = target!.querySelector<HTMLElement>(':scope > thead')
@@ -111,7 +118,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       frame = requestAnimationFrame(() => {
         const width = document.documentElement.clientWidth || window.innerWidth
         const height = window.innerHeight
-        const workspace = document.getElementById('main-content')?.getBoundingClientRect()
+        const workspace = (target?.closest('#app-sidebar') ? document.querySelector('.app-shell') : document.getElementById('main-content'))?.getBoundingClientRect()
         const workspaceLeft = Math.max(0, workspace?.left ?? 0)
         const workspaceRight = Math.min(width, workspace?.right || width)
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
@@ -124,7 +131,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           const topBoundary = headerBottom + 16
           const rightRoom = workspaceRight - context.right - 36
           const leftRoom = context.left - cardLeftBoundary - 36
-          const side = preferredSide === 'above' ? null
+          const side = preferredSide === 'above' || preferredSide === 'below' ? null
             : preferredSide === 'left' && leftRoom >= 280 ? 'left'
               : preferredSide && rightRoom >= 280 ? 'right' : preferredSide && leftRoom >= 280 ? 'left' : null
           const cardWidth = Math.min(420, side === 'right' ? rightRoom : side === 'left' ? leftRoom : workspaceRight - cardLeftBoundary - 24)
@@ -134,7 +141,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
             : Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12))
           let cardTop = side ? Math.max(topBoundary, Math.min(context.top, height - cardHeight - 12))
             : preferredSide === 'above' ? context.top - cardHeight - 24 : context.bottom + 24
-          if (!side && cardTop + cardHeight > height - 12) cardTop = context.top - cardHeight - 24
+          if (!side && preferredSide !== 'below' && cardTop + cardHeight > height - 12) cardTop = context.top - cardHeight - 24
           cardTop = Math.max(topBoundary, Math.min(cardTop, height - cardHeight - 12))
           setPosition(previous => ({
             box: {
@@ -267,6 +274,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit])
   return position
 }

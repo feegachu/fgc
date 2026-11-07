@@ -5,7 +5,7 @@ import { present } from '../arbitrage/utils'
 import type { CandidateRow } from './api'
 import { Amount, CalculatedAmount, CalculationBadge } from './badges'
 import { triggerLabels } from './labels'
-export const columns: TableColumn<CandidateRow>[] = [
+export const columns = (openDetail: (row: CandidateRow) => void): TableColumn<CandidateRow>[] => [
   {
     key: 'candidateId',
     label: '후보 번호',
@@ -20,7 +20,9 @@ export const columns: TableColumn<CandidateRow>[] = [
     sortable: true,
     width: '10rem',
     cellClassName: 'tabular-nums',
-    render: (r) => <span title={present(r.contractNo)}>{present(r.contractNo)}</span>,
+    render: (r) => <button type="button" className="claw-contract-link" title={present(r.contractNo)}
+      aria-haspopup="dialog" aria-label={`${present(r.contractNo)} 환수 상세 보기 · 후보 ${present(r.candidateId)}`}
+      disabled={r.candidateId == null} onClick={() => openDetail(r)}>{present(r.contractNo)}</button>,
   },
   {
     key: 'insurer',

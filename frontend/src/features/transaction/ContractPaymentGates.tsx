@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { Precheck } from './form-api'
 import { gateStates } from './form-model'
 import { rateText } from '../../lib/format'
@@ -88,7 +89,7 @@ export function ContractPaymentGates({
       </header>
       <div className="surface-body transaction-gate-list" aria-live="polite">
         {steps.map((step, index) => (
-          <div key={step.label} className={`transaction-gate-step transaction-gate-${step.state}`}>
+          <div key={step.label} style={{ '--check-delay': (index * 300) + 'ms' } as CSSProperties} className={`transaction-gate-step transaction-gate-${step.state}`}>
             <span key={step.state} className="material-symbols-rounded transaction-gate-icon" aria-hidden="true">
               {step.state === 'pass' ? (
                 <svg className="contract-payment-check" viewBox="0 0 24 24" fill="none">

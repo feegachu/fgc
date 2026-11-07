@@ -7,6 +7,8 @@ import { screenFor } from '../../../app/screens'
 import { GuideRuntime } from '../guide/runtime'
 import { GuideTargets } from '../guide/targets'
 import type { EntityRef, GuideContext, GuideSnapshot } from '../guide/types'
+import { readBatchPaymentGuide } from '../../transaction/contract-payment-guide'
+import type { WorkflowDestination } from './catalog'
 import { getPaymentGuideObserver } from '../../transaction/payment-guide'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from './entry'
 import { decide, STEPS, handoffFor, replacePayment as replacementSelection } from './state'
@@ -71,12 +73,13 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
     (!!routeContract && !!selection.contractId && Number(routeContract) !== selection.contractId) ||
     (!!routeSchedule && !!selection.scheduleId && Number(routeSchedule) !== selection.scheduleId)
   )
-  const detailedPayment = decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
+  const batchPayment = after && params.get('guideMode') === 'after' && location.pathname === '/transactions/new' && !params.has('id')
+  const detailedPayment = !batchPayment && decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
   const walkthrough = usePaymentWalkthrough(detailedPayment && !busy, month, selection?.stage, selection?.contractId)
   // show() can navigate from the just-saved editor to the same route with its new ID.
   // Bind only after that transition has finished: the old editor is replaced while
   // its saved draft loads, which is not loss of a target in the new explanation.
-  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy, after)
+  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy, after, batchPayment)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
   const demoNumberStep = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
@@ -98,6 +101,25 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
       runtime.current?.pause('USER_PAUSED')
     }
   }), [])
+  const followHandoff = useRef<() => void>(() => {})
+  useLayoutEffect(() => {
+    followHandoff.current = () => {
+      if (selection && !busy) void show(selection, false, decision?.step === 'schedule.review', false, false, explanation.step?.destination)
+    }
+  })
+  useEffect(() => {
+    const target = explanation.target
+    if (!detailedWorkflow || collapsed || busy || !target || !explanation.step?.destination) return
+    const click = (event: MouseEvent) => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+      if (!(event.target instanceof Node) || !target.contains(event.target)) return
+      event.preventDefault()
+      event.stopPropagation()
+      followHandoff.current()
+    }
+    document.addEventListener('click', click, true)
+    return () => document.removeEventListener('click', click, true)
+  }, [detailedWorkflow, collapsed, busy, explanation.target, explanation.step?.destination])
   const current = useRef({ location, user, selection })
   useLayoutEffect(() => {
     current.current = { ...current.current, location, user, selection }
@@ -211,6 +233,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
     acknowledge = false,
     replacePayment = false,
     allowDiscard = false,
+    destinationHint?: WorkflowDestination,
   ) {
     request.current?.abort()
     const controller = new AbortController(),
@@ -225,6 +248,19 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
     try {
       const sourceLocation = locationContext(current.current.location)
       const next = initial || replacePayment ? base : collect(base)
+      if (batchPayment && destinationHint === 'validation-list') {
+        const batch = readBatchPaymentGuide()
+        if (!batch?.ready || !batch.paymentIds.length) throw new Error('선택한 지급 건을 모두 확정한 뒤 월 통합검증으로 이동하세요.')
+        if (batch.contractId !== next.contractId || batch.month !== next.month || batch.stage !== next.stage)
+          throw new Error('계약·정산월·지급단계가 현재 안내 대상과 다릅니다.')
+        const payments = await Promise.all(batch.paymentIds.map(paymentId => readPayment(String(paymentId), signal)))
+        if (payments.some(payment => payment.status !== 'CONFIRMED' || payment.paymentStage !== next.stage ||
+          payment.settlementMonth?.slice(0, 7) !== next.month || !payment.attributions?.length ||
+          payment.attributions.some(row => row.contractId !== next.contractId)))
+          throw new Error('선택한 지급 건의 확정 결과를 다시 확인하세요.')
+        payments.sort((a, b) => Date.parse(b.updatedAt ?? b.createdAt ?? '') - Date.parse(a.updatedAt ?? a.createdAt ?? ''))
+        next.paymentId = payments[0].commissionTransactionId
+      }
       const evidence = await readEvidence(next, signal)
       signal.throwIfAborted()
       if (current.current.user.roleCode !== user.roleCode)
@@ -250,7 +286,8 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         throw new Error('정정 후 확정된 지급 번호를 선택하세요.')
       const result = decide(next, evidence, user.roleCode ?? '')
       if (!initial && result.step === decision?.step) setProgressNotice(result.reason)
-      const routes = destinations(next)
+      const routeHint = destinationHint ?? (after && result.step === 'schedule.review' ? 'schedule-list' : undefined)
+      const routes = destinations(next, routeHint)
       const destination = routes[result.step]
       const paymentContext = getPaymentGuideObserver()?.readContext()
       const dirty = Boolean(paymentContext?.dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
@@ -262,7 +299,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         [...destinationUrl.searchParams].some(([key, value]) => currentParams.get(key) !== value)
       if (needsNavigation && dirty && !allowDiscard) {
         setLeave(() => () => {
-          void show(base, initial, acknowledge, replacePayment, true)
+          void show(base, initial, acknowledge, replacePayment, true, destinationHint)
         })
         return
       }
@@ -296,7 +333,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         serverStateVersion: null,
         dirty: false,
       })
-      const catalog = settlementCatalog(next),
+      const catalog = settlementCatalog(next, routeHint),
         targets = new GuideTargets()
       catalog.steps.forEach((step) =>
         targets.register({
@@ -701,7 +738,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                 {explanation.status === 'PAUSED' && <Button variant="secondary" onClick={explanation.retry}>다시 찾기</Button>}
                 <div className="payment-guide-actions">
                   <Button variant="secondary" disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전</Button>
-                  <Button className="screen-step-next" disabled={busy || !explanation.ready} onClick={() => explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
+                  <Button className="screen-step-next" disabled={busy || !explanation.ready || !!explanation.step?.destination} onClick={() => explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.destination ? '강조된 메뉴를 눌러주세요' : explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
                 </div>
               </section>
             ) : <p>{decision?.reason}</p>}

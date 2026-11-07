@@ -59,7 +59,7 @@ async function prepare(page: Page, guide: Guide, account: string): Promise<Prepa
     expect(detail.sourceRefs.length).toBeGreaterThan(0)
     expect(detail.paymentAttributions.length).toBeGreaterThan(0)
     await login(page, account, `/clawbacks?month=${month}&${query}`)
-    await page.getByRole('row', { name: `후보 ${candidate.candidateId} 상세 보기`, exact: true }).click()
+    await page.getByRole('button', { name: `${contractNo} 환수 상세 보기 · 후보 ${candidate.candidateId}`, exact: true }).click()
     await expect(feature(page, 'clawback.evidence.source')).toBeVisible()
     return { fixtureNotes: [`UI targets only: ${detail.scheduleLines.length} schedule rows; no clawback calculation or confirmation is executed.`] }
   }

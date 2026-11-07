@@ -31,9 +31,11 @@ export interface ScreenHelpStep {
   concise?: boolean
   /** Read the current preview's one-line explanation without changing the step. */
   liveDescriptionSelector?: string
-  presentation?: { side?: 'right' | 'left' | 'above' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean }
+  presentation?: { side?: 'right' | 'left' | 'above' | 'below' | 'either'; includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number }
   openControl?: boolean
   advanceOnSelection?: boolean
+  /** Advance only after the business handler reports successful completion. */
+  advanceOnEvent?: string
   /** Presentation lifecycle only: replay a card or start/stop a chart preview. */
   onEnter?: () => void | (() => void)
   attribute?: 'data-guide-target' | 'data-guide-feature'

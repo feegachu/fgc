@@ -115,13 +115,15 @@ function ContractEditor({
   const returnTo = safeReturnTo(params.get('returnTo'), '/contracts')
   const queryClient = useQueryClient()
   const currentDate = today()
+  const selectedMonth = params.get('month')
+  const defaultContractDate = validMonth(selectedMonth) ? `${selectedMonth}-01` : currentDate
   // Keep the original read token and values until the user explicitly reloads the editor.
   const [original] = useState(contract)
   const location = useLocation()
   // 영향 미리보기에서 넘긴 상태·효력일시 초안. 이동만으로 저장하지 않는다(화면정의서 CONT-W02).
   const [previewDraft] = useState(() => statusDraftFrom(location.state, contract?.allowedNextStatuses ?? []))
   const [draft, setDraft] = useState(() => ({
-    ...initialDraft(currentDate, contract),
+    ...initialDraft(defaultContractDate, contract),
     ...(previewDraft && { contractStatus: previewDraft.contractStatus }),
   }))
   const [errors, setErrors] = useState<ContractFieldErrors>({})
@@ -140,7 +142,7 @@ function ContractEditor({
   const requestKey = usePolicyRequest()
   const submitting = useRef(false)
   const [savedSuccessfully, setSavedSuccessfully] = useState(false)
-  const [initialInput] = useState(() => JSON.stringify(initialDraft(currentDate, contract)))
+  const [initialInput] = useState(() => JSON.stringify(initialDraft(defaultContractDate, contract)))
   const clearUnsaved = useUnsavedWork(!savedSuccessfully && JSON.stringify(draft) !== initialInput)
   const mounted = useRef(true)
   const insurers = useInsurerOptions()

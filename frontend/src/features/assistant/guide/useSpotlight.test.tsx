@@ -3,13 +3,37 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useSpotlight } from './useSpotlight'
 
-function Card({ target, detailed = false }: { target: HTMLElement | null; detailed?: boolean }) {
+function Card({ target, detailed = false, presentation }: { target: HTMLElement | null; detailed?: boolean; presentation?: Parameters<typeof useSpotlight>[3] }) {
   const card = useRef<HTMLElement>(null)
-  const position = useSpotlight(target, card, detailed)
+  const position = useSpotlight(target, card, detailed, presentation)
   return <section ref={card} aria-label="Guide card" data-box={JSON.stringify(position.box)} style={position.card}>Next</section>
 }
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
+
+it('places the comparison coach below the first three rows of a long panel', () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1440)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(900)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(240)
+  const panel = document.createElement('section')
+  panel.innerHTML = `<ol>${'<li>예상 스케줄</li>'.repeat(20)}</ol>`
+  document.body.append(panel)
+  vi.spyOn(panel, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 600, 1000))
+  for (const [index, row] of [...panel.querySelectorAll('li')].entries()) {
+    const rect = new DOMRect(110, 150 + index * 40, 580, 40)
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rect)
+    vi.spyOn(row, 'getClientRects').mockReturnValue([rect] as unknown as DOMRectList)
+  }
+  try {
+    render(<Card target={panel} detailed presentation={{ side: 'below', rowLimit: 3 }} />)
+    act(() => { vi.advanceTimersByTime(100) })
+    const card = screen.getByRole('region', { name: 'Guide card' })
+    expect(JSON.parse(card.dataset.box!)).toEqual({ left: 90, top: 90, width: 620, height: 190 })
+    expect(card).toHaveStyle({ left: '100px', top: '294px' })
+  } finally { panel.remove() }
+})
 
 it.each([0, 2, 20])('highlights columns and at most three of %i result rows without scrolling to the table end', count => {
   vi.useFakeTimers()

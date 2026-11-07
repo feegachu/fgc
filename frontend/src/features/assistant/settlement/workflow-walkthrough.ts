@@ -1,8 +1,11 @@
+import type { WorkflowDestination } from './catalog'
+import { contractPaymentHelp } from '../../transaction/contract-payment-help'
 import type { SettlementStep } from './state'
 import type { ScreenHelpStep } from '../guide/ScreenHelp'
 import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
+import { useSidebarStore } from '../../../stores/sidebar'
 
-export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
   id: string
   selector: string
   title: string
@@ -11,6 +14,9 @@ export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'prese
   requiresSelectedTab?: boolean
   workflowInstruction?: string
   nextLabel?: string
+  scope?: 'shell'
+  destination?: WorkflowDestination
+  firstMatch?: boolean
 }
 const target = (id: string) => `[data-guide-target="${id}"]`
 const step = (id: string, selector: string, title: string, instruction: string, input = false): WorkflowExplanation =>
@@ -108,22 +114,45 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
 }
 
 /** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
-export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true): WorkflowExplanation[] {
+export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true, batchPayment = false): WorkflowExplanation[] {
   if (reuseContractDetail && stage === 'contract.create' && /^\/contracts\/\d+$/.test(path)) {
     return [...getScreenWalkthrough('CONT-W02').map(entry => ({
       ...entry, id: entry.targetId, selector: guideSelector(entry),
-    })), {
-      id: 'contract.openSchedules', selector: '#contract-tab-schedules',
-      title: '예상 스케줄로 이어가기', concise: true,
-      instruction: '예상 스케줄 탭을 눌러 생성된 회차를 확인하세요.',
-      interaction: '확인한 뒤 다음 업무로 이동하세요.', requiresSelectedTab: true,
-      presentation: { side: 'right' },
-    }]
+    })), menuHandoff('contract.openSchedules', 'sche-w01', '예상 스케줄', 'schedule-list')]
   }
   if (reuseContractDetail && stage === 'schedule.review' && path === '/schedules') {
-    return [...getScreenWalkthrough('SCHE-W01').map(entry => ({
-      ...entry, id: entry.targetId, selector: guideSelector(entry),
-    })), paymentHandoff('[data-guide-target="schedule.results"]')]
+    return [...sharedSteps('SCHE-W01'), menuHandoff('schedule.openPayments', 'tran-w01', '수수료 지급', 'payment-list')]
+  }
+  if (reuseContractDetail && stage === 'payment.draft' && path === '/transactions') {
+    return [...sharedSteps('TRAN-W01').filter(entry => !entry.id.endsWith('context-link-2')), {
+      id: 'payment.openRegistration', selector: '[data-guide-feature="features.transaction.transaction-list-page.context-link-2"]',
+      title: '수수료 지급 등록으로 이어가기', concise: true,
+      instruction: '신규 등록을 눌러 계약별 지급 건을 작성하세요.',
+      interaction: '수정 후 등록 화면에서 안내를 이어갑니다.',
+      destination: 'payment-form', presentation: { side: 'left' },
+    }]
+  }
+  if (batchPayment && stage === 'payment.draft' && path === '/transactions/new') {
+    return [...contractPaymentHelp.map(entry => ({ ...entry, id: entry.targetId, selector: guideSelector(entry) })),
+      menuHandoff('payment.openValidation', 'vrun-w01', '월 통합검증', 'validation-list')]
+  }
+  if (reuseContractDetail && stage === 'schedule.review' && path.startsWith('/schedules/')) {
+    return [...sharedSteps('SCHE-W02'), menuHandoff('schedule.openPayments', 'tran-w01', '수수료 지급', 'payment-list')]
+  }
+  if (reuseContractDetail && stage === 'validation.execute' && path === '/validation-runs') {
+    return [...sharedSteps('VRUN-W01'), {
+      id: 'validation.month', selector: `${target('validation.create')} input[type="month"]`,
+      title: '검증월 선택', concise: true, input: true, openControl: true, advanceOnSelection: true,
+      instruction: '이번 지급을 검증할 정산월을 선택하세요.',
+      interaction: '월을 고르면 실행 생성 안내로 이어집니다.',
+      presentation: { side: 'right', includeLabel: true },
+    }, {
+      id: 'validation.createSubmit', selector: target('validation.createSubmit'),
+      title: '실행 생성', concise: true,
+      instruction: '실행 생성을 눌러 월 통합검증 실행을 만드세요.',
+      interaction: '같은 월의 진행 중 실행이 있다면 목록에서 열어 주세요.',
+      presentation: { side: 'right' },
+    }]
   }
   const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
   if (stage === 'contract.create') return instructions
@@ -143,16 +172,23 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
     return shared ? { ...shared, ...instruction, title: shared.title, instruction: shared.instruction,
       workflowInstruction: instruction.instruction } : instruction
   })
-  return reuseContractDetail && stage === 'schedule.review' && path.startsWith('/schedules/')
-    ? [...explanations, paymentHandoff('[data-guide-target="schedule.lines"]')]
-    : explanations
+  return explanations
 }
 
-function paymentHandoff(selector: string): WorkflowExplanation {
+function sharedSteps(screen: string): WorkflowExplanation[] {
+  return getScreenWalkthrough(screen).map(entry => ({ ...entry, id: entry.targetId, selector: guideSelector(entry) }))
+}
+
+function menuHandoff(id: string, screen: string, label: string, destination: WorkflowDestination): WorkflowExplanation {
   return {
-    id: 'schedule.openPayments', selector, title: '수수료 지급으로 이어가기', concise: true,
-    instruction: '예상 회차와 금액을 확인했다면 지급 등록으로 이동하세요.',
-    interaction: '아래 수수료 지급 버튼을 누르면 확인한 계약으로 이어집니다.',
-    nextLabel: '수수료 지급으로 이동', presentation: { side: 'left' },
+    id, selector: '[data-guide-feature="navigation.menu.' + screen + '"]', scope: 'shell',
+    title: label + '로 이어가기', concise: true, destination,
+    instruction: '왼쪽 사이드바의 ' + label + ' 메뉴를 누르세요.',
+    interaction: destination === 'validation-list' ? '선택한 지급 건을 모두 확정한 뒤 월 검증을 진행합니다.' : '이동한 화면의 도움말로 안내를 이어갑니다.',
+    presentation: { side: 'right' },
+    onEnter: () => {
+      useSidebarStore.getState().setCollapsed(false, false)
+      useSidebarStore.getState().setSection(screen === 'vrun-w01' ? 'compliance' : 'contracts', true)
+    },
   }
 }

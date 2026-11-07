@@ -196,10 +196,10 @@
 .contract-payment-check path {
   stroke-dasharray: 1;
   stroke-dashoffset: 0;
-  animation: contract-payment-check-draw 450ms ease-out both;
+  animation: contract-payment-check-draw 950ms var(--check-delay, 0ms) ease-in-out both;
 }
 .contract-payment-gates .transaction-gate-pass .transaction-gate-icon {
-  animation: contract-payment-check-pop 400ms ease-out both;
+  animation: contract-payment-check-pop 850ms var(--check-delay, 0ms) ease-in-out both;
 }
 @keyframes contract-payment-check-draw {
   from { stroke-dashoffset: 1; }
@@ -230,8 +230,9 @@
 .contract-comparison-panel-reveal {
   animation: contract-comparison-reveal 1100ms 150ms ease-in-out both;
 }
-.contract-comparison-amount-reveal {
-  animation: contract-comparison-reveal 1000ms 1450ms ease-in-out both;
+.contract-comparison-moving-amount {
+  animation: contract-comparison-reveal 1000ms ease-in-out both;
+  transition: x 2000ms ease-in-out, y 2000ms ease-in-out, width 2000ms ease-in-out, height 2000ms ease-in-out;
 }
 @keyframes contract-comparison-reveal {
   from { opacity: 0; }
@@ -245,7 +246,7 @@ body:has(.contract-payment-comparison-overlay) .payment-guide-spotlight.screen-s
   .contract-payment-check path,
   .contract-payment-gates .transaction-gate-pass .transaction-gate-icon,
   .contract-comparison-panel-reveal,
-  .contract-comparison-amount-reveal { animation: none; }
+  .contract-comparison-moving-amount { animation: none; transition: none; }
 }
 @media (max-width: 63.9375rem) {
   .contract-payment-actions { grid-column: 1 / -1; }
@@ -253,3 +254,16 @@ body:has(.contract-payment-comparison-overlay) .payment-guide-spotlight.screen-s
 @media (max-width: 36rem) {
   .contract-payment-editor .contract-payment-actions .transaction-action-list { grid-template-columns: 1fr; }
 }
+
+.contract-batch-cap-summary { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.contract-batch-cap-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px; margin-bottom: 16px; background: var(--color-bg-subtle, #f5f7fc); border-radius: 12px; }
+.contract-batch-cap-summary-grid div { display: grid; gap: 4px; }
+.contract-batch-cap-summary-grid span { color: var(--color-text-muted, #66758d); font-size: 12px; }
+.contract-batch-cap-table { overflow-x: auto; }
+.contract-batch-cap-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.contract-batch-cap-table th, .contract-batch-cap-table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f3; text-align: left; vertical-align: top; }
+.contract-batch-cap-table th:nth-child(2), .contract-batch-cap-table td:nth-child(2) { text-align: right; white-space: nowrap; }
+.contract-batch-cap-table td:first-child > span, .contract-batch-cap-table small { display: block; margin-top: 4px; }
+.contract-batch-cap-table td:first-child > span { color: #66758d; }
+.contract-batch-cap-result { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.contract-batch-cap-result small { flex-basis: 100%; }

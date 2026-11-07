@@ -4,19 +4,19 @@ const isoDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() 
 
 /** Guide-only picker: native popups cannot be animated or opened after a scroll without a user gesture. */
 export function GuideFieldPicker({ target }: { target: HTMLElement | null }) {
-  const field = target instanceof HTMLSelectElement || target instanceof HTMLInputElement && target.type === 'date' ? target : null
+  const field = target instanceof HTMLSelectElement || target instanceof HTMLInputElement && ['date', 'month'].includes(target.type) ? target : null
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<CSSProperties>({})
   const [month, setMonth] = useState(() => {
-    const date = field?.value && /^\d{4}-\d{2}-\d{2}$/.test(field.value) ? new Date(`${field.value}T12:00:00`) : new Date()
+    const date = field?.value && /^\d{4}-\d{2}(-\d{2})?$/.test(field.value) ? new Date(`${field.value.length === 7 ? field.value + "-01" : field.value}T12:00:00`) : new Date()
     return new Date(date.getFullYear(), date.getMonth(), 1)
   })
   useEffect(() => {
     if (!field) return
     const show = () => {
       if (field.matches(':disabled')) return
-      if (field instanceof HTMLInputElement && /^\d{4}-\d{2}-\d{2}$/.test(field.value)) {
-        const date = new Date(`${field.value}T12:00:00`)
+      if (field instanceof HTMLInputElement && /^\d{4}-\d{2}(-\d{2})?$/.test(field.value)) {
+        const date = new Date(`${field.value.length === 7 ? field.value + "-01" : field.value}T12:00:00`)
         setMonth(new Date(date.getFullYear(), date.getMonth(), 1))
       }
       setOpen(true)
@@ -65,6 +65,20 @@ export function GuideFieldPicker({ target }: { target: HTMLElement | null }) {
     {field instanceof HTMLSelectElement ? <div role="listbox" aria-label={`${field.name === 'insurerId' ? '보험회사' : '계약상태'} 선택 목록`}>
       {[...field.options].map(option => <button type="button" role="option" key={option.value} aria-selected={option.value === field.value}
         disabled={option.disabled || !option.value} onClick={() => choose(option.value)}>{option.label}</button>)}
+    </div> : field.type === 'month' ? <div role="group" aria-label="검증월 선택">
+      <header>
+        <button type="button" aria-label="이전 해" onClick={() => setMonth(new Date(month.getFullYear() - 1, 0, 1))}>‹</button>
+        <strong aria-live="polite">{month.getFullYear()}년</strong>
+        <button type="button" aria-label="다음 해" onClick={() => setMonth(new Date(month.getFullYear() + 1, 0, 1))}>›</button>
+      </header>
+      <div className="guide-calendar-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        {Array.from({ length: 12 }, (_, index) => {
+          const value = `${month.getFullYear()}-${String(index + 1).padStart(2, '0')}`
+          return <button type="button" key={value} aria-label={value} aria-pressed={value === field.value}
+            disabled={Boolean(field.min && value < field.min || field.max && value > field.max || field.readOnly)}
+            onClick={() => choose(value)}>{index + 1}월</button>
+        })}
+      </div>
     </div> : <div role="group" aria-label="계약일 달력">
       <header>
         <button type="button" aria-label="이전 달" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>‹</button>
