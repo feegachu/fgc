@@ -185,6 +185,20 @@ describe('401과 세션 복구', () => {
       vi.unstubAllGlobals()
     }
   })
+  it('미리 하는 연장은 네트워크, 서버 오류에서 토큰을 지우거나 이동하지 않는다', async () => {
+    for (const failure of [() => Promise.reject(new TypeError('offline')), () => Promise.resolve(fail(502, 'FGC-COMMON-500'))]) {
+      const { client, getToken, location } = setup(vi.fn<typeof fetch>(failure))
+      await expect(client.extendSession()).rejects.toBeDefined()
+      expect(getToken()).toBe('old')
+      expect(location.assign).not.toHaveBeenCalled()
+    }
+  })
+  it('미리 하는 연장이 인증 실패면 로그인을 끝내고 이동한다', async () => {
+    const { client, getToken, location } = setup(vi.fn<typeof fetch>(async () => fail()))
+    await expect(client.extendSession()).rejects.toBeInstanceOf(ApiError)
+    expect(getToken()).toBeNull()
+    expect(location.assign).toHaveBeenCalledTimes(1)
+  })
   it('refresh 이후 늦게 도착한 옛 토큰의 401은 추가 refresh 없이 재시도한다', async () => {
     const late = deferred<Response>()
     const fetcher = vi.fn<typeof fetch>(async (path, options) => {

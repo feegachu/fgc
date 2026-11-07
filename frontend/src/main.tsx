@@ -19,7 +19,7 @@ import './features/arbitrage/arbitrage.css'
 import './features/clawback/clawback.css'
 import './features/error/error.css'
 import { apiClient } from './lib/api/client'
-import { hasSessionActivity, sessionIdleExpired } from './features/auth/useIdleLogout'
+import { hasSessionActivity, sessionClosed, sessionIdleExpired } from './features/auth/useIdleLogout'
 import { clearSessionData } from './features/auth/session'
 
 // 로그인 URL을 새로 열어도 유효한 쿠키가 있으면 기존 인증을 복원한다.
@@ -31,8 +31,8 @@ if (firstVisit && window.location.pathname + window.location.search === import.m
 const loginPage = apiClient.isLoginPage()
 const search = new URLSearchParams(window.location.search)
 const skipRestore = loginPage && (firstVisit || search.has('logout') || search.has('reason'))
-// 오래 자리를 비운 뒤 다시 열면 쿠키가 살아 있어도 복원하지 않고 로그인을 끝낸다.
-const idle = !skipRestore && sessionIdleExpired()
+// 오래 자리를 비웠거나 화면을 모두 닫고 3분이 지난 뒤 다시 열면 쿠키가 살아 있어도 로그인을 끝낸다.
+const idle = !skipRestore && (sessionIdleExpired() || sessionClosed())
 if (idle) {
   await apiClient.logout().catch(() => undefined)
   clearSessionData(queryClient)

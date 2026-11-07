@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
-import { sessionIdleExpired, useIdleLogout } from './useIdleLogout'
+import { sessionClosed, sessionIdleExpired, useIdleLogout } from './useIdleLogout'
 
 const logout = vi.fn()
 vi.mock('./useLogout', () => ({ useLogout: () => ({ logout, loggingOut: false }) }))
@@ -60,6 +60,34 @@ describe('미사용 자동 로그아웃', () => {
     act(() => void vi.advanceTimersByTime(31 * MINUTE))
     expect(logout).not.toHaveBeenCalled()
     expect(localStorage.getItem('fgc.lastActivityAt')).toBeNull()
+  })
+
+  it('열린 화면은 30초마다 표시를 남기고, 모두 닫고 3분이 지나면 닫힌 것으로 본다', () => {
+    expect(sessionClosed()).toBe(false)
+    const { unmount } = renderHook(() => useIdleLogout(true))
+    expect(localStorage.getItem('fgc.openAt')).toBe(String(Date.now()))
+    act(() => void vi.advanceTimersByTime(30_000))
+    expect(localStorage.getItem('fgc.openAt')).toBe(String(Date.now()))
+    unmount()
+    act(() => void vi.advanceTimersByTime(2 * MINUTE + 59_000))
+    expect(sessionClosed()).toBe(false)
+    act(() => void vi.advanceTimersByTime(1_000))
+    expect(sessionClosed()).toBe(true)
+  })
+
+  it('연장이 네트워크 오류로 실패하면 1분 뒤 입력에서 다시 한다', async () => {
+    const extend = vi.spyOn(apiClient, 'extendSession').mockRejectedValueOnce(new TypeError('offline')).mockResolvedValue()
+    renderHook(() => useIdleLogout(true))
+    act(() => void vi.advanceTimersByTime(25 * MINUTE))
+    act(() => void window.dispatchEvent(new Event('keydown')))
+    await act(async () => {})
+    expect(extend).toHaveBeenCalledTimes(1)
+    act(() => void vi.advanceTimersByTime(30_000))
+    act(() => void window.dispatchEvent(new Event('keydown')))
+    expect(extend).toHaveBeenCalledTimes(1)
+    act(() => void vi.advanceTimersByTime(30_000))
+    act(() => void window.dispatchEvent(new Event('keydown')))
+    expect(extend).toHaveBeenCalledTimes(2)
   })
 
   it('브라우저를 다시 열 때 마지막 사용 시각으로 판단한다', () => {

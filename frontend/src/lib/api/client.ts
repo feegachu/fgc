@@ -60,7 +60,7 @@ export function createApiClient(env: ClientEnvironment) {
       credentials: 'same-origin', signal: options.signal,
     })
   }
-  async function refresh(redirectOnFailure = true) {
+  async function refresh(redirectOnFailure = true, keepOnTransient = false) {
     if (refreshPromise) return refreshPromise
     const currentGeneration = generation
     const pending = (async () => {
@@ -74,7 +74,9 @@ export function createApiClient(env: ClientEnvironment) {
         if (generation !== currentGeneration) throw new ApiError({ code: 'FGC-AUTH-002' }, null, 401)
         env.setToken(data.accessToken)
       } catch (error) {
-        if (generation === currentGeneration) {
+        // 미리 하는 연장은 인증 실패에서만 끝낸다. 네트워크, 서버 오류면 아직 유효한 토큰을 그대로 둔다.
+        const authFailure = error instanceof ApiError && (error.status === 401 || error.status === 403)
+        if (generation === currentGeneration && (authFailure || !keepOnTransient)) {
           if (redirectOnFailure) expire(error instanceof ApiError && error.code === 'FGC-AUTH-004')
           else env.setToken(null)
         }
@@ -168,7 +170,7 @@ export function createApiClient(env: ClientEnvironment) {
   }
   // Don't redirect the login page back to itself on a missing refresh cookie.
   function isLoginPage() { return routerPath(env.location, env.base).split(/[?#]/)[0] === '/login' }
-  return { request, requestBlob, requestPdf, restoreSession, extendSession: () => refresh(), login, logout, isLoginPage }
+  return { request, requestBlob, requestPdf, restoreSession, extendSession: () => refresh(true, true), login, logout, isLoginPage }
 }
 export const apiClient = createApiClient({
   fetch: (...args) => globalThis.fetch(...args),
