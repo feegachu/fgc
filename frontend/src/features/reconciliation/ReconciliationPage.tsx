@@ -144,8 +144,7 @@ const historyColumns: TableColumn<Run>[] = [
   {
     key: 'period',
     label: '완료',
-    sortKey: 'startedAt',
-    sortable: true,
+    // 서버 정렬 목록에 완료 시각이 없어 시작 시각으로 정렬되므로 정렬을 걸지 않는다.
     width: '9.5rem',
     render: (row) => dateTime(row.completedAt),
   },
