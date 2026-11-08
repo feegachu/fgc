@@ -65,7 +65,7 @@ it('uses a separate correction handoff even when the resolved exception disappea
   expect(steps[0].selector).toBe('h1')
 })
 it('explains returned results rather than searching for inputs after successful navigation', () => {
-  expect(workflowWalkthrough('contract.create', '/contracts/4', false)[0].id).toBe('saved')
+  expect(workflowWalkthrough('contract.create', '/contracts/4', false, false, false)[0].id).toBe('saved')
   expect(workflowWalkthrough('payment.confirm', '/transactions', false)[0].selector).toContain('payment.results')
 })
 

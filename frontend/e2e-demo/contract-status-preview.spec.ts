@@ -49,15 +49,15 @@ async function deniedPreview(page: Page, url: string, effectiveAt: string) {
 }
 
 // FUN-077, IF-API-64: 실제 서버의 계산 결과를 화면과 대조하고 DB 가 바뀌지 않음을 확인한 뒤 IF-API-19 로 저장한다.
-test('상태 사건 영향 미리보기는 실제 서버 결과를 보이고 DB 를 바꾸지 않으며 저장은 계약 수정으로만 한다', async ({ page }) => {
+test('상태 변경 영향 미리보기는 실제 서버 결과를 보이고 DB 를 바꾸지 않으며 저장은 계약 수정으로만 한다', async ({ page }) => {
   const contractNo = 'FGC-FGL01-202607-0001'
   const id = sql(`SELECT contract_id FROM fgc.insurance_contract WHERE contract_no = '${contractNo}'`)
   const path = `/contracts/${id}/status-events/preview`
   const effectiveAt = yesterdayInSeoul()
   await login(page, 'settle01', `/contracts/${id}?month=2026-07`)
   await page.getByRole('button', { name: '영향 미리보기' }).click()
-  const dialog = page.getByRole('dialog', { name: '상태 사건 영향 미리보기' })
-  await dialog.getByLabel('사건 종류').selectOption('TERMINATED')
+  const dialog = page.getByRole('dialog', { name: '상태 변경 영향 미리보기' })
+  await dialog.getByLabel('변경 종류').selectOption('TERMINATED')
   await dialog.getByLabel('효력일시').fill(effectiveAt)
   const before = database()
 

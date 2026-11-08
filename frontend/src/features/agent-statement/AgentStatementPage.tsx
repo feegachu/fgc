@@ -11,6 +11,7 @@ import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
 import { KpiCard } from '../../components/KpiCard'
 import { date, int, month as formatMonth, rate, today, won } from '../../lib/format'
+import { nameWithCode } from '../../lib/screenText'
 import { sortBinding } from '../../lib/tableSort'
 import { useAgentOptions, useCommissionItems } from '../base/api'
 import { policyCodeLabel } from '../policies/labels'
@@ -39,26 +40,20 @@ const AMOUNT_KEYS = ['basisAmount', 'fixedAmount', 'originallyPaidAmount']
 const PERCENT_KEYS = ['ratePct', 'appliedRatePct']
 /** 서버가 근거(evidence)로 내려주는 원천 항목의 화면 이름. 목록에 없는 키는 그대로 보여 주지 않고 숨긴다. */
 const EVIDENCE_LABELS: Record<string, string> = {
-  commissionTransactionId: '지급 건 번호',
-  sourceType: '원천 유형',
+  sourceType: '자료 구분',
   attributionMethod: '귀속 방식',
   settlementMonth: '정산월',
   paidOn: '지급일',
-  cashflowType: '흐름',
+  cashflowType: '지급/차감',
   note: '비고',
-  replacesPaymentId: '이 건이 대체한 지급 건 번호',
-  replacedByPaymentId: '이 건을 대체한 지급 건 번호',
-  scheduleHeaderId: '스케줄 번호',
   scheduleVersionNo: '스케줄 버전',
   paymentConditionCode: '지급 조건',
-  basisCode: '기준 코드',
+  basisCode: '계산 기준',
   basisAmount: '기준 금액',
   calculationType: '계산 방식',
   ratePct: '적용률(%)',
   fixedAmount: '고정 금액',
-  clawbackCaseId: '환수 건 번호',
   caseNo: '환수 관리번호',
-  transactionAttributionId: '기지급 귀속행 번호',
   originallyPaidAmount: '기지급 기준액',
   appliedRatePct: '적용 환수율(%)',
 }
@@ -69,12 +64,6 @@ const EVIDENCE_VALUE_LABELS: Record<string, Record<string, string>> = {
   cashflowType: { PAYMENT: '지급', DEDUCTION: '차감' },
 }
 const CODE_VALUE_KEYS = ['attributionMethod', 'paymentConditionCode', 'basisCode', 'calculationType']
-const SOURCE_LABELS: Record<string, string> = {
-  TRANSACTION_ATTRIBUTION: '지급 귀속',
-  COMMISSION_TRANSACTION: '지급 건',
-  SCHEDULE_LINE: '스케줄 회차',
-  CLAWBACK_LINE: '환수 계산',
-}
 
 export default function AgentStatementPage() {
   const { month, user, revised, helpVersion } = useOutletContext<ShellContext>()
@@ -165,7 +154,6 @@ export default function AgentStatementPage() {
       label: '수수료 항목',
       sortable: true,
       width: '10rem',
-      align: 'center',
       render: (row) => row.commissionItemName || '-',
     },
     {
@@ -173,10 +161,9 @@ export default function AgentStatementPage() {
       label: '회차',
       sortable: true,
       width: '4.5rem',
-      align: 'center',
       render: (row) => (row.installmentNo == null ? '-' : `${row.installmentNo}회`),
     },
-    { key: 'basisDate', label: '기준일', sortable: true, width: '6.5rem', align: 'center', render: (row) => date(row.basisDate) },
+    { key: 'basisDate', label: '기준일', sortable: true, width: '6.5rem', render: (row) => date(row.basisDate) },
     {
       key: 'entryType',
       label: '내역 구분',
@@ -191,7 +178,7 @@ export default function AgentStatementPage() {
       label: '금액',
       sortable: true,
       width: '8rem',
-      align: 'center',
+      align: 'number',
       render: (row) =>
         row.amount == null || row.dataStatus === 'MISSING' ? <span className="ast-muted">금액 미확인</span> : won(row.amount),
     },
@@ -225,7 +212,7 @@ export default function AgentStatementPage() {
         key={`${filterKey}:${resetCount}:${enhanced ? agentId : ''}:${selectedBranchId}`}
         initial={enhanced ? { ...filters, agentId: selectedBranchId !== null ? '' : agentId ?? '' } : filters}
         isAgent={isAgent}
-        agents={(agents.data ?? []).map((row) => [String(row.agentId), `${row.agentCode} · ${row.agentName}`])}
+        agents={(agents.data ?? []).map((row) => [String(row.agentId), nameWithCode(row.agentName, row.agentCode)])}
         items={(items.data ?? []).map((row) => [String(row.commissionItemId), row.itemName ?? '-'])}
         onSearch={(next) => apply({ ...next, contractNo: next.contractNo.trim(), page: 1 })}
         onReset={() => {
@@ -442,7 +429,6 @@ function DetailPanel({
                 <Row label="회차" value={entry.installmentNo == null ? '-' : `${entry.installmentNo}회`} />
                 <Row label="기준 설명" value={detail?.basis.dateBasis[entry.entryType]} />
                 <Row label="적용 정책" value={entry.policyName ? `${entry.policyName} v${entry.policyVersionNo}` : '-'} />
-                <Row label="원천" value={`${SOURCE_LABELS[entry.source.entityType] ?? '원천 자료'} ${entry.source.id}번`} />
               </dl>
             </section>
             {evidence.length > 0 && (

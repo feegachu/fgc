@@ -7,18 +7,10 @@ import { Amount, CalculatedAmount, CalculationBadge } from './badges'
 import { triggerLabels } from './labels'
 export const columns = (openDetail: (row: CandidateRow) => void): TableColumn<CandidateRow>[] => [
   {
-    key: 'candidateId',
-    label: '후보 번호',
-    sortable: true,
-    width: '6rem',
-    cellClassName: 'tabular-nums',
-    render: (r) => present(r.candidateId),
-  },
-  {
     key: 'contractNo',
     label: '계약번호',
     sortable: true,
-    width: '10rem',
+    width: '12rem',
     cellClassName: 'tabular-nums',
     render: (r) => <button type="button" className="claw-contract-link" title={present(r.contractNo)}
       aria-haspopup="dialog" aria-label={`${present(r.contractNo)} 환수 상세 보기 · 후보 ${present(r.candidateId)}`}

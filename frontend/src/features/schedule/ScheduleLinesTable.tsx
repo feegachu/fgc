@@ -34,7 +34,7 @@ export function ScheduleLinesTable({ lines, total, emptyMessage, paymentHref }: 
       ? <span title="정액 계산 금액">정액 {amount(row.fixedAmount)}</span> : row.ratePct == null ? EMPTY : `${rate(row.ratePct)}%` },
     { key: 'lineStatus', label: '상태', width: '7rem', sortable: true, align: 'center', render: row => <>
       <ScheduleStatusBadge code={row.lineStatus} label={responseLabel(null, LINE_STATUS, row.lineStatus)} />
-      {row.sourceStatusEventId != null && <small className="schedule-source-event">원천 사건 #{row.sourceStatusEventId}</small>}
+      {row.sourceStatusEventId != null && <small className="schedule-source-event">상태 변경 있음</small>}
     </> },
     { key: 'ruleRef', label: '적용 규칙 번호', width: '9rem', sortable: true, render: row => row.ruleRef == null ? EMPTY : int(row.ruleRef) },
     { key: 'action', label: '지급 등록', width: '8rem', render: row => {

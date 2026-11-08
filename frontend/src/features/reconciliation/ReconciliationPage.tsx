@@ -105,7 +105,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'targetCount',
     sortable: true,
     width: '4.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => int(row.targetCount),
   },
   {
@@ -114,7 +114,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'matchedCount',
     sortable: true,
     width: '4.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => int(row.matchedCount),
   },
   {
@@ -123,7 +123,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'exceptionCount',
     sortable: true,
     width: '4.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => int(row.exceptionCount),
   },
   {
@@ -132,7 +132,7 @@ const historyColumns: TableColumn<Run>[] = [
     sortKey: 'matchRatePct',
     sortable: true,
     width: '5.5rem',
-    align: 'left',
+    align: 'number',
     render: (row) => (row.matchRatePct == null ? EMPTY : `${Number(row.matchRatePct).toFixed(1)}%`),
   },
   {
@@ -146,11 +146,10 @@ const historyColumns: TableColumn<Run>[] = [
   },
   {
     key: 'period',
-    label: '시작, 완료',
-    sortKey: 'startedAt',
-    sortable: true,
-    width: '11rem',
-    render: (row) => `${dateTime(row.startedAt)}, ${dateTime(row.completedAt)}`,
+    label: '완료',
+    // 서버 정렬 목록에 완료 시각이 없어 시작 시각으로 정렬되므로 정렬을 걸지 않는다.
+    width: '9.5rem',
+    render: (row) => dateTime(row.completedAt),
   },
 ]
 const resultColumns: TableColumn<Result>[] = [
@@ -350,7 +349,6 @@ export default function ReconciliationPage() {
       key: 'detail',
       label: '상세',
       width: '4rem',
-      align: 'left',
       render: (row) => (
         <Button data-guide-feature="features.reconciliation.reconciliation-page.button"
           variant="ghost"
@@ -366,7 +364,7 @@ export default function ReconciliationPage() {
   return (
     <div className="reco-react-page list-page">
       <header className="page-header">
-        <ScreenHelp screenId="RECO-W01" saveGuide={executionGuide} outcome="execution" />
+        {canProcess ? <ScreenHelp screenId="RECO-W01" saveGuide={executionGuide} outcome="execution" /> : <ScreenHelp screenId="RECO-W01" variant="reader" />}
         <h1 className="page-title">대사 실행/결과</h1>
       </header>
       <section data-guide-feature="features.reconciliation.reconciliation-page.section" data-guide-target="reconciliation.filters" className="surface reco-react-run" aria-label="대사 실행 조건">
@@ -375,7 +373,7 @@ export default function ReconciliationPage() {
           observedId={runId}
           observedStatus={status}
           resultReady={results.isSuccess && !results.isFetching}
-          queryError={history.isError || results.isError ? '서버 결과 조회에 실패했습니다. 다시 조회하세요.' : ''}
+          queryError={history.isError || results.isError ? '결과를 불러오지 못했습니다. 다시 조회하세요.' : ''}
           criteria={criteria}
           pending={execution.isPending}
           canProcess={canProcess}
@@ -441,7 +439,7 @@ export default function ReconciliationPage() {
                   value={type}
                   onChange={(e) => update({ resultType: e.target.value, resultPage: '' }, { resetPage: false })}
                 >
-                  <option value="">전체 (11종)</option>
+                  <option value="">전체</option>
                   {Object.entries(RESULT_TYPE).map(([code, label]) => (
                     <option key={code} value={code}>
                       {label}

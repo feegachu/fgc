@@ -120,7 +120,7 @@ it('preserves dirty input when navigation is cancelled and only discards after a
   await act(() => router.navigate('/contracts/new?month=2026-07'))
   await userEvent.type(screen.getByRole('textbox', { name: '보험회사' }), '입력중')
   await act(() => router.navigate('/schedules?month=2026-07'))
-  await screen.findByRole('dialog', { name: '저장하지 않은 입력이 있어요' })
+  await screen.findByRole('dialog', { name: '저장하지 않은 입력이 있습니다' })
   await userEvent.click(screen.getByRole('button', { name: '돌아가기' }))
   expect(screen.getByRole('textbox', { name: '보험회사' })).toHaveValue('입력중')
   await act(() => router.navigate('/schedules?month=2026-07'))
@@ -171,7 +171,7 @@ it('does not time out a navigation confirmation over unsaved input', async () =>
   expect(await screen.findByText(/저장하지 않은 입력이 있습니다/)).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/contracts/new')
   expect(screen.getByRole('textbox', { name: '보험회사' })).toHaveValue('보존할 입력')
-  expect(screen.queryByRole('dialog', { name: '저장하지 않은 입력이 있어요' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog', { name: '저장하지 않은 입력이 있습니다' })).not.toBeInTheDocument()
 })
 it('disables previous when there is no visited step and pauses on month changes', async () => {
   setup()

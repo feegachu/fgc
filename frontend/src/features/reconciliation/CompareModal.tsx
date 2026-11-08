@@ -100,7 +100,7 @@ function CompareContent({ detail, month, revised }: { detail: Detail; month: str
           <dd>{detail.primaryReason?.label || text(detail.primaryReasonCode)}</dd>
         </div>
         <div>
-          <dt>매칭키</dt>
+          <dt>비교 기준</dt>
           {/* 내부 키 원문은 숨기고 맞춰 보는 기준만 보인다(RECO-W01 매칭키). */}
           <dd>계약번호, 지급단계, 설계사, 수수료 항목, 회차</dd>
         </div>
@@ -161,7 +161,7 @@ function SourceSide({
     <section data-guide-feature="features.reconciliation.compare-modal.section-2" className="surface">
       <header className="surface-header">
         <h3 className="surface-title">{title}</h3>
-        <span>{matches.length}개 원천</span>
+        <span>{matches.length}건</span>
       </header>
       {!matches.length ? (
         <p className="empty-state">{expected ? '예상 없음' : '실제 없음'}</p>
@@ -169,10 +169,7 @@ function SourceSide({
         matches.map((match, index) => (
           <div className="reco-react-source" key={`${match.matchSeq}-${index}`}>
             <h4>
-              {title} 원천 {index + 1},{' '}
-              {expected
-                ? `스케줄행 번호 ${match.scheduleLineId ?? EMPTY}`
-                : `수수료 지급 번호 ${match.commissionTransactionId ?? EMPTY}`}
+              {title} {index + 1}, {expected ? '예상 스케줄' : '지급 건'}
             </h4>
             <dl>
               <div>
@@ -219,7 +216,7 @@ function SourceSide({
                 </dd>
               </div>
             </dl>
-            <p>저장된 대사 원천</p>
+            <p>저장된 대사 근거</p>
           </div>
         ))
       )}

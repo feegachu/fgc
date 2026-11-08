@@ -117,3 +117,9 @@ body:has([role='dialog']) .settlement-guide-spotlight {
 }
 .settlement-guide.screen-step-guide .screen-step-count { font-size: 13px; }
 .settlement-guide.screen-step-guide .screen-step-context { font-size: 11px; }
+
+/* Keep both the coach and its navigation in the same slot between workflow steps. */
+.settlement-guide[data-guide-docked='true'] { display:flex; flex-direction:column; }
+.settlement-guide[data-guide-docked='true']>.payment-guide-header { flex-shrink:0; }
+.settlement-guide[data-guide-docked='true']>section { display:flex; flex:1; flex-direction:column; min-height:0; overflow:auto; }
+.settlement-guide[data-guide-docked='true']>section>.payment-guide-actions { flex-shrink:0; margin-top:auto; bottom:0; }

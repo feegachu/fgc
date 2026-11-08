@@ -76,7 +76,7 @@ function renderHistory(handler: Handler) {
   )
   return { client, actions: userEvent.setup() }
 }
-const historyTable = () => screen.findByRole('table', { name: '상태 사건' })
+const historyTable = () => screen.findByRole('table', { name: '상태 변경' })
 const rowCells = (table: HTMLElement, index: number) =>
   within(within(table).getAllByRole('row')[index + 1])
     .getAllByRole('cell')
@@ -200,8 +200,8 @@ describe('CONT-W02 상태이력 표', () => {
     ],
     [
       followUp('EXHAUSTED', [job('EXHAUSTED', { attemptCount: 5, errorCode: null })]),
-      '자동 재시도 소진',
-      ['5/5회 시도, 운영 담당 확인 필요', '실패 사유: 기록 없이 중단됨'],
+      '자동 처리 실패',
+      ['5/5회 시도, 담당자에게 문의하세요', '실패 사유: 기록 없이 중단됨'],
     ],
     [followUp('SUCCEEDED', [job('SUCCEEDED', { attemptCount: 1 })]), '완료', []],
     [followUp('SUCCEEDED', [job('SUCCEEDED', { attemptCount: 3 })]), '완료', ['재시도 후 성공, 3/5회 시도']],
@@ -270,7 +270,7 @@ describe('CONT-W02 상태이력 표', () => {
     ]
     renderHistory(() => events)
     await historyTable()
-    expect(screen.getByText(/이 계약의 뒤 사건도 함께 멈춥니다. 운영 담당 확인이 필요합니다/)).toBeInTheDocument()
+    expect(screen.getByText(/이 계약의 뒤 상태 변경도 함께 멈춥니다. 담당자에게 문의하세요/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /재시도/ })).toBeNull()
     expect(screen.queryByText(/초마다 다시 조회합니다/)).toBeNull()
     expect(followUpRunning(events)).toBe(false)
@@ -304,8 +304,8 @@ describe('CONT-W02 상태이력 표', () => {
 
 describe('CONT-W02 사건 영향 패널', () => {
   const openPanel = async (actions: ReturnType<typeof userEvent.setup>, seq = 2) => {
-    await actions.click(await screen.findByRole('button', { name: `사건 ${seq} 영향 보기` }))
-    return screen.findByRole('dialog', { name: `사건 ${seq} 영향` })
+    await actions.click(await screen.findByRole('button', { name: `변경 ${seq} 영향 보기` }))
+    return screen.findByRole('dialog', { name: `변경 ${seq} 영향` })
   }
   const effectUrl = (pageNo: number, eventId = 7) => `${HISTORY_URL}/${eventId}/effects?page=${pageNo}&size=20`
 
@@ -363,13 +363,13 @@ describe('CONT-W02 사건 영향 패널', () => {
       ])
     })
     const dialog = await openPanel(actions)
-    const table = await within(dialog).findByRole('table', { name: '사건 영향' })
+    const table = await within(dialog).findByRole('table', { name: '변경 영향' })
     expect(requested).toContain(effectUrl(1))
     expect(
       within(table)
         .getAllByRole('columnheader')
         .map((header) => header.textContent),
-    ).toEqual(['대상', '이전 상태', '이후 상태', '금액', '정책', '처리/제외 사유'])
+    ).toEqual(['대상', '이전 상태', '이후 상태', '금액', '처리/제외 사유'])
     const rows = within(table)
       .getAllByRole('row')
       .slice(1)
@@ -378,12 +378,12 @@ describe('CONT-W02 사건 영향 패널', () => {
           .getAllByRole('cell')
           .map((cell) => cell.textContent),
       )
-    expect(rows[0].slice(0, 5)).toEqual(['지급 건 #501', '작성중', '지급 보류', '5,000원', '정책 버전 #12'])
+    expect(rows[0].slice(0, 4)).toEqual(['지급 건', '작성중', '지급 보류', '5,000원'])
     // 금액, 정책, 사유의 null은 0원이나 빈칸이 아니라 자료 없음이다.
-    expect(rows[1]).toEqual(['지급 건 #502', '확정', '이력 보존, 처리 제외', '자료 없음', '자료 없음', '자료 없음'])
-    expect(rows[2].slice(0, 4)).toEqual(['지급 건 #503', '작성중', '보류 해제', '0원'])
+    expect(rows[1]).toEqual(['지급 건', '확정', '이력 보존, 처리 제외', '자료 없음', '자료 없음'])
+    expect(rows[2].slice(0, 4)).toEqual(['지급 건', '작성중', '보류 해제', '0원'])
     expect(rows[3][2]).toBe('소급 제외')
-    expect(rows[4].slice(0, 4)).toEqual(['스케줄 회차 #601', '지급 예정', '지급 예정 중단', '-1,000원'])
+    expect(rows[4].slice(0, 4)).toEqual(['예상 스케줄 회차', '지급 예정', '지급 예정 중단', '-1,000원'])
     expect(rows[5][2]).toBe('회차 보류')
     expect(rows[6].slice(1, 3)).toEqual(['지급 예정 중단', '지급 예정'])
     expect(rows[7][2]).toBe('이력 보존, 처리 제외')
@@ -396,49 +396,49 @@ describe('CONT-W02 사건 영향 패널', () => {
     let release: (value: unknown) => void = () => undefined
     const { actions } = renderHistory((url) => {
       if (url === HISTORY_URL) return [event({ followUp: followUp('SUCCEEDED') })]
-      if (url === effectUrl(1)) return page([effect({ entityId: 501 })], { totalElements: 21, totalPages: 2 })
+      if (url === effectUrl(1)) return page([effect({ amount: 501 })], { totalElements: 21, totalPages: 2 })
       return new Promise((resolve) => {
         release = resolve
       })
     })
     const dialog = await openPanel(actions)
-    expect(await within(dialog).findByText('지급 건 #501')).toBeInTheDocument()
+    expect(await within(dialog).findByText('501원')).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: '영향 21건' })).toBeInTheDocument()
     await actions.click(within(dialog).getByRole('button', { name: '2' }))
     expect(await within(dialog).findByText('갱신 중입니다. 이전 결과를 표시합니다.')).toBeInTheDocument()
-    expect(within(dialog).getByText('지급 건 #501')).toBeInTheDocument()
+    expect(within(dialog).getByText('501원')).toBeInTheDocument()
     expect(requested).toContain(effectUrl(2))
-    release(page([effect({ entityId: 521 })], { page: 2, totalElements: 21, totalPages: 2 }))
-    expect(await within(dialog).findByText('지급 건 #521')).toBeInTheDocument()
-    expect(within(dialog).queryByText('지급 건 #501')).toBeNull()
+    release(page([effect({ amount: 521 })], { page: 2, totalElements: 21, totalPages: 2 }))
+    expect(await within(dialog).findByText('521원')).toBeInTheDocument()
+    expect(within(dialog).queryByText('501원')).toBeNull()
   })
 
   it('늦게 도착한 다른 페이지 응답이 지금 보는 페이지를 덮지 않는다', async () => {
     let release: (value: unknown) => void = () => undefined
     const { actions } = renderHistory((url) => {
       if (url === HISTORY_URL) return [event({ followUp: followUp('SUCCEEDED') })]
-      if (url === effectUrl(1)) return page([effect({ entityId: 501 })], { totalElements: 21, totalPages: 2 })
+      if (url === effectUrl(1)) return page([effect({ amount: 501 })], { totalElements: 21, totalPages: 2 })
       return new Promise((resolve) => {
         release = resolve
       })
     })
     const dialog = await openPanel(actions)
-    await within(dialog).findByText('지급 건 #501')
+    await within(dialog).findByText('501원')
     await actions.click(within(dialog).getByRole('button', { name: '2' }))
     await within(dialog).findByText('갱신 중입니다. 이전 결과를 표시합니다.')
     await actions.click(within(dialog).getByRole('button', { name: '1' }))
     await waitFor(() => expect(within(dialog).queryByText('갱신 중입니다. 이전 결과를 표시합니다.')).toBeNull())
-    await act(async () => release(page([effect({ entityId: 521 })], { page: 2, totalElements: 21, totalPages: 2 })))
-    expect(within(dialog).getByText('지급 건 #501')).toBeInTheDocument()
-    expect(within(dialog).queryByText('지급 건 #521')).toBeNull()
+    await act(async () => release(page([effect({ amount: 521 })], { page: 2, totalElements: 21, totalPages: 2 })))
+    expect(within(dialog).getByText('501원')).toBeInTheDocument()
+    expect(within(dialog).queryByText('521원')).toBeNull()
   })
 
   it.each([
-    ['NOT_REQUIRED', '이 사건은 후속 처리 대상이 아니라 영향이 없습니다.'],
+    ['NOT_REQUIRED', '이 변경은 후속 처리 대상이 아니라 영향이 없습니다.'],
     ['PENDING', '후속 처리 대기 중입니다. 처리가 끝나면 영향이 표시됩니다.'],
     ['PROCESSING', '후속 처리 중입니다. 처리가 끝나면 영향이 표시됩니다.'],
     ['FAILED', '후속 처리에 실패해 영향이 기록되지 않았습니다. 자동 재시도를 기다립니다.'],
-    ['EXHAUSTED', '자동 재시도를 모두 써서 영향이 기록되지 않았습니다. 운영 담당 확인이 필요합니다.'],
+    ['EXHAUSTED', '자동 처리에 실패해 영향이 기록되지 않았습니다. 담당자에게 문의하세요.'],
     ['SUCCEEDED', '후속 처리를 마쳤고 바뀐 대상이 없습니다.'],
   ] as const)('영향 0건을 후속 상태 %s의 이유로 안내한다', async (status, message) => {
     const { actions } = renderHistory((url) =>
@@ -469,7 +469,7 @@ describe('CONT-W02 사건 영향 패널', () => {
     expect(within(dialog).queryByRole('table')).toBeNull()
     fail = false
     await actions.click(within(dialog).getByRole('button', { name: '다시 시도' }))
-    expect(await within(dialog).findByText('지급 건 #501')).toBeInTheDocument()
+    expect(await within(dialog).findByText('5,000원')).toBeInTheDocument()
   })
 
   it('영향 조회 서버 실패는 내부 상세 없이 요청번호를 보인다', async () => {
@@ -545,17 +545,17 @@ describe('CONT-W02 사건 영향 패널', () => {
 
     status = 'SUCCEEDED'
     await refetchHistory(client)
-    expect(screen.getByRole('dialog', { name: '사건 2 영향' })).toBe(dialog)
-    expect(screen.getByRole('table', { name: '상태 사건' })).toBe(table)
+    expect(screen.getByRole('dialog', { name: '변경 2 영향' })).toBe(dialog)
+    expect(screen.getByRole('table', { name: '상태 변경' })).toBe(table)
     expect(viewport.scrollLeft).toBe(120)
     expect(selectedRow()).toHaveClass('is-selected')
-    expect(await within(dialog).findByText('지급 건 #501')).toBeInTheDocument()
+    expect(await within(dialog).findByText('5,000원')).toBeInTheDocument()
 
     failHistory = true
     await refetchHistory(client)
     expect(await screen.findByText(/이전 조회 결과를 표시합니다/)).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: '사건 2 영향' })).toBe(dialog)
-    expect(screen.getByRole('table', { name: '상태 사건' })).toBe(table)
+    expect(screen.getByRole('dialog', { name: '변경 2 영향' })).toBe(dialog)
+    expect(screen.getByRole('table', { name: '상태 변경' })).toBe(table)
     expect(selectedRow()).toHaveClass('is-selected')
   })
 
@@ -573,7 +573,7 @@ describe('CONT-W02 사건 영향 패널', () => {
     denied = true
     await refetchHistory(client)
     expect(await screen.findByRole('alert')).toHaveTextContent('본인 데이터만 조회하거나 허용된 확인 기록을 저장할 수 있습니다.')
-    expect(screen.queryByRole('table', { name: '상태 사건' })).toBeNull()
+    expect(screen.queryByRole('table', { name: '상태 변경' })).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -594,9 +594,9 @@ describe('CONT-W02 사건 영향 패널', () => {
     const table = await historyTable()
     await actions.click(screen.getByRole('button', { name: '접수 순' }))
     expect(rowCells(table, 0)[0]).toBe('3')
-    const open = screen.getByRole('button', { name: '사건 2 영향 보기' })
+    const open = screen.getByRole('button', { name: '변경 2 영향 보기' })
     await actions.click(open)
-    const dialog = await screen.findByRole('dialog', { name: '사건 2 영향' })
+    const dialog = await screen.findByRole('dialog', { name: '변경 2 영향' })
     await actions.click(within(dialog).getByRole('button', { name: '닫기' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(rowCells(table, 0)[0]).toBe('3')
@@ -604,8 +604,8 @@ describe('CONT-W02 사건 영향 패널', () => {
     expect(within(table).getAllByRole('row')[2]).toHaveClass('is-selected')
     expect(open).toHaveFocus()
     // Esc로 닫아도 같고 다른 사건을 열면 첫 페이지부터 읽는다.
-    await actions.click(screen.getByRole('button', { name: '사건 3 영향 보기' }))
-    await screen.findByRole('dialog', { name: '사건 3 영향' })
+    await actions.click(screen.getByRole('button', { name: '변경 3 영향 보기' }))
+    await screen.findByRole('dialog', { name: '변경 3 영향' })
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(requested).toContain(effectUrl(1, 8))

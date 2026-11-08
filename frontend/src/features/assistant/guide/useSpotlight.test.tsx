@@ -294,3 +294,32 @@ it('uses a scrollable bottom card when a full-width target leaves no usable vert
     })
   } finally { target.remove() }
 })
+
+
+it('keeps the full workflow coach fixed across targets, missing targets and viewport resizing', () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  const width = vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1440)
+  const height = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(900)
+  const first = document.createElement('section'), next = document.createElement('section')
+  document.body.append(first, next)
+  vi.spyOn(first, 'getBoundingClientRect').mockReturnValue(new DOMRect(280, 100, 1100, 200))
+  vi.spyOn(next, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 100, 480, 50))
+  const view = render(<Card target={first} detailed presentation={{ fixedCard: 'left' }} />)
+  try {
+    act(() => { vi.advanceTimersByTime(100) })
+    const card = screen.getByRole('region', { name: 'Guide card' })
+    const original = card.getAttribute('style')
+    const originalBox = card.dataset.box
+    view.rerender(<Card target={next} detailed presentation={{ side: 'right', fixedCard: 'left' }} />)
+    act(() => { vi.advanceTimersByTime(100) })
+    expect(card.getAttribute('style')).toBe(original)
+    expect(card.dataset.box).not.toBe(originalBox)
+    view.rerender(<Card target={null} detailed presentation={{ fixedCard: 'left' }} />)
+    act(() => { vi.advanceTimersByTime(100) })
+    expect(card.getAttribute('style')).toBe(original)
+    width.mockReturnValue(360); height.mockReturnValue(400)
+    act(() => { fireEvent(window, new Event('resize')); vi.advanceTimersByTime(100) })
+    expect(card).toHaveStyle({ left: '12px', top: '24px', width: '336px', height: '360px' })
+  } finally { first.remove(); next.remove() }
+})

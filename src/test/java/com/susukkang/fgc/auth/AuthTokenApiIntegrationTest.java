@@ -119,7 +119,9 @@ class AuthTokenApiIntegrationTest {
                 .andReturn().getResponse();
         String setCookie = loginResponse.getHeader(HttpHeaders.SET_COOKIE);
         assertThat(setCookie).contains("fgc_refresh=", "HttpOnly", "Secure", "SameSite=Strict",
-                "Path=/api/v1/auth", "Max-Age=1209600");
+                "Path=/api/v1/auth");
+        // 세션 쿠키: 브라우저를 닫으면 사라져 다시 열어도 이전 사용자로 복원되지 않는다.
+        assertThat(setCookie).doesNotContain("Max-Age", "Expires");
         assertThat(auditCount("LOGIN_SUCCESS", "settle01")).isEqualTo(successBefore + 1);
 
         Tokens tokens = tokensOf(loginResponse);
@@ -233,6 +235,23 @@ class AuthTokenApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validPaymentJson()))
                 .andExpect(status().isForbidden());
+    }
+
+    // ── 미사용 만료: 화면 자동 로그아웃을 건너뛴 쿠키도 서버가 거절한다 (회전 없이 60분)
+
+    @Test
+    void refreshIsRejectedAfterIdleLimitAndAcceptedBeforeIt() throws Exception {
+        Tokens tokens = login("settle01");
+        jdbcTemplate.update("UPDATE fgc.auth_refresh_token SET issued_at = now() - interval '59 minutes'"
+                + " WHERE revoked_at IS NULL");
+        Tokens refreshed = refresh(tokens.refresh());
+
+        jdbcTemplate.update("UPDATE fgc.auth_refresh_token SET issued_at = now() - interval '61 minutes'"
+                + " WHERE revoked_at IS NULL");
+        mockMvc.perform(trusted(post("/api/v1/auth/refresh")).cookie(refreshCookie(refreshed.refresh())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("FGC-AUTH-002"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("Max-Age=0")));
     }
 
     // ── 시나리오 6: 로그아웃 후 재사용, 회전 전 Refresh 재사용 ─────────────────
@@ -616,7 +635,7 @@ class AuthTokenApiIntegrationTest {
                         "amount", 500000,
                         "inclusionDecisionStatus", "INCLUDED",
                         "exclusionType", "NONE",
-                        "inclusionDecisionReason", "룰셋 산입",
+                        "inclusionDecisionReason", "규칙 산입",
                         "allocationBasis", "DIRECT",
                         "evidenceRef", "EVIDENCE-001",
                         "attributionMethod", "DIRECT")))));

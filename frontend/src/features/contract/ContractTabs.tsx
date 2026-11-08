@@ -1,4 +1,4 @@
-import { plannedBasisPresentation } from '../arbitrage/planned-basis'
+import { plannedBasisPresentation, UPPER_BOUND_NOTE } from '../arbitrage/planned-basis'
 import { returnLink } from '../transaction/payment-entry'
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
@@ -17,6 +17,7 @@ import { CapDetailModal } from '../cap/CapDetailModal'
 import { Amount, CapStatus, CapUsage } from '../cap/badges'
 import { JOURNAL_TYPE } from '../ledger/labels'
 import { SchedulePreviewForm } from '../schedule/SchedulePreviewForm'
+import { EvidenceLink } from '../../components/EvidenceLink'
 import { ScheduleStatusBadge } from '../schedule/badges'
 import { LINE_STATUS, PAYMENT_STAGE, responseLabel } from '../schedule/labels'
 import {
@@ -51,7 +52,8 @@ const Text = ({ value }: { value: unknown }) => <CellDisclosure singleLine previ
 const transactionLabels: Record<string, string> = { DRAFT: '작성중', CONFIRMED: '확정', CANCELLED: '취소' }
 const statusTones: Record<string, StatusTone> = {
   RUNNING: 'info',
-  DRAFT: 'info',
+  DRAFT: 'neutral',
+  POSTED: 'success',
   COMPLETED: 'success',
   SUCCESS: 'success',
   SUCCEEDED: 'success',
@@ -71,7 +73,7 @@ function ResultStatus({
   labels?: Record<string, string>
 }) {
   return (
-    <StatusBadge optionCount={Object.keys(labels).length} tone={statusTones[code ?? ''] ?? 'neutral'}>
+    <StatusBadge tablePresentation="dot" tone={statusTones[code ?? ''] ?? 'neutral'}>
       {responseLabel(label, labels, code)}
     </StatusBadge>
   )
@@ -195,7 +197,7 @@ export function ContractTabs({
             ) : name === 'acquisition' ? (
               <>
                 <PanelHeading title="계약체결비용 한도">
-                  선지급과 유지관리 예정 금액을 한도와 각각 비교합니다. 예정 스케줄 생성과 별개입니다.
+                  선지급과 유지관리 예정 금액을 계약체결비용 한도와 각각 비교합니다.
                 </PanelHeading>
                 <ContractAcquisitionCost contractId={id} contractNo={contract.contractNo} concise={revised} />
               </>
@@ -316,7 +318,7 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
                 <h3 className="surface-title">{PAYMENT_STAGE[stage]}</h3>
                 <p>
                   {data.headers?.[0]
-                    ? `버전 ${data.headers[0].scheduleVersionNo ?? '-'}, ${int(data.headers[0].installmentCount)}회차, ${int(data.headers[0].lineCount)}행`
+                    ? `버전 ${data.headers[0].scheduleVersionNo ?? '-'}, ${int(data.headers[0].installmentCount)}회차`
                     : '생성된 스케줄이 없습니다.'}
                 </p>
                 {!revised && data.headers?.[0]?.schedulePurpose === 'SIMULATION' && (
@@ -329,7 +331,7 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
               .map((header) => (
                 <p key={header.scheduleHeaderId}>
                   <Link data-guide-feature="contract.schedule.preview-detail" to={returnLink(`/schedules/${header.scheduleHeaderId}`, `${location.pathname}${location.search}`)}>
-                    예정판 v{header.scheduleVersionNo} · {header.installmentCount}회차 상세 보기
+                    예상 스케줄 v{header.scheduleVersionNo} · {header.installmentCount}회차 상세 보기
                   </Link>
                 </p>
               ))}
@@ -389,6 +391,7 @@ function CapTab({ id }: { id: string }) {
     {
       key: 'usage',
       label: '사용률',
+      align: 'number',
       render: (row) => (
         <CapUsage
           value={row.result?.usagePct == null ? undefined : String(row.result.usagePct)}
@@ -400,6 +403,7 @@ function CapTab({ id }: { id: string }) {
     {
       key: 'basis',
       label: '계산근거',
+      align: 'center',
       render: (row) => (
         <Button data-guide-feature="features.contract.contract-tabs.button-5"
           variant="ghost"
@@ -422,7 +426,7 @@ function CapTab({ id }: { id: string }) {
           warning
         </span>
         <span className="guidance-copy">
-          두 규제를 더하지 마세요, 원수사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
+          두 규제를 더하지 마세요, 보험회사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
         </span>
       </p>}
       <div className="contract-tab-body">
@@ -462,7 +466,15 @@ const arbitrageColumns: TableColumn<ContractArbitrageCheck>[] = [
   },
   {
     key: 'planned',
-    label: '지급예정액·계산 기준',
+    label: (
+      <>
+        지급예정액·계산 기준{' '}
+        <EvidenceLink icon="help" label="지급예정액 상한 설명">
+          {UPPER_BOUND_NOTE}
+        </EvidenceLink>
+      </>
+    ),
+    labelText: '지급예정액·계산 기준',
     align: 'number',
     render: (row) => {
       const basis = plannedBasisPresentation(row.plannedCommissionBasis)
@@ -517,6 +529,7 @@ const journalColumns: TableColumn<ContractJournal>[] = [
   {
     key: 'type',
     label: '유형',
+    align: 'center',
     render: (row) => (
       <CategoryBadge value={row.journalType} optionCount={Object.keys(JOURNAL_TYPE).length}>
         <Text value={JOURNAL_TYPE[row.journalType as keyof typeof JOURNAL_TYPE]} />

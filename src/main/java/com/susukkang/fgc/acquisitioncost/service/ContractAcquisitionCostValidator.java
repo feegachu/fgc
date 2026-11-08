@@ -169,7 +169,7 @@ public final class ContractAcquisitionCostValidator {
                     VIOLATION.label(), exceededFrom, reason);
         }
         if (rule.pct() == null) {
-            reasons.add(new AcquisitionCostReason("LIMIT_RATE_MISSING", "룰셋에 " + label + " 한도율이 없습니다."));
+            reasons.add(new AcquisitionCostReason("LIMIT_RATE_MISSING", "규칙에 " + label + " 한도율이 없습니다."));
         }
         if (limit == null || calculated == null || needsReview) {
             return new AcquisitionCostItem(rule.code(), label, base, rule.pct(), calculated, limit, usage, REVIEW_REQUIRED,
@@ -191,7 +191,7 @@ public final class ContractAcquisitionCostValidator {
 
     private static String reviewReason(BigDecimal base, BigDecimal limitPct, BigDecimal calculated) {
         if (base == null) return "계약체결비용 기준액이 없어 한도를 계산하지 못했습니다.";
-        if (limitPct == null) return "룰셋에 한도율이 없어 한도를 계산하지 못했습니다.";
+        if (limitPct == null) return "규칙에 한도율이 없어 한도를 계산하지 못했습니다.";
         if (calculated == null) return "예정 스케줄을 특정하지 못해 계산액을 구하지 못했습니다.";
         return "금액을 확정할 수 없는 항목이 있어 검토가 필요합니다.";
     }

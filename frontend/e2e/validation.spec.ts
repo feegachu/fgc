@@ -75,7 +75,7 @@ test('실패 월 재시작은 이전 시도를 기다리고 다른 탭의 빠른
   await page.getByRole('textbox', { name: '재시작 사유' }).fill('실패 원인 수정')
   await page.getByRole('button', { name: '재시작 요청' }).click()
   await expect(restart).toBeDisabled()
-  await expect(page.getByText('실행 요청을 수락했습니다. 이번 시도의 진행률을 확인하고 있습니다.')).toBeVisible()
+  await expect(page.getByText('실행을 시작했습니다. 진행률을 확인하고 있습니다.')).toBeVisible()
   await expect(restart).toBeEnabled({ timeout: 10_000 })
   await expect(page.getByText('다른 탭이 재시작한 원장의 재실패', { exact: false })).toBeVisible()
   expect(posts).toBe(1)

@@ -43,7 +43,6 @@ export default function ClawbackPage() {
   const { month, user, helpVersion } = useOutletContext<ShellContext>()
   const revised = helpVersion === 'after'
   const [calculationHost, setCalculationHost] = useState<HTMLDivElement | null>(null)
-  const [documentHost, setDocumentHost] = useState<HTMLDivElement | null>(null)
   const calculating = useIsMutating({ mutationKey: ['clawback', 'calculate'] }) > 0
   const issuing = useIsMutating({ mutationKey: ['clawback', 'issue-notice'] }) > 0
   const processing = calculating || issuing
@@ -94,7 +93,7 @@ export default function ClawbackPage() {
   const dateError =
     draft.dateFrom && draft.dateTo && draft.dateFrom > draft.dateTo ? '종료일이 시작일보다 빠릅니다.' : ''
   return (
-    <ClawbackActionPlacement.Provider value={{ revised, calculation: calculationHost, document: documentHost }}>
+    <ClawbackActionPlacement.Provider value={{ revised, calculation: calculationHost, document: null, roleCode: user.roleCode, refreshing: detail.isFetching, onRefresh: () => detail.refetch() }}>
     <div className="claw-page">
       <header className="page-header">
         <ScreenHelp screenId="CLAW-W01" />
@@ -112,7 +111,7 @@ export default function ClawbackPage() {
         }}
         onReset={() => apply(defaultCriteria(month ?? ''))}
         actions={
-          <Button data-guide-feature="features.clawback.clawback-page.button" variant="secondary" disabled={busy} onClick={() => void query.refetch()}>
+          <Button data-guide-feature="features.clawback.clawback-page.button" variant="secondary" disabled={busy} onClick={() => { void query.refetch(); if (selected) void detail.refetch() }}>
             <span className="material-symbols-rounded" aria-hidden="true">
               refresh
             </span>
@@ -271,7 +270,7 @@ export default function ClawbackPage() {
       </section>
       <Modal open={selected != null} title={`환수 상세 · ${selected?.contractNo ?? '계약 확인'}`}
         className="modal-large claw-detail-modal" onClose={closeDetail} closeOnEscape={!processing}
-        footer={<div className="claw-footer-actions">{revised && <><div ref={setCalculationHost} /><div ref={setDocumentHost} /></>}
+        footer={<div className="claw-footer-actions">{revised && <div ref={setCalculationHost} />}
           <Button variant="secondary" disabled={processing} onClick={closeDetail}>닫기</Button></div>}>
         <section data-guide-feature="features.clawback.clawback-page.section-2" className="claw-detail-panel" aria-labelledby="claw-detail-title">
           <header className="surface-header claw-panel-header">
@@ -295,13 +294,13 @@ export default function ClawbackPage() {
             ) : detail.data ? (
               <>
                 <ClawbackDetail key={selected?.candidateId} detail={detail.data} revised={revised} />
-                <ClawbackDocuments
+                {!revised && <ClawbackDocuments
                   key={`${selected?.candidateId}:${detail.data.latestCalculation?.calculationVersion}:${detail.data.candidate?.sourceVersion}`}
                   detail={detail.data}
                   roleCode={user.roleCode}
                   refreshing={detail.isFetching || processing}
                   onRefresh={() => detail.refetch()}
-                />
+                />}
               </>
             ) : null}
           </div>

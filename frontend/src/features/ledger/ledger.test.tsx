@@ -228,7 +228,7 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await screen.findByRole('button', { name: 'JRN-001' })
     expect(calls.some((call) => call.url.startsWith('/api/v1/journals?') && call.url.includes('sort='))).toBe(false)
   })
-  it('원천은 예외함 참조와 같이 원천 이름과 번호로 보인다', async () => {
+  it('원천은 내부 번호 없이 원천 이름으로 보인다', async () => {
     renderAt('/journals?searched=true', (url) =>
       url.startsWith('/api/v1/journals?')
         ? {
@@ -245,8 +245,8 @@ describe('LEDG-W01 검증원장 React 전환', () => {
         : undefined,
     )
     const table = await screen.findByRole('table', { name: '조회 조건에 해당하는 검증원장 분개 목록' })
-    expect((await within(table).findAllByText('지급 건 4104')).length).toBeGreaterThan(0)
-    expect(within(table).queryByText(/#4104/)).not.toBeInTheDocument()
+    expect((await within(table).findAllByText('지급 건')).length).toBeGreaterThan(0)
+    expect(within(table).queryByText(/4104/)).not.toBeInTheDocument()
   })
   it('selected 딥링크는 기준 월 목록과 함께 상세와 검증 실행별 불균형을 조회한다', async () => {
     renderAt('/journals?selected=11', (url) =>

@@ -196,10 +196,10 @@ public class ClawbackNoticeDocumentService {
                 header.insurerName(), header.productName(), header.agentCode(), header.agentName(),
                 triggerLabel(String.valueOf(basis.get("triggerType")), header.triggerStatus()),
                 date(basis.get("eventDate")), date(basis.get("contractDate")),
-                header.policyCode() + " v" + header.policyVersionNo() + " · " + header.policyName(),
+                header.policyName() + " v" + header.policyVersionNo(),
                 calculation.calculationVersion(), calculation.calculatedAt(),
                 basis.get("elapsedMonths") instanceof Number n ? n.intValue() : null,
-                "LINE_HALF_UP_WON".equals(basis.get("rounding")) ? "행별 원 단위 반올림(HALF_UP) 후 합산"
+                "LINE_HALF_UP_WON".equals(basis.get("rounding")) ? "행별로 원 단위 반올림 후 합산 (5 이상 올림)"
                         : String.valueOf(basis.get("rounding")),
                 lines, calculation.amount(), List.copyOf(rates), basis.get("reason") instanceof String reason ? reason : null,
                 new ClawbackNoticePdfRenderer.Party(header.gaName(), header.branchName(), header.teamName()));
@@ -231,7 +231,7 @@ public class ClawbackNoticeDocumentService {
             return objectMapper.readerFor(Calculation.class)
                     .with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readValue(json);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("환수 계산판을 읽을 수 없습니다.", e);
+            throw new IllegalStateException("환수 계산 결과를 읽을 수 없습니다.", e);
         }
     }
 

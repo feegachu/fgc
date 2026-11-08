@@ -174,7 +174,7 @@ public class PolicyDraftValidator {
 
     private static void validateFeeRules(PolicyDraft draft, String requiredRegime) {
         if (!draft.feeRegimeRules().isEmpty() && requiredRegime == null) {
-            throw invalid("feeRegimeRules", "분급 룰셋은 4년·7년 수수료 정책에만 등록할 수 있습니다.");
+            throw invalid("feeRegimeRules", "분급 규칙은 4년·7년 수수료 정책에만 등록할 수 있습니다.");
         }
         Set<Long> feeIds = new HashSet<>();
         for (int i = 0; i < draft.feeRegimeRules().size(); i++) {
@@ -186,7 +186,7 @@ public class PolicyDraftValidator {
             if (draft.basicDocumentVersion() != null && rule.basicDocumentVersion() != null
                     && !draft.basicDocumentVersion().equals(rule.basicDocumentVersion())) {
                 throw invalid(FEE_RULE_PREFIX + i + "].basicDocumentVersion",
-                        "정책과 분급 룰셋의 기초서류 버전이 일치해야 합니다.");
+                        "정책과 분급 규칙의 기초서류 버전이 일치해야 합니다.");
             }
         }
         validateFeeOverlaps(draft.feeRegimeRules());
@@ -249,7 +249,7 @@ public class PolicyDraftValidator {
     // 수수료 규칙은 판매일별로 나뉘지 않으므로 해당 정책의 모든 분급 룰셋에서 유효해야 한다.
     static void validateCommissionRegimeBound(CommissionRuleDraft rule, FeeRegimeRuleDraft regime, String field) {
         if (rule.installmentTo() > regime.maxInstallments()) {
-            throw invalid(field + ".installmentTo", "수수료 규칙은 분급 룰셋의 최대 회차를 넘을 수 없습니다.");
+            throw invalid(field + ".installmentTo", "수수료 규칙은 분급 규칙의 최대 회차를 넘을 수 없습니다.");
         }
         if (rule.feeComponentType() != FeeComponentType.LONG_TERM_MAINTENANCE) return;
         if (FOUR_YEAR.equals(regime.feeRegimeCode())) {
@@ -258,7 +258,7 @@ public class PolicyDraftValidator {
         if (regime.longTermMaintenanceFrom() == null
                 || rule.installmentFrom() < regime.longTermMaintenanceFrom()
                 || rule.installmentTo() > regime.longTermMaintenanceTo()) {
-            throw invalid(field + ".installmentFrom", "장기유지 수수료 규칙은 룰셋의 장기유지 구간 안에 있어야 합니다.");
+            throw invalid(field + ".installmentFrom", "장기유지 수수료 규칙은 규칙의 장기유지 구간 안에 있어야 합니다.");
         }
     }
 
@@ -281,7 +281,7 @@ public class PolicyDraftValidator {
 
     private static void validateFeeRule(FeeRegimeRuleDraft rule, String requiredRegime, String field) {
         if (!Objects.equals(requiredRegime, rule.feeRegimeCode())) {
-            throw invalid(field + ".feeRegimeCode", "정책 유형과 분급 룰셋의 수수료 체계가 일치해야 합니다.");
+            throw invalid(field + ".feeRegimeCode", "정책 유형과 분급 규칙의 수수료 체계가 일치해야 합니다.");
         }
         checkPeriod(rule.salesStartDateFrom(), rule.salesStartDateTo(), field + ".salesStartDateTo");
         checkPeriod(rule.basicDocumentDateFrom(), rule.basicDocumentDateTo(), field + ".basicDocumentDateTo");
@@ -311,7 +311,7 @@ public class PolicyDraftValidator {
                         && overlaps(left.basicDocumentDateFrom(), left.basicDocumentDateTo(),
                                     right.basicDocumentDateFrom(), right.basicDocumentDateTo())) {
                     throw new FgcBusinessException(FgcErrorCode.POL_002, FEE_RULE_PREFIX + j + "]",
-                            Map.of(CONFLICTING_INDEX, i), "같은 분급 룰셋의 적용 구간이 겹칩니다.");
+                            Map.of(CONFLICTING_INDEX, i), "같은 분급 규칙의 적용 구간이 겹칩니다.");
                 }
             }
         }

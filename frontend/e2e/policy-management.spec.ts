@@ -4,7 +4,7 @@ import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('policy-preview')
-  await expect(page.getByRole('heading', { name: '정책/룰셋 관리' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '정책 관리' })).toBeVisible()
 })
 
 for (const width of [1440, 390]) {
@@ -97,8 +97,8 @@ test('draft creation, field focus and unsaved changes preserve the selected poli
   await expect(page.getByRole('heading', { name: '신규 정책 화면 검토', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '초안 수정' }).click()
   await expect(page.getByRole('dialog').getByLabel('정책코드')).toBeDisabled()
-  await page.getByRole('button', { name: /분급 룰셋/ }).click()
-  await page.getByRole('button', { name: '분급 룰셋 추가' }).click()
+  await page.getByRole('button', { name: /분급 규칙/ }).click()
+  await page.getByRole('button', { name: '분급 규칙 추가' }).click()
   await expect(page.getByRole('dialog').getByLabel('장기유지 시작 회차')).toHaveValue('')
   await expect(page.getByRole('dialog').getByLabel('장기유지 끝 회차')).toHaveValue('')
 })
@@ -114,7 +114,7 @@ test('RATE and FIXED switch exclusively, and seven-year rules validate the exact
   await expect(page.getByRole('dialog').getByLabel('요율 (%)')).toHaveValue('')
   await page.getByRole('dialog').getByLabel('정액 (원)').fill('12000')
   await page.screenshot({ path: 'test-results/policy-ui-722/04-rule-editor.png', fullPage: true })
-  await page.getByRole('button', { name: /분급 룰셋/ }).click()
+  await page.getByRole('button', { name: /분급 규칙/ }).click()
   await page.getByRole('dialog').getByLabel('최대 회차').fill('12.5')
   await page.getByRole('button', { name: '초안 저장' }).click()
   await expect(page.getByRole('dialog').getByLabel('최대 회차')).toBeFocused()
@@ -130,8 +130,8 @@ test('RATE and FIXED switch exclusively, and seven-year rules validate the exact
 })
 
 test('approval requires a reason, activation is separate, and new version selects a fresh draft', async ({ page }) => {
-  await page.getByRole('radio', { name: 'UI-STATUS v1 선택' }).click()
-  await expect(page.getByRole('radio', { name: 'UI-STATUS v1 선택' })).toBeChecked()
+  await page.getByRole('radio', { name: '계약상태별 지급조건 v1 선택' }).click()
+  await expect(page.getByRole('radio', { name: '계약상태별 지급조건 v1 선택' })).toBeChecked()
   await page.getByRole('button', { name: '선택 정책 관리' }).click()
   await page.getByRole('button', { name: '승인', exact: true }).click()
   await page.getByRole('button', { name: '승인 확인' }).click()
@@ -148,7 +148,7 @@ test('approval requires a reason, activation is separate, and new version select
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '초안 수정' })).toBeVisible()
   await page.getByRole('tab', { name: '정책 버전', exact: true }).click()
-  await expect(page.getByRole('radio', { name: 'UI-STATUS v2 선택', exact: true })).toBeChecked()
+  await expect(page.getByRole('radio', { name: '계약상태별 지급조건 v2 선택', exact: true })).toBeChecked()
   await page.getByRole('tab', { name: '관리 상세', exact: true }).click()
   await page.getByRole('button', { name: '제출', exact: true }).click()
   await page.getByRole('dialog').getByLabel('작업 사유').fill('새 버전 검토 요청')
@@ -169,5 +169,5 @@ test('narrow viewport keeps the form usable and close restores selection', async
   await page.screenshot({ path: 'test-results/policy-ui-722/06-narrow.png', fullPage: true })
   await page.getByRole('button', { name: '취소', exact: true }).click()
   await page.getByRole('button', { name: '편집 취소', exact: true }).click()
-  await expect(page.getByRole('radio', { name: 'UI-SEVEN-YEAR v1 선택' })).toBeChecked()
+  await expect(page.getByRole('radio', { name: '7년 분급 수수료 정책 v1 선택' })).toBeChecked()
 })

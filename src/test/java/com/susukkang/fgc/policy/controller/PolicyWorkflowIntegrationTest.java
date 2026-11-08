@@ -166,7 +166,7 @@ class PolicyWorkflowIntegrationTest {
         for (int month : new int[]{0, 11, 12, 23}) {
             var resolution = ClawbackRuleResolver.resolve(comparisonRules, List.of(baseItem), month);
             assertThat(resolution.excludeReason()).isNull();
-            assertThat(resolution.policyVersion()).isEqualTo(draft.path("policyCode").asText() + " v1");
+            assertThat(resolution.policyVersion()).isEqualTo(draft.path("policyName").asText() + " v1");
             assertThat(resolution.ratesByItem().get(baseItem)).isEqualByComparingTo(month < 12 ? "50" : "25");
         }
     }

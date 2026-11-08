@@ -145,8 +145,8 @@ public class AcquisitionCostCheckService {
                 lines = store.findLines(schedule.scheduleHeaderId());
             } else {
                 reasons.add(schedules.isEmpty()
-                        ? new AcquisitionCostReason("SCHEDULE_MISSING", "이 지급 정책으로 만든 활성 예정 스케줄이 없습니다.")
-                        : new AcquisitionCostReason("SCHEDULE_AMBIGUOUS", "활성 예정 스케줄이 둘 이상이라 하나로 정할 수 없습니다."));
+                        ? new AcquisitionCostReason("SCHEDULE_MISSING", "이 지급 정책으로 만든 사용 중인 예상 스케줄이 없습니다.")
+                        : new AcquisitionCostReason("SCHEDULE_AMBIGUOUS", "사용 중인 예상 스케줄이 둘 이상이라 하나로 정할 수 없습니다."));
             }
         } else {
             AcquisitionCostReason cause = regimeReason(payment.resolution().reasonCode());
@@ -221,12 +221,12 @@ public class AcquisitionCostCheckService {
             case REGIME_NOT_ELIGIBLE -> "4년·7년 체계로 등록됐지만 적용례를 충족하지 않습니다.";
             case FOUR_YEAR_AFTER_SPECIAL_PERIOD -> "4년 특례 종료 뒤의 판매개시 또는 계약이라 적용 체계를 확정할 수 없습니다.";
             case SEVEN_YEAR_IN_SPECIAL_PERIOD -> "4년 특례 기간에 7년 체계로 등록돼 있습니다.";
-            case RULESET_MISSING -> "적용할 분급 룰셋이 없습니다.";
-            case RULESET_AMBIGUOUS -> "적용할 분급 룰셋이 둘 이상입니다.";
-            case RULESET_FLAGGED -> "경계사례로 표시된 룰셋이라 자동으로 확정하지 않습니다.";
-            case RULESET_LIMIT_MISSING -> "룰셋에 필수 한도율이 없습니다.";
-            case COMMISSION_RULE_INVALID -> "지급 규칙이 룰셋 조건과 맞지 않습니다.";
-            case RULESET_SELECTED -> "룰셋을 선택했습니다.";
+            case RULESET_MISSING -> "적용할 분급 규칙이 없습니다.";
+            case RULESET_AMBIGUOUS -> "적용할 분급 규칙이 둘 이상입니다.";
+            case RULESET_FLAGGED -> "경계사례로 표시된 규칙이라 자동으로 확정하지 않습니다.";
+            case RULESET_LIMIT_MISSING -> "규칙에 필수 한도율이 없습니다.";
+            case COMMISSION_RULE_INVALID -> "지급 규칙이 분급 규칙 조건과 맞지 않습니다.";
+            case RULESET_SELECTED -> "규칙을 선택했습니다.";
         });
     }
 

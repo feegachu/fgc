@@ -98,7 +98,7 @@ test('리사이즈 후에도 예외 목록의 지정된 컬럼 정렬을 유지�
 for (const [path, label] of [
   ['journals', '분개 목록과 분개 상세 카드 너비'],
   ['arbitrage-checks', '계약별 판정과 상세 카드 너비'],
-  ['transactions/new', '지급 건, 귀속행과 확정 점검 카드 너비'],
+  ['transactions/new', '지급 건, 귀속 내역과 확정 점검 카드 너비'],
   ['audit-logs', '감사 기록과 변경 내용 비교 카드 너비'],
 ]) {
   test(path + ': 카드 드래그·저장·모바일 배치를 지원한다', async ({ page }, testInfo) => {
@@ -173,7 +173,7 @@ test('예상 스케줄의 마지막 열이 남는 너비를 채우고 앞쪽 열
   await page.goto('schedules')
   const table = page.getByRole('table').first()
   await expect(table.getByRole('link', { name: 'FGC-001 회차 보기' })).toBeVisible()
-  const alignments = ['left', 'left', 'center', 'center', 'left', 'center', 'center', 'left', 'right', 'left', 'left']
+  const alignments = ['left', 'left', 'center', 'left', 'center', 'center', 'left', 'right', 'left', 'left']
   for (const [index, alignment] of alignments.entries()) {
     await expect(table.getByRole('columnheader').nth(index)).toHaveCSS('text-align', alignment)
     await expect(table.locator('tbody tr').first().locator('td').nth(index)).toHaveCSS('text-align', alignment)

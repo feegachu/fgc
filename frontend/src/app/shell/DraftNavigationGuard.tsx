@@ -34,7 +34,7 @@ export function DraftNavigationGuard() {
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [])
-  return <Modal open={blocker.state === 'blocked'} title="저장하지 않은 입력이 있어요" onClose={keepInput}
+  return <Modal open={blocker.state === 'blocked'} title="저장하지 않은 입력이 있습니다" onClose={keepInput}
     footer={<>
       <Button data-guide-feature="app.shell.draft-navigation-guard.keep" variant="secondary" onClick={keepInput}>돌아가기</Button>
       <Button data-guide-feature="app.shell.draft-navigation-guard.discard" onClick={() => blocker.proceed?.()}>이동</Button>

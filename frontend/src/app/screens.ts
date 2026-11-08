@@ -25,7 +25,7 @@ export const screens: ScreenDefinition[] = [
   {
     id: 'POL-W01',
     path: '/policies',
-    title: '정책/룰셋',
+    title: '정책',
     menu: '/policies',
     section: 'admin',
     icon: 'settings',

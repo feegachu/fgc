@@ -86,7 +86,7 @@ class ContractControllerTest {
                 .productName("가상 건강보장보험 A")
                 .contractDate(LocalDate.of(2026, 8, 6))
                 .monthlyEquivalentFirstPremium(new BigDecimal("100000"))
-                .agentIdName("FC-0001 서본부")
+                .agentIdName("서본부 (A-FC-001)")
                 .contractStatus(ACTIVE)
                 .capResultStatus(CapResultStatus.NORMAL)
                 .dataOrigin(DataOrigin.MANUAL)
@@ -184,6 +184,22 @@ class ContractControllerTest {
     void createContractRejectsMissingPremiumPerCycle() throws Exception {
         ContractCreateRequest request = createRequest();
         request.setPremiumPerCycleAmount(null);
+
+        mockMvc.perform(post("/api/v1/contracts")
+                        .with(user("settlement").roles("SETTLEMENT"))
+                        .with(csrf())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("premiumPerCycleAmount"));
+    }
+
+    /** 저장 칸(numeric 15,2)을 넘기는 금액이 500 대신 입력 오류로 끝나야 한다. */
+    @Test
+    @DisplayName("보험료 자릿수가 넘치면 입력 오류로 거절한다")
+    void createContractRejectsPremiumOverflow() throws Exception {
+        ContractCreateRequest request = createRequest();
+        request.setPremiumPerCycleAmount(new java.math.BigDecimal("100000000000"));
 
         mockMvc.perform(post("/api/v1/contracts")
                         .with(user("settlement").roles("SETTLEMENT"))

@@ -37,7 +37,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   border: 1px solid var(--ast-gray-line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-12);
   background: var(--color-bg-surface);
   overflow: hidden;
 }
@@ -113,7 +113,7 @@
   justify-items: start;
   gap: var(--space-1);
   padding: var(--space-4);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-12);
   background: var(--ast-gray);
 }
 .ast-hero-amount { font-size: 1.5rem; line-height: 2rem; }

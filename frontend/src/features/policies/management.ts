@@ -15,7 +15,7 @@ export const sources = {
   REGULATORY: '규제',
   INSURER_RULE: '보험사 규칙',
   GA_POLICY: '회사 정책',
-  PROJECT_ASSUMPTION: '프로젝트 가정',
+  PROJECT_ASSUMPTION: '자체 기준',
 }
 export const sourceStatusTags = ['현행규정', '개정고시', '시행세칙', 'FAQ', '회사정책'] as const
 export const sourceReferenceNotice = 'FGC의 근거 정보는 참조용이며 상품위원회 등 법정 심의/의결을 대체하지 않습니다.'
@@ -26,20 +26,57 @@ export const statusLabels: Record<string, string> = {
   ACTIVE: '적용중',
   RETIRED: '종료',
 }
+// V71 policy_reference.title. 화면에는 규정 코드 대신 이 이름을 쓴다.
+export const regulationTitles: Record<string, string> = {
+  'REG-01': '판매수수료 구조',
+  'REG-02': '선지급수수료',
+  'REG-03': '유지관리수수료',
+  'REG-04': '4년 한시 특례',
+  'REG-05': '장기유지수수료',
+  'REG-06': '공통비, 간접지원경비',
+  'REG-06A': '초년도 1,200%룰의 공통비',
+  'REG-06B': '유지관리수수료의 간접지원경비',
+  'REG-06C': '일반 공통비 안분정책',
+  'REG-07': '유지관리 수령인',
+  'REG-08': '초년도 1,200%룰',
+  'REG-09': 'GA 확대, 수수료등 범위',
+  'REG-10': '준법경영비 3% 공제',
+  'REG-11': '한도 계산 제외항목',
+  'REG-12': '차익거래 방지',
+  'REG-13': '유지관리수수료의 미지급',
+  'REG-14': '회사별 환수율',
+  'REG-15': '구 분할지급제 삭제',
+  'REG-16': '정착지원금 환수',
+  'REG-17': '판매수수료 비교공시',
+  'REG-18': '대형 GA 비교설명',
+  'REG-19': '분급 적용례, 규칙 판정',
+  'REG-20': '경력설계사 정착지원금 귀속',
+  'REG-21': '신인모집종사자, 신인활동지원비',
+  'REG-22': '지급기준 버전, 우회지급',
+  'REG-23': '예상 해약환급률표',
+  'REG-24': '상품위원회',
+}
 /**
  * 근거 코드는 그대로 저장하고 화면에서만 읽기 쉬운 이름으로 보인다.
  * 'docs/05_인터페이스정의서_v2_0.md#9-5'처럼 시드에 남은 문서 경로와 승계 기록 'policy:45'가 대상이다.
  * 'policy:45'의 45는 내부 번호라 판 번호(v2)처럼 보이지 않게 숫자를 빼고, 판은 versions에서 찾을 때만 붙인다.
  */
-export function refLabel(ref: string, versions?: Pick<Policy, 'policyVersionId' | 'policyCode' | 'versionNo'>[]) {
+export function refLabel(ref: string, versions?: Pick<Policy, 'policyVersionId' | 'versionNo'>[]) {
   const successor = /^policy:(\d+)$/.exec(ref)
   if (successor) {
     const next = versions?.find((version) => String(version.policyVersionId) === successor[1])
-    return next ? `다음 정책 버전 ${next.policyCode} v${next.versionNo}` : '다음 정책 버전'
+    return next ? `다음 정책 버전 v${next.versionNo}` : '다음 정책 버전'
   }
+  const regulation = /^REG-\d{2}[A-Z]?/.exec(ref)
+  if (regulation) return regulationTitles[regulation[0]] ?? '관련 규정'
+  // 출처 코드와 팀 결정 번호는 보여 줄 이름이 없다. 빈 문자열이면 호출부가 표시하지 않는다.
+  if (/^(?:SRC-|D-\d)/.test(ref)) return ''
   const doc = /^docs\/(?:\d+_|FGC_)?(.+?)(?:_v\d+(?:_\d+)*)?\.md(?:#(.+))?$/.exec(ref)
-  return doc ? [doc[1].replaceAll('_', ' '), doc[2]].filter(Boolean).join(' ') : policySeedText(ref)
+  if (doc) return doc[1].includes('운영정책서') ? ['회사 운영정책', doc[2]].filter(Boolean).join(' ') : ''
+  return policySeedText(ref)
 }
+/** 표시할 이름이 있는 근거만 이름으로 바꾼다. */
+export const refLabels = (refs: string[] = []) => refs.map((ref) => refLabel(ref)).filter(Boolean)
 export const actionLabels = {
   SUBMIT: '제출',
   APPROVE: '승인',

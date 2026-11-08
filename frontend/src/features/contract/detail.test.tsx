@@ -14,6 +14,7 @@ import type { RequestOptions } from '../../lib/api/client'
 import { ApiError } from '../../lib/api/errors'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
+import { UPPER_BOUND_NOTE } from '../arbitrage/planned-basis'
 import ContractDetailPage from './ContractDetailPage'
 import type { ContractDetail, ContractStatusEvent } from './api'
 import { sortStatusEvents } from './detailState'
@@ -105,8 +106,9 @@ describe('CONT-W02 계약 상세', () => {
     expect(within(table).getByText('50,000원')).toBeVisible()
     expect(within(table).getByText(label!)).toBeVisible()
     expect(within(table).getByText(label!)).not.toHaveAttribute('title')
-    if (basis === 'UNRESOLVED_UPPER_BOUND_V1')
-      expect(within(table).getByText('연결이 불명확한 지급은 차감하지 않은 상한입니다. 자료 확인 전에는 확정된 잔여액으로 해석하지 마세요.')).toBeVisible()
+    // 설명은 행마다 반복하지 않고 머리글 도움말에서 한 번만 본다.
+    expect(within(table).queryByText(UPPER_BOUND_NOTE)).not.toBeInTheDocument()
+    expect(within(table).getByRole('button', { name: '지급예정액 상한 설명' })).toBeVisible()
     expect(requested.some(({ options }) => options?.method === 'POST')).toBe(false)
   })
 
@@ -142,7 +144,7 @@ describe('CONT-W02 계약 상세', () => {
     await screen.findByRole('heading', { name: 'CONT-0001' })
     expect(screen.getAllByText('서버 정상')).toHaveLength(2)
     expect(screen.getByText('서버 월납')).toBeInTheDocument()
-    const history = await screen.findByRole('table', { name: '상태 사건' })
+    const history = await screen.findByRole('table', { name: '상태 변경' })
     const row = (index: number) => within(within(history).getAllByRole('row')[index + 1]).getAllByRole('cell')
     expect(row(0)[0]).toHaveTextContent('1')
     expect(row(0)[1]).toHaveTextContent('최초 → 정상')
@@ -171,13 +173,13 @@ describe('CONT-W02 계약 상세', () => {
     expect(events.map((row) => row.eventSeq)).toEqual([9, 3, 2])
   })
 
-  it('운영판 없이 예정판만 있으면 계약 탭에서도 지급 확정 제외를 표시한다', async () => {
+  it('운영판 없이 예상 스케줄만 있으면 계약 탭에서도 지급 확정 제외를 표시한다', async () => {
     renderAt('/contracts/1?tab=schedules', (url) => {
       if (!url.includes('/schedules?')) return
       return { headers: [{ scheduleHeaderId: 10, schedulePurpose: 'SIMULATION', scheduleVersionNo: 1, installmentCount: 48, lineCount: 48 }], lines: [] }
     })
     await waitFor(() => expect(screen.getAllByText('예정 결과 · 지급 확정 대상이 아닙니다.')).toHaveLength(2))
-    expect(screen.getAllByText('버전 1, 48회차, 48행')).toHaveLength(2)
+    expect(screen.getAllByText('버전 1, 48회차')).toHaveLength(2)
   })
 
   it('스케줄 deep link에서도 두 지급단계를 함께 표시하고 기존 읽기 전용 버전 요약을 유지한다', async () => {
@@ -217,7 +219,7 @@ describe('CONT-W02 계약 상세', () => {
     expect(calls('/schedules?paymentStage=GA_TO_FC')).toHaveLength(1)
     expect(await screen.findByRole('cell', { name: 'GA' })).toBeInTheDocument()
     expect(screen.queryByLabelText('지급단계')).toBeNull()
-    expect(within(fc).getByText('버전 2, 1회차, 1행')).toBeInTheDocument()
+    expect(within(fc).getByText('버전 2, 1회차')).toBeInTheDocument()
     expect(within(fc).queryByRole('link')).not.toBeInTheDocument()
     expect(within(fc).queryByText('서버 확정')).not.toBeInTheDocument()
   })
@@ -248,7 +250,7 @@ describe('CONT-W02 계약 상세', () => {
     const tab = await screen.findByRole('tab', { name: '계약체결비용' })
     expect(requested.filter(({ url }) => url.includes('acquisition-cost-checks'))).toHaveLength(0)
     await actions.click(tab)
-    expect(await screen.findByText(/이 검증이 없어도 예정 스케줄 생성과 조회는 할 수 있습니다/)).toBeInTheDocument()
+    expect(await screen.findByText('이 지급단계의 검증 결과가 없습니다.')).toBeInTheDocument()
     const calls = requested.filter(({ url }) => url.includes('acquisition-cost-checks'))
     expect(calls).toHaveLength(1)
     expect(calls[0].url).toContain('contractId=1')
@@ -319,7 +321,7 @@ describe('CONT-W02 계약 상세', () => {
     renderAt('/contracts/1?tab=cap&capCheckId=999', (url) =>
       url.endsWith('/cap-checks') ? [{ capCheckId: 31, result: { paymentStage: 'INSURER_TO_GA' } }] : undefined,
     )
-    await screen.findByRole('button', { name: '원수사→GA 계산근거' })
+    await screen.findByRole('button', { name: '보험회사→GA 계산근거' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(requested.some(({ url }) => url.includes('/999/details'))).toBe(false)
   })

@@ -17,9 +17,8 @@ export function GatePanel({ result }: { result: Precheck | null }) {
     <PrecheckResultPanel titleId="transaction-gate-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="transaction-gate-title">
-          ③ 확정 전 6단계 점검
+          확정 전 6단계 점검
         </h2>
-        <span className="transaction-panel-meta">운영정책서 제31조</span>
       </header>
       <div className="surface-body transaction-gate-list" id="gate-list" aria-live="polite">
         {!result && <p className="transaction-gate-detail">사전검증을 하면 결과가 표시됩니다.</p>}
@@ -123,7 +122,6 @@ export function CapPanel({
         <h2 className="surface-title" id="transaction-cap-title">
           1,200% 사전검증
         </h2>
-        <span className="transaction-panel-meta">저장하지 않고 계산만</span>
       </header>
       <div
         className="surface-body transaction-cap-body"
@@ -166,7 +164,7 @@ export function CapPanel({
           )
         ) : (
           <p className="transaction-panel-placeholder">
-            [사전검증]을 누르면 한도 초과 여부를 미리 계산하며 아무것도 저장하지 않습니다.
+            [사전검증]을 누르면 한도 초과 여부를 미리 계산합니다. 저장되지 않습니다.
           </p>
         )}
       </div>
@@ -265,7 +263,7 @@ export function ConfirmationModal({
           {[
             ['지급 관리번호', form.sourceBusinessKey || '-'],
             ['지급액', won(form.amount)],
-            ['흐름', form.cashflowType === 'PAYMENT' ? '지급' : '차감'],
+            ['지급/차감', form.cashflowType === 'PAYMENT' ? '지급' : '차감'],
             ['판정 결과', !failureText && result?.confirmable ? '확정 가능' : '확정 차단'],
           ].map(([label, value]) => (
             <div className="transaction-cap-amount-line" key={label}>
@@ -299,7 +297,7 @@ export function ConfirmationModal({
                   reloadDocument
                   to={withMonth(`/transactions/new?id=${encodeURIComponent(paymentId ?? '')}`, month)}
                 >
-                  귀속행 판정 다시 확인
+                  귀속 내역 판정 다시 확인
                 </Link>
               )}
               {hasException && (

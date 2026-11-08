@@ -192,7 +192,7 @@ describe('EXCP-W01 예외함', () => {
     await userEvent.setup().click(within(await table()).getAllByRole('row')[1])
     expect(screen.queryByRole('option', { name: '재검토 시작' })).not.toBeInTheDocument()
     expect(document.querySelector('a[href*="transactions/new?id=41"]')).toBeNull()
-    expect(screen.getAllByText('지급 건 41')).not.toHaveLength(0)
+    expect(screen.getAllByText('지급 건')).not.toHaveLength(0)
     expect(screen.queryByText(/COMMISSION_TRANSACTION/)).not.toBeInTheDocument()
   })
 
@@ -406,9 +406,7 @@ describe('EXCP-W01 예외함', () => {
     const references = screen.getAllByRole('link', { name: /^계약 C-0001/ })
     expect(references.length).toBeGreaterThan(0)
     for (const link of references) expect(link).toHaveAttribute('href', '/app/contracts/3')
-    expect(screen.getByText('검증 실행', { exact: false, selector: '.exception-occurrence-meta' })).toHaveTextContent(
-      '검증 실행 44, 1,200% 판정 9',
-    )
+    expect(screen.getByText('1,200% 판정', { selector: '.exception-occurrence-meta span' })).toBeInTheDocument()
   })
 
   it('저장된 설명과 처리 사유의 스크립트는 글자로만 보이고 실행되지 않는다 (SER-004)', async () => {
@@ -550,7 +548,7 @@ describe('EXCP-W01 예외함', () => {
     if (guided) await actions.click(screen.getByRole('radio', { name: '수정 전' }))
     const actionSelect = await screen.findByLabelText(/조치/)
     expect(within(actionSelect).queryByRole('option', { name: '해결' })).toBeNull()
-    expect(within(actionSelect).getByRole('option', { name: '오탐' })).toBeInTheDocument()
+    expect(within(actionSelect).getByRole('option', { name: '예외 아님' })).toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '원장 정정 계속' }))
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText(/J-0070/)).toBeInTheDocument()
@@ -574,11 +572,11 @@ describe('EXCP-W01 예외함', () => {
       await waitFor(() => expect(within(dialog).getByRole('button', { name: '다음' })).toBeEnabled())
       expect(within(dialog).queryByText('역분개와 재기표를 완료했습니다.')).toBeNull()
       await actions.click(within(dialog).getByRole('button', { name: '다음' }))
-      expect(await within(dialog).findByText('서버 정정 확인 · 가이드 완료')).toBeVisible()
+      expect(await within(dialog).findByText('정정 완료')).toBeVisible()
       await actions.click(within(dialog).getByRole('button', { name: '안내 마치기' }))
     }
     expect(await within(dialog).findByText('역분개와 재기표를 완료했습니다.')).toBeInTheDocument()
-    expect(within(dialog).getByText('정정 묶음으로 연결했습니다.')).toBeInTheDocument()
+    expect(within(dialog).getByText('정정 내역으로 연결했습니다.')).toBeInTheDocument()
     expect(within(dialog).queryByText(/CG-1|#72/)).not.toBeInTheDocument()
     expect(within(dialog).getByRole('link', { name: /^재기표/ })).toHaveAttribute('href', '/app/journals?selected=72')
   })
@@ -654,7 +652,7 @@ it('action help requires a real action sequence and preserves input for a failed
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled())
   expect(screen.queryByText('1. 검토 시작')).not.toBeInTheDocument()
   await actions.click(screen.getByRole('button', { name: '다음' }))
-  expect(await screen.findByText('서버 처리 확인 · 가이드 완료')).toBeVisible()
+  expect(await screen.findByText('처리 완료')).toBeVisible()
   await actions.click(screen.getByRole('button', { name: '안내 마치기' }))
   expect(await screen.findByText('1. 검토 시작')).toBeVisible()
 })
@@ -689,11 +687,11 @@ it.each(['status', 'sequence', 'pending refresh'])('committed action with %s mis
     await waitFor(() => expect(within(form).queryByRole('option', { name: '검토 시작' })).not.toBeInTheDocument())
     await act(async () => { finish!(response) })
   }
-  expect(await within(form).findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(await within(form).findByText(/저장은 되었지만 결과를 표시하지 못했습니다/)).toBeVisible()
   await waitFor(() => expect(searchPaths().length).toBeGreaterThan(reads))
   expect(within(form).getByRole('button', { name: '처리 저장' })).toBeDisabled()
   fireEvent.submit(form)
-  expect(within(form).getByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(within(form).getByText(/저장은 되었지만 결과를 표시하지 못했습니다/)).toBeVisible()
   expect(requests().filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
 })
 
@@ -711,7 +709,7 @@ it.each([
   await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
   const reads = searchPaths().length
   await actions.click(within(dialog).getByRole('button', { name: '정정 실행' }))
-  expect(await within(dialog).findByText(/서버 정정 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(await within(dialog).findByText(/정정은 되었지만 결과를 표시하지 못했습니다/)).toBeVisible()
   await waitFor(() => expect(searchPaths().length).toBeGreaterThan(reads))
   expect(within(dialog).getByRole('button', { name: '정정 실행' })).toBeDisabled()
   fireEvent.submit(dialog.querySelector('form')!)

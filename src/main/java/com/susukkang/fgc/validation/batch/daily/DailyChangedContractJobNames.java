@@ -14,6 +14,23 @@ public final class DailyChangedContractJobNames {
     // 행의 step_name 값과 반드시 같아야 한다.
     public static final String CHANGED_CONTRACT_STEP_NAME = "changedContractStep";
 
+    /** 일 배치가 처리할 계약의 조건. Reader와 "오늘 처리할 것이 있는가" 판단이 같은 조건을 쓴다. */
+    public static final String CHANGED_CONTRACT_CONDITION = """
+            (c.updated_at > :lastProcessedAt
+             OR EXISTS (
+                 SELECT 1
+                   FROM fgc.contract_status_event e
+                  WHERE e.contract_id = c.contract_id
+                    AND NOT EXISTS (
+                        SELECT 1
+                          FROM fgc.contract_status_event_processing p
+                         WHERE p.contract_status_event_id = e.contract_status_event_id
+                           AND p.processing_job = :jobName
+                           AND p.processing_status = 'SUCCEEDED'
+                    )
+             ))
+            """;
+
     private DailyChangedContractJobNames() {
     }
 }

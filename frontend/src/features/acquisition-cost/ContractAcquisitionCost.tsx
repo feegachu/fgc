@@ -36,7 +36,7 @@ function LegacyContractAcquisitionCost({ contractId, contractNo }: { contractId:
             }}
           >
             <option value="GA_TO_FC">GA→설계사</option>
-            <option value="INSURER_TO_GA">원수사→GA</option>
+            <option value="INSURER_TO_GA">보험회사→GA</option>
           </select>
         </Field>
         {canProcess ? (
@@ -68,7 +68,7 @@ function LegacyContractAcquisitionCost({ contractId, contractNo }: { contractId:
       ) : latest ? (
         <AcquisitionCostResult check={latest} />
       ) : (
-        <p className="empty-state">이 지급단계의 검증 결과가 없습니다. 이 검증이 없어도 예정 스케줄 생성과 조회는 할 수 있습니다.</p>
+        <p className="empty-state">이 지급단계의 검증 결과가 없습니다.</p>
       )}
     </div>
   )

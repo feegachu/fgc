@@ -49,19 +49,23 @@ export async function issueNotice(caseId: number, body: NoticeRequest, idempoten
   }
   return data
 }
-export async function downloadNotice(edition: NoticeDocument) {
+export async function readNoticePdf(edition: NoticeDocument) {
   const { documentNo, version, downloadPath } = edition
   if (!documentNo || !/^[A-Za-z0-9_-]+$/.test(documentNo) || !Number.isSafeInteger(version) || version! < 1) {
-    throw new Error('다운로드할 문서번호와 발행판을 확인할 수 없습니다.')
+    throw new Error('다운로드할 문서번호와 발행본을 확인할 수 없습니다.')
   }
   const expectedPath = `/api/v1/documents/${encodeURIComponent(documentNo)}.pdf?version=${version}`
-  if (downloadPath !== expectedPath) throw new Error('문서의 다운로드 경로와 발행판이 일치하지 않습니다.')
+  if (downloadPath !== expectedPath) throw new Error('문서의 다운로드 경로와 발행본이 일치하지 않습니다.')
   const { blob } = await apiClient.requestPdf(expectedPath)
+  return { blob, filename: `${documentNo}-v${version}.pdf` }
+}
+export async function downloadNotice(edition: NoticeDocument) {
+  const { blob, filename } = await readNoticePdf(edition)
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   try {
     anchor.href = url
-    anchor.download = `${documentNo}-v${version}.pdf`
+    anchor.download = filename
     document.body.append(anchor)
     anchor.click()
   } finally {

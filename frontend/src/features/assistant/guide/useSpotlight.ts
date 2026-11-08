@@ -6,7 +6,7 @@ const HIGHLIGHT_PADDING = 10
 export interface SpotlightPresentation {
   side?: 'right' | 'left' | 'above' | 'below' | 'either'
   includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number
-  fixedCard?: boolean; scrollToTop?: boolean
+  fixedCard?: boolean | 'left'; scrollToTop?: boolean
 }
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
@@ -129,6 +129,37 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const workspaceLeft = Math.max(0, workspace?.left ?? 0)
         const workspaceRight = Math.min(width, workspace?.right || width)
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
+        // The full workflow keeps one coach slot while only the spotlight moves.
+        // Reserve a stable height as well: shorter instructions must not move Next.
+        if (fixedCard === 'left') {
+          const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+          const topBoundary = headerBottom + 16
+          const cardWidth = Math.min(420, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+          const cardHeight = Math.max(0, Math.min(360, height - topBoundary - 16))
+          const cardLeft = cardLeftBoundary + 12
+          const cardTop = height - cardHeight - 16
+          const rect = target?.isConnected ? targetRect() : null
+          setPosition({
+            box: rect ? {
+              left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
+              top: Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
+              width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
+              height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
+            } : null,
+            card: { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, height: cardHeight, maxHeight: cardHeight, overflowY: 'auto' },
+          })
+          if (rect && preparedPresentation !== `${width}:${height}` && !targetInHeader) {
+            preparedPresentation = `${width}:${height}`
+            const overlapsCard = rect.left < cardLeft + cardWidth && rect.right > cardLeft
+            const bottom = overlapsCard ? cardTop - 24 : height - 16
+            const offset = rect.top < topBoundary ? rect.top - topBoundary
+              : rect.bottom > bottom ? Math.max(0, Math.min(rect.bottom - bottom, rect.top - topBoundary)) : 0
+            const modalBody = target?.closest<HTMLElement>('.modal-body')
+            if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
+            else scrollSmoothly(scrollToTop ? -window.scrollY : offset)
+          }
+          return
+        }
         if (full && target?.isConnected) {
           const rect = targetRect()
           const popupWidth = includeLabel ? target.matches('input[type="date"]') ? 300 : 280 : 0

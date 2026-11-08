@@ -34,10 +34,10 @@ it('restores the active tab when closing it is cancelled without losing the draf
 it('guards browser back, month changes and browser unload', async () => {
   const router = setup()
   await act(() => router.navigate(-1))
-  expect(screen.getByRole('dialog', { name: '저장하지 않은 입력이 있어요' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: '저장하지 않은 입력이 있습니다' })).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: '돌아가기' }))
   await act(() => router.navigate('/contracts/new?month=2026-08'))
-  expect(screen.getByRole('dialog', { name: '저장하지 않은 입력이 있어요' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: '저장하지 않은 입력이 있습니다' })).toBeInTheDocument()
   const event = new Event('beforeunload', { cancelable: true })
   fireEvent(window, event)
   expect(event.defaultPrevented).toBe(true)

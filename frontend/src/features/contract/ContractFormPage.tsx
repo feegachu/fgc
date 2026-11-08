@@ -194,10 +194,10 @@ function ContractEditor({
     errors[`statusEvent.${field}`] ?? (statusEvent[field] ? eventErrors[`statusEvent.${field}`] : undefined)
   const disabled = !valid || saving || savedSuccessfully || loadingReferences || Boolean(referenceError) || conflict || missingToken
   const changes = [
-    statusChanged && '상태 사건 기록, 해당 미확정 대상 처리',
+    statusChanged && '상태 변경 기록, 해당 미확정 대상 처리',
     original && changesSchedule(createRequest(form), original) && '산정정보 변경에 따른 스케줄 새 버전',
   ].filter(Boolean)
-  const changeSummary = changes.length ? changes.join(', ') : '계약 정보만 저장(상태 사건, 스케줄 새 버전 없음)'
+  const changeSummary = changes.length ? changes.join(', ') : '계약 정보만 저장(상태 변경, 스케줄 새 버전 없음)'
   useEffect(() => { saveGuide.update(draft, valid && !loadingReferences && !referenceError && !conflict && !missingToken) }, [saveGuide, draft, valid, loadingReferences, referenceError, conflict, missingToken])
   const productTerm = product?.paymentTermMonths
   const hasProductTerm = productTerm != null && Number.isInteger(productTerm) && productTerm > 0
@@ -323,7 +323,7 @@ function ContractEditor({
         setSavedSuccessfully(true)
         clearUnsaved()
         setConfirmSave(false)
-        const message = '서버 저장 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 저장하지 말고 목록에서 저장 결과를 확인하세요.'
+        const message = '저장은 되었지만 결과를 표시하지 못했습니다. 다시 저장하지 말고 목록에서 확인하세요.'
         saveGuide.fail(message)
         setSaveError(message)
         setSaving(false)
@@ -371,8 +371,8 @@ function ContractEditor({
       labelAccessory={
         field === 'standardSurrenderDeductionAmount' ? (
           <EvidenceLink label="표준해약공제액 근거" icon="help">
-            REG-08, 제4-32조제5항 [현행규정]. 표준해약공제액 80% 이상을 공제하는 상품은 1,200% 한도 계산에서 1년
-            경과시점 예상 해약환급금을 합산합니다. REG-12, 제4-32조제6항 [현행규정]. 차익거래 판정에서도 일정 상품의
+            감독규정 제4-32조제5항. 표준해약공제액 80% 이상을 공제하는 상품은 1,200% 한도 계산에서 1년
+            경과시점 예상 해약환급금을 합산합니다. 제4-32조제6항. 차익거래 판정에서도 일정 상품의
             36개월 이내 해지는 해약환급금을 합산합니다.
           </EvidenceLink>
         ) : undefined
@@ -478,7 +478,7 @@ function ContractEditor({
                   error={errors.productOfferingId}
                   labelAccessory={
                     <EvidenceLink label="판매버전 근거" icon="help">
-                      REG-19, 부칙 제2조 [개정고시]. 분급 관련 조항은 시행 후 최초로 작성/변경된 기초서류로서
+                      개정 감독규정 부칙 제2조. 분급 관련 조항은 시행 후 최초로 작성/변경된 기초서류로서
                       판매개시일이 2027-01-01 이후인 상품부터 적용합니다. 1,200%룰/차익거래 적용 여부는 계약 체결일
                       기준으로 별도 판단하므로 계약일에 유효한 판매버전을 선택해야 합니다.
                     </EvidenceLink>
@@ -576,7 +576,7 @@ function ContractEditor({
                     label="효력일시"
                     required
                     error={eventError('effectiveAt')}
-                    helper="실제 효력 시각(한국 시간). 최신 사건의 효력일시 이후, 접수일시 이전이어야 합니다."
+                    helper="실제 효력 시각(한국 시간). 최신 상태 변경의 효력일시 이후, 접수일시 이전이어야 합니다."
                   >
                     <input data-guide-feature="features.contract.contract-form-page.status-event-effective-at"
                       type="datetime-local"
@@ -599,14 +599,14 @@ function ContractEditor({
                       onChange={(event) => changeEvent('receivedAt', event.target.value)}
                     />
                   </Field>
-                  <Field label="사유코드" required error={eventError('reasonCode')}>
+                  <Field label="사유 구분" required error={eventError('reasonCode')}>
                     <select data-guide-feature="features.contract.contract-form-page.status-event-reason-code"
                       name="statusEvent.reasonCode"
                       className="select-control"
                       value={statusEvent.reasonCode}
                       onChange={(event) => changeEvent('reasonCode', event.target.value)}
                     >
-                      <option value="">사유코드를 선택하세요</option>
+                      <option value="">사유 구분을 선택하세요</option>
                       {reasonCodes.map((code) => (
                         <option key={code} value={code}>
                           {statusReasonLabels[code]}
@@ -643,7 +643,6 @@ function ContractEditor({
                 <h2 id="contract-agent-heading" className="surface-title">
                   모집 설계사, 소속
                 </h2>
-                <p>설계사를 선택하면 계약일 기준 소속 조직을 자동으로 채웁니다.</p>
               </div>
             </header>
             <div className="contract-form-fields contract-agent-fields">
@@ -654,13 +653,13 @@ function ContractEditor({
                   error={
                     errors.agentId ??
                     (agentUnavailable
-                      ? '바꾼 계약일에 이 설계사가 활동 중인 FC가 아닙니다. 설계사는 바꿀 수 없으니 계약일을 확인해 주세요.'
+                      ? '바꾼 계약일에 활동 중인 설계사가 아닙니다. 설계사는 바꿀 수 없으니 계약일을 확인해 주세요.'
                       : undefined)
                   }
                   helper={id ? '최초 연결 설계사는 바꿀 수 없습니다.' : undefined}
                   labelAccessory={
                     <EvidenceLink label="모집 설계사 근거" icon="help">
-                      REG-07, 제4-32조제12항제1/2호 [현행규정]. 유지관리수수료/장기유지수수료의 지급 대상은 최초
+                      감독규정 제4-32조제12항제1호, 제2호. 유지관리수수료/장기유지수수료의 지급 대상은 최초
                       모집자로 고정되지 않고 계약을 유지관리하는 모집종사자입니다. 이 화면이 저장하는 값은 계약에 처음
                       연결한 모집 설계사이며 등록 뒤에는 바꿀 수 없습니다. 유지관리 담당 변경과 승계는 이 시스템에서
                       처리하지 않습니다.
@@ -689,7 +688,6 @@ function ContractEditor({
                 label="소속 조직"
                 required
                 error={errors.organizationId}
-                helper="계약일 기준 소속 조직이 자동으로 들어갑니다."
               >
                 <input data-guide-feature="features.contract.contract-form-page.organization-name"
                   name="organizationName"
@@ -709,7 +707,7 @@ function ContractEditor({
                 <h2 id="contract-premium-heading" className="surface-title">
                   보험료, 납입 조건
                 </h2>
-                <p>원주기 보험료와 월납환산 초회보험료를 구분해 입력합니다.</p>
+                <p>납입주기 보험료와 월납환산 초회보험료를 구분해 입력하세요.</p>
               </div>
             </header>
             <div className="contract-form-fields contract-premium-fields">
@@ -783,7 +781,7 @@ function ContractEditor({
         </fieldset>
         <div className="surface contract-form-actions">
           <p id="contract-save-hint" className="contract-save-hint" role="status">
-            {serverSaved ? '서버에 저장되었습니다. 가이드 완료를 확인해 주세요.' : saving
+            {serverSaved ? '저장되었습니다. 안내에서 다음을 누르세요.' : saving
               ? id
                 ? '계약 수정을 저장하고 있습니다.'
                 : '계약과 스케줄을 저장하고 있습니다.'
@@ -799,7 +797,7 @@ function ContractEditor({
                         : '저장할 준비가 되었습니다.'
                       : !referenceError && !Object.keys(draftErrors).length
                         ? '상태 변경 사유의 필수 항목(*)과 일시를 확인해 주세요.'
-                        : '필수 항목(*)과 자동 입력되는 소속 조직을 확인해 주세요.'}
+                        : '필수 항목(*)을 확인해 주세요.'}
           </p>
           <div className="contract-action-buttons" aria-label="계약 취소와 저장">
             {(conflict || missingToken) && (
@@ -862,7 +860,7 @@ function ContractEditor({
             <dd>{statusEvent.receivedAt.replace('T', ' ')}</dd>
           </div>
           <div>
-            <dt>사유코드</dt>
+            <dt>사유 구분</dt>
             <dd>{responseLabel(statusReasonLabels, statusEvent.reasonCode)}</dd>
           </div>
           <div>

@@ -81,7 +81,7 @@ it.each(['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN'])(
     expect(await screen.findByText('발행된 PDF가 없습니다.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'PDF 생성' })).toBeEnabled()
     expect(screen.getByText('0원')).toBeInTheDocument()
-    expect(screen.getAllByText('source-v2')).toHaveLength(2)
+    expect(screen.queryByText('source-v2')).not.toBeInTheDocument()
     expect(request).toHaveBeenCalledTimes(1)
     expect(request.mock.calls[0][0]).toBe('/api/v1/clawbacks/7/notice-documents?page=1&size=20')
   },
@@ -92,7 +92,7 @@ it('COMPLIANCE sees editions and downloads but no issue action', async () => {
   const table = await screen.findByRole('table', { name: '환수 PDF 발행 이력' })
   expect(within(table).getByText('CLN-7')).toBeInTheDocument()
   expect(within(table).getByText('2026-07-31 09:00')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '발행판 v1 다운로드' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: '발행본 v1 다운로드' })).toBeEnabled()
   expect(screen.queryByRole('button', { name: /PDF 생성|재발행/ })).not.toBeInTheDocument()
 })
 
@@ -171,9 +171,9 @@ it('blocks stale source snapshots while keeping old editions downloadable', asyn
     candidate: { ...detail.candidate, sourceVersion: 'new-source', calculationStatus: 'REVIEW_REQUIRED' },
   })
   await screen.findByRole('table', { name: '환수 PDF 발행 이력' })
-  expect(screen.getByText(/현재 원천과 다른 계산판/)).toBeInTheDocument()
+  expect(screen.getByText(/현재 근거와 다른 계산/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: '재발행' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: '발행판 v1 다운로드' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: '발행본 v1 다운로드' })).toBeEnabled()
 })
 
 it.each([401, 403, 409, 422, 500])('shows issuance HTTP %i without adding a successful edition', async (status) => {
@@ -187,7 +187,7 @@ it.each([401, 403, 409, 422, 500])('shows issuance HTTP %i without adding a succ
     status === 403
       ? 'PDF 발행 권한이 없습니다.'
       : status === 409
-        ? '현재 계산판·원천과 발행 요청이 다릅니다. 다시 조회해 주세요.'
+        ? '현재 계산 결과와 근거가 발행 요청과 다릅니다. 다시 조회해 주세요.'
         : status === 422
           ? '발행에 필요한 계산·정책 근거를 확인해 주세요.'
           : 'PDF 발행에 실패했습니다. 응답 유실 시 같은 요청으로 재시도합니다.',
@@ -199,7 +199,7 @@ it.each([401, 403, 409, 422, 500])('shows issuance HTTP %i without adding a succ
     expect(onRefresh).toHaveBeenCalledOnce()
   }
   if (status === 403) expect(screen.queryByRole('button', { name: '발행 재시도' })).not.toBeInTheDocument()
-  if (status === 422) expect(screen.getByText('확인 항목: 대상 계산판')).toBeInTheDocument()
+  if (status === 422) expect(screen.getByText('확인 항목: 대상 계산 결과')).toBeInTheDocument()
 })
 
 it('downloads the exact historical edition and does not save JSON failures as a PDF', async () => {
@@ -210,23 +210,23 @@ it('downloads the exact historical edition and does not save JSON failures as a 
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
   setup(() => history([edition(2), { ...edition(1), calculationVersion: 1 }]))
   await screen.findByRole('table')
-  await userEvent.click(screen.getByRole('button', { name: '발행판 v1 다운로드' }))
+  await userEvent.click(screen.getByRole('button', { name: '발행본 v1 다운로드' }))
   await waitFor(() => expect(click).toHaveBeenCalledOnce())
   expect(pdf).toHaveBeenCalledWith('/api/v1/documents/CLN-7.pdf?version=1')
   expect(create).toHaveBeenCalledWith(blob)
   pdf.mockRejectedValueOnce(failure(404, 'FGC-COMMON-004'))
-  await userEvent.click(screen.getByRole('button', { name: '발행판 v2 다운로드' }))
-  await screen.findByText('요청한 발행판의 파일이 없습니다. 발행 이력을 다시 조회해 주세요.')
+  await userEvent.click(screen.getByRole('button', { name: '발행본 v2 다운로드' }))
+  await screen.findByText('요청한 발행본의 파일이 없습니다. 발행 이력을 다시 조회해 주세요.')
   expect(click).toHaveBeenCalledOnce()
   expect(create).toHaveBeenCalledOnce()
-  expect(screen.getByText(/실제 통지 완료/)).toBeInTheDocument()
+  expect(screen.getByText(/실제 통지가 아니며/)).toBeInTheDocument()
 })
 
 it.each([undefined, 'https://example.com/file.pdf', '/api/v1/documents/CLN-7.pdf?version=2'])(
   'rejects an absent or mismatched download path: %s',
   async (path) => {
     const pdf = vi.spyOn(apiClient, 'requestPdf')
-    await expect(downloadNotice({ ...edition(1), downloadPath: path })).rejects.toThrow('경로와 발행판')
+    await expect(downloadNotice({ ...edition(1), downloadPath: path })).rejects.toThrow('경로와 발행본')
     expect(pdf).not.toHaveBeenCalled()
   },
 )
@@ -297,15 +297,15 @@ it('pages the issue history independently and blocks issue actions while detail 
     totalElements: 21,
     totalPages: 2,
   }))
-  await screen.findByRole('button', { name: '발행판 v21 다운로드' })
+  await screen.findByRole('button', { name: '발행본 v21 다운로드' })
   await userEvent.click(
     within(screen.getByRole('navigation', { name: 'PDF 발행 이력 페이지' })).getByRole('button', {
       name: /^2$/,
     }),
   )
-  await screen.findByRole('button', { name: '발행판 v1 다운로드' })
+  await screen.findByRole('button', { name: '발행본 v1 다운로드' })
   expect(request.mock.calls.at(-1)?.[0]).toContain('page=2&size=20')
   rerender(view(detail, 'SETTLEMENT', true))
   expect(screen.getByRole('button', { name: '재발행' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: '발행판 v1 다운로드' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '발행본 v1 다운로드' })).toBeDisabled()
 })

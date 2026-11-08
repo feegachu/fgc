@@ -4,7 +4,7 @@
  */
 .schedule-list-page {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-4);
 }
 
 .schedule-results-card {
@@ -173,7 +173,7 @@
 
 .schedule-detail-page {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-4);
 }
 
 .schedule-detail-card {
