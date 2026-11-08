@@ -35,6 +35,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -57,6 +58,8 @@ public class AgentHomeService {
     static final String UNKNOWN = "UNKNOWN";
     /** 사람 확인이 필요한 상태 사건. 프로젝트 가정이며 정상화(ACTIVE)·청약 단계는 후보로 만들지 않는다. */
     public static final List<String> REVIEW_EVENT_STATUSES = List.of("UNPAID", "LAPSED", "REVIVED", "CANCELLED", "TERMINATED");
+    // 전체 기간에도 빈 달까지 반환하므로 한 요청의 월별 버킷 수를 제한한다.
+    private static final int MAX_PORTFOLIO_MONTHS = 100 * 12;
     private static final Set<String> PERIODS = Set.of("6", "12", "ALL");
     private static final Set<String> INSURER_TYPES = Set.of("ALL", "LIFE", "NON_LIFE");
     private static final Map<String, String> CATEGORY_LABEL = Map.of(
@@ -82,6 +85,9 @@ public class AgentHomeService {
         long agentId = agentId();
         LocalDate today = LocalDate.now(DateUtil.SEOUL_ZONE);
         LocalDate asOf = asOfParam == null ? today : asOfParam;
+        if (asOf.getYear() < 1 || asOf.getYear() > 9999) {
+            throw invalid("asOf");
+        }
         String period = periodParam == null ? "12" : periodParam;
         String insurerType = insurerTypeParam == null ? "ALL" : insurerTypeParam;
         if (!PERIODS.contains(period)) {
@@ -95,6 +101,10 @@ public class AgentHomeService {
         }
 
         Range range = range(agentId, asOf, period);
+        long months = ChronoUnit.MONTHS.between(YearMonth.from(range.from()), YearMonth.from(range.to())) + 1;
+        if (months > MAX_PORTFOLIO_MONTHS) {
+            throw invalid("asOf");
+        }
         OffsetDateTime asOfEnd = asOf.plusDays(1).atStartOfDay(DateUtil.SEOUL_ZONE).toOffsetDateTime();
         List<String> warnings = new ArrayList<>();
 
