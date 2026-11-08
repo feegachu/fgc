@@ -1,10 +1,10 @@
 import type { StatusTone } from '../../components/StatusBadge'
 import { int } from '../../lib/format'
 /** 정책 후보와 정책 상세 머리 모두 내부 번호 대신 정책 코드와 판으로 보인다. */
-type PolicyName = { policyCode?: string; versionNo?: number }
-export const policyLabel = (policy?: PolicyName) => (policy ? `${policy.policyCode} v${int(policy.versionNo)}` : '선택한 정책')
+type PolicyName = { policyName?: string; versionNo?: number }
+export const policyLabel = (policy?: PolicyName) => (policy ? `${policy.policyName} v${int(policy.versionNo)}` : '선택한 정책')
 export const triggerLabels: Record<string, string> = {
-  STATUS_EVENT: '상태 사건',
+  STATUS_EVENT: '상태 변경',
   ARBITRAGE: '차익거래',
 }
 export const calculationStatuses = [
@@ -19,10 +19,10 @@ export const reviewReasonLabels: Record<string, string> = {
   SCHEDULE_MISSING: '연결된 지급 스케줄 없음',
   PAYMENT_INSTALLMENT_MISSING: '지급 회차가 연결되지 않은 지급 있음',
   PAYMENT_SCOPE_MISMATCH: '지급 귀속 범위 불일치',
-  STATUS_EVENT_SUPERSEDED: '이후 상태 사건으로 대체됨',
-  EVENT_NOT_EFFECTIVE: '사건 효력 전',
+  STATUS_EVENT_SUPERSEDED: '이후 상태 변경으로 대체됨',
+  EVENT_NOT_EFFECTIVE: '변경 효력 전',
   ARBITRAGE_SOURCE_CHANGED: '차익거래 검증 결과 변경',
-  CALCULATION_STALE: '계산 후 원천이 바뀌어 다시 계산 필요',
+  CALCULATION_STALE: '계산 후 근거 자료가 바뀌어 다시 계산 필요',
   POLICY_NOT_OFFERED: '선택한 정책이 이 후보의 적용 정책이 아님',
   PAID_ATTRIBUTION_MISSING: '환수할 기지급 내역 없음',
   ELAPSED_MONTH_NOT_COVERED: '경과월에 맞는 환수 규칙 없음',

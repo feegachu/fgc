@@ -219,8 +219,8 @@ public class ContractQueryRepository {
         return joins(queryFactory.select(Projections.constructor(ContractView.class,
                         c.contractId, c.contractNo, insurer.insurerName, product.productName,
                         c.contractDate, c.monthlyEquivalentFirstPremium,
-                        Expressions.stringTemplate("concat('FC-', lpad(cast({0} as string), 4, '0'), ' ', {1})",
-                                agent.agentId, agent.agentName),
+                        Expressions.stringTemplate("concat({0}, ' (', {1}, ')')",
+                                agent.agentName, agent.agentCode),
                         c.currentStatus, latestCapCheck.resultStatus, c.dataOrigin)).from(c))
                 .where(filters(condition)).orderBy(QuerydslSort.order(sortOf(condition), SORTABLE, insuranceContract.contractId.desc()));
     }

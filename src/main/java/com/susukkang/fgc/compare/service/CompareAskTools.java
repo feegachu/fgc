@@ -487,7 +487,9 @@ final class CompareAskTools {
     }
 
     private static final Pattern AFTER_PARTICLE = Pattern.compile("^\\s*(?:은|는|이|가|인|의)?\\s*");
-    private static final Pattern BEFORE_PARTICLE = Pattern.compile("\\s*(?:은|는|이|가|도|만|인)?\\s*$");
+    /** 표기 바로 앞에서 떼는 조사 한 글자와 공백(정규식 \s 와 같은 글자). */
+    private static final String BEFORE_PARTICLES = "은는이가도만인";
+    private static final String SPACES = " \t\n\u000B\f\r";
     /** '1위예요', '1위이고', '1위,'처럼 순위 표기로 절이 끝나는 꼴. '2위보다'는 비교 기준이라 여기에 들지 않는다. */
     private static final Pattern CLAUSE_END = Pattern.compile("^\\s*(?:이고|이며|이면서|이에요|예요|입니다|이었|였|이야|야|이다|이지만|이라|인데|이므로|이니|이나|[,.!?]|$)");
 
@@ -541,11 +543,8 @@ final class CompareAskTools {
             spans.stream().filter(span -> span.at() == at).forEach(span -> candidates.add(span.rank()));
         }
         if (CLAUSE_END.matcher(normalized.substring(label[2])).find()) {
-            Matcher before = BEFORE_PARTICLE.matcher(normalized.substring(0, label[1]));
-            if (before.find()) {
-                int end = before.start();
-                spans.stream().filter(span -> span.end() == end).forEach(span -> candidates.add(span.rank()));
-            }
+            int end = nameEndBefore(normalized, label[1]);
+            spans.stream().filter(span -> span.end() == end).forEach(span -> candidates.add(span.rank()));
         }
         if (candidates.isEmpty()) {
             // 바로 붙은 이름이 없으면('1위 상품은 A', '1위는 바로 A') 같은 절 안의 첫 이름과 짝짓는다. 접속 표현이 끼거나 비교 상대로 쓰인 이름은 짝이 아니다.
@@ -556,6 +555,25 @@ final class CompareAskTools {
                     .ifPresent(span -> candidates.add(span.rank()));
         }
         return !candidates.isEmpty() && !candidates.contains(label[0]) ? "RANK_MISMATCH" : null;
+    }
+
+    /**
+     * 표기 바로 앞에서 공백, 조사 한 글자, 공백을 거꾸로 뗀 위치. 'A가 1위예요'에서 A가 끝나는 곳이다.
+     * 정규식 \s*(조사)?\s*$ 의 가장 왼쪽 일치 시작과 같다. 그 정규식은 공백이 길면 시작 위치마다 다시 시도해 느려졌다(SonarCloud S8786).
+     */
+    private static int nameEndBefore(String text, int labelStart) {
+        int end = skipSpacesBackward(text, labelStart);
+        if (end > 0 && BEFORE_PARTICLES.indexOf(text.charAt(end - 1)) >= 0) {
+            end = skipSpacesBackward(text, end - 1);
+        }
+        return end;
+    }
+
+    private static int skipSpacesBackward(String text, int end) {
+        while (end > 0 && SPACES.indexOf(text.charAt(end - 1)) >= 0) {
+            end--;
+        }
+        return end;
     }
 
     private static String checkEnumeration(List<Span> spans, List<int[]> group, int regionEnd) {

@@ -130,10 +130,10 @@ function ScheduleDetailView({ id }: { id: string }) {
       reasons.push(header.confirmBlockedReason === 'SCHEDULE_NOT_ACTIVE_PLANNED'
         ? '사용 중인 예정 상태의 스케줄만 확정할 수 있습니다.'
         : header.confirmBlockedReason === 'FGC-IMPL-SCHEDULE_PREVIEW_ONLY'
-          ? '4년·7년 예정판은 지급 확정 대상이 아닙니다.'
-          : '서버에서 확정할 수 없는 상태로 확인했습니다.')
+          ? '4년·7년 예상 스케줄은 지급 확정 대상이 아닙니다.'
+          : '확정할 수 없는 상태입니다.')
     }
-    if (previewOnly) reasons.push('4년·7년 예정판은 지급 확정 대상이 아닙니다.')
+    if (previewOnly) reasons.push('4년·7년 예상 스케줄은 지급 확정 대상이 아닙니다.')
     if (!canProcess) reasons.push('확정과 재생성은 정산담당자와 시스템관리자만 할 수 있습니다.')
     if (header.activeYn !== true) reasons.push('사용 중인 버전이 아닙니다.')
     if (header.status === 'CONFIRMED') reasons.push('이미 확정된 스케줄입니다.')
@@ -209,8 +209,7 @@ function ScheduleDetailView({ id }: { id: string }) {
       <section data-guide-feature="features.schedule.schedule-detail-page.section" className="surface schedule-detail-card" aria-labelledby="schedule-header-title">
         <header className="surface-header schedule-info-header">
           <h2 className="surface-title" id="schedule-header-title">
-            스케줄 기본정보,{' '}
-            <span className="tabular-nums">스케줄 번호 {header ? value(header.scheduleHeaderId) : '-'}</span>
+            스케줄 기본정보
           </h2>
           {/* 지급단계는 이동 컨트롤이다(화면정의서 SCHE-W02, IF-API-28C). */}
           <div className="filter-field schedule-stage-field">
@@ -302,7 +301,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 <th scope="col">지급예정일</th>
                 <th scope="col">수수료 항목</th>
                 <th scope="col">수령자</th>
-                <th scope="col">기준코드</th>
+                <th scope="col">계산 기준</th>
                 <th scope="col" className="is-number">
                   기준금액
                 </th>
@@ -315,16 +314,12 @@ function ScheduleDetailView({ id }: { id: string }) {
                 <th scope="col" className="is-center">
                   상태
                 </th>
-                {/* IF-API-28 ruleRef — 규칙 5 "근거 없는 숫자는 화면에 띄우지 않습니다" */}
-                <th scope="col" className="is-left">
-                  적용 규칙 번호
-                </th>
                 <th scope="col">지급 등록</th>
               </tr>
             </thead>
             <tbody>
               {!header ? (
-                <StateRow columns={14}>
+                <StateRow columns={13}>
                   <InlineState
                     message={loadError ?? '예상 스케줄을 불러오는 중입니다.'}
                     error={Boolean(loadError)}
@@ -332,7 +327,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                   />
                 </StateRow>
               ) : lines.length === 0 ? (
-                <StateRow columns={14}>
+                <StateRow columns={13}>
                   <p className="schedule-inline-state is-empty" role="status">
                     등록된 회차가 없습니다.
                   </p>
@@ -373,7 +368,7 @@ function ScheduleDetailView({ id }: { id: string }) {
                 <td className="is-number tabular-nums">
                   <Money amount={header?.expectedTotal} />
                 </td>
-                <td colSpan={11} />
+                <td colSpan={10} />
               </tr>
             </tfoot>
           </table>
@@ -390,7 +385,7 @@ function ScheduleDetailView({ id }: { id: string }) {
           />
         </fieldset>
       )}
-      {previewOnly && header && <p role="status">정책 정의 {header.installmentCount ?? '-'}회차 · {header.lineCount ?? '-'}행. 실제 정책 구간만 표시하며 빈 회차를 추가하지 않습니다.</p>}
+      {previewOnly && header && <p role="status">정책에 정의된 {header.installmentCount ?? '-'}회차만 표시합니다.</p>}
       <section data-guide-feature="features.schedule.schedule-detail-page.section-3" className="surface schedule-detail-card" aria-labelledby="schedule-versions-title">
         <header className="surface-header">
           <h2 className="surface-title" id="schedule-versions-title">
@@ -489,7 +484,7 @@ function ScheduleDetailView({ id }: { id: string }) {
             committed()
             void client.invalidateQueries({ queryKey: ['schedules'] })
           })
-          if (Number(result.scheduleHeaderId) === Number(id) || !Number.isSafeInteger(result.versionNo) || result.versionNo! <= (header?.scheduleVersionNo ?? 0)) throw new Error('서버 응답에서 새 스케줄 버전을 확인하지 못했습니다. 목록을 새로 조회하세요.')
+          if (Number(result.scheduleHeaderId) === Number(id) || !Number.isSafeInteger(result.versionNo) || result.versionNo! <= (header?.scheduleVersionNo ?? 0)) throw new Error('새 스케줄 버전을 확인하지 못했습니다. 목록을 새로 조회하세요.')
           return result.scheduleHeaderId!
         }}
         onComplete={(newId) => {
@@ -600,9 +595,8 @@ function LineRow({ line, paymentHref }: { line: ScheduleLine; paymentHref?: stri
       <td className="is-left tabular-nums">{line.calculationType === 'FIXED' ? <Money amount={line.fixedAmount} /> : line.ratePct == null ? EMPTY : `${rate(line.ratePct)}%`}</td>
       <td className="is-center">
         <ScheduleStatusBadge code={line.lineStatus} label={responseLabel(null, LINE_STATUS, line.lineStatus)} />
-        {line.sourceStatusEventId != null && <small className="schedule-source-event">원천 사건 #{line.sourceStatusEventId}</small>}
+        {line.sourceStatusEventId != null && <small className="schedule-source-event">상태 변경 있음</small>}
       </td>
-      <td className="is-left tabular-nums">{line.ruleRef == null ? EMPTY : int(line.ruleRef)}</td>
       <td>
         {paymentHref && (
           <Link data-guide-feature="features.schedule.schedule-detail-page.link-2" className="button button-ghost" to={paymentHref} aria-label={`${line.lineNo}번 회차 지급 등록`}>
@@ -754,7 +748,7 @@ function RegenerateModal({
     meta: { errorToast: false },
     onError: (caught) => {
       if (stored.current) {
-        const message = '서버 생성 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 생성하지 말고 목록에서 새 버전을 확인하세요.'
+        const message = '생성은 되었지만 결과를 표시하지 못했습니다. 다시 생성하지 말고 목록에서 새 버전을 확인하세요.'
         saveGuide.fail(message)
         setError(message)
         toast(message, 'warning')
@@ -809,10 +803,9 @@ function RegenerateModal({
       }
     >
       <ScreenHelp screenId="SCHE-W02" variant="regenerate" saveGuide={saveGuide} />
-      {saved && <p role="status">서버에서 새 스케줄 버전을 생성했습니다. 가이드 완료를 확인하세요.</p>}
+      {saved && <p role="status">새 스케줄 버전을 만들었습니다. 안내에서 다음을 누르세요.</p>}
       <p className="schedule-modal-description">
-        기존 스케줄은 그대로 두고 버전 번호를 올린 새 스케줄을 만듭니다. 지난 버전을 지우지 않으므로 당시 금액의 근거도
-        계속 확인할 수 있습니다.
+        기존 스케줄은 남기고 새 버전을 만듭니다.
       </p>
       <div className={`field ${error ? 'is-error' : ''}`}>
         <label className="field-label" htmlFor="regenerate-reason">

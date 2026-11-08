@@ -56,7 +56,7 @@ function OriginalJournal({ journal }: { journal: JournalDetail }) {
         <strong className={`journal-correction-validation ${journal.balanced ? 'is-valid' : 'is-invalid'}`}>
           {journal.balanced ? '차변/대변 검증 통과' : '차변/대변 검증 필요'}
         </strong>
-        {journal.correctionGroupKey && <span className="text-secondary">정정 묶음 있음</span>}
+        {journal.correctionGroupKey && <span className="text-secondary">정정 내역 있음</span>}
         {journal.reversedByJournalHeaderId && (
           <Link data-guide-feature="features.exception.journal-correction-modal.link" className="button button-ghost" to={`/journals?selected=${journal.reversedByJournalHeaderId}`}>
             역분개 {journal.reversedByJournalNo}
@@ -223,10 +223,10 @@ function CorrectionBody({
     onSuccess: async (done) => {
       clearUnsaved()
       try {
-        if (!Number.isSafeInteger(done.actionSeq) || Number(done.actionSeq) <= 0 || done.actionType !== 'CORRECT' || done.originalJournalHeaderId !== journal.journalHeaderId || done.toStatus !== 'RESOLVED' || !Number.isSafeInteger(done.reversalJournalHeaderId) || Number(done.reversalJournalHeaderId) <= 0 || !Number.isSafeInteger(done.repostedJournalHeaderId) || Number(done.repostedJournalHeaderId) <= 0) throw new Error('서버 원장 정정 결과를 확인하지 못했습니다.')
+        if (!Number.isSafeInteger(done.actionSeq) || Number(done.actionSeq) <= 0 || done.actionType !== 'CORRECT' || done.originalJournalHeaderId !== journal.journalHeaderId || done.toStatus !== 'RESOLVED' || !Number.isSafeInteger(done.reversalJournalHeaderId) || Number(done.reversalJournalHeaderId) <= 0 || !Number.isSafeInteger(done.repostedJournalHeaderId) || Number(done.repostedJournalHeaderId) <= 0) throw new Error('원장 정정 결과를 확인하지 못했습니다.')
         if (mounted.current) await saveGuide.saved(Number(done.repostedJournalHeaderId))
       } catch {
-        const message = '서버 정정 성공 응답을 받았지만 결과 확인이 필요합니다. 다시 실행하지 말고 정정 이력을 확인한 뒤 화면을 다시 여세요.'
+        const message = '정정은 되었지만 결과를 표시하지 못했습니다. 다시 실행하지 말고 정정 이력을 확인한 뒤 화면을 다시 여세요.'
         if (mounted.current) {
           setNeedsRefresh(true)
           saveGuide.fail(message)
@@ -377,7 +377,7 @@ function CorrectionBody({
               {result ? (
                 <div className="journal-correction-result" role="status">
                   <span>역분개와 재기표를 완료했습니다.</span>
-                  <span className="text-secondary">정정 묶음으로 연결했습니다.</span>
+                  <span className="text-secondary">정정 내역으로 연결했습니다.</span>
                   {/* 결과 응답에는 분개번호가 없다. 정정 뒤 다시 불러온 원분개 상세의 번호를 쓴다. */}
                   <Link data-guide-feature="features.exception.journal-correction-modal.link-3" className="button button-ghost" to={`/journals?selected=${result.originalJournalHeaderId}`}>
                     원분개 {journal.journalNo}
@@ -390,9 +390,9 @@ function CorrectionBody({
                   </Link>
                 </div>
               ) : item.status === 'REJECTED' ? (
-                <p>오탐/반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
+                <p>예외 아님/반려로 종결되어 역분개와 신규 재기표는 실행되지 않았습니다.</p>
               ) : item.status === 'RESOLVED' ? (
-                <p>정정이 완료된 예외입니다. 원분개의 정정 묶음과 연결 분개를 확인하세요.</p>
+                <p>정정이 완료된 예외입니다. 원분개의 정정 내역과 연결 분개를 확인하세요.</p>
               ) : (
                 <p>검토를 시작하면 신규 분개를 입력할 수 있습니다.</p>
               )}

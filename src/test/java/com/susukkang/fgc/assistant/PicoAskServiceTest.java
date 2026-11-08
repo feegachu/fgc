@@ -499,7 +499,7 @@ class PicoAskServiceTest {
         var question = "환수 후보 근거는 어디에서 보나요?";
         var guide = catalog.definitions().stream().filter(g -> g.workflowId().equals("clawback.review")).findFirst().orElseThrow();
         var numbered = catalog.chunks(guide, question, List.of("GA_ADMIN")).stream()
-                .filter(chunk -> chunk.title().contains("③")).findFirst().orElseThrow();
+                .filter(chunk -> chunk.title().contains("후보 근거")).findFirst().orElseThrow();
         when(gateway.call(any(),eq(PicoAskService.GuideSelection.class)))
                 .thenReturn(new PicoAskService.GuideSelection(List.of("clawback.review"), false));
         when(gateway.call(any(),eq(PicoAskService.ModelAnswer.class)))

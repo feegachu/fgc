@@ -1,3 +1,5 @@
+export const UPPER_BOUND_NOTE = '지급예정액 상한은 연결이 불명확한 지급을 차감하지 않은 금액입니다. 자료 확인 전에는 확정된 잔여액으로 해석하지 마세요.'
+
 /** 저장된 기준만 설명한다. 금액·판정이나 과거 검증 결과를 재계산하지 않는다. */
 export function plannedBasisPresentation(basis: string | null | undefined) {
   switch (basis) {

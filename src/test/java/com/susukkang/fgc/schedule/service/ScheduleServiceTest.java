@@ -417,7 +417,7 @@ class ScheduleServiceTest {
                 FgcErrorCode.CAP_004,
                 "paymentStage",
                 Map.of("contractId", 20L),
-                "적용 가능한 1,200% 룰셋이 없습니다."
+                "적용 가능한 1,200% 한도 규칙이 없습니다."
         ));
 
         assertThatThrownBy(() -> scheduleService.confirmSchedule(10L))
@@ -426,7 +426,7 @@ class ScheduleServiceTest {
 
         verify(scheduleReviewService).registerCapReviewBeforeCommit(
                 20L, PaymentStage.GA_TO_FC, "POLICY_MISSING",
-                "1,200% 룰셋 검토 필요 - GA_TO_FC", "적용 가능한 1,200% 룰셋이 없습니다.");
+                "1,200% 한도 규칙 검토 필요 - GA_TO_FC", "적용 가능한 1,200% 한도 규칙이 없습니다.");
         verify(scheduleWriteRepository, never()).confirmPlannedScheduleLines(any());
         verify(scheduleWriteRepository, never()).confirmScheduleHeader(any());
     }

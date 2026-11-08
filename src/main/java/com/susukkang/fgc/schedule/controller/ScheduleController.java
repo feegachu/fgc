@@ -2,6 +2,7 @@ package com.susukkang.fgc.schedule.controller;
 
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.code.PaymentStage;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.CsvExportWriter;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -26,6 +27,12 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/schedules")
 public class ScheduleController {
+
+    /** frontend/src/features/schedule/labels.ts 의 GENERATION_REASON 과 같다. 사용자가 적은 재생성 사유는 그대로 나간다. */
+    private static final java.util.Map<String, String> GENERATION_REASON_LABELS = java.util.Map.of(
+            "CONTRACT_CREATED", "계약 등록",
+            "CONTRACT_UPDATED", "계약 수정",
+            "CONTRACT_DETAIL_MANUAL", "계약 상세에서 재생성");
 
     private final ScheduleService scheduleService;
     /**
@@ -54,10 +61,10 @@ public class ScheduleController {
                     schedule.getSchedulePurposeLabel(), schedule.getStatusLabel(), schedule.getPolicyVersionLabel(),
                     schedule.getScheduleVersionNo(), schedule.getInstallmentCount(), schedule.getExpectedTotal(),
                     Boolean.TRUE.equals(schedule.getActiveYn()) ? "사용중" : "미사용",
-                    schedule.getGenerationReason(), schedule.getGeneratedAt()
+                    GENERATION_REASON_LABELS.getOrDefault(schedule.getGenerationReason(), schedule.getGenerationReason()), schedule.getGeneratedAt()
             ));
         }
-        String filename = "예상스케줄목록_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+        String filename = "예상스케줄목록_" + LocalDateTime.now(DateUtil.SEOUL_ZONE).format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())

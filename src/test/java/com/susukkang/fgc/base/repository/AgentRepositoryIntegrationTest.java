@@ -321,7 +321,7 @@ class AgentRepositoryIntegrationTest {
                 ), asOf, asOf);
 
         assertThat(activeFcs).extracting(SeedFc::agentCode)
-                .containsExactly("A-FC-001", "A-FC-002", "A-FC-003");
+                .containsExactly("A-FC-001", "A-FC-002", "A-FC-003", "A-FC-005", "A-FC-006");
 
         activeFcs.forEach(fc -> {
             assertThat(agentRepository.findActiveAgentIdFromOrganizationHierarchy(

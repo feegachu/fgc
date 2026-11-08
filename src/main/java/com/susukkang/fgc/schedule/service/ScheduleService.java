@@ -251,14 +251,14 @@ public class ScheduleService {
             if (requireAllStages) throw new FgcBusinessException(
                     FgcErrorCode.IMPL_SCHEDULE_REVIEW_REQUIRED, SCHEDULE_HEADER_ID,
                     Map.of(REASON, "DATA_QUALITY"),
-                    stage + ": 취소된 예정판은 자동 재생성하지 않습니다. 원천과 처리 사유를 확인하세요.");
+                    stage + ": 취소된 예상 스케줄은 자동 재생성하지 않습니다. 원천과 처리 사유를 확인하세요.");
             scheduleReviewService.registerCapReviewBeforeCommit(contract.getContractId(), stage, "DATA_QUALITY",
-                    "취소 예정판 자동 생성 검토 필요", "취소된 예정판은 자동 재생성하지 않습니다. 원천과 처리 사유를 확인하세요.");
+                    "취소 예상 스케줄 자동 생성 검토 필요", "취소된 예상 스케줄은 자동 재생성하지 않습니다. 원천과 처리 사유를 확인하세요.");
             return new ScheduleGenerationResult(List.of(), 0);
         }
         if (previews.hasCalculation(old, calculationFingerprint(contract.getContractId(), selected)))
             return new ScheduleGenerationResult(List.of(), 0);
-        var header = persistPreview(contract, stage, selected, "계약·배치 원천 및 승인 정책 반영");
+        var header = persistPreview(contract, stage, selected, "계약과 승인된 정책 반영");
         int lines = policy.getRules().stream().mapToInt(rule -> rule.getInstallmentTo() - rule.getInstallmentFrom() + 1).sum();
         return new ScheduleGenerationResult(List.of(header.getScheduleHeaderId()), lines);
     }
@@ -1070,7 +1070,7 @@ public class ScheduleService {
             );
         }
 
-        return contractDate.plusMonths(installmentNo-1);
+        return contractDate.plusMonths(installmentNo-1L);
     }
     /**
      * 설명 : 계약, 지급 단계 및 수수료 규칙을 기준으로 실제 수수료 수령 설계사 ID를 결정한다.
@@ -1421,7 +1421,7 @@ public class ScheduleService {
                 contractId,
                 paymentStage,
                 POLICY_MISSING,
-                "1,200% 룰셋 검토 필요 - " + paymentStage.name(),
+                "1,200% 한도 규칙 검토 필요 - " + paymentStage.name(),
                 description
         );
         if (affectedRows != 1) {
@@ -1490,9 +1490,9 @@ public class ScheduleService {
                     header.getContractId(),
                     header.getPaymentStage(),
                     POLICY_MISSING,
-                    "1,200% 룰셋 검토 필요 - " + header.getPaymentStage().name(),
+                    "1,200% 한도 규칙 검토 필요 - " + header.getPaymentStage().name(),
                     exception.getDetail() == null
-                            ? "적용 가능한 1,200% 룰셋이 없습니다."
+                            ? "적용 가능한 1,200% 한도 규칙이 없습니다."
                             : exception.getDetail()
             );
             throw new ScheduleConfirmationRejectedException(FgcErrorCode.SCHE_004);

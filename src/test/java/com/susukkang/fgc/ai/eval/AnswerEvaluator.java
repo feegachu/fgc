@@ -426,7 +426,7 @@ final class AnswerEvaluator {
         md.append("\n## 질문 유형별\n\n| 유형 | 사례 | PASS | FAIL | 판정 불가 |\n|---|---|---|---|---|\n");
         run.types().forEach(row -> md.append("| ").append(row.type()).append(" | ").append(row.cases()).append(" | ")
                 .append(row.pass()).append(" | ").append(row.fail()).append(" | ").append(row.inconclusive()).append(" |\n"));
-        md.append("\n## 처리 시간 (PER-008, 목표는 프로젝트 가정)\n\n| 항목 | 표본 | 평균(ms) | p95(ms) | 목표(ms) | p95 판정 |\n|---|---|---|---|---|---|\n");
+        md.append("\n## 처리 시간 (PER-008, 목표는 자체 기준)\n\n| 항목 | 표본 | 평균(ms) | p95(ms) | 목표(ms) | p95 판정 |\n|---|---|---|---|---|---|\n");
         run.latency().forEach(row -> md.append("| ").append(row.metric()).append(" | ").append(row.samples()).append(" | ")
                 .append(row.meanMs()).append(" | ").append(row.p95Ms()).append(" | ")
                 .append(row.targetMs() == null ? "-" : row.targetMs()).append(" | ").append(row.overTarget()).append(" |\n"));

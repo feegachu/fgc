@@ -138,7 +138,7 @@ test('1440폭에서 읽어야 할 열이 가로 스크롤 뒤로 가지 않고 �
 
   // VRUN-W01: 상세로 가는 길인 열기와 실패 사유
   await page.goto(`validation-runs?month=${month}`)
-  await expect(page.getByRole('link', { name: /회차 실행 열기$/ }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: /차 실행 열기$/ }).first()).toBeVisible()
   await expect.poll(() => hiddenPixels(page, ['상세', '실패 사유'])).toEqual({ 상세: 0, '실패 사유': 0 })
 
   // EXCP-W01: 오른쪽 패널을 연 기본 분할에서 내용, 상태, 담당자

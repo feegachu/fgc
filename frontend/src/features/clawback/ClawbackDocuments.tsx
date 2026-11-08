@@ -12,8 +12,8 @@ import type { CandidateDetail, NoticeDocument } from './api'
 
 const writers = ['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN']
 const fieldLabels: Record<string, string> = {
-  calculationVersion: '대상 계산판',
-  expectedSourceVersion: '현재 원천 버전',
+  calculationVersion: '대상 계산 결과',
+  expectedSourceVersion: '현재 근거',
   policyVersionId: '계산 정책',
 }
 type Props = {
@@ -123,19 +123,11 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
           </dd>
         </div>
         <div>
-          <dt>대상 계산판</dt>
+          <dt>대상 계산 결과</dt>
           <dd>
             {calculation ? `v${int(calculation.calculationVersion)}` : '미계산'}
-            {calculation && !current ? ' (현재 원천과 다른 계산판)' : ''}
+            {calculation && !current ? ' (현재 근거와 다른 계산)' : ''}
           </dd>
-        </div>
-        <div>
-          <dt>계산 원천 버전</dt>
-          <dd>{calculation?.sourceVersion ?? '자료 없음'}</dd>
-        </div>
-        <div>
-          <dt>현재 원천 버전</dt>
-          <dd>{candidate?.sourceVersion ?? '자료 없음'}</dd>
         </div>
         <div>
           <dt>계산액 · 계산일</dt>
@@ -146,13 +138,13 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
         </div>
       </dl>
       <p className="claw-evidence-empty">
-        내부 검토용 가상 양식입니다. PDF 발행·다운로드는 실제 통지 완료를 뜻하지 않으며 환수 상태를 변경하지 않습니다.
+        내부 검토용입니다. 실제 통지가 아니며 환수 상태를 바꾸지 않습니다.
       </p>
       {!calculation ? (
         <p className="claw-evidence-empty">환수액 계산 후 PDF를 생성할 수 있습니다.</p>
       ) : !current ? (
         <p role="status" className="claw-evidence-empty">
-          원천이 변경되었거나 현재 발행 조건을 충족하지 않습니다. 다시 조회하고 최신 근거로 계산해 주세요.
+          근거 자료가 바뀌었거나 현재 발행 조건을 충족하지 않습니다. 다시 조회하고 최신 근거로 계산해 주세요.
         </p>
       ) : null}
       <div className="claw-calculation-actions">
@@ -188,20 +180,20 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
             {isStatus(issue.error, 403)
               ? 'PDF 발행 권한이 없습니다.'
               : conflict
-                ? '현재 계산판·원천과 발행 요청이 다릅니다. 다시 조회해 주세요.'
+                ? '현재 계산 결과와 근거가 발행 요청과 다릅니다. 다시 조회해 주세요.'
                 : isStatus(issue.error, 422)
                   ? '발행에 필요한 계산·정책 근거를 확인해 주세요.'
                   : 'PDF 발행에 실패했습니다. 응답 유실 시 같은 요청으로 재시도합니다.'}
           </p>
           <QueryState error={issue.error} />
-          {issue.error instanceof ApiError && issue.error.field && (
-            <p>확인 항목: {fieldLabels[issue.error.field] ?? issue.error.field}</p>
+          {issue.error instanceof ApiError && issue.error.field && fieldLabels[issue.error.field] && (
+            <p>확인 항목: {fieldLabels[issue.error.field]}</p>
           )}
         </div>
       )}
       {issue.data && (
         <p role="status" className="claw-evidence-empty">
-          PDF 발행 완료: {issue.data.documentNo} · 발행판 v{issue.data.version} · 계산판 v
+          PDF 발행 완료: {issue.data.documentNo} · 발행본 v{issue.data.version} · 계산 결과 v
           {issue.data.calculationVersion}
         </p>
       )}
@@ -227,9 +219,8 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
           rowKey={(row) => `${row.documentNo}:${row.version}`}
           columns={[
             { key: 'no', label: '문서번호', render: (row) => row.documentNo ?? '자료 없음' },
-            { key: 'edition', label: '발행판', render: (row) => `v${int(row.version)}` },
-            { key: 'calculation', label: '계산판', render: (row) => `v${int(row.calculationVersion)}` },
-            { key: 'by', label: '발행자 번호', render: (row) => row.createdBy ?? '자료 없음' },
+            { key: 'edition', label: '발행본', render: (row) => `v${int(row.version)}` },
+            { key: 'calculation', label: '계산 결과', render: (row) => `v${int(row.calculationVersion)}` },
             { key: 'at', label: '발행일시', render: (row) => dateTime(row.createdAt) },
             {
               key: 'download',
@@ -238,7 +229,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
                 <Button
                   data-guide-feature="clawback.documents.download"
                   variant="secondary"
-                  aria-label={`발행판 v${row.version} 다운로드`}
+                  aria-label={`발행본 v${row.version} 다운로드`}
                   disabled={refreshing || Boolean(downloading)}
                   loading={downloading === `${row.documentNo}:${row.version}`}
                   onClick={() => void download(row)}
@@ -264,7 +255,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
         <div className="claw-document-message" role="alert">
           <p>
             {isStatus(downloadError, 404)
-              ? '요청한 발행판의 파일이 없습니다. 발행 이력을 다시 조회해 주세요.'
+              ? '요청한 발행본의 파일이 없습니다. 발행 이력을 다시 조회해 주세요.'
               : isStatus(downloadError, 403)
                 ? 'PDF 다운로드 권한이 없습니다.'
                 : 'PDF 다운로드에 실패했습니다. 파일은 저장하지 않았습니다.'}

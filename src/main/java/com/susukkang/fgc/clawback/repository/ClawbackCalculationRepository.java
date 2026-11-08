@@ -147,7 +147,7 @@ public class ClawbackCalculationRepository {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("환수 계산판을 저장할 수 없습니다.", e);
+            throw new IllegalStateException("환수 계산 결과를 저장할 수 없습니다.", e);
         }
     }
 
@@ -156,7 +156,7 @@ public class ClawbackCalculationRepository {
             return objectMapper.readerFor(Calculation.class)
                     .with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readValue(json);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("환수 계산판을 읽을 수 없습니다.", e);
+            throw new IllegalStateException("환수 계산 결과를 읽을 수 없습니다.", e);
         }
     }
 }

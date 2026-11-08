@@ -149,7 +149,6 @@ function BasisContent({ data }: { data: CapBasis }) {
     ['한도 배수', `${multiplier}배`, false],
     ['해약환급금 합산', won(item.refund12mAmount), true],
     ['준법경영비 공제', insurerStage ? won(item.complianceDeductionAmount) : '적용하지 않음', insurerStage],
-    ['적용 룰셋', item.capRuleSetId == null ? '-' : `룰셋 ${item.capRuleSetId}번`, false],
   ] as const
   return (
     <div className="cap-react-detail">
@@ -157,14 +156,12 @@ function BasisContent({ data }: { data: CapBasis }) {
         <strong>{item.contractNo || '-'}</strong>
         <span>{item.paymentStageLabel || STAGES[item.paymentStage as keyof typeof STAGES] || '-'}</span>
         <CapStatus code={item.resultStatus} label={item.resultStatusLabel} />
-        <p>
-          기준일 {date(item.asOfDate)}, 룰셋 {item.capRuleSetId == null ? '-' : `${item.capRuleSetId}번`}
-        </p>
+        <p>기준일 {date(item.asOfDate)}</p>
       </header>
       <div className="cap-react-detail-grid">
         <div className="cap-react-detail-left">
           <section data-guide-feature="features.cap.cap-detail-modal.section-2" className="surface">
-            <h3>① 입력값</h3>
+            <h3>입력값</h3>
             <table data-guide-feature="features.cap.cap-detail-modal.table" className="data-table">
               <tbody>
                 {inputs.map(([label, value, monetary]) => (
@@ -178,7 +175,7 @@ function BasisContent({ data }: { data: CapBasis }) {
           </section>
           <section data-guide-feature="features.cap.cap-detail-modal.section-3" className="surface">
             <h3>
-              ② 계산식 <CapEvidence />
+              계산식 <CapEvidence />
             </h3>
             <p>
               한도 = {limitParts.join(' ')} = {won(item.limitAmount)}
@@ -189,9 +186,9 @@ function BasisContent({ data }: { data: CapBasis }) {
             <p>= {usageRate(item.usagePct)}%</p>
           </section>
           <section data-guide-feature="features.cap.cap-detail-modal.section-4" className="surface">
-            <h3>④ 합계와 판정</h3>
+            <h3>합계와 판정</h3>
             <CapUsage value={item.usagePct} status={item.resultStatus} warning={data.warningStartUsagePct} />
-            {snapshot.warningUsagePct != null && <p>주의 기준 (1,200% 예산) {rate(snapshot.warningUsagePct)}%</p>}
+            {snapshot.warningUsagePct != null && <p>주의 기준 {rate(snapshot.warningUsagePct)}%</p>}
             <dl>
               <div>
                 <dt>산입 합계</dt>
@@ -217,7 +214,7 @@ function BasisContent({ data }: { data: CapBasis }) {
         </div>
         <section data-guide-feature="features.cap.cap-detail-modal.section-5" className="surface cap-react-detail-lines">
           <h3>
-            ③ 항목별 산입 내역 <small>{int(details.length)}개 항목</small>
+            항목별 산입 내역 <small>{int(details.length)}개 항목</small>
           </h3>
           <DataTable
             caption="항목별 산입 내역"

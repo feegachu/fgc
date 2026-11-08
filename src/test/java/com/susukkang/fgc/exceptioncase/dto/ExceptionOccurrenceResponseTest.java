@@ -64,7 +64,7 @@ class ExceptionOccurrenceResponseTest {
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::label)
                 .containsExactly("지급단계", "결과상태", "한도액");
         assertThat(items).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
-                .containsExactly("원수사→GA", label, "1,000원");
+                .containsExactly("보험회사→GA", label, "1,000원");
         assertThat(response.evidenceJson()).isEqualTo(evidenceJson);
         assertThat(response.detectionLabel()).isEqualTo("신규");
     }
@@ -76,9 +76,9 @@ class ExceptionOccurrenceResponseTest {
                 """).evidenceItems()).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
                 .containsExactly("FUTURE_STAGE", "FUTURE_STATUS");
         assertThat(withEvidence("""
-                {"paymentStage":"원수사→GA","resultStatus":"위반"}
+                {"paymentStage":"보험회사→GA","resultStatus":"위반"}
                 """).evidenceItems()).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)
-                .containsExactly("원수사→GA", "위반");
+                .containsExactly("보험회사→GA", "위반");
         assertThat(withEvidence("""
                 {"paymentStage":"","resultStatus":null}
                 """).evidenceItems()).extracting(ExceptionOccurrenceResponse.EvidenceItem::value)

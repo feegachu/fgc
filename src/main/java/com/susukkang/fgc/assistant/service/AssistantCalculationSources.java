@@ -308,7 +308,7 @@ public class AssistantCalculationSources {
             new PaymentCalculationSnapshot.Source(
                 "schedule:" + detail.getScheduleHeaderId(),
                 "SCHEDULE",
-                "활성 운영 스케줄",
+                "사용 중인 예상 스케줄",
                 str(detail.getHeader().getGeneratedAt()),
                 str(detail.getScheduleHeaderId())),
             dates.size() == 1 ? dates.getFirst().toString() : null,

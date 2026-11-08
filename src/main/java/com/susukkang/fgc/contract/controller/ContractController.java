@@ -2,6 +2,7 @@ package com.susukkang.fgc.contract.controller;
 
 import com.susukkang.fgc.auth.dto.FgcUserDetails;
 import com.susukkang.fgc.common.security.Roles;
+import com.susukkang.fgc.common.util.DateUtil;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.common.web.CsvExportWriter;
 import com.susukkang.fgc.common.web.PageResponse;
@@ -65,7 +66,7 @@ public class ContractController {
                     contract.getContractDate(), contract.getMonthlyEquivalentFirstPremium(), contract.getAgentIdName(),
                     contract.getContractStatus() == null ? null : contract.getContractStatus().label(),
                     contract.getCapResultStatus() == null ? null : contract.getCapResultStatus().label(),
-                    contract.getDataOrigin()
+                    contract.getDataOriginLabel()
             ));
         }
         return csvAttachment("보험계약목록", List.of(
@@ -74,7 +75,7 @@ public class ContractController {
     }
 
     private static ResponseEntity<byte[]> csvAttachment(String prefix, List<String> headers, List<List<?>> rows) {
-        String filename = prefix + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
+        String filename = prefix + "_" + LocalDateTime.now(DateUtil.SEOUL_ZONE).format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv";
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build().toString())

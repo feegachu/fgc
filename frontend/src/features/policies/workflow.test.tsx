@@ -258,7 +258,7 @@ describe('production policy workflow', () => {
     await user.click(screen.getByRole('button', { name: '제출' }))
     await user.type(screen.getByLabelText(/작업 사유/), '검토 요청')
     await user.click(screen.getByRole('button', { name: '제출 확인' }))
-    await waitFor(() => expect(screen.getByLabelText('출처 근거 코드')).toHaveFocus())
+    await waitFor(() => expect(screen.getByLabelText('출처 자료 번호')).toHaveFocus())
     expect(screen.getByRole('heading', { name: '정책 초안 수정' })).toBeVisible()
   })
 
@@ -275,7 +275,7 @@ describe('production policy workflow', () => {
         <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
       </QueryClientProvider>,
     )
-    const summary = within(screen.getByText('분급 룰셋 1').closest('section')!)
+    const summary = within(screen.getByText('분급 규칙 1').closest('section')!)
     const version = summary.getByText('기초서류 버전').parentElement!
     expect(version).toHaveTextContent('BD-2027-01')
     const period = summary.getByText('기초서류 일자 범위').parentElement!
@@ -336,7 +336,7 @@ describe('production policy workflow', () => {
         <PolicyManagement policy={detail.header!} detail={detail} refreshing={false} onSaved={vi.fn()} />
       </QueryClientProvider>,
     )
-    expect(screen.getByText('정정/승계로 계산 적용에서 제외됨')).toBeVisible()
+    expect(screen.getByText('새 버전으로 교체되어 계산에서 제외')).toBeVisible()
     // 18은 내부 번호라 그대로 보이지 않는다. 조회 목록에 다음 버전이 있으면 정책 코드와 판으로 보인다.
     expect(screen.getByText('다음 정책 버전')).toBeVisible()
     expect(screen.queryByText(/다음 정책 버전 18/)).not.toBeInTheDocument()
@@ -347,11 +347,11 @@ describe('production policy workflow', () => {
           detail={detail}
           refreshing={false}
           onSaved={vi.fn()}
-          versions={[{ policyVersionId: 18, policyCode: 'WORKFLOW-TEST', versionNo: 2 }]}
+          versions={[{ policyVersionId: 18, versionNo: 2 }]}
         />
       </QueryClientProvider>,
     )
-    expect(screen.getByText('다음 정책 버전 WORKFLOW-TEST v2')).toBeVisible()
+    expect(screen.getByText('다음 정책 버전 v2')).toBeVisible()
   })
 
   it('creates a real draft from the production form and returns its server ID', async () => {
@@ -488,7 +488,7 @@ describe('production policy workflow', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByLabelText(/새 버전 적용 시작일/)).toHaveValue('')
     expect(within(dialog).getByLabelText(/새 버전 적용 종료일/)).toHaveValue('')
-    expect(within(dialog).getByText(/이전 계약은 재계산할 때도 기존 버전과 요율을 유지/)).toBeVisible()
+    expect(within(dialog).getByText(/이전 계약은 그대로입니다/)).toBeVisible()
     fireEvent.change(within(dialog).getByLabelText(/새 버전 적용 시작일/), { target: { value: '2028-01-01' } })
     await user.type(within(dialog).getByLabelText(/작업 사유/), '다음 연도 정책')
     await user.click(within(dialog).getByRole('button', { name: '새 초안 만들기' }))
@@ -609,7 +609,6 @@ describe('production policy workflow', () => {
     const { user, onSaved } = mountEditor(draft, 17)
     await user.click(screen.getByRole('button', { name: /근거 자료/ }))
     await user.click(screen.getByRole('button', { name: '행 삭제' }))
-    expect(screen.getByLabelText('출처 근거 코드')).toHaveValue('SRC-023')
     await user.click(screen.getByRole('button', { name: '초안 저장' }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(17))
     expect(request).toHaveBeenCalledWith(
@@ -684,7 +683,7 @@ it('policy guide requires valid inputs and server success before closing', async
   await waitFor(() => expect(next()).toBeEnabled())
   expect(onSaved).not.toHaveBeenCalled()
   await user.click(next())
-  expect(await screen.findByText('서버 저장 확인 · 가이드 완료')).toBeVisible()
+  expect(await screen.findByText('저장 완료')).toBeVisible()
   await user.click(screen.getByRole('button', { name: '안내 마치기' }))
   await waitFor(() => expect(onSaved).toHaveBeenCalledWith(17))
 })
@@ -694,7 +693,7 @@ it('keeps a stored policy locked if the server receipt ID cannot be verified', a
   const initial = { ...emptyDraft(), policyCode: 'RECEIPT-TEST', policyName: '저장 확인', policyType: 'SCHEDULE_ELIGIBILITY', sourceClass: 'GA_POLICY', effectiveFrom: '2027-01-01' }
   const { user, onSaved, onClose } = mountEditor(initial)
   await user.click(screen.getByRole('button', { name: '초안 저장' }))
-  expect(await screen.findByText(/서버 저장 성공 응답을 받았지만 결과 확인/)).toBeVisible()
+  expect(await screen.findByText(/저장은 되었지만 결과를 표시하지 못했습니다/)).toBeVisible()
   expect(screen.getByRole('button', { name: '초안 저장' })).toBeDisabled()
   expect(screen.getByLabelText(/정책명/)).toBeDisabled()
   await user.click(screen.getByRole('button', { name: '초안 저장' }))

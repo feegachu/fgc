@@ -74,8 +74,8 @@ export function CapError({ error, retry }: { error: Error; retry: () => void }) 
 export function CapEvidence() {
   return (
     <EvidenceLink icon label="1,200% 한도 판정 근거">
-      <strong>REG-08/09/10/23, SRC-022 제4-32조⑤/⑭</strong>
-      <p>계약별 저장 판정입니다. 해약환급금은 합산하고 준법경영비 공제는 원수사→GA 단계에만 적용합니다.</p>
+      <strong>보험업감독규정 제4-32조 제5항, 제14항</strong>
+      <p>계약별 저장 판정입니다. 해약환급금은 합산하고 준법경영비 공제는 보험회사→GA 단계에만 적용합니다.</p>
     </EvidenceLink>
   )
 }

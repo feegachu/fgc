@@ -7,7 +7,7 @@
     "steps": [
       {
         "targetId": "contract.statusHistory",
-        "instruction": "본인 계약의 기본정보와 상태이력을 확인하세요. 효력일과 접수일을 구분하고 상태 변경의 처리 결과를 확인합니다."
+        "instruction": "본인 계약의 기본정보와 상태이력을 확인하세요. 효력일시와 접수일시를 구분하고 상태 변경의 처리 결과를 확인합니다."
       }
     ]
   },
@@ -48,11 +48,11 @@
     "steps": [
       {
         "targetId": "contract.form",
-        "instruction": "보험회사·상품·계약일·설계사·보험료와 필수 항목을 입력하세요. 오류를 수정한 뒤 실제 저장 버튼을 누릅니다."
+        "instruction": "보험회사·상품·계약일·설계사·보험료와 필수 항목을 입력하세요. 오류를 수정한 뒤 저장 버튼을 누릅니다."
       },
       {
         "targetId": "contract.save",
-        "instruction": "실제 등록 또는 수정 저장 버튼을 직접 누르세요. 서버 오류는 입력값을 정정하고, 성공 후 계약 상세에서 저장 결과를 확인합니다."
+        "instruction": "등록 또는 수정 저장 버튼을 누르세요. 오류가 나면 입력값을 고치고, 성공하면 계약 상세에서 저장 결과를 확인합니다."
       }
     ]
   },
@@ -63,7 +63,7 @@
     "steps": [
       {
         "targetId": "contract.statusHistory",
-        "instruction": "기본정보 탭의 상태이력에서 적용일과 수신일을 구분해 확인하세요."
+        "instruction": "기본정보 탭의 상태이력에서 효력일시와 접수일시를 구분해 확인하세요."
       },
       {
         "targetId": "contract.schedules",
@@ -82,7 +82,7 @@
       },
       {
         "targetId": "schedule.results",
-        "instruction": "스케줄을 선택하면 회차 상세로 이동합니다. 버전과 활성 상태를 함께 확인하세요."
+        "instruction": "스케줄을 선택하면 회차 상세로 이동합니다. 버전과 사용 여부를 함께 확인하세요."
       }
     ]
   },
@@ -97,7 +97,7 @@
       },
       {
         "targetId": "schedule.generate",
-        "instruction": "새 버전 만들기가 가능한 경우 버튼을 눌러 생성 사유 입력으로 이동하세요. 4년·7년 예정판은 아래 입력 영역에서 사유를 적고 실제 생성 버튼을 누릅니다. 생성 후 버전 비교에서 결과를 확인하세요."
+        "instruction": "새 버전 만들기가 가능한 경우 버튼을 눌러 생성 사유 입력으로 이동하세요. 4년·7년 예상 스케줄은 아래 입력 영역에서 사유를 적고 실제 생성 버튼을 누릅니다. 생성 후 버전 비교에서 결과를 확인하세요."
       }
     ]
   },
@@ -123,7 +123,7 @@
     "steps": [
       {
         "targetId": "dashboard.guide",
-        "instruction": "전체 업무 가이드는 현재 정산월의 계약부터 최종 확정까지 안내합니다. 시작 대상을 선택하고 실제 업무 버튼을 직접 조작하세요."
+        "instruction": "전체 업무 가이드는 현재 정산월의 계약부터 최종 확정까지 안내합니다. 시작 대상을 선택하고 업무 버튼을 직접 조작하세요."
       }
     ]
   },
@@ -134,7 +134,7 @@
     "steps": [
       {
         "targetId": "validation.create",
-        "instruction": "검증월·실행 유형을 확인하고 실제 생성 버튼을 누릅니다. 생성 성공과 실행 완료는 다르며 상세에서 실행 상태를 확인하세요."
+        "instruction": "검증월·실행 유형을 확인하고 생성 버튼을 누릅니다. 생성 성공과 실행 완료는 다르며 상세에서 실행 상태를 확인하세요."
       },
       {
         "targetId": "validation.createSubmit",
@@ -149,23 +149,23 @@
     "steps": [
       {
         "targetId": "validation.progress",
-        "instruction": "서버의 10단계 진행 상태와 오류를 확인합니다. 실패한 실행은 실패 지점 재시작 영역에서 서버가 안내하는 가능 여부와 사유를 확인하세요."
+        "instruction": "10단계 진행 상태와 오류를 확인합니다. 실패한 실행은 실패 지점 재시작 영역에서 가능 여부와 사유를 확인하세요."
       },
       {
         "targetId": "validation.execute",
-        "instruction": "생성됨 상태에서는 실제 실행 버튼을 누르세요. 요청 접수는 완료가 아니며 진행 상태가 계산완료나 확정으로 바뀐 것을 확인해야 다음으로 진행할 수 있습니다. 실패 시 재시작 가능 여부를 확인합니다. 계산 완료는 최종 확정과 다릅니다."
+        "instruction": "생성됨 상태에서는 실행 버튼을 누르세요. 요청 접수는 완료가 아니며 진행 상태가 계산완료나 확정으로 바뀐 것을 확인해야 다음으로 진행할 수 있습니다. 실패 시 재시작 가능 여부를 확인합니다. 계산 완료는 최종 확정과 다릅니다."
       },
       {
         "targetId": "validation.restart",
-        "instruction": "실패 지점 재시작은 서버가 허용한 경우에만 사유를 입력해 요청하세요. 수락 후 새 시도의 진행 결과를 확인합니다. 재시작이 불가능하면 신규 실행 만들기로 목록에 돌아가 검증월과 유형을 확인하세요. 확정된 실행은 다시 실행하지 않습니다."
+        "instruction": "실패 지점 재시작은 가능할 때만 사유를 입력해 요청하세요. 요청 후 새 시도의 진행 결과를 확인합니다. 재시작이 불가능하면 신규 실행 만들기로 목록에 돌아가 검증월과 유형을 확인하세요. 확정된 실행은 다시 실행하지 않습니다."
       },
       {
         "targetId": "validation.checklist",
-        "instruction": "확정 전 8개 조건을 확인하고 미충족 원천을 정정·재검증하세요."
+        "instruction": "확정 전 8개 조건을 확인하고 미충족 원래 건을 정정·재검증하세요."
       },
       {
         "targetId": "validation.finalize",
-        "instruction": "최종 확정 권한과 서버 조건을 확인하세요. 실제 확정 성공 후 결과가 잠기며 안내 확인만으로 확정되지 않습니다."
+        "instruction": "최종 확정 권한과 조건을 확인하세요. 확정에 성공하면 결과가 잠기며 안내 확인만으로 확정되지 않습니다."
       }
     ]
   },
@@ -176,7 +176,7 @@
     "steps": [
       {
         "targetId": "reconciliation.filters",
-        "instruction": "정산월·보험회사·대사 범위를 확인하고 실제 실행 버튼을 누릅니다. 지급 사전검증과 대사 일치는 별도 판정입니다."
+        "instruction": "정산월·보험회사·대사 범위를 확인하고 실행 버튼을 누릅니다. 지급 사전검증과 대사 일치는 별도 판정입니다."
       },
       {
         "targetId": "reconciliation.execute",
@@ -188,7 +188,7 @@
       },
       {
         "targetId": "reconciliation.history",
-        "instruction": "이전 실행 이력과 현재 결과의 실행 번호를 구분하세요. 원천 정정 후 새 대사 결과를 확인합니다."
+        "instruction": "이전 실행 이력과 현재 결과의 실행 번호를 구분하세요. 원래 건 정정 후 새 대사 결과를 확인합니다."
       }
     ]
   },
@@ -203,17 +203,17 @@
       },
       {
         "targetId": "exception.action",
-        "instruction": "선택 예외의 원천 링크와 이력을 확인한 뒤 검토·정정·해결을 처리합니다. 처리 저장만으로 원천이 정정되거나 재검증이 끝나지 않습니다."
+        "instruction": "선택 예외의 원본 링크와 이력을 확인한 뒤 검토·정정·해결을 처리합니다. 처리 저장만으로 원래 건이 정정되거나 재검증이 끝나지 않습니다."
       },
       {
         "targetId": "exception.detail",
-        "instruction": "예외 한 건을 선택한 뒤 검출 이력의 실행별 근거를 확인하세요. 원천 수정은 해당 업무 화면에서 수행합니다."
+        "instruction": "예외 한 건을 선택한 뒤 검출 이력의 실행별 근거를 확인하세요. 원래 건 수정은 해당 업무 화면에서 수행합니다."
       }
     ]
   },
   {
     "screenId": "POL-W01",
-    "title": "정책·룰셋",
+    "title": "정책",
     "page": "policies/PoliciesPage.tsx",
     "steps": [
       {
@@ -277,7 +277,7 @@
     "steps": [
       {
         "targetId": "ledger.overview",
-        "instruction": "원장 목록에서 분개를 선택하고 차변·대변·원천 연결을 확인하세요. 정정·역분개는 권한과 기존 절차에 따라 직접 수행합니다."
+        "instruction": "원장 목록에서 분개를 선택하고 차변·대변·원천 연결을 확인하세요. 정정·역분개는 권한과 기존 절차에 따라 수행합니다."
       }
     ]
   },
@@ -300,11 +300,11 @@
     "steps": [
       {
         "targetId": "policy.editor",
-        "instruction": "정책 종류·기본정보와 규칙을 입력하세요. 필수값 오류를 수정하고 원천 근거를 확인합니다."
+        "instruction": "정책 종류·기본정보와 규칙을 입력하세요. 필수값 오류를 수정하고 근거를 확인합니다."
       },
       {
         "targetId": "policy.save",
-        "instruction": "실제 초안 저장 버튼을 직접 누르세요. 서버의 저장 결과를 확인한 뒤 검토 요청 절차로 진행합니다."
+        "instruction": "초안 저장 버튼을 누르세요. 저장 결과를 확인한 뒤 검토 요청 절차로 진행합니다."
       }
     ]
   },
@@ -316,7 +316,7 @@
     "steps": [
       {
         "targetId": "policy.actions",
-        "instruction": "선택 정책의 상태와 서버가 허용한 조치를 확인하세요. 검토 요청·승인·활성화는 실제 버튼으로 수행하며 권한을 우회하지 않습니다."
+        "instruction": "선택 정책의 상태와 할 수 있는 조치를 확인하세요. 검토 요청과 승인, 활성화는 버튼으로 수행합니다."
       }
     ]
   },
@@ -356,7 +356,7 @@
       },
       {
         "targetId": "schedule.regenerate.submit",
-        "instruction": "실제 새 버전 만들기 버튼을 누르세요. 새 스케줄 버전이 만들어진 뒤에만 완료할 수 있습니다. 예정 생성은 지급 확정이 아닙니다."
+        "instruction": "새 버전 만들기 버튼을 누르세요. 새 스케줄 버전이 만들어진 뒤에만 완료할 수 있습니다. 예정 생성은 지급 확정이 아닙니다."
       }
     ]
   },
@@ -368,7 +368,7 @@
     "steps": [
       {
         "targetId": "exception.actionInput",
-        "instruction": "선택한 예외의 허용 조치와 처리 사유를 입력하세요. 증빙과 원천 정정 필요 여부를 확인하세요. 조치 저장은 재검증·재대사를 대신하지 않습니다."
+        "instruction": "선택한 예외의 허용 조치와 처리 사유를 입력하세요. 증빙과 원래 건 정정 필요 여부를 확인하세요. 조치 저장은 재검증·재대사를 대신하지 않습니다."
       },
       {
         "targetId": "exception.actionSave",
@@ -384,18 +384,18 @@
     "steps": [
       {
         "targetId": "validation.finalizeWarning",
-        "instruction": "선택한 검증월·회차와 잠금 경고를 확인하세요. 기존 권한과 서버의 8개 조건을 통과해야 확정할 수 있습니다."
+        "instruction": "선택한 검증월과 실행 차수, 잠금 경고를 확인하세요. 8개 조건을 통과해야 확정할 수 있습니다."
       },
       {
         "targetId": "validation.finalizeSubmit",
-        "instruction": "이 확인창의 실제 확정 버튼을 누르세요. 서버의 확정 결과를 받아야 가이드가 완료됩니다. 실제 송금·회계 마감이 아닙니다."
+        "instruction": "이 확인창의 확정 버튼을 누르세요. 확정 결과를 받아야 안내가 끝납니다."
       }
     ]
   },
   {
     "screenId": "EXCP-W01",
     "variant": "correction",
-    "title": "원장 원천 정정",
+    "title": "원장 원래 건 정정",
     "page": "exception/JournalCorrectionModal.tsx",
     "steps": [
       {
@@ -404,7 +404,7 @@
       },
       {
         "targetId": "exception.correctionSave",
-        "instruction": "실제 정정 실행 버튼을 누르세요. 서버에서 원분개에 대한 역분개·재기표가 성공해야 다음으로 진행합니다. 실패하면 입력을 보존하고 다시 확인하세요."
+        "instruction": "정정 실행 버튼을 누르세요. 원분개의 역분개와 재기표가 성공해야 다음으로 넘어갑니다. 실패하면 입력을 유지한 채 다시 확인하세요."
       }
     ]
   },
@@ -415,7 +415,7 @@
     "steps": [
       {
         "targetId": "clawback.filters",
-        "instruction": "기간·계약 등 조건으로 환수 검토 대상을 조회하고 한 건의 근거를 확인하세요. 검토 대상은 확정된 환수채무가 아닙니다. 계산·PDF 생성은 권한과 서버 조건을 확인한 뒤 기존 버튼으로 직접 수행합니다."
+        "instruction": "기간, 계약 등 조건으로 환수 검토 대상을 조회하고 한 건의 근거를 확인하세요. 검토 대상은 확정된 환수채무가 아닙니다. 계산과 PDF 생성은 권한을 확인한 뒤 버튼으로 수행합니다."
       }
     ]
   },
@@ -431,7 +431,7 @@
       },
       {
         "targetId": "schedule.preview.submit",
-        "instruction": "실제 예정 생성 또는 새 버전 만들기 버튼을 누르세요. 서버 성공 결과를 확인한 후 다음을 눌러 안내를 완료합니다."
+        "instruction": "예정 생성 또는 새 버전 만들기 버튼을 누르세요. 성공하면 다음을 눌러 안내를 마칩니다."
       }
     ]
   },
@@ -447,7 +447,67 @@
       },
       {
         "targetId": "schedule.preview.submit",
-        "instruction": "실제 예정 생성 또는 새 버전 만들기 버튼을 누르세요. 서버 성공 결과를 확인한 후 다음을 눌러 안내를 완료합니다."
+        "instruction": "예정 생성 또는 새 버전 만들기 버튼을 누르세요. 성공하면 다음을 눌러 안내를 마칩니다."
+      }
+    ]
+  },
+  {
+    "screenId": "CONT-W01",
+    "variant": "reader",
+    "title": "보험계약 목록",
+    "page": "contract/ContractListPage.tsx",
+    "steps": [
+      {
+        "targetId": "contract.filters",
+        "instruction": "계약번호, 보험회사, 기간으로 검색하고 계약을 선택해 상세를 확인하세요."
+      }
+    ]
+  },
+  {
+    "screenId": "VRUN-W01",
+    "variant": "reader",
+    "title": "월 통합검증 목록",
+    "page": "validation/ValidationRunListPage.tsx",
+    "steps": [
+      {
+        "targetId": "validation.runs",
+        "instruction": "실행 목록에서 검증월과 상태를 확인하고, 열기를 눌러 결과를 보세요. 새 실행은 정산담당자가 만듭니다."
+      }
+    ]
+  },
+  {
+    "screenId": "RECO-W01",
+    "variant": "reader",
+    "title": "대사 실행/결과",
+    "page": "reconciliation/ReconciliationPage.tsx",
+    "steps": [
+      {
+        "targetId": "reconciliation.filters",
+        "instruction": "정산월, 보험회사, 대사 범위를 확인하세요. 대사 실행은 정산담당자가 합니다."
+      },
+      {
+        "targetId": "reconciliation.results",
+        "instruction": "실행 결과에서 불일치 유형과 계약을 확인하세요."
+      },
+      {
+        "targetId": "reconciliation.history",
+        "instruction": "이전 실행 이력을 고르면 그 실행의 결과를 볼 수 있습니다."
+      }
+    ]
+  },
+  {
+    "screenId": "EXCP-W01",
+    "variant": "reader",
+    "title": "예외함",
+    "page": "exception/ExceptionPage.tsx",
+    "steps": [
+      {
+        "targetId": "exception.filters",
+        "instruction": "유형, 상태, 계약번호로 조회하고 예외 한 건을 선택하세요."
+      },
+      {
+        "targetId": "exception.action",
+        "instruction": "선택한 예외의 내용과 처리 상태를 확인하세요. 처리는 담당자가 합니다."
       }
     ]
   }

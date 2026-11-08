@@ -18,7 +18,7 @@ public enum PolicySourceClass {
             case REGULATORY -> "규제";
             case INSURER_RULE -> "보험사 규칙";
             case GA_POLICY -> "회사 정책";
-            case PROJECT_ASSUMPTION -> "프로젝트 가정";
+            case PROJECT_ASSUMPTION -> "자체 기준";
         };
     }
 

@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { apiClient } from '../../lib/api/client'
+import { dateTime } from '../../lib/format'
 import type { components } from '../../lib/api/schema'
+import { policyCodeLabel } from '../policies/labels'
 import { isWonAmount } from './guards'
 import './payment-calculation.css'
 type Snapshot = components['schemas']['PaymentCalculationSnapshot']
@@ -214,7 +216,7 @@ export function CalculationWorkbench({
       <summary>업무 계산 도우미</summary>
       {expanded && (
         <>
-          <p>기존 프로그램의 계산 근거를 조회합니다. 저장·지급 확정은 직접 진행하세요.</p>
+          <p>시스템이 계산한 근거를 조회합니다. 저장·지급 확정은 직접 진행하세요.</p>
           <label>
             계산 업무
             <select
@@ -346,14 +348,14 @@ export function CalculationWorkbench({
               </dl>
               {result.lines?.map((line) => (
                 <p key={line.sourceId}>
-                  계약 #{line.contractId} · 항목 #{line.commissionItemId} · {line.installmentNo}회차 · 귀속일{' '}
+                  {line.installmentNo}회차 · 귀속일{' '}
                   {line.attributionDate} · 지급예정일 {line.dueDate} · {line.cashflowType === 'DEDUCTION' ? '공제 예정' : '예상'} {won(line.expectedAmount)} · 기준{' '}
-                  {line.basisCode} {line.basisAmount} · 요율 {line.ratePct}% · 규칙 #{line.ruleId}
+                  {policyCodeLabel(line.basisCode)} {won(line.basisAmount)} · 요율 {line.ratePct}%
                 </p>
               ))}
               {result.capPreview?.map((row, index) => (
                 <p key={index}>
-                  계약 #{String(row.contractId ?? '미확인')} · 한도 {won(row.limitAmount)} · 산입{' '}
+                  한도 {won(row.limitAmount)} · 산입{' '}
                   {won(row.includedAmount)} · 잔여 {won(row.remainingAmount)} ·{' '}
                   {String(row.resultStatusLabel ?? row.resultStatus ?? '미확인')} · 사용률{' '}
                   {row.usagePct == null ? '미제공' : `${String(row.usagePct)}%`}
@@ -363,19 +365,14 @@ export function CalculationWorkbench({
                 <p key={index}>{blocker.message}</p>
               ))}
               {!!result.missingInputs?.length && <p>추가 확인: {result.missingInputs.join(', ')}</p>}
-              <p>
-                기준일 {result.basis?.asOfDate ?? '행별 확인'} · 정책{' '}
-                {result.basis?.policyVersionIds?.join(', ') || '미제공'} · 규칙{' '}
-                {result.basis?.ruleIds?.join(', ') || '미제공'} · 반올림 {result.basis?.rounding?.mode} /{' '}
-                {result.basis?.rounding?.aggregation}
-              </p>
+              <p>기준일 {result.basis?.asOfDate ?? '행별 확인'}</p>
               {result.basis?.sourceRefs?.map((source) => (
                 <p key={source.sourceId}>
-                  근거 {source.title} #{source.entityId} · {source.version}
+                  근거 {source.title}
                 </p>
               ))}
               <p>{result.recommendation?.reason}</p>
-              {result.validity && <small>유효 시각 {result.validity.expiresAt} · 사용 전 최신 근거 재확인</small>}
+              {result.validity && <small>유효 시각 {dateTime(result.validity.expiresAt)} · 사용 전 최신 근거 재확인</small>}
             </section>
           )}
         </>

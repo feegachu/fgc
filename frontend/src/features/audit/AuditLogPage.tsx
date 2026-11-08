@@ -91,14 +91,6 @@ const columns: TableColumn<AuditLog>[] = [
     width: '14rem',
     render: (row) => auditReasonLabel(row.actionCode, row.reason),
   },
-  {
-    key: 'policy',
-    label: '정책버전',
-    sortKey: 'policyVersionId',
-    sortable: true,
-    width: '7rem',
-    render: (row) => dash(row.policyVersionId),
-  },
   { key: 'requestId', label: '요청번호', width: '10rem', render: (row) => dash(row.requestId) },
 ]
 
@@ -342,7 +334,7 @@ function AuditDiff({ log, auditLogId }: { log: AuditLog; auditLogId: number }) {
                 const changed = entry.changed ? ' audit-diff-cell-changed' : ''
                 return (
                   <tr key={entry.field}>
-                    <td className="tabular-nums audit-diff-value" title={entry.field}>
+                    <td className="tabular-nums audit-diff-value">
                       {diffFieldLabel(entry.field ?? '')}
                     </td>
                     <td className={`tabular-nums audit-diff-value${changed}`} title={entry.before ?? undefined}>
