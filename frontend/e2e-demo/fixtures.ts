@@ -58,15 +58,16 @@ export function responseFor(page: Page, path: string, method = 'POST') {
     (response) => new URL(response.url()).pathname === `/api/v1${path}` && response.request().method() === method,
   )
 }
-export async function api(page: Page, path: string, body?: unknown) {
-  // The browser's own access token is intentionally not exposed. Setup requests use a separate demo admin session.
+export async function api(page: Page, path: string, body?: unknown, account = 'admin') {
+  // The browser token stays private. Use a different read-only account for assertions
+  // during an active admin session: signing in the same account invalidates that session.
   const origin = new URL(page.url()).origin
   const client = await request.newContext({
     baseURL: origin,
     extraHTTPHeaders: { Origin: origin, 'X-FGC-Client': 'web' },
   })
   try {
-    const auth = await client.post('/api/v1/auth/login', { data: { loginId: 'admin', password } })
+    const auth = await client.post('/api/v1/auth/login', { data: { loginId: account, password } })
     expect(auth.ok(), await auth.text()).toBe(true)
     const token = (await auth.json()).data.accessToken
     const result = await client.fetch(`/api/v1${path}`, {

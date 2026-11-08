@@ -94,12 +94,14 @@ test('새 업무 가이드에서 계약 등록 → 계약별 지급 확정 → �
   )
   expect(Number.isSafeInteger(reconId) && reconId > 0).toBe(true)
   await page.goto(`/reconciliations?month=2026-07&runId=${reconId}`)
-  const results = await api(page, `/reconciliations/${reconId}/results?page=1&size=100`)
-  const open = await api(page, `/exceptions?status=OPEN&validationRunId=${rid}&page=1&size=100`)
+  // Keep the browser's admin session alive while independently reading the outcomes.
+  // A second admin login would trigger a 401 redirect racing with the next navigation.
+  const results = await api(page, `/reconciliations/${reconId}/results?page=1&size=100`, undefined, 'audit01')
+  const open = await api(page, `/exceptions?status=OPEN&validationRunId=${rid}&page=1&size=100`, undefined, 'audit01')
   expect(results.summary.exceptionCount).toBe(0)
   expect(results.summary.matchedCount).toBe(results.summary.resultCount)
   expect(open.totalElements).toBe(0)
-  await login(page, 'admin', `/validation-runs/${rid}?month=2026-07`)
+  await page.goto(`/validation-runs/${rid}?month=2026-07`)
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '확정', exact: true }).click()
   const finalized = responseFor(page, `/validation-runs/${rid}/finalize`)
