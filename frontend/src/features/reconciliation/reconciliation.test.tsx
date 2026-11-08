@@ -701,7 +701,7 @@ describe('RECO-W01·W02 React 전환', () => {
     expect(reads).toBeGreaterThan(1)
     await waitFor(() => expect(calls.filter((call) => call.url.includes('/41/results')).length).toBeGreaterThan(1))
     expect(invalidate.mock.calls.filter(([options]) => options?.queryKey?.[1] === 'results')).toHaveLength(1)
-  }, 10000)
+  })
   it('500 상세 조회는 requestId만 표시하고 임의 id는 호출하지 않는다', async () => {
     renderAt('/reconciliations?resultId=7', (url) => {
       if (url.endsWith('/results/7'))
@@ -770,4 +770,4 @@ it('execution help resets on run selection and waits for the new completed resul
   expect(screen.getByText(/실행되었습니다. 다음을 누르세요/)).toBeVisible()
   await user.selectOptions(screen.getByLabelText(/지급단계/, { selector: 'select' }), 'INSURER_TO_GA')
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeDisabled())
-}, 10000)
+})

@@ -58,7 +58,8 @@ test('read-only role finishes screen help where the write action is not availabl
   for (const path of ['validation-runs', 'reconciliation', 'reconciliations', 'exceptions'])
     await page.route(`**/api/v1/${path}**`, (route) => route.fulfill({ json: empty }))
   for (const [path, steps] of [['contracts', 1], ['validation-runs', 1], ['reconciliations', 3], ['exceptions', 2]] as const) {
-    await page.goto(path)
+    // 기준월 없이 열면 셸이 주소에 month를 붙이면서 도움말을 새로 시작해, 그보다 먼저 연 안내가 닫힌다.
+    await page.goto(`${path}?month=2026-07`)
     await page.getByRole('button', { name: '도움말', exact: true }).first().click()
     for (let step = 0; step < steps; step++) await page.getByRole('button', { name: '설명 확인 · 다음' }).click()
     await expect(page.getByRole('heading', { name: '화면 사용법 안내 완료' })).toBeVisible()

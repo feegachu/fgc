@@ -77,9 +77,12 @@ for (const roleCode of ['SETTLEMENT', 'COMPLIANCE', 'GA_ADMIN', 'SYSTEM_ADMIN'])
     await expect(page.getByRole('img', { name: '기준일별 초과액 추이' })).toBeVisible()
     await page.reload()
     await expect(page.locator('.pagination-controls [aria-current="page"]')).toHaveText('2')
+    const clearList = page.waitForResponse((response) => response.url().includes('status=CLEAR'))
     await page.getByRole('button', { name: /이상없음.*초과액/ }).click()
     await expect(page).toHaveURL(/status=CLEAR/)
     await expect(page).not.toHaveURL(/page=/)
+    // 판정 필터를 바꾸면 목록을 다시 읽는 동안 재검증 버튼이 잠긴다. 주소만 보고 누르면 그 사이에 눌러 창이 열리지 않는다.
+    await clearList
     const recheck = page.getByRole('button', { name: '이 계약만 다시 검증' })
     if (canProcess) {
       await expect(recheck).toBeEnabled()
