@@ -20,6 +20,16 @@ export function DraftNavigationGuard() {
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     const current = new URLSearchParams(currentLocation.search)
     const next = new URLSearchParams(nextLocation.search)
+    // Closing/changing an exception modal leaves unrelated editors intact.
+    // Its own dirty action form must still block a direct URL/selection change.
+    if (currentLocation.pathname === nextLocation.pathname && /\/exceptions$/.test(currentLocation.pathname)) {
+      const selected = current.get('selected')
+      const currentFilters = new URLSearchParams(current), nextFilters = new URLSearchParams(next)
+      currentFilters.delete('selected')
+      nextFilters.delete('selected')
+      if (currentFilters.toString() === nextFilters.toString()
+        && !Object.keys(useUnsavedWorkStore.getState().owners).some(owner => owner.startsWith(`exception:${selected}:`))) return false
+    }
     if (currentLocation.pathname === nextLocation.pathname && !current.has('month') && next.get('month') === useWorkspaceStore.getState().month) {
       next.delete('month')
       if (next.toString() === current.toString()) return false

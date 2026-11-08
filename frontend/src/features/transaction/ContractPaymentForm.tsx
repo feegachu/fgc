@@ -144,6 +144,7 @@ export function ContractPaymentForm({
   const [selectedResult, setSelectedResult] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [uncertain, setUncertain] = useState(false)
+  const [recoveringSave, setRecoveringSave] = useState(false)
   const contracts = useEntityChoices('contracts', { contractDateTo: monthEnd }, [contractId], true,
     row => !!row.contractDate && row.contractDate <= monthEnd)
   const selectedContract = contracts.data.find(row => String(row.contractId) === contractId)
@@ -185,15 +186,16 @@ export function ContractPaymentForm({
       visible.flatMap(line => line.scheduleLineId ? [line.scheduleLineId] : []), signal),
     enabled: contractAllowed && !!header && detail.isSuccess,
     staleTime: 0,
+    refetchOnMount: 'always',
     meta: { errorToast: false },
   })
   const [resumeError, setResumeError] = useState('')
   const [restoredKey, setRestoredKey] = useState('')
-  const restoring = !!contractId && (existing.isPending || restoredKey !== resumeKey)
-  function restoreDrafts() {
-    if (!existing.data || !detail.data?.lines) return
+  const restoring = !!contractId && (!existing.isFetchedAfterMount || restoredKey !== resumeKey)
+  function restoreDrafts(payments = existing.data) {
+    if (!payments || !detail.data?.lines) return false
     setRestoredKey(resumeKey)
-    const entries = Object.entries(existing.data)
+    const entries = Object.entries(payments)
     const first = entries[0]?.[1]
     if (first && entries.some(([,payment]) => payment.scheduledPaymentDate !== first.scheduledPaymentDate ||
       payment.attributions?.[0]?.attributionDate !== first.attributions?.[0]?.attributionDate ||
@@ -229,12 +231,14 @@ export function ContractPaymentForm({
       setSavedLines(detail.data.lines)
       setSaved(restored)
       setEdits(restoredEdits)
+      setExcluded(visible.filter(line => !restored[line.scheduleLineId!]).map(line => line.scheduleLineId!))
     }
     setResumeError('')
+    return true
   }
   // Hydrate a newly loaded scope before rendering its editor. Subsequent refetches
   // cannot overwrite edits made in this scope.
-  if (existing.data && detail.data?.lines && restoredKey !== resumeKey) restoreDrafts()
+  if (existing.isFetchedAfterMount && !existing.isFetching && existing.isSuccess && detail.data?.lines && restoredKey !== resumeKey) restoreDrafts()
   const eligible = (line: ScheduleLine) =>
     ['PLANNED', 'CONFIRMED', 'RESTARTED'].includes(line.lineStatus ?? '') && !!line.scheduleLineId
   const selected = visible.filter((line) => eligible(line) && !excluded.includes(line.scheduleLineId!))
@@ -380,9 +384,14 @@ export function ContractPaymentForm({
       if (missing.length) {
         const response = await apiClient.request<Payment[]>('/api/v1/transactions/batch', {
           method: 'POST', body: { payments: missing.map(rowPayload) },
+        }).catch(failure => {
+          setUncertain(true)
+          setRecoveringSave(true)
+          throw failure
         })
         if (response.data?.length !== missing.length) {
           setUncertain(true)
+          setRecoveringSave(true)
           throw new Error('저장 결과를 확인하지 못했습니다. 지급 목록에서 등록 여부를 확인하세요.')
         }
         const next: Record<number, Saved> = {}
@@ -461,6 +470,16 @@ export function ContractPaymentForm({
   }
   async function reconcile() {
     await run('reload', async () => {
+      if (recoveringSave) {
+        const payments = await loadSchedulePayments(contractId, stage, month,
+          visible.flatMap(line => line.scheduleLineId ? [line.scheduleLineId] : []))
+        ensureMounted()
+        if (!restoreDrafts(payments)) throw new Error('저장된 지급 건을 복원하지 못했습니다. 목록에서 확인하세요.')
+        setRecoveringSave(false)
+        setUncertain(false)
+        setChecks({})
+        return
+      }
       for (const [key, entry] of Object.entries(saved)) {
         const payment = await readPayment(String(entry.payment.commissionTransactionId))
         if (
@@ -660,9 +679,9 @@ export function ContractPaymentForm({
                   >
                     확정
                   </Button>
-                  {uncertain && Object.keys(saved).length > 0 && (
+                  {uncertain && (
                     <Button data-guide-feature="features.contract-payment-form.button-14" variant="secondary" loading={busy === 'reload'} onClick={() => void reconcile()}>
-                      확정 결과 다시 확인
+                      {recoveringSave ? '저장 결과 다시 확인' : '확정 결과 다시 확인'}
                     </Button>
                   )}
                 </div>

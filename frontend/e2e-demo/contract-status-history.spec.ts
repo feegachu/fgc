@@ -32,6 +32,8 @@ test('CONT-W03 상태 변경 뒤 CONT-W02 이력과 후속 상태, 영향을 실
 
   await second.getByRole('button', { name: '변경 2 영향 보기' }).click()
   const panel = page.getByRole('dialog', { name: '변경 2 영향' })
+  await expect(panel).toContainText('정상 → 미납')
+  await expect(panel).toContainText('settle01')
   await expect(panel.getByRole('heading', { name: '영향 0건' })).toBeVisible()
   await expect(panel.getByText('후속 처리 대기 중입니다. 처리가 끝나면 영향이 표시됩니다.')).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('real-status-effects-pending.png') })
@@ -87,8 +89,7 @@ test('CONT-W03 상태 변경 뒤 CONT-W02 이력과 후속 상태, 영향을 실
   await expect(own).not.toContainText('#9003')
   await page.screenshot({ path: testInfo.outputPath('real-status-effects-agent.png') })
   await own.getByRole('button', { name: '닫기', exact: true }).click()
-  // 이력의 영향 건수는 남의 행까지 세므로 AGENT에게 보이지 않는다.
-  await expect(page.getByRole('main')).not.toContainText('지급 보류 1건')
+  // 영향 상세에서 본인 지급만 반환됐는지 위에서 확인했다. 간략 타임라인에는 영향 합계가 없다.
   await page.goto(`contracts/${other}`)
   await expect(page.getByRole('alert')).toContainText('본인 데이터만')
   await expect(page.locator('.contract-history-timeline')).toHaveCount(0)

@@ -10,6 +10,7 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
 import { applyActionToCache } from './api'
@@ -24,6 +25,32 @@ vi.mock('react-router', async (importOriginal) => {
   } }
 })
 beforeEach(() => { legacyHelpContext = false })
+
+it('예외 모달 닫기는 다른 화면의 미저장 입력을 버리거나 경고하지 않는다', async () => {
+  const { actions } = renderPage('/app/exceptions?month=2026-07&selected=11')
+  const modal = await screen.findByRole('dialog', { name: /^예외 상세/ })
+  act(() => useUnsavedWorkStore.getState().mark('other-editor', true))
+  try {
+    await actions.click(within(modal).getByRole('button', { name: '닫기', exact: true }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^예외 상세/ })).not.toBeInTheDocument())
+    expect(useUnsavedWorkStore.getState().owners['other-editor']).toBe(true)
+  } finally {
+    act(() => useUnsavedWorkStore.getState().mark('other-editor', false))
+  }
+})
+
+it('예외 모달 자체의 미저장 처리 사유는 닫기 전에 보호한다', async () => {
+  const { actions } = renderPage('/app/exceptions?month=2026-07&selected=11')
+  const modal = await screen.findByRole('dialog', { name: /^예외 상세/ })
+  await actions.type(within(modal).getByRole('textbox', { name: /처리 사유/ }), '검토 중인 사유')
+  await actions.click(within(modal).getByRole('button', { name: '닫기', exact: true }))
+  const confirm = await screen.findByRole('dialog', { name: '작성 중인 내용을 닫을까요?' })
+  await actions.click(within(confirm).getByRole('button', { name: '계속 작성' }))
+  expect(within(modal).getByRole('textbox', { name: /처리 사유/ })).toHaveValue('검토 중인 사유')
+  await actions.click(within(modal).getByRole('button', { name: '닫기', exact: true }))
+  await actions.click(within(await screen.findByRole('dialog', { name: '작성 중인 내용을 닫을까요?' })).getByRole('button', { name: '입력 버리고 닫기' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+})
 
 const user = {
   loginId: 'settle01',

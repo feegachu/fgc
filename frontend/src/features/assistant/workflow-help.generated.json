@@ -15918,8 +15918,8 @@
         "stepId": "help.e6db04368c66a1a0c39a0c2cf618f278",
         "screenId": "TRAN-W02",
         "targetId": "features.contract-payment-form.button-14",
-        "title": "수수료 지급 등록, 확정 결과 다시 확인",
-        "instruction": "‘확정 결과 다시 확인’ 위치입니다.",
+        "title": "수수료 지급 등록, 저장 결과 다시 확인 / 확정 결과 다시 확인",
+        "instruction": "‘저장 결과 다시 확인 / 확정 결과 다시 확인’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -16820,8 +16820,8 @@
         "stepId": "help.e6db04368c66a1a0c39a0c2cf618f278",
         "screenId": "TRAN-W02",
         "targetId": "features.contract-payment-form.button-14",
-        "title": "수수료 지급 등록, 확정 결과 다시 확인",
-        "instruction": "‘확정 결과 다시 확인’ 위치입니다.",
+        "title": "수수료 지급 등록, 저장 결과 다시 확인 / 확정 결과 다시 확인",
+        "instruction": "‘저장 결과 다시 확인 / 확정 결과 다시 확인’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",
@@ -17722,8 +17722,8 @@
         "stepId": "help.e6db04368c66a1a0c39a0c2cf618f278",
         "screenId": "TRAN-W02",
         "targetId": "features.contract-payment-form.button-14",
-        "title": "수수료 지급 등록, 확정 결과 다시 확인",
-        "instruction": "‘확정 결과 다시 확인’ 위치입니다.",
+        "title": "수수료 지급 등록, 저장 결과 다시 확인 / 확정 결과 다시 확인",
+        "instruction": "‘저장 결과 다시 확인 / 확정 결과 다시 확인’ 위치입니다.",
         "completionRuleId": "USER_REVIEWED",
         "roles": [
           "SYSTEM_ADMIN",

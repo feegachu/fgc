@@ -509,7 +509,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
           </p>
         )}
         {collapsed && selection ? (
-          <button disabled={busy} onClick={() => (detailedPayment || detailedWorkflow) ? setCollapsed(false) : void show(selection)}>
+          <button disabled={busy} onClick={() => void show(selection)}>
             현재 결과로 이어서 안내
           </button>
         ) : !selection ? (
@@ -725,7 +725,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
           </p>
         )}
         {collapsed && selection ? (
-          <button disabled={busy} onClick={() => (detailedPayment || detailedWorkflow) ? setCollapsed(false) : void show(selection)}>
+          <button disabled={busy} onClick={() => void show(selection)}>
             현재 결과로 이어서 안내
           </button>
         ) : (

@@ -93,3 +93,56 @@ test(`계약별 지급 초안 복원·수정은 기존 식별키를 유지한다
   expect(writes).toEqual(['PUT /api/v1/transactions/12'])
 })
 }
+
+for (const lostResponse of [false, true]) {
+test(`선택한 행만 저장하고 캐시 재진입·응답 유실을 복구한다: ${lostResponse}`, async ({ page }) => {
+  const contract = { contractId: 3, contractNo: 'C-003', contractDate: '2026-07-01' }
+  const item = { commissionItemId: 1, itemCode: 'BASE_COMMISSION', itemName: '기본수수료', cashflowType: 'PAYMENT' }
+  const header = { scheduleHeaderId: 5, activeYn: true, paymentStage: 'GA_TO_FC', scheduleRegime: 'CURRENT', schedulePurpose: 'OPERATIONAL', status: 'CONFIRMED' }
+  const lines = [7, 8].map(id => ({ scheduleLineId: id, contractId: 3, installmentNo: 1, beneficiaryAgentId: 2,
+    recipientName: `설계사${id}`, commissionItemId: 1, commissionItemName: '기본수수료', cashflowType: 'PAYMENT', expectedAmount: 1000,
+    attributionDate: '2026-07-01', dueDate: '2026-07-01', lineStatus: 'PLANNED' }))
+  let payments: Record<string, unknown>[] = []
+  let posts = 0
+  await page.route('**/api/v1/**', async route => {
+    const request = route.request(), path = new URL(request.url()).pathname
+    if (path.endsWith('/transactions/batch') && request.method() === 'POST') {
+      posts++
+      const bodies = request.postDataJSON().payments
+      expect(bodies).toHaveLength(1)
+      payments = bodies.map((body: Record<string, unknown>) => ({ ...body, commissionTransactionId: 12, status: 'DRAFT', updatedAt: '2026-07-01T12:00:00' }))
+      if (lostResponse) return route.abort('failed')
+      return route.fulfill({ json: { data: payments, error: null, requestId: 'batch' } })
+    }
+    const data = path.endsWith('/auth/refresh') ? { accessToken: 'batch-resume' }
+      : path.endsWith('/auth/me') ? { loginId: 'resume', userName: '복원 검증', roleCode: 'SETTLEMENT', canProcess: true, demoMonth: '2026-07' }
+      : path.endsWith('/contracts/3/schedules') ? { headers: [header] }
+      : path.endsWith('/schedules/5') ? { header, lines }
+      : path.endsWith('/contracts/3/transactions') ? { transactions: payments, reconciliations: [] }
+      : path.endsWith('/transactions/12') ? payments[0]
+      : path.endsWith('/contracts/3') ? contract
+      : path.endsWith('/contracts') ? { content: [contract], totalPages: 1 }
+      : path.includes('/commission-items') ? { content: [item], totalPages: 1 } : { content: [], totalPages: 1 }
+    await route.fulfill({ json: { data, error: null, requestId: 'batch' } })
+  })
+  await page.goto('/transactions/new?month=2026-07&contractId=3')
+  const excluded = page.getByRole('checkbox', { name: '설계사8 기본수수료 선택' })
+  await expect(page.getByRole('spinbutton', { name: '귀속금액 7' })).toBeEnabled()
+  await excluded.uncheck()
+  await page.locator('[data-guide-target="payment.batch.save"]').click()
+  if (lostResponse) {
+    await expect(page.locator('[data-guide-target="payment.batch.save"]')).toBeDisabled()
+    await page.getByRole('button', { name: '저장 결과 다시 확인', exact: true }).click()
+  }
+  await expect(page.getByRole('button', { name: '사전검증', exact: true })).toBeEnabled()
+  await page.locator('.contract-payment-editor').getByRole('link', { name: '목록으로', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '수수료 지급 건 목록', exact: true })).toBeVisible()
+  if (!lostResponse) payments[0].status = 'CONFIRMED'
+  await page.locator('.workspace-tab-link').filter({ hasText: '수수료 지급 등록' }).click()
+  if (lostResponse) await expect(page.getByRole('button', { name: '사전검증', exact: true })).toBeEnabled()
+  else await expect(page.getByRole('button', { name: '확정 완료', exact: true })).toBeVisible()
+  await expect(excluded).not.toBeChecked()
+  await expect(page.locator('[data-guide-target="payment.batch.save"]')).toBeDisabled()
+  expect(posts).toBe(1)
+})
+}

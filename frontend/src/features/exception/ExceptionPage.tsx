@@ -96,12 +96,15 @@ export function ExceptionPage() {
     )
   }
   function dismissDetail() {
+    const unsaved = useUnsavedWorkStore.getState()
+    Object.keys(unsaved.owners).filter(owner => owner.startsWith(`exception:${selectedId}:`))
+      .forEach(owner => unsaved.mark(owner, false))
     setConfirmClose(false)
     setParams(current => { const next = new URLSearchParams(current); next.delete('selected'); return next }, { replace: true })
   }
   function closeDetail() {
     if (processing) return
-    if (Object.keys(useUnsavedWorkStore.getState().owners).length) setConfirmClose(true)
+    if (Object.keys(useUnsavedWorkStore.getState().owners).some(owner => owner.startsWith(`exception:${selectedId}:`))) setConfirmClose(true)
     else dismissDetail()
   }
   function reset() {

@@ -9,7 +9,7 @@ export async function loadSchedulePayments(contractId: string, stage: string, mo
   if (!Array.isArray(response.data?.transactions)) throw new Error('기존 지급 건을 확인하지 못했습니다. 다시 조회하세요.')
   // The demo loader also persists one payment per schedule line using its stable GA key.
   // Only exact keys qualify; suffixed split payments and unrelated manual entries stay separate.
-  const keys = new Map(lineIds.flatMap(id => [
+  const keys = new Map<string, number>(lineIds.flatMap(id => [
     [`SCHEDULE-LINE-${stage}-${id}`, id] as const,
     [`GA-${month.replace('-', '')}-L${id}`, id] as const,
   ]))

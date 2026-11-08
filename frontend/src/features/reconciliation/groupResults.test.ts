@@ -31,3 +31,12 @@ it('groups by real validation run, payment direction, insurer and reconciliation
   expect(groups.get('validation:999:GA_TO_FC')).toEqual([runs[0]])
   expect(nodes[0].children![0].children![0].id).toBe('run:10')
 })
+
+it('keeps corrected history selectable but excludes it from parent summary and results', () => {
+  const old: Run = { reconciliationRunId: 1, validationRunId: 9, paymentStage: 'GA_TO_FC', insurerId: 1, superseded: true }
+  const current: Run = { ...old, reconciliationRunId: 2, superseded: false }
+  const { nodes, groups } = runHistoryGroups([current, old])
+  expect(groups.get('validation:9')).toEqual([current])
+  expect(groups.get('validation:9:GA_TO_FC')).toEqual([current])
+  expect(nodes[0].children![0].children!.map(node => node.id)).toEqual(['run:2', 'run:1'])
+})

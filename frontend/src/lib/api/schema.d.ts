@@ -5974,6 +5974,7 @@ export interface components {
             startedAt?: string;
             status?: string;
             statusLabel?: string;
+            superseded?: boolean;
             /** Format: int64 */
             targetCount?: number;
             /** Format: int64 */

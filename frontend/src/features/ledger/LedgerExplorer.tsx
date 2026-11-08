@@ -70,8 +70,8 @@ export function LedgerExplorer() {
           {contract?.agentName && <span>{contract.agentName} · {contract.insurerName}</span>}<small>{selected ? '선택한 분개' : `분개 ${int(totals?.journalCount ?? 0)}건`}</small>
           {selected && <Button data-guide-feature="ledger.explorer.all-entries" variant="ghost" onClick={() => update({ selected: '' })}>전체 내역</Button>}</header>
         <div className="ledger-balance-summary kpi-group">
-          <KpiCard guideId="ledger.kpi.debit" label="차변 합계" value={totals?.debitTotal ?? '—'} unit="원" format={int} footer="조회 범위의 차변 합계" />
-          <KpiCard guideId="ledger.kpi.credit" label="대변 합계" value={totals?.creditTotal ?? '—'} unit="원" format={int} footer="조회 범위의 대변 합계" />
+          <KpiCard guideId="ledger.kpi.debit" label="차변 합계" value={totals?.debitTotal ?? '—'} unit="원" format={int} footer="연결된 분개 전체 금액 · 계약별 배분액 아님" />
+          <KpiCard guideId="ledger.kpi.credit" label="대변 합계" value={totals?.creditTotal ?? '—'} unit="원" format={int} footer="연결된 분개 전체 금액 · 계약별 배분액 아님" />
           <KpiCard guideId="ledger.kpi.balance" label="차변 − 대변" value={totals ? totals.debitTotal - totals.creditTotal : '—'} unit="원" format={int}
             tone={!totals ? 'neutral' : totals.debitTotal === totals.creditTotal ? 'success' : 'error'} footer={!totals ? '조회 대기' : totals.debitTotal === totals.creditTotal ? '차변·대변 균형' : '차변·대변 불일치'} />
         </div>

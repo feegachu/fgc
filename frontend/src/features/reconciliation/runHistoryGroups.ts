@@ -7,7 +7,8 @@ import { RunHistoryCard } from './RunHistoryCard'
 export function runHistoryGroups(runs: Run[]) {
   const groups = new Map<string, Run[]>()
   const group = (id: string, label: string, members: Run[], children: HierarchyNode[]): HierarchyNode => {
-    groups.set(id, members)
+    // Keep old runs selectable as history, but never add them to current totals.
+    groups.set(id, members.filter(run => !run.superseded))
     return { id, label, meta: `${members.length}건`, children }
   }
   const nodes = [...new Set(runs.map(run => run.validationRunId != null ? `validation:${run.validationRunId}` : `standalone:${run.reconciliationRunId}`))].map(key => {

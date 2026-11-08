@@ -256,11 +256,7 @@ export const screenWalkthroughs: Record<string, readonly ScreenHelpStep[]> = {
     target('exception.filters', '예외 조회 조건',
       '유형·상태·계약번호로 범위를 좁히세요.', '조회를 누르고 목록에서 한 건을 선택하세요.'),
     region('exception.list', '.data-table-viewport', '예외 목록',
-      '심각도·상태·계약과 발생 원인을 확인하세요.', '한 건을 누르면 상세 모달에서 확인하고 처리할 수 있습니다.'),
-    target('exception.detail', '검출 근거',
-      '선택한 예외의 원천과 검출 이력을 확인하세요.', '최신 실행에서 다시 검출되었는지도 살펴보세요.'),
-    target('exception.action', '처리와 이력',
-      '조치를 선택하고 사유·증빙을 입력하세요.', '원천 정정과 재검증은 별도로 진행합니다.')
+      '심각도·상태·계약과 발생 원인을 확인하세요.', '한 건을 열고 상세 모달의 도움말에서 처리 방법을 확인하세요.')
   ).map(step => ({ ...step, anchor: undefined, presentation: { fixedCard: 'right' as const, allowPageScroll: true } })),
   'EXCP-W01.action': tour('예외 처리 입력',
     feature('features.exception.action-panel.select', '처리 조치 선택',

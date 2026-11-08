@@ -58,4 +58,21 @@ class JournalExplorerRepositoryIntegrationTest {
         assertThat(commonResult.journals().content()).extracting(JournalExplorer.Entry::journalHeaderId).containsExactly(common);
         assertThat(repository.explore(filter(null),null,true,null,1,1,20).journals().totalElements()).isEqualTo(3);
     }
+    @Test void sharedJournalKeepsWholeEntryPerContractButCountsOnceInAllTotals() {
+        var contracts = jdbc.queryForList("SELECT contract_id FROM fgc.insurance_contract ORDER BY contract_id LIMIT 2", Long.class);
+        long id = header("EXP-TEST-SHARED", null);
+        line(id,1,"EXPECTED_RECEIVABLE",contracts.get(0),30000,0);
+        line(id,2,"EXPECTED_RECEIVABLE",contracts.get(1),20000,0);
+        line(id,3,"EXPECTED_INCOME",null,0,50000);
+        for (Long contract : contracts) {
+            var selected = repository.explore(filter(null),contract,false,null,1,1,20);
+            assertThat(selected.totals().debitTotal()).isEqualByComparingTo("50000");
+            assertThat(selected.totals().creditTotal()).isEqualByComparingTo("50000");
+            assertThat(selected.journals().content().getFirst().lines()).hasSize(3);
+        }
+        var all = repository.explore(filter(null),null,true,null,1,1,20);
+        assertThat(all.contracts().totalElements()).isEqualTo(2);
+        assertThat(all.journals().totalElements()).isEqualTo(1);
+        assertThat(all.totals().debitTotal()).isEqualByComparingTo("50000");
+    }
 }

@@ -36,6 +36,7 @@ public record ReconciliationRunHistoryResponse(
         BigDecimal actualTotal,
         BigDecimal differenceTotal,
         BigDecimal matchRatePct,
-        Integer validationRunNo
+        Integer validationRunNo,
+        boolean superseded
 ) {
 }

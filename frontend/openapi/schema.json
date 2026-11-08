@@ -9761,6 +9761,9 @@
           "statusLabel" : {
             "type" : "string"
           },
+          "superseded" : {
+            "type" : "boolean"
+          },
           "targetCount" : {
             "format" : "int64",
             "type" : "integer"

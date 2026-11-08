@@ -96,6 +96,6 @@ public class ReconciliationRunHistoryServiceImpl implements ReconciliationRunHis
                 DateUtil.toSeoul(row.getFinalizedAt()), row.getFinalizedBy(),
                 row.getTargetCount(), row.getMatchedCount(), row.getExceptionCount(),
                 row.getExpectedTotal(), row.getActualTotal(), row.getDifferenceTotal(),
-                matchRatePct, row.getValidationRunNo());
+                matchRatePct, row.getValidationRunNo(), row.isSuperseded());
     }
 }

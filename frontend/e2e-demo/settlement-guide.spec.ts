@@ -1,6 +1,29 @@
-import { test, expect, login, completeMonthly } from './fixtures'
+import { test, expect, login, completeMonthly, sql } from './fixtures'
 
 test.use({ video: 'off' })
+
+test('FUN-088 실제 서버: 접은 가이드를 기존 계약의 현재 결과로 이어서 안내한다', async ({ page }) => {
+  const contract = sql("SELECT contract_id FROM fgc.insurance_contract WHERE contract_no='FGC-FGL01-202607-0002'")
+  await login(page, 'settle01', `/contracts/${contract}?month=2026-07`)
+  await page.getByRole('link', { name: 'FGC 업무 대시보드', exact: true }).click()
+  await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
+  await page.getByRole('dialog', { name: '전체 업무 가이드', exact: true }).getByRole('button', { name: '계약 생성부터 시작' }).click()
+  const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
+  await expect(guide.getByRole('heading', { name: '계약일', exact: true })).toBeVisible()
+  await guide.getByRole('button', { name: '접기', exact: true }).click()
+  await page.locator('.workspace-tab-link').filter({ hasText: '보험계약 상세' }).click()
+  await expect(page).toHaveURL(new RegExp(`/contracts/${contract}\\?`))
+  const writes: string[] = []
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()) && path.startsWith('/api/v1/') && !path.startsWith('/api/v1/auth/')) writes.push(path)
+  })
+  await guide.getByRole('button', { name: '현재 결과로 이어서 안내', exact: true }).click()
+  await expect(guide).toContainText('전체 업무 가이드 · 2/9')
+  await expect(guide.getByRole('heading', { name: '조회 조건', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/schedules\?/)
+  expect(writes).toEqual([])
+})
 
 test('FUN-088 실제 서버: 전체 업무 가이드는 계약 생성 화면에서 시작하고 저장을 대신하지 않는다', async ({ page }) => {
   await login(page, 'settle01', '/?month=2026-07')

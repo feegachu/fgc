@@ -300,6 +300,7 @@ test('SCHE DoD CT-C02: 실제 상태 효과 API와 회차 원천 사건 표시�
     const viewport = element.closest('.data-table-viewport')!
     viewport.scrollLeft = viewport.scrollWidth
   })
+  await row.getByText('상태 변경 있음', { exact: true }).scrollIntoViewIfNeeded()
   await expect(row.getByText('상태 변경 있음', { exact: true })).toBeInViewport()
   await page.screenshot({ path: info.outputPath('real-source-status-event.png'), fullPage: true })
 })
