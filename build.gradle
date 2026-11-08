@@ -5,9 +5,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath platform('com.fasterxml.jackson:jackson-bom:2.21.7')
+        classpath platform('com.fasterxml.jackson:jackson-bom:2.22.4')
         constraints {
-            classpath 'org.apache.commons:commons-lang3:3.20.0'
+            classpath 'org.apache.commons:commons-lang3:3.21.0'
         }
     }
 }
@@ -81,7 +81,7 @@ dependencies {
     // 외부 LLM(SER-013·IF-EXT-03) — OI-023 결정: OpenAI 공식 Java SDK, Spring AI 는 2차 미사용. 호출은 ai.service.LlmGateway 한 곳에서만.
     // SDK 가 끌어오는 비-jakarta swagger-annotations 2.2.31 이 springdoc 의 swagger-annotations-jakarta 와 같은 패키지라
     // bootJar 에서 먼저 잡히면 /v3/api-docs 가 500(NoSuchMethodError Schema.$dynamicRef)이다. 같은 클래스는 jakarta 판이 제공한다.
-    implementation('com.openai:openai-java:4.94.0') {
+    implementation('com.openai:openai-java:4.100.0') {
         exclude group: 'io.swagger.core.v3', module: 'swagger-annotations'
     }
 
