@@ -162,11 +162,12 @@
   & .ah-status-legend em { margin-left: auto; font-style: normal; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* 상품 추천 AI 런처: 오른쪽 아래에 떠 있는 마스코트와 회전 테두리 라벨(#739 디자인) */
-  & .ah-launcher { position: fixed; right: 16px; bottom: 16px; z-index: calc(var(--z-overlay, 80) - 3); display: grid; place-items: center; width: 96px; height: 96px; padding: 0; background: none; border: 0; cursor: pointer; }
+  & .ah-launcher { --ah-pico: 92px; position: fixed; right: 16px; bottom: 16px; z-index: calc(var(--z-overlay, 80) - 3); display: grid; place-items: center; width: 96px; height: 96px; padding: 0; background: none; border: 0; cursor: pointer; }
   /* 캐릭터 자체는 가만히 있는 모션(Bear Still)이고, 런처 전체가 위아래로 떠다닌다 */
   & .ah-launcher-mascot { display: block; filter: drop-shadow(0 6px 10px rgb(15 23 42 / 22%)); animation: ah-float 3.2s ease-in-out infinite; will-change: transform; }
   & .ah-launcher:hover .ah-launcher-mascot, & .ah-launcher:focus-visible .ah-launcher-mascot { animation-play-state: paused; }
-  & .ah-launcher-label { position: absolute; right: 100px; bottom: 30px; padding: 8px 13px; border: 2.5px solid transparent; border-radius: 20px; background: linear-gradient(#fff, #fff) padding-box, conic-gradient(from var(--ah-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box; animation: ah-border-spin 3.4s linear infinite; box-shadow: 0 1px 2px rgb(15 23 42 / 6%); font-size: 15px; font-weight: 600; color: #6a4893; white-space: nowrap; }
+  /* 문구 블록은 캐릭터 크기(--ah-pico)에 비례한다. 캐릭터를 키우거나 줄이면 이 변수만 바꾼다. */
+  & .ah-launcher-label { position: absolute; right: calc(var(--ah-pico) + 8px); bottom: calc(var(--ah-pico) * 0.33); padding: calc(var(--ah-pico) * 0.075) calc(var(--ah-pico) * 0.11); border: calc(var(--ah-pico) * 0.027) solid transparent; border-radius: calc(var(--ah-pico) * 0.2); background: linear-gradient(#fff, #fff) padding-box, conic-gradient(from var(--ah-angle), #6a4893, #b79be0, #9a76c2, #7f57ac, #d3c3ee, #6a4893) border-box; animation: ah-border-spin 3.4s linear infinite; box-shadow: 0 1px 2px rgb(15 23 42 / 6%); font-size: calc(var(--ah-pico) * 0.13); font-weight: 600; color: #6a4893; white-space: nowrap; }
 }
 @keyframes ah-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
 @property --ah-angle {
@@ -192,9 +193,8 @@
   .ah .ah-donut-flex { flex-direction: column; align-items: stretch; }
   .ah .ah-donut-canvas { align-self: center; }
   .ah .ah-donut-legend { flex: none; width: 100%; }
-  .ah .ah-launcher { width: 104px; height: 104px; right: 16px; bottom: 78px; }
+  .ah .ah-launcher { --ah-pico: 100px; width: 104px; height: 104px; right: 16px; bottom: 78px; }
   .ah .ah-launcher .ah-launcher-mascot { --pico-size: 100px !important; } /* PicoMotion 이 인라인으로 준 크기보다 우선 */
-  .ah .ah-launcher-label { right: 108px; bottom: 32px; padding: 8px 13px; border-width: 2px; font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ah .ah-slice, .ah .ah-bar, .ah .ah-pd-fill, .ah .ah-status-bar span, .ah .ah-seg-thumb { transition: none; }
