@@ -132,11 +132,11 @@ describe('AGNT-W01 포트폴리오', () => {
   it('판매 관리 필터는 서버에 기간·보험사 구분·보험사를 보내 다시 집계한다', async () => {
     renderHome()
     const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
-    expect(within(panel).getByText('최근 12개월, 전체 보험사')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '12개월' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(panel).getByText('합계 3건')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: '손해' }))
     await waitFor(() => expect(homeCalls().some((p) => p.includes('insurerType=NON_LIFE'))).toBe(true))
-    expect(within(panel).getByText('최근 12개월, 손해보험')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '손해' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(within(panel).getByRole('button', { name: '6개월' }))
     await waitFor(() => expect(homeCalls().some((p) => p.includes('period=6') && p.includes('insurerType=NON_LIFE'))).toBe(true))
     await userEvent.click(within(panel).getAllByRole('button', { name: '전체' })[1])
@@ -147,10 +147,12 @@ describe('AGNT-W01 포트폴리오', () => {
     expect(within(panel).queryByText('B손해 필터 적용 중')).not.toBeInTheDocument()
   })
 
-  it('기준일·집계 기간·분모와 수수료 기준월을 화면에 표시한다', async () => {
+  it('판매 관리 블록의 보조 문구(기간·보험사 구분, 기준일·집계 기간·계약)는 보이지 않고 수수료 기준월은 그대로 표시한다', async () => {
     renderHome()
     const panel = await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })
-    expect(panel).toHaveTextContent('기준일 2026-07-31, 집계 기간 2025-08-01 ~ 2026-07-31, 계약 3건')
+    expect(panel).not.toHaveTextContent('최근 12개월, 전체 보험사')
+    expect(panel).not.toHaveTextContent('기준일')
+    expect(panel).not.toHaveTextContent('집계 기간')
     expect(await screen.findByLabelText('수령 예정 수수료')).toHaveTextContent('2026-07 기준')
   })
 
@@ -280,12 +282,13 @@ describe('AGNT-W01 로딩·권한·늦은 응답 (#714 DoD)', () => {
     await waitFor(() => expect(pending.nonLife).toBeDefined())
     await userEvent.click(within(panel).getByRole('button', { name: '생명' }))
     await waitFor(() => expect(pending.life).toBeDefined())
-    pending.life(envelope(baseHome({ range: { from: '2024-02-01', to: '2026-07-31' } })))
-    await waitFor(() => expect(panel).toHaveTextContent('2024-02-01'))
-    pending.nonLife(envelope(baseHome({ range: { from: '2020-03-01', to: '2026-07-31' } })))
+    // 응답을 구분하는 값으로 합계 건수를 쓴다(최신 조건=생명 7건, 늦게 온 이전 조건=손해 9건).
+    pending.life(envelope(baseHome({ portfolio: { ...baseHome().portfolio, contractCount: 7 } })))
+    await waitFor(() => expect(panel).toHaveTextContent('합계 7건'))
+    pending.nonLife(envelope(baseHome({ portfolio: { ...baseHome().portfolio, contractCount: 9 } })))
     await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(panel).toHaveTextContent('2024-02-01')
-    expect(panel).not.toHaveTextContent('2020-03-01')
+    expect(panel).toHaveTextContent('합계 7건')
+    expect(panel).not.toHaveTextContent('합계 9건')
   })
 })
 
@@ -310,7 +313,7 @@ describe('상품 추천 AI', () => {
     await userEvent.click(await screen.findByRole('button', { name: '상품 추천 AI' }))
     await screen.findByRole('dialog', { name: '상품 추천 AI' })
     await userEvent.keyboard('{Escape}')
-    expect(within(await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })).getByText('최근 6개월, 전체 보험사')).toBeInTheDocument()
+    expect(within(await screen.findByRole('region', { name: '설계사 판매 관리 그래프' })).getByRole('button', { name: '6개월' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('관리자 역할은 포트폴리오에 접근할 수 없다', async () => {
