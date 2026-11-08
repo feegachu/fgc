@@ -1026,6 +1026,21 @@
         "next": []
       },
       {
+        "stepId": "help.8420c58684bd2324124cfe21ad5b74a8",
+        "screenId": "CONT-W02",
+        "targetId": "features.acquisition-cost.contract-acquisition-cost.results",
+        "title": "보험계약 상세, 전체 결과 보기",
+        "instruction": "‘전체 결과 보기’ 위치입니다.",
+        "completionRuleId": "USER_REVIEWED",
+        "roles": [
+          "SYSTEM_ADMIN",
+          "GA_ADMIN",
+          "SETTLEMENT",
+          "COMPLIANCE"
+        ],
+        "next": []
+      },
+      {
         "stepId": "help.92a30c52e377623c36c07803cbe1aff4",
         "screenId": "CONT-W02",
         "targetId": "features.acquisition-cost.contract-acquisition-cost.select",

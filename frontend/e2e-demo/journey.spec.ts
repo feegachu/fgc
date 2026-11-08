@@ -236,12 +236,12 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
   await expect(conditions).toHaveCount(8)
   for (const [index, condition] of checklist.conditions.entries()) {
     await expect(conditions.nth(index)).toContainText(`${condition.no}. ${condition.label}`)
-    await expect(conditions.nth(index).locator('.vrun-checklist-result')).toContainText(
+    await expect(conditions.nth(index).locator('.vrun-checklist-label')).toContainText(
       condition.passed ? '통과' : `미충족 ${condition.count}건`,
     )
   }
   await expect(page.locator('#finalize-action-note')).toHaveText(
-    '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.',
+    '위 8개 조건을 모두 통과하면 확정할 수 있습니다.',
   )
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
   const pending = await api(
@@ -262,12 +262,13 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
       await page.getByRole('button', { name: '처리 저장' }).click()
       await successful(saved)
     }
+    await page.getByRole('dialog', { name: /^예외 상세/ }).getByRole('button', { name: '창 닫기' }).click()
   }
   const ready = await api(page, `/validation-runs/${run.validationRunId}/finalize-checklist`)
   expect(ready.passed, JSON.stringify(ready.conditions)).toBe(true)
   await login(page, 'gaadmin', `/validation-runs/${run.validationRunId}?month=2026-07`)
   await expect(conditions).toHaveCount(8)
-  await expect(conditions.locator('.vrun-checklist-result')).toHaveText(Array(8).fill('통과'))
+  await expect(conditions.locator('.vrun-checklist-label > span')).toHaveText(Array(8).fill(' · 통과'))
   await expect(page.getByText('8개 조건 모두 통과', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '확정', exact: true }).click()

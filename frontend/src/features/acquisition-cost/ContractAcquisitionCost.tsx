@@ -13,7 +13,7 @@ import { ContractAcquisitionTable } from './ContractAcquisitionTable'
 /** 계약 상세의 작은 영역(스크럼 4차). 이 계약의 최근 결과만 보이고, 목록과 이력은 ACQC-W01에서 본다. */
 export function ContractAcquisitionCost({ contractId, contractNo, concise = false }: { contractId: string; contractNo?: string; concise?: boolean }) {
   return concise ? <>
-    <Link to={`/acquisition-cost-checks?contractNo=${encodeURIComponent(contractNo ?? '')}`}>전체 결과 보기</Link>
+    <Link data-guide-feature="features.acquisition-cost.contract-acquisition-cost.results" to={`/acquisition-cost-checks?contractNo=${encodeURIComponent(contractNo ?? '')}`}>전체 결과 보기</Link>
     <ContractAcquisitionTable contractId={contractId} />
   </> : <LegacyContractAcquisitionCost contractId={contractId} contractNo={contractNo} />
 }

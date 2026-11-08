@@ -26,7 +26,7 @@ for (const width of [1440, 390]) {
       const coach = await card.boundingBox()
       return Boolean(target && coach && coach.x >= 0 && coach.y >= 0 && coach.x + coach.width <= width + 1 && coach.y + coach.height <= 901 && !(target.x < coach.x + coach.width && target.x + target.width > coach.x && target.y < coach.y + coach.height && target.y + target.height > coach.y))
     }).toBe(true)
-    expect(await spotlight.evaluate(element => getComputedStyle(element).transitionDuration)).toBe('0.2s, 0.2s, 0.2s, 0.2s')
+    expect(await spotlight.evaluate(element => getComputedStyle(element).transitionDuration)).toBe('0.7s, 0.7s, 0.7s, 0.7s')
     await page.screenshot({ path: info.outputPath('01-layout.png'), fullPage: true })
     await card.getByRole('button', { name: '접기', exact: true }).focus()
     await page.keyboard.press('Enter')

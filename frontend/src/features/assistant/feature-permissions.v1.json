@@ -188,6 +188,7 @@
     "features.acquisition-cost.acquisition-cost-result.section": "INTERNAL_READ",
     "features.acquisition-cost.contract-acquisition-cost.button": "CAN_PROCESS",
     "features.acquisition-cost.contract-acquisition-cost.link": "INTERNAL_READ",
+    "features.acquisition-cost.contract-acquisition-cost.results": "INTERNAL_READ",
     "features.acquisition-cost.contract-acquisition-cost.select": "INTERNAL_READ",
     "features.agent-home.agent-home-page.button": "AGENT",
     "features.agent-home.agent-home-page.button-2": "AGENT",

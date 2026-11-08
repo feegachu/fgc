@@ -67,7 +67,7 @@ class AgentStatementIntegrationTest {
         assertThat(own.paymentAmount()).isEqualByComparingTo(expected);
         var excluded = statements.overview(new com.susukkang.fgc.report.repository.AgentStatementRepository.Filter(
                 0, month, "E2E-NO-MATCH-' OR 1=1 --", Long.MAX_VALUE, "PAYMENT"));
-        assertThat(excluded).allSatisfy(row -> {
+        assertThat(excluded).isNotEmpty().allSatisfy(row -> {
             assertThat(row.entryCount()).isZero();
             assertThat(row.paymentAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         });

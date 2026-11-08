@@ -660,6 +660,11 @@
     "element": "Link"
   },
   {
+    "id": "features.acquisition-cost.contract-acquisition-cost.results",
+    "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
+    "element": "Link"
+  },
+  {
     "id": "features.acquisition-cost.contract-acquisition-cost.select",
     "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
     "element": "select"
