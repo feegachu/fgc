@@ -12,17 +12,16 @@
 FROM docker.io/library/eclipse-temurin:21-jdk AS build
 WORKDIR /src
 COPY . .
-# gradlew(Gradle 9.7)가 스스로 내려받는다. 테스트는 DB 컨테이너가 필요해 여기서 제외한다.
+# 로컬 소스 빌드용. CI는 테스트를 통과한 WAR를 ci-runtime 타깃에 전달한다.
 RUN chmod +x gradlew && ./gradlew bootWar -x test --no-daemon
 
 # ---------- 2단계: 실행 ----------
 # 태그를 고정한다 — "10.1-jre21" 은 날마다 다른 이미지라 스캔 결과가 재현되지 않는다 (교안: 리허설 후 Digest 고정)
-FROM docker.io/library/tomcat:10.1.60-jre21
+FROM docker.io/library/tomcat:10.1.60-jre21 AS runtime-base
 # base OS(Ubuntu) 패키지 CVE — 빌드 시점의 보안 패치 반영
 # /usr/bin/pebble: 베이스 이미지의 Go 프로세스 관리자. 실행 명령은 catalina.sh 이고 쓰는 곳이 없는데 Trivy HIGH 4건(Go stdlib)이 이 파일에서만 나와 지운다 (#677)
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
  && rm -rf /usr/local/tomcat/webapps/* /usr/bin/pebble
-COPY --from=build /src/build/libs/fgc-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
 
 # 앞단 nginx 가 TLS 를 끝내고 X-Forwarded-Proto/For 를 넘긴다(nginx/default.conf.template). 외장 Tomcat 은
 # application.yml 의 server.forward-headers-strategy(내장 Tomcat 전용)를 읽지 않으므로 같은 일을 RemoteIpValve 가 한다.
@@ -43,3 +42,11 @@ ENV SPRING_DATASOURCE_URL="jdbc:postgresql://127.0.0.1:5432/fgc?currentSchema=fg
 
 EXPOSE 8080
 CMD ["catalina.sh", "run"]
+
+# CI: WAR 하나만 있는 컨텍스트를 사용하므로 Gradle·소스를 다시 내려받거나 빌드하지 않는다.
+FROM runtime-base AS ci-runtime
+COPY fgc-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
+
+# 기본 타깃은 기존 로컬 소스 빌드 사용법을 유지한다.
+FROM runtime-base AS runtime
+COPY --from=build /src/build/libs/fgc-0.0.1-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war

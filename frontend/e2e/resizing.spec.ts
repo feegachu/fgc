@@ -131,21 +131,30 @@ for (const [path, label] of [
       const layout = page.locator('.ledger-explorer-layout')
       await expect(layout).toBeVisible()
       await expect(page.getByRole('separator', { name: label, exact: true })).toHaveCount(0)
-      await page.setViewportSize({ width: 390, height: 844 })
-      await expect(layout).toBeVisible()
-      await expect(page.locator('.app-shell')).toHaveClass(/is-sidebar-collapsed/)
-      // Check every frame during the old sidebar transition, not just the settled layout.
-      const widths = await page.evaluate(() => new Promise<number[]>((resolve) => {
+      const collector = await page.evaluateHandle(() => {
         const samples: number[] = []
-        const start = performance.now()
+        let frame = 0
+        /** Collect mobile frames from before resize until the caller stops observation. */
         function sample() {
-          samples.push(document.documentElement.scrollWidth)
-          if (performance.now() - start < 400) requestAnimationFrame(sample)
-          else resolve(samples)
+          if (window.innerWidth === 390) samples.push(document.documentElement.scrollWidth)
+          frame = requestAnimationFrame(sample)
         }
         sample()
-      }))
-      expect(Math.max(...widths)).toBeLessThanOrEqual(390)
+        return { stop: () => { cancelAnimationFrame(frame); return samples } }
+      })
+      try {
+        await page.setViewportSize({ width: 390, height: 844 })
+        await expect(layout).toBeVisible()
+        await expect(page.locator('.app-shell')).toHaveClass(/is-sidebar-collapsed/)
+        // Keep observing after state updates, without discarding the earliest resize frames.
+        await page.waitForTimeout(400)
+        const widths = await collector.evaluate((value) => value.stop())
+        expect(widths.length).toBeGreaterThan(0)
+        expect(Math.max(...widths)).toBeLessThanOrEqual(390)
+      } finally {
+        await collector.evaluate((value) => value.stop())
+        await collector.dispose()
+      }
       return
     }
     const handle = page.getByRole('separator', { name: label, exact: true })
