@@ -78,25 +78,28 @@ final class CompareAskTools {
     /** '1위'처럼 순위를 말하는 표기. 소수점·쉼표 뒤의 숫자(금액 일부)는 순위로 보지 않는다. */
     private static final Pattern RANK_LABEL = Pattern.compile("(?<![\\d,.])(\\d{1,3})\\s*위(?!\\d)");
     /** '가장 큰/높은/많은'(최댓값) 또는 '가장 작은/낮은/적은'(최솟값) 주장. */
-    private static final Pattern SUPERLATIVE = Pattern.compile("가장\\s*(큰|크|커|높|많|작은|작|낮|적)");
+    private static final Pattern SUPERLATIVE = Pattern.compile("가장\\s*(큰|크|커|높|많|작은|작|낮|적)", Pattern.CANON_EQ);
     /** '한도에 걸렸다·도달했다·초과했다' 처럼 한도에 닿았다는 주장. 조사가 없는 '한도 초과 시'(설명)는 잡지 않는다. */
-    private static final Pattern CAP_HIT = Pattern.compile("한도(?:에|를|까지)\\s*(?:걸|도달|초과|넘|닿)(?!는|하는)");
+    private static final Pattern CAP_HIT = Pattern.compile("한도(?:[에를]|까지)\\s*(?:걸|도달|초과|[넘닿])(?!는|하는)", Pattern.CANON_EQ);
     /** 상품을 짚지 않은 문장은 "모든/전체 상품"처럼 전체를 말할 때만 상태 주장으로 본다(용어 설명의 "한도를 넘는 금액은…"은 제외). */
-    private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체");
-    private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에");
+    private static final Pattern ALL_SCOPE = Pattern.compile("모두|모든|전부|전체", Pattern.CANON_EQ);
+    private static final Pattern CONDITIONAL = Pattern.compile("하면|이면|으면|라면|경우|만약|시\\s|시에", Pattern.CANON_EQ);
     /** 한도 도달 표현. 한 문장에서 긍정과 부정이 섞이면('1위는 걸렸고 2위는 걸리지 않았어요') 주장이 섞여 있어 판단하지 않는다. */
-    private static final Pattern CAP_VERB = Pattern.compile("걸리|걸려|걸렸|걸린|도달|초과|넘|닿");
+    private static final Pattern CAP_VERB = Pattern.compile("걸[리려렸린]|도달|초과|[넘닿]", Pattern.CANON_EQ);
     /** 답에 서버 내부 도구를 드러내는 말('도구를 통해 제공하며', 'get_item'). 설계사에게는 의미 없는 내부 구현이라 답으로 내보내지 않는다. '보조 도구예요' 같은 일반 용례는 막지 않는다. */
-    private static final Pattern TOOL_MENTION = Pattern.compile("(?:내부|서버)\\s*도구|도구\\s*(?:를|로|가|값|호출|결과)|get_item|explain_term|compare\\s*\\(|함수\\s*호출");
+    private static final List<Pattern> TOOL_MENTIONS = List.of(
+            Pattern.compile("(?:내부|서버)\\s*도구|함수\\s*호출", Pattern.CANON_EQ),
+            Pattern.compile("도구\\s*(?:[를로가값]|호출|결과)", Pattern.CANON_EQ),
+            Pattern.compile("get_item|explain_term|compare\\s*\\(", Pattern.CANON_EQ));
     /** 도달 표현과 부정 사이에 끼는 활용('초과되지', '넘어서지', '걸려 있지', '초과하지'). */
-    private static final Pattern NEGATION_TAIL = Pattern.compile("^(?:[하한]|되|돼|[어아해]서|\\s*있)?");
+    private static final Pattern NEGATION_TAIL = Pattern.compile("^(?:[하한되돼]|[어아해]서|\\s*있)?", Pattern.CANON_EQ);
     private static final List<Pattern> NEGATIONS = List.of(
-            Pattern.compile("^[지진]도?는?\\s*(?:않|못|아니)"),
-            Pattern.compile("^[은는]?\\s*(?:적|일|경우|상태)(?:이|가|은|는|도)?\\s*(?:전혀\\s*)?(?:없|아니)"));
+            Pattern.compile("^[지진]도?는?\\s*(?:[않못]|아니)", Pattern.CANON_EQ),
+            Pattern.compile("^[은는]?\\s*(?:적|일|경우|상태)[이가은는도]?\\s*(?:전혀\\s*)?(?:없|아니)", Pattern.CANON_EQ));
 
-    private static final Pattern ANY_NEGATION = Pattern.compile("않|없|못|아니");
+    private static final Pattern ANY_NEGATION = Pattern.compile("[않없못]|아니", Pattern.CANON_EQ);
     /** '한도를 넘어 받지 못한 금액이 있어요'처럼 못 받은 금액이 있다는 말. 부정어가 있어도 한도에 걸렸다는 긍정 주장이다. */
-    private static final Pattern UNRECEIVED_AMOUNT_EXISTS = Pattern.compile("(?:못|않)(?:(?!않|없|못|아니)[^,.!?]){0,10}?(?:금액|수수료|분)(?:이|은)?\\s*있");
+    private static final Pattern UNRECEIVED_AMOUNT_EXISTS = Pattern.compile("[못않](?:(?![않없못]|아니)[^,.!?]){0,10}?(?:금액|수수료|분)[이은]?\\s*있", Pattern.CANON_EQ);
     private static final int POSITIVE = 0;
     private static final int NEGATED = 1;
     private static final int UNCLEAR = 2;
@@ -286,7 +289,7 @@ final class CompareAskTools {
         if (RECOMMEND_PHRASES.stream().anyMatch(normalized::contains)) {
             return "RECOMMENDATION";
         }
-        if (TOOL_MENTION.matcher(normalized).find()) {
+        if (TOOL_MENTIONS.stream().anyMatch(pattern -> pattern.matcher(normalized).find())) {
             return "TOOL_MENTION";
         }
         // 금액·비율은 서버 문장이 맡는다. 보험사·상품 이름 안의 숫자, 용어 '1,200% 룰', 표시 중인 범위의 순위 표기('1위')만 예외다.
@@ -378,9 +381,12 @@ final class CompareAskTools {
     }
 
     /** 항목 없이 '가장 앞섰다'고만 쓴 문장('A가 가장 앞섰어요'). 순위는 종합 결과라서 이렇게 말할 수 있는 상품은 1위뿐이다(#919 C-R1). */
-    private static final Pattern LEAD_CLAIM = Pattern.compile("(?:가장|제일|맨)(?:\\s*먼저)?\\s*(?:앞섰|앞서|앞선|우수|상위)");
+    private static final Pattern LEAD_CLAIM = Pattern.compile("(?:가장|제일|맨)(?:\\s*먼저)?\\s*(?:앞섰|앞서|앞선|우수|상위)", Pattern.CANON_EQ);
 
-    private static final Pattern LEAD_NEGATION = Pattern.compile("^(?:[하한])?(?:[지진]도?는?\\s*(?:않|못)|\\s*(?:상품|것|쪽|곳)?(?:이|가|은|는)?\\s*아니)");
+    /** 두 갈래(하지 않았다 / 아니다)로 나눠 한 식의 복잡도를 줄이고, 소유 수량자로 되돌림(backtracking)을 막는다. */
+    private static final List<Pattern> LEAD_NEGATIONS = List.of(
+            Pattern.compile("^[하한]?[지진]도?는?\\s*+[않못]", Pattern.CANON_EQ),
+            Pattern.compile("^[하한]?\\s*+(?:상품|것|쪽|곳)?+[이가은는]?+\\s*+아니", Pattern.CANON_EQ));
 
     private String verifyLeadClaim(String sentence) {
         if (!LEAD_CLAIM.matcher(sentence).find() || CONDITIONAL.matcher(sentence).find() || sentence.contains("다면")) {
@@ -398,7 +404,8 @@ final class CompareAskTools {
             return null;
         }
         // '가장 앞서지 않았어요', '가장 앞선 상품이 아니에요'는 1위가 아닐 때만 맞다.
-        boolean negated = LEAD_NEGATION.matcher(sentence.substring(lead.end())).find();
+        String afterLead = sentence.substring(lead.end());
+        boolean negated = LEAD_NEGATIONS.stream().anyMatch(pattern -> pattern.matcher(afterLead).find());
         return mentioned.contains(top) == negated ? "LEAD_MISMATCH" : null;
     }
 

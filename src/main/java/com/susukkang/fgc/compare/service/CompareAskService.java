@@ -95,7 +95,10 @@ public class CompareAskService {
     /** 챗봇 자체를 묻는 질문(역할·소개·무엇을 알려 주는지). */
     private static final Pattern INTRO_QUESTION = Pattern.compile("역할|뭘 알려|무엇을 알려|뭐 하는|뭐하는|누구|소개|무슨 기능|AI야|ai야", Pattern.CANON_EQ);
     /** 특정 순위가 아니라 순위를 정하는 방식을 묻는 질문('순위가 어떻게 정해졌어?'). 이런 질문에는 2위 같은 특정 순위의 금액 문장을 붙이지 않는다(#919). */
-    private static final Pattern CRITERIA_QUESTION = Pattern.compile("순위.{0,6}(?:어떻게|무슨|뭘|무엇).{0,6}(?:정해|정하|결정|산정|매겨|나와|나뉘)|순위.{0,4}(?:기준|방식)|(?:정하는|정해지는|매기는)\\s*(?:기준|방식)", Pattern.CANON_EQ);
+    private static final List<Pattern> CRITERIA_QUESTIONS = List.of(
+            Pattern.compile("순위.{0,6}(?:어떻게|무슨|뭘|무엇).{0,6}(?:정해|정하|결정|산정|매겨|나와|나뉘)", Pattern.CANON_EQ),
+            Pattern.compile("순위.{0,4}(?:기준|방식)", Pattern.CANON_EQ),
+            Pattern.compile("(?:정하는|정해지는|매기는)\\s*(?:기준|방식)", Pattern.CANON_EQ));
     static final String RANK_CRITERIA = "이 서비스가 쓰는 가정 산식(compare-net-v1) 기준으로, 순위는 보수적 순수령액이 큰 순서로 정해요. 같으면 환수 노출액이 작은 쪽이, 그래도 같으면 상품 등록 순서가 앞서요. 순위는 참고용이라 최종 선택은 설계사님이 해요.";
     private static final Pattern RANK_QUESTION = Pattern.compile("\\d+\\s*(?:순위|위|등)(?!급)|순위|차이|비교", Pattern.CANON_EQ);
     private static final List<String> FORBIDDEN = CompareSummaryService.FORBIDDEN;
@@ -283,7 +286,7 @@ public class CompareAskService {
 
     /** 순위를 정하는 방식을 묻는 질문. 용어를 함께 물었으면 용어 답이 먼저다. */
     static boolean isCriteriaQuestion(String question) {
-        return CRITERIA_QUESTION.matcher(question).find() && !isGlossaryQuestion(question);
+        return CRITERIA_QUESTIONS.stream().anyMatch(pattern -> pattern.matcher(question).find()) && !isGlossaryQuestion(question);
     }
 
     private static boolean hasItems(CompareRankingResponse ranking) {

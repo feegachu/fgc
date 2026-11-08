@@ -192,9 +192,8 @@ class CompareAskToolsTest {
         assertThat(tools.verify("1위보다 2위가 나보험 튼튼건강이에요.")).isNull();
     }
 
-    @Test
-    @DisplayName("'한도에 걸렸다'는 말한 상품 모두에 이월이 있어야 맞고, 섞인 주장은 판단하지 않는다")
-    void capStateClaimsNeedEveryMentionedProductToCarryOver() {
+    /** 1위 든든건강(이월 없음), 2위 튼튼건강(이월 100,000), 3위 편한건강(이월 없음)으로 1위 항목을 조회한 도구. */
+    private CompareAskTools capStateTools() {
         CompareRankingResponse base = ranking();
         Item first = new Item(1, 1, "가보험", "든든건강", 784_000, 734_000, 0, 50_000, 684_000, 90.5, null, List.of());
         Item second = new Item(2, 2, "나보험", "튼튼건강", 700_000, 650_000, 100_000, 16_000, 634_000, 80.0, null, List.of());
@@ -203,6 +202,13 @@ class CompareAskToolsTest {
                 base.categoryLabel(), base.asOf(), base.ruleVersion(), base.policyVersion(), base.basePremium(), base.clawbackMonth(),
                 base.warnings(), null, List.of(first, second, third), List.of(), CompareRankingFilters.NONE));
         tools.run("get_item", RANK_1);
+        return tools;
+    }
+
+    @Test
+    @DisplayName("'한도에 걸렸다'는 말한 상품 모두에 이월이 있어야 맞고, 섞인 주장은 판단하지 않는다")
+    void capStateClaimsNeedEveryMentionedProductToCarryOver() {
+        CompareAskTools tools = capStateTools();
 
         assertThat(tools.verify("모든 상품이 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("가보험 든든건강과 나보험 튼튼건강 모두 한도에 걸렸어요.")).isEqualTo("CAP_STATE_MISMATCH");
@@ -212,6 +218,13 @@ class CompareAskToolsTest {
         // 같은 주장을 반복한 문장은 함께 검사하고, 서로 다른 주장이 한 문장에 섞이면 판단하지 않는다.
         assertThat(tools.verify("가보험 든든건강은 한도에 걸렸고 초과했어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도에 걸렸고 가보험 든든건강은 걸리지 않았어요.")).isNull();
+    }
+
+    @Test
+    @DisplayName("도달 표현과 떨어진 부정어는 안전한 쪽으로 거절하고, 못 받은 금액이 있다는 말만 긍정으로 읽는다")
+    void negationsFarFromTheCapVerbAreNotReadAsNegationsOfIt() {
+        CompareAskTools tools = capStateTools();
+
         // 도달 표현과 무관한 뒤쪽 서술어의 '못'·'없'은 부정이 아니다(#919).
         assertThat(tools.verify("나보험 튼튼건강은 한도를 넘어 받지 못한 금액이 있어요.")).isNull();
         // 부정어가 바로 뒤가 아니면 긍정인지 부정인지 알 수 없어 거절한다(안전한 쪽). 못 받은 금액이 '있다'는 말만 긍정으로 읽는다.
@@ -225,6 +238,13 @@ class CompareAskToolsTest {
         assertThat(tools.verify("가보험 든든건강은 한도를 넘어 이번 달 지급분이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("가보험 든든건강은 한도에 도달해 이번 달 추가 수수료가 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도를 초과해 이번 달에 더 받을 수 있는 금액이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
+    }
+
+    @Test
+    @DisplayName("허용 목록 밖의 활용형 부정도 이월이 있는 상품에 대한 틀린 주장을 통과시키지 않는다")
+    void unlistedNegationFormsDoNotLetAWrongClaimThrough() {
+        CompareAskTools tools = capStateTools();
+
         // 허용 목록 밖의 활용형 부정도 틀린 주장을 통과시키지 않는다(#925 리뷰). 이월이 있는 상품에 대해 '안 걸렸다'고 하면 거절한다.
         assertThat(tools.verify("나보험 튼튼건강은 한도를 넘기지 않았어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도를 넘긴 적이 없어요.")).isEqualTo("CAP_STATE_MISMATCH");
@@ -234,6 +254,13 @@ class CompareAskToolsTest {
         // 못 받은 금액이 있다는 말이 뒤에 붙어도 앞쪽의 다른 부정을 덮지 않는다.
         assertThat(tools.verify("나보험 튼튼건강은 한도를 넘긴 적은 없지만 아직 받지 못한 금액이 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
         assertThat(tools.verify("나보험 튼튼건강은 한도를 넘기지 않았고 받지 못한 금액이 있어요.")).isEqualTo("CAP_STATE_MISMATCH");
+    }
+
+    @Test
+    @DisplayName("활용이 낀 부정도 부정으로 읽어 이월이 없는 상품에는 통과, 있는 상품에는 거절한다")
+    void inflectedNegationsAreNegations() {
+        CompareAskTools tools = capStateTools();
+
         // 활용이 낀 부정도 부정이다(#925 리뷰).
         assertThat(tools.verify("가보험 든든건강은 한도를 넘어서지 않았어요.")).isNull();
         assertThat(tools.verify("가보험 든든건강은 한도에 걸려 있지 않아요.")).isNull();
