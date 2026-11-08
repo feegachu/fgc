@@ -862,6 +862,12 @@
 }
 
 @media (max-width: 47.9375rem) {
+  /* 좁은 화면에서는 사이드바가 접히는 중간 폭이 본문을 밀어내지 않도록 즉시 전환한다. */
+  .app-shell-layout,
+  .app-sidebar {
+    transition: none;
+  }
+
   .app-header-field-label {
     display: none;
   }

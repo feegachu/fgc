@@ -133,7 +133,19 @@ for (const [path, label] of [
       await expect(page.getByRole('separator', { name: label, exact: true })).toHaveCount(0)
       await page.setViewportSize({ width: 390, height: 844 })
       await expect(layout).toBeVisible()
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+      await expect(page.locator('.app-shell')).toHaveClass(/is-sidebar-collapsed/)
+      // Check every frame during the old sidebar transition, not just the settled layout.
+      const widths = await page.evaluate(() => new Promise<number[]>((resolve) => {
+        const samples: number[] = []
+        const start = performance.now()
+        function sample() {
+          samples.push(document.documentElement.scrollWidth)
+          if (performance.now() - start < 400) requestAnimationFrame(sample)
+          else resolve(samples)
+        }
+        sample()
+      }))
+      expect(Math.max(...widths)).toBeLessThanOrEqual(390)
       return
     }
     const handle = page.getByRole('separator', { name: label, exact: true })
