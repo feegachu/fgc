@@ -38,6 +38,7 @@ const dashboard: WorkspaceTab = {
   icon: 'dashboard',
   modified: false,
 }
+const editorTabIds = new Set(['CONT-W03', 'TRAN-W02'])
 export function createWorkspaceStore(
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = sessionStorage,
 ) {
@@ -106,7 +107,10 @@ export function createWorkspaceStore(
     },
     openTab: (tab) => {
       if (!screens.some((screen) => screen.id === tab.id)) return
-      let tabs = get().tabs.map((item) => (item.id === tab.id ? { ...tab, modified: item.modified } : item))
+      // The shell opens the destination only after navigation (and any draft confirmation) succeeds.
+      let tabs = get().tabs
+        .filter((item) => item.id === tab.id || !editorTabIds.has(item.id))
+        .map((item) => (item.id === tab.id ? { ...tab, modified: item.modified } : item))
       if (!tabs.some((item) => item.id === tab.id)) tabs = [...tabs, { ...tab, modified: false }]
       if (tabs.length > 10)
         tabs.splice(

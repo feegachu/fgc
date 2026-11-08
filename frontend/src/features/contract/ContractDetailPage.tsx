@@ -31,7 +31,8 @@ function ContractDetailView({ id }: { id: string }) {
   const canProcess = usePermission('canProcess')
   const roleCode = useAuth().user?.roleCode
   const isAgent = roleCode === 'AGENT'
-  const revised = (useOutletContext<ShellContext | null>()?.helpVersion ?? 'after') === 'after' && !isAgent
+  const context = useOutletContext<ShellContext | null>()
+  const revised = context?.revised ?? ((context?.helpVersion ?? 'after') === 'after' && !isAgent)
   const [previewOpen, setPreviewOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -114,6 +115,9 @@ function ContractDetailView({ id }: { id: string }) {
           <h1 className="page-title">보험계약 상세</h1>
         </div>
         <Link data-guide-feature="features.contract.contract-detail-page.link" className="button button-secondary" to={safeReturnTo(params.get('returnTo'), '/contracts')}>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            arrow_back
+          </span>
           목록으로
         </Link>
       </header>
@@ -155,6 +159,9 @@ function ContractDetailView({ id }: { id: string }) {
                         params.get('month') ?? undefined,
                       )}
                     >
+                      <span className="material-symbols-rounded" aria-hidden="true">
+                        payments
+                      </span>
                       지급 등록
                     </Link>
                   )}

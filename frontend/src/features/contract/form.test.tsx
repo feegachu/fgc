@@ -221,11 +221,25 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument()
   })
 
-  it.each(['/contracts/new', '/contracts/21/edit'])('등록·수정 취소는 목록으로 이동한다: %s', async (path) => {
+  it.each([
+    ['/contracts/new', '/contracts'],
+    ['/contracts/21/edit', '/contracts/21'],
+  ])('등록·수정 취소는 이전 목록·상세로 돌아간다: %s', async (path, destination) => {
     const { user, router, writes } = renderAt(path)
     await screen.findByRole('link', { name: '취소' })
     await user.click(screen.getByRole('link', { name: '취소' }))
-    expect(router.state.location.pathname).toBe('/contracts')
+    expect(router.state.location.pathname).toBe(destination)
+    expect(writes).toHaveLength(0)
+  })
+
+  it('수정 화면의 목록으로는 해당 계약 상세로 돌아가고 목록 검색 조건과 정산월을 유지한다', async () => {
+    const back = '/contracts?contractNo=CONT&page=3'
+    const { user, router, writes } = renderAt(`/contracts/21/edit?month=2026-07&returnTo=${encodeURIComponent(back)}`)
+    await user.click(screen.getByRole('link', { name: '목록으로' }))
+    expect(router.state.location.pathname).toBe('/contracts/21')
+    const params = new URLSearchParams(router.state.location.search)
+    expect(params.get('returnTo')).toBe(back)
+    expect(params.get('month')).toBe('2026-07')
     expect(writes).toHaveLength(0)
   })
 
@@ -352,7 +366,7 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     expect(writes).toHaveLength(1)
   })
 
-  it('저장 중 목록으로 이동하면 완료 후 캐시는 만료시키되 현재 화면을 바꾸지 않는다', async () => {
+  it('저장 중 상세로 돌아가면 완료 후 캐시는 만료시키되 현재 화면을 바꾸지 않는다', async () => {
     let finish!: (value: unknown) => void
     const pending = new Promise((resolve) => {
       finish = resolve
@@ -362,13 +376,13 @@ describe('[FGC-FUN-018] 보험계약 입력 안전성', () => {
     await ready()
     await user.click(save())
     await user.click(screen.getByRole('link', { name: '목록으로' }))
-    await screen.findByText('계약 목록')
+    await screen.findByText('계약 상세')
     await act(async () => finish({ contractId: 21, scheduleHeaderIds: [31] }))
     await waitFor(() => expect(invalidated).toHaveBeenCalledWith({ queryKey: ['cap-checks'], refetchType: 'none' }))
     for (const prefix of ['contracts', 'schedules', 'cap-checks']) {
       expect(invalidated).toHaveBeenCalledWith({ queryKey: [prefix], refetchType: 'none' })
     }
-    expect(router.state.location.pathname).toBe('/contracts')
+    expect(router.state.location.pathname).toBe('/contracts/21')
     expect(router.state.location.state).toBeNull()
     expect(useToastStore.getState().messages).toEqual([])
   })

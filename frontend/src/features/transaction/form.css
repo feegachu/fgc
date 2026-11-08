@@ -185,10 +185,10 @@
 .contract-payment-check path {
   stroke-dasharray: 1;
   stroke-dashoffset: 0;
-  animation: contract-payment-check-draw 950ms var(--check-delay, 0ms) ease-in-out both;
+  animation: contract-payment-check-draw 300ms var(--check-delay, 0ms) ease-in-out both;
 }
 .contract-payment-gates .transaction-gate-pass .transaction-gate-icon {
-  animation: contract-payment-check-pop 850ms var(--check-delay, 0ms) ease-in-out both;
+  animation: contract-payment-check-pop 260ms var(--check-delay, 0ms) ease-in-out both;
 }
 @keyframes contract-payment-check-draw {
   from { stroke-dashoffset: 1; }
@@ -217,11 +217,11 @@
   background: white;
 }
 .contract-comparison-panel-reveal {
-  animation: contract-comparison-reveal 1100ms 150ms ease-in-out both;
+  animation: contract-comparison-reveal 400ms ease-in-out both;
 }
 .contract-comparison-moving-amount {
-  animation: contract-comparison-reveal 1000ms ease-in-out both;
-  transition: x 2000ms ease-in-out, y 2000ms ease-in-out, width 2000ms ease-in-out, height 2000ms ease-in-out;
+  animation: contract-comparison-reveal 300ms ease-in-out both;
+  transition: x 650ms ease-in-out, y 650ms ease-in-out, width 650ms ease-in-out, height 650ms ease-in-out;
 }
 @keyframes contract-comparison-reveal {
   from { opacity: 0; }

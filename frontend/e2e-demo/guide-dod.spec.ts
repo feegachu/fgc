@@ -85,7 +85,7 @@ for (const width of [1440, 390]) {
     await expect(pico.getByText('현재 보고 있는 업무', { exact: true })).toHaveCount(0)
     await expect(pico.getByText('PICO WORKFLOW ASSISTANT', { exact: true })).toHaveCount(0)
     await expect(page.locator('.launcher-dot,.pico-launcher-dot,.live-dot')).toHaveCount(0)
-    await expect(pico.getByText(/^현재 화면 .+, 대상 선택 없음, 기준월 /)).toBeVisible()
+    await expect(pico.getByText(/^현재 화면 .+, 대상 선택 없음, 기준월 /)).toHaveCount(0)
     await page.screenshot({ path: info.outputPath('05-service-pico-cleanup.png'), fullPage: true })
     await pico.getByRole('button', { name: '비서 닫기', exact: true }).click()
     await expect(input).toHaveValue('DOD-KEEP-INPUT')

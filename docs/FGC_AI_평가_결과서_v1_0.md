@@ -1,5 +1,7 @@
 # FGC AI 평가 결과서 v1.0
 
+> 2026-11-09 #943 변경 안내: 이 문서는 작성·측정 당시의 기록입니다. 이후 피코 계산 도우미와 별도 가이드 실행기 및 PicoGuideStartButton/PaymentCalculationPanel 관련 화면·테스트가 제거되었고 기존 페이지 도움말 연결로 통합되었습니다. 아래의 옛 파일명·명령은 당시 증거이며 현재 재실행 명령이 아닙니다. 현재 연결 회귀는 PageHelpLauncher.test.tsx·PicoReplyText.test.tsx와 e2e/pico-chat.spec.ts를 사용합니다.
+
 | 항목 | 내용 |
 |---|---|
 | 대상 요구사항 | FGC-TER-011 AI 추출·응답 평가셋(M), FGC-PER-008 AI 처리 시간(S), #677 표 6번(프롬프트 주입, CT-G04, CT-G05) |

@@ -501,10 +501,13 @@ export function ContractPaymentForm({
           <h1 className="page-title">지급 계약 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
-          <ScreenWalkthrough title="계약별 지급 등록" steps={contractPaymentHelp} />
           <Link data-guide-feature="features.contract-payment-form.link-1" className="button button-secondary" to={returnTo}>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              arrow_back
+            </span>
             목록으로
           </Link>
+          <ScreenWalkthrough screenId="TRAN-W02" title="계약별 지급 등록" steps={contractPaymentHelp} />
         </div>
       </header>
       {(existing.isError || resumeError) && <p role="alert" className="guidance guidance-warning">
@@ -641,6 +644,7 @@ export function ContractPaymentForm({
                 <div className="transaction-action-list">
                   <Button data-guide-feature="features.contract-payment-form.button-11"
                     data-guide-target="payment.batch.save"
+                    data-guide-completed={clean && !uncertain}
                     variant="secondary"
                     loading={busy === 'save'}
                     disabled={
@@ -664,6 +668,7 @@ export function ContractPaymentForm({
                   </Button>
                   <Button data-guide-feature="features.contract-payment-form.button-12"
                     data-guide-target="payment.batch.precheck"
+                    data-guide-completed={(allChecked || selected.length > 0 && selected.every(line => done(line.scheduleLineId!))) && !uncertain}
                     variant="secondary"
                     loading={busy === 'precheck'}
                     disabled={!!busy || !canProcess || !clean || !balanced || !remaining.length || uncertain}
@@ -673,6 +678,7 @@ export function ContractPaymentForm({
                   </Button>
                   <Button data-guide-feature="features.contract-payment-form.button-13"
                     data-guide-target="payment.batch.confirm"
+                    data-guide-completed={selected.length > 0 && selected.every(line => done(line.scheduleLineId!)) && !uncertain}
                     loading={busy === 'confirm'}
                     disabled={!!busy || !canProcess || !allChecked || uncertain}
                     onClick={() => setConfirmOpen(true)}

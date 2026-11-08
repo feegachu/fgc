@@ -1,8 +1,6 @@
-import { CalculationWorkbench } from './CalculationWorkbench'
 import { ApiError } from '../../lib/api/client'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { createPortal } from 'react-dom'
 import type { ShellUser } from '../../app/shell/Sidebar'
 import { findGuide, GUIDE_CATALOG } from './catalog'
 import type { AssistantContext, CalculationResult, MessageResult } from './contracts'
@@ -13,17 +11,16 @@ import basic from './assets/pico-basic.png'
 import guide from './assets/pico-guide.png'
 import detective from './assets/pico-detective.png'
 import './pico-assistant.css'
-import { PaymentCalculationPanel } from './PaymentCalculationPanel'
 import { PaymentGuideOverlay } from './PaymentGuide'
 import { useGuideRuntime } from './guide-runtime'
-import { askPico, picoPaymentReference } from './pico-api'
-import { PicoGuideStartButton } from './PicoGuideStartButton'
+import { askPico } from './pico-api'
 import type { PicoReply } from './pico-api'
 import type { PicoTurn } from './pico-api'
 import { screenFor, screens } from '../../app/screens'
-import { useWorkspaceStore } from '../../stores/workspace'
 import { findWorkflowGuide, WORKFLOW_GUIDES, workflowSteps } from './workflow-catalog'
 import { useWorkflowGuide } from './workflow-state'
+import { PicoReplyText } from './PicoReplyText'
+import { PicoGuideAction } from './PicoGuideAction'
 
 const labels: Record<PaymentScenario, string> = {
   'PAY-01': '이번 달 수수료는 얼마야?',
@@ -68,14 +65,15 @@ type Entry =
   | { id: number; role: 'user'; text: string }
   | { id: number; role: 'notice'; text: string }
   | { id: number; role: 'assistant'; result: MessageResult }
-  | { id: number; role: 'live'; reply: PicoReply; guideContext: string; hasPaymentContext: boolean }
+  | { id: number; role: 'live'; reply: PicoReply }
 interface Conversation {
   entries: Entry[]
+  revealedReplies: number[]
   revision: number
   scenario: PaymentScenario
   plan: MessageResult | null
 }
-const initial = (): Conversation => ({ entries: [], revision: 0, scenario: 'PAY-02', plan: null })
+const initial = (): Conversation => ({ entries: [], revealedReplies: [], revision: 0, scenario: 'PAY-02', plan: null })
 function demoContext(revision: number, scenario: PaymentScenario): AssistantContext {
   return {
     screenId: 'TRAN-W02',
@@ -96,6 +94,11 @@ function Symbol({ name }: { name: string }) {
       {name}
     </span>
   )
+}
+function workflowIcon(workflowId: string) {
+  const paymentIcons: Record<string, string> = { 'payment.amount.review': 'payments', 'payment.draft': 'edit', 'payment.confirm': 'lock' }
+  const definition = findWorkflowGuide(workflowId, '1.0')
+  return paymentIcons[workflowId] ?? screens.find(screen => screen.id === definition?.steps[0]?.screenId)?.icon ?? 'menu_book'
 }
 function Won({ amount }: { amount: string | null }) {
   return (
@@ -144,42 +147,27 @@ export function AssistantDemoMount({
   enabled = import.meta.env.VITE_ASSISTANT_DEMO === 'true' || import.meta.env.VITE_ASSISTANT_AI === 'true',
   screenId,
   screenContext,
-  launcherHost,
 }: {
   user: ShellUser
   loggingOut?: boolean
   enabled?: boolean
   screenId?: string
   screenContext?: string
-  launcherHost?: HTMLElement | null
 }) {
   if (!enabled || loggingOut || !['SYSTEM_ADMIN', 'GA_ADMIN', 'SETTLEMENT', 'COMPLIANCE'].includes(user.roleCode))
     return null
-  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} roleCode={user.roleCode} screenId={screenId} screenContext={screenContext} launcherHost={launcherHost} />
+  return <AssistantWithGuide key={`${user.loginId}:${user.roleCode}:${user.canProcess}`} canProcess={user.canProcess} roleCode={user.roleCode} screenId={screenId} screenContext={screenContext} />
 }
-/**
- * CMN-C04: the screen/target/month the question carries (화면정의서 v3.0 :3267, #622).
- * Only the open panel subscribes to the month, so a month change never re-renders the closed assistant.
- */
-function PicoContextLine({ screenId, paymentId }: { screenId: string; paymentId: string | null }) {
-  const month = useWorkspaceStore((state) => state.month)
-  const title = screens.find((screen) => screen.id === screenId)?.title ?? '공통 화면'
-  return (
-    <p className="pico-context">
-      현재 화면 {title}, 대상 {paymentId ? '선택한 지급 건' : '선택 없음'}, 기준월 {month ?? '선택 없음'}
-    </p>
-  )
-}
-function AssistantWithGuide({ canProcess, roleCode, screenId, screenContext, launcherHost }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string; launcherHost?: HTMLElement | null }) {
+function AssistantWithGuide({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
   useEffect(() => () => useGuideRuntime.getState().reset(), [])
   return (
     <>
-      <PicoAssistant canProcess={canProcess} roleCode={roleCode} screenId={screenId} screenContext={screenContext} launcherHost={launcherHost} />
-      <PaymentGuideOverlay />
+      <PicoAssistant canProcess={canProcess} roleCode={roleCode} screenId={screenId} screenContext={screenContext} />
+      {import.meta.env.VITE_ASSISTANT_AI !== 'true' && <PaymentGuideOverlay />}
     </>
   )
 }
-export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, launcherHost }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string; launcherHost?: HTMLElement | null }) {
+export function PicoAssistant({ canProcess, roleCode, screenId, screenContext }: { canProcess: boolean; roleCode?: string; screenId?: string; screenContext?: string }) {
   const [open, setOpen] = useState(false)
   const aiEnabled = import.meta.env.VITE_ASSISTANT_AI === 'true'
   const currentScreen = screenId ?? screenFor(window.location.pathname)?.id ?? 'CMN-C04'
@@ -191,30 +179,12 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
   const aiRequest = useRef<AbortController | null>(null)
   const aiSequence = useRef(0)
   const aiLock = useRef(false)
-  const [calculationEpoch, setCalculationEpoch] = useState(0)
   const runtimeSession = useGuideRuntime((state) => state.session)
   const observed = useGuideRuntime((state) => state.observation)
   const workflowActive = useWorkflowGuide((state) => state.active)
   const paymentActive = useWorkflowGuide((state) => state.paymentActive)
   const settlementActive = useWorkflowGuide((state) => state.settlementActive)
   const activeGuideContext = useWorkflowGuide((state) => state.guideContext)
-  const guideContext = JSON.stringify([
-    observed?.owner,
-    observed?.paymentId,
-    observed?.scopeKey,
-    observed?.revision,
-    observed?.saved,
-    observed?.precheck,
-    observed?.modalOpen,
-    canProcess,
-    screenContext,
-  ])
-  const [latestLiveQuestion, setLatestLiveQuestion] = useState<{ context: string; revision: string | null }>({
-    context: guideContext,
-    revision: null,
-  })
-  // Actual target/input changes invalidate completed proposals; transient readiness only cancels transport.
-  if (latestLiveQuestion.context !== guideContext) setLatestLiveQuestion({ context: guideContext, revision: null })
   const guideActive =
     runtimeSession != null && !['PAUSED', 'COMPLETED', 'CANCELLED', 'ERROR'].includes(runtimeSession.status)
   const otherGuideActive = workflowActive || paymentActive || settlementActive
@@ -227,13 +197,22 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
   const [input, setInput] = useState('')
   const [pickedScenario, setPickedScenario] = useState<PaymentScenario>('PAY-02')
   const [conversation, setConversation] = useState<Conversation>(initial)
+  const latestEntry = conversation.entries.at(-1)
+  const typingReply = latestEntry?.role === 'live' && !conversation.revealedReplies.includes(latestEntry.id)
+  const followOutput = useRef(true)
   const [planError, setPlanError] = useState('')
   const textarea = useRef<HTMLTextAreaElement>(null),
     stream = useRef<HTMLDivElement>(null)
   const panelId = useId(),
     titleId = useId()
   useEffect(() => {
-    if (!visible) return
+    if (!visible) {
+      setConversation(previous => {
+        const ids = previous.entries.filter(entry => entry.role === 'live').map(entry => entry.id)
+        return ids.some(id => !previous.revealedReplies.includes(id)) ? { ...previous, revealedReplies: ids } : previous
+      })
+      return
+    }
     textarea.current?.focus()
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) {
@@ -254,6 +233,15 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
         behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
       })
   }, [open, tab, conversation.entries])
+  useEffect(() => {
+    const messages = stream.current?.querySelector('.pico-messages')
+    if (!visible || !messages || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      if (followOutput.current) stream.current?.scrollTo?.({ top: stream.current.scrollHeight, behavior: 'instant' })
+    })
+    observer.observe(messages)
+    return () => observer.disconnect()
+  }, [visible, tab])
   useEffect(
     () => () => {
       aiRequest.current?.abort()
@@ -283,13 +271,13 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
     setAiBusy(false)
   }
   async function sendLive(text: string) {
-    if (aiLock.current || !text.trim()) return
+    if (aiLock.current || typingReply || !text.trim()) return
+    followOutput.current = true
     const controller = new AbortController(),
       sequence = ++aiSequence.current
     aiRequest.current = controller
     aiLock.current = true
     setAiBusy(true)
-    setLatestLiveQuestion({ context: guideContext, revision: String(sequence) })
     setInput('')
     setTab('chat')
     setConversation((previous) => ({
@@ -327,8 +315,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
             id: previous.entries.length,
             role: 'live',
             reply,
-            guideContext,
-            hasPaymentContext: Boolean(picoPaymentReference(paymentId)),
           },
         ],
       }))
@@ -360,8 +346,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
       }
     }
   }
-  const isCurrentLiveReply = (entry: Extract<Entry, { role: 'live' }>) =>
-    !aiBusy && entry.guideContext === guideContext && entry.reply.contextRevision === latestLiveQuestion.revision
   const currentContext = demoContext(conversation.revision, conversation.scenario)
   const plan = conversation.plan?.workflowProposal
     ? findGuide(conversation.plan.workflowProposal.workflowId, conversation.plan.workflowProposal.guideVersion)
@@ -384,6 +368,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
         result = readPaymentFixture('PAY-10', context, now)
       }
       return {
+        ...previous,
         scenario,
         revision,
         plan: null,
@@ -402,7 +387,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
   function send(event: FormEvent) {
     event.preventDefault()
     const text = input.trim()
-    if (!text || aiLock.current) return
+    if (!text || aiLock.current || typingReply) return
     if (aiEnabled) {
       void sendLive(text)
       return
@@ -433,7 +418,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
     setPlanError('')
   }
   const launcher = (
-    <div className={launcherHost ? 'pico-launcher pico-launcher-docked' : 'pico-launcher'}>
+    <div className="pico-launcher">
       <button
         id={`${panelId}-launcher`}
         className="pico-launcher-button"
@@ -454,7 +439,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
   )
   return (
     <div className="pico-assistant-root">
-      {!visible && (launcherHost ? createPortal(launcher, launcherHost) : launcher)}
+      {!visible && launcher}
       {visible && (
         <aside id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className="pico-panel">
           <header className="pico-panel-header">
@@ -473,7 +458,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
               onClick={() => {
                 cancelAi()
                 setConversation(initial())
-                setCalculationEpoch((value) => value + 1)
                 setPickedScenario('PAY-02')
                 setInput('')
                 setPlanError('')
@@ -508,7 +492,7 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
               aria-controls={`${panelId}-chat`}
               onClick={() => setTab('chat')}
             >
-              대화
+              <svg className="pico-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3Z" /></svg>대화
             </button>
             <button
               id={`${panelId}-plan-tab`}
@@ -518,26 +502,19 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
               aria-controls={`${panelId}-plan`}
               onClick={() => setTab('plan')}
             >
-              업무 안내
+              <Symbol name="menu_book" />업무 안내
             </button>
           </div>
           <div
             ref={stream}
             className="pico-stream"
+            onScroll={event => { const element = event.currentTarget; followOutput.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80 }}
             role="tabpanel"
             id={`${panelId}-${tab}`}
             aria-labelledby={`${panelId}-${tab}-tab`}
           >
             {tab === 'chat' ? (
               <>
-                <CalculationWorkbench key={`${guideContext}:${calculationEpoch}`} canProcess={canProcess} />
-                {observed && (
-                  <PaymentCalculationPanel
-                    key={`${observed.owner}:${observed.paymentId}:${observed.scopeKey}:${observed.revision}:${observed.saved}:${observed.busy}:${observed.ready}:${calculationEpoch}`}
-                    observation={observed}
-                    canProcess={canProcess}
-                  />
-                )}
                 {conversation.entries.length === 0 && (
                   <div className="pico-welcome">
                     <img src={basic} alt="피코" />
@@ -602,54 +579,28 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
                           <b>피코</b>
                           <span>{entry.reply.source === 'AI' ? 'AI 답변' : '안내'}</span>
                         </div>
-                        <p>{entry.reply.message}</p>
+                        <PicoReplyText text={entry.reply.message!} animate={!conversation.revealedReplies.includes(entry.id)} onComplete={() => {
+                          setConversation(previous => previous.revealedReplies.includes(entry.id) ? previous : { ...previous, revealedReplies: [...previous.revealedReplies, entry.id] })
+                        }} />
+                        {conversation.revealedReplies.includes(entry.id) && <>
                         {entry.reply.evidenceRefs?.map((source) => (
                           <div className="pico-source" key={source.chunkId}>
                             <Symbol name="menu_book" />
                             {source.title}
                           </div>
                         ))}
-                        {entry.reply.decision === 'START_GUIDE' && entry.reply.validatedGuide && (
-                          findWorkflowGuide(entry.reply.validatedGuide.workflowId!, '1.0') ? (
-                            <button type="button" className="button button-secondary" disabled={!isCurrentLiveReply(entry)}
-                              onClick={() => { const guide = entry.reply.validatedGuide!; useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(guide.workflowId!, guide.stepId); setOpen(false) }}>
-                              이 업무 안내 시작, {findWorkflowGuide(entry.reply.validatedGuide.workflowId!, '1.0')?.title}
-                            </button>
-                          ) : entry.reply.validatedGuide.entityRefs?.length === 0 ? (
-                            <button type="button" className="button button-secondary" disabled={!isCurrentLiveReply(entry)}
-                              onClick={() => { const guide = entry.reply.validatedGuide!; useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(guide.workflowId!, guide.stepId); setOpen(false) }}>
-                              이 업무 안내 시작, {findGuide(entry.reply.validatedGuide.workflowId!, '1.0')?.title}
-                            </button>
-                          ) : <PicoGuideStartButton workflowId={entry.reply.validatedGuide.workflowId!}
-                            validatedGuide={entry.reply.validatedGuide} contextRevision={entry.reply.contextRevision!}
-                            canProcess={canProcess} sourceContextAvailable={entry.hasPaymentContext} contextValid={isCurrentLiveReply(entry)} />
-                        )}
-                        {entry.reply.decision === 'ANSWER_ONLY' &&
-                          [...new Set(entry.reply.evidenceRefs?.map((source) => source.workflowId))]
-                            .filter((id): id is string => Boolean(id))
-                            .map((workflowId) => findWorkflowGuide(workflowId, '1.0') ? (
-                              <button key={workflowId} type="button" className="button button-secondary" disabled={!isCurrentLiveReply(entry)}
-                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
-                                이 업무 안내 시작, {findWorkflowGuide(workflowId, '1.0')?.title}
-                              </button>
-                            ) : !observed?.paymentId ? (
-                              <button key={workflowId} type="button" className="button button-secondary" disabled={!canProcess || !isCurrentLiveReply(entry)}
-                                onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId, entry.reply.evidenceRefs?.find((ref) => ref.workflowId === workflowId && ref.stepId?.startsWith('help.'))?.stepId ?? undefined); setOpen(false) }}>
-                                지급 작성 화면에서 안내 시작, {findGuide(workflowId, '1.0')?.title}
-                              </button>
-                            ) : (
-                              <PicoGuideStartButton
-                                key={workflowId}
-                                workflowId={workflowId}
-                                contextRevision={entry.reply.contextRevision!}
-                                canProcess={canProcess}
-                                sourceContextAvailable={entry.hasPaymentContext}
-                                contextValid={isCurrentLiveReply(entry)}
-                              />
-                            ))}
-                        {['ANSWER_ONLY', 'START_GUIDE'].includes(entry.reply.decision ?? '') && !isCurrentLiveReply(entry) && <p className="pico-notice" role="status">질문 또는 화면이 바뀌었습니다. 현재 화면에서 다시 질문하면 안내를 시작할 수 있습니다.</p>}
-                        {entry.reply.decision === 'ANSWER_ONLY' && !canProcess && !observed?.paymentId && entry.reply.evidenceRefs?.some((ref) => ref.workflowId != null && !findWorkflowGuide(ref.workflowId, '1.0')) && <p className="pico-notice" role="status">지급 작성 화면 안내는 정산담당자에게 요청하세요. 현재 계정은 조회 안내만 사용할 수 있습니다.</p>}
-                        <small>일반 업무 안내입니다. 현재 지급 처리 완료를 뜻하지 않습니다.</small>
+                        <div className="pico-answer-actions" aria-label="연결할 화면 도움말">
+                          {(entry.reply.decision === 'START_GUIDE' && entry.reply.validatedGuide
+                            ? [entry.reply.validatedGuide.workflowId!]
+                            : entry.reply.decision === 'ANSWER_ONLY' ? [...new Set(entry.reply.evidenceRefs?.map(ref => ref.workflowId).filter((id): id is string => Boolean(id)))] : []
+                          ).map(workflowId => {
+                            const definition = findWorkflowGuide(workflowId, '1.0') ?? findGuide(workflowId, '1.0')
+                            return definition ? <PicoGuideAction key={workflowId} title={definition.title}
+                              label={`도움말 열기, ${definition.title}`} disabled={aiBusy}
+                              onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflowId); setOpen(false) }} /> : null
+                          })}
+                        </div>
+                        </>}
                       </article>
                     ) : (
                       <article className="pico-answer" key={entry.id}>
@@ -702,6 +653,10 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
                       </article>
                     ),
                   )}
+                  {aiBusy && <article className="pico-answer pico-pending" role="status" aria-label="피코 답변 준비 중">
+                    <div className="pico-answer-author"><img src={guide} alt="" /><b>피코</b></div>
+                    <div className="pico-typing-indicator"><span aria-hidden="true"><i /><i /><i /></span>답변을 준비하고 있어요</div>
+                  </article>}
                 </div>
               </>
             ) : aiEnabled ? (
@@ -712,17 +667,16 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
                   {[...availableWorkflows].sort((left, right) => Number(right.steps.some((step) => step.screenId === currentScreen)) - Number(left.steps.some((step) => step.screenId === currentScreen))).map((workflow) => (
                     <button key={workflow.workflowId} type="button" className="pico-suggestion"
                       onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflow.workflowId); setOpen(false) }}>
-                      <span><b>{workflow.title}</b><small>{workflow.description}</small></span><Symbol name="chevron_right" />
+                      <span className="pico-suggestion-icon"><Symbol name={workflowIcon(workflow.workflowId)} /></span><span><b>{workflow.title}</b><small>{workflow.description}</small></span><Symbol name="chevron_right" />
                     </button>
                   ))}
                   {GUIDE_CATALOG.filter((workflow) => workflow.enabled && canProcess && workflow.roles.some((role) => role === currentRole)).map((workflow) => (
                     <button key={workflow.workflowId} type="button" className="pico-suggestion"
                       onClick={() => { useGuideRuntime.getState().stop(); useWorkflowGuide.getState().start(workflow.workflowId); setOpen(false) }}>
-                      <span><b>{workflow.title}</b><small>지급 화면의 실제 입력, 저장, 검증 상태를 확인하며 안내합니다.</small></span><Symbol name="chevron_right" />
+                      <span className="pico-suggestion-icon"><Symbol name={workflowIcon(workflow.workflowId)} /></span><span><b>{workflow.title}</b><small>지급 화면의 도움말을 엽니다.</small></span><Symbol name="chevron_right" />
                     </button>
                   ))}
                 </div>
-                <p className="pico-plan-boundary">화면 안내는 업무 처리 완료를 뜻하지 않아요. 저장, 계산, 확정은 기존 업무 화면에서 직접 진행하세요.</p>
               </div>
             ) : (
               <div className="pico-plan">
@@ -794,12 +748,6 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
                 </button>
               </details>
             )}
-            {aiBusy && (
-              <p className="pico-notice" role="status">
-                승인된 가이드로 답변을 준비하고 있어요.
-              </p>
-            )}
-            <PicoContextLine screenId={observed ? 'TRAN-W02' : currentScreen} paymentId={observed?.paymentId ?? null} />
             <form onSubmit={send} className="pico-composer">
               <textarea
                 ref={textarea}
@@ -815,17 +763,10 @@ export function PicoAssistant({ canProcess, roleCode, screenId, screenContext, l
                   }
                 }}
               />
-              <button aria-label="질문 보내기" type="submit" disabled={!input.trim() || aiBusy}>
+              <button aria-label="질문 보내기" type="submit" disabled={!input.trim() || aiBusy || typingReply}>
                 <Symbol name="arrow_upward" />
               </button>
             </form>
-            <small>
-              {aiEnabled
-                ? '업무 안내 기준, 실제 계산과 처리는 업무 화면에서 확인'
-                : observed
-                  ? '시연 질문은 합성 자료, 저장된 지급 계산은 별도 조회, 실제 AI 미연결'
-                  : '합성 데이터 시연, 실제 AI/계약/지급과 연결되지 않습니다.'}
-            </small>
           </div>
         </aside>
       )}

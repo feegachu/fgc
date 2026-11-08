@@ -1,5 +1,6 @@
 import { useUnsavedWorkStore } from '../../../stores/unsavedWork'
 import { useSpotlight } from '../guide/useSpotlight'
+import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import type { ShellUser } from '../../../app/shell/Sidebar'
@@ -92,13 +93,16 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
   const coachSide = explanation.step?.id === 'contract.statusHistory'
     || decision?.step === 'contract.create' && location.pathname === '/contracts/new'
       && explanation.step?.presentation?.side === 'left' ? 'left' : 'right'
-  const paymentAnchor = batchPayment && detailedWorkflow && !explanation.step?.destination
-    ? ['payment.batch.contract', 'payment.batch.lines'].includes(explanation.step?.id ?? '')
-      ? '.contract-payment-gates' : '[data-guide-target="payment.batch.lines"]' : undefined
+  const exceptionFinish = after && location.pathname === '/exceptions' && explanation.step?.id === 'exception.reference'
+  const exceptionEnd = after && location.pathname === '/exceptions' && explanation.last
+  const guideStageNumber = location.pathname === '/exceptions' ? 9 : location.pathname === '/journals' ? 8 : decision ? STEPS.indexOf(decision.step) + 1 : 1
+  const guideGroup = location.pathname === '/exceptions' ? '예외함 확인' : location.pathname === '/journals' ? '검증원장' : decision ? titles[STEPS.indexOf(decision.step)] : ''
+  const guideDialog = exceptionFinish ? document.querySelector<HTMLElement>('.exception-detail-modal') : null
   const validationPlayback = useValidationPlaybackGuide(after && detailedWorkflow && !collapsed && !busy && decision?.step === 'validation.execute', explanation.step?.id, explanation.next)
   const position = useSpotlight(!collapsed ? activeTarget : null, card, detailedWorkflow,
-    after ? { ...explanation.step?.presentation, fixedCard: coachSide, cardAnchor: paymentAnchor, preventScroll: !!paymentAnchor } : detailedWorkflow ? explanation.step?.presentation : undefined)
-  useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
+    after ? { ...explanation.step?.presentation, fixedCard: explanation.step?.presentation?.fixedCard === 'center' ? 'center'
+      : explanation.step?.presentation?.fixedCard === 'left' ? 'left' : coachSide } : detailedWorkflow ? explanation.step?.presentation : undefined)
+  const actionPending = useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
   const detailedInput = useRef(false)
   useLayoutEffect(() => { detailedInput.current = detailedPayment || detailedWorkflow })
   const runtime = useRef<GuideRuntime<Evidence> | null>(null)
@@ -350,6 +354,9 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
       })
       const catalog = settlementCatalog(next, routeHint),
         targets = new GuideTargets()
+      if (after) catalog.steps.forEach(step => {
+        if (step.stepId === 'exception.resolve') step.targetId = 'exception.list'
+      })
       catalog.steps.forEach((step) =>
         targets.register({
           screenId: step.screenId,
@@ -368,7 +375,6 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         conditions: {
           AVAILABLE: () => 'SATISFIED',
           NOT_AUTOMATIC: () => 'WAITING_RESULT',
-          FINALIZED: () => (result.complete ? 'SATISFIED' : 'WAITING_RESULT'),
         },
         confirmLeave: async () => false,
         openScreen: async (screen, runtimeSignal) => {
@@ -406,7 +412,6 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         serverStateVersion: null,
       })
 
-      if (result.complete) await runner.next()
     } catch (failure) {
       if (!controller.signal.aborted && token === epoch.current)
         setError(failureText(failure, '최신 상태를 확인하지 못했습니다.'))
@@ -690,14 +695,15 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
       <SettlementOverview open={!selection} busy={busy} error={error} onClose={close} onStart={() => void start()} />
       {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
       {!collapsed && !validationPlayback.hidden && position.box && (
-        <div className="payment-guide-spotlight settlement-guide-spotlight screen-step-spotlight" aria-hidden="true" style={position.box} />
+        createPortal(<div className="payment-guide-spotlight settlement-guide-spotlight screen-step-spotlight" data-guide-in-dialog={!!guideDialog} aria-hidden="true" style={position.box} />, guideDialog ?? document.body)
       )}
-      {selection && <aside
+      {selection && createPortal(<aside
         ref={card}
         style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : { ...position.card, visibility: validationPlayback.hidden ? 'hidden' : undefined }}
         className="settlement-guide payment-guide-card screen-step-guide"
         data-help-presentation={true}
         data-guide-docked={!collapsed}
+        data-guide-in-dialog={!!guideDialog}
         data-guide-anchored={Boolean((activeTarget || position.box) && !collapsed)}
         aria-label="전체 업무 가이드"
         aria-busy={busy}
@@ -710,7 +716,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
             width="32"
             height="32"
           />
-          <span className="screen-step-count">전체 업무 가이드{decision && ` · ${STEPS.indexOf(decision.step) + 1}/9`}</span>
+          <span className="screen-step-count">전체 업무 가이드{decision && ` · ${guideStageNumber}/9`}</span>
           {selection && (
             <Button variant="ghost" onClick={() => setCollapsed((value) => !value)}>
               {collapsed ? '펼치기' : '접기'}
@@ -747,7 +753,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
               <section aria-label="업무 세부 안내" aria-live="polite">
                 <GuideStepContent step={demoNumberStep ? { ...explanation.step, concise: true,
                   instruction: '빈 계약번호에는 기존 데모 번호의 다음 번호를 채웁니다.',
-                  interaction: '번호를 확인하고 다음을 누르세요.' } : explanation.step} index={explanation.index} total={explanation.total} group={`${decision ? titles[STEPS.indexOf(decision.step)] : ''} · ${explanation.index + 1}/${explanation.total}`} />
+                  interaction: '번호를 확인하고 다음을 누르세요.' } : explanation.step} index={explanation.index} total={explanation.total} group={`${guideGroup} · ${explanation.index + 1}/${explanation.total}`} />
                 {demoNumberStep && demoNumber.pending && <p role="status">다음 데모 계약번호를 불러오고 있습니다.</p>}
                 {demoNumberStep && demoNumber.error && <div><p role="alert">{demoNumber.error}</p><Button variant="secondary" onClick={demoNumber.retry}>번호 다시 불러오기</Button></div>}
                 {validationPlayback.error && <p role="alert">{validationPlayback.error}</p>}
@@ -755,8 +761,8 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                 {explanation.status === 'PAUSED' && <Button variant="secondary" onClick={explanation.retry}>다시 찾기</Button>}
                 <div className="payment-guide-actions">
                   <Button variant="secondary" disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전</Button>
-                  <DisabledButtonHint disabled={waitingForContractSave} reason="‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.">
-                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.follow || !!explanation.step?.requireAction && explanation.target?.getAttribute('data-guide-completed') !== 'true'} onClick={() => explanation.step?.follow ? void navigate(explanation.step.follow.path + '?month=' + selection.month) : explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.destination || explanation.step?.follow ? '강조된 메뉴를 눌러주세요' : explanation.step?.follow?.label ?? explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
+                  <DisabledButtonHint disabled={waitingForContractSave || actionPending} reason={waitingForContractSave ? '‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.' : explanation.step?.disabledReason ?? '강조된 작업을 먼저 완료해 주세요.'}>
+                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.follow || actionPending} onClick={() => exceptionEnd ? close() : explanation.step?.follow ? void navigate(explanation.step.follow.path + '?month=' + selection.month) : explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{exceptionEnd && !actionPending ? '안내 마치기' : explanation.step?.destination || explanation.step?.follow ? '강조된 메뉴를 눌러주세요' : explanation.step?.follow?.label ?? explanation.step?.nextLabel ?? (explanation.last ? '다음 업무' : '다음')}</Button>
                   </DisabledButtonHint>
                 </div>
               </section>
@@ -786,45 +792,6 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
                 월 검증 결과 선택
               </button>
             )}
-            {decision?.step === 'exception.resolve' && (!detailedWorkflow || explanation.last || !explanation.target) &&
-              !handoffFor('exception.resolve', user.roleCode ?? '', user.canProcess) && (
-                <div className="settlement-guide-actions">
-                  <label>
-                    정정 후 지급 번호
-                    <input
-                      inputMode="numeric"
-                      disabled={busy}
-                      value={replacementNo}
-                      onChange={(event) => setReplacementNo(event.target.value)}
-                    />
-                  </label>
-                  <button
-                    disabled={busy}
-                    onClick={() => {
-                      const paymentId = id(replacementNo)
-                      if (!paymentId) {
-                        setError('정정 후 확정된 지급 번호를 입력하세요.')
-                        return
-                      }
-                      void show(replacementSelection(selection, paymentId), false, false, true)
-                    }}
-                  >
-                    정정 지급으로 이어서 안내
-                  </button>
-                  <button disabled={busy} onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
-                    새 월 검증 선택·생성
-                  </button>
-                  <button disabled={busy} onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
-                    월 검증 다시 확인
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => revisit(destinations(selection)['reconciliation.review'].path)}
-                  >
-                    대사 결과 다시 선택
-                  </button>
-                </div>
-              )}
             {!detailedPayment && !detailedWorkflow && <details>
               <summary>전체 9단계 보기</summary>
               <ol>
@@ -839,7 +806,7 @@ function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; he
         {!collapsed && !detailedPayment && !detailedWorkflow && (
           <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
         )}
-      </aside>}
+      </aside>, guideDialog ?? document.body)}
       <Modal
         open={leave !== null}
         title="미저장 입력이 있습니다"

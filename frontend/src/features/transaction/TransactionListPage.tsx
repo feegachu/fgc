@@ -358,6 +358,7 @@ export default function TransactionListPage() {
           columns={columns}
           {...sortBinding(filters.sort, TRANSACTION_SORT_KEYS, (sort) => apply({ ...filters, sort, page: 1 }))}
           rows={guideExample && !search.isError ? [example, ...rows] : rows}
+          rowClassName={row => row.commissionTransactionId === -1 ? 'transaction-guide-example' : ''}
           rowKey={(row) => String(row.commissionTransactionId)}
           selectedKeys={params.get('selectedId') ? [params.get('selectedId')!] : []}
           emptyMessage={

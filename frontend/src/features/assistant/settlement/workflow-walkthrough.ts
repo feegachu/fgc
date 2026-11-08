@@ -5,7 +5,7 @@ import type { ScreenHelpStep } from '../guide/ScreenHelp'
 import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
 import { useSidebarStore } from '../../../stores/sidebar'
 
-export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follow' | 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follow' | 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'disabledReason' | 'waitForTarget' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
   id: string
   selector: string
   title: string
@@ -14,7 +14,7 @@ export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follo
   requiresSelectedTab?: boolean
   workflowInstruction?: string
   nextLabel?: string
-  scope?: 'shell'
+  scope?: 'shell' | 'dialog'
   destination?: WorkflowDestination
   firstMatch?: boolean
 }
@@ -24,7 +24,7 @@ const step = (id: string, selector: string, title: string, instruction: string, 
 const review = (id: string, title: string, instruction: string) => step(id, target(id), title, instruction)
 
 /** Explanations never execute a business operation or assert server completion. */
-function workflowInstructions(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false): WorkflowExplanation[] {
+function workflowInstructions(stage: SettlementStep, path: string, correctionPending = false): WorkflowExplanation[] {
   switch (stage) {
     case 'contract.create':
       if (path !== '/contracts/new') return [step('saved', 'h1', '계약 저장 결과를 확인하세요', '저장된 계약 상세인지 확인하세요. 다음 버튼으로 서버의 계약과 스케줄을 조회합니다.')]
@@ -42,7 +42,7 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
         step('schedule.header', '[aria-labelledby="schedule-header-title"]', '계약과 지급단계를 확인하세요', '현재 계약과 지급단계가 맞는지 확인하세요. 4년·7년 예정은 지급 확정 흐름과 연결하지 않습니다.'),
         review('schedule.lines', '회차와 귀속일을 확인하세요', '회차별 지급 시점과 귀속일을 확인하세요. 일부 행만 보고 전체 회차를 확인한 것으로 판단하지 마세요.'),
         review('schedule.lines', '항목과 금액을 확인하세요', '회차별 수수료 항목과 예상 금액을 근거와 비교하세요. 예상 금액은 실제 지급 확정이 아닙니다.'),
-        step('schedule.versions', '[aria-labelledby="schedule-versions-title"]', '사용 중인 버전을 확인하세요', '버전 이력과 사용 여부를 확인하세요. 아래 확인 버튼은 최신 상태를 조회하며 스케줄을 확정하지 않습니다.'),
+        step('schedule.current', '[aria-labelledby="schedule-header-title"]', '사용 중인 스케줄을 확인하세요', '현재 버전과 사용 여부를 확인하세요. 확인 뒤 수수료 지급으로 이어갑니다.'),
       ]
     case 'payment.draft': return [] // Dedicated input-aware walkthrough.
     case 'payment.precheck':
@@ -78,44 +78,30 @@ function workflowInstructions(stage: SettlementStep, path: string, selectedExcep
       step('reconciliation.insurer', '[data-guide-feature="features.reconciliation.reconciliation-page.select-2"]', '보험회사를 확인하세요', '계약의 보험회사를 선택하세요. 전체는 실행 이력 조회용입니다.'),
       review('reconciliation.execute', '대사를 실행하거나 기존 결과를 선택하세요', '필요한 경우 실제 대사 실행을 누르세요. 원래 건을 정정했다면 새 검증과 연결된 새 대사 결과를 사용하세요.'),
       review('reconciliation.history', '실행 이력을 선택하세요', '검증 실행·기준월·지급단계가 맞는 실행의 결과를 선택하세요. 완료 전에는 기다리고 실패하면 원인을 확인하세요.'),
-      review('reconciliation.results', '일치·불일치를 확인하세요', '결과 건수와 불일치 유형을 확인하세요. 아래 버튼은 결과에 따라 예외 처리 또는 최종 확정으로 안내합니다.'),
+      review('reconciliation.results', '일치·불일치를 확인하세요', '결과 건수와 불일치 유형을 확인하세요. 결과 확인 후 검증원장과 예외함 참조 안내로 이어갑니다.'),
     ]
-    case 'exception.resolve':
-      if (correctionPending) return [step('exception.replacement', 'h1', '정정 후 지급을 연결하세요', '취소된 지급을 재사용하지 않습니다. 정정 후 확정된 지급 번호를 아래에 입력하고 새 월 검증과 새 대사 결과를 연결하세요.')]
-      if (path !== '/exceptions') return [step('exception.source', 'h1', '원천 화면에서 직접 정정하세요', '기존 취소·정정 절차로 원천을 수정하세요. 정정 지급을 확정한 뒤 아래 정정 지급 연결과 새 월 검증 안내를 사용하세요.')]
-      if (!selectedException) return [
-        review('exception.filters', '처리할 예외를 찾으세요', '현재 계약·검증월·미해결 상태로 조회하고 예외 한 건을 선택하세요.'),
-        review('exception.action', '선택한 예외를 확인하세요', '예외를 선택하면 근거와 허용 조치에 대한 세부 안내가 이어집니다.'),
-      ]
-      return [
-        review('exception.detail', '검출 근거를 확인하세요', '어느 실행에서 어떤 불일치가 생겼는지 확인하세요. 원본 링크를 통해 원천 내용을 대조하세요.'),
-        step('exception.type', `${target('exception.actionInput')} select`, '허용 조치를 선택하세요', '선택할 수 있는 검토, 정정, 해결 조치 중 맞는 항목을 고르세요.', true),
-        step('exception.reason', `${target('exception.actionInput')} textarea`, '처리 사유를 입력하세요', '판단 근거와 실제 처리 내용을 입력하세요. 해결 표시만으로 원래 건이 정정되지는 않습니다.', true),
-        step('exception.evidence', `${target('exception.actionInput')} input`, '증빙을 확인하세요', '필요한 문서번호나 링크를 입력하세요.'),
-        review('exception.actionSave', '처리 내용을 직접 저장하세요', '실제 처리 저장을 누르세요. 처리 성공과 원래 건 정정·재검증 완료는 서로 다릅니다.'),
-        review('exception.action', '원래 건 정정과 재검증을 연결하세요', '원래 건 정정 후 확정 지급 번호를 연결하고 새 월 검증·재대사 결과를 선택하세요. 아래 연결 버튼을 차례로 사용하세요.'),
-      ]
-    case 'validation.finalize': return [
-      step('finalize.header', '[aria-labelledby="vrun-header-title"]', '최종 확정 대상을 확인하세요', '검증월과 실행 회차가 현재 업무의 결과인지 확인하세요.'),
-      ...[
-        ['계산 완료 상태', '검증 계산이 끝났는지 확인하세요. 실행 중 또는 실패는 확정할 수 없습니다.'],
-        ['차변·대변 일치', '차대가 맞지 않는 분개가 0건인지 확인하세요. 원장 정정이 필요하면 먼저 처리합니다.'],
-        ['긴급 미처리 예외', '긴급 미처리 예외가 0건인지 확인하세요. 미충족 바로가기에서 근거를 확인합니다.'],
-        ['정책 누락·중복', '정책 없음과 중복이 0건인지 확인하세요. 정책을 정정했다면 재검증이 필요합니다.'],
-        ['귀속합계', '귀속합계 오류가 0건인지 확인하세요. 지급 원천과 계약별 귀속을 대조합니다.'],
-        ['상세·요약 합계', '계약별 상세 합계와 실행 요약 합계가 일치하는지 확인하세요.'],
-        ['최신 실행', '같은 검증월의 가장 최근 실행인지 확인하세요. 오래된 실행을 확정하지 않습니다.'],
-        ['중복 확정 방지', '같은 검증월에 이미 확정된 실행이 없는지 확인하세요.'],
-      ].map(([title, instruction], index) => step(`finalize.condition.${index + 1}`, `[data-guide-condition="${index + 1}"]`, `${index + 1}/8 · ${title}`, instruction)),
-      review('validation.finalize', '확정 권한과 잠금 안내를 확인하세요', 'GA관리자 또는 시스템관리자의 작업입니다. 확정 후 결과가 잠기며 실제 송금이나 회계 마감과는 다릅니다.'),
-      review('validation.finalize', '최종 확정을 실행하세요', '화면의 최종 확정 버튼과 확인창을 직접 조작하세요. 상태가 확정(잠김)일 때만 안내가 끝납니다.'),
-    ]
+    case 'ledger.review': return sharedSteps('LEDG-W01')
+    case 'exception.resolve': return [step('exception.source', 'h1', '예외함에서 참조를 확인하세요', correctionPending
+      ? '취소된 지급의 원인과 참조를 확인하세요. 필요한 처리와 정정은 담당자가 안내 종료 후 직접 진행합니다.'
+      : '예외 목록에서 행을 눌러 참조와 계산근거를 확인하는 방법까지 안내합니다.')]
+
   }
 }
 
 /** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
 export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true, batchPayment = false): WorkflowExplanation[] {
-  if (reuseContractDetail && stage === 'reconciliation.review') {
+  if (path === '/exceptions' && ['reconciliation.review', 'ledger.review', 'exception.resolve'].includes(stage)) {
+    if (selectedException) return [{
+      id: 'exception.reference', selector: '[data-guide-target="exception.reference"]', scope: 'dialog',
+      title: '참조 버튼에서 원인 확인', concise: true,
+      instruction: '참조 또는 계산근거 열기 버튼으로 원자료와 검출 이유를 확인할 수 있습니다.',
+      interaction: '필요한 처리와 정정은 담당자가 직접 진행합니다. 전체 업무 가이드는 여기서 마칩니다.',
+      presentation: { fixedCard: 'center', includeTarget: '[data-guide-target="exception.basis"]' },
+    }]
+    return sharedSteps('EXCP-W01').map(entry => entry.id === 'exception.list' ? { ...entry, requireAction: true,
+      disabledReason: '예외 행을 눌러 상세 모달을 열어 주세요.' } : entry)
+  }
+  if (reuseContractDetail && (stage === 'reconciliation.review' || stage === 'ledger.review')) {
     if (path === '/reconciliations') return sharedSteps('RECO-W01')
     if (path === '/journals') return sharedSteps('LEDG-W01')
     if (path === '/exceptions') return sharedSteps('EXCP-W01')
@@ -163,7 +149,7 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
     return [...sharedSteps('VRUN-W02').filter(entry => entry.id !== 'validation.openReconciliation'),
       menuHandoff('validation.openReconciliation', 'reco-w01', '대사 실행/결과', 'reconciliation')]
   }
-  const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
+  const instructions = workflowInstructions(stage, path, correctionPending)
   if (stage === 'contract.create') return instructions
   const screenId = path.startsWith('/contracts/') ? 'CONT-W02'
     : path.startsWith('/schedules/') ? 'SCHE-W02'
@@ -172,11 +158,6 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
           : path === '/reconciliations' ? 'RECO-W01' : path === '/exceptions' ? 'EXCP-W01' : ''
   const page = getScreenWalkthrough(screenId)
   const explanations = instructions.map(instruction => {
-    if (reuseContractDetail && stage === 'schedule.review' && instruction.id === 'schedule.versions') {
-      return { ...instruction, selector: '#schedule-versions-tab', title: '버전 비교', concise: true,
-        instruction: '버전비교 탭에서 생성 이력과 사용 중인 버전을 확인하세요.',
-        interaction: '확인한 뒤 수수료 지급으로 이어갑니다.', requiresSelectedTab: true }
-    }
     const shared = page.find(entry => guideSelector(entry) === instruction.selector)
     return shared ? { ...shared, ...instruction, title: shared.title, instruction: shared.instruction,
       workflowInstruction: instruction.instruction } : instruction
@@ -194,7 +175,7 @@ function menuHandoff(id: string, screen: string, label: string, destination: Wor
     title: label + '로 이어가기', concise: true, destination,
     instruction: '왼쪽 사이드바의 ' + label + ' 메뉴를 누르세요.',
     interaction: destination === 'validation-list' ? '선택한 지급 건을 모두 확정한 뒤 월 검증을 진행합니다.' : '이동한 화면의 도움말로 안내를 이어갑니다.',
-    presentation: { side: 'right' },
+    presentation: { side: 'right', preserveCardPosition: true, ...(destination === 'validation-list' ? { cardAlign: 'top' as const } : {}) },
     onEnter: () => {
       useSidebarStore.getState().setCollapsed(false, false)
       useSidebarStore.getState().setSection(screen === 'vrun-w01' ? 'compliance' : screen === 'reco-w01' ? 'ledger' : 'contracts', true)

@@ -6,8 +6,9 @@ const HIGHLIGHT_PADDING = 10
 export interface SpotlightPresentation {
   side?: 'right' | 'left' | 'above' | 'below' | 'either'
   includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number
-  fixedCard?: boolean | 'left' | 'right'; scrollToTop?: boolean
+  fixedCard?: boolean | 'left' | 'right' | 'center'; cardAlign?: 'top'; scrollToTop?: boolean
   cardAnchor?: string; preventScroll?: boolean; allowPageScroll?: boolean; scrollTargetTop?: boolean
+  includeTarget?: string
 }
 
 export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
@@ -19,8 +20,10 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
   const preserveCardPosition = presentation?.preserveCardPosition
   const rowLimit = presentation?.rowLimit
   const fixedCard = presentation?.fixedCard
+  const cardAlign = presentation?.cardAlign
   const scrollToTop = presentation?.scrollToTop, scrollTargetTop = presentation?.scrollTargetTop
   const cardAnchor = presentation?.cardAnchor, preventScroll = presentation?.preventScroll
+  const includeTarget = presentation?.includeTarget
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -54,6 +57,14 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     const heightLimit = () => Math.min(detailed ? 560 : 460, window.innerHeight * (detailed && window.innerWidth >= 768 ? 0.65 : 0.5))
     const targetRect = () => {
       const rect = target!.getBoundingClientRect()
+      if (includeTarget) {
+        const extra = (target!.closest('[role="dialog"]') ?? document).querySelector<HTMLElement>(includeTarget)
+        if (extra?.getClientRects().length) {
+          const bounds = extra.getBoundingClientRect()
+          const left = Math.min(rect.left, bounds.left), top = Math.min(rect.top, bounds.top)
+          return new DOMRect(left, top, Math.max(rect.right, bounds.right) - left, Math.max(rect.bottom, bounds.bottom) - top)
+        }
+      }
       if (includeLabel) {
         const label = target!.closest('.field')?.querySelector('.field-label')?.getBoundingClientRect()
         if (label) return new DOMRect(rect.left, Math.min(rect.top, label.top), rect.width, rect.bottom - Math.min(rect.top, label.top))
@@ -133,25 +144,30 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
         // The full workflow keeps one coach slot while only the spotlight moves.
         // Reserve a stable height as well: shorter instructions must not move Next.
-        if (fixedCard === 'left' || fixedCard === 'right') {
+        if (fixedCard === 'left' || fixedCard === 'right' || fixedCard === 'center') {
           const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
           const topBoundary = headerBottom + 16
           const anchor = cardAnchor ? document.querySelector(cardAnchor)?.getBoundingClientRect() : null
           const cardWidth = Math.min(420, anchor ? Math.max(224, anchor.width - 24) : Infinity, Math.max(0, workspaceRight - cardLeftBoundary - 24))
           const cardHeight = Math.max(0, Math.min(360, anchor ? Math.max(240, anchor.height - 24) : Infinity, height - topBoundary - 16))
           const cardLeft = anchor ? Math.max(cardLeftBoundary + 12, Math.min(anchor.left + 12, workspaceRight - cardWidth - 12))
-            : fixedCard === 'right' ? workspaceRight - cardWidth - 12 : cardLeftBoundary + 12
-          const cardTop = anchor ? Math.max(topBoundary, Math.min(anchor.top + 12, height - cardHeight - 16)) : height - cardHeight - 16
+            : fixedCard === 'center' ? (cardLeftBoundary + workspaceRight - cardWidth) / 2
+              : fixedCard === 'right' ? workspaceRight - cardWidth - 12 : cardLeftBoundary + 12
+          const cardTop = cardAlign === 'top' ? topBoundary : fixedCard === 'center' ? Math.max(topBoundary, (height - cardHeight) / 2)
+            : anchor ? Math.max(topBoundary, Math.min(anchor.top + 12, height - cardHeight - 16)) : height - cardHeight - 16
           const rect = target?.isConnected ? targetRect() : null
-          setPosition({
+          setPosition(previous => ({
             box: rect ? {
               left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
               top: Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
               width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
               height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
             } : null,
-            card: { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, height: cardHeight, maxHeight: cardHeight, overflowY: 'auto' },
-          })
+            card: preserveCardPosition && typeof previous.card.left === 'number' && typeof previous.card.top === 'number'
+              ? { ...previous.card, left: Math.max(12, Math.min(previous.card.left, width - Number(previous.card.width) - 12)),
+                top: Math.max(topBoundary, Math.min(previous.card.top, height - Number(previous.card.height ?? cardHeight) - 16)) }
+              : { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, height: cardHeight, maxHeight: cardHeight, overflowY: 'auto' },
+          }))
           if (rect && preparedPresentation !== `${width}:${height}` && !targetInHeader && !preventScroll) {
             preparedPresentation = `${width}:${height}`
             const overlapsCard = rect.left < cardLeft + cardWidth && rect.right > cardLeft
@@ -316,6 +332,6 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, scrollToTop, cardAnchor, preventScroll, scrollTargetTop])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, cardAlign, scrollToTop, cardAnchor, preventScroll, scrollTargetTop, includeTarget])
   return position
 }

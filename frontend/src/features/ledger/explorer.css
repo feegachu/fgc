@@ -1,14 +1,13 @@
 .ledger-explorer-page-header { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
 .ledger-explorer-page-header .page-header-copy { margin-right:auto; }
 .ledger-explorer-page-header .page-header-copy p { margin:6px 0 0; color:var(--color-text-secondary); font-size:13px; }
-.ledger-explorer-toolbar { display:flex; padding:4px; border:1px solid var(--color-border-default); border-radius:10px; background:var(--color-bg-subtle); }
-.ledger-explorer-toolbar button { min-height:38px; padding:8px 18px; border:0; border-radius:7px; background:transparent; color:var(--color-text-secondary); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
-.ledger-explorer-toolbar button[aria-pressed='true'] { background:var(--color-action-primary); color:var(--color-text-inverse,#fff); }
-.ledger-explorer-toolbar button:focus-visible { outline:2px solid var(--color-action-primary); outline-offset:2px; }
+.ledger-journal-tools { display:flex; align-items:center; gap:12px; margin-left:auto; }
+.ledger-journal-tools small { color:var(--color-text-secondary); font-size:12px; }
 .ledger-explorer-layout { display:grid; grid-template-columns:minmax(285px,340px) minmax(0,1fr); gap:20px; align-items:start; }
 .ledger-explorer-layout.is-all { grid-template-columns:minmax(0,1fr); }
 .ledger-contracts,.ledger-journals,.ledger-contract-summary,.ledger-linked-evidence { min-width:0; overflow:hidden; }
 .ledger-explorer-right { display:flex; min-width:0; flex-direction:column; gap:20px; }
+.ledger-summary-group { display:grid; gap:16px; min-width:0; }
 .ledger-explorer-layout .surface-header { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-height:58px; padding:14px 18px; }
 .ledger-explorer-layout .surface-title { font-size:14px; }
 .ledger-explorer-layout .surface-header>span { color:var(--color-text-secondary); font-size:12px; }

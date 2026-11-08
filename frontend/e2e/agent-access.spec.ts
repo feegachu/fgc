@@ -101,6 +101,26 @@ test('계약 상세의 저장된 내부 탭은 기본정보로 제한하고 내�
   expect(unexpected).toEqual([])
 })
 
+test('설계사 계약 화면은 보라색의 짧은 탭과 이후 UI로 고정한다', async ({ page }, info) => {
+  const unexpected = await agentFixture(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('contracts/1?month=2026-07')
+  const tab = page.getByRole('tab', { name: '기본정보' })
+  await expect(page.locator('.app-shell')).toHaveAttribute('data-ui-revision', 'after')
+  await expect(page.locator('.contract-history-compact')).toBeVisible()
+  const width = (await tab.boundingBox())!.width
+  expect(width).toBeGreaterThanOrEqual(100)
+  expect(width).toBeLessThanOrEqual(140)
+  await expect(tab).toHaveCSS('color', 'rgb(81, 58, 149)')
+  await expect(page.locator('.contract-history-panel-header h3')).toHaveCSS('color', 'rgb(81, 58, 149)')
+  await expect(page.getByRole('group', { name: '계약/지급 화면 이전·이후 비교' })).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('agent-contract-after.png'), fullPage: true })
+  await expect(page.locator('.contract-history-compact')).toBeVisible()
+  await expect(page.getByRole('link', { name: '지급 등록', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '수정', exact: true })).toHaveCount(0)
+  expect(unexpected).toEqual([])
+})
+
 test('내부 화면 직접 URL은 403 화면으로 표시하고 업무 API를 호출하지 않는다', async ({ page }) => {
   const unexpected = await agentFixture(page)
   await page.goto('journals')

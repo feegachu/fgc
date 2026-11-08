@@ -280,10 +280,5 @@
 .reco-react-history .reco-history-leaf { margin:3px 0 5px; border:1px solid transparent; border-radius:7px; }
 .reco-react-history .reco-history-leaf.is-active { border-color:var(--color-border-focus); background:var(--color-action-primary-subtle,var(--color-bg-subtle)); }
 .reco-history-leaf>.hierarchy-toggle { display:none; }
-.reco-history-leaf .hierarchy-select { padding:10px; }
-.reco-history-run { display:flex; flex-direction:column; gap:6px; width:100%; min-width:0; }
-.reco-history-run-title { display:flex; align-items:center; gap:8px; }
-.reco-history-run-title strong { overflow-wrap:anywhere; }
-.reco-history-run-status { display:flex; flex-wrap:wrap; align-items:center; gap:6px; color:var(--color-text-secondary); font-size:11px; }
-.reco-history-run-difference { color:var(--color-text-secondary); font-size:11px; }
-.reco-history-run-difference strong { font-weight:500; }
+.reco-history-leaf .hierarchy-select { padding:6px 10px; }
+.reco-history-run { display:block; width:100%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

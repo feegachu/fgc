@@ -72,7 +72,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
-function mount(role = 'SETTLEMENT', initialEntry = '/') {
+function mount(role = 'SETTLEMENT', initialEntry = '/', helpVersion: 'before' | 'after' = 'before') {
   function Shell() {
     return (
       <>
@@ -81,7 +81,7 @@ function mount(role = 'SETTLEMENT', initialEntry = '/') {
         <main id="main-content">
           <Outlet />
         </main>
-        <SettlementGuide helpVersion="before"
+        <SettlementGuide helpVersion={helpVersion}
           user={{ ...user, roleCode: role, canProcess: ['SETTLEMENT', 'SYSTEM_ADMIN'].includes(role) }}
           month="2026-07"
         />
@@ -109,14 +109,13 @@ function mount(role = 'SETTLEMENT', initialEntry = '/') {
             element: (
               <form data-guide-target="schedule.lines">
                 <section aria-labelledby="schedule-header-title">스케줄 요약</section>
-                <section aria-labelledby="schedule-versions-title">버전 이력</section>
                 실제 스케줄
                 <DirtyInput label="스케줄 메모" />
               </form>
             ),
           },
           { path: '/schedules/99', element: <section data-guide-target="schedule.lines">다른 스케줄</section> },
-          { path: '/exceptions', element: <><section data-guide-target="exception.filters">예외 조회</section><section data-guide-target="exception.action">예외 처리</section></> },
+          { path: '/exceptions', element: <><section data-guide-target="exception.filters">예외 조회</section><section data-guide-target="exception.list">예외 목록</section><section data-guide-target="exception.action">예외 처리</section></> },
           { path: '/transactions/new', element: <section data-guide-target="payment.form">지급 입력</section> },
         ],
       },
@@ -497,34 +496,32 @@ it.each([
 })
 
 
-it('rechecks server evidence after saving a terminal exception action removes explanation 5/6', async () => {
+it('finishes the revised guide inside the exception modal without returning to ledger or processing the exception', async () => {
   const read = vi.spyOn(evidenceApi, 'readEvidence').mockResolvedValue({ scheduleAcknowledged: false })
-  const decide = vi.spyOn(settlementState, 'decide').mockReturnValue({ step: 'exception.resolve', reason: '미처리 예외' })
-  const { actor, router } = mount('SETTLEMENT', '/exceptions?selected=7')
-  const form = document.createElement('div')
-  form.innerHTML = `<section data-guide-target="exception.detail">근거</section>
-    <div data-guide-target="exception.actionInput"><select><option>해결</option></select><textarea>정정 완료</textarea><input value="DOC-7" /></div>
-    <button data-guide-target="exception.actionSave">처리 저장</button>`
-  document.querySelector('#main-content')!.append(form)
+  vi.spyOn(settlementState, 'decide').mockReturnValue({ step: 'exception.resolve', reason: '미처리 예외' })
+  const { actor, router } = mount('SETTLEMENT', '/', 'after')
   await actor.click(screen.getByRole('button', { name: '전체 업무 가이드' }))
-  await actor.click(screen.getByRole('button', { name: '안내 시작' }))
-  await waitFor(() => expect(screen.queryByText('최신 결과를 확인하고 있습니다.')).not.toBeInTheDocument())
-  await act(async () => { void router.navigate('/exceptions?selected=7') })
-  for (let i = 0; i < 4; i++) {
-    await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
-    await actor.click(screen.getByRole('button', { name: '확인하고 다음 설명' }))
-  }
-  await screen.findByRole('heading', { name: '처리 내용을 직접 저장하세요' })
-  await waitFor(() => expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeEnabled())
-  // The real action form unmounts after the server accepts a terminal action.
-  form.querySelector('button')!.onclick = () => form.remove()
-  await actor.click(screen.getByRole('button', { name: '처리 저장' }))
-  await screen.findByRole('button', { name: '다시 찾기' })
-  expect(screen.getByRole('button', { name: '확인하고 다음 설명' })).toBeDisabled()
-  const calls = read.mock.calls.length
-  decide.mockReturnValue({ step: 'contract.create', reason: '새 서버 결과' })
-  await actor.click(screen.getByRole('button', { name: '현재 결과로 이어서 안내' }))
-  await waitFor(() => expect(read).toHaveBeenCalledTimes(calls + 1))
-  await waitFor(() => expect(router.state.location.pathname).toBe('/contracts/new'))
-  expect(vi.mocked(apiClient.request).mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
+  await actor.click(screen.getByRole('button', { name: /계약 생성부터 시작/ }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/exceptions'))
+  await waitFor(() => expect(screen.getByLabelText('전체 업무 가이드')).toHaveAttribute('aria-busy', 'false'))
+  const modal = document.createElement('div')
+  modal.className = 'exception-detail-modal'
+  modal.setAttribute('role', 'dialog')
+  modal.innerHTML = '<div data-guide-target="exception.reference"><button>참조 열기</button></div>'
+  document.body.append(modal)
+  try {
+    await act(async () => { await router.navigate('/exceptions?month=2026-07&selected=7') })
+    expect(await screen.findByRole('heading', { name: '참조 버튼에서 원인 확인' })).toBeVisible()
+    expect(modal.querySelector('[aria-label="전체 업무 가이드"]')).not.toBeNull()
+    expect(screen.queryByText('정정 후 지급 번호')).not.toBeInTheDocument()
+    const calls = read.mock.calls.length
+    const finish = screen.getByRole('button', { name: '안내 마치기' })
+    await waitFor(() => expect(finish).toBeEnabled())
+    await actor.click(finish)
+    expect(screen.queryByRole('complementary', { name: '전체 업무 가이드' })).not.toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/exceptions')
+    expect(router.state.location.search).toContain('selected=7')
+    expect(read).toHaveBeenCalledTimes(calls)
+    expect(modal.isConnected).toBe(true)
+  } finally { modal.remove() }
 })

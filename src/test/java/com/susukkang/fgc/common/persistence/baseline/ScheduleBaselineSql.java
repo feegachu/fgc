@@ -153,45 +153,6 @@ final class ScheduleBaselineSql {
                 sql.append(" ");
                 yield new Statement(sql.toString(), parameters, rows(com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse.class), "", "");
             }
-            case "selectVersionsByScheduleHeaderId" -> {
-                StringBuilder sql = new StringBuilder();
-                var parameters = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
-                parameters.addValue("p0", parameter(value(input, "scheduleHeaderId")));
-                sql.append("""
-                    WITH target AS (
-                        SELECT contract_id, payment_stage
-                          FROM schedule_header
-                         WHERE schedule_header_id = :p0
-                    )
-                    SELECT sh.schedule_header_id,
-                           c.contract_no,
-                           sh.payment_stage,
-                           sh.schedule_regime,
-                           sh.schedule_purpose,
-                           sh.schedule_version_no,
-                           sh.status,
-                           sh.active_yn,
-                           sh.generated_at,
-                           sh.generation_reason,
-                           COUNT(sl.schedule_line_id) AS line_count,
-                           COALESCE(SUM(sl.expected_amount), 0) AS expected_total,
-                           CONCAT(pv.policy_name, ' v', pv.version_no) AS policy_version_label
-                      FROM schedule_header sh
-                      JOIN target t
-                        ON t.contract_id = sh.contract_id
-                       AND t.payment_stage = sh.payment_stage
-                      JOIN insurance_contract c
-                        ON c.contract_id = sh.contract_id
-                      JOIN policy_version pv
-                        ON pv.policy_version_id = sh.policy_version_id
-                      LEFT JOIN schedule_line sl
-                        ON sl.schedule_header_id = sh.schedule_header_id
-                     GROUP BY sh.schedule_header_id, c.contract_no, pv.policy_name, pv.version_no
-                     ORDER BY sh.schedule_version_no DESC, sh.schedule_header_id DESC
-                    """);
-                sql.append(" ");
-                yield new Statement(sql.toString(), parameters, rows(com.susukkang.fgc.schedule.dto.ScheduleHeaderResponse.class), "", "");
-            }
             case "countByCondition" -> {
                 StringBuilder sql = new StringBuilder();
                 var parameters = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();

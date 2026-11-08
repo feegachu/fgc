@@ -3,10 +3,26 @@ import { createWorkspaceStore, validMonth } from './workspace'
 import { screens } from '../app/screens'
 beforeEach(() => sessionStorage.clear())
 const permissions = { canProcess: true, canViewAuditLog: true }
+it.each(['/contracts/new', '/contracts/21/edit', '/transactions/new'])('입력 화면 %s를 나가면 편집 탭을 닫고 목록 탭은 보존한다', (path) => {
+  const store = createWorkspaceStore()
+  store.getState().initialize('u', '2026-07', null, permissions)
+  const list = screens.find(screen => screen.path === '/contracts')!
+  const editor = screens.find(screen => screen.path === (path.includes('/edit') ? '/contracts/:id/edit' : path))!
+  store.getState().openTab({ ...list, href: list.path })
+  store.getState().openTab({ ...editor, href: path })
+  store.getState().markModified(editor.id)
+  store.getState().openTab({ ...editor, href: `${path}?month=2026-08` })
+  expect(store.getState().tabs.find(tab => tab.id === editor.id)?.modified).toBe(true)
+  store.getState().openTab({ ...list, href: list.path })
+  expect(store.getState().tabs.map(tab => tab.id)).toEqual(['DASH-W01', 'CONT-W01'])
+  const restored = createWorkspaceStore()
+  restored.getState().initialize('u', '2026-07', null, permissions)
+  expect(restored.getState().tabs.map(tab => tab.id)).toEqual(['DASH-W01', 'CONT-W01'])
+})
 it('11개 업무 탭은 최대 10개로 제한하고 대시보드를 고정·복원한다', () => {
   const store = createWorkspaceStore()
   store.getState().initialize('settle01', '2026-07', null, permissions)
-  for (const screen of screens.filter((screen) => !screen.path.includes(':')).slice(0, 12))
+  for (const screen of screens.filter((screen) => !screen.path.includes(':') && !['AGNT-W01', 'CONT-W03', 'TRAN-W02'].includes(screen.id)).slice(0, 12))
     store.getState().openTab({ id: screen.id, title: screen.title, icon: screen.icon, href: screen.path })
   expect(store.getState().tabs).toHaveLength(10)
   expect(store.getState().tabs[0].id).toBe('DASH-W01')

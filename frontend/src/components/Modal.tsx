@@ -11,7 +11,7 @@ export function Modal({
   children,
   footer,
   onClose,
-  closeOnBackdrop = false,
+  closeOnBackdrop = true,
   closeOnEscape = true,
   initialFocusRef,
   className = '',
@@ -102,7 +102,7 @@ export function Modal({
     <div data-guide-feature="components.modal.div"
       className="modal-backdrop"
       onClick={(event) => {
-        if (closeOnBackdrop && event.target === event.currentTarget) onClose()
+        if (closeOnBackdrop && event.target === event.currentTarget && modalStack.at(-1) === dialog.current) onClose()
       }}
     >
       <div

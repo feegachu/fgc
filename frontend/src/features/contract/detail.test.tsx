@@ -301,7 +301,7 @@ describe('CONT-W02 계약 상세', () => {
         }
     })
     await screen.findByText('104.1%')
-    expect(screen.getByText(/두 규제를 더하지 마세요/)).toBeInTheDocument()
+    expect(screen.queryByText(/두 규제를 더하지 마세요/)).not.toBeInTheDocument()
     const open = screen.getByRole('button', { name: 'GA→설계사 계산근거' })
     await actions.click(open)
     const dialog = await screen.findByRole('dialog', { name: '계산근거' })

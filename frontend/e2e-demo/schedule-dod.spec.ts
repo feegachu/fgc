@@ -137,9 +137,9 @@ for (const seven of [false, true]) {
     await page.getByRole('button', { name: `${fixture.years}년 예정 새 버전 만들기`, exact: true }).click()
     const next = await successful(response)
     await expect(page).toHaveURL(new RegExp(`/schedules/${next.scheduleHeaderId}\\b`))
-    await page.getByRole('tab', { name: '버전비교', exact: true }).click()
-    await expect(page.getByRole('table', { name: '같은 계약의 스케줄 버전 이력' })).toContainText('v1')
-    await expect(page.getByRole('table', { name: '같은 계약의 스케줄 버전 이력' })).toContainText('v2')
+    await expect(page.getByRole('tab', { name: '버전비교', exact: true })).toHaveCount(0)
+    await expect(page.locator('[aria-labelledby="schedule-header-title"]')).toContainText('v2')
+    expect(Number(sql(`SELECT count(*) FROM fgc.schedule_header WHERE contract_id=${fixture.contract}`))).toBe(Number(before) + 1)
     expect(sql(`SELECT active_yn FROM fgc.schedule_header WHERE schedule_header_id=${fixture.id}`)).toBe('f')
     await page.getByRole('link', { name: '목록으로', exact: true }).click()
     await expect(page.getByLabel('적용 체계', { exact: true })).toHaveValue(fixture.regime)
@@ -195,10 +195,11 @@ test('SCHE DoD: 역할별 직접 API/URL·ID 변경과 읽기 전용 버튼을 �
     if (account === 'agent01') sql("UPDATE fgc.app_user SET account_status='ACTIVE',password_hash=(SELECT password_hash FROM fgc.app_user WHERE login_id='settle01') WHERE login_id='agent01'")
     const session = await actor(account)
     try {
-      for (const path of ['/schedules', `/schedules/${ids[0]}`, `/schedules/${ids[1]}`, `/schedules/${ids[0]}/versions`, `/schedules/${ids[0]}/export.csv`]) {
+      for (const path of ['/schedules', `/schedules/${ids[0]}`, `/schedules/${ids[1]}`, `/schedules/${ids[0]}/export.csv`]) {
         const response = await session.raw(path)
         expect(response.status(), `${account} ${path}`).toBe(account === 'agent01' ? 403 : 200)
       }
+      expect((await session.raw(`/schedules/${ids[0]}/versions`)).status()).toBe(account === 'agent01' ? 403 : 404)
       if (['gaadmin', 'audit01', 'agent01'].includes(account)) {
         for (const suffix of ['confirm', 'regenerate']) expect((await session.raw(`/schedules/${ids[0]}/${suffix}`, 'POST', { reason: '권한 우회 시도' })).status()).toBe(403)
       } else {

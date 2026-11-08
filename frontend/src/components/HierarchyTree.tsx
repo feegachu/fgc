@@ -37,13 +37,13 @@ export function HierarchyTree({ nodes, selectedId, onSelect, label, initiallyCol
   return <nav className="hierarchy-tree" aria-label={label}>{render(nodes, 0)}</nav>
 }
 
-export function ViewModeSwitch({ value, onChange, label = '보기 방식' }: {
-  value: 'tree' | 'table'; onChange: (value: 'tree' | 'table') => void; label?: string
+export function ViewModeSwitch({ value, onChange, label = '보기 방식', treeLabel = '트리 보기', tableLabel = '표 보기' }: {
+  value: 'tree' | 'table'; onChange: (value: 'tree' | 'table') => void; label?: string; treeLabel?: string; tableLabel?: string
 }) {
   return <div className="hierarchy-view-switch" role="group" aria-label={label} data-view={value}>
     <span className="hierarchy-view-slider" aria-hidden="true" />
-    {(['tree', 'table'] as const).map(mode => <button data-guide-feature="hierarchy.button-3" type="button" key={mode} aria-label={mode === 'tree' ? '트리 보기' : '표 보기'}
-      aria-pressed={value === mode} onClick={() => onChange(mode)} title={mode === 'tree' ? '트리 보기' : '표 보기'}>
+    {(['tree', 'table'] as const).map(mode => <button data-guide-feature="hierarchy.button-3" type="button" key={mode} aria-label={mode === 'tree' ? treeLabel : tableLabel}
+      aria-pressed={value === mode} onClick={() => onChange(mode)} title={mode === 'tree' ? treeLabel : tableLabel}>
       <span className="material-symbols-rounded" aria-hidden="true">{mode === 'tree' ? 'folder' : 'table_chart'}</span>
     </button>)}
   </div>

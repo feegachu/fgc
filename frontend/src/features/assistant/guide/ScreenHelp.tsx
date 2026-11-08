@@ -34,6 +34,9 @@ export interface ScreenHelpStep {
   liveDescriptionSelector?: string
   presentation?: SpotlightPresentation
   requireAction?: boolean
+  disabledReason?: string
+  /** Keep a later step whose target is revealed by a required user action. */
+  waitForTarget?: boolean
   openControl?: boolean
   advanceOnSelection?: boolean
   /** Advance only after the business handler reports successful completion. */
@@ -41,7 +44,7 @@ export interface ScreenHelpStep {
   /** Presentation lifecycle only: replay a card or start/stop a chart preview. */
   onEnter?: () => void | (() => void)
   attribute?: 'data-guide-target' | 'data-guide-feature'
-  scope?: 'shell'
+  scope?: 'shell' | 'dialog'
   group: string
   title: string
   instruction: string
@@ -69,7 +72,7 @@ export function ScreenHelp({ walkthrough, legacyTrigger, disabled, triggerRef, .
   const definition = definitions.find((entry) => entry.screenId === screenId && entry.variant === variant)
   if (!definition) return <button type="button" className="button button-secondary screen-help-trigger" disabled title="등록된 도움말 버전을 찾을 수 없습니다."><HelpIcon />도움말</button>
   if (helpVersion === 'after') {
-    const tourProps = { title: definition.title, steps: walkthrough ?? getScreenWalkthrough(screenId, variant), disabled, triggerRef }
+    const tourProps = { title: definition.title, screenId, variant, steps: walkthrough ?? getScreenWalkthrough(screenId, variant), disabled, triggerRef }
     return routed ? <RoutedWalkthrough screenId={screenId} tourProps={tourProps} /> : <ScreenWalkthrough {...tourProps} />
   }
   return <Fragment key={helpVersion}>
@@ -253,7 +256,7 @@ function ScreenHelpSession({ screenId, variant, walkthrough, saveGuide, finalize
     || (needsFinalization ? finalizeState.savedId !== null && !finalizeState.pending
       : !saveState.pending && (index === 0 ? saveState.valid || saveState.savedId !== null : saveState.savedId !== null))
   return <>
-    <button type="button" ref={setTrigger} className="button button-secondary screen-help-trigger" aria-expanded={open} onClick={open ? close : start}><HelpIcon />도움말</button>
+    <button type="button" ref={setTrigger} className="button button-secondary screen-help-trigger" data-screen-help={screenId} data-screen-help-variant={variant ?? ''} aria-expanded={open} onClick={open ? close : start}><HelpIcon />도움말</button>
     {open && !modal && createPortal(<>
       {!folded && position.box && !paused && !complete && <div className={`payment-guide-spotlight${walkthrough ? ' screen-step-spotlight' : ''}`} aria-hidden="true" style={position.box} />}
       <section ref={card} className={`payment-guide-card${walkthrough ? ' screen-step-guide' : ''}`} aria-label={`${definition.title} 도움말`} data-help-target={snapshot.step?.targetId} data-guide-anchored={Boolean(snapshot.target && !modal)} style={position.card}>

@@ -122,7 +122,10 @@ body:has([role='dialog']) .settlement-guide-spotlight {
 .settlement-guide[data-guide-docked='true'] { display:flex; flex-direction:column; }
 .settlement-guide[data-guide-docked='true']>.payment-guide-header { flex-shrink:0; }
 .settlement-guide[data-guide-docked='true']>section { display:flex; flex:1; flex-direction:column; min-height:0; overflow:auto; }
-.settlement-guide[data-guide-docked='true']>section>.payment-guide-actions { flex-shrink:0; margin-top:auto; bottom:0; }
+.settlement-guide[data-guide-docked='true']>section { overflow-x:hidden; }
+.settlement-guide[data-guide-docked='true']>section>.payment-guide-actions { flex-shrink:0; margin-top:auto; margin-inline:0; padding-inline:0; bottom:0; }
+.settlement-guide[data-guide-in-dialog='true'],
+.settlement-guide-spotlight[data-guide-in-dialog='true'] { visibility:visible !important; }
 
 .settlement-guide .payment-guide-actions > .disabled-button-hint { flex: 1; min-width: 0; }
 .settlement-guide .payment-guide-actions > .disabled-button-hint > button { width: 100%; }
