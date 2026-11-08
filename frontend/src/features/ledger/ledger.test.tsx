@@ -15,6 +15,12 @@ import { useToastStore } from '../../stores/toasts'
 import { correctionTarget, criteriaFromParams, effectiveCriteria, monthRange } from './api'
 import type { JournalDetail } from './api'
 
+// These tests exercise the original table API/actions. Explorer behavior has separate browser coverage.
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router')
+  return { ...actual, useOutletContext: () => ({ ...actual.useOutletContext<object>(), helpVersion: 'before' }) }
+})
+
 const original: JournalDetail = {
   journalHeaderId: 11,
   journalNo: 'JRN-001',
@@ -280,7 +286,7 @@ describe('LEDG-W01 검증원장 React 전환', () => {
     await user.type(screen.getByRole('textbox', { name: '역분개 사유' }), ' 정정 필요 ')
     await user.type(screen.getByLabelText('증빙 참조'), ' DOC-1 ')
     await user.click(screen.getByRole('button', { name: '역분개 생성' }))
-    expect(await within(screen.getByRole('region', { name: '분개 상세' })).findByText('역분개됨')).toBeVisible()
+    expect((await within(screen.getByRole('region', { name: '분개 상세' })).findAllByText('역분개됨'))[0]).toBeVisible()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
   it('정정 예외 요청 응답 redirectUrl의 selected를 유지하여 예외함으로 이동한다', async () => {

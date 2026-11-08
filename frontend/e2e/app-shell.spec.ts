@@ -61,9 +61,22 @@ test('read-only role finishes screen help where the write action is not availabl
     // 기준월 없이 열면 셸이 주소에 month를 붙이면서 도움말을 새로 시작해, 그보다 먼저 연 안내가 닫힌다.
     await page.goto(`${path}?month=2026-07`)
     await page.getByRole('button', { name: '도움말', exact: true }).first().click()
-    for (let step = 0; step < steps; step++) await page.getByRole('button', { name: '설명 확인 · 다음' }).click()
-    await expect(page.getByRole('heading', { name: '화면 사용법 안내 완료' })).toBeVisible()
-    await page.getByRole('button', { name: '안내 마치기' }).click()
+    const card = page.locator('.screen-step-guide')
+    let visited = 0
+    for (; visited < 20; visited++) {
+      await expect(card.getByRole('heading')).toBeVisible()
+      const finish = card.getByRole('button', { name: '안내 마치기', exact: true })
+      if (await finish.count()) { await finish.click(); break }
+      const next = card.getByRole('button', { name: '다음', exact: true })
+      if (!await next.count()) {
+        await expect(card.getByRole('button', { name: '강조된 메뉴를 눌러주세요' })).toBeDisabled()
+        await card.getByRole('button', { name: '종료', exact: true }).click()
+        break
+      }
+      await next.click()
+    }
+    expect(visited + 1).toBeGreaterThanOrEqual(steps)
+    await expect(card).toHaveCount(0)
   }
 })
 

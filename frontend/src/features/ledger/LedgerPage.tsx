@@ -384,6 +384,7 @@ export function LedgerFilters({
 
 export function DetailSummary({ detail }: { detail: JournalDetail }) {
   const values = [
+    ['분개 상태', detail.statusLabel || JOURNAL_STATUS[detail.status!] || EMPTY],
     ['분개번호', disclose(detail.journalNo)],
     ['분개일', date(detail.journalDate)],
     ['유형', detail.journalTypeLabel || JOURNAL_TYPE[detail.journalType!] || EMPTY],

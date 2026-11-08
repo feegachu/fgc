@@ -11,6 +11,12 @@ import { useAuthStore } from '../../stores/auth'
 import { useWorkspaceStore } from '../../stores/workspace'
 import type { StatementDetail, StatementEntry, StatementList } from './api'
 
+// These tests exercise the original table API/actions. Explorer behavior has separate browser coverage.
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual<typeof import('react-router')>('react-router')
+  return { ...actual, useOutletContext: () => ({ ...actual.useOutletContext<object>(), helpVersion: 'before' }) }
+})
+
 const agentUser = {
   loginId: 'agent01',
   userName: '김설계',

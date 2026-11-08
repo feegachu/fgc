@@ -13,7 +13,7 @@ const contracts = [
 
 test('화면 도움말에서 지급 입력 영역을 확인해도 저장 요청을 보내지 않는다', async ({ page }) => {
   await installApi(page)
-  await page.goto('transactions/new?month=2026-07')
+  await page.goto('transactions/new?amount=0&month=2026-07')
   await expect(page.locator('[data-guide-target="payment.scope"]')).toBeVisible()
   const amount = page.getByLabel(/금액 \(원\)/)
   await amount.fill('260000')
@@ -39,15 +39,15 @@ for (const width of [1440, 390]) {
   test(`수정 후 지급 도움말은 저장 없이 입력·귀속·검증·확정을 설명한다 (${width})`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 })
     const fixture = await installApi(page)
-    await page.goto('transactions/new?month=2026-07')
+    await page.goto('transactions/new?amount=0&month=2026-07')
     const amount = page.getByLabel(/금액 \(원\)/)
     await amount.fill('260000')
     await chooseDetailedHelp(page)
-    const before = fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method)).length
+    const before = fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method) && !request.path.includes('/auth/')).length
     const titles = await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 10)
     expect(titles).toEqual(expect.arrayContaining(['지급 총액', '계약별 귀속', '초안 저장', '사전검증과 차단 사유', '지급 건 확정']))
     await expect(amount).toHaveValue('260000')
-    expect(fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method)).length).toBe(before)
+    expect(fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method) && !request.path.includes('/auth/')).length).toBe(before)
   })
 }
 
@@ -295,16 +295,16 @@ async function installApi(
   }
 }
 
-test('지급 목록 도움말은 신규 등록과 수정·삭제까지 네 단계로 안내한다', async ({ page }) => {
+test('지급 목록 도움말은 신규 등록과 수정·삭제까지 세 단계로 안내한다', async ({ page }) => {
   const fixture = await installApi(page, { initialDraft: {
     commissionTransactionId: 101, status: 'DRAFT', sourceBusinessKey: 'HELP-DRAFT',
     sourceType: 'GA_MANUAL_PAYMENT', paymentStage: 'GA_TO_FC', amount: 1000, settlementMonth: '2026-07-01',
   } })
   await page.goto('transactions?month=2026-07')
   await expect(page.getByRole('button', { name: 'HELP-DRAFT 삭제', exact: true })).toBeVisible()
-  const titles = await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 4)
-  expect(titles).toEqual(['지급 조회 범위', '지급 상태와 금액', '신규 지급 등록', '지급 수정·삭제'])
-  expect(fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method))).toEqual([])
+  const titles = await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
+  expect(titles).toEqual(['지급 상태와 금액', '신규 지급 등록', '지급 수정·삭제'])
+  expect(fixture.requests.filter(request => /POST|PUT|PATCH|DELETE/.test(request.method) && !request.path.includes('/auth/'))).toEqual([])
 })
 
 test('초안 삭제는 확인 후 실행하며 취소 시 목록을 유지한다', async ({ page }) => {
@@ -366,7 +366,7 @@ test('600번째 설계사는 서버 검색 후 키보드로 선택하며 첫 페
       }),
     })
   })
-  await page.goto('transactions/new?month=2026-07')
+  await page.goto('transactions/new?amount=0&month=2026-07')
   const recipient = page.getByRole('combobox', { name: /수령 설계사/ })
   await expect(recipient).toBeEnabled()
   await recipient.fill('600')
@@ -390,6 +390,11 @@ test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경�
   await page.goto('contracts/1?month=2027-07')
   await page.getByRole('link', { name: '지급 등록', exact: true }).click()
   expect(new URL(page.url()).searchParams.has('attributionDate')).toBe(false)
+  await expect(page.getByRole('heading', { name: '지급 계약 건 등록, 귀속, 확정' })).toBeVisible()
+  // 개별 지급 입력은 금액/항목 딥링크와 기존 건 수정에서 계속 지원한다.
+  const singleEntry = new URL(page.url())
+  singleEntry.searchParams.set('amount', '0')
+  await page.goto(singleEntry.toString())
   await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), '1')
   // 금액은 미리 채우지 않으므로 직접 넣는다. 이 시험은 귀속일 검사만 본다.
   await page.locator('#amount').fill('250000')
@@ -419,7 +424,7 @@ test('계약 상세 지급 등록은 귀속일을 필수로 받고 12개월 경�
 })
 
 async function enterDraft(page: Page, amount: number, count: number) {
-  await page.goto('transactions/new?month=2026-07')
+  await page.goto('transactions/new?amount=0&month=2026-07')
   await selectEntity(page, page.getByLabel('수령 설계사', { exact: false }), '6')
   await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), '1')
   await page.locator('#bizKey').fill('E2E-MULTI-CONTRACT')
@@ -497,7 +502,7 @@ test('COMPLIANCE는 지급 등록 경로에 접근할 수 없다', async ({ page
 test('귀속 표의 가로 스크롤은 페이지 전체 너비를 늘리지 않는다', async ({ page }) => {
   await installApi(page)
   await page.setViewportSize({ width: 1440, height: 1000 })
-  await page.goto('transactions/new?month=2026-07')
+  await page.goto('transactions/new?amount=0&month=2026-07')
   await expect(page.locator('#recipient')).toBeEnabled()
   const layout = await page.evaluate(() => ({
     viewport: window.innerWidth,
@@ -594,7 +599,7 @@ for (const source of ['preview', 'detail', 'failed detail']) {
       capCode: source === 'preview' ? 'FGC-CAP-001' : 'FGC-CAP-002',
       detailFailure: source === 'failed detail',
     })
-    await page.goto('transactions/new?id=101&month=2026-07')
+    await page.goto('transactions/new?amount=0&id=101&month=2026-07')
     await expect(page.locator('#btn-precheck')).toBeEnabled()
     await page.locator('#btn-precheck').click()
     await expect(page.locator('#btn-confirm')).toBeEnabled()
@@ -621,7 +626,7 @@ test('초안의 자동 보정된 귀속값은 수정 저장 후에만 검증한�
       },
     ]),
   })
-  await page.goto('transactions/new?id=101&month=2026-07')
+  await page.goto('transactions/new?amount=0&id=101&month=2026-07')
   await expect(page.locator('#btn-save')).toBeEnabled()
   await expect(page.getByLabel('1번 귀속 내역 산입 판정')).toHaveValue('INCLUDED')
   await expect(page.locator('#btn-precheck')).toBeDisabled()
@@ -633,7 +638,7 @@ test('초안의 자동 보정된 귀속값은 수정 저장 후에만 검증한�
 })
 test('다른 사람이 먼저 저장한 초안은 409 안내 후 입력을 유지하고 재조회 뒤에만 저장한다 (#753)', async ({ page }) => {
   const fixture = await installApi(page, { initialDraft: storedDraft([storedRow]) })
-  await page.goto('transactions/new?id=101&month=2026-07')
+  await page.goto('transactions/new?amount=0&id=101&month=2026-07')
   await expect(page.locator('#btn-save')).toBeEnabled()
   fixture.changeOnServer({ amount: 300000, updatedAt: '2026-07-31T09:05:00.654321+09:00' })
   await page.locator('#amount').fill('999000')
@@ -660,7 +665,7 @@ test('다른 사람이 먼저 저장한 초안은 409 안내 후 입력을 유�
 })
 test('빈 저장 초안은 빈 귀속표로 보여 주고 서버 입력 오류로 확정을 차단한다', async ({ page }) => {
   await installApi(page, { initialDraft: storedDraft([]), emptyAttributions: true })
-  await page.goto('transactions/new?id=101&month=2026-07')
+  await page.goto('transactions/new?amount=0&id=101&month=2026-07')
   await expect(page.locator('#btn-precheck')).toBeEnabled()
   await expect(page.locator('#attr-body [data-contract-id]')).toHaveCount(0)
   await page.locator('#btn-precheck').click()
@@ -722,7 +727,7 @@ for (const viewport of [
         ],
       },
     })
-    await page.goto('transactions/new?id=101&month=2026-07')
+    await page.goto('transactions/new?amount=0&id=101&month=2026-07')
     await expect(page.locator('#btn-precheck')).toBeEnabled()
     await page.getByRole('button', { name: '도움말', exact: true }).click()
     const card = page.locator('.screen-step-guide')

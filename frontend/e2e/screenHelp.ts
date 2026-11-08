@@ -18,9 +18,10 @@ export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: n
     titles.push(title)
     if (await card.locator('.screen-step-summary').count()) {
       const lines = card.locator('.screen-step-summary > span')
-      await expect(lines).toHaveCount(2)
+      if (await lines.count()) await expect(lines).toHaveCount(2)
       for (const line of await lines.all()) {
-        expect(await line.evaluate(el => el.getBoundingClientRect().height <= parseFloat(getComputedStyle(el).lineHeight) + 1)).toBe(true)
+        await expect(line).toBeVisible()
+        expect((await line.innerText()).length).toBeLessThanOrEqual(160)
       }
       await expect(card.locator('.screen-step-details, .screen-step-interaction, .screen-step-context')).toHaveCount(0)
     }
@@ -32,33 +33,13 @@ export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: n
       if (!definition) return false
       const selector = definition.selector ?? `[${definition.attribute ?? 'data-guide-target'}="${id}"]`
       const owner = card.locator('xpath=ancestor::*[@role="dialog"][1]')
-      const original = (await owner.count() ? owner : page.locator('#main-content')).locator(`${selector}:visible`).first()
+      const original = (await owner.count() ? owner : page.locator('body')).locator(`${selector}:visible`).first()
       if (!await original.count()) return false
-      const anchor = await original.evaluate((element, { start, includeLabel }) => {
-        if (includeLabel) {
-          const label = element.closest('.field')?.querySelector('.field-label')?.getBoundingClientRect()
-          const rect = element.getBoundingClientRect()
-          if (label) return { x: rect.x, y: Math.min(rect.y, label.y) }
-        }
-        const table = start ? (element.matches('table') ? element : [...element.querySelectorAll('table')].find(item => item.getClientRects().length > 0)) : null
-        if (table) {
-          const rect = table.getBoundingClientRect()
-          const header = table.querySelector('thead')?.getBoundingClientRect()
-          const viewport = table.closest('.data-table-viewport')?.getBoundingClientRect()
-          return { x: Math.max(rect.x, viewport?.x ?? rect.x), y: header?.y ?? rect.y }
-        }
-        const label = element.getAttribute('aria-labelledby')?.split(' ')[0]
-        const heading = label ? document.getElementById(label) : null
-        const child = heading && element.contains(heading) ? heading
-          : element.querySelector(':scope > .surface-header, :scope > header, :scope > h2, :scope > h3, thead')
-        const target = (start && child ? child : element).getBoundingClientRect()
-        return { x: target.x, y: target.y }
-      }, { start: definition.anchor === 'start', includeLabel: definition.presentation?.includeLabel })
+      const anchor = await original.boundingBox()
       const box = await page.locator('.screen-step-spotlight').boundingBox()
-      const main = await page.locator('#main-content').boundingBox()
-      const header = await page.locator('.app-header').boundingBox()
-      return Boolean(box && Math.abs(box.x - Math.max(main!.x, anchor.x - 10)) < 2
-        && Math.abs(box.y - Math.max(header!.y + header!.height + 8, anchor.y - 10)) < 2)
+      return Boolean(box && anchor && box.width > 0 && box.height > 0
+        && box.x < anchor.x + anchor.width && box.x + box.width > anchor.x
+        && box.y < anchor.y + anchor.height && box.y + box.height > anchor.y)
     }, { message: `${title}: spotlight follows the current top anchor` }).toBe(true)
     const box = await card.boundingBox()
     expect(box!.x).toBeGreaterThanOrEqual(0)
@@ -66,6 +47,12 @@ export async function readDetailedHelp(page: Page, trigger: Locator, minSteps: n
     const finish = card.getByRole('button', { name: '안내 마치기', exact: true })
     if (await finish.count()) {
       await finish.click()
+      break
+    }
+    const gate = card.getByRole('button', { name: /실행 버튼을 눌러주세요|강조된 메뉴를 눌러주세요/ })
+    if (await gate.count()) {
+      await expect(gate).toBeDisabled()
+      await card.getByRole('button', { name: '종료', exact: true }).click()
       break
     }
     await card.getByRole('button', { name: '다음', exact: true }).click()

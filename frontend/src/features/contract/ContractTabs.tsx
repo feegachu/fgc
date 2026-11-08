@@ -356,7 +356,6 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
 }
 
 function CapTab({ id }: { id: string }) {
-  const revised = useContext(RevisedDetail)
   const query = useQuery(contractCapChecksQuery(id))
   const [params, setParams] = useSearchParams()
   const requested = params.get('capCheckId')
@@ -421,14 +420,14 @@ function CapTab({ id }: { id: string }) {
       <PanelHeading title="1,200% 한도 검증" legacy>
         지급단계별 최신 판정을 합산하지 않고 각각 표시합니다.
       </PanelHeading>
-      {!revised && <p className="guidance guidance-warning contract-tab-guidance">
+      <p className="guidance guidance-warning contract-tab-guidance">
         <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
           warning
         </span>
         <span className="guidance-copy">
           두 규제를 더하지 마세요, 보험회사→GA 한도와 GA→설계사 한도는 별개로 판정합니다.
         </span>
-      </p>}
+      </p>
       <div className="contract-tab-body">
         <QueryContent query={query}>
           {(rows) => (

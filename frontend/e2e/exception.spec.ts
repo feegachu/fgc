@@ -84,9 +84,9 @@ test('예외 목록을 조회하고 한 건을 선택해 조치를 저장한다'
   await expect(page.getByRole('link', { name: '1,200% 위반 1건' })).toBeVisible()
   expect(new URL(searchUrls[0]).searchParams.get('status')).toBe('OPEN')
 
-  await page.getByRole('button', { name: '11' }).click()
   await chooseDetailedHelp(page)
-  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }).first(), 5)
+  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }).first(), 3)
+  await page.getByRole('button', { name: '11' }).click()
   await readDetailedHelp(page, page.locator('[data-guide-scope="exception-action"]').getByRole('button', { name: '도움말', exact: true }), 4)
   await page.getByLabel('조치').selectOption('START_REVIEW')
   const save = page.getByRole('button', { name: '처리 저장' })

@@ -22,6 +22,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class JournalExplorerRepository {
+    private static final String DEBIT_TOTAL = "debit_total";
+    private static final String CREDIT_TOTAL = "credit_total";
     private final NamedParameterJdbcTemplate jdbc;
     private static final String SCOPE = """
         WITH links AS (
@@ -49,13 +51,30 @@ public class JournalExplorerRepository {
         )
         """;
 
+    private static final String SELECTED_SCOPE = SCOPE + """
+            , entries AS (SELECT DISTINCT journal_header_id,journal_no,journal_date,journal_type,status,
+                validation_run_id,description,debit_total,credit_total FROM scoped
+              WHERE (CAST(:selected AS bigint) IS NULL OR COALESCE(linked_contract_id,0)=:selected)
+                AND (CAST(:journalId AS bigint) IS NULL OR journal_header_id=:journalId))
+            """;
+
+    private static Long selectedContract(boolean all, Long contractId, List<Contract> contracts) {
+        if (all) return null;
+        if (contractId != null) return contractId;
+        if (contracts.isEmpty()) return null;
+        return contracts.getFirst().contractId();
+    }
+
     public JournalExplorer explore(Filter filter, Long contractId, boolean all, Long journalId,
                                    int contractPage, int page, int size) {
+        if (contractPage < 1 || page < 1 || size < 1 || size > 100) {
+            throw new IllegalArgumentException("Invalid explorer pagination");
+        }
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("from", filter.from()).addValue("to", filter.to()).addValue("type", filter.type())
                 .addValue("status", filter.status()).addValue("account", blank(filter.account()))
                 .addValue("contractNo", blank(filter.contractNo()) == null ? null : "%" + escape(filter.contractNo().trim()) + "%")
-                .addValue("limit", size).addValue("offset", (long) (contractPage - 1) * size);
+                .addValue("limit", size).addValue("offset", ((long) contractPage - 1L) * size);
         long contractCount = count(SCOPE + "SELECT count(DISTINCT COALESCE(linked_contract_id,0)) FROM scoped", parameters);
         List<Contract> contracts = jdbc.query(SCOPE + """
             SELECT COALESCE(linked_contract_id,0) AS contract_id, COALESCE(contract_no,'공통·미연결') AS contract_no,
@@ -64,21 +83,15 @@ public class JournalExplorerRepository {
             FROM scoped GROUP BY linked_contract_id,contract_no ORDER BY contract_no NULLS LAST,linked_contract_id
             LIMIT :limit OFFSET :offset
             """, parameters, (rs, row) -> new Contract(rs.getLong("contract_id"), rs.getString("contract_no"),
-                rs.getLong("journal_count"), rs.getBigDecimal("debit_total"), rs.getBigDecimal("credit_total"),rs.getString("agent_name"),rs.getString("insurer_name")));
-        Long selected = all ? null : contractId != null ? contractId : contracts.isEmpty() ? null : contracts.getFirst().contractId();
-        parameters.addValue("selected", selected).addValue("journalId", journalId).addValue("offset", (long) (page - 1) * size);
-        String selectedScope = SCOPE + """
-            , entries AS (SELECT DISTINCT journal_header_id,journal_no,journal_date,journal_type,status,
-                validation_run_id,description,debit_total,credit_total FROM scoped
-              WHERE (CAST(:selected AS bigint) IS NULL OR COALESCE(linked_contract_id,0)=:selected)
-                AND (CAST(:journalId AS bigint) IS NULL OR journal_header_id=:journalId))
-            """;
-        long journalCount = count(selectedScope + "SELECT count(*) FROM entries", parameters);
-        Totals totals = jdbc.queryForObject(selectedScope + """
+                rs.getLong("journal_count"), rs.getBigDecimal(DEBIT_TOTAL), rs.getBigDecimal(CREDIT_TOTAL),rs.getString("agent_name"),rs.getString("insurer_name")));
+        Long selected = selectedContract(all, contractId, contracts);
+        parameters.addValue("selected", selected).addValue("journalId", journalId).addValue("offset", ((long) page - 1L) * size);
+        long journalCount = count(SELECTED_SCOPE + "SELECT count(*) FROM entries", parameters);
+        Totals totals = jdbc.queryForObject(SELECTED_SCOPE + """
             SELECT count(*) AS journal_count, COALESCE(sum(debit_total),0) AS debit_total, COALESCE(sum(credit_total),0) AS credit_total,
               (SELECT count(*) FROM fgc.journal_line l JOIN entries e ON e.journal_header_id=l.journal_header_id) AS line_count FROM entries
-            """,parameters,(rs,row)->new Totals(rs.getLong("journal_count"),rs.getLong("line_count"),rs.getBigDecimal("debit_total"),rs.getBigDecimal("credit_total")));
-        List<Entry> headers = jdbc.query(selectedScope + "SELECT * FROM entries ORDER BY journal_date DESC,journal_header_id DESC LIMIT :limit OFFSET :offset",
+            """,parameters,(rs,row)->new Totals(rs.getLong("journal_count"),rs.getLong("line_count"),rs.getBigDecimal(DEBIT_TOTAL),rs.getBigDecimal(CREDIT_TOTAL)));
+        List<Entry> headers = jdbc.query(SELECTED_SCOPE + "SELECT * FROM entries ORDER BY journal_date DESC,journal_header_id DESC LIMIT :limit OFFSET :offset",
                 parameters, (rs, row) -> entry(rs, List.of()));
         Map<Long, List<Line>> lines = new HashMap<>();
         if (!headers.isEmpty()) {
@@ -103,7 +116,7 @@ public class JournalExplorerRepository {
     private static Entry entry(ResultSet rs, List<Line> lines) throws SQLException {
         return new Entry(rs.getLong("journal_header_id"),rs.getString("journal_no"),rs.getObject("journal_date",LocalDate.class),
                 rs.getString("journal_type"),rs.getString("status"),rs.getObject("validation_run_id",Long.class),rs.getString("description"),
-                rs.getBigDecimal("debit_total"),rs.getBigDecimal("credit_total"),lines);
+                rs.getBigDecimal(DEBIT_TOTAL),rs.getBigDecimal(CREDIT_TOTAL),lines);
     }
     private static String blank(String text) { return text == null || text.isBlank() ? null : text.trim(); }
     private static String escape(String text) { return text.replace("\\","\\\\").replace("%","\\%").replace("_","\\_"); }

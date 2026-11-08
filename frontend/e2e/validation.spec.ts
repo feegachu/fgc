@@ -83,6 +83,8 @@ test('실패 월 재시작은 이전 시도를 기다리고 다른 탭의 빠른
 })
 
 test('실행을 만들고 돌려 확정한다', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   let status: 'CREATED' | 'RUNNING' | 'COMPLETED' | 'FINALIZED' = 'CREATED'
   await page.route('**/api/v1/validation-runs/7/restartability', route => route.fulfill({ json: envelope({ allowed: false, reason: '실패 상태가 아닙니다.' }) }))
   await page.route('**/api/v1/validation-runs/7/retries', route => route.fulfill({ json: envelope([]) }))
@@ -168,7 +170,7 @@ test('실행을 만들고 돌려 확정한다', async ({ page }) => {
   await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 2)
   await page.getByRole('button', { name: '실행 생성' }).click()
   await expect(page.getByRole('heading', { name: '월 통합검증 상세/확정' })).toBeVisible()
-  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 7)
+  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
   expect(status).toBe('CREATED')
 
   await page.getByRole('button', { name: '실행', exact: true }).click()

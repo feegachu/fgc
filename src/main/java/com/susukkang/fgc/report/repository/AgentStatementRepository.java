@@ -162,30 +162,21 @@ public class AgentStatementRepository {
                    e.source_entity_type, e.detail::text, e.basis_month, pv.policy_name, pv.version_no
             """;
 
-    private final EntityManager entityManager;
-
-    /** 한 요청으로 전체 설계사를 조회하며, 개별 명세와 동일한 CTE/귀속 범위를 재사용한다. */
-    public List<StatementAgentOverview> overview(Filter filter) {
-        Map<Long, StatementAgentOverview.OrganizationNode> organizations = new HashMap<>();
-        entityManager.createNativeQuery("SELECT organization_id,parent_id,organization_name,organization_type FROM fgc.organization")
-                .getResultList().forEach(value -> {
-                    Object[] row = (Object[]) value;
-                    long id = ((Number) row[0]).longValue();
-                    organizations.put(id, new StatementAgentOverview.OrganizationNode(id,
-                            row[1] == null ? null : ((Number) row[1]).longValue(), (String) row[2], (String) row[3]));
-                });
-        StringBuilder aggregate = new StringBuilder(ENTRIES_CTE.replace(":agentId", "a.agent_id"))
-                .append("""
+    private static final String OVERVIEW_AGGREGATE = ENTRIES_CTE.replace(":agentId", "a.agent_id") + """
                         SELECT count(DISTINCT e.contract_id) AS contracts, count(*) AS entries,
                                COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'PAYMENT'), 0) AS payment,
                                COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'HELD'), 0) AS held,
                                COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'ADJUSTMENT'), 0) AS adjustment,
                                COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'CLAWBACK'), 0) AS clawback,
                                count(*) FILTER (WHERE e.amount IS NULL) AS missing
-                        """).append(JOINS);
-        Map<String, Object> params = where(aggregate, filter);
-        params.remove(AGENT_ID);
-        String sql = """
+                        """ + JOINS + """
+            WHERE e.basis_month = :month
+              AND (CAST(:contractNo AS text) IS NULL OR strpos(lower(ic.contract_no), lower(CAST(:contractNo AS text))) > 0)
+              AND (CAST(:commissionItemId AS bigint) IS NULL OR e.commission_item_id = :commissionItemId)
+              AND (CAST(:entryType AS text) IS NULL OR e.entry_type = :entryType)
+            """;
+
+    private static final String OVERVIEW_SQL = """
                 SELECT a.agent_id, a.agent_code, a.agent_name,
                        COALESCE(b.organization_id, o.organization_id),
                        COALESCE(b.organization_name, o.organization_name), o.organization_name,
@@ -208,14 +199,32 @@ public class AgentStatementRepository {
                      WHERE organization_type = 'BRANCH' ORDER BY depth LIMIT 1
                   ) b ON TRUE
                   CROSS JOIN LATERAL (
-                """ + aggregate + """
+                """ + OVERVIEW_AGGREGATE + """
                   ) s
                  WHERE s.entries > 0 OR (a.appointment_date <= :monthEnd
                      AND (a.termination_date IS NULL OR a.termination_date >= :month))
                  ORDER BY s.entries > 0 DESC, COALESCE(b.organization_name, o.organization_name),
                           a.agent_name, a.agent_id
                 """;
-        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(sql);
+
+    private final EntityManager entityManager;
+
+    /** 한 요청으로 전체 설계사를 조회하며, 개별 명세와 동일한 CTE/귀속 범위를 재사용한다. */
+    public List<StatementAgentOverview> overview(Filter filter) {
+        Map<Long, StatementAgentOverview.OrganizationNode> organizations = new HashMap<>();
+        entityManager.createNativeQuery("SELECT organization_id,parent_id,organization_name,organization_type FROM fgc.organization")
+                .getResultList().forEach(value -> {
+                    Object[] row = (Object[]) value;
+                    long id = ((Number) row[0]).longValue();
+                    organizations.put(id, new StatementAgentOverview.OrganizationNode(id,
+                            row[1] == null ? null : ((Number) row[1]).longValue(), (String) row[2], (String) row[3]));
+                });
+        Map<String, Object> params = new HashMap<>();
+        params.put("month", filter.month());
+        params.put("contractNo", filter.contractNo());
+        params.put("commissionItemId", filter.commissionItemId());
+        params.put("entryType", filter.entryType());
+        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(OVERVIEW_SQL);
         params.forEach(query::setParameter);
         query.setParameter("monthEnd", filter.month().withDayOfMonth(filter.month().lengthOfMonth()));
         return query.getResultList().stream().map(result -> {

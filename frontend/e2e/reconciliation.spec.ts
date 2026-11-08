@@ -31,7 +31,11 @@ test('수정 후 대사 도움말은 목록과 비교 창을 실제 실행 없�
   await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
   await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()
   const modal = page.getByRole('dialog', { name: '대사 비교 상세' })
-  const titles = await readDetailedHelp(page, modal.getByRole('button', { name: '도움말', exact: true }), 5)
+  const titles: string[] = []
+  for (const tab of ['비교 요약', '예상 원천', '실제 지급', '차액·분류 근거', '관련 화면']) {
+    await modal.getByRole('tab', { name: tab, exact: true }).click()
+    titles.push(...await readDetailedHelp(page, modal.getByRole('button', { name: '도움말', exact: true }), 1))
+  }
   expect(titles).toContain('실제 지급 원천')
   await expect(modal).toBeVisible()
   expect(writes).toEqual([])
@@ -85,8 +89,9 @@ test('비교 모달의 null 회차는 대시, 음수 예상·실제·차액은 �
   await expect(page.getByRole('dialog').getByText('C-001, 초회 수수료, -')).toBeVisible()
   await expect(page.getByRole('dialog')).not.toContainText('-회차')
   await expect(page.getByRole('dialog')).not.toContainText('—회차')
+  await page.getByRole('tab', { name: '차액·분류 근거', exact: true }).click()
   for (const text of ['-12,000원', '-13,000원', '-1,000원']) {
-    const amounts = page.getByRole('dialog').getByText(text, { exact: true })
+    const amounts = page.getByRole('dialog').getByRole('tabpanel').getByText(text, { exact: true })
     await expect(amounts.first()).toBeVisible()
     for (const amount of await amounts.all()) {
       await expect(amount).toHaveCSS('color', 'rgb(185, 28, 28)')
@@ -191,7 +196,9 @@ test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외
   }
   await page.screenshot({ path: testInfo.outputPath('reconciliation-minus-differences.png'), fullPage: true })
   await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()
+  await page.getByRole('tab', { name: '예상 원천', exact: true }).click()
   await expect(page.getByRole('dialog').getByText('예상 없음', { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: '실제 지급', exact: true }).click()
   await expect(page.getByRole('dialog').getByText('실제 없음', { exact: true })).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).click()
   await page.getByRole('button', { name: '불일치 예외 일괄 생성' }).click()

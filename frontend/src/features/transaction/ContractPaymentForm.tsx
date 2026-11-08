@@ -22,6 +22,7 @@ import {
   type PaymentPayload,
   type Precheck,
 } from './form-api'
+import { loadSchedulePayments } from './contract-payment-resume'
 import { ContractPaymentCapPanel } from './ContractPaymentCapPanel'
 import { ContractPaymentGates } from './ContractPaymentGates'
 import { ContractPaymentComparison } from './ContractPaymentComparison'
@@ -177,6 +178,62 @@ export function ContractPaymentForm({
     installment ||
     String(lines.find((line) => line.dueDate?.startsWith(settlementMonth))?.installmentNo ?? installments[0] ?? '')
   const visible = lines.filter((line) => String(line.installmentNo) === chosen)
+  const resumeKey = `${contractId}:${stage}:${month}:${header?.scheduleHeaderId}:${chosen}`
+  const existing = useQuery({
+    queryKey: ['transactions', 'schedule-resume', resumeKey],
+    queryFn: ({ signal }) => loadSchedulePayments(contractId, stage, month,
+      visible.flatMap(line => line.scheduleLineId ? [line.scheduleLineId] : []), signal),
+    enabled: contractAllowed && !!header && detail.isSuccess,
+    staleTime: 0,
+    meta: { errorToast: false },
+  })
+  const [resumeError, setResumeError] = useState('')
+  const [restoredKey, setRestoredKey] = useState('')
+  const restoring = !!contractId && (existing.isPending || restoredKey !== resumeKey)
+  function restoreDrafts() {
+    if (!existing.data || !detail.data?.lines) return
+    setRestoredKey(resumeKey)
+    const entries = Object.entries(existing.data)
+    const first = entries[0]?.[1]
+    if (first && entries.some(([,payment]) => payment.scheduledPaymentDate !== first.scheduledPaymentDate ||
+      payment.attributions?.[0]?.attributionDate !== first.attributions?.[0]?.attributionDate ||
+      payment.evidenceRef !== first.evidenceRef)) {
+      setResumeError('저장된 행의 귀속일·예정일·증빙이 서로 다릅니다. 지급 목록에서 개별 건을 이어서 처리하세요.')
+      return
+    }
+    const restored: Record<number, Saved> = {}
+    const restoredEdits: Record<number, Partial<Edit>> = {}
+    for (const [key, payment] of entries) {
+      const line = detail.data.lines.find(row => row.scheduleLineId === Number(key))
+      if (!line || payment.amount == null || !payment.commissionItemId || !payment.scheduledPaymentDate || !payment.attributions?.[0]?.attributionDate) {
+        setResumeError('저장된 지급 건의 필수 정보를 목록에서 확인하세요.')
+        return
+      }
+      let body: PaymentPayload
+      try {
+        body = payload({ ...line, expectedAmount: payment.amount, commissionItemId: payment.commissionItemId,
+        attributionDate: payment.attributions[0].attributionDate, dueDate: payment.scheduledPaymentDate,
+        cashflowType: payment.cashflowType }, Number(contractId), stage, month, payment.evidenceRef ?? '')
+      } catch {
+        setResumeError('저장된 지급 건의 스케줄 정보를 목록에서 확인하세요.')
+        return
+      }
+      restored[Number(key)] = { payment, fingerprint: JSON.stringify(body) }
+      restoredEdits[Number(key)] = { amount: String(payment.amount), item: String(payment.commissionItemId) }
+    }
+    if (first) {
+      setAttributionDate(first.attributions![0].attributionDate!)
+      setPaymentDate(first.scheduledPaymentDate!)
+      setEvidence(first.evidenceRef ?? '')
+      setSavedLines(detail.data.lines)
+      setSaved(restored)
+      setEdits(restoredEdits)
+    }
+    setResumeError('')
+  }
+  // Hydrate a newly loaded scope before rendering its editor. Subsequent refetches
+  // cannot overwrite edits made in this scope.
+  if (existing.data && detail.data?.lines && restoredKey !== resumeKey) restoreDrafts()
   const eligible = (line: ScheduleLine) =>
     ['PLANNED', 'CONFIRMED', 'RESTARTED'].includes(line.lineStatus ?? '') && !!line.scheduleLineId
   const selected = visible.filter((line) => eligible(line) && !excluded.includes(line.scheduleLineId!))
@@ -241,7 +298,7 @@ export function ContractPaymentForm({
     remaining.length > 0 &&
     remaining.every((line) => checks[line.scheduleLineId!]?.confirmable === true)
   const scopeLocked = !!busy || Object.keys(saved).length > 0 || uncertain
-  const editingLocked = !!busy || uncertain || selected.some((line) => done(line.scheduleLineId!))
+  const editingLocked = !!busy || uncertain || restoring || existing.isError || !!resumeError
   const currentResult = selected.some((line) => String(line.scheduleLineId) === selectedResult)
     ? Number(selectedResult)
     : remaining[0]?.scheduleLineId || selected[0]?.scheduleLineId
@@ -264,13 +321,15 @@ export function ContractPaymentForm({
     setChecks({})
     setError('')
     setSelectedResult('')
+    setResumeError('')
+    setRestoredKey('')
   }
   const editRow = (id: number, patch: Partial<Edit>) => {
     setEdits((previous) => ({ ...previous, [id]: { ...previous[id], ...patch } }))
     setChecks({})
   }
   async function run(action: string, task: () => Promise<void>) {
-    if (lock.current || !canProcess) return
+    if (lock.current || !canProcess || restoring || existing.isError || resumeError) return
     lock.current = true
     setBusy(action)
     setError('')
@@ -314,37 +373,30 @@ export function ContractPaymentForm({
       }
       ensureMounted()
       const bodies = selected.map(rowPayload)
-      if (!Object.keys(saved).length) {
+      const missing = selected.filter(line => !saved[line.scheduleLineId!])
+      if (missing.length) {
         const response = await apiClient.request<Payment[]>('/api/v1/transactions/batch', {
-          method: 'POST',
-          body: { payments: bodies },
+          method: 'POST', body: { payments: missing.map(rowPayload) },
         })
-        if (response.data?.length !== selected.length) {
+        if (response.data?.length !== missing.length) {
           setUncertain(true)
           throw new Error('저장 결과를 확인하지 못했습니다. 지급 목록에서 등록 여부를 확인하세요.')
         }
         const next: Record<number, Saved> = {}
-        selected.forEach((line, index) => {
-          next[line.scheduleLineId!] = { payment: response.data![index], fingerprint: JSON.stringify(bodies[index]) }
+        missing.forEach((line, index) => {
+          next[line.scheduleLineId!] = { payment: response.data![index], fingerprint: JSON.stringify(rowPayload(line)) }
         })
         setSavedLines(lines)
-        setSaved(next)
-      } else {
-        for (const [index, line] of selected.entries()) {
-          ensureMounted()
-          const old = saved[line.scheduleLineId!]
-          if (!old?.payment.commissionTransactionId || !old.payment.updatedAt)
-            throw new Error('저장본을 지급 목록에서 다시 확인하세요.')
-          const payment = await saveDraft(
-            String(old.payment.commissionTransactionId),
-            bodies[index],
-            old.payment.updatedAt,
-          )
-          setSaved((previous) => ({
-            ...previous,
-            [line.scheduleLineId!]: { payment, fingerprint: JSON.stringify(bodies[index]) },
-          }))
-        }
+        setSaved(previous => ({ ...previous, ...next }))
+      }
+      for (const [index, line] of selected.entries()) {
+        const old = saved[line.scheduleLineId!]
+        if (!old || old.payment.status === 'CONFIRMED' || old.fingerprint === JSON.stringify(bodies[index])) continue
+        ensureMounted()
+        if (!old.payment.commissionTransactionId || !old.payment.updatedAt)
+          throw new Error('저장본을 지급 목록에서 다시 확인하세요.')
+        const payment = await saveDraft(String(old.payment.commissionTransactionId), bodies[index], old.payment.updatedAt)
+        setSaved(previous => ({ ...previous, [line.scheduleLineId!]: { payment, fingerprint: JSON.stringify(bodies[index]) } }))
       }
     })
   }
@@ -433,6 +485,10 @@ export function ContractPaymentForm({
           </Link>
         </div>
       </header>
+      {(existing.isError || resumeError) && <p role="alert" className="guidance guidance-warning">
+        {resumeError || formError(existing.error, '기존 지급 건을 확인하지 못했습니다. 화면을 다시 열어주세요.')}
+      </p>}
+      {restoring && !existing.isError && !resumeError && <p role="status">기존 지급 건을 확인하고 있습니다.</p>}
       <ResizableSplit
         className="transaction-form-layout"
         storageKey="contract-payment-workspace"
@@ -442,7 +498,7 @@ export function ContractPaymentForm({
         <div className="transaction-form-column">
           <section data-guide-feature="features.contract-payment-form.section-2" className="surface transaction-form-panel" data-guide-target="payment.batch.scope">
             <header className="surface-header transaction-surface-header">
-              <h2 className="surface-title">① 지급 계약 건</h2>
+              <h2 className="surface-title">지급 계약 건</h2>
               <span className="transaction-panel-meta">{clean ? '저장됨' : '미저장'}</span>
             </header>
             <fieldset
@@ -477,7 +533,7 @@ export function ContractPaymentForm({
                   <option value="INSURER_TO_GA">보험사 → GA</option>
                 </select>
               </Field>
-              <Field label="원천유형">
+              <Field label="자료 구분">
                 <input data-guide-feature="features.contract-payment-form.input-5" value="GA 수기지급" readOnly />
               </Field>
               <Field label="정산월" required>
@@ -507,7 +563,7 @@ export function ContractPaymentForm({
               </Field>
               <Field label="증빙">
                 <input data-guide-feature="features.contract-payment-form.input-8"
-                  disabled={editingLocked}
+                  disabled={editingLocked || selected.some(line => done(line.scheduleLineId!))}
                   value={evidence}
                   maxLength={500}
                   placeholder="문서번호, 링크"
@@ -530,7 +586,7 @@ export function ContractPaymentForm({
                   type="date"
                   min={attributionMinimum}
                   max={monthEnd}
-                  disabled={editingLocked}
+                  disabled={editingLocked || selected.some(line => done(line.scheduleLineId!))}
                   value={attributionDate}
                   onChange={(event) => {
                     setAttributionDate(event.target.value)
@@ -551,7 +607,7 @@ export function ContractPaymentForm({
                   type="date"
                   min={monthStart}
                   max={monthEnd}
-                  disabled={editingLocked}
+                  disabled={editingLocked || selected.some(line => done(line.scheduleLineId!))}
                   value={paymentDate}
                   onChange={(event) => {
                     setPaymentDate(event.target.value)
@@ -647,14 +703,14 @@ export function ContractPaymentForm({
           </section>
           <section data-guide-feature="features.contract-payment-form.section-16" className="surface transaction-attribution-panel" data-guide-target="payment.batch.lines">
             <header className="surface-header transaction-surface-header">
-              <h2 className="surface-title">② 귀속행, 이 계약의 설계사별 지급 내역</h2>
+              <h2 className="surface-title">설계사별 지급 내역</h2>
               <span className="transaction-panel-meta">
                 {selected.length}행 · 스케줄 {header?.scheduleVersionNo ?? '-'} 버전
               </span>
             </header>
             <div className="data-table-viewport">
               <table data-guide-feature="features.contract-payment-form.table-17" className="data-table contract-payment-table">
-                <caption className="visually-hidden">계약의 지급 귀속행</caption>
+                <caption className="visually-hidden">계약의 지급 지급 내역</caption>
                 <colgroup>
                   <col className="batch-col-select" />
                   <col className="batch-col-number" />
@@ -702,7 +758,7 @@ export function ContractPaymentForm({
                         </td>
                         <td>
                           <SearchSelect data-guide-feature="features.contract-payment-form.searchselect-19"
-                            disabled={editingLocked || !eligible(line)}
+                            disabled={editingLocked || done(line.scheduleLineId!) || !eligible(line)}
                             aria-label={`${line.recipientName} 수수료 항목 ${key}`}
                             value={edit.item}
                             source={itemSource}
@@ -718,7 +774,7 @@ export function ContractPaymentForm({
                           <input data-guide-feature="features.contract-payment-form.input-20"
                             data-compare-amount={`actual-${key}`}
                             aria-label={`귀속금액 ${key}`}
-                            disabled={editingLocked || !eligible(line)}
+                            disabled={editingLocked || done(line.scheduleLineId!) || !eligible(line)}
                             type="number"
                             min="0"
                             step="1"
@@ -748,7 +804,7 @@ export function ContractPaymentForm({
                   })}
                   {!visible.length && (
                     <tr>
-                      <td colSpan={6}>계약과 회차를 선택하면 귀속행이 자동으로 채워집니다.</td>
+                      <td colSpan={6}>계약과 회차를 선택하면 지급 내역이 자동으로 채워집니다.</td>
                     </tr>
                   )}
                 </tbody>

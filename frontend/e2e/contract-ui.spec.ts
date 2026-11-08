@@ -143,9 +143,9 @@ test('수정 후 계약 목록은 상단을 유지하고 입력·탭별 상세 �
   await page.goto('contracts/1?month=2026-07')
   await expect(page.locator('.contract-summary-number')).toHaveText('CONT-UI-001')
   await chooseDetailedHelp(page)
-  expect(await readDetailedHelp(page, help, 4)).toContain('계약 상태이력')
+  expect(await readDetailedHelp(page, help, 4)).toContain('계약 상태와 변경 이력')
   await page.getByRole('tab', { name: '지급/대사' }).click()
-  expect(await readDetailedHelp(page, help, 3)).toContain('계약에 연결된 지급')
+  expect(await readDetailedHelp(page, help, 3)).toContain('계약 상세 탭')
 })
 test('기본 도움말은 현재 계약 목록을 짚고 입력을 보존한다', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })

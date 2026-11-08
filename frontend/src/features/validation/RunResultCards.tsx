@@ -33,10 +33,10 @@ export function RunExceptionCards({ detail, completed }: { detail: ValidationRun
   const summary = detail.exceptionSummary
   return <ResultKpis completed={completed} cards={[
     { step: 8, label: '이번 실행 검출', value: summary?.detectedCount, footer: '이번 검증에서 발견한 예외' },
-    { step: 8, label: '신규 업무건', value: summary?.newCount, footer: '처음 발견해 새로 등록한 건' },
-    { step: 8, label: '기존 업무건 재검출', value: summary?.recurringCount, footer: '기존 예외가 다시 발견된 건' },
+    { step: 8, label: '새 예외', value: summary?.newCount, footer: '처음 발견해 새로 등록한 건' },
+    { step: 8, label: '다시 발견된 예외', value: summary?.recurringCount, footer: '기존 예외가 다시 발견된 건' },
     { step: 8, label: '해결 후 재발', value: summary?.reopenedCount, footer: '해결·반려 후 다시 열린 건' },
     { step: 8, label: '이번 실행 미검출', value: summary?.notDetectedCount, footer: '이번에는 검출되지 않은 미처리 건' },
-    { step: 8, label: '미처리 업무건', value: summary?.openWorkItemCount, footer: '해당 검증월의 신규·검토중 건' },
+    { step: 8, label: '미처리 예외', value: summary?.openWorkItemCount, footer: '해당 검증월의 신규·검토중 건' },
   ]} />
 }

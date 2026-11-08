@@ -516,7 +516,7 @@ function TargetSection({ detail, revised, ready }: { detail: ValidationRunDetail
     <section data-guide-feature="features.validation.validation-run-detail-page.section-4" className="surface" aria-labelledby="vrun-target-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-target-title">
-          {revised ? '대상 선별 결과' : '③ 대상 선별 결과'}
+          대상 선별 결과
         </h2>
         <p className="vrun-card-note">
           {ready ? `선정 ${summary?.selectedCount ?? 0}, 제외 ${summary?.excludedCount ?? 0}, 검토필요 ${summary?.reviewRequiredCount ?? 0}` : '대상 선별 대기'}
@@ -555,7 +555,7 @@ function SummarySection({ detail, status, completed, ready = false }: { detail: 
     <section data-guide-feature="features.validation.validation-run-detail-page.section-5" className="surface" aria-labelledby="vrun-summary-title" data-guide-completed={ready}>
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-summary-title">
-          {completed !== undefined ? '결과 요약' : '④ 결과 요약'}
+          결과 요약
         </h2>
       </header>
       {completed !== undefined ? <RunSummaryCards detail={detail} completed={completed} /> : <div className="kpi-grid kpi-group vrun-summary-grid">
@@ -709,7 +709,7 @@ function ChecklistSection({
     <section data-guide-feature="features.validation.validation-run-detail-page.legacy-checklist" className="surface" aria-labelledby="vrun-checklist-title">
       <header className="surface-header">
         <h2 className="surface-title" id="vrun-checklist-title">
-          {revised ? '확정 전 8단계 점검' : '⑤ 확정 조건 (운영정책서 제44조, 8개 전부 통과해야 함)'}
+          확정 전 8단계 점검
         </h2>
         {summary.tone ? (
           <StatusBadge tone={summary.tone}>{summary.text}</StatusBadge>
@@ -803,7 +803,7 @@ function FinalizeSection({
       <div className="vrun-finalize-row">
         <div className="vrun-finalize-copy">
           <p className="vrun-finalize-title" id="vrun-finalize-section-title">
-            {revised ? '검증 결과 확정' : '⑥ 확정'}
+            검증 결과 확정
           </p>
           <p className="field-helper vrun-finalize-guide" id="finalize-action-guide">
             {revised ? <>확정하면 검증 결과와 계산 근거가 잠깁니다.<br />실제 송금은 아니며, 변경하려면 새 실행이 필요합니다.</> : <>

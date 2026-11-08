@@ -42,7 +42,7 @@ export function ContractPaymentGates({
   const steps = [
     {
       sourceIndex: 1,
-      label: '귀속행 입력',
+      label: '지급 내역 입력',
       state: local(1, inputsReady),
       text: inputsReady ? '입력 완료' : '입력 대기',
     },
@@ -81,7 +81,7 @@ export function ContractPaymentGates({
     <PrecheckResultPanel className="contract-payment-gates" titleId="contract-payment-gates-title">
       <header className="surface-header transaction-surface-header">
         <h2 className="surface-title" id="contract-payment-gates-title">
-          ③ 확정 전 6단계 점검
+          확정 전 6단계 점검
         </h2>
       </header>
       <div className="surface-body transaction-gate-list" aria-live="polite">

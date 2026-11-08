@@ -131,7 +131,7 @@ describe('AUTH-W01 로그인', () => {
     sessionStorage.setItem('fgc.other.preference', 'old')
     localStorage.setItem('unrelated', 'keep')
     await enterCredentials(actions)
-    await screen.findByRole('heading', { name: '지급 건 등록, 귀속, 확정' })
+    await screen.findByRole('heading', { name: '지급 계약 건 등록, 귀속, 확정' })
     expect(router.state.location.pathname).toBe(`${base}/transactions/new`)
     expect(router.state.location.search).toBe('?month=2026-08&status=ACTIVE')
     expect(router.state.location.hash).toBe('#form')

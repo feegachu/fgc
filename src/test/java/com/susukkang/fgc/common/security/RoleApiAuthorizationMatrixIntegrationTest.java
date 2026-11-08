@@ -172,6 +172,7 @@ class RoleApiAuthorizationMatrixIntegrationTest {
                         "{\"eventType\":\"LAPSED\",\"effectiveAt\":\"2026-01-01T00:00:00+09:00\"}", PROCESS_OR_GA),
                 // 지급 — IF-22·23·23D·24·25
                 row("IF-22", POST, "/api/v1/transactions", PAYMENT, PROCESS),
+                row("IF-22B", POST, "/api/v1/transactions/batch", "{\"payments\":[" + PAYMENT + "]}", PROCESS),
                 row("IF-23", PUT, "/api/v1/transactions/{}", PAYMENT_UPDATE, PROCESS),
                 row("IF-23D", DELETE, "/api/v1/transactions/{}", null, PROCESS),
                 row("IF-24", POST, "/api/v1/transactions/{}/precheck", null, PROCESS),

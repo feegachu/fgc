@@ -177,21 +177,7 @@ public class ClawbackNoticeDocumentService {
         var lines = calculation.lines().stream().map(line -> new ClawbackNoticePdfRenderer.Line(
                 itemNames.getOrDefault(line.commissionItemId(), "항목 " + line.commissionItemId()),
                 line.installmentNo(), line.basisAmount(), line.appliedRatePct(), line.clawbackAmount())).toList();
-        var rates = new java.util.ArrayList<ClawbackNoticePdfRenderer.RateBand>();
-        if (basis.get("rateTable") instanceof java.util.List<?> savedRates) {
-            for (Object saved : savedRates) {
-                if (!(saved instanceof Map<?, ?> row)) throw new IllegalStateException("계산판 환수율표를 읽을 수 없습니다.");
-                Long ruleId = row.get("ruleId") instanceof Number number ? number.longValue() : null;
-                Long itemId = row.get("commissionItemId") instanceof Number number ? number.longValue() : null;
-                rates.add(new ClawbackNoticePdfRenderer.RateBand(ruleId,
-                        itemId == null ? "전체 수수료 항목" : itemNames.getOrDefault(itemId, "항목 " + itemId),
-                        row.get("monthFrom") instanceof Number number ? number.intValue() : null,
-                        row.get("monthTo") instanceof Number number ? number.intValue() : null,
-                        new java.math.BigDecimal(String.valueOf(row.get("ratePct"))),
-                        calculation.lines().stream().anyMatch(line -> java.util.Objects.equals(line.clawbackRuleId(), ruleId)),
-                        (itemId != null ? 4 : 0) + (row.get("productOfferingId") != null ? 2 : 0) + (row.get("insurerId") != null ? 1 : 0)));
-            }
-        }
+        var rates = savedRates(basis, calculation, itemNames);
         return new ClawbackNoticePdfRenderer.Notice(documentNo, version, issuedAt, header.contractNo(),
                 header.insurerName(), header.productName(), header.agentCode(), header.agentName(),
                 triggerLabel(String.valueOf(basis.get("triggerType")), header.triggerStatus()),
@@ -204,6 +190,31 @@ public class ClawbackNoticeDocumentService {
                 lines, calculation.amount(), List.copyOf(rates), basis.get("reason") instanceof String reason ? reason : null,
                 new ClawbackNoticePdfRenderer.Party(header.gaName(), header.branchName(), header.teamName()));
     }
+
+    private static List<ClawbackNoticePdfRenderer.RateBand> savedRates(Map<String, Object> basis,
+            Calculation calculation, Map<Long, String> itemNames) {
+        if (!(basis.get("rateTable") instanceof List<?> saved)) return List.of();
+        return saved.stream().map(value -> savedRate(value, calculation, itemNames)).toList();
+    }
+
+    private static ClawbackNoticePdfRenderer.RateBand savedRate(Object value, Calculation calculation,
+            Map<Long, String> itemNames) {
+        if (!(value instanceof Map<?, ?> row)) throw new IllegalStateException("계산판 환수율표를 읽을 수 없습니다.");
+        Long ruleId = longValue(row.get("ruleId"));
+        Long itemId = longValue(row.get("commissionItemId"));
+        int priority = specificity(itemId, 4) + specificity(row.get("productOfferingId"), 2)
+                + specificity(row.get("insurerId"), 1);
+        return new ClawbackNoticePdfRenderer.RateBand(ruleId,
+                itemId == null ? "전체 수수료 항목" : itemNames.getOrDefault(itemId, "항목 " + itemId),
+                intValue(row.get("monthFrom")), intValue(row.get("monthTo")),
+                new java.math.BigDecimal(String.valueOf(row.get("ratePct"))),
+                calculation.lines().stream().anyMatch(line -> java.util.Objects.equals(line.clawbackRuleId(), ruleId)),
+                priority);
+    }
+
+    private static int specificity(Object value, int score) { return value == null ? 0 : score; }
+    private static Long longValue(Object value) { return value instanceof Number n ? n.longValue() : null; }
+    private static Integer intValue(Object value) { return value instanceof Number n ? n.intValue() : null; }
 
     private static String triggerLabel(String triggerType, String newStatus) {
         if ("ARBITRAGE".equals(triggerType)) return "차익거래 검증";

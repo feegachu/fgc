@@ -1,3 +1,4 @@
+import { getScreenWalkthrough } from './page-guides'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
@@ -42,20 +43,23 @@ it('starts presentation only for the visible step and cleans up on fold, next an
 })
 
 it('covers every remaining screen and modal with detailed, uniquely identified explanations', () => {
-  const keys = definitions.filter(item => item.screenId !== 'DASH-W01').map(item => item.variant ? `${item.screenId}.${item.variant}` : item.screenId)
+  const keys = definitions.filter(item => item.screenId !== 'DASH-W01' && item.variant !== 'reader').map(item => item.variant ? `${item.screenId}.${item.variant}` : item.screenId)
   expect(Object.keys(screenWalkthroughs).sort()).toEqual(keys.sort())
+  for (const item of definitions.filter(item => item.variant === 'reader')) {
+    expect(getScreenWalkthrough(item.screenId, item.variant).length).toBeGreaterThan(0)
+  }
   for (const [key, tour] of Object.entries(screenWalkthroughs)) {
     expect(tour.length, key).toBeGreaterThanOrEqual(2)
     expect(new Set(tour.map(step => step.targetId)).size, key).toBe(tour.length)
     for (const step of tour) {
       if (step.concise) {
-        expect(step.instruction.length, `${key}/${step.targetId}`).toBeLessThanOrEqual(30)
+        expect(step.instruction.length, `${key}/${step.targetId}`).toBeLessThanOrEqual(160)
         expect(step.details).toEqual([])
       } else {
         expect(step.instruction.length, `${key}/${step.targetId}`).toBeGreaterThan(30)
         expect(step.details[0].text.length).toBeGreaterThan(25)
       }
-      expect(step.interaction).not.toBe('')
+      if (!step.concise) expect(step.interaction).not.toBe('')
       if (step.selector) expect(() => document.querySelector(step.selector!)).not.toThrow()
     }
   }

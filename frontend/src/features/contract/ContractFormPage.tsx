@@ -774,7 +774,7 @@ function ContractEditor({
                 ? `월납환산 초회보험료 ${int(Number(draft.monthlyEquivalentFirstPremium))}원 × 12 = ${int(Number(draft.monthlyEquivalentFirstPremium) * 12)}원`
                 : '월납환산 초회보험료의 12배입니다. 예: 10만원 × 12 = 120만원'}</p>
               <p>
-                참고용 기본 계산식입니다. 실제 한도는 적용 룰셋/해약환급금 합산 등을 반영해 저장 뒤 다시 계산합니다.
+                참고용 기본 계산식입니다. 실제 한도는 적용 규정과 해약환급금 합산 등을 반영해 저장 뒤 다시 계산합니다.
               </p>
             </aside>
           </section>

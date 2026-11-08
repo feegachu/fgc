@@ -19,7 +19,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
       setScrollState(previous => previous.overflow === overflowing && previous.atStart === atStart && previous.atEnd === atEnd
         ? previous : { overflow: overflowing, atStart, atEnd })
     }
-    const fitTabs = () => {
+    const fitTabs = (revealActive = false) => {
       const { paddingLeft, paddingRight } = getComputedStyle(bar)
       const available = bar.getBoundingClientRect().width - parseFloat(paddingLeft) - parseFloat(paddingRight)
       overflowing = tabs.length > Math.max(1, Math.round(available / 180))
@@ -30,7 +30,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
       const tabWidth = width / slots
       let first = Math.max(0, Math.min(Math.round(element.scrollLeft / previousWidth), tabs.length - slots))
       const activeIndex = tabs.findIndex(tab => tab.id === activeId)
-      if (activeIndex >= 0) {
+      if (revealActive && activeIndex >= 0) {
         if (activeIndex < first) first = activeIndex
         else if (activeIndex >= first + slots) first = activeIndex - slots + 1
       }
@@ -39,16 +39,17 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
       element.scrollTo?.({ left: first * tabWidth, behavior: 'instant' })
       updateEdges()
     }
-    fitTabs()
-    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fitTabs) : null
+    fitTabs(true)
+    const onResize = () => fitTabs()
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null
     observer?.observe(element)
     observer?.observe(bar)
     element.addEventListener('scroll', updateEdges)
-    window.addEventListener('resize', fitTabs)
+    window.addEventListener('resize', onResize)
     return () => {
       observer?.disconnect()
       element.removeEventListener('scroll', updateEdges)
-      window.removeEventListener('resize', fitTabs)
+      window.removeEventListener('resize', onResize)
     }
   }, [tabs, activeId, overflow])
 

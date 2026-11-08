@@ -238,7 +238,7 @@ export default function AgentStatementPage() {
                 명세 내역
               </h2>
               <div className="ast-list-tools">
-                <span className="ast-count"><span className="tabular-nums">{int(total)}</span>건 · 한 화면 20행</span>
+                <span className="ast-count"><span className="tabular-nums">{int(total)}</span>건 · 20건씩</span>
                 {enhanced && view === 'table' && <StatementViewSwitch value={view} onChange={setView} />}
               </div>
             </header>
