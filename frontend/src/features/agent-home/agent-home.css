@@ -89,7 +89,7 @@
   & .ah-retry { font-size: 0.75rem; color: var(--color-text-link); text-decoration: underline; }
 
   /* 설계사 판매 관리 */
-  & .ah-panel { padding: var(--space-5) var(--space-6); background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-8); }
+  & .ah-panel { padding: var(--space-6) var(--space-8); background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-8); }
   & .ah-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
   & .ah-panel-title { font-size: 0.875rem; font-weight: 700; }
   & .ah-panel-sub { margin-top: 2px; font-size: 0.8125rem; color: var(--muted); }
@@ -103,7 +103,7 @@
   & .ah-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand-600); }
   & .ah-chip button { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--brand-100); color: var(--brand-600); font-size: 0.75rem; }
   & .ah-note { margin-left: auto; font-size: 0.8125rem; color: var(--muted); }
-  & .ah-chart-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-2); }
+  & .ah-chart-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-5); margin-top: var(--space-3); }
   & .ah-box { grid-column: span 6; min-width: 0; padding: var(--space-3) var(--space-4) var(--space-2); background: var(--color-bg-surface); border: 1px solid var(--border); border-radius: var(--radius-8); }
   & .ah-donut-box, & .ah-product-box { grid-column: span 5; }
   & .ah-trend-box, & .ah-status-box { grid-column: span 7; }

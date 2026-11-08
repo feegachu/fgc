@@ -104,6 +104,35 @@ describe('FUN-079 상품 추천 AI 챗봇', () => {
     expect(screen.queryByText('내 한도 현황')).not.toBeInTheDocument()
   })
 
+  it('1단계 말풍선에는 개인정보 안내 문구가 없고 보험사 세부 선택에는 "선택 사항" 표기가 없다', async () => {
+    renderModal()
+    await screen.findByRole('button', { name: /건강보험/ })
+    expect(screen.getByText('어떤 카테고리의 상품을 비교해 볼까요?')).toBeInTheDocument()
+    expect(screen.queryByText(/선택지만 고를 수 있어요/)).not.toBeInTheDocument()
+    expect(screen.queryByText('선택 사항')).not.toBeInTheDocument()
+  })
+
+  it('한도 이월 상품 제외 체크박스는 보험사 세부 선택 제목 줄에 있고 그대로 동작한다', async () => {
+    renderModal()
+    const filters = await screen.findByRole('region', { name: '보험사 세부 선택' })
+    const checkbox = within(filters).getByRole('checkbox', { name: '한도를 넘어 이월이 생기는 상품은 제외' })
+    expect(checkbox.closest('.cb-filters-head')).not.toBeNull()
+    expect(checkbox).not.toBeChecked()
+    await userEvent.click(checkbox)
+    expect(checkbox).toBeChecked()
+    expect(within(filters).getByText('1개 적용')).toBeInTheDocument()
+    await userEvent.click(within(filters).getByRole('button', { name: '초기화' }))
+    expect(checkbox).not.toBeChecked()
+  })
+
+  it('자주 묻는 질문은 버튼 제목을 되풀이하지 않고 본문만 보여 준다', async () => {
+    renderModal()
+    await userEvent.click(await screen.findByRole('button', { name: '피코 AI 소개' }))
+    const card = document.querySelector('.cb-faq-card') as HTMLElement
+    expect(card).toHaveTextContent('고른 카테고리의 보험사별 상품을 내 계약 기준으로 비교해')
+    expect(card).not.toHaveTextContent('피코 AI 소개')
+  })
+
   it('뉴스를 못 가져와도 카테고리 선택은 그대로 쓸 수 있다', async () => {
     onNews = async () => {
       throw new Error('down')

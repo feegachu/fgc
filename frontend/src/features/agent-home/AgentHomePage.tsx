@@ -39,7 +39,6 @@ const KINDS: { value: InsurerKind; label: string }[] = [
 type CountQuery = { data?: number; isError: boolean; refetch?: () => unknown }
 type FocusState = 'ready' | 'loading' | 'error'
 const periodLabel = (p: Period) => (p === 'all' ? '전체 기간' : `최근 ${p}개월`)
-const kindLabel = (k: InsurerKind) => (k === 'all' ? '전체 보험사' : k === 'LIFE' ? '생명보험' : '손해보험')
 
 export function AgentHomePage() {
   const { month } = useOutletContext<ShellContext>()
@@ -339,14 +338,11 @@ function Charts({
   // 경고·합계·분포는 모두 같은 모집단(선택한 보험사까지 좁힌 집계)에서 읽는다.
   const shown = focusHome ?? home
   const warnings = focusState === 'ready' ? (shown.basis?.warnings ?? []) : []
-  const range = shown.range
   return (
     <section data-guide-feature="features.agent-home.agent-home-page.section-2" className="ah-panel" aria-label="설계사 판매 관리 그래프">
       <div className="ah-panel-head">
         <div>
           <h2 className="ah-panel-title">설계사 판매 관리</h2>
-          <p className="ah-panel-sub">{`${label}, ${kindLabel(kind)}`}</p>
-          <p className="ah-panel-sub">{`기준일 ${home.asOf}, 집계 기간 ${range?.from ?? '-'} ~ ${range?.to ?? '-'}, 계약 ${home.portfolio?.contractCount ?? 0}건`}</p>
         </div>
         <div className="ah-controls">
           <Segmented label="기간" options={PERIODS} value={period} onChange={onPeriod} />

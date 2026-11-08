@@ -91,11 +91,21 @@
 .cb .cb-bot { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 12px; animation: cb-in 0.22s ease-out; }
 /* 캐릭터 움직임은 단계별 피코 모션(mascot/PicoMotion, Rive)이 그린다 */
 .cb .cb-bot .cb-mascot { width: 101px; height: 101px; flex: 0 0 101px; }
-/* 선별 중(2단계)에는 3단계처럼 캐릭터를 '피코 AI' 이름 옆(위쪽)에 두고, 불러오는 동안 한 바퀴씩 천천히 돈다.
-   한 바퀴(5.5s)는 ChatbotModal 의 SPIN_MS 와 같아야 한다. 회전 중심은 배의 F 로고(가로 48%, 세로 66%)다 */
+/* 선별 중(2단계)에는 3단계처럼 캐릭터를 '피코 AI' 이름 옆(위쪽)에 두고, 불러오는 동안 돋보기를 흔들듯 좌우로 기울다가
+   한 번 부드럽게 좌우 반전한다(회전 없음). 한 주기(5.5s)는 ChatbotModal 의 SPIN_MS 와 같아야 한다. 기울임 중심은 배의 F 로고(가로 48%, 세로 66%)다 */
 .cb .cb-bot:has([data-pico-motion='hat']) { align-items: flex-start; }
-.cb .cb-bot [data-pico-motion='hat'] { transform-origin: 48% 66%; animation: cb-turn 5.5s linear infinite; }
-@keyframes cb-turn { to { transform: rotate(360deg); } }
+.cb .cb-bot [data-pico-motion='hat'] { transform-origin: 48% 66%; animation: cb-search 5.5s ease-in-out infinite; }
+@keyframes cb-search {
+  0%, 100% { transform: perspective(500px) rotateY(0) rotate(0); }
+  12% { transform: perspective(500px) rotateY(0) rotate(-7deg); }
+  24% { transform: perspective(500px) rotateY(0) rotate(7deg); }
+  36% { transform: perspective(500px) rotateY(0) rotate(-5deg); }
+  46% { transform: perspective(500px) rotateY(0) rotate(0); }
+  58% { transform: perspective(500px) rotateY(180deg) rotate(0); }
+  68% { transform: perspective(500px) rotateY(180deg) rotate(7deg); }
+  80% { transform: perspective(500px) rotateY(180deg) rotate(-7deg); }
+  90% { transform: perspective(500px) rotateY(180deg) rotate(0); }
+}
 .cb .cb-bot-msg { flex: 1; min-width: 0; max-width: calc(100% - 113px); }
 @keyframes cb-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -117,7 +127,7 @@
 .cb .cb-replies .cb-replies-bubble { align-self: flex-end; width: min(100%, 880px); box-sizing: border-box; }
 .cb .cb-logo { flex: 0 0 auto; width: 108px; height: 44px; background: #291e5a; -webkit-mask: var(--cb-logo) center / contain no-repeat; mask: var(--cb-logo) center / contain no-repeat; }
 .cb .cb-replies-bubble { padding: 14px; border-radius: var(--radius-16) var(--radius-16) 6px var(--radius-16); background: var(--cb-brand-50); }
-.cb .cb-cats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.cb .cb-cats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; width: 100%; }
 .cb .cb-cat {
   display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; padding: 14px 14px; border: 1.5px solid #cbd5e1; border-radius: var(--radius-12);
   background: #fff; color: var(--cb-t900); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; text-align: center; transition: all 0.15s;
@@ -289,7 +299,7 @@
 .cb .cb-filters-head .cb-muted { font: inherit; }
 .cb .cb-filters-reset { margin-left: auto; font-size: 0.8125rem; font-weight: 500; line-height: 1.125rem; }
 .cb .cb-filters-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); }
-.cb .cb-filters .filter-checkbox { margin-left: auto; }
+.cb .cb-filters-head .filter-checkbox { margin-left: var(--space-2); font-weight: 400; }
 .cb .cb-filters fieldset { flex: 1 1 260px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .cb .cb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .cb .cb-chip { padding: 6px 14px; border: 1.5px solid #cbd5e1; border-radius: var(--radius-full); background: #fff; font-size: 13px; font-weight: 600; color: var(--cb-t700); }

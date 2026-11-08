@@ -17,7 +17,7 @@ import './chatbot.css'
 
 const STEPS = ['카테고리 선택', '상품 선별', '비교 결과와 근거']
 const CHECKS = ['내 한도 확인', '정책 수수료율 확인', '환수 규칙 확인', '협회 등급 확인']
-/** 계산이 빨라도 화면이 깜빡이지 않도록 2단계는 캐릭터가 한 바퀴 도는 시간 동안 보여 준다. chatbot.css 의 cb-turn 주기(5.5s)와 같아야 한다. */
+/** 계산이 빨라도 화면이 깜빡이지 않도록 2단계는 캐릭터 모션이 한 주기 도는 시간 동안 보여 준다. chatbot.css 의 cb-search 주기(5.5s)와 같아야 한다. */
 const SPIN_MS = 5500
 const CHECK_MS = SPIN_MS / CHECKS.length
 // 설계사 화면의 보라 캐릭터(#839) 단계별 모션: 1단계 웃으며 인사, 2단계 탐정 모자(정지), 3단계 안경과 지시봉, 답변을 찾지 못하면 당황.
@@ -444,7 +444,6 @@ function StepOne({
       <Bot>
         <div className="cb-card">
           <div className="cb-greet">어떤 카테고리의 상품을 비교해 볼까요?</div>
-          <p className="cb-muted">선택지만 고를 수 있어요. 고객 개인정보는 입력받지 않습니다.</p>
           {loading ? (
             <p className="cb-muted" aria-busy="true">
               카테고리를 불러오는 중이에요.
@@ -496,7 +495,7 @@ function StepOne({
       </div>
       {open && (
         <div className="cb-faq-card" aria-live="polite">
-          <b>{open.label}</b>: {open.body}
+          {open.body}
           {open.key === 'rank' && (
             <div className="cb-formula" aria-label="받을 수 있는 수수료에서 해지 시 돌려줄 금액을 뺀 값">
               <span>받을 수 있는 수수료</span>
