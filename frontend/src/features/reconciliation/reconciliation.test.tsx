@@ -14,6 +14,15 @@ import { useToastStore } from '../../stores/toasts'
 import { criteriaFromParams } from './api'
 import type { Detail, Run } from './api'
 
+// Preserve legacy API/table regression fixtures; guide-revision.spec.ts covers the current UI and guides.
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  return { ...actual, useOutletContext: () => {
+    const context = actual.useOutletContext<Record<string, unknown>>()
+    return { ...context, helpVersion: 'before' }
+  } }
+})
+
 const run: Run = {
   reconciliationRunId: 41,
   validationRunId: 3,

@@ -39,7 +39,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ClawbackCalculationService {
     /** 산식이 바뀌면 올린다. 같은 원천·정책이어도 산식 버전이 다르면 새 판이 된다. */
-    static final String CALC_RULE_VERSION = "claw-calc-v1";
+    static final String CALC_RULE_VERSION = "claw-calc-v2";
     static final String BASIS_CODE = "PAID_ATTRIBUTED_AMOUNT";
     private static final Set<String> CALCULABLE_CASE_STATUSES = Set.of("DETECTED", "CALCULATED");
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
@@ -134,6 +134,12 @@ public class ClawbackCalculationService {
         basis.put("policyVersionId", request.policyVersionId());
         basis.put("reason", reason);
         basis.put("excluded", excluded);
+        // 발행 시점의 정책을 다시 읽지 않도록 해당 상품의 환수율표도 계산판에 보존한다.
+        basis.put("rateTable", store.findRules(request.policyVersionId()).stream()
+                .filter(rule -> rule.insurerId() == null || rule.insurerId().equals(candidate.insurerId()))
+                .filter(rule -> rule.productOfferingId() == null || rule.productOfferingId().equals(candidate.productOfferingId()))
+                .filter(rule -> rule.condition() == null || rule.condition().replaceAll("\\s", "").equals("{}"))
+                .toList());
         Calculation calculation = new Calculation(clawbackCase.caseId(), candidateId, versionNo,
                 candidate.sourceVersion(), request.policyVersionId(), calculatedAt, userId, total, lines, basis);
         long calculationId = store.insertCalculation(clawbackCase.caseId(), candidateId, versionNo,

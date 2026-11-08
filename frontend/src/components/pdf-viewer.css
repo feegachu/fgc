@@ -1,0 +1,9 @@
+.modal.pdf-viewer { width:calc(100vw - 32px); max-width:none; height:calc(100dvh - 32px); max-height:none; }
+.pdf-viewer>.modal-header { flex-shrink:0; padding:12px 20px; }
+.pdf-viewer>.modal-body { display:flex; flex:1; flex-direction:column; min-height:0; padding:0; overflow:hidden; background:#171b27; }
+.pdf-viewer-frame { flex:1; width:100%; min-height:0; border:0; background:#171b27; }
+.claw-pdf-action { margin-left:auto; }
+.claw-calculation-result-header { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:12px; }
+.claw-calculation-result-header>.claw-calculation-summary { margin:0; }
+.claw-pdf-error { color:var(--color-status-error-text); font-size:12px; }
+@media(max-width:40rem) { .modal.pdf-viewer { width:100vw; height:100dvh; border-radius:0; } }

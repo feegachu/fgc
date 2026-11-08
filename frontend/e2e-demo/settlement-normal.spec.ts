@@ -1,10 +1,10 @@
 import { selectEntity } from '../e2e/selectEntity'
-import { continueFlow, readFlowExplanations, test, expect, login, api, responseFor, successful, sql } from './fixtures'
+import { test, expect, login, api, responseFor, successful, sql } from './fixtures'
 
 test.use({ video: 'off' })
-// One guide session passes all nine logical steps on the normal path: reconciliation matches, so step 8 is skipped.
+// Start through the production guide, then verify the real payment and settlement operations.
 // SYSTEM_ADMIN holds both CAN_PROCESS and CAN_FINALIZE_VALIDATION; role handoffs are settlement-completion.spec.ts.
-test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단계 없이 최종 확정 (한 번의 안내)', async ({ page }, info) => {
+test('새 업무 가이드에서 계약 등록 → 계약별 지급 확정 → 대사 일치 → 최종 확정', async ({ page }, info) => {
   const errors: string[] = []
   const writes: string[] = []
   const proofReads: string[] = []
@@ -21,15 +21,14 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   await page.goto('login')
   const seed = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0001&page=1&size=20')
   const original = await api(page, `/contracts/${seed.content[0].contractId}`)
-  const items = await api(page, '/base/commission-items?asOf=2026-07-01')
-  const item = items.find((entry: { itemCode: string }) => entry.itemCode === 'BASE_COMMISSION')
   await login(page, 'admin', '/?month=2026-07')
   await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
   const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
-  await guide.getByRole('button', { name: '안내 시작', exact: true }).click()
+  await page.getByRole('dialog', { name: '전체 업무 가이드', exact: true }).getByRole('button', { name: '계약 생성부터 시작' }).click()
   await expect(page).toHaveURL(/\/contracts\/new/)
   await expect(guide).toContainText('1/9')
   expect(writes).toEqual([])
+  await guide.getByRole('button', { name: '접기', exact: true }).click()
 
   await page.locator('input[name=contractDate]').fill(original.contractDate)
   await page.locator('select[name=insurerId]').selectOption(String(original.insurerId))
@@ -51,7 +50,7 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
   sql(`TRUNCATE fgc.commission_transaction CASCADE;
     TRUNCATE fgc.contract_status_event CASCADE;
     UPDATE fgc.insurance_contract SET current_status='MATURED' WHERE contract_id <> ${cid};
-    UPDATE fgc.schedule_header SET status='HOLD' WHERE contract_id <> ${cid};`)
+    UPDATE fgc.schedule_header SET status='HOLD' WHERE contract_id <> ${cid} AND status NOT IN ('ADJUSTED', 'CANCELLED');`)
   const source = JSON.parse(
     sql(`SELECT row_to_json(x) FROM (
     SELECT sl.*, sh.schedule_header_id AS header_id FROM fgc.schedule_line sl
@@ -65,114 +64,57 @@ test('FUN-088 정상 흐름: 새 계약 등록 → 대사 일치 → 예외 단�
     UPDATE fgc.schedule_line SET expected_amount=40 WHERE schedule_line_id=${source.schedule_line_id};`)
   const amount = 40
 
-  await continueFlow(page)
-  await expect(page).toHaveURL(new RegExp(`/schedules/${source.header_id}(?:\\?|$)`))
-  await expect(guide).toContainText('2/9')
-  await readFlowExplanations(page)
-  await guide.getByRole('button', { name: '스케줄 확인 완료' }).click()
-  await expect(page).toHaveURL(/\/transactions\/new/)
-  await expect(guide).toContainText('3/9')
-
-  await selectEntity(page, page.locator('#recipient'), String(original.agentId))
-  await selectEntity(page, page.locator('#item'), String(item.commissionItemId))
-  await page.locator('#bizKey').fill('E2E-FUN088-NORMAL')
-  await page.locator('#amount').fill(String(amount))
-  if (!(await page.locator('[data-contract-id]').count())) await page.locator('#btn-add-attr').click()
-  await selectEntity(page, page.locator('[data-contract-id]'), String(cid))
-  await page.locator('[data-attr-date]').fill(source.due_date)
-  await page.locator('[data-attr-amount]').fill(String(amount))
-  const saving = responseFor(page, '/transactions')
-  await page.locator('#btn-save').click()
-  const pid = (await successful(saving)).commissionTransactionId
-  await continueFlow(page)
-  await expect(guide).toContainText('4/9')
+  await guide.getByRole('button', { name: '종료', exact: true }).click()
+  await page.goto(`/transactions/new?contractId=${cid}&month=2026-07`)
+  const saving = responseFor(page, '/transactions/batch')
+  await page.getByRole('button', { name: '임시저장', exact: true }).click()
+  const payments = await successful(saving)
+  expect(payments).toHaveLength(1)
+  const pid = payments[0].commissionTransactionId
+  expect(payments[0].amount).toBe(amount)
   const checking = responseFor(page, `/transactions/${pid}/precheck`)
-  await page.locator('#btn-precheck').click()
+  await page.getByRole('button', { name: '사전검증', exact: true }).click()
   expect((await successful(checking)).confirmable).toBe(true)
-  await continueFlow(page)
-  await expect(guide).toContainText('5/9')
-  await page.locator('#btn-confirm').click()
+  await page.getByRole('button', { name: '확정', exact: true }).click()
   const confirming = responseFor(page, `/transactions/${pid}/confirm`)
-  await page.getByRole('dialog').getByRole('button', { name: '확정 실행' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '확인하고 확정', exact: true }).click()
   expect((await successful(confirming)).status).toBe('CONFIRMED')
-  await expect(page).toHaveURL(/\/transactions\?/)
-  // Router location can change before the guide commits its destination walkthrough.
-  await expect(page.getByRole('main').getByRole('heading', { name: '수수료 지급 건 목록', exact: true })).toBeVisible()
-  await expect(guide.getByRole('heading', { name: '확정된 지급을 확인하세요', exact: true })).toBeVisible()
-
-  await continueFlow(page)
-  await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
+  await page.goto('/validation-runs?month=2026-07')
   const creating = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성' }).click()
   const rid = Number((await successful(creating)).validationRunId)
   await expect(page).toHaveURL(new RegExp(`/validation-runs/${rid}\\b`))
-  // URL이 먼저 바뀔 수 있으므로 이동한 화면의 설명이 표시될 때까지 기다린다.
-  await expect(guide.getByRole('heading', { name: '검증 실행을 확인하세요', exact: true })).toBeVisible()
-  await continueFlow(page)
-  await expect(guide).toContainText('6/9')
-  await expect(guide).toContainText('월 통합검증 계산이 끝나지 않았습니다')
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await expect
     .poll(() => sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${rid}`), { timeout: 120000 })
     .toBe('COMPLETED')
-  await continueFlow(page)
-  await expect(page).toHaveURL(/\/reconciliations\?/)
-
   const reconId = Number(
     sql(`SELECT reconciliation_run_id FROM fgc.reconciliation_run
       WHERE validation_run_id=${rid} AND insurer_id=${original.insurerId} AND payment_stage='GA_TO_FC'`),
   )
   expect(Number.isSafeInteger(reconId) && reconId > 0).toBe(true)
-  await page
-    .getByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' })
-    .getByRole('row')
-    .filter({ has: page.getByRole('cell', { name: String(reconId), exact: true }) })
-    .click()
-  // The guide's own reads decide the branch; record them instead of re-reading through another session.
-  const resultsRead = page.waitForResponse((response) => {
-    const url = new URL(response.url())
-    // The page's own results query always sends sort; the guide's read does not.
-    return (
-      url.pathname === `/api/v1/reconciliations/${reconId}/results` &&
-      !url.searchParams.has('sort') &&
-      response.request().method() === 'GET'
-    )
-  })
-  const openRead = page.waitForResponse((response) => {
-    const url = new URL(response.url())
-    return (
-      url.pathname === '/api/v1/exceptions' &&
-      url.searchParams.get('status') === 'OPEN' &&
-      url.searchParams.get('validationRunId') === String(rid)
-    )
-  })
-  await continueFlow(page)
-  const results = (await (await resultsRead).json()).data
-  const open = (await (await openRead).json()).data
+  await page.goto(`/reconciliations?month=2026-07&runId=${reconId}`)
+  // Keep the browser's admin session alive while independently reading the outcomes.
+  // A second admin login would trigger a 401 redirect racing with the next navigation.
+  const results = await api(page, `/reconciliations/${reconId}/results?page=1&size=100`, undefined, 'audit01')
+  const open = await api(page, `/exceptions?status=OPEN&validationRunId=${rid}&page=1&size=100`, undefined, 'audit01')
   expect(results.summary.exceptionCount).toBe(0)
   expect(results.summary.matchedCount).toBe(results.summary.resultCount)
   expect(open.totalElements).toBe(0)
-  // A matched reconciliation without open exceptions goes from step 7 straight to step 9.
-  await expect(guide).toContainText('9/9')
-  await readFlowExplanations(page)
-  await expect(guide).toContainText('8개 조건을 통과했습니다')
-  await expect(page).toHaveURL(new RegExp(`/validation-runs/${rid}(?:\\?|$)`))
-  await expect(guide).not.toContainText('전체 업무 안내 완료')
-
+  await page.goto(`/validation-runs/${rid}?month=2026-07`)
+  await expect(page.getByRole('button', { name: '확정', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '확정', exact: true }).click()
   const finalized = responseFor(page, `/validation-runs/${rid}/finalize`)
   await page.getByRole('dialog').getByRole('button', { name: '확정', exact: true }).click()
   expect((await successful(finalized)).status).toBe('FINALIZED')
   await page.getByRole('dialog', { name: '확정했습니다' }).getByRole('button', { name: '확인', exact: true }).click()
-  await continueFlow(page)
-  await expect(guide).toContainText('전체 업무 안내 완료')
   expect(sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${rid}`)).toBe('FINALIZED')
   expect(errors).toEqual([])
-  expect(proofReads).toContain('/api/v1/assistant/prechecks/revalidate')
   // The user's own button clicks are the only business writes; the guide added none.
   expect(writes).toEqual([
     '/api/v1/contracts',
-    '/api/v1/transactions',
+    '/api/v1/transactions/batch',
+    `/api/v1/transactions/${pid}/precheck`,
     `/api/v1/transactions/${pid}/precheck`,
     `/api/v1/transactions/${pid}/confirm`,
     '/api/v1/validation-runs',

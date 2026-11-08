@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 // 네트워크를 모킹한 VRUN 시나리오: 목록에서 실행 생성 → 상세에서 실행 → 폴링 완료 → 확정(GA_ADMIN).
 // 실서버 시나리오는 #418 범위다.
@@ -82,6 +83,8 @@ test('실패 월 재시작은 이전 시도를 기다리고 다른 탭의 빠른
 })
 
 test('실행을 만들고 돌려 확정한다', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   let status: 'CREATED' | 'RUNNING' | 'COMPLETED' | 'FINALIZED' = 'CREATED'
   await page.route('**/api/v1/validation-runs/7/restartability', route => route.fulfill({ json: envelope({ allowed: false, reason: '실패 상태가 아닙니다.' }) }))
   await page.route('**/api/v1/validation-runs/7/retries', route => route.fulfill({ json: envelope([]) }))
@@ -163,8 +166,12 @@ test('실행을 만들고 돌려 확정한다', async ({ page }) => {
 
   await page.goto('validation-runs?month=2026-07')
   await expect(page.getByRole('heading', { name: '월 통합검증 실행 목록' })).toBeVisible()
+  await chooseDetailedHelp(page)
+  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 2)
   await page.getByRole('button', { name: '실행 생성' }).click()
   await expect(page.getByRole('heading', { name: '월 통합검증 상세/확정' })).toBeVisible()
+  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
+  expect(status).toBe('CREATED')
 
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '8/10 단계 (80%)' })).toBeVisible({ timeout: 10_000 })
@@ -172,6 +179,8 @@ test('실행을 만들고 돌려 확정한다', async ({ page }) => {
   const finalize = page.getByRole('button', { name: '확정', exact: true })
   await expect(finalize).toBeEnabled({ timeout: 10_000 })
   await finalize.click()
+  await readDetailedHelp(page, page.getByRole('dialog').getByRole('button', { name: '도움말', exact: true }), 3)
+  expect(status).toBe('COMPLETED')
   await page.getByRole('dialog').getByRole('button', { name: '확정', exact: true }).click()
   await expect(page.getByRole('dialog', { name: '확정했습니다' })).toBeVisible()
 })

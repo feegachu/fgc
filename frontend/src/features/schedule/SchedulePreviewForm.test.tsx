@@ -8,6 +8,11 @@ import { SchedulePreviewForm } from './SchedulePreviewForm'
 import { generatePreview } from './api'
 import type { PreviewContext } from './api'
 
+// Exercise the retained walkthrough in the sidebar's before mode.
+vi.mock('react-router', async (original) => ({
+  ...await original<typeof import('react-router')>(),
+  useOutletContext: () => ({ helpVersion: 'before' }),
+}))
 const access = vi.hoisted(() => ({ allowed: true }))
 vi.mock('../auth/useAuth', () => ({ usePermission: () => access.allowed }))
 vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), generatePreview: vi.fn() }))

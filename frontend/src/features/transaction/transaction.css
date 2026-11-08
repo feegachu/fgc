@@ -55,7 +55,7 @@
   overflow: hidden;
 }
 
-.transaction-list-table { min-width: 71.25rem; }
+.transaction-list-table { min-width: 67rem; }
 .transaction-col-stage { width: 6.5rem; }
 .transaction-col-source { width: 7rem; }
 /* 업무키는 토글 없이 title 툴팁으로 보완해 항상 값을 보여준다(이슈 326과 같은 방식). */
@@ -285,4 +285,16 @@
 
 .transaction-delete {
   color: var(--color-status-error-text);
+}
+
+.transaction-guide-actions {
+  border-radius: 6px;
+  animation: transaction-guide-actions-reveal 250ms 800ms both;
+}
+@keyframes transaction-guide-actions-reveal {
+  from { outline: 2px solid transparent; outline-offset: 2px; }
+  to { outline: 2px solid var(--color-fgc-blue); outline-offset: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .transaction-guide-actions { animation-duration: 0ms; }
 }

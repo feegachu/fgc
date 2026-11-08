@@ -29,11 +29,7 @@
   grid-column: 1 / -1;
 }
 
-.exception-work-grid {
-  margin-top: var(--space-4);
-}
-
-/* 내용 열은 폭을 지정하지 않아 나머지를 받는다. 앞쪽 6열이 기본 분할(60%)의 왼쪽 패널에 들어가는 폭이다. */
+/* 좁은 화면에서는 표 영역 안에서 가로로 스크롤한다. */
 .exception-table {
   width: 100%;
   min-width: 82.25rem;
@@ -421,7 +417,6 @@
 }
 
 @media (max-width: 63.9375rem) {
-  .exception-work-grid,
   .exception-side-panels,
   .exception-detail-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -508,6 +503,7 @@
 
 .exception-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: var(--space-4);
 }
@@ -572,4 +568,17 @@
 .exception-table-viewport:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
+}
+
+.exception-detail-modal { width: min(1160px, calc(100vw - 32px)); }
+.exception-detail-modal .exception-side-panels { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
+.exception-detail-modal [data-guide-target="exception.action"] { grid-column: 1; grid-row: 1 / span 2; }
+.exception-detail-modal .exception-side-panels > :first-child,
+.exception-detail-modal .exception-side-panels > :last-child { grid-column: 2; }
+.exception-detail-modal .exception-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 800px) {
+  .exception-detail-modal .exception-side-panels { display: flex; flex-direction: column; }
+  .exception-detail-modal .exception-side-panels > .surface { width: 100%; }
+  .exception-detail-modal [data-guide-target="exception.action"] { order: -1; }
+  .exception-detail-modal .exception-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

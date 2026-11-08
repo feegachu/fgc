@@ -1,5 +1,6 @@
 import type { PaymentGuideInput } from '../../transaction/payment-guide'
 import { isWonAmount } from '../guards'
+import { getScreenWalkthrough } from '../guide/page-guides'
 
 export interface PaymentWalkthroughStep {
   id: string
@@ -7,6 +8,8 @@ export interface PaymentWalkthroughStep {
   title: string
   instruction: string
   ready: boolean
+  interaction?: string
+  concise?: boolean
 }
 // Input checks only unlock explanation steps. Saving/completion still requires server evidence.
 const validAmount = (value: string) => isWonAmount(value) && BigInt(value) >= 0n && BigInt(value) <= BigInt(Number.MAX_SAFE_INTEGER)
@@ -14,8 +17,17 @@ export function paymentWalkthrough(input: PaymentGuideInput | null, contractId?:
   if (!input) return []
   const { form, rows } = input
   const steps: PaymentWalkthroughStep[] = []
-  const add = (id: string, selector: string, title: string, instruction: string, ready = true) =>
-    steps.push({ id, selector, title, instruction, ready })
+  const page = getScreenWalkthrough('TRAN-W02')
+  const pageTargets: Record<string, string> = {
+    stage: 'features.transaction.transaction-form-page.stage', month: 'features.transaction.transaction-form-page.settlement-month',
+    recipient: 'features.transaction.transaction-form-page.recipient', item: 'features.transaction.transaction-form-page.item',
+    amount: 'payment.amount', key: 'features.transaction.transaction-form-page.biz-key', save: 'payment.save',
+  }
+  const add = (id: string, selector: string, title: string, instruction: string, ready = true) => {
+    const shared = page.find(step => step.targetId === pageTargets[id])
+    steps.push({ ...(shared ?? {}), id, selector, title: shared?.title ?? title,
+      instruction: shared?.instruction ?? instruction, ready })
+  }
   add('stage', '#stage', '지급단계를 확인하세요', 'GA → 설계사인지 보험사 → GA인지 확인하세요. 전체 가이드에서 선택한 지급단계와 같아야 합니다.')
   add('month', '#settlementMonth', '정산월을 확인하세요', '이번 지급이 속하는 정산월을 확인하세요.', !!form.settlementMonth)
   if (form.paymentStage === 'GA_TO_FC')

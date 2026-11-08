@@ -5,7 +5,10 @@ import { invalidateJournalCorrectionQueries } from './correction-cache'
 import { useRef, useState } from 'react'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
+import { useNavigate, useOutletContext } from 'react-router'
+import type { ShellContext } from '../../app/shell/AppShell'
+import { LedgerExplorer } from './LedgerExplorer'
+import { LedgerOverview } from './LedgerOverview'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
@@ -158,6 +161,10 @@ const lineColumns: TableColumn<JournalLine>[] = [
 
 /** LEDG-W01: 진입하면 기준 정산월 목록을 바로 조회하고, 조회 버튼(searched=true)의 조건은 그대로 따른다. selected 딥링크를 유지한다. */
 export default function LedgerPage() {
+  const context = useOutletContext<ShellContext>()
+  return context?.helpVersion === 'after' ? <LedgerExplorer /> : <LegacyLedgerPage />
+}
+function LegacyLedgerPage() {
   const { params, update, reset } = useSearchParamsState(FILTER_KEYS)
   const month = useWorkspaceStore((state) => state.month)
   const criteria = criteriaFromParams(params)
@@ -196,7 +203,7 @@ export default function LedgerPage() {
         label="분개 목록과 분개 상세 카드 너비"
         defaultRatio={55}
       >
-        <section data-guide-feature="features.ledger.ledger-page.section" data-guide-target="ledger.overview" className="surface" aria-busy={list.isFetching}>
+        <LedgerOverview busy={list.isFetching}>
           <ListHeader total={data?.totalElements ?? 0} pageSize={20}>
             <h2 className="surface-title">분개 목록</h2>
           </ListHeader>
@@ -220,7 +227,7 @@ export default function LedgerPage() {
             totalPages={data?.totalPages ?? 0}
             onPageChange={(page) => update({ page: String(page) }, { resetPage: false })}
           />
-        </section>
+        </LedgerOverview>
         <section data-guide-feature="features.ledger.ledger-page.section-2" className="surface" aria-label="분개 상세" aria-busy={!!selected && detail.isFetching}>
           <header className="surface-header">
             <h2 className="surface-title">분개 상세</h2>
@@ -300,7 +307,7 @@ export default function LedgerPage() {
   )
 }
 
-function LedgerFilters({
+export function LedgerFilters({
   criteria,
   month,
   searched,
@@ -375,8 +382,9 @@ function LedgerFilters({
   )
 }
 
-function DetailSummary({ detail }: { detail: JournalDetail }) {
+export function DetailSummary({ detail }: { detail: JournalDetail }) {
   const values = [
+    ['분개 상태', detail.statusLabel || JOURNAL_STATUS[detail.status!] || EMPTY],
     ['분개번호', disclose(detail.journalNo)],
     ['분개일', date(detail.journalDate)],
     ['유형', detail.journalTypeLabel || JOURNAL_TYPE[detail.journalType!] || EMPTY],
@@ -401,7 +409,7 @@ function DetailSummary({ detail }: { detail: JournalDetail }) {
   )
 }
 
-function JournalActionModal({
+export function JournalActionModal({
   action,
   detail,
   allowed,

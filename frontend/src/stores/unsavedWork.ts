@@ -11,8 +11,9 @@ export const useUnsavedWorkStore = create<{ owners: Record<string, boolean>; mar
   }),
 }))
 
-export function useUnsavedWork(dirty: boolean, revision?: string) {
-  const owner = useId()
+export function useUnsavedWork(dirty: boolean, revision?: string, scope = '') {
+  const id = useId()
+  const owner = `${scope}${id}`
   useEffect(() => {
     useUnsavedWorkStore.getState().mark(owner, dirty)
     return () => useUnsavedWorkStore.getState().mark(owner, false)

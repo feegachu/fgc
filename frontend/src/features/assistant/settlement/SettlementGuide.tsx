@@ -7,21 +7,33 @@ import { screenFor } from '../../../app/screens'
 import { GuideRuntime } from '../guide/runtime'
 import { GuideTargets } from '../guide/targets'
 import type { EntityRef, GuideContext, GuideSnapshot } from '../guide/types'
+import { readBatchPaymentGuide } from '../../transaction/contract-payment-guide'
+import type { WorkflowDestination } from './catalog'
 import { getPaymentGuideObserver } from '../../transaction/payment-guide'
-import type { ContractPage } from '../../contract/api'
-import { readPayment } from '../../transaction/form-api'
 import { closeSettlementGuide, settlementEntry, subscribeSettlementEntry } from './entry'
 import { decide, STEPS, handoffFor, replacePayment as replacementSelection } from './state'
 import type { Selection, Evidence, Decision } from './state'
+import type { ContractPage } from '../../contract/api'
+import { readPayment } from '../../transaction/form-api'
+import type { HelpVersion } from '../guide/help-version'
 import { guideGet, readEvidence } from './api'
 import { destinations, settlementCatalog, titles, FLOW_VERSION } from './catalog'
 import './settlement.css'
 import '../../transaction/payment-guide.css'
 import { Modal } from '../../../components/Modal'
+import { Button } from '../../../components/Button'
+import { DisabledButtonHint } from '../../../components/DisabledButtonHint'
+import { SettlementOverview } from './SettlementOverview'
+import { GuideStepContent } from '../guide/GuideStepContent'
+import { useDemoContractNumber } from './useDemoContractNumber'
 import guideMascot from '../assets/pico-guide.png'
 import { useWorkflowGuide } from '../workflow-state'
 import { usePaymentWalkthrough } from './usePaymentWalkthrough'
 import { useWorkflowWalkthrough } from './useWorkflowWalkthrough'
+import { useValidationPlaybackGuide } from './useValidationPlaybackGuide'
+import { useGuideStep } from '../guide/useGuideSequence'
+import { GuideFieldPicker } from '../guide/GuideFieldPicker'
+import '../guide/screen-help.css'
 
 const id = (value: string | null) =>
   value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
@@ -30,13 +42,14 @@ function failureText(failure: unknown, fallback: string) {
     ? '최신 상태 조회가 5초 안에 끝나지 않았습니다. 잠시 후 다시 확인하세요.'
     : failure instanceof Error ? failure.message : fallback
 }
-export function SettlementGuide({ user, month }: { user: ShellUser; month: string | null }) {
+export function SettlementGuide({ user, month, helpVersion = 'after' }: { user: ShellUser; month: string | null; helpVersion?: HelpVersion }) {
   const open = useSyncExternalStore(subscribeSettlementEntry, settlementEntry)
   useEffect(() => () => closeSettlementGuide(), [user.loginId])
   if (!open || !month || user.roleCode === 'AGENT') return null
-  return <Flow key={`${user.loginId}:${month}`} user={user} month={month} />
+  return <Flow key={`${user.loginId}:${month}`} user={user} month={month} helpVersion={helpVersion} />
 }
-function Flow({ user, month }: { user: ShellUser; month: string }) {
+function Flow({ user, month, helpVersion }: { user: ShellUser; month: string; helpVersion: HelpVersion }) {
+  const after = helpVersion === 'after'
   const location = useLocation(),
     navigate = useNavigate()
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -46,6 +59,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     [paymentNo, setPaymentNo] = useState('')
   const [stage, setStage] = useState<Selection['stage']>('GA_TO_FC')
   const [decision, setDecision] = useState<Decision | null>(null)
+  const [progressNotice, setProgressNotice] = useState('')
   const [collapsed, setCollapsed] = useState(false)
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('')
@@ -61,15 +75,30 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     (!!routeContract && !!selection.contractId && Number(routeContract) !== selection.contractId) ||
     (!!routeSchedule && !!selection.scheduleId && Number(routeSchedule) !== selection.scheduleId)
   )
-  const detailedPayment = decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
+  const batchPayment = after && params.get('guideMode') === 'after' && location.pathname === '/transactions/new' && !params.has('id')
+  const detailedPayment = !batchPayment && decision?.step === 'payment.draft' && location.pathname === '/transactions/new' && !error && !contextMismatch
   const walkthrough = usePaymentWalkthrough(detailedPayment && !busy, month, selection?.stage, selection?.contractId)
   // show() can navigate from the just-saved editor to the same route with its new ID.
   // Bind only after that transition has finished: the old editor is replaced while
   // its saved draft loads, which is not loss of a target in the new explanation.
-  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy)
+  const explanation = useWorkflowWalkthrough(decision?.step, location.pathname, !!new URLSearchParams(location.search).get('selected'), decision?.correctionPending, !busy, after, batchPayment)
   const detailedWorkflow = snapshot?.status !== 'COMPLETED' && !!explanation.step && !error && !contextMismatch && !handoffFor(decision!.step, user.roleCode ?? '', user.canProcess)
   const activeTarget = detailedPayment ? walkthrough.target : detailedWorkflow ? explanation.target : snapshot?.target ?? null
-  const position = useSpotlight(!collapsed ? activeTarget : null, card)
+  const demoNumberStep = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
+    && explanation.step?.id === 'features.contract.contract-form-page.contract-no'
+  const demoNumber = useDemoContractNumber(explanation.target, demoNumberStep && detailedWorkflow && !collapsed && !busy && !leave)
+  const waitingForContractSave = after && decision?.step === 'contract.create' && location.pathname === '/contracts/new'
+    && explanation.last && explanation.step?.id === 'contract.save'
+  const coachSide = explanation.step?.id === 'contract.statusHistory'
+    || decision?.step === 'contract.create' && location.pathname === '/contracts/new'
+      && explanation.step?.presentation?.side === 'left' ? 'left' : 'right'
+  const paymentAnchor = batchPayment && detailedWorkflow && !explanation.step?.destination
+    ? ['payment.batch.contract', 'payment.batch.lines'].includes(explanation.step?.id ?? '')
+      ? '.contract-payment-gates' : '[data-guide-target="payment.batch.lines"]' : undefined
+  const validationPlayback = useValidationPlaybackGuide(after && detailedWorkflow && !collapsed && !busy && decision?.step === 'validation.execute', explanation.step?.id, explanation.next)
+  const position = useSpotlight(!collapsed ? activeTarget : null, card, detailedWorkflow,
+    after ? { ...explanation.step?.presentation, fixedCard: coachSide, cardAnchor: paymentAnchor, preventScroll: !!paymentAnchor } : detailedWorkflow ? explanation.step?.presentation : undefined)
+  useGuideStep(explanation.step, explanation.target, explanation.next, detailedWorkflow && !collapsed && !busy && !leave)
   const detailedInput = useRef(false)
   useLayoutEffect(() => { detailedInput.current = detailedPayment || detailedWorkflow })
   const runtime = useRef<GuideRuntime<Evidence> | null>(null)
@@ -84,6 +113,28 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       runtime.current?.pause('USER_PAUSED')
     }
   }), [])
+  const followHandoff = useRef<() => void>(() => {})
+  useLayoutEffect(() => {
+    followHandoff.current = () => {
+      if (selection && !busy) {
+        if (explanation.step?.follow) void navigate(explanation.step.follow.path + '?month=' + selection.month)
+        else void show(selection, false, decision?.step === 'schedule.review', false, false, explanation.step?.destination)
+      }
+    }
+  })
+  useEffect(() => {
+    const target = explanation.target
+    if (!detailedWorkflow || collapsed || busy || !target || !explanation.step?.destination && !explanation.step?.follow) return
+    const click = (event: MouseEvent) => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+      if (!(event.target instanceof Node) || !target.contains(event.target)) return
+      event.preventDefault()
+      event.stopPropagation()
+      followHandoff.current()
+    }
+    document.addEventListener('click', click, true)
+    return () => document.removeEventListener('click', click, true)
+  }, [detailedWorkflow, collapsed, busy, explanation.target, explanation.step?.destination, explanation.step?.follow])
   const current = useRef({ location, user, selection })
   useLayoutEffect(() => {
     current.current = { ...current.current, location, user, selection }
@@ -197,6 +248,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     acknowledge = false,
     replacePayment = false,
     allowDiscard = false,
+    destinationHint?: WorkflowDestination,
   ) {
     request.current?.abort()
     const controller = new AbortController(),
@@ -206,10 +258,24 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     setBusy(true)
     setCollapsed(false)
     setError('')
+    setProgressNotice('')
     runtime.current?.pause('REFRESHING')
     try {
       const sourceLocation = locationContext(current.current.location)
       const next = initial || replacePayment ? base : collect(base)
+      if (batchPayment && destinationHint === 'validation-list') {
+        const batch = readBatchPaymentGuide()
+        if (!batch?.ready || !batch.paymentIds.length) throw new Error('선택한 지급 건을 모두 확정한 뒤 월 통합검증으로 이동하세요.')
+        if (batch.contractId !== next.contractId || batch.month !== next.month || batch.stage !== next.stage)
+          throw new Error('계약·정산월·지급단계가 현재 안내 대상과 다릅니다.')
+        const payments = await Promise.all(batch.paymentIds.map(paymentId => readPayment(String(paymentId), signal)))
+        if (payments.some(payment => payment.status !== 'CONFIRMED' || payment.paymentStage !== next.stage ||
+          payment.settlementMonth?.slice(0, 7) !== next.month || !payment.attributions?.length ||
+          payment.attributions.some(row => row.contractId !== next.contractId)))
+          throw new Error('선택한 지급 건의 확정 결과를 다시 확인하세요.')
+        payments.sort((a, b) => Date.parse(b.updatedAt ?? b.createdAt ?? '') - Date.parse(a.updatedAt ?? a.createdAt ?? ''))
+        next.paymentId = payments[0].commissionTransactionId
+      }
       const evidence = await readEvidence(next, signal)
       signal.throwIfAborted()
       if (current.current.user.roleCode !== user.roleCode)
@@ -234,7 +300,9 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
       if (replacePayment && evidence.payment?.status !== 'CONFIRMED')
         throw new Error('정정 후 확정된 지급 번호를 선택하세요.')
       const result = decide(next, evidence, user.roleCode ?? '')
-      const routes = destinations(next)
+      if (!initial && result.step === decision?.step) setProgressNotice(result.reason)
+      const routeHint = destinationHint ?? (after && result.step === 'schedule.review' ? 'schedule-list' : undefined)
+      const routes = destinations(next, routeHint)
       const destination = routes[result.step]
       const paymentContext = getPaymentGuideObserver()?.readContext()
       const dirty = Boolean(paymentContext?.dirty) || Object.keys(useUnsavedWorkStore.getState().owners).length > 0
@@ -246,7 +314,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         [...destinationUrl.searchParams].some(([key, value]) => currentParams.get(key) !== value)
       if (needsNavigation && dirty && !allowDiscard) {
         setLeave(() => () => {
-          void show(base, initial, acknowledge, replacePayment, true)
+          void show(base, initial, acknowledge, replacePayment, true, destinationHint)
         })
         return
       }
@@ -280,7 +348,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
         serverStateVersion: null,
         dirty: false,
       })
-      const catalog = settlementCatalog(next),
+      const catalog = settlementCatalog(next, routeHint),
         targets = new GuideTargets()
       catalog.steps.forEach((step) =>
         targets.register({
@@ -347,6 +415,11 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     }
   }
   async function start() {
+    if (busy) return
+    if (after) {
+      await show({ month, stage: 'GA_TO_FC' }, true)
+      return
+    }
     const controller = new AbortController()
     const startLocation = current.current.location.pathname + current.current.location.search
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(5000)])
@@ -395,16 +468,19 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
     setCollapsed(true)
     void navigate(path)
   }
+  // Preserve the original presentation for the before/after comparison.
+  if (!after) {
   return (
     <>
-      {!collapsed && position.box && activeTarget && (
+      {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
+      {!collapsed && !validationPlayback.hidden && position.box && (
         <div className="payment-guide-spotlight settlement-guide-spotlight" aria-hidden="true" style={position.box} />
       )}
       <aside
         ref={card}
-        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : position.card}
+        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : { ...position.card, visibility: validationPlayback.hidden ? 'hidden' : undefined }}
         className="settlement-guide"
-        data-guide-anchored={Boolean(activeTarget && !collapsed)}
+        data-guide-anchored={Boolean((activeTarget || position.box) && !collapsed)}
         aria-label="전체 업무 가이드"
         aria-busy={busy}
       >
@@ -433,7 +509,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
           </p>
         )}
         {collapsed && selection ? (
-          <button disabled={busy} onClick={() => (detailedPayment || detailedWorkflow) ? setCollapsed(false) : void show(selection)}>
+          <button disabled={busy} onClick={() => void show(selection)}>
             현재 결과로 이어서 안내
           </button>
         ) : !selection ? (
@@ -477,7 +553,7 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
               <section aria-label="지급 초안 세부 안내" aria-live="polite">
                 <small>입력 안내 {walkthrough.index + 1}/{walkthrough.total}</small>
                 <h2>{walkthrough.step.title}</h2>
-                <p>{walkthrough.step.instruction}</p>
+                {walkthrough.step.concise ? <p className="screen-step-summary"><span>{walkthrough.step.instruction}</span><span>{walkthrough.step.interaction}</span></p> : <p>{walkthrough.step.instruction}</p>}
                 {walkthrough.message && <p role="status">{walkthrough.message}</p>}
                 {walkthrough.status === 'PAUSED' && <button onClick={walkthrough.retry}>다시 찾기</button>}
                 {walkthrough.step.id === 'save' && walkthrough.saved && <p role="status">저장되었습니다. 결과를 확인하고 다음 업무로 이동하세요.</p>}
@@ -492,7 +568,8 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
               <section aria-label="업무 세부 안내" aria-live="polite">
                 <small>설명 {explanation.index + 1}/{explanation.total}</small>
                 <h2>{explanation.step.title}</h2>
-                <p>{explanation.step.instruction}</p>
+                {explanation.step.concise ? <p className="screen-step-summary"><span>{explanation.step.instruction}</span><span>{explanation.step.interaction}</span></p> : <p>{explanation.step.instruction}</p>}
+                {explanation.step.workflowInstruction && <p>{explanation.step.workflowInstruction}</p>}
                 {explanation.message && <p role="status">{explanation.message}</p>}
                 {explanation.status === 'PAUSED' && <button onClick={explanation.retry}>다시 찾기</button>}
                 <div className="settlement-guide-actions">
@@ -580,6 +657,189 @@ function Flow({ user, month }: { user: ShellUser; month: string }) {
           <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
         )}
       </aside>
+      <Modal
+        open={leave !== null}
+        title="미저장 입력이 있습니다"
+        onClose={() => setLeave(null)}
+        initialFocusRef={stayButton}
+        footer={
+          <>
+            <button className="button button-secondary" ref={stayButton} onClick={() => setLeave(null)}>
+              현재 화면 유지
+            </button>
+            <button
+              className="button button-primary"
+              onClick={() => {
+                const proceed = leave
+                setLeave(null)
+                proceed?.()
+              }}
+            >
+              입력 버리고 이동
+            </button>
+          </>
+        }
+      >
+        <p>이동하면 현재 화면의 미저장 입력이 사라질 수 있습니다. 저장을 대신 실행하지 않습니다.</p>
+      </Modal>
+    </>
+  )
+  }
+  return (
+    <>
+      <SettlementOverview open={!selection} busy={busy} error={error} onClose={close} onStart={() => void start()} />
+      {detailedWorkflow && !collapsed && !busy && !leave && explanation.step?.openControl && <GuideFieldPicker key={explanation.step.id} target={explanation.target} />}
+      {!collapsed && !validationPlayback.hidden && position.box && (
+        <div className="payment-guide-spotlight settlement-guide-spotlight screen-step-spotlight" aria-hidden="true" style={position.box} />
+      )}
+      {selection && <aside
+        ref={card}
+        style={collapsed ? { left: 'auto', top: 80, right: 16, bottom: 'auto' } : { ...position.card, visibility: validationPlayback.hidden ? 'hidden' : undefined }}
+        className="settlement-guide payment-guide-card screen-step-guide"
+        data-help-presentation={true}
+        data-guide-docked={!collapsed}
+        data-guide-anchored={Boolean((activeTarget || position.box) && !collapsed)}
+        aria-label="전체 업무 가이드"
+        aria-busy={busy}
+      >
+        <header className="payment-guide-header">
+          <img
+            src={guideMascot}
+            alt=""
+            className="payment-guide-mascot"
+            width="32"
+            height="32"
+          />
+          <span className="screen-step-count">전체 업무 가이드{decision && ` · ${STEPS.indexOf(decision.step) + 1}/9`}</span>
+          {selection && (
+            <Button variant="ghost" onClick={() => setCollapsed((value) => !value)}>
+              {collapsed ? '펼치기' : '접기'}
+            </Button>
+          )}
+          <Button variant="ghost" onClick={close}>종료</Button>
+        </header>
+        {!collapsed && !detailedPayment && !detailedWorkflow && (
+          <p>
+            {month} · {selection.stage === 'GA_TO_FC' ? 'GA → 설계사' : '보험사 → GA'} ·{' '}
+            {contractLabel || '새 업무'}
+          </p>
+        )}
+        {collapsed && selection ? (
+          <button disabled={busy} onClick={() => void show(selection)}>
+            현재 결과로 이어서 안내
+          </button>
+        ) : (
+          <>
+
+            {detailedPayment && walkthrough.step ? (
+              <section aria-label="지급 초안 세부 안내" aria-live="polite">
+                <GuideStepContent step={walkthrough.step} index={walkthrough.index} total={walkthrough.total} group={`지급 등록 · ${walkthrough.index + 1}/${walkthrough.total}`} />
+                {!walkthrough.target && walkthrough.message && <p role="status">{walkthrough.message}</p>}
+                {walkthrough.status === 'PAUSED' && <Button variant="secondary" onClick={walkthrough.retry}>다시 찾기</Button>}
+                <div className="payment-guide-actions">
+                  <Button variant="secondary" disabled={busy || walkthrough.index === 0} onClick={walkthrough.previous}>이전</Button>
+                  {walkthrough.step.id === 'save' ? (
+                    <Button className="screen-step-next" disabled={busy || !walkthrough.ready || !walkthrough.saved} onClick={() => void show(selection)}>다음 업무</Button>
+                  ) : <Button className="screen-step-next" disabled={busy || !walkthrough.ready} onClick={walkthrough.next}>다음</Button>}
+                </div>
+              </section>
+            ) : detailedWorkflow ? (
+              <section aria-label="업무 세부 안내" aria-live="polite">
+                <GuideStepContent step={demoNumberStep ? { ...explanation.step, concise: true,
+                  instruction: '빈 계약번호에는 기존 데모 번호의 다음 번호를 채웁니다.',
+                  interaction: '번호를 확인하고 다음을 누르세요.' } : explanation.step} index={explanation.index} total={explanation.total} group={`${decision ? titles[STEPS.indexOf(decision.step)] : ''} · ${explanation.index + 1}/${explanation.total}`} />
+                {demoNumberStep && demoNumber.pending && <p role="status">다음 데모 계약번호를 불러오고 있습니다.</p>}
+                {demoNumberStep && demoNumber.error && <div><p role="alert">{demoNumber.error}</p><Button variant="secondary" onClick={demoNumber.retry}>번호 다시 불러오기</Button></div>}
+                {validationPlayback.error && <p role="alert">{validationPlayback.error}</p>}
+                {!explanation.target && explanation.message && <p role="status">{explanation.message}</p>}
+                {explanation.status === 'PAUSED' && <Button variant="secondary" onClick={explanation.retry}>다시 찾기</Button>}
+                <div className="payment-guide-actions">
+                  <Button variant="secondary" disabled={busy || explanation.index === 0} onClick={explanation.previous}>이전</Button>
+                  <DisabledButtonHint disabled={waitingForContractSave} reason="‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.">
+                  <Button className="screen-step-next" disabled={busy || waitingForContractSave || !explanation.ready || !!explanation.step?.destination || !!explanation.step?.follow || !!explanation.step?.requireAction && explanation.target?.getAttribute('data-guide-completed') !== 'true'} onClick={() => explanation.step?.follow ? void navigate(explanation.step.follow.path + '?month=' + selection.month) : explanation.last ? void show(selection, false, decision?.step === 'schedule.review') : explanation.next()}>{explanation.step?.destination || explanation.step?.follow ? '강조된 메뉴를 눌러주세요' : explanation.step?.follow?.label ?? explanation.step?.nextLabel ?? (explanation.last ? decision?.step === 'validation.finalize' ? '완료 확인' : '다음 업무' : '다음')}</Button>
+                  </DisabledButtonHint>
+                </div>
+              </section>
+            ) : <p>{decision?.reason}</p>}
+            {progressNotice && !busy && (detailedPayment || detailedWorkflow && explanation.last) && <p role="status">{progressNotice}</p>}
+            {contextMismatch && <p role="status">선택한 계약·스케줄·정산월과 현재 화면이 다릅니다. 기존 대상으로 돌아가거나 안내를 종료하고 새로 시작하세요.</p>}
+            {busy && <p role="status">현재 서버 결과를 확인하고 있습니다.</p>}
+            {!detailedPayment && !detailedWorkflow && !busy && (snapshot?.status === 'PAUSED' || snapshot?.status === 'ERROR') ? (
+              <p role="status">안내 대상을 확인하지 못했거나 화면·입력이 바뀌었습니다. 현재 결과로 다시 확인하세요.</p>
+            ) : null}
+            {snapshot?.status === 'COMPLETED' ? (
+              <strong>전체 업무 안내 완료</strong>
+            ) : (
+              <div className="settlement-guide-actions">
+                {decision?.step === 'schedule.review' && !detailedWorkflow && (
+                  <button disabled={busy} onClick={() => void show(selection, false, true)}>
+                    스케줄 확인 완료
+                  </button>
+                )}
+                {!detailedPayment && (!detailedWorkflow || !explanation.target) && <button disabled={busy} onClick={() => void show(selection)}>
+                  현재 결과로 이어서 안내
+                </button>}
+              </div>
+            )}
+            {decision?.step === 'validation.execute' && !user.canProcess && (
+              <button disabled={busy} onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
+                월 검증 결과 선택
+              </button>
+            )}
+            {decision?.step === 'exception.resolve' && (!detailedWorkflow || explanation.last || !explanation.target) &&
+              !handoffFor('exception.resolve', user.roleCode ?? '', user.canProcess) && (
+                <div className="settlement-guide-actions">
+                  <label>
+                    정정 후 지급 번호
+                    <input
+                      inputMode="numeric"
+                      disabled={busy}
+                      value={replacementNo}
+                      onChange={(event) => setReplacementNo(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      const paymentId = id(replacementNo)
+                      if (!paymentId) {
+                        setError('정정 후 확정된 지급 번호를 입력하세요.')
+                        return
+                      }
+                      void show(replacementSelection(selection, paymentId), false, false, true)
+                    }}
+                  >
+                    정정 지급으로 이어서 안내
+                  </button>
+                  <button disabled={busy} onClick={() => revisit(`/validation-runs?month=${selection.month}`)}>
+                    새 월 검증 선택·생성
+                  </button>
+                  <button disabled={busy} onClick={() => revisit(destinations(selection)['validation.execute'].path)}>
+                    월 검증 다시 확인
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => revisit(destinations(selection)['reconciliation.review'].path)}
+                  >
+                    대사 결과 다시 선택
+                  </button>
+                </div>
+              )}
+            {!detailedPayment && !detailedWorkflow && <details>
+              <summary>전체 9단계 보기</summary>
+              <ol>
+                {titles.map((title) => (
+                  <li key={title}>{title}</li>
+                ))}
+              </ol>
+            </details>}
+          </>
+        )}
+        {error && <p role="alert">{error}</p>}
+        {!collapsed && !detailedPayment && !detailedWorkflow && (
+          <small>안내는 저장·실행·확정을 대신하지 않습니다. 종료해도 저장된 업무 데이터는 남습니다.</small>
+        )}
+      </aside>}
       <Modal
         open={leave !== null}
         title="미저장 입력이 있습니다"

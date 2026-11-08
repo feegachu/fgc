@@ -61,9 +61,22 @@ test('read-only role finishes screen help where the write action is not availabl
     // 기준월 없이 열면 셸이 주소에 month를 붙이면서 도움말을 새로 시작해, 그보다 먼저 연 안내가 닫힌다.
     await page.goto(`${path}?month=2026-07`)
     await page.getByRole('button', { name: '도움말', exact: true }).first().click()
-    for (let step = 0; step < steps; step++) await page.getByRole('button', { name: '설명 확인 · 다음' }).click()
-    await expect(page.getByRole('heading', { name: '화면 사용법 안내 완료' })).toBeVisible()
-    await page.getByRole('button', { name: '안내 마치기' }).click()
+    const card = page.locator('.screen-step-guide')
+    let visited = 0
+    for (; visited < 20; visited++) {
+      await expect(card.getByRole('heading')).toBeVisible()
+      const finish = card.getByRole('button', { name: '안내 마치기', exact: true })
+      if (await finish.count()) { await finish.click(); break }
+      const next = card.getByRole('button', { name: '다음', exact: true })
+      if (!await next.count()) {
+        await expect(card.getByRole('button', { name: '강조된 메뉴를 눌러주세요' })).toBeDisabled()
+        await card.getByRole('button', { name: '종료', exact: true }).click()
+        break
+      }
+      await next.click()
+    }
+    expect(visited + 1).toBeGreaterThanOrEqual(steps)
+    await expect(card).toHaveCount(0)
   }
 })
 
@@ -140,4 +153,48 @@ test('unknown route and keyboard month cancellation', async ({ page }) => {
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
   await expect(page).toHaveURL(/month=2026-07/)
+})
+
+
+test.describe('탭 경계 정렬', () => {
+  test.use({ deviceScaleFactor: 1.25 })
+  test('125% 배율에서도 탭을 통째로 맞추고 이동·리사이즈 후 닫기 버튼이 잘리지 않는다', async ({ page }) => {
+    test.setTimeout(60000)
+    await session(page, 'SYSTEM_ADMIN')
+    await page.setViewportSize({ width: 1536, height: 864 })
+    await page.goto('contracts?month=2026-07')
+    const aligned = async () => page.locator('.workspace-tabs').evaluate(rail => {
+      const box = rail.getBoundingClientRect()
+      const tabs = [...rail.querySelectorAll<HTMLElement>('.workspace-tab')].map(tab => tab.getBoundingClientRect())
+      const width = tabs[0]?.width ?? 0
+      const visible = tabs.filter(tab => Math.min(tab.right, box.right) - Math.max(tab.left, box.left) > 1)
+      return width > 0 && Math.abs(box.width / width - Math.round(box.width / width)) < 0.01
+        && tabs.every(tab => Math.abs(tab.width - width) < 0.1)
+        && visible.length > 0 && visible.every(tab => tab.left >= box.left - 1 && tab.right <= box.right + 1)
+    })
+    for (const path of ['/transactions', '/schedules', '/cap-checks', '/journals', '/reconciliations', '/exceptions', '/base', '/policies']) {
+      await page.evaluate(href => {
+        window.history.pushState({}, '', `${href}?month=2026-07`)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }, path)
+      await expect(page.locator('.workspace-tab.is-active a')).toHaveAttribute('href', new RegExp(`^${path}[?]`))
+      await expect.poll(aligned).toBe(true)
+    }
+    for (const width of [1536, 1280, 1097, 1440]) {
+      await page.setViewportSize({ width, height: 864 })
+      await expect.poll(aligned).toBe(true)
+      await page.getByRole('button', { name: '첫 번째 업무 탭으로 이동' }).click()
+      await expect(page.getByRole('button', { name: '첫 번째 업무 탭으로 이동' })).toBeDisabled()
+      await expect.poll(aligned).toBe(true)
+      await page.getByRole('button', { name: '마지막 업무 탭으로 이동' }).click()
+      await expect(page.getByRole('button', { name: '마지막 업무 탭으로 이동' })).toBeDisabled()
+      await expect.poll(aligned).toBe(true)
+    }
+    await page.locator('.workspace-tabs').evaluate(rail => { rail.scrollLeft = rail.querySelector('.workspace-tab')!.getBoundingClientRect().width * 1.6 })
+    await expect.poll(aligned).toBe(true)
+    await page.getByRole('button', { name: '마지막 업무 탭으로 이동' }).click()
+    await page.locator('.workspace-tab.is-active .workspace-tab-close').click()
+    await expect.poll(aligned).toBe(true)
+    await page.screenshot({ path: 'test-results/workspace-fitted-tabs.png' })
+  })
 })

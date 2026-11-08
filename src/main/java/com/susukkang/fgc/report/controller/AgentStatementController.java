@@ -1,5 +1,7 @@
 package com.susukkang.fgc.report.controller;
 
+import java.util.List;
+import com.susukkang.fgc.report.dto.StatementAgentOverview;
 import com.susukkang.fgc.common.security.Roles;
 import com.susukkang.fgc.common.web.ApiResponse;
 import com.susukkang.fgc.report.dto.StatementDetail;
@@ -30,6 +32,17 @@ public class AgentStatementController {
     private static final String SORT = "정렬(key,asc|desc). basisDate·entryType·contractNo·commissionItemCode·installmentNo·statusCode·amount. 비우면 기준일 내림차순";
 
     private final AgentStatementService service;
+
+    @Operation(summary = "지점·설계사별 수수료 명세 요약(내부)")
+    @GetMapping("/reports/agents/statements/overview")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<List<StatementAgentOverview>> overview(
+            @RequestParam String month,
+            @RequestParam(required = false) String contractNo,
+            @RequestParam(required = false) Long commissionItemId,
+            @RequestParam(required = false) String entryType) {
+        return ApiResponse.success(service.overview(month, contractNo, commissionItemId, entryType));
+    }
 
     @Operation(summary = "본인 수수료 명세 목록", description = "지급·보류·조정·환수 내역과 같은 필터의 유형별 합계를 돌려줍니다.")
     @GetMapping("/agent/me/statements")

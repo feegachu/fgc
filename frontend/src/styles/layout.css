@@ -630,7 +630,8 @@
 }
 
 .workspace-tabs {
-  scroll-padding-inline: var(--space-8);
+  scroll-padding-inline: 0;
+  scroll-snap-type: x mandatory;
   display: flex;
   min-width: 0;
   flex: 1;
@@ -646,6 +647,7 @@
 }
 
 .workspace-tab {
+  scroll-snap-align: start;
   position: relative;
   display: grid;
   width: var(--layout-workspace-tab-width);
@@ -665,7 +667,7 @@
 }
 
 .workspace-tab + .workspace-tab {
-  margin-left: -1px;
+  margin-left: 0;
 }
 
 .workspace-tab.is-active {

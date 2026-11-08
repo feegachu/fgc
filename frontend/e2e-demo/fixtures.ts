@@ -58,15 +58,16 @@ export function responseFor(page: Page, path: string, method = 'POST') {
     (response) => new URL(response.url()).pathname === `/api/v1${path}` && response.request().method() === method,
   )
 }
-export async function api(page: Page, path: string, body?: unknown) {
-  // The browser's own access token is intentionally not exposed. Setup requests use a separate demo admin session.
+export async function api(page: Page, path: string, body?: unknown, account = 'admin') {
+  // The browser token stays private. Use a different read-only account for assertions
+  // during an active admin session: signing in the same account invalidates that session.
   const origin = new URL(page.url()).origin
   const client = await request.newContext({
     baseURL: origin,
     extraHTTPHeaders: { Origin: origin, 'X-FGC-Client': 'web' },
   })
   try {
-    const auth = await client.post('/api/v1/auth/login', { data: { loginId: 'admin', password } })
+    const auth = await client.post('/api/v1/auth/login', { data: { loginId: account, password } })
     expect(auth.ok(), await auth.text()).toBe(true)
     const token = (await auth.json()).data.accessToken
     const result = await client.fetch(`/api/v1${path}`, {
@@ -90,25 +91,4 @@ export async function completeMonthly(page: Page, month = '2026-07') {
     })
     .toBe('COMPLETED')
   return run.validationRunId as number
-}
-
-/** Read one explanation at a time; never use these buttons to perform a business write. */
-export async function readFlowExplanations(page: Page) {
-  const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
-  await expect(guide).toHaveAttribute('aria-busy', 'false')
-  const expand = guide.getByRole('button', { name: '펼치기', exact: true })
-  if (await expand.isVisible()) await expand.click()
-  for (let index = 0; index < 40; index++) {
-    const next = guide.getByRole('button', { name: '확인하고 다음 설명', exact: true })
-    if (!(await next.isVisible())) return
-    await expect(next).toBeEnabled()
-    await next.click()
-  }
-  throw new Error('세부 설명이 40단계 안에 끝나지 않았습니다.')
-}
-export async function continueFlow(page: Page) {
-  await readFlowExplanations(page)
-  const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
-  await guide.getByRole('button', { name: /^(현재 결과로 이어서 안내|저장 결과 확인 · 다음 업무)$/ }).click()
-  await expect(guide).toHaveAttribute('aria-busy', 'false')
 }

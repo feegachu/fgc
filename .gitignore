@@ -99,3 +99,5 @@ skill-observations/
 graphify-out/
 .grok/
 files/
+# PDF 렌더링 검수 산출물
+/output/pdf/

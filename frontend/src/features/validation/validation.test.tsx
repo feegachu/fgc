@@ -12,6 +12,15 @@ import { useWorkspaceStore } from '../../stores/workspace'
 import { failureText, stepState } from './steps'
 import { findWorkflowGuide } from '../assistant/workflow-catalog'
 
+// Preserve legacy API/table regression fixtures; guide-revision.spec.ts covers the current UI and guides.
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  return { ...actual, useOutletContext: () => {
+    const context = actual.useOutletContext<Record<string, unknown>>()
+    return { ...context, helpVersion: 'before' }
+  } }
+})
+
 const baseUser = {
   loginId: 'settle01',
   userName: '정산 담당자',

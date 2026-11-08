@@ -110,6 +110,25 @@ const candidateCalls = (request: { mock: { calls: unknown[][] } }) =>
     .filter((u: URL) => u.pathname.endsWith('/candidates'))
 afterEach(() => vi.restoreAllMocks())
 
+async function openDetail(contractNo = 'CLW-001', candidateId = 42) {
+  await userEvent.setup().click(await screen.findByRole('button', { name: `${contractNo} 환수 상세 보기 · 후보 ${candidateId}` }))
+  return screen.findByRole('dialog', { name: `환수 상세 · ${contractNo}` })
+}
+
+it('opens details only from the chosen contract and restores focus and filters after closing', async () => {
+  const user = userEvent.setup()
+  const { request, router } = mount('/clawbacks?contractNo=CLW')
+  const trigger = await screen.findByRole('button', { name: 'CLW-001 환수 상세 보기 · 후보 42' })
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(request.mock.calls.some(([path]) => /\/candidates\/\d+$/.test(String(path)))).toBe(false)
+  await openDetail()
+  expect(await screen.findByRole('region', { name: '발생 원인과 검증 근거' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: '닫기' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+  expect(router.state.location.search).toBe('?contractNo=CLW')
+})
+
 it('defaults to the event-date basis for the work month', async () => {
   const { request } = mount()
   await screen.findByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
@@ -163,6 +182,7 @@ it('blocks an inverted period without calling the server', async () => {
 
 it('shows source, payment and hold evidence with calculation locked by allowedActions', async () => {
   mount()
+  await openDetail()
   const evidence = await screen.findByRole('region', { name: '발생 원인과 검증 근거' })
   expect(within(evidence).getByText('상태 변경')).toBeInTheDocument()
   const payment = screen.getByRole('region', { name: '연결 지급, 귀속' })
@@ -217,6 +237,7 @@ it('shows a single policy candidate as a candidate, not as the applied policy', 
     ],
   }
   mount('/clawbacks', (p) => (p.includes('/candidates/42') ? envelope(single) : fixtures(p)))
+  await openDetail()
   // 내부 정책버전 번호 대신 정책 코드와 판으로 보이고, 계산에서 확인하기 전이라는 뜻을 남긴다.
   expect(await screen.findByText('표준 환수율 v1, 아래 환수 계산에서 확인')).toBeInTheDocument()
   expect(screen.queryByText(/정책버전 15/)).not.toBeInTheDocument()
@@ -232,6 +253,7 @@ it('links evidence to the source contract, arbitrage check and payment', async (
   }
   const user = userEvent.setup()
   mount('/clawbacks', (p) => (p.includes('/candidates/41') ? envelope(arbitrageDetail) : fixtures(p)))
+  await openDetail()
   const payments = await screen.findByRole('region', { name: '연결 지급, 귀속' })
   expect(within(payments).getByRole('link', { name: '지급 건 보기' })).toHaveAttribute(
     'href',
@@ -239,8 +261,9 @@ it('links evidence to the source contract, arbitrage check and payment', async (
   )
   const sources = screen.getByRole('region', { name: '발생 원인과 검증 근거' })
   expect(within(sources).getByRole('link', { name: '계약 상태이력' })).toHaveAttribute('href', '/contracts/10')
+  await user.click(screen.getByRole('button', { name: '닫기' }))
   const table = screen.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
-  await user.click(within(table).getByText('CLW-002'))
+  await user.click(within(table).getByRole('button', { name: 'CLW-002 환수 상세 보기 · 후보 41' }))
   const arbitrage = await screen.findByRole('link', { name: '차익거래 검증' })
   expect(arbitrage).toHaveAttribute('href', '/arbitrage-checks?month=2026-07&contractNo=CLW-002')
 })
@@ -328,6 +351,7 @@ it('calculates with the chosen policy and a reason, then shows the result lines 
   const user = userEvent.setup()
   const { posts, responder } = calculationFixtures(() => envelope(calculation))
   mount('/clawbacks', responder)
+  await openDetail()
   // 정책 후보가 하나면 미리 골라 두지만, 사유를 쓰기 전에는 계산하지 않는다.
   expect(await screen.findByRole('radio', { name: /^표준 환수율 v1\b/ })).toBeChecked()
   expect(screen.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
@@ -374,6 +398,7 @@ it('stops on missing grounds with plain reasons and never shows the failure as 0
   )
   const { posts, responder } = calculationFixtures(() => missing)
   mount('/clawbacks', responder)
+  await openDetail()
   await fillAndCalculate(user)
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveTextContent(
@@ -404,6 +429,7 @@ it('reloads the latest grounds when the source changed and sends the retry with 
       return envelope({ ...calculable, candidate: { ...calculable.candidate, sourceVersion: 'claw-v2-def' } })
     return responder(p, options)
   })
+  await openDetail()
   await fillAndCalculate(user)
   expect(await screen.findByRole('alert')).toHaveTextContent(
     '조회한 뒤 후보 상태나 근거가 바뀌었습니다. 최신 내용을 다시 불러옵니다. 확인한 뒤 다시 계산하세요. (요청번호: CALC-409)',
@@ -440,6 +466,7 @@ it('drops a chosen policy that left the candidates after the source changed', as
       })
     return fixtures(p)
   })
+  await openDetail()
   await user.click(await screen.findByRole('radio', { name: /^표준 환수율 v2\b/ }))
   await fillAndCalculate(user)
   expect(await screen.findByRole('alert')).toHaveTextContent('조회한 뒤 후보 상태나 근거가 바뀌었습니다.')
@@ -460,6 +487,7 @@ it('retries a lost response with the same key so the server keeps one calculatio
     return new TypeError('Failed to fetch')
   })
   mount('/clawbacks', responder)
+  await openDetail()
   await fillAndCalculate(user)
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveTextContent('연결이 끊겨 계산 결과를 확인하지 못했습니다. 같은 내용으로 다시 누르면 중복 없이 이어서 처리합니다.')
@@ -479,6 +507,7 @@ it('explains an idempotency conflict without the server code', async () => {
   )
   const { responder } = calculationFixtures(() => conflict)
   mount('/clawbacks', responder)
+  await openDetail()
   await fillAndCalculate(user)
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveTextContent('같은 계산 요청을 다른 내용으로 다시 보냈습니다. 화면을 새로 고친 뒤 다시 계산하세요. (요청번호: CALC-409B)')
@@ -499,14 +528,34 @@ it('locks the button while a calculation is in flight', async () => {
     }
     return p.endsWith('/candidates/42') ? envelope(calculable) : fixtures(p)
   })
+  await openDetail()
   await fillAndCalculate(user)
   const button = screen.getByRole('button', { name: '환수액 계산' })
   await waitFor(() => expect(button).toBeDisabled())
   expect(button).toHaveAttribute('aria-busy', 'true')
+  expect(screen.getByRole('button', { name: '닫기' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: '창 닫기' }))
+  await user.keyboard('{Escape}')
+  expect(screen.getByRole('dialog', { name: '환수 상세 · CLW-001' })).toBeInTheDocument()
   await user.click(button)
   expect(posts).toHaveLength(1)
   finish(envelope(calculation))
   await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'))
+})
+
+it('preserves a draft reason when closing is cancelled and discards it only after confirmation', async () => {
+  const user = userEvent.setup()
+  const { responder } = calculationFixtures(() => envelope(calculation))
+  mount('/clawbacks', responder)
+  await openDetail()
+  await user.type(await screen.findByLabelText(/계산 사유/), '정책 검토 중')
+  await user.click(screen.getByRole('button', { name: '닫기' }))
+  const confirmation = screen.getByRole('dialog', { name: '작성 중인 내용을 닫을까요?' })
+  await user.click(within(confirmation).getByRole('button', { name: '계속 작성' }))
+  expect(screen.getByLabelText(/계산 사유/)).toHaveValue('정책 검토 중')
+  await user.click(screen.getByRole('button', { name: '닫기' }))
+  await user.click(screen.getByRole('button', { name: '입력 버리고 닫기' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
 it('새로고침하면 선택한 후보의 상세도 다시 읽어 기지급과 계산 가능 여부를 갱신한다', async () => {
@@ -517,9 +566,12 @@ it('새로고침하면 선택한 후보의 상세도 다시 읽어 기지급과 
       ? envelope({ ...calculable, candidate: { ...calculable.candidate, paidAmount: paid } })
       : fixtures(p),
   )
+  await openDetail()
   expect(await screen.findByText('환수할 기지급 내역이 없어 계산할 수 없습니다.')).toBeInTheDocument()
   paid = 1200000
+  await user.click(screen.getByRole('button', { name: '닫기' }))
   await user.click(screen.getByRole('button', { name: '새로고침' }))
+  await openDetail()
   await waitFor(() => expect(screen.queryByText('환수할 기지급 내역이 없어 계산할 수 없습니다.')).not.toBeInTheDocument())
   expect(request.mock.calls.filter(([p]) => String(p).endsWith('/candidates/42')).length).toBeGreaterThanOrEqual(2)
 })
@@ -536,6 +588,7 @@ it('asks for a policy choice when several policies apply', async () => {
         })
       : fixtures(p),
   )
+  await openDetail()
   expect(await screen.findByText('2개, 아래 환수 계산에서 선택')).toBeInTheDocument()
   expect(screen.getByText('적용할 정책을 고르세요.')).toBeInTheDocument()
   await user.type(screen.getByLabelText(/계산 사유/), '정책 확인 후 계산')
@@ -557,6 +610,7 @@ it('names the policy of a calculation whose policy version left the candidates',
         ? envelope({ header: { policyVersionId: 15, policyName: '표준 환수율', versionNo: 1 } })
         : fixtures(p),
   )
+  await openDetail()
   expect(await screen.findByText(/최신 계산 결과 v1, .*표준 환수율 v1, 경과월 18개월/)).toBeInTheDocument()
   expect(screen.queryByText(/적용 정책 확인/)).not.toBeInTheDocument()
 })
@@ -575,6 +629,7 @@ it('marks a calculation made before the source changed as stale', async () => {
         })
       : fixtures(p),
   )
+  await openDetail()
   expect(await screen.findByText('계산 후 근거 자료가 바뀌어 다시 계산 필요', { selector: 'li' })).toBeInTheDocument()
   expect(
     screen.getByText('계산한 뒤 근거 자료나 정책이 바뀌었습니다. 이 계산 결과는 지금 근거와 다르니 다시 계산하세요.'),

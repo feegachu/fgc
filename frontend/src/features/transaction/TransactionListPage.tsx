@@ -1,5 +1,5 @@
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams, useLocation } from 'react-router'
 import { ContextLink } from '../../components/ContextLink'
@@ -40,6 +40,14 @@ const disclosure = (value: string | undefined) => <CellDisclosure singleLine pre
 
 export default function TransactionListPage() {
   const { month, user } = useOutletContext<ShellContext>()
+  const [guideExample, setGuideExample] = useState(false)
+  useEffect(() => {
+    const show = () => setGuideExample(true)
+    const hide = () => setGuideExample(false)
+    window.addEventListener('fgc-payment-example-start', show)
+    window.addEventListener('fgc-payment-example-stop', hide)
+    return () => { window.removeEventListener('fgc-payment-example-start', show); window.removeEventListener('fgc-payment-example-stop', hide) }
+  }, [])
   const location = useLocation()
   const returnTo = location.pathname + location.search
   const [params, setParams] = useSearchParams()
@@ -92,6 +100,9 @@ export default function TransactionListPage() {
     setKnown(next)
   }
   const rows = search.isError ? [] : (search.data?.content ?? [])
+  const example: PaymentRow = { commissionTransactionId: -1, sourceBusinessKey: '안내용 예시 · 실제 지급 건 아님',
+    paymentStage: 'GA_TO_FC', paymentStageLabel: 'GA→설계사', sourceType: 'GA_MANUAL_PAYMENT', sourceTypeLabel: '안내 예시',
+    status: 'DRAFT', statusLabel: '예시', recipientAgentName: '예시 설계사', commissionItemName: '예시 수수료', amount: 0, attributionCount: 1 }
   const sum = rows.reduce((total, row) => total + Number(row.amount ?? 0), 0)
   const total = search.isError ? 0 : (search.data?.totalElements ?? 0)
   const totalPages = Math.max(1, search.data?.totalPages ?? 1)
@@ -129,7 +140,7 @@ export default function TransactionListPage() {
       key: 'key',
       label: '지급 관리번호',
       sortable: true,
-      width: '10rem',
+      width: '8rem',
       cellClassName: 'transaction-mono',
       render: (row) => <span title={row.sourceBusinessKey}>{row.sourceBusinessKey || '-'}</span>,
     },
@@ -211,7 +222,10 @@ export default function TransactionListPage() {
       width: '7rem',
       align: 'center',
       render: (row) =>
-        row.status !== 'DRAFT' ? (
+        row.commissionTransactionId === -1 ? <div className="transaction-row-actions transaction-guide-actions">
+          <Button data-guide-feature="features.transaction-list-page.button-1" variant="ghost" aria-label="예시 지급 건 수정" onClick={() => toast('수정 기능을 설명하는 예시 행입니다.', 'info')}>수정</Button>
+          <Button data-guide-feature="features.transaction-list-page.button-2" variant="ghost" aria-label="예시 지급 건 삭제" onClick={() => toast('삭제 기능을 설명하는 예시 행입니다.', 'info')}>삭제</Button>
+        </div> : row.status !== 'DRAFT' ? (
           '-'
         ) : user.canProcess ? (
           <div className="transaction-row-actions">
@@ -343,7 +357,7 @@ export default function TransactionListPage() {
           caption="조회 조건에 해당하는 수수료 지급 건"
           columns={columns}
           {...sortBinding(filters.sort, TRANSACTION_SORT_KEYS, (sort) => apply({ ...filters, sort, page: 1 }))}
-          rows={rows}
+          rows={guideExample && !search.isError ? [example, ...rows] : rows}
           rowKey={(row) => String(row.commissionTransactionId)}
           selectedKeys={params.get('selectedId') ? [params.get('selectedId')!] : []}
           emptyMessage={

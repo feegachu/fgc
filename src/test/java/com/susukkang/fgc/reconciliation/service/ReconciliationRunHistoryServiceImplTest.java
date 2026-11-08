@@ -76,6 +76,19 @@ class ReconciliationRunHistoryServiceImplTest {
     }
 
     @Test
+    void exposesSupersededHistoryForExclusionFromCurrentGroupTotals() {
+        var old = row(3, 2, 1);
+        old.setSuperseded(true);
+        given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))
+                .willReturn(List.of(old));
+        assertThat(service.findHistory(NO_FILTER, 1, 20, "createdAt,desc").content())
+                .singleElement().satisfies(response -> {
+                    assertThat(response.superseded()).isTrue();
+                    assertThat(response.statusLabel()).isEqualTo("정정 전 이력");
+                });
+    }
+
+    @Test
     void calculatesMatchRatePctRoundedToOneDecimal() {
         // 3건 중 2건 일치 = 66.6666...% → 소수점 첫째 자리 반올림으로 66.7
         given(reconciliationRunHistoryRepository.search(null, null, null, new ListSort("createdAt", false), 0, 20))

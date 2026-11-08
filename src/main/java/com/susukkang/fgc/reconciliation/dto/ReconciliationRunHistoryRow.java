@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
 public class ReconciliationRunHistoryRow {
     private Long reconciliationRunId;
     private Long validationRunId;
+    private Integer validationRunNo;
     private LocalDate settlementMonth;
     private String paymentStage;
     private Long insurerId;

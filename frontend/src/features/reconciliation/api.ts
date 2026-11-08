@@ -5,14 +5,15 @@ import type { components } from '../../lib/api/schema'
 import { validMonth } from '../../stores/workspace'
 import { PAYMENT_STAGE, RESULT_TYPE } from './labels'
 import { formatSort, parseSort } from '../../lib/tableSort'
+import { aggregateSummaries, paginateGroupResults } from './groupResults'
 
 type Schemas = components['schemas']
-export type Run = Schemas['ReconciliationRunHistoryResponse']
+export type Run = Schemas['ReconciliationRunHistoryResponse'] & { validationRunNo?: number | null }
 export type Result = Schemas['ReconciliationResultListItemResponse']
 export type Detail = Schemas['ReconciliationResultDetailResponse']
 export type Match = Schemas['Match']
 export type Summary = Schemas['ReconciliationSummaryResponse']
-export type History = Schemas['ReconciliationRunSearchResponse']
+export type History = Omit<Schemas['ReconciliationRunSearchResponse'], 'content'> & { content?: Run[] }
 export type Results = Schemas['ReconciliationResultSearchResponse']
 export const PAGE_SIZE = 20
 /** 서버(ReconciliationRunHistoryRepository.SORT_KEYS)와 같은 이력 정렬 key. 지급단계·상태는 순서 기준이 없어 제외한다. */
@@ -72,19 +73,27 @@ async function get<T>(path: string, signal?: AbortSignal) {
   if (!data) throw new Error('자료를 불러오지 못했습니다. 다시 시도하세요.')
   return data
 }
-export const historyQuery = (criteria: Criteria) =>
+export const historyQuery = (criteria: Criteria, tree = false) =>
   queryOptions({
-    queryKey: ['reconciliations', 'history', criteria],
-    queryFn: ({ signal }) => {
+    queryKey: ['reconciliations', 'history', criteria, tree],
+    queryFn: async ({ signal }) => {
       const query = new URLSearchParams({
         month: criteria.month,
-        page: String(criteria.page),
-        size: String(PAGE_SIZE),
+        page: tree ? '1' : String(criteria.page),
+        size: tree ? '100' : String(PAGE_SIZE),
         sort: criteria.sort || 'createdAt,desc',
       })
       if (criteria.stage) query.set('stage', criteria.stage)
       if (criteria.insurer) query.set('insurerId', criteria.insurer)
-      return get<History>(`/api/v1/reconciliations?${query}`, signal)
+      const first = await get<History>(`/api/v1/reconciliations?${query}`, signal)
+      if (!tree) return first
+      const content = [...(first.content ?? [])]
+      for (let page = 2; page <= (first.totalPages ?? 1); page++) {
+        query.set('page', String(page))
+        const next = await get<History>(`/api/v1/reconciliations?${query}`, signal)
+        content.push(...(next.content ?? []))
+      }
+      return { ...first, content, totalPages: Math.ceil(content.length / 20) }
     },
     enabled: !!criteria.month,
     placeholderData: keepPreviousData,
@@ -93,6 +102,29 @@ export const historyQuery = (criteria: Criteria) =>
     refetchInterval: (query) =>
       query.state.data?.content?.some((run) => run.status === 'RUNNING' || run.status === 'CREATED') ? 2000 : false,
   })
+export function groupedResultQuery(runIds: string[], type: string, page: number, onlyMismatch: boolean, sort: string, enabled: boolean, running: boolean) {
+  const ids = [...new Set(runIds)].sort()
+  return queryOptions({
+    queryKey: ['reconciliations', 'group-results', ids, type, page, onlyMismatch, sort], enabled,
+    queryFn: async ({ signal }) => {
+      const groups = await Promise.all(ids.map(async id => {
+        const query = new URLSearchParams({ page: '1', size: '100', sort: sort || 'createdAt,desc' })
+        if (Object.hasOwn(RESULT_TYPE, type)) query.set('resultType', type)
+        const first = await get<Results>(`/api/v1/reconciliations/${id}/results?${query}`, signal)
+        const rows = [...(first.items?.content ?? [])]
+        for (let page = 2; page <= (first.items?.totalPages ?? 1); page++) {
+          query.set('page', String(page))
+          const next = await get<Results>(`/api/v1/reconciliations/${id}/results?${query}`, signal)
+          rows.push(...(next.items?.content ?? []))
+        }
+        return { rows, summary: first.summary }
+      }))
+      if (groups.some(group => !group.summary)) throw new Error('실행 요약을 확인하지 못했습니다. 다시 조회하세요.')
+      return { items: paginateGroupResults(groups.flatMap(group => group.rows), page, onlyMismatch, sort),
+        summary: aggregateSummaries(groups.map(group => group.summary!)) }
+    }, refetchInterval: running ? 2000 : false, meta: { errorToast: false },
+  })
+}
 export const resultQuery = (runId: string, resultType: string, page: number, running: boolean, sort = '') =>
   queryOptions({
     queryKey: ['reconciliations', 'results', runId, resultType, page, sort],

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '../../components/Button'
 import { CellDisclosure } from '../../components/CellDisclosure'
@@ -9,7 +9,7 @@ import { Modal } from '../../components/Modal'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { StatusTone } from '../../components/StatusBadge'
 import { ApiError } from '../../lib/api/errors'
-import { dateTime, int } from '../../lib/format'
+import { date, dateTime, int } from '../../lib/format'
 import { nameWithCode } from '../../lib/screenText'
 import { Amount } from '../cap/badges'
 import { contractEventsQuery, contractStatusEffectsQuery } from './api'
@@ -42,6 +42,13 @@ type Processing = NonNullable<ContractStatusEvent['processings']>[number]
 type Summary = NonNullable<Processing['summary']>
 
 const NO_DATA = '자료 없음'
+// Guide-only dates: keep the base day where possible, clamping at month end.
+function previewDate(base: string, months: number) {
+  if (base === '-') return undefined
+  const [year, month, day] = base.split('-').map(Number)
+  const lastDay = new Date(Date.UTC(year, month - 1 + months + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(year, month - 1 + months, Math.min(day, lastDay))).toISOString().slice(0, 10)
+}
 const followUpTones: Record<string, StatusTone> = {
   NOT_REQUIRED: 'neutral',
   PENDING: 'info',
@@ -287,7 +294,44 @@ function StatusEffectsPanel({ id, event, onClose }: { id: string; event: Contrac
   )
 }
 
-export function ContractStatusHistory({ id }: { id: string }) {
+export function ContractStatusHistory({ id, compact = false }: { id: string; compact?: boolean }) {
+  const guideRoot = useRef<HTMLElement>(null)
+  const timeline = useRef<HTMLOListElement>(null)
+  const [previewCount, setPreviewCount] = useState<number | null>(null)
+  useEffect(() => {
+    const root = guideRoot.current
+    if (!compact || !root) return
+    let timer: ReturnType<typeof setInterval> | undefined
+    let previousScroll = 0
+    const stop = () => {
+      clearInterval(timer)
+      setPreviewCount(null)
+      timeline.current?.scrollTo({ top: previousScroll, behavior: 'instant' })
+    }
+    const start = () => {
+      clearInterval(timer)
+      previousScroll = timeline.current?.scrollTop ?? 0
+      setPreviewCount(0)
+      let count = 0
+      timer = setInterval(() => {
+        count += 1
+        setPreviewCount(count)
+        if (count === 3) clearInterval(timer)
+      }, 1200)
+    }
+    root.addEventListener('fgc-contract-status-start', start)
+    root.addEventListener('fgc-contract-status-stop', stop)
+    return () => {
+      clearInterval(timer)
+      root.removeEventListener('fgc-contract-status-start', start)
+      root.removeEventListener('fgc-contract-status-stop', stop)
+    }
+  }, [compact])
+  useEffect(() => {
+    if (!timeline.current || previewCount === null) return
+    timeline.current.scrollTo({ top: timeline.current.scrollHeight,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  }, [previewCount])
   const history = useQuery({
     ...contractEventsQuery(id),
     refetchInterval: (query) => (followUpRunning(query.state.data) ? FOLLOW_UP_REFETCH_MS : false),
@@ -298,20 +342,26 @@ export function ContractStatusHistory({ id }: { id: string }) {
   // 재조회 실패에도 보던 이력과 선택을 유지한다. 권한이 사라졌으면(403) 이전 결과를 계속 보여 주지 않는다.
   const denied = history.error instanceof ApiError && history.error.status === 403
   const events = denied ? undefined : history.data
+  const ordered = sortStatusEvents(events ?? [], compact ? 'effectiveAt' : sort)
+  const previewBase = [...ordered].reverse().map(event => date(event.effectiveAt)).find(value => value !== '-') ?? '-'
   const opened = selection?.open ? events?.find((event) => event.eventId === selection.eventId) : undefined
   return (
     <section
+      ref={guideRoot}
       data-guide-feature="features.contract.contract-tabs.section-3"
       data-guide-target="contract.statusHistory"
-      className="contract-history-panel"
+      className={`contract-history-panel${compact ? ' contract-history-compact' : ''}`}
       aria-labelledby="contract-history-title"
     >
       <header className="contract-history-panel-header">
         <div>
-          <h3 id="contract-history-title">상태이력</h3>
-          <p>상태 변경과 그 처리 결과를 보여 줍니다.</p>
+          <h3 id="contract-history-title">
+            {compact && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M6 6v12m0-6h6a6 6 0 0 0 6-6" /><circle cx="6" cy="4" r="2" /><circle cx="6" cy="20" r="2" /><circle cx="18" cy="4" r="2" /></svg>}
+            상태이력
+          </h3>
+          {!compact && <p>상태 변경과 그 처리 결과를 보여 줍니다.</p>}
         </div>
-        <div className="contract-history-sort" role="group" aria-label="상태이력 정렬 기준">
+        {!compact && <div className="contract-history-sort" role="group" aria-label="상태이력 정렬 기준">
           <Button
             data-guide-feature="features.contract.contract-tabs.button-3"
             className={`contract-history-sort-button ${sort === 'effectiveAt' ? 'is-active' : ''}`}
@@ -330,7 +380,7 @@ export function ContractStatusHistory({ id }: { id: string }) {
           >
             접수 순
           </Button>
-        </div>
+        </div>}
       </header>
       {events ? (
         <>
@@ -351,12 +401,34 @@ export function ContractStatusHistory({ id }: { id: string }) {
               </span>
             </p>
           )}
-          {followUpRunning(events) && (
+          {!compact && followUpRunning(events) && (
             <p className="contract-history-note" role="status">
               끝나지 않은 후속 처리가 있어 {FOLLOW_UP_REFETCH_MS / 1000}초마다 다시 조회합니다.
             </p>
           )}
-          <DataTable
+          {compact ? <ol ref={timeline} className="contract-history-timeline" aria-label="계약 상태 변화">
+            {!!ordered.length && <li className="contract-history-origin">
+              <strong>{ordered[0].previousStatus ? responseLabel(contractStatusLabels, ordered[0].previousStatus, ordered[0].previousStatusLabel) : '최초'}</strong>
+            </li>}
+            {ordered.map((event, index) => <li className={`contract-history-event${selection?.eventId === event.eventId ? " is-selected" : ""}`} key={event.eventId ?? index}>
+              <div className="contract-history-node-heading">
+                <strong>{responseLabel(contractStatusLabels, event.newStatus, event.newStatusLabel)}</strong>
+                {event.eventId != null && <Button data-guide-feature="features.contract-status-history.button-1" variant="secondary" aria-label={`변경 ${int(event.eventSeq)} 영향 보기`} onClick={() => setSelection({ eventId: event.eventId!, open: true })}>상세 보기</Button>}
+              </div>
+              <time dateTime={event.effectiveAt}>{dateTime(event.effectiveAt)}</time>
+              <span>{reasonText(event)}</span>
+              <FollowUpStatus event={event} />
+            </li>)}
+            {previewCount !== null && <li className="contract-history-demo-label"><span>도움말 예시</span></li>}
+            {['미납', '실효', '해지'].slice(0, previewCount ?? 0).map((status, index) => {
+              const exampleDate = previewDate(previewBase, index + 1)
+              return <li className="contract-history-demo-node" key={`demo-${status}`}>
+                <strong>{status}</strong>
+                {exampleDate ? <time dateTime={exampleDate}>{exampleDate}</time> : <span>{index + 1}개월 뒤</span>}
+              </li>
+            })}
+            {!events.length && previewCount === null && <li className="empty-state">등록된 상태이력이 없습니다.</li>}
+          </ol> : <DataTable
             className="contract-history-table"
             caption="상태 변경"
             columns={columns}
@@ -364,7 +436,7 @@ export function ContractStatusHistory({ id }: { id: string }) {
             rowKey={(row) => String(row.eventId ?? `${row.sourceSystem ?? ''}-${row.sourceEventKey ?? row.eventSeq}`)}
             selectedKeys={selection ? [String(selection.eventId)] : []}
             emptyMessage="등록된 상태이력이 없습니다."
-          />
+          />}
         </>
       ) : (
         <QueryContent query={history}>{() => null}</QueryContent>

@@ -1,9 +1,26 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, RefObject } from 'react'
+import { useGuideScrollLock } from './useGuideScrollLock'
 
 const HIGHLIGHT_PADDING = 10
+export interface SpotlightPresentation {
+  side?: 'right' | 'left' | 'above' | 'below' | 'either'
+  includeLabel?: boolean; sideBoundary?: string; preserveCardPosition?: boolean; rowLimit?: number
+  fixedCard?: boolean | 'left' | 'right'; scrollToTop?: boolean
+  cardAnchor?: string; preventScroll?: boolean; allowPageScroll?: boolean; scrollTargetTop?: boolean
+}
 
-export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>) {
+export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLElement | null>, detailed = false,
+  presentation?: SpotlightPresentation) {
+  useGuideScrollLock(card, presentation?.allowPageScroll)
+  const full = Boolean(presentation), preferredSide = presentation?.side
+  const includeLabel = presentation?.includeLabel
+  const sideBoundary = presentation?.sideBoundary
+  const preserveCardPosition = presentation?.preserveCardPosition
+  const rowLimit = presentation?.rowLimit
+  const fixedCard = presentation?.fixedCard
+  const scrollToTop = presentation?.scrollToTop, scrollTargetTop = presentation?.scrollTargetTop
+  const cardAnchor = presentation?.cardAnchor, preventScroll = presentation?.preventScroll
   const [position, setPosition] = useState<{
     box: { left: number; top: number; width: number; height: number } | null
     card: CSSProperties
@@ -11,12 +28,82 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
   useEffect(() => {
     let frame = 0
     let placementFrame = 0
+    let scrollFrame = 0
     let preparedWidth: number | null = null
+    let preparedPresentation = ''
     let measuredTarget: DOMRect | null = null
+    const targetInHeader = Boolean(target?.closest('.app-header'))
+    const scrollSmoothly = (offset: number) => {
+      cancelAnimationFrame(scrollFrame)
+      const start = window.scrollY
+      const end = Math.max(0, Math.min(start + offset, document.documentElement.scrollHeight - window.innerHeight))
+      if (Math.abs(end - start) < 1) return
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        window.scrollTo({ top: end, behavior: 'instant' })
+        return
+      }
+      const began = performance.now()
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - began) / 700)
+        window.scrollTo({ top: start + (end - start) * (t * t * (3 - 2 * t)), behavior: 'instant' })
+        measure()
+        if (t < 1) scrollFrame = requestAnimationFrame(tick)
+      }
+      scrollFrame = requestAnimationFrame(tick)
+    }
+    const heightLimit = () => Math.min(detailed ? 560 : 460, window.innerHeight * (detailed && window.innerWidth >= 768 ? 0.65 : 0.5))
+    const targetRect = () => {
+      const rect = target!.getBoundingClientRect()
+      if (includeLabel) {
+        const label = target!.closest('.field')?.querySelector('.field-label')?.getBoundingClientRect()
+        if (label) return new DOMRect(rect.left, Math.min(rect.top, label.top), rect.width, rect.bottom - Math.min(rect.top, label.top))
+      }
+      if (rowLimit && !target!.matches('table')) {
+        const rows = [...target!.querySelectorAll<HTMLElement>('tbody > tr, ol > li')]
+          .filter(row => row.getClientRects().length > 0).slice(0, rowLimit)
+        const last = rows.at(-1)?.getBoundingClientRect()
+        if (last) return new DOMRect(rect.left, rect.top, rect.width, Math.max(0, Math.min(rect.bottom, last.bottom) - rect.top))
+      }
+      if (!detailed || !target!.matches('table')) return rect
+      const header = target!.querySelector<HTMLElement>(':scope > thead')
+      const rows = [...target!.querySelectorAll<HTMLElement>(':scope > tbody > tr')]
+        .filter(row => row.getClientRects().length > 0).slice(0, 3)
+      const first = header ?? rows[0], last = rows.at(-1) ?? header
+      if (!first || !last) return rect
+      const viewport = target!.closest('.data-table-viewport')?.getBoundingClientRect()
+      const left = Math.max(rect.left, viewport?.left ?? rect.left)
+      const right = Math.min(rect.right, viewport?.right ?? rect.right)
+      const top = first.getBoundingClientRect().top
+      return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, last.getBoundingClientRect().bottom - top))
+    }
     const alignTarget = () => {
       if (!target?.isConnected) return
+      if (targetInHeader) return
+      const tableViewport = target.closest<HTMLElement>('.data-table-viewport')
+      if (tableViewport && !target.matches('table')) {
+        const element = target.getBoundingClientRect(), viewport = tableViewport.getBoundingClientRect()
+        const offset = element.right > viewport.right ? element.right - viewport.right + 12
+          : element.left < viewport.left ? element.left - viewport.left - 12 : 0
+        if (offset) tableViewport.scrollBy({ left: offset, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+      }
+      if (detailed) {
+        const rect = targetRect()
+        const modalBody = target.closest<HTMLElement>('.modal-body')
+        const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0
+        const top = Math.max(0, headerBottom, modalBody?.getBoundingClientRect().top ?? 0) + 16
+        const bottom = Math.min(window.innerHeight, modalBody?.getBoundingClientRect().bottom ?? window.innerHeight) - 16
+        // Keep an already visible element still. For large panels, explain their top
+        // portion instead of scrolling to the last row to make room for the coach.
+        const visibleEnd = Math.min(rect.bottom, rect.top + Math.min(160, Math.max(0, bottom - top)))
+        const offset = rect.top < top ? rect.top - top : visibleEnd > bottom ? visibleEnd - bottom : 0
+        if (offset) {
+          if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
+          else scrollSmoothly(offset)
+        }
+        return
+      }
       target.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
-      const room = Math.min(460, window.innerHeight / 2) + 40
+      const room = heightLimit() + 40
       const rect = target.getBoundingClientRect()
       const modalBody = target.closest<HTMLElement>('.modal-body')
       const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0
@@ -40,12 +127,92 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
       frame = requestAnimationFrame(() => {
         const width = document.documentElement.clientWidth || window.innerWidth
         const height = window.innerHeight
-        const workspace = document.getElementById('main-content')?.getBoundingClientRect()
+        const workspace = (target?.closest('#app-sidebar') ? document.querySelector('.app-shell') : document.getElementById('main-content'))?.getBoundingClientRect()
         const workspaceLeft = Math.max(0, workspace?.left ?? 0)
         const workspaceRight = Math.min(width, workspace?.right || width)
         const cardLeftBoundary = workspaceRight - workspaceLeft >= 224 ? workspaceLeft : 0
-        const cardWidth = Math.min(360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
-        let rect = target?.isConnected ? target.getBoundingClientRect() : null
+        // The full workflow keeps one coach slot while only the spotlight moves.
+        // Reserve a stable height as well: shorter instructions must not move Next.
+        if (fixedCard === 'left' || fixedCard === 'right') {
+          const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+          const topBoundary = headerBottom + 16
+          const anchor = cardAnchor ? document.querySelector(cardAnchor)?.getBoundingClientRect() : null
+          const cardWidth = Math.min(420, anchor ? Math.max(224, anchor.width - 24) : Infinity, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+          const cardHeight = Math.max(0, Math.min(360, anchor ? Math.max(240, anchor.height - 24) : Infinity, height - topBoundary - 16))
+          const cardLeft = anchor ? Math.max(cardLeftBoundary + 12, Math.min(anchor.left + 12, workspaceRight - cardWidth - 12))
+            : fixedCard === 'right' ? workspaceRight - cardWidth - 12 : cardLeftBoundary + 12
+          const cardTop = anchor ? Math.max(topBoundary, Math.min(anchor.top + 12, height - cardHeight - 16)) : height - cardHeight - 16
+          const rect = target?.isConnected ? targetRect() : null
+          setPosition({
+            box: rect ? {
+              left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
+              top: Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
+              width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
+              height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
+            } : null,
+            card: { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, height: cardHeight, maxHeight: cardHeight, overflowY: 'auto' },
+          })
+          if (rect && preparedPresentation !== `${width}:${height}` && !targetInHeader && !preventScroll) {
+            preparedPresentation = `${width}:${height}`
+            const overlapsCard = rect.left < cardLeft + cardWidth && rect.right > cardLeft
+            const bottom = overlapsCard ? cardTop - 24 : height - 16
+            const offset = rect.top < topBoundary ? rect.top - topBoundary
+              : rect.bottom > bottom ? Math.max(0, Math.min(rect.bottom - bottom, rect.top - topBoundary)) : 0
+            const modalBody = target?.closest<HTMLElement>('.modal-body')
+            if (modalBody) modalBody.scrollBy?.({ top: offset, behavior: 'instant' })
+            else scrollSmoothly(scrollToTop ? -window.scrollY : scrollTargetTop ? rect.top - topBoundary : offset)
+          }
+          return
+        }
+        if (full && target?.isConnected) {
+          const rect = targetRect()
+          const popupWidth = includeLabel ? target.matches('input[type="date"]') ? 300 : 280 : 0
+          const panel = sideBoundary ? target.closest(sideBoundary)?.getBoundingClientRect() : undefined
+          const context = new DOMRect(panel?.left ?? rect.left, rect.top, Math.max(panel?.width ?? rect.width, popupWidth), rect.height)
+          const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
+          const topBoundary = headerBottom + 16
+          const rightRoom = workspaceRight - context.right - 36
+          const leftRoom = context.left - cardLeftBoundary - 36
+          const side = preferredSide === 'above' || preferredSide === 'below' ? null
+            : preferredSide === 'left' && leftRoom >= 280 ? 'left'
+              : preferredSide && rightRoom >= 280 ? 'right' : preferredSide && leftRoom >= 280 ? 'left' : null
+          const cardWidth = Math.min(420, side === 'right' ? rightRoom : side === 'left' ? leftRoom : workspaceRight - cardLeftBoundary - 24)
+          const maxHeight = Math.max(160, height - topBoundary - 12)
+          const cardHeight = Math.min(Math.max(card.current?.scrollHeight ?? 0, card.current?.offsetHeight ?? 0) || 280, maxHeight)
+          const cardLeft = fixedCard ? Math.max(cardLeftBoundary + 12, workspaceRight - cardWidth - 16) : side === 'right' ? context.right + 24 : side === 'left' ? context.left - cardWidth - 24
+            : Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12))
+          let cardTop = fixedCard ? height - cardHeight - 16 : side ? Math.max(topBoundary, Math.min(context.top, height - cardHeight - 12))
+            : preferredSide === 'above' ? context.top - cardHeight - 24 : context.bottom + 24
+          if (!fixedCard && !side && preferredSide !== 'below' && cardTop + cardHeight > height - 12) cardTop = context.top - cardHeight - 24
+          cardTop = Math.max(topBoundary, Math.min(cardTop, height - cardHeight - 12))
+          setPosition(previous => ({
+            box: {
+              left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
+              top: Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
+              width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
+              height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
+            },
+            card: preserveCardPosition && previous.box && typeof previous.card.left === 'number' && typeof previous.card.top === 'number' && typeof previous.card.width === 'number'
+              ? { ...previous.card,
+                left: Math.max(cardLeftBoundary + 12, Math.min(previous.card.left, workspaceRight - Number(previous.card.width) - 12)),
+                top: Math.max(topBoundary, Math.min(previous.card.top, height - cardHeight - 12)),
+                width: Math.min(Number(previous.card.width), workspaceRight - cardLeftBoundary - 24), maxHeight }
+              : { left: cardLeft, top: cardTop, right: 'auto', bottom: 'auto', width: cardWidth, maxHeight, overflowY: 'auto' },
+          }))
+          if (preparedPresentation !== `${width}:${height}` && !targetInHeader && !preserveCardPosition) {
+            preparedPresentation = `${width}:${height}`
+            // Reveal the whole card, reserving a full explanation below it only on narrow screens.
+            const bottom = height - 20 - (side ? 0 : cardHeight + 24)
+            const offset = preferredSide === 'above'
+              ? context.top < topBoundary ? context.top - topBoundary : Math.max(0, context.bottom - height + 20)
+              : context.top < topBoundary || context.height > bottom - topBoundary
+                ? context.top - topBoundary : Math.max(0, context.bottom - bottom)
+            scrollSmoothly(scrollToTop ? -window.scrollY : fixedCard ? Math.max(0, context.top - topBoundary) : offset)
+          }
+          return
+        }
+        const cardWidth = Math.min(detailed ? 420 : 360, Math.max(0, workspaceRight - cardLeftBoundary - 24))
+        let rect = target?.isConnected ? targetRect() : null
         // A resize can push the coach offscreen. A position-only change can be user scroll.
         if (rect && measuredTarget
           && (rect.width !== measuredTarget.width || rect.height !== measuredTarget.height)) {
@@ -55,7 +222,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
           preparedWidth = workspaceRight - workspaceLeft
           // Leave room below the real target for the coach, including at the end of a page.
           alignTarget()
-          rect = target.getBoundingClientRect()
+          rect = targetRect()
           // The anchored card adds page scroll room in this render. Re-align once after
           // its layout commits; browser scroll anchoring can otherwise undo the first move.
           cancelAnimationFrame(placementFrame)
@@ -69,11 +236,11 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         measuredTarget = rect
         const headerBottom = Math.max(0, document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0)
         const naturalHeight = Math.max(card.current?.offsetHeight || 0, card.current?.scrollHeight || 0)
-        const cardHeight = Math.min(naturalHeight || 460, 460, height / 2)
+        const cardHeight = Math.min(naturalHeight || heightLimit(), heightLimit())
         const topBoundary = headerBottom + 8
         let cardLeft = rect ? Math.max(cardLeftBoundary + 12, Math.min(rect.left, workspaceRight - cardWidth - 12)) : 0
         let cardTop = rect ? rect.bottom + 24 : 0
-        let maxHeight = Math.min(460, height / 2)
+        let maxHeight = heightLimit()
         if (rect && cardTop + cardHeight > height - 12) {
           if (rect.top - 24 - cardHeight >= topBoundary) {
             cardTop = rect.top - 24 - cardHeight
@@ -97,16 +264,16 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
         const availableHeight = Math.max(0, height - topBoundary - 12)
         if (maxHeight < Math.min(160, availableHeight)) {
           // An oversized target leaves no usable slot: use the documented bottom card.
-          maxHeight = Math.min(460, height / 2, availableHeight)
+          maxHeight = Math.min(heightLimit(), availableHeight)
           cardTop = height - Math.min(cardHeight, maxHeight) - 12
         }
         maxHeight = Math.min(maxHeight, availableHeight)
         cardTop = Math.max(topBoundary, Math.min(cardTop, height - Math.min(cardHeight, maxHeight) - 12))
         const box = rect ? {
           left: Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING),
-          top: Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
+          top: Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING),
           width: Math.max(0, Math.min(workspaceRight, rect.right + HIGHLIGHT_PADDING) - Math.max(workspaceLeft, rect.left - HIGHLIGHT_PADDING)),
-          height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
+          height: Math.max(0, Math.min(height, rect.bottom + HIGHLIGHT_PADDING) - Math.max(targetInHeader ? 0 : headerBottom + 8, rect.top - HIGHLIGHT_PADDING)),
         } : null
         setPosition({
           box: box?.width && box.height ? box : null,
@@ -129,7 +296,7 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     if (workspace) resize?.observe(workspace)
     // A split pane can move or resize the target without a viewport event.
     const layoutPoll = !resize && target ? window.setInterval(() => {
-      const rect = target.isConnected ? target.getBoundingClientRect() : null
+      const rect = target.isConnected ? targetRect() : null
       if (rect?.left !== measuredTarget?.left || rect?.top !== measuredTarget?.top
         || rect?.width !== measuredTarget?.width || rect?.height !== measuredTarget?.height) {
         measure()
@@ -142,12 +309,13 @@ export function useSpotlight(target: HTMLElement | null, card: RefObject<HTMLEle
     return () => {
       cancelAnimationFrame(frame)
       cancelAnimationFrame(placementFrame)
+      cancelAnimationFrame(scrollFrame)
       resize?.disconnect()
       window.clearInterval(layoutPoll)
       window.removeEventListener('scroll', measure, true)
       window.removeEventListener('resize', measure)
       window.visualViewport?.removeEventListener('resize', measure)
     }
-  }, [target, card])
+  }, [target, card, detailed, full, preferredSide, includeLabel, sideBoundary, preserveCardPosition, rowLimit, fixedCard, scrollToTop, cardAnchor, preventScroll, scrollTargetTop])
   return position
 }

@@ -1165,6 +1165,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/journals/explorer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 계약별 검증원장 탐색
+         * @description 계약별 분개 건수와 차변·대변을 페이지 단위로 조회한다. contractId=0은 공통·미연결이다.
+         */
+        get: operations["explore"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/journals/imbalances": {
         parameters: {
             query?: never;
@@ -1414,6 +1434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/agents/statements/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 지점·설계사별 수수료 명세 요약(내부) */
+        get: operations["overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/agents/{agentId}/statements": {
         parameters: {
             query?: never;
@@ -1593,6 +1630,23 @@ export interface paths {
          * @description 필수값과 계약·설계사·수수료 항목을 검증한 후 DRAFT로 저장합니다.
          */
         post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transactions/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 계약별 지급 초안 일괄 등록 */
+        post: operations["createContractPaymentBatch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2404,6 +2458,11 @@ export interface components {
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
+        ApiResponseJournalExplorer: {
+            data?: components["schemas"]["JournalExplorer"];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
         ApiResponseJournalImbalanceSearchResponse: {
             data?: components["schemas"]["JournalImbalanceSearchResponse"];
             error?: components["schemas"]["ApiError"];
@@ -2426,6 +2485,11 @@ export interface components {
         };
         ApiResponseListCommissionItemResponse: {
             data?: components["schemas"]["CommissionItemResponse"][];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseListCommissionPaymentResponse: {
+            data?: components["schemas"]["CommissionPaymentResponse"][];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -2471,6 +2535,11 @@ export interface components {
         };
         ApiResponseListScheduleHeaderResponse: {
             data?: components["schemas"]["ScheduleHeaderResponse"][];
+            error?: components["schemas"]["ApiError"];
+            requestId?: string;
+        };
+        ApiResponseListStatementAgentOverview: {
+            data?: components["schemas"]["StatementAgentOverview"][];
             error?: components["schemas"]["ApiError"];
             requestId?: string;
         };
@@ -3514,6 +3583,9 @@ export interface components {
             /** @enum {string} */
             inclusionDecisionStatus?: "INCLUDED" | "EXCLUDED" | "REVIEW_REQUIRED";
         };
+        CommissionPaymentBatchRequest: {
+            payments: components["schemas"]["CommissionPaymentCreateRequest"][];
+        };
         CommissionPaymentCreateRequest: {
             /** Format: int64 */
             agentId?: number;
@@ -3860,6 +3932,17 @@ export interface components {
             ruleVersion?: string | null;
             status?: string;
             warnings?: string[];
+        };
+        Contract: {
+            agentName?: string;
+            /** Format: int64 */
+            contractId?: number;
+            contractNo?: string;
+            creditTotal?: number;
+            debitTotal?: number;
+            insurerName?: string;
+            /** Format: int64 */
+            journalCount?: number;
         };
         ContractCheckRequest: {
             /** Format: int64 */
@@ -4245,6 +4328,21 @@ export interface components {
             recentRuns?: components["schemas"]["RecentValidationRunResponse"][];
             /** Format: int64 */
             reconMismatch?: number;
+        };
+        Entry: {
+            creditTotal?: number;
+            debitTotal?: number;
+            description?: string;
+            /** Format: date */
+            journalDate?: string;
+            /** Format: int64 */
+            journalHeaderId?: number;
+            journalNo?: string;
+            journalType?: string;
+            lines?: components["schemas"]["Line"][];
+            status?: string;
+            /** Format: int64 */
+            validationRunId?: number;
         };
         EventFollowUp: {
             jobs?: components["schemas"]["FollowUpJob"][];
@@ -4746,6 +4844,13 @@ export interface components {
             /** Format: int64 */
             validationRunId?: number;
         };
+        JournalExplorer: {
+            contracts?: components["schemas"]["PageResponseContract"];
+            journals?: components["schemas"]["PageResponseEntry"];
+            /** Format: int64 */
+            selectedContractId?: number;
+            totals?: components["schemas"]["Totals"];
+        };
         JournalImbalanceItemResponse: {
             creditTotal?: number;
             debitTotal?: number;
@@ -4814,6 +4919,15 @@ export interface components {
             imbalanceCount?: number;
             /** Format: int64 */
             journalCount?: number;
+        };
+        Line: {
+            accountCode?: string;
+            accountName?: string;
+            creditAmount?: number;
+            debitAmount?: number;
+            /** Format: int32 */
+            lineNo?: number;
+            memo?: string;
         };
         LoginRequest: {
             loginId: string;
@@ -4889,6 +5003,14 @@ export interface components {
         Option: {
             code?: string;
             label?: string;
+        };
+        OrganizationNode: {
+            /** Format: int64 */
+            organizationId?: number;
+            organizationName?: string;
+            organizationType?: string;
+            /** Format: int64 */
+            parentId?: number;
         };
         /** @description GA·조직 기준정보 */
         OrganizationResponse: {
@@ -5055,6 +5177,18 @@ export interface components {
             /** Format: int32 */
             totalPages?: number;
         };
+        PageResponseContract: {
+            content?: components["schemas"]["Contract"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
         PageResponseContractStatusEffectResponse: {
             content?: components["schemas"]["ContractStatusEffectResponse"][];
             /** Format: int32 */
@@ -5069,6 +5203,18 @@ export interface components {
         };
         PageResponseContractView: {
             content?: components["schemas"]["ContractView"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            sort?: string;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        PageResponseEntry: {
+            content?: components["schemas"]["Entry"][];
             /** Format: int32 */
             page?: number;
             /** Format: int32 */
@@ -5223,24 +5369,24 @@ export interface components {
             transactionAttributionId?: number;
         };
         PicoAskRequest: {
+            clientContextRevision: string;
+            conversation?: components["schemas"]["PicoConversationTurn"][];
+            entityRefs: components["schemas"]["PicoEntityRef"][];
+            guideVersion: string;
             question: string;
             screenId: string;
-            entityRefs: components["schemas"]["PicoEntityRef"][];
-            clientContextRevision: string;
-            guideVersion: string;
-            conversation?: components["schemas"]["PicoConversationTurn"][];
         };
         PicoAskResponse: {
+            contextRevision?: string;
             /** @enum {string} */
             decision?: "ANSWER_ONLY" | "START_GUIDE" | "ASK_CLARIFICATION" | "UNSUPPORTED";
-            message?: string;
-            guideVersion?: string;
-            contextRevision?: string;
             evidenceRefs?: components["schemas"]["PicoEvidenceRef"][];
-            validatedGuide?: components["schemas"]["PicoValidatedGuide"] | null;
+            fallbackReason?: string;
+            guideVersion?: string;
+            message?: string;
             /** @enum {string} */
             source?: "AI" | "FIXED";
-            fallbackReason?: string;
+            validatedGuide?: components["schemas"]["PicoValidatedGuide"] | null;
         };
         PicoConversationTurn: {
             /** @enum {string} */
@@ -5248,36 +5394,44 @@ export interface components {
             text: string;
         };
         PicoEntityRef: {
-            /** @enum {string} */
-            type: "CONTRACT" | "PAYMENT" | "SCHEDULE" | "VALIDATION_RUN" | "RECONCILIATION_RUN" | "EXCEPTION";
             /** Format: int64 */
             id: number;
+            /** @enum {string} */
+            type: "CONTRACT" | "PAYMENT" | "SCHEDULE" | "VALIDATION_RUN" | "RECONCILIATION_RUN" | "EXCEPTION";
         };
         PicoEvidenceRef: {
             chunkId?: string;
-            workflowId?: string;
             stepId?: string;
             title?: string;
+            workflowId?: string;
         };
         PicoGuideRequest: {
-            workflowId: string;
+            clientContextRevision: string;
             guideVersion: string;
             paymentId: string;
-            clientContextRevision: string;
             prepareToken?: string | null;
-            stepId?: string;
             serverStateVersion?: string;
+            stepId?: string;
+            workflowId: string;
         };
         PicoGuideResponse: {
-            status?: string;
-            workflowId?: string;
-            stepId?: string;
-            guideVersion?: string;
-            paymentId?: string;
             clientContextRevision?: string;
             /** Format: date-time */
             expiresAt?: string;
+            guideVersion?: string;
+            paymentId?: string;
             prepareToken?: string | null;
+            status?: string;
+            stepId?: string;
+            workflowId?: string;
+        };
+        PicoValidatedGuide: {
+            clientContextRevision?: string;
+            entityRefs?: components["schemas"]["PicoEntityRef"][];
+            guideVersion?: string;
+            serverStateVersion?: string | null;
+            stepId?: string;
+            workflowId?: string;
         };
         /** @description 정책 제출·승인·반려·활성화 요청 */
         PolicyActionRequest: {
@@ -5820,12 +5974,15 @@ export interface components {
             startedAt?: string;
             status?: string;
             statusLabel?: string;
+            superseded?: boolean;
             /** Format: int64 */
             targetCount?: number;
             /** Format: int64 */
             tolerancePolicyVersionId?: number;
             /** Format: int64 */
             validationRunId?: number;
+            /** Format: int32 */
+            validationRunNo?: number;
         };
         ReconciliationRunSearchResponse: {
             content?: components["schemas"]["ReconciliationRunHistoryResponse"][];
@@ -6236,6 +6393,32 @@ export interface components {
             status?: string;
             triggerType?: string;
         };
+        StatementAgentOverview: {
+            adjustmentAmount?: number;
+            agentCode?: string;
+            /** Format: int64 */
+            agentId?: number;
+            agentName?: string;
+            /** Format: int64 */
+            branchId?: number;
+            branchName?: string;
+            clawbackAmount?: number;
+            /** Format: int64 */
+            contractCount?: number;
+            /** Format: int64 */
+            entryCount?: number;
+            heldAmount?: number;
+            /** Format: int64 */
+            missingAmountCount?: number;
+            /** Format: int64 */
+            organizationId?: number;
+            organizationName?: string;
+            organizationPath?: components["schemas"]["OrganizationNode"][];
+            /** Format: int64 */
+            parentOrganizationId?: number;
+            paymentAmount?: number;
+            rankCode?: string;
+        };
         StatementBasis: {
             dateBasis?: {
                 [key: string]: string;
@@ -6298,6 +6481,14 @@ export interface components {
             /** Format: int64 */
             expiresIn?: number;
             tokenType?: string;
+        };
+        Totals: {
+            creditTotal?: number;
+            debitTotal?: number;
+            /** Format: int64 */
+            journalCount?: number;
+            /** Format: int64 */
+            lineCount?: number;
         };
         TransactionPrecheckResponse: {
             blockers?: components["schemas"]["Blocker"][];
@@ -6413,14 +6604,6 @@ export interface components {
         VerifyRequest: {
             paymentId: string;
             precheckToken: string;
-        };
-        PicoValidatedGuide: {
-            workflowId?: string;
-            stepId?: string;
-            guideVersion?: string;
-            entityRefs?: components["schemas"]["PicoEntityRef"][];
-            clientContextRevision?: string;
-            serverStateVersion?: string | null;
         };
     };
     responses: never;
@@ -8356,6 +8539,39 @@ export interface operations {
             };
         };
     };
+    explore: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                type?: "EXPECTED_INSURER_INCOME" | "ACTUAL_INSURER_STATEMENT" | "EXPECTED_FC_PAYOUT" | "CONFIRMED_FC_PAYOUT" | "ADJUSTMENT" | "CLAWBACK" | "RECOVERY" | "REVERSAL";
+                account?: string;
+                contractNo?: string;
+                status?: "DRAFT" | "POSTED" | "REVERSED";
+                contractId?: number;
+                all?: boolean;
+                journalId?: number;
+                contractPage?: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseJournalExplorer"];
+                };
+            };
+        };
+    };
     findImbalances: {
         parameters: {
             query: {
@@ -8879,6 +9095,31 @@ export interface operations {
             };
         };
     };
+    overview: {
+        parameters: {
+            query: {
+                month: string;
+                contractNo?: string;
+                commissionItemId?: number;
+                entryType?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListStatementAgentOverview"];
+                };
+            };
+        };
+    };
     forAgent: {
         parameters: {
             query?: {
@@ -9199,6 +9440,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiFailureResponse"];
+                };
+            };
+        };
+    };
+    createContractPaymentBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommissionPaymentBatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListCommissionPaymentResponse"];
                 };
             };
         };

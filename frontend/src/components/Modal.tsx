@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import type { ReactNode, RefObject } from 'react'
 const focusSelector =
   'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+const modalStack: HTMLElement[] = []
+let bodyOverflow = ''
 export function Modal({
   open,
   title,
@@ -35,15 +37,17 @@ export function Modal({
   useEffect(() => {
     if (!open) return
     const previous = document.activeElement as HTMLElement | null
-    const previousOverflow = document.body.style.overflow
+    if (!modalStack.length) bodyOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const element = dialog.current!
+    modalStack.push(element)
     const focusable = () =>
       [...element.querySelectorAll<HTMLElement>(focusSelector)].filter(
         (item) => !item.hidden && !item.closest('[hidden]') && item.getAttribute('aria-hidden') !== 'true',
       )
     ;(initialFocusRef?.current ?? focusable()[0] ?? element).focus()
     const keydown = (event: KeyboardEvent) => {
+      if (modalStack.at(-1) !== element) return
       if (event.key === 'Escape' && closeOnEscapeRef.current) {
         event.preventDefault()
         onCloseRef.current()
@@ -67,6 +71,7 @@ export function Modal({
       }
     }
     const focusin = (event: FocusEvent) => {
+      if (modalStack.at(-1) !== element) return
       if (!element.contains(event.target as Node)) (focusable()[0] ?? element).focus()
     }
     document.addEventListener('keydown', keydown)
@@ -74,8 +79,9 @@ export function Modal({
     return () => {
       document.removeEventListener('keydown', keydown)
       document.removeEventListener('focusin', focusin)
-      document.body.style.overflow = previousOverflow
-      if (previous?.isConnected) previous.focus()
+      modalStack.splice(modalStack.indexOf(element), 1)
+      if (!modalStack.length) document.body.style.overflow = bodyOverflow
+      if (previous?.isConnected && (!modalStack.length || modalStack.at(-1)?.contains(previous))) previous.focus()
     }
   }, [open, initialFocusRef])
   // Disabling a focused control can move browser focus to the body during a request.
@@ -84,6 +90,7 @@ export function Modal({
     if (
       open &&
       element &&
+      modalStack.at(-1) === element &&
       (!element.contains(document.activeElement) || document.activeElement?.matches(':disabled'))
     ) {
       const next = element.querySelector<HTMLElement>(focusSelector)

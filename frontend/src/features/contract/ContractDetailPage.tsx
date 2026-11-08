@@ -1,7 +1,8 @@
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router'
+import type { ShellContext } from '../../app/shell/AppShell'
 import { paymentEntryHref, safeReturnTo, returnLink } from '../transaction/payment-entry'
 import { Button } from '../../components/Button'
 import { date, int, won } from '../../lib/format'
@@ -30,6 +31,7 @@ function ContractDetailView({ id }: { id: string }) {
   const canProcess = usePermission('canProcess')
   const roleCode = useAuth().user?.roleCode
   const isAgent = roleCode === 'AGENT'
+  const revised = (useOutletContext<ShellContext | null>()?.helpVersion ?? 'after') === 'after' && !isAgent
   const [previewOpen, setPreviewOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -234,7 +236,7 @@ function ContractDetailView({ id }: { id: string }) {
               ]}
             />
           </section>
-          <ContractTabs id={id} contract={contract} active={active} onSelect={selectTab} agentOnly={isAgent} />
+          <ContractTabs id={id} contract={contract} active={active} onSelect={selectTab} agentOnly={isAgent} revised={revised} />
           <ContractStatusPreviewModal
             id={id}
             contract={contract}

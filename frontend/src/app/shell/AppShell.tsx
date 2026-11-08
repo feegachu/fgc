@@ -14,6 +14,7 @@ import { useLogout } from '../../features/auth/useLogout'
 import { AuthStatus } from '../../features/auth/AuthStatus'
 import { DraftNavigationGuard } from './DraftNavigationGuard'
 import { AgentTopbar } from './AgentTopbar'
+import type { HelpVersion } from '../../features/assistant/guide/help-version'
 import './kpi-designs.css'
 import './agent-theme.css'
 import './app-theme.css'
@@ -24,6 +25,7 @@ export interface ShellContext {
   user: ShellUser
   month: string | null
   revised?: boolean
+  helpVersion?: HelpVersion
 }
 /** 내부 사용자에게 확정 관리자 UI를 적용하고 AGENT 전용 셸의 화면 범위를 유지한다. */
 export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultMonth: string }) {
@@ -35,6 +37,7 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
   const tabs = useWorkspaceStore((state) => state.tabs)
   const collapsed = useSidebarStore((state) => state.collapsed)
   const revised = user.roleCode !== 'AGENT'
+  const helpVersion: HelpVersion = 'after'
   const errorTitle = useErrorTitleStore((state) => state.title)
   const { loggingOut, logout } = useLogout()
   const allowed = current && canOpen(current, user)
@@ -118,10 +121,10 @@ export function AppShellView({ user, defaultMonth }: { user: ShellUser; defaultM
         </header>
         <main id="main-content" data-guide-page={current?.id} data-guide-pathname={location.pathname} className="app-main" tabIndex={-1}>
           <div className="page-content">
-            <Outlet context={{ user, month, revised } satisfies ShellContext} />
+            <Outlet key={helpVersion} context={{ user, month, revised, helpVersion } satisfies ShellContext} />
           </div>
         </main>
-        <SettlementGuide user={user} month={month} />
+        <SettlementGuide user={user} month={month} helpVersion={helpVersion} />
         {!location.pathname.startsWith('/agent-home') && (
           <footer className="app-footer">
             {revised ? (

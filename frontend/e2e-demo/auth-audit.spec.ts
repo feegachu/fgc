@@ -43,7 +43,7 @@ test('비로그인 지급 등록 딥링크 → 로그인 → 쿼리·해시 복�
   await page.getByLabel(/^아이디/).fill('settle01')
   await page.getByLabel(/^비밀번호\s*\*?$/).fill(password)
   await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '지급 건 등록, 귀속, 확정' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /지급 (계약 )?건 등록, 귀속, 확정/ })).toBeVisible()
   await expect(page).toHaveURL(new URL(route, page.url()).href)
 })
 

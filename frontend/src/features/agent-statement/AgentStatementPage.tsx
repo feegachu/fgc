@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOutletContext, useSearchParams } from 'react-router'
 import type { ShellContext } from '../../app/shell/AppShell'
@@ -9,6 +9,7 @@ import type { TableColumn } from '../../components/DataTable'
 import { Field } from '../../components/Field'
 import { FilterBar } from '../../components/FilterBar'
 import { ListPagination } from '../../components/ListPagination'
+import { KpiCard } from '../../components/KpiCard'
 import { date, int, month as formatMonth, rate, today, won } from '../../lib/format'
 import { nameWithCode } from '../../lib/screenText'
 import { sortBinding } from '../../lib/tableSort'
@@ -16,6 +17,9 @@ import { useAgentOptions, useCommissionItems } from '../base/api'
 import { policyCodeLabel } from '../policies/labels'
 import { sourceOptions } from '../transaction/list-api'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
+import { StatementResults } from './StatementResults'
+import type { ScreenHelpStep } from '../assistant/guide/ScreenHelp'
+import { StatementExplorer, StatementViewSwitch } from './StatementExplorer'
 import {
   ENTRY_TYPE_OPTIONS,
   InvalidStatementAgentIdError,
@@ -25,6 +29,7 @@ import {
   statementDetailQuery,
   statementError,
   statementListQuery,
+  statementOverviewQuery,
   STATEMENT_SORT_KEYS,
 } from './api'
 import type { EntryType, StatementBasis, StatementDetail, StatementEntry, StatementFilters, StatementSummary } from './api'
@@ -61,25 +66,69 @@ const EVIDENCE_VALUE_LABELS: Record<string, Record<string, string>> = {
 const CODE_VALUE_KEYS = ['attributionMethod', 'paymentConditionCode', 'basisCode', 'calculationType']
 
 export default function AgentStatementPage() {
-  const { month, user, revised } = useOutletContext<ShellContext>()
+  const { month, user, revised, helpVersion } = useOutletContext<ShellContext>()
   const isAgent = user.roleCode === 'AGENT'
+  const enhanced = !isAgent && helpVersion !== 'before'
+  const [view, setView] = useState<'tree' | 'table'>('tree')
+  const currentView = useRef(view)
+  useEffect(() => { currentView.current = view }, [view])
+  const helpSteps = useMemo<ScreenHelpStep[]>(() => [
+    {
+      targetId: 'statement.filters',
+      title: '조회 조건',
+      instruction: '기준월과 설계사, 계약번호로 조회 범위를 정합니다.',
+      interaction: '조건을 선택하고 조회를 누르세요.',
+    },
+    {
+      targetId: 'features.agent-statement.agent-statement-page.summary',
+      attribute: 'data-guide-feature',
+      title: '지급·보류·조정·환수',
+      instruction: '선택한 지사·설계사의 합계를 확인합니다.',
+      interaction: '지사는 전체 합계, 설계사는 개인 통계입니다.',
+    },
+    {
+      targetId: 'statement.results',
+      title: '지점과 설계사 명세',
+      instruction: '트리에서 지점·설계사별 내역을 확인합니다.',
+      interaction: '표에서는 계약별 금액과 근거를 볼 수 있습니다.',
+      onEnter: () => {
+        const original = currentView.current
+        const timer = window.setInterval(() => setView(previous => previous === 'tree' ? 'table' : 'tree'), 3000)
+        return () => { clearInterval(timer); setView(original) }
+      },
+    },
+  ].map(step => ({ ...step, group: '설계사 수수료 명세', details: [], concise: true } as ScreenHelpStep)), [])
   const defaultMonth = month || today().slice(0, 7)
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params, defaultMonth)
+  const branchFilterKey = JSON.stringify([filters.month, filters.contractNo, filters.commissionItemId, filters.entryType])
+  const [branchSelection, setBranchSelection] = useState<{ id: number; filterKey: string; groupId?: string; agents?: number[]; label?: string } | null>(null)
   // 본인 화면에는 설계사 선택이 없다. 내부 조회에서만 agentId 를 고른다.
-  const agentId = isAgent ? null : filters.agentId || null
+  const overview = useQuery(statementOverviewQuery(filters, enhanced))
+  const overviewRows = overview.isError ? [] : overview.data ?? []
+  const selectedBranchId = enhanced && view === 'tree' && branchSelection?.filterKey === branchFilterKey
+    && (overview.isPending || overview.isError || overviewRows.some(row => row.branchId === branchSelection.id)) ? branchSelection.id : null
+  const branchRows = overviewRows.filter(row => branchSelection?.agents ? branchSelection.agents.includes(row.agentId) : row.branchId === selectedBranchId)
+  const branchSummary: StatementSummary | undefined = selectedBranchId === null ? undefined : {
+    payment: { amount: branchRows.reduce((sum, row) => sum + row.paymentAmount, 0), count: 0 },
+    held: { amount: branchRows.reduce((sum, row) => sum + row.heldAmount, 0), count: 0 },
+    adjustment: { amount: branchRows.reduce((sum, row) => sum + row.adjustmentAmount, 0), count: 0 },
+    clawback: { amount: branchRows.reduce((sum, row) => sum + row.clawbackAmount, 0), count: 0 },
+  }
+  const agentId = isAgent ? null : filters.agentId || (enhanced && overviewRows[0] ? String(overviewRows[0].agentId) : null)
   const entryKey = params.get('entryKey') ?? ''
   const ready = isAgent || agentId !== null
   // 조회 조건이 같으면 입력 중인 필터를 지우지 않도록, entryKey 를 뺀 정규화한 조건을 key 로 쓴다.
   const filterKey = filterParams(filters, !isAgent).toString()
   const [resetCount, setResetCount] = useState(0)
   const list = useQuery(statementListQuery(filters, agentId, ready))
-  const detail = useQuery(statementDetailQuery(entryKey, agentId, ready))
+  const detail = useQuery(statementDetailQuery(entryKey, agentId, ready && (!enhanced || view === 'table')))
   const asOf = `${filters.month || defaultMonth}-01`
   const agents = useAgentOptions(asOf, '', !isAgent)
   const items = useCommissionItems(asOf)
 
   function apply(next: StatementFilters, keepEntry = false) {
+    setBranchSelection(null)
     const query = filterParams(next, !isAgent)
     if (keepEntry && entryKey) query.set('entryKey', entryKey)
     setParams(query, { replace: true })
@@ -149,42 +198,49 @@ export default function AgentStatementPage() {
   return (
     <div className="ast-page">
       <header className="page-header">
-        {!isAgent && <ScreenHelp screenId="RPT-W02" />}
         <div className="page-header-copy">
           <h1 className="page-title">설계사 수수료 명세</h1>
           {!isAgent && !revised && (
             <p className="ast-lede">설계사를 선택해 본인 귀속 기준 명세를 조회합니다.</p>
           )}
         </div>
+        <div className="page-header-actions">
+        {!isAgent && <ScreenHelp screenId="RPT-W02" walkthrough={enhanced && helpVersion === 'after' ? helpSteps : undefined} />}
+        </div>
       </header>
       <StatementFiltersBar
-        key={`${filterKey}:${resetCount}`}
-        initial={filters}
+        key={`${filterKey}:${resetCount}:${enhanced ? agentId : ''}:${selectedBranchId}`}
+        initial={enhanced ? { ...filters, agentId: selectedBranchId !== null ? '' : agentId ?? '' } : filters}
         isAgent={isAgent}
         agents={(agents.data ?? []).map((row) => [String(row.agentId), nameWithCode(row.agentName, row.agentCode)])}
         items={(items.data ?? []).map((row) => [String(row.commissionItemId), row.itemName ?? '-'])}
         onSearch={(next) => apply({ ...next, contractNo: next.contractNo.trim(), page: 1 })}
         onReset={() => {
           setResetCount((count) => count + 1)
-          apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: filters.agentId })
+          apply({ ...readFilters(new URLSearchParams(), defaultMonth), agentId: enhanced ? '' : filters.agentId })
         }}
       />
-      {!ready ? (
+      {(ready || selectedBranchId !== null) && <SummaryCards summary={branchSummary ?? list.data?.summary} basis={list.data?.basis} loading={selectedBranchId !== null ? overview.isPending : list.isPending} failed={selectedBranchId !== null ? overview.isError : list.isError} dashboardStyle={enhanced} scopeLabel={selectedBranchId !== null ? `${branchSelection?.label ?? branchRows[0]?.branchName ?? '지사'} 전체 합계` : undefined} />}
+      {enhanced && view === 'tree' && (overview.isPending || overview.isError ? <div className="surface ast-state" role={overview.isError ? 'alert' : 'status'}>
+        {overview.isError ? statementError(overview.error) : '지점과 설계사 명세를 불러오는 중입니다.'}
+        {overview.isError && <Button data-guide-feature="features.agent-statement-page.button-1" variant="secondary" onClick={() => void overview.refetch()}>다시 시도</Button>}
+      </div> : overviewRows.length ? <StatementExplorer key={`${filters.month}:${filters.contractNo}:${filters.commissionItemId}:${filters.entryType}`} viewControl={<StatementViewSwitch value={view} onChange={setView} />} rows={overviewRows} selectedId={selectedBranchId !== null ? null : agentId} selectedBranchId={selectedBranchId} onSelectGroup={(groupId, members, label) => { if (members[0]) setBranchSelection({ id: members[0].branchId, filterKey: branchFilterKey, groupId, agents: members.map(row => row.agentId), label }) }} onSelectBranch={id => setBranchSelection({ id, filterKey: branchFilterKey })} onSelect={id => apply({ ...filters, agentId: id, page: 1 })} /> : <p className="surface ast-state" role="status">조회 조건에 해당하는 설계사가 없습니다.</p>)}
+      {enhanced && view === 'table' && !ready && <div className="surface surface-header"><span>조회할 명세가 없습니다.</span><StatementViewSwitch value={view} onChange={setView} /></div>}
+      {!ready && !enhanced ? (
         <p className="ast-state" role="status">
           설계사를 고른 뒤 조회를 누르세요.
         </p>
-      ) : (
+      ) : ready && (!enhanced || view === 'table') ? (
         <>
-          <SummaryCards
-            summary={list.data?.summary} basis={list.data?.basis} loading={list.isPending} failed={list.isError} />
-          <section data-guide-feature="features.agent-statement.agent-statement-page.list-panel" data-guide-target="statement.results" className="surface ast-list-panel" aria-labelledby="ast-list-title" aria-busy={list.isFetching}>
+          <StatementResults className="ast-list-panel" titleId="ast-list-title" busy={list.isFetching}>
             <header className="surface-header">
               <h2 className="surface-title" id="ast-list-title">
                 명세 내역
               </h2>
-              <span className="ast-count">
-                <span className="tabular-nums">{int(total)}</span>건, 20건씩
-              </span>
+              <div className="ast-list-tools">
+                <span className="ast-count"><span className="tabular-nums">{int(total)}</span>건 · 20건씩</span>
+                {enhanced && view === 'table' && <StatementViewSwitch value={view} onChange={setView} />}
+              </div>
             </header>
             <DataTable
               className="ast-table"
@@ -222,7 +278,7 @@ export default function AgentStatementPage() {
                 onPageChange={(next) => apply({ ...filters, page: next }, true)}
               />
             )}
-          </section>
+          </StatementResults>
           {entryKey && (
             <DetailPanel
               detail={detail.data}
@@ -232,7 +288,7 @@ export default function AgentStatementPage() {
             />
           )}
         </>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -252,11 +308,15 @@ function SummaryCards({
   basis,
   loading,
   failed,
+  dashboardStyle = false,
+  scopeLabel,
 }: {
   summary?: StatementSummary
   basis?: StatementBasis
   loading: boolean
   failed: boolean
+  dashboardStyle?: boolean
+  scopeLabel?: string
 }) {
   const cards: [EntryType, keyof StatementSummary, string, string][] = [
     ['PAYMENT', 'payment', '지급', '확정된 본인 귀속 지급'],
@@ -264,8 +324,30 @@ function SummaryCards({
     ['ADJUSTMENT', 'adjustment', '조정', '정정·역분개로 반영된 금액(차감은 음수)'],
     ['CLAWBACK', 'clawback', '환수', '환수 계산액이며 실제 회수 완료액이 아닙니다'],
   ]
+  if (dashboardStyle) {
+    return (
+      <section data-guide-feature="features.agent-statement.agent-statement-page.summary" className="kpi-grid kpi-group ast-dashboard-summary" aria-label="유형별 요약">
+        {cards.map(([type, key, label, note]) => {
+          const bucket = failed ? undefined : summary?.[key]
+          return <KpiCard guideId="features.agent-statement-page.kpicard-2"
+            key={type}
+
+            label={label}
+            value={bucket ? bucket.amount : failed ? '조회 실패' : loading ? '…' : '-'}
+            unit={bucket ? '원' : undefined}
+            format={int}
+            zero={bucket?.amount === 0}
+            footer={<span className="kpi-comparison" title={scopeLabel ?? note}>
+              {scopeLabel ?? <>{bucket ? `${int(bucket.count)}건` : ''}
+              {basis?.dateBasis[type] ? ` · ${basis.dateBasis[type]}` : ''}</>}
+            </span>}
+          />
+        })}
+      </section>
+    )
+  }
   return (
-    <section data-guide-feature="features.agent-statement.agent-statement-page.summary" className="ast-summary" aria-label="유형별 요약">
+    <section data-guide-feature="features.agent-statement.agent-statement-page.legacy-summary" className="ast-summary" aria-label="유형별 요약">
       {cards.map(([type, key, label, note]) => {
         const bucket = summary?.[key]
         return (

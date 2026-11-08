@@ -139,7 +139,8 @@
   .kpi-group > :nth-child(n + 6) { animation-delay: 250ms; }
 
   .dashboard-main-grid > .surface,
-  .dashboard-side-column > .surface {
+  .dashboard-side-column > .surface,
+  .dashboard-recent-panels > .surface {
     animation: kpi-rise 420ms cubic-bezier(0.2, 0, 0, 1) 240ms backwards;
   }
 }
@@ -197,6 +198,10 @@
 }
 .app-shell[data-kpi-style='summary'] .page-content .kpi-card::before {
   display: none;
+}
+/* 선택 테두리도 카드의 둥근 형태를 따르도록 한다. */
+.app-shell[data-kpi-style='summary'] .page-content .exception-summary-card {
+  border-radius: 0.75rem;
 }
 .app-shell[data-kpi-style='summary'] .page-content .kpi-value-row {
   justify-content: flex-start;

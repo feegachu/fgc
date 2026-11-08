@@ -28,6 +28,10 @@
 :root {
   color-scheme: light;
 
+  --color-fgc-blue: #164d86;
+  --color-fgc-ink: #17334b;
+  --color-fgc-surface: #f5f8ff;
+
   --color-blue-50: #eef4ff;
   --color-blue-100: #d9e7ff;
   --color-blue-500: #2f6bff;
@@ -137,7 +141,7 @@
   --layout-sidebar-brand-height: 4.5rem;
   --layout-header-height: 3.25rem;
   --layout-workspace-tabs-height: 2.5rem;
-  --layout-workspace-tab-width: 13.75rem;
+  --layout-workspace-tab-width: 180px;
   --layout-content-max: 100rem;
   --layout-page-padding: 1.5rem;
   --data-table-cell-padding-x: 0.75rem;

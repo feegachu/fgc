@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import { DataTable } from '../../components/DataTable'
@@ -70,11 +70,21 @@ const compact = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFra
 const valueOf = (row: BranchMetrics, key: AmountKey) => row[key] ?? 0
 
 /** 같은 월의 지점별 네 지표를 막대로 비교하고 선택 지점·지표의 상세를 연결한다. */
-export function AgentStatusPanel({ month }: { month: string }) {
+export function AgentStatusPanel({ month, preview = false, replay = 0 }: { month: string; preview?: boolean; replay?: number }) {
   const [metric, setMetric] = useState<BranchMetric>('COMMISSIONS')
   const [hovered, setHovered] = useState<number | null>(null)
   const [focused, setFocused] = useState<number | null>(null)
   const [selected, setSelected] = useState<BranchMetrics | null>(null)
+  useEffect(() => {
+    if (!preview || selected) return
+    const timer = window.setInterval(() => {
+      if (document.hidden) return
+      setMetric(current => metricChoices[(metricChoices.findIndex(choice => choice.metric === current) + 1) % metricChoices.length].metric)
+      setHovered(null)
+      setFocused(null)
+    }, 3000)
+    return () => window.clearInterval(timer)
+  }, [preview, selected, metric])
   const contentId = useId(),
     tooltipId = useId()
   const query = useQuery(branchDashboardQuery(month))
@@ -125,7 +135,7 @@ export function AgentStatusPanel({ month }: { month: string }) {
         </span>
       </header>
       <div className="branch-dashboard-body">
-        <div className="branch-dashboard-toolbar">
+        <div className="branch-dashboard-toolbar" data-guide-target="dashboard.branches.metrics">
           <ChartViewSelector
             views={metricChoices}
             selected={metricChoices.findIndex((item) => item.metric === metric)}
@@ -151,7 +161,7 @@ export function AgentStatusPanel({ month }: { month: string }) {
             지점별 현황을 불러오는 중입니다.
           </p>
         ) : (
-          <div id={contentId} className="branch-chart-content">
+          <div id={contentId} className="branch-chart-content" data-guide-target="dashboard.branches.chart">
             <div className="branch-series-legend">
               <span>
                 <i style={{ background: '#4266db' }} />
@@ -164,7 +174,7 @@ export function AgentStatusPanel({ month }: { month: string }) {
                 </span>
               )}
             </div>
-            <div key={`${month}-${metric}`} className="agent-branch-slide">
+            <div key={`${month}-${metric}-${replay}`} className="agent-branch-slide">
               {!rows.length ? (
                 <p className="empty-state">표시할 지점이 없습니다.</p>
               ) : (

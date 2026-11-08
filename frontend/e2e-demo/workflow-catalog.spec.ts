@@ -59,8 +59,6 @@ async function prepare(page: Page, guide: Guide, account: string): Promise<Prepa
     expect(detail.sourceRefs.length).toBeGreaterThan(0)
     expect(detail.paymentAttributions.length).toBeGreaterThan(0)
     await login(page, account, `/clawbacks?month=${month}&${query}`)
-    await page.getByRole('row', { name: `후보 ${candidate.candidateId} 상세 보기`, exact: true }).click()
-    await expect(feature(page, 'clawback.evidence.source')).toBeVisible()
     return { fixtureNotes: [`UI targets only: ${detail.scheduleLines.length} schedule rows; no clawback calculation or confirmation is executed.`] }
   }
   if (guide.workflowId === 'cap.review') {
@@ -71,6 +69,10 @@ async function prepare(page: Page, guide: Guide, account: string): Promise<Prepa
     expect(cap, 'Full cap tutorial requires a real calculation result, not only the NOT_APPLICABLE branch.').toBeTruthy()
     await login(page, account, `/cap-checks?month=${month}&stage=INSURER_TO_GA&contractNo=${encodeURIComponent(cap.contractNo)}`)
     return { cap: { capCheckId: cap.capCheckId, contractNo: cap.contractNo } }
+  }
+  if (guide.workflowId === 'exception.resolve') {
+    await page.goto('login')
+    await completeMonthly(page, month)
   }
   if (guide.workflowId === 'validation.detail') {
     await page.goto('login')
@@ -170,6 +172,17 @@ for (const guide of guides) {
       await start(page, guide, role)
       for (const [index, step] of planned.entries()) {
         let target = feature(page, step.targetId)
+        if (guide.workflowId === 'clawback.review') {
+          if (step.stepId === 'clawback.review.step.3') {
+            await page.getByRole('button', { name: /FGC-FGN01-202603-0001 환수 상세 보기/ }).click()
+          }
+          const tab = ({ 'clawback.evidence.source': '원천 사건', 'clawback.evidence.payment': '지급·귀속', 'clawback.evidence.schedule': '지급 스케줄' } as Record<string, string>)[step.targetId]
+          if (tab) await page.getByRole('tab', { name: tab, exact: true }).click()
+        }
+        if (guide.workflowId === 'exception.resolve' && step.stepId === 'exception.resolve.step.3') {
+          await page.getByRole('table', { name: '예외 목록', exact: true }).locator('tbody .table-row-link').first().click()
+          await expect(page.getByRole('dialog', { name: /^예외 상세/ })).toBeVisible()
+        }
         if (guide.workflowId === 'policy.review' && step.targetId.endsWith('.policy-version')) {
           await expect(tutorial(page).getByRole('heading', { name: step.title, exact: true })).toBeVisible()
           await expect(target.first()).toBeVisible()

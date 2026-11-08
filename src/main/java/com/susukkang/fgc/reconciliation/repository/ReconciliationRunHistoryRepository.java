@@ -65,10 +65,12 @@ public class ReconciliationRunHistoryRepository {
                 vw.result_count AS targetCount, vw.matched_count AS matchedCount,
                 vw.exception_count AS exceptionCount,
                 vw.expected_total AS expectedTotal, vw.actual_total AS actualTotal,
-                vw.difference_total AS differenceTotal, rr.superseded_yn, rr.corrects_reconciliation_run_id
+                vw.difference_total AS differenceTotal, rr.superseded_yn, rr.corrects_reconciliation_run_id,
+                vr.run_no AS validation_run_no
                 FROM fgc.reconciliation_run rr
                 JOIN fgc.vw_reconciliation_summary vw ON vw.reconciliation_run_id = rr.reconciliation_run_id
                 LEFT JOIN fgc.insurer ins ON ins.insurer_id = rr.insurer_id
+                LEFT JOIN fgc.validation_run vr ON vr.validation_run_id = rr.validation_run_id
                 LEFT JOIN fgc.app_user creator ON creator.user_id = rr.created_by
                 LEFT JOIN fgc.app_user finalizer ON finalizer.user_id = rr.finalized_by
                 WHERE 1 = 1
@@ -103,6 +105,7 @@ public class ReconciliationRunHistoryRepository {
         query.addScalar("differencetotal", BigDecimal.class);
         query.addScalar("superseded_yn", Boolean.class);
         query.addScalar("corrects_reconciliation_run_id", Long.class);
+        query.addScalar("validation_run_no", Integer.class);
         return query.setTupleTransformer((values, aliases) -> {
             ReconciliationRunHistoryRow row = new ReconciliationRunHistoryRow();
             row.setReconciliationRunId((Long) values[0]);
@@ -127,6 +130,7 @@ public class ReconciliationRunHistoryRepository {
             row.setDifferenceTotal((BigDecimal) values[19]);
             row.setSuperseded((Boolean) values[20]);
             row.setCorrectsReconciliationRunId((Long) values[21]);
+            row.setValidationRunNo((Integer) values[22]);
             return row;
         }).getResultList();
     }
