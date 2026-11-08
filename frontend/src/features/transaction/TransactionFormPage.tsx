@@ -100,7 +100,6 @@ export default function TransactionFormPage() {
   const returnTo = safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))
   return <>
     {actualMode === 'after' ? <ContractPaymentForm key={`${activeMonth}:${params.get('contractId') ?? ''}`} initialContractId={readPaymentEntry(params).contractId} month={activeMonth} canProcess={user.canProcess} returnTo={returnTo} /> : <TransactionForm
-
       key={`${id ?? 'new'}:${activeMonth}:${id ? revision : params.toString()}`}
       entry={id ? {} : readPaymentEntry(params)}
       returnTo={safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))}

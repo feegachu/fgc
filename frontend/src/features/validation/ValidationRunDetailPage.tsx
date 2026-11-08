@@ -822,7 +822,7 @@ function FinalizeSection({
         <div className="vrun-finalize-trigger"
           tabIndex={!enabled ? 0 : undefined}
           aria-label={!enabled ? '확정 불가 사유' : undefined}
-          aria-describedby={!enabled ? 'finalize-disabled-tooltip' : undefined}
+          aria-describedby={!enabled && showDisabledReason ? 'finalize-disabled-tooltip' : undefined}
           onMouseEnter={() => setShowDisabledReason(true)}
           onMouseLeave={() => setShowDisabledReason(false)}
           onFocus={() => setShowDisabledReason(true)}
@@ -841,7 +841,7 @@ function FinalizeSection({
           </span>
           <span>{status === 'FINALIZED' ? '확정(잠김)' : '확정'}</span>
         </Button>
-        {!enabled && <div id="finalize-disabled-tooltip" role="tooltip" className="vrun-finalize-tooltip" hidden={!showDisabledReason}>
+        {!enabled && showDisabledReason && <div id="finalize-disabled-tooltip" role="tooltip" className="vrun-finalize-tooltip">
           <strong>확정할 수 없는 이유</strong>
           <p>{reason}</p>
           {status === 'COMPLETED' && blockedConditions.length > 0 && <ul>

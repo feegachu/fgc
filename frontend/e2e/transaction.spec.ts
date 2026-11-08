@@ -694,7 +694,7 @@ for (const viewport of [
   { width: 1440, height: 1000 },
   { width: 390, height: 844 },
 ]) {
-  test(`도움말 확인 → 사전검증 → 실제 확정 → 목록 (${viewport.width})`, async ({ page }, testInfo) => {
+  test(`도움말 확인 → 사전검증 → 실제 확정 → 목록 (${viewport.width})`, async ({ page }) => {
     await page.setViewportSize(viewport)
     await page.emulateMedia({ reducedMotion: 'reduce' })
     const errors: string[] = []
@@ -735,7 +735,6 @@ for (const viewport of [
     await expect(card).toBeHidden()
     await expect(page.getByTestId('payment-guide-spotlight')).toBeHidden()
     await page.getByRole('button', { name: '확정 실행', exact: true }).click()
-    await expect(page).toHaveURL(/\/transactions(?:\?.*)?$/)
     await expect(page).toHaveURL(/\/transactions(?:\?.*)?$/)
     expect(fixture.requests.filter((request) => request.path.endsWith('/confirm'))).toHaveLength(1)
     expect(errors).toEqual([])

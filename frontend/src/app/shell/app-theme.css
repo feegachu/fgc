@@ -178,7 +178,7 @@ html:has(.app-shell.app-theme) body {
   background: var(--color-action-subtle);
 }
 
-/* Use the shared fixed tab width, keeping compact height and close controls. */
+/* Uniform tabs fit the rail; keep compact height and close controls. */
 :root .workspace-tab {
   height: var(--control-height-sm);
   border: 0;

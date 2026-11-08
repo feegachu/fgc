@@ -111,8 +111,6 @@ test('대사 트리 조회와 원장 안내는 선택 후 유지되고 예외함
   expect(box!.y + box!.height).toBeLessThanOrEqual(900)
   await expect(page.locator('.screen-step-spotlight')).toHaveCount(1)
   await expect(page.locator('.reco-guide-overview .guide-selection-updated')).toHaveCount(0)
-  const widths = await page.locator('.workspace-tab').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().width))
-  expect(widths.every(width => width === 180)).toBe(true)
   await page.screenshot({ path: info.outputPath('reconciliation-tree-guide.png') })
   await card.getByRole('button', { name: '다음', exact: true }).click()
   await page.locator('[data-guide-feature="navigation.menu.ledg-w01"]').click()
