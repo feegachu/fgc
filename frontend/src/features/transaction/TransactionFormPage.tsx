@@ -1,4 +1,4 @@
-import { CalculationWorkbench } from '../assistant/CalculationWorkbench'
+import { ContractPaymentForm } from './ContractPaymentForm'
 import { useUnsavedWork } from '../../stores/unsavedWork'
 import { isWonAmount } from '../assistant/guards'
 import { usePaymentGuideObservation } from '../assistant/usePaymentGuideObservation'
@@ -7,7 +7,6 @@ import { useWorkflowGuide } from '../assistant/workflow-state'
 import { connectPaymentGuideLaunch } from './payment-guide-launch'
 import { nameWithCode } from '../../lib/screenText'
 import { settlementEntry, subscribeSettlementEntry } from '../assistant/settlement/entry'
-import { EvidenceLink } from '../../components/EvidenceLink'
 import { ResizableSplit } from '../../components/ResizableSplit'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -50,13 +49,16 @@ import {
 import type { FormValues } from './form-model'
 import { connectPaymentGuide, PaymentGuideObserver } from './payment-guide'
 import { PaymentGuide } from './PaymentGuide'
+import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import './transaction.css'
 import './form.css'
 
 export default function TransactionFormPage() {
-  const { user, month } = useOutletContext<ShellContext>()
+  const { user, month, helpVersion } = useOutletContext<ShellContext>()
   const [params] = useSearchParams()
   const id = params.get('id')
+  const legacyEntry = !!id || params.has('commissionItemId') || params.has('amount')
+  const actualMode = legacyEntry ? 'before' : helpVersion ?? 'after'
   const [revision, setRevision] = useState(0)
   const queryClient = useQueryClient()
   const draft = useQuery({
@@ -95,8 +97,9 @@ export default function TransactionFormPage() {
         수정 가능한 지급 초안이 아닙니다. <Link data-guide-feature="features.transaction.transaction-form-page.link" to={withMonth('/transactions', activeMonth)}>목록으로</Link>
       </div>
     )
-  return (
-    <TransactionForm
+  const returnTo = safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))
+  return <>
+    {actualMode === 'after' ? <ContractPaymentForm key={`${activeMonth}:${params.get('contractId') ?? ''}`} initialContractId={readPaymentEntry(params).contractId} month={activeMonth} canProcess={user.canProcess} returnTo={returnTo} /> : <TransactionForm
       key={`${id ?? 'new'}:${activeMonth}:${id ? revision : params.toString()}`}
       entry={id ? {} : readPaymentEntry(params)}
       returnTo={safeReturnTo(params.get('returnTo'), withMonth('/transactions', activeMonth))}
@@ -106,8 +109,8 @@ export default function TransactionFormPage() {
       canProcess={user.canProcess}
       role={user.roleCode}
       onReload={reload}
-    />
-  )
+    />}
+  </>
 }
 
 function TransactionForm({
@@ -133,6 +136,12 @@ function TransactionForm({
   const root = useRef<HTMLDivElement>(null)
   const help = useRef<HTMLButtonElement>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const helpVersion = useOutletContext<ShellContext | null>()?.helpVersion ?? 'after'
+  const [openedHelpVersion, setOpenedHelpVersion] = useState(helpVersion)
+  if (openedHelpVersion !== helpVersion) {
+    setOpenedHelpVersion(helpVersion)
+    setHelpOpen(false)
+  }
   const [initialWorkflowId, setInitialWorkflowId] = useState<string | null>(null)
   const [initialGuideStepId, setInitialGuideStepId] = useState<string | undefined>()
   const [guideRevision, setGuideRevision] = useState(0)
@@ -354,23 +363,7 @@ function TransactionForm({
     }
   }, [helpOpen])
 
-  function calculationCandidate() {
-    const payload = validatedPayload()
-    return {
-      ...payload,
-      amount: form.amount,
-      settlementMonth: form.settlementMonth,
-      contractId: payload.contractId == null ? null : rows[0].contractId,
-      agentId: payload.agentId == null ? null : form.agentId,
-      commissionItemId: form.commissionItemId,
-      allocationPolicyVersion: payload.allocationPolicyVersion == null ? null : String(payload.allocationPolicyVersion),
-      attributions: payload.attributions.map((row, index) => ({
-        ...row,
-        contractId: row.contractId == null ? null : rows[index].contractId,
-        amount: rows[index].amount,
-      })),
-    }
-  }
+
   function invalidatePreview() {
     setInputEdited(true)
     setGuideRevision((value) => value + 1)
@@ -590,7 +583,7 @@ function TransactionForm({
           <h1 className="page-title">지급 건 등록, 귀속, 확정</h1>
         </div>
         <div className="page-header-actions">
-          <button data-guide-feature="features.transaction.transaction-form-page.button-2"
+          <ScreenHelp screenId="TRAN-W02" disabled={fullFlow || helpOpen} triggerRef={help} legacyTrigger={<button data-guide-feature="features.transaction.transaction-form-page.button-2"
             ref={help}
             type="button"
             className="button button-secondary"
@@ -600,7 +593,7 @@ function TransactionForm({
             onClick={() => { useWorkflowGuide.getState().clear(); setInitialWorkflowId(null); setHelpOpen(true) }}
           >
             도움말
-          </button>
+          </button>} />
           <Link data-guide-feature="features.transaction.transaction-form-page.link-2" className="button button-secondary" to={returnTo}>
             <span className="material-symbols-rounded" aria-hidden="true">
               arrow_back
@@ -609,42 +602,6 @@ function TransactionForm({
           </Link>
         </div>
       </header>
-      <CalculationWorkbench
-        key={`${paymentId}:${guideRevision}:${busy}:${ready}:${locked}:${confirmationNeedsRetry}`}
-        canProcess={ready && !locked && !confirmationNeedsRetry}
-        candidate={ready && !locked && !confirmationNeedsRetry ? calculationCandidate : undefined}
-        paymentId={paymentId}
-        revision={guideRevision}
-        onApply={ready && !locked && !confirmationNeedsRetry ? (amount, scope, snapshot) => {
-          const line = snapshot.lines?.[0]
-          if (
-            scope.aggregation !== 'SINGLE_LINE' || rows.length !== 1 || !line ||
-            line.attributionDate !== rows[0].attributionDate || scope.contractId !== rows[0].contractId ||
-            scope.settlementMonth !== form.settlementMonth || scope.paymentStage !== form.paymentStage ||
-            scope.commissionItemId !== form.commissionItemId ||
-            (form.paymentStage === 'GA_TO_FC' && scope.beneficiaryAgentId !== form.agentId)
-          ) return false
-          changeForm({ amount })
-          toast('예상액을 입력했습니다. 귀속 금액과 실제 명세를 확인한 후 저장·사전검증을 진행하세요.', 'success')
-          return true
-        } : undefined}
-      />
-      <aside
-        className="guidance guidance-info transaction-boundary-guidance"
-        aria-labelledby="transaction-boundary-title"
-      >
-        <span className="material-symbols-rounded guidance-icon" aria-hidden="true">
-          event
-        </span>
-        <div>
-          <h2 className="guidance-title" id="transaction-boundary-title">
-            초년도는 계약일부터 1주년 전날까지입니다{' '}
-            <EvidenceLink label="초년도 판단 기준" icon="help">
-              회차가 아니라 귀속일로 판단합니다. 13회차로 미뤄도 한도를 피할 수 없습니다.
-            </EvidenceLink>
-          </h2>
-        </div>
-      </aside>
       {(loading || referenceError) && (
         <div
           id="transaction-form-status"

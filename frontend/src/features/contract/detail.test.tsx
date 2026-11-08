@@ -2,6 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter } from 'react-router'
+// Exercise the retained walkthrough in the sidebar's before mode.
+vi.mock('react-router', async (original) => ({
+  ...await original<typeof import('react-router')>(),
+  useOutletContext: () => ({ helpVersion: 'before' }),
+}))
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../lib/api/client'

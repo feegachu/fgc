@@ -48,11 +48,30 @@ class AgentStatementIntegrationTest {
     @Autowired PasswordEncoder passwords;
     @Autowired FgcUserDetailsService users;
     @Autowired AuthTokenService tokens;
+    @Autowired com.susukkang.fgc.report.repository.AgentStatementRepository statements;
 
     private Long ownAgent;
     private Long otherAgent;
     private String agentToken;
     private String internalToken;
+
+    @Test
+    void overviewBindsNullableFiltersAndAgreesWithIndividualSummaries() {
+        var month = java.time.LocalDate.parse(MONTH_FIRST);
+        var all = statements.overview(new com.susukkang.fgc.report.repository.AgentStatementRepository.Filter(
+                0, month, null, null, null));
+        assertThat(all).isNotEmpty();
+        var own = all.stream().filter(row -> row.agentId() == ownAgent).findFirst().orElseThrow();
+        BigDecimal expected = jdbc.queryForObject("SELECT COALESCE(sum(ta.attributed_amount),0) " + OWN_PAYMENTS,
+                BigDecimal.class, ownAgent);
+        assertThat(own.paymentAmount()).isEqualByComparingTo(expected);
+        var excluded = statements.overview(new com.susukkang.fgc.report.repository.AgentStatementRepository.Filter(
+                0, month, "E2E-NO-MATCH-' OR 1=1 --", Long.MAX_VALUE, "PAYMENT"));
+        assertThat(excluded).isNotEmpty().allSatisfy(row -> {
+            assertThat(row.entryCount()).isZero();
+            assertThat(row.paymentAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        });
+    }
 
     @BeforeEach
     void prepare() {

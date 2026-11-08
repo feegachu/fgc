@@ -1,0 +1,4 @@
+.disabled-button-hint { position: relative; display: inline-flex; max-width: 100%; }
+.disabled-button-hint > button:disabled { pointer-events: none; }
+.disabled-button-hint:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 3px; border-radius: 6px; }
+.disabled-button-tooltip { position: absolute; z-index: 1500; bottom: calc(100% + 9px); right: 0; width: max-content; max-width: min(290px, 70vw); padding: 9px 12px; border-radius: 7px; background: #22344d; color: white; box-shadow: 0 4px 15px #17334b25; font-size: 12px; font-weight: 400; line-height: 1.6; white-space: normal; }

@@ -1,0 +1,60 @@
+.ledger-explorer-page-header { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
+.ledger-explorer-page-header .page-header-copy { margin-right:auto; }
+.ledger-explorer-page-header .page-header-copy p { margin:6px 0 0; color:var(--color-text-secondary); font-size:13px; }
+.ledger-explorer-toolbar { display:flex; padding:4px; border:1px solid var(--color-border-default); border-radius:10px; background:var(--color-bg-subtle); }
+.ledger-explorer-toolbar button { min-height:38px; padding:8px 18px; border:0; border-radius:7px; background:transparent; color:var(--color-text-secondary); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.ledger-explorer-toolbar button[aria-pressed='true'] { background:var(--color-action-primary); color:var(--color-text-inverse,#fff); }
+.ledger-explorer-toolbar button:focus-visible { outline:2px solid var(--color-action-primary); outline-offset:2px; }
+.ledger-explorer-layout { display:grid; grid-template-columns:minmax(285px,340px) minmax(0,1fr); gap:20px; align-items:start; }
+.ledger-explorer-layout.is-all { grid-template-columns:minmax(0,1fr); }
+.ledger-contracts,.ledger-journals,.ledger-contract-summary,.ledger-linked-evidence { min-width:0; overflow:hidden; }
+.ledger-explorer-right { display:flex; min-width:0; flex-direction:column; gap:20px; }
+.ledger-explorer-layout .surface-header { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-height:58px; padding:14px 18px; }
+.ledger-explorer-layout .surface-title { font-size:14px; }
+.ledger-explorer-layout .surface-header>span { color:var(--color-text-secondary); font-size:12px; }
+.ledger-explorer-layout .surface-header>small { margin-left:auto; color:var(--color-text-secondary); font-size:12px; }
+.ledger-journals>.surface-header>button { margin-left:auto; }
+.ledger-explorer-right .is-balanced { color:var(--color-status-success-text); }
+.ledger-explorer-right .is-unbalanced { color:var(--color-status-error-text); }
+.ledger-entry-table { width:100%; min-width:850px; table-layout:fixed; }
+.ledger-entry-table th,.ledger-entry-table td { padding:7px 12px; font-size:12px; line-height:1.4; overflow-wrap:anywhere; }
+.ledger-entry-table th:first-child { width:22%; }
+.ledger-entry-table th:nth-child(2) { width:22%; }
+.ledger-entry-table th:nth-child(3) { width:24%; }
+.ledger-entry-table th:nth-last-child(-n+2) { width:16%; }
+.ledger-entry-table th:nth-last-child(-n+2),.ledger-entry-table td:nth-last-child(-n+2) { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ledger-entry-table tbody+tbody { border-top:1px solid var(--color-border-default); }
+.ledger-entry-table tbody.is-selected { background:var(--color-action-primary-subtle,var(--color-bg-subtle)); }
+.ledger-entry-table tbody.is-selected td { background:transparent; }
+.ledger-entry-table .ledger-journal-cell { vertical-align:middle; padding:8px 12px; }
+.ledger-journal-cell>span { display:block; margin-bottom:3px; color:var(--color-text-secondary); }
+.ledger-journal-cell>button { padding:0; border:0; background:none; color:var(--color-action-primary); font:inherit; font-weight:600; text-align:left; cursor:pointer; }
+.ledger-journal-cell>div { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:4px; font-size:11px; }
+.ledger-type-label { padding:2px 5px; border-radius:4px; background:var(--color-bg-subtle); }
+.ledger-entry-table tfoot { background:var(--color-bg-subtle); font-weight:700; }
+.ledger-linked-evidence .ledger-react-summary { margin:0; padding:20px; }
+.ledger-linked-evidence .ledger-react-actions { padding:0 20px 20px; }
+.ledger-balance-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; padding:0; }
+.ledger-journal-cell small { color:var(--color-text-secondary); font-size:10px; }
+.ledger-contract-tree { padding:8px; max-height:650px; overflow:auto; }
+.ledger-contract-tree ul { list-style:none; margin:0; padding:0; }
+.ledger-contract-tree>ul>li+li { margin-top:1px; }
+.ledger-contract-node { display:flex; align-items:center; border:1px solid transparent; border-radius:7px; }
+.ledger-contract-node.is-active { border-color:var(--color-border-focus); background:var(--color-action-subtle); }
+.ledger-contract-toggle { display:grid; place-items:center; flex:0 0 22px; padding:0; border:0; background:none; color:var(--color-text-secondary); cursor:pointer; }
+.ledger-contract-select { display:flex; align-items:center; gap:7px; flex:1; min-width:0; height:32px; padding:4px 6px 4px 2px; border:0; background:none; color:inherit; text-align:left; cursor:pointer; font:inherit; }
+.ledger-contract-name { display:flex; align-items:center; gap:5px; min-width:0; font-size:12px; }
+.ledger-contract-name strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
+.ledger-contract-tree .material-symbols-rounded { font-size:18px; }
+.ledger-contract-meta { display:flex; align-items:center; flex:none; gap:7px; margin:0 0 0 auto; color:var(--color-text-secondary); font-size:11px; }
+.ledger-contract-meta small { font:inherit; white-space:nowrap; }
+.ledger-contract-tree .ledger-contract-entries { margin:1px 0 4px 12px; padding-left:10px; border-left:1px solid var(--color-border-default); }
+.ledger-journal-select { display:flex; width:100%; gap:8px; justify-content:space-between; min-height:28px; padding:5px 8px; border:0; border-radius:4px; background:none; color:var(--color-text-secondary); font:inherit; font-size:12px; text-align:left; cursor:pointer; }
+.ledger-journal-select small { flex:none; font:inherit; }
+.ledger-journal-select[aria-current='true'] { color:var(--color-action-primary); background:var(--color-action-subtle); }
+.ledger-contract-node:hover,.ledger-journal-select:hover { background:var(--color-bg-subtle); }
+.ledger-contract-tree button:focus-visible { outline:2px solid var(--color-border-focus); outline-offset:-2px; }
+.ledger-tree-message,.ledger-tree-paging { padding:6px; font-size:11px; color:var(--color-text-secondary); }
+.ledger-tree-paging { display:flex; justify-content:space-between; align-items:center; }
+@media(max-width:68rem) { .ledger-explorer-layout { grid-template-columns:minmax(255px,290px) minmax(0,1fr); gap:12px; } }
+@media(max-width:52rem) { .ledger-explorer-layout { grid-template-columns:minmax(0,1fr); } .ledger-contract-tree { max-height:280px; } .ledger-balance-summary { grid-template-columns:minmax(0,1fr); } }

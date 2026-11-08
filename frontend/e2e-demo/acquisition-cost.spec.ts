@@ -165,8 +165,8 @@ test('실제 서버에서 두 한도를 따로 판정하고 자료 부족과 적
   const before = sql('SELECT count(*) FROM fgc.acquisition_cost_check')
   await page.goto(`/contracts/${contractId}?tab=acquisition&month=2026-07`)
   const panel = page.getByRole('tabpanel', { name: '계약체결비용' })
-  await expect(panel.getByRole('article', { name: '선지급 총액 한도 결과' })).toContainText('한도 초과')
-  await expect(panel.getByRole('button', { name: '검증 요청' })).toBeEnabled()
+  await expect(panel.getByRole('table')).toContainText('한도 초과')
+  await expect(panel.getByRole('columnheader', { name: '선지급 판정' })).toBeVisible()
   await page.screenshot({ path: 'e2e-artifacts/729-contract-tab.png', fullPage: true })
   expect(sql('SELECT count(*) FROM fgc.acquisition_cost_check')).toBe(before)
 

@@ -1,0 +1,19 @@
+.hierarchy-tree { min-width: 0; overflow: auto; font-size: 13px; }
+.hierarchy-tree ul { margin: 0; padding: 0; list-style: none; }
+.hierarchy-row { display: flex; align-items: center; min-height: 34px; border-radius: 5px; }
+.hierarchy-row:hover { background: var(--color-bg-subtle); }
+.hierarchy-row.is-active { background: var(--color-action-subtle); color: var(--color-action-primary); }
+.hierarchy-toggle { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; width: 22px; height: 30px; padding: 0; border: 0; color: inherit; background: none; }
+.hierarchy-select { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px 4px 0; border: 0; color: inherit; background: none; font: inherit; text-align: left; cursor: pointer; }
+.hierarchy-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hierarchy-select small { flex: none; margin-left: auto; color: var(--color-text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.hierarchy-tree .material-symbols-rounded { flex: none; font-size: 18px; line-height: 1; }
+.hierarchy-toggle .material-symbols-rounded { transform: translateY(1px); }
+.hierarchy-tree button:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: -2px; }
+.hierarchy-view-switch { position: relative; display: inline-grid; grid-template-columns: repeat(2, 32px); flex: none; width: 68px; height: 34px; padding: 2px; box-sizing: border-box; border: 1px solid var(--color-border-default); border-radius: 7px; background: var(--color-bg-subtle); }
+.hierarchy-view-switch button { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.hierarchy-view-switch button[aria-pressed='true'] { color: var(--color-action-primary); }
+.hierarchy-view-switch .material-symbols-rounded { font-size: 18px; line-height: 1; }
+.hierarchy-view-slider { position: absolute; top: 2px; left: 2px; width: 31px; height: 28px; border-radius: 4px; background: var(--color-bg-surface); box-shadow: 0 1px 3px #17334b20; transition: transform 180ms ease; }
+.hierarchy-view-switch[data-view='table'] .hierarchy-view-slider { transform: translateX(32px); }
+@media (prefers-reduced-motion: reduce) { .hierarchy-view-slider { transition: none; } }

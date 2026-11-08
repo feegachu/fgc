@@ -2,7 +2,7 @@ import { typeBadgeTone } from '../exception/rules'
 import { ScreenHelp } from '../assistant/guide/ScreenHelp'
 import { openSettlementGuide } from '../assistant/settlement/entry'
 import { useQuery } from '@tanstack/react-query'
-import type { CSSProperties } from 'react'
+import { Fragment, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { CellDisclosure } from '../../components/CellDisclosure'
 import { DataTable } from '../../components/DataTable'
@@ -21,6 +21,7 @@ import { AgentStatusPanel } from './AgentStatusPanel'
 import { MonthlyCommissions } from './MonthlyCommissions'
 import { RecentExceptionTicker } from './RecentExceptionTicker'
 import { DashboardSkeleton } from './DashboardSkeleton'
+import { dashboardWalkthrough } from './dashboard-walkthrough'
 import { RegionError, UpdatedAt } from './RegionStatus'
 import { RiskComposition, type CompositionItem } from './RiskComposition'
 import { exceptionStatusTone, runStatusTone, severityTone } from './tones'
@@ -36,6 +37,15 @@ export function DashboardPage() {
 
 /** 검증·미처리 집계를 독립적으로 조회하고 확정 관리자 배치와 업무 화면 연결을 제공한다. */
 function DashboardContent({ month, revised }: { month: string; revised: boolean }) {
+  const [helpMotion, setHelpMotion] = useState<{ active: string | null; replays: Record<string, number> }>({ active: null, replays: {} })
+  const walkthrough = useMemo(() => dashboardWalkthrough.map(step => ({
+    ...step,
+    onEnter: () => {
+      setHelpMotion(current => ({ active: step.targetId, replays: { ...current.replays, [step.targetId]: (current.replays[step.targetId] ?? 0) + 1 } }))
+      return () => setHelpMotion(current => ({ ...current, active: null }))
+    },
+  })), [])
+  const replay = (id: string) => helpMotion.replays[id] ?? 0
   const { data, error, isPending, isFetching, dataUpdatedAt, refetch } = useQuery({
     ...dashboardSummaryQueryOptions(month),
     meta: { errorToast: false },
@@ -233,7 +243,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
           검증 항목별 건수 비중
         </h2>
       </header>
-      <RiskComposition items={compositionItems} />
+      <RiskComposition key={replay('features.dashboard.dashboard-page.composition')} items={compositionItems} />
       {!revised && (
         <p className="risk-composition-note">
           미처리 예외는 일부 항목과 겹쳐 비중에서 제외했습니다. 항목마다 세는 단위가 달라 건수의 단순 비율로 표시합니다.
@@ -274,7 +284,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
   return (
     <div className="dashboard-page">
       <header className="page-header">
-        <ScreenHelp screenId="DASH-W01" />
+        <ScreenHelp screenId="DASH-W01" walkthrough={revised ? walkthrough : undefined} />
         <div className="page-header-copy">
           <h1 className="page-title">업무 대시보드</h1>
         </div>
@@ -310,6 +320,7 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
           {kpis?.map((kpi) => {
             const card = (
               <KpiCard
+                key={replay('features.dashboard.dashboard-page.section')}
                 guideId={guideFeatureId('dashboard.kpi', kpi.id)}
                 label={kpi.label}
                 value={kpi.value ?? '-'}
@@ -346,10 +357,10 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
           <div className="dashboard-main-column">
             {revised ? (
               <>
-                <MonthlyCommissions key={month} month={month} />
+                <MonthlyCommissions key={month} month={month} replay={replay('features.dashboard.monthly-commissions.section')} />
                 <div className="dashboard-insight-grid">
                   {summaryReady && compositionPanel}
-                  <AgentStatusPanel month={month} />
+                  <AgentStatusPanel month={month} preview={helpMotion.active === 'features.dashboard.agent-status-panel.section'} replay={replay('features.dashboard.agent-status-panel.section')} />
                 </div>
               </>
             ) : (
@@ -358,19 +369,23 @@ function DashboardContent({ month, revised }: { month: string; revised: boolean 
           </div>
           <div className="dashboard-side-column">
             {summaryReady && (
-              <>
-                {revised ? (
-                  <RecentExceptionTicker rows={data?.recentExceptions ?? []} month={month} />
-                ) : (
-                  compositionPanel
-                )}
-                {runsPanel}
-              </>
+              <div className="dashboard-recent-panels" data-guide-target="dashboard.recent-activity">
+                <Fragment key={replay('dashboard.recent-activity')}>
+                  {revised ? (
+                    <RecentExceptionTicker rows={data?.recentExceptions ?? []} month={month} />
+                  ) : (
+                    compositionPanel
+                  )}
+                  {runsPanel}
+                </Fragment>
+              </div>
             )}
             {revised && (
-              <div className="dashboard-support-cards">
-                <SettlementGuideEntry card />
-                <AssociationEntry />
+              <div className="dashboard-support-cards" data-guide-target="dashboard.support">
+                <Fragment key={replay('dashboard.support')}>
+                  <SettlementGuideEntry card />
+                  <AssociationEntry />
+                </Fragment>
               </div>
             )}
           </div>

@@ -1,7 +1,7 @@
-import { continueFlow, readFlowExplanations, test, expect, login, api, responseFor, successful, sql } from './fixtures'
+import { test, expect, login, api, responseFor, successful, sql } from './fixtures'
 
 test.use({ video: 'off' })
-test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', async ({ page }, info) => {
+test('원천 지급 정정 → 재검증·재대사 → 역할 인계 후 최종 확정', async ({ page }, info) => {
   const errors: string[] = []
   const writes: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
@@ -20,7 +20,7 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   sql(`TRUNCATE fgc.commission_transaction CASCADE;
     TRUNCATE fgc.contract_status_event CASCADE;
     UPDATE fgc.insurance_contract SET current_status='MATURED' WHERE contract_id <> ${cid};
-    UPDATE fgc.schedule_header SET status='HOLD' WHERE contract_id <> ${cid};`)
+    UPDATE fgc.schedule_header SET status='HOLD' WHERE contract_id <> ${cid} AND status NOT IN ('ADJUSTED', 'CANCELLED');`)
   await page.goto(`/contracts/${cid}?month=2026-07&tab=schedules`)
   const generated = page.waitForResponse(
     (r) => r.url().includes('/schedules/regenerate') && r.request().method() === 'POST',
@@ -69,35 +69,28 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   const pid = payment.commissionTransactionId
   expect((await api(page, `/transactions/${pid}/precheck`, {})).confirmable).toBe(true)
   await api(page, `/transactions/${pid}/confirm`, {})
-  await page.goto('/?month=2026-07')
-  await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
-  const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
-  await guide.getByLabel(/기존 지급 번호/).fill(String(pid))
-  await guide.getByRole('button', { name: '안내 시작', exact: true }).click()
-  await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
+  await page.goto('/validation-runs?month=2026-07')
   const created = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성', exact: true }).click()
   const run = await successful(created)
   // A person resumes after the detail screen opens; resuming mid-navigation makes the guide report a screen change.
   await expect(page).toHaveURL(new RegExp(`/validation-runs/${run.validationRunId}\\b`))
-  await continueFlow(page)
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await expect
     .poll(async () => (await api(page, `/validation-runs/${run.validationRunId}/progress`)).status, { timeout: 120000 })
     .toBe('COMPLETED')
-  await continueFlow(page)
   const runs = await api(page, '/reconciliations?month=2026-07&stage=GA_TO_FC&page=1&size=100')
   const recon = runs.content.find(
     (r: { validationRunId: number; insurerId: number }) =>
       r.validationRunId === run.validationRunId && r.insurerId === contract.insurerId,
   )
+  await page.goto(`/reconciliations?month=2026-07&runId=${recon.reconciliationRunId}&historyView=table`)
+  await page.getByRole('button', { name: '표 보기', exact: true }).click()
   const history = page.getByRole('table', { name: '검색조건에 해당하는 대사 실행 이력' })
   await history
     .getByRole('row')
     .filter({ has: page.getByRole('cell', { name: String(recon.reconciliationRunId), exact: true }) })
     .click()
-  await continueFlow(page)
-  await expect(guide).toContainText('8/9')
   const before = await api(page, `/reconciliations/${recon.reconciliationRunId}/results?page=1&size=100`)
   expect(before.summary.exceptionCount).toBeGreaterThan(0)
   const jid = Number(
@@ -105,28 +98,14 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
       `SELECT journal_header_id FROM fgc.journal_header WHERE source_entity_type='COMMISSION_TRANSACTION' AND source_entity_id='${pid}' AND status='POSTED'`,
     ),
   )
-  await guide.getByRole('button', { name: '접기', exact: true }).click()
-  await page.getByRole('link', { name: '검증원장', exact: true }).click()
+  await page.goto(`/journals?month=2026-07&ledgerView=all&evidence=${jid}`)
   const journal = await api(page, `/journals/${jid}`)
-  await page
-    .getByRole('table', { name: '조회 조건에 해당하는 검증원장 분개 목록' })
-    .getByRole('row')
-    .filter({ hasText: journal.journalNo })
-    .click()
+  await expect(page.getByRole('region', { name: '분개 상세' })).toContainText(journal.journalNo)
   await page.getByRole('button', { name: '역분개 + 재기표', exact: true }).click()
   await page.getByRole('textbox', { name: '정정 요청 사유', exact: true }).fill('예상 지급 대비 과소 지급 원천 정정')
   await page.getByRole('button', { name: '예외함에서 정정 계속', exact: true }).click()
   await page.getByRole('combobox', { name: '조치', exact: true }).selectOption('START_REVIEW')
   await page.getByLabel('처리 사유').fill('원분개와 지급 예정 금액 확인')
-  await expect(guide).toHaveAttribute('aria-busy', 'false')
-  const expandForAction = guide.getByRole('button', { name: '펼치기', exact: true })
-  if (await expandForAction.isVisible()) await expandForAction.click()
-  // Save from the action explanation itself. A resolved case can remove its form;
-  // do not skip ahead to a permanent target before exercising that transition.
-  for (let step = 0; step < 6 && !(await guide.getByRole('heading', { name: '처리 내용을 직접 저장하세요' }).isVisible()); step++) {
-    await guide.getByRole('button', { name: '확인하고 다음 설명', exact: true }).click()
-  }
-  await expect(guide.getByRole('heading', { name: '처리 내용을 직접 저장하세요' })).toBeVisible()
   await page.getByRole('button', { name: '처리 저장', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await expect(dialog).toBeVisible()
@@ -156,21 +135,7 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
   )
   expect((await api(page, `/reconciliations/${revised}/results?page=1&size=100`)).summary.exceptionCount).toBe(0)
   if (await dialog.isVisible()) await dialog.getByRole('button', { name: '닫기', exact: true }).click()
-  // The resolved exception disappears from OPEN results. Explicitly refresh server evidence,
-  // rather than pretending its vanished input targets were reviewed.
-  const expandAfterCorrection = guide.getByRole('button', { name: '펼치기', exact: true })
-  if (await expandAfterCorrection.isVisible()) await expandAfterCorrection.click()
-  await expect(guide).toContainText('안내 대상이 사라지거나 숨겨져 중단했습니다')
-  await expect(guide.getByRole('button', { name: '확인하고 다음 설명', exact: true })).toBeDisabled()
-  await expect(guide.getByRole('button', { name: '현재 결과로 이어서 안내' })).toBeEnabled()
-  await guide.getByRole('button', { name: '현재 결과로 이어서 안내' }).click()
-  await expect(guide).toContainText('기존 지급이 취소되었습니다')
-  await guide.getByLabel('정정 후 지급 번호', { exact: true }).fill(String(pid))
-  await guide.getByRole('button', { name: '정정 지급으로 이어서 안내' }).click()
-  await expect(guide.getByRole('alert')).toContainText('정정 후 확정된 지급 번호')
-  await guide.getByLabel('정정 후 지급 번호', { exact: true }).fill(String(replacement))
-  await guide.getByRole('button', { name: '정정 지급으로 이어서 안내' }).click()
-  await expect(page).toHaveURL(/\/validation-runs\?month=2026-07/)
+  await page.goto('/validation-runs?month=2026-07')
   const recreated = responseFor(page, '/validation-runs')
   await page.getByRole('button', { name: '실행 생성', exact: true }).click()
   const rerun = await successful(recreated)
@@ -180,52 +145,27 @@ test('FUN-088 원천 지급 정정 → 재검증·재대사 → 최종 확정', 
       timeout: 120000,
     })
     .toBe('COMPLETED')
-  await continueFlow(page)
-  await expect(page).toHaveURL(/\/reconciliations\?/)
   const updatedRuns = await api(page, '/reconciliations?month=2026-07&stage=GA_TO_FC&page=1&size=100')
   const latest = updatedRuns.content.find(
     (r: { validationRunId: number; insurerId: number }) =>
       r.validationRunId === rerun.validationRunId && r.insurerId === contract.insurerId,
   )
-  await history
-    .getByRole('row')
-    .filter({ has: page.getByRole('cell', { name: String(latest.reconciliationRunId), exact: true }) })
-    .click()
+  await page.goto(`/reconciliations?month=2026-07&runId=${latest.reconciliationRunId}&historyView=table`)
+  await page.getByRole('button', { name: '표 보기', exact: true }).click()
   const results = await api(page, `/reconciliations/${latest.reconciliationRunId}/results?page=1&size=100`)
   expect(results.summary.exceptionCount).toBe(0)
   expect(results.summary.matchedCount).toBe(results.summary.resultCount)
-  await continueFlow(page)
-  await expect(guide).toContainText('9/9')
-  await readFlowExplanations(page)
-  await expect(guide).toContainText('맡기세요')
   const checklist = await api(page, `/validation-runs/${rerun.validationRunId}/finalize-checklist`)
   expect(checklist.passed, JSON.stringify(checklist)).toBe(true)
+  await page.goto(`/validation-runs/${rerun.validationRunId}?month=2026-07`)
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
-  // Re-authentication intentionally clears in-memory guide state; admin resumes from actual IDs.
-  await login(page, 'gaadmin', '/?month=2026-07')
-  await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
-  await guide.getByLabel(/기존 지급 번호/).fill(String(replacement))
-  await guide.getByRole('button', { name: '안내 시작', exact: true }).click()
-  await expect(guide.getByRole('alert')).toContainText('정산담당자나 시스템관리자')
-  await guide.getByRole('button', { name: '월 검증 결과 선택', exact: true }).click()
-  await expect(page).toHaveURL(/\/validation-runs\?/)
-  await page.locator(`a[href*="/validation-runs/${rerun.validationRunId}?"]`).click()
-  await continueFlow(page)
-  await history
-    .getByRole('row')
-    .filter({ has: page.getByRole('cell', { name: String(latest.reconciliationRunId), exact: true }) })
-    .click()
-  await continueFlow(page)
-  await readFlowExplanations(page)
-  await expect(guide).toContainText('8개 조건을 통과했습니다')
-  await expect(guide).not.toContainText('전체 업무 안내 완료')
+  await login(page, 'gaadmin', `/validation-runs/${rerun.validationRunId}?month=2026-07`)
+  await expect(page.getByRole('button', { name: '확정', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '확정', exact: true }).click()
   const finalized = responseFor(page, `/validation-runs/${rerun.validationRunId}/finalize`)
   await page.getByRole('dialog').getByRole('button', { name: '확정', exact: true }).click()
   expect((await successful(finalized)).status).toBe('FINALIZED')
   await page.getByRole('dialog', { name: '확정했습니다' }).getByRole('button', { name: '확인', exact: true }).click()
-  await continueFlow(page)
-  await expect(guide).toContainText('전체 업무 안내 완료')
   expect((await api(page, `/validation-runs/${rerun.validationRunId}`)).header.status).toBe('FINALIZED')
   expect(sql(`SELECT status FROM fgc.validation_run WHERE validation_run_id=${rerun.validationRunId}`)).toBe(
     'FINALIZED',

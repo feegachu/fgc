@@ -16,7 +16,7 @@ for (const multi of [false, true]) {
       if (path.startsWith('/api/v1/transactions'))
         requests.push({ path, method: response.request().method(), status: response.status() })
     })
-    await login(page, 'settle01', '/transactions/new?month=2026-07')
+    await login(page, 'settle01', '/transactions/new?amount=0&month=2026-07')
     const contracts = await api(page, '/contracts?contractNo=FGC-FGL01-202607-0002&page=1&size=20')
     expect(contracts.content).toHaveLength(1)
     const contract = await api(page, `/contracts/${contracts.content[0].contractId}`)
@@ -48,9 +48,11 @@ for (const multi of [false, true]) {
       // Restore the actual included allocation after checking the evidence gate.
       await page.locator('[data-inclusion]').first().selectOption('INCLUDED')
     }
-    await page.getByRole('button', { name: '도움말', exact: true }).click()
+    await page.getByRole('button', { name: '업무 비서 AI 열기, 피코', exact: true }).click()
+    const assistant = page.getByRole('dialog', { name: '피코 업무 비서' })
+    await assistant.getByRole('tab', { name: '업무 안내', exact: true }).click()
+    await assistant.getByRole('button').filter({ has: page.getByText('지급 초안 저장', { exact: true }) }).click()
     const card = page.getByRole('region', { name: '지급 업무 가이드' })
-    await card.getByRole('button', { name: '지급 초안 저장', exact: true }).click()
     for (let index = 0; index < 3; index++)
       await card.getByRole('button', { name: '확인하고 다음', exact: true }).click()
     await card.getByRole('button', { name: '다음', exact: true }).click()

@@ -6,6 +6,8 @@ import { workflowWalkthrough } from './workflow-walkthrough'
 import { paymentWalkthrough } from './payment-walkthrough'
 import { initialForm, newRow } from '../../transaction/form-model'
 import { STEPS } from './state'
+import { screens } from '../../../app/screens'
+import { guideFeatureId } from '../feature-ids'
 
 // Check the actual catalogs against JSX declarations, scoped to their owning screen.
 // Runtime tests cover conditional visibility and duplicate mounted instances.
@@ -78,6 +80,10 @@ function countBinding(sources: string[], selector: string) {
         }
       }
       if (name === 'data-guide-condition' && ts.isJsxAttribute(node) && node.name.getText(ast) === name && node.initializer?.getText(ast) === '{condition.no}') count++
+      // Sidebar menu IDs come from the real screen catalog, rather than literal JSX.
+      if (name === 'data-guide-feature' && ts.isJsxAttribute(node) && node.name.getText(ast) === name
+        && node.initializer?.getText(ast) === "{guideFeatureId('navigation.menu', definition.id)}"
+        && screens.some(screen => guideFeatureId('navigation.menu', screen.id) === value)) count++
       if (selector === 'h1' && ts.isJsxOpeningElement(node) && node.tagName.getText(ast) === 'h1') count++
       ts.forEachChild(node, visit)
     }
@@ -103,7 +109,9 @@ for (const stage of STEPS.filter(stage => stage !== 'payment.draft')) {
     for (const path of routes[stage]) for (const selected of [false, true]) for (const corrected of [false, true]) {
       const domain = scenarios.find(([route]) => route === path)![1]
       for (const step of workflowWalkthrough(stage, path, selected, corrected)) {
-        expect(countBinding(step.selector === 'h1' && domain === 'contract' ? sourceFiles(domain).filter(file => file.endsWith('ContractDetailPage.tsx')) : sourceFiles(domain), step.selector), `${path} ${step.selector}`).toBe(1)
+        const sources = step.scope === 'shell' ? [resolve(import.meta.dirname, '../../../app/shell/Sidebar.tsx')]
+          : step.selector === 'h1' && domain === 'contract' ? sourceFiles(domain).filter(file => file.endsWith('ContractDetailPage.tsx')) : sourceFiles(domain)
+        expect(countBinding(sources, step.selector), `${path} ${step.selector}`).toBe(1)
       }
     }
   })

@@ -1944,7 +1944,7 @@
         "screenId": "CLAW-W01",
         "targetId": "features.clawback.clawback-page.section",
         "title": "환수 후보 선택",
-        "instruction": "후보 목록에서 처리할 계약의 후보를 선택합니다. 조회 직후 기본 표시된 후보를 실제 처리 대상으로 단정하지 말고 계약과 발생 사유를 확인합니다.",
+          "instruction": "후보 목록에서 계약번호를 눌러 상세를 엽니다. 근거와 환수 계산 결과를 확인하고 PDF로 출력할 수 있습니다.",
         "completionRuleId": "USER_REVIEWED",
         "next": [
           {

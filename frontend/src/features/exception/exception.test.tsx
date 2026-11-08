@@ -10,9 +10,47 @@ import { apiClient, ApiError } from '../../lib/api/client'
 import { useAuthStore } from '../../stores/auth'
 import { useToastStore } from '../../stores/toasts'
 import { useWorkspaceStore } from '../../stores/workspace'
+import { useUnsavedWorkStore } from '../../stores/unsavedWork'
 import { validateCorrectionLines } from './correctionLines'
 import type { ExceptionCase, ExceptionOptions, ExceptionSearchResult } from './api'
 import { applyActionToCache } from './api'
+
+// Legacy action-guide regression fixtures do not expose comparison controls in the app.
+let legacyHelpContext = false
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  return { ...actual, useOutletContext: () => {
+    const context = actual.useOutletContext<Record<string, unknown>>()
+    return legacyHelpContext ? { ...context, helpVersion: 'before' } : context
+  } }
+})
+beforeEach(() => { legacyHelpContext = false })
+
+it('예외 모달 닫기는 다른 화면의 미저장 입력을 버리거나 경고하지 않는다', async () => {
+  const { actions } = renderPage('/app/exceptions?month=2026-07&selected=11')
+  const modal = await screen.findByRole('dialog', { name: /^예외 상세/ })
+  act(() => useUnsavedWorkStore.getState().mark('other-editor', true))
+  try {
+    await actions.click(within(modal).getByRole('button', { name: '닫기' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /^예외 상세/ })).not.toBeInTheDocument())
+    expect(useUnsavedWorkStore.getState().owners['other-editor']).toBe(true)
+  } finally {
+    act(() => useUnsavedWorkStore.getState().mark('other-editor', false))
+  }
+})
+
+it('예외 모달 자체의 미저장 처리 사유는 닫기 전에 보호한다', async () => {
+  const { actions } = renderPage('/app/exceptions?month=2026-07&selected=11')
+  const modal = await screen.findByRole('dialog', { name: /^예외 상세/ })
+  await actions.type(within(modal).getByRole('textbox', { name: /처리 사유/ }), '검토 중인 사유')
+  await actions.click(within(modal).getByRole('button', { name: '닫기' }))
+  const confirm = await screen.findByRole('dialog', { name: '작성 중인 내용을 닫을까요?' })
+  await actions.click(within(confirm).getByRole('button', { name: '계속 작성' }))
+  expect(within(modal).getByRole('textbox', { name: /처리 사유/ })).toHaveValue('검토 중인 사유')
+  await actions.click(within(modal).getByRole('button', { name: '닫기' }))
+  await actions.click(within(await screen.findByRole('dialog', { name: '작성 중인 내용을 닫을까요?' })).getByRole('button', { name: '입력 버리고 닫기' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+})
 
 const user = {
   loginId: 'settle01',
@@ -221,6 +259,7 @@ describe('EXCP-W01 예외함', () => {
     })
     const { router, actions } = renderPage('/app/exceptions?month=2026-07&contractNo=C-0001&page=4&selected=11')
     const list = await table()
+    await actions.click(within(await screen.findByRole('dialog', { name: /^예외 상세/ })).getByRole('button', { name: '닫기' }))
     const lastQuery = () => new URLSearchParams(searchPaths().at(-1)!.split('?')[1])
     // 순서 기준이 없는 유형·상태 컬럼은 정렬 버튼이 없다.
     expect(within(list).queryByRole('button', { name: '상태' })).toBeNull()
@@ -271,6 +310,7 @@ describe('EXCP-W01 예외함', () => {
       '/app/exceptions?month=2026-07&validationMonth=2026-07&type=CAP_VIOLATION&status=OPEN&contractNo=C-0001&page=4&selected=11',
     )
     await screen.findByText('4 / 12 페이지')
+    await actions.click(within(await screen.findByRole('dialog', { name: /^예외 상세/ })).getByRole('button', { name: '닫기' }))
     const pagination = () => screen.getByRole('navigation', { name: '예외 목록 페이지 선택' })
     const controls = () => within(pagination())
     expect(controls().queryByRole('button', { name: '처음' })).toBeNull()
@@ -513,6 +553,7 @@ describe('EXCP-W01 예외함', () => {
   })
 
   it.each([false, true])('원장 정정은 실제 서버 성공 뒤 결과를 표시한다 (도움말=%s)', async (guided) => {
+  legacyHelpContext = true
     vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
     searchResponse = () => search([correctionCase])
@@ -549,7 +590,7 @@ describe('EXCP-W01 예외함', () => {
     expect(within(actionSelect).queryByRole('option', { name: '해결' })).toBeNull()
     expect(within(actionSelect).getByRole('option', { name: '예외 아님' })).toBeInTheDocument()
     await actions.click(screen.getByRole('button', { name: '원장 정정 계속' }))
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
     expect(await within(dialog).findByText(/J-0070/)).toBeInTheDocument()
     expect(within(dialog).getByText('차변/대변 검증 통과')).toBeInTheDocument()
     // 계정과목은 한글명만 보이고 내부 코드는 병기하지 않는다
@@ -612,7 +653,7 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
-  const dialog = await screen.findByRole('dialog')
+  const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await within(dialog).findByText(/J-0070/)
   await actions.type(within(dialog).getByLabelText(/정정 사유/), '사유')
   const debit = within(dialog).getAllByLabelText(/차변/)[0]
@@ -624,6 +665,7 @@ it('양수였던 금액을 지워 두 금액이 모두 0이 되면 요청을 보
 })
 
 it('action help requires a real action sequence and preserves input for a failed retry', async () => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   let attempts = 0
@@ -633,6 +675,7 @@ it('action help requires a real action sequence and preserves input for a failed
     return { exceptionActionId: undefined, actionSeq: 1, actionType: 'START_REVIEW', actionTypeLabel: '검토 시작', fromStatus: 'NEW', toStatus: 'IN_REVIEW', toStatusLabel: '검토중', reason: '원천 확인' }
   }
   const { actions } = renderPage()
+  await table()
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
   await actions.click(form.getByRole('button', { name: '도움말' }))
@@ -660,7 +703,7 @@ it('resolved journal corrections expose read-only results without a write guide'
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 확인' }))
-  const dialog = await screen.findByRole('dialog')
+  const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await within(dialog).findByText(/J-0070/)
   expect(within(dialog).queryByRole('button', { name: '도움말' })).not.toBeInTheDocument()
   expect(within(dialog).queryByRole('button', { name: '정정 실행' })).not.toBeInTheDocument()
@@ -702,7 +745,7 @@ it.each([
   const { actions } = renderPage()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
-  const dialog = await screen.findByRole('dialog')
+  const dialog = await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' })
   await within(dialog).findByText(/J-0070/)
   await actions.type(within(dialog).getByLabelText(/정정 사유/), '계정 오류 정정')
   const reads = searchPaths().length
@@ -726,10 +769,12 @@ it('does not append a cached action twice or overwrite a newer cached status', (
 })
 
 it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a committed action after unmount (help=%s, sequence=%s)', async (guided, sequence) => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   let finish!: (value: unknown) => void
   postResponse = () => new Promise(resolve => { finish = resolve })
   const { actions, unmount } = renderPage()
+  await table()
   await actions.click(within(await table()).getByRole('button', { name: '11' }))
   const form = within(await screen.findByRole('form', { name: '예외 처리' }))
   await actions.selectOptions(form.getByLabelText(/조치/), 'START_REVIEW')
@@ -757,13 +802,15 @@ it.each([[false, 1], [true, 1], [false, 0]] as const)('updates or refreshes a co
 })
 
 it('invalidates a completed correction when help is unmounted before acknowledgement', async () => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   searchResponse = () => search([correctionCase])
   postResponse = () => ({ actionSeq: 2, actionType: 'CORRECT', fromStatus: 'IN_REVIEW', toStatus: 'RESOLVED', originalJournalHeaderId: 70, reversalJournalHeaderId: 71, repostedJournalHeaderId: 72 })
   const { actions, unmount } = renderPage()
+  await table()
   await actions.click(within(await table()).getByRole('button', { name: '12' }))
   await actions.click(await screen.findByRole('button', { name: '원장 정정 계속' }))
-  const dialog = within(await screen.findByRole('dialog'))
+  const dialog = within(await screen.findByRole('dialog', { name: '원분개 역분개, 신규 재기표' }))
   await dialog.findByText(/J-0070/)
   await actions.type(dialog.getByLabelText(/정정 사유/), '계정 오류 정정')
   await actions.click(dialog.getByRole('button', { name: '도움말' }))

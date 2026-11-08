@@ -15,7 +15,7 @@ test('활성 계정 API에 없는 기존 계정으로 과거 원장을 조회할
           }
         : path.endsWith('/journals/accounts')
           ? [{ accountCode: 'EXPECTED_INCOME', accountName: '예상 수수료수익 대응', activeYn: true }]
-          : { content: [], page: 1, totalPages: 0 }
+          : { contracts: { content: [], page: 1, totalPages: 0 }, journals: { content: [], page: 1, totalPages: 0 }, totals: { journalCount: 0, lineCount: 0, debitTotal: 0, creditTotal: 0 } }
     await route.fulfill({ json: { data, error: null, requestId: 'ledger-history-fixture' } })
   })
   await page.goto('journals?month=2026-07')
@@ -60,8 +60,8 @@ test('LEDG-W01 조건 조회 → 행 선택 → 역분개 생성 → 상태 갱�
         canReverseJournal: true,
       }
     else if (path.endsWith('/journals/accounts')) data = []
-    else if (path === '/api/v1/journals')
-      data = { content: [original], page: 1, size: 20, totalElements: 1, totalPages: 1, sort: 'journalDate,desc' }
+    else if (path === '/api/v1/journals/explorer')
+      data = { contracts: { content: [], page: 1, totalPages: 0 }, journals: { content: [original], page: 1, size: 20, totalElements: 1, totalPages: 1 }, totals: { journalCount: 1, lineCount: 1, debitTotal: 1200000, creditTotal: 1200000 } }
     else if (path.endsWith('/journals/11'))
       data = reversed
         ? { ...original, status: 'REVERSED', statusLabel: '역분개됨', reversedByJournalHeaderId: 12 }
@@ -75,7 +75,7 @@ test('LEDG-W01 조건 조회 → 행 선택 → 역분개 생성 → 상태 갱�
     } else throw new Error(`unexpected ${path}`)
     await route.fulfill({ json: envelope(data) })
   })
-  await page.goto('journals')
+  await page.goto('journals?ledgerView=all')
   // 진입 시 기준 정산월을 자동 조회한다. 조건 재조회 후에도 행 선택을 유지한다.
   await expect(page.getByRole('button', { name: 'JRN-001', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '조회', exact: true }).click()

@@ -10,7 +10,7 @@ const screens = [
   { id: 'base-agent', path: 'base', filter: 'tab=agent&keyword=QA&asOf=2026-07-01&organizationId=1' },
   { id: 'schedule', path: 'schedules', filter: 'stage=GA_TO_FC&status=PLANNED' },
   { id: 'cap', path: 'cap-checks', filter: 'stage=GA_TO_FC&status=WARNING&contractNo=QA' },
-  { id: 'ledger', path: 'journals', filter: 'searched=true&from=2026-07-01&to=2026-07-31&contract=1' },
+  { id: 'ledger', path: 'journals', filter: 'ledgerView=all&from=2026-07-01&to=2026-07-31&contract=1' },
   { id: 'audit', path: 'audit-logs', filter: 'action=PAYMENT_CONFIRMED&userId=12' },
   { id: 'validation', path: 'validation-runs', filter: 'status=COMPLETED' },
   { id: 'arbitrage', path: 'arbitrage-checks', filter: 'stage=GA_TO_FC&status=CANDIDATE&contractNo=QA' },
@@ -55,6 +55,7 @@ for (const screen of screens) {
       else if (url.pathname.endsWith('/base/agents')) data = {
         ...paging, content: [{ agentId: 1, agentCode: 'QA', agentName: '시연 설계사', activeYn: true }],
       }
+      else if (url.pathname.endsWith('/journals/explorer')) data = { contracts: { content: [], page: 1, totalPages: 0 }, journals: paging, totals: { journalCount: 0, lineCount: 0, debitTotal: 0, creditTotal: 0 } }
       else if (url.pathname.endsWith('/journals/accounts')) data = []
       else if (url.pathname.endsWith('/base/commission-items')) data = []
       else if (url.pathname.includes('active-monthly')) data = { exists: false }
@@ -67,7 +68,8 @@ for (const screen of screens) {
       }
       await route.fulfill({ json: { data, error: null, requestId: 'pagination-557' } })
     })
-    const initial = new URLSearchParams(`month=2026-07&${screen.filter}&page=4`)
+    const pageKey = screen.id === 'ledger' ? 'journalPage' : 'page'
+    const initial = new URLSearchParams(`month=2026-07&${screen.filter}&${pageKey}=4`)
     await page.goto(`${screen.path}?${initial}`)
     const pagination = page.locator('.pagination-controls')
     await expect(pagination).toBeVisible()
@@ -92,8 +94,8 @@ for (const screen of screens) {
       await pagination.getByRole('button', { name: label, exact: true }).click()
       await expect(pagination.locator('[aria-current="page"]')).toHaveText(String(target))
       const params = new URL(page.url()).searchParams
-      expect(params.get('page')).toBe(String(target))
-      for (const [key, value] of initial) if (key !== 'page') expect(params.get(key)).toBe(value)
+      expect(params.get(pageKey)).toBe(String(target))
+      for (const [key, value] of initial) if (key !== pageKey) expect(params.get(key)).toBe(value)
       await expect.poll(() => requested.some((url) => url.searchParams.get('page') === String(target))).toBe(true)
     }
     await move('다음 5페이지', 6)
@@ -117,7 +119,7 @@ for (const screen of screens) {
     for (const total of [0, 1]) {
       totalPages = total
       const query = new URLSearchParams(initial)
-      query.set('page', '1')
+      query.set(pageKey, '1')
       await page.goto(`${screen.path}?${query}`)
       await page.waitForLoadState('networkidle')
       await expect(pagination).toHaveCount(0)

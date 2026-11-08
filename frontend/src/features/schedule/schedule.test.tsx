@@ -15,6 +15,17 @@ import { criteriaFromParams, normalizePage } from './api'
 import type { ScheduleDetail, ScheduleHeader } from './api'
 import { responseLabel } from './labels'
 
+// Legacy action-guide regression fixtures do not expose comparison controls in the app.
+let legacyHelpContext = false
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  return { ...actual, useOutletContext: () => {
+    const context = actual.useOutletContext<Record<string, unknown>>()
+    return legacyHelpContext ? { ...context, helpVersion: 'before' } : context
+  } }
+})
+beforeEach(() => { legacyHelpContext = false })
+
 const envelope = <T,>(data: T) => ({ data, error: null, requestId: 'schedule-test' })
 const header = (scheduleHeaderId: number, overrides: Partial<ScheduleHeader> = {}): ScheduleHeader => ({
   scheduleHeaderId,
@@ -112,8 +123,8 @@ const toasts = () => useToastStore.getState().messages.map((message) => message.
 // 화면에 내부 번호가 없어 지금 보고 있는 스케줄은 버전 이력의 현재 행으로 확인한다.
 // 같은 행의 정책 이름(POL-2026-07 v3)에도 v3가 있어, 행 전체가 아니라 첫 칸의 버전만 본다.
 const currentVersion = () =>
-  within(screen.getByRole('table', { name: '같은 계약의 스케줄 버전 이력' }))
-    .getAllByRole('row')
+  within(screen.getByRole('table', { name: '같은 계약의 스케줄 버전 이력', hidden: true }))
+    .getAllByRole('row', { hidden: true })
     .find((row) => row.getAttribute('aria-current') === 'true')
     ?.querySelector('td')
 
@@ -458,7 +469,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
   })
 
   it('헤더·회차·합계·버전 이력을 1차와 같은 표기로 보여 준다', async () => {
-    renderAt('/schedules/11?month=2026-07', baseHandler())
+    const { actions } = renderAt('/schedules/11?month=2026-07', baseHandler())
     expect(await screen.findByText('한빛생명, 종신보험')).toBeInTheDocument()
     const lines = screen.getByRole('table', { name: '회차별 예상 지급 금액' })
     expect(within(lines).getByText('1,000.1%')).toBeInTheDocument()
@@ -467,6 +478,7 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     expect(within(lines).getAllByText('-100,000원')[0]).toHaveClass('is-negative-amount')
     // 합계는 서버 expectedTotal 이다.
     expect(lines.querySelector('tfoot')).toHaveTextContent('합계 (2줄)1,500,000원')
+    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
     const versionTable = await screen.findByRole('table', { name: '같은 계약의 스케줄 버전 이력' })
     const currentRow = within(versionTable).getByRole('link', { name: 'v2' }).closest('tr')!
     expect(currentRow).toHaveAttribute('aria-current', 'true')
@@ -480,7 +492,9 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     await screen.findByText('한빛생명, 종신보험')
     await actions.selectOptions(screen.getByLabelText('지급단계'), 'INSURER_TO_GA')
     await waitFor(() => expect(router.state.location.pathname).toBe('/schedules/10'))
+    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
     await waitFor(() => expect(currentVersion()).toHaveTextContent('v1'))
+    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
     await actions.click(
       within(await screen.findByRole('table', { name: '같은 계약의 스케줄 버전 이력' })).getByRole('link', {
         name: 'v2',
@@ -528,7 +542,8 @@ describe('SCHE-W02 예상 스케줄 상세', () => {
     const regen = calls('/api/v1/schedules/11/regenerate')[0]
     expect(regen.options).toMatchObject({ method: 'POST', body: { reason: '2026-07 정책 개정' } })
     expect(toasts()).toContain('새 스케줄 버전을 만들었습니다. 새 버전으로 이동합니다.')
-    // 새 버전 화면 전환, 상세 조회, 버전 이력 조회가 이어져 부하가 크면 5초를 넘긴다.
+    await actions.click(screen.getByRole('tab', { name: '버전비교' }))
+    // 새 버전 상세와 버전 이력이 준비될 때까지 기다린다.
     await waitFor(() => expect(currentVersion()).toHaveTextContent('v3'), { timeout: 10_000 })
     // 버전 이력이 상세보다 먼저 올 수 있다. 상세까지 읽어 버튼이 켜진 뒤에 누른다.
     await waitFor(() => expect(screen.getByRole('button', { name: '확정' })).toBeEnabled())
@@ -690,12 +705,13 @@ it('4년 정액 정책은 실제 정액·정책 회차 수를 표시하고 취�
   data.lines = [{ ...data.lines![0], calculationType: 'FIXED', ratePct: undefined, fixedAmount: 12345 }]
   renderAt('/schedules/11', url => url === '/api/v1/schedules/11' ? data : [])
   await screen.findByText('한빛생명, 종신보험')
-  expect(screen.getByRole('cell', { name: '12,345원' })).toBeVisible()
-  expect(screen.getByText(/정책에 정의된 12회차만 표시합니다/)).toBeVisible()
+  expect(screen.getByRole('cell', { name: '정액 12,345원' })).toBeVisible()
+  expect(screen.getByText(/정책 정의 12회차/)).toBeVisible()
   expect(screen.queryByRole('button', { name: '4년 예정 새 버전 만들기' })).not.toBeInTheDocument()
 })
 
 it('regeneration help validates reason and waits for new server version before navigation', async () => {
+  legacyHelpContext = true
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   const { router, actions } = renderAt('/schedules/11', (url) => {
@@ -706,6 +722,7 @@ it('regeneration help validates reason and waits for new server version before n
     if (url === '/api/v1/schedules/11/versions') return [header(11, { scheduleVersionNo: 2 })]
     return undefined
   })
+  await screen.findByText('한빛생명, 종신보험')
   await screen.findByText('한빛생명, 종신보험')
   await actions.click(screen.getByRole('button', { name: '새 버전 만들기' }))
   const modal = within(screen.getByRole('dialog', { name: '새 버전 만들기' }))

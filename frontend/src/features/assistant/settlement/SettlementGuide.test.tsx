@@ -81,7 +81,7 @@ function mount(role = 'SETTLEMENT', initialEntry = '/') {
         <main id="main-content">
           <Outlet />
         </main>
-        <SettlementGuide
+        <SettlementGuide helpVersion="before"
           user={{ ...user, roleCode: role, canProcess: ['SETTLEMENT', 'SYSTEM_ADMIN'].includes(role) }}
           month="2026-07"
         />

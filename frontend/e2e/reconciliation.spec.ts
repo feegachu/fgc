@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 const envelope = (data: unknown) => ({ data, error: null, requestId: 'reco-fixture' })
 const result = {
@@ -15,6 +16,30 @@ const result = {
   matches: [],
   detailSnapshot: { paymentStage: 'GA_TO_FC' },
 }
+
+test('수정 후 대사 도움말은 목록과 비교 창을 실제 실행 없이 설명한다', async ({ page }) => {
+  await historyFixture(page)
+  await page.route('**/api/v1/reconciliations/42/results?**', route => route.fulfill({ json: envelope({
+    summary: { resultCount: 1, matchedCount: 0, exceptionCount: 1, expectedTotal: 12000, actualTotal: 11000, differenceTotal: -1000 },
+    items: { content: [result], page: 1, totalPages: 1 },
+  }) }))
+  await page.goto('reconciliations?month=2026-07&runId=42')
+  await expect(page.getByRole('button', { name: '대사 결과 7 비교 보기' })).toBeVisible()
+  await chooseDetailedHelp(page)
+  const writes: string[] = []
+  page.on('request', request => { if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url()) })
+  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
+  await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()
+  const modal = page.getByRole('dialog', { name: '대사 비교 상세' })
+  const titles: string[] = []
+  for (const tab of ['비교 요약', '예상 원천', '실제 지급', '차액·분류 근거', '관련 화면']) {
+    await modal.getByRole('tab', { name: tab, exact: true }).click()
+    titles.push(...await readDetailedHelp(page, modal.getByRole('button', { name: '도움말', exact: true }), 1))
+  }
+  expect(titles).toContain('실제 지급 원천')
+  await expect(modal).toBeVisible()
+  expect(writes).toEqual([])
+})
 
 async function historyFixture(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/**', async (route) => {
@@ -64,8 +89,9 @@ test('비교 모달의 null 회차는 대시, 음수 예상·실제·차액은 �
   await expect(page.getByRole('dialog').getByText('C-001, 초회 수수료, -')).toBeVisible()
   await expect(page.getByRole('dialog')).not.toContainText('-회차')
   await expect(page.getByRole('dialog')).not.toContainText('—회차')
+  await page.getByRole('tab', { name: '차액·분류 근거', exact: true }).click()
   for (const text of ['-12,000원', '-13,000원', '-1,000원']) {
-    const amounts = page.getByRole('dialog').getByText(text, { exact: true })
+    const amounts = page.getByRole('dialog').getByRole('tabpanel').getByText(text, { exact: true })
     await expect(amounts.first()).toBeVisible()
     for (const amount of await amounts.all()) {
       await expect(amount).toHaveCSS('color', 'rgb(185, 28, 28)')
@@ -170,7 +196,9 @@ test('RECO-W01 실행 → 자동 선택 → RECO-W02 비교 → 불일치 예외
   }
   await page.screenshot({ path: testInfo.outputPath('reconciliation-minus-differences.png'), fullPage: true })
   await page.getByRole('button', { name: '대사 결과 7 비교 보기' }).click()
+  await page.getByRole('tab', { name: '예상 원천', exact: true }).click()
   await expect(page.getByRole('dialog').getByText('예상 없음', { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: '실제 지급', exact: true }).click()
   await expect(page.getByRole('dialog').getByText('실제 없음', { exact: true })).toBeVisible()
   await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).click()
   await page.getByRole('button', { name: '불일치 예외 일괄 생성' }).click()

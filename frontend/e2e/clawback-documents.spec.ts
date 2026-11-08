@@ -1,22 +1,56 @@
 import { test, expect, type Page } from '@playwright/test'
 
-async function expandDetail(page: Page) {
-  await page.setViewportSize({ width: 1600, height: 1000 })
-  const divider = page.getByRole('separator', { name: '환수 검토 후보 목록과 상세 너비' })
-  for (let step = 0; step < 3; step++) await divider.press('Shift+ArrowLeft')
-  await page
-    .getByRole('region', { name: '환수 PDF·발행 이력' })
-    .getByRole('table')
-    .evaluate((table) => {
-      if (table.parentElement) table.parentElement.scrollLeft = 0
-    })
+// The full Chromium build includes the PDF viewer; headless shell auto-downloads PDFs.
+test.use({ channel: 'chromium' })
+
+async function openDetail(page: Page) {
+  await page.getByRole('button', { name: 'CLW-727-001 환수 상세 보기 · 후보 42' }).click()
+  await expect(page.getByRole('dialog', { name: '환수 상세 · CLW-727-001' })).toBeVisible()
 }
+
+test('전체 너비 표에서 계약번호로 상세를 열고 좁은 화면에서도 모달 안에서 읽는다', async ({ page }, info) => {
+  await installApi(page)
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await page.goto('/clawbacks?month=2026-07&contractNo=CLW-727')
+  const table = page.getByRole('table', { name: '검색 조건에 해당하는 환수 검토 후보' })
+  await expect(table).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('separator', { name: '환수 검토 후보 목록과 상세 너비' })).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('clawback-table.png'), fullPage: true })
+  const trigger = table.getByRole('button', { name: /환수 상세 보기/ })
+  await trigger.focus()
+  await trigger.press('Enter')
+  const dialog = page.getByRole('dialog', { name: '환수 상세 · CLW-727-001' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('tab')).toHaveCount(5)
+  await expect(dialog.getByRole('tab', { name: '계약·검토 정보' })).toHaveAttribute('aria-selected', 'true')
+  await dialog.getByRole('tab', { name: '지급 스케줄' }).click()
+  await expect(dialog.getByRole('tabpanel', { name: '지급 스케줄' })).toBeVisible()
+  await expect(dialog.locator('.modal-footer').getByRole('button', { name: 'PDF 출력', exact: true })).toHaveCount(0)
+  await expect(dialog.locator('.modal-footer').getByRole('button', { name: '환수액 계산', exact: true })).toBeVisible()
+  for (const size of [{ width: 1440, height: 900 }, { width: 375, height: 740 }]) {
+    await page.setViewportSize(size)
+    await expect.poll(async () => {
+      const box = await dialog.boundingBox()
+      return !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= size.width && box.y + box.height <= size.height
+    }).toBe(true)
+    await expect(dialog.getByRole('button', { name: '닫기', exact: true })).toBeVisible()
+    await page.screenshot({ path: info.outputPath(`clawback-modal-${size.width}.png`) })
+  }
+  await dialog.getByRole('button', { name: '닫기', exact: true }).click()
+  await expect(trigger).toBeFocused()
+  await expect(page).toHaveURL(/contractNo=CLW-727/)
+})
 
 // 브라우저 상호작용 검증용 API 응답. 실제 DB/PDF 금액·해시 검증은 CT-W02 통합 시험과 구분한다.
 async function installApi(
   page: Page,
   { reader = false, stale = false, missingFile = false, loseResponse = false, gaAdmin = false } = {},
 ) {
+  await page.route('**/clawbacks?*', async route => {
+    const response = await route.fetch()
+    await route.fulfill({ response, headers: { ...response.headers(), 'Content-Security-Policy': "frame-src 'self' blob:; object-src 'none'" } })
+  })
   const writes: { key?: string; body: unknown }[] = []
   const documents: Record<string, unknown>[] = []
   const attempts = new Map<string, Record<string, unknown>>()
@@ -122,7 +156,7 @@ async function installApi(
         })
       return route.fulfill({
         contentType: 'application/pdf',
-        body: '%PDF-1.7\nfixture edition ' + url.searchParams.get('version'),
+        body: fixturePdf(),
         headers: { 'Content-Disposition': 'attachment; filename="CLN-7.pdf"' },
       })
     }
@@ -131,66 +165,87 @@ async function installApi(
   return { writes, documents }
 }
 
-test('PDF 발행 응답 유실 재시도·새 키 재발행·정확한 과거판 다운로드', async ({ page }, info) => {
+test('계산 결과에서 기본 PDF 뷰어를 열고 같은 계산의 문서를 재사용한다', async ({ page }, info) => {
   const { writes, documents } = await installApi(page, { loseResponse: true })
   await page.goto('/clawbacks?month=2026-07&contractNo=CLW-727')
-  const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-  await expect(panel.getByRole('button', { name: 'PDF 생성', exact: true })).toBeEnabled()
   await page.getByLabel('계약번호', { exact: true }).fill('아직 조회하지 않은 입력')
-  await panel.getByRole('button', { name: 'PDF 생성', exact: true }).click()
-  await panel.getByRole('button', { name: '발행 재시도' }).click()
-  await expect(panel.getByText(/PDF 발행 완료/)).toContainText('발행본 v1')
-  expect(writes[0]).toEqual(writes[1])
-  expect(writes[0].body).toEqual({ calculationVersion: 2, expectedSourceVersion: 'claw-v1-ui727' })
-  await panel.getByRole('button', { name: '재발행', exact: true }).click()
-  await expect(panel.getByText(/PDF 발행 완료/)).toContainText('발행본 v2')
-  expect(writes[2].key).not.toBe(writes[1].key)
-  expect(documents).toHaveLength(2)
-  await expect(page.getByLabel('계약번호', { exact: true })).toHaveValue('아직 조회하지 않은 입력')
-  const downloaded = page.waitForEvent('download')
-  const response = page.waitForRequest('**/documents/CLN-7.pdf?version=1')
-  await panel.getByRole('button', { name: '발행본 v1 다운로드' }).click()
-  await response
-  expect((await downloaded).suggestedFilename()).toBe('CLN-7-v1.pdf')
-  await expandDetail(page)
-  await panel.scrollIntoViewIfNeeded()
-  await panel.screenshot({ path: info.outputPath('pdf-history.png') })
-})
-
-test('stale 409는 재발행을 잠그고 다시 조회해도 검색 입력을 보존한다', async ({ page }, info) => {
-  await installApi(page, { stale: true })
-  await page.goto('/clawbacks?month=2026-07')
-  const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-  await page.getByLabel('계약번호', { exact: true }).fill('입력 유지')
-  await panel.getByRole('button', { name: 'PDF 생성', exact: true }).click()
-  await expect(panel.getByText('현재 계산 결과와 근거가 발행 요청과 다릅니다. 다시 조회해 주세요.')).toBeVisible()
-  await expect(panel.getByRole('button', { name: '발행 재시도' })).toBeDisabled()
-  await page.setViewportSize({ width: 1600, height: 1000 })
-  await panel.screenshot({ path: info.outputPath('pdf-stale409.png') })
-  await panel.getByRole('button', { name: '다시 조회' }).click()
-  await expect(page.getByLabel('계약번호', { exact: true })).toHaveValue('입력 유지')
-  await expect(panel.getByRole('button', { name: '발행 재시도' })).toBeEnabled()
-})
-
-test('COMPLIANCE 읽기 전용·없는 PDF 파일의 JSON을 저장하지 않는다', async ({ page }, info) => {
-  await installApi(page, { reader: true, missingFile: true })
-  await page.goto('/clawbacks?month=2026-07')
-  const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-  await expect(panel.getByRole('table', { name: '환수 PDF 발행 이력' })).toBeVisible()
-  await expect(panel.getByRole('button', { name: /PDF 생성|재발행/ })).toHaveCount(0)
+  await openDetail(page)
+  const output = page.getByRole('button', { name: 'PDF 출력하기', exact: true })
+  await expect(page.getByRole('region', { name: '환수 PDF·발행 이력' })).toHaveCount(0)
   let downloads = 0
   page.on('download', () => downloads++)
-  await panel.getByRole('button', { name: '발행본 v1 다운로드' }).click()
-  await expect(panel.getByText('요청한 발행본의 파일이 없습니다. 발행 이력을 다시 조회해 주세요.')).toBeVisible()
+  await output.click()
+  await expect(page.getByText('PDF를 준비하지 못했습니다. 같은 요청으로 다시 시도하세요.')).toBeVisible()
+  await output.click()
+  const viewer = page.getByRole('dialog', { name: '환수 문서뷰어' })
+  await expect(viewer).toBeVisible()
+  await expect(viewer.locator('iframe')).toHaveAttribute('src', /^blob:.*#toolbar=1/)
   expect(downloads).toBe(0)
-  await expandDetail(page)
-  await panel.screenshot({ path: info.outputPath('pdf-file-missing.png') })
+  expect(writes[0]).toEqual(writes[1])
+  expect(writes[0].body).toEqual({ calculationVersion: 2, expectedSourceVersion: 'claw-v1-ui727' })
+  await expect(viewer.getByRole('link', { name: '다운로드' })).toHaveCount(0)
+  await expect(viewer.getByText('CLN-7-v1.pdf', { exact: true })).toHaveCount(0)
+  await expect.poll(() => page.frames().some(frame => frame.url().startsWith('chrome-extension:'))).toBe(true)
+  const pdfFrame = page.frames().find(frame => frame.url().startsWith('chrome-extension:'))!
+  await expect(pdfFrame.locator('viewer-toolbar')).toBeVisible()
+  await expect(pdfFrame.locator('viewer-thumbnail')).toHaveCount(1)
+  await page.screenshot({ path: info.outputPath('pdf-viewer.png') })
+  await viewer.getByRole('button', { name: '창 닫기' }).click()
+  await expect(output).toBeFocused()
+  await output.click()
+  await expect(viewer).toBeVisible()
+  expect(writes).toHaveLength(2)
+  expect(documents).toHaveLength(1)
+  await viewer.getByRole('button', { name: '창 닫기' }).click()
+  await expect(page.getByLabel('계약번호', { exact: true })).toHaveValue('아직 조회하지 않은 입력')
 })
 
-test('GA_ADMIN은 공통 canProcess가 false여도 IF73 권한으로 발행한다', async ({ page }) => {
+test('stale 409는 출력 요청을 잠그고 다시 조회 후 재시도한다', async ({ page }) => {
+  await installApi(page, { stale: true })
+  await page.goto('/clawbacks?month=2026-07')
+  await openDetail(page)
+  const output = page.getByRole('button', { name: 'PDF 출력하기', exact: true })
+  await output.click()
+  await expect(page.getByText('계산 근거가 바뀌었습니다. 다시 조회하고 계산해 주세요.')).toBeVisible()
+  await expect(output).toBeDisabled()
+  await page.getByRole('button', { name: '다시 조회', exact: true }).click()
+  await expect(output).toBeEnabled()
+})
+
+test('COMPLIANCE는 기존 문서만 조회하고 없는 파일을 저장하거나 재발행하지 않는다', async ({ page }) => {
+  const { writes } = await installApi(page, { reader: true, missingFile: true })
+  await page.goto('/clawbacks?month=2026-07')
+  await openDetail(page)
+  let downloads = 0
+  page.on('download', () => downloads++)
+  await page.getByRole('button', { name: 'PDF 출력하기', exact: true }).click()
+  await expect(page.getByText('PDF를 불러오지 못했습니다. 다시 눌러 재시도하세요.')).toBeVisible()
+  expect(writes).toHaveLength(0)
+  expect(downloads).toBe(0)
+  await expect(page.getByRole('dialog', { name: '환수 문서뷰어' })).toHaveCount(0)
+})
+
+test('GA_ADMIN은 공통 canProcess가 false여도 IF73 권한으로 문서를 연다', async ({ page }) => {
   await installApi(page, { gaAdmin: true })
   await page.goto('/clawbacks?month=2026-07')
-  const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-  await panel.getByRole('button', { name: 'PDF 생성', exact: true }).click()
-  await expect(panel.getByText(/PDF 발행 완료/)).toContainText('발행본 v1')
+  await openDetail(page)
+  await page.getByRole('button', { name: 'PDF 출력하기', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '환수 문서뷰어' })).toBeVisible()
 })
+
+function fixturePdf() {
+  const stream = 'BT /F1 22 Tf 72 750 Td (Clawback statement - browser fixture) Tj ET'
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets = [0]
+  objects.forEach((object, index) => { offsets.push(pdf.length); pdf += `${index + 1} 0 obj\n${object}\nendobj\n` })
+  const xref = pdf.length
+  pdf += `xref\n0 6\n0000000000 65535 f \n${offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`
+  return pdf
+}

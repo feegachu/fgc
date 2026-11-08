@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { canAnimate } from '../../lib/motion'
 import { useWorkspaceStore } from '../../stores/workspace'
@@ -8,38 +8,49 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
   const navigate = useNavigate()
   const rail = useRef<HTMLDivElement>(null)
   const [{ overflow, atStart, atEnd }, setScrollState] = useState({ overflow: false, atStart: true, atEnd: true })
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = rail.current
     const bar = element?.parentElement
     if (!element || !bar) return
-    const update = () => {
-      // 이동 버튼이 생기기 전의 가용 폭으로 넘침을 판단한다.
-      const { paddingLeft, paddingRight } = getComputedStyle(bar)
-      const available = bar.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight)
-      const overflow = element.scrollWidth > available + 1
+    let overflowing = false
+    const updateEdges = () => {
       const atStart = element.scrollLeft <= 1
       const atEnd = element.scrollLeft >= element.scrollWidth - element.clientWidth - 1
-      setScrollState((previous) =>
-        previous.overflow === overflow && previous.atStart === atStart && previous.atEnd === atEnd
-          ? previous
-          : { overflow, atStart, atEnd },
-      )
+      setScrollState(previous => previous.overflow === overflowing && previous.atStart === atStart && previous.atEnd === atEnd
+        ? previous : { overflow: overflowing, atStart, atEnd })
     }
-    update()
-    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    const fitTabs = (revealActive = false) => {
+      const { paddingLeft, paddingRight } = getComputedStyle(bar)
+      const available = bar.getBoundingClientRect().width - parseFloat(paddingLeft) - parseFloat(paddingRight)
+      overflowing = tabs.length > Math.max(1, Math.round(available / 180))
+      const width = element.getBoundingClientRect().width
+      if (width <= 0) return
+      const slots = Math.max(1, Math.round(width / 180))
+      const previousWidth = element.querySelector<HTMLElement>('.workspace-tab')?.getBoundingClientRect().width || 180
+      const tabWidth = width / slots
+      let first = Math.max(0, Math.min(Math.round(element.scrollLeft / previousWidth), tabs.length - slots))
+      const activeIndex = tabs.findIndex(tab => tab.id === activeId)
+      if (revealActive && activeIndex >= 0) {
+        if (activeIndex < first) first = activeIndex
+        else if (activeIndex >= first + slots) first = activeIndex - slots + 1
+      }
+      // Use the measured CSS-pixel rail width, including fractional OS/zoom layouts.
+      element.style.setProperty('--layout-workspace-tab-width', `${tabWidth}px`)
+      element.scrollTo?.({ left: first * tabWidth, behavior: 'instant' })
+      updateEdges()
+    }
+    fitTabs(true)
+    const onResize = () => fitTabs()
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null
     observer?.observe(element)
-    element.addEventListener('scroll', update)
-    window.addEventListener('resize', update)
+    observer?.observe(bar)
+    element.addEventListener('scroll', updateEdges)
+    window.addEventListener('resize', onResize)
     return () => {
       observer?.disconnect()
-      element.removeEventListener('scroll', update)
-      window.removeEventListener('resize', update)
+      element.removeEventListener('scroll', updateEdges)
+      window.removeEventListener('resize', onResize)
     }
-  }, [tabs])
-  useEffect(() => {
-    rail.current
-      ?.querySelector<HTMLElement>('[aria-current="page"]')
-      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
   }, [tabs, activeId, overflow])
 
   function scrollToEdge(edge: 'start' | 'end') {
@@ -68,7 +79,7 @@ export function WorkspaceTabs({ activeId }: { activeId?: string }) {
             className={`workspace-tab ${tab.id === activeId ? 'is-active' : ''} ${tab.modified ? 'is-modified' : ''}`}
             key={tab.id}
           >
-            <Link data-guide-feature="app.shell.workspace-tabs.link" className="workspace-tab-link" to={tab.href} aria-current={tab.id === activeId ? 'page' : undefined}>
+            <Link data-guide-feature="app.shell.workspace-tabs.link" className="workspace-tab-link" title={tab.title} to={tab.href} aria-current={tab.id === activeId ? 'page' : undefined}>
               <span className="material-symbols-rounded" aria-hidden="true">
                 {tab.icon}
               </span>

@@ -1,0 +1,132 @@
+.payment-guide-card.screen-step-guide {
+  --pico-guide-accent: var(--color-fgc-blue);
+  --pico-guide-ink: var(--color-fgc-ink);
+  border-color: color-mix(in srgb, var(--color-fgc-blue) 25%, white);
+  padding: 18px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.screen-step-guide .screen-step-count {
+  flex: 1;
+  color: var(--color-fgc-blue);
+  font-weight: 700;
+}
+
+.screen-step-guide .screen-step-progress {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 4px;
+  appearance: none;
+  accent-color: var(--color-fgc-blue);
+}
+
+.screen-step-progress::-webkit-progress-bar { background: var(--color-fgc-surface); border-radius: 4px; }
+.screen-step-progress::-webkit-progress-value { background: var(--color-fgc-blue); border-radius: 4px; }
+.screen-step-progress::-moz-progress-bar { background: var(--color-fgc-blue); border-radius: 4px; }
+
+.payment-guide-card.screen-step-guide p.screen-step-group {
+  margin: 16px 0 4px;
+  color: var(--color-fgc-blue);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.payment-guide-card.screen-step-guide h2 { margin: 0 0 8px; font-size: 18px; }
+.payment-guide-card.screen-step-guide > p { font-size: 13px; line-height: 1.7; color: var(--color-fgc-ink); }
+.screen-step-summary > span { display: block; }
+.payment-guide-card.screen-step-guide {
+  transition: left 700ms ease-in-out, top 700ms ease-in-out, width 700ms ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .payment-guide-card.screen-step-guide { transition: none; }
+}
+
+.guide-field-picker {
+  position: fixed;
+  z-index: 1250;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 12px 32px #17334b26;
+  color: var(--color-fgc-ink);
+}
+.guide-field-picker, .guide-field-picker-motion { animation: guide-picker-open 400ms ease-out; }
+@keyframes guide-picker-open { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.guide-field-picker button { min-height: 36px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.guide-field-picker button:hover:not(:disabled) { background: var(--color-fgc-surface); }
+.guide-field-picker button:disabled { opacity: .4; cursor: default; }
+.guide-field-picker button:focus-visible { outline: 2px solid var(--color-fgc-blue); }
+.guide-field-picker [role='option'] { display: block; width: 100%; padding: 8px 12px; text-align: left; }
+.guide-field-picker [aria-selected='true'], .guide-field-picker [aria-pressed='true'] { background: var(--color-fgc-blue); color: white; }
+.guide-field-picker button:is([aria-selected='true'], [aria-pressed='true']):hover:not(:disabled) {
+  background: var(--color-fgc-ink);
+  color: white;
+}
+.guide-field-picker header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; }
+.guide-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; }
+.guide-calendar-grid > span { font-size: 12px; padding: 4px; }
+@media (prefers-reduced-motion: reduce) { .guide-field-picker, .guide-field-picker-motion { animation: none; } }
+
+body:has(.screen-step-guide[data-help-presentation='true'][data-guide-anchored='true']) .pico-launcher {
+  display: none;
+}
+
+.screen-step-details { display: grid; gap: 12px; margin: 16px 0; font-size: 12px; line-height: 1.7; }
+.screen-step-details dt { margin-bottom: 3px; color: var(--color-fgc-ink); font-weight: 700; }
+.screen-step-details dd { margin: 0; color: var(--color-text-secondary); }
+
+.screen-step-guide p.screen-step-interaction {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--color-fgc-surface);
+  font-size: 12px;
+}
+.screen-step-interaction strong { display: block; margin-bottom: 4px; color: var(--color-fgc-blue); }
+
+.screen-step-guide .payment-guide-actions {
+  position: sticky;
+  bottom: -18px;
+  margin-inline: -18px;
+  padding: 12px 18px;
+  background: white;
+  border-top: 1px solid var(--color-border-default);
+}
+.screen-step-guide .payment-guide-actions > button { flex: 1; }
+.payment-guide-card.screen-step-guide button.button-secondary:not(:disabled):not(.is-disabled) { color: var(--color-fgc-blue); border-color: color-mix(in srgb, var(--color-fgc-blue) 25%, white); background: white; }
+.payment-guide-card.screen-step-guide button.button-ghost:not(:disabled):not(.is-disabled) { color: var(--color-fgc-blue); }
+.payment-guide-card.screen-step-guide button.screen-step-next:not(:disabled):not(.is-disabled) { background: var(--color-fgc-blue); border-color: var(--color-fgc-blue); color: white; }
+.payment-guide-card.screen-step-guide button.screen-step-next:hover:not(:disabled):not(.is-disabled) { background: var(--color-fgc-ink); border-color: var(--color-fgc-ink); }
+.screen-step-guide button:focus-visible { outline-color: var(--color-fgc-blue); }
+
+.payment-guide-card.screen-step-guide p.screen-step-context {
+  margin-top: 12px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.payment-guide-spotlight.screen-step-spotlight {
+  border-color: var(--color-fgc-blue);
+  background: transparent;
+  box-shadow: 0 0 0 3px #164d861f, 0 0 0 200vmax #17334b38;
+  animation: none;
+}
+
+.guide-selection-updated { animation: guide-selection-update 1.2s ease-out; }
+@keyframes guide-selection-update {
+  from { outline: 2px solid var(--color-fgc-blue); outline-offset: 3px; }
+  to { outline: 2px solid transparent; outline-offset: 3px; }
+}
+@media (prefers-reduced-motion: reduce) { .guide-selection-updated { animation-duration: 0s; } }
+
+.guide-tree-controls [role='tree'] > li:first-child > .hierarchy-row > .hierarchy-toggle,
+.guide-tree-controls [role='tree'] > li:first-child > .hierarchy-row > .hierarchy-select .hierarchy-label {
+  outline: 2px solid var(--color-fgc-blue);
+  outline-offset: 3px;
+  border-radius: 4px;
+}

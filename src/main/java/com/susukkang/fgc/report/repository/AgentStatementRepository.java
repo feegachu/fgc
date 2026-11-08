@@ -1,5 +1,6 @@
 package com.susukkang.fgc.report.repository;
 
+import com.susukkang.fgc.report.dto.StatementAgentOverview;
 import com.susukkang.fgc.common.security.AgentDataScopeService;
 import com.susukkang.fgc.common.web.ListSort;
 import com.susukkang.fgc.common.web.SqlSort;
@@ -13,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,13 +39,14 @@ public class AgentStatementRepository {
     public static final Set<String> ENTRY_TYPES = Set.of(PAYMENT, HELD, ADJUSTMENT, CLAWBACK);
 
     private static final String ENTRY_TYPE = "e.entry_type";
+    private static final String CONTRACT_NO = "contractNo";
     private static final String AGENT_ID = "agentId";
     private static final String ENTRY_TYPE_PARAM = "entryType";
 
     private static final Map<String, String> SORTABLE = Map.of(
             "basisDate", "e.basis_date",
             "entryType", ENTRY_TYPE,
-            "contractNo", "ic.contract_no",
+            CONTRACT_NO, "ic.contract_no",
             "commissionItemCode", "ci.item_code",
             "installmentNo", "e.installment_no",
             "statusCode", "e.status_code",
@@ -159,7 +163,90 @@ public class AgentStatementRepository {
                    e.source_entity_type, e.detail::text, e.basis_month, pv.policy_name, pv.version_no
             """;
 
+    private static final String OVERVIEW_AGGREGATE = ENTRIES_CTE.replace(":agentId", "a.agent_id") + """
+                        SELECT count(DISTINCT e.contract_id) AS contracts, count(*) AS entries,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'PAYMENT'), 0) AS payment,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'HELD'), 0) AS held,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'ADJUSTMENT'), 0) AS adjustment,
+                               COALESCE(sum(e.amount) FILTER (WHERE e.entry_type = 'CLAWBACK'), 0) AS clawback,
+                               count(*) FILTER (WHERE e.amount IS NULL) AS missing
+                        """ + JOINS + """
+            WHERE e.basis_month = :month
+              AND (CAST(:contractNo AS text) IS NULL OR strpos(lower(ic.contract_no), lower(CAST(:contractNo AS text))) > 0)
+              AND (CAST(:commissionItemId AS bigint) IS NULL OR e.commission_item_id = :commissionItemId)
+              AND (CAST(:entryType AS text) IS NULL OR e.entry_type = :entryType)
+            """;
+
+    private static final String OVERVIEW_SQL = """
+                SELECT a.agent_id, a.agent_code, a.agent_name,
+                       COALESCE(b.organization_id, o.organization_id),
+                       COALESCE(b.organization_name, o.organization_name), o.organization_name,
+                       s.contracts, s.entries, s.payment, s.held, s.adjustment, s.clawback, s.missing,
+                       o.organization_id, o.parent_id, a.rank_code
+                  FROM fgc.agent a
+                  JOIN fgc.organization o ON o.organization_id = a.organization_id
+                  LEFT JOIN LATERAL (
+                    WITH RECURSIVE ancestors AS (
+                      SELECT organization_id, parent_id, organization_name, organization_type,
+                             ARRAY[organization_id] AS path, 0 AS depth
+                        FROM fgc.organization WHERE organization_id = a.organization_id
+                      UNION ALL
+                      SELECT p.organization_id, p.parent_id, p.organization_name, p.organization_type,
+                             x.path || p.organization_id, x.depth + 1
+                        FROM fgc.organization p JOIN ancestors x ON p.organization_id = x.parent_id
+                       WHERE NOT p.organization_id = ANY(x.path)
+                    )
+                    SELECT organization_id, organization_name FROM ancestors
+                     WHERE organization_type = 'BRANCH' ORDER BY depth LIMIT 1
+                  ) b ON TRUE
+                  CROSS JOIN LATERAL (
+                """ + OVERVIEW_AGGREGATE + """
+                  ) s
+                 WHERE s.entries > 0 OR (a.appointment_date <= :monthEnd
+                     AND (a.termination_date IS NULL OR a.termination_date >= :month))
+                 ORDER BY s.entries > 0 DESC, COALESCE(b.organization_name, o.organization_name),
+                          a.agent_name, a.agent_id
+                """;
+
     private final EntityManager entityManager;
+
+    /** 한 요청으로 전체 설계사를 조회하며, 개별 명세와 동일한 CTE/귀속 범위를 재사용한다. */
+    // OVERVIEW_SQL is assembled once from repository-owned SQL and fixed scope fragments.
+    // No request value is interpolated: every filter below is a bound query parameter.
+    @SuppressWarnings("java:S2077")
+    public List<StatementAgentOverview> overview(Filter filter) {
+        Map<Long, StatementAgentOverview.OrganizationNode> organizations = new HashMap<>();
+        entityManager.createNativeQuery("SELECT organization_id,parent_id,organization_name,organization_type FROM fgc.organization")
+                .getResultList().forEach(value -> {
+                    Object[] row = (Object[]) value;
+                    long id = ((Number) row[0]).longValue();
+                    organizations.put(id, new StatementAgentOverview.OrganizationNode(id,
+                            row[1] == null ? null : ((Number) row[1]).longValue(), (String) row[2], (String) row[3]));
+                });
+        NativeQuery<?> query = (NativeQuery<?>) entityManager.createNativeQuery(OVERVIEW_SQL);
+        query.setParameter("month", filter.month(), LocalDate.class);
+        query.setParameter(CONTRACT_NO, filter.contractNo(), String.class);
+        query.setParameter("commissionItemId", filter.commissionItemId(), Long.class);
+        query.setParameter(ENTRY_TYPE_PARAM, filter.entryType(), String.class);
+        query.setParameter("monthEnd", filter.month().withDayOfMonth(filter.month().lengthOfMonth()));
+        return query.getResultList().stream().map(result -> {
+            Object[] c = (Object[]) result;
+            List<StatementAgentOverview.OrganizationNode> path = new ArrayList<>();
+            Set<Long> seen = new HashSet<>();
+            Long organizationId = ((Number) c[13]).longValue();
+            while (organizationId != null && seen.add(organizationId) && organizations.containsKey(organizationId)) {
+                var organization = organizations.get(organizationId);
+                path.add(0, organization);
+                organizationId = organization.parentId();
+            }
+            return new StatementAgentOverview(
+                    ((Number) c[0]).longValue(), (String) c[1], (String) c[2], ((Number) c[3]).longValue(),
+                    (String) c[4], (String) c[5], ((Number) c[6]).longValue(), ((Number) c[7]).longValue(),
+                    (BigDecimal) c[8], (BigDecimal) c[9], (BigDecimal) c[10], (BigDecimal) c[11],
+                    ((Number) c[12]).longValue(), ((Number) c[13]).longValue(),
+                    c[14] == null ? null : ((Number) c[14]).longValue(), (String) c[15], List.copyOf(path));
+        }).toList();
+    }
 
     /** 목록·합계가 같이 쓰는 필터. month 는 그 달 1일이다. */
     public record Filter(long agentId, LocalDate month, String contractNo, Long commissionItemId, String entryType) {
@@ -226,7 +313,7 @@ public class AgentStatementRepository {
         sql.append(" WHERE e.basis_month = :month");
         if (filter.contractNo() != null) {
             sql.append(" AND strpos(lower(ic.contract_no), lower(:contractNo)) > 0");
-            params.put("contractNo", filter.contractNo());
+            params.put(CONTRACT_NO, filter.contractNo());
         }
         if (filter.commissionItemId() != null) {
             sql.append(" AND e.commission_item_id = :commissionItemId");

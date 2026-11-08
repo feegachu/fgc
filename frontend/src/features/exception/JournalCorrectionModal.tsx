@@ -194,7 +194,7 @@ function CorrectionBody({
   const [result, setResult] = useState<JournalCorrectionResult | null>(null)
   const draftKey = JSON.stringify([journalDate, description, lines, reason, evidenceRef])
   const [initialDraftKey] = useState(draftKey)
-  const clearUnsaved = useUnsavedWork(editable && result === null && draftKey !== initialDraftKey, draftKey)
+  const clearUnsaved = useUnsavedWork(editable && result === null && draftKey !== initialDraftKey, draftKey, `exception:${item.exceptionCaseId}:`)
 
   const [saveGuide] = useState(() => new SaveGuide())
   const mounted = useRef(false)
@@ -205,6 +205,7 @@ function CorrectionBody({
   useEffect(() => { saveGuide.update(input, valid) }, [saveGuide, input, valid])
 
   const mutation = useMutation({
+    mutationKey: ['exception', 'write', item.exceptionCaseId],
     mutationFn: () =>
       postJournalCorrection(item.exceptionCaseId!, {
         reason: reason.trim(),

@@ -186,8 +186,7 @@ async function fixture(
 
 const historyRow = (page: Page, seq: number) =>
   page
-    .getByRole('table', { name: '상태 변경' })
-    .getByRole('row')
+    .locator('.contract-history-event')
     .filter({ has: page.getByRole('button', { name: `변경 ${seq} 영향 보기` }) })
 
 test('필수 열과 후속 상태를 구분하고 영향 패널에서 지급 보류와 회차 중단을 다른 라벨로 보인다', async ({
@@ -270,35 +269,23 @@ test('필수 열과 후속 상태를 구분하고 영향 패널에서 지급 보
   })
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('contracts/1')
-  const table = page.getByRole('table', { name: '상태 변경' })
-  await expect(table).toBeVisible({ timeout: 30_000 })
-  await expect(table.getByRole('columnheader')).toHaveText([
-    '순번',
-    '변경 전→후',
-    '효력일시',
-    '접수일시',
-    '처리일시',
-    '처리자',
-    '사유',
-    '후속 상태',
-    '영향',
-  ])
-  await expect(historyRow(page, 1)).toContainText('자료 없음')
+  const timeline = page.getByRole('list', { name: '계약 상태 변화' })
+  await expect(timeline).toBeVisible({ timeout: 30_000 })
+  await expect(timeline.locator('.contract-history-event')).toHaveCount(5)
   await expect(historyRow(page, 1)).toContainText('대상 없음')
   await expect(historyRow(page, 1)).toContainText('신규 계약')
   await expect(historyRow(page, 2)).toContainText('재시도 후 성공, 2/5회 시도')
-  await expect(historyRow(page, 2)).toContainText('지급 보류 1건, 회차 변경 2건, 처리 제외 1건')
-  await expect(historyRow(page, 3)).toContainText('바뀐 대상 0건')
   await expect(historyRow(page, 4)).toContainText('실패, 재시도 대기')
   await expect(historyRow(page, 4)).toContainText('실패 사유: 적용할 정책을 찾지 못했습니다')
   await expect(historyRow(page, 4)).not.toContainText('FGC-IMPL')
   await expect(historyRow(page, 5)).toContainText('처리 대기')
-  await expect(page.getByText('끝나지 않은 후속 처리가 있어 10초마다 다시 조회합니다.')).toBeVisible()
+  await expect(page.getByText('끝나지 않은 후속 처리가 있어 10초마다 다시 조회합니다.')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('status-history-table.png'), fullPage: true })
 
   await page.getByRole('button', { name: '변경 2 영향 보기' }).click()
   const panel = page.getByRole('dialog', { name: '변경 2 영향' })
   await expect(panel.getByRole('heading', { name: '영향 21건' })).toBeVisible()
+  await expect(panel).toContainText('지급 보류 1건, 회차 변경 2건, 처리 제외 1건')
   await expect(effectRow(panel, 0)).toContainText('지급 보류')
   await expect(effectRow(panel, 1)).toContainText('이력 보존, 처리 제외')
   await expect(effectRow(panel, 1)).toContainText('0원')
@@ -348,7 +335,7 @@ test('자동 재시도 소진은 운영 담당 확인 안내만 보이고 재시
   await expect(page.getByRole('button', { name: /재시도/ })).toHaveCount(0)
   await expect(page.getByText(/초마다 다시 조회합니다/)).toHaveCount(0)
   const overflow = await page
-    .locator('.contract-history-panel .data-table-viewport')
+    .locator('.contract-history-timeline')
     .evaluate((element) => element.scrollWidth - element.clientWidth)
   expect(overflow).toBeLessThanOrEqual(1)
   expect(
@@ -384,27 +371,30 @@ test('처리 중 자동 재조회에도 사건 선택과 패널, 표와 화면 �
   await page.goto('contracts/1')
   const row = historyRow(page, 12)
   await expect(row).toContainText('처리 대기')
-  const viewport = page.locator('.contract-history-panel .data-table-viewport')
+  const viewport = page.locator('.contract-history-timeline')
   await row.getByRole('button', { name: '변경 12 영향 보기' }).click()
   const panel = page.getByRole('dialog', { name: '변경 12 영향' })
   await expect(panel.getByText('후속 처리 대기 중입니다. 처리가 끝나면 영향이 표시됩니다.')).toBeVisible()
   // 클릭이 버튼을 화면 안으로 스크롤한 뒤의 위치가 기준이다.
   const scrollLeft = await viewport.evaluate((element) => element.scrollLeft)
-  expect(scrollLeft).toBeGreaterThan(0)
-  const pageScroll = await page.evaluate(() => window.scrollY)
-  expect(pageScroll).toBeGreaterThan(0)
+  expect(scrollLeft).toBe(0)
+  const pageScroll = await page.locator('#main-content').evaluate(el => el.scrollTop)
+  const timelineScroll = await viewport.evaluate(el => el.scrollTop)
+  expect(timelineScroll + pageScroll).toBeGreaterThan(0)
   finished = true
   await expect(panel.getByRole('row', { name: /예상 스케줄 회차/ }).first()).toBeVisible({ timeout: 20_000 })
   await expect(panel).toBeVisible()
   await expect(row).toHaveClass(/is-selected/)
   await expect(row).toContainText('완료')
   expect(await viewport.evaluate((element) => element.scrollLeft)).toBe(scrollLeft)
+  expect(await viewport.evaluate(el => el.scrollTop)).toBeCloseTo(timelineScroll, 0)
   await page.screenshot({ path: testInfo.outputPath('status-history-refetched.png') })
   await panel.getByRole('button', { name: '닫기', exact: true }).click()
   await expect(row).toHaveClass(/is-selected/)
   expect(await viewport.evaluate((element) => element.scrollLeft)).toBe(scrollLeft)
+  expect(await viewport.evaluate(el => el.scrollTop)).toBeCloseTo(timelineScroll, 0)
   // 처리가 끝나 재조회 안내 줄이 사라진 높이만큼만 달라지고 화면 맨 위로 돌아가지 않는다.
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(pageScroll - 50)
+  expect(await page.locator('#main-content').evaluate(el => el.scrollTop)).toBeGreaterThan(pageScroll - 50)
   await expect(row).toBeInViewport()
 })
 

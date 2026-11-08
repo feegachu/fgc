@@ -1,11 +1,12 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { STEPS } from './state'
+import { getScreenWalkthrough } from '../guide/page-guides'
 import { workflowWalkthrough } from './workflow-walkthrough'
 import { useWorkflowWalkthrough } from './useWorkflowWalkthrough'
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList)
-  document.body.innerHTML = '<main id="main-content"><input name="contractDate" type="date"><select name="insurerId"><option value="">선택</option><option value="1">보험회사</option></select><input name="productOfferingId" role="combobox" data-selected-value=""></main>'
+  document.body.innerHTML = '<main id="main-content"><input name="contractDate" type="date" data-guide-feature="features.contract.contract-form-page.contract-date"><select name="insurerId" data-guide-feature="features.contract.contract-form-page.insurer-id"><option value="">선택</option><option value="1">보험회사</option></select><input name="productOfferingId" data-guide-feature="features.contract.contract-form-page.product-offering-id" role="combobox" data-selected-value=""></main>'
 })
 afterEach(() => { vi.restoreAllMocks(); document.body.innerHTML = '' })
 it('provides explanations for all eight remaining business stages', () => {
@@ -14,7 +15,7 @@ it('provides explanations for all eight remaining business stages', () => {
     expect(steps.length).toBeGreaterThan(0)
     expect(steps.every(step => step.selector && step.title && step.instruction)).toBe(true)
   }
-  expect(workflowWalkthrough('contract.create', '/contracts/new', false)).toHaveLength(11)
+  expect(workflowWalkthrough('contract.create', '/contracts/new', false)).toHaveLength(9)
   expect(workflowWalkthrough('validation.finalize', '/validation-runs/1', false)).toHaveLength(11)
 })
 it('requires explicit next and a real SearchSelect selection rather than typed text', async () => {
@@ -39,7 +40,7 @@ it('requires explicit next and a real SearchSelect selection rather than typed t
 it('blocks missing or duplicate targets and restores the same explanation after recovery', async () => {
   const { result } = renderHook(() => useWorkflowWalkthrough('contract.create', '/contracts/new', false))
   await waitFor(() => expect(result.current.target).not.toBeNull())
-  act(() => document.querySelector('main')!.insertAdjacentHTML('beforeend', '<input name="contractDate">'))
+  act(() => document.querySelector('main')!.insertAdjacentHTML('beforeend', '<input name="contractDate" data-guide-feature="features.contract.contract-form-page.contract-date">'))
   await waitFor(() => expect(result.current.target).toBeNull())
   expect(result.current.ready).toBe(false)
   act(() => document.querySelectorAll('[name=contractDate]')[1].remove())
@@ -48,23 +49,14 @@ it('blocks missing or duplicate targets and restores the same explanation after 
   await waitFor(() => expect(result.current.target).not.toBeNull())
   expect(result.current.index).toBe(0)
 })
-it('allows an empty optional cycle premium without writing a value', async () => {
+it('calls the same contract page guide in order and adds a server-result gate at the end', () => {
   const steps = workflowWalkthrough('contract.create', '/contracts/new', false)
-  document.querySelector('main')!.innerHTML = steps.slice(0, 10).map(step => `<input name="${step.id}" value="${step.id === 'premiumPerCycleAmount' ? '' : '1'}">`).join('')
-  const input = document.querySelector<HTMLInputElement>('[name="premiumPerCycleAmount"]')!
-  const changed = vi.fn()
-  input.addEventListener('input', changed)
-  const { result } = renderHook(() => useWorkflowWalkthrough('contract.create', '/contracts/new', false))
-  for (let index = 0; index < 6; index++) {
-    await waitFor(() => expect(result.current.ready).toBe(true))
-    act(() => result.current.next())
-  }
-  await waitFor(() => expect(result.current.step?.id).toBe('premiumPerCycleAmount'))
-  await waitFor(() => expect(result.current.ready).toBe(true))
-  act(() => result.current.next())
-  expect(result.current.step?.id).toBe('firstPremiumAmount')
-  expect(input.value).toBe('')
-  expect(changed).not.toHaveBeenCalled()
+  const page = getScreenWalkthrough('CONT-W03').filter(step => !step.targetId.endsWith('next-contract-status') && !step.targetId.endsWith('status-event-effective-at'))
+  expect(steps.map(step => step.id)).toEqual(page.map(step => step.targetId))
+  expect(steps.map(step => [step.title, step.instruction, step.interaction, step.presentation, step.openControl])).toEqual(
+    page.map(step => [step.title, step.instruction, step.interaction, step.presentation, step.openControl]))
+  expect(steps.at(-1)?.workflowInstruction).toContain('서버의 계약과 스케줄')
+  expect(steps[0].id).toContain('contract-date')
 })
 it('uses a separate correction handoff even when the resolved exception disappeared', () => {
   const steps = workflowWalkthrough('exception.resolve', '/exceptions', true, true)
@@ -73,7 +65,7 @@ it('uses a separate correction handoff even when the resolved exception disappea
   expect(steps[0].selector).toBe('h1')
 })
 it('explains returned results rather than searching for inputs after successful navigation', () => {
-  expect(workflowWalkthrough('contract.create', '/contracts/4', false)[0].id).toBe('saved')
+  expect(workflowWalkthrough('contract.create', '/contracts/4', false, false, false)[0].id).toBe('saved')
   expect(workflowWalkthrough('payment.confirm', '/transactions', false)[0].selector).toContain('payment.results')
 })
 

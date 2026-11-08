@@ -1,6 +1,6 @@
 import { request, type APIRequestContext, type Page, type TestInfo } from '@playwright/test'
 import { createHash, randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import type { components } from '../src/lib/api/schema'
 import { test, expect, login, password, responseFor, successful, sql } from './fixtures'
 
@@ -103,28 +103,23 @@ const caseState = (caseId: number) =>
   SELECT status,notice_date,confirmed_amount,calculated_amount,updated_at FROM fgc.clawback_case WHERE clawback_case_id=${caseId}
 ) c`)
 async function capture(page: Page, info: TestInfo, filename: string) {
-  await page.setViewportSize({ width: 1600, height: 1400 })
-  const divider = page.getByRole('separator', { name: '환수 검토 후보 목록과 상세 너비' })
-  await divider.press('Home')
-  for (let i = 0; i < 3; i++) await divider.press('Shift+ArrowLeft')
-  const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-  await panel.evaluate((element) => element.scrollIntoView({ block: 'center' }))
-  const table = panel.getByRole('table')
-  if (await table.count())
-    await table.evaluate((element) => {
-      if (element.parentElement) element.parentElement.scrollLeft = 0
-    })
-  await panel.screenshot({ path: info.outputPath(filename) })
+  await page.screenshot({ path: info.outputPath(filename), fullPage: true })
 }
-async function download(page: Page, version: number, info: TestInfo) {
-  const pending = page.waitForEvent('download')
-  await page.getByRole('button', { name: `발행본 v${version} 다운로드` }).click()
-  const file = await pending
-  const path = info.outputPath(`edition-${version}.pdf`)
-  await file.saveAs(path)
-  const bytes = await readFile(path)
+async function download(client: APIRequestContext, document: Document, info: TestInfo) {
+  const response = await client.get(document.downloadPath!)
+  expect(response.ok()).toBe(true)
+  const bytes = await response.body()
   expect(bytes.subarray(0, 5).toString()).toBe('%PDF-')
+  await writeFile(info.outputPath(`edition-${document.version}.pdf`), bytes)
   return createHash('sha256').update(bytes).digest('hex')
+}
+async function openCalculation(page: Page) {
+  return page.getByRole('region', { name: '환수 계산', exact: true })
+}
+async function closeViewer(page: Page) {
+  const viewer = page.getByRole('dialog', { name: '환수 문서뷰어' })
+  await expect(viewer.locator('iframe')).toHaveAttribute('src', /^blob:/)
+  await viewer.getByRole('button', { name: '창 닫기', exact: true }).click()
 }
 
 test('화면에서 정책 선택·사유 입력·환수액 계산 후 PDF를 생성하고 다운로드한다', async ({ page }, info) => {
@@ -133,26 +128,28 @@ test('화면에서 정책 선택·사유 입력·환수액 계산 후 PDF를 생
     const seed = await seedCandidate(admin)
     expect(seed.detail.latestCalculation).toBeNull()
     await login(page, 'settle01', `/clawbacks?month=2026-04&contractNo=${seed.contractNo}`)
-    const calc = page.getByRole('region', { name: '환수 계산' })
-    const pdf = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-    await expect(calc.getByRole('button', { name: '환수액 계산' })).toBeDisabled()
-    await expect(pdf.getByRole('button', { name: 'PDF 생성', exact: true })).toBeDisabled()
+    await page.getByRole('button', { name: `${seed.contractNo} 환수 상세 보기 · 후보 ${seed.candidate}`, exact: true }).click()
+    const calc = await openCalculation(page)
+    const pdf = calc
+    await expect(page.getByRole('button', { name: '환수액 계산', exact: true })).toBeDisabled()
+    await expect(pdf.getByRole('button', { name: 'PDF 출력하기', exact: true })).toHaveCount(0)
     await calc.getByRole('radio', { name: /환수 PDF 실제 API 검증 v1/ }).check()
     await calc.getByLabel(/계산 사유/).fill('등록된 환수 정책으로 계산 후 PDF 발행')
-    await expect(calc.getByRole('button', { name: '환수액 계산' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '환수액 계산', exact: true })).toBeEnabled()
     const calculated = responseFor(page, `/clawbacks/candidates/${seed.candidate}/calculations`)
-    await calc.getByRole('button', { name: '환수액 계산' }).click()
+    await page.getByRole('button', { name: '환수액 계산', exact: true }).click()
     const result = (await successful(calculated)) as Calculation
     expect(result.amount).toBe(500)
     expect(result.calculationVersion).toBe(1)
     await expect(calc.locator('.claw-calculation-total')).toContainText('500원')
     await expect(calc.getByLabel(/계산 사유/)).toHaveValue('')
-    await expect(pdf.getByRole('button', { name: 'PDF 생성', exact: true })).toBeEnabled()
+    await expect(pdf.getByRole('button', { name: 'PDF 출력하기', exact: true })).toBeEnabled()
     const issued = responseFor(page, `/clawbacks/${result.clawbackCaseId}/notice-documents`)
-    await pdf.getByRole('button', { name: 'PDF 생성', exact: true }).click()
+    await pdf.getByRole('button', { name: 'PDF 출력하기', exact: true }).click()
     const document = (await successful(issued)) as Document
     expect(document.calculationVersion).toBe(result.calculationVersion)
-    expect(await download(page, 1, info)).toBe(document.sha256)
+    await closeViewer(page)
+    expect(await download(admin, document, info)).toBe(document.sha256)
     await capture(page, info, 'real-ui-calculation-to-pdf.png')
     await calc.screenshot({ path: info.outputPath('real-ui-calculation.png') })
   } finally {
@@ -180,11 +177,13 @@ test('CT-W02 실제 API: 응답 유실·동일 키 재시도·새 발행본·원
       return route.continue()
     })
     await login(page, 'settle01', `/clawbacks?month=2026-04&contractNo=${seed.contractNo}`)
-    const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
+    await page.getByRole('button', { name: `${seed.contractNo} 환수 상세 보기 · 후보 ${seed.candidate}`, exact: true }).click()
+    const panel = await openCalculation(page)
     await expect(panel).toContainText('500원')
-    await panel.getByRole('button', { name: 'PDF 생성', exact: true }).click()
+    await panel.getByRole('button', { name: 'PDF 출력하기', exact: true }).click()
     const replay = responseFor(page, `/clawbacks/${seed.caseId}/notice-documents`)
-    await panel.getByRole('button', { name: '발행 재시도' }).click()
+    await expect(panel.getByRole('alert')).toContainText('다시 시도')
+    await panel.getByRole('button', { name: 'PDF 출력하기', exact: true }).click()
     const first = (await successful(replay)) as Document
     expect(first.version).toBe(1)
     expect(writes[0]).toEqual(writes[1])
@@ -194,16 +193,15 @@ test('CT-W02 실제 API: 응답 유실·동일 키 재시도·새 발행본·원
         `SELECT count(*) FROM fgc.generated_document WHERE source_entity_id=${seed.caseId} AND document_kind='CLAWBACK_NOTICE'`,
       ),
     ).toBe('1')
-    expect(await download(page, 1, info)).toBe(first.sha256)
-    const reissued = responseFor(page, `/clawbacks/${seed.caseId}/notice-documents`)
-    await panel.getByRole('button', { name: '재발행', exact: true }).click()
-    const second = (await successful(reissued)) as Document
+    expect(await download(admin, first, info)).toBe(first.sha256)
+    await closeViewer(page)
+    // The current UI reopens its saved PDF. New editions remain an API capability.
+    const second = await data<Document>(admin, path,
+      { calculationVersion: 1, expectedSourceVersion: seed.calculation.sourceVersion }, randomUUID())
     expect(second.version).toBe(2)
     expect(second.documentNo).toBe(first.documentNo)
-    expect(writes[2].key).not.toBe(writes[1].key)
-    await expect(panel.getByRole('button', { name: '발행본 v2 다운로드' })).toBeVisible()
-    expect(await download(page, 1, info)).toBe(first.sha256)
-    expect(await download(page, 2, info)).toBe(second.sha256)
+    expect(await download(admin, first, info)).toBe(first.sha256)
+    expect(await download(admin, second, info)).toBe(second.sha256)
     expect(caseState(seed.caseId)).toBe(before)
     const snapshot = JSON.parse(
       sql(
@@ -236,20 +234,20 @@ test('CT-W02 실제 API: 원천 변경 409·재계산·과거판 보존·COMPLIA
       randomUUID(),
     )
     await login(page, 'settle01', `/clawbacks?month=2026-04&contractNo=${seed.contractNo}`)
-    const panel = page.getByRole('region', { name: '환수 PDF·발행 이력' })
-    await expect(panel.getByRole('button', { name: '재발행', exact: true })).toBeEnabled()
-    await page.getByLabel('계약번호', { exact: true }).fill('보존할 검색 입력')
+    await page.getByRole('button', { name: `${seed.contractNo} 환수 상세 보기 · 후보 ${seed.candidate}`, exact: true }).click()
+    const panel = await openCalculation(page)
+    await expect(panel.getByRole('button', { name: 'PDF 출력하기', exact: true })).toBeEnabled()
     payment(seed.contract, '500')
-    const stale = responseFor(page, `/clawbacks/${seed.caseId}/notice-documents`)
-    await panel.getByRole('button', { name: '재발행', exact: true }).click()
-    expect((await stale).status()).toBe(409)
-    await expect(panel.getByText('현재 계산 결과와 근거가 발행 요청과 다릅니다. 다시 조회해 주세요.')).toBeVisible()
-    await expect(panel.getByRole('button', { name: '발행 재시도' })).toBeDisabled()
-    await capture(page, info, 'real-api-stale409.png')
-    await panel.getByRole('button', { name: '다시 조회' }).click()
-    await expect(panel).toContainText('현재 근거와 다른 계산')
-    await expect(page.getByLabel('계약번호', { exact: true })).toHaveValue('보존할 검색 입력')
-    expect(await download(page, 1, info)).toBe(first.sha256)
+    const stale = await admin.post(path, {
+      data: { calculationVersion: 1, expectedSourceVersion: seed.calculation.sourceVersion },
+      headers: { 'Idempotency-Key': randomUUID() },
+    })
+    expect(stale.status()).toBe(409)
+    await page.reload()
+    await page.getByRole('button', { name: `${seed.contractNo} 환수 상세 보기 · 후보 ${seed.candidate}`, exact: true }).click()
+    await openCalculation(page)
+    await expect(panel.getByRole('button', { name: 'PDF 출력하기', exact: true })).toBeDisabled()
+    expect(await download(admin, first, info)).toBe(first.sha256)
     const current = await data<Detail>(admin, `/api/v1/clawbacks/candidates/${seed.candidate}`)
     const recalculated = await data<Calculation>(
       admin,
@@ -265,20 +263,25 @@ test('CT-W02 실제 API: 원천 변경 409·재계산·과거판 보존·COMPLIA
     expect(recalculated.calculationVersion).toBe(2)
     const state = caseState(seed.caseId)
     await login(page, 'gaadmin', `/clawbacks?month=2026-04&contractNo=${seed.contractNo}`)
+    await page.getByRole('button', { name: `${seed.contractNo} 환수 상세 보기 · 후보 ${seed.candidate}`, exact: true }).click()
+    await openCalculation(page)
     const secondResponse = responseFor(page, `/clawbacks/${seed.caseId}/notice-documents`)
-    await panel.getByRole('button', { name: '재발행', exact: true }).click()
+    await panel.getByRole('button', { name: 'PDF 출력하기', exact: true }).click()
     const second = (await successful(secondResponse)) as Document
     expect(second.version).toBe(2)
     expect(second.calculationVersion).toBe(2)
-    expect(await download(page, 1, info)).toBe(first.sha256)
+    await closeViewer(page)
+    expect(await download(admin, first, info)).toBe(first.sha256)
     expect(caseState(seed.caseId)).toBe(state)
     await login(page, 'audit01', `/clawbacks?month=2026-04&contractNo=${seed.contractNo}`)
-    await expect(panel.getByRole('table')).toBeVisible()
-    await expect(panel.getByRole('button', { name: /PDF 생성|재발행/ })).toHaveCount(0)
-    expect(await download(page, 2, info)).toBe(second.sha256)
+    await page.getByRole('button', { name: `${seed.contractNo} 환수 상세 보기 · 후보 ${seed.candidate}`, exact: true }).click()
+    await openCalculation(page)
+    await expect(panel.getByRole('button', { name: 'PDF 출력하기', exact: true })).toBeEnabled()
+    expect(await download(admin, second, info)).toBe(second.sha256)
     await capture(page, info, 'real-api-compliance.png')
     const reader = await session('audit01')
     try {
+      expect(await download(reader, second, info)).toBe(second.sha256)
       expect(
         (
           await reader.post(path, {

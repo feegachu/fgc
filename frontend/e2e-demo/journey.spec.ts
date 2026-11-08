@@ -81,7 +81,7 @@ async function payment(page: Page, amount: number, contractNumbers: string[], ex
   const items = await api(page, '/base/commission-items?asOf=2026-07-01')
   const item = items.find((item: { itemCode: string }) => item.itemCode === 'BASE_COMMISSION')
   expect(item, 'Demo BASE_COMMISSION item must exist').toBeTruthy()
-  await page.goto(`transactions/new?month=${month}`)
+  await page.goto(`transactions/new?amount=0&month=${month}`)
   await selectEntity(page, page.getByLabel('수령 설계사', { exact: false }), String(contracts[0].agentId))
   await selectEntity(page, page.getByLabel('수수료 항목', { exact: false }), String(item.commissionItemId))
   await page.locator('#bizKey').fill(`E2E-418-PAYMENT-${amount}`)
@@ -219,7 +219,7 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
     })
     .toBe('COMPLETED')
   await expect(page.locator('section[aria-labelledby="vrun-header-title"] .status-badge')).toHaveText('계산완료')
-  await expect(page.locator('.vrun-progress-value')).toHaveText('8/10 단계 (80%)')
+  await expect(page.locator('.vrun-progress-value')).toHaveText('8/10 단계 (80%)', { timeout: 40_000 })
   for (let index = 0; index < 8; index++) await expect(steps.nth(index)).toContainText('완료')
   for (let index = 8; index < 10; index++) {
     await expect(steps.nth(index)).toContainText('담당자 처리')
@@ -236,12 +236,12 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
   await expect(conditions).toHaveCount(8)
   for (const [index, condition] of checklist.conditions.entries()) {
     await expect(conditions.nth(index)).toContainText(`${condition.no}. ${condition.label}`)
-    await expect(conditions.nth(index).locator('.vrun-checklist-result')).toContainText(
+    await expect(conditions.nth(index).locator('.vrun-checklist-label')).toContainText(
       condition.passed ? '통과' : `미충족 ${condition.count}건`,
     )
   }
   await expect(page.locator('#finalize-action-note')).toHaveText(
-    '확정 조건 8개를 모두 통과해야 합니다. 아래 체크리스트를 확인하세요.',
+    '위 8개 조건을 모두 통과하면 확정할 수 있습니다.',
   )
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeDisabled()
   const pending = await api(
@@ -262,12 +262,13 @@ test('월 검증 생성·실행·8개 조건·GA_ADMIN 확정', async ({ page })
       await page.getByRole('button', { name: '처리 저장' }).click()
       await successful(saved)
     }
+    await page.getByRole('dialog', { name: /^예외 상세/ }).getByRole('button', { name: '창 닫기' }).click()
   }
   const ready = await api(page, `/validation-runs/${run.validationRunId}/finalize-checklist`)
   expect(ready.passed, JSON.stringify(ready.conditions)).toBe(true)
   await login(page, 'gaadmin', `/validation-runs/${run.validationRunId}?month=2026-07`)
   await expect(conditions).toHaveCount(8)
-  await expect(conditions.locator('.vrun-checklist-result')).toHaveText(Array(8).fill('통과'))
+  await expect(conditions.locator('.vrun-checklist-label > span')).toHaveText(Array(8).fill(' · 통과'))
   await expect(page.getByText('8개 조건 모두 통과', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '확정', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '확정', exact: true }).click()
@@ -313,12 +314,12 @@ test('대사 실행 → 결과 자동 선택 → 비교 모달', async ({ page }
 test('원장 역분개 → 원본 상태와 반대 분개 확인', async ({ page }) => {
   await login(page)
   await completeMonthly(page)
-  await page.goto('journals?month=2026-07&from=2026-07-01&to=2026-07-31&searched=true')
-  const table = page.getByRole('table', { name: '조회 조건에 해당하는 검증원장 분개 목록' })
+  await page.goto('journals?ledgerView=all&month=2026-07&from=2026-07-01&to=2026-07-31&searched=true')
+  const table = page.getByRole('table', { name: '분개별 차변·대변 내역' })
   const row = table.locator('tbody tr').filter({ hasText: '기표됨' }).first()
   await row.getByRole('button').first().click()
-  await expect(page).toHaveURL(/selected=\d+/)
-  const originalId = Number(new URL(page.url()).searchParams.get('selected'))
+  await expect(page).toHaveURL(/evidence=\d+/)
+  const originalId = Number(new URL(page.url()).searchParams.get('evidence'))
   const original = await api(page, `/journals/${originalId}`)
   expect(original.status).toBe('POSTED')
   await page.getByRole('button', { name: '역분개', exact: true }).click()

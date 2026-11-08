@@ -1,36 +1,39 @@
+import type { WorkflowDestination } from './catalog'
+import { contractPaymentHelp } from '../../transaction/contract-payment-help'
 import type { SettlementStep } from './state'
+import type { ScreenHelpStep } from '../guide/ScreenHelp'
+import { getScreenWalkthrough, guideSelector } from '../guide/page-guides'
+import { useSidebarStore } from '../../../stores/sidebar'
 
-export interface WorkflowExplanation {
+export interface WorkflowExplanation extends Partial<Pick<ScreenHelpStep, 'follow' | 'presentation' | 'openControl' | 'advanceOnSelection' | 'advanceOnEvent' | 'requireAction' | 'onEnter' | 'interaction' | 'concise' | 'liveDescriptionSelector'>> {
   id: string
   selector: string
   title: string
   instruction: string
   input?: boolean
+  requiresSelectedTab?: boolean
+  workflowInstruction?: string
+  nextLabel?: string
+  scope?: 'shell'
+  destination?: WorkflowDestination
+  firstMatch?: boolean
 }
 const target = (id: string) => `[data-guide-target="${id}"]`
 const step = (id: string, selector: string, title: string, instruction: string, input = false): WorkflowExplanation =>
   ({ id, selector, title, instruction, input })
 const review = (id: string, title: string, instruction: string) => step(id, target(id), title, instruction)
-const field = (name: string, title: string, instruction: string) => step(name, `[name="${name}"]`, title, instruction, true)
 
 /** Explanations never execute a business operation or assert server completion. */
-export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false): WorkflowExplanation[] {
+function workflowInstructions(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false): WorkflowExplanation[] {
   switch (stage) {
     case 'contract.create':
-      if (path !== '/contracts/new') return [step('saved', 'h1', '계약 저장 결과를 확인하세요', '저장된 계약 상세인지 확인하세요. 다음 버튼으로 저장된 계약과 스케줄을 조회합니다.')]
-      return [
-        field('contractDate', '계약일을 입력하세요', '상품과 정책의 적용 기준이 되는 실제 계약일을 입력하세요.'),
-        field('insurerId', '보험회사를 선택하세요', '계약의 원수 보험회사를 선택하세요.'),
-        field('productOfferingId', '판매 상품을 선택하세요', '계약일과 보험회사에 맞는 검색 결과를 선택하세요. 검색어 입력만으로 선택되지 않습니다.'),
-        field('contractNo', '계약번호를 입력하세요', '원천의 계약번호를 입력하고 중복 여부를 확인하세요.'),
-        field('agentId', '담당 설계사를 선택하세요', '검색 결과에서 실제 계약 담당 설계사를 선택하세요.'),
-        field('paymentCycleCode', '납입주기를 확인하세요', '월납·연납·일시납 등 실제 납입주기를 선택하세요.'),
-        step('premiumPerCycleAmount', '[name="premiumPerCycleAmount"]', '주기 보험료를 확인하세요', '입력하거나 비워 두세요. 비워 두면 월납환산 보험료와 납입주기로 자동 계산합니다.'),
-        field('firstPremiumAmount', '초회 보험료를 입력하세요', '계약의 최초 납입 보험료를 입력하세요.'),
-        field('monthlyEquivalentFirstPremium', '월납환산 보험료를 확인하세요', '초년도 한도의 기준 금액입니다. 실제 원천 기준으로 확인하세요.'),
-        field('paymentTermMonths', '납입기간을 확인하세요', '상품 기준 납입기간을 개월 단위로 확인하세요. 자동 채워진 값도 확인합니다.'),
-        review('contract.save', '직접 계약을 저장하세요', '화면의 등록 버튼을 누르세요. 오류는 입력을 수정하고, 성공 후 저장 결과를 확인합니다.'),
-      ]
+      if (path !== '/contracts/new') return [step('saved', 'h1', '계약 저장 결과를 확인하세요', '저장된 계약 상세인지 확인하세요. 다음 버튼으로 서버의 계약과 스케줄을 조회합니다.')]
+      return getScreenWalkthrough('CONT-W03')
+        .filter(entry => !entry.targetId.endsWith('next-contract-status') && !entry.targetId.endsWith('status-event-effective-at'))
+        .map(entry => ({ ...entry, id: entry.targetId, selector: guideSelector(entry),
+          input: entry.openControl || entry.targetId.endsWith('contract-no'),
+          workflowInstruction: entry.targetId === 'contract.save' ? '직접 저장한 뒤 서버의 계약과 스케줄을 확인하고 다음 업무로 이어갑니다.' : undefined,
+        }))
     case 'schedule.review':
       if (!path.startsWith('/schedules/')) return [
         review('contract.schedules', '계약의 스케줄을 선택하세요', '지급단계와 사용 중인 버전을 확인하고 회차 상세를 여세요. 결과가 없으면 원천과 생성 상태를 확인하세요.'),
@@ -107,5 +110,94 @@ export function workflowWalkthrough(stage: SettlementStep, path: string, selecte
       review('validation.finalize', '확정 권한과 잠금 안내를 확인하세요', 'GA관리자 또는 시스템관리자의 작업입니다. 확정 후 결과가 잠기며 실제 송금이나 회계 마감과는 다릅니다.'),
       review('validation.finalize', '최종 확정을 실행하세요', '화면의 최종 확정 버튼과 확인창을 직접 조작하세요. 상태가 확정(잠김)일 때만 안내가 끝납니다.'),
     ]
+  }
+}
+
+/** The pipeline calls each page's guide, adding only workflow-specific checks and handoffs. */
+export function workflowWalkthrough(stage: SettlementStep, path: string, selectedException: boolean, correctionPending = false, reuseContractDetail = true, batchPayment = false): WorkflowExplanation[] {
+  if (reuseContractDetail && stage === 'reconciliation.review') {
+    if (path === '/reconciliations') return sharedSteps('RECO-W01')
+    if (path === '/journals') return sharedSteps('LEDG-W01')
+    if (path === '/exceptions') return sharedSteps('EXCP-W01')
+  }
+  if (reuseContractDetail && stage === 'contract.create' && /^\/contracts\/\d+$/.test(path)) {
+    return [...getScreenWalkthrough('CONT-W02').map(entry => ({
+      ...entry, id: entry.targetId, selector: guideSelector(entry),
+    })), menuHandoff('contract.openSchedules', 'sche-w01', '예상 스케줄', 'schedule-list')]
+  }
+  if (reuseContractDetail && stage === 'schedule.review' && path === '/schedules') {
+    return [...sharedSteps('SCHE-W01'), menuHandoff('schedule.openPayments', 'tran-w01', '수수료 지급', 'payment-list')]
+  }
+  if (reuseContractDetail && stage === 'payment.draft' && path === '/transactions') {
+    return [...sharedSteps('TRAN-W01').filter(entry => !entry.id.endsWith('context-link-2')), {
+      id: 'payment.openRegistration', selector: '[data-guide-feature="features.transaction.transaction-list-page.context-link-2"]',
+      title: '수수료 지급 등록으로 이어가기', concise: true,
+      instruction: '신규 등록을 눌러 계약별 지급 건을 작성하세요.',
+      interaction: '계약별 지급 등록 화면에서 안내를 이어갑니다.',
+      destination: 'payment-form', presentation: { side: 'left' },
+    }]
+  }
+  if (batchPayment && stage === 'payment.draft' && path === '/transactions/new') {
+    return [...contractPaymentHelp.map(entry => ({ ...entry, id: entry.targetId, selector: guideSelector(entry) })),
+      menuHandoff('payment.openValidation', 'vrun-w01', '월 통합검증', 'validation-list')]
+  }
+  if (reuseContractDetail && stage === 'schedule.review' && path.startsWith('/schedules/')) {
+    return [...sharedSteps('SCHE-W02'), menuHandoff('schedule.openPayments', 'tran-w01', '수수료 지급', 'payment-list')]
+  }
+  if (reuseContractDetail && stage === 'validation.execute' && path === '/validation-runs') {
+    return [...sharedSteps('VRUN-W01'), {
+      id: 'validation.month', selector: `${target('validation.create')} input[type="month"]`,
+      title: '검증월 선택', concise: true, input: true, openControl: true, advanceOnSelection: true,
+      instruction: '이번 지급을 검증할 정산월을 선택하세요.',
+      interaction: '월을 고르면 실행 생성 안내로 이어집니다.',
+      presentation: { side: 'right', includeLabel: true },
+    }, {
+      id: 'validation.createSubmit', selector: target('validation.createSubmit'),
+      title: '실행 생성', concise: true,
+      instruction: '실행 생성을 눌러 월 통합검증 실행을 만드세요.',
+      interaction: '같은 월의 진행 중 실행이 있다면 목록에서 열어 주세요.',
+      presentation: { side: 'right' },
+    }]
+  }
+  if (reuseContractDetail && stage === 'validation.execute' && /^\/validation-runs\/\d+$/.test(path)) {
+    return [...sharedSteps('VRUN-W02').filter(entry => entry.id !== 'validation.openReconciliation'),
+      menuHandoff('validation.openReconciliation', 'reco-w01', '대사 실행/결과', 'reconciliation')]
+  }
+  const instructions = workflowInstructions(stage, path, selectedException, correctionPending)
+  if (stage === 'contract.create') return instructions
+  const screenId = path.startsWith('/contracts/') ? 'CONT-W02'
+    : path.startsWith('/schedules/') ? 'SCHE-W02'
+      : path === '/transactions/new' ? 'TRAN-W02' : path === '/transactions' ? 'TRAN-W01'
+        : path === '/validation-runs' ? 'VRUN-W01' : path.startsWith('/validation-runs/') ? 'VRUN-W02'
+          : path === '/reconciliations' ? 'RECO-W01' : path === '/exceptions' ? 'EXCP-W01' : ''
+  const page = getScreenWalkthrough(screenId)
+  const explanations = instructions.map(instruction => {
+    if (reuseContractDetail && stage === 'schedule.review' && instruction.id === 'schedule.versions') {
+      return { ...instruction, selector: '#schedule-versions-tab', title: '버전 비교', concise: true,
+        instruction: '버전비교 탭에서 생성 이력과 사용 중인 버전을 확인하세요.',
+        interaction: '확인한 뒤 수수료 지급으로 이어갑니다.', requiresSelectedTab: true }
+    }
+    const shared = page.find(entry => guideSelector(entry) === instruction.selector)
+    return shared ? { ...shared, ...instruction, title: shared.title, instruction: shared.instruction,
+      workflowInstruction: instruction.instruction } : instruction
+  })
+  return explanations
+}
+
+function sharedSteps(screen: string): WorkflowExplanation[] {
+  return getScreenWalkthrough(screen).map(entry => ({ ...entry, id: entry.targetId, selector: guideSelector(entry) }))
+}
+
+function menuHandoff(id: string, screen: string, label: string, destination: WorkflowDestination): WorkflowExplanation {
+  return {
+    id, selector: '[data-guide-feature="navigation.menu.' + screen + '"]', scope: 'shell',
+    title: label + '로 이어가기', concise: true, destination,
+    instruction: '왼쪽 사이드바의 ' + label + ' 메뉴를 누르세요.',
+    interaction: destination === 'validation-list' ? '선택한 지급 건을 모두 확정한 뒤 월 검증을 진행합니다.' : '이동한 화면의 도움말로 안내를 이어갑니다.',
+    presentation: { side: 'right' },
+    onEnter: () => {
+      useSidebarStore.getState().setCollapsed(false, false)
+      useSidebarStore.getState().setSection(screen === 'vrun-w01' ? 'compliance' : screen === 'reco-w01' ? 'ledger' : 'contracts', true)
+    },
   }
 }

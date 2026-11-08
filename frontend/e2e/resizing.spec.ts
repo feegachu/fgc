@@ -98,7 +98,7 @@ test('리사이즈 후에도 예외 목록의 지정된 컬럼 정렬을 유지�
 for (const [path, label] of [
   ['journals', '분개 목록과 분개 상세 카드 너비'],
   ['arbitrage-checks', '계약별 판정과 상세 카드 너비'],
-  ['transactions/new', '지급 건, 귀속 내역과 확정 점검 카드 너비'],
+  ['transactions/new', '지급 계약 건과 검증 결과 너비'],
   ['audit-logs', '감사 기록과 변경 내용 비교 카드 너비'],
 ]) {
   test(path + ': 카드 드래그·저장·모바일 배치를 지원한다', async ({ page }, testInfo) => {
@@ -118,6 +118,7 @@ for (const [path, label] of [
         }
       else if (url.pathname.endsWith('/accounts') || url.pathname.endsWith('/commission-items')) data = []
       else if (url.pathname.endsWith('/audit-logs/options')) data = { entityTypes: [], actions: [], users: [] }
+      else if (url.pathname.endsWith('/journals/explorer')) data = { contracts: empty, journals: empty, totals: { journalCount: 0, lineCount: 0, debitTotal: 0, creditTotal: 0 } }
       else if (url.pathname.endsWith('/arbitrage-checks'))
         data = {
           summary: { clearCount: 0, candidateCount: 0, reviewRequiredCount: 0 },
@@ -126,6 +127,15 @@ for (const [path, label] of [
       await route.fulfill({ json: envelope(data) })
     })
     await page.goto(path)
+    if (path === 'journals') {
+      const layout = page.locator('.ledger-explorer-layout')
+      await expect(layout).toBeVisible()
+      await expect(page.getByRole('separator', { name: label, exact: true })).toHaveCount(0)
+      await page.setViewportSize({ width: 390, height: 844 })
+      await expect(layout).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+      return
+    }
     const handle = page.getByRole('separator', { name: label, exact: true })
     await expect(handle).toBeVisible()
     const panels = page.locator('.resizable-split-panel')
@@ -279,27 +289,16 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('table', { name: '예외 목록' })).toBeVisible()
 })
 
-test('카드 경계를 드래그하고 새로고침·키보드·복원을 지원한다', async ({ page }, testInfo) => {
-  const handle = page.getByRole('separator', { name: '예외 목록과 상세 카드 너비' })
-  const left = page.locator('.resizable-split-panel').first()
-  const before = (await left.boundingBox())!.width
-  await drag(page, handle, 180)
-  const resized = (await left.boundingBox())!.width
-  expect(resized).toBeGreaterThan(before + 150)
-  await page.reload()
-  await expect(handle).toBeVisible()
-  expect((await left.boundingBox())!.width).toBeCloseTo(resized, 0)
-  await handle.focus()
-  await page.keyboard.press('ArrowLeft')
-  expect((await left.boundingBox())!.width).toBeLessThan(resized)
-  await page.keyboard.press('Home')
-  expect((await left.boundingBox())!.width).toBeCloseTo(before, 0)
-  await drag(page, handle, -1500)
-  await expect(handle).toHaveAttribute('aria-valuenow', '25')
-  expect((await left.boundingBox())!.width).toBeGreaterThanOrEqual(256)
-  await handle.dblclick()
-  await expect(handle).toHaveAttribute('aria-valuenow', '60')
-  await page.screenshot({ path: testInfo.outputPath('resizable-cards.png'), fullPage: true })
+test('예외 목록은 전체 너비를 쓰고 선택한 건은 모달에서 처리한다', async ({ page }) => {
+  await expect(page.getByRole('separator', { name: '예외 목록과 상세 카드 너비' })).toHaveCount(0)
+  const table = page.getByRole('table', { name: '예외 목록' })
+  const before = await table.boundingBox()
+  await table.getByRole('button', { name: '11', exact: true }).click()
+  const modal = page.getByRole('dialog')
+  await expect(modal.getByLabel('조치')).toBeVisible()
+  await modal.getByRole('button', { name: '닫기', exact: true }).click()
+  expect((await table.boundingBox())!.width).toBeCloseTo(before!.width, 0)
+  await expect(table.getByRole('button', { name: '11', exact: true })).toBeFocused()
 })
 
 test('컬럼 확대·축소·가로 스크롤·저장 후에도 행 선택이 동작하고 전체 보기 없이 내용을 표시한다', async ({
@@ -332,6 +331,7 @@ test('컬럼 확대·축소·가로 스크롤·저장 후에도 행 선택이 �
   expect((await header.boundingBox())!.width).toBeCloseTo(initial, 0)
   await table.getByRole('button', { name: '11', exact: true }).click()
   await expect(page.getByLabel('조치')).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: '닫기', exact: true }).click()
   const titleCell = table.getByRole('cell').filter({ hasText: '1,200% 한도 초과 계약의 긴 검증 사유와 상세 내용' })
   await expect(table.locator('summary, details')).toHaveCount(0)
   await expect(table.getByText('전체 보기', { exact: true })).toHaveCount(0)
@@ -342,21 +342,20 @@ test('컬럼 확대·축소·가로 스크롤·저장 후에도 행 선택이 �
   await page.screenshot({ path: testInfo.outputPath('resizable-columns.png'), fullPage: true })
 })
 
-test('모바일은 카드 세로 배치와 표 스크롤을 유지하고 데스크톱 복귀 시 비율을 복원한다', async ({ page }, testInfo) => {
-  const handle = page.getByRole('separator', { name: '예외 목록과 상세 카드 너비' })
-  await drag(page, handle, 140)
-  const ratio = await handle.getAttribute('aria-valuenow')
+test('모바일 예외 목록은 표 스크롤을 유지하고 상세 모달이 화면 안에 들어온다', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(handle).toBeHidden()
-  const panels = page.locator('.resizable-split-panel')
-  await expect.poll(() => panels.evaluateAll(([left, right]) =>
-    right.getBoundingClientRect().top - left.getBoundingClientRect().bottom,
-  )).toBeGreaterThanOrEqual(0)
+  // The tab strip recalculates its slot width in ResizeObserver after the viewport change.
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  const table = page.getByRole('table', { name: '예외 목록' })
+  expect(await table.locator('..').evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true)
+  await table.getByRole('button', { name: '11', exact: true }).click()
+  const modal = page.getByRole('dialog')
+  await expect(modal.getByLabel('조치')).toBeVisible()
+  const bounds = (await modal.boundingBox())!
+  expect(bounds.x).toBeGreaterThanOrEqual(0)
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(390)
   await page.screenshot({ path: testInfo.outputPath('mobile.png'), fullPage: true })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-  const viewport = page.getByRole('table', { name: '예외 목록' }).locator('..')
-  expect(await viewport.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  await modal.getByRole('button', { name: '닫기', exact: true }).click()
   await page.setViewportSize({ width: 1920, height: 1080 })
-  await expect(handle).toBeVisible()
-  await expect(handle).toHaveAttribute('aria-valuenow', ratio!)
+  await expect(table).toBeVisible()
 })

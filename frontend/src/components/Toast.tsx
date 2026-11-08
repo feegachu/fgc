@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { subscribeApiErrors } from '../lib/api/errorNotifications'
 import { useToastStore } from '../stores/toasts'
 import type { ToastMessage } from '../stores/toasts'
+import { ToastProgressSteps } from './ToastProgressSteps'
 const icons = {
   info: 'info',
   success: 'check_circle',
@@ -19,13 +20,14 @@ function Toast({ item }: { item: ToastMessage }) {
   }, [item.id, item.duration, close])
   const [title, ...details] = item.message.split(', ')
   return (
-    <div className={`toast toast-${item.tone}`} role={item.tone === 'error' ? 'alert' : 'status'} aria-atomic="true">
-      <span className="toast-icon" aria-hidden="true">
+    <div className={`toast toast-${item.tone}${item.progress ? ' toast-with-progress' : ''}`} role={item.tone === 'error' ? 'alert' : 'status'} aria-atomic="true">
+      {!item.progress && <span className="toast-icon" aria-hidden="true">
         <span className="material-symbols-rounded">{icons[item.tone]}</span>
-      </span>
+      </span>}
       <div className="toast-content">
         <p className="toast-message">{title}</p>
         {details.length > 0 && <p className="toast-message-detail">{details.join(', ')}</p>}
+        {item.progress && <ToastProgressSteps progress={item.progress} />}
       </div>
       <button data-guide-feature="components.toast.button" type="button" className="icon-button toast-close" aria-label="알림 닫기" onClick={() => close(item.id)}>
         <span className="material-symbols-rounded" aria-hidden="true">
@@ -45,11 +47,14 @@ export function ToastRegion() {
     [],
   )
   return createPortal(
-    <div className="toast-region" role="region" aria-label="알림" aria-live="polite">
-      {messages.map((item) => (
+    <><div className="toast-region" role="region" aria-label="알림" aria-live="polite">
+      {messages.filter(item => !item.progress).map((item) => (
         <Toast key={item.id} item={item} />
       ))}
-    </div>,
+    </div>
+    <div className="toast-region toast-progress-region" role="region" aria-label="검증 진행 알림" aria-live="polite">
+      {messages.filter(item => item.progress).map(item => <Toast key={item.id} item={item} />)}
+    </div></>,
     document.body,
   )
 }

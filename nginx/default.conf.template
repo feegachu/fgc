@@ -13,7 +13,7 @@ server {
 
     # 보안 헤더 값 (#677). SPA 는 인라인 스크립트·eval·외부 연결이 없고 폰트도 자체 호스팅이라 'self' 만 허용한다.
     # 아래 include(fgc.d)보다 먼저 둔다 — 운영 TLS 설정(00-tls.conf)이 $fgc_hsts 를 덮어쓴다.
-    set $fgc_csp "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
+    set $fgc_csp "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'";
     set $fgc_hsts "";
     include /etc/nginx/fgc-security-headers.conf;
 

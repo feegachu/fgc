@@ -7,12 +7,12 @@
   {
     "id": "app.shell.draft-navigation-guard.discard",
     "file": "app/shell/DraftNavigationGuard.tsx",
-    "element": "button"
+    "element": "Button"
   },
   {
     "id": "app.shell.draft-navigation-guard.keep",
     "file": "app/shell/DraftNavigationGuard.tsx",
-    "element": "button"
+    "element": "Button"
   },
   {
     "id": "app.shell.sidebar.button",
@@ -108,6 +108,16 @@
     "id": "clawback.evidence.source",
     "file": "features/clawback/ClawbackDetail.tsx",
     "element": "section"
+  },
+  {
+    "id": "clawback.pdf-viewer.open",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "clawback.pdf-viewer.refresh",
+    "file": "features/clawback/ClawbackDocuments.tsx",
+    "element": "Button"
   },
   {
     "id": "components.button.button",
@@ -650,6 +660,11 @@
     "element": "Link"
   },
   {
+    "id": "features.acquisition-cost.contract-acquisition-cost.results",
+    "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
+    "element": "Link"
+  },
+  {
     "id": "features.acquisition-cost.contract-acquisition-cost.select",
     "file": "features/acquisition-cost/ContractAcquisitionCost.tsx",
     "element": "select"
@@ -875,6 +890,16 @@
     "element": "textarea"
   },
   {
+    "id": "features.agent-statement-page.button-1",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.agent-statement-page.kpicard-2",
+    "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "KpiCard"
+  },
+  {
     "id": "features.agent-statement.agent-statement-page.agent-select",
     "file": "features/agent-statement/AgentStatementPage.tsx",
     "element": "select"
@@ -915,8 +940,13 @@
     "element": "select"
   },
   {
-    "id": "features.agent-statement.agent-statement-page.list-panel",
+    "id": "features.agent-statement.agent-statement-page.legacy-summary",
     "file": "features/agent-statement/AgentStatementPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.agent-statement.agent-statement-page.list-panel",
+    "file": "features/agent-statement/StatementResults.tsx",
     "element": "section"
   },
   {
@@ -943,6 +973,11 @@
     "id": "features.agent-statement.agent-statement-page.type-select",
     "file": "features/agent-statement/AgentStatementPage.tsx",
     "element": "select"
+  },
+  {
+    "id": "features.animated-run-checklist.button-1",
+    "file": "features/validation/AnimatedRunChecklist.tsx",
+    "element": "Button"
   },
   {
     "id": "features.arbitrage.arbitrage-amount-summary.button",
@@ -1250,6 +1285,26 @@
     "element": "select"
   },
   {
+    "id": "features.clawback-detail.button-1",
+    "file": "features/clawback/ClawbackDetail.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.clawback-page.button-1",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.clawback-page.button-2",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.clawback-page.button-3",
+    "file": "features/clawback/ClawbackPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.clawback.clawback-calculation.form",
     "file": "features/clawback/ClawbackCalculation.tsx",
     "element": "form"
@@ -1358,6 +1413,161 @@
     "id": "features.clawback.clawback-page.select-6",
     "file": "features/clawback/ClawbackPage.tsx",
     "element": "select"
+  },
+  {
+    "id": "features.columns.button-1",
+    "file": "features/clawback/columns.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.compare-modal.button-1",
+    "file": "features/reconciliation/CompareModal.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.contract-payment-cap-panel.section-1",
+    "file": "features/transaction/ContractPaymentCapPanel.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract-payment-cap-panel.table-2",
+    "file": "features/transaction/ContractPaymentCapPanel.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.contract-payment-form.button-11",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract-payment-form.button-12",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract-payment-form.button-13",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract-payment-form.button-14",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract-payment-form.button-21",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract-payment-form.button-23",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.contract-payment-form.button-24",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract-payment-form.button-25",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.contract-payment-form.input-10",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract-payment-form.input-18",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract-payment-form.input-20",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract-payment-form.input-5",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract-payment-form.input-6",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract-payment-form.input-8",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract-payment-form.input-9",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "input"
+  },
+  {
+    "id": "features.contract-payment-form.link-1",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.contract-payment-form.link-15",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "Link"
+  },
+  {
+    "id": "features.contract-payment-form.searchselect-19",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.contract-payment-form.searchselect-3",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "SearchSelect"
+  },
+  {
+    "id": "features.contract-payment-form.section-16",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract-payment-form.section-2",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract-payment-form.section-22",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.contract-payment-form.select-4",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract-payment-form.select-7",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "select"
+  },
+  {
+    "id": "features.contract-payment-form.table-17",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.contract-payment-form.table-26",
+    "file": "features/transaction/ContractPaymentForm.tsx",
+    "element": "table"
+  },
+  {
+    "id": "features.contract-status-history.button-1",
+    "file": "features/contract/ContractStatusHistory.tsx",
+    "element": "Button"
   },
   {
     "id": "features.contract.contract-detail-page.button",
@@ -1840,6 +2050,21 @@
     "element": "section"
   },
   {
+    "id": "features.exception-page.button-1",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception-page.button-2",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.exception-page.button-3",
+    "file": "features/exception/ExceptionPage.tsx",
+    "element": "Button"
+  },
+  {
     "id": "features.exception.action-panel.button",
     "file": "features/exception/ActionPanel.tsx",
     "element": "Button"
@@ -2066,7 +2291,7 @@
   },
   {
     "id": "features.ledger.ledger-page.section",
-    "file": "features/ledger/LedgerPage.tsx",
+    "file": "features/ledger/LedgerOverview.tsx",
     "element": "section"
   },
   {
@@ -2470,6 +2695,11 @@
     "element": "summary"
   },
   {
+    "id": "features.schedule-detail-page.button-1",
+    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "element": "button"
+  },
+  {
     "id": "features.schedule.schedule-detail-page.button",
     "file": "features/schedule/ScheduleDetailPage.tsx",
     "element": "Button"
@@ -2516,7 +2746,7 @@
   },
   {
     "id": "features.schedule.schedule-detail-page.link-2",
-    "file": "features/schedule/ScheduleDetailPage.tsx",
+    "file": "features/schedule/ScheduleLinesTable.tsx",
     "element": "Link"
   },
   {
@@ -2551,8 +2781,8 @@
   },
   {
     "id": "features.schedule.schedule-detail-page.table",
-    "file": "features/schedule/ScheduleDetailPage.tsx",
-    "element": "table"
+    "file": "features/schedule/ScheduleLinesTable.tsx",
+    "element": "div"
   },
   {
     "id": "features.schedule.schedule-detail-page.table-2",
@@ -2608,6 +2838,21 @@
     "id": "features.schedule.schedule-list-page.select-4",
     "file": "features/schedule/ScheduleListPage.tsx",
     "element": "select"
+  },
+  {
+    "id": "features.statement-explorer.button-1",
+    "file": "features/agent-statement/StatementExplorer.tsx",
+    "element": "button"
+  },
+  {
+    "id": "features.transaction-list-page.button-1",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "features.transaction-list-page.button-2",
+    "file": "features/transaction/TransactionListPage.tsx",
+    "element": "Button"
   },
   {
     "id": "features.transaction.attribution-editor.btn-add-attr",
@@ -2696,7 +2941,7 @@
   },
   {
     "id": "features.transaction.confirmation-panels.section",
-    "file": "features/transaction/ConfirmationPanels.tsx",
+    "file": "features/transaction/PrecheckResultPanel.tsx",
     "element": "section"
   },
   {
@@ -2930,6 +3175,11 @@
     "element": "select"
   },
   {
+    "id": "features.validation-run-list-page.input-1",
+    "file": "features/validation/ValidationRunListPage.tsx",
+    "element": "input"
+  },
+  {
     "id": "features.validation.finalize-dialogs.button",
     "file": "features/validation/FinalizeDialogs.tsx",
     "element": "Button"
@@ -3005,6 +3255,16 @@
     "element": "Button"
   },
   {
+    "id": "features.validation.validation-run-detail-page.legacy-checklist",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "section"
+  },
+  {
+    "id": "features.validation.validation-run-detail-page.legacy-checklist-link",
+    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "element": "Link"
+  },
+  {
     "id": "features.validation.validation-run-detail-page.link",
     "file": "features/validation/ValidationRunDetailPage.tsx",
     "element": "Link"
@@ -3016,7 +3276,7 @@
   },
   {
     "id": "features.validation.validation-run-detail-page.link-3",
-    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "file": "features/validation/AnimatedRunChecklist.tsx",
     "element": "Link"
   },
   {
@@ -3056,7 +3316,7 @@
   },
   {
     "id": "features.validation.validation-run-detail-page.section-7",
-    "file": "features/validation/ValidationRunDetailPage.tsx",
+    "file": "features/validation/AnimatedRunChecklist.tsx",
     "element": "section"
   },
   {
@@ -3105,6 +3365,106 @@
     "element": "select"
   },
   {
+    "id": "hierarchy.button-1",
+    "file": "components/HierarchyTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "hierarchy.button-2",
+    "file": "components/HierarchyTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "hierarchy.button-3",
+    "file": "components/HierarchyTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-1",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-2",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-3",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-4",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-5",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.contract-tree.button-6",
+    "file": "features/ledger/LedgerContractTree.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.all-entries",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.button-1",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.button-2",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.button-3",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "button"
+  },
+  {
+    "id": "ledger.explorer.correction",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.retry",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.reverse",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "Button"
+  },
+  {
+    "id": "ledger.explorer.section-1",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "section"
+  },
+  {
+    "id": "ledger.explorer.section-2",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "section"
+  },
+  {
+    "id": "ledger.explorer.section-3",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "section"
+  },
+  {
+    "id": "ledger.explorer.table-1",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "table"
+  },
+  {
     "id": "ledger.filter.input.contractno",
     "file": "features/ledger/LedgerPage.tsx",
     "element": "input"
@@ -3133,6 +3493,21 @@
     "id": "ledger.filter.select.type",
     "file": "features/ledger/LedgerPage.tsx",
     "element": "select"
+  },
+  {
+    "id": "ledger.kpi.balance",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "ledger.kpi.credit",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "KpiCard"
+  },
+  {
+    "id": "ledger.kpi.debit",
+    "file": "features/ledger/LedgerExplorer.tsx",
+    "element": "KpiCard"
   },
   {
     "id": "navigation.group.admin",

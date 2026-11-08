@@ -1,6 +1,6 @@
 import { plannedBasisPresentation, UPPER_BOUND_NOTE } from '../arbitrage/planned-basis'
 import { returnLink } from '../transaction/payment-entry'
-import { useRef } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { guideFeatureId } from '../assistant/feature-ids'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -41,6 +41,9 @@ import { ContractFacts, QueryContent } from './detailParts'
 import { arbitrageStatusLabels, paymentCycleLabels } from './labels'
 import { contractTabs as tabs } from './detailState'
 import type { ContractTab } from './detailState'
+import { contractTabDescriptions, contractTabIcons } from './detailState'
+
+const RevisedDetail = createContext(false)
 
 const text = (value: unknown) => (value == null || value === '' ? '-' : String(value))
 const stageLabel = (code?: string, label?: string) => responseLabel(label, PAYMENT_STAGE, code)
@@ -82,17 +85,59 @@ export function ContractTabs({
   active,
   onSelect,
   agentOnly = false,
+  revised = false,
 }: {
   id: string
   contract: ContractDetail
   active: ContractTab
   onSelect: (tab: ContractTab) => void
   agentOnly?: boolean
+  revised?: boolean
 }) {
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])
+  const previewRoot = useRef<HTMLDivElement>(null)
+  const [preview, setPreview] = useState<ContractTab | null>(null)
+  const activeRef = useRef(active)
+  useLayoutEffect(() => { activeRef.current = active }, [active])
+  useEffect(() => {
+    const root = previewRoot.current
+    if (!revised || !root) return
+    let timer: ReturnType<typeof setInterval> | undefined
+    const stop = () => { clearInterval(timer); setPreview(null) }
+    const start = () => {
+      clearInterval(timer)
+      setPreview(activeRef.current)
+      timer = setInterval(() => {
+        if (document.querySelector('[role="dialog"]')) return
+        setPreview(current => tabs[(tabs.findIndex(([name]) => name === (current ?? activeRef.current)) + 1) % tabs.length][0])
+      }, 3000)
+    }
+    root.addEventListener('fgc-contract-tabs-start', start)
+    root.addEventListener('fgc-contract-tabs-stop', stop)
+    return () => {
+      clearInterval(timer)
+      root.removeEventListener('fgc-contract-tabs-start', start)
+      root.removeEventListener('fgc-contract-tabs-stop', stop)
+    }
+  }, [revised])
+  const displayed = revised ? preview ?? active : active
+  useEffect(() => {
+    if (!revised) return
+    const button = tabButtons.current[tabs.findIndex(([name]) => name === displayed)]
+    const list = button?.parentElement
+    if (!button || !list) return
+    const current = button.getBoundingClientRect(), viewport = list.getBoundingClientRect()
+    const offset = current.right > viewport.right ? current.right - viewport.right
+      : current.left < viewport.left ? current.left - viewport.left : 0
+    if (offset) list.scrollBy({ left: offset, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  }, [displayed, revised])
+  const choose = (tab: ContractTab) => preview !== null ? setPreview(tab) : onSelect(tab)
   const visibleTabs = agentOnly ? tabs.filter(([name]) => name === 'basic') : tabs
   return (
-    <>
+    <RevisedDetail.Provider value={revised}>
+    <div className={revised ? 'contract-detail-workspace' : 'contract-detail-legacy-wrapper'}>
+    <div ref={previewRoot} className={revised ? 'contract-detail-primary' : 'contract-detail-legacy-wrapper'}
+      data-guide-target="contract.tabContent" data-guide-description={contractTabDescriptions[displayed]}>
       <div className="tab-list contract-detail-tabs" role="tablist" aria-label="계약 상세 영역">
         {visibleTabs.map(([name, label], index) => (
           <button data-guide-feature={guideFeatureId('contract.tab', name)}
@@ -104,10 +149,10 @@ export function ContractTabs({
             className="tab-button"
             role="tab"
             id={`contract-tab-${name}`}
-            aria-selected={active === name}
+            aria-selected={displayed === name}
             aria-controls={`contract-panel-${name}`}
-            tabIndex={active === name ? 0 : -1}
-            onClick={() => onSelect(name)}
+            tabIndex={displayed === name ? 0 : -1}
+            onClick={() => choose(name)}
             onKeyDown={(event) => {
               const next =
                 event.key === 'ArrowRight'
@@ -121,11 +166,11 @@ export function ContractTabs({
                         : null
               if (next == null) return
               event.preventDefault()
-              onSelect(visibleTabs[next][0])
+              choose(visibleTabs[next][0])
               tabButtons.current[next]?.focus()
             }}
           >
-            {label}
+            {revised && <span className="material-symbols-rounded" aria-hidden="true">{contractTabIcons[name]}</span>}{label}
           </button>
         ))}
       </div>
@@ -136,11 +181,11 @@ export function ContractTabs({
           role="tabpanel"
           aria-labelledby={`contract-tab-${name}`}
           tabIndex={0}
-          hidden={active !== name}
+          hidden={displayed !== name}
           data-guide-target={name === 'schedules' ? 'contract.schedules' : undefined}
           className={`surface contract-detail-panel ${['basic', 'schedules', 'cap', 'payment'].includes(name) ? 'contract-basic-card' : ''}`}
         >
-          {active === name &&
+          {displayed === name &&
             (name === 'basic' ? (
               <BasicTab id={id} contract={contract} />
             ) : name === 'schedules' ? (
@@ -154,7 +199,7 @@ export function ContractTabs({
                 <PanelHeading title="계약체결비용 한도">
                   선지급과 유지관리 예정 금액을 계약체결비용 한도와 각각 비교합니다.
                 </PanelHeading>
-                <ContractAcquisitionCost contractId={id} contractNo={contract.contractNo} />
+                <ContractAcquisitionCost contractId={id} contractNo={contract.contractNo} concise={revised} />
               </>
             ) : name === 'ledger' ? (
               <LedgerTab id={id} />
@@ -163,33 +208,38 @@ export function ContractTabs({
             ))}
         </section>
       ))}
-    </>
+    </div>
+    {revised && <aside className="contract-detail-status"><ContractStatusHistory id={id} compact /></aside>}
+    </div>
+    </RevisedDetail.Provider>
   )
 }
 
 function PanelHeading({ title, children, legacy = false }: { title: string; children: ReactNode; legacy?: boolean }) {
+  const revised = useContext(RevisedDetail)
   return (
     <header className={`surface-header ${legacy ? 'contract-basic-header contract-lazy-panel-header' : ''}`}>
       <div>
         <h2 className="surface-title">{title}</h2>
-        <p>{children}</p>
+        {!revised && <p>{children}</p>}
       </div>
     </header>
   )
 }
 
 function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
+  const revised = useContext(RevisedDetail)
   return (
     <>
       <header className="surface-header contract-basic-header">
-        <h2 className="surface-title">계약 기본정보</h2>
-        <p className="contract-lazy-note" role="status">
+        <h2 id={revised ? 'contract-information-title' : undefined} className="surface-title">계약 기본정보</h2>
+        {!revised && <p className="contract-lazy-note" role="status">
           계약 정보를 불러왔습니다.
-        </p>
+        </p>}
       </header>
       <div className="contract-basic-layout">
         <section data-guide-feature="features.contract.contract-tabs.section-2" className="contract-information-panel" aria-labelledby="contract-information-title">
-          <h3 id="contract-information-title">계약 정보</h3>
+          {!revised && <h3 id="contract-information-title">계약 정보</h3>}
           <ContractFacts
             className="contract-information-grid"
             items={[
@@ -210,9 +260,9 @@ function BasicTab({ id, contract }: { id: string; contract: ContractDetail }) {
             ]}
           />
         </section>
-        <div className="contract-side-panels">
+        {!revised && <div className="contract-side-panels">
           <ContractStatusHistory id={id} />
-        </div>
+        </div>}
       </div>
     </>
   )
@@ -234,6 +284,10 @@ const scheduleColumns: TableColumn<ScheduleLine>[] = [
     ),
   },
 ]
+const revisedScheduleColumns: TableColumn<ScheduleLine>[] = [
+  ['installment', '60px'], ['amount', '120px'], ['recipient', '90px'],
+  ['item', '140px'], ['dueDate', '110px'], ['status', '90px'],
+].map(([key, width]) => ({ ...scheduleColumns.find(column => column.key === key)!, width }))
 function SchedulesTab({ id }: { id: string }) {
   return (
     <>
@@ -251,6 +305,7 @@ function SchedulesTab({ id }: { id: string }) {
 }
 
 function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA_TO_FC' }) {
+  const revised = useContext(RevisedDetail)
   const query = useQuery(contractSchedulesQuery(id, stage))
   const location = useLocation()
   return (
@@ -266,7 +321,7 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
                     ? `버전 ${data.headers[0].scheduleVersionNo ?? '-'}, ${int(data.headers[0].installmentCount)}회차`
                     : '생성된 스케줄이 없습니다.'}
                 </p>
-                {data.headers?.[0]?.schedulePurpose === 'SIMULATION' && (
+                {!revised && data.headers?.[0]?.schedulePurpose === 'SIMULATION' && (
                   <p>예정 결과 · 지급 확정 대상이 아닙니다.</p>
                 )}
               </div>
@@ -284,8 +339,12 @@ function ScheduleStage({ id, stage }: { id: string; stage: 'INSURER_TO_GA' | 'GA
             <DataTable
               viewportClassName="contract-tab-viewport"
               caption={`${PAYMENT_STAGE[stage]} 예상 스케줄`}
-              columns={scheduleColumns}
-              rows={data.lines ?? []}
+              columns={revised ? revisedScheduleColumns.map(column => stage === 'INSURER_TO_GA' && column.key === 'recipient'
+                ? { ...column, render: (row: ScheduleLine) => <Text value={row.recipientName?.trim() && row.recipientName.trim() !== '-' ? row.recipientName : 'GA'} /> }
+                : column) : scheduleColumns}
+              rows={revised ? [...(data.lines ?? [])].sort((a, b) =>
+                (a.installmentNo ?? Number.MAX_SAFE_INTEGER) - (b.installmentNo ?? Number.MAX_SAFE_INTEGER)
+                || (a.lineNo ?? 0) - (b.lineNo ?? 0)) : data.lines ?? []}
               rowKey={(row) => String(row.scheduleLineId ?? row.lineNo ?? data.lines!.indexOf(row))}
               emptyMessage="조회된 스케줄 회차가 없습니다."
             />
@@ -422,6 +481,7 @@ const arbitrageColumns: TableColumn<ContractArbitrageCheck>[] = [
         <>
           <Amount value={row.plannedCommissionAmount} />
           <small style={{ display: 'block' }}>{basis.label}</small>
+          <small className="contract-basis-explanation">{basis.description}</small>
         </>
       )
     },

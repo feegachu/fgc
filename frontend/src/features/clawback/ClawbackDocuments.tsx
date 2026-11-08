@@ -1,13 +1,17 @@
-import { useRef, useState } from 'react'
+import { useContext, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { DisabledButtonHint } from '../../components/DisabledButtonHint'
+import { ClawbackActionPlacement } from './actionPlacement'
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/Button'
+import { PdfViewer } from '../../components/PdfViewer'
 import { DataTable } from '../../components/DataTable'
 import { ListPagination } from '../../components/ListPagination'
 import { ApiError } from '../../lib/api/client'
 import { dateTime, int } from '../../lib/format'
 import { QueryState } from '../reference/ReferenceUI'
 import { Amount } from './badges'
-import { downloadNotice, issueNotice, noticeHistoryKey, noticeHistoryQuery } from './api'
+import { downloadNotice, readNoticePdf, issueNotice, noticeHistoryKey, noticeHistoryQuery } from './api'
 import type { CandidateDetail, NoticeDocument } from './api'
 
 const writers = ['SETTLEMENT', 'GA_ADMIN', 'SYSTEM_ADMIN']
@@ -21,6 +25,7 @@ type Props = {
   roleCode?: string
   refreshing: boolean
   onRefresh: () => Promise<unknown>
+  compact?: boolean
 }
 const isStatus = (error: unknown, status: number) => error instanceof ApiError && error.status === status
 
@@ -29,7 +34,8 @@ export function ClawbackDocuments(props: Props) {
   if (!props.roleCode || ![...writers, 'COMPLIANCE'].includes(props.roleCode)) return null
   return <NoticePanel {...props} />
 }
-function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
+function NoticePanel({ detail, roleCode, refreshing, onRefresh, compact = false }: Props) {
+  const placement = useContext(ClawbackActionPlacement)
   const candidate = detail.candidate
   const calculation = detail.latestCalculation
   const caseId = candidate?.clawbackCaseId ?? calculation?.clawbackCaseId
@@ -63,8 +69,10 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
     meta: { errorToast: false },
   })
   const [downloadError, setDownloadError] = useState<Error | null>(null)
+  const [viewer, setViewer] = useState<{ blob: Blob; filename: string } | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
   const downloadLock = useRef(false)
+  const viewerTrigger = useRef<HTMLButtonElement | null>(null)
   const denied = [history.error, issue.error, downloadError].some((error) => isStatus(error, 403))
   const conflict = isStatus(issue.error, 409) && (issue.error as ApiError).code !== 'FGC-IMPL-REQUEST_IN_PROGRESS'
   const current = Boolean(
@@ -82,7 +90,8 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
     if (actionLock.current || blocked || !canIssue) return
     actionLock.current = true
     try {
-      await issue.mutateAsync()
+      const issued = compact ? issue.data ?? history.data?.content?.find(row => row.calculationVersion === calculation?.calculationVersion) ?? await issue.mutateAsync() : await issue.mutateAsync()
+      if (compact || placement.revised) await download(issued)
     } catch {
       /* 화면에 실패를 표시하고 같은 시도를 재시도하도록 멱등키를 보존한다. */
     } finally {
@@ -95,7 +104,8 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
     setDownloading(`${row.documentNo}:${row.version}`)
     setDownloadError(null)
     try {
-      await downloadNotice(row)
+      if (compact) setViewer(await readNoticePdf(row))
+      else await downloadNotice(row)
     } catch (error) {
       setDownloadError(error instanceof Error ? error : new Error('다운로드에 실패했습니다.'))
     } finally {
@@ -107,6 +117,37 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
     await Promise.all([onRefresh(), caseId != null ? history.refetch() : Promise.resolve()])
     issue.reset()
     setDownloadError(null)
+  }
+  const issueReason = !canIssue ? 'PDF 발행 권한이 없습니다.' : issuing || downloading ? 'PDF를 준비하고 있습니다.'
+    : !calculation ? '환수액을 먼저 계산하세요.' : !current ? '현재 원천으로 환수액을 다시 계산하세요.'
+      : conflict ? '최신 근거를 다시 조회한 뒤 발행하세요.' : history.error ? '발행 이력을 다시 조회하세요.'
+        : '최신 발행 조건을 확인하고 있습니다.'
+  const issueButton = canIssue && <DisabledButtonHint disabled={blocked || !!downloading} reason={issueReason}>
+    <Button data-guide-feature="clawback.documents.issue" loading={issuing || !!downloading} disabled={blocked || !!downloading} onClick={() => void generate()}>
+      {placement.revised ? issuing || downloading ? 'PDF 준비 중…' : 'PDF 출력' : issuing ? 'PDF 생성 중…'
+        : hasAttempt ? '발행 재시도' : history.data?.totalElements || issue.data ? '재발행' : 'PDF 생성'}
+    </Button>
+  </DisabledButtonHint>
+  if (compact) {
+    const existing = history.data?.content?.find(row => row.calculationVersion === calculation?.calculationVersion)
+    const disabled = blocked || !!downloading || (!canIssue && !existing) || denied
+    const reason = denied ? '문서를 조회할 권한이 없습니다.' : !canIssue && !existing ? '계산 담당자가 PDF를 준비한 후 조회할 수 있습니다.' : issueReason
+    return <div className="claw-pdf-action">
+      <DisabledButtonHint disabled={disabled} reason={reason}>
+        <Button data-guide-feature="clawback.pdf-viewer.open" variant="secondary" loading={issuing || !!downloading} disabled={disabled}
+          onClick={event => { viewerTrigger.current = event.currentTarget; void (canIssue ? generate() : existing && download(existing)) }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" />
+            <path d="M6.5 17v-5H8a1.25 1.25 0 0 1 0 2.5H6.5M11 12v5h1a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2zM16.5 17v-5H19m-2.5 2.5h2" />
+          </svg>PDF 출력하기
+        </Button>
+      </DisabledButtonHint>
+      {(issue.error || downloadError || history.error) && <div className="claw-pdf-error" role="alert">
+        <p>{denied ? 'PDF 조회 권한이 없습니다.' : conflict ? '계산 근거가 바뀌었습니다. 다시 조회하고 계산해 주세요.' : downloadError ? 'PDF를 불러오지 못했습니다. 다시 눌러 재시도하세요.' : 'PDF를 준비하지 못했습니다. 같은 요청으로 다시 시도하세요.'}</p>
+        {!denied && (conflict || history.error) && <Button data-guide-feature="clawback.pdf-viewer.refresh" variant="ghost" onClick={() => void refresh()}>다시 조회</Button>}
+      </div>}
+      {viewer && <PdfViewer file={viewer} onClose={() => { setViewer(null); requestAnimationFrame(() => { if (viewerTrigger.current?.isConnected) viewerTrigger.current.focus() }) }} />}
+    </div>
   }
   return (
     <section
@@ -148,22 +189,7 @@ function NoticePanel({ detail, roleCode, refreshing, onRefresh }: Props) {
         </p>
       ) : null}
       <div className="claw-calculation-actions">
-        {canIssue && (
-          <Button
-            data-guide-feature="clawback.documents.issue"
-            loading={issuing}
-            disabled={blocked}
-            onClick={() => void generate()}
-          >
-            {issuing
-              ? 'PDF 생성 중…'
-              : hasAttempt
-                ? '발행 재시도'
-                : history.data?.totalElements || issue.data
-                  ? '재발행'
-                  : 'PDF 생성'}
-          </Button>
-        )}
+        {placement.revised ? placement.document && createPortal(issueButton, placement.document) : issueButton}
         <Button
           data-guide-feature="clawback.documents.refresh"
           variant="secondary"

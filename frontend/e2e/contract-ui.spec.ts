@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 const contract = {
   contractId: 1,
@@ -22,7 +23,180 @@ const contract = {
   paymentTermMonths: 120,
   updatedAt: '2026-07-01T00:00:00.123456Z',
 }
-async function fixture(page: Page, canProcess = true, totalPages = 1) {
+
+test('계약 안내는 날짜·보험사·상품 선택을 이어주고 입력과 버튼을 가리지 않는다', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await fixture(page)
+  await page.goto('contracts/new?month=2026-07')
+  const writes: string[] = []
+  page.on('request', request => { if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url()) })
+  const form = page.locator('[data-guide-target="contract.form"]')
+  await expect(form).toBeVisible()
+  await expect(form.locator('.contract-editor-basic [name]').evaluateAll(nodes => nodes.slice(0, 4).map(node => node.getAttribute('name'))))
+    .resolves.toEqual(['contractDate', 'insurerId', 'productOfferingId', 'contractNo'])
+  await expect(page.getByText('월납환산 초회보험료의 12배입니다. 예: 10만원 × 12 = 120만원', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const guide = page.locator('.screen-step-guide')
+  await expect(guide.getByRole('heading', { name: '계약일', exact: true })).toBeVisible()
+  const calendar = page.getByRole('group', { name: '계약일 달력' })
+  await expect(calendar).toBeVisible()
+  await expect.poll(async () => (await guide.boundingBox())!.x > (await calendar.boundingBox())!.x + (await calendar.boundingBox())!.width).toBe(true)
+  // Choosing the displayed date also advances; do not require a value change.
+  await calendar.locator('[aria-pressed="true"]').click()
+  await expect(guide.getByRole('heading', { name: '보험회사 선택', exact: true })).toBeVisible()
+  await page.getByRole('listbox', { name: '보험회사 선택 목록' }).getByRole('option', { name: /시연 보험사/ }).click()
+  await expect(guide.getByRole('heading', { name: '상품 판매버전', exact: true })).toBeVisible()
+  await page.getByRole('option', { name: /시연 상품/ }).click()
+  await expect(guide.getByRole('heading', { name: '계약번호', exact: true })).toBeVisible()
+  await expect(form.locator('[name="productOfferingId"]')).toHaveAttribute('data-selected-value', '7')
+  await form.locator('[name="contractNo"]').fill('GUIDE-KEEP')
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await page.getByRole('listbox', { name: '계약상태 선택 목록' }).getByRole('option', { name: '정상', exact: true }).click()
+  await expect(guide.getByRole('heading', { name: '모집 설계사와 소속 조직' })).toBeVisible()
+  const agent = form.locator('[name="agentId"]')
+  await expect(agent).toBeFocused()
+  await expect.poll(async () => {
+    const coach = await guide.boundingBox(), field = await agent.boundingBox()
+    return Boolean(coach && field && coach.y + coach.height < field.y)
+  }).toBe(true)
+  await page.screenshot({ path: 'test-results/contract-guide-agent.png' })
+  await page.getByRole('option', { name: /시연 설계사/ }).click()
+  await expect(guide.getByRole('heading', { name: '보험료와 납입 조건' })).toBeVisible()
+  await expect.poll(async () => {
+    const coach = await guide.boundingBox(), field = await page.locator('.contract-editor-premium').boundingBox()
+    return Boolean(coach && field && coach.x + coach.width < field.x)
+  }).toBe(true)
+  await form.locator('[name="monthlyEquivalentFirstPremium"]').fill('100000')
+  await expect(page.getByText('월납환산 초회보험료 100,000원 × 12 = 1,200,000원', { exact: true })).toBeVisible()
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await expect(guide.getByRole('heading', { name: '계약 저장' })).toBeVisible()
+  await expect.poll(async () => {
+    const coach = await guide.boundingBox(), actions = await page.locator('.contract-action-buttons').boundingBox()
+    return Boolean(coach && actions && coach.x + coach.width < actions.x)
+  }).toBe(true)
+  await page.screenshot({ path: 'test-results/contract-guide-save.png' })
+  await guide.getByRole('button', { name: '안내 마치기' }).click()
+  await expect(page.locator('[data-guide-picker]')).toHaveCount(0)
+  await expect(form.locator('[name="contractNo"]')).toHaveValue('GUIDE-KEEP')
+  expect(writes).toEqual([])
+})
+
+for (const viewport of [{ width: 1440, height: 900 }, { width: 1366, height: 768 }]) {
+  test(`보험계약 등록은 입력과 저장 버튼이 한 화면에 들어온다 (${viewport.width})`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await fixture(page)
+    await page.goto('contracts/new?month=2026-07')
+    const save = page.getByRole('button', { name: '저장하고 예상 스케줄 만들기', exact: true })
+    await expect(save).toBeVisible()
+    await expect.poll(async () => {
+      const box = await save.boundingBox()
+      return Boolean(box && box.y >= 0 && box.y + box.height <= viewport.height)
+    }).toBe(true)
+    await expect(page.getByRole('heading', { name: '보험계약 등록', exact: true })).toBeInViewport()
+    await expect(page.getByLabel('납입기간(개월)', { exact: false })).toBeInViewport()
+    await page.screenshot({ path: `test-results/contract-form-compact-${viewport.width}.png` })
+  })
+}
+
+test('모바일 보험계약 목록 도움말도 단계마다 두 줄로 표시한다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await fixture(page)
+  await page.goto('contracts?month=2026-07')
+  await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 3)
+})
+
+test('수정 후 계약 목록은 상단을 유지하고 입력·탭별 상세 도움말도 끝까지 읽는다', async ({ page }) => {
+  test.setTimeout(60_000) // Three screens, including the intentionally slower spotlight transitions.
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await fixture(page, true, 1, 20)
+  await page.goto('contracts?month=2026-07')
+  await expect(page.locator('tbody tr')).toHaveCount(20)
+  await chooseDetailedHelp(page)
+  const help = page.getByRole('button', { name: '도움말', exact: true })
+  const top = await page.evaluate(() => scrollY)
+  await help.click()
+  const guide = page.locator('.screen-step-guide')
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await expect(guide.getByRole('heading', { name: '계약 목록 읽기' })).toBeVisible()
+  await expect.poll(async () => {
+    const table = page.locator('[aria-labelledby="contract-results-title"] table')
+    const anchor = await table.locator('thead').boundingBox()
+    const thirdRow = await table.locator('tbody tr').nth(2).boundingBox()
+    const highlight = await page.locator('.screen-step-spotlight').boundingBox()
+    return Boolean(anchor && thirdRow && highlight && Math.abs(highlight.y - anchor.y + 10) < 2
+      && Math.abs(highlight.y + highlight.height - thirdRow.y - thirdRow.height - 10) < 2)
+  }).toBe(true)
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(top)
+  await page.screenshot({ path: 'test-results/help-list-top-anchor.png' })
+  await expect(page.locator('.screen-step-spotlight')).toHaveCSS('transition-duration', '0.7s, 0.7s, 0.7s, 0.7s')
+  await guide.getByRole('button', { name: '종료', exact: true }).click()
+  await page.getByRole('link', { name: '신규 등록', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '보험계약 등록' })).toBeVisible()
+  await page.locator('[name="contractNo"]').fill('HELP-DRAFT')
+  const writes: string[] = []
+  page.on('request', request => { if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url()) })
+  const titles = await readDetailedHelp(page, help, 8)
+  expect(titles).toContain('계약 저장')
+  await expect(page.locator('[name="contractNo"]')).toHaveValue('HELP-DRAFT')
+  expect(writes).toEqual([])
+  await page.goto('contracts/1?month=2026-07')
+  await expect(page.locator('.contract-summary-number')).toHaveText('CONT-UI-001')
+  await chooseDetailedHelp(page)
+  expect(await readDetailedHelp(page, help, 4)).toContain('계약 상태와 변경 이력')
+  await page.getByRole('tab', { name: '지급/대사' }).click()
+  expect(await readDetailedHelp(page, help, 3)).toContain('계약 상세 탭')
+})
+test('기본 도움말은 현재 계약 목록을 짚고 입력을 보존한다', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await fixture(page)
+  await page.goto('contracts?month=2026-07')
+  const filter = page.locator('[data-guide-target="contract.filters"]')
+  await filter.getByLabel('계약번호', { exact: true }).fill('HELP-KEEP')
+  const writes: string[] = []
+  page.on('request', request => {
+    if (/POST|PUT|PATCH|DELETE/.test(request.method()) && !request.url().includes('/auth/')) writes.push(request.url())
+  })
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  const help = page.getByRole('region', { name: '보험계약 목록 도움말' })
+  await expect(help.getByRole('heading', { name: '계약 조회 조건' })).toBeVisible()
+  await expect(help.getByRole('button', { name: '다음', exact: true })).toBeEnabled()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.screenshot({ path: 'test-results/help-contract-desktop.png' })
+  await page.keyboard.press('Escape')
+  await expect(filter.getByLabel('계약번호', { exact: true })).toHaveValue('HELP-KEEP')
+  await expect(page.getByRole('button', { name: '도움말', exact: true })).toBeFocused()
+  expect(writes).toEqual([])
+})
+test('도움말은 목록이 길어도 첫 프레임에 열리고 바로 닫거나 다시 열 수 있다', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await fixture(page, true, 1, 20)
+  await page.goto('contracts?month=2026-07')
+  await expect(page.locator('tbody tr')).toHaveCount(20)
+  const firstFrame = await page.evaluate(async () => {
+    const trigger = document.querySelector<HTMLButtonElement>('.screen-help-trigger')!
+    const start = performance.now()
+    const painted = new Promise<{ elapsed: number; open: boolean }>(resolve => {
+      requestAnimationFrame(() => resolve({
+        elapsed: performance.now() - start,
+        open: Boolean(document.querySelector('.screen-step-guide')),
+      }))
+    })
+    trigger.click()
+    return painted
+  })
+  console.log('Help first frame', firstFrame)
+  expect(firstFrame.open).toBe(true)
+  expect(firstFrame.elapsed).toBeLessThan(500)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  const previewStart = Date.now()
+  await page.getByRole('button', { name: '도움말', exact: true }).click()
+  await expect(page.locator('.screen-step-count')).toHaveText('화면 요소 안내 · 1/3')
+  console.log('Help preview ready after reopen', Date.now() - previewStart, 'ms')
+  await expect(page.getByRole('region', { name: '보험계약 목록 도움말' })).toHaveCount(1)
+})
+async function fixture(page: Page, canProcess = true, totalPages = 1, rowCount = 1) {
   const envelope = (data: unknown) => ({ data, error: null, requestId: 'contract-browser' })
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
@@ -66,7 +240,7 @@ async function fixture(page: Page, canProcess = true, totalPages = 1) {
     }
     if (path.endsWith('/contracts'))
       return route.fulfill({
-        json: envelope({ content: [contract], page: 1, size: 20, totalPages, totalElements: totalPages > 1 ? 21 : 1 }),
+        json: envelope({ content: Array.from({ length: rowCount }, (_, index) => ({ ...contract, contractId: index + 1 })), page: 1, size: 20, totalPages, totalElements: totalPages > 1 ? 21 : rowCount }),
       })
     if (path.endsWith('/schedules'))
       return route.fulfill({
@@ -182,10 +356,10 @@ test('계약 직접 진입·새로고침·두 스케줄·409 입력 보존·수�
   await expect(save).toBeDisabled()
   await page.getByRole('link', { name: '취소', exact: true }).click()
   await expect(page.getByRole('dialog', { name: '저장하지 않은 입력이 있습니다' })).toBeVisible()
-  await page.getByRole('button', { name: '현재 입력 유지하고 돌아가기' }).click()
+  await page.getByRole('button', { name: '돌아가기' }).click()
   await expect(page.getByPlaceholder('계약번호 입력')).toHaveValue('CONT-UI-EDIT')
   await page.getByRole('link', { name: '취소', exact: true }).click()
-  await page.getByRole('button', { name: '입력을 버리고 이동' }).click()
+  await page.getByRole('button', { name: '이동' }).click()
   await expect(page.getByRole('heading', { name: '보험계약 목록' })).toBeVisible()
 })
 
@@ -331,4 +505,81 @@ test('페이지네이션은 현재 페이지 hover 색상과 비활성 화살표
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await expect(arrow).toHaveCSS('background-color', background)
   }
+})
+
+
+test('전체 업무 가이드의 계약 상세 다음 단계는 카드와 다음 버튼 위치를 유지한다', async ({ page }, info) => {
+  await fixture(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?month=2026-07')
+  await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
+  await page.getByRole('button', { name: /계약 생성부터 시작/ }).click()
+  await expect(page).toHaveURL(/contracts\/new/)
+  await expect(page.getByRole('complementary', { name: '전체 업무 가이드' })).toHaveAttribute('aria-busy', 'false')
+  const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
+  expect((await guide.boundingBox())!.x).toBeGreaterThan(1440 / 2)
+  // Simulate the route transition after saving, keeping the shell guide mounted.
+  await page.evaluate(() => { history.pushState({}, '', '/contracts/1?month=2026-07'); window.dispatchEvent(new PopStateEvent('popstate')) })
+  await expect(guide.getByRole('heading', { name: '선택한 계약 확인' })).toBeVisible()
+  const next = guide.getByRole('button', { name: '다음', exact: true })
+  await expect(next).toBeEnabled()
+  const before = await guide.boundingBox(), buttonBefore = await next.boundingBox()
+  expect(before!.x).toBeGreaterThan(1440 / 2)
+  await page.screenshot({ path: info.outputPath('workflow-fixed-before.png') })
+  await next.click()
+  await expect(guide.getByRole('heading', { name: '계약에서 이어지는 작업' })).toBeVisible()
+  await expect.poll(async () => JSON.stringify(await guide.boundingBox())).toBe(JSON.stringify(before))
+  const buttonAfter = await next.boundingBox()
+  expect(Math.abs(buttonAfter!.x - buttonBefore!.x)).toBeLessThanOrEqual(1)
+  expect(Math.abs(buttonAfter!.y - buttonBefore!.y)).toBeLessThanOrEqual(1)
+  await page.screenshot({ path: info.outputPath('workflow-fixed-after.png') })
+  await next.click()
+  await expect(guide.getByRole('heading', { name: '계약 상세 탭', exact: true })).toBeVisible()
+  expect((await guide.boundingBox())!.x).toBeGreaterThan(1440 / 2)
+  await next.click()
+  await expect(guide.getByRole('heading', { name: '계약 상태와 변경 이력', exact: true })).toBeVisible()
+  await expect.poll(async () => {
+    const coach = await guide.boundingBox(), history = await page.locator('[data-guide-target="contract.statusHistory"]').boundingBox()
+    return !!coach && !!history && coach.x + coach.width < history.x
+  }).toBe(true)
+  await expect(page.locator('[data-guide-target="contract.statusHistory"]').getByText('해지', { exact: true })).toBeVisible({ timeout: 10000 })
+  expect((await guide.boundingBox())!.x).toBeLessThan(1440 / 2)
+  await page.screenshot({ path: info.outputPath('workflow-history-left.png') })
+})
+
+
+test('전체 업무 가이드는 보험료 입력부터 왼쪽에서 안내한다', async ({ page }, info) => {
+  await fixture(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?month=2026-07')
+  await page.getByRole('button', { name: '전체 업무 가이드', exact: true }).click()
+  await page.getByRole('button', { name: /계약 생성부터 시작/ }).click()
+  const guide = page.getByRole('complementary', { name: '전체 업무 가이드' })
+  await expect(guide).toHaveAttribute('aria-busy', 'false')
+  const calendar = page.getByRole('group', { name: '계약일 달력' })
+  await expect.poll(async () => (await guide.boundingBox())!.x > (await calendar.boundingBox())!.x + (await calendar.boundingBox())!.width).toBe(true)
+  await calendar.locator('[aria-pressed="true"]').click()
+  await page.getByRole('listbox', { name: '보험회사 선택 목록' }).getByRole('option', { name: /시연 보험사/ }).click()
+  await page.getByRole('option', { name: /시연 상품/ }).click()
+  await expect(guide.getByRole('heading', { name: '계약번호', exact: true })).toBeVisible()
+  await page.locator('[name="contractNo"]').fill('GUIDE-POSITION')
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await page.getByRole('listbox', { name: '계약상태 선택 목록' }).getByRole('option', { name: '정상', exact: true }).click()
+  await page.getByRole('option', { name: /시연 설계사/ }).click()
+  await expect(guide.getByRole('heading', { name: '보험료와 납입 조건' })).toBeVisible()
+  await expect.poll(async () => {
+    const coach = await guide.boundingBox(), premium = await page.locator('.contract-editor-premium').boundingBox()
+    return !!coach && !!premium && coach.x + coach.width < premium.x
+  }).toBe(true)
+  const leftPosition = await guide.boundingBox()
+  await page.screenshot({ path: info.outputPath('workflow-premium-left.png') })
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await guide.getByRole('button', { name: '다음', exact: true }).click()
+  await expect(guide.getByRole('heading', { name: '계약 저장', exact: true })).toBeVisible()
+  expect(await guide.boundingBox()).toEqual(leftPosition)
+  await expect(guide.getByRole('button', { name: '다음 업무', exact: true })).toBeDisabled()
+  await guide.locator('.disabled-button-hint').hover()
+  await expect(guide.getByRole('tooltip')).toHaveText('‘저장하고 예상 스케줄 만들기’를 먼저 눌러주세요.')
 })

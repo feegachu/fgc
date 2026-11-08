@@ -147,8 +147,9 @@ function ActionForm({ item, onStarted }: { item: ExceptionCase; onStarted: () =>
   const valid = actions.some(action => action.type === actionType) && Boolean(reason.trim()) && reason.trim().length <= 1000
   const context = JSON.stringify([item.exceptionCaseId, item.status, actionType, reason, evidenceRef])
   useEffect(() => { saveGuide.update(context, valid) }, [saveGuide, context, valid])
-  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]))
+  const clearUnsaved = useUnsavedWork(Boolean(actionType || reason || evidenceRef), JSON.stringify([actionType, reason, evidenceRef]), `exception:${item.exceptionCaseId}:`)
   const mutation = useMutation({
+    mutationKey: ['exception', 'write', item.exceptionCaseId],
     mutationFn: () => { saveGuide.begin(); return postAction(item.exceptionCaseId!, { actionType, reason, evidenceRef }) },
     meta: { errorToast: false },
     onSuccess: async (action) => {

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { chooseDetailedHelp, readDetailedHelp } from './screenHelp'
 
 for (const seven of [false, true]) {
   const regime = seven ? 'SEVEN_YEAR_2029' : 'FOUR_YEAR_2027'
@@ -90,6 +91,8 @@ for (const seven of [false, true]) {
       await route.fulfill({ json: envelope(data) })
     })
     await page.goto('/schedules')
+    await chooseDetailedHelp(page)
+    await readDetailedHelp(page, page.getByRole('button', { name: '도움말', exact: true }), 2)
     await page.getByLabel('적용 체계', { exact: true }).selectOption(regime)
     await expect(page).toHaveURL(new RegExp(`regime=${regime}`))
     await expect(page.getByLabel('용도', { exact: true })).toHaveValue('SIMULATION')
@@ -98,6 +101,8 @@ for (const seven of [false, true]) {
     await expect(page.locator('a[href*="/transactions/new"]')).toHaveCount(0)
     await expect(page.getByText(seven ? '2036-02-02' : '2031-02-02', { exact: true }).first()).toBeVisible()
     await page.getByLabel('생성 사유', { exact: true }).fill('승인 정책 반영')
+    await readDetailedHelp(page, page.locator('[data-guide-feature="schedule.preview.region"]').getByRole('button', { name: '도움말', exact: true }), 3)
+    await expect(page.getByLabel('생성 사유', { exact: true })).toHaveValue('승인 정책 반영')
     await page.getByRole('button', { name: `${years} 예정 새 버전 만들기`, exact: true }).click()
     await expect(page).toHaveURL(/\/schedules\/12/)
     await page.getByRole('link', { name: '목록으로', exact: true }).click()
